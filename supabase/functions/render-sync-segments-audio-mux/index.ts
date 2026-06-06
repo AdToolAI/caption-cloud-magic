@@ -87,7 +87,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, clip_url",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, clip_url, lock_reference_url, reference_image_url",
       )
       .eq("id", sceneId)
       .single();
@@ -181,43 +181,45 @@ serve(async (req) => {
     const isFanout = donePasses.length >= 2;
     const useOverlay = isFanout || (donePasses.length >= 1 && anyTight);
     const sourcePlateUrl = String((state as any).source_clip_url ?? "");
-    const masterVideoUrlForMux = useOverlay && sourcePlateUrl ? sourcePlateUrl : finalLipsyncUrl;
-    // Face-mask radius: smaller for crowded scenes; uses smaller plate axis
-    // so the circle never exceeds the frame. ~22% of min-axis for 2 speakers,
-    // scales down for 3 (≈18%) and 4 (≈15%). Single-speaker overlay uses 28%
-    // because there is no other face to compete with.
+
+    // v72 — For multi-speaker fan-out we prefer the STATIC anchor image as
+    // the background plate. The i2v master can drift / cut to a single
+    // person mid-scene, hiding speakers 3/4. The static anchor composition
+    // keeps every face in frame; per-pass single-face preclips overlay the
+    // lip-sync on top. Single-speaker tight-overlay path keeps the video
+    // master (no drift problem with only 1 face).
+    const anchorImageUrl = String(
+      (scene as any).lock_reference_url || (scene as any).reference_image_url || "",
+    );
+    const useStaticMaster = isFanout && !!anchorImageUrl;
+    const masterImageUrlForMux = useStaticMaster ? anchorImageUrl : "";
+    const masterVideoUrlForMux = useStaticMaster
+      ? sourcePlateUrl || finalLipsyncUrl  // sent but ignored when image is set
+      : (useOverlay && sourcePlateUrl ? sourcePlateUrl : finalLipsyncUrl);
+
     const minAxis = Math.min(width, height);
     const radiusForCount =
       donePasses.length === 1 ? minAxis * 0.28 :
       donePasses.length <= 2 ? minAxis * 0.22 :
       donePasses.length === 3 ? minAxis * 0.18 :
       minAxis * 0.15;
-    // v38/v39 — Per-turn windowed overlay. Each pass's Sync.so output is
-    // overlaid ONLY during that speaker's voiced turn window(s); the rest
-    // of the time the master plate underneath is visible. This guarantees
-    // no cross-speaker mouth-animation leakage even if Sync.so's internal
-    // timing drifts. A small ~0.08s pad on each end keeps consonant
-    // onsets/offsets natural and mirrors `segments_secs` sent to Sync.so.
+
+    // v72 — When the master is a static anchor image, each speaker's
+    // preclip overlay must span the ENTIRE scene (otherwise off-turn
+    // speakers vanish since there is no animated background showing
+    // their face). The preclip itself only animates the mouth during
+    // that speaker's voiced turn; outside the turn it stays as a
+    // closed-mouth still that blends with the anchor underneath.
     //
-    // v39 — When the pass was dispatched with a TIGHT per-turn WAV
-    // (`audio_tight` field set in compose-dialog-segments), Sync.so's
-    // output already equals the turn duration and starts with animation
-    // at t=0. We tag the shot `sourceTiming: 'relative'` so the Remotion
-    // compositor plays it from the output's own t=0 instead of seeking to
-    // the absolute timeline frame — making the pipeline INDEPENDENT of
-    // the deployed Lambda bundle version (old bundles ignore the unknown
-    // field and default to relative play; new bundles honour it).
+    // Fan-out video-master mode (legacy): keep per-turn windowed overlay
+    // since the master video already shows the resting faces.
     const SHOT_PAD = 0.08;
+    const alwaysOn = useStaticMaster;
     const fanoutShots = useOverlay
       ? donePasses.flatMap((p: any) => {
           const passSegs = Array.isArray(p?.segments) ? p.segments : [];
           const isTight = !!(p as any).audio_tight;
           const sourceTiming: "relative" | "absolute" = isTight ? "relative" : "absolute";
-          // v68 — when the pass was rendered against a single-face PRECLIP
-          // (3+ speaker scenes), the Sync.so output is a 512x512 crop in
-          // source-master pixel space. Overlay it back at the original
-          // (cropX, cropY, cropSize) region with the existing crop shot type.
-          // Otherwise fall back to the v25 full-frame faceMask overlay.
           const preclipCrop = (p as any).preclip_crop;
           const hasPreclipCrop =
             preclipCrop &&
@@ -239,7 +241,8 @@ serve(async (req) => {
                   radius: radiusForCount,
                 },
               };
-          if (passSegs.length === 0) {
+          // v72 always-on overlay (one shot per speaker for full scene).
+          if (alwaysOn || passSegs.length === 0) {
             return [{
               startSec: 0,
               endSec: totalSec,
@@ -266,7 +269,7 @@ serve(async (req) => {
       : [];
 
 
-    const inputProps = {
+    const inputProps: Record<string, unknown> = {
       masterVideoUrl: masterVideoUrlForMux,
       masterAudioUrl,
       totalSec,
@@ -276,9 +279,12 @@ serve(async (req) => {
       srcHeight: height,
       shots: fanoutShots,
     };
+    if (masterImageUrlForMux) {
+      inputProps.masterImageUrl = masterImageUrlForMux;
+    }
 
     console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
+      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers${useStaticMaster ? "-static" : ""}` : "single-tight-overlay") : "single-audio-swap"} master=${(masterImageUrlForMux || masterVideoUrlForMux).slice(0, 80)} shots=${fanoutShots.length}`,
     );
 
     const renderId = crypto.randomUUID();

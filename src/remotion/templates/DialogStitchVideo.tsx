@@ -21,6 +21,7 @@ import React from 'react';
 import {
   AbsoluteFill,
   Audio,
+  Img,
   Sequence,
   Video,
   interpolate,
@@ -69,12 +70,16 @@ const ShotSchema = z.object({
 
 export const DialogStitchVideoSchema = z.object({
   masterVideoUrl: z.string().url(),
+  /** v72: optional static anchor image used INSTEAD of masterVideoUrl
+   *  when present. For multi-speaker dialog scenes the i2v plate can
+   *  drift / cut away mid-scene; using the static anchor composition
+   *  as background guarantees every speaker remains visible while the
+   *  per-pass single-face preclips animate the lips on top. */
+  masterImageUrl: z.string().url().optional().nullable(),
   masterAudioUrl: z.string().url(),
   totalSec: z.number().positive(),
   targetWidth: z.number().positive().optional(),
   targetHeight: z.number().positive().optional(),
-  /** v21: source-master dims used to map per-shot crop into composition
-   *  pixels. Defaults to targetWidth/Height when omitted. */
   srcWidth: z.number().positive().optional(),
   srcHeight: z.number().positive().optional(),
   shots: z.array(ShotSchema),
@@ -215,6 +220,7 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
 
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
+  masterImageUrl,
   masterAudioUrl,
   totalSec,
   targetWidth,
@@ -228,7 +234,6 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
     () => [...(shots ?? [])].sort((a, b) => a.startSec - b.startSec),
     [shots],
   );
-  // Source-master pixel space — fall back to comp dims if not provided.
   const sW = Number(srcWidth) > 0 ? Number(srcWidth) : (Number(targetWidth) > 0 ? Number(targetWidth) : compW);
   const sH = Number(srcHeight) > 0 ? Number(srcHeight) : (Number(targetHeight) > 0 ? Number(targetHeight) : compH);
   const scaleX = compW / sW;
@@ -236,16 +241,22 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      {/* Master plate underneath — muted, native audio track ignored. */}
+      {/* Master plate underneath — static anchor image when provided
+          (v72 multi-speaker mode), else original i2v video muted. */}
       <AbsoluteFill>
-        {masterVideoUrl && (
+        {masterImageUrl ? (
+          <Img
+            src={masterImageUrl}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : masterVideoUrl ? (
           <Video
             src={masterVideoUrl}
             muted
             playbackRate={1}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
-        )}
+        ) : null}
       </AbsoluteFill>
 
       {/* Per-turn Sync.so outputs overlay only their own window. */}
