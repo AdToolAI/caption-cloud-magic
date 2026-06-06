@@ -2271,7 +2271,12 @@ serve(async (req) => {
     // public Sync.so schema and broke sync-3 jobs with provider_unknown_error.
     // Per-turn timing is now represented only by the tight audio WAV plus
     // `sync_mode=cut_off`.
-    const videoInput: Record<string, unknown> = { type: "video", url: passInputUrl };
+    // v68 — when a per-pass single-face preclip exists, send IT to Sync.so
+    // instead of the full multi-face plate. Sync.so sees one face only →
+    // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
+    // the lipsynced crop back at preclip_crop on the original plate.
+    const dispatchVideoUrl = usePassPreclip ? (passPreclipUrl as string) : passInputUrl;
+    const videoInput: Record<string, unknown> = { type: "video", url: dispatchVideoUrl };
     const payload: Record<string, unknown> = {
       model: payloadModel,
       input: [
