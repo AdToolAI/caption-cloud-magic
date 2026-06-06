@@ -1,44 +1,86 @@
-## Was ist passiert (Szene S03 / dcbebf32…)
+## Was beobachtet wurde
 
-Edge-Logs zeigen:
+Szene `7772e99f-5c2b-4774-8d03-0332888691e8` (4 Sprecher, 9s locked Hailuo-Plate):
+
+- Beide aktiv getesteten Passes scheitern reproduzierbar mit
+  `provider_unknown_error` auf **allen** Varianten (coords-pro →
+  coords-pro-box → sync3-coords → coords-pro-lp2pro), 3× retried,
+  `retry_count: 11` insgesamt.
+- Edge-Log zeigt korrekt: `v39_tight_audio dur=1.60s windows=[[6.986,8.585]]`
+  bzw. `dur=2.45s windows=[[0, 2.448]]` für pass 0.
+- Aber die Dispatch-Zeile loggt: `sync_mode=loop` mit `totalSec=9`.
+
+## Root Cause
+
+`compose-dialog-segments/index.ts` Z.1934:
+```ts
+const payloadSyncMode = passes.length >= 2 ? "loop" : "cut_off";
 ```
-[compose-clip-webhook] Clip failed: HTTPSConnectionPool(host='lbunafpxuskwmsrraqxl.supabase.co', port=443): Read timed out. (read timeout=10)
-[compose-clip-webhook] Refunded €1.05 (ai-happyhorse/standard)
+
+v63 hat `loop` eingeführt, um ein "Frozen-Frame" zu verhindern, **wenn der
+Master-VO länger als die Plate ist** (Single-Pass v56 official segments).
+
+v64 hat dann den Tight-Slice-Pfad für N=1 nachgezogen und setzt dort
+korrekt `cut_off`.
+
+**Übersehen wurde der Mainstream-Pfad: N≥2 Multi-Pass mit Per-Speaker-
+Tight-Audio.** Hier sendet jeder Pass ein **kurzes** Tight-WAV (~1.6–2.4s)
+an Sync.so gegen die volle 9s-Plate. Mit `sync_mode=loop` versucht
+Sync.so, die 1.6s-Audio rund 5.6× über die 9s-Plate zu loopen — das ist
+keine sinnvolle Lipsync-Eingabe und Sync.so antwortet konsistent mit
+`"An unknown error occurred."` (kein error_code → `provider_unknown_error`).
+
+Warum N=2 "funktioniert hat": Bei 2 Sprechern sind die Turns oft länger
+(~3–5s pro Speaker) → das Loop-Verhältnis ist näher an 1× → Sync.so
+toleriert es manchmal. Bei N=4 wird jeder Turn kürzer (~1.5–2.5s) → das
+Loop-Verhältnis explodiert → reproduzierbarer Fail.
+
+## Fix (v66 — eine Code-Änderung)
+
+In `supabase/functions/compose-dialog-segments/index.ts` Z.1934 die
+sync_mode-Bestimmung auf **Anwesenheit von Tight-Audio** umstellen statt
+auf Pass-Anzahl:
+
+```ts
+// v66: sync_mode hängt davon ab, OB Tight-Audio gesendet wird, nicht
+// von der Sprecher-Anzahl.
+//   • tightAudioInfo gesetzt  → cut_off (Per-Pass-Tight; Output =
+//     Speech-Dauer; audio-mux Lambda overlay füllt den Rest der Plate)
+//   • kein Tight (v56 official segments mit Master-VO) → loop (v63 —
+//     Plate hält bis Master-VO endet)
+const payloadSyncMode = tightAudioInfo ? "cut_off" : "loop";
 ```
 
-Was wirklich schiefging — drei zusammenhängende Bugs:
+Konsistenzfolgen:
+- State-Metadata + Logs ziehen automatisch nach (lesen `payloadSyncMode`).
+- `render-sync-segments-audio-mux` braucht keine Änderung — der Overlay-
+  Branch greift bereits für jedes done-Pass mit `audio_tight` (v64).
+- Der echte v63-Use-Case (force_v56 Master-VO Single-Pass) bleibt auf
+  `loop` — dort wird kein Tight-Slice erzeugt, also `tightAudioInfo`
+  bleibt `null`.
+- Retry-Ladder, Face-Gate, Refund, Watchdog: keine Änderung.
 
-### Bug 1 — Replicate-Read-Timeout beim Laden der Reference-Image
-HappyHorse (`ai-happyhorse`) ist auf Replicate gestartet und wollte die Scene-Anchor-PNG aus unserem `composer-frames` Bucket laden. Replicate hat ein 10 s read-timeout — und unser Bucket liefert die Datei mit `cache-control: no-cache` + `cf-cache-status: MISS` aus, also geht jeder Fetch zum Origin. Bei 1.79 MB + Origin-Latenz kippt das gelegentlich um. Ergebnis: Replicate killed die Prediction sofort als "failed", wir bekommen Webhook → Szene tot.
+## Verifikation nach Deploy
 
-Das ist **kein** Bug in unserer HappyHorse-Integration und auch **kein** Bug im Prompt — das Bild ist erreichbar (HTTP 200, 1.79 MB), aber unter Last unzuverlässig genug, dass Replicate vor 10 s aufgibt.
+1. Neue 4-Sprecher-Szene rendern → Edge-Log zeigt jetzt
+   `sync_mode=cut_off` pro Pass; Sync.so liefert 200 OK.
+2. Webhook dispatched `render-sync-segments-audio-mux` im
+   Overlay-Branch (wie bisher für N=2).
+3. Finale Szene = 9s pristine Plate mit 4 Lipsync-Overlays an den
+   jeweiligen Turn-Windows.
+4. Regression-Check: 2-Sprecher-Szene weiterhin grün (gleicher Pfad).
+5. Regression-Check: 1-Sprecher cinematic-sync weiterhin grün (war
+   schon `cut_off`).
 
-### Bug 2 — Falscher Refund-Betrag
-`CLIP_COSTS` in `compose-clip-webhook` listet `ai-happyhorse` nicht (auch nicht `ai-pika`, `ai-runway`, `ai-vidu`, `ai-grok`, `ai-ltx`). Fallback ist 0.15 €/s → 7 s × 0.15 = **€1.05 refunded statt €1.96** (HappyHorse 720p = €0.28/s lt. Memory). User wurde um 0.91 € geprellt.
+## Doku
 
-### Bug 3 — Kein Auto-Retry
-Bei einem reinen Provider-Side-Timeout (kein Content-Fehler) sollten wir genau **einen** stillen Retry fahren, bevor die Szene endgültig als "Fehler" angezeigt wird. Aktuell: 1× failed → Szene tot, User muss manuell neu generieren.
+Neue Memory-Datei `mem/architecture/lipsync/v66-sync-mode-tight-gated.md`
+mit obiger Begründung, plus Index-Update und Rule-I.11-Verschärfung in
+`FROZEN-INVARIANTS.md` (sync_mode-Bestimmung ist tight-gated, nicht
+count-gated).
 
----
+## Out of Scope
 
-## Fix-Plan
-
-### 1. `supabase/functions/compose-clip-webhook/index.ts`
-- **CLIP_COSTS vervollständigen** — alle Composer-Provider eintragen (synchron mit `compose-video-clips`): `ai-happyhorse {0.28, 0.56}`, `ai-pika {0.20, 0.45}`, `ai-runway {0.25, 0.50}`, `ai-vidu {0.18, 0.30}`, `ai-grok {0.20, 0.40}`, `ai-ltx {0.10, 0.18}` (exakte Werte aus `src/config/*VideoCredits.ts` ziehen, nicht raten).
-- **Auto-Retry-Branch** im `failed`-Pfad: wenn `predError` einen Read-Timeout / "fetch input"-Fehler enthält **und** `retry_count < 2`, dann *nicht* als failed markieren + refunden, sondern Szene zurück auf `clip_status='pending'` setzen und `compose-video-clips` für genau diese Szene re-dispatchen (gleiches Cost-Deduct entfällt, weil schon abgebucht). Bei "echten" Fehlern (Content-Policy, invalid input, etc.) Pfad unverändert.
-
-### 2. `composer-frames` Storage Bucket
-Cache-Control auf `public, max-age=3600, immutable` setzen für hochgeladene Scene-Anchors (in `compose-scene-anchor` beim Upload). Das löst die Root-Cause: Replicate fetcht beim Retry aus dem Cloudflare-Cache statt Origin → kein Timeout mehr.
-
-### 3. Memory
-Neue Notiz `mem://architecture/video-composer/replicate-fetch-timeout-resilience.md` (1.+2. dokumentieren), Index-Eintrag.
-
-### Out of Scope
-- Keine Änderung am Lipsync-Pfad (v60–v64 unverändert).
-- Keine Provider-Logik / Prompt-Änderung.
-- Keine UI-Änderung am Composer.
-
-### Verifikation
-- Test-Szene mit HappyHorse generieren → erfolgreich.
-- Künstlich gepatchten Timeout reproduzieren → Logs zeigen `[compose-clip-webhook] auto-retry 1/2 for scene …` und neuen Replicate-Dispatch; Szene endet als `done`.
-- Refund-Log bei echtem Fail: `Refunded €1.96 (ai-happyhorse/standard)`.
+- Keine Änderung am Tight-Slice-Algorithmus, an der Face-Detection-Ladder,
+  am Audio-Mux Lambda oder am Refund-Pfad.
+- Keine UI-Änderung.
