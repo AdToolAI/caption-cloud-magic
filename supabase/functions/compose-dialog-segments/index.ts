@@ -136,13 +136,46 @@ const clampSyncCoords = (coords: [number, number] | null | undefined): [number, 
   return [Math.max(1, Math.round(x)), Math.max(1, Math.round(y))];
 };
 
+/**
+ * v71 — transient fetch errors (Supabase Storage hiccup, edge-runtime
+ * AbortSignal timeout) used to be misclassified as "audio is invalid" and
+ * burned the entire scene. We classify these explicitly so the caller can
+ * retry the dispatch later instead of marking the run failed + refunding
+ * + wiping the already-successful Sync.so passes that came before.
+ */
+const TRANSIENT_FETCH_ERROR_RE =
+  /signal timed out|timeoutexception|aborterror|the operation was aborted|network|fetch failed|connection (reset|refused|closed)|econnreset|etimedout|eai_again|http_5\d\d/i;
+function isTransientFetchError(err: unknown): boolean {
+  const msg = (err as Error)?.message ?? String(err ?? "");
+  return TRANSIENT_FETCH_ERROR_RE.test(msg);
+}
+
 async function inspectSpeakerAudio(url: string) {
-  const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  // v71 — single-attempt fetch with longer timeout (60s) so transient
+  // storage lag doesn't get reported as "audio invalid". Retries are now
+  // owned by the audio-preflight caller, which can treat repeated transient
+  // failures as "retry later" instead of a hard refund/wipe.
+  const resp = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!resp.ok) throw new Error(`audio_get_${resp.status}`);
   const bytes = new Uint8Array(await resp.arrayBuffer());
   const wav = inspectWav(bytes);
   const vad = detectVoicedFrames(bytes);
   return { bytes: bytes.byteLength, wav, vad };
+}
+
+async function inspectSpeakerAudioWithRetry(url: string, attempts = 3) {
+  let lastErr: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await inspectSpeakerAudio(url);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientFetchError(err)) throw err;
+      // small backoff: 250ms, 750ms
+      await new Promise((r) => setTimeout(r, 250 * (i + 1) * (i + 1)));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "audio_fetch_failed"));
 }
 
 interface Turn { startSec: number; endSec: number }
@@ -1475,17 +1508,76 @@ serve(async (req) => {
     const audioDiagnostics = await Promise.all(
       builtPasses.map(async (p) => {
         try {
-          const diag = await inspectSpeakerAudio(p.audio_url);
+          const diag = await inspectSpeakerAudioWithRetry(p.audio_url, 3);
           const durMismatch = diag.wav.durSec + 0.35 < totalSec;
           const silent = diag.vad.voicedSec < 0.15 && diag.vad.longestVoicedRun < 0.12;
           return { pass: p.idx, speaker: p.speaker_name, ok: !durMismatch && !silent, durMismatch, silent, ...diag };
         } catch (err) {
-          return { pass: p.idx, speaker: p.speaker_name, ok: false, error: (err as Error).message };
+          const transient = isTransientFetchError(err);
+          return {
+            pass: p.idx,
+            speaker: p.speaker_name,
+            ok: false,
+            transient,
+            error: (err as Error).message,
+          } as any;
         }
       }),
     );
     const badAudio = audioDiagnostics.find((d: any) => !d.ok) as any;
     if (badAudio) {
+      // ── v71 — Transient fetch error handling ──────────────────────────
+      // If the preflight failed ONLY because we couldn't fetch the WAV
+      // (storage hiccup / signal timeout), this is NOT proof the audio is
+      // invalid. Marking the scene `failed` here wipes the already-successful
+      // v69 passes for the other speakers and refunds the full cost — which
+      // is exactly the bug the user reported on the 4-speaker scene where
+      // passes 1–3 finished and only pass 4 hit a 30s fetch timeout.
+      //
+      // Instead: leave dialog_shots untouched (so the chained webhook can
+      // still advance), do NOT refund, and return 202 so the auto-trigger
+      // re-invokes us on the next 8s tick. The single-flight lock release
+      // happens in the outer `finally`.
+      const allBadAreTransient = audioDiagnostics
+        .filter((d: any) => !d.ok)
+        .every((d: any) => d?.transient === true);
+      if (allBadAreTransient) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} AUDIO PREFLIGHT TRANSIENT — keeping pass state, will retry on next tick (isAdvance=${isAdvance})`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_status: "PREFLIGHT_TRANSIENT", error_class: "audio_fetch_transient",
+          error_message: badAudio.error ?? "transient_audio_fetch_failure",
+          meta: { audio_diagnostics: audioDiagnostics, expected_total_sec: totalSec, is_advance: isAdvance },
+        });
+        // v71 — when this is a webhook-driven `advance` call, the auto-trigger
+        // will NOT re-pick the scene (it only re-invokes pending scenes). Self-
+        // reschedule the same advance call after a short delay so pass N+1
+        // gets dispatched as soon as Storage settles.
+        if (isAdvance) {
+          try {
+            EdgeRuntime.waitUntil((async () => {
+              await new Promise((r) => setTimeout(r, 8_000));
+              try {
+                await supabase.functions.invoke("compose-dialog-segments", {
+                  body: { scene_id: sceneId, advance: true },
+                });
+              } catch (e) {
+                console.warn(
+                  `[compose-dialog-segments] scene=${sceneId} self-retry after transient preflight failed: ${(e as Error)?.message ?? e}`,
+                );
+              }
+            })());
+          } catch { /* EdgeRuntime not available in some test contexts */ }
+        }
+        return json(
+          { ok: true, status: "preflight_transient_retry_later", scene_id: sceneId, audio_diagnostics: audioDiagnostics },
+          202,
+        );
+      }
+
+
       const reason = badAudio.error
         ? `audio_invalid_${badAudio.error}`
         : badAudio.silent
@@ -2256,7 +2348,7 @@ serve(async (req) => {
       );
     }
 
-    const finalAudioDiag = await inspectSpeakerAudio(pass.audio_url).catch((audioErr) => {
+    const finalAudioDiag = await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
       );

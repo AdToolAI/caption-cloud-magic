@@ -1,67 +1,71 @@
 ## Befund
 
-Die neue v69-Pipeline ist nicht grundsätzlich kaputt: Eine frische 4-Sprecher-Szene `4d9a1655-...` lief komplett durch:
+Der aktuelle Fehler ist jetzt eindeutig eingegrenzt:
+
+- Die v69-Pipeline selbst läuft an: FaceMap ist korrekt, v69 Single-Face-Preclips werden für Pass 1–3 erzeugt, Sync.so beendet Pass 1–3 erfolgreich.
+- Der Abbruch passiert vor Pass 4, noch bevor Sync.so den nächsten Job bekommt.
+- Ursache ist unser eigener Audio-Preflight in `compose-dialog-segments`: ein temporärer `fetch`-Timeout beim Lesen einer bereits existierenden WAV-Datei wird als harter Fehler gespeichert:
 
 ```text
-v69_preclip_unified_ready pass 1..4
-Sync.so pass 1..4 done
-render-sync-segments-audio-mux dispatched
-remotion-webhook success
-composer_scenes.lip_sync_status = done
-clip_error = null
+AUDIO PREFLIGHT BLOCK audio_invalid_Signal timed out.
+clip_error = syncso_audio_preflight_audio_invalid_Signal timed out.
 ```
 
-Der noch sichtbare Fehler hängt an einer alten Szene `a59a380d-...` aus der v68-Recovery:
-
-```text
-lip_sync_status = failed
-twoshot_stage = failed
-clip_error = multi_speaker_incomplete_0_of_4 (v68 recovery refund)
-dialog_shots.error = stuck_4_speaker_provider_unknown_error_v68_recovery
-```
-
-Dafür gab es nach v69/v70 keinen sauberen Reset-Run. Außerdem gibt es noch UI-Buttons, die Lip-Sync direkt per DB-Update / direktem `compose-dialog-segments`-Call neu starten. Das ist gefährlich, weil sie die serverseitige `reset-lipsync-scene`-Pipeline umgehen und alte Fehler-/FaceMap-/Jobdaten stehen lassen oder zu früh starten können.
+Das ist kein Beweis für kaputtes Audio. Die gleiche Szene zeigt gültige WAV-Diagnosen für die anderen Speaker; der Timeout ist ein transienter Storage/Netzwerk-Lese-Fehler, wird aber aktuell wie „Audio ist invalid“ behandelt.
 
 ## Plan
 
-### 1. Aktuell hängende Alt-Szene sauber aus dem v68-Fehlerzustand lösen
-- Die alte failed Szene `a59a380d-...` nicht manuell halb reparieren.
-- Stattdessen denselben serverseitigen Clean-Reset verwenden wie der sichere Button:
-  - offene Sync.so Jobs entfernen
-  - Credits idempotent refunden
-  - `dialog_shots`, `replicate_prediction_id`, `clip_error`, stale FaceMap/SyncJobs bereinigen
-  - Status auf `pending` setzen
-- Danach darf nur der normale Auto-Trigger die Szene wieder in v69 starten.
+### 1. Audio-Preflight resilient machen
+- `inspectSpeakerAudio()` in `compose-dialog-segments` so ändern, dass Fetch-Timeouts nicht sofort terminal sind.
+- 3 Versuche mit kurzem Backoff nutzen.
+- Timeout von 30s auf 60s erhöhen.
+- Fehler `Signal timed out`, `TimeoutError`, `AbortError`, `network`, `fetch failed` als transient klassifizieren.
 
-### 2. UI-Reset-Pfade auf eine einzige sichere Route vereinheitlichen
-- In `SceneCard.tsx` den Button `🔁 Lip-Sync neu rendern` so ändern, dass er nicht mehr direkt DB-Felder löscht und nicht sofort `compose-dialog-segments` aufruft.
-- Stattdessen ruft er `reset-lipsync-scene` auf.
-- Der bestehende Auto-Trigger startet danach automatisch `compose-dialog-segments` über die v69-Pipeline.
-- Ergebnis: kein alter v68/v5 State kann versehentlich weiterverwendet werden.
+### 2. Transiente Preflight-Timeouts nicht als endgültigen Lip-Sync-Fehler speichern
+- Wenn nur ein Audio-Fetch zeitweise timeoutet, Szene nicht auf `failed` setzen.
+- Stattdessen kontrolliert mit `202`/`retry_later` zurückgeben oder den Pass erneut versuchen lassen.
+- Wichtig: keine Credits final refunden und keine v69-Passdaten löschen, solange bereits erfolgreiche Passes existieren.
 
-### 3. Gefährliche direkte Re-Dispatches entfernen oder absichern
-- Alle direkten UI-Aufrufe von `compose-dialog-segments` aus Retry-/Reset-Buttons prüfen.
-- Direkte Calls bleiben nur dort erlaubt, wo die Szene nachweislich clean und `twoshot_stage='master_clip'` ist.
-- Für normale Fehlerzustände gilt: erst `reset-lipsync-scene`, dann Auto-Trigger.
+### 3. v69-Pass-Fortschritt schützen
+- Bereits erfolgreiche Passes 1–3 bleiben erhalten.
+- Pass 4 wird nach transientem Timeout erneut gestartet, statt die komplette Szene als kaputt zu markieren.
+- Die v69-Invariante bleibt erhalten: Sync.so bekommt weiterhin Single-Face-Preclips, nicht die Multi-Face-Plate.
 
-### 4. v69 serverseitig stärker schützen
-- `compose-dialog-segments` soll stale failed v68/v58/v41/v56 States nicht weiterverwenden.
-- Wenn `dialog_shots.status='failed'` oder ein alter Fehler wie `v68 recovery refund` erkannt wird, soll die Funktion klar abbrechen mit Hinweis `reset_required`, statt halb in einen alten State einzusteigen.
-- Der Reset-Endpoint bleibt der einzige erlaubte Weg aus `failed` zurück zu `pending`.
+### 4. Aktuell betroffene Szene sauber reaktivieren
+- Szene `12ea3e1b-d376-418f-b3e9-96f73e7007e4` aus dem falschen terminalen Fehlerzustand holen.
+- Bereits erfolgreiche Passes beibehalten.
+- Status zurück auf `running`/`queued` für den nächsten offenen Pass setzen.
+- Danach Pass 4 erneut dispatchen lassen.
 
 ### 5. Validierung
-- Alte failed Szene resetten und danach Logs prüfen:
-  - `v69_preclip_unified dispatching`
-  - `v69_preclip_unified_ready`
-  - Sync.so Passes `done`
-  - `render-sync-segments-audio-mux mode=fanout-N-speakers`
-  - `remotion-webhook [dialog-stitch] done`
+- Logs prüfen auf:
+
+```text
+v69_preclip_unified_ready pass 4
+DISPATCH pass=4/4
+sync-so-webhook pass 4/4 done
+render-sync-segments-audio-mux dispatched
+remotion-webhook done
+```
+
 - DB-Endzustand prüfen:
-  - `lip_sync_status='done'`
-  - `twoshot_stage='done'`
-  - `clip_error is null`
-  - `dialog_shots.status='done'`
 
-## Wichtig
+```text
+lip_sync_status = done/applied
+clip_error = null
+dialog_shots.status = done
+```
 
-Ich ändere dabei nicht die v69-Kernpipeline selbst. Die funktionierende Single-Face-Preclip-Logik bleibt geschützt; der Fix räumt nur alte Fehlerzustände und unsichere Neustart-Wege auf.
+## Nicht ändern
+
+- Keine Rückkehr zu Legacy-Pipelines.
+- Kein `poll-dialog-shots`, kein `render-dialog-turn`, kein alter v4/v58/v68-Recovery-Pfad.
+- Kein Full-Plate-Pfad außer dem bereits vorhandenen automatischen v69-Preclip-Fallback.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
