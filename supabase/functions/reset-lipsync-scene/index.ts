@@ -53,12 +53,13 @@ serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch { /* ignore */ }
   const sceneId = String(body?.scene_id ?? "").trim();
+  const force = body?.force === true;
   if (!sceneId) return json({ error: "scene_id_required" }, 400);
 
   // Ownership: scene → project → user
   const { data: scene } = await admin
     .from("composer_scenes")
-    .select("id, project_id, dialog_shots, lip_sync_applied_at, audio_plan")
+    .select("id, project_id, dialog_shots, lip_sync_applied_at, lip_sync_source_clip_url, clip_url, clip_status, audio_plan")
     .eq("id", sceneId)
     .maybeSingle();
   if (!scene) return json({ error: "scene_not_found" }, 404);
@@ -72,7 +73,7 @@ serve(async (req) => {
     return json({ error: "forbidden" }, 403);
   }
 
-  if ((scene as any).lip_sync_applied_at) {
+  if ((scene as any).lip_sync_applied_at && !force) {
     return json({ ok: true, status: "already_applied" });
   }
 
@@ -101,6 +102,10 @@ serve(async (req) => {
   delete (cleanedTwoshot as any).last_segments;
   delete (cleanedTwoshot as any).audio_input_mode;
   const cleanedPlan = { ...prevPlan, twoshot: cleanedTwoshot };
+  const restoredSourceClip =
+    force && typeof (scene as any).lip_sync_source_clip_url === "string"
+      ? (scene as any).lip_sync_source_clip_url
+      : (scene as any).clip_url;
 
   await admin
     .from("composer_scenes")
@@ -110,7 +115,10 @@ serve(async (req) => {
       replicate_prediction_id: null,
       dialog_shots: null,
       clip_error: null,
+      clip_url: restoredSourceClip ?? null,
+      clip_status: restoredSourceClip ? "ready" : ((scene as any).clip_status ?? "pending"),
       lip_sync_source_clip_url: null,
+      lip_sync_applied_at: null,
       audio_plan: cleanedPlan,
       updated_at: new Date().toISOString(),
     })
