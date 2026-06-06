@@ -2179,7 +2179,7 @@ serve(async (req) => {
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
       `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
-      `frame=${referenceFrameNumber} sync_mode=cut_off input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+      `frame=${referenceFrameNumber} sync_mode=loop input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
