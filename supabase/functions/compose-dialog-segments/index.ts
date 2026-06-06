@@ -2374,7 +2374,7 @@ serve(async (req) => {
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
-        sync_mode: "loop",
+        sync_mode: payloadSyncMode,
         audio_approx_sec: audioApproxSec,
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,
