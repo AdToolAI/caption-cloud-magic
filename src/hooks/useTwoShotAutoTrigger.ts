@@ -361,7 +361,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // simply still warming up. Skip silently until both are present.
           const planUrl = d.audio_plan?.twoshot?.url;
           const sourceClip = d.lip_sync_source_clip_url ?? d.clip_url;
-          // v70: legacy gate removed.
+          if (!planUrl || typeof planUrl !== 'string' || planUrl.length === 0) return false;
+          if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
           // v23: ONLY `pending` (or null) is a valid start state on the client.
           // `failed` requires explicit user reset via `reset-lipsync-scene`.
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
