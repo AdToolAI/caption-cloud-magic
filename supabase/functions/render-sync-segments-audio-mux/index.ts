@@ -213,18 +213,39 @@ serve(async (req) => {
           const passSegs = Array.isArray(p?.segments) ? p.segments : [];
           const isTight = !!(p as any).audio_tight;
           const sourceTiming: "relative" | "absolute" = isTight ? "relative" : "absolute";
-          const faceMask = {
-            cx: Number(p.coords[0]),
-            cy: Number(p.coords[1]),
-            radius: radiusForCount,
-          };
+          // v68 — when the pass was rendered against a single-face PRECLIP
+          // (3+ speaker scenes), the Sync.so output is a 512x512 crop in
+          // source-master pixel space. Overlay it back at the original
+          // (cropX, cropY, cropSize) region with the existing crop shot type.
+          // Otherwise fall back to the v25 full-frame faceMask overlay.
+          const preclipCrop = (p as any).preclip_crop;
+          const hasPreclipCrop =
+            preclipCrop &&
+            Number.isFinite(Number(preclipCrop.x)) &&
+            Number.isFinite(Number(preclipCrop.y)) &&
+            Number.isFinite(Number(preclipCrop.size));
+          const overlayPayload: Record<string, unknown> = hasPreclipCrop
+            ? {
+                crop: {
+                  x: Number(preclipCrop.x),
+                  y: Number(preclipCrop.y),
+                  size: Number(preclipCrop.size),
+                },
+              }
+            : {
+                faceMask: {
+                  cx: Number(p.coords[0]),
+                  cy: Number(p.coords[1]),
+                  radius: radiusForCount,
+                },
+              };
           if (passSegs.length === 0) {
             return [{
               startSec: 0,
               endSec: totalSec,
               outputUrl: String(p.output_url),
-              faceMask,
               sourceTiming,
+              ...overlayPayload,
             }];
           }
           return passSegs
@@ -236,13 +257,14 @@ serve(async (req) => {
                 startSec: s,
                 endSec: e,
                 outputUrl: String(p.output_url),
-                faceMask,
                 sourceTiming,
+                ...overlayPayload,
               };
             })
             .filter(Boolean);
         })
       : [];
+
 
     const inputProps = {
       masterVideoUrl: masterVideoUrlForMux,

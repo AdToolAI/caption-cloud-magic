@@ -1,31 +1,51 @@
-## Diagnose
+## Aktueller Befund
 
-Der v66-Fix ist aktiv: die Logs zeigen bei der 4-Personen-Szene `sync_mode=cut_off`. Der aktuelle Fehler ist deshalb **nicht mehr Sync.so loop/provider_unknown_error**, sondern passiert früher:
+Do I know what the issue is? **Ja.** Der aktuelle Fehler ist nicht mehr der v66/v67-Bug.
 
-- Szene: `7a430ebd-00c3-4c6f-a3d6-c58a43b2903c`
-- Fehler: `prepare_failed_no_tight_audio`
-- Pass: `3/4` / Sprecher `Kailee`
-- Log: `v39_tight_audio_failed: offset is out of bounds`
-- Window: `[[3.717, 6.71]]`
+Die Szene `a59a380d-0a79-412d-b5a9-7c2fae262f3d` zeigt:
 
-Warum es vorher funktioniert hat: Die Pipeline kommt jetzt bis zum Tight-Audio-Schnitt. Dort hat der WAV-Slicer einen Rundungsfehler: Er berechnet die Ausgabedauer mit `Math.round((end-start)*sampleRate)`, kopiert aber später Samples mit `floor(start*sampleRate)` bis `floor(end*sampleRate)`. Bei bestimmten Zeitfenstern — wie `3.717 → 6.71` — kann die Kopierlänge um 1 Frame größer sein als der vorher allokierte Output-Buffer. Dann wirft JavaScript `offset is out of bounds` und die Szene stoppt vor Sync.so.
+- `sync_mode=cut_off` ist aktiv.
+- Tight-WAV-Slicing funktioniert: alle Passes erzeugen `v39_tight_audio`.
+- Der Provider lehnt trotzdem jeden Sprecher-Pass mit `provider_unknown_error` ab.
+- Der Payload sendet weiterhin die komplette 4-Gesichter-Scene-Plate an Sync.so und versucht per `active_speaker_detection` nur ein Gesicht zu targeten.
+- Zusätzlich bleibt die Szene fälschlich auf `lip_sync_status=running`, weil ein erschöpfter Pass im State noch als `retrying` zählt.
+
+Warum es früher funktioniert hat: Der stabilere alte Pfad hat pro Sprecher zuerst einen **Single-Face-Crop/Preclip** gerendert, sodass Sync.so nur ein Gesicht sieht. Der neue v5-Fanout-Pfad nutzt zwar Face-Mask-Overlay am Ende, sendet aber beim Provider-Call wieder die volle 4-Personen-Plate. Bei 4 Personen ist genau das instabil.
 
 ## Plan
 
-1. **WAV-Slicer frame-genau machen**
-   - In `supabase/functions/_shared/syncso-preflight.ts` `sliceWavToWindows()` so ändern, dass Output-Länge und Copy-Länge aus denselben Frame-Grenzen berechnet werden.
-   - Keine Duration-Rundung mehr als Basis für Buffer-Größe.
-   - Zusätzlich defensive Bounds setzen, damit `out.set()` nie über das Zielarray hinaus schreiben kann.
+1. **4-Personen-Pfad auf Single-Face-Input zurückführen**
+   - In `compose-dialog-segments` für `speakers.length >= 3` nicht mehr die komplette Scene-Plate direkt an Sync.so senden.
+   - Stattdessen pro Pass aus den vorhandenen FaceMap-Koordinaten/BBox eine isolierte Face-Crop-Preclip-Quelle verwenden bzw. dispatchen.
+   - Sync.so bekommt dann pro Sprecher wieder nur ein Gesicht, nicht alle vier.
 
-2. **Lip-sync Dispatch unverändert lassen**
-   - `compose-dialog-segments` bleibt bei `tightAudioInfo ? "cut_off" : "loop"`.
-   - Keine Änderung an Face-Map, Sync.so Payload, Audio-Mux, Refund oder Retry-Ladder.
+2. **Payload für Face-Crop-Passes vereinfachen**
+   - Bei Face-Crop-Input `active_speaker_detection` auf `auto_detect: true` setzen oder ganz minimal halten, weil der Crop nur ein Gesicht enthält.
+   - Keine master-space Koordinaten in den 512x512 Crop-Payload schicken.
+   - `sync_mode=cut_off` und Tight-Audio bleiben unverändert.
 
-3. **Dokumentation aktualisieren**
-   - Neue Memory für v67: „frame-exact tight WAV slicing“.
-   - Frozen invariant ergänzen: Tight-Slice muss frame-exakt sein; `outFrames` muss aus denselben `startFrame/endFrame`-Werten kommen wie der Copy-Schritt.
+3. **Finales Compositing kompatibel halten**
+   - `render-sync-segments-audio-mux` so erweitern, dass erledigte Face-Crop-Passes über `crop` statt Full-Frame-`faceMask` zurück in die Original-Plate gelegt werden können.
+   - Der bestehende Full-Frame-Mask-Pfad bleibt für 1–2 Sprecher unverändert.
 
-4. **Validierung nach Implementierung**
-   - Edge function Tests bzw. gezielter Slicer-Test mit dem konkreten Fenster `3.717–6.71`.
-   - Funktion deployen.
-   - Danach dieselbe 4-Personen-Szene erneut triggern oder neu rendern und prüfen: Pass 3 erzeugt `v39_tight_audio dur≈2.99s`, Sync.so Dispatch startet, danach Audio-Mux Fan-In.
+4. **Stuck-State-Fix im Webhook**
+   - In `sync-so-webhook` erschöpfte `retrying`-Passes nicht mehr als „alive“ zählen.
+   - Wenn alle 3+/4 Sprecher terminal fehlgeschlagen sind, Szene sauber auf `failed` setzen und Credits idempotent refundieren.
+   - Dadurch bleibt der UI-Status nicht mehr endlos auf `running`.
+
+5. **Dokumentation/Frozen Invariant aktualisieren**
+   - Neue Memory `v68-4speaker-single-face-preclip` ergänzen.
+   - Regel festhalten: Bei 3+ Sprechern darf Sync.so nicht mehr die volle Multi-Face-Plate als Input bekommen; Provider-Input muss speaker-isoliert sein.
+
+6. **Validierung**
+   - Mit derselben Szene prüfen, dass Pass 1–4 jetzt mit Single-Face-Input dispatchen.
+   - Danach Logs prüfen: keine `provider_unknown_error`-Retry-Ladder mehr, alle Passes `done`, anschließend Audio-Mux.
+   - Zusätzlich prüfen, dass fehlgeschlagene Alt-Szenen nicht mehr als `running` hängen bleiben.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
