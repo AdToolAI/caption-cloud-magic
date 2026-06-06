@@ -167,6 +167,25 @@ Rules:
 
 ---
 
+## Rule I.11 — sync_mode MUST be `loop`
+
+All Sync.so `/generate` dispatches MUST set `options.sync_mode = "loop"`.
+`cut_off`, `bounce`, `remap`, `silence` are FORBIDDEN.
+
+- Rationale: Our master plate (Hailuo / HeyGen i2v, 6–12s) can be shorter
+  than the master VO audio. `cut_off` would truncate the output to the
+  shorter input → the composer freezes on the last frame while the VO
+  track keeps playing ("frozen scene, voice continues").
+- `loop` repeats the locked-camera plate so output length == audio length.
+  Per Rule I (v57 locked-plate), our plates have no cuts/zooms/pans, so
+  looping a static plate is visually indistinguishable from holding it.
+- Enforced: `compose-dialog-segments/index.ts` ~L1144 (v56 official segments
+  payload), ~L1920 (per-turn `syncOptions`).
+- Background: `mem://architecture/lipsync/v63-sync-mode-loop`.
+
+---
+
+
 ## Code annotation contract
 
 The literal string `FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md`
