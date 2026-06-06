@@ -51,7 +51,8 @@ Updated: today
 - [Sync Segments Multi-Speaker Audio Mux](mem://architecture/lipsync/sync-segments-multispeaker-audio-mux) — render-sync-segments-audio-mux
 - [Server-Owned State Machine v23](mem://architecture/lipsync/server-owned-state-machine-v23) — dialog_shots schema
 - [Unified Multi-Pass v6](mem://architecture/lipsync/unified-multi-pass-v6) — pass chaining
-- [v63 sync_mode=loop](mem://architecture/lipsync/v63-sync-mode-loop) — Sync.so dispatch uses `sync_mode=loop` (not cut_off) so output length == VO length; fixes frozen-frame + ongoing-VO when plate < audio
+- [v63 sync_mode=loop](mem://architecture/lipsync/v63-sync-mode-loop) — N≥2 uses `sync_mode=loop` so output length == VO length; superseded for N=1 by v64
+- [v64 N=1 Tight-Slice Parity](mem://architecture/lipsync/v64-n1-tight-slice-parity) — N=1 now uses tight-slice + audio-mux overlay (same path as N≥2 success); `sync_mode=cut_off` for N=1, `loop` for N≥2; fixes provider_unknown_error on 78%-silence WAVs
 - [No Per-User Video Rate Limit](mem://architecture/video-edge-functions/no-per-user-rate-limit) — wallet-only spend protection
 - [Composer Engine Normalization](mem://architecture/video-composer/engine-normalization-policy) — ai-sora → ai-hailuo, Kling 3 Omni for T2V
 - [James Bond 2028 Design](mem://design/james-bond-2028-comprehensive-design-system) — Deep black/gold aesthetic
