@@ -2348,7 +2348,7 @@ serve(async (req) => {
       );
     }
 
-    const finalAudioDiag = await inspectSpeakerAudio(pass.audio_url).catch((audioErr) => {
+    const finalAudioDiag = await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
       );
