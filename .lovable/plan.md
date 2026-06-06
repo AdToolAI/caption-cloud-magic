@@ -1,72 +1,38 @@
-## Befund
+Do I know what the issue is? Yes.
 
-Das Lip-Sync selbst läuft jetzt korrekt: alle 4 Passes erzeugen saubere Single-Face-Preclips, Sync.so liefert pro Sprecher das richtige animierte Gesicht. Die Audio-Mux-Lambda overlayt jeweils per `crop` an den richtigen Plate-Koordinaten (x=124/366/592/830, size=422 auf 1280×720).
+The backend logs show the new 4-speaker scene reached Sync.so pass 4/4 and the final dialog-stitch render completed successfully. The red “Lip-Sync abgebrochen” in the screenshot is therefore very likely a false frontend failure state triggered while the long multi-speaker run was still active. Separately, the v72 mux change has a real timing risk: it makes short per-speaker preclips span the whole scene, so those clips can play at the wrong time or stress Remotion. Also, the Lambda renderer log still shows the old Remotion bundle canary, so the new `masterImageUrl` behavior may not actually be active in Lambda yet.
 
-Sichtbares Problem in der finalen Datei:
+Plan:
 
-- Die **Master-Plate** (Hailuo i2v Output, `source_clip_url`) bleibt nicht stabil. Sie startet mit allen 4 Charakteren in Reihe und wechselt mitten in der Szene auf eine Einzelperson-Einstellung.
-- Unsere Overlay-Logik blendet jeden Preclip nur **während des eigenen Voice-Turns** ein (`startSec/endSec = segment ± 0.08s`). Wenn die Plate auf eine Einzelperson schneidet, sind Sprecher 3/4 weder in der Plate noch in einem aktiven Overlay zu sehen — daher „nur die ersten zwei Sprecher sichtbar".
-- Sprecher 1/2 sind sichtbar, weil ihre Turns vor dem Plate-Schnitt liegen.
+1. Fix the false “abgebrochen” progress state
+   - Update `usePipelineProgress.ts` so lipsync is not marked as stalled/failed while there is active backend evidence:
+     - `lipSyncStatus` is `running` or `audio_muxing`
+     - `twoshotStage` is an active stage like `master_clip`, `syncso_*`, `audio_muxing`, `preflight`, `deferred`, `circuit_open`
+     - `dialog_shots.status` is non-terminal
+     - a current Sync.so job id or mux render id exists
+   - Increase or bypass the 4-minute stall threshold for multi-speaker lipsync, because 4 speakers can legitimately take longer than 4 minutes.
+   - Ensure a completed lipsync scene clears stale frontend failure/stall state immediately.
 
-Root Cause: Hailuo i2v garantiert keine Kamerakonstanz über 9s mit 4 statischen Charakteren — wir behandeln das i2v-Ergebnis fälschlicherweise als verlässlichen 4-Face-Hintergrund.
+2. Correct the v72 mux logic
+   - Keep the static anchor master image for multi-speaker scenes.
+   - Revert the “always-on preclip overlay” part for tight per-speaker Sync.so clips.
+   - Use the static anchor as the always-visible resting face layer, and overlay each lipsynced crop only during its actual speaker turn.
+   - Preserve the old behavior for single-speaker scenes.
 
-## Plan (v72)
+3. Add mux safety guards
+   - Before using `masterImageUrl`, verify the anchor URL is present and plausible; otherwise fall back to video master.
+   - Keep dispatch idempotency unchanged so no duplicate mux renders are started.
+   - Make failure messages distinguish Sync.so failure vs final mux/render failure.
 
-### 1. Master = Static Anchor Image (Dialog-Szenen, N≥2)
+4. Refresh the final scene without rerunning Sync.so
+   - After the code change, clear only the audio-mux state for the affected scene and re-trigger the mux step.
+   - Do not rerun the 4 Sync.so speaker passes and do not charge again.
 
-In `render-sync-segments-audio-mux`:
+5. Verify
+   - Check logs for `fanout-4-speakers-static` and one successful `dialog-stitch` webhook.
+   - Confirm the scene ends as `lip_sync_status='done'`, `twoshot_stage='done'`, no `clip_error`.
+   - Confirm the UI no longer shows “Lip-Sync abgebrochen” during an active multi-speaker run.
 
-- Für Szenen mit `donePasses.length >= 2` (Multi-Speaker-Fan-Out) zusätzlich `scene.lock_reference_url || scene.reference_image_url` lesen.
-- Wenn vorhanden, neuen Payload-Eintrag `masterImageUrl` an den Lambda-Job mitgeben (statt/zusätzlich zu `masterVideoUrl`).
-- Bei N=1 bleibt der bisherige Pfad (Video-Master + Single-Tight-Overlay) unverändert.
-
-In `DialogStitchVideo.tsx`:
-
-- Schema um optionales `masterImageUrl?: string` erweitern.
-- Wenn gesetzt, statt `<Video src={masterVideoUrl} />` ein `<Img src={masterImageUrl}>` für die volle Composition-Dauer rendern (Standbild, kein Audio).
-- Fallback: `masterImageUrl` fehlt → bisheriger Video-Pfad.
-
-### 2. Always-On Preclip-Overlays (multi-speaker)
-
-Im Multi-Speaker-Fan-Out-Branch von `render-sync-segments-audio-mux`:
-
-- Pro Pass nur **einen** Shot über die volle Szenendauer emittieren (`startSec: 0`, `endSec: totalSec`) anstatt pro Segment fenstern.
-- `sourceTiming` bleibt für Tight-Passes `relative` (Sync.so-Output ist nur Sprech-Dauer lang).
-- Da Sync.so bei Stille im Audio (Pass-Audio = nur dieser Sprecher mit Stille drumherum) das Gesicht im Ruhezustand zeigt, bleibt jeder Speaker permanent im Frame ohne Mouth-Movement außerhalb des eigenen Turns. → Effekt: alle 4 Köpfe permanent sichtbar, animiert ausschließlich während des jeweiligen Sprech-Turns.
-
-Wichtig: Für `audio_tight` Passes ist der Sync.so-Output kürzer als `totalSec`. In dem Fall:
-
-- Pre-Roll: vor `tightStartOnTimeline` wird der **letzte Frame** des Preclips (oder ein parallel hinterlegtes statisches Crop-Frame der Anchor-Komposition) gezeigt.
-- Post-Roll: nach `tightEndOnTimeline` analog.
-- Pragmatischer Erstwurf: solange Tight-Output kürzer ist, simpel `loop` oder Standbild des Anchor-Crops einsetzen. Implementierung:
-  - In `DialogStitchVideo` `CroppedOverlay` um `tightWindow: { startSec, endSec }` erweitern → außerhalb des Fensters statisches Crop des `masterImageUrl` an derselben (x, y, size) Region anzeigen, im Fenster den Sync.so-Preclip abspielen.
-
-### 3. v68/v69-Logik unangetastet
-
-- `compose-dialog-segments` Preclip-Render-Pfad, FaceMap, Tight-Audio, Refunds, Self-Retry: keine Änderung.
-- 1-Sprecher-Pfad: unverändert.
-- `sync-so-webhook`: unverändert.
-
-### 4. Aktuelle Szene neu rendern
-
-Nach Deployment:
-
-- Szene `12ea3e1b-d376-418f-b3e9-96f73e7007e4`: `dialog_shots.audio_mux` löschen + `dialog_shots.status='audio_muxing'`/`lip_sync_status='audio_muxing'` wieder anstoßen, sodass `render-sync-segments-audio-mux` mit v72-Logik erneut dispatcht. Bestehende Sync.so-Outputs der 4 Passes werden wiederverwendet — kein neuer Sync.so-Spend.
-
-### 5. Verifikation
-
-- Finales Video zeigt durchgehend alle 4 Köpfe (statisches Anchor-Image als Master).
-- Während Sprecher k spricht, animiert nur sein Crop-Overlay; die anderen 3 bleiben als statisches Bild stehen.
-- Edge-Log `render-sync-segments-audio-mux` zeigt `mode=fanout-4-speakers master=image:<lock_reference_url>` und `shots=4` (statt `shots=N_segments`).
-
-## Nicht ändern
-
-- Kein neuer Hailuo i2v-Render-Pfad.
-- Keine Änderung am Sync.so-Dispatch, Tight-Slice, Refund.
-- 1-Sprecher- und Single-Tight-Overlay-Pfad bleiben video-basiert.
-
-## Geänderte Dateien (geplant)
-
-- `supabase/functions/render-sync-segments-audio-mux/index.ts`
-- `src/remotion/templates/DialogStitchVideo.tsx`
-- (SQL one-shot) Reaktivierung der betroffenen Szene
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
