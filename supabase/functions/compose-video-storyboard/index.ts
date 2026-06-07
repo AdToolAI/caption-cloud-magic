@@ -208,6 +208,12 @@ AI prompt requirements (CRITICAL — every aiPrompt MUST contain ALL of these):
 10. Always end aiPrompt with: ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no isolated product on plain background, no floating product, no product rotating in empty space" (CRITICAL — prevents AI from burning text or generating isolated product shots)
 11. Never include any quoted on-screen text in the aiPrompt itself
 
+ACTION FIELD REQUIREMENTS (CRITICAL — these drive editable manual override fields):
+- For EVERY scene, set sceneActionEn to a concise English action summary matching the aiPrompt (max 25 words). It answers: "What generally happens in this scene?"
+- For EVERY scene, set sceneActionLocalized to the same action in ${langLabel}, faithful to sceneActionEn. If language is English, it can equal sceneActionEn.
+- For every visible characterShots[] slot, set actionEn/actionUser. actionEn is what this exact character physically does in the scene in English (max 12 words). actionUser is the faithful ${langLabel} version for the manual UI field.
+- These action fields MUST be extracted from / agree with aiPrompt. Do not create conflicting actions and never leave action fields empty when a cast member is visible.
+
 ${sceneTypeHints}
 
 ${(() => {
@@ -260,6 +266,7 @@ CRITICAL RULES:
 - DO NOT use continuity pronouns ("the same person", "she from before") — consistency comes from repeated signatureItems, not claimed identity.
 - For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value (this is the PRIMARY slot, kept for backward compatibility).
 - ALSO populate characterShots[] with one entry per character actually visible in the scene (1–4 entries). The first entry MUST mirror characterShot. For solo scenes, characterShots has exactly one entry.
+- For each visible characterShots[] entry, ALSO set actionEn and actionUser. They must describe what THIS character does in the same scene action already written in aiPrompt.
 - For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent") and leave characterShots empty.
 
 🎭 MULTI-CHARACTER CO-PRESENCE (when ${chars.length} ≥ 2 characters are defined):
