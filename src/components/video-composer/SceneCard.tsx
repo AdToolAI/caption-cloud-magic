@@ -2332,18 +2332,40 @@ export default function SceneCard({
                     }))}
                     onAddCharacter={onAddCharacter}
                     realismPreset={scene.realismPreset}
-                    onApply={({ aiPrompt, dialogScript, characterShots, actionBeat }) => {
+                    onApply={({ aiPrompt, dialogScript, characterShots, actionBeat, sceneActionUser, sceneActionEn, characterActions }) => {
                       const updates: Partial<ComposerScene> = { aiPrompt };
                       if (dialogScript !== undefined)
                         updates.dialogScript = dialogScript;
+                      // Merge per-character actions into the cast slots BEFORE
+                      // we write `characterShots` to the scene so they land in
+                      // the same update. Director run is an explicit user
+                      // action → it overwrites previous slot actions.
                       if (characterShots && characterShots.length > 0) {
-                        updates.characterShots = characterShots;
-                        updates.characterShot = characterShots[0];
+                        const actionById = new Map(
+                          (characterActions ?? []).map((a) => [a.characterId, a]),
+                        );
+                        const withActions = characterShots.map((s) => {
+                          const a = actionById.get(s.characterId);
+                          if (!a) return s;
+                          return {
+                            ...s,
+                            actionUser: a.actionUser || s.actionUser,
+                            actionEn: a.actionEn || s.actionEn,
+                          };
+                        });
+                        updates.characterShots = withActions;
+                        updates.characterShot = withActions[0];
                         // Storyboard delivered a fresh cast → clear the dismissal blocklist.
                         updates.dismissedCharacterIds = [];
                       }
                       if (actionBeat) {
                         updates.actionBeat = actionBeat;
+                      }
+                      if (sceneActionUser !== undefined) {
+                        updates.sceneActionUser = sceneActionUser;
+                      }
+                      if (sceneActionEn !== undefined) {
+                        updates.sceneActionEn = sceneActionEn;
                       }
                       if (promptMode === "structured") {
                         // Drop back to free mode so the user sees the new prompt verbatim.

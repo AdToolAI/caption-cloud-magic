@@ -27,6 +27,9 @@ interface SceneDirectorBoxProps {
     dialogScript?: string;
     characterShots?: CharacterShot[];
     actionBeat?: ComposerScene['actionBeat'];
+    sceneActionUser?: string;
+    sceneActionEn?: string;
+    characterActions?: Array<{ characterId: string; actionUser: string; actionEn: string }>;
   }) => void;
   onAddCharacter?: (c: ComposerCharacter) => void;
   onInsertFollowups?: (descriptions: string[]) => void;
@@ -153,6 +156,22 @@ export function SceneDirectorBox({
         }
       }
 
+      // Per-character actions, indexed by id, for the SceneCard to push into
+      // each cast slot's actionUser/actionEn fields.
+      const pcaEn: Array<{ characterId: string; actionEn: string }> = Array.isArray(data.perCharacterActions)
+        ? data.perCharacterActions
+        : [];
+      const pcaLoc: Array<{ characterId: string; action: string }> = Array.isArray(data.perCharacterActionsLocalized)
+        ? data.perCharacterActionsLocalized
+        : [];
+      const enMap = new Map(pcaEn.map((e) => [String(e.characterId), String(e.actionEn || '')]));
+      const locMap = new Map(pcaLoc.map((e) => [String(e.characterId), String(e.action || '')]));
+      const characterActions = characterShots.map((s) => ({
+        characterId: s.characterId,
+        actionEn: (enMap.get(s.characterId) || '').trim(),
+        actionUser: (locMap.get(s.characterId) || enMap.get(s.characterId) || '').trim(),
+      }));
+
       onApply({
         aiPrompt: finalPrompt,
         dialogScript: data.dialogScript || undefined,
@@ -164,6 +183,9 @@ export function SceneDirectorBox({
               motionIntensity: data.actionBeat.motionIntensity || undefined,
             }
           : undefined,
+        sceneActionUser: String(data.sceneActionLocalized || data.sceneActionEn || '').trim() || undefined,
+        sceneActionEn: String(data.sceneActionEn || '').trim() || undefined,
+        characterActions: characterActions.length > 0 ? characterActions : undefined,
       });
 
       setResult(data);

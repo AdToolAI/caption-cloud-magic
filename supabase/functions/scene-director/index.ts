@@ -144,6 +144,10 @@ OUTPUT LANGUAGES:
 - aiPrompt: English ALWAYS (visual model performance).
 - dialogScript: ${lang} (the user's UI language). Empty string if no spoken line is needed.
 - actionBeat fields: English ALWAYS.
+- sceneActionEn: English ALWAYS. ONE sentence (≤ 25 words) that summarizes the on-screen action of THIS scene — exactly what is shown in the aiPrompt action body, without the cast header and without the negative clause.
+- sceneActionLocalized: faithful ${lang} translation of sceneActionEn (identical string if ${lang} === 'en').
+- perCharacterActions: EXACTLY one entry per character ID you return in matchedAssets.characterIds. Use the character's name + a concrete verb (≤ 12 words, English).
+- perCharacterActionsLocalized: same entries, translated into ${lang}, same order and length.
 
 ${fmt('CHARACTERS', req.library.characters)}
 
@@ -203,8 +207,34 @@ const TOOL_DEFINITION = {
           },
           required: ['characterAction', 'environmentMotion', 'motionIntensity'],
         },
+        sceneActionEn: { type: 'string', description: 'ONE English sentence summarizing what physically happens in the scene (mirrors the action body of aiPrompt, excluding cast header and negative clause). ≤ 25 words.' },
+        sceneActionLocalized: { type: 'string', description: 'Faithful translation of sceneActionEn into the user UI language. Identical to sceneActionEn when UI language is en.' },
+        perCharacterActions: {
+          type: 'array',
+          description: 'EXACTLY one entry per matchedAssets.characterIds member. Each entry describes what THIS character physically does in the scene, in English, ≤ 12 words, with a concrete verb. Required for multi-character lip-sync face-mapping.',
+          items: {
+            type: 'object',
+            properties: {
+              characterId: { type: 'string' },
+              actionEn: { type: 'string' },
+            },
+            required: ['characterId', 'actionEn'],
+          },
+        },
+        perCharacterActionsLocalized: {
+          type: 'array',
+          description: 'Same entries as perCharacterActions, translated into the user UI language. Same length and same order.',
+          items: {
+            type: 'object',
+            properties: {
+              characterId: { type: 'string' },
+              action: { type: 'string' },
+            },
+            required: ['characterId', 'action'],
+          },
+        },
       },
-      required: ['aiPrompt', 'matchedAssets', 'droppedActions', 'followupSceneSuggestions', 'missingAssets', 'confidence', 'actionBeat'],
+      required: ['aiPrompt', 'matchedAssets', 'droppedActions', 'followupSceneSuggestions', 'missingAssets', 'confidence', 'actionBeat', 'sceneActionEn', 'perCharacterActions'],
     },
   },
 };
@@ -274,7 +304,7 @@ Deno.serve(async (req) => {
     const lang = body.language ?? 'en';
 
     const requiredIdsKey = (body.requiredCharacterIds || []).slice().sort().join(',');
-    const cacheKey = await sha1(`v3|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}|req:${requiredIdsKey}`);
+    const cacheKey = await sha1(`v4|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}|req:${requiredIdsKey}`);
 
     // 1) Try cache
     const { data: cached } = await supabase
@@ -395,6 +425,41 @@ Deno.serve(async (req) => {
           promptHead: promptLower.slice(0, 200),
         });
       }
+    }
+
+    // 3c) Normalize Scene-Action + per-character action fields so the
+    // composer UI can pre-fill the manual override fields. We:
+    //  - ensure sceneActionEn exists (fallback: actionBeat.characterAction)
+    //  - ensure sceneActionLocalized exists (fallback: sceneActionEn)
+    //  - rebuild perCharacterActions(+Localized) to match the FINAL
+    //    matchedAssets.characterIds (after ghost-cast drop). Missing entries
+    //    fall back to actionBeat.characterAction so the field is at least
+    //    seeded with something meaningful.
+    {
+      const rawScene = String(result.sceneActionEn || '').trim();
+      const fallbackAction = String(result.actionBeat?.characterAction || '').trim();
+      result.sceneActionEn = rawScene || fallbackAction;
+      const rawSceneLocal = String(result.sceneActionLocalized || '').trim();
+      result.sceneActionLocalized = rawSceneLocal || result.sceneActionEn;
+
+      const rawPCA: Array<{ characterId: string; actionEn: string }> = Array.isArray(result.perCharacterActions)
+        ? result.perCharacterActions
+        : [];
+      const rawPCAL: Array<{ characterId: string; action: string }> = Array.isArray(result.perCharacterActionsLocalized)
+        ? result.perCharacterActionsLocalized
+        : [];
+      const enById = new Map(rawPCA.map((e) => [String(e.characterId), String(e.actionEn || '').trim()]));
+      const locById = new Map(rawPCAL.map((e) => [String(e.characterId), String(e.action || '').trim()]));
+
+      const finalIds: string[] = result.matchedAssets.characterIds || [];
+      result.perCharacterActions = finalIds.map((id) => ({
+        characterId: id,
+        actionEn: enById.get(id) || fallbackAction || '',
+      }));
+      result.perCharacterActionsLocalized = finalIds.map((id) => ({
+        characterId: id,
+        action: locById.get(id) || enById.get(id) || fallbackAction || '',
+      }));
     }
 
     result.budget = pickBudget(dur);
