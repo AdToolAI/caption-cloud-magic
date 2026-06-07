@@ -954,24 +954,31 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         }
       }
 
-      // ── Idempotency: remove previously auto-spawned dialog sub-scenes for
-      //    this parent so a re-generation does NOT stack old Sarah/Matthew
-      //    clips on top of the fresh ones (root cause of "random extra
-      //    speakers" / "double voiceovers" in the user's report).
+      // ── Idempotency: remove previously auto-spawned LEGACY dialog sub-scenes
+      //    for THIS parent only. Critical safety rules:
+      //      • Never touch the current parent scene itself.
+      //      • Never touch cinematic-sync main scenes (engine_override =
+      //        'cinematic-sync') — those are real scenes that just happen to
+      //        carry a legacy `dialog-srs:*` marker from older builds. Deleting
+      //        them was the root cause of "Szene 2 wird geschluckt".
+      //      • Only match sub-scenes whose marker points at THIS parent.
       try {
-        // Match both the current marker AND any legacy markers from previous
-        // sessions (when scene.id was a temp/local id). All dialog-srs:* rows
-        // for this project are eligible — they belong to the same dialog flow.
         const { data: stale } = await supabase
           .from('composer_scenes')
-          .select('id')
+          .select('id, engine_override, cinematic_preset_slug')
           .eq('project_id', pidForSrs)
-          .like('cinematic_preset_slug', 'dialog-srs:%');
-        const staleIds = (stale ?? []).map((r: any) => r.id).filter(Boolean);
+          .eq('cinematic_preset_slug', `dialog-srs:${resolvedParentSceneId}`);
+        const staleIds = (stale ?? [])
+          .filter((r: any) =>
+            r?.id &&
+            r.id !== resolvedParentSceneId &&
+            r.engine_override !== 'cinematic-sync',
+          )
+          .map((r: any) => r.id);
         if (staleIds.length > 0) {
           await supabase.from('scene_audio_clips').delete().in('scene_id', staleIds);
           await supabase.from('composer_scenes').delete().in('id', staleIds);
-          console.log('[SceneDialogStudio] removed', staleIds.length, 'stale dialog sub-scenes');
+          console.log('[SceneDialogStudio] removed', staleIds.length, 'legacy dialog sub-scenes for parent', resolvedParentSceneId);
         }
       } catch (cleanupErr) {
         console.warn('[SceneDialogStudio] stale sub-scene cleanup failed (continuing)', cleanupErr);

@@ -1,36 +1,49 @@
-## Ziel
-Szenen dürfen beim Start von Szene 3/4/… niemals aus der Datenbank gelöscht, ersetzt oder durch einen veralteten lokalen Snapshot überschrieben werden. Einzel-Generate soll nur die angeklickte Szene starten.
+## Befund
 
-## Ursache
-Der Einzel-Generate ruft aktuell erneut `ensureProjectPersisted()` auf. Diese Funktion macht bei bereits gespeicherten Projekten einen Cleanup:
+Die neue Ursache ist nicht mehr der alte `ensureProjectPersisted()`-Cleanup. Ich habe im aktuellen Datenbestand ein Projekt mit genau deinem Symptom gefunden:
 
 ```text
-lösche alle composer_scenes des Projekts,
-deren ID im lokalen project.scenes Snapshot nicht enthalten ist
+Projekt: a2749416...
+Szenen in DB: order_index {0,1,3}
+fehlende Szene: order_index 2
+Szene bei order_index 1 hat Marker: dialog-srs:<eigene scene id>
 ```
 
-Wenn der lokale Snapshot durch Realtime, Add-Scene, Sleep/Tabwechsel oder laufende DB-Refetches kurz nicht alle Szenen enthält, wird eine echte DB-Szene gelöscht. Dadurch wirkt es so, als würde Szene 3 Szene 2 „schlucken“ oder an deren Stelle rücken.
+Der Fehler sitzt im Dialog/Lip-Sync-Flow:
+
+- Früher wurden für Dialoge extra Sub-Szenen mit Marker `dialog-srs:*` erzeugt.
+- Der Cleanup löscht vor einer neuen Dialog/Lip-Sync-Generation alle Szenen im Projekt mit `cinematic_preset_slug like 'dialog-srs:%'`.
+- Inzwischen behält die neue Cinematic-Sync-Pipeline aber die echte Hauptszene als eine Szene und setzt trotzdem genau diesen `dialog-srs:*`-Marker auf die Hauptszene.
+- Ergebnis: Beim nächsten Start einer anderen Szene wird die vorherige echte Dialog-Szene als „alte Sub-Szene“ erkannt und gelöscht. Dadurch wird Szene 2 „geschluckt“ und es bleibt eine Order-Lücke.
 
 ## Plan
-1. **Einzel-Generate sicher machen**
-   - In `useSceneGenerate` bei bereits gespeichertem Projekt und UUID-Szene `ensureProjectPersisted()` überspringen.
-   - Nur die angeklickte Szene per ID vormarkieren und an `compose-video-clips` senden.
-   - Kein Match mehr primär über `orderIndex`, weil Order-Gaps/Races sonst die falsche Szene treffen können.
 
-2. **`ensureProjectPersisted` nicht mehr destruktiv im normalen Save/Generate-Pfad verwenden**
-   - Den pauschalen „lösche alle DB-Szenen, die lokal fehlen“-Cleanup entfernen oder hinter einen expliziten `reconcileDeletedScenes`-Modus setzen.
-   - Normaler Save darf Szenen aktualisieren/einfügen/reordnen, aber keine unbekannten DB-Szenen löschen.
+1. **Dialog-Cleanup entschärfen**
+   - In `SceneDialogStudio.tsx` darf der Cleanup nicht mehr pauschal alle `dialog-srs:*`-Szenen löschen.
+   - Er darf nur noch echte Legacy-Sub-Szenen löschen, aber niemals normale Cinematic-Sync-Hauptszenen.
+   - Zusätzlich: die aktuell gerenderte Parent-Szene wird explizit vom Cleanup ausgeschlossen.
 
-3. **Löschen explizit und sicher machen**
-   - `deleteScene` soll die konkrete Szene per ID löschen, statt sich auf späteren Cleanup zu verlassen.
-   - Danach Reindex/Refetch aus DB, damit die Szenenliste stabil bleibt.
-   - Dadurch bleibt echtes Löschen möglich, ohne dass Generate versehentlich Szenen entfernt.
+2. **Keinen Legacy-SRS-Marker mehr auf Hauptszenen setzen**
+   - Beim aktuellen Zwei-/Mehrsprecher-Cinematic-Sync wird `cinematicPresetSlug: dialog-srs:*` nicht mehr auf die echte Szene geschrieben.
+   - Der Marker bleibt nur für alte Subscene-Kompatibilität relevant.
 
-4. **Realtime/Refetch gegen Order-Lücken stabilisieren**
-   - Nach Generate/Refetch die Anzeige nach DB-Order sortieren, aber nicht anhand von Arraypositionen Szenen ersetzen.
-   - Bestehende Order-Lücken sollen die Anzeige nicht auf „nur 2 Szenen“ zusammenschrumpfen lassen.
+3. **Bestehende betroffene Szenen reparieren**
+   - Eine kleine Datenbank-Migration räumt falsche Marker auf echten Cinematic-Sync-Hauptszenen weg:
+     - `cinematic_preset_slug = null`, wenn `engine_override = 'cinematic-sync'` und Marker `dialog-srs:%` ist.
+   - Damit wird verhindert, dass bereits vorhandene Szene 2 beim nächsten Klick erneut gelöscht wird.
 
-5. **Prüfung**
-   - Testfall: Szene 1 fertig, Szene 2 fertig/generating, Szene 3 starten → Szene 2 bleibt in DB und UI erhalten.
-   - Testfall: mehrere schnelle Add/Generate-Klicks → keine DB-Deletes außer explizitem Löschen.
-   - Aktuelles Projekt mit Order-Gap bleibt sichtbar; neue Aktionen dürfen keine weiteren Szenen schlucken.
+4. **Order-Lücken stabilisieren**
+   - Nach DB-Refetch sollen Szenen weiterhin stabil nach `order_index` angezeigt werden.
+   - Zusätzlich wird eine sichere Reindex-Reparatur für betroffene Projekte vorbereitet, damit `{0,1,3}` wieder zu `{0,1,2}` wird, ohne Szeneninhalte zu ersetzen.
+
+5. **Schutz gegen Rückfall**
+   - Eine kurze Test-/Code-Prüfung stellt sicher:
+     - Szene 1 fertig, Szene 2 Dialog/Lip-Sync, Szene 3 startet → Szene 2 bleibt erhalten.
+     - Dialog-Cleanup löscht keine Szene mit `engine_override='cinematic-sync'`.
+     - Es gibt keine pauschalen Projekt-weiten Deletes mehr außer explizites Löschen durch den Nutzer.
+
+## Dateien/Backend-Bereiche
+
+- `src/components/video-composer/SceneDialogStudio.tsx`
+- ggf. `src/components/video-composer/VideoComposerDashboard.tsx` für Reindex/Refetch-Stabilität
+- neue Datenbank-Migration zur Marker-/Order-Reparatur
