@@ -29,6 +29,10 @@ interface DirectorRequest {
   language?: 'en' | 'de' | 'es';
   brandKitContext?: string;
   realismPreset?: 'cinematic-spot' | 'documentary' | 'lifestyle-hero' | null;
+  /** IDs the user already locked in the cast picker — MUST be matched + visible. */
+  requiredCharacterIds?: string[];
+  /** Names corresponding 1:1 to requiredCharacterIds (for prompt enforcement). */
+  requiredCharacterNames?: string[];
   library: {
     characters?: AssetEntry[];
     locations?: AssetEntry[];
@@ -114,6 +118,28 @@ For every person, place, building or object the user mentions, find the best mat
 - If no good match exists, list the missing item under "missingAssets" with a one-line description so the UI can offer "Generate with AI".
 - Set confidence: high = every named entity matched cleanly; medium = some matched + 1-2 missing; low = mostly missing or ambiguous.
 
+CAST COVERAGE (critical — multi-character lip-sync depends on this):
+- EVERY character listed in matchedAssets.characterIds MUST appear visibly in the aiPrompt action body, by name, doing something concrete.
+- A character mentioned only in a "Featuring …:" / cast header DOES NOT COUNT. They need a verb in the action body.
+- If you cannot fit all matched characters into the duration budget, then either:
+    (a) drop them from matchedAssets.characterIds (do NOT keep them as "ghost" cast that is referenced but never seen), OR
+    (b) split the overflow into followupSceneSuggestions.
+- For ensemble scenes with 2+ characters: describe the spatial arrangement (side by side, facing each other, sitting around a table, walking together, intercut between desks). NEVER write a solo close-up scene while listing extra characters as matched — the downstream Multi-Portrait renderer will only see one face and the lip-sync face-map collapses.
+- For 3-4 character scenes: prefer a wide group composition or fast intercuts between named subjects, not a single close-up on one face.
+
+EXAMPLE — GOOD (3 cast members, all visible):
+  matchedAssets.characterIds: [alice, bob, carol]
+  aiPrompt: "Alice leans over the laptop pointing at the screen while Bob takes notes; Carol stands behind them holding a coffee cup, glancing toward the window. Wide ensemble shot, …"
+
+EXAMPLE — FORBIDDEN (3 matched, only 1 acts):
+  matchedAssets.characterIds: [alice, bob, carol]
+  aiPrompt: "Alice stares at her laptop screen, overwhelmed, hand on her forehead. Close-up on her face."
+  → Either rewrite to include Bob + Carol with concrete actions, OR drop them from characterIds.
+${req.requiredCharacterIds && req.requiredCharacterIds.length > 0 && req.requiredCharacterNames?.length ? `
+PRESELECTED CAST (the user already locked these slots — ALL of them MUST appear visibly in this scene's action body, by name, doing something concrete):
+${req.requiredCharacterIds.map((id, i) => `  • id="${id}" name="${req.requiredCharacterNames![i] ?? ''}"`).join('\n')}
+The matchedAssets.characterIds you return MUST include every preselected ID above. Do not silently drop them.
+` : ''}
 OUTPUT LANGUAGES:
 - aiPrompt: English ALWAYS (visual model performance).
 - dialogScript: ${lang} (the user's UI language). Empty string if no spoken line is needed.
