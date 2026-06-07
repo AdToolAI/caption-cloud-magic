@@ -802,6 +802,29 @@ export function usePipelineProgress({
   const overallPercent = Math.round(allDone || completedCleanly ? 100 : Math.min(99, runFloorRef.current));
   const etaSeconds = isActive && !waitingForExport && !isStalled ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
 
+  // ── Persist snapshot (throttled to ~1 Hz) ────────────────────────
+  // Survives unmount / device sleep so the bar resumes instead of
+  // restarting at 0 % / 0s. Cleared when the run is terminal.
+  if (allDone || completedCleanly || hasFailure) {
+    if (pipelineStartRef.current === null) {
+      // Already settled — make sure no stale snapshot lingers.
+      clearSnapshot(storageKey);
+    }
+  } else if (pipelineStartRef.current !== null) {
+    const now = Date.now();
+    if (now - lastPersistAtRef.current > 1000) {
+      lastPersistAtRef.current = now;
+      writeSnapshot(storageKey, {
+        pipelineStart: pipelineStartRef.current,
+        runFloor: runFloorRef.current,
+        floor: floorRef.current,
+        startedAt: startedAtRef.current,
+        baseline: baselineRef.current,
+        realProgress: realProgressRef.current,
+      });
+    }
+  }
+
   return {
     phases,
     activePhase: activePhase?.id ?? null,
