@@ -191,6 +191,14 @@ export interface ComposerScene {
    */
   characterShots?: CharacterShot[];
   /**
+   * Character IDs the user explicitly removed from the cast of this scene.
+   * The prompt→cast auto-sync (`syncCastFromPrompt`) MUST skip these so a
+   * removed character does not silently reappear just because their name
+   * still occurs in the scene prompt. Cleared when the storyboard regenerates
+   * the scene end-to-end (new prompt + new cast from the LLM).
+   */
+  dismissedCharacterIds?: string[];
+  /**
    * Per-scene dialog screenplay (one block per line, "NAME: text").
    * When set, the SceneDialogStudio generates HeyGen lip-sync clips per
    * speaker and auto-spawns sub-scenes for shot-reverse-shot.
