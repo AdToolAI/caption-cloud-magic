@@ -107,6 +107,33 @@ serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // --- Extract [CastActions] BEFORE the dialog stripper. The bullet syntax
+    // (`- Name: action`) otherwise matches the generic speaker-line regex and
+    // gets thrown away, which is why per-character actions like
+    // "Matthew is making a phone call in the background" never reached the
+    // image model and Matthew ended up symmetrically next to Sarah. We parse
+    // them into a structured list, drop the marker block from the prose, and
+    // re-inject them as a protected CHARACTER ACTIONS clause further down.
+    const extractCastActions = (raw: string): { stripped: string; actions: { name: string; action: string }[] } => {
+      if (!raw) return { stripped: "", actions: [] };
+      const actions: { name: string; action: string }[] = [];
+      const stripped = raw.replace(/\[\s*CastActions\s*\]([\s\S]*?)\[\s*\/\s*CastActions\s*\]/gi, (_m, body) => {
+        const lines = String(body || "").split(/\n+/);
+        for (const ln of lines) {
+          const m = ln.match(/^\s*[-*•]\s*([\p{L}][\p{L}\s.'\-]{0,80}?)\s*:\s*(.+?)\s*$/u);
+          if (m) actions.push({ name: m[1].trim(), action: m[2].trim() });
+        }
+        return "";
+      });
+      return { stripped, actions };
+    };
+    const { stripped: rawWithoutCast, actions: castActions } = extractCastActions(body.scenePrompt || "");
+
+    // Heuristic: does any cast action describe an asymmetric placement /
+    // activity that contradicts the default equal-share two-shot framing?
+    const ASYM_RE = /\b(background|foreground|phone|standing|walking|leaning|distance|behind|away\s+from|aside|in\s+the\s+back|in\s+the\s+front|on\s+the\s+couch|by\s+the\s+window|across\s+the\s+room|on\s+(?:their|the|his|her)\s+(?:phone|laptop))\b/i;
+    const hasAsymmetricCast = castActions.some((c) => ASYM_RE.test(c.action));
+
     // --- Sanitize: strip any spoken-dialog patterns that would otherwise
     // be rendered as burned-in captions / shirt labels by Nano Banana 2.
     // Targets: `Name: line` script format, quoted speech ("...", „...", «...»),
@@ -147,9 +174,12 @@ serve(async (req) => {
         .trim();
       return { clean: s, stripped: s !== before.trim() };
     };
-    const { clean: cleanedPrompt, stripped: dialogStripped } = stripSpokenDialog(body.scenePrompt || "");
+    const { clean: cleanedPrompt, stripped: dialogStripped } = stripSpokenDialog(rawWithoutCast);
     if (dialogStripped) {
       console.log(`[compose-scene-anchor] stripped spoken-dialog patterns from scenePrompt (scene=${body.sceneId})`);
+    }
+    if (castActions.length > 0) {
+      console.log(`[compose-scene-anchor] extracted ${castActions.length} cast actions, asymmetric=${hasAsymmetricCast} (scene=${body.sceneId})`);
     }
     // Neutral fallback when very little visual content remains after stripping
     // dialog. For multi-portrait scenes we explicitly emphasise the exact
@@ -166,11 +196,15 @@ serve(async (req) => {
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
     const worldRefSig = `loc=${locationUrls.join(',')}|bld=${buildingUrls.join(',')}|prop=${propUrls.join(',')}`;
-    // v13 — bumped for Stage A (World Assets as Visual References): cache key
-    // now includes location/building/prop reference URLs so changing world
-    // assets invalidates the composed frame.
+    const castActionsSig = castActions
+      .map((c) => `${c.name.toLowerCase()}:${c.action.toLowerCase()}`)
+      .sort()
+      .join('|');
+    // v14 — bumped for asymmetric cast actions: per-character actions are now
+    // preserved and the two-shot framing is relaxed when the scene assigns
+    // background/foreground/phone activities. Cache key includes castActions.
     const promptHash = await sha1(
-      `v13|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}|${worldRefSig}`,
+      `v14|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}|${worldRefSig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}`,
     );
 
     const { data: cached } = await admin
