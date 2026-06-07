@@ -1018,7 +1018,14 @@ serve(async (req) => {
       // voiceover is LONGER than the configured scene duration, we'd lose
       // dialog (Sync.so cut_off). Auto-extend the scene to the smallest
       // Hailuo-allowed duration (6s or 10s) that fits VO + 0.4s padding.
-      if ((scene.engineOverride ?? "auto") === "cinematic-sync") {
+      // Pre-flight audio prep runs for BOTH dialog engines: legacy
+      // `cinematic-sync` and the new `sync-segments` (Sync.so sync-3 Fast
+      // Dialog) default. Without this, single-speaker sync-segments scenes
+      // ship with a moving Hailuo plate but no `audio_plan.twoshot.url`,
+      // and `compose-dialog-segments` skips the lipsync dispatch — exactly
+      // the "Voiceover plays but lips don't move" regression.
+      const __dialogEngine = scene.engineOverride ?? "auto";
+      if (__dialogEngine === "cinematic-sync" || __dialogEngine === "sync-segments") {
         __stage = `cinematic_sync_prep:${scene.id}`;
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,

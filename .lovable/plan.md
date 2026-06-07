@@ -1,116 +1,56 @@
-## Ziel
+## Diagnose — was du in den Screenshots siehst
 
-Die Multi-Speaker-Lip-Sync-Pipeline wieder auf den professionellen Zustand bringen:
+**Ja, gleiche Pipeline.** Die 1-Sprecher-Szene (Matthew, "Wie kann es sein…") läuft auf Engine **`Fast Dialog` = `sync-segments`** = exakt derselbe Code wie 2–4 Sprecher: `compose-dialog-segments` → Sync.so **Model `sync-3`** (v62: sync-3 ist universal default für N=1 und N≥2). Es gibt keinen "1-Sprecher-Sonderpfad" mehr. HeyGen war hier *nicht* aktiv — der Hinweistext "Lip-Sync via HeyGen" stimmt mit der gewählten Engine nicht überein und ist ein UI-Bug (siehe Fix 3).
 
-- Jeder Sprecher bewegt nur seinen eigenen Mund in seinem eigenen Dialogfenster.
-- Kein einzelner Sprecher darf den gesamten Dialog visuell übernehmen.
-- Das Ergebnis darf nicht wie ein eingefrorenes Foto wirken.
-- Die Lösung soll sich an Sync.so orientieren: klares Target Face / klares Audio-Segment / saubere Timeline-Compositing-Logik, keine Workaround-Kaskade.
+**Warum die Lippen trotzdem still sind**, steht direkt im Director Score:
 
-## Diagnose
+> ⚠️ **"Dialog Mismatch — Dialog vorhanden aber kein Audio Plan gelockt — generiere das Voiceover, damit Timings fixiert sind."**
 
-Die letzten Änderungen haben zwei Regressionen ausgelöst:
+Konkret: Der Hailuo-Clip wurde gerendert und das Voiceover existiert, aber `scene.audio_plan.twoshot.url` (die gemerged Master-WAV mit `speakers[].voicedRange.turns[]`) wurde **nie geschrieben**. `compose-dialog-segments` returnt in dem Fall hart:
 
-1. **Statischer Anchor als Master**
-   - v72 nutzt bei Multi-Speaker-Szenen ein Standbild als Master-Plate.
-   - Dadurch bleiben zwar alle vier Personen sichtbar, aber die Szene verliert natürliche Bewegung und wirkt wie Photoshop.
-
-2. **Hold-to-End Overlays**
-   - v74 hält pro Sprecher ein Overlay bis Szenenende.
-   - Dadurch kann ein zuletzt/oben liegender Sprecher visuell den restlichen Dialog dominieren.
-   - Besonders gefährlich, wenn `sourceTiming`/`startFrom` nicht exakt zum Sync.so-Output passt.
-
-## Plan
-
-### 1. Regressionspfad entfernen
-
-In `render-sync-segments-audio-mux/index.ts`:
-
-- Static-Master als Default entfernen.
-- `masterImageUrl` nicht mehr für normale Multi-Speaker-Lip-Sync-Muxes setzen.
-- `holdToEnd: true` nicht mehr für Multi-Speaker-Pässe setzen.
-- Zurück zu bewegtem Master-Video als Basisebene.
-
-Damit verschwinden:
-
-- der starre Standbild-Look,
-- der „ein Sprecher spricht alles“-Effekt,
-- die neue Overlay-Dauer bis Szenenende.
-
-### 2. Sync.so-konforme Sprecherfenster wiederherstellen
-
-Für jeden erfolgreichen Sync.so-Pass werden wieder nur die echten Sprecher-Zeitfenster gerendert:
-
-- `startSec = segment.startTime - pad`
-- `endSec = segment.endTime + pad`
-- `sourceTiming='relative'` bei tight/preclip outputs
-- `sourceTiming='absolute'` bei szenenlangen Sync.so outputs
-
-In `DialogStitchVideo.tsx`:
-
-- Cropped overlays bekommen ebenfalls korrektes `startFrom`, nicht nur FaceMask/FullFrame.
-- Für absolute Sync.so-Ausgaben muss das Video an der absoluten Timeline starten.
-- Für relative Preclips startet es bei Frame 0 innerhalb des Segmentfensters.
-
-### 3. Animorph ohne Hold-to-End lösen
-
-Der Animorph-Effekt wird nicht mehr durch „Overlay bis Ende halten“ gelöst, sondern durch kurze, professionelle Segmentübergänge:
-
-- Fade-out nur über 2–3 Frames statt 6 Frames.
-- Optional: Segment-Ende minimal später setzen, damit der Mund in geschlossenem Zustand endet.
-- Kein Crossfade über lange sichtbare Gesichtsunterschiede.
-
-Damit bleibt der Sprecher nur während seines Parts aktiv, aber der Übergang wirkt nicht morphend.
-
-### 4. Drift-Problem sauber absichern statt Standbild-Fallback
-
-Der ursprüngliche Grund für v72 war: bewegter i2v-Master kann bei 4 Personen auf eine Einzelperson driften.
-
-Diesen Fall lösen wir nicht mehr durch ein Standbild als Master, sondern durch einen Guard:
-
-- Multi-Speaker-Szenen behalten den bewegten Master.
-- Wenn der Master später Speaker verliert, darf nicht stillschweigend ein schlechter finaler Clip entstehen.
-- Bestehende Face-/Human-Count-Gates bleiben maßgeblich.
-- Wenn nötig wird der Master-Clip als fehlerhaft klassifiziert und neu generiert/refundet, statt einen Standbild-Clip zu verstecken.
-
-### 5. Bestehende fertige Szene nicht automatisch überschreiben
-
-Code-Fix betrifft neue und neu gemuxte Szenen.
-
-Für die aktuell kaputte Szene kann danach gezielt ein Re-Mux ausgelöst werden, sobald der Fix implementiert ist. Dabei bleibt die teure Sync.so-Arbeit erhalten; nur die finale Remotion-Komposition wird neu erstellt.
-
-## Technische Änderungen
-
-Betroffene Dateien:
-
-- `supabase/functions/render-sync-segments-audio-mux/index.ts`
-- `src/remotion/templates/DialogStitchVideo.tsx`
-- `.lovable/plan.md` / Memory nur zur Dokumentation der Regression und neuen Regel
-
-Konkrete Regeln nach dem Fix:
-
-```text
-Multi-speaker default:
-  master = moving source_clip_url
-  overlays = per speaker segment windows only
-  holdToEnd = false
-  masterImageUrl = disabled for normal mux
-
-Relative tight preclip:
-  Sequence starts at speaker segment
-  Video starts at frame 0
-
-Absolute full-scene Sync.so output:
-  Sequence starts at speaker segment
-  Video startFrom = segment startFrame
+```ts
+if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {
+  return 422 "Sync-Segments requires compose-twoshot-audio output…"
+}
 ```
 
-## Verifikation
+→ Sync.so wird nie gerufen, Plate spielt ohne Mundbewegung, VO läuft drüber als Off-Screen-Narration. Genau dein Eindruck.
 
-Nach Implementierung prüfen:
+Das passiert, weil du den Clip mit "🎬 Clip generieren" gerendert hast statt mit "🔊 **Clip generieren mit Voiceover**" (der Knopf direkt im Audio-Block, Screenshot 1). Nur der zweite Knopf zwingt `compose-twoshot-audio` davor.
 
-- Edge payload log zeigt wieder mehrere segment-window shots, nicht `shots=N speakers hold-to-end`.
-- Jeder Sprecher bewegt nur in seinem eigenen Zeitfenster den Mund.
-- Die Basisszene hat wieder natürliche Bewegung statt statischem Foto.
-- Merged audio bleibt unverändert erhalten.
-- Keine Änderung an Sync.so-Pricing, Refunds, Webhook, Credits oder Voiceover-Erzeugung.
+## Fix
+
+### 1. Auto-Lock Audio-Plan vor Sync-Segments-Render *(Hauptfix)*
+
+In `compose-video-clips` (Composer Render-Entry) für Szenen mit `engine_override='sync-segments'` ODER auto-routed Dialog:
+- Wenn `audio_plan.twoshot.url` fehlt UND `dialogScript` + Cast vorhanden → **vor** Hailuo-Dispatch `compose-twoshot-audio` aufrufen (auch für N=1; die Funktion mergt trivial bei 1 Sprecher).
+- Damit ist der Audio-Plan garantiert gelockt, sobald die Plate fertig ist und `useTwoShotAutoTrigger` greift.
+
+### 2. Auto-Retrigger für bestehende Szenen ohne Audio-Plan
+
+In `useTwoShotAutoTrigger` (sieht die Szene alle 8s an):
+- Neue Bedingung: `clip_status='ready'` + `dialogScript` + Cast + `engine='sync-segments'` + **`!audio_plan.twoshot.url`** → dispatch `compose-twoshot-audio` once (idempotent via existing `twoshot_stage='audio'` lock). Sobald die WAV da ist, läuft der bestehende Pfad nach `compose-dialog-segments` weiter.
+- Heißt: deine aktuelle "Problem"-Szene wird ohne Re-Render nachträglich gelipsynct.
+
+### 3. UI-Text-Bug "Lip-Sync via HeyGen" für Sync-Segments-Engine
+
+In der Audio-Karte (SceneCard / DialogStudioSheet) wird der Hinweis "Lip-Sync via HeyGen — Mund passt zum Audio (~€0.30)" angezeigt, obwohl die Engine `Fast Dialog` (Sync.so) ist. Den Text engine-abhängig machen:
+- `engine='heygen-talking-head'` → "Lip-Sync via HeyGen (~€0.30/Sprecher)"
+- `engine='sync-segments'` → "**Lip-Sync via Sync.so sync-3 — Mund passt zum Audio (~€0.20/s)**"
+- `engine='broll'` → "Voiceover als Off-Screen-Narration (kein Lip-Sync)"
+
+### 4. Director-Score Action-Button
+
+Die Director-Score-Karte ("Dialog Mismatch — kein Audio Plan gelockt") bekommt einen **"🔊 Voiceover jetzt generieren"** Quick-Action der genau `compose-twoshot-audio` für die Szene triggert. Damit der User sich nicht durchklicken muss.
+
+## Geänderte Dateien
+
+- `supabase/functions/compose-video-clips/index.ts` — Pre-flight `compose-twoshot-audio` bei sync-segments ohne Audio-Plan
+- `src/hooks/useTwoShotAutoTrigger.ts` — Neuer Auto-Lock-Branch für ready-Clips ohne `twoshot.url`
+- `src/components/video-composer/scene/AudioBlock.tsx` (oder vergleichbare Karte) — engine-abhängiger Lipsync-Hinweistext
+- `src/components/video-composer/scene/DirectorScoreCard.tsx` — Quick-Action-Button für "Voiceover generieren"
+
+## Was *nicht* gemacht wird
+
+- Keine Pipeline-Architektur-Änderungen. Sync.so `sync-3` bleibt universal default (v62). v75 (moving master + windowed overlays) bleibt unverändert.
+- Keine Migration bestehender Szenen — Auto-Retrigger (#2) holt sie automatisch nach.
