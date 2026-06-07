@@ -124,6 +124,16 @@ export interface CharacterShot {
    * `Wearing: <outfit name>`. When null/undefined → default portrait.
    */
   outfitLookId?: string | null;
+  /**
+   * Manual per-character Action override (user-typed, UI language).
+   * When non-empty, this slot is LOCKED — `applyActionsToPrompt` pins it
+   * into the `[CastActions]` marker block at the top of the provider
+   * prompt with strict priority over Director-generated text. Empty →
+   * fall back to whatever Scene-Director produced.
+   */
+  actionUser?: string;
+  /** Auto-translated English mirror of `actionUser`. Cached server-side. */
+  actionEn?: string;
 }
 
 export interface TextOverlayConfig {
