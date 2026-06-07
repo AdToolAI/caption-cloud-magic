@@ -1623,7 +1623,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           />
         </div>
       )}
-      {/* Lip-sync mode hint — honest about what each path actually delivers. */}
+      {/* Lip-sync mode hint — honest about what each path actually delivers.
+          Engine-aware: sync-segments (Sync.so sync-3) is the default for
+          single- AND multi-speaker dialog; HeyGen is only used when the
+          scene explicitly opts into `heygen-talking-head` (Shot-Reverse-
+          Shot split). */}
       {blocks.length > 0 && (() => {
         const portraitsAll = speakers.every(
           (sp) => Boolean(sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl),
@@ -1632,30 +1636,40 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           (sp) => !sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
         );
         const isMulti = blocks.length >= 2;
+        const engineOv = (scene as any).engineOverride as string | undefined;
+        // sync-segments is the auto default when a scene has dialog + cast
+        // (see recommendEngineForScene). Treat unset/auto as sync-segments
+        // so the user sees the correct provider name.
+        const isSyncSegments =
+          engineOv === 'sync-segments' ||
+          engineOv === 'cinematic-sync' ||
+          (!engineOv || engineOv === 'auto');
+        const isHeygenSrs = engineOv === 'heygen-talking-head' || (isMulti && renderAsSeparateScenes);
         let label: string;
         let tone: 'primary' | 'amber' | 'muted' = 'muted';
-        if (isMulti && portraitsAll) {
-          tone = 'primary';
-          const cost = (speakers.length * 0.30).toFixed(2);
-          label = language === 'de'
-            ? `🎙️ Wird als ${speakers.length} Szenen gerendert (Shot-Reverse-Shot, je 1 HeyGen-Clip pro Sprecher) — ~€${cost}`
-            : language === 'es'
-            ? `🎙️ Se renderizará como ${speakers.length} escenas (Shot-Reverse-Shot, 1 clip HeyGen por hablante) — ~€${cost}`
-            : `🎙️ Will render as ${speakers.length} scenes (Shot-Reverse-Shot, 1 HeyGen clip per speaker) — ~€${cost}`;
-        } else if (isMulti && missing) {
+        if (isMulti && missing) {
           tone = 'amber';
           label = language === 'de'
             ? `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`
             : language === 'es'
             ? `⚠️ ${missing.name} no tiene retrato — asigna un Brand-Character, si no, no hay lip-sync real.`
             : `⚠️ ${missing.name} has no portrait — assign a cast character or real lip-sync is impossible.`;
-        } else if (!isMulti && portraitsAll) {
+        } else if (isHeygenSrs && portraitsAll) {
           tone = 'primary';
+          const cost = (Math.max(1, speakers.length) * 0.30).toFixed(2);
           label = language === 'de'
-            ? '🎙️ Lip-Sync via HeyGen — Mund passt zum Audio (~€0,30)'
+            ? `🎙️ Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 HeyGen-Clip pro Sprecher) — ~€${cost}`
             : language === 'es'
-            ? '🎙️ Lip-sync via HeyGen — la boca coincide con el audio (~€0,30)'
-            : '🎙️ Lip-sync via HeyGen — mouth matches the audio (~€0.30)';
+            ? `🎙️ Se renderizará como ${speakers.length} escena(s) (Shot-Reverse-Shot, 1 clip HeyGen por hablante) — ~€${cost}`
+            : `🎙️ Will render as ${speakers.length} scene(s) (Shot-Reverse-Shot, 1 HeyGen clip per speaker) — ~€${cost}`;
+        } else if (isSyncSegments && portraitsAll) {
+          tone = 'primary';
+          // sync-segments pricing ≈ €0.20/s; show flat cost note instead of per-speaker.
+          label = language === 'de'
+            ? `⚡ Lip-Sync via Sync.so sync-3 (Fast Dialog) — Mund passt zum Audio${speakers.length > 1 ? ` · ${speakers.length} Sprecher in einer Plate` : ''} (~€0,20/s)`
+            : language === 'es'
+            ? `⚡ Lip-sync vía Sync.so sync-3 (Fast Dialog) — la boca coincide con el audio${speakers.length > 1 ? ` · ${speakers.length} hablantes en una sola toma` : ''} (~€0,20/s)`
+            : `⚡ Lip-sync via Sync.so sync-3 (Fast Dialog) — mouth matches the audio${speakers.length > 1 ? ` · ${speakers.length} speakers in one plate` : ''} (~€0.20/s)`;
         } else {
           label = language === 'de'
             ? '🔊 Audio-Overlay (kein Lip-Sync möglich ohne Cast-Portrait)'
