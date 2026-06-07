@@ -329,7 +329,9 @@ export interface ComposerScene {
    */
   realismPreset?: 'cinematic-spot' | 'documentary' | 'lifestyle-hero';
 
+  /** Stock media metadata when clipSource === 'stock' or 'stock-image'. */
   stockMediaThumb?: string;
+
   stockMediaSource?: StockMediaSource;
   stockMediaAuthor?: { name: string; url?: string };
   /**
