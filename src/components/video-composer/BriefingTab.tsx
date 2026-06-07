@@ -66,19 +66,30 @@ const actionFromPrompt = (prompt: unknown, maxWords = 25) => {
   return cleanActionText(actionClause || firstSentence, maxWords);
 };
 
-const characterActionFromPrompt = (prompt: unknown, characterName: string | undefined, sceneAction: string) => {
-  const body = String(prompt ?? '').replace(/^Featuring\s+[^:]{1,500}:\s*/i, '').replace(/,\s*no on-screen text[\s\S]*$/i, '');
+/**
+ * Cast-aware per-character fallback. Returns "" when the prompt doesn't
+ * actually mention this character — never copies another character's clause
+ * or the generic scene action into a foreign cast slot.
+ */
+const characterActionFromPrompt = (prompt: unknown, characterName: string | undefined) => {
+  const body = String(prompt ?? '')
+    .replace(/\[SceneAction\][\s\S]*?\[\/SceneAction\]\s*/gi, '')
+    .replace(/\[CastActions\][\s\S]*?\[\/CastActions\]\s*/gi, '')
+    .replace(/^Featuring\s+[^:]{1,500}:\s*/i, '')
+    .replace(/,\s*no on-screen text[\s\S]*$/i, '');
   const name = String(characterName ?? '').trim();
-  if (name) {
-    const first = name.split(/\s+/)[0]?.toLowerCase() || '';
-    const clauses = body.split(/[.!?]\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
-    const match = clauses.find((clause) => {
-      const lower = clause.toLowerCase();
-      return lower.includes(name.toLowerCase()) || (first.length >= 3 && lower.includes(first));
-    });
-    if (match) return cleanActionText(match, 12);
-  }
-  return cleanActionText(sceneAction || actionFromPrompt(prompt, 12), 12);
+  if (!name) return '';
+  const first = name.split(/\s+/)[0]?.toLowerCase() || '';
+  if (first.length < 3) return '';
+  const lower = body.toLowerCase();
+  if (!lower.includes(name.toLowerCase()) && !lower.includes(first)) return '';
+  const clauses = body.split(/[.!?]\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
+  const match = clauses.find((clause) => {
+    const l = clause.toLowerCase();
+    return l.includes(name.toLowerCase()) || l.includes(first);
+  });
+  if (!match) return '';
+  return cleanActionText(match, 12);
 };
 
 interface BriefingTabProps {
