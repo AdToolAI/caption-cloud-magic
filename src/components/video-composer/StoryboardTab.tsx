@@ -359,6 +359,23 @@ export default function StoryboardTab({
         beforeState: sceneToSnakeSnapshot(target),
       }).catch(() => { /* non-fatal */ });
     }
+    // Explicit DB delete by id. Previously we relied on
+    // ensureProjectPersisted's "delete everything not in local snapshot"
+    // cleanup, which has been removed because it silently erased real
+    // scenes during realtime races. Persisted scenes must be removed
+    // explicitly here; local-only scenes (non-UUID id) only need the
+    // local filter below.
+    if (target && /^[0-9a-f-]{36}$/i.test(target.id)) {
+      import('@/integrations/supabase/client').then(({ supabase }) => {
+        supabase
+          .from('composer_scenes')
+          .delete()
+          .eq('id', target.id)
+          .then(({ error }) => {
+            if (error) console.warn('[StoryboardTab] deleteScene DB delete failed', error);
+          });
+      });
+    }
     onUpdateScenes(
       scenes
         .filter((s) => s.id !== id)
