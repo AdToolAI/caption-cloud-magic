@@ -203,8 +203,34 @@ const TOOL_DEFINITION = {
           },
           required: ['characterAction', 'environmentMotion', 'motionIntensity'],
         },
+        sceneActionEn: { type: 'string', description: 'ONE English sentence summarizing what physically happens in the scene (mirrors the action body of aiPrompt, excluding cast header and negative clause). ≤ 25 words.' },
+        sceneActionLocalized: { type: 'string', description: 'Faithful translation of sceneActionEn into the user UI language. Identical to sceneActionEn when UI language is en.' },
+        perCharacterActions: {
+          type: 'array',
+          description: 'EXACTLY one entry per matchedAssets.characterIds member. Each entry describes what THIS character physically does in the scene, in English, ≤ 12 words, with a concrete verb. Required for multi-character lip-sync face-mapping.',
+          items: {
+            type: 'object',
+            properties: {
+              characterId: { type: 'string' },
+              actionEn: { type: 'string' },
+            },
+            required: ['characterId', 'actionEn'],
+          },
+        },
+        perCharacterActionsLocalized: {
+          type: 'array',
+          description: 'Same entries as perCharacterActions, translated into the user UI language. Same length and same order.',
+          items: {
+            type: 'object',
+            properties: {
+              characterId: { type: 'string' },
+              action: { type: 'string' },
+            },
+            required: ['characterId', 'action'],
+          },
+        },
       },
-      required: ['aiPrompt', 'matchedAssets', 'droppedActions', 'followupSceneSuggestions', 'missingAssets', 'confidence', 'actionBeat'],
+      required: ['aiPrompt', 'matchedAssets', 'droppedActions', 'followupSceneSuggestions', 'missingAssets', 'confidence', 'actionBeat', 'sceneActionEn', 'perCharacterActions'],
     },
   },
 };
