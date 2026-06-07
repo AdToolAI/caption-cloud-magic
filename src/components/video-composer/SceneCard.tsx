@@ -2252,6 +2252,8 @@ export default function SceneCard({
                       if (characterShots && characterShots.length > 0) {
                         updates.characterShots = characterShots;
                         updates.characterShot = characterShots[0];
+                        // Storyboard delivered a fresh cast → clear the dismissal blocklist.
+                        updates.dismissedCharacterIds = [];
                       }
                       if (promptMode === "structured") {
                         // Drop back to free mode so the user sees the new prompt verbatim.
