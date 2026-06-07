@@ -581,7 +581,52 @@ export default function SceneCard({
   }, [scene.dialogScript, characters?.length, promptMode, scene.engineOverride]);
 
 
-  const handleSlotsChange = (next: PromptSlots) => {
+  // ── Action overrides → prompt sync ────────────────────────────────────
+  // Inject `[SceneAction]` + `[CastActions]` marker blocks whenever the user
+  // edits the manual action fields. `applyActionsToPrompt` is idempotent
+  // (strips the existing markers before rewriting), so this is safe to run
+  // on every relevant change. Empty inputs → markers disappear → Director
+  // output regains control. Locked overrides survive Director re-rolls
+  // because this effect re-applies them right after `onApply` writes the
+  // new `aiPrompt`.
+  useEffect(() => {
+    if (!scene.clipSource.startsWith("ai-")) return;
+    const sceneActionEn = (scene.sceneActionEn ?? "").trim();
+    const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+    const castActions: CastActionEntry[] = cast
+      .map((slot) => {
+        const ch = characters?.find((c) => c.id === slot.characterId);
+        const en = (slot.actionEn ?? "").trim();
+        if (!ch || !en) return null;
+        return { name: ch.name, actionEn: en };
+      })
+      .filter((x): x is CastActionEntry => !!x);
+
+    if (promptMode === "structured") {
+      const currentSubject = (promptSlots.subject as string) || "";
+      const next = applyActionsToPrompt(currentSubject, sceneActionEn, castActions);
+      if (next !== currentSubject) {
+        const nextSlots: PromptSlots = { ...promptSlots, subject: next };
+        onUpdate({
+          promptSlots: nextSlots,
+          aiPrompt: stitchSlots(nextSlots, promptSlotOrder),
+        });
+      }
+    } else {
+      const next = applyActionsToPrompt(scene.aiPrompt || "", sceneActionEn, castActions);
+      if (next !== (scene.aiPrompt || "")) onUpdate({ aiPrompt: next });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    scene.sceneActionEn,
+    scene.aiPrompt,
+    promptMode,
+    characters?.length,
+    scene.characterShots?.map((s) => `${s.characterId}:${s.actionEn ?? ""}`).join("|"),
+    scene.characterShot?.actionEn,
+  ]);
+
+
     const stitched = stitchSlots(next, promptSlotOrder);
     onUpdate({ promptSlots: next, aiPrompt: stitched });
   };
