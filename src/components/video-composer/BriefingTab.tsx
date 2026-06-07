@@ -45,6 +45,42 @@ const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
   { value: '4:5', label: '4:5', desc: 'Instagram / Facebook' },
 ];
 
+const cleanActionText = (value: unknown, maxWords = 25) => {
+  const text = String(value ?? '').replace(/\s+/g, ' ').replace(/^[-–—:\s]+/, '').trim();
+  if (!text) return '';
+  const words = text.split(/\s+/).filter(Boolean);
+  return words.length > maxWords ? words.slice(0, maxWords).join(' ') : text;
+};
+
+const actionFromPrompt = (prompt: unknown, maxWords = 25) => {
+  const cleaned = String(prompt ?? '')
+    .replace(/\[SceneAction\][\s\S]*?\[\/SceneAction\]\s*/gi, '')
+    .replace(/\[CastActions\][\s\S]*?\[\/CastActions\]\s*/gi, '')
+    .replace(/^Featuring\s+[^:]{1,500}:\s*/i, '')
+    .replace(/,\s*no on-screen text[\s\S]*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return '';
+  const firstSentence = cleaned.split(/(?<=[.!?])\s+/)[0] || cleaned;
+  const actionClause = firstSentence.split(/,\s*(?:shot on|camera|lens|lighting|golden hour|soft light|shallow depth|filmic|muted palette|anamorphic|no on-screen)/i)[0];
+  return cleanActionText(actionClause || firstSentence, maxWords);
+};
+
+const characterActionFromPrompt = (prompt: unknown, characterName: string | undefined, sceneAction: string) => {
+  const body = String(prompt ?? '').replace(/^Featuring\s+[^:]{1,500}:\s*/i, '').replace(/,\s*no on-screen text[\s\S]*$/i, '');
+  const name = String(characterName ?? '').trim();
+  if (name) {
+    const first = name.split(/\s+/)[0]?.toLowerCase() || '';
+    const clauses = body.split(/(?<=[.!?])\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
+    const match = clauses.find((clause) => {
+      const lower = clause.toLowerCase();
+      return lower.includes(name.toLowerCase()) || (first.length >= 3 && lower.includes(first));
+    });
+    if (match) return cleanActionText(match, 12);
+  }
+  return cleanActionText(sceneAction || actionFromPrompt(prompt, 12), 12);
+};
+
 interface BriefingTabProps {
   briefing: ComposerBriefing;
   category: ComposerCategory;
