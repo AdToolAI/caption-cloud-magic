@@ -371,6 +371,7 @@ export default function VideoComposerDashboard() {
             characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
               ? ((row as any).character_shots as any)
               : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
+            dismissedCharacterIds: local?.dismissedCharacterIds ?? [],
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
             dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
@@ -511,6 +512,7 @@ export default function VideoComposerDashboard() {
             characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
               ? ((row as any).character_shots as any)
               : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
+            dismissedCharacterIds: local?.dismissedCharacterIds ?? [],
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
             dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
