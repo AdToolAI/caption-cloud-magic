@@ -66,6 +66,7 @@ import { CharacterShotBadge } from "./CharacterShotBadge";
 import { CharacterCastPicker } from "./CharacterCastPicker";
 import { UnifiedAssetPicker } from "./UnifiedAssetPicker";
 import { SceneDirectorBox } from "./SceneDirectorBox";
+import { RealismPresetPicker } from "./RealismPresetPicker";
 import { useBrandLocations } from "@/hooks/useBrandLocations";
 import { useBrandBuildings } from "@/hooks/useBrandBuildings";
 import { useBrandProps } from "@/hooks/useBrandProps";
@@ -2283,7 +2284,8 @@ export default function SceneCard({
                       reference_image_url: p.reference_image_url,
                     }))}
                     onAddCharacter={onAddCharacter}
-                    onApply={({ aiPrompt, dialogScript, characterShots }) => {
+                    realismPreset={scene.realismPreset}
+                    onApply={({ aiPrompt, dialogScript, characterShots, actionBeat }) => {
                       const updates: Partial<ComposerScene> = { aiPrompt };
                       if (dialogScript !== undefined)
                         updates.dialogScript = dialogScript;
@@ -2292,6 +2294,9 @@ export default function SceneCard({
                         updates.characterShot = characterShots[0];
                         // Storyboard delivered a fresh cast → clear the dismissal blocklist.
                         updates.dismissedCharacterIds = [];
+                      }
+                      if (actionBeat) {
+                        updates.actionBeat = actionBeat;
                       }
                       if (promptMode === "structured") {
                         // Drop back to free mode so the user sees the new prompt verbatim.
@@ -2440,15 +2445,21 @@ export default function SceneCard({
                     tools (DirectorPresetPicker + CinematicStylePresets +
                     SceneShotDirectorPanel). They now live behind
                     SceneStyleSheet (3 tabs). */}
-                  <SceneStyleChip
-                    language={lang}
-                    shotDirector={scene.shotDirector}
-                    hasModifiers={
-                      Object.keys(scene.directorModifiers || {}).length > 0
-                    }
-                    onOpen={() => setStyleSheetOpen(true)}
-                    onReset={() => onUpdate({ shotDirector: {} })}
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SceneStyleChip
+                      language={lang}
+                      shotDirector={scene.shotDirector}
+                      hasModifiers={
+                        Object.keys(scene.directorModifiers || {}).length > 0
+                      }
+                      onOpen={() => setStyleSheetOpen(true)}
+                      onReset={() => onUpdate({ shotDirector: {} })}
+                    />
+                    <RealismPresetPicker
+                      value={scene.realismPreset ?? null}
+                      onChange={(id) => onUpdate({ realismPreset: id ?? undefined })}
+                    />
+                  </div>
 
                   {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
                     block was removed. The same composed prompt + layer

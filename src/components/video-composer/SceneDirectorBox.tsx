@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { getSceneBudget, summarizeBudget } from '@/lib/sceneDirector/durationBudget';
 import { applySceneAssetsToPrompt } from '@/lib/motion-studio/applySceneAssetsToPrompt';
 import type { ComposerCharacter, ComposerScene, CharacterShot } from '@/types/video-composer';
+import type { RealismPresetId } from '@/config/cinematicRealismPresets';
 
 interface AssetEntry { id: string; name: string; reference_image_url?: string; description?: string | null }
 
@@ -20,15 +21,18 @@ interface SceneDirectorBoxProps {
   buildings: AssetEntry[];
   props: AssetEntry[];
   brandKitContext?: string;
+  realismPreset?: RealismPresetId | null;
   onApply: (updates: {
     aiPrompt: string;
     dialogScript?: string;
     characterShots?: CharacterShot[];
+    actionBeat?: ComposerScene['actionBeat'];
   }) => void;
   onAddCharacter?: (c: ComposerCharacter) => void;
   onInsertFollowups?: (descriptions: string[]) => void;
   onGenerateMissingAsset?: (kind: 'character' | 'location' | 'building' | 'prop', name: string, suggestedPrompt: string) => void;
 }
+
 
 const LABELS = {
   en: { title: 'Scene from description', desc: 'Describe the scene in your own words. The director picks matching library assets, fits the action to the duration and writes the AI prompt.', placeholder: 'WW2. A soldier drives a Leopard tank across a stone bridge at sunrise.', generate: 'Generate scene', regenerate: 'Re-roll', loading: 'Casting your library…', applied: 'Scene applied', dropped: 'Trimmed to fit duration', followup: 'Add follow-up scene', missing: 'Not in your library', generateAsset: 'Generate' },
@@ -45,6 +49,7 @@ export function SceneDirectorBox({
   buildings,
   props,
   brandKitContext,
+  realismPreset,
   onApply,
   onAddCharacter,
   onInsertFollowups,
@@ -75,6 +80,7 @@ export function SceneDirectorBox({
         durationSeconds: scene.durationSeconds,
         language: lang,
         brandKitContext,
+        realismPreset: realismPreset ?? scene.realismPreset ?? null,
         library: {
           characters: allCharacters.map((c) => ({ id: c.id, name: c.name, descriptor: c.description ?? null })),
           locations:  locations.map((a) => ({ id: a.id, name: a.name, descriptor: a.description ?? null })),
@@ -127,6 +133,13 @@ export function SceneDirectorBox({
         aiPrompt: finalPrompt,
         dialogScript: data.dialogScript || undefined,
         characterShots: characterShots.length > 0 ? characterShots : undefined,
+        actionBeat: data.actionBeat
+          ? {
+              characterAction: data.actionBeat.characterAction || undefined,
+              environmentMotion: data.actionBeat.environmentMotion || undefined,
+              motionIntensity: data.actionBeat.motionIntensity || undefined,
+            }
+          : undefined,
       });
 
       setResult(data);
