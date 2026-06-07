@@ -294,6 +294,17 @@ export default function BriefingTab({
       const scenesWithQuality = rawScenes.map((s: ComposerScene) => ({
         ...s,
         clipQuality: s.clipQuality || defaultQ,
+        sceneActionEn: s.sceneActionEn || actionFromPrompt(s.aiPrompt, 25),
+        sceneActionUser: s.sceneActionUser || s.sceneActionEn || actionFromPrompt(s.aiPrompt, 25),
+        characterShots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])).map((slot) => {
+          const ch = briefing.characters?.find((c) => c.id === slot.characterId);
+          const fallback = characterActionFromPrompt(s.aiPrompt, ch?.name, s.sceneActionEn || actionFromPrompt(s.aiPrompt, 12));
+          return {
+            ...slot,
+            actionEn: slot.actionEn || fallback,
+            actionUser: slot.actionUser || slot.actionEn || fallback,
+          };
+        }),
       }));
       onScenesGenerated(scenesWithQuality);
       hadScenes = true;
