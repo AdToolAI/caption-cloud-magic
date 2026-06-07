@@ -1,30 +1,30 @@
 ## Ziel
-Die Action-Felder dürfen nicht mehr alle denselben Charakter/Text übernehmen. Das allgemeine Feld soll die Szene insgesamt beschreiben; jedes Charakter-Feld soll nur die Aktion des jeweiligen Charakters enthalten.
+Neue KI-Briefings sollen bei Szenen mit mehreren Charakteren nicht mehr nur eine Person fokussieren. Wenn mehrere Charaktere in einer Szene vorkommen, müssen alle sichtbar sein, jeweils eine eigene Handlung haben und die Szene muss für Lip-Sync nutzbar sein: entweder Dialog miteinander oder klarer Turn zur Kamera.
 
 ## Plan
-1. **Root Cause im Storyboard-Fallback beheben**
-   - Die aktuelle Fallback-Logik sucht im Prompt nach einem Namen und fällt sonst auf die allgemeine Szene zurück.
-   - Dadurch wird bei mehreren Charakteren dieselbe Aktion (z. B. Sarah) in Matthew/Samuel/Kailee kopiert.
-   - Ich ersetze das durch eine cast-bewusste Logik: Nur wenn der Prompt wirklich eine eigene Klausel für diesen Charakter enthält, wird sie übernommen; sonst wird kein fremder Charaktertext kopiert.
+1. **Storyboard-Regeln härten**
+   - In `compose-video-storyboard` die Multi-Character-Regeln von „co-presence optional“ auf „Lip-Sync-safe group scene“ ändern.
+   - Für 2+ sichtbare Charaktere erzwingen: wide/medium group framing, all faces visible, no cropped/hidden/back-only/POV cast slots, clear left-to-right placement, no single-character close-up.
+   - `sceneActionEn` darf nicht mehr nur Sarah/den ersten Charakter beschreiben, sondern muss die gemeinsame Szene beschreiben.
 
-2. **Allgemeines Szenenfeld bereinigen**
-   - `sceneActionEn/User` soll aus dem allgemeinen Szeneninhalt kommen, aber keine Cast-/Character-Beschreibung wie „A professional modern woman…“ übernehmen.
-   - Falls der Prompt mit Cast-/Featuring-Blöcken startet, werden diese vor der Szenen-Zusammenfassung sicher entfernt.
+2. **Dialog-/Kamera-Regel ergänzen**
+   - Für jede Multi-Character-Szene muss der Prompt klar sagen: die Charaktere sprechen entweder miteinander oder nacheinander in die Kamera.
+   - `characterShots[].actionEn/actionUser` bekommt pro Charakter eine eigene, sichtbare Aktion inklusive Blick-/Sprechrichtung.
+   - Wenn nur ein Charakter sinnvoll im Fokus steht, darf `characterShots` auch nur diesen einen Charakter enthalten — keine „ghost cast“-Einträge.
 
-3. **Per-Character-Fallbacks korrekt erzeugen**
-   - Für jeden `characterShots[]` Slot wird die Aktion anhand des passenden Charakternamens und der passenden Prompt-Klausel abgeleitet.
-   - Wenn keine klare eigene Aktion vorhanden ist, wird eine neutrale, charakterbezogene Kurzform erzeugt, aber nicht die Aktion eines anderen Charakters kopiert.
-   - Server-Floor-Auto-Reparaturen bekommen dieselbe Logik, damit automatisch eingefügte Charaktere nicht wieder falsche Aktionen erhalten.
+3. **Serverseitige Reparatur ersetzen**
+   - Die aktuelle Floor-Reparatur fügt fehlende Charaktere nachträglich in beliebige Szenen ein, ohne den Prompt wirklich umzubauen. Das erzeugt genau die Screenshots: Cast-Liste enthält mehrere Personen, Prompt beschreibt aber nur Sarah.
+   - Stattdessen: Wenn ein Charakter per Floor hinzugefügt wird, wird auch der Prompt deterministisch zu einer Gruppenszene erweitert: alle Namen, alle Signature Items, klare sichtbare Positionen und eigene Aktionen.
+   - Multi-Charakter-Slots mit ungeeigneten ShotTypes (`pov`, `detail`, `back`, `silhouette`) werden für Lip-Sync-Szenen auf `full`/`profile` normalisiert.
 
-4. **Frontend-Kompatibilität absichern**
-   - Die Client-Fallbacks in `BriefingTab.tsx` werden an dieselbe Regel angepasst, damit alte/cached Edge-Function-Antworten ebenfalls korrigiert werden.
-   - `SceneCard.tsx` bleibt beim Prompt-Injection-Verhalten, schreibt aber nur noch die bereinigten Werte in `[CastActions]`.
+4. **Client-Fallback angleichen**
+   - In `BriefingTab.tsx` dieselbe Logik für alte/cached Edge-Function-Antworten ergänzen, damit neue Szenen im UI sofort bereinigt werden.
+   - Keine fremde Aktion mehr kopieren; wenn mehrere Charaktere im Cast sind, wird die allgemeine Szene zu einer gemeinsamen Gruppenszene, nicht zu einem Einzelpersonen-Prompt.
 
-## Betroffene Dateien
-- `supabase/functions/compose-video-storyboard/index.ts`
-- `src/components/video-composer/BriefingTab.tsx`
+5. **Finaler Prompt im SceneCard stabilisieren**
+   - `applyActionsToPrompt`/Cast-Injektion so erweitern, dass `[CastActions]` bei mehreren Charakteren nicht als Zusatz über einem Einzelpersonen-Prompt stehen bleibt, sondern eine klare Gruppenszenen-Anweisung ergänzt.
+   - Ziel: Der finale KI-Prompt enthält keine widersprüchliche Struktur wie „Featuring Matthew/Samuel/Kailee: Sarah sits alone…“.
 
-## Akzeptanzkriterien
-- Neues KI-Briefing mit mehreren Charakteren füllt nicht mehr alle Charakterfelder mit Sarah/Matthew/etc.
-- Das allgemeine Feld beschreibt die Szene, nicht einen einzelnen Cast-Slot.
-- `[CastActions]` im Prompt enthält pro Charakter unterschiedliche/korrekte Aktionen oder lässt unklare Aktionen weg statt falsche zu kopieren.
+## Technische Prüfungen
+- Betroffene Dateien: `supabase/functions/compose-video-storyboard/index.ts`, `src/components/video-composer/BriefingTab.tsx`, wahrscheinlich `src/lib/motion-studio/applyActionsToPrompt.ts` oder `applyCastToPrompt.ts`.
+- Nach Umsetzung: gezielt die Prompt-Erzeugung prüfen, ob bei 2–4 Charakteren alle Namen im Aktionskörper vorkommen, alle Actions eindeutig sind und keine Szene mit Multi-Cast nur einen Charakter beschreibt.
