@@ -28,6 +28,7 @@ interface DirectorRequest {
   durationSeconds: number;
   language?: 'en' | 'de' | 'es';
   brandKitContext?: string;
+  realismPreset?: 'cinematic-spot' | 'documentary' | 'lifestyle-hero' | null;
   library: {
     characters?: AssetEntry[];
     locations?: AssetEntry[];
@@ -35,6 +36,17 @@ interface DirectorRequest {
     props?: AssetEntry[];
   };
 }
+
+// Inline realism profile contexts — must stay in sync with src/config/cinematicRealismPresets.ts
+const REALISM_CONTEXTS: Record<string, string> = {
+  'cinematic-spot': `REALISM PROFILE — CINEMATIC SPOT (TV commercial / brand film).
+Prefer action beats that feel like a real commercial: driving establishing shots, hero close-ups during a meaningful action, push-ins on hands working with the product, slow steadicam glides through real environments. Lighting reads as "motivated practical + soft key", never flat. Camera operates with subtle breathing handheld or a Steadicam glide — never locked-off tripod for sprech moments. Treat dialog as voiceover-over-action, not as direct camera address, unless the user explicitly asks for a presenter shot.`,
+  'documentary': `REALISM PROFILE — DOCUMENTARY / UGC AUTHENTIC.
+Prefer captured-not-staged beats: subject mid-action, glancing at the camera mid-sentence, hands in motion, subtle imperfections (shallow handheld drift, natural reframe). Lighting is whatever the real scene would have — window light, lamp practicals, available sunlight. Camera is a small handheld lens at focal lengths between 24-35 mm, with believable micro-shake. Dialog is delivered casually while the subject keeps doing what they were doing.`,
+  'lifestyle-hero': `REALISM PROFILE — LIFESTYLE HERO (aspirational brand film).
+Prefer wide aspirational beats: subject moving through a beautiful location, golden-hour or magic-hour lighting, slow Steadicam orbits, hands interacting with hero props. Camera language is composed, deliberate, with anamorphic-style oval bokeh and cinematic depth of field. Dialog is delivered with confident, calm tonality while the subject continues a hero action (driving, walking, working, arriving).`,
+};
+
 
 const BUDGETS = [
   { upTo: 4,  maxActions: 1, maxCameraMoves: 1, maxScriptWords: 9,  maxAssets: 2 },
@@ -70,7 +82,11 @@ function buildSystemPrompt(req: DirectorRequest): string {
     return `${label}:\n` + list.map((a) => `  • id="${a.id}" name="${a.name}"${a.descriptor ? ` — ${a.descriptor.slice(0, 140)}` : ''}`).join('\n');
   };
 
-  return `You are Scene Director — a cinematographer that turns ONE free-text scene description into ONE render-ready video prompt.
+  const realismContext = req.realismPreset && REALISM_CONTEXTS[req.realismPreset]
+    ? `\n${REALISM_CONTEXTS[req.realismPreset]}\n`
+    : '';
+
+  return `You are Scene Director — a cinematographer that turns ONE free-text scene description into ONE render-ready video prompt that produces REAL CINEMATIC ACTION, not a static talking-head bust.
 
 DURATION: ${b.durationSeconds} seconds. BUDGET (hard limits — do NOT exceed):
 - max ${b.maxActions} distinct visual actions
@@ -81,6 +97,16 @@ DURATION: ${b.durationSeconds} seconds. BUDGET (hard limits — do NOT exceed):
 If the description has more than the budget allows, KEEP the most cinematic / most narratively important beat for THIS scene and put the rest into "droppedActions" + "followupSceneSuggestions" (one full description string per follow-up scene). Do NOT cram everything in.
 
 ${SCENE_HARD_RULES_EN}
+${realismContext}
+ACTION-FIRST DIRECTIVE (critical):
+- ALWAYS deliver a concrete physical action for the on-screen character — driving, walking, working with hands, gesturing, looking around, reaching for something — even when dialog is present.
+- NEVER write "person speaks directly to camera" unless the user explicitly asked for a presenter shot. Default is action + dialog as voiceover-over-action.
+- The aiPrompt MUST describe body language, hands, environment motion (wind, light shifts, passing cars, etc.) and camera language. Never just face and lips.
+- Populate \`actionBeat\` with: \`characterAction\` (what the character physically does — English, present continuous, one sentence), \`environmentMotion\` (what moves around them — English, one sentence), and \`motionIntensity\`:
+    • static    → direct camera address bust (avoid unless explicitly asked)
+    • subtle    → seated/standing while doing something small (sipping coffee, typing, glancing)
+    • moderate  → walking, gesturing, working with hands, looking around an environment
+    • high      → driving, running, riding, dancing, sports, anything with travel speed
 
 LIBRARY MATCHING:
 For every person, place, building or object the user mentions, find the best match in the library below by name + descriptor. Rules:
@@ -91,6 +117,7 @@ For every person, place, building or object the user mentions, find the best mat
 OUTPUT LANGUAGES:
 - aiPrompt: English ALWAYS (visual model performance).
 - dialogScript: ${lang} (the user's UI language). Empty string if no spoken line is needed.
+- actionBeat fields: English ALWAYS.
 
 ${fmt('CHARACTERS', req.library.characters)}
 
@@ -103,6 +130,7 @@ ${fmt('PROPS', req.library.props)}
 ${req.brandKitContext ? `BRAND CONTEXT: ${req.brandKitContext}\n` : ''}
 You MUST call the tool \`emitScene\` exactly once with the final result. Do not return prose.`;
 }
+
 
 const TOOL_DEFINITION = {
   type: 'function',
