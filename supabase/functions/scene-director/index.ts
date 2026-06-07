@@ -29,6 +29,10 @@ interface DirectorRequest {
   language?: 'en' | 'de' | 'es';
   brandKitContext?: string;
   realismPreset?: 'cinematic-spot' | 'documentary' | 'lifestyle-hero' | null;
+  /** IDs the user already locked in the cast picker — MUST be matched + visible. */
+  requiredCharacterIds?: string[];
+  /** Names corresponding 1:1 to requiredCharacterIds (for prompt enforcement). */
+  requiredCharacterNames?: string[];
   library: {
     characters?: AssetEntry[];
     locations?: AssetEntry[];
@@ -114,6 +118,28 @@ For every person, place, building or object the user mentions, find the best mat
 - If no good match exists, list the missing item under "missingAssets" with a one-line description so the UI can offer "Generate with AI".
 - Set confidence: high = every named entity matched cleanly; medium = some matched + 1-2 missing; low = mostly missing or ambiguous.
 
+CAST COVERAGE (critical — multi-character lip-sync depends on this):
+- EVERY character listed in matchedAssets.characterIds MUST appear visibly in the aiPrompt action body, by name, doing something concrete.
+- A character mentioned only in a "Featuring …:" / cast header DOES NOT COUNT. They need a verb in the action body.
+- If you cannot fit all matched characters into the duration budget, then either:
+    (a) drop them from matchedAssets.characterIds (do NOT keep them as "ghost" cast that is referenced but never seen), OR
+    (b) split the overflow into followupSceneSuggestions.
+- For ensemble scenes with 2+ characters: describe the spatial arrangement (side by side, facing each other, sitting around a table, walking together, intercut between desks). NEVER write a solo close-up scene while listing extra characters as matched — the downstream Multi-Portrait renderer will only see one face and the lip-sync face-map collapses.
+- For 3-4 character scenes: prefer a wide group composition or fast intercuts between named subjects, not a single close-up on one face.
+
+EXAMPLE — GOOD (3 cast members, all visible):
+  matchedAssets.characterIds: [alice, bob, carol]
+  aiPrompt: "Alice leans over the laptop pointing at the screen while Bob takes notes; Carol stands behind them holding a coffee cup, glancing toward the window. Wide ensemble shot, …"
+
+EXAMPLE — FORBIDDEN (3 matched, only 1 acts):
+  matchedAssets.characterIds: [alice, bob, carol]
+  aiPrompt: "Alice stares at her laptop screen, overwhelmed, hand on her forehead. Close-up on her face."
+  → Either rewrite to include Bob + Carol with concrete actions, OR drop them from characterIds.
+${req.requiredCharacterIds && req.requiredCharacterIds.length > 0 && req.requiredCharacterNames?.length ? `
+PRESELECTED CAST (the user already locked these slots — ALL of them MUST appear visibly in this scene's action body, by name, doing something concrete):
+${req.requiredCharacterIds.map((id, i) => `  • id="${id}" name="${req.requiredCharacterNames![i] ?? ''}"`).join('\n')}
+The matchedAssets.characterIds you return MUST include every preselected ID above. Do not silently drop them.
+` : ''}
 OUTPUT LANGUAGES:
 - aiPrompt: English ALWAYS (visual model performance).
 - dialogScript: ${lang} (the user's UI language). Empty string if no spoken line is needed.
@@ -247,7 +273,8 @@ Deno.serve(async (req) => {
     const dur = pickBudget(body.durationSeconds).durationSeconds;
     const lang = body.language ?? 'en';
 
-    const cacheKey = await sha1(`v2|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}`);
+    const requiredIdsKey = (body.requiredCharacterIds || []).slice().sort().join(',');
+    const cacheKey = await sha1(`v3|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}|req:${requiredIdsKey}`);
 
     // 1) Try cache
     const { data: cached } = await supabase
@@ -303,6 +330,72 @@ Deno.serve(async (req) => {
     result.matchedAssets.locationIds = (result.matchedAssets.locationIds || []).filter((id: string) => lIds.has(id));
     result.matchedAssets.buildingIds = (result.matchedAssets.buildingIds || []).filter((id: string) => bIds.has(id));
     result.matchedAssets.propIds = (result.matchedAssets.propIds || []).filter((id: string) => pIds.has(id));
+
+    // 3b) Cast-coverage validator — drop "ghost cast" that's matched but
+    // never named in the action body. Multi-Portrait renderers + Sync.so
+    // face-map collapse if matched character count > visible-face count, so
+    // a 1-face plate with 4 matched IDs is worse than an honest 1-face plate
+    // with 1 matched ID. Also ensure preselected cast IDs survive even if
+    // Gemini "forgot" to return them.
+    {
+      const charLib = body.library?.characters || [];
+      const nameOf = (id: string) => charLib.find((c) => c.id === id)?.name || '';
+      const promptLower = String(result.aiPrompt || '').toLowerCase();
+      // Strip leading "Featuring …:" / "[Cast: …]" / "nName1 and Name2:" header
+      // so the header itself doesn't count as "visible in action body".
+      const body_only = String(result.aiPrompt || '')
+        .replace(/^\s*Featuring\s+[^:]{1,400}:\s*/i, '')
+        .replace(/^\s*\[Cast:[^\]]{1,400}\]\s*/i, '')
+        .replace(/^\s*n[A-Z][A-Za-z .'\-]{1,200}:\s*/, '');
+      const bodyLower = body_only.toLowerCase();
+
+      const isVisible = (id: string): boolean => {
+        const name = nameOf(id).toLowerCase().trim();
+        if (!name) return false;
+        if (bodyLower.includes(name)) return true;
+        const first = name.split(/\s+/)[0];
+        return !!(first && first.length >= 3 && bodyLower.includes(first));
+      };
+
+      // Preserve preselected IDs even if Gemini dropped them — the user
+      // explicitly locked them in the cast picker.
+      const required = new Set(body.requiredCharacterIds || []);
+      const matchedSet = new Set<string>(result.matchedAssets.characterIds);
+      for (const id of required) if (cIds.has(id)) matchedSet.add(id);
+
+      const droppedGhostCast: string[] = [];
+      const keptIds: string[] = [];
+      for (const id of matchedSet) {
+        if (required.has(id)) {
+          // Required IDs stay regardless — they're the user's explicit
+          // intent. Coverage will still be flagged by the client chip.
+          keptIds.push(id);
+        } else if (isVisible(id)) {
+          keptIds.push(id);
+        } else {
+          droppedGhostCast.push(nameOf(id) || id);
+        }
+      }
+      result.matchedAssets.characterIds = keptIds;
+      result.droppedGhostCast = droppedGhostCast;
+      // Surface coverage for the UI chip so it doesn't have to re-derive it.
+      const missingRequired: string[] = [];
+      for (const id of required) {
+        if (cIds.has(id) && !isVisible(id)) missingRequired.push(nameOf(id) || id);
+      }
+      result.castCoverage = {
+        ok: missingRequired.length === 0 && droppedGhostCast.length === 0,
+        missingRequiredNames: missingRequired,
+        droppedGhostCast,
+      };
+      if (missingRequired.length > 0 || droppedGhostCast.length > 0) {
+        console.warn('[scene-director] cast coverage issue', {
+          missingRequired,
+          droppedGhostCast,
+          promptHead: promptLower.slice(0, 200),
+        });
+      }
+    }
 
     result.budget = pickBudget(dur);
 

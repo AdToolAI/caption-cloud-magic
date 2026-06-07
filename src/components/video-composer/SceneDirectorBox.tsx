@@ -35,9 +35,9 @@ interface SceneDirectorBoxProps {
 
 
 const LABELS = {
-  en: { title: 'Scene from description', desc: 'Describe the scene in your own words. The director picks matching library assets, fits the action to the duration and writes the AI prompt.', placeholder: 'WW2. A soldier drives a Leopard tank across a stone bridge at sunrise.', generate: 'Generate scene', regenerate: 'Re-roll', loading: 'Casting your library…', applied: 'Scene applied', dropped: 'Trimmed to fit duration', followup: 'Add follow-up scene', missing: 'Not in your library', generateAsset: 'Generate' },
-  de: { title: 'Szene aus Beschreibung', desc: 'Beschreibe die Szene in deinen Worten. Der Director sucht passende Library-Assets, passt die Aktion an die Dauer an und schreibt den AI-Prompt.', placeholder: '2. Weltkrieg. Ein Soldat fährt einen Leopard-Panzer über eine Steinbrücke im Morgenrot.', generate: 'Szene generieren', regenerate: 'Neu würfeln', loading: 'Suche in deiner Library…', applied: 'Szene übernommen', dropped: 'Gekürzt auf die Szenendauer', followup: 'Folgeszene anlegen', missing: 'Nicht in deiner Library', generateAsset: 'Erzeugen' },
-  es: { title: 'Escena desde descripción', desc: 'Describe la escena con tus palabras. El director encuentra los assets de tu biblioteca, los ajusta a la duración y escribe el prompt de IA.', placeholder: 'IIGM. Un soldado conduce un tanque Leopard sobre un puente de piedra al amanecer.', generate: 'Generar escena', regenerate: 'Re-tirar', loading: 'Buscando en tu biblioteca…', applied: 'Escena aplicada', dropped: 'Recortado a la duración', followup: 'Añadir escena siguiente', missing: 'No está en tu biblioteca', generateAsset: 'Generar' },
+  en: { title: 'Scene from description', desc: 'Describe the scene in your own words. The director picks matching library assets, fits the action to the duration and writes the AI prompt.', placeholder: 'WW2. A soldier drives a Leopard tank across a stone bridge at sunrise.', generate: 'Generate scene', regenerate: 'Re-roll', loading: 'Casting your library…', applied: 'Scene applied', dropped: 'Trimmed to fit duration', followup: 'Add follow-up scene', missing: 'Not in your library', generateAsset: 'Generate', castMissing: 'Cast in action missing', castMissingHint: 'These selected characters were not given a visible action — the renderer will only show one face. Re-roll to force them in.', forceCast: 'Force cast in action', ghostDropped: 'Ghost cast dropped' },
+  de: { title: 'Szene aus Beschreibung', desc: 'Beschreibe die Szene in deinen Worten. Der Director sucht passende Library-Assets, passt die Aktion an die Dauer an und schreibt den AI-Prompt.', placeholder: '2. Weltkrieg. Ein Soldat fährt einen Leopard-Panzer über eine Steinbrücke im Morgenrot.', generate: 'Szene generieren', regenerate: 'Neu würfeln', loading: 'Suche in deiner Library…', applied: 'Szene übernommen', dropped: 'Gekürzt auf die Szenendauer', followup: 'Folgeszene anlegen', missing: 'Nicht in deiner Library', generateAsset: 'Erzeugen', castMissing: 'Cast nicht in Action', castMissingHint: 'Diese ausgewählten Charaktere bekommen keine sichtbare Aktion — der Renderer zeigt sonst nur ein Gesicht. Re-Roll erzwingt sie in der Szene.', forceCast: 'Cast in Action erzwingen', ghostDropped: 'Geister-Cast verworfen' },
+  es: { title: 'Escena desde descripción', desc: 'Describe la escena con tus palabras. El director encuentra los assets de tu biblioteca, los ajusta a la duración y escribe el prompt de IA.', placeholder: 'IIGM. Un soldado conduce un tanque Leopard sobre un puente de piedra al amanecer.', generate: 'Generar escena', regenerate: 'Re-tirar', loading: 'Buscando en tu biblioteca…', applied: 'Escena aplicada', dropped: 'Recortado a la duración', followup: 'Añadir escena siguiente', missing: 'No está en tu biblioteca', generateAsset: 'Generar', castMissing: 'Cast sin acción', castMissingHint: 'Estos personajes seleccionados no recibieron una acción visible — el renderer mostrará una sola cara. Re-tira para forzarlos.', forceCast: 'Forzar cast en la acción', ghostDropped: 'Cast fantasma descartado' },
 };
 
 export function SceneDirectorBox({
@@ -75,12 +75,26 @@ export function SceneDirectorBox({
     if (!description.trim()) return;
     setBusy(true);
     try {
+      // Required cast = what the user already locked in characterShots.
+      // We forward both IDs and names so the system prompt can render a
+      // human-readable "PRESELECTED CAST" block + the post-call validator
+      // can preserve them.
+      const requiredShots = (scene.characterShots ?? []).filter(
+        (s) => s && s.characterId && s.shotType !== 'absent',
+      );
+      const requiredCharacterIds = requiredShots.map((s) => s.characterId);
+      const requiredCharacterNames = requiredCharacterIds
+        .map((id) => allCharacters.find((c) => c.id === id)?.name)
+        .filter((n): n is string => !!n);
+
       const payload = {
         description: description.trim(),
         durationSeconds: scene.durationSeconds,
         language: lang,
         brandKitContext,
         realismPreset: realismPreset ?? scene.realismPreset ?? null,
+        requiredCharacterIds,
+        requiredCharacterNames,
         library: {
           characters: allCharacters.map((c) => ({ id: c.id, name: c.name, descriptor: c.description ?? null })),
           locations:  locations.map((a) => ({ id: a.id, name: a.name, descriptor: a.description ?? null })),
@@ -105,10 +119,20 @@ export function SceneDirectorBox({
 
       const finalPrompt = applySceneAssetsToPrompt(data.aiPrompt, mentionAssets);
 
-      // Cast slots from matched characters
-      const characterShots: CharacterShot[] = (data.matchedAssets.characterIds || [])
-        .slice(0, 4)
-        .map((id: string) => ({ characterId: id, shotType: 'full' as const }));
+      // Cast slots: MERGE with existing characterShots instead of overwriting.
+      // The user's manual picks (shotType, ordering) stay — new matched IDs
+      // are only appended up to the 4-slot cap. This prevents "I picked 4
+      // characters but the director silently kept only 1" surprises.
+      const existing = scene.characterShots ?? [];
+      const existingIds = new Set(existing.map((s) => s.characterId));
+      const matchedIds: string[] = (data.matchedAssets.characterIds || []).slice(0, 4);
+      const merged: CharacterShot[] = [...existing];
+      for (const id of matchedIds) {
+        if (merged.length >= 4) break;
+        if (existingIds.has(id)) continue;
+        merged.push({ characterId: id, shotType: 'full' as const });
+      }
+      const characterShots: CharacterShot[] = merged;
 
       // Auto-add library characters that aren't in the briefing yet
       if (onAddCharacter && characters) {
@@ -201,6 +225,32 @@ export function SceneDirectorBox({
 
           {result && (
             <div className="space-y-2 pt-1 border-t border-primary/10">
+              {result.castCoverage && !result.castCoverage.ok && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/[0.05] p-2 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[10px] text-amber-700 dark:text-amber-300">
+                    <Badge variant="outline" className="h-4 px-1.5 text-[9px] border-amber-500/40 text-amber-700 dark:text-amber-300">
+                      ⚠ {t.castMissing}
+                    </Badge>
+                    <span className="font-medium">
+                      {[
+                        ...(result.castCoverage.missingRequiredNames || []),
+                        ...(result.castCoverage.droppedGhostCast || []),
+                      ].join(', ')}
+                    </span>
+                  </div>
+                  <p className="text-[9px] leading-relaxed text-muted-foreground/80">{t.castMissingHint}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[9px] gap-1 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                    disabled={busy}
+                    onClick={handleGenerate}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    {t.forceCast}
+                  </Button>
+                </div>
+              )}
               {Array.isArray(result.droppedActions) && result.droppedActions.length > 0 && (
                 <div className="text-[10px] text-muted-foreground/80">
                   <span className="font-medium">{t.dropped}:</span> {result.droppedActions.join(' · ')}

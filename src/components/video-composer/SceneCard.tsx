@@ -2369,7 +2369,7 @@ export default function SceneCard({
                                 ? "Describe la escena… usa @personaje y @ubicación de tu biblioteca"
                                 : "Describe the scene visually… use @character and @location from your library"
                           }
-                          rows={3}
+                          rows={6}
                         />
                         <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
                           {lang === "de"

@@ -1,120 +1,89 @@
 
-# Action-First Cinematic Pipeline
+## Was wirklich der Bug ist
 
-Ziel: Weg vom statischen "Avatar redet in die Kamera" — hin zu echten Filmszenen, in denen Charaktere fahren, laufen, gestikulieren, mit Objekten interagieren und dabei natürlich sprechen. Lipsync wird zur Politur, nicht zum Fundament.
+Du hattest Recht — **Matthew existiert in der Library**. Die `Featuring Sarah, Samuel, Kailee, Matthew:` Zeile ist der korrekt aus `matchedAssets.characterIds` gebaute @-Mention-Header, damit der Renderer alle 4 Portraits als Multi-Reference bekommt.
 
-Wir bauen das in **4 zusammenhängenden Stages** auf bestehender Infrastruktur (Scene-Director, Cinematic-Sync, Dialog-Shot-Pipeline) auf — kein Bruch, sondern Aufwertung.
+Der echte Fehler liegt im **Action-Body**: Der `scene-director` LLM listet 4 Charaktere als „matched" auf, **schreibt die Szene aber nur um Matthew** („A focused male social media manager, Matthew, staring at laptop…"). Sarah, Samuel und Kailee kommen im sichtbaren Geschehen nicht vor.
 
----
+Folge:
+- Multi-Portrait Nano Banana 2 / Vidu Q2 bekommen 4 Reference-Bilder, das Modell rendert aber nur 1 sichtbaren Kopf (weil der Prompt nur 1 Person beschreibt).
+- `compose-dialog-scene` baut einen Audio-Plan mit 4 Sprechern.
+- `_shared/twoshot-face-map.ts` läuft Gemini-Vision auf dem Plate und findet **1 Gesicht**, nicht 4.
+- Per-Segment `coordinates` fallen auf den Heuristik-Fallback zurück → alle Audio-Segmente landen auf demselben Mund → klassischer „nur ein Charakter redet alles"-Bug.
 
-## Stage 1 — Action-Beat Layer im Scene-Director
+Der Bug ist also **nicht** im Sync.so-Stack, sondern im **Director-Prompt**, der die Cast-Liste und den Action-Body nicht koppelt.
 
-Aktuell liefert der Scene-Director Cast/Location/Props + Dialog. Wir ergänzen ein neues **`action_beat`-Feld** pro Szene mit zwei Sub-Feldern:
+## Plan
 
-- `character_action` — was der Charakter physisch tut (`"steers a red convertible through Los Angeles at golden hour, one hand on the wheel, glances briefly toward the camera"`)
-- `environment_motion` — was um ihn herum passiert (`"palm trees blur past, sun flares hit the windshield, traffic lights reflect on the hood"`)
+### 1. Cast-Coverage-Regel im scene-director System-Prompt
 
-**Brief-Modus** (nur übergeordneter Brief): Scene-Director generiert beide Felder vollautomatisch aus dem Brief mit Lovable AI Tool-Calling. Pro Szene wählt er einen passenden Action-Beat-Archetyp (driving / walking / working / gesturing-still / arriving / leaving).
+`supabase/functions/scene-director/index.ts` — der System-Prompt bekommt einen zusätzlichen, harten Block:
 
-**Detail-Modus** (User schreibt pro Szene 1 Satz): Der User-Satz wird zu `character_action` promoted, der Scene-Director ergänzt `environment_motion` + Kamera-Move passend.
-
-UI: SceneDirectorBox bekommt eine neue Zeile **"Action-Beat"** mit Edit-Pencil, sodass der User die generierte Action sehen und überschreiben kann, bevor gerendert wird.
-
----
-
-## Stage 2 — Action-First Prompt Composer
-
-Die größte Ursache für statische "Talking-Head-Busts" ist die aktuelle Prompt-Komposition: Cast und Dialog dominieren, Action ist optional. Wir drehen die Reihenfolge um.
-
-Neue Prompt-Layer-Reihenfolge in `composePromptLayers`:
-
-```text
-1. SHOT-DIRECTOR (Framing/Lens/Movement) — bleibt wie gehabt
-2. CHARACTER-ACTION (neu, höchste Priorität nach Shot)
-3. ENVIRONMENT-MOTION (neu)
-4. CAST-IDENTITY (was sie tragen, wer sie sind)
-5. DIALOG-INTENT ("speaking calmly", "speaking with urgency" — kein Wortlaut!)
-6. STYLE-PRESET / Color Grade
+```
+CAST COVERAGE (critical):
+- Every character listed in matchedAssets.characterIds MUST appear visibly
+  in the aiPrompt action body, by name, doing something concrete.
+- If you cannot fit them all into the duration budget, then either:
+    (a) drop them from matchedAssets.characterIds (do NOT keep them as "ghost"
+        cast that is referenced but never seen), OR
+    (b) split the overflow into followupSceneSuggestions.
+- For ensemble scenes with 2+ characters: describe the spatial arrangement
+  (side by side, facing each other, sitting around a table, walking together,
+  intercut between desks). Never write a solo scene while listing extra
+  characters as matched.
+- For 3-4 character scenes: prefer a wide group composition or fast
+  intercuts, not a single close-up on one face.
 ```
 
-Wichtig: **Der Dialog-Wortlaut wird NICHT mehr in den i2v-Prompt geschrieben** — Hailuo/Kling verstehen Text-Inhalt sowieso nicht und verursachen damit oft starre "Sprech-Posen". Stattdessen nur die Sprech-Tonalität (`speaking warmly while driving`). Den echten Text legt Sync.so später als Lipsync drauf.
+Plus eine zwei-Beispiel-Demo direkt im System-Prompt („3 Charaktere, alle handeln" vs. „3 Charaktere, nur einer handelt — verboten"), weil Gemini auf solche Negativ-Beispiele besser anspringt als auf reine Regeln.
 
-Das ist die Kern-Änderung gegen "Münder bleiben zu / Bewegung fehlt".
+### 2. Post-Call-Validator im scene-director Edge Function
 
----
+Nach dem `emitScene`-Tool-Call: prüfe, ob **jeder Name** der Charaktere in `matchedAssets.characterIds` als Substring (case-insensitive, erstes-Wort-fallback wie in `syncCastFromPrompt.ts`) im `aiPrompt` vorkommt.
 
-## Stage 3 — Drei Realismus-Style-Presets
+- Fehlt ein Name → entferne die ID aus `matchedAssets.characterIds`, bevor das Ergebnis zurück geht.
+- Begründung: lieber 1 ehrlicher sichtbarer Charakter im Plate als 4 als „Cast" markierte Geister, die `compose-dialog-scene` dann fälschlich als Sprecher behandelt.
+- Logge die entfernten IDs in der Edge-Function-Response (`droppedGhostCast: string[]`), damit das UI sie als Warn-Chip anzeigen kann.
 
-Neuer Selector im Composer-Header (neben dem bestehenden Cinematic-Style-Preset-Picker):
+### 3. Required-Cast aus dem aktuellen Slot durchreichen
 
-- **Cinematic Spot** — 35mm Filmlook, natural lens flares, shallow DOF, "Kodak Vision3", Sync.so Pro (2 passes), Color-Grade `commercial-warm`. Default für Werbung.
-- **Documentary / Authentic** — handheld camera, natural light, slight grain, Sync.so Standard (1 pass), Color-Grade `natural`. Default für UGC/Testimonials.
-- **Lifestyle / Hero** — Steadycam glides, dramatic lighting, polished post, Sync.so Pro + Color-Grade `cinematic-teal-orange`. Default für Brand-Hero.
+`SceneDirectorBox` schickt bei Re-Roll die bereits ausgewählten `scene.characterShots`-IDs als `requiredCharacterIds` mit. Der System-Prompt fügt sie als „MUST appear" vor die Library-Liste:
 
-Jedes Preset setzt automatisch:
-- passende Shot-Director-Defaults (Framing/Movement/Lighting)
-- die richtige Sync.so-Qualitätsstufe (`single` vs `two-shot`)
-- Color-Grade und Negative-Prompt
-- bevorzugte Engine pro Szene (siehe Stage 4)
+```
+PRESELECTED CAST (the user already picked these slots — all MUST appear
+visibly in this scene's action):
+- Sarah Dusatko (id: …)
+- Samuel Dusatko (id: …)
+- Kailee (id: …)
+- Matthew Dusatko (id: …)
+```
 
----
+Damit wird Re-Roll deterministisch — das Modell darf den preselected Cast nicht mehr stillschweigend auf 1 Person eindampfen.
 
-## Stage 4 — Smarteres Engine-Routing
+### 4. Cast-Coverage-Chip in `SceneCard`
 
-`sceneEngineRouter` wird so umgebaut, dass **Action-Beats** das Routing dominieren — nicht das Vorhandensein von Dialog:
+Unter der Prompt-Box ein kleines Statussignal, das nach jedem `onApply` neu berechnet wird (rein clientseitig, pure Helper):
 
-| Bedingung | Engine | Begründung |
-|---|---|---|
-| Action-Beat mit Bewegung + Dialog | **`cinematic-sync`** (Hailuo/Kling i2v + Sync.so Polish) | Echte Action-Plate, Mund wird draufgelegt |
-| Action-Beat ohne Dialog | **`broll`** (pure Hailuo/Kling) | Off-Screen-VO oder stumm |
-| Statische "Person spricht direkt zur Kamera"-Szene | **`heygen-talking-head`** | Bleibt für klassische Sprecher-Inserts |
-| Multi-Speaker Dialog mit Action | **`sync-segments`** mit Action-Plate | Existierende Pipeline bleibt, aber Plate ist Action-First |
+- ✅ grün: alle `characterShots`-Namen kommen im Action-Body (Prompt nach dem `:` der Cast-Zeile) vor.
+- ⚠ gelb: 1+ Cast-Mitglied fehlt im Action-Body. Tooltip listet die fehlenden Namen. Button **„Cast in Action erzwingen"** ruft `scene-director` neu auf mit den fehlenden Namen als `requiredCharacterIds`.
 
-Damit wird HeyGen vom Default zur **Ausnahme** — nur noch für echte Direct-Address-Momente. Action wird zur Regel.
+Die Heuristik wiederverwendet die Match-Logik aus `syncCastFromPrompt.ts` (Single-Source-of-Truth für Cast-Namen-Matching im Composer).
 
-Zusätzlich: Engine-Empfehlung erscheint sichtbar als Badge auf jeder SceneCard mit Tooltip-Begründung und manuellem Override.
+### 5. UI-Sichtbarkeit: Prompt-Textarea
 
----
+In `SceneCard.tsx` (KI-Prompt EN — bearbeitbar Box):
+- Nach jedem erfolgreichen Director-Apply: `textareaRef.current.scrollTop = 0`, damit der „Featuring …:"-Header direkt sichtbar ist (deshalb sah dein erster Screenshot aus, als wäre der Prompt leer).
+- Min-Höhe von 6 auf ~9 Zeilen, damit bei 4-Cast-Header + Action-Body kein Scrollen nötig ist.
 
-## Akut-Bug Szene 3 (parallel zur Story-Engine)
+## Geänderte Dateien
 
-Im selben Plan-Batch:
+- `supabase/functions/scene-director/index.ts` — Cast-Coverage-Block im System-Prompt, `requiredCharacterIds` Input, Post-Call-Validator + `droppedGhostCast` im Response
+- `src/components/video-composer/SceneDirectorBox.tsx` — `requiredCharacterIds` aus `scene.characterShots` mitsenden, Cast-Merge statt Overwrite beim Apply
+- `src/components/video-composer/SceneCard.tsx` — Cast-Coverage-Chip, „Cast in Action erzwingen"-Button, Textarea-Scroll-to-Top, Min-Höhe hoch
+- `src/lib/motion-studio/castCoverage.ts` (neu) — pure Helper: `missingCastInAction(aiPrompt, characterShots, libraryCharacters)` + Tests
 
-- **Diagnose-Script** über die letzten 24h `dialog_shots` und `cinematic_sync_jobs`: Welche Szenen sind als "completed" markiert, haben aber keinen Lipsync-Pass durchlaufen? (Symptom: starr + geschlossene Münder.)
-- **Fallback-Guard in `poll-dialog-shots`**: wenn Sync.so 8-min-Timeout greift, aber die Rohe Hailuo-Plate trotzdem durchgereicht wird → Szene auf `failed` setzen + Auto-Refund + UI-Hinweis "Lipsync fehlgeschlagen, bitte regenerieren" statt stilles Durchreichen einer stummen Plate.
-- **Plate-Probe**: wenn Hailuo-Output einen Static-Anchor-Frame erkennt (Frame 1 ≈ letzter Frame über SSIM), wird die Plate verworfen und mit anderem Seed neu generiert, bevor Sync.so überhaupt startet.
+## Was NICHT geändert wird
 
----
-
-## Technische Details
-
-**Geänderte Dateien (Schätzung):**
-
-- `supabase/functions/scene-director/index.ts` — Action-Beat-Generation im Lovable-AI Tool-Call-Schema
-- `src/lib/video-composer/composePromptLayers.ts` — neue Layer-Reihenfolge, Dialog-Wortlaut wird gestrippt
-- `src/lib/video-composer/sceneEngineRouter.ts` — Action-Beat-priorisiertes Routing, neue Tabelle oben
-- `src/types/video-composer.ts` — `ComposerScene.actionBeat: { characterAction; environmentMotion }`
-- `src/config/cinematicRealismPresets.ts` — neu: 3 Presets mit allen Layer-Defaults
-- `src/components/video-composer/SceneCard.tsx` — Action-Beat-Editor in SceneDirectorBox, Engine-Badge mit Tooltip
-- `src/components/video-composer/RealismPresetPicker.tsx` — neu, im Composer-Header
-- `supabase/functions/compose-dialog-scene/index.ts` — Dialog-Wortlaut nur für Sync.so, NICHT für Hailuo-Plate
-- `supabase/functions/poll-dialog-shots/index.ts` — Static-Anchor-Probe + Fallback-Guard
-- Migration: neue Spalten `action_beat jsonb`, `realism_preset text` auf `composer_scenes`
-
-**Was bleibt unverändert:**
-
-- Bestehende Sync.so Pro / Dialog-Shot Pipeline, Webhook, 8-min Watchdog
-- HeyGen Talking Head (nur Routing-Priorität sinkt)
-- Render-All-and-Stitch, Director's Cut Handoff
-- Credit-Refund-Automatik
-
----
-
-## Erwartetes Ergebnis
-
-- Charaktere fahren, laufen, gestikulieren in echten Umgebungen statt stoisch in die Kamera zu starren.
-- Lippen bewegen sich präzise zum Voiceover — auch in Action-Szenen — weil Sync.so auf einer lebendigen Plate arbeitet.
-- 3 Realismus-Presets sorgen für konsistenten Look pro Brief, ohne dass der User 20 Slots manuell setzen muss.
-- Szene-3-Klasse-Bugs (starre Plate + geschlossene Münder) werden hart abgefangen statt still durchgereicht.
-
-Soll ich loslegen?
+- `compose-dialog-scene`, `poll-dialog-shots`, Sync.so-Webhook, Face-Map-Helper, Lipsync-Pro-Policy — alles unverändert. Der Multi-Speaker-Bug verschwindet automatisch, sobald der Plate echte 4 Köpfe zeigt statt 1.
+- Render-Engine-Routing, Action-Beat-Composer, Realism-Presets, Credit-Refund — unverändert.
+- Keine DB-Migration, keine neuen Tabellen, keine neuen Secrets.
