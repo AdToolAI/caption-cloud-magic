@@ -464,14 +464,19 @@ export default function SceneCard({
     const current =
       scene.characterShots ??
       (scene.characterShot ? [scene.characterShot] : []);
-    const next = syncCastFromPrompt(scene.aiPrompt || "", current, characters);
+    const next = syncCastFromPrompt(
+      scene.aiPrompt || "",
+      current,
+      characters,
+      scene.dismissedCharacterIds,
+    );
     if (next === current) return;
     onUpdate({
       characterShots: next,
       characterShot: next[0] ?? scene.characterShot,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.aiPrompt, characters?.length]);
+  }, [scene.aiPrompt, characters?.length, scene.dismissedCharacterIds?.length]);
 
   // Backfill: ensure scenes with a cast also carry the cast marker in the
   // prompt. `applyCastToPrompt` is idempotent (strips the existing marker
@@ -1460,10 +1465,27 @@ export default function SceneCard({
                       cast={scene.characterShots}
                       legacyCast={scene.characterShot}
                       onCastChange={(next) => {
+                        // Track explicitly-removed character IDs so the prompt→cast
+                        // auto-sync below doesn't silently re-add them just because
+                        // their name still appears in the scene prompt.
+                        const prevIds = (scene.characterShots ?? []).map(
+                          (s) => s.characterId,
+                        );
+                        const nextIds = new Set(next.map((s) => s.characterId));
+                        const removedNow = prevIds.filter((id) => !nextIds.has(id));
+                        const dismissedNext = Array.from(
+                          new Set([
+                            ...(scene.dismissedCharacterIds ?? []).filter(
+                              (id) => !nextIds.has(id),
+                            ),
+                            ...removedNow,
+                          ]),
+                        );
                         const updates: Partial<ComposerScene> = {
                           characterShots: next,
                           // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
                           characterShot: next[0],
+                          dismissedCharacterIds: dismissedNext,
                         };
                         if (promptMode === "structured") {
                           const subjectKey: keyof PromptSlots = "subject";
@@ -2230,6 +2252,8 @@ export default function SceneCard({
                       if (characterShots && characterShots.length > 0) {
                         updates.characterShots = characterShots;
                         updates.characterShot = characterShots[0];
+                        // Storyboard delivered a fresh cast → clear the dismissal blocklist.
+                        updates.dismissedCharacterIds = [];
                       }
                       if (promptMode === "structured") {
                         // Drop back to free mode so the user sees the new prompt verbatim.

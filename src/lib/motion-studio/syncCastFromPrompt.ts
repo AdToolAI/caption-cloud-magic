@@ -31,6 +31,7 @@ export function syncCastFromPrompt(
   prompt: string,
   currentShots: CharacterShot[] | undefined,
   characters: ComposerCharacter[] | undefined,
+  dismissedIds?: string[],
 ): CharacterShot[] {
   const current = currentShots ?? [];
   if (!prompt || !characters?.length) return current;
@@ -38,10 +39,12 @@ export function syncCastFromPrompt(
 
   const lower = prompt.toLowerCase();
   const haveIds = new Set(current.map((s) => s.characterId));
+  const dismissed = new Set((dismissedIds ?? []).map((id) => String(id)));
 
   const additions: CharacterShot[] = [];
   for (const c of characters) {
     if (haveIds.has(c.id)) continue;
+    if (dismissed.has(c.id)) continue;
     if (!matchesPrompt(lower, c)) continue;
     additions.push({ characterId: c.id, shotType: 'full' });
     if (current.length + additions.length >= MAX_CAST) break;
