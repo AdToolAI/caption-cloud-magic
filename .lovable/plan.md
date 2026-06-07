@@ -1,49 +1,44 @@
-## Befund
+## Bug: Entfernte Charaktere kommen automatisch in den Cast zurück
 
-Die neue Ursache ist nicht mehr der alte `ensureProjectPersisted()`-Cleanup. Ich habe im aktuellen Datenbestand ein Projekt mit genau deinem Symptom gefunden:
+### Ursache
+In `src/components/video-composer/SceneCard.tsx` (Zeilen 462–474) läuft ein `useEffect`, der `syncCastFromPrompt(...)` aufruft. Dieser Helper scannt den Szenen-Prompt nach Charakter-Namen und fügt jeden gefundenen Charakter automatisch wieder zum `characterShots`-Array hinzu — auch dann, wenn der User ihn gerade explizit über das `X` aus dem Cast-Chip entfernt hat.
 
-```text
-Projekt: a2749416...
-Szenen in DB: order_index {0,1,3}
-fehlende Szene: order_index 2
-Szene bei order_index 1 hat Marker: dialog-srs:<eigene scene id>
-```
+Solange der Name des Charakters noch irgendwo im Prompt steht (was nach dem Entfernen typischerweise der Fall ist, weil der Storyboard-Text unverändert bleibt), wird er beim nächsten Re-Render bzw. spätestens beim nächsten Prompt-Update wieder eingesetzt — exakt das beobachtete „10 Sekunden später taucht er wieder auf".
 
-Der Fehler sitzt im Dialog/Lip-Sync-Flow:
+### Lösung (minimal-invasiv, nur Frontend)
 
-- Früher wurden für Dialoge extra Sub-Szenen mit Marker `dialog-srs:*` erzeugt.
-- Der Cleanup löscht vor einer neuen Dialog/Lip-Sync-Generation alle Szenen im Projekt mit `cinematic_preset_slug like 'dialog-srs:%'`.
-- Inzwischen behält die neue Cinematic-Sync-Pipeline aber die echte Hauptszene als eine Szene und setzt trotzdem genau diesen `dialog-srs:*`-Marker auf die Hauptszene.
-- Ergebnis: Beim nächsten Start einer anderen Szene wird die vorherige echte Dialog-Szene als „alte Sub-Szene“ erkannt und gelöscht. Dadurch wird Szene 2 „geschluckt“ und es bleibt eine Order-Lücke.
+1. **Neues Feld `dismissedCharacterIds: string[]` auf `ComposerScene`** (Typ-Ergänzung in `src/types/video-composer.ts`, optional, default `[]`). Persistiert über `composer_scenes.metadata` o.ä. — falls schon ein generisches `metadata`-JSON existiert, wird es dort abgelegt, sonst rein als In-Memory-State.
 
-## Plan
+2. **In `SceneCard.tsx` (onCastChange-Handler, ~Z. 1462)** beim Vergleich `prev vs. next` die entfernten IDs ermitteln und in `dismissedCharacterIds` mergen:
+   ```ts
+   const removed = (scene.characterShots ?? [])
+     .map(s => s.characterId)
+     .filter(id => !next.some(n => n.characterId === id));
+   const dismissed = Array.from(new Set([
+     ...(scene.dismissedCharacterIds ?? []),
+     ...removed,
+   ]));
+   ```
+   Beim manuellen Wieder-Hinzufügen (Cast-Picker) wird die ID aus `dismissedCharacterIds` entfernt.
 
-1. **Dialog-Cleanup entschärfen**
-   - In `SceneDialogStudio.tsx` darf der Cleanup nicht mehr pauschal alle `dialog-srs:*`-Szenen löschen.
-   - Er darf nur noch echte Legacy-Sub-Szenen löschen, aber niemals normale Cinematic-Sync-Hauptszenen.
-   - Zusätzlich: die aktuell gerenderte Parent-Szene wird explizit vom Cleanup ausgeschlossen.
+3. **`syncCastFromPrompt` erweitern** um ein viertes Argument `dismissedIds?: string[]`. Charaktere, deren ID in `dismissedIds` ist, werden niemals automatisch eingefügt. Bleibt idempotent und gibt weiterhin die gleiche Referenz zurück, wenn nichts geändert wurde.
 
-2. **Keinen Legacy-SRS-Marker mehr auf Hauptszenen setzen**
-   - Beim aktuellen Zwei-/Mehrsprecher-Cinematic-Sync wird `cinematicPresetSlug: dialog-srs:*` nicht mehr auf die echte Szene geschrieben.
-   - Der Marker bleibt nur für alte Subscene-Kompatibilität relevant.
+4. **Aufrufstelle in `SceneCard.tsx` Z. 467** durchreichen:
+   ```ts
+   const next = syncCastFromPrompt(
+     scene.aiPrompt || "",
+     current,
+     characters,
+     scene.dismissedCharacterIds,
+   );
+   ```
 
-3. **Bestehende betroffene Szenen reparieren**
-   - Eine kleine Datenbank-Migration räumt falsche Marker auf echten Cinematic-Sync-Hauptszenen weg:
-     - `cinematic_preset_slug = null`, wenn `engine_override = 'cinematic-sync'` und Marker `dialog-srs:%` ist.
-   - Damit wird verhindert, dass bereits vorhandene Szene 2 beim nächsten Klick erneut gelöscht wird.
+5. **Reset-Punkt:** Wenn das Storyboard die Szene komplett neu generiert (neuer Prompt + neuer Cast vom LLM), wird `dismissedCharacterIds` zurückgesetzt. Konkret: im Apply-Handler bei `onApply({ aiPrompt, dialogScript, characterShots })` (Z. 2226) wird `dismissedCharacterIds: []` mitgesetzt, sofern `characterShots` vom LLM kommt.
 
-4. **Order-Lücken stabilisieren**
-   - Nach DB-Refetch sollen Szenen weiterhin stabil nach `order_index` angezeigt werden.
-   - Zusätzlich wird eine sichere Reindex-Reparatur für betroffene Projekte vorbereitet, damit `{0,1,3}` wieder zu `{0,1,2}` wird, ohne Szeneninhalte zu ersetzen.
+### Was NICHT geändert wird
+- Keine Änderungen an `compose-dialog-scene`, `compose-video-clips`, Lip-Sync-Pipeline oder Datenbank-Schema (nur ein optionales Feld, kein Migrations-Zwang — wenn Persistenz gewünscht, separate Mini-Migration als 2. Schritt).
+- Keine Änderungen am Cast-Marker-Backfill (Z. 480+), der bleibt idempotent.
+- Keine Änderungen am Realtime / Persistence-Layer (`useComposerPersistence`).
 
-5. **Schutz gegen Rückfall**
-   - Eine kurze Test-/Code-Prüfung stellt sicher:
-     - Szene 1 fertig, Szene 2 Dialog/Lip-Sync, Szene 3 startet → Szene 2 bleibt erhalten.
-     - Dialog-Cleanup löscht keine Szene mit `engine_override='cinematic-sync'`.
-     - Es gibt keine pauschalen Projekt-weiten Deletes mehr außer explizites Löschen durch den Nutzer.
-
-## Dateien/Backend-Bereiche
-
-- `src/components/video-composer/SceneDialogStudio.tsx`
-- ggf. `src/components/video-composer/VideoComposerDashboard.tsx` für Reindex/Refetch-Stabilität
-- neue Datenbank-Migration zur Marker-/Order-Reparatur
+### Ergebnis
+Entfernt der User einen Charakter aus dem Cast einer Szene, bleibt er weg — auch wenn sein Name weiterhin im Prompt-Text vorkommt. Erst ein manuelles Wieder-Hinzufügen über den Cast-Picker oder ein vollständiger Storyboard-Refresh holt ihn zurück.
