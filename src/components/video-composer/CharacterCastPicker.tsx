@@ -519,3 +519,48 @@ function OutfitPickerRow({
     </div>
   );
 }
+
+/* ============================================================== */
+/*  Per-character Action override row (auto-EN translation)        */
+/* ============================================================== */
+
+import SceneActionField from './SceneActionField';
+
+interface ActionFieldRowProps {
+  characterName: string;
+  value: string;
+  englishValue: string;
+  language: Lang;
+  onChange: (v: string) => void;
+  onEnglishChange: (en: string) => void;
+}
+
+function ActionFieldRow({
+  characterName,
+  value,
+  englishValue,
+  language,
+  onChange,
+  onEnglishChange,
+}: ActionFieldRowProps) {
+  const L = {
+    en: { label: `Action — what does ${characterName} do?`, ph: `e.g. types focused on her laptop, nods at the others` },
+    de: { label: `Aktion — was tut ${characterName}?`, ph: `z. B. tippt konzentriert am Laptop und nickt den anderen zu` },
+    es: { label: `Acción — ¿qué hace ${characterName}?`, ph: `p. ej. teclea concentrado en su portátil y asiente a los demás` },
+  }[language];
+  return (
+    <div className="pl-1">
+      <SceneActionField
+        language={language}
+        label={L.label}
+        placeholder={L.ph}
+        value={value}
+        englishValue={englishValue}
+        onChange={onChange}
+        onEnglishChange={onEnglishChange}
+        size="sm"
+        rows={2}
+      />
+    </div>
+  );
+}
