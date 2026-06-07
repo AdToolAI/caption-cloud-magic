@@ -29,6 +29,62 @@ interface UsePipelineProgressArgs {
   renderPercent?: number;
   /** Whether the master render is currently running. */
   renderRunning?: boolean;
+  /** Project id — used to persist the run state across unmount / sleep. */
+  projectId?: string;
+}
+
+// ── sessionStorage persistence ─────────────────────────────────────────
+// The render itself is backend-driven, but the *visual* progress state
+// (start time, floors, baselines) lives in component refs. When the user
+// navigates away or the device sleeps long enough to remount the route,
+// those refs vanish and the bar restarts at 0 % / 0s. Persist a snapshot
+// per-project so the bar resumes seamlessly.
+const STORAGE_PREFIX = 'composer:pipeline-progress:';
+const storageKeyFor = (projectId?: string) =>
+  `${STORAGE_PREFIX}${projectId || 'default'}`;
+
+interface PersistedSnapshot {
+  pipelineStart: number | null;
+  runFloor: number;
+  floor: Record<PipelinePhaseId, number>;
+  startedAt: Record<PipelinePhaseId, number | null>;
+  baseline: {
+    clipsReady: number;
+    clipsTotal: number;
+    lipsyncDone: number;
+    lipsyncTotal: number;
+    dialogShotsDone: number;
+    dialogShotsTotal: number;
+    voiceoverHadAudio: boolean;
+    musicHad: boolean;
+  } | null;
+  realProgress: { value: number; at: number };
+}
+
+function readSnapshot(key: string): PersistedSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshot(key: string, snap: PersistedSnapshot) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(snap));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
+function clearSnapshot(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
 }
 
 const PHASE_WEIGHTS: Record<PipelinePhaseId, number> = {
