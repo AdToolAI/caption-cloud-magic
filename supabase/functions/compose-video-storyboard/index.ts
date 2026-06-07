@@ -652,7 +652,7 @@ Generate the storyboard using the create_storyboard function.`;
           if (shots.length >= 4) continue; // slot cap
           const shotType = rotation[rotIdx % rotation.length];
           rotIdx++;
-          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name, sc.sceneActionEn || promptActionFallback(sc.aiPrompt, 12));
+          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name);
           shots.push({
             characterId: ch.id,
             shotType,
