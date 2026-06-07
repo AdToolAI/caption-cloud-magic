@@ -427,6 +427,41 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 3c) Normalize Scene-Action + per-character action fields so the
+    // composer UI can pre-fill the manual override fields. We:
+    //  - ensure sceneActionEn exists (fallback: actionBeat.characterAction)
+    //  - ensure sceneActionLocalized exists (fallback: sceneActionEn)
+    //  - rebuild perCharacterActions(+Localized) to match the FINAL
+    //    matchedAssets.characterIds (after ghost-cast drop). Missing entries
+    //    fall back to actionBeat.characterAction so the field is at least
+    //    seeded with something meaningful.
+    {
+      const rawScene = String(result.sceneActionEn || '').trim();
+      const fallbackAction = String(result.actionBeat?.characterAction || '').trim();
+      result.sceneActionEn = rawScene || fallbackAction;
+      const rawSceneLocal = String(result.sceneActionLocalized || '').trim();
+      result.sceneActionLocalized = rawSceneLocal || result.sceneActionEn;
+
+      const rawPCA: Array<{ characterId: string; actionEn: string }> = Array.isArray(result.perCharacterActions)
+        ? result.perCharacterActions
+        : [];
+      const rawPCAL: Array<{ characterId: string; action: string }> = Array.isArray(result.perCharacterActionsLocalized)
+        ? result.perCharacterActionsLocalized
+        : [];
+      const enById = new Map(rawPCA.map((e) => [String(e.characterId), String(e.actionEn || '').trim()]));
+      const locById = new Map(rawPCAL.map((e) => [String(e.characterId), String(e.action || '').trim()]));
+
+      const finalIds: string[] = result.matchedAssets.characterIds || [];
+      result.perCharacterActions = finalIds.map((id) => ({
+        characterId: id,
+        actionEn: enById.get(id) || fallbackAction || '',
+      }));
+      result.perCharacterActionsLocalized = finalIds.map((id) => ({
+        characterId: id,
+        action: locById.get(id) || enById.get(id) || fallbackAction || '',
+      }));
+    }
+
     result.budget = pickBudget(dur);
 
     // 4) Persist cache (best-effort)
