@@ -553,7 +553,7 @@ Generate the storyboard using the create_storyboard function.`;
         if (seen.has(finalId)) return;
         seen.add(finalId);
         const character = charByIdForActions.get(finalId);
-        const actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name, sceneActionEn), 12);
+        const actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name), 12);
         const actionUser = cleanActionText(slot.actionUser || actionEn, 12);
         out.push({ characterId: finalId, shotType: slot.shotType, actionEn, actionUser });
       };
