@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
     const lang = body.language ?? 'en';
 
     const requiredIdsKey = (body.requiredCharacterIds || []).slice().sort().join(',');
-    const cacheKey = await sha1(`v3|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}|req:${requiredIdsKey}`);
+    const cacheKey = await sha1(`v4|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}|req:${requiredIdsKey}`);
 
     // 1) Try cache
     const { data: cached } = await supabase
