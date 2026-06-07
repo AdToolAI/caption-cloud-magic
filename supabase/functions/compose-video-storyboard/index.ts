@@ -524,8 +524,9 @@ Generate the storyboard using the create_storyboard function.`;
 
     // Valid character ids for filtering LLM output
     const validCharIds = new Set((briefing.characters || []).map((c) => c.id));
-    const normalizeShots = (rawShots: any, primaryShot: any): Array<{ characterId: string; shotType: string }> => {
-      const out: Array<{ characterId: string; shotType: string }> = [];
+    const charByIdForActions = new Map((briefing.characters || []).map((c) => [c.id, c]));
+    const normalizeShots = (rawShots: any, primaryShot: any, prompt: string, sceneActionEn: string): Array<{ characterId: string; shotType: string; actionEn?: string; actionUser?: string }> => {
+      const out: Array<{ characterId: string; shotType: string; actionEn?: string; actionUser?: string }> = [];
       const seen = new Set<string>();
       const push = (slot: any) => {
         if (!slot || !slot.shotType || slot.shotType === 'absent') return;
@@ -536,7 +537,10 @@ Generate the storyboard using the create_storyboard function.`;
         const finalId = validCharIds.has(id) ? id : briefing.characters![0].id;
         if (seen.has(finalId)) return;
         seen.add(finalId);
-        out.push({ characterId: finalId, shotType: slot.shotType });
+        const character = charByIdForActions.get(finalId);
+        const actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name, sceneActionEn), 12);
+        const actionUser = cleanActionText(slot.actionUser || actionEn, 12);
+        out.push({ characterId: finalId, shotType: slot.shotType, actionEn, actionUser });
       };
       if (Array.isArray(rawShots)) for (const s of rawShots) push(s);
       push(primaryShot);
@@ -548,7 +552,9 @@ Generate the storyboard using the create_storyboard function.`;
       const finalEffects = aiEffects.length > 0
         ? aiEffects.map(e => ({ ...e, color: e.color || brandColor }))
         : getDefaultEffects(s.sceneType || 'custom', visualStyleId, brandColor);
-      const shots = normalizeShots(s.characterShots, s.characterShot);
+      const sceneActionEn = cleanActionText(s.sceneActionEn || promptActionFallback(s.aiPrompt, 25), 25);
+      const sceneActionUser = cleanActionText(s.sceneActionLocalized || sceneActionEn, 25);
+      const shots = normalizeShots(s.characterShots, s.characterShot, s.aiPrompt || "", sceneActionEn);
       const primary = shots[0];
       const clipSource = pickClipSource(s.sceneType || 'custom', index, arr.length, primary);
       return {
@@ -559,6 +565,8 @@ Generate the storyboard using the create_storyboard function.`;
         durationSeconds: Math.max(3, Math.min(15, s.durationSeconds || 5)),
         clipSource,
         aiPrompt: appendStyle(s.aiPrompt || ""),
+        sceneActionEn,
+        sceneActionUser,
         stockKeywords: s.stockKeywords || "",
         clipStatus: "pending",
         textOverlay: {
