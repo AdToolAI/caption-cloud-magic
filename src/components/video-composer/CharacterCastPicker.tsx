@@ -381,6 +381,26 @@ export function CharacterCastPicker({
         );
       })}
 
+      {/* Per-character Action override fields. Lazy-import the SceneActionField
+          via React to keep this module's bundle slim if the consumer never
+          opts in via showActionFields. */}
+      {showActionFields && cast.map((slot) => {
+        const ch = findCharacter(slot.characterId, resolutionPool);
+        if (!ch) return null;
+        return (
+          <ActionFieldRow
+            key={`action-${slot.characterId}`}
+            characterName={ch.name}
+            value={slot.actionUser ?? ''}
+            englishValue={slot.actionEn ?? ''}
+            language={lang}
+            onChange={(actionUser) => updateSlot(slot.characterId, { actionUser })}
+            onEnglishChange={(actionEn) => updateSlot(slot.characterId, { actionEn })}
+          />
+        );
+      })}
+
+
       {cast.length >= 2 && (
         <p className="text-[10px] text-muted-foreground/80 leading-tight">{LABELS.hint[lang]}</p>
       )}
