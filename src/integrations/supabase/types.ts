@@ -14983,6 +14983,33 @@ export type Database = {
         }
         Relationships: []
       }
+      translation_cache: {
+        Row: {
+          created_at: string
+          hash: string
+          source: string
+          source_lang: string
+          target: string
+          target_lang: string
+        }
+        Insert: {
+          created_at?: string
+          hash: string
+          source: string
+          source_lang: string
+          target: string
+          target_lang: string
+        }
+        Update: {
+          created_at?: string
+          hash?: string
+          source?: string
+          source_lang?: string
+          target?: string
+          target_lang?: string
+        }
+        Relationships: []
+      }
       trend_bookmarks: {
         Row: {
           id: string
