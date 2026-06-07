@@ -75,12 +75,26 @@ export function SceneDirectorBox({
     if (!description.trim()) return;
     setBusy(true);
     try {
+      // Required cast = what the user already locked in characterShots.
+      // We forward both IDs and names so the system prompt can render a
+      // human-readable "PRESELECTED CAST" block + the post-call validator
+      // can preserve them.
+      const requiredShots = (scene.characterShots ?? []).filter(
+        (s) => s && s.characterId && s.shotType !== 'absent',
+      );
+      const requiredCharacterIds = requiredShots.map((s) => s.characterId);
+      const requiredCharacterNames = requiredCharacterIds
+        .map((id) => allCharacters.find((c) => c.id === id)?.name)
+        .filter((n): n is string => !!n);
+
       const payload = {
         description: description.trim(),
         durationSeconds: scene.durationSeconds,
         language: lang,
         brandKitContext,
         realismPreset: realismPreset ?? scene.realismPreset ?? null,
+        requiredCharacterIds,
+        requiredCharacterNames,
         library: {
           characters: allCharacters.map((c) => ({ id: c.id, name: c.name, descriptor: c.description ?? null })),
           locations:  locations.map((a) => ({ id: a.id, name: a.name, descriptor: a.description ?? null })),
@@ -105,10 +119,20 @@ export function SceneDirectorBox({
 
       const finalPrompt = applySceneAssetsToPrompt(data.aiPrompt, mentionAssets);
 
-      // Cast slots from matched characters
-      const characterShots: CharacterShot[] = (data.matchedAssets.characterIds || [])
-        .slice(0, 4)
-        .map((id: string) => ({ characterId: id, shotType: 'full' as const }));
+      // Cast slots: MERGE with existing characterShots instead of overwriting.
+      // The user's manual picks (shotType, ordering) stay — new matched IDs
+      // are only appended up to the 4-slot cap. This prevents "I picked 4
+      // characters but the director silently kept only 1" surprises.
+      const existing = scene.characterShots ?? [];
+      const existingIds = new Set(existing.map((s) => s.characterId));
+      const matchedIds: string[] = (data.matchedAssets.characterIds || []).slice(0, 4);
+      const merged: CharacterShot[] = [...existing];
+      for (const id of matchedIds) {
+        if (merged.length >= 4) break;
+        if (existingIds.has(id)) continue;
+        merged.push({ characterId: id, shotType: 'full' as const });
+      }
+      const characterShots: CharacterShot[] = merged;
 
       // Auto-add library characters that aren't in the briefing yet
       if (onAddCharacter && characters) {
