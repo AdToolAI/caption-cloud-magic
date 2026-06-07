@@ -302,12 +302,18 @@ export default function BriefingTab({
 
       // Apply default quality to all generated scenes
       const defaultQ: ClipQuality = briefing.defaultQuality || 'standard';
-      const scenesWithQuality = rawScenes.map((s: ComposerScene) => ({
-        ...s,
-        clipQuality: s.clipQuality || defaultQ,
-        sceneActionEn: s.sceneActionEn || actionFromPrompt(s.aiPrompt, 25),
-        sceneActionUser: s.sceneActionUser || s.sceneActionEn || actionFromPrompt(s.aiPrompt, 25),
-        characterShots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])).map((slot) => {
+      const FORBIDDEN_MULTI = new Set(['back', 'pov', 'detail', 'silhouette']);
+      const joinNames = (names: string[]) => {
+        if (names.length <= 1) return names.join('');
+        if (names.length === 2) return `${names[0]} and ${names[1]}`;
+        return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+      };
+      const scenesWithQuality = rawScenes.map((s: ComposerScene) => {
+        let aiPrompt = s.aiPrompt;
+        let sceneActionEn = s.sceneActionEn || actionFromPrompt(s.aiPrompt, 25);
+        let sceneActionUser = s.sceneActionUser || s.sceneActionEn || actionFromPrompt(s.aiPrompt, 25);
+        const rawShots = (s.characterShots ?? (s.characterShot ? [s.characterShot] : []));
+        let characterShots = rawShots.map((slot) => {
           const ch = briefing.characters?.find((c) => c.id === slot.characterId);
           const fallback = characterActionFromPrompt(s.aiPrompt, ch?.name);
           return {
@@ -315,8 +321,65 @@ export default function BriefingTab({
             actionEn: slot.actionEn || fallback,
             actionUser: slot.actionUser || slot.actionEn || fallback,
           };
-        }),
-      }));
+        });
+
+        // Lip-sync safe multi-cast rewrite (mirror of edge function).
+        const visible = characterShots.filter((x: any) => x && x.shotType && x.shotType !== 'absent');
+        if (visible.length >= 2) {
+          let hasFull = false;
+          visible.forEach((slot: any, i: number) => {
+            if (FORBIDDEN_MULTI.has(slot.shotType)) slot.shotType = i === 0 ? 'full' : 'profile';
+            if (slot.shotType === 'full') hasFull = true;
+          });
+          if (!hasFull) (visible[0] as any).shotType = 'full';
+
+          const castEntries: Array<{ name: string; signature: string; action: string; slot: any }> = [];
+          for (const slot of visible) {
+            const ch = briefing.characters?.find((c) => c.id === slot.characterId);
+            if (!ch?.name) continue;
+            const existing = (slot.actionEn || '').trim();
+            const fromPrompt = characterActionFromPrompt(aiPrompt, ch.name);
+            const finalAction = existing || fromPrompt || 'looks at the others and speaks naturally on camera';
+            (slot as any).actionEn = finalAction;
+            (slot as any).actionUser = (slot.actionUser || finalAction).trim();
+            castEntries.push({ name: ch.name, signature: (ch.signatureItems || '').trim(), action: finalAction, slot });
+          }
+          if (castEntries.length >= 2) {
+            const names = castEntries.map((e) => e.name);
+            const groupAction = `${joinNames(names)} share the scene together, each visible to camera with their own action`;
+            sceneActionEn = groupAction.split(/\s+/).slice(0, 25).join(' ');
+            const userLower = (sceneActionUser || '').toLowerCase();
+            const allInUser = names.every((n) => userLower.includes(n.toLowerCase()));
+            if (!allInUser) sceneActionUser = sceneActionEn;
+
+            const stripped = String(aiPrompt || '')
+              .replace(/\[SceneAction\][\s\S]*?\[\/SceneAction\]\s*/gi, '')
+              .replace(/\[CastActions\][\s\S]*?\[\/CastActions\]\s*/gi, '')
+              .replace(/^\s*Featuring\s+[^:]{1,500}:\s*/i, '')
+              .trim();
+            const castClauses = castEntries.map((e) => {
+              const sig = e.signature ? ` (${e.signature})` : '';
+              return `${e.name}${sig} ${e.action}`;
+            });
+            const groupClause =
+              `Group scene with ${joinNames(names)} all clearly visible on camera, balanced left-to-right composition, every face fully in frame and unobstructed (no back-shots, no POV, no silhouettes, no occlusion, no single-character close-up). ` +
+              `Each character has a distinct simultaneous action: ${castClauses.join('; ')}. ` +
+              `They are engaged in dialogue — either speaking with one another with eye contact and reactions, or each speaking to camera in clear visible turns — so the mouth movements of every visible character can be lip-synced. `;
+            aiPrompt = (groupClause + stripped).trim();
+            characterShots = visible;
+          }
+        }
+
+        return {
+          ...s,
+          clipQuality: s.clipQuality || defaultQ,
+          aiPrompt,
+          sceneActionEn,
+          sceneActionUser,
+          characterShots,
+          characterShot: characterShots[0] || s.characterShot,
+        } as ComposerScene;
+      });
       onScenesGenerated(scenesWithQuality);
       hadScenes = true;
       toast({ title: t('videoComposer.storyboardGenerated'), description: `${rawScenes.length} ${t('videoComposer.scenesCreated')}` });

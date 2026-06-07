@@ -287,8 +287,16 @@ CRITICAL RULES:
 🎭 MULTI-CHARACTER CO-PRESENCE (when ${chars.length} ≥ 2 characters are defined):
 - Aim to feature TWO characters together in roughly 30–60% of the character-bearing scenes (occasionally three). The remaining character scenes can be solo for variety.
 - Pick co-presence scenes naturally based on the story: shared moments, conversations, parallel actions in the same environment, family/team scenes, etc.
-- When two characters share a scene: give each their OWN shotType (e.g. Sarah "full" + Matthew "profile", or both "full" if it is a clear two-shot establishing moment). Avoid two "absent" or two identical exotic types ("pov"+"pov").
-- The aiPrompt MUST name BOTH characters verbatim and include the signatureItems of every visible character. Do NOT use "the two of them" or pronouns — restate names.
+
+🚨 LIP-SYNC SAFE GROUP SCENE RULES (HARD REQUIREMENT — applies whenever characterShots[] has 2+ entries):
+- Framing MUST be a wide or medium GROUP shot that fits ALL characters in the frame at once. No single-character close-ups, no single-character hero shots when the cast is multi.
+- EVERY cast member's FULL FACE must be clearly visible to camera. FORBIDDEN shotTypes for multi-cast scenes: "back", "pov", "detail", "silhouette". Use only "full" or "profile" — and at least ONE character per multi-cast scene MUST be "full".
+- Characters MUST be placed side-by-side (left-to-right or in a clear group composition), NEVER stacked behind each other, NEVER one in front blocking another. No occlusion of any face.
+- The aiPrompt MUST name EVERY character verbatim in the action body (not only in a leading "Featuring …" header) and give EACH of them a distinct, simultaneous physical action. Never describe only one character while the others are listed as cast.
+- The scene MUST establish DIALOGUE INTENT so lip-sync works: either the characters speak with each other (turn-taking, eye contact, reactions) OR each character speaks directly into the camera in clear visible turns. State this explicitly in the prompt ("they talk to each other", "each speaks to camera in turn", "engaged in conversation").
+- For EACH characterShots[] entry actionEn MUST be the action of THAT specific character (not the scene's general action and not another character's action). actionUser is the same in ${langLabel}.
+- sceneActionEn MUST describe the GROUP situation including ALL character names (e.g. "Sarah, Matthew and Kailee discuss the launch around the desk"), never just one character.
+- Do NOT use "the two of them" or pronouns — always restate names.
 - Never put the same identical pair in two consecutive scenes with the same shotTypes — vary framing.`;
 })()}
 
@@ -735,6 +743,95 @@ Generate the storyboard using the create_storyboard function.`;
         }
       }
     }
+
+    // 🎭 LIP-SYNC SAFE MULTI-CAST REWRITE — for every scene with 2+ characters,
+    // normalize forbidden shotTypes (back/pov/detail/silhouette → profile),
+    // ensure each character has its OWN action (synthesize a neutral one if
+    // the LLM only wrote a single-character clause), rewrite the generic
+    // sceneActionEn into a group sentence that names every cast member, and
+    // prepend a deterministic group-scene clause to aiPrompt so providers
+    // generate a wide composition with all faces visible and clear dialogue
+    // intent — instead of a hero close-up of one character with a "Featuring
+    // X and Y and Z:" header glued on top.
+    if (hasCharacters && scenes.length > 0) {
+      const charById = new Map<string, any>();
+      for (const c of briefing.characters!) charById.set(c.id, c);
+      const FORBIDDEN_MULTI = new Set(['back', 'pov', 'detail', 'silhouette']);
+      const joinNames = (names: string[]) => {
+        if (names.length <= 1) return names.join('');
+        if (names.length === 2) return `${names[0]} and ${names[1]}`;
+        return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+      };
+      for (const sc of scenes as any[]) {
+        const shots: any[] = Array.isArray(sc.characterShots) ? sc.characterShots : [];
+        const visible = shots.filter((x) => x && x.shotType && x.shotType !== 'absent');
+        if (visible.length < 2) continue;
+
+        // 1) Normalize forbidden shotTypes; first slot is forced to 'full',
+        //    the rest stay 'full' or downgrade to 'profile'.
+        let hasFull = false;
+        visible.forEach((slot, i) => {
+          if (FORBIDDEN_MULTI.has(slot.shotType)) {
+            slot.shotType = i === 0 ? 'full' : 'profile';
+          }
+          if (slot.shotType === 'full') hasFull = true;
+        });
+        if (!hasFull) visible[0].shotType = 'full';
+
+        // 2) Per-character action — never copy another character's clause.
+        const castEntries: Array<{ name: string; signature: string; action: string; slot: any }> = [];
+        for (const slot of visible) {
+          const char = charById.get(slot.characterId);
+          if (!char?.name) continue;
+          const existing = cleanActionText(slot.actionEn, 12);
+          const fromPrompt = cleanActionText(promptCharacterActionFallback(sc.aiPrompt, char.name), 12);
+          const fallbackNeutral = `looks at the others and speaks naturally on camera`;
+          const finalAction = existing || fromPrompt || fallbackNeutral;
+          slot.actionEn = finalAction;
+          slot.actionUser = cleanActionText(slot.actionUser || finalAction, 12);
+          castEntries.push({
+            name: char.name,
+            signature: String(char.signatureItems || '').trim(),
+            action: finalAction,
+            slot,
+          });
+        }
+        if (castEntries.length < 2) continue;
+
+        // 3) Group scene action (overrides the single-character sceneActionEn).
+        const names = castEntries.map((e) => e.name);
+        const groupAction = `${joinNames(names)} share the scene together, each visible to camera with their own action`;
+        sc.sceneActionEn = cleanActionText(groupAction, 25);
+        // Keep the localized field in sync — for non-EN we leave the English
+        // group sentence as a safe default; the UI lets the user edit it.
+        sc.sceneActionUser = cleanActionText(sc.sceneActionUser && sc.sceneActionUser.toLowerCase().includes(names[0].toLowerCase()) && names.every((n) => sc.sceneActionUser.toLowerCase().includes(n.toLowerCase())) ? sc.sceneActionUser : groupAction, 25);
+        // Mirror the primary characterShot to the first visible slot.
+        sc.characterShot = { characterId: visible[0].characterId, shotType: visible[0].shotType };
+
+        // 4) Rewrite aiPrompt: strip any prior "Featuring …:" header and any
+        //    [SceneAction]/[CastActions] marker blocks (we'll let the client
+        //    re-inject them deterministically from the new fields), then
+        //    prepend a deterministic lip-sync-safe group clause that names
+        //    every cast member with their action and locks framing/dialogue.
+        const stripped = String(sc.aiPrompt || '')
+          .replace(/\[SceneAction\][\s\S]*?\[\/SceneAction\]\s*/gi, '')
+          .replace(/\[CastActions\][\s\S]*?\[\/CastActions\]\s*/gi, '')
+          .replace(/^\s*Featuring\s+[^:]{1,500}:\s*/i, '')
+          .trim();
+        const castClauses = castEntries.map((e) => {
+          const sig = e.signature ? ` (${e.signature})` : '';
+          return `${e.name}${sig} ${e.action}`;
+        });
+        const groupClause =
+          `Group scene with ${joinNames(names)} all clearly visible on camera, balanced left-to-right composition, every face fully in frame and unobstructed (no back-shots, no POV, no silhouettes, no occlusion, no single-character close-up). ` +
+          `Each character has a distinct simultaneous action: ${castClauses.join('; ')}. ` +
+          `They are engaged in dialogue — either speaking with one another with eye contact and reactions, or each speaking to camera in clear visible turns — so the mouth movements of every visible character can be lip-synced. `;
+        sc.aiPrompt = appendStyle((groupClause + stripped).trim());
+      }
+    }
+
+
+
 
 
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
