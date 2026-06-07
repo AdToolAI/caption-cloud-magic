@@ -51,6 +51,47 @@ interface Briefing {
   preferStock?: boolean;
 }
 
+function cleanActionText(value: unknown, maxWords = 25): string {
+  const text = String(value ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/^[-–—:\s]+/, "")
+    .trim();
+  if (!text) return "";
+  const words = text.split(/\s+/).filter(Boolean);
+  return words.length > maxWords ? words.slice(0, maxWords).join(" ") : text;
+}
+
+function promptActionFallback(prompt: unknown, maxWords = 25): string {
+  const cleaned = String(prompt ?? "")
+    .replace(/\[SceneAction\][\s\S]*?\[\/SceneAction\]\s*/gi, "")
+    .replace(/\[CastActions\][\s\S]*?\[\/CastActions\]\s*/gi, "")
+    .replace(/^Featuring\s+[^:]{1,500}:\s*/i, "")
+    .replace(/,\s*no on-screen text[\s\S]*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  const firstSentence = cleaned.match(/^[^.!?]+[.!?]?/)?.[0] || cleaned;
+  const actionClause = firstSentence.split(/,\s*(?:shot on|camera|lens|lighting|golden hour|soft light|shallow depth|filmic|muted palette|anamorphic|no on-screen)/i)[0];
+  return cleanActionText(actionClause || firstSentence, maxWords);
+}
+
+function promptCharacterActionFallback(prompt: unknown, characterName: string | undefined, sceneAction: string): string {
+  const body = String(prompt ?? "")
+    .replace(/^Featuring\s+[^:]{1,500}:\s*/i, "")
+    .replace(/,\s*no on-screen text[\s\S]*$/i, "");
+  const name = String(characterName ?? "").trim();
+  if (name) {
+    const first = name.split(/\s+/)[0]?.toLowerCase() || "";
+    const clauses = body.split(/[.!?]\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
+    const match = clauses.find((clause) => {
+      const lower = clause.toLowerCase();
+      return lower.includes(name.toLowerCase()) || (first.length >= 3 && lower.includes(first));
+    });
+    if (match) return cleanActionText(match, 12);
+  }
+  return cleanActionText(sceneAction || promptActionFallback(prompt, 12), 12);
+}
+
 const CATEGORY_STRUCTURES: Record<string, string> = {
   "product-ad": `USP-DRIVEN PRODUCT AD — use the AIDA framework. Treat the briefing's "productName" as the product, "usps" as benefits, "targetAudience" as the buyer persona.
 1. Hook (3-4s): Attention-grabbing visual that stops scrolling
@@ -167,6 +208,12 @@ AI prompt requirements (CRITICAL — every aiPrompt MUST contain ALL of these):
 10. Always end aiPrompt with: ", no on-screen text, no captions, no subtitles, no watermarks, no logos, no isolated product on plain background, no floating product, no product rotating in empty space" (CRITICAL — prevents AI from burning text or generating isolated product shots)
 11. Never include any quoted on-screen text in the aiPrompt itself
 
+ACTION FIELD REQUIREMENTS (CRITICAL — these drive editable manual override fields):
+- For EVERY scene, set sceneActionEn to a concise English action summary matching the aiPrompt (max 25 words). It answers: "What generally happens in this scene?"
+- For EVERY scene, set sceneActionLocalized to the same action in ${langLabel}, faithful to sceneActionEn. If language is English, it can equal sceneActionEn.
+- For every visible characterShots[] slot, set actionEn/actionUser. actionEn is what this exact character physically does in the scene in English (max 12 words). actionUser is the faithful ${langLabel} version for the manual UI field.
+- These action fields MUST be extracted from / agree with aiPrompt. Do not create conflicting actions and never leave action fields empty when a cast member is visible.
+
 ${sceneTypeHints}
 
 ${(() => {
@@ -219,6 +266,7 @@ CRITICAL RULES:
 - DO NOT use continuity pronouns ("the same person", "she from before") — consistency comes from repeated signatureItems, not claimed identity.
 - For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value (this is the PRIMARY slot, kept for backward compatibility).
 - ALSO populate characterShots[] with one entry per character actually visible in the scene (1–4 entries). The first entry MUST mirror characterShot. For solo scenes, characterShots has exactly one entry.
+- For each visible characterShots[] entry, ALSO set actionEn and actionUser. They must describe what THIS character does in the same scene action already written in aiPrompt.
 - For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent") and leave characterShots empty.
 
 🎭 MULTI-CHARACTER CO-PRESENCE (when ${chars.length} ≥ 2 characters are defined):
@@ -302,6 +350,14 @@ Generate the storyboard using the create_storyboard function.`;
                           type: "string",
                           description: "Detailed English prompt for AI video generation. Describe camera angle, subject, motion, lighting, mood.",
                         },
+                        sceneActionEn: {
+                          type: "string",
+                          description: "Concise English summary of the general scene action, faithfully matching aiPrompt, max 25 words.",
+                        },
+                        sceneActionLocalized: {
+                          type: "string",
+                          description: `Same scene action as sceneActionEn, localized in ${langLabel} for the editable UI field.`,
+                        },
                         stockKeywords: {
                           type: "string",
                           description: "Comma-separated English keywords for stock video search fallback",
@@ -346,6 +402,14 @@ Generate the storyboard using the create_storyboard function.`;
                               shotType: {
                                 type: "string",
                                 enum: ["full", "profile", "back", "detail", "pov", "silhouette", "absent"],
+                              },
+                              actionEn: {
+                                type: "string",
+                                description: "What this exact character physically does in this scene, English, max 12 words, matching aiPrompt.",
+                              },
+                              actionUser: {
+                                type: "string",
+                                description: `Same character action localized in ${langLabel} for the editable UI field.`,
                               },
                             },
                             required: ["characterId", "shotType"],
@@ -460,8 +524,9 @@ Generate the storyboard using the create_storyboard function.`;
 
     // Valid character ids for filtering LLM output
     const validCharIds = new Set((briefing.characters || []).map((c) => c.id));
-    const normalizeShots = (rawShots: any, primaryShot: any): Array<{ characterId: string; shotType: string }> => {
-      const out: Array<{ characterId: string; shotType: string }> = [];
+    const charByIdForActions = new Map((briefing.characters || []).map((c) => [c.id, c]));
+    const normalizeShots = (rawShots: any, primaryShot: any, prompt: string, sceneActionEn: string): Array<{ characterId: string; shotType: string; actionEn?: string; actionUser?: string }> => {
+      const out: Array<{ characterId: string; shotType: string; actionEn?: string; actionUser?: string }> = [];
       const seen = new Set<string>();
       const push = (slot: any) => {
         if (!slot || !slot.shotType || slot.shotType === 'absent') return;
@@ -472,7 +537,10 @@ Generate the storyboard using the create_storyboard function.`;
         const finalId = validCharIds.has(id) ? id : briefing.characters![0].id;
         if (seen.has(finalId)) return;
         seen.add(finalId);
-        out.push({ characterId: finalId, shotType: slot.shotType });
+        const character = charByIdForActions.get(finalId);
+        const actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name, sceneActionEn), 12);
+        const actionUser = cleanActionText(slot.actionUser || actionEn, 12);
+        out.push({ characterId: finalId, shotType: slot.shotType, actionEn, actionUser });
       };
       if (Array.isArray(rawShots)) for (const s of rawShots) push(s);
       push(primaryShot);
@@ -484,7 +552,9 @@ Generate the storyboard using the create_storyboard function.`;
       const finalEffects = aiEffects.length > 0
         ? aiEffects.map(e => ({ ...e, color: e.color || brandColor }))
         : getDefaultEffects(s.sceneType || 'custom', visualStyleId, brandColor);
-      const shots = normalizeShots(s.characterShots, s.characterShot);
+      const sceneActionEn = cleanActionText(s.sceneActionEn || promptActionFallback(s.aiPrompt, 25), 25);
+      const sceneActionUser = cleanActionText(s.sceneActionLocalized || sceneActionEn, 25);
+      const shots = normalizeShots(s.characterShots, s.characterShot, s.aiPrompt || "", sceneActionEn);
       const primary = shots[0];
       const clipSource = pickClipSource(s.sceneType || 'custom', index, arr.length, primary);
       return {
@@ -495,6 +565,8 @@ Generate the storyboard using the create_storyboard function.`;
         durationSeconds: Math.max(3, Math.min(15, s.durationSeconds || 5)),
         clipSource,
         aiPrompt: appendStyle(s.aiPrompt || ""),
+        sceneActionEn,
+        sceneActionUser,
         stockKeywords: s.stockKeywords || "",
         clipStatus: "pending",
         textOverlay: {
@@ -565,7 +637,13 @@ Generate the storyboard using the create_storyboard function.`;
           if (shots.length >= 4) continue; // slot cap
           const shotType = rotation[rotIdx % rotation.length];
           rotIdx++;
-          shots.push({ characterId: ch.id, shotType });
+          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name, sc.sceneActionEn || promptActionFallback(sc.aiPrompt, 12));
+          shots.push({
+            characterId: ch.id,
+            shotType,
+            actionEn,
+            actionUser: actionEn,
+          });
           sc.characterShots = shots;
           syncPrimaryFromShots(sc);
           updateClipSource(sc, idx);
