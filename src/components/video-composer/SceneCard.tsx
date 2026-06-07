@@ -626,7 +626,7 @@ export default function SceneCard({
     scene.characterShot?.actionEn,
   ]);
 
-
+  const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next, promptSlotOrder);
     onUpdate({ promptSlots: next, aiPrompt: stitched });
   };
