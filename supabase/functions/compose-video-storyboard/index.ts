@@ -637,7 +637,13 @@ Generate the storyboard using the create_storyboard function.`;
           if (shots.length >= 4) continue; // slot cap
           const shotType = rotation[rotIdx % rotation.length];
           rotIdx++;
-          shots.push({ characterId: ch.id, shotType });
+          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name, sc.sceneActionEn || promptActionFallback(sc.aiPrompt, 12));
+          shots.push({
+            characterId: ch.id,
+            shotType,
+            actionEn,
+            actionUser: actionEn,
+          });
           sc.characterShots = shots;
           syncPrimaryFromShots(sc);
           updateClipSource(sc, idx);
