@@ -125,6 +125,10 @@ import { resolveSceneWorldRefs } from "@/lib/motion-studio/prepareSceneAnchor";
 import { applyCastToPrompt } from "@/lib/motion-studio/applyCastToPrompt";
 import { syncCastFromPrompt } from "@/lib/motion-studio/syncCastFromPrompt";
 import { applyDialogToPrompt } from "@/lib/motion-studio/applyDialogToPrompt";
+import {
+  removeCharactersFromPrompt,
+  removeCharactersFromDialogScript,
+} from "@/lib/motion-studio/removeCharacterFromPrompt";
 import { parseDialogScript } from "@/lib/talking-head/parseDialogScript";
 import SceneStillFrameStudio from "./SceneStillFrameStudio";
 import SceneAnchorLibrary from "./SceneAnchorLibrary";
