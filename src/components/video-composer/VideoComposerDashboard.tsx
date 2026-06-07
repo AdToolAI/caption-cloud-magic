@@ -547,8 +547,26 @@ export default function VideoComposerDashboard() {
               : (local?.seedVariations ?? []),
           };
         });
-        const merged = [...dbScenes, ...localOnly]
-          .map((s, i) => ({ ...s, orderIndex: i }));
+        // Preserve the DB `order_index` for persisted scenes — the legacy
+        // re-index by array position (`map((s,i) => orderIndex:i)`) would
+        // overwrite DB truth during the realtime tick storm that Phase A of
+        // `ensureProjectPersisted` triggers, scrambling the UI order.
+        // Local-only scenes (no UUID yet) get appended at the end with
+        // bumped orderIndex. Final list is sorted by orderIndex and
+        // deduplicated by id so a race can never produce duplicate cards.
+        const maxDbOrder = dbScenes.length > 0
+          ? Math.max(...dbScenes.map((s) => Number(s.orderIndex ?? 0)))
+          : -1;
+        const localWithBump = localOnly.map((s, i) => ({
+          ...s,
+          orderIndex: maxDbOrder + 1 + i,
+        }));
+        const dedup = new Map<string, ComposerScene>();
+        for (const s of dbScenes) dedup.set(s.id, s);
+        for (const s of localWithBump) if (!dedup.has(s.id)) dedup.set(s.id, s);
+        const merged = Array.from(dedup.values()).sort(
+          (a, b) => Number(a.orderIndex ?? 0) - Number(b.orderIndex ?? 0),
+        );
         return { ...prev, scenes: propagateDialogLock(merged) };
       });
     } catch (err) {
