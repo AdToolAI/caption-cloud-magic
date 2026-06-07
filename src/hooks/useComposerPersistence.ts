@@ -222,6 +222,8 @@ export function useComposerPersistence() {
               dialog_locked_at: scene.dialogLockedAt ?? null,
               lock_reference_url: scene.lockReferenceUrl ?? null,
               continuity_locked: scene.continuityLocked === true,
+              action_beat: (scene.actionBeat ?? null) as any,
+              realism_preset: scene.realismPreset ?? null,
             } as any)
             .eq('id', scene.id);
 
@@ -277,6 +279,8 @@ export function useComposerPersistence() {
               dialog_locked_at: scene.dialogLockedAt ?? null,
               lock_reference_url: scene.lockReferenceUrl ?? null,
               continuity_locked: scene.continuityLocked === true,
+              action_beat: (scene.actionBeat ?? null) as any,
+              realism_preset: scene.realismPreset ?? null,
             } as any)
             .select('id')
             .single();
