@@ -126,6 +126,8 @@ import { resolveSceneWorldRefs } from "@/lib/motion-studio/prepareSceneAnchor";
 import { applyCastToPrompt } from "@/lib/motion-studio/applyCastToPrompt";
 import { syncCastFromPrompt } from "@/lib/motion-studio/syncCastFromPrompt";
 import { applyDialogToPrompt } from "@/lib/motion-studio/applyDialogToPrompt";
+import { applyActionsToPrompt, type CastActionEntry } from "@/lib/motion-studio/applyActionsToPrompt";
+import SceneActionField from "./SceneActionField";
 import {
   removeCharactersFromPrompt,
   removeCharactersFromDialogScript,
