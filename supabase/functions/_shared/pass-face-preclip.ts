@@ -102,6 +102,7 @@ export async function renderPassFacePreclip(
     srcHeight,
     coords,
     bbox,
+    siblingCoords,
     startSec,
     endSec,
   } = input;
@@ -119,7 +120,7 @@ export async function renderPassFacePreclip(
 
   const sW = evenDimension(srcWidth, 1280);
   const sH = evenDimension(srcHeight, 720);
-  const crop = computeFaceCrop(coords, bbox ?? null, sW, sH, 512);
+  const crop = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
   const outW = crop.outputSize;
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
