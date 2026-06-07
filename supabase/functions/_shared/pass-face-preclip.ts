@@ -50,6 +50,9 @@ export interface PassPreclipInput {
   coords: [number, number];
   /** Optional face bbox in source-master pixel space [x1,y1,x2,y2]. */
   bbox?: [number, number, number, number] | null;
+  /** v76 — Face centers of the OTHER speakers on the same plate. Used to
+   *  cap the crop edge so it never includes a neighbor's face. */
+  siblingCoords?: Array<[number, number]> | null;
   /** Render window for this speaker's turn(s) in scene seconds. */
   startSec: number;
   endSec: number;
@@ -99,6 +102,7 @@ export async function renderPassFacePreclip(
     srcHeight,
     coords,
     bbox,
+    siblingCoords,
     startSec,
     endSec,
   } = input;
@@ -116,7 +120,7 @@ export async function renderPassFacePreclip(
 
   const sW = evenDimension(srcWidth, 1280);
   const sH = evenDimension(srcHeight, 720);
-  const crop = computeFaceCrop(coords, bbox ?? null, sW, sH, 512);
+  const crop = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
   const outW = crop.outputSize;
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));

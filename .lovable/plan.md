@@ -1,61 +1,49 @@
 ## Problem
 
-The global progress bar (`PipelineProgressBar` + `usePipelineProgress`) tracks elapsed time, baselines, and the monotonic floor in **component-instance refs** (`pipelineStartRef`, `runFloorRef`, `baselineRef`, `floorRef`, `startedAtRef`, `realProgressRef`).
+Bei 3–4 Sprecher-Szenen rendert die v69 Single-Face-Preclip-Pipeline pro Sprecher einen Crop, der ~73 % der Master-Breite einnimmt (`safeH * 0.55` Floor in `face-crop.ts`). Auf einer 768×1028 Vier-Personen-Plate enthält dieser Crop 2–3 Gesichter statt einem. Sync.sos Active-Speaker-Detection wählt im Crop dann ein anderes Gesicht als das gemeinte, und beim finalen Mux deckt der große kreisförmige Overlay die übrigen Charaktere visuell ab. Wirkung: ein einziger Charakter (meist der mittlere/größte) scheint das ganze Skript zu sprechen.
 
-These refs are lost whenever:
-- the user navigates away from the Composer route (e.g. to another tab inside the app) and back,
-- the device sleeps long enough that the route re-mounts on wake,
-- React strict mode / a parent re-mount happens.
+Bei 1–2 Sprechern fällt das nicht auf, weil die Gesichter weit genug auseinander stehen – deshalb funktioniert es "manchmal".
 
-On remount, the "Lazy baseline initialization" detects in-flight scenes and seeds a **fresh baseline at `Date.now()`** with `elapsedSeconds = 0`. The render is still running in the background, but the bar starts again at ~1% and the elapsed/ETA counter starts at `0s / ~8:00 min`. That's the "Ladebalken fängt von vorne an"-effect the user sees.
+## Fix (klein, gezielt, keine API-Änderung)
 
-## Fix
+**1) `supabase/functions/_shared/face-crop.ts` — Cropgröße bei vielen Sprechern begrenzen**
 
-Persist the per-run progress state per project in `sessionStorage` and rehydrate on mount. The render itself is already backend-driven — only the *visual* progress state needs to survive a remount.
+`computeFaceCrop` bekommt einen optionalen `siblingCoords: Array<[x,y]>` Parameter (Koordinaten der anderen Sprecher auf derselben Plate). Daraus wird der minimale Abstand zum nächsten Nachbar-Gesicht berechnet. Die finale Crop-Kante wird auf
 
-### Changes — `src/hooks/usePipelineProgress.ts` only
+```text
+maxAllowed = max(160, 0.9 * minNeighborDistance)
+size = min(rawSize, safeW, safeH, maxAllowed)
+```
 
-1. **New key derivation**
-   - Read `projectId` (new optional arg to the hook) and build `key = composer:pipeline-progress:<projectId>`.
-   - Fall back to `composer:pipeline-progress:default` when no project id yet (early-mount case).
+geclamped. Dadurch:
+- 1 Sprecher: keine Änderung (kein Nachbar → kein Cap)
+- 2 Sprecher mit 380 px Abstand: cap = 342 px (statt 564) → genau ein Gesicht
+- 4 Sprecher mit 130 px Abstand: cap = 160 px (Mindestgröße) → wirklich nur Kopf + Schultern
 
-2. **Hydrate on mount**
-   - On first render, read the JSON payload from `sessionStorage`. If present, restore:
-     - `pipelineStartRef.current` (epoch ms)
-     - `runFloorRef.current` (0–100)
-     - `floorRef.current` (per-phase floors)
-     - `startedAtRef.current` (per-phase epoch ms)
-     - `baselineRef.current` (clipsReady/Total, lipsyncDone/Total, dialogShots, voiceoverHadAudio, musicHad)
-     - `realProgressRef.current` ({ value, at })
-   - Bump `baselineVersion` once after hydration so dependent memos recompute with the restored snapshot.
+Der bestehende bbox-Pfad (`diag * 2.0`) bleibt als bevorzugte Quelle bestehen und wird nur zusätzlich durch `maxAllowed` gekappt. Der `safeH * 0.55` / `safeH * 0.6` Floor wird auf `safeH * 0.35` für N≥3 reduziert.
 
-3. **Persist on change (throttled)**
-   - After the existing `runFloorRef.current = …` assignment near the end of the hook, write the snapshot to `sessionStorage` at most every 1s (timestamp guard, no extra effect needed).
-   - Skip writes when `pipelineStartRef.current === null` (nothing running).
+**2) `supabase/functions/_shared/pass-face-preclip.ts` (oder den Aufrufer in `compose-dialog-segments`) — `siblingCoords` weiterreichen**
 
-4. **Clear on terminal state**
-   - When `allDone || completedCleanly || hasFailure` becomes true and the 5s settle-timer fires (the existing block that nulls `pipelineStartRef`), also `sessionStorage.removeItem(key)` so the next run starts clean.
-   - Also clear when a fresh `clips:start` event arrives (already resets the refs — add the removeItem there too, before re-seeding).
+Beim Aufruf von `computeFaceCrop` pro Pass werden die `coords` der anderen Passes als `siblingCoords` mitgegeben. Keine neue DB-Spalte nötig – die Koordinaten stehen bereits in `dialog_shots.passes[].coords`.
 
-5. **Wrap all `sessionStorage` calls in `try/catch`** (Safari private mode / quota).
+**3) `mem/architecture/lipsync/v76-neighbor-aware-preclip.md` — Memory anlegen**
 
-### Changes — `src/components/video-composer/PipelineProgressBar.tsx`
-
-- Accept and forward `projectId` to `usePipelineProgress({ … projectId })`.
-
-### Changes — `src/components/video-composer/VideoComposerDashboard.tsx`
-
-- Pass `projectId={project.id}` to `<PipelineProgressBar … />` (single new prop, no logic changes).
+Kurze Notiz, dass der `safeH * 0.55` Floor das Multi-Speaker-Lipsync Symptom "ein Charakter spricht alles" verursacht hat und ab v76 ein Nachbar-Abstand-Cap greift. Hinweis, dass v72/v74 static-anchor weiterhin verboten bleibt (v75 Policy) und der Fix orthogonal dazu ist.
 
 ## Out of scope
 
-- No backend / edge-function changes — the actual render keeps polling and finishing as it does today.
-- No changes to the stall detection, phase weighting, or ETA math — only their *inputs* (the refs) get rehydrated.
-- We intentionally use `sessionStorage` (not `localStorage`), so closing the tab still clears stale progress, but in-tab navigation and screen sleep no longer reset the bar.
+- Sync.so Modell/Modes (`sync-3` / `lipsync-2-pro`), Pricing, Refund-Logik – unverändert
+- DialogStitchVideo Overlay-Renderer (`CroppedOverlay` kreisförmige Maske) – unverändert, der kleinere Crop verschwindet automatisch hinter dem feathered Mask Radius
+- v70 Legacy-Removal, v69 Unified-Preclip Routing – unverändert
+- Frontend / UI / SceneEngineRouter – keine Änderungen
 
-## Verification
+## Verifikation nach Implementation
 
-1. Start a Composer generation, switch to another route in the app, come back → bar resumes at the prior % and elapsed counter is correct (not 0s).
-2. Start a generation, lock the screen for 1 min, unlock → same behaviour.
-3. Close the tab and reopen the Composer URL → bar starts fresh (sessionStorage gone, as intended).
-4. Let a run finish cleanly → after the 3s "100%" hold, the bar disappears and `sessionStorage` no longer holds the key (verified via DevTools).
+- Neue 4-Sprecher-Szene rendern → in `dialog_shots.passes[].preclip_crop.size` sollten Werte deutlich < 400 (eher 150–260) erscheinen
+- Edge-Log `[compose-dialog-segments] … preclip_crop size=…` prüfen
+- Final-Mux: jeder der 4 Charaktere bewegt nur den eigenen Mund nur im eigenen Zeitfenster; keiner deckt die anderen optisch zu
+- Bestehende 1- und 2-Sprecher-Szenen verhalten sich unverändert (Sibling-Cap inaktiv bzw. nicht limitierend)
+
+## Was, wenn das Symptom danach noch auftritt?
+
+Dann liegt das Restproblem nicht im Crop-Sizing, sondern in einer drift-bedingten Bewegung der Master-Plate (i2v) – das wäre dann ein separates Thema (Plate-Regeneration / Static-Anchor-Verbot v75), nicht der jetzt vorgeschlagene Fix.
