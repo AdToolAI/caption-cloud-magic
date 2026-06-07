@@ -309,7 +309,7 @@ export default function BriefingTab({
         sceneActionUser: s.sceneActionUser || s.sceneActionEn || actionFromPrompt(s.aiPrompt, 25),
         characterShots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])).map((slot) => {
           const ch = briefing.characters?.find((c) => c.id === slot.characterId);
-          const fallback = characterActionFromPrompt(s.aiPrompt, ch?.name, s.sceneActionEn || actionFromPrompt(s.aiPrompt, 12));
+          const fallback = characterActionFromPrompt(s.aiPrompt, ch?.name);
           return {
             ...slot,
             actionEn: slot.actionEn || fallback,
