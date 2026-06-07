@@ -65,6 +65,12 @@ interface Props {
   legacyValue?: CharacterShot;
   onChange: (next: CharacterShot[]) => void;
   language?: Lang;
+  /**
+   * When true, each cast slot renders a manual Action field underneath the
+   * row so the user can pin exactly what THIS character does in the scene
+   * (UI language → auto-EN → `[CastActions]` marker in the prompt).
+   */
+  showActionFields?: boolean;
 }
 
 function normalizeValue(value?: CharacterShot[], legacy?: CharacterShot): CharacterShot[] {
