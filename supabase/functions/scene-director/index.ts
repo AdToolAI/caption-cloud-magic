@@ -167,8 +167,18 @@ const TOOL_DEFINITION = {
           },
         },
         confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+        actionBeat: {
+          type: 'object',
+          description: 'Action-First cinematic layer. characterAction + environmentMotion are appended to the i2v prompt with higher priority than dialog so the renderer produces real motion, not a static talking-head bust.',
+          properties: {
+            characterAction: { type: 'string', description: 'English present-continuous sentence describing what the on-screen character physically does (e.g. "driving through golden-hour streets, hands relaxed on the wheel").' },
+            environmentMotion: { type: 'string', description: 'English sentence describing what moves around the character (light, wind, traffic, weather, parallax, props).' },
+            motionIntensity: { type: 'string', enum: ['static', 'subtle', 'moderate', 'high'] },
+          },
+          required: ['characterAction', 'environmentMotion', 'motionIntensity'],
+        },
       },
-      required: ['aiPrompt', 'matchedAssets', 'droppedActions', 'followupSceneSuggestions', 'missingAssets', 'confidence'],
+      required: ['aiPrompt', 'matchedAssets', 'droppedActions', 'followupSceneSuggestions', 'missingAssets', 'confidence', 'actionBeat'],
     },
   },
 };
