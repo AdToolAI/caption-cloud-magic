@@ -298,7 +298,37 @@ export interface ComposerScene {
     movement?: string;
     lighting?: string;
   };
-  /** Stock media metadata when clipSource === 'stock' or 'stock-image'. */
+  /**
+   * Action-First Cinematic Pipeline (June 2026).
+   *
+   * Describes what the character physically does during the shot and what
+   * happens around them. Set by Scene-Director or manually by the user.
+   * Routed into the i2v prompt with HIGHER priority than cast/dialog so
+   * Hailuo/Kling render real action (driving, walking, gesturing) instead
+   * of collapsing the shot into a static "talking-head bust".
+   *
+   * `motionIntensity` also informs `recommendEngineForScene`: anything
+   * ≥ `subtle` with dialog routes to `cinematic-sync` (Hailuo plate +
+   * Sync.so polish) instead of HeyGen Photo-Avatar.
+   *
+   * Persisted as `composer_scenes.action_beat` (JSONB).
+   */
+  actionBeat?: {
+    /** What the character physically does. English. */
+    characterAction?: string;
+    /** What happens around the character (env, weather, light, props). English. */
+    environmentMotion?: string;
+    /** Drives the Engine Router. `static` = direct-address bust. */
+    motionIntensity?: 'static' | 'subtle' | 'moderate' | 'high';
+  };
+  /**
+   * Realism style preset (`cinematic-spot` | `documentary` | `lifestyle-hero`).
+   * Primes Scene-Director system context, Shot-Director defaults, color
+   * grade, and Sync.so quality tier in one click. Persisted as
+   * `composer_scenes.realism_preset`.
+   */
+  realismPreset?: 'cinematic-spot' | 'documentary' | 'lifestyle-hero';
+
   stockMediaThumb?: string;
   stockMediaSource?: StockMediaSource;
   stockMediaAuthor?: { name: string; url?: string };
