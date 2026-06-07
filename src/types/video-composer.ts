@@ -339,6 +339,17 @@ export interface ComposerScene {
    */
   realismPreset?: 'cinematic-spot' | 'documentary' | 'lifestyle-hero';
 
+  /**
+   * Manual Scene-Action override (user-typed, UI language). When non-empty,
+   * `applyActionsToPrompt` pins it into the `[SceneAction]` marker block at
+   * the top of the provider prompt, overriding what the Scene-Director (or
+   * Auto-Director) produced. Empty → director output wins.
+   */
+  sceneActionUser?: string;
+  /** Auto-translated English mirror of `sceneActionUser`. Cached server-side. */
+  sceneActionEn?: string;
+
+
   /** Stock media metadata when clipSource === 'stock' or 'stock-image'. */
   stockMediaThumb?: string;
 
