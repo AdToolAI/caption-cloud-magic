@@ -966,18 +966,31 @@ export default function VideoComposerDashboard() {
       return undefined;
     }
 
-    // Optimistic insert (so the user sees it instantly)
-    setProject(prev => ({
-      ...prev,
-      scenes: [...prev.scenes, { ...baseScene, projectId, orderIndex: prev.scenes.length }],
-    }));
+    // Optimistic insert (so the user sees it instantly).
+    // Capture the freshest scenes.length from the updater — the closure's
+    // `project.scenes` is stale because this callback's dep array only
+    // contains `project.id`. The captured `finalOrderIndex` is then re-used
+    // for the DB INSERT to avoid a UNIQUE(project_id, order_index) collision.
+    // The legacy bug used `baseScene.orderIndex` (= 0) so every new scene
+    // tried to insert at slot 0, silently failed (only console.warn), and
+    // the scene lived on as a temp-id-only entry — which combined with the
+    // realtime refetch race caused Scene 2 to "disappear" when Scene 3 was
+    // generated. (Bug 1 of the storyboard persistence triad.)
+    let finalOrderIndex = 0;
+    setProject(prev => {
+      finalOrderIndex = prev.scenes.length;
+      return {
+        ...prev,
+        scenes: [...prev.scenes, { ...baseScene, projectId, orderIndex: finalOrderIndex }],
+      };
+    });
 
     try {
       const { data, error } = await supabase
         .from('composer_scenes')
         .insert({
           project_id: projectId,
-          order_index: baseScene.orderIndex,
+          order_index: finalOrderIndex,
           scene_type: baseScene.sceneType,
           duration_seconds: baseScene.durationSeconds,
           clip_source: baseScene.clipSource,
