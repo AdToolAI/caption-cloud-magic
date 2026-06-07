@@ -1,60 +1,61 @@
-## Was passiert (Diagnose)
+## Problem
 
-Beim Anlegen einer neuen Szene im Storyboard wird sie **mit einem temporären Client-ID lokal eingefügt** und parallel sofort in `composer_scenes` geschrieben. Beim Generieren wird vor dem Render `ensureProjectPersisted` aufgerufen — dieser Schritt nummeriert die `order_index` aller Szenen neu, indem er sie kurz auf negative Werte schiebt (Phase A) und dann wieder in die richtigen Slots schreibt (Phase B). Während dieses Fensters läuft die Realtime-Subscription mit und macht laufend `refetchScenesFromDb`.
+The global progress bar (`PipelineProgressBar` + `usePipelineProgress`) tracks elapsed time, baselines, and the monotonic floor in **component-instance refs** (`pipelineStartRef`, `runFloorRef`, `baselineRef`, `floorRef`, `startedAtRef`, `realProgressRef`).
 
-Zwei konkrete Bugs greifen ineinander und sorgen für „Szene 2 wird durch Szene 3 ersetzt":
+These refs are lost whenever:
+- the user navigates away from the Composer route (e.g. to another tab inside the app) and back,
+- the device sleeps long enough that the route re-mounts on wake,
+- React strict mode / a parent re-mount happens.
 
-### Bug 1 — `addSceneToProject` schreibt jede neue Szene mit `order_index: 0`
-`src/components/video-composer/VideoComposerDashboard.tsx`, Zeile 980:
-```
-order_index: baseScene.orderIndex,   // baseScene ist {...DEFAULTS, ...partial} mit Default orderIndex: 0
-```
-Lokal wird korrekt `prev.scenes.length` gesetzt (Zeile 972), aber der DB-INSERT verwendet die unverarbeitete `baseScene.orderIndex` = `0`. Folge: Jeder neue Szene-INSERT kollidiert mit `UNIQUE(project_id, order_index)` und schlägt still fehl (nur `console.warn` Zeile 1022). Die neue Szene lebt nur lokal mit Temp-ID weiter.
+On remount, the "Lazy baseline initialization" detects in-flight scenes and seeds a **fresh baseline at `Date.now()`** with `elapsedSeconds = 0`. The render is still running in the background, but the bar starts again at ~1% and the elapsed/ETA counter starts at `0s / ~8:00 min`. That's the "Ladebalken fängt von vorne an"-effect the user sees.
 
-### Bug 2 — `refetchScenesFromDb` reindiziert nach Array-Position, nicht nach DB-`order_index`
-`VideoComposerDashboard.tsx`, Zeilen 540–541:
-```
-const merged = [...dbScenes, ...localOnly]
-  .map((s, i) => ({ ...s, orderIndex: i }));
-```
-Während Phase A der Persistenz alle Szenen kurz auf negative `order_index` schiebt, liefert ein konkurrierender Refetch die Szenen in chaotischer Reihenfolge (z. B. `[-3, -2, -1, 2]`). Die lokale UI-Reihenfolge wird per Array-Index überschrieben → Szenen rutschen visuell durcheinander.
+## Fix
 
-### Bug 3 — Temp-Szene bleibt nach Persist in `localOnly`
-Wenn `ensureProjectPersisted` der Temp-Scene 3 endlich eine UUID gibt, kommt `setProject({..., scenes: result.scenes})` (Zeile 1414). Das ersetzt die Szenen — aber **jeder Realtime-Refetch, der zwischen Phase A und diesem `setProject` feuert**, sieht `localOnly = [Scene3(temp)]` UND `dbScenes = [Scene1, Scene2, Scene3-real]` → temporär 4 Szenen, anschließend räumt der nächste `setProject` Zeile 1414 alle `localOnly` weg — inklusive Edits, die der User in Scene 2 noch nicht gespeichert hatte. Effektiv sieht der User: Scene 2 „wird ersetzt".
+Persist the per-run progress state per project in `sessionStorage` and rehydrate on mount. The render itself is already backend-driven — only the *visual* progress state needs to survive a remount.
 
-## Fix-Plan
+### Changes — `src/hooks/usePipelineProgress.ts` only
 
-### 1. `addSceneToProject` korrekt mit der finalen `order_index` insertieren
-- `baseScene.orderIndex` vor dem `insert` auf `prev.scenes.length` setzen (gleichen Wert wie der optimistische `setProject`-Aufruf).
-- Bei DB-Fehler **nicht nur warnen**, sondern den lokalen Temp-Scene-Eintrag wieder entfernen oder `clip_status: 'error'` markieren, damit der User es nicht stillschweigend mitschleppt.
+1. **New key derivation**
+   - Read `projectId` (new optional arg to the hook) and build `key = composer:pipeline-progress:<projectId>`.
+   - Fall back to `composer:pipeline-progress:default` when no project id yet (early-mount case).
 
-### 2. Realtime-Refetch atomar gegen Persistenz machen
-- Einen Modul-scope „persisting-lock" einführen (`isPersistingRef`), den `ensureProjectPersisted` während Phase A → Phase B hält.
-- `refetchScenesFromDb` skippt den Merge, solange das Lock aktiv ist (oder zumindest, solange irgendeine `order_index` < 0 zurückkommt — ein einfacher Guard: `if (data.some(r => r.order_index < 0)) return;`).
+2. **Hydrate on mount**
+   - On first render, read the JSON payload from `sessionStorage`. If present, restore:
+     - `pipelineStartRef.current` (epoch ms)
+     - `runFloorRef.current` (0–100)
+     - `floorRef.current` (per-phase floors)
+     - `startedAtRef.current` (per-phase epoch ms)
+     - `baselineRef.current` (clipsReady/Total, lipsyncDone/Total, dialogShots, voiceoverHadAudio, musicHad)
+     - `realProgressRef.current` ({ value, at })
+   - Bump `baselineVersion` once after hydration so dependent memos recompute with the restored snapshot.
 
-### 3. `refetchScenesFromDb` darf `orderIndex` nicht überschreiben
-- `orderIndex` aus DB direkt übernehmen (`row.order_index`) und **nicht** durch Array-Position ersetzen.
-- localOnly-Szenen hinten dranhängen mit `orderIndex = max(dbScenes.orderIndex) + n`.
+3. **Persist on change (throttled)**
+   - After the existing `runFloorRef.current = …` assignment near the end of the hook, write the snapshot to `sessionStorage` at most every 1s (timestamp guard, no extra effect needed).
+   - Skip writes when `pipelineStartRef.current === null` (nothing running).
 
-### 4. Persistenz: einzelne, einphasige Reindex-Strategie
-- Statt zweiphasigem Negativ-Shuffle: nur Szenen UPDATE-en, deren Ziel-`order_index` sich tatsächlich ändert, in der richtigen Reihenfolge (absteigend wenn Slot belegt). Dadurch entstehen weder negative Werte noch eine Realtime-Tick-Storm.
-- Alternativ den ganzen Reindex in einer Transaktion via RPC ausführen (eine einzige Realtime-Notification statt N).
+4. **Clear on terminal state**
+   - When `allDone || completedCleanly || hasFailure` becomes true and the 5s settle-timer fires (the existing block that nulls `pipelineStartRef`), also `sessionStorage.removeItem(key)` so the next run starts clean.
+   - Also clear when a fresh `clips:start` event arrives (already resets the refs — add the removeItem there too, before re-seeding).
 
-### 5. Defensive Dedup in `refetchScenesFromDb`
-- Vor dem `setProject` per `Map<id>` deduplizieren, damit selbst bei Races nie zwei Szenen mit derselben UUID oder Temp-ID parallel existieren.
+5. **Wrap all `sessionStorage` calls in `try/catch`** (Safari private mode / quota).
 
-## Technische Details
+### Changes — `src/components/video-composer/PipelineProgressBar.tsx`
 
-**Dateien:**
-- `src/components/video-composer/VideoComposerDashboard.tsx` — `addSceneToProject` (940-1022), `refetchScenesFromDb` (446-547)
-- `src/hooks/useComposerPersistence.ts` — `ensureProjectPersisted` Phase A/B (166-302)
+- Accept and forward `projectId` to `usePipelineProgress({ … projectId })`.
 
-**Keine Backend-/Edge-Function-Änderungen nötig** — alle Bugs liegen rein im Client-State-Management. Die `compose-video-clips`-Pipeline und Sync.so-Pfade bleiben unangetastet.
+### Changes — `src/components/video-composer/VideoComposerDashboard.tsx`
 
-**Verifikation:** Manuell reproduzieren — Szene 1, Szene 2, Szene 3 nacheinander erstellen und generieren; in der DevTools-Network-Tab prüfen, dass jeder INSERT in `composer_scenes` einen unterschiedlichen `order_index` bekommt und kein `409 Conflict` / `unique constraint` Fehler auftritt.
+- Pass `projectId={project.id}` to `<PipelineProgressBar … />` (single new prop, no logic changes).
 
-## Was bewusst NICHT angefasst wird
+## Out of scope
 
-- Sync.so-Pipeline, `compose-dialog-segments`, Lip-Sync-Logik
-- Engine-Routing (`sync-segments` / `cinematic-sync` / `heygen-talking-head`)
-- Audio-Plan-Locking
+- No backend / edge-function changes — the actual render keeps polling and finishing as it does today.
+- No changes to the stall detection, phase weighting, or ETA math — only their *inputs* (the refs) get rehydrated.
+- We intentionally use `sessionStorage` (not `localStorage`), so closing the tab still clears stale progress, but in-tab navigation and screen sleep no longer reset the bar.
+
+## Verification
+
+1. Start a Composer generation, switch to another route in the app, come back → bar resumes at the prior % and elapsed counter is correct (not 0s).
+2. Start a generation, lock the screen for 1 min, unlock → same behaviour.
+3. Close the tab and reopen the Composer URL → bar starts fresh (sessionStorage gone, as intended).
+4. Let a run finish cleanly → after the 3s "100%" hold, the bar disappears and `sessionStorage` no longer holds the key (verified via DevTools).
