@@ -66,6 +66,7 @@ import { CharacterShotBadge } from "./CharacterShotBadge";
 import { CharacterCastPicker } from "./CharacterCastPicker";
 import { UnifiedAssetPicker } from "./UnifiedAssetPicker";
 import { SceneDirectorBox } from "./SceneDirectorBox";
+import { RealismPresetPicker } from "./RealismPresetPicker";
 import { useBrandLocations } from "@/hooks/useBrandLocations";
 import { useBrandBuildings } from "@/hooks/useBrandBuildings";
 import { useBrandProps } from "@/hooks/useBrandProps";
