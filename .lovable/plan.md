@@ -1,158 +1,71 @@
 ## Ziel
 
-Pro Szene zwei neue, manuell editierbare Eingabeebenen — **immer in der Sprache der UI** schreibbar, automatisch nach Englisch übersetzt und an exakt der richtigen Stelle in den Provider-Prompt injiziert:
+Wenn der Scene-Director eine Szene generiert ("KI Modus"), sollen die manuellen Override-Felder **nicht leer** bleiben, sondern direkt mit dem ausgefüllt werden, was im Prompt steht — sowohl die allgemeine **Szenen-Aktion** als auch die **Aktion pro Charakter**. Damit gilt:
 
-1. **Scene Action** (1 Feld pro Szene) — „Was passiert in der Szene insgesamt?"
-2. **Character Action** (1 Feld pro Cast-Slot, neben Voiceover/Dialog) — „Was tut **diese** Person konkret?"
+- "Was passiert in der Szene?" stimmt 1:1 mit der Action im Prompt überein.
+- "Was tut Sarah / Matthew / Samuel / Kailee?" ist pro Charakter vorausgefüllt.
+- Der User kann jedes Feld danach manuell überschreiben (bestehendes Lock-Verhalten bleibt).
 
-Beim Storyboarding (Scene Director / Auto-Director) werden beide Felder automatisch vorbefüllt. Der User kann sie jederzeit überschreiben — und die Überschreibung gewinnt deterministisch über den AI-Prompt-Body, ohne dass ein Re-Roll nötig ist.
+Aktuell liefert `scene-director` nur **einen** `actionBeat.characterAction` (für den Hauptcharakter) und **kein** Per-Character-Mapping → daher sind alle Felder leer.
 
-## UX
+---
 
-### Cast-Slot (in `SceneDirectorBox` / Cast-Liste)
+## Änderungen
 
-Pro Slot bisher: Charakter-Picker + `shotType` + Voiceover/Dialog-Textarea.
+### 1. `supabase/functions/scene-director/index.ts` (Tool-Schema erweitern)
 
-Neu darunter:
+Im `emitScene`-Tool zwei neue Felder ergänzen:
 
-```
-[Action — was tut Sarah?]                          🌐 Auto-EN
-┌─────────────────────────────────────────────┐
-│ tippt konzentriert auf ihrem Laptop, hebt   │
-│ kurz den Blick und nickt Samuel zu          │
-└─────────────────────────────────────────────┘
-   → "types focused on her laptop, briefly
-      looks up and nods at Samuel"   (Vorschau)
-```
+- `sceneActionEn` (string, englisch) — **eine** prägnante Action-Sentence, die genau das beschreibt, was im Action-Body des `aiPrompt` passiert (ohne Cast-Header, ohne Negative-Clause).
+- `perCharacterActions` (array) — pro `characterId` in `matchedAssets.characterIds` ein Eintrag `{ characterId, actionEn }`. **Pflicht** für jeden gematchten Charakter (sonst Cast-Coverage-Validator schlägt an).
+- `sceneActionLocalized` und `perCharacterActionsLocalized` (`{ characterId, action }`) — gleiche Inhalte in `req.language`, damit das UI-Feld direkt in DE/ES gefüllt wird (kein zusätzlicher Translate-Call nötig).
 
-- Sprache = UI-Sprache (de/en/es).
-- Kleine „🌐 Auto-EN"-Pille zeigt den übersetzten Text live unter dem Feld (read-only, Debounce 400 ms).
-- Leer = Feld bleibt unsichtbar im finalen Prompt; AI-generierte Action wird benutzt.
-- Befüllt = **lockt** die Action für diesen Charakter (kleines 🔒-Icon + Tooltip „Manuell — überstimmt Director").
+System-Prompt-Anweisung ergänzen: "Fill `sceneActionEn` with one English sentence summarizing the overall on-screen action. Fill `perCharacterActions` with exactly one entry per `matchedAssets.characterIds` member — same name, concrete verb, ≤ 12 words. The localized versions must be a faithful translation in the user's UI language."
 
-### Scene-Level (in `SceneCard`, neue Zeile direkt über dem Prompt-Editor)
+Post-Call-Validator: fehlende Einträge mit Fallback `''` ergänzen; Locale-Versionen fallback = English.
 
-```
-[Was passiert in der Szene?]                       🌐 Auto-EN  🔒
-┌─────────────────────────────────────────────┐
-│ Vier Social-Media-Manager arbeiten parallel │
-│ in einem hellen Open-Space-Büro             │
-└─────────────────────────────────────────────┘
-```
+### 2. `src/components/video-composer/SceneDirectorBox.tsx` (Felder durchreichen)
 
-- Gleicher Auto-EN-Mechanismus.
-- Wenn leer: der Director-Output regiert (heutiger Zustand).
-- Wenn befüllt: ersetzt den `[2 ACTION]`-Layer im finalen Prompt komplett.
+`onApply`-Payload erweitern um:
+- `sceneActionUser` (aus `sceneActionLocalized`)
+- `sceneActionEn` (aus `sceneActionEn`)
+- `characterActions: { characterId, actionUser, actionEn }[]` (aus `perCharacterActionsLocalized` × `perCharacterActions`)
 
-## Pipeline
+Diese werden zusätzlich zu `aiPrompt / dialogScript / characterShots / actionBeat` übergeben.
 
-```text
-SceneCard / SceneDirectorBox
-        │
-        ├─ scene.sceneActionUser    (UI-lang, optional)
-        ├─ scene.sceneActionEn      (auto, cache)
-        ├─ shot.actionUser          (UI-lang, optional, per cast slot)
-        └─ shot.actionEn            (auto, cache)
-                 │
-                 ▼
-   useAutoTranslateEn() Hook  →  translate-to-english edge fn
-                 │
-                 ▼
-   composeFinalPrompt() / composePromptLayers()
-        ├─ [1 SUBJECT]  …
-        ├─ [2 ACTION]   ← scene.sceneActionEn ?? aiPromptAction
-        ├─ [2a SUBJECT-ACTIONS]
-        │     - Sarah: types focused on her laptop, nods at Samuel
-        │     - Samuel: leans back, gestures with his pen
-        │     - …
-        ├─ [3 SHOT]    …
-        ├─ [5 DIALOG]  …
-        └─ [8 NEGATIVE] …
-```
+### 3. `src/components/video-composer/SceneCard.tsx` (Mapping in den State)
 
-Damit löst sich auch der jüngst diskutierte „Ghost-Cast"-Bug **strukturell**: sobald der User pro Slot eine konkrete Aktion einträgt, wird sie zwangsläufig in den `[2a SUBJECT-ACTIONS]`-Block geschrieben → jeder gelistete Charakter hat eine sichtbare Handlung im Prompt-Body → `compose-dialog-scene` / Face-Map findet die richtige Anzahl Köpfe.
+Im bestehenden `onApply`-Handler (Zeile 2335) die neuen Felder auf den Scene-State mappen:
 
-## Übersetzung — eine zentrale Edge-Function
+- `updates.sceneActionUser = sceneActionUser` (auch wenn leer-string überschreibt → User-Erwartung: KI-Run synced)
+- `updates.sceneActionEn = sceneActionEn`
+- `characterShots` werden bereits gemerged → für jeden finalen Shot zusätzlich `actionUser` / `actionEn` aus dem `characterActions`-Mapping setzen (Match per `characterId`). Existierende manuelle Inhalte werden **nicht überschrieben**, wenn der Slot vorher schon `actionUser` hatte (Lock-Respekt) — sonst neu befüllt.
 
-Neu: `supabase/functions/translate-to-english/index.ts`
+### 4. Keine Änderungen an
 
-- Input: `{ text: string, sourceLang: 'de' | 'es' | 'en' }`
-- `sourceLang === 'en'` → 1:1 zurück, kein API-Call.
-- Sonst: Lovable AI Gateway (`google/gemini-2.5-flash`) mit kurzem System-Prompt: „Translate to natural cinematic English. Keep proper nouns. Output only the translation."
-- 24 h `translation_cache` Tabelle (Hash über `text+sourceLang`) → kein doppelter Gateway-Call beim Tippen + bei Render.
-- Rate-Limit: pro User max 60 Übersetzungen/Minute (Standard `rate_limit_check` Helper).
-- Kein Credit-Abzug (Mikro-Cost via Gemini Flash, identisch zu bestehenden Auto-Translate-Pfaden wie Video Prompt Optimizer).
+- `applyActionsToPrompt.ts` — funktioniert bereits idempotent.
+- `useAutoTranslateEn` / `translate-to-english` — wird vom UI weiter genutzt, sobald der User manuell editiert.
+- Lipsync / `compose-dialog-scene` / Render-Pipeline.
+- Persistence-Layer (Felder sind bereits in `useComposerPersistence` enthalten).
 
-Client-Hook: `src/hooks/useAutoTranslateEn.ts` — `useDebouncedValue(text, 400)` → invoke → cache in React-Query (`['translate-en', hash]`) → returnt `{ english, isLoading, error }`.
+---
 
-## Daten-Modell (frontend-only, keine DB-Migration)
+## Technische Details
 
-`src/types/video-composer.ts`:
+**Cache-Invalidation**: `scene_director_cache` Cache-Key bekommt einen `v4`-Bump (`v3` → `v4` in `cacheKey`), damit alte Einträge ohne die neuen Felder nicht zurückkommen.
 
-```ts
-interface SceneShot {
-  // … bestehend
-  actionUser?: string;   // UI-Sprache, vom User
-  actionEn?: string;     // auto-übersetzt, Cache
-  actionLocked?: boolean; // true sobald actionUser non-empty
-}
+**Edge-Cases**:
+- Charakter im Prompt aber nicht in `matchedAssets.characterIds` → kein Eintrag, Feld bleibt leer (User kann manuell ausfüllen).
+- Charakter durch Ghost-Cast-Validator gedroppt → entsprechender `perCharacterActions`-Eintrag wird ebenfalls gedroppt.
+- Re-Roll mit gefüllten User-Override-Feldern → bestehende `sceneActionUser` / Per-Slot `actionUser` werden **überschrieben**, da der User explizit "Neu würfeln" geklickt hat (Erwartung: kompletter Re-Sync). Falls das nicht erwünscht ist, leicht umzustellen.
 
-interface ComposerScene {
-  // … bestehend
-  sceneActionUser?: string;
-  sceneActionEn?: string;
-  sceneActionLocked?: boolean;
-}
-```
+**Sprache**: Englischer Prompt-Inhalt bleibt unverändert. UI-Felder zeigen DE/ES wenn `lang ≠ en`, sonst EN identisch zu `actionEn`.
 
-Persistiert im bestehenden `useComposerPersistence`-Snapshot (sessionStorage + draft-row).
+---
 
-## Prompt-Komposition
+## Dateien
 
-`src/lib/motion-studio/composeFinalPrompt.ts` (bzw. `composePromptLayers.ts`):
-
-1. **Scene Action override** — falls `scene.sceneActionEn` non-empty → ersetzt `[2 ACTION]` body, statt aus `aiPrompt` zu parsen.
-2. **Subject-Actions block** — falls **min. 1** Cast-Slot `actionEn` hat:
-   ```
-   [2a SUBJECT-ACTIONS]
-   - Sarah: <Sarah.actionEn>
-   - Samuel: <Samuel.actionEn>
-   ```
-   Cast-Slots ohne `actionEn` fallen auf eine generische „is present in the scene"-Zeile zurück, damit Cast-Coverage-Validator weiter grün bleibt.
-3. **Director-Re-Roll respektiert Locks** — `scene-director/index.ts` bekommt `lockedSceneAction` und `lockedShotActions[]` als Inputs; System-Prompt-Block: „You MUST keep these locked actions verbatim and build the rest of the scene around them." Post-Call-Validator prüft, dass jeder Locked-String im Output enthalten ist; sonst Repair-Pass.
-
-## Geänderte / neue Dateien
-
-**Neu**
-- `supabase/functions/translate-to-english/index.ts` — Gateway-Wrapper + Cache-Lookup
-- `supabase/migrations/<ts>_translation_cache.sql` — `translation_cache(hash text pk, source_lang text, target_lang text, source text, target text, created_at timestamptz default now())` mit `service_role`-only GRANT (read/write nur via Edge-Function)
-- `src/hooks/useAutoTranslateEn.ts` — Debounced React-Query Hook
-- `src/components/video-composer/SceneActionField.tsx` — Re-usable Textarea + Auto-EN-Vorschau + Lock-Toggle
-
-**Editiert**
-- `src/types/video-composer.ts` — neue Felder
-- `src/components/video-composer/SceneCard.tsx` — Scene-Action-Field über dem Prompt-Editor
-- `src/components/video-composer/SceneDirectorBox.tsx` — Character-Action-Field pro Cast-Slot (neben/unter Voiceover)
-- `src/lib/motion-studio/composeFinalPrompt.ts` + `composePromptLayers.ts` — `[2 ACTION]` override + `[2a SUBJECT-ACTIONS]` layer
-- `src/hooks/useComposerPersistence.ts` — Snapshot um neue Felder erweitert
-- `supabase/functions/scene-director/index.ts` — `lockedSceneAction`, `lockedShotActions` Inputs + System-Prompt-Block + Post-Call-Validator
-
-**Nicht angefasst**
-- `compose-dialog-scene`, `poll-dialog-shots`, Sync.so-Webhook, Face-Map, Lipsync-Pro-Policy
-- Render-Engine-Routing, Realism-Presets, Credit-Refund
-- Keine Änderung an `_shared/twoshot-face-map.ts`
-
-## Edge-Cases
-
-- **EN-User, der EN tippt** → `sourceLang='en'` short-circuit, kein Gateway-Call, `actionEn === actionUser`.
-- **Übersetzung schlägt fehl** (Gateway down) → UI zeigt gelben „Übersetzung fehlgeschlagen — Original wird verwendet"-Hinweis; `actionEn = actionUser` als Fallback, Render läuft trotzdem.
-- **User leert das Feld** → `actionUser=''`, `actionEn=''`, `actionLocked=false` → Director-Output regiert wieder.
-- **Cast-Slot ohne Charakter** (leerer Slot) → Action-Field disabled.
-- **Re-Roll bei aktivem Lock** → Director-Prompt enthält die locked actions verbatim; Validator stellt sicher dass sie im Output stehen.
-
-## Was der User dadurch gewinnt
-
-- **Deterministische Kontrolle** über jede einzelne Handlung pro Szene und pro Charakter.
-- **Schreiben in seiner Muttersprache**, aber der Provider sieht sauberes cinematic English (was nachweislich höhere Qualität bei Hailuo/Kling/Vidu/Veo liefert — siehe `multilingual-content-strategy` Memory).
-- **Lip-Sync wird automatisch ehrlicher**, weil das „Ghost-Cast"-Problem strukturell verschwindet sobald der User pro Slot eine Aktion vergibt.
-- Kein zusätzlicher Credit-Verbrauch; Übersetzung ist gecached & mikro-billig.
+- `supabase/functions/scene-director/index.ts` (Tool-Schema + System-Prompt + Cache-Key)
+- `src/components/video-composer/SceneDirectorBox.tsx` (`onApply`-Signatur + Forward)
+- `src/components/video-composer/SceneCard.tsx` (Mapping auf Scene-State)
+- *(optional)* `src/types/video-composer.ts` — `onApply`-Payload-Typ erweitern, falls separat exportiert.
