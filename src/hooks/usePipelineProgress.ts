@@ -29,6 +29,62 @@ interface UsePipelineProgressArgs {
   renderPercent?: number;
   /** Whether the master render is currently running. */
   renderRunning?: boolean;
+  /** Project id — used to persist the run state across unmount / sleep. */
+  projectId?: string;
+}
+
+// ── sessionStorage persistence ─────────────────────────────────────────
+// The render itself is backend-driven, but the *visual* progress state
+// (start time, floors, baselines) lives in component refs. When the user
+// navigates away or the device sleeps long enough to remount the route,
+// those refs vanish and the bar restarts at 0 % / 0s. Persist a snapshot
+// per-project so the bar resumes seamlessly.
+const STORAGE_PREFIX = 'composer:pipeline-progress:';
+const storageKeyFor = (projectId?: string) =>
+  `${STORAGE_PREFIX}${projectId || 'default'}`;
+
+interface PersistedSnapshot {
+  pipelineStart: number | null;
+  runFloor: number;
+  floor: Record<PipelinePhaseId, number>;
+  startedAt: Record<PipelinePhaseId, number | null>;
+  baseline: {
+    clipsReady: number;
+    clipsTotal: number;
+    lipsyncDone: number;
+    lipsyncTotal: number;
+    dialogShotsDone: number;
+    dialogShotsTotal: number;
+    voiceoverHadAudio: boolean;
+    musicHad: boolean;
+  } | null;
+  realProgress: { value: number; at: number };
+}
+
+function readSnapshot(key: string): PersistedSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshot(key: string, snap: PersistedSnapshot) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(snap));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
+function clearSnapshot(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
 }
 
 const PHASE_WEIGHTS: Record<PipelinePhaseId, number> = {
@@ -65,7 +121,9 @@ export function usePipelineProgress({
   assemblyConfig,
   renderPercent = 0,
   renderRunning = false,
+  projectId,
 }: UsePipelineProgressArgs) {
+  const storageKey = storageKeyFor(projectId);
   // ── Per-run baselines ──────────────────────────────────────────────
   // Captured the moment a phase emits `:start`. They make the bar always
   // start at 0 %, even if some assets from a previous run already exist
@@ -90,6 +148,26 @@ export function usePipelineProgress({
   const pipelineStartRef = useRef<number | null>(null);
   const runFloorRef = useRef(0);
 
+  // ── Hydration from sessionStorage ──────────────────────────────────
+  // Restore the visual progress state across unmounts (route change,
+  // device sleep, parent re-mount). Without this, the bar restarts at
+  // 0 % even though the backend render is still mid-flight.
+  const hydratedRef = useRef(false);
+  const hydratedRealProgressRef = useRef<{ value: number; at: number } | null>(null);
+  if (!hydratedRef.current) {
+    hydratedRef.current = true;
+    const snap = readSnapshot(storageKey);
+    if (snap) {
+      pipelineStartRef.current = snap.pipelineStart;
+      runFloorRef.current = snap.runFloor;
+      floorRef.current = snap.floor;
+      startedAtRef.current = snap.startedAt;
+      baselineRef.current = snap.baseline;
+      hydratedRealProgressRef.current = snap.realProgress;
+    }
+  }
+  const lastPersistAtRef = useRef(0);
+
   // ── Event-driven "start" flags ───────────────────────────────────
   const [eventFlags, setEventFlags] = useState<Record<PipelinePhaseId, boolean>>({
     clips: false, voiceover: false, lipsync: false, music: false, export: false,
@@ -107,6 +185,8 @@ export function usePipelineProgress({
       const [phase, action] = e.type.split(':') as [PipelinePhaseId, 'start' | 'end'];
       if (action === 'start') {
         if (pipelineStartRef.current === null || phase === 'clips') {
+          // Fresh run — clear any stale persisted snapshot from a previous run.
+          clearSnapshot(storageKey);
           pipelineStartRef.current = Date.now();
           runFloorRef.current = 0;
           floorRef.current = { clips: 0, voiceover: 0, lipsync: 0, music: 0, export: 0 };
@@ -601,6 +681,7 @@ export function usePipelineProgress({
       const id = window.setTimeout(() => {
         if (!phases.some((p) => p.status === 'running')) {
           pipelineStartRef.current = null;
+          clearSnapshot(storageKey);
         }
       }, 5000);
       return () => window.clearTimeout(id);
@@ -629,7 +710,9 @@ export function usePipelineProgress({
   }, 0);
   const STALL_THRESHOLD_MS = Math.max(4, maxSpeakers * 3, lipTargetCount * 2) * 60 * 1000;
   const STALL_MIN_PERCENT = 95;
-  const realProgressRef = useRef<{ value: number; at: number }>({ value: 0, at: Date.now() });
+  const realProgressRef = useRef<{ value: number; at: number }>(
+    hydratedRealProgressRef.current ?? { value: 0, at: Date.now() },
+  );
   const realProgressSum =
     clipsReal.progress * PHASE_WEIGHTS.clips +
     voiceoverReal.progress * PHASE_WEIGHTS.voiceover +
@@ -719,6 +802,29 @@ export function usePipelineProgress({
     : currentOverall;
   const overallPercent = Math.round(allDone || completedCleanly ? 100 : Math.min(99, runFloorRef.current));
   const etaSeconds = isActive && !waitingForExport && !isStalled ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
+
+  // ── Persist snapshot (throttled to ~1 Hz) ────────────────────────
+  // Survives unmount / device sleep so the bar resumes instead of
+  // restarting at 0 % / 0s. Cleared when the run is terminal.
+  if (allDone || completedCleanly || hasFailure) {
+    if (pipelineStartRef.current === null) {
+      // Already settled — make sure no stale snapshot lingers.
+      clearSnapshot(storageKey);
+    }
+  } else if (pipelineStartRef.current !== null) {
+    const now = Date.now();
+    if (now - lastPersistAtRef.current > 1000) {
+      lastPersistAtRef.current = now;
+      writeSnapshot(storageKey, {
+        pipelineStart: pipelineStartRef.current,
+        runFloor: runFloorRef.current,
+        floor: floorRef.current,
+        startedAt: startedAtRef.current,
+        baseline: baselineRef.current,
+        realProgress: realProgressRef.current,
+      });
+    }
+  }
 
   return {
     phases,

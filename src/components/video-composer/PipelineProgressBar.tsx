@@ -24,6 +24,7 @@ interface Props {
   assemblyConfig: AssemblyConfig;
   renderPercent?: number;
   renderRunning?: boolean;
+  projectId?: string;
   className?: string;
 }
 
@@ -39,10 +40,11 @@ export default function PipelineProgressBar({
   assemblyConfig,
   renderPercent,
   renderRunning,
+  projectId,
   className,
 }: Props) {
   const { phases, overallPercent, etaSeconds, elapsedSeconds, isActive, hasFailure } =
-    usePipelineProgress({ scenes, assemblyConfig, renderPercent, renderRunning });
+    usePipelineProgress({ scenes, assemblyConfig, renderPercent, renderRunning, projectId });
 
   // Keep the bar mounted for 3 s after the last phase ends, so the user sees
   // the final "100 %" tick instead of an abrupt disappearance.

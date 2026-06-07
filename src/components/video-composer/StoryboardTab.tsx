@@ -505,6 +505,7 @@ export default function StoryboardTab({
       <PipelineProgressBar
         scenes={scenes}
         assemblyConfig={DEFAULT_ASSEMBLY_CONFIG}
+        projectId={projectId}
         className="!top-[56px] !z-40 !mx-0 !px-3 rounded-xl border border-gold/30 bg-card/90 shadow-[0_4px_24px_-8px_hsl(var(--primary)/0.4)]"
       />
 
