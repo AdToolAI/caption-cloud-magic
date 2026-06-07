@@ -2374,7 +2374,32 @@ export default function SceneCard({
               )}
               {scene.clipSource.startsWith("ai-") && (
                 <div className="space-y-2">
+                  {/* Scene-Action override — user types in UI language, auto-EN
+                      is injected into the prompt's [SceneAction] marker block. */}
+                  <SceneActionField
+                    language={lang}
+                    label={
+                      lang === "de"
+                        ? "Was passiert in der Szene? (überstimmt Director)"
+                        : lang === "es"
+                          ? "¿Qué pasa en la escena? (anula al Director)"
+                          : "What happens in the scene? (overrides Director)"
+                    }
+                    placeholder={
+                      lang === "de"
+                        ? "z. B. Vier Social-Media-Manager arbeiten parallel in einem hellen Open-Space-Büro"
+                        : lang === "es"
+                          ? "p. ej. Cuatro community managers trabajan en paralelo en una oficina luminosa"
+                          : "e.g. Four social-media managers working in parallel inside a bright open-space office"
+                    }
+                    value={scene.sceneActionUser ?? ""}
+                    englishValue={scene.sceneActionEn ?? ""}
+                    onChange={(v) => onUpdate({ sceneActionUser: v })}
+                    onEnglishChange={(en) => onUpdate({ sceneActionEn: en })}
+                    rows={2}
+                  />
                   <div className="space-y-1.5">
+
                     <div className="flex items-center justify-between gap-2">
                       <Label className="text-[10px] text-muted-foreground">
                         {lang === "de"
