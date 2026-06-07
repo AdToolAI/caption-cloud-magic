@@ -153,6 +153,7 @@ export function usePipelineProgress({
   // device sleep, parent re-mount). Without this, the bar restarts at
   // 0 % even though the backend render is still mid-flight.
   const hydratedRef = useRef(false);
+  const hydratedRealProgressRef = useRef<{ value: number; at: number } | null>(null);
   if (!hydratedRef.current) {
     hydratedRef.current = true;
     const snap = readSnapshot(storageKey);
@@ -162,8 +163,10 @@ export function usePipelineProgress({
       floorRef.current = snap.floor;
       startedAtRef.current = snap.startedAt;
       baselineRef.current = snap.baseline;
+      hydratedRealProgressRef.current = snap.realProgress;
     }
   }
+  const lastPersistAtRef = useRef(0);
 
   // ── Event-driven "start" flags ───────────────────────────────────
   const [eventFlags, setEventFlags] = useState<Record<PipelinePhaseId, boolean>>({
