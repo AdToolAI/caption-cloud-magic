@@ -61,7 +61,7 @@ const actionFromPrompt = (prompt: unknown, maxWords = 25) => {
     .replace(/\s+/g, ' ')
     .trim();
   if (!cleaned) return '';
-  const firstSentence = cleaned.split(/(?<=[.!?])\s+/)[0] || cleaned;
+  const firstSentence = cleaned.match(/^[^.!?]+[.!?]?/)?.[0] || cleaned;
   const actionClause = firstSentence.split(/,\s*(?:shot on|camera|lens|lighting|golden hour|soft light|shallow depth|filmic|muted palette|anamorphic|no on-screen)/i)[0];
   return cleanActionText(actionClause || firstSentence, maxWords);
 };
@@ -71,7 +71,7 @@ const characterActionFromPrompt = (prompt: unknown, characterName: string | unde
   const name = String(characterName ?? '').trim();
   if (name) {
     const first = name.split(/\s+/)[0]?.toLowerCase() || '';
-    const clauses = body.split(/(?<=[.!?])\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
+    const clauses = body.split(/[.!?]\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
     const match = clauses.find((clause) => {
       const lower = clause.toLowerCase();
       return lower.includes(name.toLowerCase()) || (first.length >= 3 && lower.includes(first));
