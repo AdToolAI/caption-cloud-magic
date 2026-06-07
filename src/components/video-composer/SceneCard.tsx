@@ -1485,18 +1485,41 @@ export default function SceneCard({
                             ...removedNow,
                           ]),
                         );
+                        // Resolve removed-character objects for name-based prompt scrubbing.
+                        const removedChars = removedNow
+                          .map((id) => characters?.find((c) => c.id === id))
+                          .filter(
+                            (c): c is NonNullable<typeof c> =>
+                              !!c && !!c.name,
+                          );
                         const updates: Partial<ComposerScene> = {
                           characterShots: next,
                           // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
                           characterShot: next[0],
                           dismissedCharacterIds: dismissedNext,
                         };
+                        // Scrub removed names from the dialog screenplay so the
+                        // [Dialog] auto-marker can't re-introduce them on the
+                        // next render pass.
+                        if (removedChars.length && scene.dialogScript) {
+                          const cleanedDialog = removeCharactersFromDialogScript(
+                            scene.dialogScript,
+                            removedChars,
+                          );
+                          if (cleanedDialog !== scene.dialogScript) {
+                            updates.dialogScript = cleanedDialog;
+                          }
+                        }
                         if (promptMode === "structured") {
                           const subjectKey: keyof PromptSlots = "subject";
                           const currentSubject =
                             (promptSlots[subjectKey] as string) || "";
-                          const newSubject = applyCastToPrompt(
+                          const scrubbedSubject = removeCharactersFromPrompt(
                             currentSubject,
+                            removedChars,
+                          );
+                          const newSubject = applyCastToPrompt(
+                            scrubbedSubject,
                             next,
                             characters,
                             lang,
@@ -1511,8 +1534,12 @@ export default function SceneCard({
                             promptSlotOrder,
                           );
                         } else {
-                          updates.aiPrompt = applyCastToPrompt(
+                          const scrubbedPrompt = removeCharactersFromPrompt(
                             scene.aiPrompt || "",
+                            removedChars,
+                          );
+                          updates.aiPrompt = applyCastToPrompt(
+                            scrubbedPrompt,
                             next,
                             characters,
                             lang,
