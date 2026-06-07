@@ -287,8 +287,16 @@ CRITICAL RULES:
 🎭 MULTI-CHARACTER CO-PRESENCE (when ${chars.length} ≥ 2 characters are defined):
 - Aim to feature TWO characters together in roughly 30–60% of the character-bearing scenes (occasionally three). The remaining character scenes can be solo for variety.
 - Pick co-presence scenes naturally based on the story: shared moments, conversations, parallel actions in the same environment, family/team scenes, etc.
-- When two characters share a scene: give each their OWN shotType (e.g. Sarah "full" + Matthew "profile", or both "full" if it is a clear two-shot establishing moment). Avoid two "absent" or two identical exotic types ("pov"+"pov").
-- The aiPrompt MUST name BOTH characters verbatim and include the signatureItems of every visible character. Do NOT use "the two of them" or pronouns — restate names.
+
+🚨 LIP-SYNC SAFE GROUP SCENE RULES (HARD REQUIREMENT — applies whenever characterShots[] has 2+ entries):
+- Framing MUST be a wide or medium GROUP shot that fits ALL characters in the frame at once. No single-character close-ups, no single-character hero shots when the cast is multi.
+- EVERY cast member's FULL FACE must be clearly visible to camera. FORBIDDEN shotTypes for multi-cast scenes: "back", "pov", "detail", "silhouette". Use only "full" or "profile" — and at least ONE character per multi-cast scene MUST be "full".
+- Characters MUST be placed side-by-side (left-to-right or in a clear group composition), NEVER stacked behind each other, NEVER one in front blocking another. No occlusion of any face.
+- The aiPrompt MUST name EVERY character verbatim in the action body (not only in a leading "Featuring …" header) and give EACH of them a distinct, simultaneous physical action. Never describe only one character while the others are listed as cast.
+- The scene MUST establish DIALOGUE INTENT so lip-sync works: either the characters speak with each other (turn-taking, eye contact, reactions) OR each character speaks directly into the camera in clear visible turns. State this explicitly in the prompt ("they talk to each other", "each speaks to camera in turn", "engaged in conversation").
+- For EACH characterShots[] entry actionEn MUST be the action of THAT specific character (not the scene's general action and not another character's action). actionUser is the same in ${langLabel}.
+- sceneActionEn MUST describe the GROUP situation including ALL character names (e.g. "Sarah, Matthew and Kailee discuss the launch around the desk"), never just one character.
+- Do NOT use "the two of them" or pronouns — always restate names.
 - Never put the same identical pair in two consecutive scenes with the same shotTypes — vary framing.`;
 })()}
 
