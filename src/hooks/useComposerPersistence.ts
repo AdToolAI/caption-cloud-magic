@@ -148,20 +148,12 @@ export function useComposerPersistence() {
         projectId = inserted.id;
       }
 
-      // 2. Delete any scenes that are no longer part of the storyboard
-      //    (prevents orphans + frees up order_index slots for the unique constraint)
-      const keepIds = project.scenes.filter(s => isUuid(s.id)).map(s => s.id);
-      let delQuery = supabase
-        .from('composer_scenes')
-        .delete()
-        .eq('project_id', projectId!);
-      if (keepIds.length > 0) {
-        delQuery = delQuery.not('id', 'in', `(${keepIds.join(',')})`);
-      }
-      const { error: delErr } = await delQuery;
-      if (delErr) {
-        console.warn('[persistence] Cleanup of removed scenes failed:', delErr);
-      }
+      // 2. (REMOVED) Destructive "delete every DB scene not present locally" cleanup.
+      //    This step silently erased real scenes whenever the local snapshot was
+      //    momentarily stale (realtime tick mid-flight, scene just inserted by
+      //    another tab, sessionStorage hydration race after sleep/tab-switch),
+      //    which is exactly the "Szene 2 verschwindet wenn Szene 3 startet" bug.
+      //    Real deletes go through deleteScene → explicit DELETE by id.
 
       // 3. Two-phase write to satisfy UNIQUE(project_id, order_index):
       //    Phase A — push every existing row to a temporary negative order_index

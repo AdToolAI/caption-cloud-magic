@@ -50,7 +50,15 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
       try {
         let pid = opts.projectId;
         let workingScene = scene;
-        if (opts.ensureProject) {
+        const sceneAlreadyPersisted = /^[0-9a-f-]{36}$/i.test(scene.id);
+        const projectAlreadyPersisted = !!pid && /^[0-9a-f-]{36}$/i.test(pid);
+
+        // Only run the (potentially expensive, formerly destructive) full
+        // project persistence when something is genuinely unpersisted. For an
+        // already-saved scene in an already-saved project we just dispatch
+        // the render — touching the rest of the storyboard here is what used
+        // to make Szene 2 disappear when Szene 3 was started.
+        if (opts.ensureProject && (!sceneAlreadyPersisted || !projectAlreadyPersisted)) {
           let persisted: { projectId: string; scenes: ComposerScene[] } | undefined;
           try {
             persisted = await opts.ensureProject();
@@ -77,7 +85,11 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
             return;
           }
           pid = persisted.projectId;
-          const dbScene = persisted.scenes.find((s) => s.orderIndex === scene.orderIndex);
+          // Match by id first (stable), fall back to orderIndex only if the
+          // scene was just inserted and got a fresh UUID.
+          const dbScene =
+            persisted.scenes.find((s) => s.id === scene.id) ??
+            persisted.scenes.find((s) => s.orderIndex === scene.orderIndex);
           if (dbScene) workingScene = { ...dbScene, ...scene, id: dbScene.id };
         }
 
