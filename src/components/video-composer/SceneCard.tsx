@@ -2444,15 +2444,21 @@ export default function SceneCard({
                     tools (DirectorPresetPicker + CinematicStylePresets +
                     SceneShotDirectorPanel). They now live behind
                     SceneStyleSheet (3 tabs). */}
-                  <SceneStyleChip
-                    language={lang}
-                    shotDirector={scene.shotDirector}
-                    hasModifiers={
-                      Object.keys(scene.directorModifiers || {}).length > 0
-                    }
-                    onOpen={() => setStyleSheetOpen(true)}
-                    onReset={() => onUpdate({ shotDirector: {} })}
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SceneStyleChip
+                      language={lang}
+                      shotDirector={scene.shotDirector}
+                      hasModifiers={
+                        Object.keys(scene.directorModifiers || {}).length > 0
+                      }
+                      onOpen={() => setStyleSheetOpen(true)}
+                      onReset={() => onUpdate({ shotDirector: {} })}
+                    />
+                    <RealismPresetPicker
+                      value={scene.realismPreset ?? null}
+                      onChange={(id) => onUpdate({ realismPreset: id ?? undefined })}
+                    />
+                  </div>
 
                   {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
                     block was removed. The same composed prompt + layer
