@@ -455,6 +455,16 @@ export default function VideoComposerDashboard() {
       if (dbError) throw dbError;
       if (!data) return;
 
+      // Guard against the Phase-A window of `ensureProjectPersisted` — during
+      // its two-phase reindex every scene briefly sits at a NEGATIVE
+      // order_index. If a realtime tick fires in that window the rows come
+      // back in a chaotic order and the merge below would clobber the local
+      // UI order. Skip and wait for the next tick (Phase B will fire one).
+      if ((data as any[]).some((r: any) => Number(r.order_index) < 0)) {
+        return;
+      }
+
+
       setProject(prev => {
         const localById = new Map(prev.scenes.map(s => [s.id, s]));
         // Preserve any locally-created scenes that haven't been persisted yet
