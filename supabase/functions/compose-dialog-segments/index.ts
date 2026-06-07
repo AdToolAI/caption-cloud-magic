@@ -2101,8 +2101,19 @@ serve(async (req) => {
           Math.round(by2 * sy),
         ];
       }
+      // v76 — Collect coords of the OTHER passes (same plate) so the
+      // single-face preclip crop never includes a neighbor's face.
+      const siblingCoordsForPass: Array<[number, number]> = passes
+        .filter((other, idx) =>
+          idx !== currentPassIdx &&
+          Array.isArray(other?.coords) &&
+          other.coords.length === 2 &&
+          Number.isFinite(Number(other.coords[0])) &&
+          Number.isFinite(Number(other.coords[1])),
+        )
+        .map((other) => [Number(other.coords[0]), Number(other.coords[1])] as [number, number]);
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} siblings=${siblingCoordsForPass.length} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
       );
       const preclip = await renderPassFacePreclip(
         supabase,
@@ -2118,6 +2129,7 @@ serve(async (req) => {
           srcHeight: plateDims!.height,
           coords: pass.coords as [number, number],
           bbox: bboxForCrop,
+          siblingCoords: siblingCoordsForPass,
           startSec: winStartSec,
           endSec: winEndSec,
         },
