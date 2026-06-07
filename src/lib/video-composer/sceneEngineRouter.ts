@@ -65,11 +65,44 @@ export function countSpeakers(scene: ComposerScene): number {
   return speakers.size;
 }
 
+/**
+ * Action-First detection — June 2026.
+ *
+ * The Cinematic Pipeline routes scenes with ANY physical action (driving,
+ * walking, gesturing, working with props) to `cinematic-sync` so we
+ * generate a real Hailuo/Kling action plate first and polish the lip-sync
+ * on top. Only truly static "presenter speaks directly to camera" beats
+ * still go to HeyGen Photo-Avatar.
+ */
+const ACTION_KEYWORDS_RE =
+  /\b(driv|steer|walk|run|jog|stride|cycl|bik|ride|fly|pilot|sail|swim|climb|jump|dance|fight|cook|build|carry|push|pull|throw|catch|reach|gesture|gestur|point|grab|hold|lift|paint|type|write|hammer|drill|sweep|pour|stir|serve|enter|exit|arrive|leav|approach|turn|spin|lean|crouch|kneel|wave|sport|train|workout|exercise|skat|surf|ski|snowboard|race|chase|hike|wander|explore|present.{0,12}(?:product|item)|interact|examine|inspect|demonstrat|operat)/i;
+
+export function detectMotionIntensity(scene: ComposerScene): 'static' | 'subtle' | 'moderate' | 'high' {
+  // Explicit Action-Beat wins.
+  const beat = scene.actionBeat?.motionIntensity;
+  if (beat) return beat;
+
+  const haystack = [
+    scene.actionBeat?.characterAction ?? '',
+    scene.actionBeat?.environmentMotion ?? '',
+    scene.aiPrompt ?? '',
+    (scene as any).promptSlots?.action ?? '',
+    (scene as any).promptSlots?.subject ?? '',
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  if (!haystack.trim()) return 'static';
+  return ACTION_KEYWORDS_RE.test(haystack) ? 'moderate' : 'static';
+}
+
 export function recommendEngineForScene(scene: ComposerScene): EngineRecommendation {
   const override = scene.engineOverride ?? 'auto';
   const hasDialog = sceneHasDialog(scene);
   const hasCast = sceneHasCast(scene);
   const speakers = Math.max(1, countSpeakers(scene));
+  const motion = detectMotionIntensity(scene);
+  const isStatic = motion === 'static';
 
   // ── User override wins ─────────────────────────────────────────────
   if (override === 'heygen') {
@@ -96,28 +129,34 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       extraCostEur: 0.05,
     };
   }
-  // v70: cinematic-sync-legacy removed. Any persisted value falls through
-  // to the sync-segments recommendation below.
   if (override === 'cinematic-sync' || override === 'sync-segments') {
     return {
       engine: 'sync-segments',
       label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (1-Call)` : '⚡ Fast Dialog · 1-Call',
       reason:
-        'Sync.so Segments API: ein einziger Lipsync-Call über die Master-Plate mit segments[] pro Sprecher-Turn. Artlist-Pattern — ~3–5 min statt ~10–15 min, ein Webhook, ein Refund, und bis zu 3 Szenen können parallel laufen.',
+        'Sync.so Segments API: ein einziger Lipsync-Call über die Action-Plate mit segments[] pro Sprecher-Turn.',
       extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
     };
   }
 
-  // ── Auto routing ───────────────────────────────────────────────────
+  // ── Auto routing — Action-First (June 2026) ────────────────────────
   if (hasDialog && hasCast) {
-    // Default = Fast Dialog (Sync.so Segments, 1-call).
-    // Scales to N speakers in a single API request and lets the platform
-    // run 3 scenes in parallel against Sync.so's concurrency limit.
+    // Truly static direct-address beats → HeyGen (its strength).
+    // Any motion → cinematic-sync / sync-segments on a real action plate.
+    if (isStatic && speakers === 1) {
+      return {
+        engine: 'heygen-talking-head',
+        label: '🎙️ HeyGen Direct-Address (Auto)',
+        reason:
+          'Statische Sprecher-Szene ohne Action-Beat — HeyGen Photo-Avatar liefert hier den saubersten Lip-Sync.',
+        extraCostEur: estimateHeygenCostEur(1),
+      };
+    }
     return {
       engine: 'sync-segments',
-      label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (Auto)` : '⚡ Fast Dialog · 1-Call (Auto)',
+      label: speakers >= 2 ? `🎬 Action + Lip-Sync · ${speakers} Sprecher (Auto)` : '🎬 Action + Lip-Sync (Auto)',
       reason:
-        'Sync.so Segments API: ein einziger Lipsync-Call über die Master-Plate mit segments[] pro Sprecher-Turn. ~3–5 min statt ~10–15 min, parallel-fähig.',
+        'Action-First: echte Hailuo/Kling-Plate mit physischer Bewegung, Sync.so legt präzisen Lip-Sync drauf — kein starrer Talking-Head-Bust.',
       extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
     };
   }
@@ -139,3 +178,4 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     extraCostEur: 0,
   };
 }
+

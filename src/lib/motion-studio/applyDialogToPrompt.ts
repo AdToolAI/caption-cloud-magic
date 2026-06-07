@@ -48,6 +48,24 @@ function fmtSec(n: number): string {
 const NEGATIVE_CAPTION_RULE =
   'Do NOT render any on-screen text, captions, subtitles, signs, watermarks, logos or written words anywhere in the frame.';
 
+/**
+ * Dialog injection mode for the i2v / image-to-video plate prompt.
+ *
+ * - `intent` (default, Action-First pipeline):
+ *     Emits only the *intent to speak* ("X speaks naturally with subtle
+ *     lip-sync mouth movement"), NOT the verbatim quoted text. This stops
+ *     Hailuo/Kling/etc. from collapsing the scene into a static "talking-
+ *     head bust" pose every time the prompt contains dialog. The actual
+ *     spoken text still lives in `dialogScript` and is handled downstream
+ *     by TTS + Sync.so lipsync — never by the visual model.
+ *
+ * - `verbatim` (legacy):
+ *     Emits the full quoted lines with per-speaker timing ranges. Useful
+ *     for native-dialogue models (Veo 3.1 / HappyHorse / Kling 3) that
+ *     actually consume the dialog text. Opt-in only.
+ */
+export type DialogInjectionMode = 'intent' | 'verbatim';
+
 /** English spoken-lines body. Two variants:
  *  1. **Audio-plan variant** (when every block has a real `durationSec`):
  *     emits exact `start–end` ranges per speaker plus a total duration.
@@ -95,16 +113,60 @@ export function buildSpokenLinesBlock(blocks: DialogBlock[]): string {
   return `${intro}\n${lines}\n${NEGATIVE_CAPTION_RULE}`;
 }
 
+/**
+ * Intent-only body — Action-First pipeline default.
+ *
+ * Encodes WHO speaks, FOR HOW LONG, and WITH WHAT TONALITY, but never the
+ * actual words. This is what the i2v plate prompt should see so the visual
+ * model focuses on action + body language instead of a sprech-pose freeze.
+ */
+export function buildSpokenIntentBlock(blocks: DialogBlock[]): string {
+  if (!blocks?.length) return '';
+
+  const haveTiming = blocks.every(
+    (b) => typeof b.durationSec === 'number' && b.durationSec > 0,
+  );
+  const speakers = Array.from(new Set(blocks.map((b) => b.speakerName).filter(Boolean)));
+  const speakerLabel =
+    speakers.length <= 1
+      ? `${speakers[0] ?? 'The character'}`
+      : `${speakers.slice(0, -1).join(', ')} and ${speakers[speakers.length - 1]}`;
+
+  if (haveTiming) {
+    let cursor = 0;
+    for (const b of blocks) {
+      const start =
+        typeof b.startSec === 'number' && b.startSec >= 0 ? b.startSec : cursor;
+      cursor = start + (b.durationSec ?? 0) + INTER_SPEAKER_GAP_SEC;
+    }
+    const total = cursor - INTER_SPEAKER_GAP_SEC;
+    return [
+      `${speakerLabel} ${speakers.length > 1 ? 'speak' : 'speaks'} naturally during the shot with subtle, realistic lip-sync mouth movement and matching micro-expressions — keep performing the on-screen action while talking, do NOT freeze into a sprech-pose.`,
+      `Total spoken duration: ${fmtSec(total)}s.`,
+      NEGATIVE_CAPTION_RULE,
+    ].join('\n');
+  }
+
+  return [
+    `${speakerLabel} ${speakers.length > 1 ? 'speak' : 'speaks'} naturally during the shot with subtle, realistic lip-sync mouth movement and matching micro-expressions — keep performing the on-screen action while talking, do NOT freeze into a sprech-pose.`,
+    NEGATIVE_CAPTION_RULE,
+  ].join('\n');
+}
+
 export function applyDialogToPrompt(
   prompt: string,
   blocks: DialogBlock[] | undefined,
   _lang: Lang = 'de',
+  mode: DialogInjectionMode = 'intent',
 ): string {
   const prose = stripExistingMarker(prompt || '');
   const list = (blocks ?? []).filter((b) => b && b.text?.trim());
   if (list.length === 0) return prose.trimStart();
 
-  const body = buildSpokenLinesBlock(list);
+  const body = mode === 'verbatim'
+    ? buildSpokenLinesBlock(list)
+    : buildSpokenIntentBlock(list);
   const marker = `[Dialog]\n${body}\n[/Dialog]\n\n`;
   return marker + prose.trimStart();
 }
+

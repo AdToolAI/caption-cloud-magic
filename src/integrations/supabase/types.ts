@@ -5501,6 +5501,7 @@ export type Database = {
       }
       composer_scenes: {
         Row: {
+          action_beat: Json | null
           ai_prompt: string | null
           applied_style_preset_id: string | null
           audio_plan: Json | null
@@ -5559,6 +5560,7 @@ export type Database = {
           prompt_mode: string | null
           prompt_slot_order: string[] | null
           prompt_slots: Json | null
+          realism_preset: string | null
           reference_image_url: string | null
           replicate_prediction_id: string | null
           retry_count: number
@@ -5582,6 +5584,7 @@ export type Database = {
           with_audio: boolean
         }
         Insert: {
+          action_beat?: Json | null
           ai_prompt?: string | null
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
@@ -5640,6 +5643,7 @@ export type Database = {
           prompt_mode?: string | null
           prompt_slot_order?: string[] | null
           prompt_slots?: Json | null
+          realism_preset?: string | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number
@@ -5663,6 +5667,7 @@ export type Database = {
           with_audio?: boolean
         }
         Update: {
+          action_beat?: Json | null
           ai_prompt?: string | null
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
@@ -5721,6 +5726,7 @@ export type Database = {
           prompt_mode?: string | null
           prompt_slot_order?: string[] | null
           prompt_slots?: Json | null
+          realism_preset?: string | null
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number

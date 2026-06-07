@@ -542,8 +542,10 @@ export default function SceneCard({
   useEffect(() => {
     if (!scene.clipSource.startsWith("ai-")) return;
     if (!characters || characters.length === 0) return;
-    const hasTimedAudioPlan = (txt: string) =>
-      /Audio plan \(exact, do not deviate\)/i.test(txt || "");
+    // Gate re-injection on the marker wrapper — Action-First intent mode
+    // no longer emits the "Audio plan" string, so we check for the
+    // canonical `[Dialog]` block instead.
+    const hasDialogMarker = (txt: string) => /\[Dialog\][\s\S]*?\[\/Dialog\]/i.test(txt || "");
     const cast =
       scene.characterShots ??
       (scene.characterShot ? [scene.characterShot] : []);
@@ -551,10 +553,14 @@ export default function SceneCard({
       .map((cs) => characters.find((c) => c.id === cs.characterId))
       .filter((c): c is ComposerCharacter => !!c);
     const blocks = parseDialogScript(scene.dialogScript ?? "", sceneCastChars);
+    // Native-dialogue providers (Veo 3.1 / HappyHorse / Kling 3) read the
+    // verbatim text from the prompt — keep the legacy mode there.
+    const isNativeDialogue = scene.engineOverride === "native-dialogue";
+    const mode: "intent" | "verbatim" = isNativeDialogue ? "verbatim" : "intent";
     if (promptMode === "structured") {
       const currentSubject = (promptSlots.subject as string) || "";
-      if (hasTimedAudioPlan(currentSubject)) return;
-      const newSubject = applyDialogToPrompt(currentSubject, blocks, lang);
+      if (hasDialogMarker(currentSubject)) return;
+      const newSubject = applyDialogToPrompt(currentSubject, blocks, lang, mode);
       if (newSubject !== currentSubject) {
         const nextSlots: PromptSlots = { ...promptSlots, subject: newSubject };
         onUpdate({
@@ -563,13 +569,14 @@ export default function SceneCard({
         });
       }
     } else {
-      if (hasTimedAudioPlan(scene.aiPrompt || "")) return;
-      const newPrompt = applyDialogToPrompt(scene.aiPrompt || "", blocks, lang);
+      if (hasDialogMarker(scene.aiPrompt || "")) return;
+      const newPrompt = applyDialogToPrompt(scene.aiPrompt || "", blocks, lang, mode);
       if (newPrompt !== (scene.aiPrompt || ""))
         onUpdate({ aiPrompt: newPrompt });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.dialogScript, characters?.length, promptMode]);
+  }, [scene.dialogScript, characters?.length, promptMode, scene.engineOverride]);
+
 
   const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next, promptSlotOrder);
