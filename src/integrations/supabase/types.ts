@@ -5564,6 +5564,8 @@ export type Database = {
           reference_image_url: string | null
           replicate_prediction_id: string | null
           retry_count: number
+          scene_action_en: string | null
+          scene_action_user: string | null
           scene_type: string
           seed: number | null
           seed_variations: Json
@@ -5647,6 +5649,8 @@ export type Database = {
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number
+          scene_action_en?: string | null
+          scene_action_user?: string | null
           scene_type?: string
           seed?: number | null
           seed_variations?: Json
@@ -5730,6 +5734,8 @@ export type Database = {
           reference_image_url?: string | null
           replicate_prediction_id?: string | null
           retry_count?: number
+          scene_action_en?: string | null
+          scene_action_user?: string | null
           scene_type?: string
           seed?: number | null
           seed_variations?: Json

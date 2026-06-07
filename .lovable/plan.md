@@ -1,71 +1,53 @@
-## Ziel
+## Diagnose
 
-Wenn der Scene-Director eine Szene generiert ("KI Modus"), sollen die manuellen Override-Felder **nicht leer** bleiben, sondern direkt mit dem ausgefüllt werden, was im Prompt steht — sowohl die allgemeine **Szenen-Aktion** als auch die **Aktion pro Charakter**. Damit gilt:
+Die Felder sind leer, weil die Director-Antwort zwar korrekt befüllt im `onApply` ankommt und in den React-State geschrieben wird, aber zwei Persistence-Layer dahinter brechen sie sofort wieder:
 
-- "Was passiert in der Szene?" stimmt 1:1 mit der Action im Prompt überein.
-- "Was tut Sarah / Matthew / Samuel / Kailee?" ist pro Charakter vorausgefüllt.
-- Der User kann jedes Feld danach manuell überschreiben (bestehendes Lock-Verhalten bleibt).
+1. **DB-Schema fehlt.** In `composer_scenes` existieren die Spalten `scene_action_user` / `scene_action_en` **nicht** (verifiziert via `\d composer_scenes`). `useComposerPersistence` schreibt sie aber in jeden `upsert` (Z. 227–228 / 286–287). PostgREST lehnt den Upsert dann ab → Folge-Refetch / nächste Save-Runde überschreibt die Szene mit der DB-Version.
 
-Aktuell liefert `scene-director` nur **einen** `actionBeat.characterAction` (für den Hauptcharakter) und **kein** Per-Character-Mapping → daher sind alle Felder leer.
+2. **Load-Mapping fehlt.** `VideoComposerDashboard.tsx` (Z. 371 + 514) baut beim Laden aus der Row ein `ComposerScene`, mappt aber `scene_action_user` / `scene_action_en` nirgends → selbst wenn die Spalten existierten, käme nach einem Reload nichts in `sceneActionUser` / `sceneActionEn` zurück.
 
----
+3. **Per-Character-Action-Felder** (`actionUser` / `actionEn` pro Slot) reisen automatisch im `character_shots` JSONB mit — das Mapping `characterShots: row.character_shots as any` reicht aus, sobald (1)+(2) repariert sind und der Save nicht mehr verworfen wird.
+
+Cache (`v4`), `scene-director` Normalisierung und SceneCard-`onApply` sind in Ordnung — die Daten sterben rein an der Persistenz.
 
 ## Änderungen
 
-### 1. `supabase/functions/scene-director/index.ts` (Tool-Schema erweitern)
+### 1. Migration — Spalten ergänzen
 
-Im `emitScene`-Tool zwei neue Felder ergänzen:
+Neue Migration:
 
-- `sceneActionEn` (string, englisch) — **eine** prägnante Action-Sentence, die genau das beschreibt, was im Action-Body des `aiPrompt` passiert (ohne Cast-Header, ohne Negative-Clause).
-- `perCharacterActions` (array) — pro `characterId` in `matchedAssets.characterIds` ein Eintrag `{ characterId, actionEn }`. **Pflicht** für jeden gematchten Charakter (sonst Cast-Coverage-Validator schlägt an).
-- `sceneActionLocalized` und `perCharacterActionsLocalized` (`{ characterId, action }`) — gleiche Inhalte in `req.language`, damit das UI-Feld direkt in DE/ES gefüllt wird (kein zusätzlicher Translate-Call nötig).
+```sql
+ALTER TABLE public.composer_scenes
+  ADD COLUMN IF NOT EXISTS scene_action_user TEXT,
+  ADD COLUMN IF NOT EXISTS scene_action_en   TEXT;
+```
 
-System-Prompt-Anweisung ergänzen: "Fill `sceneActionEn` with one English sentence summarizing the overall on-screen action. Fill `perCharacterActions` with exactly one entry per `matchedAssets.characterIds` member — same name, concrete verb, ≤ 12 words. The localized versions must be a faithful translation in the user's UI language."
+(Keine GRANT-Änderungen nötig — Tabelle ist bestehend, RLS/Grants greifen weiter.)
 
-Post-Call-Validator: fehlende Einträge mit Fallback `''` ergänzen; Locale-Versionen fallback = English.
+### 2. `src/components/video-composer/VideoComposerDashboard.tsx`
 
-### 2. `src/components/video-composer/SceneDirectorBox.tsx` (Felder durchreichen)
+An den beiden Stellen, an denen `composer_scenes`-Rows in `ComposerScene` gemappt werden (Z. ~371 und ~514), zusätzlich:
 
-`onApply`-Payload erweitern um:
-- `sceneActionUser` (aus `sceneActionLocalized`)
-- `sceneActionEn` (aus `sceneActionEn`)
-- `characterActions: { characterId, actionUser, actionEn }[]` (aus `perCharacterActionsLocalized` × `perCharacterActions`)
+```ts
+sceneActionUser: (row as any).scene_action_user ?? '',
+sceneActionEn:   (row as any).scene_action_en   ?? '',
+```
 
-Diese werden zusätzlich zu `aiPrompt / dialogScript / characterShots / actionBeat` übergeben.
+Das stellt sicher, dass sowohl frische Director-Outputs als auch manuelle Edits einen Reload überleben.
 
-### 3. `src/components/video-composer/SceneCard.tsx` (Mapping in den State)
+### 3. `src/hooks/useComposerPersistence.ts` — Defensive Logs
 
-Im bestehenden `onApply`-Handler (Zeile 2335) die neuen Felder auf den Scene-State mappen:
-
-- `updates.sceneActionUser = sceneActionUser` (auch wenn leer-string überschreibt → User-Erwartung: KI-Run synced)
-- `updates.sceneActionEn = sceneActionEn`
-- `characterShots` werden bereits gemerged → für jeden finalen Shot zusätzlich `actionUser` / `actionEn` aus dem `characterActions`-Mapping setzen (Match per `characterId`). Existierende manuelle Inhalte werden **nicht überschrieben**, wenn der Slot vorher schon `actionUser` hatte (Lock-Respekt) — sonst neu befüllt.
+Beim `upsert`-Fehler-Branch (rund um die `composer_scenes`-Upserts) ein `console.warn('[persistence] composer_scenes upsert failed', error)` setzen, falls noch nicht vorhanden. So sehen wir in der Konsole sofort, wenn ein zukünftiger Schema-Drift wieder zuschlägt — kein stiller Datenverlust mehr.
 
 ### 4. Keine Änderungen an
 
-- `applyActionsToPrompt.ts` — funktioniert bereits idempotent.
-- `useAutoTranslateEn` / `translate-to-english` — wird vom UI weiter genutzt, sobald der User manuell editiert.
-- Lipsync / `compose-dialog-scene` / Render-Pipeline.
-- Persistence-Layer (Felder sind bereits in `useComposerPersistence` enthalten).
+- `scene-director/index.ts` — Output ist bereits vollständig normalisiert (sceneActionEn / Localized / perCharacterActions(+Localized) immer gefüllt).
+- `SceneDirectorBox.tsx` / `SceneCard.tsx` — `onApply`-Wiring überschreibt die Felder bereits korrekt, sobald Persistence sie nicht mehr wegwirft.
+- `applyActionsToPrompt.ts`, `useAutoTranslateEn`, Lipsync, Render-Pipeline.
 
----
+## Akzeptanzkriterien
 
-## Technische Details
-
-**Cache-Invalidation**: `scene_director_cache` Cache-Key bekommt einen `v4`-Bump (`v3` → `v4` in `cacheKey`), damit alte Einträge ohne die neuen Felder nicht zurückkommen.
-
-**Edge-Cases**:
-- Charakter im Prompt aber nicht in `matchedAssets.characterIds` → kein Eintrag, Feld bleibt leer (User kann manuell ausfüllen).
-- Charakter durch Ghost-Cast-Validator gedroppt → entsprechender `perCharacterActions`-Eintrag wird ebenfalls gedroppt.
-- Re-Roll mit gefüllten User-Override-Feldern → bestehende `sceneActionUser` / Per-Slot `actionUser` werden **überschrieben**, da der User explizit "Neu würfeln" geklickt hat (Erwartung: kompletter Re-Sync). Falls das nicht erwünscht ist, leicht umzustellen.
-
-**Sprache**: Englischer Prompt-Inhalt bleibt unverändert. UI-Felder zeigen DE/ES wenn `lang ≠ en`, sonst EN identisch zu `actionEn`.
-
----
-
-## Dateien
-
-- `supabase/functions/scene-director/index.ts` (Tool-Schema + System-Prompt + Cache-Key)
-- `src/components/video-composer/SceneDirectorBox.tsx` (`onApply`-Signatur + Forward)
-- `src/components/video-composer/SceneCard.tsx` (Mapping auf Scene-State)
-- *(optional)* `src/types/video-composer.ts` — `onApply`-Payload-Typ erweitern, falls separat exportiert.
+- Neues Briefing → Director Run → "Was passiert in der Szene?" zeigt die deutsche/spanische/englische Aktion direkt unterhalb mit Auto-EN-Preview.
+- Pro gemappten Charakter im `CharacterCastPicker` erscheint im Action-Feld der jeweilige Satz aus `perCharacterActionsLocalized`.
+- Nach Browser-Reload sind beide Feld-Typen weiterhin gefüllt.
+- Manuelle Edits werden weiterhin respektiert (Lock-Verhalten bleibt; nur ein expliziter Re-Run des Directors überschreibt sie).
