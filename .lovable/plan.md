@@ -1,56 +1,60 @@
-## Diagnose — was du in den Screenshots siehst
+## Was passiert (Diagnose)
 
-**Ja, gleiche Pipeline.** Die 1-Sprecher-Szene (Matthew, "Wie kann es sein…") läuft auf Engine **`Fast Dialog` = `sync-segments`** = exakt derselbe Code wie 2–4 Sprecher: `compose-dialog-segments` → Sync.so **Model `sync-3`** (v62: sync-3 ist universal default für N=1 und N≥2). Es gibt keinen "1-Sprecher-Sonderpfad" mehr. HeyGen war hier *nicht* aktiv — der Hinweistext "Lip-Sync via HeyGen" stimmt mit der gewählten Engine nicht überein und ist ein UI-Bug (siehe Fix 3).
+Beim Anlegen einer neuen Szene im Storyboard wird sie **mit einem temporären Client-ID lokal eingefügt** und parallel sofort in `composer_scenes` geschrieben. Beim Generieren wird vor dem Render `ensureProjectPersisted` aufgerufen — dieser Schritt nummeriert die `order_index` aller Szenen neu, indem er sie kurz auf negative Werte schiebt (Phase A) und dann wieder in die richtigen Slots schreibt (Phase B). Während dieses Fensters läuft die Realtime-Subscription mit und macht laufend `refetchScenesFromDb`.
 
-**Warum die Lippen trotzdem still sind**, steht direkt im Director Score:
+Zwei konkrete Bugs greifen ineinander und sorgen für „Szene 2 wird durch Szene 3 ersetzt":
 
-> ⚠️ **"Dialog Mismatch — Dialog vorhanden aber kein Audio Plan gelockt — generiere das Voiceover, damit Timings fixiert sind."**
-
-Konkret: Der Hailuo-Clip wurde gerendert und das Voiceover existiert, aber `scene.audio_plan.twoshot.url` (die gemerged Master-WAV mit `speakers[].voicedRange.turns[]`) wurde **nie geschrieben**. `compose-dialog-segments` returnt in dem Fall hart:
-
-```ts
-if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {
-  return 422 "Sync-Segments requires compose-twoshot-audio output…"
-}
+### Bug 1 — `addSceneToProject` schreibt jede neue Szene mit `order_index: 0`
+`src/components/video-composer/VideoComposerDashboard.tsx`, Zeile 980:
 ```
+order_index: baseScene.orderIndex,   // baseScene ist {...DEFAULTS, ...partial} mit Default orderIndex: 0
+```
+Lokal wird korrekt `prev.scenes.length` gesetzt (Zeile 972), aber der DB-INSERT verwendet die unverarbeitete `baseScene.orderIndex` = `0`. Folge: Jeder neue Szene-INSERT kollidiert mit `UNIQUE(project_id, order_index)` und schlägt still fehl (nur `console.warn` Zeile 1022). Die neue Szene lebt nur lokal mit Temp-ID weiter.
 
-→ Sync.so wird nie gerufen, Plate spielt ohne Mundbewegung, VO läuft drüber als Off-Screen-Narration. Genau dein Eindruck.
+### Bug 2 — `refetchScenesFromDb` reindiziert nach Array-Position, nicht nach DB-`order_index`
+`VideoComposerDashboard.tsx`, Zeilen 540–541:
+```
+const merged = [...dbScenes, ...localOnly]
+  .map((s, i) => ({ ...s, orderIndex: i }));
+```
+Während Phase A der Persistenz alle Szenen kurz auf negative `order_index` schiebt, liefert ein konkurrierender Refetch die Szenen in chaotischer Reihenfolge (z. B. `[-3, -2, -1, 2]`). Die lokale UI-Reihenfolge wird per Array-Index überschrieben → Szenen rutschen visuell durcheinander.
 
-Das passiert, weil du den Clip mit "🎬 Clip generieren" gerendert hast statt mit "🔊 **Clip generieren mit Voiceover**" (der Knopf direkt im Audio-Block, Screenshot 1). Nur der zweite Knopf zwingt `compose-twoshot-audio` davor.
+### Bug 3 — Temp-Szene bleibt nach Persist in `localOnly`
+Wenn `ensureProjectPersisted` der Temp-Scene 3 endlich eine UUID gibt, kommt `setProject({..., scenes: result.scenes})` (Zeile 1414). Das ersetzt die Szenen — aber **jeder Realtime-Refetch, der zwischen Phase A und diesem `setProject` feuert**, sieht `localOnly = [Scene3(temp)]` UND `dbScenes = [Scene1, Scene2, Scene3-real]` → temporär 4 Szenen, anschließend räumt der nächste `setProject` Zeile 1414 alle `localOnly` weg — inklusive Edits, die der User in Scene 2 noch nicht gespeichert hatte. Effektiv sieht der User: Scene 2 „wird ersetzt".
 
-## Fix
+## Fix-Plan
 
-### 1. Auto-Lock Audio-Plan vor Sync-Segments-Render *(Hauptfix)*
+### 1. `addSceneToProject` korrekt mit der finalen `order_index` insertieren
+- `baseScene.orderIndex` vor dem `insert` auf `prev.scenes.length` setzen (gleichen Wert wie der optimistische `setProject`-Aufruf).
+- Bei DB-Fehler **nicht nur warnen**, sondern den lokalen Temp-Scene-Eintrag wieder entfernen oder `clip_status: 'error'` markieren, damit der User es nicht stillschweigend mitschleppt.
 
-In `compose-video-clips` (Composer Render-Entry) für Szenen mit `engine_override='sync-segments'` ODER auto-routed Dialog:
-- Wenn `audio_plan.twoshot.url` fehlt UND `dialogScript` + Cast vorhanden → **vor** Hailuo-Dispatch `compose-twoshot-audio` aufrufen (auch für N=1; die Funktion mergt trivial bei 1 Sprecher).
-- Damit ist der Audio-Plan garantiert gelockt, sobald die Plate fertig ist und `useTwoShotAutoTrigger` greift.
+### 2. Realtime-Refetch atomar gegen Persistenz machen
+- Einen Modul-scope „persisting-lock" einführen (`isPersistingRef`), den `ensureProjectPersisted` während Phase A → Phase B hält.
+- `refetchScenesFromDb` skippt den Merge, solange das Lock aktiv ist (oder zumindest, solange irgendeine `order_index` < 0 zurückkommt — ein einfacher Guard: `if (data.some(r => r.order_index < 0)) return;`).
 
-### 2. Auto-Retrigger für bestehende Szenen ohne Audio-Plan
+### 3. `refetchScenesFromDb` darf `orderIndex` nicht überschreiben
+- `orderIndex` aus DB direkt übernehmen (`row.order_index`) und **nicht** durch Array-Position ersetzen.
+- localOnly-Szenen hinten dranhängen mit `orderIndex = max(dbScenes.orderIndex) + n`.
 
-In `useTwoShotAutoTrigger` (sieht die Szene alle 8s an):
-- Neue Bedingung: `clip_status='ready'` + `dialogScript` + Cast + `engine='sync-segments'` + **`!audio_plan.twoshot.url`** → dispatch `compose-twoshot-audio` once (idempotent via existing `twoshot_stage='audio'` lock). Sobald die WAV da ist, läuft der bestehende Pfad nach `compose-dialog-segments` weiter.
-- Heißt: deine aktuelle "Problem"-Szene wird ohne Re-Render nachträglich gelipsynct.
+### 4. Persistenz: einzelne, einphasige Reindex-Strategie
+- Statt zweiphasigem Negativ-Shuffle: nur Szenen UPDATE-en, deren Ziel-`order_index` sich tatsächlich ändert, in der richtigen Reihenfolge (absteigend wenn Slot belegt). Dadurch entstehen weder negative Werte noch eine Realtime-Tick-Storm.
+- Alternativ den ganzen Reindex in einer Transaktion via RPC ausführen (eine einzige Realtime-Notification statt N).
 
-### 3. UI-Text-Bug "Lip-Sync via HeyGen" für Sync-Segments-Engine
+### 5. Defensive Dedup in `refetchScenesFromDb`
+- Vor dem `setProject` per `Map<id>` deduplizieren, damit selbst bei Races nie zwei Szenen mit derselben UUID oder Temp-ID parallel existieren.
 
-In der Audio-Karte (SceneCard / DialogStudioSheet) wird der Hinweis "Lip-Sync via HeyGen — Mund passt zum Audio (~€0.30)" angezeigt, obwohl die Engine `Fast Dialog` (Sync.so) ist. Den Text engine-abhängig machen:
-- `engine='heygen-talking-head'` → "Lip-Sync via HeyGen (~€0.30/Sprecher)"
-- `engine='sync-segments'` → "**Lip-Sync via Sync.so sync-3 — Mund passt zum Audio (~€0.20/s)**"
-- `engine='broll'` → "Voiceover als Off-Screen-Narration (kein Lip-Sync)"
+## Technische Details
 
-### 4. Director-Score Action-Button
+**Dateien:**
+- `src/components/video-composer/VideoComposerDashboard.tsx` — `addSceneToProject` (940-1022), `refetchScenesFromDb` (446-547)
+- `src/hooks/useComposerPersistence.ts` — `ensureProjectPersisted` Phase A/B (166-302)
 
-Die Director-Score-Karte ("Dialog Mismatch — kein Audio Plan gelockt") bekommt einen **"🔊 Voiceover jetzt generieren"** Quick-Action der genau `compose-twoshot-audio` für die Szene triggert. Damit der User sich nicht durchklicken muss.
+**Keine Backend-/Edge-Function-Änderungen nötig** — alle Bugs liegen rein im Client-State-Management. Die `compose-video-clips`-Pipeline und Sync.so-Pfade bleiben unangetastet.
 
-## Geänderte Dateien
+**Verifikation:** Manuell reproduzieren — Szene 1, Szene 2, Szene 3 nacheinander erstellen und generieren; in der DevTools-Network-Tab prüfen, dass jeder INSERT in `composer_scenes` einen unterschiedlichen `order_index` bekommt und kein `409 Conflict` / `unique constraint` Fehler auftritt.
 
-- `supabase/functions/compose-video-clips/index.ts` — Pre-flight `compose-twoshot-audio` bei sync-segments ohne Audio-Plan
-- `src/hooks/useTwoShotAutoTrigger.ts` — Neuer Auto-Lock-Branch für ready-Clips ohne `twoshot.url`
-- `src/components/video-composer/scene/AudioBlock.tsx` (oder vergleichbare Karte) — engine-abhängiger Lipsync-Hinweistext
-- `src/components/video-composer/scene/DirectorScoreCard.tsx` — Quick-Action-Button für "Voiceover generieren"
+## Was bewusst NICHT angefasst wird
 
-## Was *nicht* gemacht wird
-
-- Keine Pipeline-Architektur-Änderungen. Sync.so `sync-3` bleibt universal default (v62). v75 (moving master + windowed overlays) bleibt unverändert.
-- Keine Migration bestehender Szenen — Auto-Retrigger (#2) holt sie automatisch nach.
+- Sync.so-Pipeline, `compose-dialog-segments`, Lip-Sync-Logik
+- Engine-Routing (`sync-segments` / `cinematic-sync` / `heygen-talking-head`)
+- Audio-Plan-Locking

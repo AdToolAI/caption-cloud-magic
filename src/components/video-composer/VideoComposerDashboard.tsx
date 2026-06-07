@@ -455,6 +455,16 @@ export default function VideoComposerDashboard() {
       if (dbError) throw dbError;
       if (!data) return;
 
+      // Guard against the Phase-A window of `ensureProjectPersisted` — during
+      // its two-phase reindex every scene briefly sits at a NEGATIVE
+      // order_index. If a realtime tick fires in that window the rows come
+      // back in a chaotic order and the merge below would clobber the local
+      // UI order. Skip and wait for the next tick (Phase B will fire one).
+      if ((data as any[]).some((r: any) => Number(r.order_index) < 0)) {
+        return;
+      }
+
+
       setProject(prev => {
         const localById = new Map(prev.scenes.map(s => [s.id, s]));
         // Preserve any locally-created scenes that haven't been persisted yet
@@ -537,8 +547,26 @@ export default function VideoComposerDashboard() {
               : (local?.seedVariations ?? []),
           };
         });
-        const merged = [...dbScenes, ...localOnly]
-          .map((s, i) => ({ ...s, orderIndex: i }));
+        // Preserve the DB `order_index` for persisted scenes — the legacy
+        // re-index by array position (`map((s,i) => orderIndex:i)`) would
+        // overwrite DB truth during the realtime tick storm that Phase A of
+        // `ensureProjectPersisted` triggers, scrambling the UI order.
+        // Local-only scenes (no UUID yet) get appended at the end with
+        // bumped orderIndex. Final list is sorted by orderIndex and
+        // deduplicated by id so a race can never produce duplicate cards.
+        const maxDbOrder = dbScenes.length > 0
+          ? Math.max(...dbScenes.map((s) => Number(s.orderIndex ?? 0)))
+          : -1;
+        const localWithBump = localOnly.map((s, i) => ({
+          ...s,
+          orderIndex: maxDbOrder + 1 + i,
+        }));
+        const dedup = new Map<string, ComposerScene>();
+        for (const s of dbScenes) dedup.set(s.id, s);
+        for (const s of localWithBump) if (!dedup.has(s.id)) dedup.set(s.id, s);
+        const merged = Array.from(dedup.values()).sort(
+          (a, b) => Number(a.orderIndex ?? 0) - Number(b.orderIndex ?? 0),
+        );
         return { ...prev, scenes: propagateDialogLock(merged) };
       });
     } catch (err) {
@@ -966,18 +994,31 @@ export default function VideoComposerDashboard() {
       return undefined;
     }
 
-    // Optimistic insert (so the user sees it instantly)
-    setProject(prev => ({
-      ...prev,
-      scenes: [...prev.scenes, { ...baseScene, projectId, orderIndex: prev.scenes.length }],
-    }));
+    // Optimistic insert (so the user sees it instantly).
+    // Capture the freshest scenes.length from the updater — the closure's
+    // `project.scenes` is stale because this callback's dep array only
+    // contains `project.id`. The captured `finalOrderIndex` is then re-used
+    // for the DB INSERT to avoid a UNIQUE(project_id, order_index) collision.
+    // The legacy bug used `baseScene.orderIndex` (= 0) so every new scene
+    // tried to insert at slot 0, silently failed (only console.warn), and
+    // the scene lived on as a temp-id-only entry — which combined with the
+    // realtime refetch race caused Scene 2 to "disappear" when Scene 3 was
+    // generated. (Bug 1 of the storyboard persistence triad.)
+    let finalOrderIndex = 0;
+    setProject(prev => {
+      finalOrderIndex = prev.scenes.length;
+      return {
+        ...prev,
+        scenes: [...prev.scenes, { ...baseScene, projectId, orderIndex: finalOrderIndex }],
+      };
+    });
 
     try {
       const { data, error } = await supabase
         .from('composer_scenes')
         .insert({
           project_id: projectId,
-          order_index: baseScene.orderIndex,
+          order_index: finalOrderIndex,
           scene_type: baseScene.sceneType,
           duration_seconds: baseScene.durationSeconds,
           clip_source: baseScene.clipSource,
