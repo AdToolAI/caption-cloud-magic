@@ -65,6 +65,12 @@ interface Props {
   legacyValue?: CharacterShot;
   onChange: (next: CharacterShot[]) => void;
   language?: Lang;
+  /**
+   * When true, each cast slot renders a manual Action field underneath the
+   * row so the user can pin exactly what THIS character does in the scene
+   * (UI language → auto-EN → `[CastActions]` marker in the prompt).
+   */
+  showActionFields?: boolean;
 }
 
 function normalizeValue(value?: CharacterShot[], legacy?: CharacterShot): CharacterShot[] {
@@ -103,6 +109,7 @@ export function CharacterCastPicker({
   legacyValue,
   onChange,
   language = 'en',
+  showActionFields = true,
 }: Props) {
   const lang: Lang = language;
   const cast = normalizeValue(value, legacyValue);
@@ -374,6 +381,26 @@ export function CharacterCastPicker({
         );
       })}
 
+      {/* Per-character Action override fields. Lazy-import the SceneActionField
+          via React to keep this module's bundle slim if the consumer never
+          opts in via showActionFields. */}
+      {showActionFields && cast.map((slot) => {
+        const ch = findCharacter(slot.characterId, resolutionPool);
+        if (!ch) return null;
+        return (
+          <ActionFieldRow
+            key={`action-${slot.characterId}`}
+            characterName={ch.name}
+            value={slot.actionUser ?? ''}
+            englishValue={slot.actionEn ?? ''}
+            language={lang}
+            onChange={(actionUser) => updateSlot(slot.characterId, { actionUser })}
+            onEnglishChange={(actionEn) => updateSlot(slot.characterId, { actionEn })}
+          />
+        );
+      })}
+
+
       {cast.length >= 2 && (
         <p className="text-[10px] text-muted-foreground/80 leading-tight">{LABELS.hint[lang]}</p>
       )}
@@ -489,6 +516,51 @@ function OutfitPickerRow({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/*  Per-character Action override row (auto-EN translation)        */
+/* ============================================================== */
+
+import SceneActionField from './SceneActionField';
+
+interface ActionFieldRowProps {
+  characterName: string;
+  value: string;
+  englishValue: string;
+  language: Lang;
+  onChange: (v: string) => void;
+  onEnglishChange: (en: string) => void;
+}
+
+function ActionFieldRow({
+  characterName,
+  value,
+  englishValue,
+  language,
+  onChange,
+  onEnglishChange,
+}: ActionFieldRowProps) {
+  const L = {
+    en: { label: `Action — what does ${characterName} do?`, ph: `e.g. types focused on her laptop, nods at the others` },
+    de: { label: `Aktion — was tut ${characterName}?`, ph: `z. B. tippt konzentriert am Laptop und nickt den anderen zu` },
+    es: { label: `Acción — ¿qué hace ${characterName}?`, ph: `p. ej. teclea concentrado en su portátil y asiente a los demás` },
+  }[language];
+  return (
+    <div className="pl-1">
+      <SceneActionField
+        language={language}
+        label={L.label}
+        placeholder={L.ph}
+        value={value}
+        englishValue={englishValue}
+        onChange={onChange}
+        onEnglishChange={onEnglishChange}
+        size="sm"
+        rows={2}
+      />
     </div>
   );
 }

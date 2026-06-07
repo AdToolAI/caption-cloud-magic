@@ -126,6 +126,8 @@ import { resolveSceneWorldRefs } from "@/lib/motion-studio/prepareSceneAnchor";
 import { applyCastToPrompt } from "@/lib/motion-studio/applyCastToPrompt";
 import { syncCastFromPrompt } from "@/lib/motion-studio/syncCastFromPrompt";
 import { applyDialogToPrompt } from "@/lib/motion-studio/applyDialogToPrompt";
+import { applyActionsToPrompt, type CastActionEntry } from "@/lib/motion-studio/applyActionsToPrompt";
+import SceneActionField from "./SceneActionField";
 import {
   removeCharactersFromPrompt,
   removeCharactersFromDialogScript,
@@ -578,6 +580,51 @@ export default function SceneCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.dialogScript, characters?.length, promptMode, scene.engineOverride]);
 
+
+  // ── Action overrides → prompt sync ────────────────────────────────────
+  // Inject `[SceneAction]` + `[CastActions]` marker blocks whenever the user
+  // edits the manual action fields. `applyActionsToPrompt` is idempotent
+  // (strips the existing markers before rewriting), so this is safe to run
+  // on every relevant change. Empty inputs → markers disappear → Director
+  // output regains control. Locked overrides survive Director re-rolls
+  // because this effect re-applies them right after `onApply` writes the
+  // new `aiPrompt`.
+  useEffect(() => {
+    if (!scene.clipSource.startsWith("ai-")) return;
+    const sceneActionEn = (scene.sceneActionEn ?? "").trim();
+    const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+    const castActions: CastActionEntry[] = cast
+      .map((slot) => {
+        const ch = characters?.find((c) => c.id === slot.characterId);
+        const en = (slot.actionEn ?? "").trim();
+        if (!ch || !en) return null;
+        return { name: ch.name, actionEn: en };
+      })
+      .filter((x): x is CastActionEntry => !!x);
+
+    if (promptMode === "structured") {
+      const currentSubject = (promptSlots.subject as string) || "";
+      const next = applyActionsToPrompt(currentSubject, sceneActionEn, castActions);
+      if (next !== currentSubject) {
+        const nextSlots: PromptSlots = { ...promptSlots, subject: next };
+        onUpdate({
+          promptSlots: nextSlots,
+          aiPrompt: stitchSlots(nextSlots, promptSlotOrder),
+        });
+      }
+    } else {
+      const next = applyActionsToPrompt(scene.aiPrompt || "", sceneActionEn, castActions);
+      if (next !== (scene.aiPrompt || "")) onUpdate({ aiPrompt: next });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    scene.sceneActionEn,
+    scene.aiPrompt,
+    promptMode,
+    characters?.length,
+    scene.characterShots?.map((s) => `${s.characterId}:${s.actionEn ?? ""}`).join("|"),
+    scene.characterShot?.actionEn,
+  ]);
 
   const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next, promptSlotOrder);
@@ -2327,7 +2374,32 @@ export default function SceneCard({
               )}
               {scene.clipSource.startsWith("ai-") && (
                 <div className="space-y-2">
+                  {/* Scene-Action override — user types in UI language, auto-EN
+                      is injected into the prompt's [SceneAction] marker block. */}
+                  <SceneActionField
+                    language={lang}
+                    label={
+                      lang === "de"
+                        ? "Was passiert in der Szene? (überstimmt Director)"
+                        : lang === "es"
+                          ? "¿Qué pasa en la escena? (anula al Director)"
+                          : "What happens in the scene? (overrides Director)"
+                    }
+                    placeholder={
+                      lang === "de"
+                        ? "z. B. Vier Social-Media-Manager arbeiten parallel in einem hellen Open-Space-Büro"
+                        : lang === "es"
+                          ? "p. ej. Cuatro community managers trabajan en paralelo en una oficina luminosa"
+                          : "e.g. Four social-media managers working in parallel inside a bright open-space office"
+                    }
+                    value={scene.sceneActionUser ?? ""}
+                    englishValue={scene.sceneActionEn ?? ""}
+                    onChange={(v) => onUpdate({ sceneActionUser: v })}
+                    onEnglishChange={(en) => onUpdate({ sceneActionEn: en })}
+                    rows={2}
+                  />
                   <div className="space-y-1.5">
+
                     <div className="flex items-center justify-between gap-2">
                       <Label className="text-[10px] text-muted-foreground">
                         {lang === "de"
