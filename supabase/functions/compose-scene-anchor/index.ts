@@ -265,14 +265,28 @@ serve(async (req) => {
     // to a single character or stacks faces and the multi-pass face-target
     // lipsync collapses to one speaker. This rule is Artlist-parity.
     const TWO_SHOT_FRAMING_SUFFIX = isMulti
-      ? ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} characters are fully visible in the SAME frame at roughly EQUAL screen share. Each face must be unobstructed, front-3/4 to camera, with clear separation between subjects (no occlusion, no overlap of heads). NEVER produce a single-character close-up, NEVER cut anyone out of frame, NEVER show only the back of a head. Position the subjects left/right or in a slight arc so a face detector can find ${N} distinct faces.`
+      ? (hasAsymmetricCast
+        ? ` MULTI-CHARACTER FRAMING (asymmetric, per CHARACTER ACTIONS above): all ${N} reference people must be clearly visible and individually recognizable in the SAME frame. Screen share may be UNEQUAL — honor the per-character placement (foreground/background, primary/secondary, near/far) exactly as written in CHARACTER ACTIONS. Each face must still be unobstructed enough that a face detector can locate ${N} distinct faces (no full back-of-head, no fully hidden face, no silhouette). Do NOT collapse the scene to a symmetric side-by-side shot if the actions describe different positions.`
+        : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} characters are fully visible in the SAME frame at roughly EQUAL screen share. Each face must be unobstructed, front-3/4 to camera, with clear separation between subjects (no occlusion, no overlap of heads). NEVER produce a single-character close-up, NEVER cut anyone out of frame, NEVER show only the back of a head. Position the subjects left/right or in a slight arc so a face detector can find ${N} distinct faces.`)
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
-      ? ` AVOID: single person, solo close-up, one face cropped to frame, back of head, full profile silhouette where the face is hidden, one character occluded by the other, faces overlapping, three people when only two are referenced, extra coworker, extra colleague, extra bystander, background crowd, twins, identical-looking people, repeated face.`
+      ? (hasAsymmetricCast
+        ? ` AVOID: any reference person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated identity, extra unreferenced person.`
+        : ` AVOID: single person, solo close-up, one face cropped to frame, back of head, full profile silhouette where the face is hidden, one character occluded by the other, faces overlapping, three people when only two are referenced, extra coworker, extra colleague, extra bystander, background crowd, twins, identical-looking people, repeated face.`)
       : "";
     const STRICT_RETRY_SUFFIX = strictMode && isMulti
       ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity, an extra human body, or a partial third person in frame. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} HUMAN BEINGS total — count every visible body, including profile views, partial bodies, background humans, mirror reflections, posters, screens, mannequins, statues. The total human count anywhere in the frame must equal ${N}. ISOLATE the ${N} reference people: clear or empty the rest of the environment (empty office, empty hallway, empty street). Crop/frame tight enough to physically EXCLUDE any additional humans. Do NOT add coworkers, colleagues, bystanders, passers-by, or a "third figure" to balance the composition. Do NOT repeat any reference person. Final human headcount in frame: ${N}. Repeat: exactly ${N} bodies, no more, no fewer.`
       : "";
+
+    // Per-character action clause — protected from the dialog stripper and
+    // placed BEFORE the framing rules so the model treats placement /
+    // activity per character as the ground truth.
+    const CAST_ACTIONS_CLAUSE = castActions.length > 0
+      ? ` CHARACTER ACTIONS — each named reference person does EXACTLY this in the frame (spatial placement and activity per character override any default symmetric framing rule that follows):\n` +
+        castActions.map((c) => `- ${c.name}: ${c.action}`).join("\n") +
+        `\nRender these actions literally — if a character is described "in the background", they MUST be visibly further from camera than the others; if "on the phone", a phone MUST be at their ear; if "leaning", they MUST be leaning. Do NOT relocate any character to a symmetric position just to balance the composition.`
+      : "";
+
     // Stage A — World reference clause. Tells the model WHICH later image
     // indices represent the named location / building / props so it composes
     // them faithfully INTO the scene instead of inventing generic stand-ins.
@@ -299,7 +313,7 @@ serve(async (req) => {
     }
 
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${worldClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${worldClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
