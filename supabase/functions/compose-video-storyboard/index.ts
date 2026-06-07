@@ -350,6 +350,14 @@ Generate the storyboard using the create_storyboard function.`;
                           type: "string",
                           description: "Detailed English prompt for AI video generation. Describe camera angle, subject, motion, lighting, mood.",
                         },
+                        sceneActionEn: {
+                          type: "string",
+                          description: "Concise English summary of the general scene action, faithfully matching aiPrompt, max 25 words.",
+                        },
+                        sceneActionLocalized: {
+                          type: "string",
+                          description: `Same scene action as sceneActionEn, localized in ${langLabel} for the editable UI field.`,
+                        },
                         stockKeywords: {
                           type: "string",
                           description: "Comma-separated English keywords for stock video search fallback",
@@ -394,6 +402,14 @@ Generate the storyboard using the create_storyboard function.`;
                               shotType: {
                                 type: "string",
                                 enum: ["full", "profile", "back", "detail", "pov", "silhouette", "absent"],
+                              },
+                              actionEn: {
+                                type: "string",
+                                description: "What this exact character physically does in this scene, English, max 12 words, matching aiPrompt.",
+                              },
+                              actionUser: {
+                                type: "string",
+                                description: `Same character action localized in ${langLabel} for the editable UI field.`,
                               },
                             },
                             required: ["characterId", "shotType"],
