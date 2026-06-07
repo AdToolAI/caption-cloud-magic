@@ -464,14 +464,19 @@ export default function SceneCard({
     const current =
       scene.characterShots ??
       (scene.characterShot ? [scene.characterShot] : []);
-    const next = syncCastFromPrompt(scene.aiPrompt || "", current, characters);
+    const next = syncCastFromPrompt(
+      scene.aiPrompt || "",
+      current,
+      characters,
+      scene.dismissedCharacterIds,
+    );
     if (next === current) return;
     onUpdate({
       characterShots: next,
       characterShot: next[0] ?? scene.characterShot,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.aiPrompt, characters?.length]);
+  }, [scene.aiPrompt, characters?.length, scene.dismissedCharacterIds?.length]);
 
   // Backfill: ensure scenes with a cast also carry the cast marker in the
   // prompt. `applyCastToPrompt` is idempotent (strips the existing marker
