@@ -2283,7 +2283,8 @@ export default function SceneCard({
                       reference_image_url: p.reference_image_url,
                     }))}
                     onAddCharacter={onAddCharacter}
-                    onApply={({ aiPrompt, dialogScript, characterShots }) => {
+                    realismPreset={scene.realismPreset}
+                    onApply={({ aiPrompt, dialogScript, characterShots, actionBeat }) => {
                       const updates: Partial<ComposerScene> = { aiPrompt };
                       if (dialogScript !== undefined)
                         updates.dialogScript = dialogScript;
@@ -2292,6 +2293,9 @@ export default function SceneCard({
                         updates.characterShot = characterShots[0];
                         // Storyboard delivered a fresh cast → clear the dismissal blocklist.
                         updates.dismissedCharacterIds = [];
+                      }
+                      if (actionBeat) {
+                        updates.actionBeat = actionBeat;
                       }
                       if (promptMode === "structured") {
                         // Drop back to free mode so the user sees the new prompt verbatim.
