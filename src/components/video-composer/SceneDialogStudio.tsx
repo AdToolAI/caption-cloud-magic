@@ -1140,6 +1140,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         }
 
         // Optimistic state — UI immediately shows "Generating".
+        // NOTE: we intentionally do NOT write `cinematicPresetSlug: dialog-srs:*`
+        // on the real cinematic-sync main scene anymore. That marker was a
+        // legacy hook for old auto-spawned sub-scenes and caused the cleanup
+        // pass to delete real main scenes ("Szene 2 verschwindet").
         onUpdate({
           dialogScript: dialogScriptText,
           dialogVoices: dialogVoicesMap,
@@ -1149,7 +1153,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           clipStatus: 'generating',
           twoshotStage: 'audio',
           lipSyncWithVoiceover: true,
-          cinematicPresetSlug: srsMarker,
         });
 
         // Actually trigger compose-video-clips so the master Hailuo i2v
