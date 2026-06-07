@@ -709,7 +709,9 @@ export function usePipelineProgress({
   }, 0);
   const STALL_THRESHOLD_MS = Math.max(4, maxSpeakers * 3, lipTargetCount * 2) * 60 * 1000;
   const STALL_MIN_PERCENT = 95;
-  const realProgressRef = useRef<{ value: number; at: number }>({ value: 0, at: Date.now() });
+  const realProgressRef = useRef<{ value: number; at: number }>(
+    hydratedRealProgressRef.current ?? { value: 0, at: Date.now() },
+  );
   const realProgressSum =
     clipsReal.progress * PHASE_WEIGHTS.clips +
     voiceoverReal.progress * PHASE_WEIGHTS.voiceover +
