@@ -225,6 +225,32 @@ export function SceneDirectorBox({
 
           {result && (
             <div className="space-y-2 pt-1 border-t border-primary/10">
+              {result.castCoverage && !result.castCoverage.ok && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/[0.05] p-2 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[10px] text-amber-700 dark:text-amber-300">
+                    <Badge variant="outline" className="h-4 px-1.5 text-[9px] border-amber-500/40 text-amber-700 dark:text-amber-300">
+                      ⚠ {t.castMissing}
+                    </Badge>
+                    <span className="font-medium">
+                      {[
+                        ...(result.castCoverage.missingRequiredNames || []),
+                        ...(result.castCoverage.droppedGhostCast || []),
+                      ].join(', ')}
+                    </span>
+                  </div>
+                  <p className="text-[9px] leading-relaxed text-muted-foreground/80">{t.castMissingHint}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[9px] gap-1 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                    disabled={busy}
+                    onClick={handleGenerate}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    {t.forceCast}
+                  </Button>
+                </div>
+              )}
               {Array.isArray(result.droppedActions) && result.droppedActions.length > 0 && (
                 <div className="text-[10px] text-muted-foreground/80">
                   <span className="font-medium">{t.dropped}:</span> {result.droppedActions.join(' · ')}
