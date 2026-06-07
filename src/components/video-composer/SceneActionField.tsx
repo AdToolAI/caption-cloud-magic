@@ -62,9 +62,10 @@ export default function SceneActionField({
 
   // Push the canonical English value to the parent whenever it changes.
   useEffect(() => {
+    if ((value ?? '').trim() && !english.trim() && (englishValue ?? '').trim()) return;
     if (english !== englishValue) onEnglishChange(english);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [english]);
+  }, [english, value, englishValue]);
 
   const locked = (value ?? '').trim().length > 0;
   const compact = size === 'sm';
