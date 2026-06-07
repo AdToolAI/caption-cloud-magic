@@ -144,6 +144,10 @@ OUTPUT LANGUAGES:
 - aiPrompt: English ALWAYS (visual model performance).
 - dialogScript: ${lang} (the user's UI language). Empty string if no spoken line is needed.
 - actionBeat fields: English ALWAYS.
+- sceneActionEn: English ALWAYS. ONE sentence (≤ 25 words) that summarizes the on-screen action of THIS scene — exactly what is shown in the aiPrompt action body, without the cast header and without the negative clause.
+- sceneActionLocalized: faithful ${lang} translation of sceneActionEn (identical string if ${lang} === 'en').
+- perCharacterActions: EXACTLY one entry per character ID you return in matchedAssets.characterIds. Use the character's name + a concrete verb (≤ 12 words, English).
+- perCharacterActionsLocalized: same entries, translated into ${lang}, same order and length.
 
 ${fmt('CHARACTERS', req.library.characters)}
 
