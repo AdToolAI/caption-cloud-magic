@@ -109,6 +109,7 @@ export function CharacterCastPicker({
   legacyValue,
   onChange,
   language = 'en',
+  showActionFields = false,
 }: Props) {
   const lang: Lang = language;
   const cast = normalizeValue(value, legacyValue);
