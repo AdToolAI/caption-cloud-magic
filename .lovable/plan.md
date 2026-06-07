@@ -1,30 +1,72 @@
-## Ziel
-Neue KI-Briefings sollen bei Szenen mit mehreren Charakteren nicht mehr nur eine Person fokussieren. Wenn mehrere Charaktere in einer Szene vorkommen, müssen alle sichtbar sein, jeweils eine eigene Handlung haben und die Szene muss für Lip-Sync nutzbar sein: entweder Dialog miteinander oder klarer Turn zur Kamera.
+## Root Cause
+
+In `supabase/functions/compose-scene-anchor/index.ts` passieren zwei Dinge, die per-Charakter-Aktionen (z. B. „Matthew telefoniert im Hintergrund") **vollständig auslöschen**, bevor das Bild gerendert wird:
+
+### 1. Dialog-Stripper killt `[CastActions]`-Bullets (Zeilen 114–149)
+
+Der `stripSpokenDialog`-Helper entfernt unter anderem:
+
+```text
+.replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s*:\s.*$/gmu, "")
+.replace(/^[\p{Lu}][\p{L}\s'\-]{0,40}\s*[:\-—]\s.*$/gmu, "")
+```
+
+Das matcht **exakt** die Zeile aus dem Screenshot:
+
+```text
+- Matthew Dusatko: Matthew is making a phone call in the background.
+```
+
+→ Die Bullet wird komplett gelöscht. Übrig bleibt nur der generische `[SceneAction]`-Satz „Close-up of the struggle of managing multiple platforms and content creation manually." Damit erfährt Nano Banana 2 **nie**, dass Matthew etwas anderes tun soll als Sarah.
+
+### 2. `TWO_SHOT_FRAMING_SUFFIX` erzwingt symmetrische Platzierung (Zeilen 233–238)
+
+Selbst wenn die Action ankäme, würde diese harte Regel sie überstimmen:
+
+```text
+MANDATORY TWO-SHOT FRAMING: a wide N-shot where ALL N characters are fully
+visible in the SAME frame at roughly EQUAL screen share. Each face must be
+unobstructed, front-3/4 to camera, with clear separation between subjects
+(no occlusion, no overlap of heads). NEVER produce a single-character
+close-up […]. Position the subjects left/right or in a slight arc […].
+AVOID: […] background crowd […].
+```
+
+„Equal screen share" + „no background" widerspricht direkt „Matthew im Hintergrund am Telefon". Diese Regel war für Multi-Speaker-Lip-Sync gedacht (alle Gesichter müssen erkennbar sein), schießt aber bei asymmetrischen Szenen über.
 
 ## Plan
-1. **Storyboard-Regeln härten**
-   - In `compose-video-storyboard` die Multi-Character-Regeln von „co-presence optional“ auf „Lip-Sync-safe group scene“ ändern.
-   - Für 2+ sichtbare Charaktere erzwingen: wide/medium group framing, all faces visible, no cropped/hidden/back-only/POV cast slots, clear left-to-right placement, no single-character close-up.
-   - `sceneActionEn` darf nicht mehr nur Sarah/den ersten Charakter beschreiben, sondern muss die gemeinsame Szene beschreiben.
 
-2. **Dialog-/Kamera-Regel ergänzen**
-   - Für jede Multi-Character-Szene muss der Prompt klar sagen: die Charaktere sprechen entweder miteinander oder nacheinander in die Kamera.
-   - `characterShots[].actionEn/actionUser` bekommt pro Charakter eine eigene, sichtbare Aktion inklusive Blick-/Sprechrichtung.
-   - Wenn nur ein Charakter sinnvoll im Fokus steht, darf `characterShots` auch nur diesen einen Charakter enthalten — keine „ghost cast“-Einträge.
+1. **Cast-Action-Bullets vor dem Strippen extrahieren** (`compose-scene-anchor`)
+   - Vor `stripSpokenDialog` einen neuen Helper `extractCastActions(rawPrompt)` einbauen, der den `[CastActions]`-Block parst, alle „- Name: action"-Zeilen einliest und sie als strukturierte Liste `{ name, action }[]` zurückgibt.
+   - Den `[CastActions]`-Block dann **bewusst** aus dem Prompt entfernen (damit die generischen Stripper-Regeln nicht greifen), aber die geparste Liste behalten.
+   - Bestehende Logik für `[Dialog]`-Blöcke und freie Anführungszeichen bleibt unverändert (verhindert weiterhin Burned-in-Captions).
 
-3. **Serverseitige Reparatur ersetzen**
-   - Die aktuelle Floor-Reparatur fügt fehlende Charaktere nachträglich in beliebige Szenen ein, ohne den Prompt wirklich umzubauen. Das erzeugt genau die Screenshots: Cast-Liste enthält mehrere Personen, Prompt beschreibt aber nur Sarah.
-   - Stattdessen: Wenn ein Charakter per Floor hinzugefügt wird, wird auch der Prompt deterministisch zu einer Gruppenszene erweitert: alle Namen, alle Signature Items, klare sichtbare Positionen und eigene Aktionen.
-   - Multi-Charakter-Slots mit ungeeigneten ShotTypes (`pov`, `detail`, `back`, `silhouette`) werden für Lip-Sync-Szenen auf `full`/`profile` normalisiert.
+2. **Cast-Actions als eigene, geschützte Klausel injizieren**
+   - Neuer Block `CHARACTER ACTIONS — each reference person does EXACTLY this in the frame:` mit einer Zeile pro Charakter, wenn `castActions.length > 0`.
+   - Die Klausel wird **nach** `nameClause` und **vor** `TWO_SHOT_FRAMING_SUFFIX` in `editInstruction` eingefügt, mit explizitem Hinweis: „Spatial placement and activity per character override the default symmetric framing below."
 
-4. **Client-Fallback angleichen**
-   - In `BriefingTab.tsx` dieselbe Logik für alte/cached Edge-Function-Antworten ergänzen, damit neue Szenen im UI sofort bereinigt werden.
-   - Keine fremde Aktion mehr kopieren; wenn mehrere Charaktere im Cast sind, wird die allgemeine Szene zu einer gemeinsamen Gruppenszene, nicht zu einem Einzelpersonen-Prompt.
+3. **Two-Shot-Framing kontextabhängig aufweichen**
+   - Wenn `castActions` mindestens einen Charakter mit asymmetrischer Platzierung/Aktivität enthält (Heuristik: Wort-Match auf `background|foreground|phone|standing|walking|leaning|distance|behind|away from|aside`), wird `TWO_SHOT_FRAMING_SUFFIX` durch eine weichere Variante ersetzt:
+     - „All N reference people must be clearly visible and individually recognizable in the same frame. Screen share may be unequal per the character actions above (foreground/background, primary/secondary). Each face must still be unobstructed enough that a face detector can locate N distinct faces."
+   - `TWO_SHOT_NEGATIVE` verliert in diesem Fall die Klauseln „background crowd" und „extra bystander" (die echten Hintergrund-Aktionen würde sie sonst verbieten); „back of head", „face hidden", „occluded" bleiben, damit Lip-Sync weiterhin funktioniert.
+   - `EXACT_COUNT_SUFFIX` (genaue Personenzahl, keine Duplikate, keine Extras) bleibt **unverändert** — das ist orthogonal zur Platzierung.
 
-5. **Finaler Prompt im SceneCard stabilisieren**
-   - `applyActionsToPrompt`/Cast-Injektion so erweitern, dass `[CastActions]` bei mehreren Charakteren nicht als Zusatz über einem Einzelpersonen-Prompt stehen bleibt, sondern eine klare Gruppenszenen-Anweisung ergänzt.
-   - Ziel: Der finale KI-Prompt enthält keine widersprüchliche Struktur wie „Featuring Matthew/Samuel/Kailee: Sarah sits alone…“.
+4. **Cache-Key bumpen**
+   - In Zeile 173 `v13|…` auf `v14|…` erhöhen und `castActions`-Signatur (sortierte `name:action`-Hashes) mit aufnehmen. Sonst liefert der Cache alte symmetrische Frames zurück, obwohl die neue Logik aktiv ist.
 
-## Technische Prüfungen
-- Betroffene Dateien: `supabase/functions/compose-video-storyboard/index.ts`, `src/components/video-composer/BriefingTab.tsx`, wahrscheinlich `src/lib/motion-studio/applyActionsToPrompt.ts` oder `applyCastToPrompt.ts`.
-- Nach Umsetzung: gezielt die Prompt-Erzeugung prüfen, ob bei 2–4 Charakteren alle Namen im Aktionskörper vorkommen, alle Actions eindeutig sind und keine Szene mit Multi-Cast nur einen Charakter beschreibt.
+5. **Logging**
+   - Beim Anwenden der weichen Variante einmal loggen: `[compose-scene-anchor] asymmetric cast actions detected → relaxed two-shot framing (scene=…)` plus die Anzahl extrahierter Cast-Actions. Erleichtert spätere Verifikation in den Edge-Logs.
+
+## Technische Details
+
+**Betroffene Datei:** `supabase/functions/compose-scene-anchor/index.ts` (einzige Änderung).
+
+**Nicht betroffen:**
+- `compose-video-clips` (Hailuo i2v) — bekommt weiterhin den vollen Prompt inkl. `[CastActions]`; die Verbesserung greift, weil der Anchor-Frame jetzt schon Matthew im Hintergrund am Telefon zeigt und i2v die Pose 1:1 übernimmt.
+- Storyboard-Generator, BriefingTab, applyActionsToPrompt — die letzte Iteration bleibt aktiv.
+- Lip-Sync-Pipeline (v69/v76) — `EXACT_COUNT_SUFFIX` + „N distinct faces"-Anforderung bleiben, damit Face-Detection und Per-Speaker-Preclips weiter zuverlässig N Gesichter finden.
+
+**Verifikation nach Implementation:**
+- Neue Szene mit „Matthew telefoniert im Hintergrund" → neuer Anchor-Frame muss Matthew sichtbar hinten am Telefon und Sarah vorne am Laptop zeigen.
+- Edge-Log `[compose-scene-anchor] asymmetric cast actions detected` muss erscheinen.
+- Bestehende symmetrische Szenen (zwei Charaktere am Tisch, beide reden in Kamera) dürfen optisch unverändert sein, weil ihre Cast-Actions kein asymmetrisches Keyword enthalten.
