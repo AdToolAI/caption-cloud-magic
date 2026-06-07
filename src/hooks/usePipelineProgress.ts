@@ -681,6 +681,7 @@ export function usePipelineProgress({
       const id = window.setTimeout(() => {
         if (!phases.some((p) => p.status === 'running')) {
           pipelineStartRef.current = null;
+          clearSnapshot(storageKey);
         }
       }, 5000);
       return () => window.clearTimeout(id);
