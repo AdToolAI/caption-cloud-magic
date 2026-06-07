@@ -247,7 +247,7 @@ Deno.serve(async (req) => {
     const dur = pickBudget(body.durationSeconds).durationSeconds;
     const lang = body.language ?? 'en';
 
-    const cacheKey = await sha1(`${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}`);
+    const cacheKey = await sha1(`v2|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}`);
 
     // 1) Try cache
     const { data: cached } = await supabase
@@ -287,6 +287,10 @@ Deno.serve(async (req) => {
     result.followupSceneSuggestions ??= [];
     result.missingAssets ??= [];
     result.confidence ??= 'medium';
+    result.actionBeat ??= { characterAction: '', environmentMotion: '', motionIntensity: 'subtle' };
+    if (!['static', 'subtle', 'moderate', 'high'].includes(result.actionBeat.motionIntensity)) {
+      result.actionBeat.motionIntensity = 'subtle';
+    }
 
     // Validate matched IDs actually exist in the supplied library
     const validIds = (kind: 'characters' | 'locations' | 'buildings' | 'props') =>
