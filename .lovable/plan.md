@@ -1,38 +1,30 @@
-## Diagnose
-
-Das aktuelle Problem liegt nicht mehr am Bundle oder an den neuen Datenbank-Spalten. Die leeren Felder im Screenshot kommen aus dem normalen KI-Briefing-Flow (`compose-video-storyboard`):
-
-- Die Felder werden im UI aus `scene.sceneActionUser` und `characterShots[].actionUser` gelesen.
-- Diese Werte werden nur vom separaten `SceneDirectorBox` gesetzt.
-- Der KI-Briefing-/Storyboard-Generator erzeugt aktuell aber nur `aiPrompt`, `characterShot(s)`, TextOverlay, Transition usw. — keine `sceneActionUser/En` und keine `actionUser/actionEn` pro Character-Shot.
-- Deshalb bleiben die Felder nach einem neuen Briefing leer, obwohl der Prompt selbst bereits die Action enthält.
+## Ziel
+Die Action-Felder dürfen nicht mehr alle denselben Charakter/Text übernehmen. Das allgemeine Feld soll die Szene insgesamt beschreiben; jedes Charakter-Feld soll nur die Aktion des jeweiligen Charakters enthalten.
 
 ## Plan
+1. **Root Cause im Storyboard-Fallback beheben**
+   - Die aktuelle Fallback-Logik sucht im Prompt nach einem Namen und fällt sonst auf die allgemeine Szene zurück.
+   - Dadurch wird bei mehreren Charakteren dieselbe Aktion (z. B. Sarah) in Matthew/Samuel/Kailee kopiert.
+   - Ich ersetze das durch eine cast-bewusste Logik: Nur wenn der Prompt wirklich eine eigene Klausel für diesen Charakter enthält, wird sie übernommen; sonst wird kein fremder Charaktertext kopiert.
 
-1. **Storyboard Edge Function erweitern**
-   - In `compose-video-storyboard` das Tool-Schema pro Szene um folgende Felder erweitern:
-     - `sceneActionEn`: kurze englische Zusammenfassung dessen, was allgemein in der Szene passiert.
-     - `sceneActionLocalized`: gleiche Aktion in UI-Sprache (`DE/EN/ES`).
-     - `characterShots[].actionEn`: was genau diese Person in der Szene tut, Englisch.
-     - `characterShots[].actionUser`: gleiche Aktion in UI-Sprache.
-   - Den Systemprompt so ergänzen, dass diese Werte aus demselben Inhalt wie `aiPrompt` abgeleitet werden müssen, nicht neu erfunden werden.
+2. **Allgemeines Szenenfeld bereinigen**
+   - `sceneActionEn/User` soll aus dem allgemeinen Szeneninhalt kommen, aber keine Cast-/Character-Beschreibung wie „A professional modern woman…“ übernehmen.
+   - Falls der Prompt mit Cast-/Featuring-Blöcken startet, werden diese vor der Szenen-Zusammenfassung sicher entfernt.
 
-2. **Serverseitige Normalisierung/Fallbacks hinzufügen**
-   - Nach dem AI-Response jedes Scene-Objekt normalisieren:
-     - Wenn `sceneActionEn` fehlt, aus dem `aiPrompt` eine kurze Action-Zeile extrahieren/ableiten.
-     - Wenn `sceneActionLocalized` fehlt, auf `sceneActionEn` zurückfallen.
-     - Für jeden sichtbaren `characterShot` sicherstellen, dass `actionEn/actionUser` existieren.
-     - Bei Charakteren: falls die AI keine separate Aktion liefert, aus dem Prompt rund um den Namen oder aus der allgemeinen Szene eine sinnvolle Kurzaktion erzeugen.
-   - Wichtig: Auch die bestehenden Character-Floor/Cap-Reparaturen müssen beim Hinzufügen neuer Character-Slots direkt `actionEn/actionUser` setzen, sonst würden auto-reparierte Slots wieder leer bleiben.
+3. **Per-Character-Fallbacks korrekt erzeugen**
+   - Für jeden `characterShots[]` Slot wird die Aktion anhand des passenden Charakternamens und der passenden Prompt-Klausel abgeleitet.
+   - Wenn keine klare eigene Aktion vorhanden ist, wird eine neutrale, charakterbezogene Kurzform erzeugt, aber nicht die Aktion eines anderen Charakters kopiert.
+   - Server-Floor-Auto-Reparaturen bekommen dieselbe Logik, damit automatisch eingefügte Charaktere nicht wieder falsche Aktionen erhalten.
 
-3. **Prompt-Marker beim Storyboard-Output direkt setzen**
-   - Beim Mapping in `compose-video-storyboard` die neuen Felder in die zurückgegebenen `ComposerScene`s schreiben:
-     - `sceneActionUser`, `sceneActionEn`
-     - `characterShots` inklusive `actionUser/actionEn`
-   - Optional direkt `applyActionsToPrompt`-äquivalente Marker serverseitig in `aiPrompt` voranstellen oder clientseitig über den vorhandenen SceneCard-Effekt einfügen lassen. Ich würde clientseitig nutzen, weil diese Logik bereits existiert.
+4. **Frontend-Kompatibilität absichern**
+   - Die Client-Fallbacks in `BriefingTab.tsx` werden an dieselbe Regel angepasst, damit alte/cached Edge-Function-Antworten ebenfalls korrigiert werden.
+   - `SceneCard.tsx` bleibt beim Prompt-Injection-Verhalten, schreibt aber nur noch die bereinigten Werte in `[CastActions]`.
 
-4. **Akzeptanz prüfen**
-   - Neues KI-Briefing erzeugt Szenen.
-   - Im Storyboard sind die allgemeinen und pro-Person-Action-Felder sofort befüllt.
-   - Der allgemeine Action-Text stimmt mit dem sichtbaren Prompt-Inhalt überein.
-   - Nach Reload bleiben die Werte erhalten, weil die Persistence dafür bereits vorbereitet ist.
+## Betroffene Dateien
+- `supabase/functions/compose-video-storyboard/index.ts`
+- `src/components/video-composer/BriefingTab.tsx`
+
+## Akzeptanzkriterien
+- Neues KI-Briefing mit mehreren Charakteren füllt nicht mehr alle Charakterfelder mit Sarah/Matthew/etc.
+- Das allgemeine Feld beschreibt die Szene, nicht einen einzelnen Cast-Slot.
+- `[CastActions]` im Prompt enthält pro Charakter unterschiedliche/korrekte Aktionen oder lässt unklare Aktionen weg statt falsche zu kopieren.
