@@ -273,7 +273,8 @@ Deno.serve(async (req) => {
     const dur = pickBudget(body.durationSeconds).durationSeconds;
     const lang = body.language ?? 'en';
 
-    const cacheKey = await sha1(`v2|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}`);
+    const requiredIdsKey = (body.requiredCharacterIds || []).slice().sort().join(',');
+    const cacheKey = await sha1(`v3|${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}|${body.realismPreset || ''}|req:${requiredIdsKey}`);
 
     // 1) Try cache
     const { data: cached } = await supabase
@@ -329,6 +330,72 @@ Deno.serve(async (req) => {
     result.matchedAssets.locationIds = (result.matchedAssets.locationIds || []).filter((id: string) => lIds.has(id));
     result.matchedAssets.buildingIds = (result.matchedAssets.buildingIds || []).filter((id: string) => bIds.has(id));
     result.matchedAssets.propIds = (result.matchedAssets.propIds || []).filter((id: string) => pIds.has(id));
+
+    // 3b) Cast-coverage validator — drop "ghost cast" that's matched but
+    // never named in the action body. Multi-Portrait renderers + Sync.so
+    // face-map collapse if matched character count > visible-face count, so
+    // a 1-face plate with 4 matched IDs is worse than an honest 1-face plate
+    // with 1 matched ID. Also ensure preselected cast IDs survive even if
+    // Gemini "forgot" to return them.
+    {
+      const charLib = body.library?.characters || [];
+      const nameOf = (id: string) => charLib.find((c) => c.id === id)?.name || '';
+      const promptLower = String(result.aiPrompt || '').toLowerCase();
+      // Strip leading "Featuring …:" / "[Cast: …]" / "nName1 and Name2:" header
+      // so the header itself doesn't count as "visible in action body".
+      const body_only = String(result.aiPrompt || '')
+        .replace(/^\s*Featuring\s+[^:]{1,400}:\s*/i, '')
+        .replace(/^\s*\[Cast:[^\]]{1,400}\]\s*/i, '')
+        .replace(/^\s*n[A-Z][A-Za-z .'\-]{1,200}:\s*/, '');
+      const bodyLower = body_only.toLowerCase();
+
+      const isVisible = (id: string): boolean => {
+        const name = nameOf(id).toLowerCase().trim();
+        if (!name) return false;
+        if (bodyLower.includes(name)) return true;
+        const first = name.split(/\s+/)[0];
+        return !!(first && first.length >= 3 && bodyLower.includes(first));
+      };
+
+      // Preserve preselected IDs even if Gemini dropped them — the user
+      // explicitly locked them in the cast picker.
+      const required = new Set(body.requiredCharacterIds || []);
+      const matchedSet = new Set<string>(result.matchedAssets.characterIds);
+      for (const id of required) if (cIds.has(id)) matchedSet.add(id);
+
+      const droppedGhostCast: string[] = [];
+      const keptIds: string[] = [];
+      for (const id of matchedSet) {
+        if (required.has(id)) {
+          // Required IDs stay regardless — they're the user's explicit
+          // intent. Coverage will still be flagged by the client chip.
+          keptIds.push(id);
+        } else if (isVisible(id)) {
+          keptIds.push(id);
+        } else {
+          droppedGhostCast.push(nameOf(id) || id);
+        }
+      }
+      result.matchedAssets.characterIds = keptIds;
+      result.droppedGhostCast = droppedGhostCast;
+      // Surface coverage for the UI chip so it doesn't have to re-derive it.
+      const missingRequired: string[] = [];
+      for (const id of required) {
+        if (cIds.has(id) && !isVisible(id)) missingRequired.push(nameOf(id) || id);
+      }
+      result.castCoverage = {
+        ok: missingRequired.length === 0 && droppedGhostCast.length === 0,
+        missingRequiredNames: missingRequired,
+        droppedGhostCast,
+      };
+      if (missingRequired.length > 0 || droppedGhostCast.length > 0) {
+        console.warn('[scene-director] cast coverage issue', {
+          missingRequired,
+          droppedGhostCast,
+          promptHead: promptLower.slice(0, 200),
+        });
+      }
+    }
 
     result.budget = pickBudget(dur);
 
