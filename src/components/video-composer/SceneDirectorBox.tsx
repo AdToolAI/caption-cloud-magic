@@ -27,6 +27,9 @@ interface SceneDirectorBoxProps {
     dialogScript?: string;
     characterShots?: CharacterShot[];
     actionBeat?: ComposerScene['actionBeat'];
+    sceneActionUser?: string;
+    sceneActionEn?: string;
+    characterActions?: Array<{ characterId: string; actionUser: string; actionEn: string }>;
   }) => void;
   onAddCharacter?: (c: ComposerCharacter) => void;
   onInsertFollowups?: (descriptions: string[]) => void;
