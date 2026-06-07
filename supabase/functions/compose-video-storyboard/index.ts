@@ -75,21 +75,36 @@ function promptActionFallback(prompt: unknown, maxWords = 25): string {
   return cleanActionText(actionClause || firstSentence, maxWords);
 }
 
-function promptCharacterActionFallback(prompt: unknown, characterName: string | undefined, sceneAction: string): string {
+/**
+ * Extract the action of a SPECIFIC character from a scene prompt.
+ *
+ * Cast-aware: only returns a clause if it actually mentions this character
+ * by name. Never copies another character's action and never falls back to
+ * the generic scene action — that would result in every cast slot showing
+ * "Sarah looks out the window" when only Sarah was named in the prompt.
+ *
+ * Returns "" when no character-specific clause can be located; the UI
+ * field then stays empty and the user can fill it manually.
+ */
+function promptCharacterActionFallback(prompt: unknown, characterName: string | undefined): string {
   const body = String(prompt ?? "")
+    .replace(/\[SceneAction\][\s\S]*?\[\/SceneAction\]\s*/gi, "")
+    .replace(/\[CastActions\][\s\S]*?\[\/CastActions\]\s*/gi, "")
     .replace(/^Featuring\s+[^:]{1,500}:\s*/i, "")
     .replace(/,\s*no on-screen text[\s\S]*$/i, "");
   const name = String(characterName ?? "").trim();
-  if (name) {
-    const first = name.split(/\s+/)[0]?.toLowerCase() || "";
-    const clauses = body.split(/[.!?]\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
-    const match = clauses.find((clause) => {
-      const lower = clause.toLowerCase();
-      return lower.includes(name.toLowerCase()) || (first.length >= 3 && lower.includes(first));
-    });
-    if (match) return cleanActionText(match, 12);
-  }
-  return cleanActionText(sceneAction || promptActionFallback(prompt, 12), 12);
+  if (!name) return "";
+  const first = name.split(/\s+/)[0]?.toLowerCase() || "";
+  if (first.length < 3) return "";
+  const lowerBody = body.toLowerCase();
+  if (!lowerBody.includes(name.toLowerCase()) && !lowerBody.includes(first)) return "";
+  const clauses = body.split(/[.!?]\s+|;\s+|,\s+(?=(?:while|as|and|then|with|beside|next to)\b)/i);
+  const match = clauses.find((clause) => {
+    const lower = clause.toLowerCase();
+    return lower.includes(name.toLowerCase()) || lower.includes(first);
+  });
+  if (!match) return "";
+  return cleanActionText(match, 12);
 }
 
 const CATEGORY_STRUCTURES: Record<string, string> = {
@@ -538,7 +553,7 @@ Generate the storyboard using the create_storyboard function.`;
         if (seen.has(finalId)) return;
         seen.add(finalId);
         const character = charByIdForActions.get(finalId);
-        const actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name, sceneActionEn), 12);
+        const actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name), 12);
         const actionUser = cleanActionText(slot.actionUser || actionEn, 12);
         out.push({ characterId: finalId, shotType: slot.shotType, actionEn, actionUser });
       };
@@ -637,7 +652,7 @@ Generate the storyboard using the create_storyboard function.`;
           if (shots.length >= 4) continue; // slot cap
           const shotType = rotation[rotIdx % rotation.length];
           rotIdx++;
-          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name, sc.sceneActionEn || promptActionFallback(sc.aiPrompt, 12));
+          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name);
           shots.push({
             characterId: ch.id,
             shotType,
