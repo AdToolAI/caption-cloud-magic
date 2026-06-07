@@ -24,6 +24,7 @@ interface Props {
   assemblyConfig: AssemblyConfig;
   renderPercent?: number;
   renderRunning?: boolean;
+  projectId?: string;
   className?: string;
 }
 
