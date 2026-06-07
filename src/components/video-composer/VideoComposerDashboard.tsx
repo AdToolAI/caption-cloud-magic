@@ -367,6 +367,8 @@ export default function VideoComposerDashboard() {
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
+            sceneActionUser: ((row as any).scene_action_user as string | null) ?? local?.sceneActionUser ?? '',
+            sceneActionEn: ((row as any).scene_action_en as string | null) ?? local?.sceneActionEn ?? '',
             characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
             characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
               ? ((row as any).character_shots as any)
@@ -510,6 +512,8 @@ export default function VideoComposerDashboard() {
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
+            sceneActionUser: ((row as any).scene_action_user as string | null) ?? local?.sceneActionUser ?? '',
+            sceneActionEn: ((row as any).scene_action_en as string | null) ?? local?.sceneActionEn ?? '',
             characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
             characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
               ? ((row as any).character_shots as any)
