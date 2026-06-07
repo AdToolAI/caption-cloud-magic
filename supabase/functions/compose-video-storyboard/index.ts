@@ -744,6 +744,95 @@ Generate the storyboard using the create_storyboard function.`;
       }
     }
 
+    // 🎭 LIP-SYNC SAFE MULTI-CAST REWRITE — for every scene with 2+ characters,
+    // normalize forbidden shotTypes (back/pov/detail/silhouette → profile),
+    // ensure each character has its OWN action (synthesize a neutral one if
+    // the LLM only wrote a single-character clause), rewrite the generic
+    // sceneActionEn into a group sentence that names every cast member, and
+    // prepend a deterministic group-scene clause to aiPrompt so providers
+    // generate a wide composition with all faces visible and clear dialogue
+    // intent — instead of a hero close-up of one character with a "Featuring
+    // X and Y and Z:" header glued on top.
+    if (hasCharacters && scenes.length > 0) {
+      const charById = new Map<string, any>();
+      for (const c of briefing.characters!) charById.set(c.id, c);
+      const FORBIDDEN_MULTI = new Set(['back', 'pov', 'detail', 'silhouette']);
+      const joinNames = (names: string[]) => {
+        if (names.length <= 1) return names.join('');
+        if (names.length === 2) return `${names[0]} and ${names[1]}`;
+        return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+      };
+      for (const sc of scenes as any[]) {
+        const shots: any[] = Array.isArray(sc.characterShots) ? sc.characterShots : [];
+        const visible = shots.filter((x) => x && x.shotType && x.shotType !== 'absent');
+        if (visible.length < 2) continue;
+
+        // 1) Normalize forbidden shotTypes; first slot is forced to 'full',
+        //    the rest stay 'full' or downgrade to 'profile'.
+        let hasFull = false;
+        visible.forEach((slot, i) => {
+          if (FORBIDDEN_MULTI.has(slot.shotType)) {
+            slot.shotType = i === 0 ? 'full' : 'profile';
+          }
+          if (slot.shotType === 'full') hasFull = true;
+        });
+        if (!hasFull) visible[0].shotType = 'full';
+
+        // 2) Per-character action — never copy another character's clause.
+        const castEntries: Array<{ name: string; signature: string; action: string; slot: any }> = [];
+        for (const slot of visible) {
+          const char = charById.get(slot.characterId);
+          if (!char?.name) continue;
+          const existing = cleanActionText(slot.actionEn, 12);
+          const fromPrompt = cleanActionText(promptCharacterActionFallback(sc.aiPrompt, char.name), 12);
+          const fallbackNeutral = `looks at the others and speaks naturally on camera`;
+          const finalAction = existing || fromPrompt || fallbackNeutral;
+          slot.actionEn = finalAction;
+          slot.actionUser = cleanActionText(slot.actionUser || finalAction, 12);
+          castEntries.push({
+            name: char.name,
+            signature: String(char.signatureItems || '').trim(),
+            action: finalAction,
+            slot,
+          });
+        }
+        if (castEntries.length < 2) continue;
+
+        // 3) Group scene action (overrides the single-character sceneActionEn).
+        const names = castEntries.map((e) => e.name);
+        const groupAction = `${joinNames(names)} share the scene together, each visible to camera with their own action`;
+        sc.sceneActionEn = cleanActionText(groupAction, 25);
+        // Keep the localized field in sync — for non-EN we leave the English
+        // group sentence as a safe default; the UI lets the user edit it.
+        sc.sceneActionUser = cleanActionText(sc.sceneActionUser && sc.sceneActionUser.toLowerCase().includes(names[0].toLowerCase()) && names.every((n) => sc.sceneActionUser.toLowerCase().includes(n.toLowerCase())) ? sc.sceneActionUser : groupAction, 25);
+        // Mirror the primary characterShot to the first visible slot.
+        sc.characterShot = { characterId: visible[0].characterId, shotType: visible[0].shotType };
+
+        // 4) Rewrite aiPrompt: strip any prior "Featuring …:" header and any
+        //    [SceneAction]/[CastActions] marker blocks (we'll let the client
+        //    re-inject them deterministically from the new fields), then
+        //    prepend a deterministic lip-sync-safe group clause that names
+        //    every cast member with their action and locks framing/dialogue.
+        const stripped = String(sc.aiPrompt || '')
+          .replace(/\[SceneAction\][\s\S]*?\[\/SceneAction\]\s*/gi, '')
+          .replace(/\[CastActions\][\s\S]*?\[\/CastActions\]\s*/gi, '')
+          .replace(/^\s*Featuring\s+[^:]{1,500}:\s*/i, '')
+          .trim();
+        const castClauses = castEntries.map((e) => {
+          const sig = e.signature ? ` (${e.signature})` : '';
+          return `${e.name}${sig} ${e.action}`;
+        });
+        const groupClause =
+          `Group scene with ${joinNames(names)} all clearly visible on camera, balanced left-to-right composition, every face fully in frame and unobstructed (no back-shots, no POV, no silhouettes, no occlusion, no single-character close-up). ` +
+          `Each character has a distinct simultaneous action: ${castClauses.join('; ')}. ` +
+          `They are engaged in dialogue — either speaking with one another with eye contact and reactions, or each speaking to camera in clear visible turns — so the mouth movements of every visible character can be lip-synced. `;
+        sc.aiPrompt = appendStyle((groupClause + stripped).trim());
+      }
+    }
+
+
+
+
 
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
