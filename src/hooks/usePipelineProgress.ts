@@ -121,18 +121,6 @@ export function usePipelineProgress({
   assemblyConfig,
   renderPercent = 0,
   renderRunning = false,
-}: UsePipelineProgressArgs) {
-  // ── Per-run baselines ──────────────────────────────────────────────
-  // Captured the moment a phase emits `:start`. They make the bar always
-  // start at 0 %, even if some assets from a previous run already exist
-  // (e.g. 3 of 4 clips ready → user clicks "generieren" → without this we
-  // would resume at 75 %).
-  const baselineRef = useRef<{
-export function usePipelineProgress({
-  scenes,
-  assemblyConfig,
-  renderPercent = 0,
-  renderRunning = false,
   projectId,
 }: UsePipelineProgressArgs) {
   const storageKey = storageKeyFor(projectId);
@@ -160,11 +148,42 @@ export function usePipelineProgress({
   const pipelineStartRef = useRef<number | null>(null);
   const runFloorRef = useRef(0);
 
+  // ── Hydration from sessionStorage ──────────────────────────────────
+  // Restore the visual progress state across unmounts (route change,
+  // device sleep, parent re-mount). Without this, the bar restarts at
+  // 0 % even though the backend render is still mid-flight.
+  const hydratedRef = useRef(false);
+  if (!hydratedRef.current) {
+    hydratedRef.current = true;
+    const snap = readSnapshot(storageKey);
+    if (snap) {
+      pipelineStartRef.current = snap.pipelineStart;
+      runFloorRef.current = snap.runFloor;
+      floorRef.current = snap.floor;
+      startedAtRef.current = snap.startedAt;
+      baselineRef.current = snap.baseline;
+    }
+  }
+
+  // ── Event-driven "start" flags ───────────────────────────────────
+  const [eventFlags, setEventFlags] = useState<Record<PipelinePhaseId, boolean>>({
+    clips: false, voiceover: false, lipsync: false, music: false, export: false,
+  });
+
+  // Snapshot scene/assembly state into refs so the event listener can read
+  // the latest values without re-subscribing (which would lose pending events).
+  const scenesRef = useRef(scenes);
+  const assemblyRef = useRef(assemblyConfig);
+  useEffect(() => { scenesRef.current = scenes; }, [scenes]);
+  useEffect(() => { assemblyRef.current = assemblyConfig; }, [assemblyConfig]);
+
   useEffect(() => {
     return subscribePipelineEvents((e) => {
       const [phase, action] = e.type.split(':') as [PipelinePhaseId, 'start' | 'end'];
       if (action === 'start') {
         if (pipelineStartRef.current === null || phase === 'clips') {
+          // Fresh run — clear any stale persisted snapshot from a previous run.
+          clearSnapshot(storageKey);
           pipelineStartRef.current = Date.now();
           runFloorRef.current = 0;
           floorRef.current = { clips: 0, voiceover: 0, lipsync: 0, music: 0, export: 0 };
