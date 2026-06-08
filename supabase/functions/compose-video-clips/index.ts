@@ -2695,10 +2695,12 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Pika ${pikaResp.status}`,
+                ),
+              )
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2746,11 +2748,7 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                clip_error: msg,
-                updated_at: new Date().toISOString(),
-              })
+              .update(failedClipUpdate(isCinematicSyncHH, msg))
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2838,10 +2836,12 @@ serve(async (req) => {
         console.error(`[compose-video-clips] Scene ${scene.id} error:`, errMsg);
         await supabaseAdmin
           .from("composer_scenes")
-          .update({
-            clip_status: "failed",
-            updated_at: new Date().toISOString(),
-          })
+          .update(
+            failedClipUpdate(
+              (scene.engineOverride ?? "auto") === "cinematic-sync",
+              errMsg,
+            ),
+          )
           .eq("id", scene.id);
         results.push({ sceneId: scene.id, status: "failed", error: errMsg });
       }
