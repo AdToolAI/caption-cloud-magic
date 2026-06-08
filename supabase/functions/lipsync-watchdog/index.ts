@@ -215,6 +215,25 @@ serve(async (req) => {
       ds?.engine === "sync-segments" &&
       Array.isArray(ds?.passes);
 
+    const orphanedPendingNoClip =
+      d.lip_sync_status === "pending" &&
+      !d.twoshot_stage &&
+      !d.clip_url &&
+      !d.lip_sync_applied_at;
+    if (orphanedPendingNoClip && ageMs >= STALE_PREFLIGHT_MS) {
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: null,
+          twoshot_stage: null,
+          clip_error: "watchdog: orphaned_lipsync_pending_no_clip",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", d.id);
+      failed.push({ scene_id: d.id, reason: "orphaned_lipsync_pending_no_clip" });
+      continue;
+    }
+
     // ── (1) v25 Polling fallback: forward terminal Sync.so jobs we missed ──
     if (isV5Fanout && syncApiKey) {
       const renderingPasses = (ds.passes as any[])
