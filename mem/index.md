@@ -20,6 +20,7 @@ Updated: today
 - **Lip-Sync Pipeline FROZEN (≤4 speakers)**: Read `mem://architecture/lipsync/FROZEN-INVARIANTS` before editing `compose-dialog-segments`, `sync-so-webhook`, `compose-video-clips` (neutralTwoShotPrompt / CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE), `_shared/cast-validation.ts` (MAX_SPEAKERS=4), or `StoryboardTab` cast handling. Grep `FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md` for load-bearing sites.
 
 ## Memories
+- [Orphaned Lip-Sync Pending after Clip Fail](mem://architecture/lipsync/orphaned-pending-after-clip-fail) — Cinematic-Sync clip failures clear lip_sync_status/twoshot_stage when no master clip exists; watchdog resets pending+no-clip rows to avoid endless Lip-Sync spinner
 - [Lip-Sync Frozen Invariants (≤4 speakers)](mem://architecture/lipsync/FROZEN-INVARIANTS) — 8 load-bearing rules (v58 multipass, useV41Official gate, v59 sticky markers, locked-camera prompt, no auto-ASD ≥2 speakers, MAX_SPEAKERS=4, safeCharacters, safeLower) with soft-log runtime guards (`INVARIANT_VIOLATION_*`)
 - [Lip-Sync v57 Locked-Plate & Multi-Speaker ASD Guard](mem://architecture/lipsync/v57-locked-plate-and-multispeaker-asd-guard) — Cinematic-Sync master plates hard-block cuts/zoom/shot-changes; sync-so-webhook auto-ASD retry disabled for ≥2 speakers
 - [Lip-Sync v56 Master-Audio Crop](mem://architecture/lipsync/v56-master-audio-crop) — Single master dialog WAV + per-segment audioInput crop; manual ASD first, single-speaker auto-ASD retry
