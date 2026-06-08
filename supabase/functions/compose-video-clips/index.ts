@@ -2136,10 +2136,7 @@ serve(async (req) => {
           } else {
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(failedClipUpdate(false))
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2314,10 +2311,12 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Image generation failed (${imgResp.status})`,
+                ),
+              )
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2623,10 +2622,12 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Runway ${runwayResp.status}`,
+                ),
+              )
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
