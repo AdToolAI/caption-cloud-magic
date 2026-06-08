@@ -43,6 +43,7 @@ interface SceneRow {
   lip_sync_status: string | null;
   lip_sync_applied_at: string | null;
   twoshot_stage: string | null;
+  clip_url: string | null;
   replicate_prediction_id: string | null;
   dialog_shots: any;
   audio_plan: any;
@@ -173,11 +174,12 @@ serve(async (req) => {
   const { data: rows, error } = await supabase
     .from("composer_scenes")
     .select(
-      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
+      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
     )
     .or(
       "lip_sync_status.in.(running,audio_muxing)," +
-      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred))",
+      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred))," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)",
     )
     .is("lip_sync_applied_at", null)
     .limit(200);
@@ -212,6 +214,25 @@ serve(async (req) => {
       ds?.version === 5 &&
       ds?.engine === "sync-segments" &&
       Array.isArray(ds?.passes);
+
+    const orphanedPendingNoClip =
+      d.lip_sync_status === "pending" &&
+      !d.twoshot_stage &&
+      !d.clip_url &&
+      !d.lip_sync_applied_at;
+    if (orphanedPendingNoClip && ageMs >= STALE_PREFLIGHT_MS) {
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: null,
+          twoshot_stage: null,
+          clip_error: "watchdog: orphaned_lipsync_pending_no_clip",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", d.id);
+      failed.push({ scene_id: d.id, reason: "orphaned_lipsync_pending_no_clip" });
+      continue;
+    }
 
     // ── (1) v25 Polling fallback: forward terminal Sync.so jobs we missed ──
     if (isV5Fanout && syncApiKey) {

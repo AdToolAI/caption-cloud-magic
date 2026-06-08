@@ -392,7 +392,7 @@ serve(async (req) => {
       // Get current retry count
       const { data: scene } = await supabase
         .from('composer_scenes')
-        .select('retry_count, clip_source, clip_quality')
+        .select('retry_count, clip_source, clip_quality, engine_override')
         .eq('id', sceneId)
         .single();
 
@@ -469,6 +469,14 @@ serve(async (req) => {
           clip_status: 'failed',
           retry_count: currentRetry + 1,
           clip_error: String(predError ?? '').slice(0, 500) || null,
+          ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
+            ? {
+                lip_sync_status: null,
+                twoshot_stage: null,
+                lip_sync_source_clip_url: null,
+                dialog_shots: null,
+              }
+            : {}),
           updated_at: new Date().toISOString(),
         })
         .eq('id', sceneId);

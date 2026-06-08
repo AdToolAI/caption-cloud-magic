@@ -376,6 +376,23 @@ serve(async (req) => {
       ", motion already in progress from frame one, immediate camera movement, no static opening frame";
     const STYLE_HINT = getVisualStyleHint(visualStyle);
 
+    const failedClipUpdate = (
+      isCinematicSyncScene: boolean,
+      clipError?: string,
+    ): Record<string, unknown> => ({
+      clip_status: "failed",
+      ...(clipError ? { clip_error: clipError.slice(0, 500) } : {}),
+      ...(isCinematicSyncScene
+        ? {
+            lip_sync_status: null,
+            twoshot_stage: null,
+            lip_sync_source_clip_url: null,
+            dialog_shots: null,
+          }
+        : {}),
+      updated_at: new Date().toISOString(),
+    });
+
     // Build a quick character lookup for the safety-net injection
     const charById = new Map<string, ComposerCharacter>();
     (characters || []).forEach((c) => {
@@ -2119,10 +2136,7 @@ serve(async (req) => {
           } else {
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(failedClipUpdate(false))
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2297,10 +2311,12 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Image generation failed (${imgResp.status})`,
+                ),
+              )
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2606,10 +2622,12 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Runway ${runwayResp.status}`,
+                ),
+              )
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2677,10 +2695,12 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Pika ${pikaResp.status}`,
+                ),
+              )
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2728,11 +2748,7 @@ serve(async (req) => {
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                clip_error: msg,
-                updated_at: new Date().toISOString(),
-              })
+              .update(failedClipUpdate(isCinematicSyncHH, msg))
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
@@ -2820,10 +2836,12 @@ serve(async (req) => {
         console.error(`[compose-video-clips] Scene ${scene.id} error:`, errMsg);
         await supabaseAdmin
           .from("composer_scenes")
-          .update({
-            clip_status: "failed",
-            updated_at: new Date().toISOString(),
-          })
+          .update(
+            failedClipUpdate(
+              (scene.engineOverride ?? "auto") === "cinematic-sync",
+              errMsg,
+            ),
+          )
           .eq("id", scene.id);
         results.push({ sceneId: scene.id, status: "failed", error: errMsg });
       }
@@ -2927,6 +2945,10 @@ serve(async (req) => {
         const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         if (adminUrl && adminKey) {
           const admin = createClient(adminUrl, adminKey);
+          const cinematicFailedSceneIds = (__parsedBody?.scenes ?? [])
+            .filter((s) => s?.engineOverride === "cinematic-sync")
+            .map((s) => s?.id)
+            .filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
           await admin
             .from("composer_scenes")
             .update({
@@ -2935,6 +2957,18 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .in("id", failedSceneIds);
+          if (cinematicFailedSceneIds.length > 0) {
+            await admin
+              .from("composer_scenes")
+              .update({
+                lip_sync_status: null,
+                twoshot_stage: null,
+                lip_sync_source_clip_url: null,
+                dialog_shots: null,
+                updated_at: new Date().toISOString(),
+              })
+              .in("id", cinematicFailedSceneIds);
+          }
         }
       }
     } catch (markErr) {

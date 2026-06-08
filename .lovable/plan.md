@@ -1,72 +1,63 @@
-## Root Cause
+## Was ist passiert
 
-In `supabase/functions/compose-scene-anchor/index.ts` passieren zwei Dinge, die per-Charakter-Aktionen (z. B. „Matthew telefoniert im Hintergrund") **vollständig auslöschen**, bevor das Bild gerendert wird:
+Szene **ac7fe4d8** (Szene 1 von Projekt `df044489…`):
 
-### 1. Dialog-Stripper killt `[CastActions]`-Bullets (Zeilen 114–149)
+- `clip_status='failed'`, `clip_url=NULL`, `retry_count=1`
+- `dialog_mode=true`, `lip_sync_status='pending'`, `twoshot_stage=NULL`
+- letzter Update vor ~30 min, kein `clip_error`
 
-Der `stripSpokenDialog`-Helper entfernt unter anderem:
+Der eigentliche Clip-Render (Hailuo/HappyHorse-Plate) ist gescheitert, aber `lip_sync_status` wurde nicht zurückgesetzt. Dadurch:
 
-```text
-.replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s*:\s.*$/gmu, "")
-.replace(/^[\p{Lu}][\p{L}\s'\-]{0,40}\s*[:\-—]\s.*$/gmu, "")
-```
+- Der Pre-Flight-Gate im Auto-Trigger (`useTwoShotAutoTrigger.ts:340`) verwirft die Szene als Kandidat, weil `clip_status !== 'ready'` und weder `clip_url` noch `audio_plan.twoshot.url` da sind → es wird nie etwas dispatched.
+- Der UI-Status (`progressActive` / "Lipsync" Pill) hängt an `lip_sync_status='pending'` → endloser Spinner.
+- Der `lipsync-watchdog` greift hier nicht, weil sein Filter nur `running/audio_muxing` oder `pending+circuit_open/deferred` abdeckt — eine **pending-ohne-Stage-und-ohne-Clip**-Szene ist für ihn unsichtbar.
 
-Das matcht **exakt** die Zeile aus dem Screenshot:
-
-```text
-- Matthew Dusatko: Matthew is making a phone call in the background.
-```
-
-→ Die Bullet wird komplett gelöscht. Übrig bleibt nur der generische `[SceneAction]`-Satz „Close-up of the struggle of managing multiple platforms and content creation manually." Damit erfährt Nano Banana 2 **nie**, dass Matthew etwas anderes tun soll als Sarah.
-
-### 2. `TWO_SHOT_FRAMING_SUFFIX` erzwingt symmetrische Platzierung (Zeilen 233–238)
-
-Selbst wenn die Action ankäme, würde diese harte Regel sie überstimmen:
-
-```text
-MANDATORY TWO-SHOT FRAMING: a wide N-shot where ALL N characters are fully
-visible in the SAME frame at roughly EQUAL screen share. Each face must be
-unobstructed, front-3/4 to camera, with clear separation between subjects
-(no occlusion, no overlap of heads). NEVER produce a single-character
-close-up […]. Position the subjects left/right or in a slight arc […].
-AVOID: […] background crowd […].
-```
-
-„Equal screen share" + „no background" widerspricht direkt „Matthew im Hintergrund am Telefon". Diese Regel war für Multi-Speaker-Lip-Sync gedacht (alle Gesichter müssen erkennbar sein), schießt aber bei asymmetrischen Szenen über.
+Keine offenen Sync.so-Jobs, keine `dialog_dispatch_locks`. Es ist ein reines State-Leak, kein Provider-Hänger.
 
 ## Plan
 
-1. **Cast-Action-Bullets vor dem Strippen extrahieren** (`compose-scene-anchor`)
-   - Vor `stripSpokenDialog` einen neuen Helper `extractCastActions(rawPrompt)` einbauen, der den `[CastActions]`-Block parst, alle „- Name: action"-Zeilen einliest und sie als strukturierte Liste `{ name, action }[]` zurückgibt.
-   - Den `[CastActions]`-Block dann **bewusst** aus dem Prompt entfernen (damit die generischen Stripper-Regeln nicht greifen), aber die geparste Liste behalten.
-   - Bestehende Logik für `[Dialog]`-Blöcke und freie Anführungszeichen bleibt unverändert (verhindert weiterhin Burned-in-Captions).
+### 1. Sofortige Entsperrung der hängenden Szene
+SQL-Migration (idempotent), die alle Szenen mit dem genannten kaputten State sauber zurücksetzt:
 
-2. **Cast-Actions als eigene, geschützte Klausel injizieren**
-   - Neuer Block `CHARACTER ACTIONS — each reference person does EXACTLY this in the frame:` mit einer Zeile pro Charakter, wenn `castActions.length > 0`.
-   - Die Klausel wird **nach** `nameClause` und **vor** `TWO_SHOT_FRAMING_SUFFIX` in `editInstruction` eingefügt, mit explizitem Hinweis: „Spatial placement and activity per character override the default symmetric framing below."
+```sql
+UPDATE composer_scenes
+SET lip_sync_status = NULL,
+    twoshot_stage   = NULL,
+    clip_error      = COALESCE(NULLIF(clip_error,''),
+                               'auto-reset: clip_failed_with_dangling_lipsync_pending'),
+    updated_at      = now()
+WHERE dialog_mode = true
+  AND lip_sync_status = 'pending'
+  AND lip_sync_applied_at IS NULL
+  AND (clip_url IS NULL OR clip_url = '')
+  AND (clip_status IN ('failed','pending') OR clip_status IS NULL)
+  AND updated_at < now() - interval '5 minutes';
+```
 
-3. **Two-Shot-Framing kontextabhängig aufweichen**
-   - Wenn `castActions` mindestens einen Charakter mit asymmetrischer Platzierung/Aktivität enthält (Heuristik: Wort-Match auf `background|foreground|phone|standing|walking|leaning|distance|behind|away from|aside`), wird `TWO_SHOT_FRAMING_SUFFIX` durch eine weichere Variante ersetzt:
-     - „All N reference people must be clearly visible and individually recognizable in the same frame. Screen share may be unequal per the character actions above (foreground/background, primary/secondary). Each face must still be unobstructed enough that a face detector can locate N distinct faces."
-   - `TWO_SHOT_NEGATIVE` verliert in diesem Fall die Klauseln „background crowd" und „extra bystander" (die echten Hintergrund-Aktionen würde sie sonst verbieten); „back of head", „face hidden", „occluded" bleiben, damit Lip-Sync weiterhin funktioniert.
-   - `EXACT_COUNT_SUFFIX` (genaue Personenzahl, keine Duplikate, keine Extras) bleibt **unverändert** — das ist orthogonal zur Platzierung.
+Damit verschwindet der UI-Spinner sofort und der User kann Szene 1 neu generieren.
 
-4. **Cache-Key bumpen**
-   - In Zeile 173 `v13|…` auf `v14|…` erhöhen und `castActions`-Signatur (sortierte `name:action`-Hashes) mit aufnehmen. Sonst liefert der Cache alte symmetrische Frames zurück, obwohl die neue Logik aktiv ist.
+### 2. Root-cause in `compose-video-clips`
+Im per-Szene Error-Handler (beide Stellen bei den `lip_sync_status: "pending"`-Markierungen, Zeile 2149 und 2755): wenn der Clip-Render fehlschlägt **bevor** ein Master-Clip + Audio-Plan existieren, in derselben Transaction `lip_sync_status = NULL`, `twoshot_stage = NULL` mitschreiben. So bleibt nach einem Clip-Fail kein Fake-„Lipsync pending" zurück.
 
-5. **Logging**
-   - Beim Anwenden der weichen Variante einmal loggen: `[compose-scene-anchor] asymmetric cast actions detected → relaxed two-shot framing (scene=…)` plus die Anzahl extrahierter Cast-Actions. Erleichtert spätere Verifikation in den Edge-Logs.
+### 3. Watchdog-Safety-Net in `lipsync-watchdog`
+Filter erweitern um einen dritten OR-Zweig:
 
-## Technische Details
+```
+and(lip_sync_status.eq.pending,
+    twoshot_stage.is.null,
+    clip_url.is.null)
+```
 
-**Betroffene Datei:** `supabase/functions/compose-scene-anchor/index.ts` (einzige Änderung).
+…und im Loop: wenn so ein Row älter als `STALE_PREFLIGHT_MS` (2 min) ist, hart auf `lip_sync_status=NULL` zurücksetzen mit `clip_error='watchdog: orphaned_lipsync_pending_no_clip'`. Kein Credit-Refund nötig (es gab nie einen Sync.so-Job).
 
-**Nicht betroffen:**
-- `compose-video-clips` (Hailuo i2v) — bekommt weiterhin den vollen Prompt inkl. `[CastActions]`; die Verbesserung greift, weil der Anchor-Frame jetzt schon Matthew im Hintergrund am Telefon zeigt und i2v die Pose 1:1 übernimmt.
-- Storyboard-Generator, BriefingTab, applyActionsToPrompt — die letzte Iteration bleibt aktiv.
-- Lip-Sync-Pipeline (v69/v76) — `EXACT_COUNT_SUFFIX` + „N distinct faces"-Anforderung bleiben, damit Face-Detection und Per-Speaker-Preclips weiter zuverlässig N Gesichter finden.
+### 4. Doku
+Kurze Memo-Datei `mem/architecture/lipsync/orphaned-pending-after-clip-fail.md` + Eintrag in `mem/index.md`.
 
-**Verifikation nach Implementation:**
-- Neue Szene mit „Matthew telefoniert im Hintergrund" → neuer Anchor-Frame muss Matthew sichtbar hinten am Telefon und Sarah vorne am Laptop zeigen.
-- Edge-Log `[compose-scene-anchor] asymmetric cast actions detected` muss erscheinen.
-- Bestehende symmetrische Szenen (zwei Charaktere am Tisch, beide reden in Kamera) dürfen optisch unverändert sein, weil ihre Cast-Actions kein asymmetrisches Keyword enthalten.
+## Betroffene Dateien
+- neue Migration unter `supabase/migrations/`
+- `supabase/functions/compose-video-clips/index.ts` (2 Stellen)
+- `supabase/functions/lipsync-watchdog/index.ts` (Filter + neuer Reset-Zweig)
+- `mem/architecture/lipsync/orphaned-pending-after-clip-fail.md` (neu)
+- `mem/index.md`
+
+Keine Änderungen an Sync.so-Logik, Pre-Flight-Gates oder Multi-Speaker-Pipeline.
