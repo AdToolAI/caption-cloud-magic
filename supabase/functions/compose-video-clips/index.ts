@@ -2945,6 +2945,10 @@ serve(async (req) => {
         const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         if (adminUrl && adminKey) {
           const admin = createClient(adminUrl, adminKey);
+          const cinematicFailedSceneIds = (__parsedBody?.scenes ?? [])
+            .filter((s) => s?.engineOverride === "cinematic-sync")
+            .map((s) => s?.id)
+            .filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
           await admin
             .from("composer_scenes")
             .update({
@@ -2953,6 +2957,18 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .in("id", failedSceneIds);
+          if (cinematicFailedSceneIds.length > 0) {
+            await admin
+              .from("composer_scenes")
+              .update({
+                lip_sync_status: null,
+                twoshot_stage: null,
+                lip_sync_source_clip_url: null,
+                dialog_shots: null,
+                updated_at: new Date().toISOString(),
+              })
+              .in("id", cinematicFailedSceneIds);
+          }
         }
       }
     } catch (markErr) {
