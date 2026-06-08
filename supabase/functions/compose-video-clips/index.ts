@@ -376,6 +376,23 @@ serve(async (req) => {
       ", motion already in progress from frame one, immediate camera movement, no static opening frame";
     const STYLE_HINT = getVisualStyleHint(visualStyle);
 
+    const failedClipUpdate = (
+      isCinematicSyncScene: boolean,
+      clipError?: string,
+    ): Record<string, unknown> => ({
+      clip_status: "failed",
+      ...(clipError ? { clip_error: clipError.slice(0, 500) } : {}),
+      ...(isCinematicSyncScene
+        ? {
+            lip_sync_status: null,
+            twoshot_stage: null,
+            lip_sync_source_clip_url: null,
+            dialog_shots: null,
+          }
+        : {}),
+      updated_at: new Date().toISOString(),
+    });
+
     // Build a quick character lookup for the safety-net injection
     const charById = new Map<string, ComposerCharacter>();
     (characters || []).forEach((c) => {
