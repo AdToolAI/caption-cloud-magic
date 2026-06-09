@@ -115,8 +115,60 @@ const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // Order is intentional: try lipsync-2-pro first (better fidelity when it
 // works), then sync-3 BEFORE the auto-* face-swap-risk variants.
 const SYNC3_MODEL = "sync-3";
-const RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
+// v82 (Phase 2.1) — `bbox-url-pro` is the new PRIMARY for multi-speaker
+// dialog when plate-identity is resolved. Uploads a per-frame
+// `bounding_boxes` JSON to the `composer-frames` bucket and points
+// Sync.so at it via `active_speaker_detection.bounding_boxes_url`.
+// Deterministic per-speaker targeting → no more "Lipsync hat keinen
+// Avatar getroffen". Falls through the existing ladder on failure.
+const RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
 type RetryVariant = typeof RETRY_VARIANTS[number];
+
+/**
+ * v82 — Uploads a Sync.so-compliant per-frame bounding_boxes JSON to the
+ * `composer-frames` bucket and returns its public URL. Schema:
+ *   { bounding_boxes: ([x1,y1,x2,y2] | null)[] }   // length === frame count
+ * Per https://sync.so/docs/developer-guides/speaker-selection — preferred
+ * over inline `bounding_boxes` for long / multi-speaker videos (no payload
+ * size limit, no provider-side rejections).
+ */
+async function uploadBoundingBoxesJson(
+  supabase: any,
+  params: {
+    userId: string;
+    projectId: string;
+    sceneId: string;
+    passIdx: number;
+    box: [number, number, number, number];
+    frameCount: number;
+  },
+): Promise<string | null> {
+  try {
+    const sub = params.projectId || "shared";
+    const ts = Date.now();
+    const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
+    const payload = {
+      bounding_boxes: new Array(Math.max(1, params.frameCount)).fill(params.box),
+    };
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    const { error: upErr } = await supabase.storage
+      .from("composer-frames")
+      .upload(path, blob, {
+        contentType: "application/json",
+        upsert: true,
+        cacheControl: "31536000",
+      });
+    if (upErr) {
+      console.warn(`[compose-dialog-segments] bbox-url upload failed: ${upErr.message}`);
+      return null;
+    }
+    const { data: pub } = supabase.storage.from("composer-frames").getPublicUrl(path);
+    return pub?.publicUrl ?? null;
+  } catch (e) {
+    console.warn(`[compose-dialog-segments] bbox-url upload threw: ${(e as Error).message}`);
+    return null;
+  }
+}
 
 // Pricing: Sync.so lipsync-2-pro = 9 credits/s.  ONE pass over the full clip
 // (regardless of speaker count), so cost = ceil(totalSec) * 9 (min 9).
@@ -1460,9 +1512,26 @@ serve(async (req) => {
     // speakers 2 and 3 to stay frozen). The per-pass fallback ladder
     // (coords-pro → auto-pro → auto-standard) is still applied inside
     // sync-so-webhook on actual provider failures for THIS pass only.
+    // v82 (Phase 2.1) — Fresh dispatch prefers `bbox-url-pro` for N>=2
+    // speakers when we have BOTH plateDims and a resolved plate-identity
+    // map. That gives Sync.so a per-frame deterministic target box and
+    // structurally fixes "Lipsync hat keinen Avatar getroffen" on
+    // multi-face plates. Falls back to the legacy coords-pro entry-point
+    // when plate identity is unavailable, when the per-pass preclip is
+    // present (then auto_detect on the 1-face crop is best), or on retry.
+    const havePlateIdentityForDispatch =
+      !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
+    const hasPassPreclipForDispatch = !!(pass as any).preclip_url;
+    const freshDefaultVariant: RetryVariant =
+      speakers.length >= 2 &&
+      !!plateDims &&
+      havePlateIdentityForDispatch &&
+      !hasPassPreclipForDispatch
+        ? "bbox-url-pro"
+        : "coords-pro";
     const retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
-      : "coords-pro";
+      : freshDefaultVariant;
 
     const diagnosticId = `${sceneId}:${currentPassIdx + 1}:${retryVariant}:${crypto.randomUUID()}`;
     pass.retry_variant = retryVariant;
@@ -1800,10 +1869,11 @@ serve(async (req) => {
         frame_number: referenceFrameNumber,
         coordinates: clampSyncCoords(pass.coords),
       };
-    } else if (retryVariant === "coords-pro-box") {
-      // v31 — Prefer the REAL face bounding box from the resolved faceMap
-      // (anchor-space) and rescale to plate-space. Falls back to a synthetic
-      // box around `pass.coords` only when no faceMap match exists.
+    } else if (retryVariant === "coords-pro-box" || retryVariant === "bbox-url-pro") {
+      // v31 / v82 — Build the same plate-space face box from faceMap; for
+      // `bbox-url-pro` we upload it as a per-frame JSON and hand Sync.so
+      // a `bounding_boxes_url` (preferred for multi-speaker / long clips);
+      // for the legacy `coords-pro-box` we inline `bounding_boxes`.
       const dims = plateDims ?? videoDims;
       let box: [number, number, number, number] | null = null;
       let bboxSource = "synthetic";
@@ -1847,14 +1917,40 @@ serve(async (req) => {
         box = [x1, y1, x2, y2];
       }
       const frameCount = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
-      const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
-      syncOptions.active_speaker_detection = {
-        auto_detect: false,
-        bounding_boxes: boundingBoxes,
-      };
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount}`,
-      );
+
+      let usedUrl: string | null = null;
+      if (retryVariant === "bbox-url-pro") {
+        usedUrl = await uploadBoundingBoxesJson(supabase, {
+          userId,
+          projectId: String((scene as any).project_id ?? ""),
+          sceneId,
+          passIdx: currentPassIdx,
+          box,
+          frameCount,
+        });
+      }
+
+      if (usedUrl) {
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          bounding_boxes_url: usedUrl,
+        };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} url=…${usedUrl.slice(-60)}`,
+        );
+      } else {
+        // graceful degrade — inline bounding_boxes (legacy coords-pro-box path)
+        const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          bounding_boxes: boundingBoxes,
+        };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-bbox-fallback)" : ""}`,
+        );
+      }
+
+
 
     } else {
       syncOptions.active_speaker_detection = { auto_detect: true };

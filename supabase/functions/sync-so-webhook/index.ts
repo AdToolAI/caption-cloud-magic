@@ -69,7 +69,10 @@ const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 // AFTER sync-3 attempts exhaust (sync-3 is the new default for N>=2, but
 // we keep the historically-stable lipsync-2-pro chained path as last
 // resort instead of refunding).
-const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "coords-pro-lp2pro", "auto-pro", "auto-standard"] as const;
+// v82 (Phase 2.1) — `bbox-url-pro` (Sync.so `bounding_boxes_url`) is now
+// PRIMARY for multi-speaker dialog. On failure we step down to the
+// inline-bbox `coords-pro-box`, then the rest of the legacy ladder.
+const V5_RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-coords", "coords-pro-lp2pro", "auto-pro", "auto-standard"] as const;
 
 function nextV5RetryVariant(current: unknown) {
   const idx = V5_RETRY_VARIANTS.indexOf(current as any);
