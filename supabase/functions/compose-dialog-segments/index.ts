@@ -278,7 +278,7 @@ interface PassState {
   preclip_crop?: { x: number; y: number; size: number; outputSize: number };
   preclip_error?: string;
   audio_url_full?: string;
-  audio_tight?: { url: string; dur_sec: number; windows_secs: Array<[number, number]> };
+  audio_tight?: { url: string; dur_sec: number; windows_secs: Array<[number, number]>; output_offsets_sec?: number[] };
 }
 
 interface SegmentsState {
