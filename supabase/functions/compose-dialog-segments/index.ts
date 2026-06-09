@@ -1915,14 +1915,30 @@ serve(async (req) => {
         if (!pub?.publicUrl) throw new Error("publicUrl missing");
         (pass as any).audio_url_full = pass.audio_url;
         pass.audio_url = pub.publicUrl;
+        // v90 — per-turn offsets inside the tight WAV. Mirrors sliceWavToWindows
+        // layout: each window is concatenated in sorted order, separated by
+        // gapSec (0.05s) of silence. Used by the mux to set sourceStartSec so
+        // turn N plays its own slice of the Sync.so output instead of always
+        // restarting at output-t=0 (which would replay turn-1 lips for turn-2).
+        const GAP_SEC = 0.05;
+        const sortedWindows = [...speakerWindowsSecs].sort((a, b) => a[0] - b[0]);
+        const outputOffsetsSec: number[] = [];
+        let cursor = 0;
+        for (let i = 0; i < sortedWindows.length; i++) {
+          outputOffsetsSec.push(Number(cursor.toFixed(3)));
+          const [s, e] = sortedWindows[i];
+          cursor += Math.max(0, e - s);
+          if (i < sortedWindows.length - 1) cursor += GAP_SEC;
+        }
         (pass as any).audio_tight = {
           url: pub.publicUrl,
           dur_sec: Number(sliced.durSec.toFixed(3)),
           windows_secs: speakerWindowsSecs,
+          output_offsets_sec: outputOffsetsSec,
         };
         tightAudioInfo = { url: pub.publicUrl, durSec: sliced.durSec };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight_audio dur=${sliced.durSec.toFixed(2)}s windows=${JSON.stringify(speakerWindowsSecs)} url=${pub.publicUrl.slice(0, 80)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v90_tight_audio dur=${sliced.durSec.toFixed(2)}s windows=${JSON.stringify(speakerWindowsSecs)} offsets=${JSON.stringify(outputOffsetsSec)} url=${pub.publicUrl.slice(0, 80)}`,
         );
       } catch (sliceErr) {
         console.warn(
