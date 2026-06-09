@@ -34,6 +34,10 @@ const corsHeaders = {
 const STALE_PROVIDER_MS = 10 * 60_000;   // Sync.so jobs in flight w/o update
 const STALE_PREFLIGHT_MS = 4 * 60_000;   // running but never produced a provider job
 const STALE_HARD_MS = 20 * 60_000;       // safety cap regardless of state
+// Plan v71: `pending + master_clip + clip_url + audio_plan` with NO dispatch yet
+// means compose-dialog-segments was never called (lost client invoke / 202 race).
+// Re-dispatch once after 3 min before the failure path kicks in at 4 min.
+const STALE_DISPATCH_RECOVERY_MS = 3 * 60_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
@@ -178,7 +182,7 @@ serve(async (req) => {
     )
     .or(
       "lip_sync_status.in.(running,audio_muxing)," +
-      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred))," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred,master_clip))," +
       "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)",
     )
     .is("lip_sync_applied_at", null)
