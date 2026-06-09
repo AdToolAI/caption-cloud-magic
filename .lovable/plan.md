@@ -1,57 +1,60 @@
-## Ursache (nicht durch die letzten Änderungen, älterer Bug — wird aber jetzt sichtbar weil 4 Speaker)
 
-**Es liegt NICHT an unseren Dialog-Pipeline-Änderungen vom letzten Loop** (v85 Gate / cancel-project / SceneDirector-Lock). Der Bug sitzt eine Schicht tiefer in `compose-twoshot-audio` und erklärt exakt das Symptom „funktioniert manchmal, manchmal nicht":
+## Ursache (verifiziert in den Edge-Logs der gerade fehlgeschlagenen Szene)
 
-In `supabase/functions/compose-twoshot-audio/index.ts` (Zeile ~671) werden die einzelnen Skript-Zeilen pro Speaker so gruppiert:
+Pass 1 lief in `compose-dialog-segments`, BEVOR der Gemini-Anchor-Faces-Probe gecached war:
 
-```ts
-const key = String(seg.character_id || seg.speaker_slug || seg.speaker).toLowerCase();
+```
+faceMap=none faces=0 ... coords=[[154,514],[307,514],[461,514],[614,514]] sources=[heuristic]
 ```
 
-Bedeutet: wenn zwei Cast-Member in derselben Szene **keine character_id im Skript-Block tragen** (z.B. weil das Dialog-Skript nur per Namen taggt) und sie **denselben Namen-Slug** haben — oder wenn beim Skript-Parsing ein Charakter ohne character_id durchrutscht und auf den Slug eines anderen Charakters mappt — werden ihre Turns in **einer Gruppe** zusammengefasst.
+Das sind nicht echte Face-Coords, sondern der „Final safety fallback" (Z. 950–960):
 
-Folge in deinem 4er-Cast:
-- `speakerTracks.length` wird nur 3 statt 4 → es entstehen nur 3 Sync.so-Passes.
-- Die Turns von Char 4 landen physisch auf der Audio-Spur von Char 1 → Char 1 bekommt zwei Lipsync-Pässe (eigene Zeile + Char 4s Zeile) → **„Char 1 spricht zweimal"**.
-- Für Char 4 wird nie ein Pass dispatched → **„Char 4 hat die Lippen zu"**.
+```ts
+speakerCoords[i] = [ width * t, height * 0.5 ];   // y = 514 auf 1028 px Plate
+```
 
-Warum manchmal ok, manchmal kaputt:
-- Sobald jeder Block sauber `character_id` mitliefert (Scene Director / Cast-Auswahl korrekt verdrahtet), greift die `character_id`-Branch des Keys → 4 Gruppen, 4 Pässe, alles richtig.
-- Wenn die character_id für eine Zeile fehlt (Free-Text-Edit im Aktionsfeld, manuelle Skript-Bearbeitung, Storyboard-Import ohne IDs), fällt der Key auf `speaker_slug` zurück → Kollision.
+Auf einer Portrait-Plate (Köpfe sitzen bei y≈300) zeigt y=514 mitten auf Brust/Bauch — kein Gesicht da → Sync.so animiert nichts → **alle Münder zu**.
 
-`validateCast()` in `compose-dialog-segments` läuft **vor** dieser Gruppierung gegen `twoshot.speakers`, sieht also nur 3 Gruppen und akzeptiert sie als gültigen 3er-Cast — daher kein Fehler, sondern stiller Speaker-Drop.
+Pass 2–4 liefen dann via `isAdvance`-Webhook. Inzwischen war `faceMap=anchor/cache` mit korrekten Coords `[482,308] [295,309] [641,344] [161,325]` vorhanden — aber die Advance-Branch (Z. 1485–1503) klont nur `prevState.passes` und überschreibt `pass.coords` NIE mit den frisch berechneten `speakerCoords`. Die fehlerhaften Heuristik-Coords aus Pass 1 wurden also durch alle 4 Pässe geschleift.
 
-## Plan
+Das ist eine ältere Race-Condition, die durch das Multi-Speaker-Setup jetzt zuverlässig getriggert wird. v86 ist nicht beteiligt — die neuen Guards feuern korrekt nicht.
 
-### 1. `compose-twoshot-audio` — Speaker-Identität härten
-**Datei:** `supabase/functions/compose-twoshot-audio/index.ts`
+## Plan (Datei: `supabase/functions/compose-dialog-segments/index.ts`, keine UI-Änderung)
 
-- Beim Block-Parsing (~L218) für jeden Block **zuerst** versuchen, die `character_id` aus `mentioned_character_ids` / `cast` / `dialog_voices` per Namens-Match aufzulösen, BEVOR der Block in `segments` geschoben wird. Resultat: jeder `seg.character_id` ist gesetzt, wenn ein Cast-Member existiert.
-- Group-Key (~L671) hart auf `character_id` stellen, wenn vorhanden. Fallback auf `speaker_slug + index` (nicht nur slug) — so kollidieren zwei namenlose Charaktere nicht mehr.
-- **Hard-Guard:** nach `groups`-Aufbau prüfen `speakerTracks.length === cast.length` (bzw. Anzahl distinct Cast-Member im Skript). Bei Mismatch: 400-Response mit `error: 'speaker_dedup_collision'` und Liste der kollidierenden Speaker — kein stiller Drop, kein Wallet-Debit.
+### 1. Heuristik-Fallback ist kein gültiges Dispatch-Ziel mehr
+- Nach dem `speakerCoords`-Aufbau ein neues Flag setzen: `coordsAreHeuristicOnly = coordSources.every(s => s === "none" || s === "heuristic")`.
+- Wenn `!isAdvance && !isRetry && speakers.length >= 2 && coordsAreHeuristicOnly`: KEIN Dispatch. Stattdessen Wallet-Refund + Scene auf `lip_sync_status='pending'` (NICHT `failed`) + `clip_error='awaiting_face_detection_retry'`. Auto-Trigger bzw. `useTwoShotAutoTrigger` greift im nächsten Tick neu, sobald Gemini-Anchor-Faces gecached sind.
+- Erst nach >3 aufeinanderfolgenden „awaiting"-Zyklen (`scene.meta.face_detect_retry_count >= 3`) hart auf `failed` mit `clip_error='no_face_map_after_3_retries'`. Verhindert Endlos-Loop ohne Geld zu verlieren.
 
-### 2. `compose-dialog-segments` — defensive Pass-Validation
-**Datei:** `supabase/functions/compose-dialog-segments/index.ts` (~L1016 `passSpeakers`)
+### 2. Advance-Branch refreshed Coords statt sie zu zementieren
+- In der `isAdvance`-Branch (Z. 1485–1503): nachdem `passes = prevState.passes.map(...)`, für jeden Pass `pass.coords` mit `speakerCoords[pass.speaker_idx]` überschreiben — **außer** `coordSources[pass.speaker_idx]` ist `none`/`heuristic` UND die alten Coords sind „besser" (nicht-heuristisch). Konkret:
+  - Wenn frische Coords aus `plate-identity`/`plate-slot-fallback`/`identity` kommen → immer übernehmen.
+  - Wenn frische Coords aus `heuristic`/`none` kommen → alte behalten.
+- Selbe Refresh-Logik für die `isRetry`-Branch (Z. 1504–1510).
+- Logzeile `[compose-dialog-segments] scene=… ADVANCE COORDS REFRESH pass=N old=… new=… source=…` für Sichtbarkeit.
 
-- Vor Pass-Build: prüfen `passSpeakers.length === speakers.length` UND `passSpeakers.length === distinct(speakers.character_id).length`. Bei Mismatch → Refund + Scene auf `failed` mit `clip_error: 'speaker_count_mismatch'` statt teilweise zu rendern.
-- Telemetry: speaker_count, pass_count, character_ids als JSON in `composer_scenes.meta.dialog_diagnostics` schreiben (für künftige Debug-Sessions).
+### 3. Sanity-Guard direkt vor jedem `startSyncTurnJob`/Dispatch
+Defensive zweite Linie, falls (1) oder (2) jemals umgangen werden:
+- Wenn `coordSources[pass.speaker_idx] === 'heuristic'` AND `speakers.length >= 2` → kein Dispatch, sondern `prepareShotRetry('coords_heuristic_unverified')` (Auto-Retry, kein Geld weg).
 
-### 3. UI — fehlende character_id sichtbar machen
-**Datei:** `src/components/video-composer/SceneDirectorBox.tsx` + DialogScript-Editor
+### 4. Klein-Telemetry
+- `composer_scenes.meta.face_detect_retry_count` incrementieren beim awaiting-Refund, auf 0 zurücksetzen bei erfolgreichem Dispatch mit nicht-heuristischen Coords.
+- Ein `syncso_dispatch_log`-Row mit `sync_status='HEURISTIC_BLOCKED'` + `error_class='coords_heuristic_unverified'` (über bestehende `logSyncDispatch`-Helper aus `_shared/syncso-preflight.ts`).
 
-- Wenn `dialogScript` Zeilen enthält, deren Speaker-Name in keinem zugewiesenen Cast-Member auflöst, gelber Warn-Toast: „Speaker ‚X' ist keinem Cast zugeordnet — bitte Charakter wählen". Verhindert, dass der User einen Render mit defektem Cast startet.
-
-### 4. Memory
-- Neue Memory-Datei `mem://architecture/lipsync/v86-speaker-dedup-collision-fix.md` mit der Root-Cause + Group-Key-Regel.
+### 5. Memory
+- Neue Datei `mem://architecture/lipsync/v87-coords-refresh-and-heuristic-block.md` mit Root-Cause + Refresh-Regel.
 - Index-Eintrag.
 
 ## Out of scope
-- Keine Sync.so-Pipeline-Änderungen (v85 Gate bleibt, Pro-Modell bleibt).
-- Kein Refactor von Plate-Face-Detection — die funktioniert, das Problem ist davor.
-- Keine UI-Änderung am Aktionsfeld / Lock-Logik (die ist fertig).
+- Keine Änderungen an v86 Speaker-Dedup-Logik — die ist korrekt und greift hier nicht.
+- Keine Sync.so-Ladder/`coords-pro`/`bbox-url-pro`-Änderungen.
+- Keine Änderungen an `compose-twoshot-audio`.
+- Keine UI-Änderungen.
+- Keine Plate-Identity-Refactor (`resolvePlateFaceIdentities`) — die Funktion bleibt wie sie ist; wir tolerieren ihr Fehlen jetzt nur sauber (refund + retry statt blinder Heuristik).
 
 ## Test-Matrix
-1. 4er-Cast mit eindeutigen Namen + character_id → 4 Pässe, alle Lippen bewegen sich. ✅ (das ist der bisherige glückliche Fall)
-2. 4er-Cast, zwei mit identischem Vornamen, beide haben character_id → 4 Pässe (Group-Key = character_id). ✅
-3. 4er-Cast, eine Zeile ohne character_id im Skript → **alter Pfad:** 3 Pässe + Char-Drop. **neuer Pfad:** 400 `speaker_dedup_collision`, kein Spend, klare Fehlermeldung im Toast.
-4. 2er-Cast einfacher Dialog → unverändert, 2 Pässe.
+1. Frischer 4-Speaker-Dialog, Anchor-Faces noch nicht gecached → erster Aufruf gibt 200 + `awaiting_face_detection_retry`, Wallet unverändert, Szene bleibt `pending`. Auto-Trigger feuert erneut → dispatched mit echten Coords. ✅
+2. 4-Speaker-Dialog, Anchor-Faces vorhanden, aber Plate-Identity off → identity/anchor-rescale-Coords werden verwendet, Dispatch läuft, Lippen bewegen sich (Soft-Pass-Pfad bleibt aktiv). ✅
+3. 2-Speaker-Dialog, faceMap none → blockt + retry, kein y=360-Heuristik-Dispatch mehr. ✅
+4. Advance-Branch: Pass 1 lief mit identity-Coords [482,308], dann läuft Plate-Identity später erfolgreich → Pass 2 wird mit aktualisierten plate-identity-Coords dispatched. ✅
+5. 3+ verzögertes Probing schlägt 3× hintereinander fehl → Szene wird auf `failed` mit klarer Fehlermeldung gesetzt, statt unendlich zu pending. ✅
