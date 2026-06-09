@@ -20,6 +20,11 @@ import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useContinuityDrift, driftSeverity } from '@/hooks/useContinuityDrift';
 import ContinuityHistoryDrawer from './ContinuityHistoryDrawer';
 import type { ComposerScene } from '@/types/video-composer';
+import {
+  runCinematicContinuityRules,
+  RULE_LABELS,
+  type ContinuityWarning,
+} from '@/lib/shotDirector/cinematicContinuityRules';
 
 interface ContinuityGuardianStripProps {
   scenes: ComposerScene[];
@@ -443,6 +448,17 @@ export default function ContinuityGuardianStrip({
             onCheck={() => checkPair(p)}
             onRepair={() => repairPair(p)}
             onToggleLock={() => toggleLock(p.prev)}
+            cinematicWarnings={runCinematicContinuityRules(p.prev, p.next)}
+            onApplyPatch={(patch) => {
+              onUpdateScenes(
+                scenes.map((s) =>
+                  s.id === p.next.id
+                    ? { ...s, shotDirector: { ...(s.shotDirector ?? {}), ...patch } }
+                    : s,
+                ),
+              );
+              toast.success('Shot Director angepasst');
+            }}
           />
         ))}
       </div>
@@ -463,6 +479,8 @@ function CutChip({
   onCheck,
   onRepair,
   onToggleLock,
+  cinematicWarnings = [],
+  onApplyPatch,
 }: {
   index: number;
   pair: PairState;
@@ -470,6 +488,8 @@ function CutChip({
   onCheck: () => void;
   onRepair: () => void;
   onToggleLock: () => void;
+  cinematicWarnings?: ContinuityWarning[];
+  onApplyPatch?: (patch: import('@/config/shotDirector').ShotSelection) => void;
 }) {
   const score = pair.next.continuityDriftScore ?? null;
   const label = pair.next.continuityDriftLabel ?? '';
@@ -514,6 +534,27 @@ function CutChip({
       {label && (
         <div className="text-[10px] text-muted-foreground line-clamp-2 leading-tight mb-2">
           {label}
+        </div>
+      )}
+      {cinematicWarnings.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {cinematicWarnings.map((w, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => w.suggestedPatch && onApplyPatch?.(w.suggestedPatch as any)}
+              title={w.message}
+              className={cn(
+                'rounded px-1.5 py-0.5 text-[9px] font-medium transition',
+                w.severity === 'info'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25',
+              )}
+            >
+              {RULE_LABELS[w.rule].en}
+              {w.suggestedPatch && w.severity !== 'info' ? ' ⚡' : ''}
+            </button>
+          ))}
         </div>
       )}
       <div className="flex gap-1">

@@ -28,11 +28,16 @@
 // Provider-specific re-formatting lives in `providerPromptFormats.ts`.
 
 import type { AudioPlan, AudioPlanSpeaker } from '@/types/video-composer';
+import type { ShotSelection } from '@/config/shotDirector';
 import {
   composePromptLayers,
   type ComposerInputs,
   type ComposerResult,
 } from './composePromptLayers';
+import {
+  buildPerTurnShotBlock,
+  hasPerTurnOverrides,
+} from '@/lib/shotDirector/buildPerTurnShotBlock';
 
 export type DirectorLanguage = 'de' | 'en' | 'es';
 
@@ -42,6 +47,12 @@ export interface ComposeFinalPromptInputs extends ComposerInputs {
   /** Optional sound design notes (Phase 5+). */
   sfxNotes?: string;
   ambientNotes?: string;
+  /**
+   * Phase 3.1 pre-lock overlay — per-line Shot Director overrides keyed by
+   * `${characterId}-${idx}`. Applied when an AudioPlanSpeaker has no own
+   * `shotDirector`. Ignored once the speaker entry carries the override.
+   */
+  dialogShotOverrides?: Record<string, Partial<ShotSelection>>;
 }
 
 export interface ComposeFinalPromptResult extends ComposerResult {
@@ -169,6 +180,13 @@ export function composeFinalPrompt(
 
   if (audioPlanText) {
     lines.push(`[5 DIALOG]\n${audioPlanText}`);
+  }
+
+  // [6 DIALOG SHOTS] — Phase 3.1 per-turn Shot Director overrides. Only
+  // emitted when at least one speaker carries an override; pure additive.
+  if (hasPerTurnOverrides(inputs.audioPlan, inputs.dialogShotOverrides)) {
+    const perTurn = buildPerTurnShotBlock(inputs.audioPlan, inputs.dialogShotOverrides);
+    if (perTurn) lines.push(`[6 DIALOG SHOTS]\n${perTurn}`);
   }
 
   if (inputs.sfxNotes?.trim()) {
