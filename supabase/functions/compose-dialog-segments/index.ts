@@ -1026,9 +1026,12 @@ serve(async (req) => {
       (s) => !s || s === "none" || s === "heuristic",
     );
     if (coordsAreHeuristicOnly && !isAdvance && !isRetry) {
-      const prevRetryCount = Number(
-        ((scene as any)?.meta as any)?.face_detect_retry_count ?? 0,
-      );
+      // Retry counter is persisted inside dialog_shots — composer_scenes has
+      // no `meta` column (PostgREST validates select/update keys, so any
+      // reference to a missing column hard-fails the request with a 404
+      // scene_not_found that masked the real bug for weeks).
+      const existingDs = (scene as any)?.dialog_shots ?? {};
+      const prevRetryCount = Number(existingDs?.face_detect_retry_count ?? 0);
       const nextRetryCount = prevRetryCount + 1;
       const giveUp = nextRetryCount >= 3;
 
@@ -1043,7 +1046,6 @@ serve(async (req) => {
         })
         .eq("user_id", userId);
 
-      const prevMeta = ((scene as any)?.meta ?? {}) as Record<string, unknown>;
       await supabase
         .from("composer_scenes")
         .update(
@@ -1053,13 +1055,13 @@ serve(async (req) => {
                 twoshot_stage: "failed",
                 clip_error:
                   "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
-                meta: { ...prevMeta, face_detect_retry_count: 0 },
+                dialog_shots: { ...existingDs, face_detect_retry_count: 0 },
               }
             : {
                 lip_sync_status: "pending",
                 twoshot_stage: "pending",
                 clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
-                meta: { ...prevMeta, face_detect_retry_count: nextRetryCount },
+                dialog_shots: { ...existingDs, face_detect_retry_count: nextRetryCount },
               },
         )
         .eq("id", sceneId);
