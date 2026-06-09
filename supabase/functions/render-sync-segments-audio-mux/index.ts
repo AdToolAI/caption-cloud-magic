@@ -204,8 +204,13 @@ serve(async (req) => {
     // window. Do not stretch any speaker overlay to scene end.
     // v90: asymmetric pad — generous onset, tight tail — so lips don't
     // twitch after the script ends.
+    // v91: short turns (<0.6s raw) get a relaxed 0.08s tail to match the
+    // dynamic-floor in compose-dialog-segments and stay aligned with the
+    // Sync.so output window for that turn.
     const SHOT_PAD_START = 0.06;
-    const SHOT_PAD_END = 0.02;
+    const SHOT_PAD_END_TIGHT = 0.02;
+    const SHOT_PAD_END_SHORT = 0.08;
+    const SHORT_TURN_THRESHOLD_SEC = 0.6;
 
     const fanoutShots = useOverlay
       ? donePasses.flatMap((p: any) => {
@@ -258,8 +263,10 @@ serve(async (req) => {
           );
           return sortedSegs
             .map((t: any, i: number) => {
+              const rawDur = Math.max(0, Number(t.endTime) - Number(t.startTime));
+              const tailPad = rawDur < SHORT_TURN_THRESHOLD_SEC ? SHOT_PAD_END_SHORT : SHOT_PAD_END_TIGHT;
               const s = Math.max(0, Number(t.startTime) - SHOT_PAD_START);
-              const e = Math.min(totalSec, Number(t.endTime) + SHOT_PAD_END);
+              const e = Math.min(totalSec, Number(t.endTime) + tailPad);
               if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s + 0.05) return null;
               const sourceStartSec =
                 sourceTiming === "relative" && Number.isFinite(outputOffsets[i])

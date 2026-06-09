@@ -42,6 +42,7 @@ Updated: today
 - [Syncso Preflight Stage B+C](mem://architecture/lipsync/syncso-preflight-stage-b-c) — shared preflight + telemetry
 - [Syncso Face-Gate Stage D](mem://architecture/lipsync/syncso-face-gate-stage-d) — validate-frame-face + frame_face_cache
 - [Webhook + 8min Watchdog](mem://architecture/lipsync/sync-so-webhook-stage5) — sync-so-webhook + watchdog
+- [v91 Short-Turn Tail Floor](mem://architecture/lipsync/v91-short-turn-tail-floor-and-faster-recovery) — dynamic 0.08s tail-pad floor für turns <0.6s verhindert provider_unknown_error bei Speaker 3/4; watchdog recovery 3min → 90s
 - [v89 TTS Tail Trim + Overflow Extend](mem://architecture/lipsync/v89-tts-tail-trim-and-overflow-extend) — ElevenLabs with-timestamps cap + scene-extend statt Hard-Trim
 - [v87 Coords Refresh + Heuristic Block](mem://architecture/lipsync/v87-coords-refresh-and-heuristic-block) — compose-dialog-segments refuses multi-speaker dispatch on centre-grid heuristic coords; isAdvance refreshes pass.coords from freshly-resolved speakerCoords; 3-retry awaiting cycle
 - [v88 Edge-Speaker Preclip Skip](mem://architecture/lipsync/v88-edge-speaker-preclip-skip) — Edge speakers (xFrac<0.25 / >0.75 or yFrac<0.15 / >0.85) skip the 512x512 single-face preclip and dispatch via bbox-url-pro on the full plate; fixes closed-mouth output on 4-speaker scenes where Sync.so auto_detect fails on edge-cropped frames

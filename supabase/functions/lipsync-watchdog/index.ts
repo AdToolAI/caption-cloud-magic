@@ -36,8 +36,9 @@ const STALE_PREFLIGHT_MS = 4 * 60_000;   // running but never produced a provide
 const STALE_HARD_MS = 20 * 60_000;       // safety cap regardless of state
 // Plan v71: `pending + master_clip + clip_url + audio_plan` with NO dispatch yet
 // means compose-dialog-segments was never called (lost client invoke / 202 race).
-// Re-dispatch once after 3 min before the failure path kicks in at 4 min.
-const STALE_DISPATCH_RECOVERY_MS = 3 * 60_000;
+// v91: tightened 3min → 90s. Sync.so normal render is 25-45s; 90s = 2x safety
+// envelope. Cuts perceived stall time by ~50% when a pass quietly drops.
+const STALE_DISPATCH_RECOVERY_MS = 90_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 

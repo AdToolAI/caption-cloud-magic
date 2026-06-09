@@ -1868,12 +1868,19 @@ serve(async (req) => {
     // turns; each becomes its own [start, end] entry inside segments_secs).
     // v90: asymmetric padding — 0.08s onset (consonant safety) but only
     // 0.02s on the tail to prevent lips from twitching after the script ends.
+    // v91: dynamic tail floor — short turns (< 0.6s of raw speech) fall back to
+    // 0.08s tail, otherwise Sync.so sees a near-empty window and returns
+    // `provider_unknown_error`, which silently kills speakers 3/4 in N≥3 scenes.
     const SEG_PAD_START = 0.08;
-    const SEG_PAD_END = 0.02;
+    const SEG_PAD_END_TIGHT = 0.02;
+    const SEG_PAD_END_SHORT = 0.08;
+    const SHORT_TURN_THRESHOLD_SEC = 0.6;
     const speakerWindowsSecs: Array<[number, number]> = (pass.segments ?? [])
       .map((t) => {
+        const rawDur = Math.max(0, Number(t.endTime) - Number(t.startTime));
+        const tailPad = rawDur < SHORT_TURN_THRESHOLD_SEC ? SEG_PAD_END_SHORT : SEG_PAD_END_TIGHT;
         const s = Math.max(0, Number(t.startTime) - SEG_PAD_START);
-        const e = Math.min(totalSec, Number(t.endTime) + SEG_PAD_END);
+        const e = Math.min(totalSec, Number(t.endTime) + tailPad);
         return [Number(s.toFixed(3)), Number(e.toFixed(3))] as [number, number];
       })
       .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && e > s + 0.05);
