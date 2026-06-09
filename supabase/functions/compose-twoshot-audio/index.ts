@@ -814,6 +814,7 @@ serve(async (req) => {
       Number((scene as any)?.audio_plan?.targetDuration) ||
       0;
     let sceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
+    const originalSceneDur = sceneDur;
     if (sceneDur <= 0) sceneDur = Math.max(0, planTotal);
     if (sceneDur <= 0) {
       sceneDur = 10;
@@ -821,14 +822,53 @@ serve(async (req) => {
         `[compose-twoshot-audio] scene ${scene_id} has no duration_seconds — falling back to 10s (Hailuo two-shot default).`,
       );
     }
+
+    // v89 — Plan §3: Sarah-cutoff fix.
+    // If the actual spoken audio exceeds the scene plate by more than 0.30 s,
+    // we EXTEND the scene duration instead of silently hard-trimming. The
+    // hard-trim was lopping off the last 50–400 ms of the final speaker
+    // ("…and that's wh-"). The extension is capped at +5.0 s to guard against
+    // wildly oversized scripts; beyond that we fail-fast so the UI can ask
+    // the user to shorten the text or extend the scene manually.
+    const OVERFLOW_GRACE_SEC = 0.30;
+    const MAX_EXTEND_SEC = 5.0;
+    let dialogOverflowExtended: { from: number; to: number; overflowSec: number } | null = null;
+    if (spokenSec > sceneDur + OVERFLOW_GRACE_SEC) {
+      const overflow = spokenSec - sceneDur;
+      if (overflow > MAX_EXTEND_SEC) {
+        return json({
+          error: "dialog_too_long_for_plate",
+          message:
+            `Das Skript dauert ${spokenSec.toFixed(2)} s, aber die Szene ist nur ${sceneDur.toFixed(2)} s lang. ` +
+            `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + 0.3)} s verlängern.`,
+          spoken_sec: Math.round(spokenSec * 1000) / 1000,
+          scene_dur_sec: sceneDur,
+          overflow_sec: Math.round(overflow * 1000) / 1000,
+        }, 400);
+      }
+      // Extend in 0.1s steps (matches plate-render granularity) + 0.3s tail.
+      const newDur = Math.ceil((spokenSec + 0.30) * 10) / 10;
+      dialogOverflowExtended = {
+        from: Math.round(sceneDur * 1000) / 1000,
+        to: newDur,
+        overflowSec: Math.round(overflow * 1000) / 1000,
+      };
+      console.warn(
+        `[compose-twoshot-audio] scene ${scene_id} dialog overflow — extending sceneDur ${sceneDur.toFixed(2)}s → ${newDur.toFixed(2)}s (spoken=${spokenSec.toFixed(2)}s, overflow=${overflow.toFixed(2)}s)`,
+      );
+      sceneDur = newDur;
+    }
+
     const sceneSamples = Math.round(sceneDur * SAMPLE_RATE);
+    // Never less than spoken length — guarantees Sarah's tail survives.
     const totalSamples = Math.max(spokenSamples.length, sceneSamples);
     const totalSec = totalSamples / SAMPLE_RATE;
     const tailSamples = Math.max(0, totalSamples - spokenSamples.length);
     let mergedSamples = tailSamples > 0
       ? concatSamples([spokenSamples, new Int16Array(tailSamples)])
       : spokenSamples;
-    // Hard-trim to exactly totalSamples — never longer than the scene needs.
+    // Defensive: only trim if we somehow overran totalSamples (should be a
+    // no-op because totalSamples = max(spoken, scene) already).
     if (mergedSamples.length > totalSamples) {
       mergedSamples = mergedSamples.subarray(0, totalSamples);
     }
