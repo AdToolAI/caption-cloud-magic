@@ -1687,27 +1687,15 @@ serve(async (req) => {
     // coordinates BEFORE paying Sync.so — otherwise Sync.so returns the
     // opaque "An unknown error occurred." and burns credits / time.
     if (!isAdvance) {
-      // v37 — If the anchor faceMap returned identity matches for every
-      // speaker (i.e. Gemini Vision confidently mapped each character_id to
-      // a face box on the anchor image), trust those coordinates and skip
-      // the strict per-frame plate face-check. Sync.so's ActiveSpeaker DTO
-      // operates on `frame_number + coordinates` in plate-pixel space — it
-      // does NOT require that the same face be re-detected via Gemini at
-      // that exact frame. The strict check was producing false-negative
-      // `plate_target_face_missing_*` blocks even when all three speakers
-      // were clearly visible in the plate, because Gemini's per-frame face
-      // detection sometimes only locks onto the most prominent face. See:
-      // https://sync.so/docs/developer-guides/speaker-selection
-      const allIdentityMatched =
-        speakers.length >= 3 &&
-        coordSources.length === speakers.length &&
-        coordSources.every((s) => s === "identity");
-      const strictTargetCheck = speakers.length >= 3 && !!plateDims && !allIdentityMatched;
-      if (allIdentityMatched) {
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} face-gate SOFT-PASS — all ${speakers.length} speakers identity-matched on anchor; relying on Sync.so ASD with frame_number+coordinates`,
-        );
-      }
+      // v77 — Soft-pass for "all anchor identity-matched" REMOVED.
+      // Anchor identity matches were the original cause of wrong-face
+      // lipsync (user report June 9 2026: "Lip-Sync hat keinen einzigen
+      // Avatar getroffen"). For 3+ speakers we ALWAYS run the strict
+      // per-frame plate face check; if `resolvePlateFaceIdentities` already
+      // gave us plate-pixel coords, the strict check trivially passes
+      // because coords sit on real plate faces.
+      const strictTargetCheck = speakers.length >= 3 && !!plateDims;
+
       for (const pass of builtPasses) {
         const firstTurn = pass.segments[0];
         if (!firstTurn) continue;
