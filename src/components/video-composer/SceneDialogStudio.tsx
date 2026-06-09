@@ -120,6 +120,15 @@ function formatError(e: unknown): string {
   );
 }
 
+/** Pure reader for Phase 3.1 per-line Shot Director overrides. */
+function getDialogShotOverride(
+  scene: ComposerScene,
+  lineKey: string,
+): Partial<ShotSelection> | undefined {
+  const mods = scene.directorModifiers as Record<string, unknown> | undefined;
+  const dialogShots = mods?.dialogShots as Record<string, Partial<ShotSelection>> | undefined;
+  return dialogShots?.[lineKey];
+
 const PROJECT_REQUIRED = {
   de: 'Bitte zuerst das Projekt speichern, bevor Voiceover generiert wird.',
   en: 'Please save the project first before generating voiceover.',
