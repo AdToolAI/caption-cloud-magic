@@ -50,6 +50,7 @@ export default function SceneInlinePlayer({
   onGenerate,
 }: Props) {
   const { t } = useTranslation();
+  const { reset: resetLipSync, resettingId } = useResetLipSync();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
 
