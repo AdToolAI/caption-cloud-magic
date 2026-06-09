@@ -281,6 +281,49 @@ serve(async (req) => {
       }
     }
 
+    // ── (2.5) Dispatch-recovery: master_clip never reached Sync.so ────────
+    // Plan v71 root cause: scene has clip_url + audio_plan.twoshot.url but
+    // compose-dialog-segments was never invoked (lost client invoke / 202 race
+    // / inflight-lock leak). Re-dispatch once after 3 min, BEFORE the failure
+    // path runs at 4 min. Idempotent: tracked via dialog_shots.recovery_dispatched_at.
+    const hasAudioPlan =
+      typeof d.audio_plan?.twoshot?.url === "string" && d.audio_plan.twoshot.url.length > 0;
+    const recoveryAlreadyDispatched =
+      typeof ds?.recovery_dispatched_at === "string" && ds.recovery_dispatched_at.length > 0;
+    const noDispatchYet = !hasRecordedProviderJobLocal(d);
+    if (
+      d.lip_sync_status === "pending" &&
+      d.twoshot_stage === "master_clip" &&
+      typeof d.clip_url === "string" && d.clip_url.length > 0 &&
+      hasAudioPlan &&
+      noDispatchYet &&
+      !recoveryAlreadyDispatched &&
+      ageMs >= STALE_DISPATCH_RECOVERY_MS
+    ) {
+      console.log(`[lipsync-watchdog] dispatch-recovery scene=${d.id} age=${Math.round(ageMs / 1000)}s`);
+      try {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: { ...(ds || {}), recovery_dispatched_at: new Date().toISOString() },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", d.id);
+        await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true }),
+        });
+        advanced.push({ scene_id: d.id, pass_idx: -1 });
+      } catch (e) {
+        console.warn(`[lipsync-watchdog] dispatch-recovery crash scene=${d.id}: ${(e as Error).message}`);
+      }
+      continue; // give it a tick before considering failure
+    }
+
     // ── (3) Stale-failure (last resort, only past hard TTL or true preflight) ─
     if (ageMs < STALE_PREFLIGHT_MS) continue;
     const hasJob = await hasRecordedProviderJob(supabase, d);
