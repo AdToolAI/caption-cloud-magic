@@ -58,6 +58,12 @@ const ShotSchema = z.object({
    *  'relative' = output ist kurzer Preclip ab t=0 (v10 Artlist-Pipeline)
    *  → ohne startFrom direkt in das Fenster legen. */
   sourceTiming: z.enum(['absolute', 'relative']).optional(),
+  /** v90: when sourceTiming === 'relative' the Sync.so output is a single
+   *  concatenated render of ALL this speaker's turns (tight WAV). To prevent
+   *  turn 2 from replaying turn 1's lip animation, each shot starts the
+   *  output video at its precomputed offset inside that concat. Defaults to
+   *  0 (legacy single-turn behavior). Ignored when sourceTiming==='absolute'. */
+  sourceStartSec: z.number().min(0).optional(),
   /** v21: when present the output is a square face-crop in source-master
    *  pixel space; overlay positioned/scaled to (x,y,size) with soft mask. */
   crop: CropSchema.optional().nullable(),
