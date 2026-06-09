@@ -1381,9 +1381,12 @@ export default function VideoComposerDashboard() {
               onClick={() => setShowResetDialog(true)}
               className="gap-2"
               aria-label={t('videoComposer.newProject')}
+              disabled={isResetting}
             >
-              <RotateCcw className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('videoComposer.newProject')}</span>
+              <RotateCcw className={`h-4 w-4 ${isResetting ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">
+                {isResetting ? 'Stoppe…' : t('videoComposer.newProject')}
+              </span>
             </Button>
           </div>
         </div>
@@ -1666,6 +1669,7 @@ export default function VideoComposerDashboard() {
             <AlertDialogTitle>{t('videoComposer.confirmResetTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t('videoComposer.confirmResetDesc')}
+              {' '}Alle laufenden Renders und Lip-Sync-Jobs werden abgebrochen — bereits verbrauchte Credits werden nicht refundiert.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
