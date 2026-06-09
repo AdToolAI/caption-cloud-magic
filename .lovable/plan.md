@@ -1,94 +1,43 @@
-## Ziel
+## Befund aus der DB
 
-Zwei Probleme adressieren, ohne die mühsam gehärtete Pipeline (v60 Serial-Chain, v69 Preclip, v82 bbox-url, v88 Edge-Skip, v89 TTS-Trim, v90 Aliasing-Fix) zu zerschießen:
+Szene `63fc42c2…` mit 4 Sprechern. Alle 4 Pässe stehen auf `status=done`, jeder hat `output_url`, jeder hat eine sinnvolle `audio_tight` (Sarah: 1.818s, window [6.707, 8.525]) und eine plausible `preclip_crop` (Sarah: x=32, y=346, size=160). Strukturell ist Sarahs Pass identisch zu Pässen 1–3 (gleiche `retry_variant: coords-pro`, gleiches Preclip-Schema, gleiche v90-Offsets). Sync.so-Webhook hat alle 4 Pässe als „done" geliefert, danach lief der Audio-Mux.
 
-1. **Lip-Sync greift aktuell nur bei Speaker 1+2** (4-Speaker-Szene). Nach v90 (Tail-Clamp 0.08→0.02s + per-turn offsets).
-2. **Pipeline ist gefühlt sehr langsam** — wo lässt sich gefahrlos Zeit sparen?
+Das heißt: der Pipeline‑*Status* ist sauber — aber das visuelle Ergebnis (Sarahs Lippen bewegen sich nicht) entspricht nicht den Statusdaten. Bevor wir Code anfassen, müssen wir wissen WO die Lipsync verloren geht: bei Sync.so (Output ist Passthrough ohne animierte Lippen) oder im Mux (Lipsync ist da, wird aber falsch overlayed).
 
----
+## Diagnose (read-only, sehr schnell)
 
-## Teil A — Lip-Sync nur bei Speaker 1+2: Diagnose-First, dann gezielter Fix
+D1. **Sarahs Preclip vs. Sync.so-Output Pixel-für-Pixel vergleichen.**
+    Wenn beide identisch sind → Sync.so hat den Lipsync für Pass 4 verworfen (silent passthrough). Wenn nicht → Lipsync existiert, also liegt's am Mux.
+    - Preclip: `…/dialog-pass-preclip-63fc42c2-…-p3-….mp4`
+    - Output: `…/63fc42c2-…-lipsync-pass-4.mp4`
 
-### Verdachtsmomente (in Reihenfolge)
+D2. **Sarahs Tight-WAV abhören**: `…-pass-4-tight-….wav` muss klar Sarahs Stimme enthalten, ~1.8s. Wenn (fast) stumm → Slice-Window-Bug, Sync.so hatte nichts zum Animieren. (Beachte: ihre Window-Position [6.707, 8.525] liegt nahe am Plate-Ende `totalSec`. Wenn `totalSec` z. B. nur 8.4s ist, wird `e=min(totalSec, …)` → Window collabiert ≈ 1.7s, aber wenn `audio_url_full` Stille hat, ist die Slice leise.)
 
-1. **v90 Tail-Clamp zu aggressiv für kurze Turns von Speaker 3/4.**  
-   Wenn Speaker 3 oder 4 nur kurz spricht (z. B. 0.6 s), wird das slice-Window nach `SEG_PAD_END=0.02s` extrem knapp. `normalizeWav` paddet zwar auf ≥3 s — aber Sync.so erkennt dann u. U. „kein Sprachsignal" und gibt `provider_unknown_error` zurück. Das würde die Retry-Ladder triggern, die für N≥3 oft in `coords-pro` landet und dort am 3+ Speaker Repair-Audio-Guard hängenbleibt (siehe v82-Notiz).
-2. **Per-turn `output_offsets_sec` greift nur bei Multi-Turn.**  
-   Bei 4 Sprechern mit je einem Turn ist `outputOffsets[0]=0` korrekt — also kein Mux-Problem. Aber Speaker 3/4 könnten in einer eigenen Pass-Webhook-Kette hängen (v60 serial chain), während Pass 1/2 schon geliefert haben. Aktuelle UI zeigt „nur 1+2 funktionieren", weil 3/4 noch `pending` oder bereits `failed` sind.
-3. **Watchdog Recovery wird vom Ghost-State blockiert** (siehe Sub-Agent-Befund: `hasRecordedProviderJobLocal` returns true, weil Pass 1/2 erfolgreich Job-IDs haben → Watchdog überspringt Pass 3/4 Re-Dispatch).
+D3. **Sync.so /generate Job 28ced758 direkt abfragen** (`GET /v2/generate/{id}`). Wenn Sync.so `lip_sync_status=success` mit Quality-Score liefert → wirklich animiert. Wenn `partial` / Warning → Sync.so hat heimlich aufgegeben (z. B. weil Audio zu kurz oder weil Preclip nahe am Bild­rand keine erkennbare Face-Region bot).
 
-### Diagnose-Schritte (read-only, bevor wir Code anfassen)
+D4. **Quick-Check: Mux-Lambda-Render visuell prüfen** (`final_url` der Szene). Frame bei t≈7.5s extrahieren und mit Sarahs Preclip-Output bei t≈0.8s vergleichen — sind die Pixel im Crop-Bereich identisch?
 
-1. SQL: `SELECT scene_id, turn_idx, attempt, sync_status, error_class, error_message, audio_dur_sec, created_at FROM syncso_dispatch_log WHERE scene_id = '<aktuelle szene>' ORDER BY turn_idx, attempt, created_at` — zeigt klar, ob Pass 3/4 überhaupt dispatcht wurde und wo er ausstieg.
-2. `dialog_shots.passes[2..3]` der betroffenen Szene inspizieren: `status`, `job_id`, `output_url`, `audio_tight.dur_sec`, `error_message`.
-3. Edge-Function-Logs `sync-so-webhook` und `compose-dialog-segments` nach der `scene_id` filtern.
+→ Eines dieser 4 Resultate sagt eindeutig welche Stage schuld ist.
 
-### Geplante Fixes (nach Diagnose, sehr chirurgisch)
+## Hypothesen + gezielte Fixes (erst nach Diagnose committen)
 
-A1. **Tail-Clamp verträglicher machen für kurze Turns**: Statt fest `SEG_PAD_END=0.02s` einen dynamischen Floor — Window-Dauer muss nach Padding ≥ 0.30 s sein. Sonst auf `SEG_PAD_END=0.08` (v89-Wert) zurückfallen. So bleibt der Tail-Twitch-Fix für normale Turns aktiv, kurze Turns von Speaker 3/4 werden aber nicht ausgehungert. (Datei: `compose-dialog-segments/index.ts` Slice-Block + Mux `SHOT_PAD_END` analog.)
+H1. **Sync.so verwirft Pass 4 still, weil Sarahs Preclip-Face zu nah am linken Bildrand sitzt** (cropX=32 in 720er Plate → die 160px Crop-Region berührt fast Pixel 0). Beim 512×512 Preclip ist Sarahs Gesicht zwar zentriert, aber Sync.so kann bei extremen Edge-Cases (Master-Face am Rand) den Identity-Check verlieren → Passthrough.
+   → **Fix H1**: Min-Margin bei `preclipCrop` (z. B. 24px Sicherheits­abstand zu jedem Plate-Rand), und wenn der berechnete Crop kollabiert, Crop-`size` auf 192 erhöhen (mehr Kontext). Datei: `compose-dialog-segments/index.ts` (Preclip-Crop-Block).
 
-A2. **Watchdog-Recovery härten**: `hasRecordedProviderJobLocal` darf eine Pass-Recovery nicht blockieren, wenn *nur ein Teil* der Passes dispatcht wurde. Statt boolean → Set von Pass-Indices; recovery wird pro fehlendem Pass-Index separat ausgelöst. (Datei: `lipsync-watchdog/index.ts`.)
+H2. **Sarahs Tight-WAV ist tatsächlich leise** — die per-Speaker-WAV `…-char3-sarah-dusatko.wav` ist silence-padded und Sarahs Voice-Onset liegt evtl. nicht bei master-t 6.787, sondern etwas später. Die Slice [6.707, 8.525] erwischt dann nur Stille + Restwort.
+   → **Fix H2**: vor dem Slice einen RMS-Probe-Pass: wenn Window-RMS < threshold → Window per phase-Onset-Detection auf das tatsächliche Sprach-Onset re-zentrieren (oder zumindest `endTime` um +0.2s strecken).
 
-A3. **Pre-Pass-Validierung**: In `compose-dialog-segments` direkt nach `audio_tight` einen Check einbauen — wenn `dur_sec < 0.30s` UND keine `output_offsets_sec`-Diagnose vorliegt → diesen Pass auf `auto-pro` (Full-Plate) statt Preclip routen. So fängt die Ladder Kurz-Turns sauber ab, ohne die Hauptpipeline anzufassen.
+H3. **Sync.so liefert für Pass 4 ein Output, das kürzer als das Tight-Audio ist** (Sync.so `cut_off` Verhalten am Audio-Ende), und der Mux mappt mit `sourceStartSec=0` korrekt, aber Sarahs Lippen-Frames liegen jenseits des Output-Endes.
+   → **Fix H3**: im Mux `endSec = min(startSec + outputDurationProbed, originalEndSec)` clampen; und/oder beim Dispatch `sync_mode='loop'` statt `cut_off` für den LAST pass.
 
-A4. **Manueller Recovery-Reset für die aktuelle Szene** (nur die `dialog_shots.passes[2,3]` auf `pending` setzen, `clip_url` behalten, `lip_sync_status='pending'`) damit der Watchdog die fehlenden Pässe sauber neu dispatcht — ohne die bereits gerenderten 1+2 zu zerstören.
+H4. **Webhook-Race**: der „all-done"-Webhook feuert Mux 1s nachdem Sarahs `output_url` persistiert wurde — möglicherweise rendert der Mux mit einem leeren / 404-Output für Pass 4, weil das S3-Object noch nicht öffentlich ist.
+   → **Fix H4**: HEAD-Check auf alle 4 `output_url` bevor `render-sync-segments-audio-mux` startet; 2-3 Retries mit kurzem Backoff.
 
----
+## Bitte um Auswahl
 
-## Teil B — Pipeline beschleunigen, ohne Qualität zu opfern
+Damit wir nicht spekulativ Code anfassen:
 
-Die Pipeline besteht heute pro Multi-Speaker-Szene aus diesen Phasen (vereinfacht):
+1. **Sollen wir mit D1+D4 starten** (Pixel-Vergleich der zwei MP4s) — das engt die Stage in 1 Minute ein?
+2. Oder sollen wir **direkt H1 + H4 vorbeugend implementieren** (beides risikoarm, beides plausibel für „immer der letzte Speaker"), und parallel die Diagnose laufen lassen?
 
-```text
-1. compose-video-clips        ~30–90s  (Nano Banana 2 Anchor + Hailuo i2v Master)
-2. compose-twoshot-audio      ~10–20s  (ElevenLabs TTS mit /with-timestamps)
-3. Per-Pass Preclip Render    ~5–15s pro Pass × N Speaker  (Remotion Lambda)
-4. Sync.so Dispatch SERIELL   ~25–45s pro Pass × N Speaker (v60 serial chain)
-5. render-sync-segments-mux   ~15–25s  (Remotion Lambda Mux)
-```
-
-Bei N=4 → Phase 3+4 dominieren mit ~3–4 Minuten allein für Lip-Sync.
-
-### Risikofreie / sehr risikoarme Beschleunigungen
-
-B1. **Preclip-Renderings parallel statt seriell** *(nicht zu verwechseln mit Sync.so Serial Chain)*.  
-   Aktuell rendert `compose-dialog-segments` die N Preclips nacheinander im selben Edge-Function-Lauf. Lambda-Renders sind unabhängig → `Promise.all` mit Concurrency-Limit 2–3 wäre safe. Spart ~20–40 s bei N=4. **Keine Qualitäts- oder Stabilitätskosten.**
-
-B2. **Anchor-Cache aggressiver nutzen.**  
-   `ANCHOR_AUDIT_VERSION=5` bumpt aktuell alle alten Anchor. Wenn User die Szene nur leicht ändert (z. B. Skript-Edit), wird der teure Nano Banana 2 + Identity-Audit unnötig wiederholt. Cache-Key sollte die Szenenbeschreibung + Cast + Outfit-Hash sein — Skripttext darf den Cache nicht invalidieren. Spart ~20–60 s bei Re-Runs. **Keine Qualitätskosten** (Anchor ist visuell identisch).
-
-B3. **TTS und Anchor parallelisieren.**  
-   Aktuell läuft `compose-twoshot-audio` strikt nach `compose-video-clips`. Beide haben aber keine harte Datenabhängigkeit voneinander — Skripttext und Voice-IDs sind sofort verfügbar. Trigger beide parallel direkt nach Szenen-Save. Spart 10–20 s pro Szene.
-
-B4. **Sync.so Watchdog-Polling beschleunigen.**  
-   `STALE_DISPATCH_RECOVERY_MS=3min` ist großzügig. Reduzieren auf 90 s (Sync.so normale Render ist 25–45 s, doppelte Toleranz reicht). Im Schnitt 60–90 s gespart wenn ein Pass mal zickt.
-
-B5. **Sync.so Webhook statt Polling.**  
-   `poll-dialog-shots` läuft per cron alle 60 s. Wenn `sync-so-webhook` schon konfiguriert ist (laut Memory `Sync.so Webhook + 8min Watchdog`): Webhook patcht in ~1 s. Sicherstellen, dass auch die Multi-Pass-Chain den Webhook nutzt und nicht erst auf den Minuten-Poller wartet. Spart bis zu 60 s pro Pass.
-
-### Mittleres Risiko, nur wenn Sub-Agent es freigibt
-
-B6. **Sync.so Multi-Pass PARALLEL statt seriell** (würde v60 antasten — nicht empfohlen ohne Lasttest, weil Sync.so unter Last `provider_unknown_error` häuft).
-
-### Out of scope (Qualitätsrisiko zu hoch)
-
-- Anchor-Audit überspringen, geringere Lambda-Auflösung, Hailuo i2v auf 720p reduzieren, kein Identity-Lock mehr.
-
----
-
-## Reihenfolge & Deliverables
-
-1. Diagnose-SQL ausführen (Teil A, Schritt 1–3).
-2. Auf Basis der Logs: A1 + A2 + A3 implementieren (kleine Edits, ein Edge-Function-Deploy).
-3. A4 als einmaliger manueller Reset für die aktuelle Szene.
-4. B1 + B2 + B3 + B4 in einem zweiten Commit (alle low-risk, alle einzeln messbar).
-5. B5 nur falls Webhook-Pfad für Multi-Pass-Ketten aktuell nicht greift (per Logs prüfen).
-
-Dauer-Erwartung nach B-Fixes: Multi-Speaker-Szene mit N=4 von heute ~4–5 min auf ~2–2.5 min, ohne dass Anchor-Qualität, Lip-Accuracy oder Stabilität sinken.
-
----
-
-## Bitte um Bestätigung
-
-- **Sollen wir mit der Diagnose-SQL (Teil A.1–A.3) loslegen und dir die Befunde zeigen, bevor wir den Fix-Code schreiben?** Oder direkt die Fixes A1+A2+A3 implementieren und parallel die SQL-Diagnose laufen lassen?
-- **Bei den Speedups: B1+B2+B3+B4 in einem Rutsch — oder lieber einzeln, damit du nach jedem Schritt die End-to-End-Zeit messen kannst?**
+Sobald die Stage klar ist, kommt ein zweiter Commit mit dem konkreten Fix (H1, H2, H3 oder H4) und einem manuellen Reset auf Pass 4 für die aktuelle Szene, ohne die schon gerenderten Pässe 1–3 zu zerstören.
