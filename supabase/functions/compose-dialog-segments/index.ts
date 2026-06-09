@@ -1687,14 +1687,27 @@ serve(async (req) => {
     // coordinates BEFORE paying Sync.so — otherwise Sync.so returns the
     // opaque "An unknown error occurred." and burns credits / time.
     if (!isAdvance) {
-      // v77 — Soft-pass for "all anchor identity-matched" REMOVED.
-      // Anchor identity matches were the original cause of wrong-face
-      // lipsync (user report June 9 2026: "Lip-Sync hat keinen einzigen
-      // Avatar getroffen"). For 3+ speakers we ALWAYS run the strict
-      // per-frame plate face check; if `resolvePlateFaceIdentities` already
-      // gave us plate-pixel coords, the strict check trivially passes
-      // because coords sit on real plate faces.
-      const strictTargetCheck = speakers.length >= 3 && !!plateDims;
+      // v78 (June 9 2026) — Strict gate is now CONDITIONAL on plate identity.
+      // v77 made the gate unconditional for 3+ speakers, which blocked
+      // every scene whenever `resolvePlateFaceIdentities` failed (e.g.
+      // Hailuo MP4 without moov-atom → plate frame extract crashes →
+      // `plateIdentityMap=off` → anchor-rescale coords drift 5-15% from
+      // real plate faces → strict gate hard-rejects everything → user
+      // sees "Lip-Sync hat keinen Avatar getroffen". Now: only enforce
+      // strict per-coordinate matching when we actually have plate-pixel
+      // coords (i.e. plate identity resolved at least one speaker).
+      // Otherwise fall back to v76 soft-pass + face-repair behaviour.
+      const havePlateIdentity =
+        !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
+      const strictTargetCheck =
+        speakers.length >= 3 && !!plateDims && havePlateIdentity;
+      if (speakers.length >= 3 && !havePlateIdentity) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v78 soft-pass: ` +
+          `plateIdentity unavailable for ${speakers.length} speakers — ` +
+          `falling back to face-repair instead of hard-block`,
+        );
+      }
 
       for (const pass of builtPasses) {
         const firstTurn = pass.segments[0];
