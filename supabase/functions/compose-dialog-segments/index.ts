@@ -831,6 +831,66 @@ serve(async (req) => {
       coordSources.push(picked?.source ?? "none");
       return picked?.coords ?? null;
     });
+
+    // ── Plate-native identity override (v77) ──────────────────────────────
+    // Anchor coords drift 5–15 % vs the rendered Hailuo plate. For multi-
+    // speaker scenes that drift routinely lands the Sync.so target on the
+    // WRONG face. Detect faces on the ACTUAL plate frame and identity-match
+    // against the character portraits, then replace anchor coords with
+    // plate-pixel-space coords/bbox per character.
+    const speakerPlateBboxes: Array<[number, number, number, number] | null> =
+      new Array(speakers.length).fill(null);
+    let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
+    if (!isAdvance && speakers.length >= 2 && plateDims && sourceClipUrl) {
+      try {
+        plateIdentityMap = await resolvePlateFaceIdentities({
+          supabase,
+          sceneId,
+          projectId: String((scene as any).project_id ?? ""),
+          plateUrl: sourceClipUrl,
+          plateWidth: plateDims.width,
+          plateHeight: plateDims.height,
+          midDurationSec: totalSec,
+          characters,
+        });
+      } catch (err) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} plate-identity resolve threw: ${(err as Error)?.message}`,
+        );
+      }
+    }
+    if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
+      const byId = new Map<string, PlateIdentityFace>();
+      for (const f of plateIdentityMap.faces) {
+        if (f.characterId) byId.set(String(f.characterId).toLowerCase(), f);
+      }
+      // Slot-fallback for any face the identity step couldn't label.
+      const unlabeled = plateIdentityMap.faces.filter((f) => !f.characterId);
+      speakers.forEach((sp, idx) => {
+        const cid = sp.character_id ? String(sp.character_id).toLowerCase() : "";
+        let plateFace: PlateIdentityFace | undefined = cid ? byId.get(cid) : undefined;
+        let source = "plate-identity";
+        if (!plateFace && unlabeled.length > 0) {
+          plateFace = unlabeled.find((f) => f.slot === idx) ?? unlabeled[0];
+          source = "plate-slot-fallback";
+          if (plateFace) unlabeled.splice(unlabeled.indexOf(plateFace), 1);
+        }
+        if (plateFace) {
+          speakerCoords[idx] = [plateFace.center[0], plateFace.center[1]];
+          speakerPlateBboxes[idx] = plateFace.bbox;
+          coordSources[idx] = source;
+        }
+      });
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} plate-identity faces=${plateIdentityMap.faces.length} ` +
+        `resolved=${plateIdentityMap.resolvedCount}/${speakers.length} cached=${plateIdentityMap.cached}`,
+      );
+    } else if (speakers.length >= 2 && !isAdvance) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
+      );
+    }
+
     // Final safety fallback: evenly spaced along the horizontal midline so
     // 3+ speakers never collide on the same x.
     for (let i = 0; i < speakerCoords.length; i++) {
@@ -843,12 +903,6 @@ serve(async (req) => {
         ];
       }
       speakerCoords[i] = clampSyncCoords(speakerCoords[i]);
-      // Bounds-clamp into the inner 90% of the plate. Identity-match coords
-      // are in anchor-space; if anchor/plate aspect-ratios differ (common
-      // for 3+ speaker wide group shots) the rescaled point can land
-      // outside the actual video frame and Sync.so returns the opaque
-      // "An unknown error occurred." Clamp is a no-op when coords already
-      // sit inside the plate — so 1- and 2-speaker scenes are unaffected.
       if (speakerCoords[i] && plateDims) {
         const margin = 0.05;
         const minX = Math.round(plateDims.width * margin);
@@ -866,8 +920,11 @@ serve(async (req) => {
     console.log(
       `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} ` +
       `anchor=${faceMap?.width ?? "?"}x${faceMap?.height ?? "?"} plate=${plateDims ? `${plateDims.width}x${plateDims.height}` : "probe-failed"} ` +
+      `plate_identity=${plateIdentityMap ? `${plateIdentityMap.resolvedCount}/${plateIdentityMap.faces.length}` : "off"} ` +
       `speakers=${speakers.length} coords=${JSON.stringify(speakerCoords)} sources=${JSON.stringify(coordSources)}`,
     );
+
+
 
     // ─────────────────────────────────────────────────────────────────────
     // v60 — Unified Pipeline (one path for every N≥2)
