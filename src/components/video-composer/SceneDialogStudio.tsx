@@ -401,6 +401,22 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     onUpdate({ dialogTakes: next });
   };
 
+  /**
+   * Phase 3.1 — pre-lock per-line Shot Director overrides. Persisted as
+   * a sub-object of the existing `directorModifiers` JSONB (no migration).
+   * Read by composeFinalPrompt as `dialogShotOverrides` and copied into
+   * `AudioPlanSpeaker.shotDirector` when the audio plan is locked.
+   */
+  const setDialogShotOverride = (lineKey: string, sel: Partial<ShotSelection>) => {
+    const mods = { ...(scene.directorModifiers ?? {}) } as Record<string, unknown>;
+    const dialogShots = { ...((mods.dialogShots as Record<string, Partial<ShotSelection>>) ?? {}) };
+    if (!sel || Object.keys(sel).length === 0) delete dialogShots[lineKey];
+    else dialogShots[lineKey] = sel;
+    mods.dialogShots = dialogShots;
+    onUpdate({ directorModifiers: mods as any });
+  };
+
+
   /** Pull the active take's audio for a given line, if any. */
   const getActiveTake = (lineKey: string) => {
     const b = dialogTakes[lineKey];
@@ -1466,6 +1482,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                       onChange={(sel) => setDialogShotOverride(lineKey, sel)}
                       language={language}
                     />
+
                   </div>
                 </div>
               );
