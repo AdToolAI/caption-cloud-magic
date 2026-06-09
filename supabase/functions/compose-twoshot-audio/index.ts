@@ -433,14 +433,29 @@ serve(async (req) => {
       : { data: [] as any[] };
     const slugify = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
     const charByName = new Map<string, { id: string; default_voice_id?: string }>();
+    // v86 — Track keys that resolve to MORE than one distinct character. If a
+    // dialog block's name slug falls back onto one of these, we cannot safely
+    // map it to a single character_id and must fail rather than silently merge
+    // two speakers' turns onto the same Sync.so pass (= "Char 1 spricht 2×,
+    // Char 4 hat Lippen zu" bug).
+    const ambiguousNameKeys = new Set<string>();
+    const registerCharKey = (key: string, entry: { id: string; default_voice_id?: string }) => {
+      if (!key) return;
+      const prev = charByName.get(key);
+      if (prev && prev.id.toLowerCase() !== entry.id.toLowerCase()) {
+        ambiguousNameKeys.add(key);
+      } else if (!prev) {
+        charByName.set(key, entry);
+      }
+    };
     for (const c of characters ?? []) {
       const full = String(c.name || "").trim().toLowerCase();
       const fn = full.split(/\s+/)[0];
       const slug = slugify(full);
       const entry = { id: c.id, default_voice_id: c.default_voice_id ?? undefined };
-      if (fn) charByName.set(fn, entry);
-      if (slug) charByName.set(slug, entry);
-      if (full) charByName.set(full, entry);
+      registerCharKey(fn, entry);
+      registerCharKey(slug, entry);
+      registerCharKey(full, entry);
     }
     // Also pre-index character_shots so we can map a speaker name → its
     // characterId (matthew-dusatko) directly, without needing brand_characters.
@@ -449,8 +464,8 @@ serve(async (req) => {
       const idLower = String(cs.characterId).toLowerCase();
       const fnFromId = idLower.split("-")[0];
       const entry = { id: idLower, default_voice_id: undefined };
-      if (!charByName.has(idLower)) charByName.set(idLower, entry);
-      if (fnFromId && !charByName.has(fnFromId)) charByName.set(fnFromId, entry);
+      registerCharKey(idLower, entry);
+      registerCharKey(fnFromId, entry);
     }
 
     const dialogVoices = ((scene as any).dialog_voices ?? {}) as Record<
