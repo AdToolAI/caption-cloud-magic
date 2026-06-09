@@ -2147,6 +2147,13 @@ serve(async (req) => {
           Math.round(by2 * sy),
         ];
       }
+      // v77 — When plate-identity gave us a real plate-pixel bbox for this
+      // speaker, prefer it over the anchor-rescaled box (anchor often
+      // drifts 5–15 % vs the Hailuo plate).
+      const platePassBbox = speakerPlateBboxes[pass.speaker_idx] ?? null;
+      if (platePassBbox) {
+        bboxForCrop = platePassBbox;
+      }
       // v76 — Collect coords of the OTHER passes (same plate) so the
       // single-face preclip crop never includes a neighbor's face.
       const siblingCoordsForPass: Array<[number, number]> = passes
