@@ -633,6 +633,19 @@ serve(async (req) => {
     // "track audio" and speaker 3 received speaker 2's PCM. That bug caused
     // Sync.so to animate the wrong face on a silent track ("ghost speech").
     const segmentPcm: Int16Array[] = [];
+    // v89 — Per-utterance TTS diagnostics (hallucinated-tail trim, char count,
+    // raw vs trimmed duration). Surfaced in audio_plan.twoshot.tts_diagnostics
+    // and in the UI as warning pills.
+    const ttsDiagnostics: Array<{
+      speaker: string;
+      engine: string;
+      voice: string;
+      scriptChars: number;
+      rawDurSec: number;
+      trimmedDurSec: number;
+      hallucinatedTailMs: number;
+      trimMode: "timestamps" | "energy-vad" | "none";
+    }> = [];
     const segments: Array<{
       speaker: string;
       speaker_slug: string;
