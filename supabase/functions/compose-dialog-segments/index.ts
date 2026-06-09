@@ -1869,10 +1869,11 @@ serve(async (req) => {
         frame_number: referenceFrameNumber,
         coordinates: clampSyncCoords(pass.coords),
       };
-    } else if (retryVariant === "coords-pro-box") {
-      // v31 — Prefer the REAL face bounding box from the resolved faceMap
-      // (anchor-space) and rescale to plate-space. Falls back to a synthetic
-      // box around `pass.coords` only when no faceMap match exists.
+    } else if (retryVariant === "coords-pro-box" || retryVariant === "bbox-url-pro") {
+      // v31 / v82 — Build the same plate-space face box from faceMap; for
+      // `bbox-url-pro` we upload it as a per-frame JSON and hand Sync.so
+      // a `bounding_boxes_url` (preferred for multi-speaker / long clips);
+      // for the legacy `coords-pro-box` we inline `bounding_boxes`.
       const dims = plateDims ?? videoDims;
       let box: [number, number, number, number] | null = null;
       let bboxSource = "synthetic";
@@ -1916,14 +1917,40 @@ serve(async (req) => {
         box = [x1, y1, x2, y2];
       }
       const frameCount = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
-      const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
-      syncOptions.active_speaker_detection = {
-        auto_detect: false,
-        bounding_boxes: boundingBoxes,
-      };
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount}`,
-      );
+
+      let usedUrl: string | null = null;
+      if (retryVariant === "bbox-url-pro") {
+        usedUrl = await uploadBoundingBoxesJson(supabase, {
+          userId,
+          projectId: String((scene as any).project_id ?? ""),
+          sceneId,
+          passIdx: currentPassIdx,
+          box,
+          frameCount,
+        });
+      }
+
+      if (usedUrl) {
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          bounding_boxes_url: usedUrl,
+        };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} url=…${usedUrl.slice(-60)}`,
+        );
+      } else {
+        // graceful degrade — inline bounding_boxes (legacy coords-pro-box path)
+        const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          bounding_boxes: boundingBoxes,
+        };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-bbox-fallback)" : ""}`,
+        );
+      }
+
+
 
     } else {
       syncOptions.active_speaker_detection = { auto_detect: true };
