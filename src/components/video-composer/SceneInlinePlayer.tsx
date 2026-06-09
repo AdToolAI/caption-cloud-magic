@@ -312,8 +312,13 @@ export default function SceneInlinePlayer({
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
                   } else if (twoshotStage === 'master_clip' && !hasProviderJob) {
                     // Recovery-Fenster: server-watchdog dispatcht spätestens nach 3 min.
-                    title = 'Lip-Sync wird gestartet…';
-                    sub = 'Bereit, Sync.so wird angestoßen';
+                    if (limboStuck) {
+                      title = 'Start hängt — wird neu angestoßen';
+                      sub = 'Server-Watchdog versucht es erneut · jederzeit manuell neu starten';
+                    } else {
+                      title = 'Lip-Sync wird gestartet…';
+                      sub = 'Bereit, Sync.so wird angestoßen';
+                    }
                   } else if (!twoshotStage && audioUrl) {
                     title = 'Lip-Sync wird gestartet…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
@@ -324,10 +329,33 @@ export default function SceneInlinePlayer({
                 }
                 return (
                   <>
-                    <p className="mt-2 text-[11px] font-semibold text-primary tracking-wide">
+                    <p className={cn(
+                      "mt-2 text-[11px] font-semibold tracking-wide",
+                      limboStuck ? "text-amber-300" : "text-primary",
+                    )}>
+                      {limboStuck && <AlertTriangle className="inline h-3 w-3 mr-1 -mt-0.5" />}
                       {title}
                     </p>
                     <p className="mt-0.5 text-[9px] text-muted-foreground">{sub}</p>
+                    {limboStuck && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resettingId === scene.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          resetLipSync(scene.id);
+                        }}
+                        className="mt-2 h-6 px-2 text-[10px] gap-1 bg-amber-500/10 border-amber-500/40 text-amber-200 hover:bg-amber-500/20"
+                      >
+                        {resettingId === scene.id ? (
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-2.5 w-2.5" />
+                        )}
+                        Lip-Sync neu anstoßen
+                      </Button>
+                    )}
                   </>
                 );
               })()}
