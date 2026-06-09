@@ -336,7 +336,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 cxPx={cxPx}
                 cyPx={cyPx}
                 radiusPx={radiusPx}
-                startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+                startFrom={startFromForRelative}
                 segDuration={segDuration}
                 holdToEnd={!!shot.holdToEnd}
               />
@@ -365,7 +365,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               <CroppedOverlay
                 src={shot.outputUrl}
                 segDuration={segDuration}
-                startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+                startFrom={startFromForRelative}
                 left={left}
                 top={top}
                 size={size}
@@ -385,7 +385,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             <FullFrameOverlay
               src={shot.outputUrl}
               segDuration={segDuration}
-              startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+              startFrom={startFromForRelative}
               holdToEnd={!!shot.holdToEnd}
             />
           </Sequence>
