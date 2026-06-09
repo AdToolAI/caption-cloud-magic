@@ -263,8 +263,10 @@ serve(async (req) => {
           );
           return sortedSegs
             .map((t: any, i: number) => {
+              const rawDur = Math.max(0, Number(t.endTime) - Number(t.startTime));
+              const tailPad = rawDur < SHORT_TURN_THRESHOLD_SEC ? SHOT_PAD_END_SHORT : SHOT_PAD_END_TIGHT;
               const s = Math.max(0, Number(t.startTime) - SHOT_PAD_START);
-              const e = Math.min(totalSec, Number(t.endTime) + SHOT_PAD_END);
+              const e = Math.min(totalSec, Number(t.endTime) + tailPad);
               if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s + 0.05) return null;
               const sourceStartSec =
                 sourceTiming === "relative" && Number.isFinite(outputOffsets[i])
