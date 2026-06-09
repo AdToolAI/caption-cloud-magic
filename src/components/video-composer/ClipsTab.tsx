@@ -464,13 +464,20 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       lipSyncTargets.forEach((sceneId) => {
         console.info(`[ClipsTab] Auto-triggering lip-sync for scene ${sceneId}`);
         supabase.functions
-          .invoke('compose-dialog-segments', { body: { scene_id: sceneId } })
-          .then(({ data: lsData, error: lsErr }) => {
-            const errBody = (lsErr as any)?.context;
-            const reason = lsData?.error ?? errBody?.error;
-            const message = lsData?.message ?? errBody?.message;
-            // Scene was removed (new project / scene deletion) between the
-            // post-render fan-out and the invoke. Silent — no toast.
+          .invoke('compose-dialog-segments', { body: { scene_id: sceneId, auto: true } })
+          .then(async ({ data: lsData, error: lsErr }) => {
+            // Parse FunctionsHttpError body BEFORE deciding what to surface.
+            // `lsErr.context` is a raw Response — `.error` on it is undefined,
+            // so the previous silent check never matched scene_not_found.
+            let reason: string | undefined = lsData?.error;
+            let message: string | undefined = lsData?.message;
+            let realMsg = '';
+            if (lsErr) {
+              realMsg = await extractFunctionsError(lsErr);
+              const code = realMsg.split(/\s[\(\[]/)[0]?.trim();
+              if (code) reason = reason ?? code;
+              message = message ?? realMsg;
+            }
             if (reason === 'scene_not_found') {
               console.info(`[ClipsTab] lip-sync skipped — scene ${sceneId} no longer exists`);
               return;
@@ -484,7 +491,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             } else if (lsErr) {
               toast({
                 title: 'Lip-Sync fehlgeschlagen',
-                description: message || (lsErr as Error).message || 'Unbekannter Fehler.',
+                description: realMsg || message || (lsErr as Error).message || 'Unbekannter Fehler.',
                 variant: 'destructive',
               });
               console.warn(`[ClipsTab] lip-sync invoke failed for ${sceneId}`, lsErr);
