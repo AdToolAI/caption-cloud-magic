@@ -105,6 +105,45 @@ export default function SceneInlinePlayer({
     (status === 'generating' && hasActiveBackendJob) ||
     lipsyncRunning;
 
+  // ── Plan v72 — Start-Limbo detection ────────────────────────────────────
+  // A scene parked in `master_clip` with NO provider job for >3 min means the
+  // dispatcher never reached Sync.so. The server watchdog auto-recovers, but
+  // we also surface an honest "Start hängt" banner + manual reset button so
+  // the user is never staring at a silent spinner.
+  const dialogShots: any =
+    (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
+  const replicatePredId =
+    (scene as any).replicatePredictionId ?? (scene as any).replicate_prediction_id;
+  const hasProviderJobForLimbo =
+    (typeof replicatePredId === 'string' && replicatePredId.startsWith('sync:')) ||
+    !!dialogShots?.sync_job_id ||
+    (Array.isArray(dialogShots?.shots) &&
+      dialogShots.shots.some((s: any) => s?.sync_job_id)) ||
+    (Array.isArray(dialogShots?.passes) &&
+      dialogShots.passes.some((p: any) => p?.job_id));
+  const inStartLimbo =
+    lipsyncRunning &&
+    twoshotStage === 'master_clip' &&
+    !hasProviderJobForLimbo;
+  const limboSinceRef = useRef<number | null>(null);
+  const [limboStuck, setLimboStuck] = useState(false);
+  useEffect(() => {
+    if (!inStartLimbo) {
+      limboSinceRef.current = null;
+      if (limboStuck) setLimboStuck(false);
+      return;
+    }
+    if (limboSinceRef.current == null) limboSinceRef.current = Date.now();
+    const checkStuck = () => {
+      if (limboSinceRef.current == null) return;
+      const ageMs = Date.now() - limboSinceRef.current;
+      if (ageMs >= 3 * 60_000 && !limboStuck) setLimboStuck(true);
+    };
+    checkStuck();
+    const handle = setInterval(checkStuck, 15_000);
+    return () => clearInterval(handle);
+  }, [inStartLimbo, limboStuck]);
+
 
   const handleMouseEnter = () => {
     setHovering(true);
