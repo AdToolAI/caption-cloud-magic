@@ -1866,12 +1866,14 @@ serve(async (req) => {
       : startFrame;
     // Union of all turn windows for THIS speaker (a speaker may have multiple
     // turns; each becomes its own [start, end] entry inside segments_secs).
-    // Small 0.08s pad both sides keeps consonant onsets/offsets natural.
-    const SEG_PAD = 0.08;
+    // v90: asymmetric padding — 0.08s onset (consonant safety) but only
+    // 0.02s on the tail to prevent lips from twitching after the script ends.
+    const SEG_PAD_START = 0.08;
+    const SEG_PAD_END = 0.02;
     const speakerWindowsSecs: Array<[number, number]> = (pass.segments ?? [])
       .map((t) => {
-        const s = Math.max(0, Number(t.startTime) - SEG_PAD);
-        const e = Math.min(totalSec, Number(t.endTime) + SEG_PAD);
+        const s = Math.max(0, Number(t.startTime) - SEG_PAD_START);
+        const e = Math.min(totalSec, Number(t.endTime) + SEG_PAD_END);
         return [Number(s.toFixed(3)), Number(e.toFixed(3))] as [number, number];
       })
       .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && e > s + 0.05);
