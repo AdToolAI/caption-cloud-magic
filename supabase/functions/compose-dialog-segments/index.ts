@@ -1947,13 +1947,54 @@ serve(async (req) => {
     // Lambda fails (no regression risk).
     //
     // Idempotent: once a pass has `preclip_url`, reuse it on retries.
+    // v88 — Edge-Speaker Guard. When the speaker's coords sit within the
+    // outer 25 % of the plate width (or 15 % of the height), the 512x512
+    // preclip crop is forced against the plate boundary and Sync.so's
+    // `auto_detect:true` on the resulting cropped frame routinely fails
+    // to find an active speaker → output is the unchanged preclip and
+    // the muxed scene shows a closed mouth during the speaker's voice
+    // window. DB-confirmed on scene ec22e048… (June 2026): center speakers
+    // at 41 % and 63 % width animated correctly, edge speakers at 22 %
+    // and 84 % width came back static. For edge speakers we skip the
+    // preclip entirely so `freshDefaultVariant` selects `bbox-url-pro`
+    // and Sync.so receives a per-frame deterministic target box on the
+    // FULL multi-face plate (which sync-3 handles natively).
+    const EDGE_X_FRAC = 0.25;
+    const EDGE_Y_FRAC = 0.15;
+    const speakerIsEdgePositioned = (() => {
+      if (!plateDims || !Array.isArray(pass.coords) || pass.coords.length !== 2) return false;
+      const cx = Number(pass.coords[0]);
+      const cy = Number(pass.coords[1]);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) return false;
+      const xFrac = cx / plateDims.width;
+      const yFrac = cy / plateDims.height;
+      return (
+        xFrac < EDGE_X_FRAC ||
+        xFrac > 1 - EDGE_X_FRAC ||
+        yFrac < EDGE_Y_FRAC ||
+        yFrac > 1 - EDGE_Y_FRAC
+      );
+    })();
+    const haveBboxUrlPathForEdge =
+      speakers.length >= 2 &&
+      !!plateDims &&
+      !!plateIdentityMap &&
+      (plateIdentityMap.resolvedCount ?? 0) > 0;
+    const skipPreclipForEdgeSpeaker =
+      speakerIsEdgePositioned && haveBboxUrlPathForEdge;
+    if (skipPreclipForEdgeSpeaker) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate bbox-url-pro dispatch`,
+      );
+    }
     const wantPassPreclip =
       speakers.length >= 1 &&
       !!plateDims &&
       Array.isArray(pass.coords) &&
       Number.isFinite(pass.coords[0]) &&
       Number.isFinite(pass.coords[1]) &&
-      !!tightAudioInfo;
+      !!tightAudioInfo &&
+      !skipPreclipForEdgeSpeaker;
     if (wantPassPreclip && !(pass as any).preclip_url) {
       // Window: use the first turn for this speaker as the preclip render
       // window. Per-pass tight audio is sliced to the same window union, so
