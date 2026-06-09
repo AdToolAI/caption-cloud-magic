@@ -103,9 +103,21 @@ export function computeFaceCrop(
   let size = Math.min(rawSize, safeW, safeH);
   // v76 — Neighbor cap: keep the crop comfortably narrower than the gap
   // to the closest other speaker so we never include their face.
+  // v92 — Floor bumped from 160 → 220 (and 0.9 → 0.88 of neighbor gap).
+  // At 160 the 4-speaker preclips ended up at exactly 160px crops scaled
+  // 3.2× to 512, giving Sync.so's `auto_detect` very little facial detail
+  // — the LAST speaker (Sarah) returned essentially un-animated lips in
+  // DB-confirmed scene 63fc42c2 (YAVG frame diff 1.1 vs 17 for centered
+  // speakers). 220 lifts the floor by ~38 % more facial pixels without
+  // breaking the neighbor guarantee: 0.88 × typical 170 px neighbor gap
+  // = 149.6 — we keep the larger of (220, 0.88 × gap) so single-shot and
+  // wide-gap layouts get even more context, while truly tight groups
+  // (gap < 250 px) stay at the gap-derived cap.
   if (hasNeighbors) {
-    const maxAllowed = Math.max(160, 0.9 * minNeighborDist);
+    const maxAllowed = Math.max(220, 0.88 * minNeighborDist);
     size = Math.min(size, maxAllowed);
+  } else {
+    size = Math.max(size, 220);
   }
   size = evenSnap(Math.max(64, size));
 
