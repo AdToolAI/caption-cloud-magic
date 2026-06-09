@@ -611,9 +611,9 @@ serve(async (req) => {
         cleanNames.length > 0 ? `: ${cleanNames.join(", ")}` : "";
       const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
       const visibility = n === 1
-        ? "framed in a clean front or three-quarter angle so the full mouth and jaw are clearly visible and unobstructed by hands, microphones or props"
+        ? "framed in a clean front, three-quarter or natural profile angle (sync-3 handles profile and partial-occlusion natively) so the mouth and jaw remain clearly visible and unobstructed by hands, microphones or props"
         : n === 2
-          ? "each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props"
+          ? "each visible exactly once, in a natural two-shot — front, three-quarter, profile or over-the-shoulder angles are all acceptable (sync-3 handles profile/OTS natively); the mouth and jaw of every person must stay clearly visible and unobstructed by hands, microphones or props"
           : `arranged in a single horizontal line, left-to-right, with equal screen share and clear gaps between them (no overlap, no person standing in front of another). Wide medium group shot, each face shown clean and front-facing, full mouth and jaw of every person clearly visible and unobstructed by hands, microphones or props. Identical lighting on every face`;
       // IMPORTANT: do NOT instruct the model to keep lips closed or "rest" the
       // mouth posture — that produces a frozen, ventriloquist-style face that
