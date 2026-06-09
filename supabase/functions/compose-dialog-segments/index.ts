@@ -115,8 +115,60 @@ const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // Order is intentional: try lipsync-2-pro first (better fidelity when it
 // works), then sync-3 BEFORE the auto-* face-swap-risk variants.
 const SYNC3_MODEL = "sync-3";
-const RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
+// v82 (Phase 2.1) — `bbox-url-pro` is the new PRIMARY for multi-speaker
+// dialog when plate-identity is resolved. Uploads a per-frame
+// `bounding_boxes` JSON to the `composer-frames` bucket and points
+// Sync.so at it via `active_speaker_detection.bounding_boxes_url`.
+// Deterministic per-speaker targeting → no more "Lipsync hat keinen
+// Avatar getroffen". Falls through the existing ladder on failure.
+const RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
 type RetryVariant = typeof RETRY_VARIANTS[number];
+
+/**
+ * v82 — Uploads a Sync.so-compliant per-frame bounding_boxes JSON to the
+ * `composer-frames` bucket and returns its public URL. Schema:
+ *   { bounding_boxes: ([x1,y1,x2,y2] | null)[] }   // length === frame count
+ * Per https://sync.so/docs/developer-guides/speaker-selection — preferred
+ * over inline `bounding_boxes` for long / multi-speaker videos (no payload
+ * size limit, no provider-side rejections).
+ */
+async function uploadBoundingBoxesJson(
+  supabase: any,
+  params: {
+    userId: string;
+    projectId: string;
+    sceneId: string;
+    passIdx: number;
+    box: [number, number, number, number];
+    frameCount: number;
+  },
+): Promise<string | null> {
+  try {
+    const sub = params.projectId || "shared";
+    const ts = Date.now();
+    const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
+    const payload = {
+      bounding_boxes: new Array(Math.max(1, params.frameCount)).fill(params.box),
+    };
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    const { error: upErr } = await supabase.storage
+      .from("composer-frames")
+      .upload(path, blob, {
+        contentType: "application/json",
+        upsert: true,
+        cacheControl: "31536000",
+      });
+    if (upErr) {
+      console.warn(`[compose-dialog-segments] bbox-url upload failed: ${upErr.message}`);
+      return null;
+    }
+    const { data: pub } = supabase.storage.from("composer-frames").getPublicUrl(path);
+    return pub?.publicUrl ?? null;
+  } catch (e) {
+    console.warn(`[compose-dialog-segments] bbox-url upload threw: ${(e as Error).message}`);
+    return null;
+  }
+}
 
 // Pricing: Sync.so lipsync-2-pro = 9 credits/s.  ONE pass over the full clip
 // (regardless of speaker count), so cost = ceil(totalSec) * 9 (min 9).
