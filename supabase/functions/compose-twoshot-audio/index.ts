@@ -672,19 +672,41 @@ serve(async (req) => {
       }
       const utterance = block.text;
       let pcm: Int16Array;
+      let ttsDiag: {
+        speaker: string;
+        engine: string;
+        voice: string;
+        scriptChars: number;
+        rawDurSec: number;
+        trimmedDurSec: number;
+        hallucinatedTailMs: number;
+        trimMode: "timestamps" | "energy-vad" | "none";
+      } | null = null;
       try {
         if (voice.engine === "hume") {
           if (!humeKey) throw new Error("HUME_API_KEY not configured");
           pcm = await humePcm(humeKey, voice.voiceId, voice.provider ?? "HUME_AI", utterance);
         } else {
           if (!elevenKey) throw new Error("ELEVENLABS_API_KEY not configured");
-          pcm = await elevenlabsPcm(elevenKey, voice.voiceId, utterance);
+          const res = await elevenlabsPcm(elevenKey, voice.voiceId, utterance);
+          pcm = res.pcm;
+          ttsDiag = {
+            speaker: block.rawSpeaker,
+            engine: "elevenlabs",
+            voice: voice.voiceId,
+            scriptChars: utterance.length,
+            rawDurSec: res.rawDurSec,
+            trimmedDurSec: res.trimmedDurSec,
+            hallucinatedTailMs: res.hallucinatedTailMs,
+            trimMode: res.trimMode,
+          };
         }
         console.log(`[compose-twoshot-audio] ${voice.engine} voice ok`, {
           speaker: block.rawSpeaker,
           voice: voice.voiceId,
           samples: pcm.length,
           seconds: Math.round(samplesDurationSec(pcm.length) * 1000) / 1000,
+          tts_diag: ttsDiag,
         });
       } catch (primaryErr) {
         const errMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
@@ -699,7 +721,18 @@ serve(async (req) => {
           }, 400);
         }
         try {
-          pcm = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+          const res = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+          pcm = res.pcm;
+          ttsDiag = {
+            speaker: block.rawSpeaker,
+            engine: "elevenlabs-fallback",
+            voice: FALLBACK_ELEVEN_VOICE,
+            scriptChars: utterance.length,
+            rawDurSec: res.rawDurSec,
+            trimmedDurSec: res.trimmedDurSec,
+            hallucinatedTailMs: res.hallucinatedTailMs,
+            trimMode: res.trimMode,
+          };
         } catch (fbErr) {
           return json({
             error: "tts_failed",
@@ -711,6 +744,8 @@ serve(async (req) => {
           }, 400);
         }
       }
+      if (ttsDiag) ttsDiagnostics.push(ttsDiag);
+
       const startSample = cursorSamples;
       const endSample = cursorSamples + pcm.length;
       const slug = block.speakerName;
