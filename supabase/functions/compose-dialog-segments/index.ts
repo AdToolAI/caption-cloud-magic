@@ -82,6 +82,7 @@ import {
   resolveSceneFaceMap,
 } from "../_shared/twoshot-face-map.ts";
 import { detectPlateFaces } from "../_shared/plate-face-detect.ts";
+import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -830,6 +831,66 @@ serve(async (req) => {
       coordSources.push(picked?.source ?? "none");
       return picked?.coords ?? null;
     });
+
+    // ── Plate-native identity override (v77) ──────────────────────────────
+    // Anchor coords drift 5–15 % vs the rendered Hailuo plate. For multi-
+    // speaker scenes that drift routinely lands the Sync.so target on the
+    // WRONG face. Detect faces on the ACTUAL plate frame and identity-match
+    // against the character portraits, then replace anchor coords with
+    // plate-pixel-space coords/bbox per character.
+    const speakerPlateBboxes: Array<[number, number, number, number] | null> =
+      new Array(speakers.length).fill(null);
+    let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
+    if (!isAdvance && speakers.length >= 2 && plateDims && sourceClipUrl) {
+      try {
+        plateIdentityMap = await resolvePlateFaceIdentities({
+          supabase,
+          sceneId,
+          projectId: String((scene as any).project_id ?? ""),
+          plateUrl: sourceClipUrl,
+          plateWidth: plateDims.width,
+          plateHeight: plateDims.height,
+          midDurationSec: totalSec,
+          characters,
+        });
+      } catch (err) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} plate-identity resolve threw: ${(err as Error)?.message}`,
+        );
+      }
+    }
+    if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
+      const byId = new Map<string, PlateIdentityFace>();
+      for (const f of plateIdentityMap.faces) {
+        if (f.characterId) byId.set(String(f.characterId).toLowerCase(), f);
+      }
+      // Slot-fallback for any face the identity step couldn't label.
+      const unlabeled = plateIdentityMap.faces.filter((f) => !f.characterId);
+      speakers.forEach((sp, idx) => {
+        const cid = sp.character_id ? String(sp.character_id).toLowerCase() : "";
+        let plateFace: PlateIdentityFace | undefined = cid ? byId.get(cid) : undefined;
+        let source = "plate-identity";
+        if (!plateFace && unlabeled.length > 0) {
+          plateFace = unlabeled.find((f) => f.slot === idx) ?? unlabeled[0];
+          source = "plate-slot-fallback";
+          if (plateFace) unlabeled.splice(unlabeled.indexOf(plateFace), 1);
+        }
+        if (plateFace) {
+          speakerCoords[idx] = [plateFace.center[0], plateFace.center[1]];
+          speakerPlateBboxes[idx] = plateFace.bbox;
+          coordSources[idx] = source;
+        }
+      });
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} plate-identity faces=${plateIdentityMap.faces.length} ` +
+        `resolved=${plateIdentityMap.resolvedCount}/${speakers.length} cached=${plateIdentityMap.cached}`,
+      );
+    } else if (speakers.length >= 2 && !isAdvance) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
+      );
+    }
+
     // Final safety fallback: evenly spaced along the horizontal midline so
     // 3+ speakers never collide on the same x.
     for (let i = 0; i < speakerCoords.length; i++) {
@@ -842,12 +903,6 @@ serve(async (req) => {
         ];
       }
       speakerCoords[i] = clampSyncCoords(speakerCoords[i]);
-      // Bounds-clamp into the inner 90% of the plate. Identity-match coords
-      // are in anchor-space; if anchor/plate aspect-ratios differ (common
-      // for 3+ speaker wide group shots) the rescaled point can land
-      // outside the actual video frame and Sync.so returns the opaque
-      // "An unknown error occurred." Clamp is a no-op when coords already
-      // sit inside the plate — so 1- and 2-speaker scenes are unaffected.
       if (speakerCoords[i] && plateDims) {
         const margin = 0.05;
         const minX = Math.round(plateDims.width * margin);
@@ -865,8 +920,11 @@ serve(async (req) => {
     console.log(
       `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} ` +
       `anchor=${faceMap?.width ?? "?"}x${faceMap?.height ?? "?"} plate=${plateDims ? `${plateDims.width}x${plateDims.height}` : "probe-failed"} ` +
+      `plate_identity=${plateIdentityMap ? `${plateIdentityMap.resolvedCount}/${plateIdentityMap.faces.length}` : "off"} ` +
       `speakers=${speakers.length} coords=${JSON.stringify(speakerCoords)} sources=${JSON.stringify(coordSources)}`,
     );
+
+
 
     // ─────────────────────────────────────────────────────────────────────
     // v60 — Unified Pipeline (one path for every N≥2)
@@ -1629,27 +1687,15 @@ serve(async (req) => {
     // coordinates BEFORE paying Sync.so — otherwise Sync.so returns the
     // opaque "An unknown error occurred." and burns credits / time.
     if (!isAdvance) {
-      // v37 — If the anchor faceMap returned identity matches for every
-      // speaker (i.e. Gemini Vision confidently mapped each character_id to
-      // a face box on the anchor image), trust those coordinates and skip
-      // the strict per-frame plate face-check. Sync.so's ActiveSpeaker DTO
-      // operates on `frame_number + coordinates` in plate-pixel space — it
-      // does NOT require that the same face be re-detected via Gemini at
-      // that exact frame. The strict check was producing false-negative
-      // `plate_target_face_missing_*` blocks even when all three speakers
-      // were clearly visible in the plate, because Gemini's per-frame face
-      // detection sometimes only locks onto the most prominent face. See:
-      // https://sync.so/docs/developer-guides/speaker-selection
-      const allIdentityMatched =
-        speakers.length >= 3 &&
-        coordSources.length === speakers.length &&
-        coordSources.every((s) => s === "identity");
-      const strictTargetCheck = speakers.length >= 3 && !!plateDims && !allIdentityMatched;
-      if (allIdentityMatched) {
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} face-gate SOFT-PASS — all ${speakers.length} speakers identity-matched on anchor; relying on Sync.so ASD with frame_number+coordinates`,
-        );
-      }
+      // v77 — Soft-pass for "all anchor identity-matched" REMOVED.
+      // Anchor identity matches were the original cause of wrong-face
+      // lipsync (user report June 9 2026: "Lip-Sync hat keinen einzigen
+      // Avatar getroffen"). For 3+ speakers we ALWAYS run the strict
+      // per-frame plate face check; if `resolvePlateFaceIdentities` already
+      // gave us plate-pixel coords, the strict check trivially passes
+      // because coords sit on real plate faces.
+      const strictTargetCheck = speakers.length >= 3 && !!plateDims;
+
       for (const pass of builtPasses) {
         const firstTurn = pass.segments[0];
         if (!firstTurn) continue;
@@ -2101,6 +2147,13 @@ serve(async (req) => {
           Math.round(by2 * sy),
         ];
       }
+      // v77 — When plate-identity gave us a real plate-pixel bbox for this
+      // speaker, prefer it over the anchor-rescaled box (anchor often
+      // drifts 5–15 % vs the Hailuo plate).
+      const platePassBbox = speakerPlateBboxes[pass.speaker_idx] ?? null;
+      if (platePassBbox) {
+        bboxForCrop = platePassBbox;
+      }
       // v76 — Collect coords of the OTHER passes (same plate) so the
       // single-face preclip crop never includes a neighbor's face.
       const siblingCoordsForPass: Array<[number, number]> = passes
@@ -2136,18 +2189,55 @@ serve(async (req) => {
         90_000,
       );
       if (preclip.ok && preclip.preclipUrl && preclip.crop) {
-        (pass as any).preclip_url = preclip.preclipUrl;
-        (pass as any).preclip_render_id = preclip.preclipRenderId ?? null;
-        (pass as any).preclip_crop = {
-          x: preclip.crop.x,
-          y: preclip.crop.y,
-          size: preclip.crop.size,
-          outputSize: preclip.crop.outputSize,
-        };
-        (pass as any).preclip_error = null;
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified_ready url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
-        );
+        // v77 — Validate the preclip actually shows EXACTLY one face before
+        // shipping to Sync.so. If the crop is empty (wrong coords) or
+        // contains two heads (sibling cap failed), Sync.so would happily
+        // animate the wrong region, producing the "Lip-Sync hit no avatar"
+        // failure mode the user reported.
+        let preclipFaceOk = true;
+        let preclipFaceCount: number | null = null;
+        if (speakers.length >= 2) {
+          try {
+            const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
+            const v = await validateFrameFace({
+              supabaseUrl, serviceKey,
+              videoUrl: preclip.preclipUrl,
+              frameNumber: midFrame, fps: 30,
+              targetCoords: null,
+            });
+            if (v.ok) {
+              preclipFaceCount = Number(v.faceCount ?? 0);
+              if (preclipFaceCount === 0) preclipFaceOk = false;
+              if (preclipFaceCount > 1) preclipFaceOk = false;
+            }
+          } catch (e) {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} preclip_face_gate threw: ${(e as Error)?.message}`,
+            );
+          }
+        }
+        if (preclipFaceOk) {
+          (pass as any).preclip_url = preclip.preclipUrl;
+          (pass as any).preclip_render_id = preclip.preclipRenderId ?? null;
+          (pass as any).preclip_crop = {
+            x: preclip.crop.x,
+            y: preclip.crop.y,
+            size: preclip.crop.size,
+            outputSize: preclip.crop.outputSize,
+          };
+          (pass as any).preclip_error = null;
+          (pass as any).preclip_face_count = preclipFaceCount;
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_ready faces=${preclipFaceCount ?? "skip"} url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
+          );
+        } else {
+          (pass as any).preclip_error = `face_gate_failed:count=${preclipFaceCount}`;
+          (pass as any).preclip_face_count = preclipFaceCount;
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_face_gate_BLOCK faces=${preclipFaceCount} — falling back to full-plate dispatch with plate coords`,
+          );
+        }
+
       } else {
         (pass as any).preclip_error = preclip.error ?? "unknown";
         console.warn(
