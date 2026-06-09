@@ -47,7 +47,13 @@ import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices'
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
 import { DialogTakeStrip } from './DialogTakeStrip';
-import { Sparkles as SparklesIcon, Play } from 'lucide-react';
+import PerTurnShotChip from './PerTurnShotChip';
+import {
+  buildCoveragePartials,
+  coverageMarkerFor,
+} from '@/lib/shotDirector/spawnCoverageScenes';
+import type { ShotSelection } from '@/config/shotDirector';
+import { Sparkles as SparklesIcon, Play, Clapperboard } from 'lucide-react';
 import type {
   ComposerCharacter,
   ComposerScene,
@@ -1442,16 +1448,23 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                       {b.text}
                     </span>
                   </div>
-                  <div className="pl-7">
-                    <DialogTakeStrip
-                      lineKey={lineKey}
-                      text={b.text}
-                      voiceCfg={cfg}
-                      voiceTuning={tuning}
-                      bundle={bundle}
+                  <div className="pl-7 flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <DialogTakeStrip
+                        lineKey={lineKey}
+                        text={b.text}
+                        voiceCfg={cfg}
+                        voiceTuning={tuning}
+                        bundle={bundle}
+                        language={language}
+                        projectId={projectId || scene.projectId}
+                        onChange={(next) => updateLineTakes(lineKey, next)}
+                      />
+                    </div>
+                    <PerTurnShotChip
+                      value={getDialogShotOverride(scene, lineKey)}
+                      onChange={(sel) => setDialogShotOverride(lineKey, sel)}
                       language={language}
-                      projectId={projectId || scene.projectId}
-                      onChange={(next) => updateLineTakes(lineKey, next)}
                     />
                   </div>
                 </div>
