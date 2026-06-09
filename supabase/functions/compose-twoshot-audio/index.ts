@@ -721,6 +721,36 @@ serve(async (req) => {
     }
     const speakerTracks = Array.from(groups.values()).sort((a, b) => a.startSec - b.startSec);
 
+    // v86 — HARD-GUARD: distinct raw speakers in the dialog_script MUST equal
+    // the number of grouped speaker tracks. If they don't, two different
+    // speakers collapsed into one Sync.so pass — exactly the bug where Char 1
+    // appears to speak twice while Char 4's mouth never moves. Refuse with a
+    // clear error so the UI surfaces it instead of paying for a broken render.
+    const distinctRawSpeakers = new Set(blocks.map((b) => b.rawSpeaker.trim().toLowerCase()));
+    if (distinctRawSpeakers.size > speakerTracks.length) {
+      const collidingPairs: string[] = [];
+      const seen = new Map<string, string>(); // key → first rawSpeaker
+      for (const seg of segments) {
+        const key = String(seg.character_id || seg.speaker_slug || seg.speaker).toLowerCase();
+        const prev = seen.get(key);
+        if (prev && prev.toLowerCase() !== seg.speaker.toLowerCase()) {
+          collidingPairs.push(`"${prev}" ↔ "${seg.speaker}"`);
+        } else if (!prev) {
+          seen.set(key, seg.speaker);
+        }
+      }
+      return json({
+        error: "speaker_dedup_collision",
+        message:
+          `${distinctRawSpeakers.size} unterschiedliche Sprecher im Skript, aber nur ${speakerTracks.length} eindeutige Audio-Spuren. ` +
+          `Kollision: ${[...new Set(collidingPairs)].join(", ") || "(unbekannt)"}. ` +
+          `Bitte vollen Namen verwenden oder jedem Skript-Block einen eindeutigen Charakter zuweisen.`,
+        distinct_speakers: distinctRawSpeakers.size,
+        speaker_tracks: speakerTracks.length,
+        colliding_pairs: [...new Set(collidingPairs)],
+      }, 400);
+    }
+
     for (let i = 0; i < speakerTracks.length; i++) {
       try {
         const group = speakerTracks[i];
