@@ -58,6 +58,12 @@ const ShotSchema = z.object({
    *  'relative' = output ist kurzer Preclip ab t=0 (v10 Artlist-Pipeline)
    *  → ohne startFrom direkt in das Fenster legen. */
   sourceTiming: z.enum(['absolute', 'relative']).optional(),
+  /** v90: when sourceTiming === 'relative' the Sync.so output is a single
+   *  concatenated render of ALL this speaker's turns (tight WAV). To prevent
+   *  turn 2 from replaying turn 1's lip animation, each shot starts the
+   *  output video at its precomputed offset inside that concat. Defaults to
+   *  0 (legacy single-turn behavior). Ignored when sourceTiming==='absolute'. */
+  sourceStartSec: z.number().min(0).optional(),
   /** v21: when present the output is a square face-crop in source-master
    *  pixel space; overlay positioned/scaled to (x,y,size) with soft mask. */
   crop: CropSchema.optional().nullable(),
@@ -295,6 +301,13 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         );
         const segDuration = Math.max(1, endFrame - startFrame);
         if (segDuration <= 0) return null;
+        // v90: per-turn offset into the Sync.so output for relative timing.
+        const relativeStartFrame =
+          shot.sourceTiming === 'relative'
+            ? Math.max(0, Math.round(Number(shot.sourceStartSec ?? 0) * fps))
+            : undefined;
+        const startFromForRelative =
+          shot.sourceTiming === 'relative' ? relativeStartFrame : startFrame;
 
         // v25 fan-out face-mask path (highest priority): full Sync.so output
         // for this speaker, masked to a soft circle around their face. Spans
@@ -323,7 +336,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 cxPx={cxPx}
                 cyPx={cyPx}
                 radiusPx={radiusPx}
-                startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+                startFrom={startFromForRelative}
                 segDuration={segDuration}
                 holdToEnd={!!shot.holdToEnd}
               />
@@ -352,7 +365,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               <CroppedOverlay
                 src={shot.outputUrl}
                 segDuration={segDuration}
-                startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+                startFrom={startFromForRelative}
                 left={left}
                 top={top}
                 size={size}
@@ -372,7 +385,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             <FullFrameOverlay
               src={shot.outputUrl}
               segDuration={segDuration}
-              startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+              startFrom={startFromForRelative}
               holdToEnd={!!shot.holdToEnd}
             />
           </Sequence>

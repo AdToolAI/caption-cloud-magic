@@ -202,13 +202,23 @@ serve(async (req) => {
     // Keep overlays windowed to the actual speaker turns. This is the
     // Sync.so-compliant behavior: target face + target audio + exact timeline
     // window. Do not stretch any speaker overlay to scene end.
-    const SHOT_PAD = 0.08;
+    // v90: asymmetric pad — generous onset, tight tail — so lips don't
+    // twitch after the script ends.
+    const SHOT_PAD_START = 0.06;
+    const SHOT_PAD_END = 0.02;
 
     const fanoutShots = useOverlay
       ? donePasses.flatMap((p: any) => {
           const passSegs = Array.isArray(p?.segments) ? p.segments : [];
           const isTight = !!(p as any).audio_tight;
           const sourceTiming: "relative" | "absolute" = isTight ? "relative" : "absolute";
+          // v90 — per-turn offsets inside the tight Sync.so output. Without
+          // these, every turn of a multi-turn speaker restarts at output-t=0
+          // (Sync.so output for tight WAV is a single concatenated render),
+          // so turn 2 visibly replays the lip animation of turn 1.
+          const outputOffsets: number[] = Array.isArray((p as any).audio_tight?.output_offsets_sec)
+            ? ((p as any).audio_tight.output_offsets_sec as number[])
+            : [];
           const preclipCrop = (p as any).preclip_crop;
           const hasPreclipCrop =
             preclipCrop &&
@@ -237,19 +247,30 @@ serve(async (req) => {
               endSec: totalSec,
               outputUrl: String(p.output_url),
               sourceTiming,
+              sourceStartSec: 0,
               ...overlayPayload,
             }];
           }
-          return passSegs
-            .map((t: any) => {
-              const s = Math.max(0, Number(t.startTime) - SHOT_PAD);
-              const e = Math.min(totalSec, Number(t.endTime) + SHOT_PAD);
+          // Sort turns by start so per-turn offsets line up with the tight
+          // WAV concat order (sliceWavToWindows sorts internally too).
+          const sortedSegs = [...passSegs].sort(
+            (a: any, b: any) => Number(a.startTime) - Number(b.startTime),
+          );
+          return sortedSegs
+            .map((t: any, i: number) => {
+              const s = Math.max(0, Number(t.startTime) - SHOT_PAD_START);
+              const e = Math.min(totalSec, Number(t.endTime) + SHOT_PAD_END);
               if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s + 0.05) return null;
+              const sourceStartSec =
+                sourceTiming === "relative" && Number.isFinite(outputOffsets[i])
+                  ? Math.max(0, Number(outputOffsets[i]))
+                  : 0;
               return {
                 startSec: s,
                 endSec: e,
                 outputUrl: String(p.output_url),
                 sourceTiming,
+                sourceStartSec,
                 ...overlayPayload,
               };
             })
