@@ -229,6 +229,17 @@ export default function SceneInlinePlayer({
                 // der v5-Pipeline wider, damit der Nutzer immer sieht, wo
                 // es gerade steht (statt eines stummen Spinners).
                 const audioUrl = (scene as any).audioPlan?.twoshot?.url;
+                // Plan v71: ehrliche Unterscheidung "wird gestartet" vs. "läuft".
+                // Ein Provider-Job existiert nur, wenn dialog_shots.shots[] /
+                // .passes[] / .sync_job_id oder replicate_prediction_id 'sync:'
+                // gesetzt ist. Ohne das ist die Szene noch im Dispatch-Limbo.
+                const ds: any = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
+                const rpid = (scene as any).replicatePredictionId ?? (scene as any).replicate_prediction_id;
+                const hasProviderJob =
+                  (typeof rpid === 'string' && rpid.startsWith('sync:')) ||
+                  !!ds?.sync_job_id ||
+                  (Array.isArray(ds?.shots) && ds.shots.some((s: any) => s?.sync_job_id)) ||
+                  (Array.isArray(ds?.passes) && ds.passes.some((p: any) => p?.job_id));
                 let title = 'Szene wird gebaut…';
                 let sub = 'VO & Lip-Sync inklusive';
                 if (status === 'ready' && lipsyncRunning) {
@@ -238,7 +249,7 @@ export default function SceneInlinePlayer({
                   } else if (lipSyncStatus === 'audio_muxing' || twoshotStage === 'audio_muxing') {
                     title = 'Audio wird gemischt…';
                     sub = 'Letzter Schritt';
-                  } else if (lipSyncStatus === 'running') {
+                  } else if (lipSyncStatus === 'running' && hasProviderJob) {
                     title = 'Lip-Sync läuft…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
                   } else if (twoshotStage === 'audio') {
@@ -253,11 +264,15 @@ export default function SceneInlinePlayer({
                     title = 'Wartet auf Sync.so-Slot…';
                     sub = 'Sobald frei, geht es weiter';
                   } else if (
-                    twoshotStage === 'master_clip' ||
-                    (typeof twoshotStage === 'string' && twoshotStage.startsWith('syncso_'))
+                    (twoshotStage === 'master_clip' || (typeof twoshotStage === 'string' && twoshotStage.startsWith('syncso_'))) &&
+                    hasProviderJob
                   ) {
                     title = 'Lip-Sync läuft…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
+                  } else if (twoshotStage === 'master_clip' && !hasProviderJob) {
+                    // Recovery-Fenster: server-watchdog dispatcht spätestens nach 3 min.
+                    title = 'Lip-Sync wird gestartet…';
+                    sub = 'Bereit, Sync.so wird angestoßen';
                   } else if (!twoshotStage && audioUrl) {
                     title = 'Lip-Sync wird gestartet…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
