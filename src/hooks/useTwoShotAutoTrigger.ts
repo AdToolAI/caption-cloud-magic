@@ -409,16 +409,22 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             `[useTwoShotAutoTrigger] invoking ${fnName} for scene ${d.id} (speakers=${speakers})`,
           );
           supabase.functions
-            .invoke(fnName, { body: { scene_id: d.id } })
+            .invoke(fnName, { body: { scene_id: d.id, auto: true } })
             .then(async ({ data: lsData, error: lsErr }) => {
-              const errBody = (lsErr as any)?.context;
-              const reason = lsData?.error ?? errBody?.error;
-              const message = lsData?.message ?? errBody?.message;
-              // Pre-flight races: edge function said the audio plan or the
-              // master plate isn't ready yet. The pre-flight gate above
-              // normally prevents this, but DB read-your-writes lag can
-              // still slip one through. Treat as silent retry — the next
-              // poll tick will pick it up once the row is consistent.
+              if (cancelled) return;
+              // Parse FunctionsHttpError body FIRST. `lsErr.context` is a raw
+              // Response object — reading `.error` on it returns undefined, so
+              // the previous silent-race check never matched and benign races
+              // (e.g. scene_not_found after "Neues Projekt") surfaced as toasts.
+              let reason: string | undefined = lsData?.error;
+              let message: string | undefined = lsData?.message;
+              let realMsg = '';
+              if (lsErr) {
+                realMsg = await extractFunctionsError(lsErr);
+                const code = realMsg.split(/\s[\(\[]/)[0]?.trim();
+                if (code) reason = reason ?? code;
+                message = message ?? realMsg;
+              }
               const SILENT_RACE = new Set([
                 'missing_audio_plan',
                 'missing_source_clip',
@@ -432,10 +438,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 console.info(
                   `[useTwoShotAutoTrigger] silent retry for ${d.id}: ${reason}`,
                 );
-                // Free the inflight slot immediately so a legitimate new
-                // scene with a different id isn't blocked for 30 s.
                 inflight.current.delete(d.id);
-              } else if (reason === 'tts_failed' || reason === 'no_voiceover') {
+                return;
+              }
+              if (reason === 'tts_failed' || reason === 'no_voiceover') {
                 emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
                   title: 'Cinematic-Sync braucht ein Voiceover',
@@ -445,7 +451,6 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 });
               } else if (lsErr) {
                 emitPipelineEvent({ type: 'lipsync:end' });
-                const realMsg = await extractFunctionsError(lsErr);
                 toast({
                   title: 'Lip-Sync fehlgeschlagen',
                   description: realMsg || message || 'Unbekannter Fehler beim Lip-Sync.',
@@ -458,10 +463,6 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               }
             })
             .finally(() => {
-              // Lock wird nicht sofort freigegeben — der nächste Poll-Tick
-              // sieht entweder lip_sync_applied_at gesetzt oder lip_sync_status
-              // weiterhin 'running'. Bei Failure setzt die Edge-Function selbst
-              // den Status zurück.
               setTimeout(() => inflight.current.delete(d.id), 30_000);
             });
         }
