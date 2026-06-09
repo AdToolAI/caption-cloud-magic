@@ -568,6 +568,17 @@ export interface AudioPlanSpeaker {
   voiceId?: string;
   /** Public URL of the rendered TTS clip — also used as audio source-of-truth. */
   audioUrl?: string;
+  /**
+   * Per-turn Shot Director override (Phase 3.1). When set, the values win
+   * over the scene-level `shotDirector` for this dialog turn — emitted as a
+   * `[6 DIALOG SHOTS]` block by composeFinalPrompt, and treated as the
+   * authoritative per-clip shot direction by the SRS / cinematic-sync
+   * sub-scene spawner.
+   *
+   * Stored inside the existing `composer_scenes.audio_plan` JSONB column —
+   * no schema migration. Empty = inherit scene defaults.
+   */
+  shotDirector?: import('@/config/shotDirector').ShotSelection;
 }
 
 export interface AudioPlanTwoshot {
