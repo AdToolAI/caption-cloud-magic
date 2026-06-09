@@ -1339,6 +1339,58 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             {t.blocks(blocks.length)} · {t.speakers(speakers.length)} · {t.sec(estimatedDurationSec)}
             {blocks.length > 0 && ` · €${totalCost.toFixed(2)}`}
           </span>
+          {onInsertScenesAfter && sceneCast.length >= 1 && blocks.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 gap-1 text-[10px] border-primary/40 text-primary hover:bg-primary/10"
+              title={
+                language === 'de'
+                  ? 'Master + OTS/Close-up pro Sprecher als Folge-Szenen einfügen'
+                  : language === 'es'
+                  ? 'Insertar Master + OTS/Primer plano por hablante'
+                  : 'Insert Master + OTS/Close-up coverage per speaker'
+              }
+              onClick={async () => {
+                try {
+                  const partials = buildCoveragePartials(scene);
+                  // Idempotency: delete any prior coverage children for this parent.
+                  const marker = coverageMarkerFor(scene.id);
+                  if (scene.projectId) {
+                    try {
+                      const { data: stale } = await supabase
+                        .from('composer_scenes')
+                        .select('id')
+                        .eq('project_id', scene.projectId)
+                        .eq('cinematic_preset_slug', marker);
+                      const ids = (stale ?? []).map((r: any) => r.id).filter((id: string) => id && id !== scene.id);
+                      if (ids.length > 0) {
+                        await supabase.from('composer_scenes').delete().in('id', ids);
+                      }
+                    } catch (cleanupErr) {
+                      console.warn('[AutoCoverage] cleanup failed (continuing)', cleanupErr);
+                    }
+                  }
+                  await onInsertScenesAfter(scene.id, partials, { removeParent: false });
+                  toast({
+                    title: language === 'de' ? '✨ Coverage erzeugt' : language === 'es' ? '✨ Coverage creada' : '✨ Coverage created',
+                    description:
+                      language === 'de'
+                        ? `${partials.length} Szenen nach dieser Szene eingefügt.`
+                        : language === 'es'
+                        ? `${partials.length} escenas insertadas.`
+                        : `${partials.length} scenes inserted.`,
+                  });
+                } catch (e) {
+                  toast({ title: 'Auto-Coverage', description: formatError(e), variant: 'destructive' });
+                }
+              }}
+            >
+              <Clapperboard className="h-3 w-3" />
+              {language === 'de' ? 'Auto-Coverage' : language === 'es' ? 'Auto-Coverage' : 'Auto-Coverage'}
+            </Button>
+          )}
           {onClose && (
             <Button
               type="button"
