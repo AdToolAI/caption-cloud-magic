@@ -82,6 +82,7 @@ import {
   resolveSceneFaceMap,
 } from "../_shared/twoshot-face-map.ts";
 import { detectPlateFaces } from "../_shared/plate-face-detect.ts";
+import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
