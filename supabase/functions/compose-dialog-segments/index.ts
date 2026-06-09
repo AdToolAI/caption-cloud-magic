@@ -422,7 +422,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url, lock_reference_url",
+        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url, lock_reference_url, meta",
       )
       .eq("id", sceneId)
       .single();
@@ -980,6 +980,99 @@ serve(async (req) => {
       `speakers=${speakers.length} coords=${JSON.stringify(speakerCoords)} sources=${JSON.stringify(coordSources)}`,
     );
 
+    // ── v87 — Block heuristic centre-grid dispatch (multi-speaker only) ──
+    // Root cause of "alle Münder zu" bug (June 9 2026): when Gemini anchor-
+    // faces aren't cached yet AND plate-identity resolve fails (e.g. Hailuo
+    // MP4 still warming in CDN), every coordSource falls back to "heuristic"
+    // / "none" — the safety grid plants y at plate.height * 0.5, which on a
+    // portrait plate (faces at y≈0.3) lands mid-torso. Sync.so then animates
+    // nothing because there's no face under the coordinate → user sees every
+    // speaker with closed mouth. Refuse to dispatch in that state; refund &
+    // mark the scene `pending` so the auto-trigger retries once anchor data
+    // is available. Hard-fail only after 3 awaiting cycles.
+    const coordsAreHeuristicOnly = speakers.length >= 2 && coordSources.every(
+      (s) => !s || s === "none" || s === "heuristic",
+    );
+    if (coordsAreHeuristicOnly && !isAdvance && !isRetry) {
+      const prevRetryCount = Number(
+        ((scene as any)?.meta as any)?.face_detect_retry_count ?? 0,
+      );
+      const nextRetryCount = prevRetryCount + 1;
+      const giveUp = nextRetryCount >= 3;
+
+      // Refund the wallet debit we already took at line ~741.
+      const { data: wHeur } = await supabase
+        .from("wallets").select("balance").eq("user_id", userId).single();
+      await supabase
+        .from("wallets")
+        .update({
+          balance: Number(wHeur?.balance ?? 0) + totalCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+
+      const prevMeta = ((scene as any)?.meta ?? {}) as Record<string, unknown>;
+      await supabase
+        .from("composer_scenes")
+        .update(
+          giveUp
+            ? {
+                lip_sync_status: "failed",
+                twoshot_stage: "failed",
+                clip_error:
+                  "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
+                meta: { ...prevMeta, face_detect_retry_count: 0 },
+              }
+            : {
+                lip_sync_status: "pending",
+                twoshot_stage: "pending",
+                clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
+                meta: { ...prevMeta, face_detect_retry_count: nextRetryCount },
+              },
+        )
+        .eq("id", sceneId);
+
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        user_id: userId,
+        engine: "sync-segments",
+        sync_status: "HEURISTIC_BLOCKED",
+        error_class: "coords_heuristic_unverified",
+        error_message: giveUp
+          ? `no_face_map_after_3_retries (speakers=${speakers.length}, plate=${plateDims ? `${plateDims.width}x${plateDims.height}` : "probe-failed"})`
+          : `awaiting_face_detection_retry_${nextRetryCount}_of_3 (speakers=${speakers.length})`,
+        meta: {
+          speakers: speakers.length,
+          plate_dims: plateDims ?? null,
+          face_map_source: faceMap?.source ?? "none",
+          face_map_faces: faceMap?.faces?.length ?? 0,
+          plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
+          retry_count: nextRetryCount,
+          gave_up: giveUp,
+        },
+      });
+
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v87 HEURISTIC_BLOCKED ` +
+        `speakers=${speakers.length} sources=${JSON.stringify(coordSources)} ` +
+        `retry=${nextRetryCount}/3 giveUp=${giveUp} refunded=${totalCost}`,
+      );
+
+      return json(
+        {
+          ok: !giveUp,
+          status: giveUp ? "failed" : "awaiting_face_detection",
+          error: giveUp ? "no_face_map_after_3_retries" : "awaiting_face_detection_retry",
+          message: giveUp
+            ? "Face detection still empty after 3 retries — scene marked failed."
+            : `Anchor face map not ready yet — refunded ${totalCost} credits and will retry automatically (${nextRetryCount}/3).`,
+          retry_count: nextRetryCount,
+          refunded: totalCost,
+        },
+        202,
+      );
+    }
+
 
 
     // ─────────────────────────────────────────────────────────────────────
@@ -1512,6 +1605,72 @@ serve(async (req) => {
       // Fresh dispatch: start at pass 0.
       passes = builtPasses;
       currentPassIdx = 0;
+    }
+
+    // ── v87 — Coords refresh on advance/retry ────────────────────────────
+    // Bug (verified in edge logs, scene 4c310576…): pass 1 dispatched with
+    // heuristic [x, plateH*0.5] because anchor faceMap wasn't cached yet.
+    // Those bad coords got baked into prevState.passes and every subsequent
+    // isAdvance call cloned them verbatim — even though the freshly computed
+    // `speakerCoords` now had real plate-identity / anchor coords. Refresh
+    // pass.coords whenever the fresh source is *better* than what's stored.
+    // "Better" = anything that isn't "heuristic"/"none". Heuristic coords
+    // are blocked outright on the fresh path (above guard), so this only
+    // upgrades — it never silently downgrades an already-good coord.
+    if ((isAdvance || isRetry) && Array.isArray(speakerCoords) && speakerCoords.length > 0) {
+      for (const p of passes) {
+        const idx = Number(p.speaker_idx);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= speakerCoords.length) continue;
+        const freshCoord = speakerCoords[idx];
+        const freshSource = coordSources[idx] ?? "none";
+        if (!freshCoord) continue;
+        if (freshSource === "heuristic" || freshSource === "none") continue;
+        const oldCoord = Array.isArray(p.coords) ? [p.coords[0], p.coords[1]] : null;
+        const changed =
+          !oldCoord ||
+          Math.round(Number(oldCoord[0])) !== Math.round(Number(freshCoord[0])) ||
+          Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
+        if (changed) {
+          p.coords = [freshCoord[0], freshCoord[1]];
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} ADVANCE COORDS REFRESH pass=${p.idx} ` +
+            `speaker=${p.speaker_name} old=${JSON.stringify(oldCoord)} new=${JSON.stringify(p.coords)} source=${freshSource}`,
+          );
+        }
+      }
+    }
+
+    // ── v87 — Sanity guard: never dispatch a multi-speaker pass with
+    // heuristic-only coords. Belt-and-suspenders behind the fresh-path
+    // guard above; covers any future code path that could reach here with
+    // an unverified coord (e.g. retry after a successful pass 1 if the
+    // faceMap regressed). 1-speaker scenes are exempt (centre-of-frame is
+    // a sane single-face fallback).
+    if (speakers.length >= 2) {
+      const pSrc = coordSources[Number(passes[currentPassIdx]?.speaker_idx ?? -1)] ?? "none";
+      if (pSrc === "heuristic" || pSrc === "none") {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v87 SANITY-BLOCK pass=${currentPassIdx} ` +
+          `speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} — skipping dispatch, awaiting retry`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId,
+          engine: "sync-segments",
+          sync_status: "HEURISTIC_BLOCKED",
+          error_class: "coords_heuristic_unverified",
+          error_message: `pass=${currentPassIdx} speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc}`,
+          meta: { speakers: speakers.length, pass_idx: currentPassIdx, is_advance: isAdvance, is_retry: isRetry },
+        });
+        return json(
+          {
+            ok: true,
+            status: "awaiting_face_detection",
+            skipped: `pass_${currentPassIdx}_heuristic_coord_unverified`,
+          },
+          202,
+        );
+      }
     }
 
 
