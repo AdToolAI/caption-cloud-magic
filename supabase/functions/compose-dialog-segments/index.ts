@@ -438,6 +438,38 @@ serve(async (req) => {
     const userId = project?.user_id;
     if (!userId) return json({ error: "missing_user" }, 403);
 
+    // ── Plan v72 — Dispatch-attempt breadcrumb ───────────────────────────
+    // Emit a lightweight DISPATCH_ATTEMPT_STARTED log right after lock + scene
+    // load. Lets the watchdog and ops queries distinguish three states:
+    //   1) no row at all                → dispatcher was never reached
+    //   2) DISPATCH_ATTEMPT_STARTED only → reached but preflight blocked/crashed
+    //   3) DISPATCHED                    → Sync.so was actually called
+    // Best-effort; failures are logged but don't block the run.
+    try {
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        user_id: userId,
+        engine: "sync-segments",
+        sync_status: "DISPATCH_ATTEMPT_STARTED",
+        meta: {
+          is_retry: isRetry,
+          is_advance: isAdvance,
+          is_v41_retry: isV41Retry,
+          recovery: body?.recovery === true,
+          auto: body?.auto === true,
+          repair_audio: repairAudio,
+          stage_at_entry: (scene as any).twoshot_stage ?? null,
+          lip_sync_status_at_entry: (scene as any).lip_sync_status ?? null,
+          existing_state_version: (scene as any).dialog_shots?.version ?? null,
+          existing_state_status: (scene as any).dialog_shots?.status ?? null,
+        },
+      });
+    } catch (e) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} dispatch_attempt_log_failed: ${(e as Error)?.message ?? e}`,
+      );
+    }
+
     // ── Validate audio plan ───────────────────────────────────────────────
     const plan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
     const twoshot = (plan.twoshot ?? {}) as Record<string, any>;
