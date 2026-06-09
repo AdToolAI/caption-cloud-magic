@@ -1,75 +1,75 @@
-
 ## Befund
 
-Live-DB für Szene `ec22e048…` (9.0 s plate, 4 Sprecher) zeigt zwei voneinander unabhängige Audio-Bugs:
+User-Report: „Sync trifft jeden Sprecher korrekt, aber manchmal bewegt ein Charakter die Lippen, obwohl sein Skript schon vorbei ist."
 
-**Sprecher 4 (Sarah) abgeschnitten:**
-- `voicedRange` Sarah = 6.880 – 8.691 s, Scene-Plate = 9.000 s.
-- In `compose-twoshot-audio/index.ts` (Z. 658–668) wird der gemerged Voice-Track per
-  `mergedSamples.subarray(0, totalSamples)` **hart auf Scene-Länge getrimmt**, ohne Warnung,
-  ohne Refund, ohne UI-Hinweis. Wenn die TTS-Summe `spokenSec` länger ist als `sceneDur`
-  (z. B. Hailuo lieferte einen 8.7 s-Plate statt 10 s; Sarahs Wort endet bei 8.69 s + ElevenLabs-
-  Trail), fällt das letzte Wort/der letzte Atemzug ins Trimm-Fenster und ist im finalen Mux weg.
+Code-Analyse zeigt **zwei voneinander unabhängige Quellen** für dieses Phänomen, beide im Overlay-Schritt (`render-sync-segments-audio-mux/index.ts`, Z. 200–258) bzw. im Tight-Audio-Build (`compose-dialog-segments/index.ts`, Z. 1870–1931):
 
-**Charakter 2 (Matthew) „sagt etwas nach seinem Text":**
-- Matthew Window = 2.479 – 3.501 s, `voicedSec = 1.022` (peak normalized auf -1 dBFS).
-- Das ist verdächtig: `voicedSec === endSec - startSec` heißt **die VAD findet auf dem gesamten
-  Segment Sprache** — also kein Stille-Tail. ElevenLabs hat den Tail also mit zusätzlichen
-  Wörtern / Atem / „Mhm" befüllt, die im Skript nicht stehen. Bei Aggressiv-Normalisierung
-  (-1 dBFS / -16 LUFS) wird dieses Hallucination-Tail laut hörbar und überlappt mit dem
-  Anfang von Kailees Window (3.751 s).
-- Es gibt aktuell **keinen Script-vs-Audio-Längencheck**: weder Wortzahl ↔ Dauer, noch
-  ElevenLabs `character_end_times`-Cap. Jeder von Eleven gelieferte PCM wird 1:1 in die
-  Cursor-Position übernommen (`cursorSamples += pcm.length`, Z. 596–629).
+### Ursache A — Multi-Turn-Aliasing (Hauptverdächtiger)
+Wenn ein Sprecher **mehrere Turns** in derselben Szene hat (z. B. Matthew sagt zuerst „Hi", später nochmal „yes"), passiert Folgendes:
+- `compose-dialog-segments` baut **ein einziges Tight-WAV** aus allen Turn-Fenstern des Sprechers, getrennt durch 0.05 s Gap (`sliceWavToWindows`, Z. 1900–1904).
+- Sync.so liefert **eine zusammenhängende Output-Video-Datei**, die zeitlich der Tight-WAV-Länge entspricht und am Frame 0 mit Turn-1 startet.
+- Im Mux (Z. 243–256) wird jeder Turn als **separates Shot mit `sourceTiming: "relative"`** ausgespielt. „relative" bedeutet: Jedes Shot startet im `outputUrl` bei **Output-t = 0** und spielt von dort vorwärts.
+- Konsequenz: Turn 2 zeigt im Plate-Fenster `[turn2.start − 0.08, turn2.end + 0.08]` die **Lippenbewegung von Turn 1** (weil der Sync-Output immer wieder am Anfang gestartet wird) — der Charakter „spricht" Wörter, die schon ein paar Sekunden vorher gesagt wurden.
+
+### Ursache B — Decay-Tail-Padding nach Skript-Ende
+Auch wenn ein Sprecher nur einen Turn hat:
+- Tight-Audio addiert `SEG_PAD = 0.08 s` an Anfang und Ende jeder Turn-Window (Z. 1870–1877).
+- Mux-Overlay addiert nochmals `SHOT_PAD = 0.08 s` (Z. 205, 245–246).
+- In Summe können die Lippen bis zu **160 ms nach Skript-Ende** weiterzucken, weil Sync.so im gepaddet-stillen Tail trotzdem Mikrobewegungen erzeugt. Bei Charakteren, die direkt nach dem Sprechen still im Bild bleiben, ist das deutlich sichtbar.
+
+Beide Ursachen sind *innerhalb* eines korrekten Sync-Treffers — der Charakter wird richtig ausgewählt, aber das Animationsfenster ist falsch eingegrenzt.
 
 ## Plan
 
-### 1. Diagnose-Logs hinzufügen (kein neuer Spend)
+### 1. Multi-Turn-Aliasing eliminieren (`compose-dialog-segments/index.ts`)
 
-`compose-twoshot-audio/index.ts`
-- Pro Block loggen: `scriptCharCount`, `pcmDurSec`, `expectedDurSec = scriptCharCount / 14` (ca. 14 chars/s EN), `ratio = pcmDurSec / expectedDurSec`.
-- Wenn `ratio > 1.35` → Flag `tts_overshoot` im Pass-Diagnostic-Block schreiben.
-- Wenn `spokenSec > sceneDur` → `dialog_overflow_sec = spokenSec - sceneDur` im audio_plan persistieren.
+Beim Build der Tight-Audio merken, wo jeder Turn **im Tight-Output liegt**, und ans `audio_tight`-Objekt anhängen:
 
-### 2. Hallucination-Tail-Trimmer für ElevenLabs (Fix Matthew)
+```text
+audio_tight = {
+  url, dur_sec,
+  windows_secs: [[plate_start, plate_end], ...],   // bestehend
+  output_offsets_sec: [0.000, 0.812, 1.420, ...]   // NEU: Start jedes Turns IM Tight-WAV
+}
+```
 
-`compose-twoshot-audio/index.ts` (rund um Z. 530 elevenlabsPcm-Aufruf)
-- ElevenLabs nicht über die rohe PCM-Route nutzen, sondern den `with-timestamps`-Endpunkt aufrufen — Response liefert `alignment.character_end_times_seconds`.
-- `lastScriptCharEndSec = alignment.character_end_times_seconds[lastChar]`
-- PCM hart auf `lastScriptCharEndSec + 0.12 s` zuschneiden (Konsonanten-Abklang).
-- Wenn `pcm.length / SAMPLE_RATE > lastScriptCharEndSec + 0.40 s` → in Diagnostics als `eleven_hallucinated_tail_trimmed: <ms>` loggen.
-- Fallback: wenn `with-timestamps` fehlschlägt → bisherige Route + nachgelagerter `trimSilenceTrailing(pcm, threshDb=-38, minSilenceMs=120)` per Energie-VAD.
+Berechnung: kumulative Summe der Turn-Längen + `gapSec=0.05` Trennstellen (genau wie `sliceWavToWindows` bereits intern macht — wir spiegeln den Output zurück).
 
-### 3. Sarah-Cutoff: Overflow → Scene-Extend statt Hard-Trim
+### 2. Per-Turn-Offset im Mux nutzen (`render-sync-segments-audio-mux/index.ts`)
 
-`compose-twoshot-audio/index.ts` (Z. 658–668)
-- Statt blind `subarray(0, totalSamples)` zu schneiden:
-  - Wenn `spokenSec ≤ sceneDur + 0.30` → nur trimmen, sonst NIE trimmen.
-  - Wenn `spokenSec > sceneDur + 0.30` → `newSceneDur = ceil((spokenSec + 0.30) * 10) / 10` setzen, `composer_scenes.duration_seconds` upserten und ein Flag `dialog_overflow_extended: true` in `audio_plan` schreiben.
-- Der Master-Plate (Hailuo-Video) ist meist exakt 8–10 s. Für den Extend-Fall wird das letzte Frame in `render-sync-segments-audio-mux/index.ts` per ffmpeg `tpad=stop_mode=clone:stop_duration=<diff>` über den Audio-Tail eingefroren (steht in Remotion-Bundle bereits zur Verfügung via `<Freeze>` — alternativ: serverseitig im Mux). Audio läuft komplett durch, Sarah wird nie mehr abgeschnitten.
-- Hard-Cap bei 14 s plate: darüber Pass-Fail `dialog_too_long_for_plate`, refund, UI-Toast „Skript zu lang für die gewählte Szenendauer — bitte Szene auf X s verlängern oder Text kürzen".
+In der `fanoutShots`-Map (Z. 243–256):
+- Wenn `audio_tight.output_offsets_sec[i]` existiert → Shot erhält neuen Property `sourceStartSec = output_offsets_sec[i]`.
+- Shot-Länge bleibt `(e − s)`; Remotion-Compositor spielt also `outputUrl[sourceStartSec .. sourceStartSec + (e−s)]` statt immer ab 0.
+- Default bleibt `sourceStartSec = 0` für Sprecher mit nur einem Turn (kein Verhaltensbruch).
 
-### 4. UI-Sichtbarkeit
+### 3. Remotion-Compositor erweitert (`src/remotion/templates/DialogTurnFaceCropVideo.tsx` oder die Audio-Mux-Composition, je nach aktuellem Render-Pfad)
 
-`SceneInlinePlayer.tsx` / `SceneDialogStudio.tsx`
-- Neuer Warn-Pill unter dem Skript: bei `tts_overshoot` oder `dialog_overflow_extended` farbiges Banner (gelb / cyan) mit Sekunden-Info, ohne Render zu blockieren.
-- Bei `dialog_too_long_for_plate`: rot, blockierend, mit Link „Szene verlängern".
+`<Video>`/`<OffthreadVideo>` für jedes Shot bekommt einen `startFrom={Math.round(sourceStartSec * fps)}` Prop. Wenn `sourceStartSec === 0`, identisches Verhalten zu heute.
 
-### 5. Rescue für betroffene Szene `ec22e048…`
+### 4. Decay-Tail nach Skript-Ende abschneiden
 
-- `compose-twoshot-audio` erneut anstoßen (re-TTS aller 4 Sprecher mit dem neuen Trim).
-- `compose-dialog-segments` per `reset-lipsync-scene` neu starten — die bestehenden Sync.so-Coords + Identity-Map bleiben gültig.
-- Erwartung: Matthew-Window unverändert 2.479 – ~3.30 s (Trail weg), Sarah klingt vollständig aus.
+- `SEG_PAD` (compose-dialog-segments, Z. 1870) bleibt 0.08 s **am Anfang** (Konsonanten-Onset-Schutz) — **am Ende** auf `0.02 s` reduzieren.
+- `SHOT_PAD` (mux, Z. 205) wird asymmetrisch: `START_PAD = 0.06`, `END_PAD = 0.02`.
+- Damit endet das Overlay-Fenster spätestens 20 ms nach Skript-Ende; visuell kein „Nachzucken" mehr, kein Schnitt im Wortausklang.
 
-### 6. Validierung
+### 5. Diagnose + Mem
 
-- Audio-Diagnostics-Tabelle muss zeigen: jeder Pass hat `eleven_hallucinated_tail_trimmed` ≤ 0 (idealerweise nicht gesetzt) oder dokumentierten Wert.
-- Master-WAV (`audio_plan.twoshot.url`) ffprobe = `spokenSec`, kein Hard-Cut am Scene-Ende.
-- Visuell: Matthew schweigt zwischen 3.30 und Kailees Onset; Sarah spricht ihren letzten Satz hörbar zu Ende.
+- In `composer_scenes.audio_plan.twoshot.tts_diagnostics` zusätzlich pro Sprecher `output_offsets_sec` und `turns_count` schreiben → in den QA-Logs sofort sichtbar, ob Multi-Turn-Sprecher korrekt versetzt werden.
+- Neue Memory-Datei `mem/architecture/lipsync/v90-multi-turn-aliasing-and-tail-clamp.md` mit Erklärung, Konstanten (`START_PAD=0.06`, `END_PAD=0.02`, `GAP_SEC=0.05`) und Verweis auf betroffene Datei-Zeilen.
+
+### 6. Rescue für die aktuell betroffene Szene
+
+- `compose-dialog-segments` nicht neu zahlen — `reset-lipsync-scene` auf die Szene, dann Re-Dispatch nutzt automatisch die neue Tight-Build- und Overlay-Logik (Sync.so wird die kürzeren Tight-WAVs neu generieren; das ist 1× regulärer Render, da `sourceClipUrl` und Identity-Map gleich bleiben).
+
+### 7. Validierung
+
+- DB-Check: `audio_tight.output_offsets_sec.length === segments.length` für jeden Pass.
+- ffprobe auf gerenderten Mux: an `turn[i].endTime + 0.05 s` darf das Crop-Region keine erkennbare Mund-Aktivität mehr zeigen (manuell).
+- Multi-Turn-Szene reproduzieren (z. B. ein Sprecher hat Turn 1 bei 0.5–1.8 s und Turn 2 bei 5.2–6.4 s): Turn-2-Animation muss tatsächlich Turn-2-Wörter zeigen, nicht die von Turn 1.
 
 ## Technische Details
 
-- ElevenLabs `with-timestamps`-Endpunkt: `POST /v1/text-to-speech/{voice_id}/with-timestamps`, Response enthält `audio_base64` + `alignment.{characters, character_start_times_seconds, character_end_times_seconds}`. Bereits an anderer Stelle im Projekt genutzt (`src/utils/phonemeMapping.ts`).
-- `tpad=stop_mode=clone:stop_duration` ist eine Standard-ffmpeg-Operation; alternativ kann die Mux-Lambda via Remotion-Composition `Freeze` denselben Effekt erzielen.
-- Keine Änderung an Sync.so-Payloads, an Face-Coords oder am Retry-Ladder — der Bug liegt ausschließlich in der TTS-Assembly und im Hard-Trim.
-
+- `sourceTiming: "relative"` bleibt das semantische Konzept; neu ist nur ein zusätzlicher `sourceStartSec`-Offset für die Output-Datei.
+- Keine Änderung am Sync.so-Payload, an Bounding-Boxes, am Identity-Mapping oder am Retry-Ladder — der Fix liegt 100 % zwischen Tight-Audio-Build und Lambda-Compositor.
+- Falls in der aktiven Mux-Composition `<Video startFrom>` noch nicht zur Verfügung steht (alter Bundle), erfordert das ein neues Bundle-Deploy via `scripts/deploy-remotion-bundle.sh`; das ist bereits etabliertes Muster (siehe v39-Tight-Audio-Rollout).
+- `END_PAD = 0.02` ist konservativ — falls in Tests Wortausklang abgeschnitten klingt, auf 0.04 s heben; nie über 0.08 s, sonst kommt der Nachzucken-Effekt zurück.
