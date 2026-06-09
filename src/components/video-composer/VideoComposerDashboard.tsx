@@ -623,14 +623,43 @@ export default function VideoComposerDashboard() {
     }
   }, [project, ensureProjectPersisted]);
 
-  const handleReset = useCallback(() => {
+  const [isResetting, setIsResetting] = useState(false);
+  const handleReset = useCallback(async () => {
+    const oldId = project.id;
+    setShowResetDialog(false);
+    if (oldId) {
+      setIsResetting(true);
+      try {
+        const { data, error: cancelErr } = await supabase.functions.invoke(
+          'composer-cancel-project',
+          { body: { project_id: oldId } },
+        );
+        if (cancelErr) throw cancelErr;
+        const n = (data as any)?.canceled_scenes ?? 0;
+        toast({
+          title: t('videoComposer.resetSuccessTitle') || 'Projekt zurückgesetzt',
+          description: n > 0
+            ? `${n} laufende Jobs gestoppt.`
+            : 'Keine laufenden Jobs.',
+        });
+      } catch (e) {
+        toast({
+          title: 'Cancel teilweise fehlgeschlagen',
+          description:
+            (e instanceof Error ? e.message : String(e)) +
+            ' — neues Projekt wird trotzdem gestartet.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsResetting(false);
+      }
+    }
     clearDraft();
-    setProject(defaultProject);
+    setProject({ ...defaultProject, id: '' });
     setActiveTab('briefing');
     setError(null);
-    setShowResetDialog(false);
     setShowTemplatePicker(true);
-  }, []);
+  }, [project.id, t]);
 
   const handleStartBlank = useCallback(() => {
     setShowTemplatePicker(false);
@@ -1352,9 +1381,12 @@ export default function VideoComposerDashboard() {
               onClick={() => setShowResetDialog(true)}
               className="gap-2"
               aria-label={t('videoComposer.newProject')}
+              disabled={isResetting}
             >
-              <RotateCcw className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('videoComposer.newProject')}</span>
+              <RotateCcw className={`h-4 w-4 ${isResetting ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">
+                {isResetting ? 'Stoppe…' : t('videoComposer.newProject')}
+              </span>
             </Button>
           </div>
         </div>
@@ -1637,6 +1669,7 @@ export default function VideoComposerDashboard() {
             <AlertDialogTitle>{t('videoComposer.confirmResetTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t('videoComposer.confirmResetDesc')}
+              {' '}Alle laufenden Renders und Lip-Sync-Jobs werden abgebrochen — bereits verbrauchte Credits werden nicht refundiert.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
