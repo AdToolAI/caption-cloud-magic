@@ -301,6 +301,13 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         );
         const segDuration = Math.max(1, endFrame - startFrame);
         if (segDuration <= 0) return null;
+        // v90: per-turn offset into the Sync.so output for relative timing.
+        const relativeStartFrame =
+          shot.sourceTiming === 'relative'
+            ? Math.max(0, Math.round(Number(shot.sourceStartSec ?? 0) * fps))
+            : undefined;
+        const startFromForRelative =
+          shot.sourceTiming === 'relative' ? relativeStartFrame : startFrame;
 
         // v25 fan-out face-mask path (highest priority): full Sync.so output
         // for this speaker, masked to a soft circle around their face. Spans
