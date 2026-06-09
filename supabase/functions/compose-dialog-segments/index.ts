@@ -1020,6 +1020,40 @@ serve(async (req) => {
         return turns.length > 0 && !!String(sp.track_url ?? "").trim();
       });
 
+    // v86 — Defense-in-depth: if speakerTracks collapsed upstream (e.g. two
+    // distinct cast members shared a name slug and compose-twoshot-audio's
+    // ambiguity guard didn't catch it), distinct character_ids across
+    // `speakers` must equal `speakers.length`. Otherwise two speakers point at
+    // the same character_id → Sync.so would lipsync the same face twice while
+    // another character stays silent. Fail-fast BEFORE the wallet debit.
+    const distinctCharIds = new Set(
+      speakers
+        .map((sp) => String(sp.character_id || sp.speaker || "").trim().toLowerCase())
+        .filter((s) => s.length > 0),
+    );
+    if (distinctCharIds.size > 0 && distinctCharIds.size < speakers.length) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} speaker_count_mismatch speakers=${speakers.length} distinct_ids=${distinctCharIds.size}`,
+      );
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: "speaker_count_mismatch: Zwei Cast-Mitglieder teilen denselben Character-Slot. Bitte vollen Namen verwenden oder eindeutige Cast-IDs zuweisen, dann 'Sauber neu starten'.",
+        })
+        .eq("id", sceneId);
+      return json(
+        {
+          error: "speaker_count_mismatch",
+          message: `${speakers.length} Sprecher, aber nur ${distinctCharIds.size} eindeutige Character-IDs. Pipeline würde Speaker-Pass kollidieren.`,
+          speakers: speakers.length,
+          distinct_character_ids: distinctCharIds.size,
+        },
+        400,
+      );
+    }
+
     // If we can't build per-speaker passes (missing track_url), bail with a
     // clear error rather than silently swap speakers.
     if (passSpeakers.length === 0) {
