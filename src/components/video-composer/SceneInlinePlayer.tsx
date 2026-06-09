@@ -13,12 +13,13 @@
  *
  * Selection styling (gold border + glow) is controlled by `isActive`.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, RefreshCw, Sparkles, ImageIcon, Loader2 } from 'lucide-react';
+import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
 
 interface Props {
@@ -49,6 +50,7 @@ export default function SceneInlinePlayer({
   onGenerate,
 }: Props) {
   const { t } = useTranslation();
+  const { reset: resetLipSync, resettingId } = useResetLipSync();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
 
@@ -102,6 +104,45 @@ export default function SceneInlinePlayer({
     isGenerating ||
     (status === 'generating' && hasActiveBackendJob) ||
     lipsyncRunning;
+
+  // ── Plan v72 — Start-Limbo detection ────────────────────────────────────
+  // A scene parked in `master_clip` with NO provider job for >3 min means the
+  // dispatcher never reached Sync.so. The server watchdog auto-recovers, but
+  // we also surface an honest "Start hängt" banner + manual reset button so
+  // the user is never staring at a silent spinner.
+  const dialogShots: any =
+    (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
+  const replicatePredId =
+    (scene as any).replicatePredictionId ?? (scene as any).replicate_prediction_id;
+  const hasProviderJobForLimbo =
+    (typeof replicatePredId === 'string' && replicatePredId.startsWith('sync:')) ||
+    !!dialogShots?.sync_job_id ||
+    (Array.isArray(dialogShots?.shots) &&
+      dialogShots.shots.some((s: any) => s?.sync_job_id)) ||
+    (Array.isArray(dialogShots?.passes) &&
+      dialogShots.passes.some((p: any) => p?.job_id));
+  const inStartLimbo =
+    lipsyncRunning &&
+    twoshotStage === 'master_clip' &&
+    !hasProviderJobForLimbo;
+  const limboSinceRef = useRef<number | null>(null);
+  const [limboStuck, setLimboStuck] = useState(false);
+  useEffect(() => {
+    if (!inStartLimbo) {
+      limboSinceRef.current = null;
+      if (limboStuck) setLimboStuck(false);
+      return;
+    }
+    if (limboSinceRef.current == null) limboSinceRef.current = Date.now();
+    const checkStuck = () => {
+      if (limboSinceRef.current == null) return;
+      const ageMs = Date.now() - limboSinceRef.current;
+      if (ageMs >= 3 * 60_000 && !limboStuck) setLimboStuck(true);
+    };
+    checkStuck();
+    const handle = setInterval(checkStuck, 15_000);
+    return () => clearInterval(handle);
+  }, [inStartLimbo, limboStuck]);
 
 
   const handleMouseEnter = () => {
@@ -271,8 +312,13 @@ export default function SceneInlinePlayer({
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
                   } else if (twoshotStage === 'master_clip' && !hasProviderJob) {
                     // Recovery-Fenster: server-watchdog dispatcht spätestens nach 3 min.
-                    title = 'Lip-Sync wird gestartet…';
-                    sub = 'Bereit, Sync.so wird angestoßen';
+                    if (limboStuck) {
+                      title = 'Start hängt — wird neu angestoßen';
+                      sub = 'Server-Watchdog versucht es erneut · jederzeit manuell neu starten';
+                    } else {
+                      title = 'Lip-Sync wird gestartet…';
+                      sub = 'Bereit, Sync.so wird angestoßen';
+                    }
                   } else if (!twoshotStage && audioUrl) {
                     title = 'Lip-Sync wird gestartet…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
@@ -283,10 +329,33 @@ export default function SceneInlinePlayer({
                 }
                 return (
                   <>
-                    <p className="mt-2 text-[11px] font-semibold text-primary tracking-wide">
+                    <p className={cn(
+                      "mt-2 text-[11px] font-semibold tracking-wide",
+                      limboStuck ? "text-amber-300" : "text-primary",
+                    )}>
+                      {limboStuck && <AlertTriangle className="inline h-3 w-3 mr-1 -mt-0.5" />}
                       {title}
                     </p>
                     <p className="mt-0.5 text-[9px] text-muted-foreground">{sub}</p>
+                    {limboStuck && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resettingId === scene.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          resetLipSync(scene.id);
+                        }}
+                        className="mt-2 h-6 px-2 text-[10px] gap-1 bg-amber-500/10 border-amber-500/40 text-amber-200 hover:bg-amber-500/20"
+                      >
+                        {resettingId === scene.id ? (
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-2.5 w-2.5" />
+                        )}
+                        Lip-Sync neu anstoßen
+                      </Button>
+                    )}
                   </>
                 );
               })()}

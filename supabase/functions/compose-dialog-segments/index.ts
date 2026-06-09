@@ -422,7 +422,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url, lock_reference_url, meta",
+        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url, lock_reference_url",
       )
       .eq("id", sceneId)
       .single();
@@ -437,6 +437,38 @@ serve(async (req) => {
       .single();
     const userId = project?.user_id;
     if (!userId) return json({ error: "missing_user" }, 403);
+
+    // ── Plan v72 — Dispatch-attempt breadcrumb ───────────────────────────
+    // Emit a lightweight DISPATCH_ATTEMPT_STARTED log right after lock + scene
+    // load. Lets the watchdog and ops queries distinguish three states:
+    //   1) no row at all                → dispatcher was never reached
+    //   2) DISPATCH_ATTEMPT_STARTED only → reached but preflight blocked/crashed
+    //   3) DISPATCHED                    → Sync.so was actually called
+    // Best-effort; failures are logged but don't block the run.
+    try {
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        user_id: userId,
+        engine: "sync-segments",
+        sync_status: "DISPATCH_ATTEMPT_STARTED",
+        meta: {
+          is_retry: isRetry,
+          is_advance: isAdvance,
+          is_v41_retry: isV41Retry,
+          recovery: body?.recovery === true,
+          auto: body?.auto === true,
+          repair_audio: repairAudio,
+          stage_at_entry: (scene as any).twoshot_stage ?? null,
+          lip_sync_status_at_entry: (scene as any).lip_sync_status ?? null,
+          existing_state_version: (scene as any).dialog_shots?.version ?? null,
+          existing_state_status: (scene as any).dialog_shots?.status ?? null,
+        },
+      });
+    } catch (e) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} dispatch_attempt_log_failed: ${(e as Error)?.message ?? e}`,
+      );
+    }
 
     // ── Validate audio plan ───────────────────────────────────────────────
     const plan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
@@ -994,9 +1026,12 @@ serve(async (req) => {
       (s) => !s || s === "none" || s === "heuristic",
     );
     if (coordsAreHeuristicOnly && !isAdvance && !isRetry) {
-      const prevRetryCount = Number(
-        ((scene as any)?.meta as any)?.face_detect_retry_count ?? 0,
-      );
+      // Retry counter is persisted inside dialog_shots — composer_scenes has
+      // no `meta` column (PostgREST validates select/update keys, so any
+      // reference to a missing column hard-fails the request with a 404
+      // scene_not_found that masked the real bug for weeks).
+      const existingDs = (scene as any)?.dialog_shots ?? {};
+      const prevRetryCount = Number(existingDs?.face_detect_retry_count ?? 0);
       const nextRetryCount = prevRetryCount + 1;
       const giveUp = nextRetryCount >= 3;
 
@@ -1011,7 +1046,6 @@ serve(async (req) => {
         })
         .eq("user_id", userId);
 
-      const prevMeta = ((scene as any)?.meta ?? {}) as Record<string, unknown>;
       await supabase
         .from("composer_scenes")
         .update(
@@ -1021,13 +1055,13 @@ serve(async (req) => {
                 twoshot_stage: "failed",
                 clip_error:
                   "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
-                meta: { ...prevMeta, face_detect_retry_count: 0 },
+                dialog_shots: { ...existingDs, face_detect_retry_count: 0 },
               }
             : {
                 lip_sync_status: "pending",
                 twoshot_stage: "pending",
                 clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
-                meta: { ...prevMeta, face_detect_retry_count: nextRetryCount },
+                dialog_shots: { ...existingDs, face_detect_retry_count: nextRetryCount },
               },
         )
         .eq("id", sceneId);
