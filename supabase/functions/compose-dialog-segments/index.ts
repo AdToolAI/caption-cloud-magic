@@ -121,7 +121,11 @@ const SYNC3_MODEL = "sync-3";
 // Sync.so at it via `active_speaker_detection.bounding_boxes_url`.
 // Deterministic per-speaker targeting → no more "Lipsync hat keinen
 // Avatar getroffen". Falls through the existing ladder on failure.
-const RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
+// v84 (Phase 2.3): unified ladder — `coords-pro-lp2pro` now sits between
+// `sync3-coords` and `auto-pro`, matching `V5_RETRY_VARIANTS` in
+// sync-so-webhook. Single source of truth for valid variants accepted on
+// fresh dispatch (`pass.retry_variant`).
+const RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-coords", "coords-pro-lp2pro", "auto-pro", "auto-standard"] as const;
 type RetryVariant = typeof RETRY_VARIANTS[number];
 
 /**
