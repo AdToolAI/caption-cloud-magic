@@ -1091,25 +1091,34 @@ serve(async (req) => {
     // Only set useExternalAudio when 2+ speakers actually need the external
     // merged track.
     const isMultiSpeaker = publicSpeakerTracks.length >= 2;
+    const sceneUpdate: Record<string, unknown> = {
+      character_audio_url: publicUrl,
+      audio_plan: {
+        ...(scene as any).audio_plan,
+        twoshot: {
+          segments: publicSegments,
+          speakers: publicSpeakerTracks,
+          spokenSec: Math.round(spokenSec * 1000) / 1000,
+          totalSec: Math.round(totalSec * 1000) / 1000,
+          url: publicUrl,
+          useExternalAudio: isMultiSpeaker,
+          embeddedAudio: !isMultiSpeaker,
+          generatedAt: new Date().toISOString(),
+          // v89 — per-utterance TTS diagnostics + overflow extension marker.
+          tts_diagnostics: ttsDiagnostics,
+          dialog_overflow_extended: dialogOverflowExtended,
+        },
+      },
+      updated_at: new Date().toISOString(),
+    };
+    // If we extended the scene to fit the dialog, propagate the new duration
+    // so downstream renderers (compose-dialog-segments / Remotion mux) align.
+    if (dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
+      sceneUpdate.duration_seconds = Math.round(totalSec * 1000) / 1000;
+    }
     await supabase
       .from("composer_scenes")
-      .update({
-        character_audio_url: publicUrl,
-        audio_plan: {
-          ...(scene as any).audio_plan,
-          twoshot: {
-            segments: publicSegments,
-            speakers: publicSpeakerTracks,
-            spokenSec: Math.round(spokenSec * 1000) / 1000,
-            totalSec: Math.round(totalSec * 1000) / 1000,
-            url: publicUrl,
-            useExternalAudio: isMultiSpeaker,
-            embeddedAudio: !isMultiSpeaker,
-            generatedAt: new Date().toISOString(),
-          },
-        },
-        updated_at: new Date().toISOString(),
-      })
+      .update(sceneUpdate)
       .eq("id", scene_id);
 
     return json({
