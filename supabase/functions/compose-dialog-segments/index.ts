@@ -2189,18 +2189,55 @@ serve(async (req) => {
         90_000,
       );
       if (preclip.ok && preclip.preclipUrl && preclip.crop) {
-        (pass as any).preclip_url = preclip.preclipUrl;
-        (pass as any).preclip_render_id = preclip.preclipRenderId ?? null;
-        (pass as any).preclip_crop = {
-          x: preclip.crop.x,
-          y: preclip.crop.y,
-          size: preclip.crop.size,
-          outputSize: preclip.crop.outputSize,
-        };
-        (pass as any).preclip_error = null;
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified_ready url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
-        );
+        // v77 — Validate the preclip actually shows EXACTLY one face before
+        // shipping to Sync.so. If the crop is empty (wrong coords) or
+        // contains two heads (sibling cap failed), Sync.so would happily
+        // animate the wrong region, producing the "Lip-Sync hit no avatar"
+        // failure mode the user reported.
+        let preclipFaceOk = true;
+        let preclipFaceCount: number | null = null;
+        if (speakers.length >= 2) {
+          try {
+            const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
+            const v = await validateFrameFace({
+              supabaseUrl, serviceKey,
+              videoUrl: preclip.preclipUrl,
+              frameNumber: midFrame, fps: 30,
+              targetCoords: null,
+            });
+            if (v.ok) {
+              preclipFaceCount = Number(v.faceCount ?? 0);
+              if (preclipFaceCount === 0) preclipFaceOk = false;
+              if (preclipFaceCount > 1) preclipFaceOk = false;
+            }
+          } catch (e) {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} preclip_face_gate threw: ${(e as Error)?.message}`,
+            );
+          }
+        }
+        if (preclipFaceOk) {
+          (pass as any).preclip_url = preclip.preclipUrl;
+          (pass as any).preclip_render_id = preclip.preclipRenderId ?? null;
+          (pass as any).preclip_crop = {
+            x: preclip.crop.x,
+            y: preclip.crop.y,
+            size: preclip.crop.size,
+            outputSize: preclip.crop.outputSize,
+          };
+          (pass as any).preclip_error = null;
+          (pass as any).preclip_face_count = preclipFaceCount;
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_ready faces=${preclipFaceCount ?? "skip"} url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
+          );
+        } else {
+          (pass as any).preclip_error = `face_gate_failed:count=${preclipFaceCount}`;
+          (pass as any).preclip_face_count = preclipFaceCount;
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_face_gate_BLOCK faces=${preclipFaceCount} — falling back to full-plate dispatch with plate coords`,
+          );
+        }
+
       } else {
         (pass as any).preclip_error = preclip.error ?? "unknown";
         console.warn(
