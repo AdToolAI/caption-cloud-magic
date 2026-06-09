@@ -1,69 +1,75 @@
-## Befund (Live-DB für Szene `ec22e048…`)
 
-**Sync.so v3 wird tatsächlich für alle 4 Sprecher genutzt.** Das ist in `composer_scenes.dialog_shots.passes[*]` und in `syncso_dispatch_log.meta.payload_summary.model` eindeutig: alle 4 Passes haben `model: "sync-3"`, `sync_mode: "cut_off"`, `retry_variant: "coords-pro"`, und jeder Pass läuft auf seinem eigenen 512x512-Preclip-Crop (multi-face plate → per-face preclip).
+## Befund
 
-| Pass | Speaker        | Coords    | Preclip x   | Voice-Window         | tight dur | Sync.so job-id | Status |
-|------|----------------|-----------|-------------|----------------------|-----------|----------------|--------|
-| 0    | Samuel         | 863,163   | x=734  s=258 | 0.00 – 2.23 s       | 2.31 s    | afb95162…      | done ✅ Mund bewegt sich |
-| 1    | Matthew        | 560,140   | x=442  s=234 | 2.48 – 3.50 s       | 1.18 s    | dcffdc3a…      | done ✅ Mund bewegt sich |
-| 2    | **Kailee**     | 301,170   | x=184  s=234 | 3.75 – 6.63 s       | 3.04 s    | 50389f23…      | done ⚠ Mund bleibt zu |
-| 3    | **Sarah**      | 1149,177  | x=1020 s=258 | 6.88 – 8.69 s       | 1.97 s    | 2d2fa6a2…      | done ⚠ Mund bleibt zu |
+Live-DB für Szene `ec22e048…` (9.0 s plate, 4 Sprecher) zeigt zwei voneinander unabhängige Audio-Bugs:
 
-Beobachtung: genau die beiden Sprecher an den **Bildrändern** (Kailee links: preclip-x=184, Sarah rechts: preclip-x=1020 bei video_width=1376) bekommen keinen Lipsync, während die beiden mittigen Sprecher korrekt animiert werden. Audio-Gate (`audio_diagnostics`) ist für beide grün (voiced 1.48 s / 2.28 s), die Sync.so-Jobs sind „COMPLETED", `output_url` existiert. D. h. Sync.so liefert ein Ergebnis, aber das gelieferte Crop-Video zeigt einen geschlossenen Mund.
+**Sprecher 4 (Sarah) abgeschnitten:**
+- `voicedRange` Sarah = 6.880 – 8.691 s, Scene-Plate = 9.000 s.
+- In `compose-twoshot-audio/index.ts` (Z. 658–668) wird der gemerged Voice-Track per
+  `mergedSamples.subarray(0, totalSamples)` **hart auf Scene-Länge getrimmt**, ohne Warnung,
+  ohne Refund, ohne UI-Hinweis. Wenn die TTS-Summe `spokenSec` länger ist als `sceneDur`
+  (z. B. Hailuo lieferte einen 8.7 s-Plate statt 10 s; Sarahs Wort endet bei 8.69 s + ElevenLabs-
+  Trail), fällt das letzte Wort/der letzte Atemzug ins Trimm-Fenster und ist im finalen Mux weg.
 
-## Wahrscheinliche Ursache
-
-Per-Face-Preclip (`pass-face-preclip.ts`) schneidet ein quadratisches 512x512-Sprecherfeld aus dem 1376×768-Plate. Für die Randsprecher landet das Crop-Rechteck am Bildrand (Kailee x=184…418, Sarah x=1020…1278). Sync.so v3 mit `auto_detect:true` auf einer 512x512-Plate sucht **eine** Face — wenn die Face am Rand des 512er-Crops sitzt oder durch das Quadrat-Padding (Hintergrund) verdünnt ist, fällt die Active-Speaker-Detection auf „kein Sprecher" zurück und Sync.so animiert nichts → der Output ist Pixel-identisch zum Eingangs-Preclip. Im Mux wird dann dieser unbewegte Crop wieder in die Master-Plate eingesetzt — geschlossener Mund.
-
-Beweisstütze in den Logs:
-- `preclip_face_count: null` bei allen Passes → Face-Quality-Gate wurde nicht ausgeführt
-- `retry_variant: "coords-pro"` schon im 1. Anlauf — aber im Preclip-Modus (siehe `compose-dialog-segments` Z. 2108–2111) wird trotzdem `auto_detect:true` auf das 512x512-Crop gesendet, weil dort „nur eine Face" angenommen wird. Bei Randspeakern stimmt diese Annahme aber nicht zuverlässig.
+**Charakter 2 (Matthew) „sagt etwas nach seinem Text":**
+- Matthew Window = 2.479 – 3.501 s, `voicedSec = 1.022` (peak normalized auf -1 dBFS).
+- Das ist verdächtig: `voicedSec === endSec - startSec` heißt **die VAD findet auf dem gesamten
+  Segment Sprache** — also kein Stille-Tail. ElevenLabs hat den Tail also mit zusätzlichen
+  Wörtern / Atem / „Mhm" befüllt, die im Skript nicht stehen. Bei Aggressiv-Normalisierung
+  (-1 dBFS / -16 LUFS) wird dieses Hallucination-Tail laut hörbar und überlappt mit dem
+  Anfang von Kailees Window (3.751 s).
+- Es gibt aktuell **keinen Script-vs-Audio-Längencheck**: weder Wortzahl ↔ Dauer, noch
+  ElevenLabs `character_end_times`-Cap. Jeder von Eleven gelieferte PCM wird 1:1 in die
+  Cursor-Position übernommen (`cursorSamples += pcm.length`, Z. 596–629).
 
 ## Plan
 
-### 1. Beweis sichern (schnell, kein Render-Spend)
+### 1. Diagnose-Logs hinzufügen (kein neuer Spend)
 
-- `output_url` von Pass 2 (Kailee) und Pass 3 (Sarah) per `ffprobe` / Frame-Diff gegen das Preclip prüfen.
-  - Erwartung: SSIM ≈ 1.0 → Sync.so hat tatsächlich nicht animiert.
-- `preclip_url` Bounding-Box prüfen: liegt die Face vollständig im 512x512-Quadrat?
-- Aus den Sync.so-Job-Results das Feld `active_speaker_detected` / `face_count` lesen (steht im Webhook-Payload).
+`compose-twoshot-audio/index.ts`
+- Pro Block loggen: `scriptCharCount`, `pcmDurSec`, `expectedDurSec = scriptCharCount / 14` (ca. 14 chars/s EN), `ratio = pcmDurSec / expectedDurSec`.
+- Wenn `ratio > 1.35` → Flag `tts_overshoot` im Pass-Diagnostic-Block schreiben.
+- Wenn `spokenSec > sceneDur` → `dialog_overflow_sec = spokenSec - sceneDur` im audio_plan persistieren.
 
-### 2. Preclip-Fix für Rand-Sprecher
+### 2. Hallucination-Tail-Trimmer für ElevenLabs (Fix Matthew)
 
-Datei: `supabase/functions/_shared/pass-face-preclip.ts`
+`compose-twoshot-audio/index.ts` (rund um Z. 530 elevenlabsPcm-Aufruf)
+- ElevenLabs nicht über die rohe PCM-Route nutzen, sondern den `with-timestamps`-Endpunkt aufrufen — Response liefert `alignment.character_end_times_seconds`.
+- `lastScriptCharEndSec = alignment.character_end_times_seconds[lastChar]`
+- PCM hart auf `lastScriptCharEndSec + 0.12 s` zuschneiden (Konsonanten-Abklang).
+- Wenn `pcm.length / SAMPLE_RATE > lastScriptCharEndSec + 0.40 s` → in Diagnostics als `eleven_hallucinated_tail_trimmed: <ms>` loggen.
+- Fallback: wenn `with-timestamps` fehlschlägt → bisherige Route + nachgelagerter `trimSilenceTrailing(pcm, threshDb=-38, minSilenceMs=120)` per Energie-VAD.
 
-- Crop-Center auf die echten Face-Koordinaten zwingen, nicht auf das Plate-Center clampen.
-- Padding nach außen NICHT mit Schwarz/Background füllen, sondern mit gemirrortem Plate-Inhalt **oder** den Crop verkleinern, damit die Face zentriert im 512x512 sitzt (mit `letterbox-extend` statt clamp).
-- Output mit `preclip_face_count` befüllen (face-detect lokal vor Sync.so-Aufruf). Wenn `face_count !== 1` → sofort `retry_variant = "bbox-url-pro"` auf der **vollen Plate** mit `bounding_boxes_url`, statt blind `coords-pro` auf einem schlechten Crop.
+### 3. Sarah-Cutoff: Overflow → Scene-Extend statt Hard-Trim
 
-### 3. Retry-Ladder für „mute pass" einbauen
+`compose-twoshot-audio/index.ts` (Z. 658–668)
+- Statt blind `subarray(0, totalSamples)` zu schneiden:
+  - Wenn `spokenSec ≤ sceneDur + 0.30` → nur trimmen, sonst NIE trimmen.
+  - Wenn `spokenSec > sceneDur + 0.30` → `newSceneDur = ceil((spokenSec + 0.30) * 10) / 10` setzen, `composer_scenes.duration_seconds` upserten und ein Flag `dialog_overflow_extended: true` in `audio_plan` schreiben.
+- Der Master-Plate (Hailuo-Video) ist meist exakt 8–10 s. Für den Extend-Fall wird das letzte Frame in `render-sync-segments-audio-mux/index.ts` per ffmpeg `tpad=stop_mode=clone:stop_duration=<diff>` über den Audio-Tail eingefroren (steht in Remotion-Bundle bereits zur Verfügung via `<Freeze>` — alternativ: serverseitig im Mux). Audio läuft komplett durch, Sarah wird nie mehr abgeschnitten.
+- Hard-Cap bei 14 s plate: darüber Pass-Fail `dialog_too_long_for_plate`, refund, UI-Toast „Skript zu lang für die gewählte Szenendauer — bitte Szene auf X s verlängern oder Text kürzen".
 
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
+### 4. UI-Sichtbarkeit
 
-- Nach Sync.so-Webhook-Completion ein **Lip-Motion-Gate** im Pass: per ffmpeg `cropdetect`+`scenechange` oder einfache Mund-Pixel-Diff zwischen Frame 0 und Frame mid_voice prüfen.
-- Wenn Bewegung unter Schwelle → Pass als `silent_lipsync` markieren und automatisch eine Retry-Stufe höherschalten (`coords-pro` → `bbox-url-pro` → `coords-pro-lp2pro`).
-- Aktuell springt die Retry-Ladder nur bei harten Provider-Fehlern an, nicht bei einer „leeren" Animation. Diese Lücke ist der eigentliche Bug.
+`SceneInlinePlayer.tsx` / `SceneDialogStudio.tsx`
+- Neuer Warn-Pill unter dem Skript: bei `tts_overshoot` oder `dialog_overflow_extended` farbiges Banner (gelb / cyan) mit Sekunden-Info, ohne Render zu blockieren.
+- Bei `dialog_too_long_for_plate`: rot, blockierend, mit Link „Szene verlängern".
 
-### 4. Mux-Fallback härten
+### 5. Rescue für betroffene Szene `ec22e048…`
 
-Datei: `supabase/functions/render-sync-segments-audio-mux/index.ts`
-
-- Falls für einen Sprecher das Lip-Motion-Gate fehlschlägt UND keine Retry-Stufe mehr Geld kosten soll: Overlay für diesen Sprecher in seiner Window weglassen und stattdessen das pristine Plate zeigen — verhindert Optik „toter Mund während Audio läuft" und reduziert User-Verwirrung.
-
-### 5. Rescue für die aktuell betroffene Szene
-
-- Pass 2 + Pass 3 gezielt mit `retry_variant=bbox-url-pro` auf der vollen Plate neu dispatchen (kein neuer Multipass-Run, nur die beiden Sprecher).
-- Danach `render-sync-segments-audio-mux` erneut anstoßen, gleiche `final_url` überschreiben.
-- Keine doppelten Credit-Belastungen: idempotent über `passes[idx].retry_count`.
+- `compose-twoshot-audio` erneut anstoßen (re-TTS aller 4 Sprecher mit dem neuen Trim).
+- `compose-dialog-segments` per `reset-lipsync-scene` neu starten — die bestehenden Sync.so-Coords + Identity-Map bleiben gültig.
+- Erwartung: Matthew-Window unverändert 2.479 – ~3.30 s (Trail weg), Sarah klingt vollständig aus.
 
 ### 6. Validierung
 
-- Neuer Pass 2/3 muss `lip_motion_ratio > 0.15` haben (neuer Metrik-Wert in `passes[*]`).
-- Visueller Vergleich der neuen `final_url`: alle 4 Sprecher öffnen Mund in ihrem Voice-Window.
-- Dispatch-Log zeigt sauberen Pfad `DISPATCH_ATTEMPT_STARTED → DISPATCHED → COMPLETED` mit `lip_motion_ok=true`.
+- Audio-Diagnostics-Tabelle muss zeigen: jeder Pass hat `eleven_hallucinated_tail_trimmed` ≤ 0 (idealerweise nicht gesetzt) oder dokumentierten Wert.
+- Master-WAV (`audio_plan.twoshot.url`) ffprobe = `spokenSec`, kein Hard-Cut am Scene-Ende.
+- Visuell: Matthew schweigt zwischen 3.30 und Kailees Onset; Sarah spricht ihren letzten Satz hörbar zu Ende.
 
-## Technische Details (für Implementierung)
+## Technische Details
 
-- Sync.so v3 Doku: `options.active_speaker_detection` darf entweder `auto_detect:true` ODER `coordinates: [x,y]` ODER `bounding_boxes_url` sein. Bei Randspeakern auf 16:9-Plates ist **`bounding_boxes_url` auf der vollen Plate** robuster als `auto_detect` auf einem 512x512-Crop.
-- Lip-Motion-Gate kann via Remotion-`@remotion/media-utils.getVideoMetadata` + einfache YOLO-mouth-keypoint-Distanz im Webhook-Handler laufen (kein zusätzlicher Provider-Call).
-- Keine Änderung an der Default-Engine: bleibt `sync-segments` mit Sync 3, nur die Preclip-Qualität und Retry-Auslöser werden gehärtet.
+- ElevenLabs `with-timestamps`-Endpunkt: `POST /v1/text-to-speech/{voice_id}/with-timestamps`, Response enthält `audio_base64` + `alignment.{characters, character_start_times_seconds, character_end_times_seconds}`. Bereits an anderer Stelle im Projekt genutzt (`src/utils/phonemeMapping.ts`).
+- `tpad=stop_mode=clone:stop_duration` ist eine Standard-ffmpeg-Operation; alternativ kann die Mux-Lambda via Remotion-Composition `Freeze` denselben Effekt erzielen.
+- Keine Änderung an Sync.so-Payloads, an Face-Coords oder am Retry-Ladder — der Bug liegt ausschließlich in der TTS-Assembly und im Hard-Trim.
+

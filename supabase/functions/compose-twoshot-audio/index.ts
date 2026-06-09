@@ -290,43 +290,161 @@ function resolveVoice(
   return null;
 }
 
+/**
+ * Trim trailing silence (energy VAD) from Int16 PCM. Threshold ~ -38 dBFS,
+ * min trailing silence 120 ms. Used as fallback when timestamp-trim fails.
+ */
+function trimTrailingSilence(samples: Int16Array, sampleRate = SAMPLE_RATE): Int16Array {
+  if (samples.length === 0) return samples;
+  const minSilenceSamples = Math.round(0.12 * sampleRate);
+  const threshold = 32768 * Math.pow(10, -38 / 20); // ≈ 414
+  let lastVoicedIdx = -1;
+  for (let i = samples.length - 1; i >= 0; i--) {
+    if (Math.abs(samples[i]) > threshold) { lastVoicedIdx = i; break; }
+  }
+  if (lastVoicedIdx < 0) return samples;
+  // Keep ≈80 ms tail past last voiced sample for natural consonant decay.
+  const keepUntil = Math.min(samples.length, lastVoicedIdx + Math.round(0.08 * sampleRate));
+  // Only trim if we'd remove at least minSilenceSamples (otherwise leave alone).
+  if (samples.length - keepUntil < minSilenceSamples) return samples;
+  return samples.subarray(0, keepUntil);
+}
+
+interface ElevenPcmResult {
+  pcm: Int16Array;
+  rawDurSec: number;
+  trimmedDurSec: number;
+  hallucinatedTailMs: number;
+  trimMode: "timestamps" | "energy-vad" | "none";
+}
+
 async function elevenlabsPcm(
   apiKey: string,
   voiceId: string,
   text: string,
-): Promise<Int16Array> {
-  // Raw headerless Int16LE mono. We request pcm_24000 (available on Starter
-  // tier and above — pcm_44100 is Pro-only and 403's on most accounts) and
-  // resample linearly to SAMPLE_RATE so the sample-accurate timeline stays
-  // intact. Resampling error << 1 sample after the merged-track is hard
-  // trimmed to round(sceneDur * 44.1 kHz) downstream.
+): Promise<ElevenPcmResult> {
+  // ── v89 — `with-timestamps` endpoint ─────────────────────────────────
+  // Plan §2: use ElevenLabs `with-timestamps` so we can hard-cap the PCM
+  // at `lastScriptCharEnd + 0.12 s`. This kills hallucinated trailing
+  // words/breaths that overlap the next speaker's window. Returns JSON:
+  //   { audio_base64, alignment: { character_end_times_seconds, ... } }
+  // Falls back to raw PCM + energy-VAD tail-trim if timestamps fail.
   const SOURCE_RATE = 24000;
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_${SOURCE_RATE}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "xi-api-key": apiKey,
-      "Content-Type": "application/json",
-      "Accept": "audio/basic",
+  const tsUrl =
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps?output_format=pcm_${SOURCE_RATE}`;
+  const body = JSON.stringify({
+    text,
+    model_id: "eleven_multilingual_v2",
+    voice_settings: {
+      stability: 0.45,
+      similarity_boost: 0.75,
+      style: 0.3,
+      use_speaker_boost: true,
+      speed: 1.0,
     },
-    body: JSON.stringify({
-      text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: {
-        stability: 0.45,
-        similarity_boost: 0.75,
-        style: 0.3,
-        use_speaker_boost: true,
-        speed: 1.0,
-      },
-    }),
   });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`ElevenLabs ${voiceId} failed (${res.status}): ${errText.slice(0, 200)}`);
+
+  try {
+    const res = await fetch(tsUrl, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`with-timestamps ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    const json = await res.json() as {
+      audio_base64?: string;
+      alignment?: {
+        characters?: string[];
+        character_start_times_seconds?: number[];
+        character_end_times_seconds?: number[];
+      };
+    };
+    if (!json.audio_base64) throw new Error("with-timestamps: missing audio_base64");
+
+    // Decode base64 → bytes.
+    const bin = atob(json.audio_base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const rawSrc = pcmBytesToSamples(bytes);
+    const rawDurSec = rawSrc.length / SOURCE_RATE;
+
+    // Compute trim target from last char end + 0.12s consonant tail.
+    const ends = json.alignment?.character_end_times_seconds ?? [];
+    let trimMode: ElevenPcmResult["trimMode"] = "none";
+    let trimmedSrc = rawSrc;
+    let trimmedDurSec = rawDurSec;
+    let hallucinatedTailMs = 0;
+    if (ends.length > 0) {
+      const lastEnd = Number(ends[ends.length - 1]);
+      if (Number.isFinite(lastEnd) && lastEnd > 0) {
+        const cutSec = lastEnd + 0.12;
+        const cutSamples = Math.min(rawSrc.length, Math.round(cutSec * SOURCE_RATE));
+        if (cutSamples < rawSrc.length - Math.round(0.04 * SOURCE_RATE)) {
+          trimmedSrc = rawSrc.subarray(0, cutSamples);
+          trimmedDurSec = trimmedSrc.length / SOURCE_RATE;
+          hallucinatedTailMs = Math.round((rawDurSec - trimmedDurSec) * 1000);
+          trimMode = "timestamps";
+          if (hallucinatedTailMs > 400) {
+            console.log(
+              `[compose-twoshot-audio] elevenlabs hallucinated tail trimmed: ${hallucinatedTailMs}ms (raw=${rawDurSec.toFixed(3)}s → ${trimmedDurSec.toFixed(3)}s) voice=${voiceId}`,
+            );
+          }
+        }
+      }
+    }
+    const pcm = SOURCE_RATE === SAMPLE_RATE
+      ? trimmedSrc
+      : resampleLinear(trimmedSrc, SOURCE_RATE, SAMPLE_RATE);
+    return {
+      pcm,
+      rawDurSec: Math.round(rawDurSec * 1000) / 1000,
+      trimmedDurSec: Math.round(trimmedDurSec * 1000) / 1000,
+      hallucinatedTailMs,
+      trimMode,
+    };
+  } catch (tsErr) {
+    console.warn(
+      `[compose-twoshot-audio] with-timestamps failed (${(tsErr as Error)?.message ?? tsErr}), falling back to raw PCM + energy-VAD trim`,
+    );
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_${SOURCE_RATE}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "audio/basic",
+      },
+      body,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`ElevenLabs ${voiceId} failed (${res.status}): ${errText.slice(0, 200)}`);
+    }
+    const rawSrc = pcmBytesToSamples(new Uint8Array(await res.arrayBuffer()));
+    const rawDurSec = rawSrc.length / SOURCE_RATE;
+    // Energy-VAD tail-trim on source rate.
+    const trimmedSrc = trimTrailingSilence(rawSrc, SOURCE_RATE);
+    const trimmedDurSec = trimmedSrc.length / SOURCE_RATE;
+    const hallucinatedTailMs = Math.round((rawDurSec - trimmedDurSec) * 1000);
+    const pcm = SOURCE_RATE === SAMPLE_RATE
+      ? trimmedSrc
+      : resampleLinear(trimmedSrc, SOURCE_RATE, SAMPLE_RATE);
+    return {
+      pcm,
+      rawDurSec: Math.round(rawDurSec * 1000) / 1000,
+      trimmedDurSec: Math.round(trimmedDurSec * 1000) / 1000,
+      hallucinatedTailMs,
+      trimMode: hallucinatedTailMs > 0 ? "energy-vad" : "none",
+    };
   }
-  const raw = pcmBytesToSamples(new Uint8Array(await res.arrayBuffer()));
-  return SOURCE_RATE === SAMPLE_RATE ? raw : resampleLinear(raw, SOURCE_RATE, SAMPLE_RATE);
 }
 
 async function humePcm(
@@ -515,6 +633,19 @@ serve(async (req) => {
     // "track audio" and speaker 3 received speaker 2's PCM. That bug caused
     // Sync.so to animate the wrong face on a silent track ("ghost speech").
     const segmentPcm: Int16Array[] = [];
+    // v89 — Per-utterance TTS diagnostics (hallucinated-tail trim, char count,
+    // raw vs trimmed duration). Surfaced in audio_plan.twoshot.tts_diagnostics
+    // and in the UI as warning pills.
+    const ttsDiagnostics: Array<{
+      speaker: string;
+      engine: string;
+      voice: string;
+      scriptChars: number;
+      rawDurSec: number;
+      trimmedDurSec: number;
+      hallucinatedTailMs: number;
+      trimMode: "timestamps" | "energy-vad" | "none";
+    }> = [];
     const segments: Array<{
       speaker: string;
       speaker_slug: string;
@@ -554,19 +685,41 @@ serve(async (req) => {
       }
       const utterance = block.text;
       let pcm: Int16Array;
+      let ttsDiag: {
+        speaker: string;
+        engine: string;
+        voice: string;
+        scriptChars: number;
+        rawDurSec: number;
+        trimmedDurSec: number;
+        hallucinatedTailMs: number;
+        trimMode: "timestamps" | "energy-vad" | "none";
+      } | null = null;
       try {
         if (voice.engine === "hume") {
           if (!humeKey) throw new Error("HUME_API_KEY not configured");
           pcm = await humePcm(humeKey, voice.voiceId, voice.provider ?? "HUME_AI", utterance);
         } else {
           if (!elevenKey) throw new Error("ELEVENLABS_API_KEY not configured");
-          pcm = await elevenlabsPcm(elevenKey, voice.voiceId, utterance);
+          const res = await elevenlabsPcm(elevenKey, voice.voiceId, utterance);
+          pcm = res.pcm;
+          ttsDiag = {
+            speaker: block.rawSpeaker,
+            engine: "elevenlabs",
+            voice: voice.voiceId,
+            scriptChars: utterance.length,
+            rawDurSec: res.rawDurSec,
+            trimmedDurSec: res.trimmedDurSec,
+            hallucinatedTailMs: res.hallucinatedTailMs,
+            trimMode: res.trimMode,
+          };
         }
         console.log(`[compose-twoshot-audio] ${voice.engine} voice ok`, {
           speaker: block.rawSpeaker,
           voice: voice.voiceId,
           samples: pcm.length,
           seconds: Math.round(samplesDurationSec(pcm.length) * 1000) / 1000,
+          tts_diag: ttsDiag,
         });
       } catch (primaryErr) {
         const errMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
@@ -581,7 +734,18 @@ serve(async (req) => {
           }, 400);
         }
         try {
-          pcm = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+          const res = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+          pcm = res.pcm;
+          ttsDiag = {
+            speaker: block.rawSpeaker,
+            engine: "elevenlabs-fallback",
+            voice: FALLBACK_ELEVEN_VOICE,
+            scriptChars: utterance.length,
+            rawDurSec: res.rawDurSec,
+            trimmedDurSec: res.trimmedDurSec,
+            hallucinatedTailMs: res.hallucinatedTailMs,
+            trimMode: res.trimMode,
+          };
         } catch (fbErr) {
           return json({
             error: "tts_failed",
@@ -593,6 +757,8 @@ serve(async (req) => {
           }, 400);
         }
       }
+      if (ttsDiag) ttsDiagnostics.push(ttsDiag);
+
       const startSample = cursorSamples;
       const endSample = cursorSamples + pcm.length;
       const slug = block.speakerName;
@@ -648,6 +814,7 @@ serve(async (req) => {
       Number((scene as any)?.audio_plan?.targetDuration) ||
       0;
     let sceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
+    const originalSceneDur = sceneDur;
     if (sceneDur <= 0) sceneDur = Math.max(0, planTotal);
     if (sceneDur <= 0) {
       sceneDur = 10;
@@ -655,14 +822,53 @@ serve(async (req) => {
         `[compose-twoshot-audio] scene ${scene_id} has no duration_seconds — falling back to 10s (Hailuo two-shot default).`,
       );
     }
+
+    // v89 — Plan §3: Sarah-cutoff fix.
+    // If the actual spoken audio exceeds the scene plate by more than 0.30 s,
+    // we EXTEND the scene duration instead of silently hard-trimming. The
+    // hard-trim was lopping off the last 50–400 ms of the final speaker
+    // ("…and that's wh-"). The extension is capped at +5.0 s to guard against
+    // wildly oversized scripts; beyond that we fail-fast so the UI can ask
+    // the user to shorten the text or extend the scene manually.
+    const OVERFLOW_GRACE_SEC = 0.30;
+    const MAX_EXTEND_SEC = 5.0;
+    let dialogOverflowExtended: { from: number; to: number; overflowSec: number } | null = null;
+    if (spokenSec > sceneDur + OVERFLOW_GRACE_SEC) {
+      const overflow = spokenSec - sceneDur;
+      if (overflow > MAX_EXTEND_SEC) {
+        return json({
+          error: "dialog_too_long_for_plate",
+          message:
+            `Das Skript dauert ${spokenSec.toFixed(2)} s, aber die Szene ist nur ${sceneDur.toFixed(2)} s lang. ` +
+            `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + 0.3)} s verlängern.`,
+          spoken_sec: Math.round(spokenSec * 1000) / 1000,
+          scene_dur_sec: sceneDur,
+          overflow_sec: Math.round(overflow * 1000) / 1000,
+        }, 400);
+      }
+      // Extend in 0.1s steps (matches plate-render granularity) + 0.3s tail.
+      const newDur = Math.ceil((spokenSec + 0.30) * 10) / 10;
+      dialogOverflowExtended = {
+        from: Math.round(sceneDur * 1000) / 1000,
+        to: newDur,
+        overflowSec: Math.round(overflow * 1000) / 1000,
+      };
+      console.warn(
+        `[compose-twoshot-audio] scene ${scene_id} dialog overflow — extending sceneDur ${sceneDur.toFixed(2)}s → ${newDur.toFixed(2)}s (spoken=${spokenSec.toFixed(2)}s, overflow=${overflow.toFixed(2)}s)`,
+      );
+      sceneDur = newDur;
+    }
+
     const sceneSamples = Math.round(sceneDur * SAMPLE_RATE);
+    // Never less than spoken length — guarantees Sarah's tail survives.
     const totalSamples = Math.max(spokenSamples.length, sceneSamples);
     const totalSec = totalSamples / SAMPLE_RATE;
     const tailSamples = Math.max(0, totalSamples - spokenSamples.length);
     let mergedSamples = tailSamples > 0
       ? concatSamples([spokenSamples, new Int16Array(tailSamples)])
       : spokenSamples;
-    // Hard-trim to exactly totalSamples — never longer than the scene needs.
+    // Defensive: only trim if we somehow overran totalSamples (should be a
+    // no-op because totalSamples = max(spoken, scene) already).
     if (mergedSamples.length > totalSamples) {
       mergedSamples = mergedSamples.subarray(0, totalSamples);
     }
@@ -885,25 +1091,34 @@ serve(async (req) => {
     // Only set useExternalAudio when 2+ speakers actually need the external
     // merged track.
     const isMultiSpeaker = publicSpeakerTracks.length >= 2;
+    const sceneUpdate: Record<string, unknown> = {
+      character_audio_url: publicUrl,
+      audio_plan: {
+        ...(scene as any).audio_plan,
+        twoshot: {
+          segments: publicSegments,
+          speakers: publicSpeakerTracks,
+          spokenSec: Math.round(spokenSec * 1000) / 1000,
+          totalSec: Math.round(totalSec * 1000) / 1000,
+          url: publicUrl,
+          useExternalAudio: isMultiSpeaker,
+          embeddedAudio: !isMultiSpeaker,
+          generatedAt: new Date().toISOString(),
+          // v89 — per-utterance TTS diagnostics + overflow extension marker.
+          tts_diagnostics: ttsDiagnostics,
+          dialog_overflow_extended: dialogOverflowExtended,
+        },
+      },
+      updated_at: new Date().toISOString(),
+    };
+    // If we extended the scene to fit the dialog, propagate the new duration
+    // so downstream renderers (compose-dialog-segments / Remotion mux) align.
+    if (dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
+      sceneUpdate.duration_seconds = Math.round(totalSec * 1000) / 1000;
+    }
     await supabase
       .from("composer_scenes")
-      .update({
-        character_audio_url: publicUrl,
-        audio_plan: {
-          ...(scene as any).audio_plan,
-          twoshot: {
-            segments: publicSegments,
-            speakers: publicSpeakerTracks,
-            spokenSec: Math.round(spokenSec * 1000) / 1000,
-            totalSec: Math.round(totalSec * 1000) / 1000,
-            url: publicUrl,
-            useExternalAudio: isMultiSpeaker,
-            embeddedAudio: !isMultiSpeaker,
-            generatedAt: new Date().toISOString(),
-          },
-        },
-        updated_at: new Date().toISOString(),
-      })
+      .update(sceneUpdate)
       .eq("id", scene_id);
 
     return json({
