@@ -1,91 +1,111 @@
-# Phase 3 — Shot Director: Dialog & Continuity
+## Lip-Sync Pipeline — Stand Juni 2026 (Phase 2 abgeschlossen)
 
-Build on existing infrastructure (`shotDirector.ts`, `AudioPlanSpeaker`, `replace_composer_scene_with_children` RPC, `ContinuityGuardianStrip`). No DB schema changes, no edge-function changes.
+### 1. Was wir jetzt haben (v82 + v83 + v84)
 
-## 3.1 — Per-Dialog-Turn Shot Direction
+**Aktueller Retry-Ladder (identisch in Dispatcher + Webhook):**
 
-**Data model** — extend `AudioPlanSpeaker` (`src/types/video-composer.ts:554`) with optional `shotDirector?: Partial<ShotSelection>`. Stored inside the existing `composer_scenes.audio_plan` JSONB — no migration.
-
-**UI** — in `SceneDialogStudio.tsx`, render a compact `<ShotDirectorChip>` per dialog line (next to existing `DialogTakeStrip`). Opens a popover with the 4 main axes (framing / angle / movement / lighting). Empty = inherit scene defaults.
-
-**Prompt injection** — in `composeFinalPrompt.ts:168`, after the scene-level `[3 SHOT]` block, when `audioPlan?.speakers?.some(s => s.shotDirector)`, append a per-turn block:
+```text
+1. bbox-url-pro     → sync-3 + bounding_boxes_url (Phase 2.1, NEU PRIMARY)
+2. coords-pro       → sync-3 + point-ASD
+3. coords-pro-box   → sync-3 + inline bounding_boxes
+4. sync3-coords     → sync-3 + point-ASD (Alias)
+5. coords-pro-lp2pro→ lipsync-2-pro + point-ASD (Phase 2.3 wieder erreichbar)
+6. auto-pro         → lipsync-2-pro + auto_detect
+7. auto-standard    → lipsync-2 + auto_detect (Last-Ditch vor Refund)
 ```
-[6 DIALOG SHOTS]
-@0.00s (Sarah): medium close-up, low angle
-@2.40s (Samuel): over-the-shoulder, eye level
-```
-Wrapped via new helper `src/lib/shotDirector/buildPerTurnShotBlock.ts`. Pure additive — falls through to existing behavior when no per-turn overrides exist.
 
-**Scope guardrail** — only affects SRS / cinematic-sync pipelines that spawn per-turn sub-scenes. Single-clip native-dialogue models (HappyHorse/Veo/Kling Omni) get the block as soft hints. Documented in code comments.
+**Fresh-Dispatch-Gate für `bbox-url-pro`:**
+`speakers.length ≥ 2 && plateDims && plateIdentityMap.resolvedCount > 0 && !pass.preclip_url`
+→ sonst Legacy-Default `coords-pro`.
 
-## 3.2 — Multi-Shot Continuity Engine
-
-**New util** — `src/lib/shotDirector/cinematicContinuityRules.ts`:
-- `check180Rule(prev, next)` — flags when two consecutive close-ups both use `over-the-shoulder` from the same `angle` family (likely line-crossing)
-- `checkEyelineMatch(prev, next)` — warns when angle jumps low → high or vice versa between two close-ups of the same character set
-- `checkReverseShotPair(prev, next)` — confirms valid OTS-A → OTS-B reverse pattern, returns a positive `ok` signal
-- `checkJumpCut(prev, next)` — flags identical framing+angle on same subject (jump cut)
-
-Returns `{ severity: 'info' | 'warn' | 'error', rule, message }[]`.
-
-**Wiring** — in `ContinuityGuardianStrip.tsx`, where `pairs` is already iterated (line ~65), add a parallel `cinematicWarnings = pairs.map(p => runCinematicRules(p.prev, p.next))`. Render small icon chips next to the existing visual drift indicator; click opens a tooltip with the rule explanation and a "Swap angle" quick-fix that updates `next.shotDirector`.
-
-**No new columns** — warnings are derived at render time from `composer_scenes.shot_director`.
-
-## 3.3 — Auto-Coverage
-
-**New util** — `src/lib/shotDirector/spawnCoverageScenes.ts`:
-```
-buildCoveragePartials(scene): Partial<ComposerScene>[]
-```
-Given a dialog scene with N speakers (from `audioPlan.speakers` or `dialogScript` parse), returns:
-1. **Master** — `framing: 'wide'`, `movement: 'static'`, inherits scene aiPrompt + `MASTER SHOT`
-2. **OTS-A** — `framing: 'medium-close'`, `angle: 'over-shoulder'`, `character_shots: [speaker1]`
-3. **OTS-B** — same for speaker2
-4. **Insert** — single-character close-up per additional speaker
-
-All tagged `cinematic_preset_slug = 'coverage:<parentSceneId>'` for idempotent re-spawn / cleanup (mirroring existing SRS pattern).
-
-**UI** — add a "✨ Auto-Coverage" button to `SceneShotDirectorPanel` (visible only on scenes with ≥1 speaker). Calls `insertScenesAfter(scene.id, partials, { removeParent: false })`. Toast confirms N scenes added.
-
-**Idempotency** — before insert, check existing sibling scenes for `cinematic_preset_slug LIKE 'coverage:${parentId}'`; if present, prompt user to "Replace existing coverage" (passes `removeParent: false` + deletes prior coverage children first).
-
-## 3.4 — Memory + Localization
-
-- `mem://features/video-composer/per-turn-shot-direction-and-continuity` — new entry describing per-turn override, continuity rule set, coverage spawning.
-- Localized strings (EN/DE/ES) for new chips, buttons, rule messages.
+**Hailuo-Prompt-Layer (v83):** n=1/n=2 dürfen wieder Profile + OTS, n≥3 bleibt strikte horizontale Linie (ASD-Slot-Mapping).
 
 ---
 
-## Files to create
+### 2. Vergleich mit der „alten" Pipeline (vor Phase 2)
+
+| Aspekt                          | Alt (≤ v81)                                        | Neu (v82–v84)                                               |
+| ------------------------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| Multi-Speaker PRIMARY           | `coords-pro` (point-ASD)                           | `bbox-url-pro` (per-frame JSON URL)                         |
+| Strukturelle „kein-Avatar-Hit"  | Vorhanden bei langen/komplexen Plates              | Eliminiert via deterministische Box-Map pro Frame           |
+| Hailuo-Framing n=1/n=2          | Frontal/Three-quarter erzwungen                    | Profile + OTS erlaubt (sync-3 verträgt's)                   |
+| `coords-pro-lp2pro` Escape Hatch | Vom Webhook gerufen, vom Dispatcher abgelehnt → tot | Im Ladder beider Files, v61 Logic läuft wieder              |
+| Retry-Ladder-Drift              | Dispatcher ≠ Webhook (6 vs 7 Einträge)             | Beide Files identisch, 7 Einträge                           |
+
+---
+
+### 3. Vergleich mit Sync.so Docs (v3 / sync-3)
+
+| Sync.so-Vorgabe                                          | Unser Stand                                                              | OK? |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ | --- |
+| `bounding_boxes_url` als JSON in External Storage         | `composer-frames/${userId}/.../asd/${sceneId}-pN-<ts>.json`              | ✅   |
+| Schema: `{ bounding_boxes: [[x1,y1,x2,y2], …] }`         | Exakt so, Länge = `ceil(totalSec × 30)`                                  | ✅   |
+| Per-Frame-Liste, 30 fps                                  | 30 fps hart-kodiert (matcht Hailuo-Plate-fps)                            | ✅   |
+| Empfohlen für long-form / multi-face                     | Genau dort als PRIMARY aktiviert                                         | ✅   |
+| sync-3 als universeller Default                          | `payloadModel`-Tail standardmäßig `SYNC3_MODEL`                          | ✅   |
+| Profile / partial occlusion natively supported           | Prompt-Layer öffnet das (v83)                                            | ✅   |
+| `sync_mode=cut_off` wenn VO länger als Plate             | Aktiv                                                                    | ✅   |
+| Per-Speaker Audio-Mute für N≥2                          | Frozen-Invariant I.1 — chained Multipass                                 | ✅   |
+
+**Nicht umgesetzt (bewusst, kein Bug):**
+- HDR-Preflight / 4K-Cap (Plan 2.4) — braucht ffprobe/Lambda, nicht im Edge möglich.
+- "speaking naturally with subtle mouth movement"-Suffix — würde die v60-Ventriloquist-Fixe brechen, daher gestrichen (vgl. v83-Doku).
+
+---
+
+### 4. Realitätscheck aus `syncso_dispatch_log` (letzte 7 Tage)
 
 ```text
-src/lib/shotDirector/buildPerTurnShotBlock.ts
-src/lib/shotDirector/cinematicContinuityRules.ts
-src/lib/shotDirector/spawnCoverageScenes.ts
-src/components/video-composer/PerTurnShotChip.tsx
-mem/features/video-composer/per-turn-shot-direction-and-continuity.md
+coords-pro            DISPATCHED  269
+coords-pro            FAILED      148   ← 35 % Provider-Fail → Fallback-Kette
+coords-pro-box        DISPATCHED   39
+coords-pro-box        FAILED       40   ← 50 % Fail (lange BBox-Arrays)
+sync3-coords          50/50
+coords-pro-lp2pro       3 dispatched, 3 failed
+bbox-url-pro            0           ← noch nie gefeuert
+cinematic-sync (Single-Speaker) sauber
 ```
 
-## Files to edit
+**Befund:** `bbox-url-pro` ist deployed, aber in den letzten 48 h hat noch keine Szene das Gate `N≥2 ∧ plateDims ∧ plateIdentity.resolved>0 ∧ !preclip_url` getroffen — entweder weil zuletzt nur Single-Speaker lief oder das Preclip-Vorrang die Multi-Speaker Cases noch abfängt.
 
-```text
-src/types/video-composer.ts                     (add shotDirector to AudioPlanSpeaker)
-src/lib/motion-studio/composeFinalPrompt.ts     (inject per-turn shot block)
-src/components/video-composer/SceneDialogStudio.tsx  (PerTurnShotChip per line)
-src/components/video-composer/ContinuityGuardianStrip.tsx  (cinematic rule chips)
-src/components/video-composer/SceneShotDirectorPanel.tsx   (Auto-Coverage button)
-mem/index.md                                    (register new memory)
-```
+→ **Wir wissen noch nicht empirisch, ob v82 die 148 `coords-pro`-Failures wirklich schluckt.** Code-Pfade sehen sauber aus, aber die Phase-2-These ist noch nicht in Produktion bewiesen.
 
-## Out of scope (deferred)
+---
 
-- `screenDirection` enum on `ShotSelection` for hard 180°-line enforcement → would need migration + UI rework. Phase 3 uses heuristic warnings only.
-- Updating `replace_composer_scene_with_children` RPC to carry `dialog_takes` / `audio_plan` → coverage scenes get fresh dialog state, which is the desired behavior anyway.
-- Edge-function changes — none. All work is client-side prompt assembly + scene CRUD.
+### 5. Bekannte Restrisiken
 
-## Risk / impact
+1. **Live-Validation fehlt:** Keine `bbox-url-pro`-Dispatches in den Logs. Wir müssen entweder warten bis ein Dialog mit ≥2 Sprechern + resolved Identity läuft, oder gezielt einen Test-Run anstoßen.
+2. **`coords-pro-box`-Failure-Rate liegt bei ~50 %.** Solange `bbox-url-pro` greift, ist das nur noch ein Fallback-Step — falls aber das Identity-Mapping fehlschlägt, fallen wir auf eine Variante mit historisch schlechter Quote.
+3. **Identity-Map-Auflösung:** `plateIdentityMap.resolvedCount > 0` ist die Gating-Bedingung. Wenn die Plate-Face-Detection (v77) für N≥2 keine stabile Map liefert, downgraden wir sofort auf Legacy. Keine Metrik trackt heute, wie oft das passiert.
+4. **HDR/4K-Edge-Case** weiterhin ungelöst (per Doku akzeptiert).
 
-- **Additive only** — every existing scene without per-turn overrides renders identically.
-- **No credit-cost changes** — prompt-suffix work is free; auto-coverage charges per spawned scene at normal Composer rates.
-- **Reversible** — auto-coverage scenes are tagged + can be bulk-deleted by `cinematic_preset_slug` LIKE filter.
+---
+
+### 6. Empfehlung für die nächsten Schritte
+
+**Empfehlung: keine neuen Phasen jetzt — erst validieren.**
+
+In der Reihenfolge:
+
+1. **Telemetrie-Hardening (klein, ~1 Datei):**
+   - In `compose-dialog-segments` beim Gate-Check ein strukturiertes Log `[v82-gate]` mit `{speakers, plateDims:bool, resolvedCount, hasPreclip}` schreiben.
+   - In `syncso_dispatch_log.meta` `retry_variant` immer mitschreiben (heute nur teilweise im `mode`/`coords` gesetzt).
+   → Damit sehen wir, **warum** `bbox-url-pro` (nicht) feuert und können die Fail-Rate per Variante messen.
+
+2. **Gezielter Live-Test (manuell):** Eine bekannte Multi-Speaker-Szene im Composer re-rendern und in den Logs verifizieren:
+   - `[v82-gate] picked=bbox-url-pro`
+   - `bounding_boxes_url` ist im `composer-frames`-Bucket erreichbar (HTTP 200)
+   - Webhook-Outcome = success ohne Fallback-Stepping
+
+3. **Erst dann Phase 3 oder neue Features.** Wenn (1)+(2) grün sind und die `coords-pro`-Failure-Rate über 7 Tage sichtbar fällt, ist Phase 2 wirklich abgeschlossen.
+
+**Falls bei der Live-Validierung Probleme auftauchen, plausible Ursachen (vorab):**
+- `plateIdentityMap.resolvedCount` bleibt 0 → v77 plate-face-detection genauer ansehen.
+- `composer-frames`-URL ist privat / nicht öffentlich lesbar → Bucket-Policy prüfen.
+- Box-Koordinaten in falschem Koordinatenraum (plate-space vs. clip-space) → Re-Scale-Logik in `uploadBoundingBoxesJson()` reviewen.
+
+---
+
+### Fazit
+
+**Code-seitig ist Phase 2 vollständig und Sync.so-3-konform.** Retry-Ladder, Framing-Locker, lipsync-2-pro-Escape — alles drin. **Empirisch fehlt der Proof, dass `bbox-url-pro` die Multi-Speaker-Failures wirklich eliminiert.** Bevor wir auf Phase 3 gehen, sollten wir 1–2 kleine Telemetrie-Logs einbauen und einen Multi-Speaker-Live-Test fahren. Soll ich das als Mini-Phase 2.5 (Telemetrie + Validation) umsetzen?
