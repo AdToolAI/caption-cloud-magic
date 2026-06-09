@@ -596,7 +596,22 @@ serve(async (req) => {
       const startSample = cursorSamples;
       const endSample = cursorSamples + pcm.length;
       const slug = block.speakerName;
-      const charEntry = charByName.get(slug) ?? charByName.get(slug.split("-")[0]);
+      const firstName = slug.split("-")[0];
+      // v86 — Detect ambiguous speaker name. If the user's cast contains 2+
+      // characters whose first names / slugs collide with this block's name
+      // AND the block doesn't carry a unique full-slug match, refuse rather
+      // than silently merge two speakers' lines onto one Sync.so pass.
+      const slugAmbiguous = ambiguousNameKeys.has(slug);
+      const firstNameAmbiguous = ambiguousNameKeys.has(firstName);
+      const fullSlugHit = charByName.get(slug);
+      if (!fullSlugHit && (slugAmbiguous || firstNameAmbiguous)) {
+        return json({
+          error: "ambiguous_speaker_name",
+          speaker: block.rawSpeaker,
+          message: `Sprecher "${block.rawSpeaker}" ist mehrdeutig — mehrere Cast-Mitglieder teilen diesen Namen. Bitte verwende den vollen Namen (z. B. "Vorname Nachname:") oder weise dem Skript-Block eine eindeutige Character-ID zu.`,
+        }, 400);
+      }
+      const charEntry = fullSlugHit ?? charByName.get(firstName);
       segments.push({
         speaker: block.rawSpeaker,
         speaker_slug: slug,
