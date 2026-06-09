@@ -433,6 +433,14 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 // Scene was deleted (new project / scene removed) between
                 // the poll snapshot and the invoke. Not a real failure.
                 'scene_not_found',
+                // Plan v71: benign 202s from compose-dialog-segments mean
+                // the server is already working on it / waiting for a slot.
+                // The lipsync-watchdog owns recovery — don't surface as error.
+                'already_running',
+                'scene_lock_busy',
+                'preflight_transient_retry_later',
+                'deferred',
+                'circuit_open',
               ]);
               if (reason && SILENT_RACE.has(String(reason))) {
                 console.info(

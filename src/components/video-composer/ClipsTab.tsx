@@ -478,8 +478,20 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
               if (code) reason = reason ?? code;
               message = message ?? realMsg;
             }
-            if (reason === 'scene_not_found') {
-              console.info(`[ClipsTab] lip-sync skipped — scene ${sceneId} no longer exists`);
+            const SILENT_RACE_CLIPS = new Set([
+              'scene_not_found',
+              // Plan v71: benign 202s — server already working / waiting for slot.
+              'already_running',
+              'scene_lock_busy',
+              'preflight_transient_retry_later',
+              'deferred',
+              'circuit_open',
+              'missing_audio_plan',
+              'missing_source_clip',
+              'master_clip_not_ready',
+            ]);
+            if (reason && SILENT_RACE_CLIPS.has(String(reason))) {
+              console.info(`[ClipsTab] lip-sync silent skip ${sceneId}: ${reason}`);
               return;
             }
             if (reason === 'tts_failed' || reason === 'no_voiceover') {
