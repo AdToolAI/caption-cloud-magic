@@ -1,63 +1,50 @@
-## Was ist passiert
+## Befund
 
-Szene **ac7fe4d8** (Szene 1 von Projekt `df044489…`):
-
-- `clip_status='failed'`, `clip_url=NULL`, `retry_count=1`
-- `dialog_mode=true`, `lip_sync_status='pending'`, `twoshot_stage=NULL`
-- letzter Update vor ~30 min, kein `clip_error`
-
-Der eigentliche Clip-Render (Hailuo/HappyHorse-Plate) ist gescheitert, aber `lip_sync_status` wurde nicht zurückgesetzt. Dadurch:
-
-- Der Pre-Flight-Gate im Auto-Trigger (`useTwoShotAutoTrigger.ts:340`) verwirft die Szene als Kandidat, weil `clip_status !== 'ready'` und weder `clip_url` noch `audio_plan.twoshot.url` da sind → es wird nie etwas dispatched.
-- Der UI-Status (`progressActive` / "Lipsync" Pill) hängt an `lip_sync_status='pending'` → endloser Spinner.
-- Der `lipsync-watchdog` greift hier nicht, weil sein Filter nur `running/audio_muxing` oder `pending+circuit_open/deferred` abdeckt — eine **pending-ohne-Stage-und-ohne-Clip**-Szene ist für ihn unsichtbar.
-
-Keine offenen Sync.so-Jobs, keine `dialog_dispatch_locks`. Es ist ein reines State-Leak, kein Provider-Hänger.
+Die betroffene Szene `94c42a63…` ist technisch “fertig”, aber die Lip-Sync-Ziele wurden aus der Anchor-Still-FaceMap auf die finale Video-Plate skaliert. Bei dieser Szene ist die finale Plate gegenüber dem Anchor sichtbar verschoben, besonders bei Sarah/Matthew. Weil die Pipeline bei “identity matched” den echten Plate-Check weich überspringt, wurden die Face-Crops trotzdem an falschen/zu weit versetzten Stellen gerendert.
 
 ## Plan
 
-### 1. Sofortige Entsperrung der hängenden Szene
-SQL-Migration (idempotent), die alle Szenen mit dem genannten kaputten State sauber zurücksetzt:
+1. **Kaputte Szene sofort sauber zurücksetzen**
+   - Die aktuelle falsche Lip-Sync-Ausgabe wird nicht als fertiges Ergebnis behalten.
+   - Die Szene wird auf die ursprüngliche Video-Plate zurückgesetzt, `dialog_shots`/Lip-Sync-Status werden bereinigt.
+   - Die dafür abgezogenen Lip-Sync-Credits werden idempotent zurückerstattet, damit kein Fehlversuch berechnet bleibt.
 
-```sql
-UPDATE composer_scenes
-SET lip_sync_status = NULL,
-    twoshot_stage   = NULL,
-    clip_error      = COALESCE(NULLIF(clip_error,''),
-                               'auto-reset: clip_failed_with_dangling_lipsync_pending'),
-    updated_at      = now()
-WHERE dialog_mode = true
-  AND lip_sync_status = 'pending'
-  AND lip_sync_applied_at IS NULL
-  AND (clip_url IS NULL OR clip_url = '')
-  AND (clip_status IN ('failed','pending') OR clip_status IS NULL)
-  AND updated_at < now() - interval '5 minutes';
-```
+2. **Plate-native Speaker Targets einführen**
+   - Vor jedem Multi-Person-Lip-Sync wird ein echter Frame aus der finalen Video-Plate analysiert, nicht nur der Anchor.
+   - Die Backend-Logik erkennt dort alle sichtbaren Gesichter und matcht sie gegen die Charakter-Portraits.
+   - Speaker-Ziele werden danach aus der finalen Plate abgeleitet: `character_id → echtes Plate-Gesicht → coords + bbox`.
 
-Damit verschwindet der UI-Spinner sofort und der User kann Szene 1 neu generieren.
+3. **Anchor-FaceMap nur noch als Fallback verwenden**
+   - Für 3–4 Personen darf die Anchor-FaceMap nicht mehr automatisch als “sicher” gelten.
+   - Wenn Plate-Erkennung/Identity-Match nicht alle Sprecher eindeutig findet, wird der Lip-Sync vor Provider-Kosten blockiert und die Szene zeigt eine klare Fehlermeldung statt ein falsches Ergebnis zu rendern.
 
-### 2. Root-cause in `compose-video-clips`
-Im per-Szene Error-Handler (beide Stellen bei den `lip_sync_status: "pending"`-Markierungen, Zeile 2149 und 2755): wenn der Clip-Render fehlschlägt **bevor** ein Master-Clip + Audio-Plan existieren, in derselben Transaction `lip_sync_status = NULL`, `twoshot_stage = NULL` mitschreiben. So bleibt nach einem Clip-Fail kein Fake-„Lipsync pending" zurück.
+4. **Preclip-Qualitätsgate ergänzen**
+   - Nach dem Rendern jedes Single-Face-Preclips wird geprüft, ob wirklich genau ein gut sichtbares Gesicht im Crop liegt.
+   - Wenn der Crop leer ist, mehrere Gesichter enthält oder am Rand abschneidet, wird der Lauf gestoppt/refundet statt einen falschen Avatar zu animieren.
 
-### 3. Watchdog-Safety-Net in `lipsync-watchdog`
-Filter erweitern um einen dritten OR-Zweig:
+5. **Mux/Diagnose robuster machen**
+   - In `dialog_shots.passes[]` werden die verwendeten Plate-Ziele, FaceMap-Quelle und Crop-Validierung gespeichert.
+   - Logs zeigen künftig das tatsächlich an Sync gesendete Preclip-Video statt irreführend die Master-Plate.
 
-```
-and(lip_sync_status.eq.pending,
-    twoshot_stage.is.null,
-    clip_url.is.null)
-```
+6. **Dokumentation/Memo aktualisieren**
+   - Neue Regel: Multi-Person-Lip-Sync darf erst starten, wenn Plate-native Face Targets für alle Sprecher validiert sind; Anchor-Koordinaten allein reichen nicht mehr.
 
-…und im Loop: wenn so ein Row älter als `STALE_PREFLIGHT_MS` (2 min) ist, hart auf `lip_sync_status=NULL` zurücksetzen mit `clip_error='watchdog: orphaned_lipsync_pending_no_clip'`. Kein Credit-Refund nötig (es gab nie einen Sync.so-Job).
+## Technische Änderungen
 
-### 4. Doku
-Kurze Memo-Datei `mem/architecture/lipsync/orphaned-pending-after-clip-fail.md` + Eintrag in `mem/index.md`.
+- `supabase/functions/compose-dialog-segments/index.ts`
+  - Plate-native Speaker-Target-Auflösung vor `builtPasses`.
+  - Entfernen des Soft-Pass bei `allIdentityMatched` für 3+ Sprecher.
+  - Preclip-Face-Gate vor Sync-Dispatch.
 
-## Betroffene Dateien
-- neue Migration unter `supabase/migrations/`
-- `supabase/functions/compose-video-clips/index.ts` (2 Stellen)
-- `supabase/functions/lipsync-watchdog/index.ts` (Filter + neuer Reset-Zweig)
-- `mem/architecture/lipsync/orphaned-pending-after-clip-fail.md` (neu)
-- `mem/index.md`
+- `supabase/functions/_shared/twoshot-face-map.ts` oder neuer Shared Helper
+  - Plate-Frame Identity Matching gegen Charakter-Portraits.
+  - Rückgabe von `coords`, `bbox`, `source`, `confidence` pro `character_id`.
 
-Keine Änderungen an Sync.so-Logik, Pre-Flight-Gates oder Multi-Speaker-Pipeline.
+- `supabase/functions/_shared/plate-face-detect.ts`
+  - Erweiterung um Identity Assignments, nicht nur left-to-right Slots.
+
+- Daten-Korrektur
+  - Betroffene Szene `94c42a63…` zurücksetzen und Credits idempotent erstatten.
+
+- Memo
+  - Architekturregel für “Plate-native face targeting required for multi-speaker Lip-Sync” speichern.
