@@ -290,43 +290,161 @@ function resolveVoice(
   return null;
 }
 
+/**
+ * Trim trailing silence (energy VAD) from Int16 PCM. Threshold ~ -38 dBFS,
+ * min trailing silence 120 ms. Used as fallback when timestamp-trim fails.
+ */
+function trimTrailingSilence(samples: Int16Array, sampleRate = SAMPLE_RATE): Int16Array {
+  if (samples.length === 0) return samples;
+  const minSilenceSamples = Math.round(0.12 * sampleRate);
+  const threshold = 32768 * Math.pow(10, -38 / 20); // ≈ 414
+  let lastVoicedIdx = -1;
+  for (let i = samples.length - 1; i >= 0; i--) {
+    if (Math.abs(samples[i]) > threshold) { lastVoicedIdx = i; break; }
+  }
+  if (lastVoicedIdx < 0) return samples;
+  // Keep ≈80 ms tail past last voiced sample for natural consonant decay.
+  const keepUntil = Math.min(samples.length, lastVoicedIdx + Math.round(0.08 * sampleRate));
+  // Only trim if we'd remove at least minSilenceSamples (otherwise leave alone).
+  if (samples.length - keepUntil < minSilenceSamples) return samples;
+  return samples.subarray(0, keepUntil);
+}
+
+interface ElevenPcmResult {
+  pcm: Int16Array;
+  rawDurSec: number;
+  trimmedDurSec: number;
+  hallucinatedTailMs: number;
+  trimMode: "timestamps" | "energy-vad" | "none";
+}
+
 async function elevenlabsPcm(
   apiKey: string,
   voiceId: string,
   text: string,
-): Promise<Int16Array> {
-  // Raw headerless Int16LE mono. We request pcm_24000 (available on Starter
-  // tier and above — pcm_44100 is Pro-only and 403's on most accounts) and
-  // resample linearly to SAMPLE_RATE so the sample-accurate timeline stays
-  // intact. Resampling error << 1 sample after the merged-track is hard
-  // trimmed to round(sceneDur * 44.1 kHz) downstream.
+): Promise<ElevenPcmResult> {
+  // ── v89 — `with-timestamps` endpoint ─────────────────────────────────
+  // Plan §2: use ElevenLabs `with-timestamps` so we can hard-cap the PCM
+  // at `lastScriptCharEnd + 0.12 s`. This kills hallucinated trailing
+  // words/breaths that overlap the next speaker's window. Returns JSON:
+  //   { audio_base64, alignment: { character_end_times_seconds, ... } }
+  // Falls back to raw PCM + energy-VAD tail-trim if timestamps fail.
   const SOURCE_RATE = 24000;
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_${SOURCE_RATE}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "xi-api-key": apiKey,
-      "Content-Type": "application/json",
-      "Accept": "audio/basic",
+  const tsUrl =
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps?output_format=pcm_${SOURCE_RATE}`;
+  const body = JSON.stringify({
+    text,
+    model_id: "eleven_multilingual_v2",
+    voice_settings: {
+      stability: 0.45,
+      similarity_boost: 0.75,
+      style: 0.3,
+      use_speaker_boost: true,
+      speed: 1.0,
     },
-    body: JSON.stringify({
-      text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: {
-        stability: 0.45,
-        similarity_boost: 0.75,
-        style: 0.3,
-        use_speaker_boost: true,
-        speed: 1.0,
-      },
-    }),
   });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`ElevenLabs ${voiceId} failed (${res.status}): ${errText.slice(0, 200)}`);
+
+  try {
+    const res = await fetch(tsUrl, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`with-timestamps ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    const json = await res.json() as {
+      audio_base64?: string;
+      alignment?: {
+        characters?: string[];
+        character_start_times_seconds?: number[];
+        character_end_times_seconds?: number[];
+      };
+    };
+    if (!json.audio_base64) throw new Error("with-timestamps: missing audio_base64");
+
+    // Decode base64 → bytes.
+    const bin = atob(json.audio_base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const rawSrc = pcmBytesToSamples(bytes);
+    const rawDurSec = rawSrc.length / SOURCE_RATE;
+
+    // Compute trim target from last char end + 0.12s consonant tail.
+    const ends = json.alignment?.character_end_times_seconds ?? [];
+    let trimMode: ElevenPcmResult["trimMode"] = "none";
+    let trimmedSrc = rawSrc;
+    let trimmedDurSec = rawDurSec;
+    let hallucinatedTailMs = 0;
+    if (ends.length > 0) {
+      const lastEnd = Number(ends[ends.length - 1]);
+      if (Number.isFinite(lastEnd) && lastEnd > 0) {
+        const cutSec = lastEnd + 0.12;
+        const cutSamples = Math.min(rawSrc.length, Math.round(cutSec * SOURCE_RATE));
+        if (cutSamples < rawSrc.length - Math.round(0.04 * SOURCE_RATE)) {
+          trimmedSrc = rawSrc.subarray(0, cutSamples);
+          trimmedDurSec = trimmedSrc.length / SOURCE_RATE;
+          hallucinatedTailMs = Math.round((rawDurSec - trimmedDurSec) * 1000);
+          trimMode = "timestamps";
+          if (hallucinatedTailMs > 400) {
+            console.log(
+              `[compose-twoshot-audio] elevenlabs hallucinated tail trimmed: ${hallucinatedTailMs}ms (raw=${rawDurSec.toFixed(3)}s → ${trimmedDurSec.toFixed(3)}s) voice=${voiceId}`,
+            );
+          }
+        }
+      }
+    }
+    const pcm = SOURCE_RATE === SAMPLE_RATE
+      ? trimmedSrc
+      : resampleLinear(trimmedSrc, SOURCE_RATE, SAMPLE_RATE);
+    return {
+      pcm,
+      rawDurSec: Math.round(rawDurSec * 1000) / 1000,
+      trimmedDurSec: Math.round(trimmedDurSec * 1000) / 1000,
+      hallucinatedTailMs,
+      trimMode,
+    };
+  } catch (tsErr) {
+    console.warn(
+      `[compose-twoshot-audio] with-timestamps failed (${(tsErr as Error)?.message ?? tsErr}), falling back to raw PCM + energy-VAD trim`,
+    );
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_${SOURCE_RATE}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "audio/basic",
+      },
+      body,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`ElevenLabs ${voiceId} failed (${res.status}): ${errText.slice(0, 200)}`);
+    }
+    const rawSrc = pcmBytesToSamples(new Uint8Array(await res.arrayBuffer()));
+    const rawDurSec = rawSrc.length / SOURCE_RATE;
+    // Energy-VAD tail-trim on source rate.
+    const trimmedSrc = trimTrailingSilence(rawSrc, SOURCE_RATE);
+    const trimmedDurSec = trimmedSrc.length / SOURCE_RATE;
+    const hallucinatedTailMs = Math.round((rawDurSec - trimmedDurSec) * 1000);
+    const pcm = SOURCE_RATE === SAMPLE_RATE
+      ? trimmedSrc
+      : resampleLinear(trimmedSrc, SOURCE_RATE, SAMPLE_RATE);
+    return {
+      pcm,
+      rawDurSec: Math.round(rawDurSec * 1000) / 1000,
+      trimmedDurSec: Math.round(trimmedDurSec * 1000) / 1000,
+      hallucinatedTailMs,
+      trimMode: hallucinatedTailMs > 0 ? "energy-vad" : "none",
+    };
   }
-  const raw = pcmBytesToSamples(new Uint8Array(await res.arrayBuffer()));
-  return SOURCE_RATE === SAMPLE_RATE ? raw : resampleLinear(raw, SOURCE_RATE, SAMPLE_RATE);
 }
 
 async function humePcm(
