@@ -1,111 +1,44 @@
-## Lip-Sync Pipeline — Stand Juni 2026 (Phase 2 abgeschlossen)
+## Bug: Action-Feld leer nach Storyboard + Überschreiben beim "Szene generieren"
 
-### 1. Was wir jetzt haben (v82 + v83 + v84)
+### Was passiert (Reproduktion)
+1. Storyboard läuft durch → `SceneActionField` ist leer, obwohl die Edge Function `sceneActionEn` / `sceneActionLocalized` für jede Szene zurückgibt.
+2. User tippt manuell etwas ins Action-Feld.
+3. User öffnet "Szene aus Beschreibung" (`SceneDirectorBox`), beschreibt die Szene und klickt **Szene generieren**.
+4. `scene-director` antwortet, `onApply` schreibt `sceneActionUser` / `sceneActionEn` aus der KI-Antwort **bedingungslos** zurück → User-Eingabe ist weg, stattdessen steht da der Text, der eigentlich seit Storyboard-Ende dort hätte stehen sollen.
 
-**Aktueller Retry-Ladder (identisch in Dispatcher + Webhook):**
+### Root Cause
+Zwei unabhängige Defekte verstärken sich:
 
-```text
-1. bbox-url-pro     → sync-3 + bounding_boxes_url (Phase 2.1, NEU PRIMARY)
-2. coords-pro       → sync-3 + point-ASD
-3. coords-pro-box   → sync-3 + inline bounding_boxes
-4. sync3-coords     → sync-3 + point-ASD (Alias)
-5. coords-pro-lp2pro→ lipsync-2-pro + point-ASD (Phase 2.3 wieder erreichbar)
-6. auto-pro         → lipsync-2-pro + auto_detect
-7. auto-standard    → lipsync-2 + auto_detect (Last-Ditch vor Refund)
-```
+**A) `persistScenesToDb` (Debounced Flush) lässt `scene_action_user` / `scene_action_en` aus**
+- `useComposerPersistence` schreibt die beiden Spalten beim **initialen Insert** korrekt (`scene_action_user: scene.sceneActionUser ?? null`, L227/286).
+- Der debounced Flush in `VideoComposerDashboard.persistScenesToDb` (L847-889) listet aber `scene_action_user` / `scene_action_en` **nicht** mit auf. Sobald irgendein Storyboard-Edit triggert (cast-merge in `BriefingTab`, `setScenes`-Wrapper, propagateDialogLock) bevor der Insert fertig ist, oder sobald die Realtime-Subscription die Rows neu hydratisiert, kann die Spalte als leer durchschimmern. Außerdem: viele weitere wichtige Felder (`audio_plan`, `dialog_locked_at`, `realism_preset`, `action_beat`, `first_frame_url`, `lip_sync_*`) fehlen ebenfalls — Scope hier nur das Action-Feld, der Rest wird notiert.
 
-**Fresh-Dispatch-Gate für `bbox-url-pro`:**
-`speakers.length ≥ 2 && plateDims && plateIdentityMap.resolvedCount > 0 && !pass.preclip_url`
-→ sonst Legacy-Default `coords-pro`.
+**B) `SceneDirectorBox.onApply` überschreibt User-Locked Werte**
+- L186-187 setzt immer `sceneActionUser: data.sceneActionLocalized || data.sceneActionEn || undefined`.
+- `SceneCard.tsx` L2364-2370 schreibt das ungefiltert ins Scene-Objekt → User-Override geht verloren.
+- Konsistent mit dem bestehenden "Locked Override"-Pattern in `SceneActionField` (zeigt ein 🔒-Badge wenn das Feld nicht leer ist) erwartet der User, dass manuelle Eingaben den Director überstimmen.
 
-**Hailuo-Prompt-Layer (v83):** n=1/n=2 dürfen wieder Profile + OTS, n≥3 bleibt strikte horizontale Linie (ASD-Slot-Mapping).
+### Fix
 
----
+**1. `src/components/video-composer/VideoComposerDashboard.tsx` (`persistScenesToDb`, ~L847-889)**
+- `scene_action_user: s.sceneActionUser ?? null` ergänzen.
+- `scene_action_en: s.sceneActionEn ?? null` ergänzen.
+- (Nur diese zwei Felder im Scope — andere fehlende Felder als Folgeticket; sind nicht für diesen Bug verantwortlich.)
 
-### 2. Vergleich mit der „alten" Pipeline (vor Phase 2)
+**2. `src/components/video-composer/SceneDirectorBox.tsx` (`handleGenerate` → `onApply`, ~L175-189)**
+- Vor dem Bauen von `onApply`-Payload prüfen, ob der User bereits etwas im Action-Feld hat:
+  ```ts
+  const userLockedScene = Boolean((scene.sceneActionUser ?? '').trim());
+  ```
+- `sceneActionUser` / `sceneActionEn` nur dann mitschicken, wenn `!userLockedScene`. Bei gelocktem Feld den Director-Output verwerfen — `aiPrompt` und übrige Felder (matched assets, characterShots, dialogScript) werden weiterhin appliziert.
+- Analog `characterActions` pro Slot: wenn ein bestehender Slot bereits `actionUser` hat, den Director-Vorschlag für diesen Slot verwerfen (alle anderen Slots normal überschreiben). Hält die schon dokumentierte Lock-Semantik konsistent.
+- Falls Locks erkannt wurden → ein dezenter Toast-Hinweis ("Manuelle Aktionstexte beibehalten — Director hat nur Prompt & Assets aktualisiert"), damit der User versteht, was passiert ist.
 
-| Aspekt                          | Alt (≤ v81)                                        | Neu (v82–v84)                                               |
-| ------------------------------- | -------------------------------------------------- | ----------------------------------------------------------- |
-| Multi-Speaker PRIMARY           | `coords-pro` (point-ASD)                           | `bbox-url-pro` (per-frame JSON URL)                         |
-| Strukturelle „kein-Avatar-Hit"  | Vorhanden bei langen/komplexen Plates              | Eliminiert via deterministische Box-Map pro Frame           |
-| Hailuo-Framing n=1/n=2          | Frontal/Three-quarter erzwungen                    | Profile + OTS erlaubt (sync-3 verträgt's)                   |
-| `coords-pro-lp2pro` Escape Hatch | Vom Webhook gerufen, vom Dispatcher abgelehnt → tot | Im Ladder beider Files, v61 Logic läuft wieder              |
-| Retry-Ladder-Drift              | Dispatcher ≠ Webhook (6 vs 7 Einträge)             | Beide Files identisch, 7 Einträge                           |
+### Test-Plan (manuell)
+1. Neue Briefing-Generierung → Storyboard öffnen → Action-Feld muss den AI-Text zeigen (Reload-Test: Page-Refresh → Feld bleibt befüllt, beweist dass Flush stimmt).
+2. Action-Feld leeren → SceneDirectorBox → Generate → Action-Feld zeigt Director-Output (Lock-Semantik korrekt: leer = unlocked).
+3. Action-Feld mit eigenem Text füllen → SceneDirectorBox → Generate → Action-Feld bleibt unverändert, Prompt + Cast werden aber aktualisiert; Toast erscheint.
 
----
-
-### 3. Vergleich mit Sync.so Docs (v3 / sync-3)
-
-| Sync.so-Vorgabe                                          | Unser Stand                                                              | OK? |
-| -------------------------------------------------------- | ------------------------------------------------------------------------ | --- |
-| `bounding_boxes_url` als JSON in External Storage         | `composer-frames/${userId}/.../asd/${sceneId}-pN-<ts>.json`              | ✅   |
-| Schema: `{ bounding_boxes: [[x1,y1,x2,y2], …] }`         | Exakt so, Länge = `ceil(totalSec × 30)`                                  | ✅   |
-| Per-Frame-Liste, 30 fps                                  | 30 fps hart-kodiert (matcht Hailuo-Plate-fps)                            | ✅   |
-| Empfohlen für long-form / multi-face                     | Genau dort als PRIMARY aktiviert                                         | ✅   |
-| sync-3 als universeller Default                          | `payloadModel`-Tail standardmäßig `SYNC3_MODEL`                          | ✅   |
-| Profile / partial occlusion natively supported           | Prompt-Layer öffnet das (v83)                                            | ✅   |
-| `sync_mode=cut_off` wenn VO länger als Plate             | Aktiv                                                                    | ✅   |
-| Per-Speaker Audio-Mute für N≥2                          | Frozen-Invariant I.1 — chained Multipass                                 | ✅   |
-
-**Nicht umgesetzt (bewusst, kein Bug):**
-- HDR-Preflight / 4K-Cap (Plan 2.4) — braucht ffprobe/Lambda, nicht im Edge möglich.
-- "speaking naturally with subtle mouth movement"-Suffix — würde die v60-Ventriloquist-Fixe brechen, daher gestrichen (vgl. v83-Doku).
-
----
-
-### 4. Realitätscheck aus `syncso_dispatch_log` (letzte 7 Tage)
-
-```text
-coords-pro            DISPATCHED  269
-coords-pro            FAILED      148   ← 35 % Provider-Fail → Fallback-Kette
-coords-pro-box        DISPATCHED   39
-coords-pro-box        FAILED       40   ← 50 % Fail (lange BBox-Arrays)
-sync3-coords          50/50
-coords-pro-lp2pro       3 dispatched, 3 failed
-bbox-url-pro            0           ← noch nie gefeuert
-cinematic-sync (Single-Speaker) sauber
-```
-
-**Befund:** `bbox-url-pro` ist deployed, aber in den letzten 48 h hat noch keine Szene das Gate `N≥2 ∧ plateDims ∧ plateIdentity.resolved>0 ∧ !preclip_url` getroffen — entweder weil zuletzt nur Single-Speaker lief oder das Preclip-Vorrang die Multi-Speaker Cases noch abfängt.
-
-→ **Wir wissen noch nicht empirisch, ob v82 die 148 `coords-pro`-Failures wirklich schluckt.** Code-Pfade sehen sauber aus, aber die Phase-2-These ist noch nicht in Produktion bewiesen.
-
----
-
-### 5. Bekannte Restrisiken
-
-1. **Live-Validation fehlt:** Keine `bbox-url-pro`-Dispatches in den Logs. Wir müssen entweder warten bis ein Dialog mit ≥2 Sprechern + resolved Identity läuft, oder gezielt einen Test-Run anstoßen.
-2. **`coords-pro-box`-Failure-Rate liegt bei ~50 %.** Solange `bbox-url-pro` greift, ist das nur noch ein Fallback-Step — falls aber das Identity-Mapping fehlschlägt, fallen wir auf eine Variante mit historisch schlechter Quote.
-3. **Identity-Map-Auflösung:** `plateIdentityMap.resolvedCount > 0` ist die Gating-Bedingung. Wenn die Plate-Face-Detection (v77) für N≥2 keine stabile Map liefert, downgraden wir sofort auf Legacy. Keine Metrik trackt heute, wie oft das passiert.
-4. **HDR/4K-Edge-Case** weiterhin ungelöst (per Doku akzeptiert).
-
----
-
-### 6. Empfehlung für die nächsten Schritte
-
-**Empfehlung: keine neuen Phasen jetzt — erst validieren.**
-
-In der Reihenfolge:
-
-1. **Telemetrie-Hardening (klein, ~1 Datei):**
-   - In `compose-dialog-segments` beim Gate-Check ein strukturiertes Log `[v82-gate]` mit `{speakers, plateDims:bool, resolvedCount, hasPreclip}` schreiben.
-   - In `syncso_dispatch_log.meta` `retry_variant` immer mitschreiben (heute nur teilweise im `mode`/`coords` gesetzt).
-   → Damit sehen wir, **warum** `bbox-url-pro` (nicht) feuert und können die Fail-Rate per Variante messen.
-
-2. **Gezielter Live-Test (manuell):** Eine bekannte Multi-Speaker-Szene im Composer re-rendern und in den Logs verifizieren:
-   - `[v82-gate] picked=bbox-url-pro`
-   - `bounding_boxes_url` ist im `composer-frames`-Bucket erreichbar (HTTP 200)
-   - Webhook-Outcome = success ohne Fallback-Stepping
-
-3. **Erst dann Phase 3 oder neue Features.** Wenn (1)+(2) grün sind und die `coords-pro`-Failure-Rate über 7 Tage sichtbar fällt, ist Phase 2 wirklich abgeschlossen.
-
-**Falls bei der Live-Validierung Probleme auftauchen, plausible Ursachen (vorab):**
-- `plateIdentityMap.resolvedCount` bleibt 0 → v77 plate-face-detection genauer ansehen.
-- `composer-frames`-URL ist privat / nicht öffentlich lesbar → Bucket-Policy prüfen.
-- Box-Koordinaten in falschem Koordinatenraum (plate-space vs. clip-space) → Re-Scale-Logik in `uploadBoundingBoxesJson()` reviewen.
-
----
-
-### Fazit
-
-**Code-seitig ist Phase 2 vollständig und Sync.so-3-konform.** Retry-Ladder, Framing-Locker, lipsync-2-pro-Escape — alles drin. **Empirisch fehlt der Proof, dass `bbox-url-pro` die Multi-Speaker-Failures wirklich eliminiert.** Bevor wir auf Phase 3 gehen, sollten wir 1–2 kleine Telemetrie-Logs einbauen und einen Multi-Speaker-Live-Test fahren. Soll ich das als Mini-Phase 2.5 (Telemetrie + Validation) umsetzen?
+### Out of Scope (Folgetickets)
+- Restliche im Flush fehlende Felder (`audio_plan`, `realism_preset`, `action_beat`, ...). Separates Audit empfohlen.
+- Verhalten des `actionUser` pro Cast-Slot ist analog gelocked, aber lohnt eine eigene Review der Lock-UI im `CharacterCastPicker`.

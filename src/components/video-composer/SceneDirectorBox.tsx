@@ -166,13 +166,33 @@ export function SceneDirectorBox({
         : [];
       const enMap = new Map(pcaEn.map((e) => [String(e.characterId), String(e.actionEn || '')]));
       const locMap = new Map(pcaLoc.map((e) => [String(e.characterId), String(e.action || '')]));
-      const characterActions = characterShots.map((s) => ({
-        characterId: s.characterId,
-        actionEn: (enMap.get(s.characterId) || '').trim(),
-        actionUser: (locMap.get(s.characterId) || enMap.get(s.characterId) || '').trim(),
-      }));
 
-      onApply({
+      // ── Lock semantics ──────────────────────────────────────────────────
+      // If the user already typed something into the scene action field, or
+      // into a per-character action slot, treat it as a manual override and
+      // do NOT clobber it with the director's fresh output. The director
+      // still updates aiPrompt, matched assets, characterShots and dialog.
+      const userLockedScene = Boolean((scene.sceneActionUser ?? '').trim());
+      const prevSlotActions = new Map(
+        (scene.characterShots ?? []).map((s) => [
+          s.characterId,
+          { user: (s.actionUser ?? '').trim(), en: (s.actionEn ?? '').trim() },
+        ]),
+      );
+
+      let lockedSlotCount = 0;
+      const characterActions = characterShots.map((s) => {
+        const prev = prevSlotActions.get(s.characterId);
+        if (prev && prev.user) {
+          lockedSlotCount++;
+          return { characterId: s.characterId, actionUser: prev.user, actionEn: prev.en || prev.user };
+        }
+        const en = (enMap.get(s.characterId) || '').trim();
+        const loc = (locMap.get(s.characterId) || en).trim();
+        return { characterId: s.characterId, actionEn: en, actionUser: loc };
+      });
+
+      const apply: Parameters<typeof onApply>[0] = {
         aiPrompt: finalPrompt,
         dialogScript: data.dialogScript || undefined,
         characterShots: characterShots.length > 0 ? characterShots : undefined,
@@ -183,10 +203,13 @@ export function SceneDirectorBox({
               motionIntensity: data.actionBeat.motionIntensity || undefined,
             }
           : undefined,
-        sceneActionUser: String(data.sceneActionLocalized || data.sceneActionEn || '').trim() || undefined,
-        sceneActionEn: String(data.sceneActionEn || '').trim() || undefined,
         characterActions: characterActions.length > 0 ? characterActions : undefined,
-      });
+      };
+      if (!userLockedScene) {
+        apply.sceneActionUser = String(data.sceneActionLocalized || data.sceneActionEn || '').trim() || undefined;
+        apply.sceneActionEn = String(data.sceneActionEn || '').trim() || undefined;
+      }
+      onApply(apply);
 
       setResult(data);
 
@@ -196,9 +219,18 @@ export function SceneDirectorBox({
         (data.matchedAssets.buildingIds?.length ?? 0) +
         (data.matchedAssets.propIds?.length ?? 0);
 
+      const lockNote =
+        userLockedScene || lockedSlotCount > 0
+          ? lang === 'de'
+            ? ' · Manuelle Aktionstexte beibehalten'
+            : lang === 'es'
+              ? ' · Acciones manuales conservadas'
+              : ' · Manual action text kept'
+          : '';
+
       toast({
         title: `✨ ${t.applied}`,
-        description: `${matchedCount} assets · ${data.droppedActions?.length ?? 0} ${data.droppedActions?.length === 1 ? 'action' : 'actions'} ${t.dropped.toLowerCase()}`,
+        description: `${matchedCount} assets · ${data.droppedActions?.length ?? 0} ${data.droppedActions?.length === 1 ? 'action' : 'actions'} ${t.dropped.toLowerCase()}${lockNote}`,
       });
     } catch (e: any) {
       toast({ title: 'Scene Director', description: e?.message ?? 'Failed', variant: 'destructive' });
