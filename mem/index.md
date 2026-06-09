@@ -44,6 +44,7 @@ Updated: today
 - [v78 Conditional Strict Gate](mem://architecture/lipsync/v78-conditional-strict-gate) — strict face-gate for 3+ speakers only runs when plate identity resolved; else soft-pass + face-repair
 - [v79 Dead Segments Block Removed](mem://architecture/lipsync/v79-dead-segments-block-removed) — 499 lines of debug-only v41/v54/v56 single-call `segments[]` dispatch deleted from compose-dialog-segments; backwards-compat body flags kept as no-ops
 - [v80 Webhook Legacy Branch Removed](mem://architecture/lipsync/v80-webhook-legacy-branch-removed) — 342 lines of v41-v56 single-call segments[] handler deleted from sync-so-webhook + orphan hasSegmentAudioInputCrop helper; late legacy webhooks fall through to existing legacy_v4_ignored 200
+- [v81 Shared CLIP_COSTS + Dialog-Speakers](mem://architecture/lipsync/v81-shared-clip-costs-dialog-speakers) — `_shared/clip-costs.ts` + `_shared/dialog-speakers.ts` ersetzen duplizierte Tabellen/Parser in compose-video-clips + compose-clip-webhook; Charge/Refund-Drift bei neuen Providern unmöglich
 - [Lipsync Pro Pricing Policy](mem://architecture/lipsync/sync-so-pro-model-policy) — duration-based credits + refunds
 - [Sync.so v50 Pro + BBox](mem://architecture/lipsync/v50-pro-bounding-boxes) — 3+ speakers: lipsync-2-pro + segments[] + per-segment bounding_boxes from faceMap (fixes lost speaker_3, ups quality vs v49)
 - [Multi-Char Pipeline Hardening v33](mem://architecture/lipsync/multi-character-pipeline-hardening-v33) — coords-pro-box + plate-probe

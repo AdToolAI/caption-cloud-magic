@@ -1,6 +1,11 @@
-// compose-video-clips v2.3.0 — duration snap for Luma/Wan/Seedance
+// compose-video-clips v2.4.0 — v81 shared CLIP_COSTS + dialog-speakers
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
+import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
+import {
+  countDialogSpeakers,
+  stripSpeakerPrefixes,
+} from "../_shared/dialog-speakers.ts";
 
 /** Snap an arbitrary duration (seconds) to the nearest provider-allowed discrete value. */
 function snapDuration(seconds: number, allowed: number[]): number {
@@ -37,28 +42,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-type Quality = "standard" | "pro";
-
-// Cost per second by source × quality tier — synced with client (src/types/video-composer.ts)
-const CLIP_COSTS: Record<string, Record<Quality, number>> = {
-  "ai-hailuo":     { standard: 0.15, pro: 0.2 },
-  "ai-kling":      { standard: 0.15, pro: 0.21 },
-  "ai-sora":       { standard: 0.25, pro: 0.53 },
-  "ai-wan":        { standard: 0.1,  pro: 0.18 },
-  "ai-seedance":   { standard: 0.12, pro: 0.2 },
-  "ai-luma":       { standard: 0.2,  pro: 0.32 },
-  "ai-veo":        { standard: 0.2,  pro: 1.4 },
-  "ai-runway":     { standard: 0.15, pro: 0.15 },
-  "ai-pika":       { standard: 0.1,  pro: 0.18 },
-  // Providers added after the initial table — keep these in lockstep with
-  // compose-clip-webhook CLIP_COSTS (refund table). Missing entries cause
-  // under-charges here and under-refunds in the webhook.
-  "ai-happyhorse": { standard: 0.28, pro: 0.56 }, // 720p / 1080p (Replicate 50% margin)
-  "ai-vidu":       { standard: 0.09, pro: 0.09 }, // flat €0.45 / 5s
-  "ai-grok":       { standard: 0.20, pro: 0.20 }, // 1080p only
-  "ai-ltx":        { standard: 0.08, pro: 0.12 },
-  "ai-image":      { standard: 0.01, pro: 0.015 },
-};
+// v81: CLIP_COSTS and ClipQuality are now imported from _shared/clip-costs.ts
+// (single source of truth, shared with compose-clip-webhook refund path).
+type Quality = ClipQuality;
 
 
 interface ComposerCharacter {
@@ -84,28 +70,7 @@ type DialogVoiceCfg = {
 function sceneHasDialogText(script?: string | null): boolean {
   return !!(script && script.trim().length > 0);
 }
-function countDialogSpeakers(script?: string | null): number {
-  const s = (script ?? "").trim();
-  if (!s) return 0;
-  const speakers = new Set<string>();
-  for (const line of s.split("\n")) {
-    const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
-    if (m) speakers.add(m[1].trim().toLowerCase());
-  }
-  return speakers.size;
-}
-/** Strip "NAME:" / "[NAME]:" speaker prefixes — leaves clean spoken text. */
-function stripSpeakerPrefixes(script: string): string {
-  return script
-    .split("\n")
-    .map((line) =>
-      line
-        .replace(/^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]\s*/, "")
-        .trim(),
-    )
-    .filter((l) => l.length > 0)
-    .join(" ");
-}
+// v81: countDialogSpeakers + stripSpeakerPrefixes moved to _shared/dialog-speakers.ts
 function resolveDialogVoiceId(
   cfg?: string | DialogVoiceCfg,
 ): string | undefined {
