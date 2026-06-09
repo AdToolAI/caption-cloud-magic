@@ -1,69 +1,82 @@
-# Lip-Sync Pipeline: Stuck-Recovery & Dispatch-Härtung
+## Befund
 
-## Problem (Root Cause)
+Die aktuelle Szene `ec22e048…` hängt nicht bei Sync.so selbst, sondern **vor** dem Sync.so-Call:
 
-Eine Szene hängt seit 16 Min in `lip_sync_status = pending`, `twoshot_stage = master_clip` — aber **kein `syncso_dispatch_log`** und **keine `dialog_dispatch_locks`** Einträge. Sync.so wurde nie kontaktiert. Drei unabhängige Schichten haben versagt:
+- `lip_sync_status = pending`
+- `twoshot_stage = master_clip`
+- `clip_url` vorhanden
+- `audio_plan.twoshot.url` vorhanden
+- `syncso_dispatch_log` leer
+- `dialog_dispatch_locks` leer
+- `syncso_inflight_jobs` leer
+- Watchdog hat einmal `dispatch-recovery` geloggt, aber danach gibt es keinen echten Dispatch und keinen Fehlerzustand.
 
-1. **Client-Auto-Trigger** hält Inflight-Lock zu lange, wenn `compose-dialog-segments` 202 (benign) zurückgibt
-2. **Watchdog** überwacht `pending/master_clip + clip_url + ohne dialog_shots` nicht
-3. **UI** zeigt „Lip-Sync läuft" obwohl noch nichts dispatched wurde — Stall-Detection blendet sich aus
+Das bedeutet: Sync.so bekommt sehr wahrscheinlich gar keinen Request. Die UI zeigt korrekt „Lip-Sync wird gestartet…“, aber die Recovery markiert sich selbst als „ausgelöst“ und blockiert danach weitere Recovery-Versuche, obwohl kein Sync.so-Job entstanden ist.
 
-## Lösung (4 Maßnahmen)
+## Sync.so v3 Abgleich
 
-### 1. Client Auto-Trigger Hardening
-**Files:** `src/hooks/useTwoShotAutoTrigger.ts`, `src/components/video-composer/ClipsTab.tsx`
+Die eigentliche Payload-Form im Dispatcher passt zur offiziellen Sync.so-v3-/sync-3-Anleitung:
 
-- 202-Responses (`already_running`, `scene_lock_busy`, `preflight_transient_retry_later`) als benign behandeln, NICHT als Fehler werten
-- Inflight-Lock spätestens nach 30s freigeben (statt auf Response zu warten)
-- Re-Trigger erlauben, sobald Lock frei ist und Szene weiterhin `pending/master_clip` ohne `dialog_shots`
+- Endpoint: `POST /v2/generate`
+- `model: "sync-3"`
+- `input`: Video + Audio
+- `options.active_speaker_detection`: `auto_detect`, `coordinates` oder `bounding_boxes_url`
+- `webhookUrl` für asynchrone Completion
 
-### 2. Server Watchdog Erweiterung
-**File:** `supabase/functions/lipsync-watchdog/index.ts` (läuft via pg_cron minütlich)
+Der Fehler liegt daher nicht in „Sync.so antwortet nicht“, sondern im **Start-/Invoke-/Recovery-Layer vor dem Provider-Dispatch**.
 
-Neue Detection-Regel:
-```
-scene.lip_sync_status = 'pending'
-AND scene.twoshot_stage = 'master_clip'
-AND scene.clip_url IS NOT NULL
-AND scene.audio_plan->'twoshot'->>'url' IS NOT NULL
-AND NOT EXISTS (dialog_shots WHERE scene_id = scene.id)
-AND scene.updated_at < NOW() - INTERVAL '3 minutes'
-```
-→ Re-invoke `compose-dialog-segments` mit `{ auto: true, recovery: true }`. Idempotent via Server-Lock.
+## Plan
 
-### 3. UI Ehrlichkeit
-**Files:** `src/components/video-composer/SceneInlinePlayer.tsx`, `src/hooks/usePipelineProgress.ts`
+### 1. Watchdog-Recovery wirklich idempotent machen
 
-- Status-Labels trennen:
-  - `pending + master_clip + KEIN dialog_shots` → „Wird gestartet…" (gelb, max 3 Min)
-  - `pending + master_clip + dialog_shots vorhanden` → „Lip-Sync läuft…" (cyan, Provider-Job aktiv)
-  - >3 Min in „Wird gestartet" → Banner „Start hängt — neu anstoßen" mit Retry-Button
-- Stall-Detection greift wieder für `master_clip` ohne `dialog_shots`
+Datei: `supabase/functions/lipsync-watchdog/index.ts`
 
-### 4. Backend Konsistenz (optional, leichtgewichtig)
-**File:** `supabase/functions/compose-dialog-segments/index.ts`
+- Recovery nicht mehr dauerhaft durch `dialog_shots.recovery_dispatched_at` blockieren.
+- `recovery_dispatched_at` nur als temporären Versuch behandeln:
+  - wenn nach 60–90 Sekunden kein `syncso_dispatch_log` und kein `sync:`-Job existiert, darf der Watchdog erneut auslösen.
+- Den internen Aufruf zu `compose-dialog-segments` härten:
+  - `apikey`/Auth-Header vollständig setzen
+  - HTTP-Status und Body prüfen
+  - Fehler loggen, statt still weiterzulaufen
+- Nur dann als „recovered“ zählen, wenn `compose-dialog-segments` wirklich akzeptiert wurde oder ein Dispatch-/Wait-State geschrieben wurde.
 
-- Bei `auto: true` + benign wait/retry → konsequent `202 { ok: true, status: "<reason>" }` statt 200/500-Mix
-- Keine Credit-Buchung in 202-Pfaden
-- Server-Lock-TTL auf max 90s setzen (heute teilweise unklar)
+### 2. Dispatcher-Eintritt sichtbar machen
 
-## Validation (nach Implementation)
+Datei: `supabase/functions/compose-dialog-segments/index.ts`
 
-1. **Manueller Recovery-Test**: Aktuelle stuck Szene `7a6cbf71…` → „Lip-Sync neu rendern" klicken → muss in <2 Min `dialog_shots` Eintrag erzeugen
-2. **Race-Test**: Lip-Sync starten → sofort „Neues Projekt" klicken → kein roter Toast, Lock binnen 30s frei
-3. **Watchdog-Test**: Test-Szene auf `pending/master_clip` ohne `dialog_shots` setzen, 4 Min warten → Watchdog muss automatisch dispatchen (sichtbar in `syncso_dispatch_log`)
-4. **End-to-End**: Frisches Projekt → vollständiger Lip-Sync-Run → entweder erfolgreich oder klarer Fehler, niemals Endlos-Spinner
+- Direkt nach erfolgreichem Lock einen leichten `syncso_dispatch_log`-Eintrag schreiben, z. B. `sync_status = 'DISPATCH_ATTEMPT_STARTED'`.
+- Dadurch ist künftig sofort unterscheidbar:
+  - Dispatcher wurde nie erreicht
+  - Dispatcher wurde erreicht, aber Preflight blockt
+  - Sync.so wurde erreicht
+- Für `auto: true`/`recovery: true` 202-Zustände einheitlich zurückgeben, damit Watchdog und Client dieselbe Sprache sprechen.
 
-## Restrisiko (transparent)
+### 3. Current stuck scene aktiv retten
 
-- **Sync.so Provider-Outage** (5xx/Timeout extern): Watchdog erkennt, refundet automatisch — User sieht aber Fehlermeldung. Nicht durch diese Maßnahmen verhinderbar.
-- **Sub-Minuten-Recovery**: Watchdog läuft min., bei sub-minute hangs greift erst Client-Retry (30s). Akzeptabel.
-- **`compose-dialog-segments` Crash (OOM/Deno-Bug)**: Watchdog fängt nach max 3 Min.
+Nach dem Code-Fix:
 
-## Technische Details
+- Szene `ec22e048…` serverseitig aus dem falschen Recovery-Limbo lösen.
+- `compose-dialog-segments` direkt erneut anstoßen.
+- Danach prüfen:
+  - `syncso_dispatch_log` enthält mindestens `DISPATCH_ATTEMPT_STARTED`
+  - anschließend entweder `DISPATCHED` mit Sync.so-Job-ID oder ein klarer Preflight-Fehler
+  - UI wechselt von „wird gestartet“ zu „läuft“ oder zeigt einen echten Fehler
 
-- Memory-Refs: `mem://features/video-composer/dialog-shot-pipeline`, `mem://architecture/lipsync/sync-so-webhook-stage5` (8-min per-shot Watchdog bleibt unverändert)
-- Keine DB-Schema-Änderungen
-- Keine neuen Secrets
-- Cron-Job `poll-dialog-shots-every-minute` bleibt unverändert; `lipsync-watchdog` wird nur erweitert
-- Sync.so v3 Integration bleibt wie dokumentiert — kein API-Wechsel nötig, das Problem liegt vor dem Sync.so-Call
+### 4. UI-Fallback für Start-Limbo ergänzen
+
+Datei: `src/components/video-composer/SceneInlinePlayer.tsx`
+
+- Wenn eine Szene länger als ca. 3 Minuten in `master_clip` ohne Provider-Job hängt:
+  - nicht weiter nur Spinner zeigen
+  - Text ändern zu „Start hängt — wird automatisch neu angestoßen“
+- Optional im bestehenden CTA-Konzept: „Neu anstoßen“ anzeigen, wenn kein Lock und kein Dispatch-Log existiert.
+
+### 5. Validierung
+
+Nach Umsetzung prüfe ich konkret:
+
+1. Szene `ec22e048…` bekommt innerhalb von 1–2 Minuten einen sichtbaren Dispatch-/Preflight-Log.
+2. Wenn Sync.so wirklich erreicht wird, entsteht ein `sync:`-Job und `syncso_dispatch_log.DISPATCHED`.
+3. Wenn Preflight scheitert, wird die Szene sauber `failed` mit verständlichem `clip_error`, kein Endlosspinner.
+4. Watchdog darf denselben Start-Limbo mehrfach recovern, aber nicht parallel doppelt dispatchen.
+5. Keine Credit-Doppelbuchung: Recovery-/202-Pfade dürfen keine zusätzlichen Credits verbrennen.

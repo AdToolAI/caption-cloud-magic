@@ -284,23 +284,47 @@ serve(async (req) => {
     // ── (2.5) Dispatch-recovery: master_clip never reached Sync.so ────────
     // Plan v71 root cause: scene has clip_url + audio_plan.twoshot.url but
     // compose-dialog-segments was never invoked (lost client invoke / 202 race
-    // / inflight-lock leak). Re-dispatch once after 3 min, BEFORE the failure
-    // path runs at 4 min. Idempotent: tracked via dialog_shots.recovery_dispatched_at.
+    // / inflight-lock leak). Re-dispatch idempotently. The previous
+    // `recovery_dispatched_at` was a sticky one-shot marker that left scenes
+    // wedged forever if the recovery invoke itself didn't produce a Sync.so
+    // job (silent invoke failure, transient preflight retry, etc.). We now
+    // treat it as a 90s cooldown so the watchdog can re-dispatch as long as
+    // the scene still has no provider job and no dispatch log row.
+    const RECOVERY_COOLDOWN_MS = 90_000;
     const hasAudioPlan =
       typeof d.audio_plan?.twoshot?.url === "string" && d.audio_plan.twoshot.url.length > 0;
-    const recoveryAlreadyDispatched =
-      typeof ds?.recovery_dispatched_at === "string" && ds.recovery_dispatched_at.length > 0;
+    const lastRecovery = typeof ds?.recovery_dispatched_at === "string"
+      ? Date.parse(ds.recovery_dispatched_at)
+      : NaN;
+    const recoveryCoolingDown =
+      Number.isFinite(lastRecovery) && now - lastRecovery < RECOVERY_COOLDOWN_MS;
     const noDispatchYet = !hasRecordedProviderJobLocal(d);
+    // Also check the dispatch log table to be sure we didn't already reach
+    // the dispatcher in this scene's lifetime (preflight-blocked counts too).
+    let dispatchLogCount = 0;
+    if (noDispatchYet && !recoveryCoolingDown) {
+      try {
+        const { count } = await supabase
+          .from("syncso_dispatch_log")
+          .select("id", { count: "exact", head: true })
+          .eq("scene_id", d.id);
+        dispatchLogCount = count ?? 0;
+      } catch { /* tolerate */ }
+    }
     if (
       d.lip_sync_status === "pending" &&
       d.twoshot_stage === "master_clip" &&
       typeof d.clip_url === "string" && d.clip_url.length > 0 &&
       hasAudioPlan &&
       noDispatchYet &&
-      !recoveryAlreadyDispatched &&
+      !recoveryCoolingDown &&
+      dispatchLogCount === 0 &&
       ageMs >= STALE_DISPATCH_RECOVERY_MS
     ) {
-      console.log(`[lipsync-watchdog] dispatch-recovery scene=${d.id} age=${Math.round(ageMs / 1000)}s`);
+      console.log(
+        `[lipsync-watchdog] dispatch-recovery scene=${d.id} age=${Math.round(ageMs / 1000)}s ` +
+        `last_recovery=${Number.isFinite(lastRecovery) ? new Date(lastRecovery).toISOString() : "never"}`,
+      );
       try {
         await supabase
           .from("composer_scenes")
@@ -309,14 +333,20 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", d.id);
-        await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+        const invokeResp = await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            apikey: serviceKey,
             Authorization: `Bearer ${serviceKey}`,
           },
           body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true }),
         });
+        const invokeBody = await invokeResp.text().catch(() => "");
+        console.log(
+          `[lipsync-watchdog] dispatch-recovery invoke scene=${d.id} status=${invokeResp.status} ` +
+          `body=${invokeBody.slice(0, 200)}`,
+        );
         advanced.push({ scene_id: d.id, pass_idx: -1 });
       } catch (e) {
         console.warn(`[lipsync-watchdog] dispatch-recovery crash scene=${d.id}: ${(e as Error).message}`);
