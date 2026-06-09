@@ -1512,9 +1512,26 @@ serve(async (req) => {
     // speakers 2 and 3 to stay frozen). The per-pass fallback ladder
     // (coords-pro → auto-pro → auto-standard) is still applied inside
     // sync-so-webhook on actual provider failures for THIS pass only.
+    // v82 (Phase 2.1) — Fresh dispatch prefers `bbox-url-pro` for N>=2
+    // speakers when we have BOTH plateDims and a resolved plate-identity
+    // map. That gives Sync.so a per-frame deterministic target box and
+    // structurally fixes "Lipsync hat keinen Avatar getroffen" on
+    // multi-face plates. Falls back to the legacy coords-pro entry-point
+    // when plate identity is unavailable, when the per-pass preclip is
+    // present (then auto_detect on the 1-face crop is best), or on retry.
+    const havePlateIdentityForDispatch =
+      !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
+    const hasPassPreclipForDispatch = !!(pass as any).preclip_url;
+    const freshDefaultVariant: RetryVariant =
+      speakers.length >= 2 &&
+      !!plateDims &&
+      havePlateIdentityForDispatch &&
+      !hasPassPreclipForDispatch
+        ? "bbox-url-pro"
+        : "coords-pro";
     const retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
-      : "coords-pro";
+      : freshDefaultVariant;
 
     const diagnosticId = `${sceneId}:${currentPassIdx + 1}:${retryVariant}:${crypto.randomUUID()}`;
     pass.retry_variant = retryVariant;
