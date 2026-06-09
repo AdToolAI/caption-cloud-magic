@@ -469,6 +469,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             const errBody = (lsErr as any)?.context;
             const reason = lsData?.error ?? errBody?.error;
             const message = lsData?.message ?? errBody?.message;
+            // Scene was removed (new project / scene deletion) between the
+            // post-render fan-out and the invoke. Silent — no toast.
+            if (reason === 'scene_not_found') {
+              console.info(`[ClipsTab] lip-sync skipped — scene ${sceneId} no longer exists`);
+              return;
+            }
             if (reason === 'tts_failed' || reason === 'no_voiceover') {
               toast({
                 title: 'Cinematic-Sync braucht ein Voiceover',

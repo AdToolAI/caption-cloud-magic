@@ -424,11 +424,17 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 'missing_source_clip',
                 'dialog_pipeline_missing_audio_plan',
                 'master_clip_not_ready',
+                // Scene was deleted (new project / scene removed) between
+                // the poll snapshot and the invoke. Not a real failure.
+                'scene_not_found',
               ]);
               if (reason && SILENT_RACE.has(String(reason))) {
                 console.info(
                   `[useTwoShotAutoTrigger] silent retry for ${d.id}: ${reason}`,
                 );
+                // Free the inflight slot immediately so a legitimate new
+                // scene with a different id isn't blocked for 30 s.
+                inflight.current.delete(d.id);
               } else if (reason === 'tts_failed' || reason === 'no_voiceover') {
                 emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
