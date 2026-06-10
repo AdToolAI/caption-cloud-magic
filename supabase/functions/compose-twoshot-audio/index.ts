@@ -658,7 +658,7 @@ serve(async (req) => {
       _endSample: number;
       track_url?: string;
     }> = [];
-    let cursorSamples = 0;
+    // cursorSamples is declared below at the assembly loop (after parallel TTS)
     // Inter-speaker pause inserted as real silence — NEVER appended as text
     // to the TTS prompt. Earlier we appended " ..." to non-final utterances,
     // which ElevenLabs sometimes voiced as an audible mumble/breath at the
