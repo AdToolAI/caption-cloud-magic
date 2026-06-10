@@ -1212,7 +1212,32 @@ serve(async (req) => {
       );
     }
 
-    const builtPasses: PassState[] = passSpeakers.map(({ sp, originalIdx }, passIdx) => {
+    // v95 — Per-Turn Pass Split (flag-gated, default ON).
+    // Background: v94 made the per-pass preclip span the union of all turns
+    // of the speaker so Sync.so (sync_mode=cut_off) wouldn't truncate the
+    // output below the tight-WAV length. That fixed length but exposed a
+    // second problem: the preclip now also covers the PLATE-SILENT region
+    // between turn 1 and turn 2. Sync.so tries to animate turn-2 audio onto
+    // plate frames with a closed/idle mouth → minimal lip movement.
+    // Fix: split each multi-turn pass into N single-turn passes. Each pass
+    // gets a short preclip covering only that turn's mouth-active plate
+    // region and a short tight-WAV covering only that turn's audio →
+    // Sync.so animates the full output. v94 union-window logic still runs
+    // but becomes a no-op (min=max=turn window).
+    const splitMultiTurnFlagOn = await (async () => {
+      try {
+        const { data } = await supabase
+          .from("system_config")
+          .select("value")
+          .eq("key", "composer.split_multi_turn_passes")
+          .maybeSingle();
+        // Default ON when row missing or value not explicitly false.
+        if (data?.value === false || data?.value === "false") return false;
+        return true;
+      } catch { return true; }
+    })();
+
+    const builtPassesRaw: PassState[] = passSpeakers.map(({ sp, originalIdx }, passIdx) => {
       const turns = sp.voicedRange!.turns! as Turn[];
       const passSegments: SegmentItem[] = turns.map((t) => ({
         startTime: Number(Math.max(0, t.startSec).toFixed(3)),
@@ -1233,6 +1258,24 @@ serve(async (req) => {
         status: "pending",
       };
     });
+
+    const builtPasses: PassState[] = splitMultiTurnFlagOn
+      ? builtPassesRaw.flatMap((p) => {
+          if (!Array.isArray(p.segments) || p.segments.length <= 1) return [p];
+          // Expand into N single-turn passes; preserves all identity fields.
+          return p.segments.map((seg) => ({
+            ...p,
+            segments: [seg],
+          }));
+        }).map((p, i) => ({ ...p, idx: i }))
+      : builtPassesRaw;
+
+    if (splitMultiTurnFlagOn && builtPasses.length !== builtPassesRaw.length) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v95_per_turn_split raw=${builtPassesRaw.length} → expanded=${builtPasses.length} ` +
+        `(${builtPassesRaw.map((p) => `${p.speaker_name}:${p.segments.length}t`).join(", ")})`,
+      );
+    }
 
     // ── Stufe B: HEAD-probe inputs once before paying Sync.so ────────────
     const audioUrls = builtPasses.map((p) => p.audio_url);

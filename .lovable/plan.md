@@ -1,58 +1,66 @@
-## Bug: Multi-Turn-Sprecher verliert Lipsync ab Turn 2
+# Bug v95 — "Lippen bewegen sich bei Turn 2 nur minimal"
 
-### Root Cause (verifiziert anhand Scene `182e1364…`)
-Das Preclip-Fenster pro Sprecher wird in `compose-dialog-segments/index.ts` an zwei Stellen nur aus **`firstTurn`** gebaut:
+## Diagnose (verifiziert an Scene `0915d2a0-9934-467b-97c6-130414f93dd5`)
 
-- **L2032-2033** (Plan B Batch-Preclip-Prefetch)
-- **L2210-2211** (v69 Unified Per-Pass Preclip)
+Der v94-Fix (Preclip-Fenster = Union aller Turns) ist **die Wurzel des neuen Symptoms**:
 
-```ts
-const winStartSec = Math.max(0, Number(firstTurn.startTime) - 0.08);
-const winEndSec   = Math.min(totalSec, Number(firstTurn.endTime) + 0.08);
+```
+Plate-Timeline:  [0 ───── 1.58s] Turn1 spricht  [1.58 ─── 3.19s] Plate-STILLE  [3.19 ─── 5.24s] Turn2 spricht
+Preclip (5.33s): kopiert kontinuierlich diese gesamte Plate-Region
+Tight-WAV (3.79s): Turn1 Audio [0 → 1.58s]  +  50ms Gap  +  Turn2 Audio [1.65 → 3.79s]
+
+Sync.so output = min(video, audio) = 3.79s  → also Preclip-Frames [0 ─── 3.79s]
+                                                       ▲              ▲
+                                                       │              └─ entspricht Plate-Zeit 3.79s, immer noch STILLE-Region!
+                                                       └─ Turn1 OK
 ```
 
-Hat ein Sprecher mehrere Turns (z.B. Samuel: `[0, 2.32] + [3.75, 6.31]`), ist der Preclip nur ~2.4s lang. Die Tight-WAV deckt aber alle Turns ab (5.05s mit `output_offsets_sec=[0, 2.39]`). Sync.so liefert mit `sync_mode=cut_off` nur Output = min(video, audio) ≈ Preclip-Länge. Shot 2 im Mux liest dann mit `sourceStartSec=2.39s` über das Output-Ende hinaus → eingefrorenes Frame, kein Lipsync.
+Sync.so versucht Turn-2-Audio (lebendige Sprache) auf Preclip-Frames zu legen, die einen **ruhigen, geschlossenen Mund** zeigen → Modell macht nur minimale Lippenbewegung. Mux liest Shot 2 bei `sourceStartSec=1.649s` → exakt aus der schlecht animierten Region.
 
-Symptom passt 1:1 zum Bericht: Samuel Turn 1 ✅, Samuel Turn 2 ❌, Matthew (1 Turn) ✅.
+Das ist **nicht** durch Preclip-Verlängerung lösbar. Das Preclip-Video muss **mundbewegungs-relevante Frames** für die gesamte Sync.so-Output-Dauer zeigen.
 
-### Fix (1 Datei, minimaler Patch)
+## Fix-Strategie: Per-Turn-Passes für Multi-Turn-Sprecher
 
-`supabase/functions/compose-dialog-segments/index.ts`
+Statt einen Pass mit N Turns (1 Preclip + 1 Tight-WAV + 1 Sync.so-Call) machen wir **N Passes pro Multi-Turn-Sprecher** — jeder mit kurzer Tight-WAV (genau dieser eine Turn) und kurzem Preclip (genau dieser eine Turn aus dem Plate). 
 
-Ersetze an **beiden** Stellen (L2032-2033 und L2210-2211) das First-Turn-Fenster durch die **Hülle aller Turns dieses Passes**:
+Jeder Sync.so-Call sieht dann: Video zeigt sprechenden Mund + Audio passt → volle Animation, kein Aliasing.
 
-```ts
-// Span all turns of THIS speaker so the preclip is long enough to
-// cover the full Tight-WAV. Otherwise Sync.so (sync_mode=cut_off)
-// caps the output at preclip-length and turns 2..N of the same
-// speaker render as a frozen last frame.
-const passSegments = (p.segments ?? []);  // bzw. pass.segments
-const segStarts = passSegments.map((t: any) => Number(t.startTime));
-const segEnds   = passSegments.map((t: any) => Number(t.endTime));
-const winStartSec = Math.max(0, Math.min(...segStarts) - 0.08);
-const winEndSec   = Math.min(totalSec, Math.max(...segEnds) + 0.08);
-```
+### Was geändert wird
 
-Edge-Cases:
-- Fallback bei leerer `segments[]` → `winStartSec=0, winEndSec=totalSec` (existierende Defensive bleibt unverändert).
-- Der `if (!(winEndSec > winStartSec + 0.05))`-Guard auf L2034 bleibt unverändert wirksam.
+**Datei: `supabase/functions/compose-dialog-segments/index.ts`** — Pass-Splitter direkt vor dem Multi-Pass-Build:
 
-### Warum das sicher ist
-- Preclip wird länger, aber maximal so lang wie `totalSec` (Plate-Länge). Keine neuen Lambda-Limits, kein neuer Sync.so-Vertrag.
-- Tight-WAV-Konstruktion, `output_offsets_sec`-Berechnung, Mux-Shot-Logik, Compositor — alle unverändert.
-- Kosten Sync.so (`ceil(dur)×9×passes`) bleiben gleich, weil sie an der Audio-Dauer hängen, nicht am Preclip.
-- Single-Turn-Sprecher (Matthew) verhalten sich identisch wie vorher (min/max = first/last).
+Wo aktuell Passes mit `pass.segments=[turn1, turn2]` gebaut werden, expandieren wir auf `pass.segments=[turn1]` und `pass.segments=[turn2]` (zwei separate Passes mit identischer Sprecher-Identität, aber je 1 Turn).
 
-### Verifizierung
-1. Neue 2-Sprecher-Szene rendern, bei der **mindestens ein Sprecher 2 Turns** spricht.
-2. In DB prüfen: `dialog_shots->'passes'[0]->'preclip_url'` Dauer ≈ `audio_tight.dur_sec` (±0.2s).
-3. Visuell: beide Turns des Multi-Turn-Sprechers müssen animierte Lippen zeigen.
-4. Logs greppen: `v90_tight_audio` zeigt `windows=[…2 Einträge…]`, `dur_sec≈5.0` → der korrespondierende Preclip-Render-Log muss `dur≈5.0` zeigen (statt 2.4).
+Die existierende v94-Union-Logik (L2030-2043 + L2210-2213) bleibt — sie wird zum No-Op weil pro Pass nur noch 1 Turn vorhanden ist (min=max=Turn-Window).
+
+### Kosten / Performance
+
+- Sync.so: +1 Call pro Extra-Turn pro Sprecher (Pricing `ceil(dur)×9×passes` bleibt linear in Turn-Dauer)
+- Wall-clock: durch Plan D Parallel-Sync.so-Passes (Cap=2) im Background — minimal sichtbar
+- Mux: kein Change, `output_offsets_sec` wird trivial `[0]` pro Pass, Shot-Geometrie aus `pass.segments[0]` bleibt korrekt
 
 ### Was NICHT angefasst wird
-- FROZEN-Invariants (I.1–I.12) bleiben unberührt.
-- Plan D Parallel-Sync-Flags bleiben aktiv.
-- Kein Migration nötig.
 
-### Nach dem Fix
-Memory-Update in `mem://architecture/lipsync/` als `v94-preclip-window-union-of-turns.md` (kurz dokumentieren, damit der nächste Refactor nicht wieder `firstTurn` einsetzt).
+- Tight-WAV-Logik (`sliceWavToWindows`) — wird mit 1-Turn-Window aufgerufen → 1 fortlaufende Audio-Region, kein internes Gap
+- Preclip-Renderer (`renderPassFacePreclip`) — bekommt jetzt Plate-Region exakt eines Turns
+- Mux-Lambda + Compositor — keine Änderung
+- FROZEN-Invariants I.1–I.13 — alle bleiben gültig (I.13 wird trivial erfüllt)
+- Single-Turn-Sprecher — keine Änderung
+- Parallel-Sync.so-Flags — bleiben aktiv
+
+### Verifizierung
+
+1. Neue Szene mit Multi-Turn-Sprecher (Samuel 2 Turns + Matthew 1 Turn)
+2. DB-Check: `dialog_shots->'passes'` hat 3 Einträge (statt 2), `passes[0].segments.length==1` und `passes[1].segments.length==1` für die zwei Samuel-Turns
+3. Visuell: alle 3 Turns zeigen volle Lippenbewegung
+4. Logs: 3 Sync.so-Dispatches, davon 2 parallel (durch Cap=2)
+
+### Rollback-Sicherheit
+
+Splitter ist hinter einem Feature-Flag `composer.split_multi_turn_passes` (default ON). Bei Bedarf via `system_config`-Toggle deaktivierbar → fällt auf v94-Union-Verhalten zurück.
+
+### Memory-Update nach Fix
+
+- `mem://architecture/lipsync/v95-per-turn-pass-split.md` — dokumentiert Splitter + warum Union-Preclip nicht ausreicht
+- `mem://architecture/lipsync/FROZEN-INVARIANTS.md` — Rule **I.14**: "Multi-Turn-Sprecher MÜSSEN in N Single-Turn-Passes gesplittet werden, weil Sync.so cut_off keine Plate-Stille-Regionen überbrücken kann."
+- v94-Doku als "ergänzt durch v95" markieren (nicht löschen — Union-Window ist weiterhin korrekt als Defensive)
