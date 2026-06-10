@@ -680,12 +680,15 @@ Generate the storyboard using the create_storyboard function.`;
           if (shots.length >= 4) continue; // slot cap
           const shotType = rotation[rotIdx % rotation.length];
           rotIdx++;
-          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name);
+          const neutral = neutralCharacterAction(language);
+          const heuristic = cleanActionText(promptCharacterActionFallback(sc.aiPrompt, ch.name), 12);
+          const actionEn = heuristic || neutral.en;
+          const actionUser = heuristic ? actionEn : neutral.user;
           shots.push({
             characterId: ch.id,
             shotType,
             actionEn,
-            actionUser: actionEn,
+            actionUser,
           });
           sc.characterShots = shots;
           syncPrimaryFromShots(sc);
