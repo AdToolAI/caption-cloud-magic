@@ -665,6 +665,28 @@ serve(async (req) => {
     // end of short replies ("Was denn? <mumble>"). Silence here is sample-
     // accurate and never bleeds into another speaker's lip-sync window.
     const INTER_SPEAKER_PAUSE_SEC = 0.25;
+    // ── v94 — Parallel TTS with concurrency=2 ───────────────────────────
+    // Previously the for-loop awaited each ElevenLabs/Hume call serially
+    // (~0.8-2.5s each). For a 4-speaker / 8-turn scene this added 6-20s of
+    // pure round-trip wait. Each TTS call is fully independent (no shared
+    // state) — we just need to assemble the resulting PCM buffers in
+    // original script order afterwards.
+    // Concurrency cap = 2 to stay safely below ElevenLabs' burst limit
+    // (~2-4 concurrent per API key) and avoid 429s. Order-preserving via
+    // pre-allocated result slots.
+    type TtsResult = {
+      ok: true;
+      pcm: Int16Array;
+      ttsDiag: typeof ttsDiagnostics[number] | null;
+      voice: ReturnType<typeof resolveVoice>;
+    } | {
+      ok: false;
+      response: Response;
+    };
+    const results: (TtsResult | null)[] = new Array(blocks.length).fill(null);
+
+    // Resolve all voices up-front (sync, fast); fail-fast on missing voice.
+    const resolved: Array<{ voice: NonNullable<ReturnType<typeof resolveVoice>>; block: typeof blocks[number] } | null> = [];
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const voice = resolveVoice(block, dialogVoices, charByName);
@@ -675,26 +697,14 @@ serve(async (req) => {
           message: `Sprecher "${block.rawSpeaker}" hat keine Stimme zugeordnet.`,
         }, 400);
       }
-      // Insert pause as PCM silence BEFORE every non-first utterance.
-      if (i > 0 && INTER_SPEAKER_PAUSE_SEC > 0) {
-        const pause = silenceSamples(INTER_SPEAKER_PAUSE_SEC);
-        if (pause.length > 0) {
-          sampleBuffers.push(pause);
-          cursorSamples += pause.length;
-        }
-      }
+      resolved.push({ voice, block });
+    }
+
+    async function synthOne(idx: number): Promise<void> {
+      const { voice, block } = resolved[idx]!;
       const utterance = block.text;
       let pcm: Int16Array;
-      let ttsDiag: {
-        speaker: string;
-        engine: string;
-        voice: string;
-        scriptChars: number;
-        rawDurSec: number;
-        trimmedDurSec: number;
-        hallucinatedTailMs: number;
-        trimMode: "timestamps" | "energy-vad" | "none";
-      } | null = null;
+      let ttsDiag: typeof ttsDiagnostics[number] | null = null;
       try {
         if (voice.engine === "hume") {
           if (!humeKey) throw new Error("HUME_API_KEY not configured");
@@ -721,17 +731,22 @@ serve(async (req) => {
           seconds: Math.round(samplesDurationSec(pcm.length) * 1000) / 1000,
           tts_diag: ttsDiag,
         });
+        results[idx] = { ok: true, pcm, ttsDiag, voice };
       } catch (primaryErr) {
         const errMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
         console.warn(`[compose-twoshot-audio] ${voice.engine} failed, falling back to ElevenLabs:`, errMsg);
         if (!elevenKey) {
-          return json({
-            error: "tts_failed",
-            speaker: block.rawSpeaker,
-            voice: voice.voiceId,
-            engine: voice.engine,
-            message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
-          }, 400);
+          results[idx] = {
+            ok: false,
+            response: json({
+              error: "tts_failed",
+              speaker: block.rawSpeaker,
+              voice: voice.voiceId,
+              engine: voice.engine,
+              message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+            }, 400),
+          };
+          return;
         }
         try {
           const res = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
@@ -746,15 +761,52 @@ serve(async (req) => {
             hallucinatedTailMs: res.hallucinatedTailMs,
             trimMode: res.trimMode,
           };
+          results[idx] = { ok: true, pcm, ttsDiag, voice };
         } catch (fbErr) {
-          return json({
-            error: "tts_failed",
-            speaker: block.rawSpeaker,
-            voice: voice.voiceId,
-            engine: voice.engine,
-            message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
-            fallback_error: fbErr instanceof Error ? fbErr.message : String(fbErr),
-          }, 400);
+          results[idx] = {
+            ok: false,
+            response: json({
+              error: "tts_failed",
+              speaker: block.rawSpeaker,
+              voice: voice.voiceId,
+              engine: voice.engine,
+              message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+              fallback_error: fbErr instanceof Error ? fbErr.message : String(fbErr),
+            }, 400),
+          };
+        }
+      }
+    }
+
+    // Concurrency=2 worker pool (ElevenLabs-safe). Indexes flow in script
+    // order so earlier utterances start first — minimises tail latency.
+    const CONCURRENCY = 2;
+    let nextIdx = 0;
+    async function worker(): Promise<void> {
+      while (true) {
+        const myIdx = nextIdx++;
+        if (myIdx >= blocks.length) return;
+        await synthOne(myIdx);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, blocks.length) }, () => worker()));
+
+    // ── Assemble PCM in original script order (silence pauses between) ──
+    let cursorSamples = 0;
+    for (let i = 0; i < blocks.length; i++) {
+      const res = results[i]!;
+      if (!res.ok) {
+        // Fail-fast — propagate the first TTS error response.
+        return res.response;
+      }
+      const block = blocks[i];
+      const { pcm, ttsDiag, voice } = res;
+      // Insert pause as PCM silence BEFORE every non-first utterance.
+      if (i > 0 && INTER_SPEAKER_PAUSE_SEC > 0) {
+        const pause = silenceSamples(INTER_SPEAKER_PAUSE_SEC);
+        if (pause.length > 0) {
+          sampleBuffers.push(pause);
+          cursorSamples += pause.length;
         }
       }
       if (ttsDiag) ttsDiagnostics.push(ttsDiag);
@@ -782,8 +834,8 @@ serve(async (req) => {
         speaker: block.rawSpeaker,
         speaker_slug: slug,
         character_id: charEntry?.id ?? null,
-        engine: voice.engine,
-        voice: voice.voiceId,
+        engine: voice!.engine,
+        voice: voice!.voiceId,
         // Public timestamps in seconds (3-decimal precision = ~1 ms).
         startSec: Math.round((startSample / SAMPLE_RATE) * 1000) / 1000,
         endSec: Math.round((endSample / SAMPLE_RATE) * 1000) / 1000,

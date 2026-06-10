@@ -22,7 +22,9 @@ import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 
-const POLL_INTERVAL_MS = 8_000;
+// v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
+// per scene). DB select is filtered by project_id + indexed, load negligible.
+const POLL_INTERVAL_MS = 2_500;
 
 /**
  * Engines that share the dialog/lip-sync auto-trigger pipeline.

@@ -80,6 +80,13 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const body = await req.json().catch(() => ({}));
+    // v94 — Lambda warm-ping. sync-so-webhook fires this when the
+    // second-to-last pass completes, so the edge function (and ideally the
+    // downstream Remotion Lambda container) is warm by the time the real
+    // dispatch arrives ~25-45s later. No DB read, no Lambda invoke.
+    if (body?.warmup === true) {
+      return json({ ok: true, warmed: true });
+    }
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
     const forceRemux = body?.force === true || body?.force_remux === true;
     sceneIdForDiagnostics = sceneId;
