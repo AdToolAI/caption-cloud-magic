@@ -230,11 +230,10 @@ export default function ComposerSequencePreview({
     forceRender();
   }, []);
 
-  const preloadSlot = useCallback((slot: Slot, idx: number) => {
+  const preloadSlot = useCallback((slot: AnySlot, idx: number) => {
     const list = playableRef.current;
     const target = list[idx];
     if (!target) {
-      // No more scenes — leave slot as is (but mark empty).
       slotMapRef.current[slot] = -1;
       return;
     }
@@ -247,25 +246,16 @@ export default function ComposerSequencePreview({
     slotMapRef.current[slot] = idx;
     const el = getVideoForSlot(slot);
     if (el) {
-      // Active slot honours the user's mute toggle; standby is always muted
-      // until it becomes active to avoid double-audio during preload.
-      // EXCEPTION 1: scenes whose audio is EMBEDDED in the MP4 (lip-sync
-      // output, HeyGen avatars, user uploads) must always play their own
-      // audio when active — otherwise the embedded voiceover is inaudible.
-      // EXCEPTION 2: two-shot scenes flagged with audioPlan.twoshot.
-      // useExternalAudio === true. The lipsync MP4 only embeds the LAST
-      // speaker's voice; the merged dialogue lives on the external VO
-      // track. We FORCE mute regardless of mutedRef — if we honoured the
-      // user's unmute toggle here, the embedded last-speaker audio would
-      // play on top of the external merged track and the user hears the
-      // dialogue twice (= echo + "simultaneous speakers" bug).
       const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
       const hasEmbeddedAudio = !twoshotExternal && (
         !!target.lipSyncAppliedAt ||
         (target.clipSource as string) === 'ai-heygen' ||
         target.clipSource === 'upload'
       );
-      if (slot === activeSlotRef.current) {
+      if (slot === 'C') {
+        // Hidden prefetch slot: always muted, buffer only.
+        el.muted = true;
+      } else if (slot === activeSlotRef.current) {
         el.muted = twoshotExternal
           ? true
           : (hasEmbeddedAudio ? false : mutedRef.current);
