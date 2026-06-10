@@ -1,127 +1,39 @@
-# Welle C — Native Sync.so Segments + Speaker Selection
+# Welle D – Lipsync Static-Frame Fix
 
-Ersetzt den aktuellen "3× Pass + Preclip + Crop + ffmpeg-Mux"-Pfad durch den **offiziell** dokumentierten Sync.so-Weg für Multi-Speaker-Szenen: **ein einziger** `/v2/generate`-Call mit `segments`-Array und `active_speaker_detection` pro Segment. Löst direkt den aktuellen Bug (nur Sprecher 1 animiert, Sprecher 2+3 frozen) und halbiert die Sync-Kosten bei ≥2 Sprechern.
+## Problem
+Sync.so `sync-3` mit `auto_detect:true` liefert für Sprecher 2+3 ein eingefrorenes 1:1-Copy des Inputs zurück, weil ihre Preclip-Crops nahezu statisch sind (Frame-Diff 0.4–1.1 px vs. Sarah 8–11 px). Audio läuft korrekt, aber Mund bleibt zu.
 
----
+## Lösung in 3 Hebeln
 
-## Ziel
+### Hebel 1 – Source Motion (compose-dialog-scene + Hailuo-Prompts)
+- In `compose-dialog-scene/index.ts` Hailuo-Plate-Prompt erweitern: jeder Cast-Member bekommt zusätzlich Zeile `"<Name> visibly breathing, subtle head idle motion, mouth slightly parted, never fully static"`.
+- Sichert minimale Bewegung pro Sprecher → Sync.so erkennt Face auch ohne explizite Koords.
 
-- Bei **n ≥ 2 Sprechern** in einer Dialog-Szene: 1 Hailuo-Plate → **1 Sync.so-Generation** mit `segments[]` → fertig. Kein Preclip, kein Crop, kein eigener Mux.
-- Bei **n = 1 Sprecher**: unverändert (bestehender Single-Pass-Pfad).
-- FaceMap-Daten (bereits in `frame_face_cache` / `plate_face_cache`) werden 1:1 als `bounding_boxes` an Sync übergeben — keine Auto-Detect-Lotterie.
+### Hebel 2 – Sync.so Settings (dispatch-syncso-pass)
+- `auto_detect: true` → ersetzen durch explizite `bounding_box` aus `face_map[speakerId]` pro Pass (FaceMap existiert bereits in `composer_scenes.face_map`).
+- `temperature: 0.7` → `1.0` (mehr Mund-Bewegung erlaubt).
+- `occlusion_detection_enabled: true` zusätzlich setzen.
 
----
+### Hebel 3 – Static-Frame Fallback (dispatch-syncso-pass + poll-dialog-shots)
+- Nach jedem Pass: in `poll-dialog-shots` Frame-Diff-Check auf erste 30 Frames des Pass-Outputs.
+- Wenn mean-diff < 2.0 px → markiere Pass als `static_frozen`, retry automatisch mit `model: "lipsync-2-pro"` + explizite Koords + `temperature: 1.0`.
+- Max 1 Retry pro Pass, danach hard fail mit Refund.
 
-## Architektur (neuer Pfad)
+## Migration
+- Neue Spalte `composer_scenes.lipsync_passes[].static_retry_count` (default 0).
+- Kein neuer Bucket nötig, FaceMap wird wiederverwendet.
 
-```text
-compose-dialog-scene
-        │
-        ▼  (plate + drehbuch + face_map)
-  dialog_shots row (1 row pro Szene statt 1 row pro Turn)
-        │
-        ▼
-render-sync-segments-native   ◄── NEU (ersetzt -audio-mux)
-        │  baut EINEN Sync-Call:
-        │   input: [plate.mp4, audio_t1, audio_t2, ...]
-        │   segments: [{startTime, endTime, audioInput.refId,
-        │              optionsOverride.active_speaker_detection.bounding_boxes_url}]
-        │  ▼
-        sync.so /v2/generate  (model=lipsync-2, eine Generation-ID)
-        │
-        ▼
-sync-so-webhook  → patcht dialog_shots.clip_url direkt
-                    (kein ffmpeg, kein zweiter Mux-Step)
-```
+## Test
+- Manueller Re-Run auf Scene `e451083e-2c89-46e9-8228-8164583167f2` via `compose-dialog-scene` mit `force_remux=true`.
+- Erwartung: Sarah unverändert OK; Matthew + Samuel bewegen Mund sichtbar.
+- Acceptance: alle 3 Sprecher haben Frame-Diff > 3 px im Mundbereich während ihres Turns.
 
----
-
-## Scope der Änderungen
-
-### A) Neue Edge Function `render-sync-segments-native`
-- Input: `scene_id`
-- Lädt `dialog_shots` (1 row) + alle `turns[]` (startTime/endTime/audio_url/speaker_id) + FaceMap pro Sprecher
-- Pro Sprecher: schreibt eine `bounding_boxes.json` nach Storage-Bucket `sync-bounding-boxes/<scene_id>/<speaker_id>.json` (per-frame `[x1,y1,x2,y2]` oder `null`)
-- Baut **einen** Sync.so-Request:
-  - `input`: Plate-Video + n Audio-Inputs mit `refId = turn_<i>`
-  - `segments[]`: pro Turn `{ startTime, endTime, audioInput: { refId }, optionsOverride: { active_speaker_detection: { bounding_boxes_url: "<signed url>" }, occlusion_detection_enabled: true } }`
-  - `model: "lipsync-2"`, optional `lipsync-2-pro` bei "premium"-Plan
-- Speichert `sync_generation_id` in `dialog_shots`
-- Idempotenter Credit-Refund bei 4xx/5xx (gleiches Schema wie bisher)
-
-### B) `sync-so-webhook` Anpassung
-- Erkennt neuen Render-Typ (`render_mode = 'segments-native'`)
-- Bei Completion: lädt `output_url` direkt nach `clip_url` + setzt Status `done` — überspringt die `render-sync-segments-audio-mux`/ffmpeg-Stage komplett.
-
-### C) `compose-dialog-scene` / `poll-dialog-shots`
-- Neuer Branch: wenn `turns.length >= 2` → `render-sync-segments-native` aufrufen statt 3× `dispatch-syncso-pass`.
-- Single-Speaker (`turns.length === 1`) bleibt unverändert auf bestehendem Pfad.
-- `dialog_shots`-Schema bekommt optionale Felder: `render_mode TEXT DEFAULT 'passes'`, `sync_generation_id TEXT`.
-
-### D) Storage-Bucket `sync-bounding-boxes` (privat)
-- Pro Sprecher 1 JSON-File mit `{ "bounding_boxes": [[x1,y1,x2,y2] | null, ...] }`
-- Signed-URL (1h TTL) wird in den Sync-Request injiziert
-- RLS: nur Owner + service_role
-
-### E) Memory-Update
-- `mem://architecture/lipsync/sync-so-pro-model-policy` ergänzen: Pricing-Formel ändert sich von `9 × n_speakers × seconds` zu `9 × seconds` (egal wie viele Sprecher), da nur **eine** Generation läuft.
-- `mem://features/video-composer/dialog-shot-pipeline` ergänzen: neuer `segments-native` Render-Mode.
-
----
-
-## Was bleibt unverändert
-
-- `compose-dialog-scene` (Plate-Generation per Hailuo)
-- `frame_face_cache` / `plate_face_cache` (FaceMap-Daten)
-- Welle A (Locks, Watchdog, Idempotenz)
-- Single-Speaker-Pfad
-- Sync.so-Webhook-Secret + Auth
-- Credit-Refund-Garantie
-
-## Was wird obsolet (bleibt aber als Fallback eingebunden)
-
-- `dispatch-syncso-pass` (Per-Speaker-Call) — nur noch Fallback wenn `render_mode='passes'` explizit gesetzt ist
-- `render-sync-segments-audio-mux` (Crop + ffmpeg-Mux) — nur noch Fallback
-- Preclip-Generation (`renderPassFacePreclip`) — entfällt im neuen Pfad
-
-→ Wir entfernen sie **nicht** sofort. Feature-Flag `dialog_render_mode` in `system_config` schaltet zwischen `segments-native` (Default) und `passes` (Fallback).
-
----
-
-## Migration & Rollout
-
-1. **Migration**: 2 neue Spalten an `dialog_shots` (`render_mode`, `sync_generation_id`), neuer Storage-Bucket `sync-bounding-boxes`, Feature-Flag.
-2. **Deploy**: `render-sync-segments-native`, `sync-so-webhook` (patch).
-3. **Test auf bestehender Szene** `e451083e-2c89-46e9-8228-8164583167f2` mit `force_remux=true` + `render_mode=segments-native` (kein neues Plate nötig, neuer Sync-Call).
-4. **Verifikation**: Download Output → Frame-Stack bei t=1s/4s/7s → alle 3 Münder müssen sich bewegen.
-5. **Rollout**: Feature-Flag global auf `segments-native`. Alter Pfad bleibt 2 Wochen als Fallback.
-
----
-
-## Kosten- & Risiko-Impact
-
-| | Alt (3 Passes + Mux) | Neu (Segments-Native) |
-|---|---|---|
-| Sync.so Calls / 9s-Szene | 3 × €0.81 = €2.43 | 1 × €0.81 = **€0.81** |
-| ffmpeg-Mux | ja (Edge-Funktion, ~20s) | **nein** |
-| Lambda-Crop-Math | ja (Bug-Quelle) | **nein** |
-| Speaker-Targeting | eigene Logik (kaputt) | **Sync nativ** (offiziell) |
-| Code-Pfade | 4 Funktionen | 1 Funktion |
-
----
+## Rollout
+- Feature-Flag `dialog_static_retry_enabled` default **on**.
+- Falls Regression: Flag off → alter Pfad.
+- Kein User-Reset nötig, alter Mux-Pipeline bleibt fallback.
 
 ## Out of Scope
-
-- Single-Speaker-Pfad (bleibt)
-- Sync.so-Pro vs Standard (orthogonal, weiter über Plan-Code gesteuert)
-- Welle B (parallele Passes) — wird durch Welle C **überflüssig**, aber nicht aktiv entfernt
-- HeyGen / Cinematic-Sync-Pfad (anderer Engine-Typ)
-
----
-
-## Erfolgskriterien
-
-1. Szene mit 3 Sprechern: alle 3 Münder animiert in finalem `clip_url`.
-2. Sync.so-Credit-Verbrauch pro Szene exakt `ceil(seconds) × 9` Credits (unabhängig von n).
-3. `dialog_shots.render_mode='segments-native'` für neue Szenen, alte Szenen weiter mit `passes` bedienbar.
-4. Refund bei Sync-Failure idempotent verbucht.
+- Welle C (segments-native) bleibt verworfen.
+- Single-Speaker Pfad unverändert.
+- Cinematic-Sync / HeyGen unverändert.
