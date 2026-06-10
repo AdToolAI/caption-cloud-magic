@@ -1,42 +1,127 @@
-# 3-Speaker Lipsync: nur 1 Person spricht — Diagnose & Fix
+# Welle C — Native Sync.so Segments + Speaker Selection
 
-## Status der Daten (Szene `e451083e…`)
+Ersetzt den aktuellen "3× Pass + Preclip + Crop + ffmpeg-Mux"-Pfad durch den **offiziell** dokumentierten Sync.so-Weg für Multi-Speaker-Szenen: **ein einziger** `/v2/generate`-Call mit `segments`-Array und `active_speaker_detection` pro Segment. Löst direkt den aktuellen Bug (nur Sprecher 1 animiert, Sprecher 2+3 frozen) und halbiert die Sync-Kosten bei ≥2 Sprechern.
 
-Die Pipeline-Daten sind komplett korrekt:
+---
 
-- **FaceMap**: 3 Gesichter, alle 3 mit Confidence 0.999 zu `sarah-dusatko`, `matthew-dusatko`, `samuel-dusatko` gematcht.
-- **Sync.so Dispatch Log**: 3× HTTP 201 — also 3 separate Lipsync-Passes erfolgreich erzeugt.
-- **`dialog_shots.passes`**: alle 3 mit `status=done`, eigenem `output_url`, eigenem `preclip_crop` (x=0/266/504 in 768-px Master-Space).
-- **Audio-Mux Edge Function Log**: `mode=fanout-3-speakers-windowed shots=3` → Lambda hat alle 3 Crops erhalten.
+## Ziel
 
-→ Das Problem liegt **nicht** im Face-Mapping, nicht im Sync.so-Call und nicht im Edge-Function-Payload. Es liegt entweder:
-1. im **Lambda-Bundle** (`DialogStitchVideo.tsx` v21 CroppedOverlay-Pfad — alter Bundle deployed ohne `crop`-Support, fällt auf einen Default zurück), **oder**
-2. in der **CroppedOverlay-Mathematik**, sodass Pass 1+2 außerhalb des sichtbaren Frames landen oder den gleichen Pixelbereich wie Pass 0 belegen.
+- Bei **n ≥ 2 Sprechern** in einer Dialog-Szene: 1 Hailuo-Plate → **1 Sync.so-Generation** mit `segments[]` → fertig. Kein Preclip, kein Crop, kein eigener Mux.
+- Bei **n = 1 Sprecher**: unverändert (bestehender Single-Pass-Pfad).
+- FaceMap-Daten (bereits in `frame_face_cache` / `plate_face_cache`) werden 1:1 als `bounding_boxes` an Sync übergeben — keine Auto-Detect-Lotterie.
 
-## Schritt 1 — Render herunterladen & inspizieren (Diagnose)
+---
 
-`ffprobe` auf `dialog-stitch-muxed-…-1781108231296.mp4` + 3 Standbilder extrahieren (bei t=1s, t=4s, t=7s — eine Frame pro sprechender Speaker) und visuell prüfen, **welche** Münder sich bewegen.
+## Architektur (neuer Pfad)
 
-Daraus ergibt sich eindeutig:
-- **Fall A:** Pass 1 + 2 Overlays sind unsichtbar → Lambda-Bundle ist veraltet (kein `crop`-Pfad). Fix: Bundle redeployen (`scripts/deploy-remotion-bundle.sh`) und `dialog_shots.bundle_version` invalidieren.
-- **Fall B:** Pass 1 + 2 Overlays werden an der falschen Stelle gerendert (z.B. alle bei x=0) → Bug in `CroppedOverlay` / `scaleX` (Master ist 768×768 quadratisch, Comp ist 1280×720, `Math.max(scaleX, scaleY)` skaliert die Crop-Größe übermäßig). Fix: getrennte X/Y-Skalierung, Position mit `scaleX` und `scaleY`, Größe mit `Math.min(scaleX, scaleY)` damit die 512px-Patches in ihrer Original-Region bleiben.
-- **Fall C:** Pass 1 + 2 Overlays sind voll-frame statt gecroppt → `crop`-Feld geht in der Schema-Validierung der Lambda verloren. Fix: Schema-Sync zwischen `render-sync-segments-audio-mux` Payload und `DialogStitchVideo` Zod-Schema.
+```text
+compose-dialog-scene
+        │
+        ▼  (plate + drehbuch + face_map)
+  dialog_shots row (1 row pro Szene statt 1 row pro Turn)
+        │
+        ▼
+render-sync-segments-native   ◄── NEU (ersetzt -audio-mux)
+        │  baut EINEN Sync-Call:
+        │   input: [plate.mp4, audio_t1, audio_t2, ...]
+        │   segments: [{startTime, endTime, audioInput.refId,
+        │              optionsOverride.active_speaker_detection.bounding_boxes_url}]
+        │  ▼
+        sync.so /v2/generate  (model=lipsync-2, eine Generation-ID)
+        │
+        ▼
+sync-so-webhook  → patcht dialog_shots.clip_url direkt
+                    (kein ffmpeg, kein zweiter Mux-Step)
+```
 
-## Schritt 2 — Fix ausliefern + verifizieren
+---
 
-- Patch in der entsprechenden Datei (`DialogStitchVideo.tsx` oder `scripts/deploy-remotion-bundle.sh`).
-- Redeploy des Remotion-Bundles falls Template geändert wurde.
-- Auf der existierenden Szene `e451083e…` `force_remux=true` an `render-sync-segments-audio-mux` schicken → ohne neuen Sync.so-Cost neu muxen.
-- Verifizieren mit denselben 3 Standbildern.
+## Scope der Änderungen
 
-## Schritt 3 — Memory aktualisieren
+### A) Neue Edge Function `render-sync-segments-native`
+- Input: `scene_id`
+- Lädt `dialog_shots` (1 row) + alle `turns[]` (startTime/endTime/audio_url/speaker_id) + FaceMap pro Sprecher
+- Pro Sprecher: schreibt eine `bounding_boxes.json` nach Storage-Bucket `sync-bounding-boxes/<scene_id>/<speaker_id>.json` (per-frame `[x1,y1,x2,y2]` oder `null`)
+- Baut **einen** Sync.so-Request:
+  - `input`: Plate-Video + n Audio-Inputs mit `refId = turn_<i>`
+  - `segments[]`: pro Turn `{ startTime, endTime, audioInput: { refId }, optionsOverride: { active_speaker_detection: { bounding_boxes_url: "<signed url>" }, occlusion_detection_enabled: true } }`
+  - `model: "lipsync-2"`, optional `lipsync-2-pro` bei "premium"-Plan
+- Speichert `sync_generation_id` in `dialog_shots`
+- Idempotenter Credit-Refund bei 4xx/5xx (gleiches Schema wie bisher)
 
-Falls Fall A: `mem://infrastructure/remotion/lambda-bundle-deployment-and-verification` erweitern um "bei `crop`-Schema-Änderung Bundle-Version-Bump erzwingen".
+### B) `sync-so-webhook` Anpassung
+- Erkennt neuen Render-Typ (`render_mode = 'segments-native'`)
+- Bei Completion: lädt `output_url` direkt nach `clip_url` + setzt Status `done` — überspringt die `render-sync-segments-audio-mux`/ffmpeg-Stage komplett.
 
-## Out-of-Scope
+### C) `compose-dialog-scene` / `poll-dialog-shots`
+- Neuer Branch: wenn `turns.length >= 2` → `render-sync-segments-native` aufrufen statt 3× `dispatch-syncso-pass`.
+- Single-Speaker (`turns.length === 1`) bleibt unverändert auf bestehendem Pfad.
+- `dialog_shots`-Schema bekommt optionale Felder: `render_mode TEXT DEFAULT 'passes'`, `sync_generation_id TEXT`.
 
-- Welle B (parallele Sync.so-Passes) — bleibt erst nach Fix.
-- Keine Änderung am `compose-dialog-segments`-Flow, FaceMap oder Sync.so-Dispatch.
-- Keine erneute Sync.so-Berechnung (alle 3 Outputs sind bereits gerendert).
+### D) Storage-Bucket `sync-bounding-boxes` (privat)
+- Pro Sprecher 1 JSON-File mit `{ "bounding_boxes": [[x1,y1,x2,y2] | null, ...] }`
+- Signed-URL (1h TTL) wird in den Sync-Request injiziert
+- RLS: nur Owner + service_role
 
-Soll ich loslegen?
+### E) Memory-Update
+- `mem://architecture/lipsync/sync-so-pro-model-policy` ergänzen: Pricing-Formel ändert sich von `9 × n_speakers × seconds` zu `9 × seconds` (egal wie viele Sprecher), da nur **eine** Generation läuft.
+- `mem://features/video-composer/dialog-shot-pipeline` ergänzen: neuer `segments-native` Render-Mode.
+
+---
+
+## Was bleibt unverändert
+
+- `compose-dialog-scene` (Plate-Generation per Hailuo)
+- `frame_face_cache` / `plate_face_cache` (FaceMap-Daten)
+- Welle A (Locks, Watchdog, Idempotenz)
+- Single-Speaker-Pfad
+- Sync.so-Webhook-Secret + Auth
+- Credit-Refund-Garantie
+
+## Was wird obsolet (bleibt aber als Fallback eingebunden)
+
+- `dispatch-syncso-pass` (Per-Speaker-Call) — nur noch Fallback wenn `render_mode='passes'` explizit gesetzt ist
+- `render-sync-segments-audio-mux` (Crop + ffmpeg-Mux) — nur noch Fallback
+- Preclip-Generation (`renderPassFacePreclip`) — entfällt im neuen Pfad
+
+→ Wir entfernen sie **nicht** sofort. Feature-Flag `dialog_render_mode` in `system_config` schaltet zwischen `segments-native` (Default) und `passes` (Fallback).
+
+---
+
+## Migration & Rollout
+
+1. **Migration**: 2 neue Spalten an `dialog_shots` (`render_mode`, `sync_generation_id`), neuer Storage-Bucket `sync-bounding-boxes`, Feature-Flag.
+2. **Deploy**: `render-sync-segments-native`, `sync-so-webhook` (patch).
+3. **Test auf bestehender Szene** `e451083e-2c89-46e9-8228-8164583167f2` mit `force_remux=true` + `render_mode=segments-native` (kein neues Plate nötig, neuer Sync-Call).
+4. **Verifikation**: Download Output → Frame-Stack bei t=1s/4s/7s → alle 3 Münder müssen sich bewegen.
+5. **Rollout**: Feature-Flag global auf `segments-native`. Alter Pfad bleibt 2 Wochen als Fallback.
+
+---
+
+## Kosten- & Risiko-Impact
+
+| | Alt (3 Passes + Mux) | Neu (Segments-Native) |
+|---|---|---|
+| Sync.so Calls / 9s-Szene | 3 × €0.81 = €2.43 | 1 × €0.81 = **€0.81** |
+| ffmpeg-Mux | ja (Edge-Funktion, ~20s) | **nein** |
+| Lambda-Crop-Math | ja (Bug-Quelle) | **nein** |
+| Speaker-Targeting | eigene Logik (kaputt) | **Sync nativ** (offiziell) |
+| Code-Pfade | 4 Funktionen | 1 Funktion |
+
+---
+
+## Out of Scope
+
+- Single-Speaker-Pfad (bleibt)
+- Sync.so-Pro vs Standard (orthogonal, weiter über Plan-Code gesteuert)
+- Welle B (parallele Passes) — wird durch Welle C **überflüssig**, aber nicht aktiv entfernt
+- HeyGen / Cinematic-Sync-Pfad (anderer Engine-Typ)
+
+---
+
+## Erfolgskriterien
+
+1. Szene mit 3 Sprechern: alle 3 Münder animiert in finalem `clip_url`.
+2. Sync.so-Credit-Verbrauch pro Szene exakt `ceil(seconds) × 9` Credits (unabhängig von n).
+3. `dialog_shots.render_mode='segments-native'` für neue Szenen, alte Szenen weiter mit `passes` bedienbar.
+4. Refund bei Sync-Failure idempotent verbucht.
