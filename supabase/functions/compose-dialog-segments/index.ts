@@ -1955,6 +1955,187 @@ serve(async (req) => {
       }
     }
 
+    // ── Plan B Hebel B — Batch preclip prefetch (Juni 2026) ──────────────
+    // On the FIRST dispatch only (currentPassIdx===0 && !isAdvance && !isRetry),
+    // render the v69 single-face preclip for ALL passes (1..N-1) IN PARALLEL
+    // alongside this pass. Each result is persisted into passes[i].preclip_url
+    // and the per-pass preclip block below becomes a no-op for them on the
+    // chained webhook re-invocations (idempotent via !preclip_url guard).
+    //
+    // Why: today each pass's preclip is rendered serially as the v60 chain
+    // walks pass 0..N-1, costing ~5–15s per pass × (N-1) extra wall time.
+    // Parallelizing collapses that to ~5–15s once. Sync.so serial chain is
+    // UNCHANGED — only the prep step parallelizes.
+    //
+    // Behind system_config.composer.batch_preclip_render flag (default OFF).
+    // Mirrors per-pass logic EXACTLY (edge-speaker skip, bbox from plateBbox
+    // or faceMap, sibling coords, face-gate validation). On any failure for
+    // a given pass, that pass falls back to the existing per-pass block on
+    // its chain turn — full backward compatibility.
+    const batchPreclipFlagOn = await (async () => {
+      try {
+        const { data } = await supabase
+          .from("system_config")
+          .select("value")
+          .eq("key", "composer.batch_preclip_render")
+          .maybeSingle();
+        return data?.value === true || data?.value === "true";
+      } catch { return false; }
+    })();
+    const canBatchPrefetch =
+      batchPreclipFlagOn &&
+      !isAdvance &&
+      !isRetry &&
+      currentPassIdx === 0 &&
+      speakers.length >= 2 &&
+      !!plateDims &&
+      passes.length > 1 &&
+      passes.every((p) => !(p as any).preclip_url);
+    if (canBatchPrefetch) {
+      const tBatchStart = Date.now();
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} plan_b_B_batch_preclip_start passes=${passes.length}`,
+      );
+      // Compute the same edge-speaker constants as the per-pass block.
+      const _EDGE_X = 0.25;
+      const _EDGE_Y = 0.15;
+      const _haveBboxUrlPath =
+        !!plateIdentityMap && (plateIdentityMap.resolvedCount ?? 0) > 0;
+      const _fmFaces: any[] = Array.isArray((faceMap as any)?.faces)
+        ? (faceMap as any).faces
+        : [];
+      const _fmW = Number((faceMap as any)?.width) || plateDims!.width;
+      const _fmH = Number((faceMap as any)?.height) || plateDims!.height;
+
+      const renderOnePassPreclip = async (p: PassState, idx: number) => {
+        try {
+          if ((p as any).preclip_url) return { idx, status: "already" as const };
+          // Edge-speaker skip (mirrors per-pass v88 guard).
+          if (Array.isArray(p.coords) && p.coords.length === 2) {
+            const cx = Number(p.coords[0]);
+            const cy = Number(p.coords[1]);
+            if (Number.isFinite(cx) && Number.isFinite(cy)) {
+              const xFrac = cx / plateDims!.width;
+              const yFrac = cy / plateDims!.height;
+              const edge =
+                xFrac < _EDGE_X || xFrac > 1 - _EDGE_X ||
+                yFrac < _EDGE_Y || yFrac > 1 - _EDGE_Y;
+              if (edge && _haveBboxUrlPath) {
+                return { idx, status: "skip_edge" as const };
+              }
+            }
+          } else {
+            return { idx, status: "skip_no_coords" as const };
+          }
+          const firstTurn = p.segments?.[0];
+          if (!firstTurn) return { idx, status: "skip_no_turn" as const };
+          const winStartSec = Math.max(0, Number(firstTurn.startTime) - 0.08);
+          const winEndSec = Math.min(totalSec, Number(firstTurn.endTime) + 0.08);
+          if (!(winEndSec > winStartSec + 0.05)) {
+            return { idx, status: "skip_bad_window" as const };
+          }
+          // bbox: prefer plate-native (v77), else rescaled faceMap.
+          let bboxForCrop: [number, number, number, number] | null = null;
+          const matched =
+            _fmFaces.find((f) => f?.characterId && f.characterId === p.character_id) ??
+            _fmFaces.find((f) => Number(f?.slotIndex) === Number(p.speaker_idx)) ??
+            null;
+          if (matched && Array.isArray(matched.bbox) && matched.bbox.length === 4) {
+            const [bx1, by1, bx2, by2] = matched.bbox.map((n: any) => Number(n));
+            const sx = plateDims!.width / _fmW;
+            const sy = plateDims!.height / _fmH;
+            bboxForCrop = [
+              Math.round(bx1 * sx), Math.round(by1 * sy),
+              Math.round(bx2 * sx), Math.round(by2 * sy),
+            ];
+          }
+          const platePassBbox = speakerPlateBboxes[p.speaker_idx] ?? null;
+          if (platePassBbox) bboxForCrop = platePassBbox;
+          const siblingCoords: Array<[number, number]> = passes
+            .filter((other, oi) =>
+              oi !== idx &&
+              Array.isArray(other?.coords) &&
+              other.coords.length === 2 &&
+              Number.isFinite(Number(other.coords[0])) &&
+              Number.isFinite(Number(other.coords[1])),
+            )
+            .map((other) => [Number(other.coords[0]), Number(other.coords[1])] as [number, number]);
+          const preclip = await renderPassFacePreclip(
+            supabase,
+            serviceKey,
+            supabaseUrl,
+            {
+              sceneId,
+              projectId: (scene as any).project_id,
+              userId,
+              passIdx: idx,
+              masterVideoUrl: sourceClipUrl,
+              srcWidth: plateDims!.width,
+              srcHeight: plateDims!.height,
+              coords: p.coords as [number, number],
+              bbox: bboxForCrop,
+              siblingCoords,
+              startSec: winStartSec,
+              endSec: winEndSec,
+            },
+            90_000,
+          );
+          if (!preclip.ok || !preclip.preclipUrl || !preclip.crop) {
+            (p as any).preclip_error = preclip.error ?? "unknown";
+            return { idx, status: "render_failed" as const, err: preclip.error };
+          }
+          // Mirror per-pass face-gate (validates exactly 1 face in preclip mid-frame).
+          let faceOk = true;
+          let faceCount: number | null = null;
+          try {
+            const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
+            const v = await validateFrameFace({
+              supabaseUrl, serviceKey,
+              videoUrl: preclip.preclipUrl,
+              frameNumber: midFrame, fps: 30,
+              targetCoords: null,
+            });
+            if (v.ok) {
+              faceCount = Number(v.faceCount ?? 0);
+              if (faceCount === 0 || faceCount > 1) faceOk = false;
+            }
+          } catch (_) { /* validation soft-fail → trust the preclip */ }
+          if (!faceOk) {
+            (p as any).preclip_error = `face_gate_failed:count=${faceCount}`;
+            (p as any).preclip_face_count = faceCount;
+            return { idx, status: "face_gate_blocked" as const, faceCount };
+          }
+          (p as any).preclip_url = preclip.preclipUrl;
+          (p as any).preclip_render_id = preclip.preclipRenderId ?? null;
+          (p as any).preclip_crop = {
+            x: preclip.crop.x, y: preclip.crop.y,
+            size: preclip.crop.size, outputSize: preclip.crop.outputSize,
+          };
+          (p as any).preclip_error = null;
+          (p as any).preclip_face_count = faceCount;
+          return { idx, status: "ok" as const, faceCount };
+        } catch (e) {
+          (p as any).preclip_error = `batch_exception:${(e as Error)?.message ?? e}`;
+          return { idx, status: "exception" as const, err: (e as Error)?.message };
+        }
+      };
+
+      const results = await Promise.allSettled(
+        passes.map((p, i) => renderOnePassPreclip(p, i)),
+      );
+      const summary = results.map((r, i) =>
+        r.status === "fulfilled" ? `${i}:${(r.value as any).status}` : `${i}:rej`,
+      ).join(",");
+      const okCount = results.filter(
+        (r) => r.status === "fulfilled" && (r.value as any).status === "ok",
+      ).length;
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} plan_b_B_batch_preclip_complete ` +
+        `ms_total=${Date.now() - tBatchStart} ok=${okCount}/${passes.length} results=[${summary}]`,
+      );
+    }
+
+
     // ── v69 — Single-Face PRECLIP for ALL speaker counts (1..4) ─────────
     // Unified pipeline: regardless of N, we render a tight SINGLE-FACE
     // SQUARE CROP per pass via Remotion Lambda (DialogTurnFaceCropVideo)
