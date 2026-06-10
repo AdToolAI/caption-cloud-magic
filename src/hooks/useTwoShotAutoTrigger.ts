@@ -232,7 +232,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         }
 
-
+        // Stale-Watchdog: stage='audio' >3min ohne audio_plan → clear stage
         // damit nächster Tick einen frischen Versuch startet.
         const stalePrep = (data as any[]).filter(
           (d) =>
