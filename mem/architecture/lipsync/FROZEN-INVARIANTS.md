@@ -245,8 +245,41 @@ the same speaker freeze on the last preclip frame — no lipsync.
 - Enforced: `compose-dialog-segments/index.ts` ~L2030-2043 (Plan B batch
   preclip prefetch) and ~L2205-2213 (v69 unified per-pass preclip).
 - Background: `mem://architecture/lipsync/v94-preclip-window-union-of-turns`.
+- **Supersedes note (v95):** I.13 is now a defensive backstop. The primary
+  fix for multi-turn lipsync is Rule **I.14** (per-turn pass split). With
+  I.14 active, each pass has exactly one segment so the union window is
+  trivially equal to that single turn.
 
 ---
+
+## I.14 — Multi-turn speakers MUST be split into N single-turn passes
+
+When a speaker has ≥2 turns, the pipeline expands their single pass into
+N passes (one per turn) BEFORE the Sync.so dispatch loop. Each resulting
+pass has `segments.length === 1`. This guarantees that the per-pass
+preclip covers ONLY mouth-active plate frames for that turn, which is
+the only configuration where Sync.so reliably animates the full output.
+
+Counter-example that motivated this rule (Scene `0915d2a0…`, June 2026):
+A single pass with two turns built a preclip spanning the union of both
+turns (5.33s plate region with a 1.6s silent middle). Sync.so output =
+`min(5.33s video, 3.79s tight WAV) = 3.79s`. Turn 2 of the output landed
+on preclip frames `[1.65, 3.79]s` which correspond to the PLATE-SILENT
+region — the speaker's mouth was closed/idle there, so Sync.so produced
+only minimal lip movement for turn 2.
+
+- Enforced: `compose-dialog-segments/index.ts` ~L1215-1280 (v95 per-turn
+  split, flag-gated by `system_config.composer.split_multi_turn_passes`,
+  default ON).
+- Background: `mem://architecture/lipsync/v95-per-turn-pass-split`.
+- Rollback: set `composer.split_multi_turn_passes = false` in
+  `system_config` to fall back to v94 union-window behaviour.
+
+---
+
+
+
+
 
 
 
