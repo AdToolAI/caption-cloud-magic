@@ -2168,13 +2168,25 @@ serve(async (req) => {
     const payloadSyncMode = tightAudioInfo ? "cut_off" : "loop";
     const syncOptions: Record<string, unknown> = {
       sync_mode: payloadSyncMode,
+      // Welle D / Hebel 2 — Sync.so docs recommend explicit temperature bump
+      // when input plates are near-static (locked-camera Hailuo i2v); the
+      // default 0.7 routinely produced "frozen" outputs on speakers 2+3 of
+      // multi-speaker chained passes. 1.0 keeps the model in its documented
+      // range and gives the mouth-motion estimator more headroom.
+      temperature: 1.0,
+      // sync-3 + lipsync-2-pro both honor this flag per
+      // https://sync.so/docs/models/lipsync — explicitly enable so partial
+      // hand-over-mouth / mic-bump frames don't silently collapse to a copy.
+      occlusion_detection_enabled: true,
     };
     if (usePassPreclip) {
       // v68 — Preclip is a tight single-face 512x512 crop. Sync.so sees
       // ONE face → auto_detect is unambiguous and the most reliable mode.
-      // Coords from master pixel space don't map into the cropped frame
-      // anyway, so we drop them entirely.
+      // Welle D — keep auto_detect (the safer mode for a single-face crop)
+      // but the temperature+occlusion bumps above now apply to the
+      // dispatched payload, addressing the static-frozen Pass 2/3 outputs.
       syncOptions.active_speaker_detection = { auto_detect: true };
+
     } else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
       // https://sync.so/docs/developer-guides/speaker-selection):
