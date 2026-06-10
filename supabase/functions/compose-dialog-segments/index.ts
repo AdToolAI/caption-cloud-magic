@@ -2265,11 +2265,30 @@ serve(async (req) => {
       !!plateDims &&
       !!plateIdentityMap &&
       (plateIdentityMap.resolvedCount ?? 0) > 0;
+    // v97 (Pipeline-Vergleich mit Sync.so Docs, Juni 10 2026) —
+    // Generalisierung des v88 Edge-Speaker-Skips auf ALLE Multi-Speaker-Szenen.
+    // Sync.so sync-3 verarbeitet die volle Plate nativ mit Multi-Face,
+    // Profile & Occlusion-Support, wenn wir `bounding_boxes_url` setzen
+    // (siehe docs/developer-guides/speaker-selection). Unsere 512×512
+    // Single-Face-Preclips sind eine ~67 s teure Workaround-Pipeline gegen
+    // ein Problem, das sync-3 nativ löst, und sind die Hauptquelle der
+    // "An unknown error occurred."-Fehler (preclip face-gate fails →
+    // Fallback auf full-plate-with-plate-coords → Sync.so frame_number
+    // zeigt auf den preclip-zugehörigen Frame im echten Plate-Video).
+    // Wir routen jeden Multi-Speaker-Pass auf den bbox-url-pro Pfad,
+    // wenn er verfügbar ist. Single-Speaker und Szenen ohne plate-identity
+    // fallen weiterhin auf den preclip-Pfad zurück (unverändert).
     const skipPreclipForEdgeSpeaker =
       speakerIsEdgePositioned && haveBboxUrlPathForEdge;
+    const skipPreclipForMultiSpeaker =
+      speakers.length >= 2 && haveBboxUrlPathForEdge;
     if (skipPreclipForEdgeSpeaker) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate bbox-url-pro dispatch`,
+      );
+    } else if (skipPreclipForMultiSpeaker) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v97_multi_speaker_skip_preclip speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} → full-plate bbox-url-pro dispatch (sync-3 native multi-face)`,
       );
     }
     const wantPassPreclip =
@@ -2279,7 +2298,9 @@ serve(async (req) => {
       Number.isFinite(pass.coords[0]) &&
       Number.isFinite(pass.coords[1]) &&
       !!tightAudioInfo &&
-      !skipPreclipForEdgeSpeaker;
+      !skipPreclipForEdgeSpeaker &&
+      !skipPreclipForMultiSpeaker;
+
     if (wantPassPreclip && !(pass as any).preclip_url) {
       // v94: Window spans the UNION of all turns for this speaker, not just
       // the first turn. Sync.so with sync_mode=cut_off caps output at
