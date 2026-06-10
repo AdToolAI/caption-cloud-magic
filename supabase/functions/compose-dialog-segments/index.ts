@@ -1607,7 +1607,77 @@ serve(async (req) => {
           );
         }
       }
+
+      // v97 — Fail-fast safety net for 3+ speaker scenes.
+      // If plate-identity is OFF (anchor-rescale only) AND not a single pass
+      // got `face_repair` applied (i.e. validate-frame-face never returned
+      // usable face boxes), then every preclip will be cropped from anchor
+      // coords that drift 5–15% off the real plate, Sync.so will receive
+      // empty crops, and the user pays for a ~9 min run with motionless
+      // lips. Refund + fail loudly so the user can re-render.
+      if (speakers.length >= 3 && !havePlateIdentity) {
+        const repairedCount = builtPasses.filter(
+          (p: any) => p?.face_repair && typeof p.face_repair === "object",
+        ).length;
+        if (repairedCount === 0) {
+          const reason = "face_detection_unrecoverable_3plus_speakers";
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v97 FAIL-FAST ${reason} ` +
+            `passes=${builtPasses.length} repaired=0 plate_identity=off`,
+          );
+          const alreadyRefunded = !!(existing as any)?.refunded;
+          if (!alreadyRefunded) {
+            const { data: wFF } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wFF?.balance ?? 0) + totalCost,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          }
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: {
+                ...(existing ?? {}),
+                version: 5,
+                engine: "sync-segments",
+                status: "failed",
+                cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+                refunded: !alreadyRefunded,
+                error: reason,
+                finished_at: new Date().toISOString(),
+              },
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
+              clip_error: `syncso_${reason}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", sceneId);
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "FACE_DETECTION_UNRECOVERABLE",
+            error_class: "face_detection_failed",
+            error_message: reason,
+            meta: { speakers: speakers.length, passes: builtPasses.length, repaired: 0 },
+          });
+          return json(
+            {
+              error: "face_detection_failed",
+              details:
+                "Face detection on the rendered plate failed — no usable face coordinates for any speaker. " +
+                "Please re-render the scene or try again in a moment.",
+              refunded: alreadyRefunded ? 0 : totalCost,
+              hint: "re_render_scene_clip",
+            },
+            422,
+          );
+        }
+      }
     }
+
 
 
     // ── Concurrency guard ────────────────────────────────────────────────
