@@ -48,10 +48,17 @@ const formatTime = (s: number) => {
 };
 
 const CROSSFADE_MS = 400;
-const STANDBY_BUDGET_MS = 1200;
+const STANDBY_BUDGET_MS = 1500;
+/** Max wait when standby is buffered enough to start (HAVE_CURRENT_DATA but not FUTURE_DATA). */
+const STANDBY_SOFT_WAIT_MS = 200;
 const WATCHDOG_MS = 5000;
+/** First chunk to range-fetch per clip — covers moov atom + first frames. */
+const PREWARM_BYTES = 524288;
+/** Max parallel prewarm requests. */
+const PREWARM_CONCURRENCY = 2;
 
 type Slot = 'A' | 'B';
+type AnySlot = 'A' | 'B' | 'C';
 
 export default function ComposerSequencePreview({
   scenes,
@@ -118,14 +125,18 @@ export default function ComposerSequencePreview({
   // ── Refs are the source of truth (no stale closures) ──────────
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
+  /** Hidden prefetch slot — always holds sceneIdx + 2 so the browser
+   *  has the moov atom + first frames decoded before that scene is needed. */
+  const videoCRef = useRef<HTMLVideoElement>(null);
 
   /** Which slot DOM element is currently the visible/active player. */
   const activeSlotRef = useRef<Slot>('A');
   /** Maps each slot to the sceneIdx whose src is currently loaded into it. -1 = empty. */
-  const slotMapRef = useRef<{ A: number; B: number }>({ A: -1, B: -1 });
+  const slotMapRef = useRef<{ A: number; B: number; C: number }>({ A: -1, B: -1, C: -1 });
   /** Imperative src holders so React doesn't trigger unwanted reloads. */
   const slotASrcRef = useRef<string | undefined>(undefined);
   const slotBSrcRef = useRef<string | undefined>(undefined);
+  const slotCSrcRef = useRef<string | undefined>(undefined);
   /** Opacity per slot (driven by ref, mirrored to DOM via forceRender). */
   const slotAOpacityRef = useRef(1);
   const slotBOpacityRef = useRef(0);
@@ -184,18 +195,24 @@ export default function ComposerSequencePreview({
   }, []);
 
   // ── Helpers operating on refs only (no closures over slot state) ──
-  const getVideoForSlot = (slot: Slot): HTMLVideoElement | null =>
-    slot === 'A' ? videoARef.current : videoBRef.current;
+  const getVideoForSlot = (slot: AnySlot): HTMLVideoElement | null => {
+    if (slot === 'A') return videoARef.current;
+    if (slot === 'B') return videoBRef.current;
+    return videoCRef.current;
+  };
 
-  const setSrcForSlot = useCallback((slot: Slot, src: string | undefined) => {
+  const setSrcForSlot = useCallback((slot: AnySlot, src: string | undefined) => {
     const el = getVideoForSlot(slot);
     if (!el) return;
     if (slot === 'A') {
       if (slotASrcRef.current === src) return;
       slotASrcRef.current = src;
-    } else {
+    } else if (slot === 'B') {
       if (slotBSrcRef.current === src) return;
       slotBSrcRef.current = src;
+    } else {
+      if (slotCSrcRef.current === src) return;
+      slotCSrcRef.current = src;
     }
     if (src) {
       el.src = src;
@@ -213,11 +230,10 @@ export default function ComposerSequencePreview({
     forceRender();
   }, []);
 
-  const preloadSlot = useCallback((slot: Slot, idx: number) => {
+  const preloadSlot = useCallback((slot: AnySlot, idx: number) => {
     const list = playableRef.current;
     const target = list[idx];
     if (!target) {
-      // No more scenes — leave slot as is (but mark empty).
       slotMapRef.current[slot] = -1;
       return;
     }
@@ -230,25 +246,16 @@ export default function ComposerSequencePreview({
     slotMapRef.current[slot] = idx;
     const el = getVideoForSlot(slot);
     if (el) {
-      // Active slot honours the user's mute toggle; standby is always muted
-      // until it becomes active to avoid double-audio during preload.
-      // EXCEPTION 1: scenes whose audio is EMBEDDED in the MP4 (lip-sync
-      // output, HeyGen avatars, user uploads) must always play their own
-      // audio when active — otherwise the embedded voiceover is inaudible.
-      // EXCEPTION 2: two-shot scenes flagged with audioPlan.twoshot.
-      // useExternalAudio === true. The lipsync MP4 only embeds the LAST
-      // speaker's voice; the merged dialogue lives on the external VO
-      // track. We FORCE mute regardless of mutedRef — if we honoured the
-      // user's unmute toggle here, the embedded last-speaker audio would
-      // play on top of the external merged track and the user hears the
-      // dialogue twice (= echo + "simultaneous speakers" bug).
       const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
       const hasEmbeddedAudio = !twoshotExternal && (
         !!target.lipSyncAppliedAt ||
         (target.clipSource as string) === 'ai-heygen' ||
         target.clipSource === 'upload'
       );
-      if (slot === activeSlotRef.current) {
+      if (slot === 'C') {
+        // Hidden prefetch slot: always muted, buffer only.
+        el.muted = true;
+      } else if (slot === activeSlotRef.current) {
         el.muted = twoshotExternal
           ? true
           : (hasEmbeddedAudio ? false : mutedRef.current);
@@ -269,12 +276,13 @@ export default function ComposerSequencePreview({
     setPlaying(false);
     imageStartRef.current = null;
     activeSlotRef.current = 'A';
-    slotMapRef.current = { A: -1, B: -1 };
+    slotMapRef.current = { A: -1, B: -1, C: -1 };
 
     if (playable.length > 0) {
-      // Init: load scene 0 → A, scene 1 → B.
+      // Init: load scene 0 → A, scene 1 → B, scene 2 → hidden prefetch C.
       preloadSlot('A', 0);
       preloadSlot('B', 1);
+      preloadSlot('C', 2);
       setOpacityForSlot('A', 1);
       setOpacityForSlot('B', 0);
     }
@@ -283,6 +291,45 @@ export default function ComposerSequencePreview({
 
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => () => clearAllTimers(), [clearAllTimers]);
+
+  // ── HTTP prewarm: range-fetch the first chunk of every clip URL so the
+  // browser cache has the moov atom + first frames ready before each slot
+  // calls `video.src = …`. Eliminates the 2–3s standby wait that otherwise
+  // happens between scene 2 → 3 (and any later transition) when the standby
+  // slot only starts loading its bytes after the previous scene already plays.
+  useEffect(() => {
+    if (playable.length === 0) return;
+    const ctrl = new AbortController();
+    const urls = playable
+      .filter((s) => !isImageScene(s) && !!s.clipUrl)
+      .map((s) => s.clipUrl as string);
+    if (urls.length === 0) return;
+
+    let active = 0;
+    let cursor = 0;
+    const pump = () => {
+      while (active < PREWARM_CONCURRENCY && cursor < urls.length) {
+        const url = urls[cursor++];
+        active++;
+        fetch(url, {
+          method: 'GET',
+          headers: { Range: `bytes=0-${PREWARM_BYTES - 1}` },
+          cache: 'force-cache',
+          signal: ctrl.signal,
+        })
+          .then((r) => r.arrayBuffer().catch(() => null))
+          .catch(() => null)
+          .finally(() => {
+            active--;
+            if (!ctrl.signal.aborted) pump();
+          });
+      }
+    };
+    pump();
+
+    return () => { ctrl.abort(); };
+  }, [playable]);
+
 
   // Helper: scene has embedded audio in the MP4 we should let the video play.
   // Two-shot scenes whose merged dialogue is on an external track must NOT
@@ -385,8 +432,9 @@ export default function ComposerSequencePreview({
             if (playingRef.current) v.play().catch(() => {});
           }
         }, 30);
-        // Preload the next-next into B
+        // Preload the next-next into B and the one after into prefetch C.
         preloadSlot('B', toIdx + 1);
+        preloadSlot('C', toIdx + 2);
       }
       transitioningRef.current = false;
       return;
@@ -433,15 +481,22 @@ export default function ComposerSequencePreview({
         setGlobalTime(startOffsetsRef.current[toIdx] || 0);
         lastTimeUpdateRef.current = performance.now();
 
-        // Preload toIdx + 1 into the now-free slot for the next transition.
+        // Preload toIdx + 1 into the now-free slot and toIdx + 2 into prefetch C.
         preloadSlot(fromSlot, toIdx + 1);
+        preloadSlot('C', toIdx + 2);
 
         transitioningRef.current = false;
       }, CROSSFADE_MS);
     };
 
-    if (standby.readyState >= 2) {
+    // Fast path: standby already has enough buffered to play through.
+    if (standby.readyState >= 3) {
       startCrossfade();
+    } else if (standby.readyState >= 2) {
+      // HAVE_CURRENT_DATA — at least the first frame is ready. Start the
+      // crossfade immediately but give the browser a short head-start so
+      // playback doesn't stutter right at the cut.
+      scheduleTimer(startCrossfade, STANDBY_SOFT_WAIT_MS);
     } else {
       let fired = false;
       const onReady = () => {
@@ -457,6 +512,9 @@ export default function ComposerSequencePreview({
           standby.removeEventListener('canplay', onReady);
           standby.removeEventListener('loadeddata', onReady);
         } catch { /* noop */ }
+        if (!fired) {
+          console.warn('[Preview] standby budget exceeded — hard advancing');
+        }
         onReady();
       }, STANDBY_BUDGET_MS);
     }
@@ -474,6 +532,7 @@ export default function ComposerSequencePreview({
       activeSlotRef.current = 'A';
       preloadSlot('A', 0);
       preloadSlot('B', 1);
+      preloadSlot('C', 2);
       setOpacityForSlot('A', 1);
       setOpacityForSlot('B', 0);
       return;
@@ -657,6 +716,7 @@ export default function ComposerSequencePreview({
       }
       // Preload next into B.
       preloadSlot('B', idx + 1);
+      preloadSlot('C', idx + 2);
 
       const apply = () => {
         const v = videoARef.current;
@@ -1024,6 +1084,26 @@ export default function ComposerSequencePreview({
           style={{
             opacity: isImage ? 0 : slotBOpacityRef.current,
             transition: `opacity ${CROSSFADE_MS}ms ease-in-out`,
+          }}
+        />
+
+        {/* Slot C — hidden prefetch holder (always sceneIdx + 2). Decodes the
+            moov atom + first frame so the next-next transition is instant. */}
+        <video
+          ref={videoCRef}
+          playsInline
+          preload="auto"
+          muted
+          aria-hidden
+          tabIndex={-1}
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: 'none',
+            left: -9999,
+            top: -9999,
           }}
         />
 
