@@ -1,43 +1,74 @@
-## Befund aus der DB
+# Cast-Actions nach Storyboard-Generierung garantiert füllen
 
-Szene `63fc42c2…` mit 4 Sprechern. Alle 4 Pässe stehen auf `status=done`, jeder hat `output_url`, jeder hat eine sinnvolle `audio_tight` (Sarah: 1.818s, window [6.707, 8.525]) und eine plausible `preclip_crop` (Sarah: x=32, y=346, size=160). Strukturell ist Sarahs Pass identisch zu Pässen 1–3 (gleiche `retry_variant: coords-pro`, gleiches Preclip-Schema, gleiche v90-Offsets). Sync.so-Webhook hat alle 4 Pässe als „done" geliefert, danach lief der Audio-Mux.
+## Problem
 
-Das heißt: der Pipeline‑*Status* ist sauber — aber das visuelle Ergebnis (Sarahs Lippen bewegen sich nicht) entspricht nicht den Statusdaten. Bevor wir Code anfassen, müssen wir wissen WO die Lipsync verloren geht: bei Sync.so (Output ist Passthrough ohne animierte Lippen) oder im Mux (Lipsync ist da, wird aber falsch overlayed).
+In `SceneCard.tsx` zeigt das Feld „AKTION — WAS TUT {NAME}?" nach der Storyboard-Generierung manchmal nur den Platzhalter (z. B. „z. B. tippt konzentriert am Laptop…"). Das passiert, weil `slot.actionUser` leer ist.
 
-## Diagnose (read-only, sehr schnell)
+Quelle: `supabase/functions/compose-video-storyboard/index.ts`.
 
-D1. **Sarahs Preclip vs. Sync.so-Output Pixel-für-Pixel vergleichen.**
-    Wenn beide identisch sind → Sync.so hat den Lipsync für Pass 4 verworfen (silent passthrough). Wenn nicht → Lipsync existiert, also liegt's am Mux.
-    - Preclip: `…/dialog-pass-preclip-63fc42c2-…-p3-….mp4`
-    - Output: `…/63fc42c2-…-lipsync-pass-4.mp4`
+Es gibt drei Stellen, an denen pro-Slot-Actions gesetzt werden:
 
-D2. **Sarahs Tight-WAV abhören**: `…-pass-4-tight-….wav` muss klar Sarahs Stimme enthalten, ~1.8s. Wenn (fast) stumm → Slice-Window-Bug, Sync.so hatte nichts zum Animieren. (Beachte: ihre Window-Position [6.707, 8.525] liegt nahe am Plate-Ende `totalSec`. Wenn `totalSec` z. B. nur 8.4s ist, wird `e=min(totalSec, …)` → Window collabiert ≈ 1.7s, aber wenn `audio_url_full` Stille hat, ist die Slice leise.)
+1. `normalizeShots()` (~Z. 551–571) — für jeden vom LLM gelieferten Slot:
+   ```
+   actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name), 12)
+   actionUser = cleanActionText(slot.actionUser || actionEn, 12)
+   ```
+   `promptCharacterActionFallback` gibt **`""`** zurück, wenn der Charaktername **nicht im aiPrompt** vorkommt oder keine passende Klausel gefunden wird → beide Felder bleiben leer.
 
-D3. **Sync.so /generate Job 28ced758 direkt abfragen** (`GET /v2/generate/{id}`). Wenn Sync.so `lip_sync_status=success` mit Quality-Score liefert → wirklich animiert. Wenn `partial` / Warning → Sync.so hat heimlich aufgegeben (z. B. weil Audio zu kurz oder weil Preclip nahe am Bild­rand keine erkennbare Face-Region bot).
+2. FLOOR-Auto-Repair (~Z. 663–669) — fügt Charaktere zu Szenen hinzu, in denen sie fehlen. Da der Name dort per Definition **nicht** im Prompt steht, liefert der Fallback fast immer `""`.
 
-D4. **Quick-Check: Mux-Lambda-Render visuell prüfen** (`final_url` der Szene). Frame bei t≈7.5s extrahieren und mit Sarahs Preclip-Output bei t≈0.8s vergleichen — sind die Pixel im Crop-Bereich identisch?
+3. Multi-Cast Lip-Sync-Rewrite (~Z. 781–797) — hat bereits einen `fallbackNeutral` (`"looks at the others and speaks naturally on camera"`). Dieser Pfad ist sauber.
 
-→ Eines dieser 4 Resultate sagt eindeutig welche Stage schuld ist.
+Solo-Szenen und FLOOR-Insertions haben **keinen** neutralen Fallback → leeres Feld.
 
-## Hypothesen + gezielte Fixes (erst nach Diagnose committen)
+## Fix
 
-H1. **Sync.so verwirft Pass 4 still, weil Sarahs Preclip-Face zu nah am linken Bildrand sitzt** (cropX=32 in 720er Plate → die 160px Crop-Region berührt fast Pixel 0). Beim 512×512 Preclip ist Sarahs Gesicht zwar zentriert, aber Sync.so kann bei extremen Edge-Cases (Master-Face am Rand) den Identity-Check verlieren → Passthrough.
-   → **Fix H1**: Min-Margin bei `preclipCrop` (z. B. 24px Sicherheits­abstand zu jedem Plate-Rand), und wenn der berechnete Crop kollabiert, Crop-`size` auf 192 erhöhen (mehr Kontext). Datei: `compose-dialog-segments/index.ts` (Preclip-Crop-Block).
+Einen lokalisierten neutralen Fallback (EN/DE/ES, abhängig vom bereits in der Edge-Function bekannten `lang`/`langLabel`) einführen und an den zwei nicht abgesicherten Stellen anwenden.
 
-H2. **Sarahs Tight-WAV ist tatsächlich leise** — die per-Speaker-WAV `…-char3-sarah-dusatko.wav` ist silence-padded und Sarahs Voice-Onset liegt evtl. nicht bei master-t 6.787, sondern etwas später. Die Slice [6.707, 8.525] erwischt dann nur Stille + Restwort.
-   → **Fix H2**: vor dem Slice einen RMS-Probe-Pass: wenn Window-RMS < threshold → Window per phase-Onset-Detection auf das tatsächliche Sprach-Onset re-zentrieren (oder zumindest `endTime` um +0.2s strecken).
+### Änderungen in `supabase/functions/compose-video-storyboard/index.ts`
 
-H3. **Sync.so liefert für Pass 4 ein Output, das kürzer als das Tight-Audio ist** (Sync.so `cut_off` Verhalten am Audio-Ende), und der Mux mappt mit `sourceStartSec=0` korrekt, aber Sarahs Lippen-Frames liegen jenseits des Output-Endes.
-   → **Fix H3**: im Mux `endSec = min(startSec + outputDurationProbed, originalEndSec)` clampen; und/oder beim Dispatch `sync_mode='loop'` statt `cut_off` für den LAST pass.
+1. **Helper hinzufügen** (oben bei den anderen `*Fallback`-Funktionen):
+   ```ts
+   function neutralCharacterAction(lang: 'en'|'de'|'es'): { en: string; user: string } {
+     const en = "performs the scene action naturally, visible to camera";
+     const user =
+       lang === 'de' ? "führt die Szenen-Aktion natürlich aus, sichtbar zur Kamera" :
+       lang === 'es' ? "realiza la acción de la escena con naturalidad, visible a cámara" :
+       en;
+     return { en, user };
+   }
+   ```
 
-H4. **Webhook-Race**: der „all-done"-Webhook feuert Mux 1s nachdem Sarahs `output_url` persistiert wurde — möglicherweise rendert der Mux mit einem leeren / 404-Output für Pass 4, weil das S3-Object noch nicht öffentlich ist.
-   → **Fix H4**: HEAD-Check auf alle 4 `output_url` bevor `render-sync-segments-audio-mux` startet; 2-3 Retries mit kurzem Backoff.
+2. **`normalizeShots()` härten** (Z. 564–566):
+   ```ts
+   const neutral = neutralCharacterAction(lang);
+   const actionEn   = cleanActionText(slot.actionEn   || promptCharacterActionFallback(prompt, character?.name) || neutral.en, 12);
+   const actionUser = cleanActionText(slot.actionUser || (slot.actionEn ? actionEn : neutral.user), 12);
+   ```
+   → `actionUser` bleibt nie leer; im UI-Sprachfeld steht der lokalisierte neutrale Satz, `actionEn` der englische.
 
-## Bitte um Auswahl
+3. **FLOOR-Pass härten** (Z. 663–669):
+   ```ts
+   const neutral = neutralCharacterAction(lang);
+   const actionEnRaw = promptCharacterActionFallback(sc.aiPrompt, ch.name);
+   const actionEn   = actionEnRaw || neutral.en;
+   const actionUser = actionEnRaw ? actionEn : neutral.user;
+   shots.push({ characterId: ch.id, shotType, actionEn, actionUser });
+   ```
 
-Damit wir nicht spekulativ Code anfassen:
+4. **Multi-Cast-Block angleichen** (Z. 786–791): den bestehenden `fallbackNeutral` auf denselben Helper umstellen, damit der `actionUser` ebenfalls lokalisiert ist (heute wird der englische Satz auch in DE/ES gesetzt).
 
-1. **Sollen wir mit D1+D4 starten** (Pixel-Vergleich der zwei MP4s) — das engt die Stage in 1 Minute ein?
-2. Oder sollen wir **direkt H1 + H4 vorbeugend implementieren** (beides risikoarm, beides plausibel für „immer der letzte Speaker"), und parallel die Diagnose laufen lassen?
+Damit ist invariant: **jeder sichtbare `characterShots[]`-Slot hat nach Storyboard-Generierung garantiert nicht-leeres `actionEn` und `actionUser`** — egal ob Solo, Multi-Cast oder Auto-Insert.
 
-Sobald die Stage klar ist, kommt ein zweiter Commit mit dem konkreten Fix (H1, H2, H3 oder H4) und einem manuellen Reset auf Pass 4 für die aktuelle Szene, ohne die schon gerenderten Pässe 1–3 zu zerstören.
+## Was NICHT geändert wird
+
+- Kein Frontend-Change in `SceneCard.tsx` / `CharacterCastPicker.tsx`.
+- Kein Schema-/DB-Change.
+- Keine anderen Edge-Functions berührt.
+- Bestehende vom LLM gelieferte Actions werden weiterhin bevorzugt; der Fallback greift nur, wenn LLM **und** prompt-basierter Fallback nichts liefern.
+
+## Verifikation
+
+- Neues Storyboard erzeugen (Solo-Cast + Mehr-Cast + Szene, in der ein Charakter via FLOOR eingefügt wird).
+- In allen Szenenkarten muss „AKTION — WAS TUT …?" einen tatsächlichen Text (nicht den Placeholder) zeigen.
+- Auto-EN-Badge zeigt die englische Übersetzung, `[CastActions]`-Block landet im finalen Prompt (über `applyActionsToPrompt`).
