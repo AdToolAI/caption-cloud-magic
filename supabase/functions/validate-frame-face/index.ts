@@ -39,12 +39,88 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import Replicate from "npm:replicate@0.25.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+// ── v97: Extract a PNG frame from MP4 before sending to Gemini ───────────
+// Gemini's Lovable Gateway rejects MP4 URLs with
+// "Unsupported image format". We therefore convert (videoUrl, frameNumber)
+// into a still PNG URL via Replicate's ffmpeg-extract-frame model and pass
+// THAT to Gemini. Frame extraction is retried twice per extractor.
+const FRAME_EXTRACT_TIMEOUT_MS = 60_000;
+const REPLICATE_API_TOKEN =
+  Deno.env.get("REPLICATE_API_TOKEN") ?? Deno.env.get("REPLICATE_API_KEY");
+
+function isVideoUrl(url: string): boolean {
+  const u = url.split("?")[0].toLowerCase();
+  return u.endsWith(".mp4") || u.endsWith(".mov") || u.endsWith(".webm") ||
+         u.endsWith(".m4v") || u.endsWith(".mkv");
+}
+
+async function extractFramePng(
+  videoUrl: string,
+  timestampSec: number,
+): Promise<string | null> {
+  if (!REPLICATE_API_TOKEN) {
+    console.warn("[validate-frame-face] REPLICATE_API_TOKEN missing — cannot extract MP4 frame");
+    return null;
+  }
+  const ts = Math.max(0.1, timestampSec);
+  const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
+
+  // Primary: lucataco/ffmpeg-extract-frame (precise timestamp).
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), FRAME_EXTRACT_TIMEOUT_MS);
+      let out: any;
+      try {
+        out = await replicate.run(
+          "lucataco/ffmpeg-extract-frame" as `${string}/${string}`,
+          { input: { video: videoUrl, timestamp: ts } },
+        );
+      } finally {
+        clearTimeout(t);
+      }
+      const url = normalizeReplicateOutput(out);
+      if (url) return url;
+    } catch (e) {
+      console.warn(
+        `[validate-frame-face] ffmpeg-extract-frame attempt ${attempt + 1} failed: ${(e as Error)?.message}`,
+      );
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+
+  // Fallback: lucataco/frame-extractor (first frame).
+  try {
+    const out: any = await replicate.run(
+      "lucataco/frame-extractor" as `${string}/${string}`,
+      { input: { video: videoUrl, return_first_frame: true } },
+    );
+    const url = normalizeReplicateOutput(out);
+    if (url) return url;
+  } catch (e) {
+    console.warn(`[validate-frame-face] frame-extractor fallback failed: ${(e as Error)?.message}`);
+  }
+
+  return null;
+}
+
+function normalizeReplicateOutput(out: any): string | null {
+  if (typeof out === "string") return out;
+  if (Array.isArray(out) && typeof out[0] === "string") return out[0];
+  if (out && typeof out?.url === "function") {
+    try { return out.url(); } catch { /* ignore */ }
+  }
+  if (out && typeof out?.url === "string") return out.url;
+  return null;
+}
 
 interface FaceBox {
   x: number;
