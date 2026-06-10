@@ -124,14 +124,18 @@ export default function ComposerSequencePreview({
   // ── Refs are the source of truth (no stale closures) ──────────
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
+  /** Hidden prefetch slot — always holds sceneIdx + 2 so the browser
+   *  has the moov atom + first frames decoded before that scene is needed. */
+  const videoCRef = useRef<HTMLVideoElement>(null);
 
   /** Which slot DOM element is currently the visible/active player. */
   const activeSlotRef = useRef<Slot>('A');
   /** Maps each slot to the sceneIdx whose src is currently loaded into it. -1 = empty. */
-  const slotMapRef = useRef<{ A: number; B: number }>({ A: -1, B: -1 });
+  const slotMapRef = useRef<{ A: number; B: number; C: number }>({ A: -1, B: -1, C: -1 });
   /** Imperative src holders so React doesn't trigger unwanted reloads. */
   const slotASrcRef = useRef<string | undefined>(undefined);
   const slotBSrcRef = useRef<string | undefined>(undefined);
+  const slotCSrcRef = useRef<string | undefined>(undefined);
   /** Opacity per slot (driven by ref, mirrored to DOM via forceRender). */
   const slotAOpacityRef = useRef(1);
   const slotBOpacityRef = useRef(0);
