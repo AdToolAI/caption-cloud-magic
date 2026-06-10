@@ -1822,29 +1822,122 @@ serve(async (req) => {
     // an unverified coord (e.g. retry after a successful pass 1 if the
     // faceMap regressed). 1-speaker scenes are exempt (centre-of-frame is
     // a sane single-face fallback).
+    //
+    // v98 (June 10 2026) — Advance-Deadlock fix. On advance/retry, plate-
+    // identity + face-gate are skipped (gated by `!isAdvance`), so the
+    // FRESH `coordSources` are always "heuristic" even though the stored
+    // pass already carries face-gate-repaired or plate-identity-verified
+    // coords from the first dispatch. Without this carve-out, every
+    // advance loops endlessly: SANITY-BLOCK → awaiting_retry → cron → repeat.
+    // → If the stored pass has a `face_repair` object or a non-heuristic
+    //   `coords_source`, the coords were already validated against the real
+    //   plate frame on pass 0 — accept them.
     if (speakers.length >= 2) {
-      const pSrc = coordSources[Number(passes[currentPassIdx]?.speaker_idx ?? -1)] ?? "none";
-      if (pSrc === "heuristic" || pSrc === "none") {
+      const curPass: any = passes[currentPassIdx];
+      const pSrc = coordSources[Number(curPass?.speaker_idx ?? -1)] ?? "none";
+      const storedSource = String(curPass?.coords_source ?? "").toLowerCase();
+      const hasFaceRepair =
+        curPass?.face_repair && typeof curPass.face_repair === "object";
+      const storedVerified =
+        storedSource &&
+        storedSource !== "heuristic" &&
+        storedSource !== "none";
+      const previouslyVerified = hasFaceRepair || storedVerified;
+      if ((pSrc === "heuristic" || pSrc === "none") && !previouslyVerified) {
+        // Count consecutive sanity-blocks so we fail-fast instead of spinning forever.
+        const sanityBlockCount =
+          Number((existing as any)?.sanity_block_count ?? 0) + 1;
+        const MAX_SANITY_BLOCKS = 5;
+        if (sanityBlockCount >= MAX_SANITY_BLOCKS) {
+          const reason = `sanity_block_max_retries_${MAX_SANITY_BLOCKS}_pass_${currentPassIdx}`;
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v98 SANITY-BLOCK FAIL-FAST after ${sanityBlockCount} blocks — failing scene`,
+          );
+          const alreadyRefunded = !!(existing as any)?.refunded;
+          const undispatchedPasses = Math.max(0, passes.length - currentPassIdx);
+          const refundAmount = alreadyRefunded
+            ? 0
+            : Math.round(
+                (Number((existing as any)?.cost_credits ?? totalCost) *
+                  undispatchedPasses) /
+                  Math.max(1, passes.length),
+              );
+          if (refundAmount > 0) {
+            const { data: wSB } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wSB?.balance ?? 0) + refundAmount,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          }
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: {
+                ...(existing ?? {}),
+                version: 5,
+                engine: "sync-segments",
+                status: "failed",
+                refunded: refundAmount > 0 ? true : !!(existing as any)?.refunded,
+                refund_partial_credits: refundAmount,
+                error: reason,
+                sanity_block_count: sanityBlockCount,
+                finished_at: new Date().toISOString(),
+              },
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
+              clip_error: `syncso_${reason}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", sceneId);
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "SANITY_BLOCK_EXHAUSTED",
+            error_class: "coords_heuristic_unverified",
+            error_message: reason,
+            meta: { consecutive_blocks: sanityBlockCount, pass_idx: currentPassIdx, undispatched_passes: undispatchedPasses, refund_credits: refundAmount },
+          });
+          return json({ error: "sanity_block_exhausted", reason, refunded: refundAmount }, 422);
+        }
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} v87 SANITY-BLOCK pass=${currentPassIdx} ` +
-          `speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} — skipping dispatch, awaiting retry`,
+          `speaker_idx=${curPass?.speaker_idx} source=${pSrc} stored=${storedSource || "none"} ` +
+          `count=${sanityBlockCount}/${MAX_SANITY_BLOCKS} — skipping dispatch, awaiting retry`,
         );
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: { ...(existing ?? {}), sanity_block_count: sanityBlockCount },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
         await logSyncDispatch(supabase, {
-          scene_id: sceneId,
-          user_id: userId,
-          engine: "sync-segments",
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_status: "HEURISTIC_BLOCKED",
           error_class: "coords_heuristic_unverified",
-          error_message: `pass=${currentPassIdx} speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc}`,
-          meta: { speakers: speakers.length, pass_idx: currentPassIdx, is_advance: isAdvance, is_retry: isRetry },
+          error_message: `pass=${currentPassIdx} speaker_idx=${curPass?.speaker_idx} source=${pSrc} count=${sanityBlockCount}`,
+          meta: { speakers: speakers.length, pass_idx: currentPassIdx, is_advance: isAdvance, is_retry: isRetry, sanity_block_count: sanityBlockCount },
         });
         return json(
-          {
-            ok: true,
-            status: "awaiting_face_detection",
-            skipped: `pass_${currentPassIdx}_heuristic_coord_unverified`,
-          },
+          { ok: true, status: "awaiting_face_detection", skipped: `pass_${currentPassIdx}_heuristic_coord_unverified`, sanity_block_count: sanityBlockCount },
           202,
+        );
+      }
+      // v98 — pass-through: reset the block counter so a future genuine block
+      // doesn't trip the cap prematurely.
+      if (previouslyVerified && Number((existing as any)?.sanity_block_count ?? 0) > 0) {
+        try {
+          await supabase
+            .from("composer_scenes")
+            .update({ dialog_shots: { ...(existing ?? {}), sanity_block_count: 0 } })
+            .eq("id", sceneId);
+        } catch { /* non-fatal */ }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v98 SANITY pass-through pass=${currentPassIdx} ` +
+          `stored_source=${storedSource || "n/a"} face_repair=${hasFaceRepair ? "yes" : "no"}`,
         );
       }
     }
