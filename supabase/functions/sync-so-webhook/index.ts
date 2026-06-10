@@ -631,7 +631,30 @@ serve(async (req) => {
         console.log(`[sync-so-webhook] v64 scene=${sceneId} single-speaker TIGHT → dispatching audio-mux (overlay on master plate)`);
       }
 
-      // Multi-speaker: dispatch fan-in compositor (idempotent via audio_mux.render_id).
+      // Multi-speaker: dispatch fan-in compositor.
+      // Plan D (v93): atomic mux-claim via try_claim_mux_dispatch RPC.
+      // When parallel passes complete near-simultaneously, all N webhooks
+      // see allDone=true; without the claim each would POST to the audio
+      // mux Lambda. The RPC sets dialog_shots.audio_mux.dispatched_at once
+      // and returns true only to the first caller — race-safe.
+      let muxClaimed = false;
+      try {
+        const { data: claimRes } = await supabase
+          .rpc("try_claim_mux_dispatch", { _scene_id: sceneId });
+        muxClaimed = claimRes === true;
+      } catch (e) {
+        // RPC missing/failure → fall back to legacy behavior (always dispatch).
+        // Lambda mux is idempotent via audio_mux.render_id so duplicate calls
+        // are safe; we only lose the wasted-invocation guard.
+        console.warn(`[sync-so-webhook] plan_d mux-claim rpc failed, falling through: ${(e as Error)?.message ?? e}`);
+        muxClaimed = true;
+      }
+      if (!muxClaimed) {
+        console.log(`[sync-so-webhook] plan_d_mux_lock_skipped scene=${sceneId} reason=already_claimed`);
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "already_dispatched" });
+      }
+      console.log(`[sync-so-webhook] plan_d_mux_lock_acquired scene=${sceneId}`);
+
       await supabase
         .from("composer_scenes")
         .update({
@@ -641,6 +664,10 @@ serve(async (req) => {
             final_url: finalUrl,
             sync_so_url: outputUrl,
             finished_at: nowIso,
+            audio_mux: {
+              ...((freshDoneState as any)?.audio_mux ?? {}),
+              dispatched_at: nowIso,
+            },
           },
           lip_sync_status: "audio_muxing",
           twoshot_stage: "audio_muxing",
