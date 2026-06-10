@@ -493,6 +493,7 @@ export default function ComposerSequencePreview({
       activeSlotRef.current = 'A';
       preloadSlot('A', 0);
       preloadSlot('B', 1);
+      preloadSlot('C', 2);
       setOpacityForSlot('A', 1);
       setOpacityForSlot('B', 0);
       return;
