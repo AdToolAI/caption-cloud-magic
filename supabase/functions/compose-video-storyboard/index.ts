@@ -107,6 +107,22 @@ function promptCharacterActionFallback(prompt: unknown, characterName: string | 
   return cleanActionText(match, 12);
 }
 
+/**
+ * Neutral fallback action for a character slot when neither the LLM nor the
+ * prompt-clause heuristic produced anything usable. Guarantees the per-slot
+ * "AKTION — WAS TUT {NAME}?" field is never empty after storyboard generation.
+ */
+function neutralCharacterAction(language: string): { en: string; user: string } {
+  const en = "performs the scene action naturally, visible to camera";
+  const user =
+    language === "de" ? "führt die Szenen-Aktion natürlich aus, sichtbar zur Kamera" :
+    language === "es" ? "realiza la acción de la escena con naturalidad, visible a cámara" :
+    en;
+  return { en, user };
+}
+
+
+
 const CATEGORY_STRUCTURES: Record<string, string> = {
   "product-ad": `USP-DRIVEN PRODUCT AD — use the AIDA framework. Treat the briefing's "productName" as the product, "usps" as benefits, "targetAudience" as the buyer persona.
 1. Hook (3-4s): Attention-grabbing visual that stops scrolling
