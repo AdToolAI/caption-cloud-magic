@@ -1794,9 +1794,15 @@ serve(async (req) => {
     // isAdvance call cloned them verbatim — even though the freshly computed
     // `speakerCoords` now had real plate-identity / anchor coords. Refresh
     // pass.coords whenever the fresh source is *better* than what's stored.
-    // "Better" = anything that isn't "heuristic"/"none". Heuristic coords
-    // are blocked outright on the fresh path (above guard), so this only
-    // upgrades — it never silently downgrades an already-good coord.
+    //
+    // v99 (June 10 2026) — Face-Gate-Repair is AUTHORITATIVE.
+    // Bug: Sarah (4-speaker scene 09dde12d) had `face_repair` + repaired
+    // coords [595,251] stored on pass 4. Refresh then overwrote them with
+    // the fresh `speakerCoords[3]` = [610,291] (plate-slot fallback in the
+    // lower half, no face). Sync.so rejected 4× with `provider_unknown_error`
+    // → 11min wasted, then honesty-fail. Face-Gate ran on the actual plate
+    // frame and is the only source that verified coords against pixel data.
+    // Never overwrite it.
     if ((isAdvance || isRetry) && Array.isArray(speakerCoords) && speakerCoords.length > 0) {
       for (const p of passes) {
         const idx = Number(p.speaker_idx);
@@ -1805,6 +1811,22 @@ serve(async (req) => {
         const freshSource = coordSources[idx] ?? "none";
         if (!freshCoord) continue;
         if (freshSource === "heuristic" || freshSource === "none") continue;
+        // v99 — Face-Gate-Repair lock-in.
+        const storedSrc = String((p as any).coords_source ?? "").toLowerCase();
+        const hasFaceRepair = (p as any).face_repair && typeof (p as any).face_repair === "object";
+        const isFaceGateLocked =
+          hasFaceRepair ||
+          storedSrc.startsWith("face_gate_repair") ||
+          storedSrc === "face_repair" ||
+          storedSrc === "plate_identity_verified";
+        if (isFaceGateLocked) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} ADVANCE COORDS LOCKED pass=${p.idx} ` +
+            `speaker=${p.speaker_name} stored=${JSON.stringify(p.coords)} source=${storedSrc || "face_repair"} ` +
+            `(refresh skipped — Face-Gate authoritative, would have overwritten with ${JSON.stringify(freshCoord)} from ${freshSource})`,
+          );
+          continue;
+        }
         const oldCoord = Array.isArray(p.coords) ? [p.coords[0], p.coords[1]] : null;
         const changed =
           !oldCoord ||
@@ -1812,6 +1834,7 @@ serve(async (req) => {
           Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
         if (changed) {
           p.coords = [freshCoord[0], freshCoord[1]];
+          (p as any).coords_source = freshSource;
           console.log(
             `[compose-dialog-segments] scene=${sceneId} ADVANCE COORDS REFRESH pass=${p.idx} ` +
             `speaker=${p.speaker_name} old=${JSON.stringify(oldCoord)} new=${JSON.stringify(p.coords)} source=${freshSource}`,
@@ -1946,6 +1969,110 @@ serve(async (req) => {
       }
     }
 
+
+    // ── v99 — Pre-Flight Coord-Gate (fail-fast before Sync.so dispatch) ──
+    // Last-line defense: never dispatch a multi-speaker pass whose coords
+    // weren't verified against the actual plate frame. Acceptable sources:
+    //   - face_gate_repair_* (Face-Gate ran on the plate frame, found face)
+    //   - face_repair / face_repair object present
+    //   - plate_identity_verified (plate identity resolved this speaker)
+    //   - bbox-url-pro variant (Sync.so will receive a per-frame bbox URL,
+    //     coords are advisory only — let the variant flow through)
+    // Block: heuristic, none, plate-slot-fallback, anchor-rescale without
+    // face-gate verification. These caused the Sarah 4× retry hang.
+    if (speakers.length >= 2) {
+      const curPass: any = passes[currentPassIdx];
+      const storedSrc = String(curPass?.coords_source ?? "").toLowerCase();
+      const hasFaceRepair = curPass?.face_repair && typeof curPass.face_repair === "object";
+      const verified =
+        hasFaceRepair ||
+        storedSrc.startsWith("face_gate_repair") ||
+        storedSrc === "face_repair" ||
+        storedSrc === "plate_identity_verified";
+      // bbox-url-pro path will set coords advisory only; the dispatch payload
+      // uses bbox URL so heuristic coords are tolerated. Determine the same
+      // way the dispatch logic below does (mirrors freshDefaultVariant).
+      const havePlateIdForGate =
+        !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
+      const hasPreclipForGate = !!(curPass as any)?.preclip_url;
+      const willUseBboxUrl =
+        !!plateDims && havePlateIdForGate && !hasPreclipForGate && !isRetry;
+
+      if (!verified && !willUseBboxUrl) {
+        const reason = `coords_not_verified_pass_${currentPassIdx}_speaker_${curPass?.speaker_name ?? "?"}`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v99 PRE-FLIGHT COORD-GATE BLOCK pass=${currentPassIdx} ` +
+          `speaker=${curPass?.speaker_name} coords_source=${storedSrc || "none"} face_repair=${hasFaceRepair ? "yes" : "no"} ` +
+          `coords=${JSON.stringify(curPass?.coords)} — refusing dispatch to avoid wasted Sync.so retries`,
+        );
+        const alreadyRefunded = !!(existing as any)?.refunded;
+        const undispatchedPasses = Math.max(0, passes.length - currentPassIdx);
+        const refundAmount = alreadyRefunded
+          ? 0
+          : Math.round(
+              (Number((existing as any)?.cost_credits ?? totalCost) *
+                undispatchedPasses) /
+                Math.max(1, passes.length),
+            );
+        if (refundAmount > 0) {
+          const { data: wPF } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(wPF?.balance ?? 0) + refundAmount,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              refunded: refundAmount > 0 ? true : !!(existing as any)?.refunded,
+              refund_partial_credits: refundAmount,
+              error: reason,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: `syncso_${reason}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_status: "PRE_FLIGHT_COORD_GATE_BLOCKED",
+          error_class: "coords_not_verified",
+          error_message: reason,
+          meta: {
+            speakers: speakers.length,
+            pass_idx: currentPassIdx,
+            speaker_name: curPass?.speaker_name,
+            coords: curPass?.coords,
+            coords_source: storedSrc || "none",
+            face_repair: hasFaceRepair,
+            refund_credits: refundAmount,
+            undispatched_passes: undispatchedPasses,
+          },
+        });
+        return json(
+          {
+            error: "coords_not_verified",
+            details:
+              `Speaker "${curPass?.speaker_name ?? "?"}" — face position could not be verified on the rendered plate. ` +
+              `Scene failed safely before dispatching to Sync.so (credits refunded). Re-render the scene with all faces clearly in frame.`,
+            refunded: refundAmount,
+            hint: "re_render_scene_clip",
+          },
+          422,
+        );
+      }
+    }
 
     const pass = passes[currentPassIdx];
     pass.input_url = passInputUrl;
