@@ -2027,10 +2027,17 @@ serve(async (req) => {
           } else {
             return { idx, status: "skip_no_coords" as const };
           }
-          const firstTurn = p.segments?.[0];
-          if (!firstTurn) return { idx, status: "skip_no_turn" as const };
-          const winStartSec = Math.max(0, Number(firstTurn.startTime) - 0.08);
-          const winEndSec = Math.min(totalSec, Number(firstTurn.endTime) + 0.08);
+          // v94: span ALL turns of this speaker (union of segments) so the
+          // preclip is long enough to cover the full Tight-WAV. Otherwise
+          // Sync.so (sync_mode=cut_off) caps the output at preclip length and
+          // turns 2..N of the same speaker render as a frozen last frame.
+          const passSegs = Array.isArray(p.segments) ? p.segments : [];
+          if (passSegs.length === 0) return { idx, status: "skip_no_turn" as const };
+          const segStarts = passSegs.map((t: any) => Number(t.startTime)).filter((n) => Number.isFinite(n));
+          const segEnds = passSegs.map((t: any) => Number(t.endTime)).filter((n) => Number.isFinite(n));
+          if (segStarts.length === 0 || segEnds.length === 0) return { idx, status: "skip_no_turn" as const };
+          const winStartSec = Math.max(0, Math.min(...segStarts) - 0.08);
+          const winEndSec = Math.min(totalSec, Math.max(...segEnds) + 0.08);
           if (!(winEndSec > winStartSec + 0.05)) {
             return { idx, status: "skip_bad_window" as const };
           }
@@ -2202,13 +2209,15 @@ serve(async (req) => {
       !!tightAudioInfo &&
       !skipPreclipForEdgeSpeaker;
     if (wantPassPreclip && !(pass as any).preclip_url) {
-      // Window: use the first turn for this speaker as the preclip render
-      // window. Per-pass tight audio is sliced to the same window union, so
-      // a single-turn preclip matches the lipsync output the audio-mux
-      // Lambda overlays back on top.
-      const firstTurnForPreclip = pass.segments[0];
-      const winStartSec = firstTurnForPreclip ? Math.max(0, Number(firstTurnForPreclip.startTime) - 0.08) : 0;
-      const winEndSec = firstTurnForPreclip ? Math.min(totalSec, Number(firstTurnForPreclip.endTime) + 0.08) : totalSec;
+      // v94: Window spans the UNION of all turns for this speaker, not just
+      // the first turn. Sync.so with sync_mode=cut_off caps output at
+      // min(video, audio); if the preclip only covers turn 1, turns 2..N of
+      // the same speaker freeze on the last preclip frame and lose lipsync.
+      const passSegsForPreclip = Array.isArray(pass.segments) ? pass.segments : [];
+      const psStarts = passSegsForPreclip.map((t: any) => Number(t.startTime)).filter((n) => Number.isFinite(n));
+      const psEnds = passSegsForPreclip.map((t: any) => Number(t.endTime)).filter((n) => Number.isFinite(n));
+      const winStartSec = psStarts.length > 0 ? Math.max(0, Math.min(...psStarts) - 0.08) : 0;
+      const winEndSec = psEnds.length > 0 ? Math.min(totalSec, Math.max(...psEnds) + 0.08) : totalSec;
       // Extract bbox from faceMap if available so the crop wraps the face cleanly.
       const fmFaces2: any[] = Array.isArray((faceMap as any)?.faces) ? (faceMap as any).faces : [];
       const fmW2 = Number((faceMap as any)?.width) || plateDims!.width;
