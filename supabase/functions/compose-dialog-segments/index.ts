@@ -1546,6 +1546,9 @@ serve(async (req) => {
             const original = pass.coords;
             pass.coords = clampSyncCoords(repaired);
             pass.reference_frame_number = frame;
+            (pass as any).coords_source = shouldForceRepair
+              ? "face_gate_repair_v96"
+              : "face_gate_repair_strict";
             pass.face_repair = {
               source: shouldForceRepair
                 ? "v96_plate_frame_force_repair"
