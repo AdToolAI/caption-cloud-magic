@@ -276,12 +276,13 @@ export default function ComposerSequencePreview({
     setPlaying(false);
     imageStartRef.current = null;
     activeSlotRef.current = 'A';
-    slotMapRef.current = { A: -1, B: -1 };
+    slotMapRef.current = { A: -1, B: -1, C: -1 };
 
     if (playable.length > 0) {
-      // Init: load scene 0 → A, scene 1 → B.
+      // Init: load scene 0 → A, scene 1 → B, scene 2 → hidden prefetch C.
       preloadSlot('A', 0);
       preloadSlot('B', 1);
+      preloadSlot('C', 2);
       setOpacityForSlot('A', 1);
       setOpacityForSlot('B', 0);
     }
