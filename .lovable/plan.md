@@ -1,39 +1,27 @@
-# Welle D – Lipsync Static-Frame Fix
+# Fix: "Lip-Sync wird gestartet" hängt ewig (Re-Run nach erfolgreichem Lauf)
 
-## Problem
-Sync.so `sync-3` mit `auto_detect:true` liefert für Sprecher 2+3 ein eingefrorenes 1:1-Copy des Inputs zurück, weil ihre Preclip-Crops nahezu statisch sind (Frame-Diff 0.4–1.1 px vs. Sarah 8–11 px). Audio läuft korrekt, aber Mund bleibt zu.
+## Diagnose (verifiziert in DB + Logs)
+- Szene `e451083e…`: `lip_sync_status='pending'`, `twoshot_stage='master_clip'` seit 16:53 — aber `lip_sync_applied_at = 16:18` vom vorherigen, erfolgreichen Lauf ist noch gesetzt.
+- Der Auto-Trigger (`useTwoShotAutoTrigger`, v23) verwirft jeden Kandidaten mit gesetztem `lip_sync_applied_at` → der neue Lauf wird nie dispatcht. Keine einzige `compose-dialog-segments`-Invocation seit 16:53; Watchdog scannt nur `running` und sieht die Szene nicht.
+- Ursache: Die Re-Run-Pfade in `SceneDialogStudio.tsx` (~Z. 1238) und `ClipsTab.tsx` (~Z. 924) setzen nur `lip_sync_status='pending'`, räumen aber den alten Abschluss-Zustand nicht weg.
 
-## Lösung in 3 Hebeln
+## Schritte
 
-### Hebel 1 – Source Motion (compose-dialog-scene + Hailuo-Prompts)
-- In `compose-dialog-scene/index.ts` Hailuo-Plate-Prompt erweitern: jeder Cast-Member bekommt zusätzlich Zeile `"<Name> visibly breathing, subtle head idle motion, mouth slightly parted, never fully static"`.
-- Sichert minimale Bewegung pro Sprecher → Sync.so erkennt Face auch ohne explizite Koords.
+### 1. Sofort-Entstickung (Daten-Fix)
+- Für Szene `e451083e-2c89-46e9-8228-8164583167f2`: `lip_sync_applied_at = NULL`, `dialog_shots = NULL`, `lip_sync_source_clip_url = NULL` setzen, `lip_sync_status='pending'`, `twoshot_stage='master_clip'` belassen.
+- Der Auto-Trigger nimmt die Szene dann auf seinem nächsten 8s-Tick als frischen Kandidaten auf — Welle-D-Test läuft damit direkt los.
 
-### Hebel 2 – Sync.so Settings (dispatch-syncso-pass)
-- `auto_detect: true` → ersetzen durch explizite `bounding_box` aus `face_map[speakerId]` pro Pass (FaceMap existiert bereits in `composer_scenes.face_map`).
-- `temperature: 0.7` → `1.0` (mehr Mund-Bewegung erlaubt).
-- `occlusion_detection_enabled: true` zusätzlich setzen.
+### 2. Code-Fix in beiden Re-Run-Pfaden
+- `SceneDialogStudio.tsx`: beim Update vor `compose-video-clips`-Invoke zusätzlich `lip_sync_applied_at: null`, `dialog_shots: null`, `lip_sync_source_clip_url: null`, `twoshot_stage: null` setzen.
+- `ClipsTab.tsx` (Cinematic-Sync-Pfad): identische Felder beim `pending`-Flip mitschreiben.
 
-### Hebel 3 – Static-Frame Fallback (dispatch-syncso-pass + poll-dialog-shots)
-- Nach jedem Pass: in `poll-dialog-shots` Frame-Diff-Check auf erste 30 Frames des Pass-Outputs.
-- Wenn mean-diff < 2.0 px → markiere Pass als `static_frozen`, retry automatisch mit `model: "lipsync-2-pro"` + explizite Koords + `temperature: 1.0`.
-- Max 1 Retry pro Pass, danach hard fail mit Refund.
+### 3. Selbstheilung im Auto-Trigger (Schutznetz)
+- In `useTwoShotAutoTrigger`: erkennt eine Zeile mit `lip_sync_status='pending'` + gesetztem `lip_sync_applied_at` + `twoshot_stage='master_clip'` (= klarer Re-Run-Marker), wird `lip_sync_applied_at` client-seitig genullt und die Szene als Kandidat zugelassen — analog zu den bestehenden Auto-Reset-Blöcken. Verhindert, dass alte hängende Zeilen je wieder festsitzen.
 
-## Migration
-- Neue Spalte `composer_scenes.lipsync_passes[].static_retry_count` (default 0).
-- Kein neuer Bucket nötig, FaceMap wird wiederverwendet.
+## Nicht enthalten
+- Keine Änderungen an Edge Functions, Watchdog oder Welle-D-Logik.
+- Keine Migration nötig (nur Daten-Update + Frontend).
 
 ## Test
-- Manueller Re-Run auf Scene `e451083e-2c89-46e9-8228-8164583167f2` via `compose-dialog-scene` mit `force_remux=true`.
-- Erwartung: Sarah unverändert OK; Matthew + Samuel bewegen Mund sichtbar.
-- Acceptance: alle 3 Sprecher haben Frame-Diff > 3 px im Mundbereich während ihres Turns.
-
-## Rollout
-- Feature-Flag `dialog_static_retry_enabled` default **on**.
-- Falls Regression: Flag off → alter Pfad.
-- Kein User-Reset nötig, alter Mux-Pipeline bleibt fallback.
-
-## Out of Scope
-- Welle C (segments-native) bleibt verworfen.
-- Single-Speaker Pfad unverändert.
-- Cinematic-Sync / HeyGen unverändert.
+- Nach Entstickung: Szene startet automatisch, `compose-dialog-segments`-Logs erscheinen, Fortschritt im Overlay läuft.
+- Danach einmal manuell Re-Lipsync auslösen und prüfen, dass der neue Lauf ohne manuelles Eingreifen startet (validiert Schritt 2+3).
