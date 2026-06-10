@@ -29,11 +29,14 @@
  * ordering of plate boxes is the safest deterministic mapping).
  */
 
-import Replicate from "npm:replicate@0.25.2";
+// v52: No Replicate frame extraction — Gemini accepts MP4s directly via
+// `type: "video_url"`. The previous Replicate dependency (lucataco/
+// ffmpeg-extract-frame) was deleted from Replicate, so this also fixes a
+// hard outage.
 
 const LOVABLE_GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const GEMINI_TIMEOUT_MS = 30_000;
-const FRAME_EXTRACT_TIMEOUT_MS = 90_000;
+const GEMINI_TIMEOUT_MS = 45_000;
+
 
 export interface PlateFaceBox {
   /** Plate pixel-space [x1, y1, x2, y2]. */
