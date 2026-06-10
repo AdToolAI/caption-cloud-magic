@@ -1984,11 +1984,20 @@ serve(async (req) => {
       const curPass: any = passes[currentPassIdx];
       const storedSrc = String(curPass?.coords_source ?? "").toLowerCase();
       const hasFaceRepair = curPass?.face_repair && typeof curPass.face_repair === "object";
+      // v100 — plate-identity and plate-slot-fallback both point at REAL faces
+      // detected on the actual plate frame (plate-slot-fallback just means the
+      // identity→character match was ambiguous and we assigned by slot order).
+      // Sync.so has a real chance to animate; reactive fail-fast in the
+      // webhook handles the rare provider_unknown_error case. Only block on
+      // truly faceless sources (heuristic / none / anchor-rescale without
+      // face-gate verification).
       const verified =
         hasFaceRepair ||
         storedSrc.startsWith("face_gate_repair") ||
         storedSrc === "face_repair" ||
-        storedSrc === "plate_identity_verified";
+        storedSrc === "plate_identity_verified" ||
+        storedSrc === "plate-identity" ||
+        storedSrc === "plate-slot-fallback";
       // bbox-url-pro path will set coords advisory only; the dispatch payload
       // uses bbox URL so heuristic coords are tolerated. Determine the same
       // way the dispatch logic below does (mirrors freshDefaultVariant).
