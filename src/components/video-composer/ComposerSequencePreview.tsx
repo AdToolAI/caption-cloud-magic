@@ -48,8 +48,14 @@ const formatTime = (s: number) => {
 };
 
 const CROSSFADE_MS = 400;
-const STANDBY_BUDGET_MS = 1200;
+const STANDBY_BUDGET_MS = 1500;
+/** Max wait when standby is buffered enough to start (HAVE_CURRENT_DATA but not FUTURE_DATA). */
+const STANDBY_SOFT_WAIT_MS = 200;
 const WATCHDOG_MS = 5000;
+/** First chunk to range-fetch per clip — covers moov atom + first frames. */
+const PREWARM_BYTES = 524288;
+/** Max parallel prewarm requests. */
+const PREWARM_CONCURRENCY = 2;
 
 type Slot = 'A' | 'B';
 
