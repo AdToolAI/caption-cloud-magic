@@ -292,6 +292,45 @@ export default function ComposerSequencePreview({
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => () => clearAllTimers(), [clearAllTimers]);
 
+  // ── HTTP prewarm: range-fetch the first chunk of every clip URL so the
+  // browser cache has the moov atom + first frames ready before each slot
+  // calls `video.src = …`. Eliminates the 2–3s standby wait that otherwise
+  // happens between scene 2 → 3 (and any later transition) when the standby
+  // slot only starts loading its bytes after the previous scene already plays.
+  useEffect(() => {
+    if (playable.length === 0) return;
+    const ctrl = new AbortController();
+    const urls = playable
+      .filter((s) => !isImageScene(s) && !!s.clipUrl)
+      .map((s) => s.clipUrl as string);
+    if (urls.length === 0) return;
+
+    let active = 0;
+    let cursor = 0;
+    const pump = () => {
+      while (active < PREWARM_CONCURRENCY && cursor < urls.length) {
+        const url = urls[cursor++];
+        active++;
+        fetch(url, {
+          method: 'GET',
+          headers: { Range: `bytes=0-${PREWARM_BYTES - 1}` },
+          cache: 'force-cache',
+          signal: ctrl.signal,
+        })
+          .then((r) => r.arrayBuffer().catch(() => null))
+          .catch(() => null)
+          .finally(() => {
+            active--;
+            if (!ctrl.signal.aborted) pump();
+          });
+      }
+    };
+    pump();
+
+    return () => { ctrl.abort(); };
+  }, [playable]);
+
+
   // Helper: scene has embedded audio in the MP4 we should let the video play.
   // Two-shot scenes whose merged dialogue is on an external track must NOT
   // count as embedded — otherwise the lipsync video's last-speaker-only audio
