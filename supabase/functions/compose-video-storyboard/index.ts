@@ -808,10 +808,11 @@ Generate the storyboard using the create_storyboard function.`;
           if (!char?.name) continue;
           const existing = cleanActionText(slot.actionEn, 12);
           const fromPrompt = cleanActionText(promptCharacterActionFallback(sc.aiPrompt, char.name), 12);
-          const fallbackNeutral = `looks at the others and speaks naturally on camera`;
-          const finalAction = existing || fromPrompt || fallbackNeutral;
+          const neutral = neutralCharacterAction(language);
+          const finalAction = existing || fromPrompt || neutral.en;
           slot.actionEn = finalAction;
-          slot.actionUser = cleanActionText(slot.actionUser || finalAction, 12);
+          const llmUser = cleanActionText(slot.actionUser, 12);
+          slot.actionUser = llmUser || (existing ? finalAction : (fromPrompt || neutral.user));
           castEntries.push({
             name: char.name,
             signature: String(char.signatureItems || '').trim(),
