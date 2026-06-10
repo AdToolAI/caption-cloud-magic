@@ -195,18 +195,24 @@ export default function ComposerSequencePreview({
   }, []);
 
   // ── Helpers operating on refs only (no closures over slot state) ──
-  const getVideoForSlot = (slot: Slot): HTMLVideoElement | null =>
-    slot === 'A' ? videoARef.current : videoBRef.current;
+  const getVideoForSlot = (slot: AnySlot): HTMLVideoElement | null => {
+    if (slot === 'A') return videoARef.current;
+    if (slot === 'B') return videoBRef.current;
+    return videoCRef.current;
+  };
 
-  const setSrcForSlot = useCallback((slot: Slot, src: string | undefined) => {
+  const setSrcForSlot = useCallback((slot: AnySlot, src: string | undefined) => {
     const el = getVideoForSlot(slot);
     if (!el) return;
     if (slot === 'A') {
       if (slotASrcRef.current === src) return;
       slotASrcRef.current = src;
-    } else {
+    } else if (slot === 'B') {
       if (slotBSrcRef.current === src) return;
       slotBSrcRef.current = src;
+    } else {
+      if (slotCSrcRef.current === src) return;
+      slotCSrcRef.current = src;
     }
     if (src) {
       el.src = src;
