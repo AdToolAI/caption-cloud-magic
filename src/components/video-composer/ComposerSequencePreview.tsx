@@ -393,8 +393,9 @@ export default function ComposerSequencePreview({
             if (playingRef.current) v.play().catch(() => {});
           }
         }, 30);
-        // Preload the next-next into B
+        // Preload the next-next into B and the one after into prefetch C.
         preloadSlot('B', toIdx + 1);
+        preloadSlot('C', toIdx + 2);
       }
       transitioningRef.current = false;
       return;
