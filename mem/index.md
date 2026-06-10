@@ -42,6 +42,7 @@ Updated: today
 - [Syncso Preflight Stage B+C](mem://architecture/lipsync/syncso-preflight-stage-b-c) — shared preflight + telemetry
 - [Syncso Face-Gate Stage D](mem://architecture/lipsync/syncso-face-gate-stage-d) — validate-frame-face + frame_face_cache
 - [Webhook + 8min Watchdog](mem://architecture/lipsync/sync-so-webhook-stage5) — sync-so-webhook + watchdog
+- [v94 Preclip Window Union](mem://architecture/lipsync/v94-preclip-window-union-of-turns) — FROZEN I.13: preclip = Hülle aller Sprecher-Turns (nicht firstTurn), sonst cut_off truncated Multi-Turn-Lipsync
 - [v92 Preclip Floor Bump](mem://architecture/lipsync/v92-preclip-floor-bump) — face-crop floor 160→220 px (neighbor cap 0.9→0.88) fixes last-speaker static lips on 4-speaker scenes (Sync.so auto_detect needs more facial pixels)
 - [v91 Short-Turn Tail Floor](mem://architecture/lipsync/v91-short-turn-tail-floor-and-faster-recovery) — dynamic 0.08s tail-pad floor für turns <0.6s verhindert provider_unknown_error bei Speaker 3/4; watchdog recovery 3min → 90s
 - [v89 TTS Tail Trim + Overflow Extend](mem://architecture/lipsync/v89-tts-tail-trim-and-overflow-extend) — ElevenLabs with-timestamps cap + scene-extend statt Hard-Trim

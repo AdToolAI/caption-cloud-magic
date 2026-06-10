@@ -224,6 +224,32 @@ Background: `mem://architecture/lipsync/v67-frame-exact-tight-slice`.
 
 ---
 
+## Rule I.13 — Preclip window = UNION of all speaker turns (v94)
+
+The per-pass face preclip rendered by `renderPassFacePreclip` MUST cover
+the **full span of all turns for that speaker**, not just the first turn.
+
+```ts
+const segStarts = pass.segments.map((t) => Number(t.startTime)).filter(Number.isFinite);
+const segEnds   = pass.segments.map((t) => Number(t.endTime)).filter(Number.isFinite);
+const winStartSec = Math.max(0, Math.min(...segStarts) - 0.08);
+const winEndSec   = Math.min(totalSec, Math.max(...segEnds) + 0.08);
+```
+
+Sync.so runs with `sync_mode=cut_off` (Rule I.11). Output duration =
+`min(videoDur, audioDur)`. The Tight-WAV (Rule I.12) already spans all
+turns of the speaker. If the preclip is built from `segments[0]` alone,
+the Sync.so output is capped at the first-turn length and turns 2..N of
+the same speaker freeze on the last preclip frame — no lipsync.
+
+- Enforced: `compose-dialog-segments/index.ts` ~L2030-2043 (Plan B batch
+  preclip prefetch) and ~L2205-2213 (v69 unified per-pass preclip).
+- Background: `mem://architecture/lipsync/v94-preclip-window-union-of-turns`.
+
+---
+
+
+
 
 ## Code annotation contract
 
