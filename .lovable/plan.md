@@ -1,32 +1,33 @@
-# Fix: Face-Detection darf nie wieder still scheitern (v97)
+# Fix: Gemini bekommt MP4 als video_url statt image_url
 
-## Root Cause (Szene e1c0af12, 20:25 Uhr)
-
-Zwei unabhängige Ausfälle in derselben Minute haben die v96-Reparatur komplett ausgehebelt:
-
-1. `plate-face-detect`: Replicate-Frame-Extraktion schlug fehl → keine Plate-Identity, Anchor-Koordinaten (y≈202) statt echter Mundpositionen (y≈400).
-2. `validate-frame-face` schickt die **MP4-URL direkt als Bild** an Gemini. Das AI-Gateway lehnt das jetzt ab: `400 Unsupported image format`. Dadurch: keine Face-Boxes → v96-Force-Repair konnte nicht greifen → Soft-Pass mit falschen Koordinaten → leere Preclip-Crops → keine Lippenbewegung, 9:25 min und Credits verbrannt.
-
-Stage B (Batch-Preclip) war nicht schuld — lief sauber (4/4 in 45s) und bleibt aktiv.
+## Root Cause (empirisch bestätigt)
+Gemini lehnt MP4s mit `type: "image_url"` ab (400 "Unsupported image format"), akzeptiert sie aber problemlos mit `type: "video_url"` (200, erkennt 4 Gesichter). Die Replicate-Frame-Extraktion war ein Workaround für den falschen Bug — und ist jetzt kaputt, weil `lucataco/ffmpeg-extract-frame` von Replicate gelöscht wurde.
 
 ## Änderungen
 
-### 1. `validate-frame-face`: PNG statt MP4 an Gemini
-- Vor dem Gemini-Call einen echten PNG-Frame extrahieren (gleiche Replicate-Extraktoren wie `plate-face-detect`, als gemeinsamer Shared-Helper mit 2 Versuchen pro Extraktor + kurzem Backoff).
-- PNG in den `composer-frames` Bucket rehosten und **diese** URL an Gemini geben — MP4-als-Bild wird komplett entfernt.
-- Frame-PNG pro (video_url, frame_number) cachen, damit Retries kostenlos sind.
+### 1. `supabase/functions/validate-frame-face/index.ts`
+- Gemini-Call: `type: "image_url"` → `type: "video_url"` (MP4 direkt übergeben)
+- Replicate-Frame-Extraktion entfernen (kein Fallback-Pfad mehr nötig)
+- Optionaler Timestamp-Hinweis im Prompt: „Analysiere Frame bei t=X.Xs"
 
-### 2. Face-Gate-Härtung in `compose-dialog-segments` (3+ Sprecher)
-- Wenn `validate-frame-face` keine Boxes liefert: einmaliger Fallback auf `detectPlateFaces` (hat eigenen Cache) bevor aufgegeben wird.
-- Wenn danach **immer noch keine** Plate-Face-Boxes existieren: **Fail-Fast statt Blind-Dispatch** — Szene wird sofort als `failed` markiert, Credits automatisch erstattet, klare Fehlermeldung ("Gesichtserkennung auf dem gerenderten Video fehlgeschlagen — bitte erneut starten"). Kein 9-Minuten-Lauf mehr, der garantiert tot ist.
-- Telemetrie: `face_repair.source` bzw. Block-Grund landet wie bisher im Dispatch-Log, damit der nächste Lauf in 30 Sekunden diagnostizierbar ist.
+### 2. `supabase/functions/_shared/twoshot-face-map.ts`
+- Gleiche Änderung: MP4-URL direkt als `video_url` an Gemini, keine Frame-Extraktion mehr
 
-### 3. Verifikation
-- Edge Functions neu deployen, dann dieselbe 4-Sprecher-Szene erneut rendern.
-- Erwartung in den Logs: `FACE-GATE REPAIR (v96-force)` auf allen 4 Pässen mit `preclip_crop.y ≈ 280–380`, oder (falls Extraktion erneut ausfällt) sofortiger Abbruch mit Refund statt 9-Minuten-Blindlauf.
+### 3. `supabase/functions/_shared/plate-face-detect.ts`
+- Replicate-Aufrufe entfernen, stattdessen MP4 direkt an Gemini via `video_url`
+- ~100 Zeilen Code weniger
 
-## Technische Details
-- Neuer/erweiterter Shared-Helper: `_shared/plate-face-detect.ts` → `extractPlateFrame` wird exportiert und von `validate-frame-face` mitbenutzt (Retry-Logik dort zentral).
-- 1- und 2-Sprecher-Flows bleiben unverändert (stabil).
-- Keine DB-Migration nötig; `frame_face_cache` wird weiterverwendet (zusätzlich Frame-URL im Result gespeichert).
-- Kosten: +1 Replicate-Frame-Extract pro Erstvalidierung (~0,001 €), dafür keine toten Sync.so-Läufe mehr.
+### 4. Nicht angefasst
+- `extract-video-last-frame` und `extract-video-frames` bleiben unverändert (werden für andere Zwecke genutzt, kein Lip-Sync-Blocker)
+- v97 fail-fast Logik unverändert
+- Stage B (Parallel-Dialog) unverändert
+
+## Verification
+Gleiche 4-Sprecher-Szene rendern. Erwartung:
+- `plate_identity=on` in den Logs
+- `FACE-GATE` mit echten Mund-Koordinaten pro Sprecher
+- Sichtbare Mund-Bewegung im Output
+- Schneller (kein Replicate-Detour mehr, ~2-3s gespart pro Validierung)
+
+## Risiken
+Niedrig — Single-Field-Change pro Call-Site. Falls Gemini bei sehr langen MP4s langsamer wird, können wir später optional einen `videoMetadata.endOffset` Hint hinzufügen.
