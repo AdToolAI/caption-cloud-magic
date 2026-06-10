@@ -260,13 +260,14 @@ export async function detectPlateFaces(params: {
         width: W,
         height: H,
         faces,
-        detector: "gemini-2.5-flash",
-        frame_url: frameUrl,
+        detector: "gemini-2.5-flash-video",
+        frame_url: null,
         expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
       }, { onConflict: "plate_url_hash" });
   } catch (e) {
     console.warn(`${tag} cache write failed: ${(e as Error)?.message}`);
   }
 
-  return { faces, width: W, height: H, detector: "gemini-2.5-flash", frame_url: frameUrl, cached: false };
+  return { faces, width: W, height: H, detector: "gemini-2.5-flash-video", frame_url: undefined, cached: false };
+
 }
