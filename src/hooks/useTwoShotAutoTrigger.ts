@@ -494,19 +494,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 });
               } else if (lsErr) {
                 emitPipelineEvent({ type: 'lipsync:end' });
-                // v100 — Friendlier descriptions for known coord-gate cases.
-                const rawDesc = realMsg || message || '';
-                let friendly = rawDesc;
-                if (/coords_not_verified/i.test(rawDesc)) {
-                  friendly =
-                    'Gesichts-Erkennung konnte keine Sprecher-Positionen verifizieren — bitte Plate (Hailuo-Clip) neu rendern.';
-                } else if (/slot_fallback_rejected_by_provider|plate-slot-fallback/i.test(rawDesc)) {
-                  friendly =
-                    'Sync.so hat die Sprecher-Position abgelehnt (Slot-Fallback) — bitte Plate neu generieren für saubere Identity-Map.';
-                }
                 toast({
                   title: 'Lip-Sync fehlgeschlagen',
-                  description: friendly || 'Unbekannter Fehler beim Lip-Sync.',
+                  description: realMsg || message || 'Unbekannter Fehler beim Lip-Sync.',
                   variant: 'destructive',
                 });
                 console.warn(

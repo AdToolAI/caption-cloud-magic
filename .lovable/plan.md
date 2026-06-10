@@ -1,65 +1,54 @@
-# Pre-Flight Gate Tuning: plate-slot-fallback erlauben
+# Bug — "Lip-Syncs starten gefühlt seriell"
 
-## Was passiert ist
+## Diagnose (verifiziert an Logs der letzten Szene)
 
-Edge-Log zeigt: Pass 0 Samuel — `coords_source=plate-slot-fallback` `coords=[158,226]` → Gate blockiert sofort mit `coords_not_verified`, voller Refund, Szene `failed`.
+Szene `31bea8b9-c261-46ba-8c3a-2b7d3dd187e8` hat **3 Passes** (v95 Split: Sprecher A 2 Turns + Sprecher B 1 Turn). Log zeigt:
 
-**Das war zu streng.** `plate-slot-fallback` ist NICHT dasselbe wie `heuristic`:
+```
+plan_d_parallel_dispatch_start N_passes=3 cap=2 fanout_size=2
+```
 
-| Source | Bedeutung | Coords zeigen auf… |
-|---|---|---|
-| `plate-identity` | Gemini hat Face → Character matched | ✅ richtiges Gesicht |
-| `plate-slot-fallback` | Faces auf Plate detected, aber per Slot-Order zugeordnet | ✅ echtes Gesicht (evtl. falscher Sprecher) |
-| `anchor-rescale` / `identity` | Anchor-Faces auf Plate skaliert | ⚠️ kann driften |
-| `heuristic` / `none` | Reines Center-Grid | ❌ kein Gesicht |
+→ Pass 0 + Pass 1 starten parallel, **Pass 2 bleibt `pending`** und wird erst gekickt, sobald Pass 0 oder 1 abgeschlossen ist (per Webhook-Chain). 
 
-Bei `plate-slot-fallback` zeigt der Koordinatenpunkt auf ein **echtes Gesicht im Plate** — Sync.so hat eine reelle Chance zu animieren. Im schlimmsten Fall bewegt sich der falsche Mund (Sprecher-Mismatch), aber kein leerer Sync.so-Call.
+Das ist kein Bug — das ist exakt der `composer.sync_so_concurrency_cap = 2` Wert aus `system_config`. Plan D (v93) ist aktiv und parallelisiert wie erwartet, nur der Cap ist zu konservativ für 3+ Pass-Szenarien (insbesondere nach v95 Per-Turn-Split, der die Pass-Anzahl bei Multi-Turn-Sprechern erhöht).
 
-## Ursache der Verwirrung
+## Fix
 
-Der Sarah-Bug (`[610,291]` mit Face bei `[595,251]`) sah aus wie "Slot-Fallback kaputt", war aber etwas anderes: die **Advance-Refresh-Stage** hat eine bereits Face-Gate-reparierte Pass-Coord mit frischen Slot-Fallback-Coords überschrieben. Diesen Bug haben wir bereits mit der **Coord-Order-Fix** behoben (Face-Gate-Lock-In). Der zusätzliche v99-Pre-Flight-Gate für `plate-slot-fallback` war Overkill.
+`system_config.composer.sync_so_concurrency_cap` von **2 → 4** anheben (Code-Clamp ist bereits `[1..4]`, kein Code-Change nötig).
 
-## Plan
+```sql
+UPDATE system_config SET value = '4'::jsonb
+WHERE key = 'composer.sync_so_concurrency_cap';
+```
 
-### 1. Block-Liste in v99 Pre-Flight verengen (`compose-dialog-segments` ~L1981)
+### Effekt
+- 2 Sprecher / 2 Passes: unverändert (alle parallel)
+- 2 Sprecher / 3 Passes (1× Multi-Turn): **alle 3 parallel** statt 2+1
+- 3 Sprecher / 3 Passes: alle 3 parallel statt 2+1
+- 4 Sprecher / 4 Passes: alle 4 parallel statt 2+2
+- MAX_SPEAKERS=4 (FROZEN I.6) bleibt das natürliche Obergrenze
 
-Nur noch hart blocken bei wirklich gesichtslosen Coords:
-- **Block:** `null`, `"none"`, `"heuristic"`, `"anchor-rescale"` (ohne Face-Gate-Verifikation), `"identity"` (ohne Face-Gate)
-- **Erlaubt:** `"plate-identity"`, `"plate-slot-fallback"`, `"face_gate_repair_*"`, `"face_repair"`, `"plate_identity_verified"`, `"bbox-url-pro"`
+### Wallclock-Erwartung
+Aktuelle 3-Pass-Szene ~7:30 min mit cap=2 (1 Welle à 2 + 1 Welle à 1). Mit cap=4: **eine** Sync.so-Welle für alle 3 Passes parallel → erwartet **~5:30–6:00 min** (Speedup ~20–25 %).
 
-Begründung: alles aus der Plate-Identity-Pipeline (auch Slot-Fallback) hat reale Face-Koordinaten — Sync.so darf das verarbeiten.
+### Was NICHT angefasst wird
+- Kein Code-Change (Clamp ist bereits 4)
+- Plan D Race-Safety (atomic RPCs `update_dialog_pass_slot`, `try_claim_mux_dispatch`) bleibt
+- v95 Per-Turn-Split bleibt
+- Webhook-Chain bleibt als Fallback aktiv (falls jemals N > cap)
+- Sync.so-Kosten unverändert (Pricing pro Output-Sekunde × Passes, parallel spart nur Wall-clock)
 
-### 2. Reaktiver Fail-Fast bei Provider-Error mit Slot-Fallback
+### Rollback
+```sql
+UPDATE system_config SET value = '2'::jsonb
+WHERE key = 'composer.sync_so_concurrency_cap';
+```
 
-In der Sync.so-Error-Handler-Stage (`sync-so-webhook` FAILED-Branch + retry-Ladder):
-- Wenn `error_class === "provider_unknown_error"` **UND** `pass.coords_source === "plate-slot-fallback"` → **0 Retries**, sofort Pass-Fail mit klarem Error: `slot_fallback_rejected_by_provider` (Hinweis: "Plate-Identity konnte Sprecher nicht eindeutig zuordnen, Sync.so hat die Position abgelehnt — bitte Plate neu rendern").
-- Alle anderen `provider_unknown_error` mit verifizierten Coords → normaler Retry (1×) wie bisher.
+### Verifizierung
+Nächste 3-Pass-Szene: Log muss `cap=4 fanout_size=3` zeigen, **kein** `pendingIdxs[0]` Kick aus dem Webhook für Pass 2.
 
-Damit fangen wir den echten Failure-Case (Sarah-artig) reaktiv ab, statt präventiv alle Slot-Fallbacks zu killen.
+### Risiko
+Minimal. Sync.so verträgt parallele Calls auf demselben gelockten Plate problemlos (kein Rate-Limit-Issue in bisherigen Tests bei cap=2). Falls Sync.so 429ed → einfacher Rollback auf 2.
 
-### 3. UI-Toast verfeinern (`DialogScenePill` / Composer)
-
-- Bei `coords_not_verified` (jetzt seltener): "Gesichts­erkennung konnte keine Sprecher-Positionen verifizieren — bitte Szene neu rendern."
-- Bei `slot_fallback_rejected_by_provider`: "Sync.so hat die Sprecher-Position abgelehnt (Slot-Fallback) — bitte Plate neu generieren für saubere Identity-Map."
-
-### 4. Telemetrie
-
-- `coord_gate_blocked` Event behalten, aber zusätzlich `reactive_slot_fallback_fail` Event mit `pass_idx`, `coords`, `coords_source`.
-
-## Out of Scope
-
-- Coord-Order Fix (Face-Gate Lock-In) bleibt unverändert — der war korrekt.
-- v87 Heuristic-Retry-3× bleibt unverändert.
-- Sync.so-Pass-Reihenfolge (seriell) bleibt FROZEN.
-
-## Erwarteter Effekt
-
-- Aktuelle Szene mit `plate-slot-fallback` würde wieder dispatchen → Sync.so-Lipsync läuft.
-- Wenn Sync.so tatsächlich rejectet → 1 Pass à ~60s Fail-Fast (kein 11-Min-Hänger).
-- Nur reine Grid-Fallbacks ohne jegliche Face-Detection werden noch präventiv blockiert.
-
-## Technische Notizen
-
-- Keine DB-Migration nötig.
-- Backward-kompatibel: bestehende `failed`-Szenen mit `coords_not_verified` bleiben, neue Runs gehen durch.
-- Risiko: wenn Plate-Identity systematisch falsche Slots liefert, könnten Sprecher-Münder vertauscht sein. Mitigation = der reaktive Fail-Fast in (2) plus klare UI-Message in (3).
+### Memory-Update nach Fix
+`mem://architecture/lipsync/v93-parallel-sync-so-passes.md` ergänzen: "Default-Cap nach v95-Per-Turn-Split auf 4 angehoben, da Pass-Anzahl pro Szene gestiegen ist."

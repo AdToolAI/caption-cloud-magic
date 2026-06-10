@@ -46,19 +46,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// ── v98: Pass MP4 URLs directly to Gemini as `video_url` ─────────────────
-// Earlier versions extracted a PNG via Replicate because we mistakenly used
-// `image_url` (which rejects MP4s with HTTP 400 "Unsupported image format").
-// Empirically Gemini accepts MP4s perfectly with `type: "video_url"` — and
-// the Replicate frame-extractor we depended on (lucataco/ffmpeg-extract-frame)
-// has been removed from Replicate, so the workaround is now broken anyway.
-function isVideoUrl(url: string): boolean {
-  const u = url.split("?")[0].toLowerCase();
-  return u.endsWith(".mp4") || u.endsWith(".mov") || u.endsWith(".webm") ||
-         u.endsWith(".m4v") || u.endsWith(".mkv");
-}
-
-
 interface FaceBox {
   x: number;
   y: number;
@@ -182,15 +169,6 @@ async function callGeminiVision(
   }
   const timestampSec = frameNumber / Math.max(1, fps);
 
-  // v98: Send MP4 URL directly to Gemini as `video_url`. The model walks the
-  // stream and analyses the requested timestamp itself. For non-video URLs
-  // (already a PNG/JPEG) we send `image_url` as before.
-  const mediaPart = isVideoUrl(videoUrl)
-    ? { type: "video_url", video_url: { url: videoUrl } }
-    : { type: "image_url", image_url: { url: videoUrl } };
-
-
-
   const prompt = `You are analyzing one specific frame of a video.
 
 The frame is at timestamp ${timestampSec.toFixed(3)}s (frame ${frameNumber} @ ${fps}fps).
@@ -233,8 +211,7 @@ If no face is clearly visible (back of head, blurred, hidden), return faceCount=
           role: "user",
           content: [
             { type: "text", text: prompt },
-            mediaPart,
-
+            { type: "image_url", image_url: { url: videoUrl } },
           ],
         },
       ],

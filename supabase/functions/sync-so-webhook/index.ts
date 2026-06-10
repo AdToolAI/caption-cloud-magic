@@ -848,36 +848,10 @@ serve(async (req) => {
         }
       }
       // fail_fast codes short-circuit the ladder entirely.
-      let canRetry = codeBucket !== "fail_fast"
+      const canRetry = codeBucket !== "fail_fast"
         && (treatAsTransient || forceCoordsRepair)
         && passRetryCount < MAX_V5_RETRIES
         && nextVariant !== null;
-
-      // v100 — Reactive fail-fast: if this pass had `plate-slot-fallback`
-      // coords (real face on plate, but identity→character match was
-      // ambiguous) and Sync.so still rejected with provider_unknown_error,
-      // a retry with identical inputs cannot recover (deterministic mismatch).
-      // For 3+ speaker scenes the v30 ladder (coords-pro-box, sync3-coords)
-      // already escalates intelligently — only block for 2-speaker scenes
-      // where the ladder would otherwise burn ~60s retries on the same payload.
-      const passCoordsSource = String(
-        (currentPassState as any)?.coords_source ?? ""
-      ).toLowerCase();
-      if (
-        canRetry &&
-        speakerCount === 2 &&
-        isProviderUnknown &&
-        passCoordsSource === "plate-slot-fallback" &&
-        passRetryCount >= 1
-      ) {
-        console.warn(
-          `[sync-so-webhook] v100 scene=${sceneId} pass=${currentPass} REACTIVE FAIL-FAST ` +
-          `coords_source=plate-slot-fallback + provider_unknown_error + retry=${passRetryCount} ` +
-          `— deterministic mismatch, skipping further retries`,
-        );
-        canRetry = false;
-      }
-
 
       if (canRetry) {
         const needsAudioRepair = codeBucket === "retry_with_repair" || forceCoordsRepair;
