@@ -1794,9 +1794,15 @@ serve(async (req) => {
     // isAdvance call cloned them verbatim — even though the freshly computed
     // `speakerCoords` now had real plate-identity / anchor coords. Refresh
     // pass.coords whenever the fresh source is *better* than what's stored.
-    // "Better" = anything that isn't "heuristic"/"none". Heuristic coords
-    // are blocked outright on the fresh path (above guard), so this only
-    // upgrades — it never silently downgrades an already-good coord.
+    //
+    // v99 (June 10 2026) — Face-Gate-Repair is AUTHORITATIVE.
+    // Bug: Sarah (4-speaker scene 09dde12d) had `face_repair` + repaired
+    // coords [595,251] stored on pass 4. Refresh then overwrote them with
+    // the fresh `speakerCoords[3]` = [610,291] (plate-slot fallback in the
+    // lower half, no face). Sync.so rejected 4× with `provider_unknown_error`
+    // → 11min wasted, then honesty-fail. Face-Gate ran on the actual plate
+    // frame and is the only source that verified coords against pixel data.
+    // Never overwrite it.
     if ((isAdvance || isRetry) && Array.isArray(speakerCoords) && speakerCoords.length > 0) {
       for (const p of passes) {
         const idx = Number(p.speaker_idx);
@@ -1805,6 +1811,22 @@ serve(async (req) => {
         const freshSource = coordSources[idx] ?? "none";
         if (!freshCoord) continue;
         if (freshSource === "heuristic" || freshSource === "none") continue;
+        // v99 — Face-Gate-Repair lock-in.
+        const storedSrc = String((p as any).coords_source ?? "").toLowerCase();
+        const hasFaceRepair = (p as any).face_repair && typeof (p as any).face_repair === "object";
+        const isFaceGateLocked =
+          hasFaceRepair ||
+          storedSrc.startsWith("face_gate_repair") ||
+          storedSrc === "face_repair" ||
+          storedSrc === "plate_identity_verified";
+        if (isFaceGateLocked) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} ADVANCE COORDS LOCKED pass=${p.idx} ` +
+            `speaker=${p.speaker_name} stored=${JSON.stringify(p.coords)} source=${storedSrc || "face_repair"} ` +
+            `(refresh skipped — Face-Gate authoritative, would have overwritten with ${JSON.stringify(freshCoord)} from ${freshSource})`,
+          );
+          continue;
+        }
         const oldCoord = Array.isArray(p.coords) ? [p.coords[0], p.coords[1]] : null;
         const changed =
           !oldCoord ||
@@ -1812,6 +1834,7 @@ serve(async (req) => {
           Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
         if (changed) {
           p.coords = [freshCoord[0], freshCoord[1]];
+          (p as any).coords_source = freshSource;
           console.log(
             `[compose-dialog-segments] scene=${sceneId} ADVANCE COORDS REFRESH pass=${p.idx} ` +
             `speaker=${p.speaker_name} old=${JSON.stringify(oldCoord)} new=${JSON.stringify(p.coords)} source=${freshSource}`,
