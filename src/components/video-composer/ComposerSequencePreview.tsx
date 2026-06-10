@@ -442,15 +442,22 @@ export default function ComposerSequencePreview({
         setGlobalTime(startOffsetsRef.current[toIdx] || 0);
         lastTimeUpdateRef.current = performance.now();
 
-        // Preload toIdx + 1 into the now-free slot for the next transition.
+        // Preload toIdx + 1 into the now-free slot and toIdx + 2 into prefetch C.
         preloadSlot(fromSlot, toIdx + 1);
+        preloadSlot('C', toIdx + 2);
 
         transitioningRef.current = false;
       }, CROSSFADE_MS);
     };
 
-    if (standby.readyState >= 2) {
+    // Fast path: standby already has enough buffered to play through.
+    if (standby.readyState >= 3) {
       startCrossfade();
+    } else if (standby.readyState >= 2) {
+      // HAVE_CURRENT_DATA — at least the first frame is ready. Start the
+      // crossfade immediately but give the browser a short head-start so
+      // playback doesn't stutter right at the cut.
+      scheduleTimer(startCrossfade, STANDBY_SOFT_WAIT_MS);
     } else {
       let fired = false;
       const onReady = () => {
@@ -466,6 +473,9 @@ export default function ComposerSequencePreview({
           standby.removeEventListener('canplay', onReady);
           standby.removeEventListener('loadeddata', onReady);
         } catch { /* noop */ }
+        if (!fired) {
+          console.warn('[Preview] standby budget exceeded — hard advancing');
+        }
         onReady();
       }, STANDBY_BUDGET_MS);
     }
