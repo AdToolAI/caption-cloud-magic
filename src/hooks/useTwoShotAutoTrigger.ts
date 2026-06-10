@@ -199,6 +199,39 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           typeof d.dialog_script === 'string' &&
           /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/m.test(d.dialog_script);
 
+        // Re-Run Self-Heal: Szene ist auf pending zurückgesetzt, aber
+        // lip_sync_applied_at vom vorigen Erfolgs-Lauf steht noch — der
+        // Kandidatenfilter weiter unten würde sie sonst stumm verwerfen.
+        // Klarer Re-Run-Marker = pending + applied_at gesetzt + Master-Clip da.
+        const orphanReruns = (data as any[]).filter(
+          (d) =>
+            isDialogEngine(d.engine_override) &&
+            d.lip_sync_status === 'pending' &&
+            d.lip_sync_applied_at &&
+            typeof d.clip_url === 'string' &&
+            d.clip_url.length > 0,
+        );
+        if (orphanReruns.length > 0) {
+          console.warn(
+            `[useTwoShotAutoTrigger] self-heal: clearing stale applied_at on ${orphanReruns.length} re-run scene(s)`,
+          );
+          await Promise.all(
+            orphanReruns.map((d) => {
+              d.lip_sync_applied_at = null;
+              d.dialog_shots = null;
+              d.lip_sync_source_clip_url = null;
+              return supabase
+                .from('composer_scenes')
+                .update({
+                  lip_sync_applied_at: null,
+                  dialog_shots: null,
+                  lip_sync_source_clip_url: null,
+                })
+                .eq('id', d.id);
+            }),
+          );
+        }
+
         // Stale-Watchdog: stage='audio' >3min ohne audio_plan → clear stage
         // damit nächster Tick einen frischen Versuch startet.
         const stalePrep = (data as any[]).filter(

@@ -1,0 +1,1 @@
+UPDATE public.composer_scenes SET lip_sync_applied_at = NULL, dialog_shots = NULL, lip_sync_source_clip_url = NULL WHERE id = 'e451083e-2c89-46e9-8228-8164583167f2';

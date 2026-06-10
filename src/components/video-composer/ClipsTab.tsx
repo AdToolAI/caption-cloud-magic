@@ -923,6 +923,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           clip_status: 'generating',
           lip_sync_status: 'pending',
           lip_sync_with_voiceover: true,
+          // Re-Run: alten Abschluss-Zustand wegräumen, sonst verwirft der
+          // Auto-Trigger die Szene als „bereits angewendet".
+          lip_sync_applied_at: null,
+          dialog_shots: null,
+          lip_sync_source_clip_url: null,
+          twoshot_stage: null,
         })
         .eq('id', targetSceneId);
       if (persistErr) {
