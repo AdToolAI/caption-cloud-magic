@@ -137,7 +137,10 @@ export default function SceneInlinePlayer({
     const checkStuck = () => {
       if (limboSinceRef.current == null) return;
       const ageMs = Date.now() - limboSinceRef.current;
-      if (ageMs >= 3 * 60_000 && !limboStuck) setLimboStuck(true);
+      // v94: 3min → 6min, weil der normale Dispatcher-Pfad (compose-dialog-scene
+      // → poll-dialog-shots cron) im Worst-Case 60-90s pro Stage-Übergang kostet.
+      // Der gelbe "Start hängt"-Banner ist nur UI; die Pipeline läuft unverändert.
+      if (ageMs >= 6 * 60_000 && !limboStuck) setLimboStuck(true);
     };
     checkStuck();
     const handle = setInterval(checkStuck, 15_000);
