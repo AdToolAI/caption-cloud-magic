@@ -1,54 +1,32 @@
-# Bug — "Lip-Syncs starten gefühlt seriell"
+# Fix: Face-Detection darf nie wieder still scheitern (v97)
 
-## Diagnose (verifiziert an Logs der letzten Szene)
+## Root Cause (Szene e1c0af12, 20:25 Uhr)
 
-Szene `31bea8b9-c261-46ba-8c3a-2b7d3dd187e8` hat **3 Passes** (v95 Split: Sprecher A 2 Turns + Sprecher B 1 Turn). Log zeigt:
+Zwei unabhängige Ausfälle in derselben Minute haben die v96-Reparatur komplett ausgehebelt:
 
-```
-plan_d_parallel_dispatch_start N_passes=3 cap=2 fanout_size=2
-```
+1. `plate-face-detect`: Replicate-Frame-Extraktion schlug fehl → keine Plate-Identity, Anchor-Koordinaten (y≈202) statt echter Mundpositionen (y≈400).
+2. `validate-frame-face` schickt die **MP4-URL direkt als Bild** an Gemini. Das AI-Gateway lehnt das jetzt ab: `400 Unsupported image format`. Dadurch: keine Face-Boxes → v96-Force-Repair konnte nicht greifen → Soft-Pass mit falschen Koordinaten → leere Preclip-Crops → keine Lippenbewegung, 9:25 min und Credits verbrannt.
 
-→ Pass 0 + Pass 1 starten parallel, **Pass 2 bleibt `pending`** und wird erst gekickt, sobald Pass 0 oder 1 abgeschlossen ist (per Webhook-Chain). 
+Stage B (Batch-Preclip) war nicht schuld — lief sauber (4/4 in 45s) und bleibt aktiv.
 
-Das ist kein Bug — das ist exakt der `composer.sync_so_concurrency_cap = 2` Wert aus `system_config`. Plan D (v93) ist aktiv und parallelisiert wie erwartet, nur der Cap ist zu konservativ für 3+ Pass-Szenarien (insbesondere nach v95 Per-Turn-Split, der die Pass-Anzahl bei Multi-Turn-Sprechern erhöht).
+## Änderungen
 
-## Fix
+### 1. `validate-frame-face`: PNG statt MP4 an Gemini
+- Vor dem Gemini-Call einen echten PNG-Frame extrahieren (gleiche Replicate-Extraktoren wie `plate-face-detect`, als gemeinsamer Shared-Helper mit 2 Versuchen pro Extraktor + kurzem Backoff).
+- PNG in den `composer-frames` Bucket rehosten und **diese** URL an Gemini geben — MP4-als-Bild wird komplett entfernt.
+- Frame-PNG pro (video_url, frame_number) cachen, damit Retries kostenlos sind.
 
-`system_config.composer.sync_so_concurrency_cap` von **2 → 4** anheben (Code-Clamp ist bereits `[1..4]`, kein Code-Change nötig).
+### 2. Face-Gate-Härtung in `compose-dialog-segments` (3+ Sprecher)
+- Wenn `validate-frame-face` keine Boxes liefert: einmaliger Fallback auf `detectPlateFaces` (hat eigenen Cache) bevor aufgegeben wird.
+- Wenn danach **immer noch keine** Plate-Face-Boxes existieren: **Fail-Fast statt Blind-Dispatch** — Szene wird sofort als `failed` markiert, Credits automatisch erstattet, klare Fehlermeldung ("Gesichtserkennung auf dem gerenderten Video fehlgeschlagen — bitte erneut starten"). Kein 9-Minuten-Lauf mehr, der garantiert tot ist.
+- Telemetrie: `face_repair.source` bzw. Block-Grund landet wie bisher im Dispatch-Log, damit der nächste Lauf in 30 Sekunden diagnostizierbar ist.
 
-```sql
-UPDATE system_config SET value = '4'::jsonb
-WHERE key = 'composer.sync_so_concurrency_cap';
-```
+### 3. Verifikation
+- Edge Functions neu deployen, dann dieselbe 4-Sprecher-Szene erneut rendern.
+- Erwartung in den Logs: `FACE-GATE REPAIR (v96-force)` auf allen 4 Pässen mit `preclip_crop.y ≈ 280–380`, oder (falls Extraktion erneut ausfällt) sofortiger Abbruch mit Refund statt 9-Minuten-Blindlauf.
 
-### Effekt
-- 2 Sprecher / 2 Passes: unverändert (alle parallel)
-- 2 Sprecher / 3 Passes (1× Multi-Turn): **alle 3 parallel** statt 2+1
-- 3 Sprecher / 3 Passes: alle 3 parallel statt 2+1
-- 4 Sprecher / 4 Passes: alle 4 parallel statt 2+2
-- MAX_SPEAKERS=4 (FROZEN I.6) bleibt das natürliche Obergrenze
-
-### Wallclock-Erwartung
-Aktuelle 3-Pass-Szene ~7:30 min mit cap=2 (1 Welle à 2 + 1 Welle à 1). Mit cap=4: **eine** Sync.so-Welle für alle 3 Passes parallel → erwartet **~5:30–6:00 min** (Speedup ~20–25 %).
-
-### Was NICHT angefasst wird
-- Kein Code-Change (Clamp ist bereits 4)
-- Plan D Race-Safety (atomic RPCs `update_dialog_pass_slot`, `try_claim_mux_dispatch`) bleibt
-- v95 Per-Turn-Split bleibt
-- Webhook-Chain bleibt als Fallback aktiv (falls jemals N > cap)
-- Sync.so-Kosten unverändert (Pricing pro Output-Sekunde × Passes, parallel spart nur Wall-clock)
-
-### Rollback
-```sql
-UPDATE system_config SET value = '2'::jsonb
-WHERE key = 'composer.sync_so_concurrency_cap';
-```
-
-### Verifizierung
-Nächste 3-Pass-Szene: Log muss `cap=4 fanout_size=3` zeigen, **kein** `pendingIdxs[0]` Kick aus dem Webhook für Pass 2.
-
-### Risiko
-Minimal. Sync.so verträgt parallele Calls auf demselben gelockten Plate problemlos (kein Rate-Limit-Issue in bisherigen Tests bei cap=2). Falls Sync.so 429ed → einfacher Rollback auf 2.
-
-### Memory-Update nach Fix
-`mem://architecture/lipsync/v93-parallel-sync-so-passes.md` ergänzen: "Default-Cap nach v95-Per-Turn-Split auf 4 angehoben, da Pass-Anzahl pro Szene gestiegen ist."
+## Technische Details
+- Neuer/erweiterter Shared-Helper: `_shared/plate-face-detect.ts` → `extractPlateFrame` wird exportiert und von `validate-frame-face` mitbenutzt (Retry-Logik dort zentral).
+- 1- und 2-Sprecher-Flows bleiben unverändert (stabil).
+- Keine DB-Migration nötig; `frame_face_cache` wird weiterverwendet (zusätzlich Frame-URL im Result gespeichert).
+- Kosten: +1 Replicate-Frame-Extract pro Erstvalidierung (~0,001 €), dafür keine toten Sync.so-Läufe mehr.
