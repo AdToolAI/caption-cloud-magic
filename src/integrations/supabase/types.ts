@@ -17725,6 +17725,11 @@ export type Database = {
         Args: { _holder: string; _scene_id: string; _ttl_seconds?: number }
         Returns: boolean
       }
+      try_claim_mux_dispatch: { Args: { _scene_id: string }; Returns: boolean }
+      update_dialog_pass_slot: {
+        Args: { _pass_idx: number; _patch: Json; _scene_id: string }
+        Returns: Json
+      }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
       verify_license_certificate: {
         Args: { _token: string }

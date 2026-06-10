@@ -2912,21 +2912,41 @@ serve(async (req) => {
         .eq("id", sceneId);
     }
 
-    // ── v60: NO parallel fan-out for any speaker count. The webhook chains
-    //    Pass 1..N-1 serially via `pendingIdxs[0]` on COMPLETE events. This
-    //    eliminates the 2-speaker dispatch-race that v33 already removed for
-    //    N≥3 and gives every multi-speaker scene a single, uniform pipeline.
-    //    FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.9)
-    // ── v25 Fan-Out (DISABLED in v60): on fresh dispatch, kick off all remaining passes in
-    //    parallel via background self-invokes. Each runs as an independent
-    //    Sync.so job against the SAME original plate (no chaining). The
-    //    Sync.so 3-slot concurrency guard upstream handles back-pressure.
-    // v33: For 3+ speaker scenes, do NOT fan out passes in parallel. v60
-    // extends this to 2-speaker scenes for the same race-elimination reasons.
-    const fanOutAllowed = false;
+    // ── Plan D (v93) — flag-gated parallel fan-out, supersedes hard `false`.
+    //    Default flag composer.parallel_sync_so_passes = false → behaves as
+    //    v60 unified serial chain (FROZEN I.9 v60 semantics preserved).
+    //    When flag is ON, dispatch up to composer.sync_so_concurrency_cap
+    //    additional passes in parallel via background self-invokes. Each
+    //    pass is an independent Sync.so job against the SAME original plate
+    //    (no chaining). Passes beyond the cap stay `pending` and are
+    //    chained by the webhook's pendingIdxs[0] kick on each COMPLETE.
+    //    Race-safety: per-pass state writes go through
+    //    public.update_dialog_pass_slot() RPC (atomic per-slot jsonb_set).
+    //    See mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.9) +
+    //    mem/architecture/lipsync/v93-parallel-sync-so-passes.md
+    let parallelFlagOn = false;
+    let concurrencyCap = 2;
+    try {
+      const { data: pFlag } = await supabase
+        .from("system_config").select("value")
+        .eq("key", "composer.parallel_sync_so_passes").maybeSingle();
+      parallelFlagOn = pFlag?.value === true || pFlag?.value === "true";
+      const { data: cFlag } = await supabase
+        .from("system_config").select("value")
+        .eq("key", "composer.sync_so_concurrency_cap").maybeSingle();
+      const rawCap = (cFlag as any)?.value;
+      const parsedCap = typeof rawCap === "number" ? rawCap : Number(rawCap);
+      if (Number.isFinite(parsedCap) && parsedCap >= 1) {
+        concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
+      }
+    } catch { /* defaults */ }
+    const fanOutAllowed = parallelFlagOn && passes.length >= 2;
     if (!isAdvance && !isRetry && fanOutAllowed) {
-      for (let i = 1; i < passes.length; i++) {
-        const delayMs = i * 250;
+      // Pass 0 was just dispatched above. Fan out passes [1 .. cap-1] now;
+      // any beyond cap remain `pending` and get kicked by the webhook.
+      const fanOutEnd = Math.min(passes.length, concurrencyCap);
+      for (let i = 1; i < fanOutEnd; i++) {
+        const delayMs = i * 250; // small jitter prevents Sync.so burst spike
         setTimeout(() => {
           fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
             method: "POST",
@@ -2936,16 +2956,16 @@ serve(async (req) => {
             },
             body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: i }),
           }).catch((err) =>
-            console.warn(`[compose-dialog-segments] fan-out pass=${i} dispatch threw: ${(err as Error).message}`),
+            console.warn(`[compose-dialog-segments] plan_d fan-out pass=${i} dispatch threw: ${(err as Error).message}`),
           );
         }, delayMs);
       }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} FAN-OUT scheduled ${passes.length - 1} additional passes in parallel`,
+        `[compose-dialog-segments] scene=${sceneId} plan_d_parallel_dispatch_start N_passes=${passes.length} cap=${concurrencyCap} fanout_size=${fanOutEnd}`,
       );
     } else if (!isAdvance && !isRetry && passes.length > 1) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} SERIAL mode (${passes.length} speakers, v60 unified) — webhook will chain pass 2..N as pass 1..N-1 complete`,
+        `[compose-dialog-segments] scene=${sceneId} SERIAL mode (${passes.length} speakers, v60 unified, parallel_flag=${parallelFlagOn}) — webhook will chain pass 2..N as pass 1..N-1 complete`,
       );
     }
 
