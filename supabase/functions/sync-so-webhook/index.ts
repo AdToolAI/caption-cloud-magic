@@ -529,17 +529,45 @@ serve(async (req) => {
       }
 
       if (!allDone) {
-        // Just persist this pass — let the fan-out parallel dispatches finish.
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
-            lip_sync_status: "running",
-            twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.log(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
+        // Plan D (v93): atomic per-slot patch via RPC. Replaces the prior
+        // read-modify-write of `passes[]` which could lose updates when
+        // sibling parallel passes completed within milliseconds. The slot
+        // patch is idempotent — only `passes[currentPass]` is touched.
+        try {
+          await supabase.rpc("update_dialog_pass_slot", {
+            _scene_id: sceneId,
+            _pass_idx: currentPass,
+            _patch: {
+              status: "done",
+              output_url: rehostedUrl ?? outputUrl,
+              rehosted: !!rehostedUrl,
+              finished_at: nowIso,
+            },
+          });
+          // Top-level scene status / counters — non-slot fields, safe to UPDATE.
+          await supabase
+            .from("composer_scenes")
+            .update({
+              lip_sync_status: "running",
+              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
+              updated_at: nowIso,
+            })
+            .eq("id", sceneId);
+        } catch (e) {
+          // RPC failure → fall back to the legacy full-array write so a
+          // missing/migration-pending RPC never strands a scene.
+          console.warn(`[sync-so-webhook] plan_d rpc failed, falling back: ${(e as Error)?.message ?? e}`);
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
+              lip_sync_status: "running",
+              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
+              updated_at: nowIso,
+            })
+            .eq("id", sceneId);
+        }
+        console.log(`[sync-so-webhook] v25/plan_d scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
 
         // v94 — Lambda warm-ping. When second-to-last pass completes, wake
         // the audio-mux edge function so it's hot by the time the last pass
