@@ -1,54 +1,72 @@
-# Bug — "Lip-Syncs starten gefühlt seriell"
+# Root Cause + Pipeline-Vergleich mit Sync.so Docs
 
-## Diagnose (verifiziert an Logs der letzten Szene)
+## Was Sync.so wirklich erwartet (Docs)
 
-Szene `31bea8b9-c261-46ba-8c3a-2b7d3dd187e8` hat **3 Passes** (v95 Split: Sprecher A 2 Turns + Sprecher B 1 Turn). Log zeigt:
+| Bereich | Empfehlung Docs | Was wir tun |
+|---|---|---|
+| **Multi-Face Targeting** | `bounding_boxes` **per Frame** als Array oder `bounding_boxes_url` zu JSON-Datei (eine Box pro Frame oder `null`). Sync-3 verarbeitet die **volle Plate** mit nativem Multi-Face/Profile/Occlusion-Support. | Wir bauen **Preclips** (Lambda-Render eines 512×512-Crops um den Mund) und schicken `frame_number`+`coordinates` auf diesen Mini-Clip. Das ist die teure manuelle Variante eines Problems, das sync-3 nativ löst. |
+| **Audio-Video-Dauer** | Sollen "close to each other" sein; `cut_off` trimmt Audio aufs Video. | Wir schicken 9s Plate + 2.25s tight-WAV → Sync.so cuttet Audio auf 2.25s. OK, aber redundant gegenüber dem Plate-Window. |
+| **Audio-Encoding** | Bei `generation_input_audio_invalid`: `ffmpeg -c:a pcm_s16le`. | Wir re-encoden bereits per Webhook-Retry (`repair_audio`). |
+| **Multi-Speaker** | Offizieller Weg: **Segments API** — eine Plate, mehrere Audio-Tracks mit Zeitfenstern + speaker-target. | Wir machen **N getrennte Sync.so-Calls** (1 pro Sprecher-Turn) + Lambda-Stitcher. |
+| **`auto_detect`** | `false` ist korrekt, wenn manuelle Auswahl. | ✅ |
 
-```
-plan_d_parallel_dispatch_start N_passes=3 cap=2 fanout_size=2
-```
+**Sync.so-Fehler "An unknown error occurred"** = `generation_unhandled_error` oder `generation_pipeline_failed`. Beides sind Catch-Alls. In unserem Fall korreliert er mit Pass 0 nach dem v77-`face_gate_BLOCK` (faces=0 im Preclip) → Fallback auf "full-plate dispatch with plate coords" → der Preclip-Pfad und der Full-Plate-Pfad mischen sich, und die `frame_number=27` zeigt auf einen Frame, der im wirklich gesendeten Video nicht existiert. Sync.so kann den Speaker nicht resolven → Pipeline-Fail.
 
-→ Pass 0 + Pass 1 starten parallel, **Pass 2 bleibt `pending`** und wird erst gekickt, sobald Pass 0 oder 1 abgeschlossen ist (per Webhook-Chain). 
+## Was wir ändern (Root-Cause-Fix + Speedup)
 
-Das ist kein Bug — das ist exakt der `composer.sync_so_concurrency_cap = 2` Wert aus `system_config`. Plan D (v93) ist aktiv und parallelisiert wie erwartet, nur der Cap ist zu konservativ für 3+ Pass-Szenarien (insbesondere nach v95 Per-Turn-Split, der die Pass-Anzahl bei Multi-Turn-Sprechern erhöht).
+### A. Preclip-Pfad fallenlassen, **`bounding_boxes_url` mit voller Plate** verwenden (Architektur-Fix)
+- Beim Plate-Face-Detect (haben wir bereits per Gemini) generieren wir **eine JSON-Datei pro Sprecher** mit einem Box-Array über alle Frames der Plate. Für die Frames, in denen der gewünschte Sprecher spricht: seine Box. Für alle anderen Frames: `null` (Sync-3 lässt diese Frames unverändert).
+- Upload nach Storage (`face-bbox` Bucket), URL im Payload.
+- Payload pro Pass:
+  ```json
+  { "model": "sync-3",
+    "input": [
+      { "type": "video", "url": "<volle Plate, NICHT preclip>" },
+      { "type": "audio", "url": "<full audio mit Silence-Padding statt tight>" }
+    ],
+    "options": {
+      "sync_mode": "cut_off",
+      "active_speaker_detection": {
+        "auto_detect": false,
+        "bounding_boxes_url": "<bbox-json für diesen Sprecher>"
+      }
+    }
+  }
+  ```
+- **Konsequenz:** Lambda-Preclip-Render entfällt (~67 s gespart pro Runde). Lambda-Stitcher entfällt teilweise — Sync-3 liefert direkt die volle Plate mit dem Mund-Override für die richtigen Frames; wir müssen nur noch die N Outputs der N Sprecher per ffmpeg `overlay` zusammenfassen (oder, wenn die Sprecher zeitlich disjunkt sind, die Sprecher-Segmente trimmen+concat statt overlay).
+- **Sync.so-Fehlerquote** fällt drastisch, weil wir den nativen Sync-3-Pfad nutzen (für den die Doku ausdrücklich Multi-Face + Profile + Occlusion garantiert) statt unseren fragilen Crop-Workaround.
 
-## Fix
+### B. Vorbereitungs-Phase parallelisieren (Speedup für die verbleibende Pipeline)
+1. **Face-Gate Repair parallel** (`Promise.all` statt 4× seriell Gemini) → ~40 s gespart.
+2. **Bbox-JSON-Generierung parallel** für alle Sprecher (rein lokal aus dem bereits gecachten Gemini-Result) → quasi instant.
 
-`system_config.composer.sync_so_concurrency_cap` von **2 → 4** anheben (Code-Clamp ist bereits `[1..4]`, kein Code-Change nötig).
+### C. UI-Status ehrlich
+Wenn ein Pass im Status `retrying` ist, im Clip-Overlay statt "Lip-Sync wird gestartet…" anzeigen: "Sync.so-Fehler — Neuversuch X/3 läuft". Reines Frontend.
 
-```sql
-UPDATE system_config SET value = '4'::jsonb
-WHERE key = 'composer.sync_so_concurrency_cap';
-```
+## Technische Punkte
+- Dateien:
+  - `supabase/functions/compose-dialog-segments/index.ts` (Bbox-JSON-Builder, neuer Payload, Entfernen des Preclip-Calls auf dem Happy-Path)
+  - `supabase/functions/_shared/` (neue `bboxJson.ts` Helper)
+  - Stitcher-Edge-Function für N-Output-Merge (entweder neue `stitch-bbox-outputs` oder bestehende `compose-dialog-stitch` anpassen)
+  - Frontend: Clip-Karten-Overlay
+- Storage-Bucket: `dialog-bbox` (RLS: user-id als erstes Path-Segment, gemäß Core-Regel)
+- Preclip-Pfad bleibt als **Fallback** unter Flag `composer.dialog_use_preclip` (default `false`) erhalten — kein Big-Bang, wir können A/B testen.
+- v96 Force-Repair bleibt erhalten (Coords werden für die Bbox-Berechnung weiterhin gebraucht).
+- Plan-D Parallel-Cap (4) bleibt unverändert.
 
-### Effekt
-- 2 Sprecher / 2 Passes: unverändert (alle parallel)
-- 2 Sprecher / 3 Passes (1× Multi-Turn): **alle 3 parallel** statt 2+1
-- 3 Sprecher / 3 Passes: alle 3 parallel statt 2+1
-- 4 Sprecher / 4 Passes: alle 4 parallel statt 2+2
-- MAX_SPEAKERS=4 (FROZEN I.6) bleibt das natürliche Obergrenze
+## Erwartung
+| Phase | Heute | Nach Fix |
+|---|---|---|
+| Face-Detect + v96 Repair | ~70 s seriell | ~15 s parallel |
+| Lambda-Preclip-Render | ~67 s seriell | **entfällt** |
+| Sync.so Dispatch + Run | ~3 min (mit 1 Retry) | ~1:30 min (kaum Retries) |
+| Stitcher | ~10 s | ~10 s |
+| **Wallclock 4 Sprecher** | **~9:20 min** | **~2:30 min** |
 
-### Wallclock-Erwartung
-Aktuelle 3-Pass-Szene ~7:30 min mit cap=2 (1 Welle à 2 + 1 Welle à 1). Mit cap=4: **eine** Sync.so-Welle für alle 3 Passes parallel → erwartet **~5:30–6:00 min** (Speedup ~20–25 %).
+## Verifizierung
+- Nächste 4-Sprecher-Szene: keine `Preclip Lambda renderId` mehr, dafür 4 Bbox-JSON-URLs im DB-`passes[]`.
+- Sync.so-Webhook: 0 `FAILED` Events in 10 aufeinanderfolgenden Runs.
+- Wallclock-Telemetrie unter 3 min für ≥4 Sprecher.
 
-### Was NICHT angefasst wird
-- Kein Code-Change (Clamp ist bereits 4)
-- Plan D Race-Safety (atomic RPCs `update_dialog_pass_slot`, `try_claim_mux_dispatch`) bleibt
-- v95 Per-Turn-Split bleibt
-- Webhook-Chain bleibt als Fallback aktiv (falls jemals N > cap)
-- Sync.so-Kosten unverändert (Pricing pro Output-Sekunde × Passes, parallel spart nur Wall-clock)
-
-### Rollback
-```sql
-UPDATE system_config SET value = '2'::jsonb
-WHERE key = 'composer.sync_so_concurrency_cap';
-```
-
-### Verifizierung
-Nächste 3-Pass-Szene: Log muss `cap=4 fanout_size=3` zeigen, **kein** `pendingIdxs[0]` Kick aus dem Webhook für Pass 2.
-
-### Risiko
-Minimal. Sync.so verträgt parallele Calls auf demselben gelockten Plate problemlos (kein Rate-Limit-Issue in bisherigen Tests bei cap=2). Falls Sync.so 429ed → einfacher Rollback auf 2.
-
-### Memory-Update nach Fix
-`mem://architecture/lipsync/v93-parallel-sync-so-passes.md` ergänzen: "Default-Cap nach v95-Per-Turn-Split auf 4 angehoben, da Pass-Anzahl pro Szene gestiegen ist."
+## Rollback
+Flag `composer.dialog_use_preclip = true` → zurück auf bestehende Pipeline.
