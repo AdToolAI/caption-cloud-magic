@@ -1470,9 +1470,17 @@ serve(async (req) => {
         );
       }
 
-      for (const pass of builtPasses) {
+      // v97 (Juni 10 2026) — Face-Gate-Repair PARALLEL statt seriell.
+      // Vorher: 4 Sprecher × ~12 s Gemini-Frame-Detect = ~50 s wallclock.
+      // Jetzt: alle Passes laufen via Promise.all (frame_face_cache dedupliziert
+      // identische Frames automatisch) → ~12-15 s wallclock.
+      type GateOutcome =
+        | { ok: true; pass: any }
+        | { ok: false; pass: any; reason: string; strict: boolean; hadFaces: boolean; frames: number[]; lastValidationFrame?: number };
+
+      const gateOne = async (pass: any): Promise<GateOutcome> => {
         const firstTurn = pass.segments[0];
-        if (!firstTurn) continue;
+        if (!firstTurn) return { ok: true, pass };
         const frames = strictTargetCheck
           ? frameCandidatesForTurn(firstTurn, totalSec, ASSUMED_FPS)
           : uniqueSortedFrames([((firstTurn.startTime + firstTurn.endTime) / 2) * ASSUMED_FPS]);
@@ -1498,37 +1506,17 @@ serve(async (req) => {
           lastValidation = { ...v, frame, targetCoordsForCheck };
           if (v.ok && !v.faceVisible) continue;
 
-          // v96 (June 10 2026) — Anchor-drift mitigation for 3+ speakers.
-          // The anchor FaceMap (still image used for face detection) often
-          // has a different framing than the actual rendered plate video
-          // (different camera height/zoom). Linear rescale of anchor coords
-          // to plate dims can land outside the real face zone — observed
-          // on scene 2413bd83 where anchor faces at y≈180 (in 1200H) mapped
-          // to y≈153 in 1028H plate, while real mouths are at y≈400.
-          // Sync.so then receives a 512×512 preclip of empty background and
-          // returns the input unanimated (no lip movement).
-          //
-          // Fix: For 3+ speaker scenes, ALWAYS attempt to extract face
-          // boxes from the actual plate frame and rebuild coords from
-          // those boxes (L→R sorted, mapped by speaker_idx). This replaces
-          // the bad anchor-rescaled coords before preclip render. Falls
-          // back to original soft-accept if boxes can't be extracted.
           const faceBoxes = Array.isArray(v.faceBoxes) ? [...v.faceBoxes] : [];
           const sortedBoxes = faceBoxes
             .filter((b: any) => Number(b?.w) > 0.02 && Number(b?.h) > 0.02)
             .sort((a: any, b: any) => Number(a.x) - Number(b.x));
-          // v36: For 3+ speaker scenes we MUST NOT silently collapse a
-          // missing speaker slot onto an existing face (slot=0 fallback).
           const enoughFaces = sortedBoxes.length >= Math.max(1, speakers.length);
           const speakerHasOwnSlot = pass.speaker_idx < sortedBoxes.length;
           const canRepair = speakerHasOwnSlot && (speakers.length < 3 || enoughFaces);
           const slot = canRepair ? pass.speaker_idx : -1;
           const box = slot >= 0 ? sortedBoxes[slot] : null;
 
-          // v96 — Multi-speaker: prefer plate-derived coords over anchor
-          // rescale, even when strictTargetCheck is off (plate identity
-          // unresolved). Only repair when we have enough faces to safely
-          // map every speaker_idx; otherwise fall back to original behaviour.
+          // v96 — Multi-speaker: prefer plate-derived coords over anchor rescale.
           const shouldForceRepair =
             speakers.length >= 3 && !!plateDims && !!box && enoughFaces;
 
@@ -1562,7 +1550,6 @@ serve(async (req) => {
             accepted = true;
             break;
           }
-          // No box & no strict-gate → accept original coords (legacy soft-pass).
           if (!strictTargetCheck) {
             pass.reference_frame_number = frame;
             accepted = true;
@@ -1577,37 +1564,50 @@ serve(async (req) => {
           console.error(
             `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} reason=${reason} frames=${frames.join(",")}`,
           );
-          const { data: w0 } = await supabase
-            .from("wallets").select("balance").eq("user_id", userId).single();
-          await supabase
-            .from("wallets")
-            .update({
-              balance: Number(w0?.balance ?? 0) + totalCost,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId);
-          await supabase
-            .from("composer_scenes")
-            .update({
-              lip_sync_status: "failed",
-              twoshot_stage: "failed",
-              clip_error: reason,
-            })
-            .eq("id", sceneId);
-          return json(
-            {
-              error: strictTargetCheck && hadFaces ? "plate_target_face_missing" : "face_validation_failed",
-              details: strictTargetCheck && hadFaces
-                ? `target face for ${pass.speaker_name} is not reliably visible on the final scene plate — re-render with all faces in frame`
-                : `no face for ${pass.speaker_name} in tested frames`,
-              refunded: totalCost,
-              hint: strictTargetCheck && hadFaces ? "re_render_scene_clip" : "switch_to_cinematic_sync_engine",
-            },
-            422,
-          );
+          return {
+            ok: false, pass, reason,
+            strict: strictTargetCheck, hadFaces, frames,
+            lastValidationFrame: lastValidation?.frame,
+          };
         }
+        return { ok: true, pass };
+      };
+
+      const gateResults = await Promise.all(builtPasses.map((p: any) => gateOne(p)));
+      const firstReject = gateResults.find((r) => !r.ok) as Extract<GateOutcome, { ok: false }> | undefined;
+      if (firstReject) {
+        const { pass, reason, strict, hadFaces } = firstReject;
+        const { data: w0 } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({
+            balance: Number(w0?.balance ?? 0) + totalCost,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+        await supabase
+          .from("composer_scenes")
+          .update({
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: reason,
+          })
+          .eq("id", sceneId);
+        return json(
+          {
+            error: strict && hadFaces ? "plate_target_face_missing" : "face_validation_failed",
+            details: strict && hadFaces
+              ? `target face for ${pass.speaker_name} is not reliably visible on the final scene plate — re-render with all faces in frame`
+              : `no face for ${pass.speaker_name} in tested frames`,
+            refunded: totalCost,
+            hint: strict && hadFaces ? "re_render_scene_clip" : "switch_to_cinematic_sync_engine",
+          },
+          422,
+        );
       }
     }
+
 
 
     // ── Concurrency guard ────────────────────────────────────────────────
