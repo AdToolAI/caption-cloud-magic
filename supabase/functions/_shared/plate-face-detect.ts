@@ -79,10 +79,11 @@ interface GeminiFace {
   confidence?: number;
 }
 
-/** Ask Gemini Vision for normalized face bboxes on the extracted frame. */
+/** Ask Gemini Vision for normalized face bboxes — accepts MP4 or image URL. */
 async function askGeminiForPlateFaces(
-  frameUrl: string,
+  mediaUrl: string,
   expectedCount: number,
+  timestampSec: number,
 ): Promise<GeminiFace[]> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) {
@@ -90,6 +91,10 @@ async function askGeminiForPlateFaces(
     return [];
   }
   const want = Math.max(1, Math.min(8, expectedCount || 2));
+  const isVideo = /\.(mp4|mov|webm|m4v|mkv)(\?|$)/i.test(mediaUrl);
+  const mediaPart = isVideo
+    ? { type: "video_url", video_url: { url: mediaUrl } }
+    : { type: "image_url", image_url: { url: mediaUrl } };
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), GEMINI_TIMEOUT_MS);
@@ -108,7 +113,9 @@ async function askGeminiForPlateFaces(
               {
                 type: "text",
                 text:
-                  `This is a single frame from a rendered video that should contain ${want} human face(s). ` +
+                  (isVideo
+                    ? `Analyse the video frame at approximately t=${timestampSec.toFixed(2)}s. It should contain ${want} human face(s). `
+                    : `This is a single frame that should contain ${want} human face(s). `) +
                   "Detect EVERY clearly visible human face and return a TIGHT bounding box around each face " +
                   "(forehead → chin, ear → ear — exclude shoulders & background). " +
                   "Return STRICT JSON only — no prose, no markdown fences. " +
@@ -118,8 +125,9 @@ async function askGeminiForPlateFaces(
                   "If a face is partially cropped, still return its visible portion's bbox. " +
                   "If no faces, return empty faces array.",
               },
-              { type: "image_url", image_url: { url: frameUrl } },
+              mediaPart,
             ],
+
           },
         ],
       }),
