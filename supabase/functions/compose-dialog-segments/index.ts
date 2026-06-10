@@ -1970,6 +1970,110 @@ serve(async (req) => {
     }
 
 
+    // ── v99 — Pre-Flight Coord-Gate (fail-fast before Sync.so dispatch) ──
+    // Last-line defense: never dispatch a multi-speaker pass whose coords
+    // weren't verified against the actual plate frame. Acceptable sources:
+    //   - face_gate_repair_* (Face-Gate ran on the plate frame, found face)
+    //   - face_repair / face_repair object present
+    //   - plate_identity_verified (plate identity resolved this speaker)
+    //   - bbox-url-pro variant (Sync.so will receive a per-frame bbox URL,
+    //     coords are advisory only — let the variant flow through)
+    // Block: heuristic, none, plate-slot-fallback, anchor-rescale without
+    // face-gate verification. These caused the Sarah 4× retry hang.
+    if (speakers.length >= 2) {
+      const curPass: any = passes[currentPassIdx];
+      const storedSrc = String(curPass?.coords_source ?? "").toLowerCase();
+      const hasFaceRepair = curPass?.face_repair && typeof curPass.face_repair === "object";
+      const verified =
+        hasFaceRepair ||
+        storedSrc.startsWith("face_gate_repair") ||
+        storedSrc === "face_repair" ||
+        storedSrc === "plate_identity_verified";
+      // bbox-url-pro path will set coords advisory only; the dispatch payload
+      // uses bbox URL so heuristic coords are tolerated. Determine the same
+      // way the dispatch logic below does (mirrors freshDefaultVariant).
+      const havePlateIdForGate =
+        !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
+      const hasPreclipForGate = !!(curPass as any)?.preclip_url;
+      const willUseBboxUrl =
+        !!plateDims && havePlateIdForGate && !hasPreclipForGate && !isRetry;
+
+      if (!verified && !willUseBboxUrl) {
+        const reason = `coords_not_verified_pass_${currentPassIdx}_speaker_${curPass?.speaker_name ?? "?"}`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v99 PRE-FLIGHT COORD-GATE BLOCK pass=${currentPassIdx} ` +
+          `speaker=${curPass?.speaker_name} coords_source=${storedSrc || "none"} face_repair=${hasFaceRepair ? "yes" : "no"} ` +
+          `coords=${JSON.stringify(curPass?.coords)} — refusing dispatch to avoid wasted Sync.so retries`,
+        );
+        const alreadyRefunded = !!(existing as any)?.refunded;
+        const undispatchedPasses = Math.max(0, passes.length - currentPassIdx);
+        const refundAmount = alreadyRefunded
+          ? 0
+          : Math.round(
+              (Number((existing as any)?.cost_credits ?? totalCost) *
+                undispatchedPasses) /
+                Math.max(1, passes.length),
+            );
+        if (refundAmount > 0) {
+          const { data: wPF } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(wPF?.balance ?? 0) + refundAmount,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              refunded: refundAmount > 0 ? true : !!(existing as any)?.refunded,
+              refund_partial_credits: refundAmount,
+              error: reason,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: `syncso_${reason}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_status: "PRE_FLIGHT_COORD_GATE_BLOCKED",
+          error_class: "coords_not_verified",
+          error_message: reason,
+          meta: {
+            speakers: speakers.length,
+            pass_idx: currentPassIdx,
+            speaker_name: curPass?.speaker_name,
+            coords: curPass?.coords,
+            coords_source: storedSrc || "none",
+            face_repair: hasFaceRepair,
+            refund_credits: refundAmount,
+            undispatched_passes: undispatchedPasses,
+          },
+        });
+        return json(
+          {
+            error: "coords_not_verified",
+            details:
+              `Speaker "${curPass?.speaker_name ?? "?"}" — face position could not be verified on the rendered plate. ` +
+              `Scene failed safely before dispatching to Sync.so (credits refunded). Re-render the scene with all faces clearly in frame.`,
+            refunded: refundAmount,
+            hint: "re_render_scene_clip",
+          },
+          422,
+        );
+      }
+    }
+
     const pass = passes[currentPassIdx];
     pass.input_url = passInputUrl;
     pass.status = "rendering";
