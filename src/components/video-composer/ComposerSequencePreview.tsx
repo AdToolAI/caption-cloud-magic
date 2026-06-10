@@ -677,6 +677,7 @@ export default function ComposerSequencePreview({
       }
       // Preload next into B.
       preloadSlot('B', idx + 1);
+      preloadSlot('C', idx + 2);
 
       const apply = () => {
         const v = videoARef.current;
