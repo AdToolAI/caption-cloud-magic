@@ -1,0 +1,1 @@
+UPDATE public.system_config SET value = '4'::jsonb, updated_at = now() WHERE key = 'composer.sync_so_concurrency_cap';
