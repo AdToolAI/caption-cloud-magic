@@ -1087,6 +1087,26 @@ export default function ComposerSequencePreview({
           }}
         />
 
+        {/* Slot C — hidden prefetch holder (always sceneIdx + 2). Decodes the
+            moov atom + first frame so the next-next transition is instant. */}
+        <video
+          ref={videoCRef}
+          playsInline
+          preload="auto"
+          muted
+          aria-hidden
+          tabIndex={-1}
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: 'none',
+            left: -9999,
+            top: -9999,
+          }}
+        />
+
         {/* Global timeline-based text overlays (independent of scene boundaries) */}
         {globalTextOverlays && globalTextOverlays.length > 0 && (
           <PreviewTextOverlayLayer
