@@ -245,6 +245,19 @@ async function callGeminiVision(
   }
   const timestampSec = frameNumber / Math.max(1, fps);
 
+  // v97: Gemini Gateway rejects MP4 URLs (HTTP 400 "Unsupported image format").
+  // Extract a PNG still first and send that to Gemini. For non-video URLs
+  // (already a PNG/JPEG) we skip extraction and pass straight through.
+  let imageUrlForGemini = videoUrl;
+  if (isVideoUrl(videoUrl)) {
+    const pngUrl = await extractFramePng(videoUrl, timestampSec);
+    if (!pngUrl) {
+      throw new Error("frame_extract_failed");
+    }
+    imageUrlForGemini = pngUrl;
+  }
+
+
   const prompt = `You are analyzing one specific frame of a video.
 
 The frame is at timestamp ${timestampSec.toFixed(3)}s (frame ${frameNumber} @ ${fps}fps).
