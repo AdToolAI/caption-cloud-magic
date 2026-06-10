@@ -1253,6 +1253,7 @@ serve(async (req) => {
         speaker_name: String(sp.speaker ?? `Speaker ${originalIdx + 1}`),
         audio_url: String(sp.track_url),
         coords: speakerCoords[originalIdx] ?? [0.5, 0.5],
+        coords_source: coordSources[originalIdx] ?? "none",
         segments: passSegments,
         input_url: "", // filled per pass below
         status: "pending",
