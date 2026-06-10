@@ -107,6 +107,22 @@ function promptCharacterActionFallback(prompt: unknown, characterName: string | 
   return cleanActionText(match, 12);
 }
 
+/**
+ * Neutral fallback action for a character slot when neither the LLM nor the
+ * prompt-clause heuristic produced anything usable. Guarantees the per-slot
+ * "AKTION — WAS TUT {NAME}?" field is never empty after storyboard generation.
+ */
+function neutralCharacterAction(language: string): { en: string; user: string } {
+  const en = "performs the scene action naturally, visible to camera";
+  const user =
+    language === "de" ? "führt die Szenen-Aktion natürlich aus, sichtbar zur Kamera" :
+    language === "es" ? "realiza la acción de la escena con naturalidad, visible a cámara" :
+    en;
+  return { en, user };
+}
+
+
+
 const CATEGORY_STRUCTURES: Record<string, string> = {
   "product-ad": `USP-DRIVEN PRODUCT AD — use the AIDA framework. Treat the briefing's "productName" as the product, "usps" as benefits, "targetAudience" as the buyer persona.
 1. Hook (3-4s): Attention-grabbing visual that stops scrolling
@@ -561,8 +577,12 @@ Generate the storyboard using the create_storyboard function.`;
         if (seen.has(finalId)) return;
         seen.add(finalId);
         const character = charByIdForActions.get(finalId);
-        const actionEn = cleanActionText(slot.actionEn || promptCharacterActionFallback(prompt, character?.name), 12);
-        const actionUser = cleanActionText(slot.actionUser || actionEn, 12);
+        const neutral = neutralCharacterAction(language);
+        const llmEn = cleanActionText(slot.actionEn, 12);
+        const llmUser = cleanActionText(slot.actionUser, 12);
+        const heuristic = cleanActionText(promptCharacterActionFallback(prompt, character?.name), 12);
+        const actionEn = llmEn || heuristic || neutral.en;
+        const actionUser = llmUser || (llmEn ? actionEn : (heuristic || neutral.user));
         out.push({ characterId: finalId, shotType: slot.shotType, actionEn, actionUser });
       };
       if (Array.isArray(rawShots)) for (const s of rawShots) push(s);
@@ -660,12 +680,15 @@ Generate the storyboard using the create_storyboard function.`;
           if (shots.length >= 4) continue; // slot cap
           const shotType = rotation[rotIdx % rotation.length];
           rotIdx++;
-          const actionEn = promptCharacterActionFallback(sc.aiPrompt, ch.name);
+          const neutral = neutralCharacterAction(language);
+          const heuristic = cleanActionText(promptCharacterActionFallback(sc.aiPrompt, ch.name), 12);
+          const actionEn = heuristic || neutral.en;
+          const actionUser = heuristic ? actionEn : neutral.user;
           shots.push({
             characterId: ch.id,
             shotType,
             actionEn,
-            actionUser: actionEn,
+            actionUser,
           });
           sc.characterShots = shots;
           syncPrimaryFromShots(sc);
@@ -785,10 +808,11 @@ Generate the storyboard using the create_storyboard function.`;
           if (!char?.name) continue;
           const existing = cleanActionText(slot.actionEn, 12);
           const fromPrompt = cleanActionText(promptCharacterActionFallback(sc.aiPrompt, char.name), 12);
-          const fallbackNeutral = `looks at the others and speaks naturally on camera`;
-          const finalAction = existing || fromPrompt || fallbackNeutral;
+          const neutral = neutralCharacterAction(language);
+          const finalAction = existing || fromPrompt || neutral.en;
           slot.actionEn = finalAction;
-          slot.actionUser = cleanActionText(slot.actionUser || finalAction, 12);
+          const llmUser = cleanActionText(slot.actionUser, 12);
+          slot.actionUser = llmUser || (existing ? finalAction : (fromPrompt || neutral.user));
           castEntries.push({
             name: char.name,
             signature: String(char.signatureItems || '').trim(),
