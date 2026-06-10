@@ -1,33 +1,27 @@
-# Fix: Gemini bekommt MP4 als video_url statt image_url
+# Lip-Sync Advance-Deadlock beheben (v98)
 
-## Root Cause (empirisch bestätigt)
-Gemini lehnt MP4s mit `type: "image_url"` ab (400 "Unsupported image format"), akzeptiert sie aber problemlos mit `type: "video_url"` (200, erkennt 4 Gesichter). Die Replicate-Frame-Extraktion war ein Workaround für den falschen Bug — und ist jetzt kaputt, weil `lucataco/ffmpeg-extract-frame` von Replicate gelöscht wurde.
+## Problem
+4-Sprecher-Szene `c269ea2e` hängt seit >10 Min in `syncso_fanout_1_of_4`. Pass 1 wurde korrekt dispatched (Face-Gate hat Koordinaten repariert), aber alle Advance-Läufe für Pass 2–4 werden jede Minute vom v87 SANITY-BLOCK abgewiesen:
 
-## Änderungen
+- Im Advance-Modus werden Plate-Identity und Face-Gate übersprungen (`if (!isAdvance)`), die frischen `coordSources` sind daher immer `heuristic`.
+- Der SANITY-BLOCK prüft nur die frische Quelle — er ignoriert, dass die gespeicherten Passes bereits **face-gate-reparierte Koordinaten** (`face_repair`) aus dem ersten Lauf tragen.
+- Ergebnis: Endlosschleife „awaiting retry" ohne Timeout.
 
-### 1. `supabase/functions/validate-frame-face/index.ts`
-- Gemini-Call: `type: "image_url"` → `type: "video_url"` (MP4 direkt übergeben)
-- Replicate-Frame-Extraktion entfernen (kein Fallback-Pfad mehr nötig)
-- Optionaler Timestamp-Hinweis im Prompt: „Analysiere Frame bei t=X.Xs"
+## Fix (compose-dialog-segments/index.ts)
 
-### 2. `supabase/functions/_shared/twoshot-face-map.ts`
-- Gleiche Änderung: MP4-URL direkt als `video_url` an Gemini, keine Frame-Extraktion mehr
+1. **SANITY-BLOCK verifizierte Passes durchlassen:** Vor dem Block prüfen, ob `passes[currentPassIdx]` ein `face_repair`-Objekt oder eine zuvor gespeicherte nicht-heuristische Koordinaten-Provenienz hat. Wenn ja → Dispatch erlauben (Koordinaten wurden beim ersten Lauf gegen den echten Plate-Frame validiert).
+2. **Provenienz persistieren:** Beim ersten Dispatch `coords_source` (z. B. `face_gate_repair`, `plate-identity`) am Pass speichern, damit Advance-Läufe sie lesen können — nicht nur indirekt über `face_repair`.
+3. **Endlosschleifen-Stopp:** Wenn der SANITY-BLOCK denselben Pass >5× hintereinander blockt (Zähler in `dialog_shots`), Szene auf `failed` setzen mit Refund der noch nicht dispatchten Passes — statt unendlich zu spinnen. (Memory-Regel: idempotente Refunds.)
 
-### 3. `supabase/functions/_shared/plate-face-detect.ts`
-- Replicate-Aufrufe entfernen, stattdessen MP4 direkt an Gemini via `video_url`
-- ~100 Zeilen Code weniger
+## Sofortmaßnahme für die hängende Szene
+Nach Deploy die Szene `c269ea2e` per `reset-lipsync-scene`-Logik nicht nötig — der nächste Cron-Tick (1 Min) greift mit dem Fix automatisch, da die reparierten Koordinaten in den Passes liegen. Falls Pass 1 bei Sync.so inzwischen fertig ist, advanced der Webhook sofort weiter.
 
-### 4. Nicht angefasst
-- `extract-video-last-frame` und `extract-video-frames` bleiben unverändert (werden für andere Zwecke genutzt, kein Lip-Sync-Blocker)
-- v97 fail-fast Logik unverändert
-- Stage B (Parallel-Dialog) unverändert
+## Verifikation
+- Edge-Logs: `ADVANCE` Dispatch für Pass 2–4 statt SANITY-BLOCK.
+- `twoshot_stage` wandert von `syncso_fanout_1_of_4` → `2_of_4` → … → `done`.
+- DB-Check: `lip_sync_status='done'` für die Szene.
 
-## Verification
-Gleiche 4-Sprecher-Szene rendern. Erwartung:
-- `plate_identity=on` in den Logs
-- `FACE-GATE` mit echten Mund-Koordinaten pro Sprecher
-- Sichtbare Mund-Bewegung im Output
-- Schneller (kein Replicate-Detour mehr, ~2-3s gespart pro Validierung)
-
-## Risiken
-Niedrig — Single-Field-Change pro Call-Site. Falls Gemini bei sehr langen MP4s langsamer wird, können wir später optional einen `videoMetadata.endOffset` Hint hinzufügen.
+## Technische Details
+- Betroffen: nur `supabase/functions/compose-dialog-segments/index.ts` (Sanity-Guard ~Zeile 1825, Pass-Build/Dispatch-Pfad für Provenienz-Feld).
+- Kein Schema-Change; Zähler + `coords_source` leben im bestehenden `dialog_shots`-JSONB.
+- Deploy: `compose-dialog-segments`.
