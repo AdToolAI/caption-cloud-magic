@@ -122,17 +122,35 @@ Any string field arriving from `brand_characters`, `brand_locations`,
 `src/lib/motion-studio/strings.ts` before `.toLowerCase()`. Direct
 `.toLowerCase()` calls on those values are a regression.
 
-## I.9 — No parallel fan-out for any speaker count (v60)
+## I.9 — Dispatch-race protection for parallel Sync.so passes (v93, supersedes v60)
 
-`fanOutAllowed` in `compose-dialog-segments` MUST stay `false`. Pass 1..N-1
-are chained serially by `sync-so-webhook` on each COMPLETE event via
-`pendingIdxs[0]`. The historical 2-speaker parallel fan-out caused the same
-dispatch race v33 already removed for N≥3 (two pass-0 jobs within ms, the
-later one logged as `job ... not in passes[]`). v60 unified the rule:
-**one Sync.so job per scene at any moment, regardless of N**.
+Parallel per-pass dispatch is ALLOWED, but only under this race-safety
+contract — every clause is load-bearing:
 
-- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L2418
-- Background: `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`
+- `compose-dialog-segments` MUST hold `try_acquire_dialog_lock(90s)` while
+  fanning out (existing v33 guard, unchanged).
+- Per-pass `passes[i]` state writes from the webhook MUST go through
+  `public.update_dialog_pass_slot(_scene_id, _pass_idx, _patch)` RPC.
+  Direct `UPDATE composer_scenes SET dialog_shots = ...` of the passes[]
+  array on the COMPLETE/!allDone path causes JSONB lost-update when N
+  parallel webhooks land within milliseconds. Legacy full-array UPDATE is
+  permitted only as the catch-block fallback if the RPC throws.
+- Audio-mux dispatch on the allDone path MUST be gated by
+  `public.try_claim_mux_dispatch(_scene_id)`. Only one of N near-
+  simultaneous COMPLETE webhooks wins; the rest must short-circuit with a
+  `plan_d_mux_lock_skipped` log and return without touching the Lambda.
+- Parallel fan-out is bounded by `system_config.composer.sync_so_concurrency_cap`
+  (default 2, hard-clamped [1..4]). Passes beyond the cap stay `pending`
+  and are chained by the webhook's `pendingIdxs[0]` kick (the v60 chain
+  path is the steady-state for any tail beyond the cap).
+- The `composer.parallel_sync_so_passes` flag MUST default `false`. With
+  the flag off, behavior is bit-identical to v60 serial chain.
+
+- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L2915
+  (flag-gated fanOutAllowed), `supabase/functions/sync-so-webhook/index.ts`
+  ~L531 (per-pass RPC), ~L634 (try_claim_mux_dispatch).
+- Background: `mem://architecture/lipsync/v93-parallel-sync-so-passes`,
+  `mem://architecture/lipsync/v60-unified-multispeaker-pipeline` (predecessor).
 
 ## I.10 — sync-3 is the universal default model (v62, supersedes v61 multi-speaker-only rule)
 
