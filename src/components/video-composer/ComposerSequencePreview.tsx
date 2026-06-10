@@ -58,6 +58,7 @@ const PREWARM_BYTES = 524288;
 const PREWARM_CONCURRENCY = 2;
 
 type Slot = 'A' | 'B';
+type AnySlot = 'A' | 'B' | 'C';
 
 export default function ComposerSequencePreview({
   scenes,
