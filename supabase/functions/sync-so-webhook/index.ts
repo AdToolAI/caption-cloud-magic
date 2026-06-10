@@ -541,6 +541,20 @@ serve(async (req) => {
           .eq("id", sceneId);
         console.log(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
 
+        // v94 — Lambda warm-ping. When second-to-last pass completes, wake
+        // the audio-mux edge function so it's hot by the time the last pass
+        // arrives ~25-45s later. Fire-and-forget; the warmup branch returns
+        // 200 immediately without touching the DB or Lambda.
+        if (doneCount === totalPasses - 1 && totalPasses >= 2) {
+          try {
+            fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+              body: JSON.stringify({ warmup: true }),
+            }).catch(() => {});
+          } catch { /* ignore */ }
+        }
+
         // Kick the next pending pass — now that we freed a slot, advance.
         if (pendingIdxs.length > 0) {
           const nextIdx = pendingIdxs[0];
