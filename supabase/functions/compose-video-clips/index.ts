@@ -34,7 +34,7 @@ import {
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 7;
+const ANCHOR_AUDIT_VERSION = 8;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1229,6 +1229,14 @@ serve(async (req) => {
                   (u): u is string => typeof u === "string" && u.length > 0,
                 )
                 .slice(0, 4);
+              // v111 — canonical face-only identity refs, aligned 1:1 with
+              // portraitUrls. When the primary slot is an outfit cover (which
+              // sometimes drifts in identity), this gives Nano Banana 2 the
+              // real face as a separate ground-truth image.
+              const identityPortraitUrls = effectiveShots
+                .slice(0, portraitUrls.length)
+                .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
+                .filter((u): u is string => typeof u === "string" && u.length > 0);
               const characterNames = effectiveShots
                 .map((cs) => charById.get(cs.characterId)?.name)
                 .filter(
@@ -1284,15 +1292,12 @@ serve(async (req) => {
                 const composeAnchor = async (
                   label: string,
                   strict = false,
+                  swap = false,
+                  swapMismatches: string[] = [],
                 ): Promise<string | null> => {
                   console.log(
-                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}]`,
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}]`,
                   );
-                  // Scene-aware anchor: ALWAYS combine the two-shot framing
-                  // constraint with the cleaned visual scene description.
-                  // The neutral-only fallback used to produce a gray neutral
-                  // two-shot that bore no relation to the user's scene — the
-                  // i2v step would then drift to a totally different shot.
                   const sceneDesc = stripExtraHumansForAnchor(
                     stripDialogForAnchor(scene.aiPrompt || ""),
                   );
@@ -1315,11 +1320,14 @@ serve(async (req) => {
                         sceneId: scene.id,
                         portraitUrl: portraitUrls[0],
                         portraitUrls,
+                        identityPortraitUrls,
                         characterNames,
                         scenePrompt: anchorPrompt,
                         aspectRatio: "16:9",
                         shotType: scene.characterShot?.shotType,
                         strictNoDuplicates: strict,
+                        strictSwapMode: swap,
+                        swapMismatches,
                       }),
                     },
                   );
@@ -1354,9 +1362,10 @@ serve(async (req) => {
                     | "extra"
                     | "missing"
                     | "ambiguous"
+                    | "swap"
                     | null = null;
                   let notes = "";
-                  // Human-count is the strictest signal — catches profile/background extras.
+                  let mismatched: string[] = [];
                   if (hc !== null && hc > expectedFaces) {
                     identity = "extra";
                     notes = `human count ${hc} > expected ${expectedFaces}`;
@@ -1364,23 +1373,30 @@ serve(async (req) => {
                     identity = "extra";
                     notes = `face count ${fc} > expected ${expectedFaces}`;
                   }
-                  // Deep identity audit (only meaningful for multi-portrait).
                   if (portraitUrls.length >= 2) {
+                    // v111 — audit against IDENTITY refs (canonical headshots)
+                    // when available; otherwise fall back to the wardrobe refs.
+                    const auditRefs = identityPortraitUrls.length === portraitUrls.length
+                      ? identityPortraitUrls
+                      : portraitUrls;
                     const audit = await auditAnchorIdentity(
                       url,
-                      portraitUrls,
+                      auditRefs,
                       characterNames,
                       LOVABLE_API_KEY!,
                     );
                     if (audit && !audit.ok) {
                       identity = audit.reason ?? identity ?? "ambiguous";
                       notes = audit.detail || notes;
+                      if (audit.reason === "swap" && Array.isArray(audit.mismatched)) {
+                        mismatched = audit.mismatched;
+                      }
                     }
                   }
                   console.log(
-                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} humans=${hc}/${expectedFaces} identity=${identity ?? "ok"} notes="${notes.slice(0, 120)}"`,
+                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} humans=${hc}/${expectedFaces} identity=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] notes="${notes.slice(0, 120)}"`,
                   );
-                  return { faceCount: fc, humanCount: hc, identity, notes };
+                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched };
                 };
 
                 let composedUrl: string | null = null;
@@ -1391,11 +1407,12 @@ serve(async (req) => {
                   | "extra"
                   | "missing"
                   | "ambiguous"
+                  | "swap"
                   | null = null;
                 let identityNotes = "";
+                let identityMismatched: string[] = [];
                 let skipAuditPersist = false;
 
-                // 1) Reuse existing anchor only if it passed current audit version.
                 if (prevAuditOk && existingLooksComposed) {
                   console.log(
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: reusing pinned anchor (audit v${ANCHOR_AUDIT_VERSION} ok)`,
@@ -1409,11 +1426,6 @@ serve(async (req) => {
                     : null;
                   skipAuditPersist = true;
                 } else {
-                  // 2) Stale or missing anchor → invalidate cache and re-compose.
-                  // Always delete cache for cinematic-sync before composing: older
-                  // client-side anchors used the same scene/cache key while carrying
-                  // 3 portrait/person prompts, so a null DB reference alone is not
-                  // enough to guarantee a fresh 2-speaker anchor.
                   if (existingLooksComposed) {
                     console.log(
                       `[compose-video-clips] cinematic-sync scene ${scene.id}: pinned anchor missing audit v${ANCHOR_AUDIT_VERSION} → re-composing`,
@@ -1428,17 +1440,24 @@ serve(async (req) => {
                     humanCount = e1.humanCount;
                     identityFailure = e1.identity;
                     identityNotes = e1.notes;
+                    identityMismatched = e1.mismatched ?? [];
 
                     const needsRetry =
                       identityFailure !== null ||
                       (faceCount !== null && faceCount !== expectedFaces) ||
                       (humanCount !== null && humanCount !== expectedFaces);
                     if (needsRetry) {
+                      const isSwap = identityFailure === "swap";
                       console.log(
-                        `[compose-video-clips] anchor scene ${scene.id}: attempt-1 failed (faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} identity=${identityFailure}) → strict retry`,
+                        `[compose-video-clips] anchor scene ${scene.id}: attempt-1 failed (faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} identity=${identityFailure}) → ${isSwap ? "swap" : "strict"} retry`,
                       );
                       await invalidateCache();
-                      const retryUrl = await composeAnchor("attempt-2", true);
+                      const retryUrl = await composeAnchor(
+                        "attempt-2",
+                        !isSwap,
+                        isSwap,
+                        isSwap ? identityMismatched : [],
+                      );
                       if (retryUrl) {
                         const e2 = await evaluate(retryUrl, "attempt-2");
                         composedUrl = retryUrl;
@@ -1446,6 +1465,7 @@ serve(async (req) => {
                         humanCount = e2.humanCount;
                         identityFailure = e2.identity;
                         identityNotes = e2.notes;
+                        identityMismatched = e2.mismatched ?? [];
                       }
                     }
                   }
