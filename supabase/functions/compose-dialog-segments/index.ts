@@ -2882,7 +2882,7 @@ serve(async (req) => {
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
       `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
-      `frame=${referenceFrameNumber} sync_mode=${payloadSyncMode} input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+      `frame=${referenceFrameNumber} sync_mode=${String(syncOptions.sync_mode)} input=${dispatchVideoUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
@@ -2940,7 +2940,7 @@ serve(async (req) => {
         .eq("id", sceneId);
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
-        sync_source_kind: "segments", video_url: passInputUrl,
+        sync_source_kind: "segments", video_url: dispatchVideoUrl,
         http_status: resp.status, sync_status: "DISPATCH_FAILED",
         error_class: classifySyncError(errTxt),
         error_message: errTxt.slice(0, 500),
@@ -3046,7 +3046,7 @@ serve(async (req) => {
     await logSyncDispatch(supabase, {
       scene_id: sceneId, user_id: userId, engine: "sync-segments",
       job_id: jobId, sync_source_kind: "segments",
-      video_url: passInputUrl,
+      video_url: dispatchVideoUrl,
       video_bytes: videoProbe.bytes,
       video_content_type: videoProbe.contentType,
       window_start_sec: 0, window_end_sec: totalSec,
@@ -3066,7 +3066,7 @@ serve(async (req) => {
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
-        sync_mode: payloadSyncMode,
+        sync_mode: syncOptions.sync_mode,
         audio_approx_sec: audioApproxSec,
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,
@@ -3083,10 +3083,12 @@ serve(async (req) => {
         // failing passes to verify the bbox/video/audio frame-count mismatch
         // hypothesis without grepping edge logs.
         v102_probe: (pass as any)._v102_probe ?? null,
+        v103_probe: (pass as any)._v102_probe ?? null,
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
+        dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
         payload_summary: {
           model: payload.model,
-          input_video: passInputUrl,
+          input_video: dispatchVideoUrl,
           audio: pass.audio_url,
           frame_number: referenceFrameNumber,
           coordinates: pass.coords,
