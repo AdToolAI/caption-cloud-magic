@@ -2545,141 +2545,55 @@ serve(async (req) => {
       syncOptions.occlusion_detection_enabled = true;
     }
     if (usePassPreclip) {
-      // v101 — Re-enable v99 explicit crop-local bounding boxes for preclip
-      // dispatch. DB-verified silent no-op (scene 07185a89, all 4 speakers
-      // `done` but mouths closed) reproduces when we send `auto_detect:true`
-      // on the 512×512 single-face preclip — Sync.so happily returns the
-      // input unchanged. Explicit per-frame bbox in CROP-LOCAL output pixels
-      // forces sync-3 to actually animate the mouth region. We keep the
-      // v100 safer `temperature: 0.5` so we do NOT reintroduce the v99
-      // `temperature: 1.0` + bbox combination that triggered
-      // `provider_unknown_error` on scene 720fd0b1.
-      const preCrop = (pass as any).preclip_crop as
-        | { x: number; y: number; size: number; outputSize: number }
-        | undefined;
-      const fmFacesP: any[] = Array.isArray((faceMap as any)?.faces)
-        ? (faceMap as any).faces
-        : [];
-      const fmWP = Number((faceMap as any)?.width) || plateDims?.width || 0;
-      const fmHP = Number((faceMap as any)?.height) || plateDims?.height || 0;
-      const matchedFaceP =
-        fmFacesP.find((f) => f?.characterId && f.characterId === pass.character_id) ??
-        fmFacesP.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
-        null;
-      let platePixelBbox: [number, number, number, number] | null =
-        speakerPlateBboxes[pass.speaker_idx] ?? null;
-      if (!platePixelBbox && matchedFaceP && Array.isArray(matchedFaceP.bbox) && matchedFaceP.bbox.length === 4 && fmWP > 0 && fmHP > 0 && plateDims) {
-        const [bx1, by1, bx2, by2] = matchedFaceP.bbox.map((n: any) => Number(n));
-        const sx = plateDims.width / fmWP;
-        const sy = plateDims.height / fmHP;
-        platePixelBbox = [
-          Math.round(bx1 * sx),
-          Math.round(by1 * sy),
-          Math.round(bx2 * sx),
-          Math.round(by2 * sy),
-        ];
+      // v103 — DB-verified root cause: sync-3 returns `provider_unknown_error`
+      // (HTTP 200, webhook FAILED) whenever we attach explicit
+      // `bounding_boxes` to its payload. Per Sync.so docs `bounding_boxes`
+      // is a `lipsync-2-pro` feature ONLY — sync-3 silently rejects it.
+      // The 18:06 dispatches for scene f67d51ba sent sync-3 + 56-frame bbox
+      // (perfectly aligned to the 56-frame preclip) and every pass failed
+      // with provider_unknown_error. Drop bbox entirely on the preclip path:
+      // the 512×512 single-face crop has exactly ONE face, so auto_detect
+      // is unambiguous and safe.
+      syncOptions.active_speaker_detection = { auto_detect: true };
+
+      // v103 — sync_mode policy on preclip: when audio (per-pass tight VO)
+      // is longer than the preclip (~1.87s), `cut_off` would trim output to
+      // 1.87s and the audio-mux tail would have a closed mouth. Force
+      // `loop` so Sync.so plays the locked-camera preclip for the full
+      // audio duration (v63 rule for plate<audio scenarios).
+      const videoDurSec = typeof (pass as any).preclip_duration_sec === "number"
+        ? Number((pass as any).preclip_duration_sec)
+        : null;
+      const audioFullSec = (() => {
+        const diag = audioDiagnostics.find((d) => d.pass === pass.idx);
+        const wavDur = (diag as any)?.wav?.durSec;
+        return typeof wavDur === "number" ? wavDur : null;
+      })();
+      const audioForMode = audioFullSec ?? tightAudioInfo?.durSec ?? totalSec;
+      if (videoDurSec != null && audioForMode > videoDurSec + 0.05) {
+        syncOptions.sync_mode = "loop";
       }
-      let cropLocalBox: [number, number, number, number] | null = null;
-      if (preCrop && platePixelBbox) {
-        const scale = preCrop.outputSize / Math.max(1, preCrop.size);
-        const [bx1, by1, bx2, by2] = platePixelBbox;
-        const w = bx2 - bx1;
-        const h = by2 - by1;
-        const pad = Math.max(w, h) * 0.12;
-        const lx1 = (bx1 - pad - preCrop.x) * scale;
-        const ly1 = (by1 - pad - preCrop.y) * scale;
-        const lx2 = (bx2 + pad - preCrop.x) * scale;
-        const ly2 = (by2 + pad - preCrop.y) * scale;
-        const out = preCrop.outputSize;
-        const cx1 = Math.max(0, Math.round(lx1));
-        const cy1 = Math.max(0, Math.round(ly1));
-        const cx2 = Math.min(out, Math.round(lx2));
-        const cy2 = Math.min(out, Math.round(ly2));
-        if (cx2 > cx1 + 4 && cy2 > cy1 + 4) {
-          cropLocalBox = [cx1, cy1, cx2, cy2];
-        }
-      }
-      if (cropLocalBox) {
-        const durForFrames = tightAudioInfo?.durSec ?? totalSec;
-        const frameCount = Math.max(1, Math.ceil(durForFrames * 30));
-        const boundingBoxes: number[][] = new Array(frameCount).fill(cropLocalBox);
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          bounding_boxes: boundingBoxes,
-        };
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v101_preclip_bbox speaker=${pass.speaker_name} cropLocalBox=${JSON.stringify(cropLocalBox)} frames=${frameCount} preCrop=${JSON.stringify(preCrop)} plateBbox=${JSON.stringify(platePixelBbox)}`,
-        );
-        // v102 Step A — explicit alignment probe. We log what the REAL video
-        // looks like (preclip mp4) vs. what we're sending Sync.so as bbox-array
-        // length and as audio. Hypothesis: when bbox_count !== video_frames
-        // and/or audio_full_sec !== video_dur_sec, sync-3 returns
-        // `provider_unknown_error` (HTTP 200, webhook FAILED). The probe writes
-        // these into both the console log AND syncso_dispatch_log.meta.v102_probe
-        // so we can verify offline. No logic changes yet.
-        const videoDurSec = typeof (pass as any).preclip_duration_sec === "number"
-          ? Number((pass as any).preclip_duration_sec)
-          : null;
-        const videoFramesExpected = videoDurSec != null
+
+      (pass as any)._v102_probe = {
+        stage: "preclip-autodetect-v103",
+        model_intent: "sync-3",
+        sync_mode: syncOptions.sync_mode,
+        bbox_count: 0,
+        audio_voiced_sec: tightAudioInfo?.durSec ?? null,
+        audio_full_sec: audioFullSec,
+        video_dur_sec: videoDurSec,
+        video_frames_expected: videoDurSec != null
           ? Math.max(1, Math.ceil(videoDurSec * 30))
-          : null;
-        const audioFullSec = (() => {
-          const diag = audioDiagnostics.find((d) => d.pass === pass.idx);
-          const wavDur = (diag as any)?.wav?.durSec;
-          return typeof wavDur === "number" ? wavDur : null;
-        })();
-        const v102Probe = {
-          stage: "preclip-bbox-dispatch",
-          model_intent: "sync-3",
-          sync_mode: payloadSyncMode,
-          bbox_count: boundingBoxes.length,
-          frame_count_source: tightAudioInfo ? "audio_voiced" : "audio_full",
-          dur_for_frames_sec: Number(durForFrames.toFixed(3)),
-          audio_voiced_sec: tightAudioInfo?.durSec ?? null,
-          audio_full_sec: audioFullSec,
-          video_dur_sec: videoDurSec,
-          video_frames_expected: videoFramesExpected,
-          bbox_vs_video_delta: videoFramesExpected != null
-            ? boundingBoxes.length - videoFramesExpected
-            : null,
-          audio_vs_video_delta_sec: audioFullSec != null && videoDurSec != null
-            ? Number((audioFullSec - videoDurSec).toFixed(3))
-            : null,
-          preclip_url_tail: passPreclipUrl ? `…${passPreclipUrl.slice(-80)}` : null,
-        };
-        (pass as any)._v102_probe = v102Probe;
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v102_probe ${JSON.stringify(v102Probe)}`,
-        );
-      } else {
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v101_preclip_bbox_skip preCrop=${!!preCrop} plateBbox=${!!platePixelBbox} — falling back to auto_detect:true`,
-        );
-        const videoDurSec = typeof (pass as any).preclip_duration_sec === "number"
-          ? Number((pass as any).preclip_duration_sec)
-          : null;
-        const audioFullSec = (() => {
-          const diag = audioDiagnostics.find((d) => d.pass === pass.idx);
-          const wavDur = (diag as any)?.wav?.durSec;
-          return typeof wavDur === "number" ? wavDur : null;
-        })();
-        (pass as any)._v102_probe = {
-          stage: "preclip-autodetect-fallback",
-          model_intent: "sync-3",
-          sync_mode: payloadSyncMode,
-          bbox_count: 0,
-          audio_voiced_sec: tightAudioInfo?.durSec ?? null,
-          audio_full_sec: audioFullSec,
-          video_dur_sec: videoDurSec,
-          video_frames_expected: videoDurSec != null
-            ? Math.max(1, Math.ceil(videoDurSec * 30))
-            : null,
-        };
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v102_probe ${JSON.stringify((pass as any)._v102_probe)}`,
-        );
-      }
+          : null,
+        audio_vs_video_delta_sec: audioFullSec != null && videoDurSec != null
+          ? Number((audioFullSec - videoDurSec).toFixed(3))
+          : null,
+      };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v103_preclip_autodetect speaker=${pass.speaker_name} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
+      );
+    }
+
 
 
 
