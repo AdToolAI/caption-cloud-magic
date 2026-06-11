@@ -3167,8 +3167,48 @@ serve(async (req) => {
       202,
     );
   } catch (e) {
-    console.error("[compose-dialog-segments] error", e);
-    return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
+    const errMsg = e instanceof Error ? e.message : String(e ?? "unknown");
+    const errStack = e instanceof Error ? e.stack ?? "" : "";
+    console.error(
+      `[compose-dialog-segments] dispatch_crash scene=${crashSceneId ?? "n/a"} err=${errMsg}\n${errStack}`,
+    );
+    // v100 — Crash-safe envelope: if we already knew which scene we were
+    // dispatching for, mark it failed+refund immediately so the user does not
+    // see a phantom `pending` for 4 min until lipsync-watchdog fires
+    // STALE_PREFLIGHT_MS. The Schicht A auto-reset above will then self-heal
+    // on the next 30s auto-tick without manual intervention.
+    if (crashSceneId && crashUserId && crashSupabase) {
+      try {
+        await logSyncDispatch(crashSupabase, {
+          scene_id: crashSceneId,
+          user_id: crashUserId,
+          engine: "sync-segments",
+          sync_status: "DISPATCH_CRASH",
+          error_class: "dispatch_crash",
+          error_message: errMsg.slice(0, 500),
+          meta: { stack: errStack.slice(0, 1000) },
+        });
+      } catch (logErr) {
+        console.warn(
+          `[compose-dialog-segments] crash_log_failed scene=${crashSceneId} err=${(logErr as Error)?.message ?? logErr}`,
+        );
+      }
+      try {
+        await failLipSync({
+          supabase: crashSupabase,
+          sceneId: crashSceneId,
+          userId: crashUserId,
+          reason: `dispatch_crash: ${errMsg.slice(0, 160)}`,
+          refundCredits: 0,
+          syncApiKey: crashSyncApiKey,
+        });
+      } catch (failErr) {
+        console.warn(
+          `[compose-dialog-segments] crash_failLipSync_failed scene=${crashSceneId} err=${(failErr as Error)?.message ?? failErr}`,
+        );
+      }
+    }
+    return json({ error: errMsg }, 500);
   } finally {
     if (lockSupabase && lockSceneId && lockHolder) {
       try {
