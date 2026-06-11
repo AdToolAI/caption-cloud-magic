@@ -2860,6 +2860,18 @@ serve(async (req) => {
     // the lipsynced crop back at preclip_crop on the original plate.
     const dispatchVideoUrl = usePassPreclip ? (passPreclipUrl as string) : passInputUrl;
     const videoInput: Record<string, unknown> = { type: "video", url: dispatchVideoUrl };
+    // v106 — Doc-strict options scrub. The official Sync.so sync-3 reference
+    // (https://sync.so/docs/models/sync-3 + /api-reference/api/generate-api/create)
+    // lists ONLY `sync_mode` and `active_speaker_detection` under `options` for
+    // sync-3. `temperature` and `occlusion_detection_enabled` belong to the
+    // lipsync-2 / lipsync-2-pro family. Sending them with `model: "sync-3"`
+    // is accepted by the validator (HTTP 201) but the provider job then
+    // terminates with `provider_unknown_error` — DB-verified on scene
+    // c8fb1fe6 across 4/4 coords-pro full-plate passes (2026-06-11).
+    if (payloadModel === SYNC3_MODEL) {
+      delete (syncOptions as any).temperature;
+      delete (syncOptions as any).occlusion_detection_enabled;
+    }
     const payload: Record<string, unknown> = {
       model: payloadModel,
       input: [
@@ -2870,6 +2882,7 @@ serve(async (req) => {
       webhookUrl: diagnosticWebhookUrl,
       webhook_url: diagnosticWebhookUrl,
     };
+
     // v105 — Compliance probe of the ACTUAL outgoing Sync.so payload.
     // We previously persisted v102/v103 probes computed from the per-speaker
     // full-length WAV, which masked the real input. v105 reads back from
