@@ -1407,11 +1407,12 @@ serve(async (req) => {
                   | "extra"
                   | "missing"
                   | "ambiguous"
+                  | "swap"
                   | null = null;
                 let identityNotes = "";
+                let identityMismatched: string[] = [];
                 let skipAuditPersist = false;
 
-                // 1) Reuse existing anchor only if it passed current audit version.
                 if (prevAuditOk && existingLooksComposed) {
                   console.log(
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: reusing pinned anchor (audit v${ANCHOR_AUDIT_VERSION} ok)`,
@@ -1425,11 +1426,6 @@ serve(async (req) => {
                     : null;
                   skipAuditPersist = true;
                 } else {
-                  // 2) Stale or missing anchor → invalidate cache and re-compose.
-                  // Always delete cache for cinematic-sync before composing: older
-                  // client-side anchors used the same scene/cache key while carrying
-                  // 3 portrait/person prompts, so a null DB reference alone is not
-                  // enough to guarantee a fresh 2-speaker anchor.
                   if (existingLooksComposed) {
                     console.log(
                       `[compose-video-clips] cinematic-sync scene ${scene.id}: pinned anchor missing audit v${ANCHOR_AUDIT_VERSION} → re-composing`,
@@ -1444,17 +1440,24 @@ serve(async (req) => {
                     humanCount = e1.humanCount;
                     identityFailure = e1.identity;
                     identityNotes = e1.notes;
+                    identityMismatched = e1.mismatched ?? [];
 
                     const needsRetry =
                       identityFailure !== null ||
                       (faceCount !== null && faceCount !== expectedFaces) ||
                       (humanCount !== null && humanCount !== expectedFaces);
                     if (needsRetry) {
+                      const isSwap = identityFailure === "swap";
                       console.log(
-                        `[compose-video-clips] anchor scene ${scene.id}: attempt-1 failed (faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} identity=${identityFailure}) → strict retry`,
+                        `[compose-video-clips] anchor scene ${scene.id}: attempt-1 failed (faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} identity=${identityFailure}) → ${isSwap ? "swap" : "strict"} retry`,
                       );
                       await invalidateCache();
-                      const retryUrl = await composeAnchor("attempt-2", true);
+                      const retryUrl = await composeAnchor(
+                        "attempt-2",
+                        !isSwap,
+                        isSwap,
+                        isSwap ? identityMismatched : [],
+                      );
                       if (retryUrl) {
                         const e2 = await evaluate(retryUrl, "attempt-2");
                         composedUrl = retryUrl;
@@ -1462,6 +1465,7 @@ serve(async (req) => {
                         humanCount = e2.humanCount;
                         identityFailure = e2.identity;
                         identityNotes = e2.notes;
+                        identityMismatched = e2.mismatched ?? [];
                       }
                     }
                   }
