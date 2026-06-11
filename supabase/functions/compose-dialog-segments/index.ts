@@ -2451,89 +2451,34 @@ serve(async (req) => {
     const payloadSyncMode = tightAudioInfo ? "cut_off" : "loop";
     const syncOptions: Record<string, unknown> = {
       sync_mode: payloadSyncMode,
-      // Welle D / Hebel 2 — Sync.so docs recommend explicit temperature bump
-      // when input plates are near-static (locked-camera Hailuo i2v); the
-      // default 0.7 routinely produced "frozen" outputs on speakers 2+3 of
-      // multi-speaker chained passes. 1.0 keeps the model in its documented
-      // range and gives the mouth-motion estimator more headroom.
-      temperature: 1.0,
-      // sync-3 + lipsync-2-pro both honor this flag per
-      // https://sync.so/docs/models/lipsync — explicitly enable so partial
-      // hand-over-mouth / mic-bump frames don't silently collapse to a copy.
-      occlusion_detection_enabled: true,
+      // v100 — back to Sync.so doc default (0.5, range 0–1). v99's hard-coded
+      // 1.0 combined with static per-frame bounding_boxes on a single-face
+      // preclip reproducibly triggered `provider_unknown_error` on every
+      // pass of multi-speaker scenes (DB-verified for scene 720fd0b1…).
+      temperature: 0.5,
     };
+    // Occlusion detection is only meaningful on multi-face / hand-over-mouth
+    // plates. For the 512×512 single-face preclip path we leave it OFF — it
+    // slows sync-3 measurably and adds no quality on a clean head-and-shoulders
+    // crop. The full-plate bbox-url-pro path below re-enables it.
+    if (!usePassPreclip) {
+      syncOptions.occlusion_detection_enabled = true;
+    }
     if (usePassPreclip) {
-      // v99 — Preclip is a tight single-face crop, but `auto_detect:true`
-      // silently no-ops on some Hailuo preclips (DB-verified: Matthew's
-      // 278→512 upscaled preclip in scene 71abb2e2 came back with mean
-      // frame-diff 1.24 vs Samuel/Kailee at 5.85/6.97 → mouth closed).
-      // Force-target the face by uploading a static per-frame bounding box
-      // in CROP-LOCAL output-pixel space derived from the faceMap bbox
-      // and the persisted preclip_crop region.
-      const preCrop = (pass as any).preclip_crop as
-        | { x: number; y: number; size: number; outputSize: number }
-        | undefined;
-      const fmFacesP: any[] = Array.isArray((faceMap as any)?.faces)
-        ? (faceMap as any).faces
-        : [];
-      const matchedFaceP =
-        fmFacesP.find((f) => f?.characterId && f.characterId === pass.character_id) ??
-        fmFacesP.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
-        null;
-      const fmWP = Number((faceMap as any)?.width) || (plateDims?.width ?? 0);
-      const fmHP = Number((faceMap as any)?.height) || (plateDims?.height ?? 0);
-      // Prefer plate-identity bbox (plate-pixel space) when available.
-      const platePassBboxP = (speakerPlateBboxes as any)?.[pass.speaker_idx] ?? null;
-      let plateBbox: [number, number, number, number] | null = null;
-      if (platePassBboxP && Array.isArray(platePassBboxP) && platePassBboxP.length === 4) {
-        plateBbox = platePassBboxP as [number, number, number, number];
-      } else if (
-        matchedFaceP &&
-        Array.isArray(matchedFaceP.bbox) &&
-        matchedFaceP.bbox.length === 4 &&
-        plateDims &&
-        fmWP > 0 &&
-        fmHP > 0
-      ) {
-        const [bx1, by1, bx2, by2] = matchedFaceP.bbox.map((n: any) => Number(n));
-        const sx = plateDims.width / fmWP;
-        const sy = plateDims.height / fmHP;
-        plateBbox = [
-          Math.round(bx1 * sx),
-          Math.round(by1 * sy),
-          Math.round(bx2 * sx),
-          Math.round(by2 * sy),
-        ];
-      }
-      let cropLocalBox: [number, number, number, number] | null = null;
-      if (preCrop && plateBbox && preCrop.size > 0 && preCrop.outputSize > 0) {
-        const scale = preCrop.outputSize / preCrop.size;
-        const padPx = 0.12 * Math.max(plateBbox[2] - plateBbox[0], plateBbox[3] - plateBbox[1]);
-        const lx1 = Math.max(0, Math.round((plateBbox[0] - preCrop.x - padPx) * scale));
-        const ly1 = Math.max(0, Math.round((plateBbox[1] - preCrop.y - padPx) * scale));
-        const lx2 = Math.min(preCrop.outputSize, Math.round((plateBbox[2] - preCrop.x + padPx) * scale));
-        const ly2 = Math.min(preCrop.outputSize, Math.round((plateBbox[3] - preCrop.y + padPx) * scale));
-        if (lx2 > lx1 + 8 && ly2 > ly1 + 8) {
-          cropLocalBox = [lx1, ly1, lx2, ly2];
-        }
-      }
-      if (cropLocalBox) {
-        const frameCountP = Math.max(1, Math.ceil((tightAudioInfo?.dur_sec ?? totalSec) * ASSUMED_FPS));
-        const boundingBoxesP: (number[] | null)[] = new Array(frameCountP).fill(cropLocalBox);
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          bounding_boxes: boundingBoxesP,
-        };
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v99_preclip_bbox speaker=${pass.speaker_name} cropLocalBox=${JSON.stringify(cropLocalBox)} frames=${frameCountP} preCrop=${JSON.stringify(preCrop)} plateBbox=${JSON.stringify(plateBbox)}`,
-        );
-      } else {
-        // Fallback: legacy auto_detect when we can't compute a crop-local box.
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v99_preclip_bbox_skip reason=no_plate_bbox_or_crop preCrop=${JSON.stringify(preCrop)} plateBbox=${JSON.stringify(plateBbox)} → auto_detect:true`,
-        );
-      }
+      // v100 — Doku-konform: bei einem expliziten Single-Face Preclip
+      // (Remotion-Crop ≥ 384px, exactly ONE face guaranteed by v77 face-gate
+      // and v76 neighbor-aware recenter) ist `active_speaker_detection`
+      // entweder gar nicht nötig ODER `auto_detect: true`. Die v99 Variante
+      // mit hartkodierten `bounding_boxes` über jeden Frame eines bereits
+      // einseitigen Crops ist genau das Anti-Pattern, das Sync.so reproduzierbar
+      // mit `An unknown error occurred.` quittiert (4/4 Passes in Szene
+      // 720fd0b1 = totaler Komplett-Fail). sync-3 baut globales Verständnis
+      // pro Shot — bei One-Face-Input ist Auto-Detect deterministisch.
+      syncOptions.active_speaker_detection = { auto_detect: true };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v100_preclip_autodetect speaker=${pass.speaker_name} preclip=${passPreclipUrl?.split("/").pop()}`,
+      );
+
 
 
 
