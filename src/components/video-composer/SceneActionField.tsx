@@ -61,11 +61,21 @@ export default function SceneActionField({
   });
 
   // Push the canonical English value to the parent whenever it changes.
+  // Guard 1 (existing): if the user has typed something but translation
+  // hasn't produced anything yet, don't overwrite a previously-good english.
+  // Guard 2 (new): while a translation is in flight OR the user is mid-typing
+  // (value non-empty, english still empty), never push an empty english back.
+  // The previous behavior briefly emitted `''` between keystrokes, which kicked
+  // the SceneCard prompt-sync effect and amplified the cursor-jump feeling.
   useEffect(() => {
-    if ((value ?? '').trim() && !english.trim() && (englishValue ?? '').trim()) return;
+    const userTyped = (value ?? '').trim().length > 0;
+    if (userTyped && !english.trim() && (englishValue ?? '').trim()) return;
+    if (userTyped && !english.trim()) return; // translation still pending / empty
+    if (isLoading) return;
     if (english !== englishValue) onEnglishChange(english);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [english, value, englishValue]);
+  }, [english, value, englishValue, isLoading]);
+
 
   const locked = (value ?? '').trim().length > 0;
   const compact = size === 'sm';

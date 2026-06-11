@@ -349,30 +349,40 @@ export default function VideoComposerDashboard() {
             previewClipUrl: (row as any).preview_clip_url ?? null,
             previewStatus: (row as any).preview_status ?? null,
             // ── Non-lifecycle fields below: DB-first with local fallback ──
-            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
-            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
+            aiPrompt: pickText(row.id, 'aiPrompt', row.ai_prompt as any, local?.aiPrompt),
+            stockKeywords: pickText(row.id, 'stockKeywords', row.stock_keywords as any, local?.stockKeywords),
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
             clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
-            textOverlay: row.text_overlay ?? local?.textOverlay ?? {
-              text: '',
-              position: 'bottom',
-              animation: 'fade-in',
-              fontSize: 48,
-              color: '#FFFFFF',
-            },
+            textOverlay: (() => {
+              const rowOverlay = (row.text_overlay as any) ?? null;
+              const merged = rowOverlay ?? local?.textOverlay ?? {
+                text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
+              };
+              // Protect the in-progress overlay text from realtime overwrites.
+              return {
+                ...merged,
+                text: pickText(row.id, 'textOverlay.text', rowOverlay?.text ?? null, local?.textOverlay?.text),
+              };
+            })(),
             transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
-            sceneActionUser: ((row as any).scene_action_user as string | null) ?? local?.sceneActionUser ?? '',
-            sceneActionEn: ((row as any).scene_action_en as string | null) ?? local?.sceneActionEn ?? '',
+            sceneActionUser: pickText(row.id, 'sceneActionUser', (row as any).scene_action_user, local?.sceneActionUser),
+            sceneActionEn: pickText(row.id, 'sceneActionEn', (row as any).scene_action_en, local?.sceneActionEn),
             characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
-            characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
-              ? ((row as any).character_shots as any)
-              : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
+            characterShots: (() => {
+              // When the user is mid-typing in a per-character action field,
+              // prefer the local characterShots (which carry the in-progress
+              // actionUser/actionEn). Otherwise fall back to DB-first.
+              if (isDirty(row.id, 'characterShotsActions') && local?.characterShots) return local.characterShots;
+              return (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
+                ? ((row as any).character_shots as any)
+                : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? []));
+            })(),
             dismissedCharacterIds: local?.dismissedCharacterIds ?? [],
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
@@ -491,8 +501,8 @@ export default function VideoComposerDashboard() {
             lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
             lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
             lipSyncStatus: (row as any).lip_sync_status ?? null,
-            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
-            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
+            aiPrompt: pickText(row.id, 'aiPrompt', row.ai_prompt as any, local?.aiPrompt),
+            stockKeywords: pickText(row.id, 'stockKeywords', row.stock_keywords as any, local?.stockKeywords),
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
@@ -503,21 +513,31 @@ export default function VideoComposerDashboard() {
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
             clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
-            textOverlay: row.text_overlay ?? local?.textOverlay ?? {
-              text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
-            },
+            textOverlay: (() => {
+              const rowOverlay = (row.text_overlay as any) ?? null;
+              const merged = rowOverlay ?? local?.textOverlay ?? {
+                text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
+              };
+              return {
+                ...merged,
+                text: pickText(row.id, 'textOverlay.text', rowOverlay?.text ?? null, local?.textOverlay?.text),
+              };
+            })(),
             transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
             replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
-            sceneActionUser: ((row as any).scene_action_user as string | null) ?? local?.sceneActionUser ?? '',
-            sceneActionEn: ((row as any).scene_action_en as string | null) ?? local?.sceneActionEn ?? '',
+            sceneActionUser: pickText(row.id, 'sceneActionUser', (row as any).scene_action_user, local?.sceneActionUser),
+            sceneActionEn: pickText(row.id, 'sceneActionEn', (row as any).scene_action_en, local?.sceneActionEn),
             characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
-            characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
-              ? ((row as any).character_shots as any)
-              : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
+            characterShots: (() => {
+              if (isDirty(row.id, 'characterShotsActions') && local?.characterShots) return local.characterShots;
+              return (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
+                ? ((row as any).character_shots as any)
+                : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? []));
+            })(),
             dismissedCharacterIds: local?.dismissedCharacterIds ?? [],
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
@@ -776,6 +796,65 @@ export default function VideoComposerDashboard() {
   const pendingScenesRef = useRef<ComposerScene[] | null>(null);
   const persistScenesToDbRef = useRef<((projectId: string, scenes: ComposerScene[]) => Promise<void>) | null>(null);
 
+  // ── Pending-user-edits guard ────────────────────────────────────────────
+  // While the user is actively typing into a freeform text field (action,
+  // prompt, stock keywords, overlay text), realtime DB ticks must NOT
+  // overwrite the local value with a stale `composer_scenes` row. Without
+  // this guard, every keystroke risks being clobbered by an in-flight
+  // realtime tick that still carries the previous DB value, which feels
+  // like "the field deletes itself while I type".
+  //
+  // For each scene id we keep a Set of dirty field keys. `setScenes` (the
+  // sole path through which user edits enter the local state) compares
+  // incoming vs previous values for the watched fields and marks any that
+  // changed. The two DB-merge sites below skip overlaying those fields.
+  // A field is cleared from the set as soon as the DB row reports the
+  // same value as the local one (i.e. the save round-trip completed).
+  const USER_TEXT_FIELDS = [
+    'sceneActionUser',
+    'sceneActionEn',
+    'aiPrompt',
+    'stockKeywords',
+    'textOverlay.text',
+    'characterShotsActions',
+  ] as const;
+  type UserTextField = typeof USER_TEXT_FIELDS[number];
+  const pendingUserEditsRef = useRef<Map<string, Set<UserTextField>>>(new Map());
+
+  const markDirty = (sceneId: string, key: UserTextField) => {
+    let set = pendingUserEditsRef.current.get(sceneId);
+    if (!set) { set = new Set(); pendingUserEditsRef.current.set(sceneId, set); }
+    set.add(key);
+  };
+  const clearDirtyIfMatches = (
+    sceneId: string,
+    key: UserTextField,
+    rowVal: unknown,
+    localVal: unknown,
+  ) => {
+    const set = pendingUserEditsRef.current.get(sceneId);
+    if (!set || !set.has(key)) return;
+    if (JSON.stringify(rowVal ?? null) === JSON.stringify(localVal ?? null)) {
+      set.delete(key);
+      if (set.size === 0) pendingUserEditsRef.current.delete(sceneId);
+    }
+  };
+  const isDirty = (sceneId: string, key: UserTextField) =>
+    pendingUserEditsRef.current.get(sceneId)?.has(key) === true;
+
+  // Pick local-or-row depending on dirty flag, then clear the flag if both sides agree.
+  const pickText = (
+    sceneId: string,
+    key: UserTextField,
+    rowVal: string | null | undefined,
+    localVal: string | null | undefined,
+  ): string => {
+    clearDirtyIfMatches(sceneId, key, rowVal, localVal);
+    if (isDirty(sceneId, key)) return (localVal ?? '') as string;
+    return (rowVal ?? localVal ?? '') as string;
+  };
+
+
 
   const showCampaignTab = !!project.adMeta;
   const TABS = [
@@ -962,6 +1041,21 @@ export default function VideoComposerDashboard() {
       }
       return s;
     });
+    // Mark watched freeform-text fields as "dirty" whenever the user changes
+    // them locally. The realtime-merge sites further down read these flags
+    // to avoid overwriting an in-flight user edit with a stale DB row.
+    for (const s of cleaned) {
+      const prev = prevById.get(s.id);
+      if (!prev) continue;
+      if ((s.sceneActionUser ?? '') !== (prev.sceneActionUser ?? '')) markDirty(s.id, 'sceneActionUser');
+      if ((s.sceneActionEn ?? '') !== (prev.sceneActionEn ?? '')) markDirty(s.id, 'sceneActionEn');
+      if ((s.aiPrompt ?? '') !== (prev.aiPrompt ?? '')) markDirty(s.id, 'aiPrompt');
+      if ((s.stockKeywords ?? '') !== (prev.stockKeywords ?? '')) markDirty(s.id, 'stockKeywords');
+      if ((s.textOverlay?.text ?? '') !== (prev.textOverlay?.text ?? '')) markDirty(s.id, 'textOverlay.text');
+      const aSig = (s.characterShots ?? []).map((x: any) => `${x.characterId}:${x.actionUser ?? ''}:${x.actionEn ?? ''}`).join('|');
+      const bSig = (prev.characterShots ?? []).map((x: any) => `${x.characterId}:${x.actionUser ?? ''}:${x.actionEn ?? ''}`).join('|');
+      if (aSig !== bSig) markDirty(s.id, 'characterShotsActions');
+    }
     const propagated = propagateDialogLock(cleaned);
     setProject(prev => {
       // Schedule debounced DB flush only for already-persisted projects.

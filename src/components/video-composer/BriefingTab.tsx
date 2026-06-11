@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { extractFunctionsError } from '@/lib/functionsError';
 import { useTranslation } from '@/hooks/useTranslation';
 import type {
   ComposerBriefing,
@@ -292,13 +293,38 @@ export default function BriefingTab({
 
       if (error) {
         console.warn('[BriefingTab] storyboard invoke error:', error, 'data:', data);
-        throw error;
+        // Pull the real server-side message + retryable flag out of the
+        // FunctionsHttpError context (supabase-js hides it behind a generic
+        // "non-2xx status code" message otherwise). Particularly useful for
+        // the 503 "AI Gateway temporarily unavailable" surfaced by the
+        // retry+fallback wrapper in compose-video-storyboard.
+        let friendly = '';
+        let retryable = false;
+        try {
+          const ctx: any = (error as any)?.context;
+          if (ctx && typeof ctx.clone === 'function') {
+            const text = await ctx.clone().text();
+            if (text) {
+              try {
+                const j = JSON.parse(text);
+                friendly = String(j?.error || j?.message || '').trim();
+                retryable = j?.retryable === true;
+              } catch { /* not JSON */ }
+            }
+          }
+        } catch { /* ignore */ }
+        if (!friendly) friendly = await extractFunctionsError(error);
+        const e: any = new Error(friendly || t('videoComposer.tryAgain'));
+        e.retryable = retryable;
+        throw e;
       }
+
       const rawScenes = Array.isArray(data?.scenes) ? data.scenes : null;
       if (!rawScenes || rawScenes.length === 0) {
         console.warn('[BriefingTab] storyboard returned no scenes. payload:', data);
         throw new Error(data?.error || t('videoComposer.storyboardError'));
       }
+
 
       // Apply default quality to all generated scenes
       const defaultQ: ClipQuality = briefing.defaultQuality || 'standard';
@@ -385,13 +411,23 @@ export default function BriefingTab({
       toast({ title: t('videoComposer.storyboardGenerated'), description: `${rawScenes.length} ${t('videoComposer.scenesCreated')}` });
     } catch (err: any) {
       console.error('Storyboard generation error:', err);
+      const isRetryable = err?.retryable === true;
       toast({
-        title: t('videoComposer.storyboardError'),
-        description: err?.message || t('videoComposer.tryAgain'),
+        title: isRetryable
+          ? (language === 'de' ? 'KI-Dienst ist gerade überlastet'
+            : language === 'es' ? 'El servicio de IA está temporalmente saturado'
+            : 'AI service is temporarily overloaded')
+          : t('videoComposer.storyboardError'),
+        description: isRetryable
+          ? (language === 'de' ? 'Bitte in ca. 30 Sekunden erneut auf „Storyboard generieren" klicken.'
+            : language === 'es' ? 'Por favor, vuelve a pulsar «Generar storyboard» en unos 30 segundos.'
+            : 'Please click "Generate storyboard" again in about 30 seconds.')
+          : (err?.message || t('videoComposer.tryAgain')),
         variant: 'destructive',
       });
       // Bring the user back to Briefing so they can fix inputs and retry.
       onGenerationFailed?.();
+
     } finally {
       setIsGenerating(false);
       onGenerationEnd?.();
