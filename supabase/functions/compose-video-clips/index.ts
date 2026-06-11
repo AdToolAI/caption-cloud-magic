@@ -1292,15 +1292,12 @@ serve(async (req) => {
                 const composeAnchor = async (
                   label: string,
                   strict = false,
+                  swap = false,
+                  swapMismatches: string[] = [],
                 ): Promise<string | null> => {
                   console.log(
-                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}]`,
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}]`,
                   );
-                  // Scene-aware anchor: ALWAYS combine the two-shot framing
-                  // constraint with the cleaned visual scene description.
-                  // The neutral-only fallback used to produce a gray neutral
-                  // two-shot that bore no relation to the user's scene — the
-                  // i2v step would then drift to a totally different shot.
                   const sceneDesc = stripExtraHumansForAnchor(
                     stripDialogForAnchor(scene.aiPrompt || ""),
                   );
@@ -1323,11 +1320,14 @@ serve(async (req) => {
                         sceneId: scene.id,
                         portraitUrl: portraitUrls[0],
                         portraitUrls,
+                        identityPortraitUrls,
                         characterNames,
                         scenePrompt: anchorPrompt,
                         aspectRatio: "16:9",
                         shotType: scene.characterShot?.shotType,
                         strictNoDuplicates: strict,
+                        strictSwapMode: swap,
+                        swapMismatches,
                       }),
                     },
                   );
