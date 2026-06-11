@@ -501,8 +501,8 @@ export default function VideoComposerDashboard() {
             lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
             lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
             lipSyncStatus: (row as any).lip_sync_status ?? null,
-            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
-            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
+            aiPrompt: pickText(row.id, 'aiPrompt', row.ai_prompt as any, local?.aiPrompt),
+            stockKeywords: pickText(row.id, 'stockKeywords', row.stock_keywords as any, local?.stockKeywords),
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
@@ -513,21 +513,31 @@ export default function VideoComposerDashboard() {
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
             clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
-            textOverlay: row.text_overlay ?? local?.textOverlay ?? {
-              text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
-            },
+            textOverlay: (() => {
+              const rowOverlay = (row.text_overlay as any) ?? null;
+              const merged = rowOverlay ?? local?.textOverlay ?? {
+                text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
+              };
+              return {
+                ...merged,
+                text: pickText(row.id, 'textOverlay.text', rowOverlay?.text ?? null, local?.textOverlay?.text),
+              };
+            })(),
             transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
             replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
-            sceneActionUser: ((row as any).scene_action_user as string | null) ?? local?.sceneActionUser ?? '',
-            sceneActionEn: ((row as any).scene_action_en as string | null) ?? local?.sceneActionEn ?? '',
+            sceneActionUser: pickText(row.id, 'sceneActionUser', (row as any).scene_action_user, local?.sceneActionUser),
+            sceneActionEn: pickText(row.id, 'sceneActionEn', (row as any).scene_action_en, local?.sceneActionEn),
             characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
-            characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
-              ? ((row as any).character_shots as any)
-              : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
+            characterShots: (() => {
+              if (isDirty(row.id, 'characterShotsActions') && local?.characterShots) return local.characterShots;
+              return (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
+                ? ((row as any).character_shots as any)
+                : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? []));
+            })(),
             dismissedCharacterIds: local?.dismissedCharacterIds ?? [],
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
