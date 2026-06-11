@@ -86,7 +86,98 @@ interface GeminiFace {
   confidence?: number;
 }
 
-/** Ask Gemini Vision for normalized face bboxes — accepts an mp4 URL plus timestamp hint. */
+// v99 — Empirisch via qa-gemini-mp4-url-probe verifizierte Payloads:
+//   PRIMARY  : `type=input_video` mit der mp4-URL → 200, faces (4.2s).
+//   FALLBACK : `type=image_url` mit data:video/mp4;base64,... → 200, faces (3.4s, ≤18 MB).
+// 400-Pfade (zur Doku, NICHT verwenden): image_url(raw mp4), image_url(signed mp4),
+//   video_url, file/file_data — alle "Unsupported image format" oder upstream_error.
+
+const PLATE_PROMPT = (want: number, ts: number) =>
+  `Look at the frame at timestamp ${ts.toFixed(2)}s of this video. ` +
+  `That frame should contain ${want} human face(s). ` +
+  "Detect EVERY clearly visible human face and return a TIGHT bounding box around each face " +
+  "(forehead → chin, ear → ear — exclude shoulders & background). " +
+  "Return STRICT JSON only — no prose, no markdown fences. " +
+  "Schema: {\"faces\":[{\"slot\":<int>,\"center\":[nx,ny],\"bbox\":[nx1,ny1,nx2,ny2],\"confidence\":<0..1>}]}. " +
+  "Coordinates MUST be NORMALIZED 0..1 (0,0 = top-left, 1,1 = bottom-right). " +
+  "'slot' is the index after sorting all visible faces by ascending normalized x (left-most face = slot 0). " +
+  "If a face is partially cropped, still return its visible portion's bbox. " +
+  "If no faces, return empty faces array.";
+
+function parseFaces(content: string): GeminiFace[] {
+  const m = String(content ?? "").match(/\{[\s\S]*\}/);
+  if (!m) return [];
+  try {
+    const parsed = JSON.parse(m[0]);
+    return Array.isArray(parsed?.faces) ? parsed.faces : [];
+  } catch {
+    return [];
+  }
+}
+
+async function callGeminiGateway(
+  lovableKey: string,
+  content: unknown[],
+  tag: string,
+): Promise<{ ok: boolean; faces: GeminiFace[]; status: number | string }> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), GEMINI_TIMEOUT_MS);
+  try {
+    const resp = await fetch(LOVABLE_GW, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content }],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!resp.ok) {
+      const errBody = await resp.text().catch(() => "");
+      console.warn(`${tag} gemini HTTP ${resp.status} body=${errBody.slice(0, 240)}`);
+      return { ok: false, faces: [], status: resp.status };
+    }
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    return { ok: true, faces: parseFaces(String(txt)), status: 200 };
+  } catch (e) {
+    clearTimeout(t);
+    console.warn(`${tag} gemini exception: ${(e as Error)?.message}`);
+    return { ok: false, faces: [], status: "EXCEPTION" };
+  }
+}
+
+async function fetchMp4AsBase64DataUrl(url: string, maxBytes = 18 * 1024 * 1024): Promise<string | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      console.warn(`[plate-face-detect] base64-fetch ${r.status} for ${url.slice(0, 80)}`);
+      return null;
+    }
+    const ab = await r.arrayBuffer();
+    if (ab.byteLength > maxBytes) {
+      console.warn(`[plate-face-detect] base64 skip: ${ab.byteLength} > ${maxBytes} bytes`);
+      return null;
+    }
+    const bytes = new Uint8Array(ab);
+    let bin = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    }
+    const mime = r.headers.get("content-type") ?? "video/mp4";
+    return `data:${mime};base64,${btoa(bin)}`;
+  } catch (e) {
+    console.warn(`[plate-face-detect] base64-fetch exception: ${(e as Error)?.message}`);
+    return null;
+  }
+}
+
+/** Ask Gemini Vision for normalized face bboxes — input_video primary, base64 fallback. */
 async function askGeminiForPlateFaces(
   frameUrl: string,
   expectedCount: number,
@@ -98,57 +189,44 @@ async function askGeminiForPlateFaces(
     return [];
   }
   const want = Math.max(1, Math.min(8, expectedCount || 2));
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), GEMINI_TIMEOUT_MS);
-    const resp = await fetch(LOVABLE_GW, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text:
-                  `Look at the frame at timestamp ${timestampSec.toFixed(2)}s of this video. ` +
-                  `That frame should contain ${want} human face(s). ` +
-                  "Detect EVERY clearly visible human face and return a TIGHT bounding box around each face " +
-                  "(forehead → chin, ear → ear — exclude shoulders & background). " +
-                  "Return STRICT JSON only — no prose, no markdown fences. " +
-                  "Schema: {\"faces\":[{\"slot\":<int>,\"center\":[nx,ny],\"bbox\":[nx1,ny1,nx2,ny2],\"confidence\":<0..1>}]}. " +
-                  "Coordinates MUST be NORMALIZED 0..1 (0,0 = top-left, 1,1 = bottom-right). " +
-                  "'slot' is the index after sorting all visible faces by ascending normalized x (left-most face = slot 0). " +
-                  "If a face is partially cropped, still return its visible portion's bbox. " +
-                  "If no faces, return empty faces array.",
-              },
-              { type: "image_url", image_url: { url: frameUrl } },
-            ],
-          },
-        ],
-      }),
-      signal: ctrl.signal,
-    });
-    clearTimeout(t);
-    if (!resp.ok) {
-      console.warn(`[plate-face-detect] gemini HTTP ${resp.status}`);
-      return [];
-    }
-    const j = await resp.json();
-    const txt = j?.choices?.[0]?.message?.content ?? "";
-    const m = String(txt).match(/\{[\s\S]*\}/);
-    if (!m) return [];
-    const parsed = JSON.parse(m[0]);
-    return Array.isArray(parsed?.faces) ? parsed.faces : [];
-  } catch (e) {
-    console.warn(`[plate-face-detect] gemini exception: ${(e as Error)?.message}`);
-    return [];
+  const prompt = PLATE_PROMPT(want, timestampSec);
+
+  // PRIMARY: type=input_video with the mp4 URL (verified 200 via probe).
+  const primary = await callGeminiGateway(
+    lovableKey,
+    [
+      { type: "text", text: prompt },
+      { type: "input_video", input_video: { url: frameUrl } } as unknown,
+    ],
+    "[plate-face-detect:input_video]",
+  );
+  if (primary.ok && primary.faces.length >= want) {
+    return primary.faces;
   }
+
+  // FALLBACK: data:video/mp4;base64,... via image_url (verified 200 via probe).
+  // Trigger when primary failed OR returned fewer faces than expected
+  // (probe showed input_video can miss 1 in 4-speaker shots; base64 hit 4/4).
+  const dataUrl = await fetchMp4AsBase64DataUrl(frameUrl);
+  if (!dataUrl) {
+    // Base64 fallback unavailable (too large / fetch failed) — return whatever primary gave.
+    return primary.faces;
+  }
+  const fallback = await callGeminiGateway(
+    lovableKey,
+    [
+      { type: "text", text: prompt },
+      { type: "image_url", image_url: { url: dataUrl } },
+    ],
+    "[plate-face-detect:base64]",
+  );
+  if (fallback.ok && fallback.faces.length > primary.faces.length) {
+    console.log(
+      `[plate-face-detect] base64 fallback wins: primary=${primary.faces.length} fallback=${fallback.faces.length}`,
+    );
+    return fallback.faces;
+  }
+  return primary.faces.length >= fallback.faces.length ? primary.faces : fallback.faces;
 }
 
 /**
