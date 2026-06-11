@@ -349,30 +349,40 @@ export default function VideoComposerDashboard() {
             previewClipUrl: (row as any).preview_clip_url ?? null,
             previewStatus: (row as any).preview_status ?? null,
             // ── Non-lifecycle fields below: DB-first with local fallback ──
-            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
-            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
+            aiPrompt: pickText(row.id, 'aiPrompt', row.ai_prompt as any, local?.aiPrompt),
+            stockKeywords: pickText(row.id, 'stockKeywords', row.stock_keywords as any, local?.stockKeywords),
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
             clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
-            textOverlay: row.text_overlay ?? local?.textOverlay ?? {
-              text: '',
-              position: 'bottom',
-              animation: 'fade-in',
-              fontSize: 48,
-              color: '#FFFFFF',
-            },
+            textOverlay: (() => {
+              const rowOverlay = (row.text_overlay as any) ?? null;
+              const merged = rowOverlay ?? local?.textOverlay ?? {
+                text: '', position: 'bottom', animation: 'fade-in', fontSize: 48, color: '#FFFFFF',
+              };
+              // Protect the in-progress overlay text from realtime overwrites.
+              return {
+                ...merged,
+                text: pickText(row.id, 'textOverlay.text', rowOverlay?.text ?? null, local?.textOverlay?.text),
+              };
+            })(),
             transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
-            sceneActionUser: ((row as any).scene_action_user as string | null) ?? local?.sceneActionUser ?? '',
-            sceneActionEn: ((row as any).scene_action_en as string | null) ?? local?.sceneActionEn ?? '',
+            sceneActionUser: pickText(row.id, 'sceneActionUser', (row as any).scene_action_user, local?.sceneActionUser),
+            sceneActionEn: pickText(row.id, 'sceneActionEn', (row as any).scene_action_en, local?.sceneActionEn),
             characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
-            characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
-              ? ((row as any).character_shots as any)
-              : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
+            characterShots: (() => {
+              // When the user is mid-typing in a per-character action field,
+              // prefer the local characterShots (which carry the in-progress
+              // actionUser/actionEn). Otherwise fall back to DB-first.
+              if (isDirty(row.id, 'characterShotsActions') && local?.characterShots) return local.characterShots;
+              return (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
+                ? ((row as any).character_shots as any)
+                : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? []));
+            })(),
             dismissedCharacterIds: local?.dismissedCharacterIds ?? [],
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
