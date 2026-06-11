@@ -39,6 +39,7 @@ async function askGeminiForPlateIdentity(
   frameUrl: string,
   characters: Array<{ characterId: string; portraitUrl: string }>,
   faces: PlateFaceBox[],
+  timestampSec: number,
 ): Promise<Map<number, { characterId: string; confidence: number }>> {
   const out = new Map<number, { characterId: string; confidence: number }>();
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -55,7 +56,8 @@ async function askGeminiForPlateIdentity(
       {
         type: "text",
         text:
-          `The FIRST image is one frame from a rendered video, containing ${faces.length} human face(s). ` +
+          `The FIRST attachment is a video; look at the frame at timestamp ${timestampSec.toFixed(2)}s. ` +
+          `That frame contains ${faces.length} human face(s). ` +
           `Faces are pre-numbered by slot, sorted left-to-right (slot 0 = left-most). ${slotDescriptions}. ` +
           `The remaining images are reference portraits in this order: ` +
           ids.map((id, i) => `(${i + 1}) ${id}`).join(", ") + ". " +
@@ -133,11 +135,13 @@ export async function resolvePlateFaceIdentities(params: {
   if (!plateMap || plateMap.faces.length === 0) return null;
 
   let identityBySlot = new Map<number, { characterId: string; confidence: number }>();
+  const idTsHint = Math.max(0.2, params.midDurationSec * 0.5);
   if (plateMap.frame_url && params.characters.length >= 1 && plateMap.faces.length >= 2) {
     identityBySlot = await askGeminiForPlateIdentity(
       plateMap.frame_url,
       params.characters,
       plateMap.faces,
+      idTsHint,
     );
   } else if (params.characters.length === 1 && plateMap.faces.length >= 1) {
     identityBySlot.set(0, { characterId: params.characters[0].characterId, confidence: 0.9 });

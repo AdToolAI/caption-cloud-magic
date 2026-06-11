@@ -29,11 +29,14 @@
  * ordering of plate boxes is the safest deterministic mapping).
  */
 
-import Replicate from "npm:replicate@0.25.2";
+// v98 — Frame extraction via Gemini Vision directly on the video URL.
+// Replicate's `lucataco/ffmpeg-extract-frame` and `lucataco/frame-extractor`
+// both 404 (models removed). `validate-frame-face` proves Gemini 2.5 Flash
+// accepts an mp4 URL as `image_url` and returns face bboxes for the
+// referenced timestamp — no Replicate call, no PNG rehost needed.
 
 const LOVABLE_GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_TIMEOUT_MS = 30_000;
-const FRAME_EXTRACT_TIMEOUT_MS = 90_000;
 
 export interface PlateFaceBox {
   /** Plate pixel-space [x1, y1, x2, y2]. */
@@ -66,103 +69,14 @@ async function hashUrl(url: string): Promise<string> {
     .join("");
 }
 
-/** Extract one frame from the plate via Replicate's ffmpeg model, upload to composer-frames. */
-async function extractPlateFrame(params: {
-  supabase: any;
-  plateUrl: string;
-  midDurationSec: number;
-  sceneId: string;
-  projectId: string;
-}): Promise<string | null> {
-  // v51.1 — Replicate SDK + dual env var support.
-  // The previous direct POST to
-  // `https://api.replicate.com/v1/models/lucataco/ffmpeg-extract-frame/predictions`
-  // returns 404 (Replicate's model-by-name predictions endpoint expects a
-  // pinned version for some models). The SDK handles version resolution
-  // automatically and is the path already proven stable by
-  // `extract-video-frames` and `extract-video-last-frame`.
-  const REPLICATE_API_TOKEN =
-    Deno.env.get("REPLICATE_API_TOKEN") ?? Deno.env.get("REPLICATE_API_KEY");
-  if (!REPLICATE_API_TOKEN) {
-    console.warn("[plate-face-detect] REPLICATE_API_TOKEN/REPLICATE_API_KEY missing — cannot extract frame");
-    return null;
-  }
-  const timestamp = Math.max(0.5, Math.min(params.midDurationSec, params.midDurationSec * 0.5));
-
-  let frameUrl: string | null = null;
-  try {
-    const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), FRAME_EXTRACT_TIMEOUT_MS);
-    let out: any;
-    try {
-      out = await replicate.run(
-        "lucataco/ffmpeg-extract-frame" as `${string}/${string}`,
-        { input: { video: params.plateUrl, timestamp } },
-      );
-    } finally {
-      clearTimeout(t);
-    }
-    if (typeof out === "string") frameUrl = out;
-    else if (Array.isArray(out) && typeof out[0] === "string") frameUrl = out[0];
-    else if (out && typeof (out as any)?.url === "function") frameUrl = (out as any).url();
-    else if (out && typeof (out as any)?.url === "string") frameUrl = (out as any).url;
-  } catch (e) {
-    console.warn(`[plate-face-detect] ffmpeg-extract-frame SDK failed: ${(e as Error)?.message}`);
-  }
-
-  // Fallback: lucataco/frame-extractor (different model, returns last frame by default;
-  // we ask for first frame which is close enough to mid for our face-locate purpose).
-  if (!frameUrl) {
-    try {
-      const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
-      const out: any = await replicate.run(
-        "lucataco/frame-extractor" as `${string}/${string}`,
-        { input: { video: params.plateUrl, return_first_frame: true } },
-      );
-      if (typeof out === "string") frameUrl = out;
-      else if (Array.isArray(out) && typeof out[0] === "string") frameUrl = out[0];
-      else if (out && typeof (out as any)?.url === "function") frameUrl = (out as any).url();
-      else if (out && typeof (out as any)?.url === "string") frameUrl = (out as any).url;
-    } catch (e) {
-      console.warn(`[plate-face-detect] frame-extractor fallback failed: ${(e as Error)?.message}`);
-    }
-  }
-
-  if (!frameUrl) {
-    console.warn("[plate-face-detect] no frameUrl returned from any extractor");
-    return null;
-  }
-
-  // Rehost into our own bucket so the URL is stable & Gemini can fetch it
-  // (Replicate URLs expire after ~1h).
-  try {
-    const pngRes = await fetch(frameUrl);
-    if (!pngRes.ok) {
-      console.warn(`[plate-face-detect] fetch frame ${pngRes.status}`);
-      return frameUrl;
-    }
-    const bytes = new Uint8Array(await pngRes.arrayBuffer());
-    const path = `${params.projectId}/plate-frames/${params.sceneId}-${Date.now()}.png`;
-    const up = await params.supabase.storage
-      .from("composer-frames")
-      .upload(path, bytes, {
-        contentType: "image/png",
-        upsert: true,
-        cacheControl: "31536000",
-      });
-    if (up.error) {
-      console.warn(`[plate-face-detect] storage upload failed: ${up.error.message}`);
-      return frameUrl;
-    }
-    const { data: pub } = params.supabase.storage
-      .from("composer-frames")
-      .getPublicUrl(path);
-    return pub.publicUrl;
-  } catch (e) {
-    console.warn(`[plate-face-detect] rehost exception: ${(e as Error)?.message}`);
-    return frameUrl;
-  }
+/**
+ * v98: no longer extracts a PNG via Replicate (those models 404).
+ * Gemini Vision accepts the mp4 URL directly with a timestamp hint in
+ * the prompt — see `validate-frame-face`. We simply return the plate URL
+ * itself; `frame_url` in the cache row is now the plate URL.
+ */
+function resolveFrameUrl(plateUrl: string): string {
+  return plateUrl;
 }
 
 interface GeminiFace {
@@ -172,10 +86,11 @@ interface GeminiFace {
   confidence?: number;
 }
 
-/** Ask Gemini Vision for normalized face bboxes on the extracted frame. */
+/** Ask Gemini Vision for normalized face bboxes — accepts an mp4 URL plus timestamp hint. */
 async function askGeminiForPlateFaces(
   frameUrl: string,
   expectedCount: number,
+  timestampSec: number,
 ): Promise<GeminiFace[]> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) {
@@ -201,7 +116,8 @@ async function askGeminiForPlateFaces(
               {
                 type: "text",
                 text:
-                  `This is a single frame from a rendered video that should contain ${want} human face(s). ` +
+                  `Look at the frame at timestamp ${timestampSec.toFixed(2)}s of this video. ` +
+                  `That frame should contain ${want} human face(s). ` +
                   "Detect EVERY clearly visible human face and return a TIGHT bounding box around each face " +
                   "(forehead → chin, ear → ear — exclude shoulders & background). " +
                   "Return STRICT JSON only — no prose, no markdown fences. " +
@@ -283,22 +199,13 @@ export async function detectPlateFaces(params: {
     console.warn(`${tag} cache read failed: ${(e as Error)?.message}`);
   }
 
-  // 2. Extract a real frame from the plate.
-  const frameUrl = await extractPlateFrame({
-    supabase: params.supabase,
-    plateUrl: params.plateUrl,
-    midDurationSec: params.midDurationSec,
-    sceneId: params.sceneId,
-    projectId: params.projectId,
-  });
-  if (!frameUrl) {
-    console.warn(`${tag} frame extract FAILED — caller should fall back`);
-    return null;
-  }
-  console.log(`${tag} frame extracted url=${frameUrl.slice(0, 100)}`);
+  // 2. v98: no Replicate extraction — Gemini reads the mp4 directly.
+  const frameUrl = resolveFrameUrl(params.plateUrl);
+  const tsHint = Math.max(0.2, params.midDurationSec * 0.5);
+  console.log(`${tag} gemini-direct-mp4 ts≈${tsHint.toFixed(2)}s url=${frameUrl.slice(0, 100)}`);
 
   // 3. Ask Gemini Vision for face bboxes on the real plate frame.
-  const rawFaces = await askGeminiForPlateFaces(frameUrl, params.expectedCount);
+  const rawFaces = await askGeminiForPlateFaces(frameUrl, params.expectedCount, tsHint);
   if (rawFaces.length === 0) {
     console.warn(`${tag} gemini returned 0 faces — caller should fall back`);
     return null;
