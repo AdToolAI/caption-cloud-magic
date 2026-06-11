@@ -199,22 +199,13 @@ export async function detectPlateFaces(params: {
     console.warn(`${tag} cache read failed: ${(e as Error)?.message}`);
   }
 
-  // 2. Extract a real frame from the plate.
-  const frameUrl = await extractPlateFrame({
-    supabase: params.supabase,
-    plateUrl: params.plateUrl,
-    midDurationSec: params.midDurationSec,
-    sceneId: params.sceneId,
-    projectId: params.projectId,
-  });
-  if (!frameUrl) {
-    console.warn(`${tag} frame extract FAILED — caller should fall back`);
-    return null;
-  }
-  console.log(`${tag} frame extracted url=${frameUrl.slice(0, 100)}`);
+  // 2. v98: no Replicate extraction — Gemini reads the mp4 directly.
+  const frameUrl = resolveFrameUrl(params.plateUrl);
+  const tsHint = Math.max(0.2, params.midDurationSec * 0.5);
+  console.log(`${tag} gemini-direct-mp4 ts≈${tsHint.toFixed(2)}s url=${frameUrl.slice(0, 100)}`);
 
   // 3. Ask Gemini Vision for face bboxes on the real plate frame.
-  const rawFaces = await askGeminiForPlateFaces(frameUrl, params.expectedCount);
+  const rawFaces = await askGeminiForPlateFaces(frameUrl, params.expectedCount, tsHint);
   if (rawFaces.length === 0) {
     console.warn(`${tag} gemini returned 0 faces — caller should fall back`);
     return null;
