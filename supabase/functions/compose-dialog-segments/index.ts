@@ -2356,19 +2356,38 @@ serve(async (req) => {
     // fallen weiterhin auf den preclip-Pfad zurück (unverändert).
     const skipPreclipForEdgeSpeaker =
       speakerIsEdgePositioned && haveBboxUrlPathForEdge;
-    const skipPreclipForMultiSpeaker =
-      speakers.length >= 2 && haveBboxUrlPathForEdge;
+    // v105 — Sync.so 3 docs: for multi-speaker clips the recommended pattern
+    // is full-plate video + deterministic ASD (bounding_boxes(_url) OR
+    // frame_number+coordinates with `auto_detect=false`). Auto-detect on a
+    // 512x512 single-face preclip is documented for "single/obvious speaker"
+    // only and routinely yielded COMPLETED jobs with no visible mouth motion
+    // on 4-speaker scenes (DB-verified for scene ddde37a6 on 2026-06-11).
+    // We now ALWAYS skip the preclip for N>=2; if plate-identity is
+    // unresolved the dispatcher falls back to coords-pro (frame_number +
+    // coordinates), which is also doc-compliant and deterministic.
+    const skipPreclipForMultiSpeaker = speakers.length >= 2;
     if (skipPreclipForEdgeSpeaker) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate bbox-url-pro dispatch`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate deterministic ASD dispatch`,
       );
     } else if (skipPreclipForMultiSpeaker) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v97_multi_speaker_skip_preclip speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} → full-plate bbox-url-pro dispatch (sync-3 native multi-face)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_multi_speaker_force_fullplate speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} → full-plate sync-3 deterministic ASD (bbox-url-pro or coords-pro)`,
       );
     }
+    // v105 — Clear stale preclip state so a previously-rendered preclip from
+    // a pre-v105 dispatch cannot resurrect the auto_detect path on retry.
+    if (skipPreclipForMultiSpeaker && ((pass as any).preclip_url || (pass as any).preclip_crop)) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_clear_stale_preclip url=…${String((pass as any).preclip_url ?? "").slice(-40)}`,
+      );
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_crop = null;
+      (pass as any).preclip_duration_sec = null;
+      (pass as any).preclip_render_id = null;
+    }
     const wantPassPreclip =
-      speakers.length >= 1 &&
+      speakers.length === 1 &&
       !!plateDims &&
       Array.isArray(pass.coords) &&
       Number.isFinite(pass.coords[0]) &&
@@ -2851,8 +2870,53 @@ serve(async (req) => {
       webhookUrl: diagnosticWebhookUrl,
       webhook_url: diagnosticWebhookUrl,
     };
+    // v105 — Compliance probe of the ACTUAL outgoing Sync.so payload.
+    // We previously persisted v102/v103 probes computed from the per-speaker
+    // full-length WAV, which masked the real input. v105 reads back from
+    // `payload.input[].audio.url` so the dispatch log proves auto_detect
+    // is OFF for N>=2 and the ASD shape is the one Sync.so docs require.
+    const asdForProbe = (syncOptions as any).active_speaker_detection ?? null;
+    const v105Probe = {
+      stage: usePassPreclip
+        ? "preclip-sync3-autodetect-v105"
+        : "fullplate-sync3-deterministic-v105",
+      model_intent: "sync-3",
+      payload_model: payloadModel,
+      dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+      retry_variant: retryVariant,
+      asd_mode: asdForProbe?.auto_detect === true
+        ? "auto_detect"
+        : asdForProbe?.bounding_boxes_url
+          ? "bounding_boxes_url"
+          : Array.isArray(asdForProbe?.bounding_boxes)
+            ? "bounding_boxes_inline"
+            : asdForProbe?.frame_number != null
+              ? "coordinates"
+              : "unknown",
+      asd_auto_detect: asdForProbe?.auto_detect === true,
+      asd_has_bounding_boxes_url: !!asdForProbe?.bounding_boxes_url,
+      asd_has_coordinates: Array.isArray(asdForProbe?.coordinates),
+      asd_frame_number: asdForProbe?.frame_number ?? null,
+      sync_mode: (syncOptions as any).sync_mode,
+      speakers: speakers.length,
+      payload_audio_url: pass.audio_url,
+      payload_video_url: dispatchVideoUrl,
+    };
+    (pass as any)._v105_probe = v105Probe;
+    // Hard-fail multi-speaker dispatches that still try to send auto_detect:
+    // this is the doc-violating shape that produced "Frozen mouths" on
+    // scene ddde37a6 (4 speakers, COMPLETED jobs, no lip motion).
+    if (speakers.length >= 2 && asdForProbe?.auto_detect === true) {
+      return await failBeforeProviderDispatch(
+        "multi_speaker_auto_detect_blocked",
+        "asd_auto_detect_on_multi_speaker",
+        "Refusing to dispatch sync-3 with auto_detect=true on a multi-speaker scene; deterministic ASD (coordinates or bounding_boxes) is required.",
+        500,
+        { v105_probe: v105Probe },
+      );
+    }
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v53_doc_strict tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "none"} segments_secs=disabled windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_doc_strict ${JSON.stringify(v105Probe)} tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "none"} windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
     );
 
     // ── Length sanity log ────────────────────────────────────────────────
@@ -3084,6 +3148,7 @@ serve(async (req) => {
         // hypothesis without grepping edge logs.
         v102_probe: (pass as any)._v102_probe ?? null,
         v103_probe: (pass as any)._v102_probe ?? null,
+        v105_probe: (pass as any)._v105_probe ?? null,
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
         dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
         payload_summary: {
