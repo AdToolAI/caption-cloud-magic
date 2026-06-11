@@ -336,6 +336,14 @@ serve(async (req) => {
   let lockSupabase: any = null;
   let lockSceneId: string | null = null;
   let lockHolder: string | null = null;
+  // v100 — crash-safe envelope: keep sceneId/userId/syncApiKey reachable from
+  // the outer catch so an uncaught throw before/after dispatch can immediately
+  // mark the scene `failed` (with refund) instead of leaving it `pending` until
+  // lipsync-watchdog wakes 4 min later and calls failLipSync("preflight_aborted").
+  let crashSceneId: string | null = null;
+  let crashUserId: string | null = null;
+  let crashSupabase: any = null;
+  let crashSyncApiKey: string | null = null;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -437,6 +445,15 @@ serve(async (req) => {
       .single();
     const userId = project?.user_id;
     if (!userId) return json({ error: "missing_user" }, 403);
+
+    // v100 — register sceneId/userId/supabase/syncApiKey for the crash-safe
+    // outer catch (line ~3107). From this point on, any uncaught throw will
+    // mark the scene `failed` + refund immediately so the user does not have
+    // to wait for lipsync-watchdog.
+    crashSceneId = sceneId;
+    crashUserId = userId;
+    crashSupabase = supabase;
+    crashSyncApiKey = syncApiKey || null;
 
     // ── Plan v72 — Dispatch-attempt breadcrumb ───────────────────────────
     // Emit a lightweight DISPATCH_ATTEMPT_STARTED log right after lock + scene
@@ -587,17 +604,69 @@ serve(async (req) => {
       existing &&
       (existingStatus === "failed" || /v68|v58|v41|v56|recovery refund|provider_unknown/i.test(existingError));
     if (isStaleFailedState) {
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} reset_required — refusing stale failed state status=${existingStatus} error=${existingError.slice(0, 160)}`,
+      // v100 — Self-heal stale watchdog-killed terminal state on auto-trigger.
+      // When the watchdog (or any prior failure) refunded credits and parked
+      // dialog_shots in {status:failed, refunded:true}, the previous
+      // behaviour returned 409 reset_required, forcing the user to click
+      // "Sauber neu starten" manually. For auto-trigger calls we now clear
+      // the stale state in-line and continue with a clean dispatch. Manual
+      // invocations (auto !== true) still get the 409 so the explicit reset
+      // button remains the user's eskalation path.
+      const isAutoTrigger = body?.auto === true || body?.recovery === true;
+      const existingPasses = Array.isArray((existing as any)?.passes)
+        ? ((existing as any).passes as Array<{ status?: string }>)
+        : [];
+      const hasActivePass = existingPasses.some((p) =>
+        ["queued", "rendering", "retrying"].includes(String(p?.status ?? "")),
       );
-      return json(
-        {
-          error: "reset_required",
-          message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before v69 dispatch.",
-        },
-        409,
-      );
+      const isCleanlyRefunded =
+        (existing as any)?.refunded === true && !hasActivePass;
+      const canAutoReset =
+        isAutoTrigger &&
+        existingStatus === "failed" &&
+        isCleanlyRefunded;
+
+      if (canAutoReset) {
+        console.log(
+          `[compose-dialog-segments] v100 auto-reset-stale-failed scene=${sceneId} prev_error=${existingError.slice(0, 120)}`,
+        );
+        const { error: resetErr } = await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: null,
+            lip_sync_status: "pending",
+            clip_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        if (resetErr) {
+          console.warn(
+            `[compose-dialog-segments] v100 auto-reset write_failed scene=${sceneId} err=${resetErr.message} — falling back to 409`,
+          );
+          return json(
+            {
+              error: "reset_required",
+              message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before dispatch.",
+            },
+            409,
+          );
+        }
+        // Continue with a clean slate — `existing` is now logically null.
+        (scene as any).dialog_shots = null;
+      } else {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} reset_required — refusing stale failed state status=${existingStatus} error=${existingError.slice(0, 160)} auto=${isAutoTrigger} refunded=${(existing as any)?.refunded === true} hasActivePass=${hasActivePass}`,
+        );
+        return json(
+          {
+            error: "reset_required",
+            message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before v69 dispatch.",
+          },
+          409,
+        );
+      }
     }
+
     if (
       !isRetry &&
       !isAdvance &&
@@ -3098,8 +3167,48 @@ serve(async (req) => {
       202,
     );
   } catch (e) {
-    console.error("[compose-dialog-segments] error", e);
-    return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
+    const errMsg = e instanceof Error ? e.message : String(e ?? "unknown");
+    const errStack = e instanceof Error ? e.stack ?? "" : "";
+    console.error(
+      `[compose-dialog-segments] dispatch_crash scene=${crashSceneId ?? "n/a"} err=${errMsg}\n${errStack}`,
+    );
+    // v100 — Crash-safe envelope: if we already knew which scene we were
+    // dispatching for, mark it failed+refund immediately so the user does not
+    // see a phantom `pending` for 4 min until lipsync-watchdog fires
+    // STALE_PREFLIGHT_MS. The Schicht A auto-reset above will then self-heal
+    // on the next 30s auto-tick without manual intervention.
+    if (crashSceneId && crashUserId && crashSupabase) {
+      try {
+        await logSyncDispatch(crashSupabase, {
+          scene_id: crashSceneId,
+          user_id: crashUserId,
+          engine: "sync-segments",
+          sync_status: "DISPATCH_CRASH",
+          error_class: "dispatch_crash",
+          error_message: errMsg.slice(0, 500),
+          meta: { stack: errStack.slice(0, 1000) },
+        });
+      } catch (logErr) {
+        console.warn(
+          `[compose-dialog-segments] crash_log_failed scene=${crashSceneId} err=${(logErr as Error)?.message ?? logErr}`,
+        );
+      }
+      try {
+        await failLipSync({
+          supabase: crashSupabase,
+          sceneId: crashSceneId,
+          userId: crashUserId,
+          reason: `dispatch_crash: ${errMsg.slice(0, 160)}`,
+          refundCredits: 0,
+          syncApiKey: crashSyncApiKey,
+        });
+      } catch (failErr) {
+        console.warn(
+          `[compose-dialog-segments] crash_failLipSync_failed scene=${crashSceneId} err=${(failErr as Error)?.message ?? failErr}`,
+        );
+      }
+    }
+    return json({ error: errMsg }, 500);
   } finally {
     if (lockSupabase && lockSceneId && lockHolder) {
       try {
