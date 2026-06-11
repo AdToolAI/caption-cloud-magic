@@ -28,6 +28,13 @@ interface Body {
   portraitUrls?: string[];
   /** Optional character names matched 1:1 with portraitUrls (used in prompt). */
   characterNames?: string[];
+  /** v111 — canonical face-only reference portraits aligned 1:1 with
+   *  `portraitUrls`. When `portraitUrls` contains outfit covers (full-body
+   *  Gemini renders that occasionally drift in identity), these canonical
+   *  headshots are appended as ADDITIONAL reference images and labelled
+   *  "IDENTITY reference for <name>" so Nano Banana 2 anchors the face to
+   *  the real person and the wardrobe to the outfit cover. */
+  identityPortraitUrls?: string[];
   scenePrompt: string;
   aspectRatio?: "16:9" | "9:16" | "1:1";
   shotType?: string;
@@ -35,14 +42,12 @@ interface Body {
    *  block. Used by compose-video-clips on the SECOND attempt after the
    *  first anchor showed a cloned identity or an extra person. */
   strictNoDuplicates?: boolean;
-  /** Stage A — World Assets as Visual References.
-   * Each array supplies up to N additional reference images that Nano Banana 2
-   * composes INTO the same first frame as the cast portraits.
-   *  - locationUrls: max 1 (background / environment identity)
-   *  - buildingUrls: max 1 (named architecture / landmark identity)
-   *  - propUrls    : max 3 (hand-held / on-table objects)
-   * Names are matched 1:1 with the URLs and used to label each ref in the
-   * edit prompt so the model knows what each image represents. */
+  /** v111 — strict identity-swap retry mode. When set, append a SWAP RETRY
+   *  clause naming the specific characters whose face was rendered wrong on
+   *  the previous attempt. */
+  strictSwapMode?: boolean;
+  swapMismatches?: string[];
+  /** Stage A — World Assets as Visual References. */
   locationUrls?: string[];
   buildingUrls?: string[];
   propUrls?: string[];
