@@ -446,6 +446,15 @@ serve(async (req) => {
     const userId = project?.user_id;
     if (!userId) return json({ error: "missing_user" }, 403);
 
+    // v100 — register sceneId/userId/supabase/syncApiKey for the crash-safe
+    // outer catch (line ~3107). From this point on, any uncaught throw will
+    // mark the scene `failed` + refund immediately so the user does not have
+    // to wait for lipsync-watchdog.
+    crashSceneId = sceneId;
+    crashUserId = userId;
+    crashSupabase = supabase;
+    crashSyncApiKey = syncApiKey || null;
+
     // ── Plan v72 — Dispatch-attempt breadcrumb ───────────────────────────
     // Emit a lightweight DISPATCH_ATTEMPT_STARTED log right after lock + scene
     // load. Lets the watchdog and ops queries distinguish three states:
