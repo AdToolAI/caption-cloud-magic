@@ -1176,6 +1176,101 @@ serve(async (req) => {
       );
     }
 
+    // ── v107 — Coords-Collision Guard (Multi-Speaker, fresh dispatch) ────
+    // Two faces with pixel coords closer than max(120 px, plate.width * 0.08)
+    // are indistinguishable to Sync.so sync-3 active-speaker-detection on
+    // the full plate AND produce overlapping single-face preclip crops on
+    // the v69 pipeline (sibling cap collapses them into the same square).
+    // Refuse to dispatch in that state, refund, surface a clear error.
+    // DB-verified for scene 89db58ca (4 speakers, coords 838 & 901 px on
+    // 1376 px-wide plate, Δ 63 px → "2 mouths closed, 2 mouths speak all").
+    if (
+      speakers.length >= 2 &&
+      plateDims &&
+      !isAdvance &&
+      !isRetry
+    ) {
+      const pts: Array<[number, number, number]> = speakerCoords
+        .map((c, i) => (c ? [Number(c[0]), Number(c[1]), i] as [number, number, number] : null))
+        .filter((p): p is [number, number, number] => !!p && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+      let minDist = Infinity;
+      let collisionPair: [number, number] | null = null;
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const dx = pts[i][0] - pts[j][0];
+          const dy = pts[i][1] - pts[j][1];
+          const d = Math.hypot(dx, dy);
+          if (d < minDist) {
+            minDist = d;
+            collisionPair = [pts[i][2], pts[j][2]];
+          }
+        }
+      }
+      const minAllowed = Math.max(120, Math.round(plateDims.width * 0.08));
+      if (collisionPair && minDist < minAllowed) {
+        const reason = `face_coords_collision_${Math.round(minDist)}px_min_${minAllowed}px_pair_${collisionPair[0]}_${collisionPair[1]}`;
+        console.error(`[compose-dialog-segments] scene=${sceneId} v107 COORDS_COLLISION_BLOCK ${reason}`);
+        const existingDsCC: any = (existing ?? {}) as any;
+        const alreadyRefundedCC = !!existingDsCC?.refunded;
+        if (!alreadyRefundedCC) {
+          const { data: wCC } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(wCC?.balance ?? 0) + Number(totalCost ?? 0),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...existingDsCC,
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: Number(existingDsCC?.cost_credits ?? totalCost ?? 0),
+              refunded: !alreadyRefundedCC,
+              error: reason,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: `v107_coords_collision:${reason}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_status: "PREFLIGHT_BLOCKED",
+          error_class: "v107_coords_collision",
+          error_message: reason,
+          meta: {
+            speakers: speakers.length,
+            plate_dims: plateDims,
+            min_dist_px: minDist,
+            min_allowed_px: minAllowed,
+            collision_pair: collisionPair,
+            coords: speakerCoords,
+            coord_sources: coordSources,
+          },
+        });
+        return json(
+          {
+            error: "face_coords_collision",
+            reason,
+            refunded: alreadyRefundedCC ? 0 : Number(totalCost ?? 0),
+          },
+          422,
+        );
+      }
+    }
+
+
+
+
 
 
     // ─────────────────────────────────────────────────────────────────────
@@ -2356,45 +2451,29 @@ serve(async (req) => {
     // fallen weiterhin auf den preclip-Pfad zurück (unverändert).
     const skipPreclipForEdgeSpeaker =
       speakerIsEdgePositioned && haveBboxUrlPathForEdge;
-    // v105 — Sync.so 3 docs: for multi-speaker clips the recommended pattern
-    // is full-plate video + deterministic ASD (bounding_boxes(_url) OR
-    // frame_number+coordinates with `auto_detect=false`). Auto-detect on a
-    // 512x512 single-face preclip is documented for "single/obvious speaker"
-    // only and routinely yielded COMPLETED jobs with no visible mouth motion
-    // on 4-speaker scenes (DB-verified for scene ddde37a6 on 2026-06-11).
-    // We now ALWAYS skip the preclip for N>=2; if plate-identity is
-    // unresolved the dispatcher falls back to coords-pro (frame_number +
-    // coordinates), which is also doc-compliant and deterministic.
-    const skipPreclipForMultiSpeaker = speakers.length >= 2;
+    // v107 — Hard-preclip enforcement: every multi-speaker pass MUST go
+    // through the single-face preclip path. v105 force-fullplate was the
+    // root cause of the "2 mouths closed, 2 mouths speak everyone's lines"
+    // failure on 4-speaker scenes (DB-verified 89db58ca on 2026-06-11):
+    // coords 838 px and 901 px (Δ 63 px on 1376 px wide plate) collided so
+    // sync-3 routed two audios onto the same face and morphed neighbours
+    // together. Only exception: edge-speaker bbox-url-pro path (v88), which
+    // is doc-compliant on the full multi-face plate. If a preclip can't be
+    // produced for an N>=2 pass we MUST hard-fail with refund — no silent
+    // full-plate fallback. See mem/architecture/lipsync/v107-hard-preclip-enforcement.md.
     if (skipPreclipForEdgeSpeaker) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate deterministic ASD dispatch`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate deterministic ASD (bbox-url-pro)`,
       );
-    } else if (skipPreclipForMultiSpeaker) {
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_multi_speaker_force_fullplate speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} → full-plate sync-3 deterministic ASD (bbox-url-pro or coords-pro)`,
-      );
-    }
-    // v105 — Clear stale preclip state so a previously-rendered preclip from
-    // a pre-v105 dispatch cannot resurrect the auto_detect path on retry.
-    if (skipPreclipForMultiSpeaker && ((pass as any).preclip_url || (pass as any).preclip_crop)) {
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_clear_stale_preclip url=…${String((pass as any).preclip_url ?? "").slice(-40)}`,
-      );
-      (pass as any).preclip_url = null;
-      (pass as any).preclip_crop = null;
-      (pass as any).preclip_duration_sec = null;
-      (pass as any).preclip_render_id = null;
     }
     const wantPassPreclip =
-      speakers.length === 1 &&
+      speakers.length >= 1 &&
       !!plateDims &&
       Array.isArray(pass.coords) &&
       Number.isFinite(pass.coords[0]) &&
       Number.isFinite(pass.coords[1]) &&
       !!tightAudioInfo &&
-      !skipPreclipForEdgeSpeaker &&
-      !skipPreclipForMultiSpeaker;
+      !skipPreclipForEdgeSpeaker;
 
     if (wantPassPreclip && !(pass as any).preclip_url) {
       // v94: Window spans the UNION of all turns for this speaker, not just
@@ -2533,6 +2612,88 @@ serve(async (req) => {
     // auto_detect (the cropped 512x512 frame has exactly ONE face).
     const passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
     const usePassPreclip = !!passPreclipUrl;
+
+    // ── v107 — Hard-fail Multi-Speaker without preclip ───────────────────
+    // For N>=2 we forbid full-plate dispatch unless the pass is explicitly
+    // on the doc-compliant edge-speaker bbox-url-pro path. Anything else
+    // (preclip render failed, face-gate blocked, coords missing, tight
+    // audio missing) means Sync.so would otherwise see the multi-face
+    // plate with ambiguous coords → wrong-face / morph bug. Fail clean.
+    if (
+      speakers.length >= 2 &&
+      !usePassPreclip &&
+      !skipPreclipForEdgeSpeaker
+    ) {
+      const failReason = (pass as any).preclip_error ?? "preclip_prerequisites_missing";
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v107_multispeaker_preclip_required_BLOCK reason=${failReason} — refusing full-plate dispatch`,
+      );
+      const existingDsLocal: any = (scene as any)?.dialog_shots ?? existing ?? {};
+      const alreadyRefunded107 = !!existingDsLocal?.refunded;
+      if (!alreadyRefunded107) {
+        const { data: wV } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({
+            balance: Number(wV?.balance ?? 0) + Number(totalCost ?? 0),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+      }
+      const passesPatched = passes.map((p, i) =>
+        i === currentPassIdx
+          ? { ...p, status: "failed" as const, last_error: failReason, last_error_class: "v107_preclip_required" }
+          : p,
+      );
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...existingDsLocal,
+            version: 5,
+            engine: "sync-segments",
+            passes: passesPatched,
+            status: "failed",
+            cost_credits: Number(existingDsLocal?.cost_credits ?? totalCost ?? 0),
+            refunded: !alreadyRefunded107,
+            error: `v107_preclip_required_pass_${currentPassIdx + 1}:${failReason}`,
+            finished_at: new Date().toISOString(),
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: `v107_preclip_required_for_multispeaker:${failReason}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "PREFLIGHT_BLOCKED",
+        error_class: "v107_preclip_required",
+        error_message: failReason,
+        meta: {
+          pass_idx: currentPassIdx,
+          speakers: speakers.length,
+          plate_dims: plateDims ?? null,
+          preclip_error: (pass as any).preclip_error ?? null,
+          preclip_face_count: (pass as any).preclip_face_count ?? null,
+          have_tight_audio: !!tightAudioInfo,
+          have_coords:
+            Array.isArray(pass.coords) &&
+            Number.isFinite(Number(pass.coords?.[0])) &&
+            Number.isFinite(Number(pass.coords?.[1])),
+        },
+      });
+      return json(
+        {
+          error: "v107_preclip_required_for_multispeaker",
+          reason: failReason,
+          refunded: alreadyRefunded107 ? 0 : Number(totalCost ?? 0),
+        },
+        422,
+      );
+    }
+
 
 
 
