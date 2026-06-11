@@ -1229,6 +1229,14 @@ serve(async (req) => {
                   (u): u is string => typeof u === "string" && u.length > 0,
                 )
                 .slice(0, 4);
+              // v111 — canonical face-only identity refs, aligned 1:1 with
+              // portraitUrls. When the primary slot is an outfit cover (which
+              // sometimes drifts in identity), this gives Nano Banana 2 the
+              // real face as a separate ground-truth image.
+              const identityPortraitUrls = effectiveShots
+                .slice(0, portraitUrls.length)
+                .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
+                .filter((u): u is string => typeof u === "string" && u.length > 0);
               const characterNames = effectiveShots
                 .map((cs) => charById.get(cs.characterId)?.name)
                 .filter(
