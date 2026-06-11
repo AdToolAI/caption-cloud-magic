@@ -135,11 +135,13 @@ export async function resolvePlateFaceIdentities(params: {
   if (!plateMap || plateMap.faces.length === 0) return null;
 
   let identityBySlot = new Map<number, { characterId: string; confidence: number }>();
+  const idTsHint = Math.max(0.2, params.midDurationSec * 0.5);
   if (plateMap.frame_url && params.characters.length >= 1 && plateMap.faces.length >= 2) {
     identityBySlot = await askGeminiForPlateIdentity(
       plateMap.frame_url,
       params.characters,
       plateMap.faces,
+      idTsHint,
     );
   } else if (params.characters.length === 1 && plateMap.faces.length >= 1) {
     identityBySlot.set(0, { characterId: params.characters[0].characterId, confidence: 0.9 });
