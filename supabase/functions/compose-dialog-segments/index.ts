@@ -3170,6 +3170,12 @@ serve(async (req) => {
         },
         video_probe: videoProbe,
         audio_diagnostics: audioDiagnostics.find((d) => d.pass === pass.idx) ?? null,
+        // v102 Step A — alignment probe persisted on every DISPATCHED row so
+        // we can query syncso_dispatch_log.meta->'v102_probe' across all
+        // failing passes to verify the bbox/video/audio frame-count mismatch
+        // hypothesis without grepping edge logs.
+        v102_probe: (pass as any)._v102_probe ?? null,
+        preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
         payload_summary: {
           model: payload.model,
           input_video: passInputUrl,
