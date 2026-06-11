@@ -2534,19 +2534,79 @@ serve(async (req) => {
       syncOptions.occlusion_detection_enabled = true;
     }
     if (usePassPreclip) {
-      // v100 — Doku-konform: bei einem expliziten Single-Face Preclip
-      // (Remotion-Crop ≥ 384px, exactly ONE face guaranteed by v77 face-gate
-      // and v76 neighbor-aware recenter) ist `active_speaker_detection`
-      // entweder gar nicht nötig ODER `auto_detect: true`. Die v99 Variante
-      // mit hartkodierten `bounding_boxes` über jeden Frame eines bereits
-      // einseitigen Crops ist genau das Anti-Pattern, das Sync.so reproduzierbar
-      // mit `An unknown error occurred.` quittiert (4/4 Passes in Szene
-      // 720fd0b1 = totaler Komplett-Fail). sync-3 baut globales Verständnis
-      // pro Shot — bei One-Face-Input ist Auto-Detect deterministisch.
-      syncOptions.active_speaker_detection = { auto_detect: true };
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v100_preclip_autodetect speaker=${pass.speaker_name} preclip=${passPreclipUrl?.split("/").pop()}`,
-      );
+      // v101 — Re-enable v99 explicit crop-local bounding boxes for preclip
+      // dispatch. DB-verified silent no-op (scene 07185a89, all 4 speakers
+      // `done` but mouths closed) reproduces when we send `auto_detect:true`
+      // on the 512×512 single-face preclip — Sync.so happily returns the
+      // input unchanged. Explicit per-frame bbox in CROP-LOCAL output pixels
+      // forces sync-3 to actually animate the mouth region. We keep the
+      // v100 safer `temperature: 0.5` so we do NOT reintroduce the v99
+      // `temperature: 1.0` + bbox combination that triggered
+      // `provider_unknown_error` on scene 720fd0b1.
+      const preCrop = (pass as any).preclip_crop as
+        | { x: number; y: number; size: number; outputSize: number }
+        | undefined;
+      const fmFacesP: any[] = Array.isArray((faceMap as any)?.faces)
+        ? (faceMap as any).faces
+        : [];
+      const fmWP = Number((faceMap as any)?.width) || plateDims?.width || 0;
+      const fmHP = Number((faceMap as any)?.height) || plateDims?.height || 0;
+      const matchedFaceP =
+        fmFacesP.find((f) => f?.characterId && f.characterId === pass.character_id) ??
+        fmFacesP.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
+        null;
+      let platePixelBbox: [number, number, number, number] | null =
+        speakerPlateBboxes[pass.speaker_idx] ?? null;
+      if (!platePixelBbox && matchedFaceP && Array.isArray(matchedFaceP.bbox) && matchedFaceP.bbox.length === 4 && fmWP > 0 && fmHP > 0 && plateDims) {
+        const [bx1, by1, bx2, by2] = matchedFaceP.bbox.map((n: any) => Number(n));
+        const sx = plateDims.width / fmWP;
+        const sy = plateDims.height / fmHP;
+        platePixelBbox = [
+          Math.round(bx1 * sx),
+          Math.round(by1 * sy),
+          Math.round(bx2 * sx),
+          Math.round(by2 * sy),
+        ];
+      }
+      let cropLocalBox: [number, number, number, number] | null = null;
+      if (preCrop && platePixelBbox) {
+        const scale = preCrop.outputSize / Math.max(1, preCrop.size);
+        const [bx1, by1, bx2, by2] = platePixelBbox;
+        const w = bx2 - bx1;
+        const h = by2 - by1;
+        const pad = Math.max(w, h) * 0.12;
+        const lx1 = (bx1 - pad - preCrop.x) * scale;
+        const ly1 = (by1 - pad - preCrop.y) * scale;
+        const lx2 = (bx2 + pad - preCrop.x) * scale;
+        const ly2 = (by2 + pad - preCrop.y) * scale;
+        const out = preCrop.outputSize;
+        const cx1 = Math.max(0, Math.round(lx1));
+        const cy1 = Math.max(0, Math.round(ly1));
+        const cx2 = Math.min(out, Math.round(lx2));
+        const cy2 = Math.min(out, Math.round(ly2));
+        if (cx2 > cx1 + 4 && cy2 > cy1 + 4) {
+          cropLocalBox = [cx1, cy1, cx2, cy2];
+        }
+      }
+      if (cropLocalBox) {
+        const durForFrames = tightAudioInfo?.durSec ?? totalSec;
+        const frameCount = Math.max(1, Math.ceil(durForFrames * 30));
+        const boundingBoxes: number[][] = new Array(frameCount).fill(cropLocalBox);
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          bounding_boxes: boundingBoxes,
+        };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v101_preclip_bbox speaker=${pass.speaker_name} cropLocalBox=${JSON.stringify(cropLocalBox)} frames=${frameCount} preCrop=${JSON.stringify(preCrop)} plateBbox=${JSON.stringify(platePixelBbox)}`,
+        );
+      } else {
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v101_preclip_bbox_skip preCrop=${!!preCrop} plateBbox=${!!platePixelBbox} — falling back to auto_detect:true`,
+        );
+      }
+
+
 
 
 
