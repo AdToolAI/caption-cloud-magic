@@ -1611,7 +1611,7 @@ serve(async (req) => {
 
 
     // ── Concurrency guard ────────────────────────────────────────────────
-    const MAX_INFLIGHT = 3;
+    const MAX_INFLIGHT = 4; // v98: raised from 3 so 4-speaker scenes dispatch in one wave
     const inflightCount = await countInflightSyncJobs(supabase, 10);
     if (inflightCount >= MAX_INFLIGHT) {
       console.warn(
