@@ -95,6 +95,11 @@ serve(async (req) => {
       : (body.portraitUrl ? [body.portraitUrl] : []);
     const names = (body.characterNames ?? []).slice(0, portraits.length);
 
+    // v111 — canonical identity refs (face-only headshots), 1:1 with portraits.
+    const identityPortraits = (body.identityPortraitUrls ?? [])
+      .filter((u) => typeof u === "string" && u.length > 0)
+      .slice(0, portraits.length);
+
     // Stage A — World refs. Hard caps: 1 location, 1 building, 3 props.
     const locationUrls = (body.locationUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 1);
     const buildingUrls = (body.buildingUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 1);
