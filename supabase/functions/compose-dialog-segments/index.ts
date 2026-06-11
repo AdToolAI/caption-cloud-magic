@@ -2593,13 +2593,7 @@ serve(async (req) => {
       );
     }
 
-
-
-
-
-
-
-    } else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
+    else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
       // https://sync.so/docs/developer-guides/speaker-selection):
       // frame_number = a frame WHERE THE SPEAKER IS VISIBLE. We anchor on
