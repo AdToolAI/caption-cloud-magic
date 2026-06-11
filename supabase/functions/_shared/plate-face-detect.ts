@@ -86,10 +86,11 @@ interface GeminiFace {
   confidence?: number;
 }
 
-/** Ask Gemini Vision for normalized face bboxes on the extracted frame. */
+/** Ask Gemini Vision for normalized face bboxes — accepts an mp4 URL plus timestamp hint. */
 async function askGeminiForPlateFaces(
   frameUrl: string,
   expectedCount: number,
+  timestampSec: number,
 ): Promise<GeminiFace[]> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) {
@@ -115,7 +116,8 @@ async function askGeminiForPlateFaces(
               {
                 type: "text",
                 text:
-                  `This is a single frame from a rendered video that should contain ${want} human face(s). ` +
+                  `Look at the frame at timestamp ${timestampSec.toFixed(2)}s of this video. ` +
+                  `That frame should contain ${want} human face(s). ` +
                   "Detect EVERY clearly visible human face and return a TIGHT bounding box around each face " +
                   "(forehead → chin, ear → ear — exclude shoulders & background). " +
                   "Return STRICT JSON only — no prose, no markdown fences. " +
