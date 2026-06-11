@@ -2870,8 +2870,53 @@ serve(async (req) => {
       webhookUrl: diagnosticWebhookUrl,
       webhook_url: diagnosticWebhookUrl,
     };
+    // v105 — Compliance probe of the ACTUAL outgoing Sync.so payload.
+    // We previously persisted v102/v103 probes computed from the per-speaker
+    // full-length WAV, which masked the real input. v105 reads back from
+    // `payload.input[].audio.url` so the dispatch log proves auto_detect
+    // is OFF for N>=2 and the ASD shape is the one Sync.so docs require.
+    const asdForProbe = (syncOptions as any).active_speaker_detection ?? null;
+    const v105Probe = {
+      stage: usePassPreclip
+        ? "preclip-sync3-autodetect-v105"
+        : "fullplate-sync3-deterministic-v105",
+      model_intent: "sync-3",
+      payload_model: payloadModel,
+      dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+      retry_variant: retryVariant,
+      asd_mode: asdForProbe?.auto_detect === true
+        ? "auto_detect"
+        : asdForProbe?.bounding_boxes_url
+          ? "bounding_boxes_url"
+          : Array.isArray(asdForProbe?.bounding_boxes)
+            ? "bounding_boxes_inline"
+            : asdForProbe?.frame_number != null
+              ? "coordinates"
+              : "unknown",
+      asd_auto_detect: asdForProbe?.auto_detect === true,
+      asd_has_bounding_boxes_url: !!asdForProbe?.bounding_boxes_url,
+      asd_has_coordinates: Array.isArray(asdForProbe?.coordinates),
+      asd_frame_number: asdForProbe?.frame_number ?? null,
+      sync_mode: (syncOptions as any).sync_mode,
+      speakers: speakers.length,
+      payload_audio_url: pass.audio_url,
+      payload_video_url: dispatchVideoUrl,
+    };
+    (pass as any)._v105_probe = v105Probe;
+    // Hard-fail multi-speaker dispatches that still try to send auto_detect:
+    // this is the doc-violating shape that produced "Frozen mouths" on
+    // scene ddde37a6 (4 speakers, COMPLETED jobs, no lip motion).
+    if (speakers.length >= 2 && asdForProbe?.auto_detect === true) {
+      return await failBeforeProviderDispatch(
+        "multi_speaker_auto_detect_blocked",
+        "asd_auto_detect_on_multi_speaker",
+        "Refusing to dispatch sync-3 with auto_detect=true on a multi-speaker scene; deterministic ASD (coordinates or bounding_boxes) is required.",
+        500,
+        { v105_probe: v105Probe },
+      );
+    }
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v53_doc_strict tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "none"} segments_secs=disabled windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_doc_strict ${JSON.stringify(v105Probe)} tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "none"} windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
     );
 
     // ── Length sanity log ────────────────────────────────────────────────
