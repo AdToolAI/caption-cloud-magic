@@ -242,9 +242,16 @@ function buildFilterClauses(filters: AnalyticsFilters): string {
 async function getRealMetrics(startDate?: string, endDate?: string, compareEnabled = false, filters: AnalyticsFilters = {}) {
   console.log('[PostHog Analytics] Fetching real metrics from PostHog');
   
-  // Default to last 30 days if no date range provided
-  const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const end = endDate || new Date().toISOString();
+  // Default to last 30 days if no date range provided.
+  // CRITICAL: Validate inputs to prevent HogQL injection — values are interpolated into queries below.
+  const toSafeIso = (v: string | undefined, fallback: string): string => {
+    if (!v) return fallback;
+    const d = new Date(v);
+    if (isNaN(d.getTime())) throw new Error(`Invalid date: ${v}`);
+    return d.toISOString();
+  };
+  const start = toSafeIso(startDate, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+  const end = toSafeIso(endDate, new Date().toISOString());
   
   // Calculate previous period for comparison (same length as current period)
   const periodLength = new Date(end).getTime() - new Date(start).getTime();
