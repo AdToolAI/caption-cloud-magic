@@ -292,6 +292,15 @@ export default function BriefingTab({
 
       if (error) {
         console.warn('[BriefingTab] storyboard invoke error:', error, 'data:', data);
+        // Surface server-provided friendly message (especially the 503
+        // "AI Gateway temporarily unavailable" from the retry wrapper).
+        const friendly = (data as any)?.error;
+        const retryable = (data as any)?.retryable === true;
+        if (friendly) {
+          const e: any = new Error(friendly);
+          e.retryable = retryable;
+          throw e;
+        }
         throw error;
       }
       const rawScenes = Array.isArray(data?.scenes) ? data.scenes : null;
@@ -299,6 +308,7 @@ export default function BriefingTab({
         console.warn('[BriefingTab] storyboard returned no scenes. payload:', data);
         throw new Error(data?.error || t('videoComposer.storyboardError'));
       }
+
 
       // Apply default quality to all generated scenes
       const defaultQ: ClipQuality = briefing.defaultQuality || 'standard';
