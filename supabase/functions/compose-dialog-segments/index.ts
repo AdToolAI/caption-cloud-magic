@@ -2556,11 +2556,13 @@ serve(async (req) => {
       // is unambiguous and safe.
       syncOptions.active_speaker_detection = { auto_detect: true };
 
-      // v103 — sync_mode policy on preclip: when audio (per-pass tight VO)
-      // is longer than the preclip (~1.87s), `cut_off` would trim output to
-      // 1.87s and the audio-mux tail would have a closed mouth. Force
-      // `loop` so Sync.so plays the locked-camera preclip for the full
-      // audio duration (v63 rule for plate<audio scenarios).
+      // v104 — sync-3 preclip must be doc-strict. Sync.so manages
+      // temperature/occlusion internally for sync-3, and historical runs show
+      // the tight WAV duration matches the preclip window. Keep `cut_off` so
+      // the lipsynced crop remains pass-local; do NOT loop to full scene audio.
+      delete syncOptions.temperature;
+      delete syncOptions.occlusion_detection_enabled;
+      syncOptions.sync_mode = "cut_off";
       const videoDurSec = typeof (pass as any).preclip_duration_sec === "number"
         ? Number((pass as any).preclip_duration_sec)
         : null;
@@ -2569,14 +2571,11 @@ serve(async (req) => {
         const wavDur = (diag as any)?.wav?.durSec;
         return typeof wavDur === "number" ? wavDur : null;
       })();
-      const audioForMode = audioFullSec ?? tightAudioInfo?.durSec ?? totalSec;
-      if (videoDurSec != null && audioForMode > videoDurSec + 0.05) {
-        syncOptions.sync_mode = "loop";
-      }
-
       (pass as any)._v102_probe = {
-        stage: "preclip-autodetect-v103",
+        stage: "preclip-sync3-autodetect-v104",
         model_intent: "sync-3",
+        payload_model: "sync-3",
+        asd_mode: "auto_detect",
         sync_mode: syncOptions.sync_mode,
         bbox_count: 0,
         audio_voiced_sec: tightAudioInfo?.durSec ?? null,
@@ -2590,7 +2589,7 @@ serve(async (req) => {
           : null,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v103_preclip_autodetect speaker=${pass.speaker_name} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v104_preclip_sync3_autodetect speaker=${pass.speaker_name} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
       );
     }
 
