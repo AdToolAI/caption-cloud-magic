@@ -1,88 +1,94 @@
-## Status: nein, der vorherige Plan repariert nur das UI-Symptom
 
-Der vorherige Plan markiert nur die hängengebliebene Szene als „failed“ und gibt Credits zurück. Das eigentliche Problem — Sync.so liefert für jede der vier Sprecher-Passes `An unknown error occurred.` (provider_unknown_error, kein error_code) — bleibt bestehen. Beim nächsten Lauf hängt die UI zwar nicht mehr, aber jeder 4-Sprecher-Dialog scheitert weiterhin sofort und es gibt keine bewegten Münder.
+## Problem 1 — Storyboard EdgeFunction-Fehler
 
-## Was die offizielle Sync.so-Doku sagt (sync-3 / v2/generate)
+Log (`compose-video-storyboard`):
+```
+AI Gateway error: 503 {"error":{"message":"Service temporarily unavailable","type":"upstream_error"}}
+```
 
-Quellen:
-- `https://sync.so/docs/developer-guides/speaker-selection`
-- `https://sync.so/docs/api-reference/api/generate-api/create`
+Das ist ein transientes Upstream-Problem der Lovable AI Gateway (Gemini 3 Flash). Der einzige Call in `compose-video-storyboard/index.ts` (Zeile 354) hat aktuell **keinerlei Retry** — der erste 5xx bricht sofort ab und der User sieht „Edge Function returned a non-2xx status code".
 
-Relevante Regeln, die wir derzeit verletzen:
+## Problem 2 — Aktionsfeld wird beim Tippen ständig gelöscht / dauert 3× so lang
 
-1. **`active_speaker_detection` ist nur für Clips mit mehreren Gesichtern gedacht.**  
-   Zitat: „Speaker selection helps you target the right face when a clip or image contains multiple people.“  
-   Bei einem 512×512 Single-Face-Preclip (genau unser v69/v77-Output) gehört **kein** `active_speaker_detection`-Block in den Payload — oder höchstens `{ auto_detect: true }`.
+Root Cause (in `VideoComposerDashboard.tsx`, Zeile 370/371 und 515/516):
 
-2. **`bounding_boxes` muss pro Video-Frame eine Box liefern (oder `null`), Länge = exakte Frameanzahl des Videos.**  
-   Wir berechnen die Länge aus `ceil(audio_tight.dur_sec * 30)`. Das ist die Audio-Frameanzahl, nicht die Video-Frameanzahl, und unsere ASSUMED_FPS=30 stimmt nicht zwingend mit dem Remotion-Preclip-MP4 überein.
+```
+sceneActionUser: row.scene_action_user ?? local?.sceneActionUser ?? ''
+sceneActionEn:   row.scene_action_en   ?? local?.sceneActionEn   ?? ''
+```
 
-3. **`bounding_boxes` ist als Detektions-Hilfe für multi-face Plates gedacht.**  
-   Wir füllen das Array mit derselben statischen Box für jeden Frame eines bereits einseitigen 512×512 Preclips. Das ist genau das Anti-Pattern, das in der Doku nicht beschrieben ist — und es triggert reproduzierbar `provider_unknown_error` ohne `error_code` (DB-bestätigt für alle 4 Passes der Szene `720fd0b1…`).
+Beim Tippen passiert folgendes:
 
-4. **`temperature`-Default ist `0.5`, Bereich 0–1.** Wir senden hart `1.0` für jeden Pass. Erlaubt, aber am Rand und nicht von der Doku empfohlen.
+1. User tippt einen Buchstaben → `onUpdate({ sceneActionUser })` setzt lokalen State.
+2. Debounced Save (~1–2 s) schreibt den Wert in `composer_scenes`.
+3. **Realtime-Tick** kommt zurück mit der noch alten DB-Zeile (oder einer Zeile, die ein anderer Save gerade geschrieben hat).
+4. Merge nimmt `row.scene_action_user ?? local` → DB-Wert ist nicht-null → er **überstimmt** den frischeren lokalen Wert.
+5. Der UI-Cursor springt, der gerade getippte Buchstabe ist weg, der User muss nochmal tippen → gefühlt 3× so lang.
 
-5. **`occlusion_detection_enabled: true`** ist erlaubt, verlangsamt aber sync-3 spürbar. Für Single-Face-Preclips überflüssig.
+Dasselbe gilt für `sceneActionEn` (wird zusätzlich noch vom Auto-Translate 500 ms später erneut gesetzt) und potenziell für jedes editierbare Freitext-Feld, das im Realtime-Merge mit `row.X ?? local.X` behandelt wird (`aiPrompt`, `stockKeywords`, `dialogScript`, `characterShots[].actionUser/actionEn`).
 
-6. **sync-3 handhabt Locked-Camera / Still-Frame Plates und Single-Face nativ** — die Doku erklärt explizit, dass sync-3 globales Verständnis pro Shot baut. Genau dafür wurde Preclip → sync-3 + `auto_detect: true` in v68/v69 designed und hat im Log auch funktioniert (Samuel/Kailee/Sarah lipsyncten, Frame-Diff 5.85 / 6.97 / normal). Nur Matthew war stumm — das war ein Einzelfall.
+Außerdem: Beim Storyboard-Re-Roll wird `sceneActionUser` aus der DB neu reingeschrieben, selbst wenn der User schon manuell editiert hat — d. h. "vorausgefüllt ist immer noch nicht da" liegt am 503-Fehler aus Problem 1 (Storyboard bricht ab → keine `sceneActionUser` für die Szene), nicht an einer separaten Logik.
 
-## Was v99 wirklich falsch gemacht hat
-
-v99 hat als Reaktion auf den Einzelfall „Matthew Mund zu“ für ALLE Preclip-Dispatches `auto_detect: true` durch hartcodierte per-Frame `bounding_boxes` ersetzt. Damit:
-
-- 3 vorher funktionierende Sprecher (Samuel, Kailee, Sarah) fallen jetzt in denselben verdächtigen Code-Pfad,
-- Sync.so erhält ein Anti-Pattern (statisches Bbox-Array auf einem Single-Face-Crop),
-- sämtliche 4 Passes der nächsten Szene scheitern mit `provider_unknown_error` — und der gesamte Retry-Ladder (coords-pro → coords-pro-box → sync3-coords) feuert dieselbe ungültige Form erneut ab,
-- nach 9 fehlgeschlagenen Versuchen läuft der Watchdog rein, refundet die Credits, aber lässt `lip_sync_status='running'` stehen → UI hängt bei 95 %.
+---
 
 ## Plan
 
-### A. Sync.so-Payload doku-konform bauen
-Datei: `supabase/functions/compose-dialog-segments/index.ts` (Bereich um Zeile 2465–2540, der v99-Block)
+### 1. `compose-video-storyboard` — Retry + Modell-Fallback (Problem 1)
 
-1. **Single-Face Preclip-Dispatch (`usePassPreclip === true`)**  
-   Wieder zur doku-konformen Variante:
-   - `active_speaker_detection = { auto_detect: true }`
-   - Keine `bounding_boxes`, keine `frame_number`, keine `coordinates`.
-   - Begründung: Der Preclip wurde explizit als 512×512 Single-Face Crop gerendert (v69 + v77 Face-Gate). Sync.so/sync-3 ist genau für diesen Fall gemacht.
+In `supabase/functions/compose-video-storyboard/index.ts` den Block ab Zeile 354:
 
-2. **`v99_preclip_bbox` Logging-Tag entfernen**, durch `v100_preclip_autodetect` ersetzen, damit Edge-Logs den neuen Pfad eindeutig zeigen.
+- Wrappe den `fetch(...)`-Call in eine kleine Helper-Funktion `callGatewayWithRetry()`:
+  - Bis zu **3 Versuche** bei `502 / 503 / 504` (transient).
+  - Exponential Backoff: 800 ms → 1600 ms → 3200 ms (+ Jitter).
+  - `429` und `402` weiterhin ohne Retry direkt nach oben durchreichen (unverändert).
+  - Nach dem letzten 503-Versuch: **einmaliger Fallback** auf `google/gemini-2.5-flash` (dasselbe Tool-Schema, gleiche Messages).
+  - Logging: `[storyboard] gateway attempt N status=… model=…`.
+- Wenn alle Retries + Fallback fehlschlagen, neue Error-Response: `{ error: "AI Gateway temporarily unavailable", retryable: true }` mit `status: 503` (statt aktuell 500), damit das Frontend einen passenden Hinweis-Toast zeigen kann.
+- Frontend (`BriefingTab.tsx` Aufrufstelle): bei `status===503 && retryable` einen klaren Toast: „KI-Dienst ist gerade überlastet — bitte in 30 s erneut versuchen." statt der generischen „Edge Function returned a non-2xx status code".
 
-3. **`temperature` auf den Doku-Default `0.5` zurücksetzen**, statt hart `1.0`. Optional pro Retry-Variante leicht variieren (0.5 → 0.6 → 0.4) — keine 1.0 mehr.
+### 2. Realtime-Merge: User-Edits dürfen nicht von DB-Tick überschrieben werden (Problem 2)
 
-4. **`occlusion_detection_enabled`** für den Preclip-Pfad weglassen (Single-Face, keine Occlusion zu erwarten). Auf dem `bbox-url-pro` Voll-Plate-Pfad bleibt es an.
+In `src/components/video-composer/VideoComposerDashboard.tsx` an **beiden** Merge-Stellen (mount-sync ~Zeile 370–371 und `refetchScenesFromDb` ~Zeile 515–516):
 
-### B. Den Matthew-Spezialfall sauber lösen
-Datei: `supabase/functions/compose-dialog-segments/index.ts` (Preclip-Render-Block, v76 neighbor-aware preclip)
+- Einen kleinen Helfer einführen, z. B.
 
-Statt am Sync.so-Payload zu drehen, korrigieren wir die Ursache (Matthews 278→512 hochskalierter Crop, den Sync.so übersah):
-- Mindest-Crop-Größe von 232/242 auf **mindestens 384 Pixel** anheben (kein Upscale-Faktor > 1.5), damit Sync.so genug Pixel hat.
-- Wenn der neighbor-aware Crop kleiner werden müsste, lieber den siblings-Filter lockern (etwas vom Nachbarn akzeptieren) statt einen 232er-Mini-Crop zu erzwingen.
-- Logging: `v100_preclip_minsize source=… requested=232 enforced=384`.
+  ```ts
+  const isUserEditedField = (sceneId: string, fieldKey: string) =>
+    pendingUserEditsRef.current.get(sceneId)?.has(fieldKey) === true;
 
-### C. Bounding-Box-Pfad (Multi-Face-Plate) doku-konform machen
-Datei: `supabase/functions/compose-dialog-segments/index.ts` (Block um Zeile 2552–2632, `coords-pro-box` / `bbox-url-pro`)
+  const mergeUserText = (rowVal: string | null, localVal: string | undefined, sceneId: string, key: string) =>
+    isUserEditedField(sceneId, key) ? (localVal ?? '') : (rowVal ?? localVal ?? '');
+  ```
 
-Hier ist der Bbox-Pfad legitim (Voll-Plate mit ≥2 Gesichtern). Trotzdem korrigieren:
-- Frame-Anzahl auf **Video-Frames** umstellen (nicht Audio-Frames). Das ist die Spec.
-- `null` einsetzen für Frames außerhalb der Speaker-Sprechzeit (Doku: „or null when no face is present“), statt überall dieselbe Box. Das ist das eigentliche Multi-Speaker-Pattern.
-- `temperature` ebenfalls auf 0.5.
+- Eine neue `pendingUserEditsRef = useRef<Map<sceneId, Set<fieldKey>>>(new Map())`.
+- `updateScene()` markiert pro Feld den "dirty"-Eintrag, sobald die Eingabe von einer User-Interaktion stammt. Die Markierung wird gelöscht, sobald der Save-Roundtrip bestätigt hat, dass DB-Row und lokaler Wert übereinstimmen (vergleichen in der DB-Sync Map nach dem Save).
+- Anwendung auf die kritischen Freitext-Felder:
+  - `sceneActionUser` (Hauptproblem)
+  - `sceneActionEn`
+  - `aiPrompt`
+  - `stockKeywords`
+  - `characterShots[].actionUser/actionEn` (gleiches Tipp-Problem auf Charakter-Slots)
+  - `textOverlay.text`
+- **Wichtig**: KEIN globales "local always wins" — nur Felder mit aktiver User-Edit-Markierung werden bevorzugt. Alle anderen Felder (clipStatus, clipUrl, lipSyncStatus, …) bleiben streng DB-first wie bisher (das ist absichtlich so für Lifecycle-Felder).
 
-### D. UI / Watchdog-Symptom-Fix (aus dem alten Plan, gekürzt)
-Damit bei einem zukünftigen Hard-Fail die UI nicht erneut bei 95 % hängt:
-- `supabase/functions/_shared/lipsync-fail.ts`: offene Passes auf `canceled_by_scene_failure` markieren.
-- `supabase/functions/lipsync-watchdog/index.ts`: wenn `dialog_shots.status='failed'` aber top-level `lip_sync_status='running'` → sofort top-level auf `failed`.
-- `supabase/functions/sync-so-webhook/index.ts`: `retrying` mit ausgeschöpftem Budget zählt nicht als „alive sibling“.
-- Aktuelle Szene `720fd0b1…` einmalig auf `failed` korrigieren (Credits wurden bereits zurückgezahlt).
+### 3. `SceneActionField` — kein leerer englischer Wert während des Tippens pushen
 
-### E. Deployment & Verifikation
-Deploy:
-- `compose-dialog-segments`
-- `sync-so-webhook`
-- `lipsync-watchdog`
+In `src/components/video-composer/SceneActionField.tsx` (Zeile 64):
 
-Akzeptanz-Test mit derselben 4-Sprecher-Szene:
-- Edge-Log zeigt `v100_preclip_autodetect` für alle 4 Passes, kein `bounding_boxes` mehr im POST-Body an Sync.so.
-- Sync.so liefert `COMPLETED` für mindestens 3/4 Passes; verbleibender 1/4 (falls Matthew weiter stumm bleibt) wird per größerem Preclip retried, nicht per ASD-Bbox.
-- Wallclock < 5 min für 4 Sprecher (vorher >10 min mit Komplett-Fail).
-- UI: zeigt „Lip-Sync läuft… 4/4“ → „audio_muxing“ → „angewendet“, nicht endlos 95 %.
+- Den Guard etwas strenger fassen: solange `isLoading === true` (Debounce/Translate läuft) und der User aktiv tippt, **nicht** `onEnglishChange('')` triggern. Aktuell wird bei jedem Tippen kurz `english=''` an Parent gepusht, was den `useEffect` in `SceneCard.tsx` (Zeile 592) anstößt, der wiederum den Prompt rewriten will → unnötige Re-Renders, die das Cursor-Wegspring-Gefühl verstärken.
+
+### 4. Verifikation
+
+- `compose-video-storyboard` deployen → Edge-Log-Sweep für „gateway attempt 2 status=503" sichten, danach erfolgreiche 200 oder sauberer 503 mit klarem Toast.
+- In der Preview eine Szene öffnen, schnell 10–15 Zeichen ins „Was passiert in der Szene?"-Feld tippen → kein Cursor-Spring, kein Verlust einzelner Zeichen, Wert bleibt nach 2 s Save stabil.
+- Mit DevTools-Network-Throttle (Slow 3G) erneut tippen → Realtime-Tick darf das Feld nicht überschreiben.
+- Storyboard-Re-Roll: Wenn ein Feld bereits manuell gefüllt ist, bleibt es erhalten (kommt jetzt zusätzlich kostenlos aus Schritt 2 mit raus).
+
+### Dateien, die geändert werden
+
+- `supabase/functions/compose-video-storyboard/index.ts` (Retry + Fallback)
+- `src/components/video-composer/BriefingTab.tsx` (besserer 503-Toast — UI-only)
+- `src/components/video-composer/VideoComposerDashboard.tsx` (Pending-User-Edits Map, beide Merge-Pfade)
+- `src/components/video-composer/SceneActionField.tsx` (kein leerer EN-Push während des Tippens)
+
+Keine Schema-/RLS-/Storage-Änderungen.
