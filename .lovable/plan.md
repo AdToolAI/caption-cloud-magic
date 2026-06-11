@@ -1,78 +1,29 @@
-## Bug: v107 ↔ v105 Konflikt — `multi_speaker_auto_detect_blocked`
+## v110 — Remove v107 Coords-Collision Pre-Guard
 
-### Root Cause (DB-gestützt aus Code, nicht spekuliert)
+### Root cause (DB-verified)
+- Scene `f2a58546-692a-4ef5-a690-ba93b513abf5` failed with `v107_coords_collision:face_coords_collision_76px_min_120px_pair_2_3`.
+- The v107 pre-guard (in `supabase/functions/compose-dialog-segments/index.ts`, lines ~1179-1269) refuses to dispatch the whole scene when any two speaker face-coords on the master plate are closer than `max(120 px, plate.width × 0.08)`.
+- This guard was written for the legacy v69 single-face-preclip pipeline, where a close sibling collapsed the crop into a useless tiny square.
+- With **v109 native-resolution preclip** already shipped, a smaller crop is no longer destructive — Sync.so either lip-syncs cleanly or returns a per-pass closed-mouth no-op. The other speakers must not be killed alongside.
 
-In `compose-dialog-segments/index.ts`:
+### Fix
+1. **Delete the v107 pre-guard block** (`compose-dialog-segments/index.ts`, lines 1179–1269). Replace with a soft warning log only (`v110_coords_close speakers=…  minDist=…`), no refund, no scene-failure.
+2. **Keep the v107 hard-fail on full-plate dispatch without a valid preclip** (lines ~2616–2700) — that one still protects us from Sync.so multi-face confusion on the full plate. Untouched.
+3. **Memory + index update**: add `mem/architecture/lipsync/v110-soft-coords-collision.md` documenting the rule (close coords are no longer a pre-dispatch blocker; preclip is allowed to be small; per-pass results determine success). Reference from `mem/index.md`.
+4. **Reset & refund scene `f2a58546…`**: clear `lip_sync_status`, `twoshot_stage`, `clip_error`, `dialog_shots`, `lip_sync_applied_at`, `updated_at`; clear `syncso_inflight_jobs` and `dialog_dispatch_locks` for the scene; refund the consumed credits idempotently. Migration SQL.
+5. **No client-side change**. The existing `useResetLipSync` / "Sauber neu starten" button stays as the user's escape hatch.
 
-1. **v107 (Zeile ~`wantPassPreclip`):** erzwingt für `speakers.length >= 2` zwingend den **Single-Face-Preclip-Pfad** (`usePassPreclip = true`).
-2. **Preclip-Branch (Zeile 2727–2737, v103):** setzt für jeden Preclip-Pass bewusst
-   ```
-   syncOptions.active_speaker_detection = { auto_detect: true }
-   ```
-   Das ist korrekt und doc-strict: der 512×512 Single-Face-Crop hat per Definition genau **ein** Gesicht, also ist `auto_detect` unzweideutig (und sync-3 lehnt jeden anderen ASD-Shape auf einer Preclip ab → das war ja gerade der v103-Fix).
-3. **v105 Hard-Guard (Zeile 3086–3097):** blockiert unkonditional jede Dispatch mit `speakers.length >= 2 && auto_detect === true` — **unabhängig davon**, ob das Video eine Full-Plate oder eine Single-Face-Preclip ist.
-
-→ Mit v107 läuft jeder N≥2 Pass durch den Preclip-Pfad. Der Preclip-Pfad setzt korrekterweise `auto_detect: true`. Die v105-Guard wurde aber zur Zeit geschrieben, als Multi-Speaker noch auf der **Full-Plate** gelandet ist — dort war `auto_detect:true` gefährlich (mehrere Gesichter ⇒ Sync.so routet falsch ⇒ "Animorph"). Auf der Single-Face-Preclip ist `auto_detect:true` dagegen die einzige doc-konforme Option.
-
-Der Guard feuert deshalb fälschlich auf einen Pfad, den er nie hätte blockieren sollen — und legt die gesamte Pipeline lahm (genau das, was im Screenshot zu sehen ist: `multi_speaker_auto_detect_blocked`, alle 4 Speaker bleiben in "WARTET").
-
-### v108 Fix
-
-**Nur eine semantische Korrektur** an der v105-Guard. Keine Änderung an v107, v106, v103.
-
-In `supabase/functions/compose-dialog-segments/index.ts` ~Zeile 3086–3097:
-
-```ts
-// v108 — Single-Face-Preclip hat per Definition exakt EIN Gesicht; auto_detect
-// ist dort die einzige doc-konforme Option (v103). Die v105-Guard zielt nur
-// auf den Full-Plate-Pfad mit mehreren Gesichtern — dort verursacht
-// auto_detect das "Animorph"-Routing. Auf preclip wird sie ausgeschaltet.
-if (
-  !usePassPreclip &&
-  speakers.length >= 2 &&
-  asdForProbe?.auto_detect === true
-) {
-  return await failBeforeProviderDispatch(
-    "multi_speaker_auto_detect_blocked",
-    "asd_auto_detect_on_multi_speaker_fullplate",
-    "Refusing to dispatch sync-3 with auto_detect=true on a multi-speaker FULL-PLATE; preclip path required.",
-    500,
-    { v105_probe: v105Probe },
-  );
-}
-```
-
-Das `!usePassPreclip` schließt v107 + v103 wieder konsistent zusammen:
-- N≥2 Full-Plate + auto_detect → **block** (alte v105-Intention bleibt erhalten)
-- N≥2 Preclip + auto_detect → **erlaubt** (v103/v104 Pfad, einziger doc-konformer Shape)
-- N≥2 Full-Plate + deterministic ASD (coords / bbox-url) → erlaubt
-- Edge-Speaker `skipPreclipForEdgeSpeaker` + `bounding_boxes_url` → erlaubt (war auch schon vor v108 ok, ASD ist nicht auto_detect)
-
-### Cleanup für das aktuelle Failure
-
-Migration, die für die im Screenshot blockierte Szene:
-1. die `wallets`-Buchung idempotent **refunded** (Lookup über die letzte `clip_error` = `multi_speaker_auto_detect_blocked` Row in `dialog_scenes`/`dialog_shots` des Users),
-2. die Szene resettet (`lip_sync_status = null`, `twoshot_stage = null`, `clip_error = null`, `dialog_shots = null`, `plate_face_map = null`, `plate_identity = null`),
-3. mögliche `syncso_inflight_jobs` + `dialog_dispatch_locks` für die Szene räumt.
-
-Die Szenen-ID lese ich direkt vor der Migration aus `supabase--read_query` (letzte Row in `dialog_scenes` des aktuellen Users mit `clip_error LIKE 'multi_speaker_auto_detect_blocked%'`), damit kein falscher Refund passiert.
+### Files
+- `supabase/functions/compose-dialog-segments/index.ts` — delete lines 1179-1269, replace with single log line.
+- `mem/architecture/lipsync/v110-soft-coords-collision.md` — new.
+- `mem/index.md` — add v110 entry.
+- `supabase/migrations/<timestamp>_v110_reset_collision_scene.sql` — reset + refund for `f2a58546…`.
 
 ### Verification
+- After re-dispatch, `qa_live_runs`/edge logs must show no `v107_coords_collision`; instead expect `v110_coords_close` warning followed by normal per-pass preclip dispatch.
+- Outcome on a 4-speaker close-face scene: at minimum 2–3/4 speakers lip-sync correctly (full success ideal). A single closed-mouth pass must not kill the scene.
+- No regression on well-spaced scenes (no new warnings, identical happy path).
 
-Nach dem Fix einmal die Szene erneut dispatchen und prüfen:
-- `syncso_dispatch_log.meta.dispatch_video_kind === "preclip"` für **alle 4** Passes
-- `meta.asd_mode === "auto_detect"` (nicht mehr `coordinates`)
-- `meta.options_keys` enthält **kein** `temperature`/`occlusion_detection_enabled` (v106 bleibt aktiv)
-- Keine `provider_unknown_error` mehr, kein `multi_speaker_auto_detect_blocked`
-
-### Memory
-
-`mem/architecture/lipsync/v108-preclip-autodetect-allowed.md` — dokumentiert die Ausnahme: v105-Guard gilt nur für Full-Plate, Preclip + auto_detect ist die kanonische sync-3-Form für Multi-Speaker.
-Index-Eintrag in `mem/index.md` aktualisieren.
-
-### Geänderte Dateien
-
-- `supabase/functions/compose-dialog-segments/index.ts` (Guard-Condition, ~5 Zeilen)
-- `supabase/migrations/<timestamp>_v108_refund_and_reset_blocked_scene.sql`
-- `mem/architecture/lipsync/v108-preclip-autodetect-allowed.md` (neu)
-- `mem/index.md` (eine Zeile)
+### Out of scope (deliberate)
+- Sibling-mask overlay on preclip (black ellipse over neighbor mouth) — bigger change; revisit if v110 still produces closed mouths on close-face passes.
+- Per-pass result audit (mouth-static detection) — already discussed for v109; not part of this hotfix.
