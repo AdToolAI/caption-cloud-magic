@@ -776,6 +776,65 @@ export default function VideoComposerDashboard() {
   const pendingScenesRef = useRef<ComposerScene[] | null>(null);
   const persistScenesToDbRef = useRef<((projectId: string, scenes: ComposerScene[]) => Promise<void>) | null>(null);
 
+  // ── Pending-user-edits guard ────────────────────────────────────────────
+  // While the user is actively typing into a freeform text field (action,
+  // prompt, stock keywords, overlay text), realtime DB ticks must NOT
+  // overwrite the local value with a stale `composer_scenes` row. Without
+  // this guard, every keystroke risks being clobbered by an in-flight
+  // realtime tick that still carries the previous DB value, which feels
+  // like "the field deletes itself while I type".
+  //
+  // For each scene id we keep a Set of dirty field keys. `setScenes` (the
+  // sole path through which user edits enter the local state) compares
+  // incoming vs previous values for the watched fields and marks any that
+  // changed. The two DB-merge sites below skip overlaying those fields.
+  // A field is cleared from the set as soon as the DB row reports the
+  // same value as the local one (i.e. the save round-trip completed).
+  const USER_TEXT_FIELDS = [
+    'sceneActionUser',
+    'sceneActionEn',
+    'aiPrompt',
+    'stockKeywords',
+    'textOverlay.text',
+    'characterShotsActions',
+  ] as const;
+  type UserTextField = typeof USER_TEXT_FIELDS[number];
+  const pendingUserEditsRef = useRef<Map<string, Set<UserTextField>>>(new Map());
+
+  const markDirty = (sceneId: string, key: UserTextField) => {
+    let set = pendingUserEditsRef.current.get(sceneId);
+    if (!set) { set = new Set(); pendingUserEditsRef.current.set(sceneId, set); }
+    set.add(key);
+  };
+  const clearDirtyIfMatches = (
+    sceneId: string,
+    key: UserTextField,
+    rowVal: unknown,
+    localVal: unknown,
+  ) => {
+    const set = pendingUserEditsRef.current.get(sceneId);
+    if (!set || !set.has(key)) return;
+    if (JSON.stringify(rowVal ?? null) === JSON.stringify(localVal ?? null)) {
+      set.delete(key);
+      if (set.size === 0) pendingUserEditsRef.current.delete(sceneId);
+    }
+  };
+  const isDirty = (sceneId: string, key: UserTextField) =>
+    pendingUserEditsRef.current.get(sceneId)?.has(key) === true;
+
+  // Pick local-or-row depending on dirty flag, then clear the flag if both sides agree.
+  const pickText = (
+    sceneId: string,
+    key: UserTextField,
+    rowVal: string | null | undefined,
+    localVal: string | null | undefined,
+  ): string => {
+    clearDirtyIfMatches(sceneId, key, rowVal, localVal);
+    if (isDirty(sceneId, key)) return (localVal ?? '') as string;
+    return (rowVal ?? localVal ?? '') as string;
+  };
+
+
 
   const showCampaignTab = !!project.adMeta;
   const TABS = [
