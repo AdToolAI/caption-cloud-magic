@@ -205,16 +205,22 @@ serve(async (req) => {
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
+    const swapMode = body.strictSwapMode === true;
+    const swapMismatches = Array.isArray(body.swapMismatches)
+      ? body.swapMismatches.filter((s) => typeof s === "string" && s.length > 0)
+      : [];
     const worldRefSig = `loc=${locationUrls.join(',')}|bld=${buildingUrls.join(',')}|prop=${propUrls.join(',')}`;
+    const identitySig = identityPortraits.length > 0
+      ? `id=${identityPortraits.join(',')}`
+      : 'id=none';
     const castActionsSig = castActions
       .map((c) => `${c.name.toLowerCase()}:${c.action.toLowerCase()}`)
       .sort()
       .join('|');
-    // v14 — bumped for asymmetric cast actions: per-character actions are now
-    // preserved and the two-shot framing is relaxed when the scene assigns
-    // background/foreground/phone activities. Cache key includes castActions.
+    // v15 — adds canonical identity reference portraits (separate from
+    // outfit-cover wardrobe refs) + identity-swap strict retry mode.
     const promptHash = await sha1(
-      `v14|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}|${worldRefSig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}`,
+      `v15|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}`,
     );
 
     const { data: cached } = await admin
