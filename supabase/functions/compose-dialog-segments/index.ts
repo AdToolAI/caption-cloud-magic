@@ -2714,8 +2714,9 @@ serve(async (req) => {
     // stills where lipsync-2-pro's "Still Frame Limitation" silently fails.
     // sync-3 handles both static and motion plates natively. lipsync-2-pro
     // remains reachable only via the explicit `coords-pro-lp2pro` fallback.
-    const payloadModel =
-      retryVariant === "sync3-coords"
+    const payloadModel = usePassPreclip
+      ? SYNC3_MODEL
+      : retryVariant === "sync3-coords"
         ? SYNC3_MODEL
         : retryVariant === "auto-standard"
           ? LIPSYNC_FALLBACK_MODEL
