@@ -351,143 +351,184 @@ ${(briefing.characters && briefing.characters.length > 0)
 
 Generate the storyboard using the create_storyboard function.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "create_storyboard",
-              description: "Create a structured video storyboard with scenes",
-              parameters: {
-                type: "object",
-                properties: {
-                  scenes: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        sceneType: {
-                          type: "string",
-                          enum: ["hook", "problem", "solution", "demo", "social-proof", "cta", "custom"],
+    // Build the request body once — the model is the only field that changes
+    // between the primary attempt and the gemini-2.5-flash fallback below.
+    const buildBody = (model: string) => JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "create_storyboard",
+            description: "Create a structured video storyboard with scenes",
+            parameters: {
+              type: "object",
+              properties: {
+                scenes: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      sceneType: {
+                        type: "string",
+                        enum: ["hook", "problem", "solution", "demo", "social-proof", "cta", "custom"],
+                      },
+                      durationSeconds: {
+                        type: "number",
+                        description: "Duration in seconds (3-15)",
+                      },
+                      aiPrompt: {
+                        type: "string",
+                        description: "Detailed English prompt for AI video generation. Describe camera angle, subject, motion, lighting, mood.",
+                      },
+                      sceneActionEn: {
+                        type: "string",
+                        description: "Concise English summary of the general scene action, faithfully matching aiPrompt, max 25 words.",
+                      },
+                      sceneActionLocalized: {
+                        type: "string",
+                        description: `Same scene action as sceneActionEn, localized in ${langLabel} for the editable UI field.`,
+                      },
+                      stockKeywords: {
+                        type: "string",
+                        description: "Comma-separated English keywords for stock video search fallback",
+                      },
+                      textOverlayText: {
+                        type: "string",
+                        description: `🚨 MUST always be an empty string "". The storyboard AI never writes burned-in text. The user adds text overlays / hooks / CTAs later in the editor. No exceptions, regardless of category.`,
+                      },
+                      textPosition: {
+                        type: "string",
+                        enum: ["top", "center", "bottom", "bottom-left", "bottom-right"],
+                      },
+                      textAnimation: {
+                        type: "string",
+                        enum: ["none", "fade-in", "scale-bounce", "slide-left", "slide-right", "word-by-word", "glow-pulse"],
+                      },
+                      transitionType: {
+                        type: "string",
+                        enum: ["none", "fade", "crossfade", "wipe", "slide", "zoom"],
+                      },
+                      characterShot: {
+                        type: "object",
+                        description: "PRIMARY slot — when a recurring character is featured, set characterId to the character's id from the briefing and shotType to the chosen framing strategy. Omit (or shotType=\"absent\") for scenes without any character. When the scene features multiple characters, this MUST mirror characterShots[0].",
+                        properties: {
+                          characterId: { type: "string" },
+                          shotType: {
+                            type: "string",
+                            enum: ["full", "profile", "back", "detail", "pov", "silhouette", "absent"],
+                          },
                         },
-                        durationSeconds: {
-                          type: "number",
-                          description: "Duration in seconds (3-15)",
-                        },
-                        aiPrompt: {
-                          type: "string",
-                          description: "Detailed English prompt for AI video generation. Describe camera angle, subject, motion, lighting, mood.",
-                        },
-                        sceneActionEn: {
-                          type: "string",
-                          description: "Concise English summary of the general scene action, faithfully matching aiPrompt, max 25 words.",
-                        },
-                        sceneActionLocalized: {
-                          type: "string",
-                          description: `Same scene action as sceneActionEn, localized in ${langLabel} for the editable UI field.`,
-                        },
-                        stockKeywords: {
-                          type: "string",
-                          description: "Comma-separated English keywords for stock video search fallback",
-                        },
-                        textOverlayText: {
-                          type: "string",
-                          description: `🚨 MUST always be an empty string "". The storyboard AI never writes burned-in text. The user adds text overlays / hooks / CTAs later in the editor. No exceptions, regardless of category.`,
-                        },
-                        textPosition: {
-                          type: "string",
-                          enum: ["top", "center", "bottom", "bottom-left", "bottom-right"],
-                        },
-                        textAnimation: {
-                          type: "string",
-                          enum: ["none", "fade-in", "scale-bounce", "slide-left", "slide-right", "word-by-word", "glow-pulse"],
-                        },
-                        transitionType: {
-                          type: "string",
-                          enum: ["none", "fade", "crossfade", "wipe", "slide", "zoom"],
-                        },
-                        characterShot: {
+                        required: ["characterId", "shotType"],
+                        additionalProperties: false,
+                      },
+                      characterShots: {
+                        type: "array",
+                        description: "Multi-character cast for this scene. 1 entry for solo, 2–4 entries when several recurring characters share the frame. The first entry MUST equal characterShot. Leave empty for scenes without any character.",
+                        maxItems: 4,
+                        items: {
                           type: "object",
-                          description: "PRIMARY slot — when a recurring character is featured, set characterId to the character's id from the briefing and shotType to the chosen framing strategy. Omit (or shotType=\"absent\") for scenes without any character. When the scene features multiple characters, this MUST mirror characterShots[0].",
                           properties: {
                             characterId: { type: "string" },
                             shotType: {
                               type: "string",
                               enum: ["full", "profile", "back", "detail", "pov", "silhouette", "absent"],
                             },
+                            actionEn: {
+                              type: "string",
+                              description: "What this exact character physically does in this scene, English, max 12 words, matching aiPrompt.",
+                            },
+                            actionUser: {
+                              type: "string",
+                              description: `Same character action localized in ${langLabel} for the editable UI field.`,
+                            },
                           },
                           required: ["characterId", "shotType"],
                           additionalProperties: false,
                         },
-                        characterShots: {
-                          type: "array",
-                          description: "Multi-character cast for this scene. 1 entry for solo, 2–4 entries when several recurring characters share the frame. The first entry MUST equal characterShot. Leave empty for scenes without any character.",
-                          maxItems: 4,
-                          items: {
-                            type: "object",
-                            properties: {
-                              characterId: { type: "string" },
-                              shotType: {
-                                type: "string",
-                                enum: ["full", "profile", "back", "detail", "pov", "silhouette", "absent"],
-                              },
-                              actionEn: {
-                                type: "string",
-                                description: "What this exact character physically does in this scene, English, max 12 words, matching aiPrompt.",
-                              },
-                              actionUser: {
-                                type: "string",
-                                description: `Same character action localized in ${langLabel} for the editable UI field.`,
-                              },
-                            },
-                            required: ["characterId", "shotType"],
-                            additionalProperties: false,
+                      },
+                      effects: {
+                        type: "array",
+                        description: `Pick 1-2 frame-deterministic visual effects to layer above this scene's clip/image. Available effects: ${ALL_EFFECT_IDS.map(id => `"${id}" (${EFFECT_DESCRIPTIONS[id]})`).join('; ')}. Match effect to scene type & visual style. Use "intensity" 0.3-0.7 for subtle, 0.7-1.0 for hero moments.`,
+                        maxItems: 2,
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", enum: [...ALL_EFFECT_IDS] },
+                            intensity: { type: "number", minimum: 0, maximum: 1 },
                           },
-                        },
-                        effects: {
-                          type: "array",
-                          description: `Pick 1-2 frame-deterministic visual effects to layer above this scene's clip/image. Available effects: ${ALL_EFFECT_IDS.map(id => `"${id}" (${EFFECT_DESCRIPTIONS[id]})`).join('; ')}. Match effect to scene type & visual style. Use "intensity" 0.3-0.7 for subtle, 0.7-1.0 for hero moments.`,
-                          maxItems: 2,
-                          items: {
-                            type: "object",
-                            properties: {
-                              id: { type: "string", enum: [...ALL_EFFECT_IDS] },
-                              intensity: { type: "number", minimum: 0, maximum: 1 },
-                            },
-                            required: ["id", "intensity"],
-                            additionalProperties: false,
-                          },
+                          required: ["id", "intensity"],
+                          additionalProperties: false,
                         },
                       },
-                      required: ["sceneType", "durationSeconds", "aiPrompt", "stockKeywords", "textOverlayText", "textPosition", "textAnimation", "transitionType"],
-                      additionalProperties: false,
                     },
+                    required: ["sceneType", "durationSeconds", "aiPrompt", "stockKeywords", "textOverlayText", "textPosition", "textAnimation", "transitionType"],
+                    additionalProperties: false,
                   },
                 },
-                required: ["scenes"],
-                additionalProperties: false,
               },
+              required: ["scenes"],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "create_storyboard" } },
-      }),
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "create_storyboard" } },
     });
 
-    if (!response.ok) {
+    // Retry-with-fallback wrapper:
+    // 1. Up to 3 attempts on the primary model with exponential backoff
+    //    (only for transient 502/503/504 — 429/402/4xx never retry).
+    // 2. One final fallback to google/gemini-2.5-flash if the primary
+    //    keeps returning transient errors. Lovable AI Gateway occasionally
+    //    has short Gemini-3-flash outages that gemini-2.5-flash rides out.
+    const PRIMARY_MODEL = "google/gemini-3-flash-preview";
+    const FALLBACK_MODEL = "google/gemini-2.5-flash";
+    const TRANSIENT_STATUSES = new Set([502, 503, 504]);
+
+    const callGateway = async (model: string): Promise<Response> => {
+      return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: buildBody(model),
+      });
+    };
+
+    let response: Response | null = null;
+    let lastStatus = 0;
+    let lastErrText = "";
+    const attemptPlan: Array<{ model: string; attempt: number; backoffMs: number }> = [
+      { model: PRIMARY_MODEL, attempt: 1, backoffMs: 0 },
+      { model: PRIMARY_MODEL, attempt: 2, backoffMs: 800 },
+      { model: PRIMARY_MODEL, attempt: 3, backoffMs: 1600 },
+      { model: FALLBACK_MODEL, attempt: 4, backoffMs: 800 }, // final fallback
+    ];
+
+    for (const step of attemptPlan) {
+      if (step.backoffMs > 0) {
+        const jitter = Math.floor(Math.random() * 200);
+        await new Promise((r) => setTimeout(r, step.backoffMs + jitter));
+      }
+      console.log(`[storyboard] gateway attempt ${step.attempt} model=${step.model}`);
+      try {
+        response = await callGateway(step.model);
+      } catch (netErr) {
+        console.warn(`[storyboard] network error attempt ${step.attempt}:`, (netErr as Error).message);
+        lastStatus = 0;
+        lastErrText = (netErr as Error).message || "network error";
+        continue;
+      }
+
+      // Non-retryable client errors — return immediately.
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }), {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly.", retryable: true }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -498,9 +539,31 @@ Generate the storyboard using the create_storyboard function.`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errText = await response.text();
-      console.error("AI Gateway error:", response.status, errText);
-      throw new Error(`AI Gateway error: ${response.status}`);
+
+      if (response.ok) break;
+
+      // Transient → retry. Other 4xx/5xx → break and surface error.
+      lastStatus = response.status;
+      try { lastErrText = await response.text(); } catch { lastErrText = ""; }
+      if (!TRANSIENT_STATUSES.has(response.status)) {
+        console.error(`[storyboard] non-transient gateway error ${response.status}:`, lastErrText);
+        break;
+      }
+      console.warn(`[storyboard] transient ${response.status} on attempt ${step.attempt}, will retry`);
+      response = null;
+    }
+
+    if (!response || !response.ok) {
+      const isTransient = TRANSIENT_STATUSES.has(lastStatus) || lastStatus === 0;
+      const status = isTransient ? 503 : (lastStatus || 500);
+      const message = isTransient
+        ? "AI Gateway temporarily unavailable — please try again in 30 seconds."
+        : `AI Gateway error: ${lastStatus}`;
+      console.error(`[storyboard] giving up after retries. lastStatus=${lastStatus} lastErr=${lastErrText.slice(0, 300)}`);
+      return new Response(JSON.stringify({ error: message, retryable: isTransient }), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const aiResult = await response.json();
