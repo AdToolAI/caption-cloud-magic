@@ -2356,19 +2356,38 @@ serve(async (req) => {
     // fallen weiterhin auf den preclip-Pfad zurück (unverändert).
     const skipPreclipForEdgeSpeaker =
       speakerIsEdgePositioned && haveBboxUrlPathForEdge;
-    const skipPreclipForMultiSpeaker =
-      speakers.length >= 2 && haveBboxUrlPathForEdge;
+    // v105 — Sync.so 3 docs: for multi-speaker clips the recommended pattern
+    // is full-plate video + deterministic ASD (bounding_boxes(_url) OR
+    // frame_number+coordinates with `auto_detect=false`). Auto-detect on a
+    // 512x512 single-face preclip is documented for "single/obvious speaker"
+    // only and routinely yielded COMPLETED jobs with no visible mouth motion
+    // on 4-speaker scenes (DB-verified for scene ddde37a6 on 2026-06-11).
+    // We now ALWAYS skip the preclip for N>=2; if plate-identity is
+    // unresolved the dispatcher falls back to coords-pro (frame_number +
+    // coordinates), which is also doc-compliant and deterministic.
+    const skipPreclipForMultiSpeaker = speakers.length >= 2;
     if (skipPreclipForEdgeSpeaker) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate bbox-url-pro dispatch`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate deterministic ASD dispatch`,
       );
     } else if (skipPreclipForMultiSpeaker) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v97_multi_speaker_skip_preclip speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} → full-plate bbox-url-pro dispatch (sync-3 native multi-face)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_multi_speaker_force_fullplate speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} → full-plate sync-3 deterministic ASD (bbox-url-pro or coords-pro)`,
       );
     }
+    // v105 — Clear stale preclip state so a previously-rendered preclip from
+    // a pre-v105 dispatch cannot resurrect the auto_detect path on retry.
+    if (skipPreclipForMultiSpeaker && ((pass as any).preclip_url || (pass as any).preclip_crop)) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_clear_stale_preclip url=…${String((pass as any).preclip_url ?? "").slice(-40)}`,
+      );
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_crop = null;
+      (pass as any).preclip_duration_sec = null;
+      (pass as any).preclip_render_id = null;
+    }
     const wantPassPreclip =
-      speakers.length >= 1 &&
+      speakers.length === 1 &&
       !!plateDims &&
       Array.isArray(pass.coords) &&
       Number.isFinite(pass.coords[0]) &&
