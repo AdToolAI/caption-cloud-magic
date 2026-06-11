@@ -1,46 +1,34 @@
-# Fix: Matthew (linker Sprecher) hat geschlossenen Mund — Preclip-Neighbor-Overlap
+# v99: Preclip mit expliziter Crop-Local Bbox (kein auto_detect mehr)
 
-## Root Cause (verifiziert in Logs Szene `71abb2e2`)
+## Diagnose
 
-Face-Map (Plate 1376×768):
-- Matthew slot 0 center `[227, 144]`
-- Samuel  slot 1 center `[544, 146]`
-- Kailee  slot 2 center `[861, 167]`
-- Sarah   slot 3 center `[1149, 177]`
+Heruntergeladen + analysiert (Szene `71abb2e2`, 4 Sprecher):
 
-Pass-Dispatch:
-- Pass 1 Samuel — **kein Preclip**, voller Plate + Punkt-ASD `[544,146]` → trifft Samuel → ✅ Mund bewegt
-- Pass 2 Matthew — **Preclip** 512×512 um `[227,144]` → Crop x ∈ [-29, 483] → **Samuels Bbox (x=460–629) liegt im Crop**
-- Pass 3 Kailee — Preclip 512×512 um `[861,167]` → Crop x ∈ [605, 1117] → Samuel (629) und Sarah (1061) am Rand, aber Kailee mittiger → ✅
-- Pass 4 Sarah  — Preclip 512×512 um `[1149,177]` → Crop x ∈ [893, 1376/Edge] → Kailee am linken Rand, Sarah dominant mittig → ✅
+| Pass | Sprecher  | Output             | Mean Frame-Diff |
+|------|-----------|--------------------|-----------------|
+| 1    | Samuel    | full-plate         | **5.85**        |
+| 2    | Matthew   | preclip 278→512    | **1.24** ← tot  |
+| 3    | Kailee    | preclip            | **6.97**        |
+| 4    | Sarah     | preclip            | normal          |
 
-Sync.so Auto-Detect im Preclip wählt das mittigere Gesicht. In Matthews Crop ist Matthew bei x=256 (Crop-relativ) und Samuel bei x=573 (Crop-relativ, näher zur Mitte 256) — Samuel gewinnt. Matthews Audio läuft auf Samuels Mund im Crop; beim Composite zurück in die Plate fehlt an Matthews Position jegliche Animation → **Matthews Mund bleibt zu**.
+Sync.so akzeptierte Matthews Preclip + Audio, lieferte `status=done`, **erzeugte aber keinerlei Mundbewegung** (Frame-Diff 1.24 ≈ Standbild-Rauschen). Der v76 Neighbor-Cap arbeitet korrekt — Samuel ist **nicht** in Matthews 278×278 Crop (x=88..366, Samuel bei x=460..629). Das war die falsche Hypothese.
 
-Samuel (Pass 1) selber funktioniert, weil er den vollen-Plate-Pfad ohne Preclip nimmt mit Punkt-ASD direkt auf seiner Position.
+Wahres Problem: `auto_detect:true` auf einem 278→512 upscaled Hailuo-Preclip mit kurzem Audio (1.075 s) versagt still — Sync.so findet kein Target, kopiert das Eingangsvideo.
 
-## Fix
+## Fix (v99 — deployed)
 
-### A. Neighbor-Aware Preclip Recentering für Rand-Sprecher (Haupt-Fix)
-`compose-dialog-segments`: Bei der Preclip-Generierung pro Pass die **Nachbar-Distanz** prüfen. Wenn der nächste Nachbar < `cropHalfWidth + faceHalfWidth` entfernt ist:
-- **Crop-Center vom Nachbarn weg verschieben**, sodass der Nachbar gerade aus dem Crop fällt. Konkret: `newCenterX = neighborX - (cropHalfWidth + faceHalfWidth + safetyPad)` (für Nachbarn rechts) bzw. spiegelverkehrt.
-- Falls dadurch der eigentliche Speaker ans Crop-Rand wandert (>40 % vom Zentrum weg): Crop schrumpfen auf z. B. 384×384 oder 256×256 — so lange noch beide Bbox-Rand-Tests `speaker_in && neighbor_out` halten.
-- Logging: `preclip_recenter old=[x,y] new=[x,y] neighborDist=Δ reason=neighbor_overlap`.
+`compose-dialog-segments`: Preclip-Dispatch sendet jetzt explizit `active_speaker_detection.bounding_boxes` mit statischer Box in **Crop-Local Output-Pixel-Koordinaten**:
 
-### B. Preclip-internes Target statt Auto-Detect (Härtung)
-Statt Sync.so im Preclip auto-detecten zu lassen, **Bbox des Speakers im Crop-Koordinatensystem** explizit mitgeben (`bounding_boxes` als statisches Single-Box-Array, eine Box gefüllt für ganze Clip-Dauer). Das eliminiert das Auto-Detect-Risiko komplett, auch wenn doch noch ein Nachbar im Crop steckt.
+1. Plate-Bbox aus `speakerPlateBboxes` oder Anchor-Facemap.
+2. In Crop-Local: `(plateBbox - preclip_crop.{x,y}) * (512/cropSize)` + 12 % Padding.
+3. `bounding_boxes` Array Länge `ceil(dur_sec * 30)`, alle Frames = dieselbe Box.
+4. `auto_detect: false`.
 
-### C. v98 Plate-Identity-MP4 nicht fixen (deprioritisiert)
-Gemini-Direct-MP4 liefert konstant 0 faces — der v97-`bbox-url-pro`-Pfad bleibt deaktiviert. Mit Fix A+B brauchen wir Plate-Identity hier nicht zwingend; die Anchor-Coords sitzen auf der Plate ausreichend genau (Drift <15 px gemessen), problem war ausschließlich die Crop-Overlap-Logik. Separat als Follow-Up: ffmpeg-Lambda-Stillframe statt MP4-URL.
-
-## Reihenfolge / Risiko
-- **A** ist minimal, lokal in der Preclip-Crop-Berechnung, keine Auswirkung auf Inflight/Cap/Ladder.
-- **B** ist defensive Härtung, fügt nur ein Feld im Sync.so-Payload hinzu (Single-Speaker-Bbox in Crop-Pixeln).
-- A allein behebt Matthew. B verhindert Wiederauftreten bei dichteren Konstellationen (5 Sprecher, engere Anchor-Frames).
-
-## Files
-- `supabase/functions/compose-dialog-segments/index.ts` — Preclip-Center-Berechnung mit Neighbor-Check; optional Single-Speaker-Bbox im Preclip-Payload.
-- Ggf. `supabase/functions/_shared/twoshot-face-map.ts` — Helper `computeSafePreclipCenter(speakers, slotIndex, cropSize)` zentralisiert.
+Fallback auf alten `auto_detect:true` Pfad nur wenn Bbox nicht berechenbar (`v99_preclip_bbox_skip` Log).
 
 ## Verifizierung
-- Nächster 4-Sprecher-Run: Log zeigt `preclip_recenter` für Matthew (und ggf. Kailee/Sarah falls Konstellation eng); Sichtprüfung — **alle 4 Münder bewegen sich**.
-- Regressions-Check: Pass-1-Samuel-Pfad (full-plate kein Preclip) bleibt unverändert.
+
+Nächster 4-Sprecher-Run:
+- Log: `v99_preclip_bbox speaker=Matthew Dusatko cropLocalBox=[…] frames=…`
+- Sichtprüfung: alle 4 Münder bewegen sich.
+- Notfall-Quantcheck: `ffmpeg fps=10` Mouth-Crop Frame-Diff > 4 für jeden Pass.
