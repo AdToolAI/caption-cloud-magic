@@ -2914,8 +2914,14 @@ serve(async (req) => {
       speakers: speakers.length,
       payload_audio_url: pass.audio_url,
       payload_video_url: dispatchVideoUrl,
+      // v106 — full options-key list so any future doc-drift (unsupported
+      // field smuggled into sync-3) is visible in dispatch logs.
+      options_keys: Object.keys(syncOptions),
+      v106_doc_strict_scrub: payloadModel === SYNC3_MODEL,
     };
     (pass as any)._v105_probe = v105Probe;
+    (pass as any)._v106_probe = v105Probe;
+
     // Hard-fail multi-speaker dispatches that still try to send auto_detect:
     // this is the doc-violating shape that produced "Frozen mouths" on
     // scene ddde37a6 (4 speakers, COMPLETED jobs, no lip motion).
