@@ -1176,20 +1176,16 @@ serve(async (req) => {
       );
     }
 
-    // ── v107 — Coords-Collision Guard (Multi-Speaker, fresh dispatch) ────
-    // Two faces with pixel coords closer than max(120 px, plate.width * 0.08)
-    // are indistinguishable to Sync.so sync-3 active-speaker-detection on
-    // the full plate AND produce overlapping single-face preclip crops on
-    // the v69 pipeline (sibling cap collapses them into the same square).
-    // Refuse to dispatch in that state, refund, surface a clear error.
-    // DB-verified for scene 89db58ca (4 speakers, coords 838 & 901 px on
-    // 1376 px-wide plate, Δ 63 px → "2 mouths closed, 2 mouths speak all").
-    if (
-      speakers.length >= 2 &&
-      plateDims &&
-      !isAdvance &&
-      !isRetry
-    ) {
+    // ── v110 — Soft Coords-Close Warning (no longer a blocker) ───────────
+    // v107 used to hard-fail the entire scene when two speaker face coords
+    // were closer than max(120 px, plate.width × 0.08). That guard was
+    // written for the legacy v69 single-face-preclip pipeline where a close
+    // sibling collapsed the crop to a useless tiny square. With v109
+    // native-resolution preclip a smaller crop is no longer destructive —
+    // Sync.so either lip-syncs cleanly or returns a per-pass closed-mouth
+    // no-op for that single speaker. The remaining N-1 speakers must not be
+    // killed alongside. We keep the measurement as a warning only.
+    if (speakers.length >= 2 && plateDims && !isAdvance && !isRetry) {
       const pts: Array<[number, number, number]> = speakerCoords
         .map((c, i) => (c ? [Number(c[0]), Number(c[1]), i] as [number, number, number] : null))
         .filter((p): p is [number, number, number] => !!p && Number.isFinite(p[0]) && Number.isFinite(p[1]));
@@ -1197,76 +1193,23 @@ serve(async (req) => {
       let collisionPair: [number, number] | null = null;
       for (let i = 0; i < pts.length; i++) {
         for (let j = i + 1; j < pts.length; j++) {
-          const dx = pts[i][0] - pts[j][0];
-          const dy = pts[i][1] - pts[j][1];
-          const d = Math.hypot(dx, dy);
+          const d = Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1]);
           if (d < minDist) {
             minDist = d;
             collisionPair = [pts[i][2], pts[j][2]];
           }
         }
       }
-      const minAllowed = Math.max(120, Math.round(plateDims.width * 0.08));
-      if (collisionPair && minDist < minAllowed) {
-        const reason = `face_coords_collision_${Math.round(minDist)}px_min_${minAllowed}px_pair_${collisionPair[0]}_${collisionPair[1]}`;
-        console.error(`[compose-dialog-segments] scene=${sceneId} v107 COORDS_COLLISION_BLOCK ${reason}`);
-        const existingDsCC: any = (existing ?? {}) as any;
-        const alreadyRefundedCC = !!existingDsCC?.refunded;
-        if (!alreadyRefundedCC) {
-          const { data: wCC } = await supabase
-            .from("wallets").select("balance").eq("user_id", userId).single();
-          await supabase
-            .from("wallets")
-            .update({
-              balance: Number(wCC?.balance ?? 0) + Number(totalCost ?? 0),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId);
-        }
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...existingDsCC,
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              cost_credits: Number(existingDsCC?.cost_credits ?? totalCost ?? 0),
-              refunded: !alreadyRefundedCC,
-              error: reason,
-              finished_at: new Date().toISOString(),
-            },
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
-            clip_error: `v107_coords_collision:${reason}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
-        await logSyncDispatch(supabase, {
-          scene_id: sceneId, user_id: userId, engine: "sync-segments",
-          sync_status: "PREFLIGHT_BLOCKED",
-          error_class: "v107_coords_collision",
-          error_message: reason,
-          meta: {
-            speakers: speakers.length,
-            plate_dims: plateDims,
-            min_dist_px: minDist,
-            min_allowed_px: minAllowed,
-            collision_pair: collisionPair,
-            coords: speakerCoords,
-            coord_sources: coordSources,
-          },
-        });
-        return json(
-          {
-            error: "face_coords_collision",
-            reason,
-            refunded: alreadyRefundedCC ? 0 : Number(totalCost ?? 0),
-          },
-          422,
+      const softThreshold = Math.max(120, Math.round(plateDims.width * 0.08));
+      if (collisionPair && minDist < softThreshold) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v110_coords_close ` +
+          `speakers=${speakers.length} minDist=${Math.round(minDist)}px ` +
+          `threshold=${softThreshold}px pair=${collisionPair[0]}_${collisionPair[1]} — proceeding (no block)`,
         );
       }
     }
+
 
 
 
