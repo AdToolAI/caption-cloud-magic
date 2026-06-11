@@ -3083,14 +3083,19 @@ serve(async (req) => {
     (pass as any)._v105_probe = v105Probe;
     (pass as any)._v106_probe = v105Probe;
 
-    // Hard-fail multi-speaker dispatches that still try to send auto_detect:
-    // this is the doc-violating shape that produced "Frozen mouths" on
-    // scene ddde37a6 (4 speakers, COMPLETED jobs, no lip motion).
-    if (speakers.length >= 2 && asdForProbe?.auto_detect === true) {
+    // v108 — Single-Face-Preclip hat per Definition exakt EIN Gesicht; auto_detect
+    // ist dort die einzige doc-konforme Option (v103). Die v105-Guard zielt nur
+    // auf den Full-Plate-Pfad mit mehreren Gesichtern — dort verursacht
+    // auto_detect das "Animorph"-Routing. Auf Preclip wird sie ausgeschaltet.
+    if (
+      !usePassPreclip &&
+      speakers.length >= 2 &&
+      asdForProbe?.auto_detect === true
+    ) {
       return await failBeforeProviderDispatch(
         "multi_speaker_auto_detect_blocked",
-        "asd_auto_detect_on_multi_speaker",
-        "Refusing to dispatch sync-3 with auto_detect=true on a multi-speaker scene; deterministic ASD (coordinates or bounding_boxes) is required.",
+        "asd_auto_detect_on_multi_speaker_fullplate",
+        "Refusing to dispatch sync-3 with auto_detect=true on a multi-speaker FULL-PLATE; preclip path required.",
         500,
         { v105_probe: v105Probe },
       );
