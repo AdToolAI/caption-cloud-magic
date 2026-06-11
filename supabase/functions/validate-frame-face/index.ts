@@ -198,26 +198,66 @@ Reply ONLY with strict JSON, no markdown:
 
 If no face is clearly visible (back of head, blurred, hidden), return faceCount=0, empty faces array, and all quality fields null.`;
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: videoUrl } },
-          ],
-        },
-      ],
-      temperature: 0,
-    }),
-  });
+  // v99: empirisch verifiziert (qa-gemini-mp4-url-probe):
+  //   PRIMARY  `type=input_video` mit mp4 URL → 200.
+  //   FALLBACK `type=image_url` mit data:video/mp4;base64,... → 200 (≤18 MB).
+  //   400-Pfade: image_url(raw), image_url(signed), video_url, file_data.
+  async function postGateway(content: unknown[]): Promise<Response> {
+    return fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content }],
+        temperature: 0,
+      }),
+    });
+  }
+
+  let resp = await postGateway([
+    { type: "text", text: prompt },
+    { type: "input_video", input_video: { url: videoUrl } } as unknown,
+  ]);
+
+  if (!resp.ok) {
+    const primaryStatus = resp.status;
+    const primaryBody = await resp.text().catch(() => "");
+    console.warn(
+      `[validate-frame-face] input_video HTTP ${primaryStatus} body=${primaryBody.slice(0, 200)} — falling back to base64`,
+    );
+    // Base64 fallback
+    let dataUrl: string | null = null;
+    try {
+      const r = await fetch(videoUrl);
+      if (r.ok) {
+        const ab = await r.arrayBuffer();
+        if (ab.byteLength <= 18 * 1024 * 1024) {
+          const bytes = new Uint8Array(ab);
+          let bin = "";
+          const CHUNK = 0x8000;
+          for (let i = 0; i < bytes.length; i += CHUNK) {
+            bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+          }
+          const mime = r.headers.get("content-type") ?? "video/mp4";
+          dataUrl = `data:${mime};base64,${btoa(bin)}`;
+        } else {
+          console.warn(`[validate-frame-face] base64 skip: ${ab.byteLength} bytes > 18MB`);
+        }
+      }
+    } catch (e) {
+      console.warn(`[validate-frame-face] base64 fetch failed: ${(e as Error)?.message}`);
+    }
+    if (!dataUrl) {
+      throw new Error(`gemini_http_${primaryStatus}: ${primaryBody.slice(0, 240)}`);
+    }
+    resp = await postGateway([
+      { type: "text", text: prompt },
+      { type: "image_url", image_url: { url: dataUrl } },
+    ]);
+  }
 
   if (!resp.ok) {
     const t = await resp.text();
