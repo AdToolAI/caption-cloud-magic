@@ -1362,9 +1362,10 @@ serve(async (req) => {
                     | "extra"
                     | "missing"
                     | "ambiguous"
+                    | "swap"
                     | null = null;
                   let notes = "";
-                  // Human-count is the strictest signal — catches profile/background extras.
+                  let mismatched: string[] = [];
                   if (hc !== null && hc > expectedFaces) {
                     identity = "extra";
                     notes = `human count ${hc} > expected ${expectedFaces}`;
@@ -1372,23 +1373,30 @@ serve(async (req) => {
                     identity = "extra";
                     notes = `face count ${fc} > expected ${expectedFaces}`;
                   }
-                  // Deep identity audit (only meaningful for multi-portrait).
                   if (portraitUrls.length >= 2) {
+                    // v111 — audit against IDENTITY refs (canonical headshots)
+                    // when available; otherwise fall back to the wardrobe refs.
+                    const auditRefs = identityPortraitUrls.length === portraitUrls.length
+                      ? identityPortraitUrls
+                      : portraitUrls;
                     const audit = await auditAnchorIdentity(
                       url,
-                      portraitUrls,
+                      auditRefs,
                       characterNames,
                       LOVABLE_API_KEY!,
                     );
                     if (audit && !audit.ok) {
                       identity = audit.reason ?? identity ?? "ambiguous";
                       notes = audit.detail || notes;
+                      if (audit.reason === "swap" && Array.isArray(audit.mismatched)) {
+                        mismatched = audit.mismatched;
+                      }
                     }
                   }
                   console.log(
-                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} humans=${hc}/${expectedFaces} identity=${identity ?? "ok"} notes="${notes.slice(0, 120)}"`,
+                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} humans=${hc}/${expectedFaces} identity=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] notes="${notes.slice(0, 120)}"`,
                   );
-                  return { faceCount: fc, humanCount: hc, identity, notes };
+                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched };
                 };
 
                 let composedUrl: string | null = null;
