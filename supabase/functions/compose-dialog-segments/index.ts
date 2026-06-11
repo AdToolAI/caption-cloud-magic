@@ -604,17 +604,69 @@ serve(async (req) => {
       existing &&
       (existingStatus === "failed" || /v68|v58|v41|v56|recovery refund|provider_unknown/i.test(existingError));
     if (isStaleFailedState) {
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} reset_required — refusing stale failed state status=${existingStatus} error=${existingError.slice(0, 160)}`,
+      // v100 — Self-heal stale watchdog-killed terminal state on auto-trigger.
+      // When the watchdog (or any prior failure) refunded credits and parked
+      // dialog_shots in {status:failed, refunded:true}, the previous
+      // behaviour returned 409 reset_required, forcing the user to click
+      // "Sauber neu starten" manually. For auto-trigger calls we now clear
+      // the stale state in-line and continue with a clean dispatch. Manual
+      // invocations (auto !== true) still get the 409 so the explicit reset
+      // button remains the user's eskalation path.
+      const isAutoTrigger = body?.auto === true || body?.recovery === true;
+      const existingPasses = Array.isArray((existing as any)?.passes)
+        ? ((existing as any).passes as Array<{ status?: string }>)
+        : [];
+      const hasActivePass = existingPasses.some((p) =>
+        ["queued", "rendering", "retrying"].includes(String(p?.status ?? "")),
       );
-      return json(
-        {
-          error: "reset_required",
-          message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before v69 dispatch.",
-        },
-        409,
-      );
+      const isCleanlyRefunded =
+        (existing as any)?.refunded === true && !hasActivePass;
+      const canAutoReset =
+        isAutoTrigger &&
+        existingStatus === "failed" &&
+        isCleanlyRefunded;
+
+      if (canAutoReset) {
+        console.log(
+          `[compose-dialog-segments] v100 auto-reset-stale-failed scene=${sceneId} prev_error=${existingError.slice(0, 120)}`,
+        );
+        const { error: resetErr } = await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: null,
+            lip_sync_status: "pending",
+            clip_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        if (resetErr) {
+          console.warn(
+            `[compose-dialog-segments] v100 auto-reset write_failed scene=${sceneId} err=${resetErr.message} — falling back to 409`,
+          );
+          return json(
+            {
+              error: "reset_required",
+              message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before dispatch.",
+            },
+            409,
+          );
+        }
+        // Continue with a clean slate — `existing` is now logically null.
+        (scene as any).dialog_shots = null;
+      } else {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} reset_required — refusing stale failed state status=${existingStatus} error=${existingError.slice(0, 160)} auto=${isAutoTrigger} refunded=${(existing as any)?.refunded === true} hasActivePass=${hasActivePass}`,
+        );
+        return json(
+          {
+            error: "reset_required",
+            message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before v69 dispatch.",
+          },
+          409,
+        );
+      }
     }
+
     if (
       !isRetry &&
       !isAdvance &&
