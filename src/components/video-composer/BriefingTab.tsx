@@ -411,13 +411,23 @@ export default function BriefingTab({
       toast({ title: t('videoComposer.storyboardGenerated'), description: `${rawScenes.length} ${t('videoComposer.scenesCreated')}` });
     } catch (err: any) {
       console.error('Storyboard generation error:', err);
+      const isRetryable = err?.retryable === true;
       toast({
-        title: t('videoComposer.storyboardError'),
-        description: err?.message || t('videoComposer.tryAgain'),
+        title: isRetryable
+          ? (language === 'de' ? 'KI-Dienst ist gerade überlastet'
+            : language === 'es' ? 'El servicio de IA está temporalmente saturado'
+            : 'AI service is temporarily overloaded')
+          : t('videoComposer.storyboardError'),
+        description: isRetryable
+          ? (language === 'de' ? 'Bitte in ca. 30 Sekunden erneut auf „Storyboard generieren" klicken.'
+            : language === 'es' ? 'Por favor, vuelve a pulsar «Generar storyboard» en unos 30 segundos.'
+            : 'Please click "Generate storyboard" again in about 30 seconds.')
+          : (err?.message || t('videoComposer.tryAgain')),
         variant: 'destructive',
       });
       // Bring the user back to Briefing so they can fix inputs and retry.
       onGenerationFailed?.();
+
     } finally {
       setIsGenerating(false);
       onGenerationEnd?.();
