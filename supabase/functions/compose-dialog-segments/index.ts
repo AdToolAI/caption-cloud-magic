@@ -3148,6 +3148,7 @@ serve(async (req) => {
         // hypothesis without grepping edge logs.
         v102_probe: (pass as any)._v102_probe ?? null,
         v103_probe: (pass as any)._v102_probe ?? null,
+        v105_probe: (pass as any)._v105_probe ?? null,
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
         dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
         payload_summary: {
