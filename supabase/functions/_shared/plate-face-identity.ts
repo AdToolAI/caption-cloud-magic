@@ -39,6 +39,7 @@ async function askGeminiForPlateIdentity(
   frameUrl: string,
   characters: Array<{ characterId: string; portraitUrl: string }>,
   faces: PlateFaceBox[],
+  timestampSec: number,
 ): Promise<Map<number, { characterId: string; confidence: number }>> {
   const out = new Map<number, { characterId: string; confidence: number }>();
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -55,7 +56,8 @@ async function askGeminiForPlateIdentity(
       {
         type: "text",
         text:
-          `The FIRST image is one frame from a rendered video, containing ${faces.length} human face(s). ` +
+          `The FIRST attachment is a video; look at the frame at timestamp ${timestampSec.toFixed(2)}s. ` +
+          `That frame contains ${faces.length} human face(s). ` +
           `Faces are pre-numbered by slot, sorted left-to-right (slot 0 = left-most). ${slotDescriptions}. ` +
           `The remaining images are reference portraits in this order: ` +
           ids.map((id, i) => `(${i + 1}) ${id}`).join(", ") + ". " +
