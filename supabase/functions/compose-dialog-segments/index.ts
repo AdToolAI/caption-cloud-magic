@@ -2485,6 +2485,10 @@ serve(async (req) => {
             size: preclip.crop.size,
             outputSize: preclip.crop.outputSize,
           };
+          // v102 Step A — persist preclip duration (see batch path above).
+          (pass as any).preclip_duration_sec = typeof preclip.durationSec === "number"
+            ? preclip.durationSec
+            : null;
           (pass as any).preclip_error = null;
           (pass as any).preclip_face_count = preclipFaceCount;
           console.log(
