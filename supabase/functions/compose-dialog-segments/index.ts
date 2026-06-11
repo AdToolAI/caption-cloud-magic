@@ -2556,11 +2556,13 @@ serve(async (req) => {
       // is unambiguous and safe.
       syncOptions.active_speaker_detection = { auto_detect: true };
 
-      // v103 — sync_mode policy on preclip: when audio (per-pass tight VO)
-      // is longer than the preclip (~1.87s), `cut_off` would trim output to
-      // 1.87s and the audio-mux tail would have a closed mouth. Force
-      // `loop` so Sync.so plays the locked-camera preclip for the full
-      // audio duration (v63 rule for plate<audio scenarios).
+      // v104 — sync-3 preclip must be doc-strict. Sync.so manages
+      // temperature/occlusion internally for sync-3, and historical runs show
+      // the tight WAV duration matches the preclip window. Keep `cut_off` so
+      // the lipsynced crop remains pass-local; do NOT loop to full scene audio.
+      delete syncOptions.temperature;
+      delete syncOptions.occlusion_detection_enabled;
+      syncOptions.sync_mode = "cut_off";
       const videoDurSec = typeof (pass as any).preclip_duration_sec === "number"
         ? Number((pass as any).preclip_duration_sec)
         : null;
@@ -2569,14 +2571,11 @@ serve(async (req) => {
         const wavDur = (diag as any)?.wav?.durSec;
         return typeof wavDur === "number" ? wavDur : null;
       })();
-      const audioForMode = audioFullSec ?? tightAudioInfo?.durSec ?? totalSec;
-      if (videoDurSec != null && audioForMode > videoDurSec + 0.05) {
-        syncOptions.sync_mode = "loop";
-      }
-
       (pass as any)._v102_probe = {
-        stage: "preclip-autodetect-v103",
+        stage: "preclip-sync3-autodetect-v104",
         model_intent: "sync-3",
+        payload_model: "sync-3",
+        asd_mode: "auto_detect",
         sync_mode: syncOptions.sync_mode,
         bbox_count: 0,
         audio_voiced_sec: tightAudioInfo?.durSec ?? null,
@@ -2590,17 +2589,11 @@ serve(async (req) => {
           : null,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v103_preclip_autodetect speaker=${pass.speaker_name} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v104_preclip_sync3_autodetect speaker=${pass.speaker_name} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
       );
     }
 
-
-
-
-
-
-
-    } else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
+    else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
       // https://sync.so/docs/developer-guides/speaker-selection):
       // frame_number = a frame WHERE THE SPEAKER IS VISIBLE. We anchor on
@@ -2721,8 +2714,9 @@ serve(async (req) => {
     // stills where lipsync-2-pro's "Still Frame Limitation" silently fails.
     // sync-3 handles both static and motion plates natively. lipsync-2-pro
     // remains reachable only via the explicit `coords-pro-lp2pro` fallback.
-    const payloadModel =
-      retryVariant === "sync3-coords"
+    const payloadModel = usePassPreclip
+      ? SYNC3_MODEL
+      : retryVariant === "sync3-coords"
         ? SYNC3_MODEL
         : retryVariant === "auto-standard"
           ? LIPSYNC_FALLBACK_MODEL
@@ -2888,7 +2882,7 @@ serve(async (req) => {
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
       `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
-      `frame=${referenceFrameNumber} sync_mode=${payloadSyncMode} input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+      `frame=${referenceFrameNumber} sync_mode=${String(syncOptions.sync_mode)} input=${dispatchVideoUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
@@ -2946,7 +2940,7 @@ serve(async (req) => {
         .eq("id", sceneId);
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
-        sync_source_kind: "segments", video_url: passInputUrl,
+        sync_source_kind: "segments", video_url: dispatchVideoUrl,
         http_status: resp.status, sync_status: "DISPATCH_FAILED",
         error_class: classifySyncError(errTxt),
         error_message: errTxt.slice(0, 500),
@@ -3052,7 +3046,7 @@ serve(async (req) => {
     await logSyncDispatch(supabase, {
       scene_id: sceneId, user_id: userId, engine: "sync-segments",
       job_id: jobId, sync_source_kind: "segments",
-      video_url: passInputUrl,
+      video_url: dispatchVideoUrl,
       video_bytes: videoProbe.bytes,
       video_content_type: videoProbe.contentType,
       window_start_sec: 0, window_end_sec: totalSec,
@@ -3072,7 +3066,7 @@ serve(async (req) => {
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
-        sync_mode: payloadSyncMode,
+        sync_mode: syncOptions.sync_mode,
         audio_approx_sec: audioApproxSec,
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,
@@ -3089,10 +3083,12 @@ serve(async (req) => {
         // failing passes to verify the bbox/video/audio frame-count mismatch
         // hypothesis without grepping edge logs.
         v102_probe: (pass as any)._v102_probe ?? null,
+        v103_probe: (pass as any)._v102_probe ?? null,
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
+        dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
         payload_summary: {
           model: payload.model,
-          input_video: passInputUrl,
+          input_video: dispatchVideoUrl,
           audio: pass.audio_url,
           frame_number: referenceFrameNumber,
           coordinates: pass.coords,
