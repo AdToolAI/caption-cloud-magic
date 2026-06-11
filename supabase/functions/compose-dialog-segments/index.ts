@@ -2259,6 +2259,13 @@ serve(async (req) => {
             x: preclip.crop.x, y: preclip.crop.y,
             size: preclip.crop.size, outputSize: preclip.crop.outputSize,
           };
+          // v102 Step A — persist preclip duration so the dispatch builder can
+          // log the real video frame count vs. the bbox-array length and the
+          // audio duration. This lets us prove/disprove the "bbox count != video
+          // frames" root-cause for the sync-3 `provider_unknown_error` loop.
+          (p as any).preclip_duration_sec = typeof preclip.durationSec === "number"
+            ? preclip.durationSec
+            : null;
           (p as any).preclip_error = null;
           (p as any).preclip_face_count = faceCount;
           return { idx, status: "ok" as const, faceCount };
