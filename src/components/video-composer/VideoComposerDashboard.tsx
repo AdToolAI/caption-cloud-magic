@@ -1021,6 +1021,21 @@ export default function VideoComposerDashboard() {
       }
       return s;
     });
+    // Mark watched freeform-text fields as "dirty" whenever the user changes
+    // them locally. The realtime-merge sites further down read these flags
+    // to avoid overwriting an in-flight user edit with a stale DB row.
+    for (const s of cleaned) {
+      const prev = prevById.get(s.id);
+      if (!prev) continue;
+      if ((s.sceneActionUser ?? '') !== (prev.sceneActionUser ?? '')) markDirty(s.id, 'sceneActionUser');
+      if ((s.sceneActionEn ?? '') !== (prev.sceneActionEn ?? '')) markDirty(s.id, 'sceneActionEn');
+      if ((s.aiPrompt ?? '') !== (prev.aiPrompt ?? '')) markDirty(s.id, 'aiPrompt');
+      if ((s.stockKeywords ?? '') !== (prev.stockKeywords ?? '')) markDirty(s.id, 'stockKeywords');
+      if ((s.textOverlay?.text ?? '') !== (prev.textOverlay?.text ?? '')) markDirty(s.id, 'textOverlay.text');
+      const aSig = (s.characterShots ?? []).map((x: any) => `${x.characterId}:${x.actionUser ?? ''}:${x.actionEn ?? ''}`).join('|');
+      const bSig = (prev.characterShots ?? []).map((x: any) => `${x.characterId}:${x.actionUser ?? ''}:${x.actionEn ?? ''}`).join('|');
+      if (aSig !== bSig) markDirty(s.id, 'characterShotsActions');
+    }
     const propagated = propagateDialogLock(cleaned);
     setProject(prev => {
       // Schedule debounced DB flush only for already-persisted projects.
