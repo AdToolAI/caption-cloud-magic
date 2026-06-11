@@ -1,41 +1,94 @@
-# Plan: Gemini-MP4-URL empirisch verifizieren und einsetzen
 
-## Kontext
-Ich habe die letzten ~450 Nachrichten durchsucht (Treffer: #2139, #2958, #8176, #8178, #9082, #9484, #9920, #9922, #9924, #9938, #9940, #9942). In keiner davon steht eine Aussage von mir, dass es zwei Arten von MP4-URLs für Gemini gibt — eine die geht, eine die 400 wirft. Die einzigen früheren Aussagen waren *negativ* ("Gemini akzeptiert MP4 nicht zuverlässig"). 
+## Root-Cause-Analyse
 
-Du sagst aber bestimmt, dass eine Variante funktioniert. Statt weiter darüber zu diskutieren, wer was wann gesagt hat, schlage ich vor das **empirisch zu beweisen**: eine kleine Probe-Edge-Function ruft Gemini mit allen plausiblen MP4-URL-Formen einmal real auf, loggt Status + Body, und wir bauen die Fix-Pipeline auf die Variante, die nachweislich 200 + Faces liefert.
+**Was beim User passiert ist** (Scene `07185a89…`, 4-Sprecher Dialog):
 
-## Schritt 1 — Probe-Edge-Function `qa-gemini-mp4-url-probe`
-Neue, einmalige QA-Function (nicht im Produktionspfad). Input: eine bekannte Test-MP4 (kurzer Plate-Clip mit ≥1 sichtbarem Gesicht, z.B. der letzte fehlgeschlagene Composer-Plate). Sie ruft Lovable AI Gateway (`google/gemini-2.5-flash`) sequenziell mit **6 URL-Varianten** auf und gibt eine Tabelle zurück:
+1. ~17:00 — Erster `compose-dialog-segments` Dispatch wurde aufgerufen. Er hat den Scene-State auf `lip_sync_status=pending, twoshot_stage=master_clip` gesetzt UND `dialog_shots={version:5}` geschrieben, ist dann aber **vor dem ersten Sync.so-Submit gecrashed** (uncaught throw — wahrscheinlich in der v99 bbox-Computation, face-map resolve, oder Plate-Identity-Resolution; das passierte ausserhalb eines try/catch, weshalb nichts in `syncso_dispatch_log` landete und keine sichtbare Error-Zeile im Edge-Log).
+2. 17:07:01 — `lipsync-watchdog` läuft, sieht: scene älter als `STALE_PREFLIGHT_MS` (4 min), `dialog_shots` ohne `job_id` und `syncso_dispatch_log` leer → ruft `failLipSync` mit `reason=watchdog_preflight_aborted` auf, refundet Credits, setzt `dialog_shots={status:"failed", error:"watchdog_preflight_aborted", refunded:true}`.
+3. 17:07:27+ — Der Auto-Trigger im UI ruft alle ~30 s weiter `compose-dialog-segments` auf. Die `isStaleFailedState`-Guard (Z. 583-600) sieht `existingStatus="failed"` und returnt **409 `reset_required`** — kein Recovery passiert.
+4. Der User sieht den roten "Fehler / Lip-Sync abgebrochen"-Banner und muss manuell "Sauber neu starten" klicken (`reset-lipsync-scene`).
 
-| # | Variante | URL-Form |
-|---|----------|----------|
-| 1 | Supabase Public | `…/storage/v1/object/public/<bucket>/<path>.mp4` |
-| 2 | Supabase Signed (1h TTL) | `…/storage/v1/object/sign/<bucket>/<path>?token=…` |
-| 3 | Remotion S3 unsigned | `https://<bucket>.s3.<region>.amazonaws.com/<key>.mp4` |
-| 4 | Remotion S3 presigned (1h TTL) | `…?X-Amz-Signature=…` |
-| 5 | Eigener Edge-Proxy mit erzwungenem `Content-Type: video/mp4` | `…/functions/v1/mp4-proxy?u=…` |
-| 6 | Google Files API Upload (`genai.files.upload` → `file_data.fileUri`) | `gs://generativelanguage…` |
+DB-Beweis: 6 `syncso_dispatch_log`-Zeilen, alle mit `sync_status=DISPATCH_ATTEMPT_STARTED` und Meta `existing_state_status="failed", existing_state_version: 5` — d.h. der allererste Crash hatte noch nicht mal in `syncso_dispatch_log` geloggt; nur die nachfolgenden geblockten Versuche tauchen dort auf.
 
-Pro Variante wird sowohl das `messages[].content[].type = "image_url"`-Pattern (Gateway-OpenAI-kompatibel) als auch — falls vom Gateway erlaubt — das native Gemini `file_data`/`inline_data`-Pattern probiert. Geloggt wird: HTTP-Status, erste 500 Zeichen der Antwort, Latenz, ob die Antwort eine Face-Liste enthält.
+---
 
-Du oder ich rufen die Function einmal mit der echten Plate-MP4 auf, die zuletzt 0 Faces ergeben hat. Nach ~30 s wissen wir definitiv welche Variante 200 + verwertbare Face-Daten liefert.
+## Fix in zwei Schichten
 
-## Schritt 2 — Pipeline auf Gewinner umstellen
-Sobald wir den Gewinner haben (z.B. "Signed Storage URL mit Content-Type-Header"), passe ich an:
+### Schicht A — Self-Healing in `compose-dialog-segments`
 
-- `supabase/functions/_shared/plate-face-detect.ts` — Builder für die korrekte URL-Form (signed-URL-Helper / Files-API-Upload / Proxy).
-- `supabase/functions/validate-frame-face/index.ts` — gleiche Builder-Helper, behebt parallel die aktuellen 400-"soft-pass"-Stürme.
-- `supabase/functions/compose-dialog-segments/index.ts` — Hard-Block für 3+ Sprecher wenn Detection trotzdem 0 Faces meldet (kein Credit-Verbrauch auf "Mund zu"-Render).
-- Migration: `plate_face_cache` bekommt `gemini_url_variant` text + `frame_url` text, damit der Cache nicht versehentlich eine 400-URL wiederverwendet.
+In Z. 583-600 (`isStaleFailedState` Branch) statt 409 `reset_required` zu returnen:
 
-## Schritt 3 — Verifikation
-Nach Deploy:
-1. Erneuter 4-Sprecher-Composer-Run.
-2. Logs müssen `plate_identity=4/4` + `coordSources=["plate-identity"]` zeigen.
-3. Sync.so Lipsync-Outputs visuell prüfen: alle 4 Münder offen synchron zur VO.
-4. Falls 4/4 nicht erreicht: Fallback auf clip-side Face-Detect bleibt aktiv (keine Regression).
+```text
+WENN existing.status === "failed"
+  UND existing.refunded === true               (watchdog hat sauber refundet)
+  UND existing.version === 5                   (v5 sync-segments State)
+  UND KEINE active passes (passes[*].status ∉ {rendering, queued})
+  UND request ist `auto` (Auto-Trigger, kein manueller Klick)
+→
+  1. Lösche dialog_shots aus composer_scenes (= das was reset-lipsync-scene auch tut)
+  2. Setze lip_sync_status='pending', clip_error=null
+  3. Continue mit dem Dispatch-Flow als wäre es ein frischer Start
+  4. Log: "auto-reset-stale-failed scene=… prev_error=…"
+```
 
-## Was ich von dir brauche, bevor ich baue
-- **Bestätigung**, dass ich Schritt 1 (Probe-Function + einmaliger Real-Call gegen Lovable AI Gateway, kostet ~6× Gemini-Vision-Credits ≈ <0,01 €) ausführen darf.
-- Optional: Falls du die Antwort schon kennst (z.B. "es ist die Signed URL" oder "der Files-API-Upload"), sag es — dann skippe ich Schritt 1 und baue direkt Schritt 2.
+Resultat: Der nächste Auto-Tick (alle 30 s) heilt sich selbst, der User muss den Reset-Button nicht mehr klicken. Manuelle Aufrufe (`auto !== true`) bleiben unverändert geblockt, damit der User weiterhin den "Sauber neu starten"-Button als bewusste Eskalation hat.
+
+### Schicht B — Crash-Safe Envelope (verhindert die Klasse "preflight aborted" komplett)
+
+Das ganze Dispatch-Body von `compose-dialog-segments` (ab dem Punkt wo `lip_sync_status=pending` gesetzt wird, bis zum ersten erfolgreichen Sync.so-Submit oder einem expliziten Return) wird in einen `try/catch` gewrapped:
+
+```text
+try { ... existing dispatch logic ... }
+catch (e) {
+  console.error(`[compose-dialog-segments] dispatch_crash scene=${sceneId} err=${e.message}\n${e.stack}`)
+  // Stelle sicher dass syncso_dispatch_log eine Crash-Zeile bekommt
+  await logSyncDispatch({ sceneId, sync_status: "DISPATCH_CRASH",
+                          error_class: "dispatch_crash", error_message: e.message })
+  // Sofort sauberer Failure-State + Refund (damit nicht 4 min auf watchdog gewartet wird)
+  await failLipSync({ supabase, sceneId, userId, reason: `dispatch_crash: ${e.message}`,
+                      refundCredits: 0, /* nothing charged yet — TTS was per-character */ })
+  return json({ error: "dispatch_crash", message: e.message }, 500)
+}
+```
+
+Effekt: Ein zukünftiger Crash erzeugt sofort einen sauberen `dialog_shots={status:"failed", refunded:true}` State (statt 4 min Phantom-`pending`), und Schicht A auto-heilt beim nächsten Auto-Tick — d.h. der User merkt im Idealfall einen kurzen "Retrying"-Flash statt einem 6-Min-Totalausfall.
+
+### Schicht C — Sofort-Aktion für die aktuelle Szene
+
+Da der Auto-Reset erst nach Deploy aktiv wird und der User die Szene jetzt sauber haben will: zusätzlich ein einmaliges SQL-Update als Teil der Migration (idempotent):
+
+```sql
+update composer_scenes
+   set dialog_shots = null,
+       lip_sync_status = 'pending',
+       clip_error = null,
+       updated_at = now()
+ where id = '07185a89-6540-4d49-ab91-69e4e554d182'
+   and dialog_shots->>'status' = 'failed'
+   and dialog_shots->>'error' = 'watchdog_preflight_aborted';
+```
+
+Dann startet der bestehende Auto-Trigger im UI den frischen v99-Dispatch innerhalb von 30 s.
+
+---
+
+## Was NICHT geändert wird
+
+- `STALE_PREFLIGHT_MS` (4 min) im Watchdog bleibt — er ist die letzte Sicherheitslinie für echte Hänger.
+- v99 bbox-Logik, face-map, plate-identity bleibt unverändert. Falls Schicht B den nächsten Crash fängt, sehen wir im Log endlich den echten Stack-Trace und können dann gezielt fixen.
+- Manueller "Sauber neu starten"-Button bleibt als Eskalationspfad.
+- FROZEN-Invariants I.1–I.13 unverändert.
+
+---
+
+## Files
+
+- `supabase/functions/compose-dialog-segments/index.ts` — `isStaleFailedState`-Branch (Z. 583-600) um Auto-Reset-Pfad erweitern; gesamtes Dispatch-Body in `try/catch` wrappen.
+- Migration für das einmalige SQL-Update der betroffenen Szene.
+- Memory-Update: `mem://architecture/lipsync/auto-reset-stale-failed.md` (neue Datei) + Index-Eintrag.
+
+## Verifikation
+
+1. Nach Deploy: betroffene Szene ist sauber, Auto-Trigger startet frischen v99-Dispatch, Lip-Sync läuft in ~7:30 min wieder durch.
+2. Falls v99 erneut crasht: neuer `[compose-dialog-segments] dispatch_crash scene=… err=…` Log mit Stack-Trace → echte Root-Cause-Investigation auf Basis konkretem Error.
+3. Kein 4-Min-Phantom-`pending` mehr; kein roter "Fehler"-Banner für transiente Dispatch-Crashes.
