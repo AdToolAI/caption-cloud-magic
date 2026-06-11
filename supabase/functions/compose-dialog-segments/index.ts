@@ -336,6 +336,14 @@ serve(async (req) => {
   let lockSupabase: any = null;
   let lockSceneId: string | null = null;
   let lockHolder: string | null = null;
+  // v100 — crash-safe envelope: keep sceneId/userId/syncApiKey reachable from
+  // the outer catch so an uncaught throw before/after dispatch can immediately
+  // mark the scene `failed` (with refund) instead of leaving it `pending` until
+  // lipsync-watchdog wakes 4 min later and calls failLipSync("preflight_aborted").
+  let crashSceneId: string | null = null;
+  let crashUserId: string | null = null;
+  let crashSupabase: any = null;
+  let crashSyncApiKey: string | null = null;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
