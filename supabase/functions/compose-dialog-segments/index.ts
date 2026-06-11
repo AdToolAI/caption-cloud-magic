@@ -2610,10 +2610,74 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v101_preclip_bbox speaker=${pass.speaker_name} cropLocalBox=${JSON.stringify(cropLocalBox)} frames=${frameCount} preCrop=${JSON.stringify(preCrop)} plateBbox=${JSON.stringify(platePixelBbox)}`,
         );
+        // v102 Step A — explicit alignment probe. We log what the REAL video
+        // looks like (preclip mp4) vs. what we're sending Sync.so as bbox-array
+        // length and as audio. Hypothesis: when bbox_count !== video_frames
+        // and/or audio_full_sec !== video_dur_sec, sync-3 returns
+        // `provider_unknown_error` (HTTP 200, webhook FAILED). The probe writes
+        // these into both the console log AND syncso_dispatch_log.meta.v102_probe
+        // so we can verify offline. No logic changes yet.
+        const videoDurSec = typeof (pass as any).preclip_duration_sec === "number"
+          ? Number((pass as any).preclip_duration_sec)
+          : null;
+        const videoFramesExpected = videoDurSec != null
+          ? Math.max(1, Math.ceil(videoDurSec * 30))
+          : null;
+        const audioFullSec = (() => {
+          const diag = audioDiagnostics.find((d) => d.pass === pass.idx);
+          const wavDur = (diag as any)?.wav?.durSec;
+          return typeof wavDur === "number" ? wavDur : null;
+        })();
+        const v102Probe = {
+          stage: "preclip-bbox-dispatch",
+          model_intent: "sync-3",
+          sync_mode: payloadSyncMode,
+          bbox_count: boundingBoxes.length,
+          frame_count_source: tightAudioInfo ? "audio_voiced" : "audio_full",
+          dur_for_frames_sec: Number(durForFrames.toFixed(3)),
+          audio_voiced_sec: tightAudioInfo?.durSec ?? null,
+          audio_full_sec: audioFullSec,
+          video_dur_sec: videoDurSec,
+          video_frames_expected: videoFramesExpected,
+          bbox_vs_video_delta: videoFramesExpected != null
+            ? boundingBoxes.length - videoFramesExpected
+            : null,
+          audio_vs_video_delta_sec: audioFullSec != null && videoDurSec != null
+            ? Number((audioFullSec - videoDurSec).toFixed(3))
+            : null,
+          preclip_url_tail: passPreclipUrl ? `…${passPreclipUrl.slice(-80)}` : null,
+        };
+        (pass as any)._v102_probe = v102Probe;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v102_probe ${JSON.stringify(v102Probe)}`,
+        );
       } else {
         syncOptions.active_speaker_detection = { auto_detect: true };
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v101_preclip_bbox_skip preCrop=${!!preCrop} plateBbox=${!!platePixelBbox} — falling back to auto_detect:true`,
+        );
+        const videoDurSec = typeof (pass as any).preclip_duration_sec === "number"
+          ? Number((pass as any).preclip_duration_sec)
+          : null;
+        const audioFullSec = (() => {
+          const diag = audioDiagnostics.find((d) => d.pass === pass.idx);
+          const wavDur = (diag as any)?.wav?.durSec;
+          return typeof wavDur === "number" ? wavDur : null;
+        })();
+        (pass as any)._v102_probe = {
+          stage: "preclip-autodetect-fallback",
+          model_intent: "sync-3",
+          sync_mode: payloadSyncMode,
+          bbox_count: 0,
+          audio_voiced_sec: tightAudioInfo?.durSec ?? null,
+          audio_full_sec: audioFullSec,
+          video_dur_sec: videoDurSec,
+          video_frames_expected: videoDurSec != null
+            ? Math.max(1, Math.ceil(videoDurSec * 30))
+            : null,
+        };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v102_probe ${JSON.stringify((pass as any)._v102_probe)}`,
         );
       }
 
