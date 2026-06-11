@@ -1,93 +1,112 @@
-## Befund
+## Vollständige Pipeline-Analyse vs. Sync.so v3 Dokumentation
 
-Die Sync.so-3-Requests sind zwar inzwischen syntaktisch gültig und laufen durch, aber die sichtbare Ausgabe bleibt „Frozen“, weil unsere Pipeline weiterhin nicht dem empfohlenen Multi-Speaker-Workflow entspricht.
+### Was Sync.so offiziell für sync-3 unterstützt (Quelle: sync.so/docs/developer-guides/speaker-selection + /models/sync-3)
 
-Wesentliche Abweichungen:
+Erlaubte `options` für `model: "sync-3"` laut Doku:
+- `sync_mode` (`cut_off`, `loop`, etc.)
+- `active_speaker_detection` mit **einer** von drei Formen:
+  - **a) Auto-Detect (Video):** `{ auto_detect: true }` — keine weiteren Felder
+  - **b) Manuell Koordinaten:** `{ auto_detect: false, frame_number: N, coordinates: [x, y] }`
+  - **c) Bounding-Boxes pro Frame:** `{ auto_detect: false, bounding_boxes: [...] }` ODER `{ auto_detect: false, bounding_boxes_url: "..." }`
 
-1. **Multi-Speaker wird mit `auto_detect: true` auf Preclips gefahren**
-   - Sync.so empfiehlt Auto-Detect nur für Single/obvious-speaker-Clips.
-   - Für mehrere Personen soll deterministisch mit `frame_number + coordinates` oder `bounding_boxes(_url)` gearbeitet werden.
-   - Unsere v104-Payloads nutzen auf jedem 512x512-Preclip `active_speaker_detection: { auto_detect: true }`.
+In den offiziellen Docs für sync-3 **nicht aufgeführt**:
+- `temperature`
+- `occlusion_detection_enabled` (sync-3 hat „built-in obstruction detection" – kein Toggle)
 
-2. **Preclip-Video und Audio sind zeitlich nicht zuverlässig identisch**
-   - Die Log-Probe zeigt Preclips von ca. 1.1–3.1s, aber Telemetrie/Audio-Diagnostik weiterhin 9s-Full-Timeline-WAVs mit Lead-ins bis ~7s.
-   - Wenn Sync.so auf einem kurzen Preclip zuerst Stille/idle Audio sieht, ist das erwartbare Ergebnis: Job completed, aber keine sichtbare Mundanimation.
+### Was unsere Pipeline aktuell sendet (DB-belegt, Scene c8fb1fe6)
 
-3. **Unsere Telemetrie validiert nicht den echten Payload**
-   - `audio_diagnostics`, `audio_probe` und `audio_full_sec` kommen teilweise aus den ursprünglichen per-speaker Full-Length-Tracks, nicht aus der tatsächlich gesendeten `payload.input[].audio.url`.
-   - Dadurch wurde „bbox_count=0 / 201 / completed“ korrekt gemeldet, aber nicht geprüft, ob Sync.so wirklich passendes Audio+Video bekam.
+Payload für jeden der 4 Pässe (v105, `coords-pro` / `sync3-coords`):
+```json
+{
+  "model": "sync-3",
+  "input": [{video}, {audio}],
+  "options": {
+    "sync_mode": "cut_off",
+    "temperature": 0.5,                              // NICHT in sync-3 Docs
+    "occlusion_detection_enabled": true,             // NICHT in sync-3 Docs
+    "active_speaker_detection": {
+      "auto_detect": false,
+      "coordinates": [153, 193],
+      "frame_number": 27
+    }
+  }
+}
+```
+Sync.so antwortet: HTTP 201 (Job angenommen), Webhook später: `status: FAILED, error: "An unknown error occurred."`
 
-4. **Alte Kommentare/Logik widersprechen sich**
-   - Der Code enthält bereits eine v97-Strategie „Multi-Speaker full-plate + bbox-url-pro“, aber der tatsächliche Lauf ging trotzdem über `preclip-sync3-autodetect-v104`.
-   - Das deutet auf stale `preclip_url`/FaceMap-State oder Gate-Order-Probleme hin: ein bestehender Preclip gewinnt gegen die eigentlich bessere Sync.so-3-Multi-Speaker-Route.
+### Root-Cause-Analyse (mehrschichtig)
 
-## Plan
+**Root Cause 1 — Unbekannte Optionen für sync-3 → `provider_unknown_error`:**
+- `temperature` und `occlusion_detection_enabled` sind in der offiziellen sync-3 API-Doku nicht aufgeführt.
+- Sync.so akzeptiert den Job in der Validierung (HTTP 201) und bricht ihn dann beim Provider-Run mit unspezifischem Fehler ab.
+- Das erklärt, warum alle 4 Pässe konsistent mit „An unknown error occurred." enden, obwohl die ASD-Struktur an sich formal richtig aussieht.
 
-1. **Sync.so-3 Multi-Speaker Standardpfad umstellen**
-   - Für N≥2 keine `auto_detect`-Preclips mehr als Standard verwenden.
-   - Standard wird: Full plate video + `sync-3` + `active_speaker_detection` mit deterministischem Target:
-     - bevorzugt `bounding_boxes_url`, wenn Plate-Identity/FaceMap vorhanden ist
-     - sonst `frame_number + coordinates`
-   - `auto_detect: true` bleibt nur für echte Single-Face-Crops oder Single-Speaker-Szenen ohne Mehrpersonen-Kontext.
+**Root Cause 2 — Frage „Wird Auto-Detect korrekt umgesetzt?":**
+**Nein.** v105 deaktiviert `auto_detect` für Multi-Speaker explizit:
+```
+v105_multi_speaker_force_fullplate speakers=4 resolved=0 → 
+full-plate sync-3 deterministic ASD (bbox-url-pro or coords-pro)
+```
+Das ist genau die Stelle, wo zuvor (Closed-Mouth-Bug) `auto_detect: true` pro Pass eingesetzt wurde, was zwar valide Doku-Konformität war, aber bei 4 Pässen je dieselbe Person animiert hätte. Die jetzige Lösung „coords statt auto_detect" ist konzeptionell richtig — sie scheitert nur an Root Cause 1 (unzulässige Options) und Root Cause 3 (falsche Koordinaten).
 
-2. **Stale Preclip-State neutralisieren**
-   - Beim Fresh-Dispatch für Multi-Speaker vorhandene `preclip_url`, `preclip_crop`, `preclip_duration_sec` ignorieren oder löschen.
-   - Damit kann ein alter v104-Preclip nicht erneut den Sync.so-3-konformen Full-Plate-Pfad übersteuern.
+**Root Cause 3 — Koordinaten sind heuristisch, nicht echt:**
+- `plate-face-detect` (Gemini) findet zwar 4 Gesichter, aber `plate-identity` resolved 0/4 (kein Mapping zu Speaker-Namen).
+- Fallback `plate-slot-fallback` verteilt 4 Punkte gleichmäßig (x: 153, 314, 465, 617; y: 193–224) auf 768×1028-Plate.
+- Selbst wenn Sync.so den Job ausführen würde: Koordinaten zeigen vermutlich nicht exakt auf die Mundregion → Closed-Mouth-Resultat (genau das Symptom der Vorgängerszene ddde37a6).
 
-3. **Payload-Audio wirklich prüfen**
-   - Direkt vor dem Sync.so-POST die tatsächlich gesendete Audio-URL (`pass.audio_url`) inspizieren.
-   - Loggen: echte Payload-Audiodauer, Lead-in, voiced seconds, peak, bytes.
-   - Wenn Payload-Audio und Videofenster stark auseinanderlaufen, Dispatch blockieren statt „grün“ laufen lassen.
+**Root Cause 4 — Multi-Speaker-Stuck-State im Webhook:**
+- Wenn Teilfehler auftreten und keine Inflight-Jobs mehr offen sind, bleibt `lip_sync_status='running'` und `twoshot_stage='syncso_fanout_2_of_4'` stehen.
+- Szene ddde37a6 hat sogar `clip_url + lip_sync_applied_at`, aber Status „running" — die UI hängt deshalb dauerhaft auf „Lip-Sync läuft…".
 
-4. **Tight-Audio und Preclip-Fenster angleichen**
-   - Falls Preclip weiterhin als Fallback genutzt wird, muss Audio exakt zum Preclip-Fenster passen: keine Full-Timeline-Leadin-WAVs an kurze Preclips.
-   - Sync.so bekommt dann entweder:
-     - Full plate + Full/segment-konforme Timeline mit deterministic speaker selection, oder
-     - Short preclip + short audio ab t=0.
-   - Keine Mischform „short video + 9s silence-padded audio“.
+**Root Cause 5 — Beste Praxis für Multi-Speaker (nach Doku):**
+Doku empfiehlt für Mehrsprecher-Szenen explizit `bounding_boxes` pro Frame (oder `bounding_boxes_url` für lange Videos). Wir machen pro Sprecher einen separaten Pass mit einer Koordinate — das funktioniert formal, ist aber bei 4 Sprechern fehleranfälliger als die „eine Generation mit per-Frame-Bounding-Boxen, bei der Sync.so pro Frame die aktive Person wählt".
 
-5. **Telemetry v105 hinzufügen**
-   - Neuer Probe-Block: `stage: sync3-fullplate-deterministic-v105` oder `singleface-preclip-v105`.
-   - Felder: `dispatch_video_kind`, `payload_audio_dur_sec`, `payload_audio_lead_in_sec`, `payload_video_dur_sec`, `asd_shape`, `has_bounding_boxes_url`, `has_coordinates`, `auto_detect`.
-   - Erfolgskriterium: Bei Multi-Speaker darf `auto_detect=true` nicht mehr auftauchen.
+### Plan zur Behebung
 
-6. **Betroffene Szene sauber neu starten**
-   - Szene `ddde37a6-9334-4286-8aa4-528d8a8f4a5e` resetten:
-     - `lip_sync_status` zurücksetzen
-     - `clip_error` löschen
-     - stale Preclip-Felder aus `dialog_shots.passes[]` entfernen
-   - Danach neu dispatchen und prüfen:
-     - 4 Sync.so-Jobs mit `sync-3`
-     - Full-plate deterministic speaker targeting
-     - keine `auto_detect`-Preclips bei N=4
-     - finale Ausgabe zeigt sichtbare Mundbewegung pro Sprecher.
+**Phase A — Payload streng doku-konform machen (`compose-dialog-segments`):**
+1. Für `model: "sync-3"` `temperature` und `occlusion_detection_enabled` **nicht mehr senden**. Diese Optionen nur noch für `lipsync-2` / `lipsync-2-pro` setzen.
+2. Telemetrie v106 erweitern: gesamte tatsächliche `options`-Keys ins Log schreiben, damit Doku-Drift sofort sichtbar ist.
+3. Acceptance-Kriterium: Erster frischer Multi-Speaker-Pass läuft mit sync-3 ohne `provider_unknown_error` durch.
 
-## Technische Details
+**Phase B — Koordinaten-Härtung:**
+1. Wenn `plate-identity` 0/N löst, **nicht** weiter mit Slot-Spread-Coords dispatchen.
+2. Stattdessen: einen zweiten Identity-Versuch (Gemini Vision, deterministischer Prompt) erzwingen; bei erneutem Fehlschlag direkt auf den Bounding-Boxes-Pfad (Phase C) eskalieren.
+3. Acceptance-Kriterium: Jeder dispatchete Coord-Pass hat verifizierte Face-Coords (`source != 'plate-slot-fallback'`).
 
-Relevante Stellen:
+**Phase C — Doku-Best-Practice „bounding_boxes" als Primärweg für Multi-Speaker:**
+1. Statt N Pässe à „eine Coord pro Speaker" eine Generation mit `bounding_boxes` pro Frame (oder `bounding_boxes_url`) verwenden, wenn N ≥ 2 und Face-Detection alle N Gesichter geliefert hat.
+2. Sync.so wählt dann pro Frame automatisch die aktive Person — das ist die offiziell empfohlene Multi-Speaker-Methode.
+3. Fallback bleibt: pro Pass `frame_number + coordinates` mit verifizierten Coords.
 
-- `supabase/functions/compose-dialog-segments/index.ts`
-  - Pass-/Audio-Slicing: ca. Zeilen 1993–2089
-  - Preclip-Gate und v104 `auto_detect`: ca. Zeilen 2300–2594
-  - `bbox-url-pro`/Coordinates-ASD: ca. Zeilen 2596–2687
-  - Sync.so payload POST: ca. Zeilen 2834–2892
+**Phase D — Stuck-State-Recovery:**
+1. `sync-so-webhook`: bei `done + failed == N` und keinen offenen Jobs → Szene final markieren (`failed` mit klarer Fehlermeldung oder `done` falls Teil-Output verwendbar), nicht weiter „running" lassen.
+2. Idempotenter Credit-Refund für nicht ausgelieferte Pässe.
+3. Watchdog (pg_cron `poll-dialog-shots-every-minute`): Hard-Reset, wenn `lip_sync_status='running'` ∧ `updated_at` älter als 8 min ∧ keine Inflight-Jobs.
 
-- `supabase/functions/render-sync-segments-audio-mux/index.ts`
-  - Overlay/Stitching der einzelnen Sync.so-Ausgaben: ca. Zeilen 164–305
+**Phase E — UI-Härtung:**
+1. Wenn `lip_sync_status='running'` aber `updated_at` älter als ~3 min, in der UI deutlichen „Hängt"-Hinweis mit „Reset"-Aktion zeigen (Hook `useResetLipSync` ist bereits vorhanden).
 
-- Sync.so Docs-Abgleich:
-  - Auto-detect: nur für single/obvious speaker sinnvoll.
-  - Multi-Speaker: `frame_number + coordinates` oder `bounding_boxes(_url)`; `auto_detect=false` für manuelle Auswahl.
+**Phase F — Sofort-Reset für die zwei aktuellen Szenen:**
+1. `ddde37a6`: hat `clip_url + lip_sync_applied_at` → Status auf `done` ziehen (sauber synchronisieren).
+2. `c8fb1fe6`: aktueller Fanout terminal nicht reparierbar (zu viele provider_unknown_error) → über `reset-lipsync-scene` zurücksetzen, Credits refunden, nach Phase A neu dispatchen.
 
-## Verifikation
+**Phase G — Verifikation:**
+1. Frischer 4-Sprecher-Lauf nach Phase A: prüfen, dass Sync.so `COMPLETED` liefert (kein `provider_unknown_error`).
+2. Lippen-Bewegung sichtprüfen.
+3. Memory `mem://architecture/lipsync/v106-…` mit doku-konformer Options-Liste anlegen.
 
-Nach Implementierung:
+### Technische Details
 
-1. Query `syncso_dispatch_log` für die Szene.
-2. Bestätigen:
-   - `payload_model = sync-3`
-   - `dispatch_video_kind = full_plate` für alle 4 Sprecher
-   - `auto_detect != true`
-   - `bounding_boxes_url` oder `coordinates` vorhanden
-   - echte Payload-Audiodauer passt zur gewählten Dispatch-Strategie
-3. Finale `clip_url` öffnen/prüfen, dass die vier Sprecher sichtbar den Mund bewegen.
+Dateien, die voraussichtlich angefasst werden:
+- `supabase/functions/compose-dialog-segments/index.ts` (Payload-Builder, Identity-Retry, bounding_boxes-Primärpfad, v106 Telemetrie)
+- `supabase/functions/sync-so-webhook/index.ts` (terminale Stuck-State-Behandlung, idempotenter Refund)
+- `supabase/functions/poll-dialog-shots/index.ts` (Watchdog Hard-Reset)
+- Migration: Status-Korrektur der zwei betroffenen Szenen
+- Optional UI-Hinweis in der Composer-Szenenkarte
+
+### Was sich aus den Logs als Beweise zusammenträgt
+- Scene c8fb1fe6: 4 Pässe, alle dispatched mit identischer Options-Form, **alle** terminieren als `provider_unknown_error` trotz HTTP 201.
+- v105_probe bestätigt: `payload_model=sync-3`, `asd_mode=coordinates`, `auto_detect=false`, `dispatch_video_kind=full_plate`.
+- `plate_identity=0/4`, alle Coord-Quellen `plate-slot-fallback` → Coords nicht verifiziert.
+- Scene ddde37a6 (vorige): gleiche Struktur, Jobs `COMPLETED`, aber Lippen geschlossen → bestätigt, dass Coords nicht auf Mundregion treffen.
+- Beide Szenen sind backend-seitig steckengeblieben (`lip_sync_status='running'` ohne offene Jobs).
