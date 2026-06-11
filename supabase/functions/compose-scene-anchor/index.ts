@@ -294,6 +294,13 @@ serve(async (req) => {
       ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity, an extra human body, or a partial third person in frame. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} HUMAN BEINGS total — count every visible body, including profile views, partial bodies, background humans, mirror reflections, posters, screens, mannequins, statues. The total human count anywhere in the frame must equal ${N}. ISOLATE the ${N} reference people: clear or empty the rest of the environment (empty office, empty hallway, empty street). Crop/frame tight enough to physically EXCLUDE any additional humans. Do NOT add coworkers, colleagues, bystanders, passers-by, or a "third figure" to balance the composition. Do NOT repeat any reference person. Final human headcount in frame: ${N}. Repeat: exactly ${N} bodies, no more, no fewer.`
       : "";
 
+    // v111 — STRICT SWAP RETRY: the previous attempt rendered the WRONG face
+    // for one or more named characters (e.g. a woman's head on a male
+    // reference). Name the offenders explicitly.
+    const STRICT_SWAP_SUFFIX = swapMode && isMulti
+      ? ` STRICT IDENTITY SWAP RETRY — the previous attempt rendered the WRONG PERSON in the slot of: ${swapMismatches.length > 0 ? swapMismatches.join(", ") : "one or more characters"}. Read carefully: every named reference person above has a CANONICAL IDENTITY headshot supplied later in the image list — that IDENTITY image is the ground truth for that person's FACE (sex, age, hair color, hair length, skin tone, jawline, nose, eye color, beard/stubble). Do NOT swap, replace, regender, or substitute any character with a different person. If a reference looks androgynous, follow the IDENTITY headshot's apparent sex and age STRICTLY. Wardrobe and body shape may come from the outfit-cover image for that character, but the FACE must match the IDENTITY headshot pixel-for-pixel. Double-check before output: does each named character's face actually match THEIR identity headshot? If not, regenerate the face from the identity headshot.`
+      : "";
+
     // Per-character action clause — protected from the dialog stripper and
     // placed BEFORE the framing rules so the model treats placement /
     // activity per character as the ground truth.
@@ -328,13 +335,28 @@ serve(async (req) => {
         `\nIf any world reference is inconsistent with the scene description, the IMAGE wins (visual identity outranks prose). Compose locations and buildings as the background environment; place props in plausible positions per the scene.`;
     }
 
+    // v111 — IDENTITY REFERENCE clause. After world refs, append canonical
+    // face-only headshots aligned 1:1 with the first N portraits.
+    let identityClause = "";
+    const identityLines: string[] = [];
+    for (let i = 0; i < identityPortraits.length; i++) {
+      imgIdx += 1;
+      const nm = names[i] ?? `Character #${i + 1}`;
+      identityLines.push(`Image #${imgIdx} = IDENTITY reference for ${nm} (face-only headshot — this is the GROUND TRUTH for ${nm}'s face: sex, age, hair, skin tone, jawline, eyes, nose. Use the body/wardrobe from Image #${i + 1} for ${nm}, but the FACE from this image.).`);
+    }
+    if (identityLines.length > 0) {
+      identityClause =
+        ` IDENTITY REFERENCES — these supersede the wardrobe images for face identity. If Image #${1} through #${portraits.length} disagree with the IDENTITY references on a character's face (sex, age, hair color), the IDENTITY reference WINS:\n` +
+        identityLines.join("\n");
+    }
+
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${worldClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${worldClause}${identityClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
 
-    // --- Call Nano Banana 2 with all portraits + world refs as separate image_url parts ---
+    // --- Call Nano Banana 2 with all portraits + world refs + identity refs as separate image_url parts ---
     const userContent: any[] = [{ type: "text", text: editInstruction }];
     for (const url of portraits) {
       userContent.push({ type: "image_url", image_url: { url } });
@@ -346,6 +368,9 @@ serve(async (req) => {
       userContent.push({ type: "image_url", image_url: { url } });
     }
     for (const url of propUrls) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+    for (const url of identityPortraits) {
       userContent.push({ type: "image_url", image_url: { url } });
     }
 
