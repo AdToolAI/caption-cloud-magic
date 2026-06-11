@@ -120,7 +120,13 @@ export async function renderPassFacePreclip(
 
   const sW = evenDimension(srcWidth, 1280);
   const sH = evenDimension(srcHeight, 720);
-  const crop = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
+  const crop0 = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
+  // v109 — No synthetic upscale. Preclip output edge = crop.size (min 256, even).
+  // Sync-3's face detector loses fidelity on 220→512 bicubic upscales (mouth-static
+  // "done" no-op). Pass real pixels at native crop resolution instead.
+  const nativeOut = Math.max(256, crop0.size);
+  const evenNative = nativeOut % 2 === 0 ? nativeOut : nativeOut - 1;
+  const crop = { ...crop0, outputSize: evenNative };
   const outW = crop.outputSize;
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
