@@ -2698,27 +2698,50 @@ serve(async (req) => {
       syncOptions.occlusion_detection_enabled = true;
     }
     if (usePassPreclip) {
-      // v114 — Sync.so Support KB ("Why is my lip-sync not working / no mouth
-      // movement?") explicitly recommends MANUAL `coordinates` for tight
-      // single-face crops where `auto_detect` may fail to lock onto the
-      // speaker if the midpoint frame happens to have a closed/idle mouth
-      // (very common on Hailuo "speaking naturally" plates). v103/v104 used
-      // `auto_detect: true` on the preclip, which produced silent passes
-      // (job COMPLETED, mouth unchanged) when the audio-motion correlation
-      // could not be established. We now pin ASD to the geometric center of
-      // the preclip at frame 0 — guaranteed to land on the only face in the
-      // 720×720 single-face crop. Doc-strict for sync-3 (only sync_mode +
-      // active_speaker_detection are allowed; temperature/occlusion are
-      // stripped). See mem/architecture/lipsync/sync-3-doc-strict-options-v106.
+      // v115 — Back to Sync.so's official guidance for single/obvious speaker
+      // clips. The Speaker-Selection doc
+      // (https://sync.so/docs/developer-guides/speaker-selection) is explicit:
+      //
+      //   "Auto-detect (video only): fastest setup; best for single/obvious
+      //    speaker clips. Set auto_detect: true and skip manual fields."
+      //
+      // Our preclip is exactly that: a 720p+ tight single-face crop that the
+      // preclip face-gate already validated as faces === 1. v114 tried to
+      // pin ASD to the geometric center on the assumption that auto_detect
+      // could fail on closed-mouth midframes, but DB-confirmed runs (scene
+      // 7470be0d…, pass 2 Matthew) show coords_center on a single-face
+      // preclip reproducibly returns `provider_unknown_error`. Auto-detect
+      // on a verified single-face crop is the doc-correct, stable path.
+      //
+      // The retry ladder (RETRY_VARIANTS) still includes `coords-pro` /
+      // `sync3-coords` as targeted fallbacks for the rare case where
+      // auto_detect itself fails on this specific preclip.
+      //
+      // Doc-strict for sync-3: ONLY sync_mode + active_speaker_detection are
+      // allowed; temperature/occlusion are stripped here.
+      // See mem/architecture/lipsync/sync-3-doc-strict-options-v106.
+      const passFaceCount = Number((pass as any).preclip_face_count ?? 0);
       const outSize = Number((pass as any).preclip_crop?.outputSize)
         || Number((pass as any).preclip_crop?.size)
         || 720;
-      const center = Math.max(8, Math.floor(outSize / 2));
-      syncOptions.active_speaker_detection = {
-        auto_detect: false,
-        frame_number: 0,
-        coordinates: [center, center],
-      };
+      const useAutoDetect = passFaceCount === 1;
+      let asdMode: string;
+      if (useAutoDetect) {
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        asdMode = "auto_detect";
+      } else {
+        // Fallback only when preclip face-gate could not confirm exactly one
+        // face (e.g. validator skipped, or 0/>1 detected). We still send
+        // center coords as a hard pointer to the geometric middle so Sync.so
+        // has *some* anchor instead of silently picking nothing.
+        const center = Math.max(8, Math.floor(outSize / 2));
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          frame_number: 0,
+          coordinates: [center, center],
+        };
+        asdMode = "coords_center_fallback";
+      }
 
       delete syncOptions.temperature;
       delete syncOptions.occlusion_detection_enabled;
@@ -2732,11 +2755,11 @@ serve(async (req) => {
         return typeof wavDur === "number" ? wavDur : null;
       })();
       (pass as any)._v102_probe = {
-        stage: "preclip-sync3-coords-center-v114",
+        stage: "preclip-sync3-auto-detect-v115",
         model_intent: "sync-3",
         payload_model: "sync-3",
-        asd_mode: "coords_center",
-        asd_coords: [center, center],
+        asd_mode: asdMode,
+        preclip_face_count: passFaceCount,
         sync_mode: syncOptions.sync_mode,
         bbox_count: 0,
         audio_voiced_sec: tightAudioInfo?.durSec ?? null,
@@ -2753,7 +2776,7 @@ serve(async (req) => {
           : null,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v114_preclip_sync3_coords_center speaker=${pass.speaker_name} center=[${center},${center}] sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v115_preclip_sync3 speaker=${pass.speaker_name} asd_mode=${asdMode} face_count=${passFaceCount} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
       );
     }
 
