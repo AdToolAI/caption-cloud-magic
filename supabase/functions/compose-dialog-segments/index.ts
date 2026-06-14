@@ -2732,7 +2732,9 @@ serve(async (req) => {
     // When preclip is available, swap the Sync.so video input + force
     // auto_detect (the cropped 512x512 frame has exactly ONE face).
     const passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
-    const usePassPreclip = !!passPreclipUrl;
+    // v118 — mutable; the face-gate bypass below can disable the preclip
+    // dispatch path when the cropped frame validated 0 or >1 faces.
+    let usePassPreclip = !!passPreclipUrl;
 
     // ── v107 — Hard-fail Multi-Speaker without preclip ───────────────────
     // For N>=2 we forbid full-plate dispatch unless the pass is explicitly
