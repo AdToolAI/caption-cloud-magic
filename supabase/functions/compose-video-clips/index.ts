@@ -324,7 +324,19 @@ serve(async (req) => {
     const NEGATIVE_PROMPT_I2V_EXTRA =
       ", static first frame, frozen opening, still image hold at start, motionless beginning, freeze frame intro";
     const CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE =
-      ", talking mouth, lip movement, speaking animation, open mouth speech, mouthing words, mouth flapping, exaggerated facial talking, dialogue performance, singing, yelling" +
+      // v112 — REMOVED the broad anti-mouth-motion tokens
+      // ("talking mouth, lip movement, speaking animation, open mouth speech,
+      //  mouthing words, mouth flapping") that previously lived here. They
+      // directly contradicted the official Sync.so AI-video guidance
+      // (sync.so/docs/compatibility-and-tips/media-content-tips:
+      //  "the character should be speaking naturally [...] random mouth
+      //   movements are necessary to get the best results from our lipsync
+      //   model"). With those tokens active, AI plates were rendered with a
+      //  statically closed mouth and sync-3 returned the input unchanged
+      //  ("COMPLETED" but mouths don't move). We retain ONLY the
+      //  *exaggerated*-talking guard so plates don't drift into clearly-
+      //  worded speech that fights the audio.
+      ", exaggerated facial talking, dialogue performance, singing, yelling, words clearly visible on lips" +
       // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
       // mid-clip camera cut or push-in when given a 3-shot start-frame plus
       // a long dialog-style prompt. The downstream Sync.so dispatch then
@@ -332,6 +344,8 @@ serve(async (req) => {
       // maps the wrong speaker's audio onto the wrong face (auto-ASD) or
       // returns an opaque "unknown error" (manual ASD). Hard-block every
       // form of in-clip framing change for cinematic-sync master plates.
+      // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.4):
+      // every framing-change keyword below MUST stay.
       ", camera cut, scene change, shot change, new shot, different angle, edit cut, hard cut, jump cut, zoom in, zoom out, push in, pull out, dolly, dolly in, dolly out, crane, pan, tilt, whip pan, close-up insert, reframe, second camera, multi-camera, picture-in-picture";
     const POSITIVE_CLEAN_CUE =
       ", clean cinematic composition, natural environment";
