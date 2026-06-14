@@ -373,6 +373,32 @@ serve(async (req) => {
     } else if (hasJob && ageMs > STALE_PROVIDER_MS) {
       const polledThisTick = polled.some((p) => p.scene_id === d.id);
       if (!polledThisTick) reason = "watchdog_provider_timeout";
+    } else if (isV5Fanout && ageMs > 12 * 60_000) {
+      // v120 — Zombie guard. Scene running >12min: if NO pass is currently
+      // `rendering` with a live job_id (i.e. only `retrying`/`pending` ghosts
+      // or exhausted `failed`), AND there are recent FAILED dispatch_log
+      // rows in the last 5min, terminate with refund.
+      const passes120: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+      const liveRendering = passes120.some((p) => {
+        if (String(p?.status ?? "") !== "rendering") return false;
+        if (!p?.job_id) return false;
+        const sa = typeof p?.started_at === "string" ? Date.parse(p.started_at) : NaN;
+        return Number.isFinite(sa) && (Date.now() - sa) < 10 * 60_000;
+      });
+      if (!liveRendering) {
+        try {
+          const since = new Date(Date.now() - 5 * 60_000).toISOString();
+          const { count } = await supabase
+            .from("syncso_dispatch_log")
+            .select("id", { count: "exact", head: true })
+            .eq("scene_id", d.id)
+            .eq("sync_status", "FAILED")
+            .gte("created_at", since);
+          if ((count ?? 0) >= 2) {
+            reason = "v120_zombie_no_live_pass";
+          }
+        } catch { /* tolerate */ }
+      }
     }
     if (!reason) continue;
 
