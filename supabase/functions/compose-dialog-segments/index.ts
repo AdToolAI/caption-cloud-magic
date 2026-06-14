@@ -1048,15 +1048,16 @@ serve(async (req) => {
       );
     }
 
-    // ── v116 (Fix C) — Plate-Quality Gate for N≥3 ────────────────────────
-    // For 3+ speaker scenes, if plate-side face detection couldn't resolve
-    // identity for every speaker (faces missing or fewer detected faces
-    // than speakers), the anchor-rescale fallback drifts hard enough to
-    // routinely land Sync.so coords on the WRONG face → provider_unknown
-    // / wrong-mouth-moves. Per Sync.so docs (improving-lip-sync-quality):
-    // "All speakers must be clearly visible." Burning credits on an
-    // un-resolvable plate is wasted money — block early, refund, and
-    // force the user to re-render the scene clip.
+    // ── v117 — Plate-Quality Gate (soft) for N≥3 ─────────────────────────
+    // v116 blocked whenever Gemini Vision failed to *resolve* identities
+    // even when all faces were physically present, producing false-positive
+    // "plate is bad" refunds on perfectly fine 4-person plates. v117 narrows
+    // the block to the only failure mode where Sync.so genuinely cannot
+    // recover: fewer detected faces than expected speakers (e.g. Sora
+    // out-of-frame bug). When face *count* matches but identity assignment
+    // is shaky, the slot-order fallback in resolvePlateFaceIdentities
+    // (also v117) already injects a deterministic mapping, so dispatch is
+    // safe to proceed.
     //
     // Gate fires only on the FIRST dispatch attempt (not advance/retry) so
     // re-tries that webhook chains in carry forward.
@@ -1071,10 +1072,17 @@ serve(async (req) => {
     ) {
       const detectedFaces = plateIdentityMap?.faces?.length ?? 0;
       const resolvedFaces = plateIdentityMap?.resolvedCount ?? 0;
+      // v117: only hard-block when faces are physically missing or the
+      // plate-side detection failed entirely. Identity-resolution shortfall
+      // alone is NOT a block (slot-order fallback covers it).
       const gateFails =
         !plateIdentityMap ||
-        detectedFaces < speakers.length ||
-        resolvedFaces < speakers.length;
+        detectedFaces < speakers.length;
+      if (resolvedFaces < speakers.length && detectedFaces >= speakers.length) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate_SOFT_WARN detected=${detectedFaces}/${speakers.length} resolved=${resolvedFaces}/${speakers.length} — dispatch proceeds with slot-order coords`,
+        );
+      }
       if (gateFails) {
         const reason = !plateIdentityMap
           ? "plate_identity_unavailable"
