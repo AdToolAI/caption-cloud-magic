@@ -1793,8 +1793,36 @@ serve(async (req) => {
       };
 
       const gateResults = await Promise.all(builtPasses.map((p: any) => gateOne(p)));
+
+      // ── v119 — Soft-pass when plate-identity is already authoritative ──
+      // If `plateIdentityMap` already resolved >= speakers.length faces, the
+      // pass already carries plate-pixel-space coords + bbox from the real
+      // rendered plate (see plate-face-identity block above). The strict
+      // mid-turn Gemini frame check is then only a diagnostic. Hard-failing
+      // here (e.g. because the speaker briefly turned their head on the
+      // probed frame) blocks a perfectly dispatchable Sync.so call with
+      // `bounding_boxes_url` — the exact false positive the user is hitting
+      // on scene 90116518…  Demote it to a soft warning and dispatch on.
+      const plateIdentityAuthoritative =
+        !!plateIdentityMap &&
+        (plateIdentityMap.resolvedCount ?? 0) >= speakers.length;
       const firstReject = gateResults.find((r) => !r.ok) as Extract<GateOutcome, { ok: false }> | undefined;
-      if (firstReject) {
+      if (firstReject && plateIdentityAuthoritative) {
+        const blockedNames = gateResults
+          .filter((r) => !r.ok)
+          .map((r) => (r as Extract<GateOutcome, { ok: false }>).pass.speaker_name);
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v119_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
+        );
+        for (const r of gateResults) {
+          if (!r.ok) {
+            const rr = r as Extract<GateOutcome, { ok: false }>;
+            if (rr.pass && rr.pass.reference_frame_number == null) {
+              rr.pass.reference_frame_number = rr.lastValidationFrame ?? rr.frames?.[0] ?? 0;
+            }
+          }
+        }
+      } else if (firstReject) {
         const { pass, reason, strict, hadFaces } = firstReject;
         const { data: w0 } = await supabase
           .from("wallets").select("balance").eq("user_id", userId).single();
