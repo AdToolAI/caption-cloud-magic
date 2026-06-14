@@ -1,63 +1,71 @@
-## Problem
+# v112 — Was `auto_detect` zu sehen bekommt verbessern
 
-In 3–4 person scene anchors composed by Nano Banana 2, the *count* is correct (no clones, no extras, no missing), but the **face mapping is wrong** — one character ends up with a different person's head (in this case Samuel rendered as a woman). Lipsync is now reliable, so this is the next visible defect.
+`auto_detect: true` bleibt (offiziell empfohlen für sync-3). Der Fehler liegt am **Input** in den Preclip, nicht in der Speaker-Selection-Logik.
 
-### Root cause
+## Beleg aus der offiziellen Sync.so-Doku
 
-Two compounding effects:
-1. The compose step is fed **only one image per character** — the **outfit cover** (a Gemini-generated full-body in the picked outfit). On larger 3–4 cast counts, Gemini's outfit covers occasionally drift in face identity and gender. Nano Banana 2 then faithfully copies that wrong face.
-2. The existing `auditAnchorIdentity` only catches `clone / extra / missing`. A clean **identity swap** (each ref appears once, count = N) passes the audit and is shipped.
+Quellen: `sync.so/docs/compatibility-and-tips/improving-lip-sync-quality`, `.../media-content-tips`.
 
-## Plan (v111)
+1. **Auflösung** — "Use at least **480p resolution for reliable face detection**. Higher resolutions up to 4K supported. We recommend **1080p as the best balance**."
+   → Unsere Preclips rendern aktuell mit `outputSize = max(256, cropSize)`, also oft **256×256**. Das liegt **deutlich unter** der Mindestanforderung. Auto-detect findet das Gesicht zwar (Crop ist face-centered), aber die Lippen-Generation hat zu wenig Pixeldichte → "COMPLETED" aber Mund bleibt sichtbar unverändert.
 
-### 1. Send canonical portrait + outfit cover per character to compose-scene-anchor
-File: `supabase/functions/compose-video-clips/index.ts` (cinematic-sync block, ~line 1220 and universal anchor block ~line 1670) and `supabase/functions/compose-scene-anchor/index.ts`.
+2. **AI-generierte Plates** — Wörtliches Zitat: *"When creating videos with third-party AI video generation models, include this instruction in the text prompt: **'the character should be speaking naturally'**. The generated AI video will have some random mouth movements, which are necessary to get the best results from our lipsync model."*
+   → Unser Hailuo-i2v-Plate-Prompt enthält das aktuell **nicht**. Ohne idle-Mund-Mikrobewegungen tut sich sync-3 sehr schwer, die Lippen zu animieren — genau das beobachtete Symptom.
 
-- Extend the call payload with a new optional `identityPortraitUrls: string[]` aligned 1:1 to `portraitUrls` (the brand_character `reference_image_url`).
-- In `compose-scene-anchor`, when `identityPortraitUrls` is present, append them as **additional reference images** after the world refs, and label them in the prompt:
-  > `Image #X = IDENTITY reference for ${name} (face only — use this face for ${name}, but use the wardrobe/body of Image #${i+1}).`
-- Bump cache key prefix `v14|…` → `v15|…` so old cached anchors don't suppress the new path.
+3. **Single face in frame** — Wird durch unseren face-zentrierten Crop bereits erfüllt; `auto_detect` ist hier korrekt und idiomatisch.
 
-### 2. Add identity-swap detection to the audit
-File: `supabase/functions/_shared/identity-audit.ts`.
+## Änderungen (gezielt, klein)
 
-- Extend the Gemini prompt: ask for an extra field per `perReference` entry:
-  ```
-  "faceMatch": "match" | "mismatch" | "uncertain",
-  "mismatchNotes": "<short — e.g. 'depicted person is female, reference is male'>"
-  ```
-- Add a new failure `reason: "swap"` with priority **above** `extra`/`missing`, returning the list of mismatched names.
-- Keep the existing terminal `ok: true` only when every ref appears exactly once AND every `faceMatch === "match"`.
+### A) Preclip-Auflösung auf ≥720p anheben
 
-### 3. Wire swap into the existing retry ladder
-File: `supabase/functions/compose-video-clips/index.ts` (anchor audit loop, search `prevAuditRaw` / `composeAnchor`).
+Datei: `supabase/functions/compose-dialog-segments/pass-face-preclip.ts` (Crop-Renderer / `outputSize`-Berechnung).
 
-- When the audit returns `reason === "swap"`, re-call `composeAnchor("retry-swap", true)` and inject a **STRICT SWAP RETRY** clause into `compose-scene-anchor` (new `strictSwapMode: boolean`) that names the mismatched character(s) and emphasizes the per-image identity binding.
-- Reuse the existing 2-attempt cap — no extra credit cost beyond what we already spend on a retry.
+- Neue Regel: `outputSize = clamp(roundEven(cropSize × upscaleFactor), min=720, max=1280)`
+  - Wenn `cropSize ≥ 720` → 1:1 (kein Upscale, keine Distortion).
+  - Wenn `cropSize < 720` → ffmpeg-Upscale via `scale=720:720:flags=lanczos` (gleiches Seitenverhältnis 1:1 bleibt).
+- v109-Lehre (kein synthetisches Mega-Upscale) bleibt gewahrt: Cap bei 1280, Lanczos statt bicubic, kein Sharpen-Filter.
+- Kommentar im Code: "Sync.so docs require ≥480p for reliable face detection; we target 720p for sync-3 quality margin."
 
-### 4. Memory + cache bump
-- New memory file `mem/architecture/video-composer/anchor-identity-swap-v111.md` describing: dual-reference (portrait + outfit), audit-extended swap reason, strict retry, cache key v15.
-- Add to `mem/index.md`.
+### B) "Speaking naturally"-Hint im Plate-Prompt
 
-### 5. Reset the affected scenes so the user can re-compose
-Migration:
-- Scenes `c7d4bb76-b20d-4591-bc13-6763fbdf52bd` and `f2a58546-692a-4ef5-a690-ba93b513abf5`: clear `reference_image_url`, `audioPlan.twoshot.anchor_face_audit`, `clip_url`, `lip_sync_status`, `twoshot_stage`, `clip_status`, `clip_error` so the next dispatch rebuilds the anchor with v111.
-- No credit refund needed (lipsync succeeded — only the anchor face was wrong; the user explicitly liked the lipsync). If you want a goodwill refund anyway, say so and I'll add it.
+Datei: `supabase/functions/compose-dialog-scene/index.ts` (Hailuo-i2v-Prompt-Builder für Dialog-Plates) und/oder `supabase/functions/_shared/dialog-plate-prompt.ts`.
 
-## Out of scope (for now)
-- Per-character single-portrait compose + ffmpeg stitch (heavier, leave for v112 if v111 still drifts).
-- Replacing Nano Banana 2 with a different model.
-- Auto-fixing drifted outfit covers (separate Stage-21 regen flow).
+- Append (idempotent, einmalig) am Ende des Plate-Prompts für **alle** Dialog-Plates:
+  `", the character should be speaking naturally with subtle natural mouth movements"`
+- Nur Plates aus dem Dialog-Pipeline-Pfad (kein Eingriff in normale Composer-Clips).
 
-## Verification
-- `compose-scene-anchor` log line shows `identityRefs=N` when v111 path is used.
-- Audit returns `reason: "swap"` on a known bad render (manually re-running the previous anchor URL through the extended audit).
-- After reset, re-running the 4-person scene produces an anchor where each character's face visibly matches their brand portrait, and the audit logs `ok=true`.
+### C) Logging zur Verifikation
 
-## Files touched
-- `supabase/functions/compose-scene-anchor/index.ts`
-- `supabase/functions/compose-video-clips/index.ts`
-- `supabase/functions/_shared/identity-audit.ts`
-- `mem/architecture/video-composer/anchor-identity-swap-v111.md` (new)
-- `mem/index.md`
-- new migration to reset the two affected scenes
+In `pass-face-preclip.ts` und `sync-so-webhook` ergänzen:
+- `preclip_dims: { width, height }` im `syncso_dispatch_log`
+- `preclip_face_box_ratio` (Crop-Größe / Output-Größe), damit Future-Regressionen sofort sichtbar werden.
+
+### D) Reset der betroffenen Szene
+
+Migration: Reset `e57ef6dd-31a4-4b9d-9b49-5894d64bea7d`:
+- `dialog_shots = NULL`, `clip_url = NULL`, `clip_status = NULL`, `lip_sync_status = NULL`, `twoshot_stage = NULL`, `lip_sync_applied_at = NULL`, `replicate_prediction_id = NULL`
+- Credit-Refund über bestehende deterministische UUID-Logik (idempotent).
+- `scene_anchor_cache`-Eintrag bleibt (Anchor ist korrekt, nur Lipsync-Plate wird neu).
+
+### E) Memory + Deploy
+
+- `mem/architecture/lipsync/v112-preclip-resolution-and-speaking-natural-plate.md`:
+  - Offizielle Doku-Zitate (≥480p, "speaking naturally")
+  - Wahl: Target 720p (Sicherheitsmarge), Cap 1280p (Cost/Latency)
+  - `auto_detect: true` bleibt offizieller Default
+- `mem/index.md`: Eintrag unter v111
+- Deploy: `compose-dialog-segments`, `compose-dialog-scene`
+
+## Out of Scope
+
+- Speaker-Selection-Modus (bleibt `auto_detect: true`)
+- Sync.so-Modell (bleibt `sync-3`)
+- Audio-Mux / Stitcher / `audio_plan`
+- Composer-Clip-Auflösungen (nur Dialog-Preclips)
+- Bestehende erfolgreiche Lipsync-Renders (kein Backfill)
+
+## Wird das das Problem wirklich beheben?
+
+Hohe Konfidenz: **A** behebt die Hauptursache (zu kleines Inputbild für sync-3). **B** ist der zweite Doku-konforme Hebel speziell für AI-Plates. Beide werden in der offiziellen Doku explizit als Bedingungen für funktionierende Lippenbewegung genannt. **C** macht jedes künftige Regress sofort sichtbar.
+
+Soll ich es so bauen?

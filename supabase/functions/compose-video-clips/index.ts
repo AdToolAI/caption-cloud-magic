@@ -324,7 +324,19 @@ serve(async (req) => {
     const NEGATIVE_PROMPT_I2V_EXTRA =
       ", static first frame, frozen opening, still image hold at start, motionless beginning, freeze frame intro";
     const CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE =
-      ", talking mouth, lip movement, speaking animation, open mouth speech, mouthing words, mouth flapping, exaggerated facial talking, dialogue performance, singing, yelling" +
+      // v112 — REMOVED the broad anti-mouth-motion tokens
+      // ("talking mouth, lip movement, speaking animation, open mouth speech,
+      //  mouthing words, mouth flapping") that previously lived here. They
+      // directly contradicted the official Sync.so AI-video guidance
+      // (sync.so/docs/compatibility-and-tips/media-content-tips:
+      //  "the character should be speaking naturally [...] random mouth
+      //   movements are necessary to get the best results from our lipsync
+      //   model"). With those tokens active, AI plates were rendered with a
+      //  statically closed mouth and sync-3 returned the input unchanged
+      //  ("COMPLETED" but mouths don't move). We retain ONLY the
+      //  *exaggerated*-talking guard so plates don't drift into clearly-
+      //  worded speech that fights the audio.
+      ", exaggerated facial talking, dialogue performance, singing, yelling, words clearly visible on lips" +
       // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
       // mid-clip camera cut or push-in when given a 3-shot start-frame plus
       // a long dialog-style prompt. The downstream Sync.so dispatch then
@@ -332,6 +344,8 @@ serve(async (req) => {
       // maps the wrong speaker's audio onto the wrong face (auto-ASD) or
       // returns an opaque "unknown error" (manual ASD). Hard-block every
       // form of in-clip framing change for cinematic-sync master plates.
+      // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.4):
+      // every framing-change keyword below MUST stay.
       ", camera cut, scene change, shot change, new shot, different angle, edit cut, hard cut, jump cut, zoom in, zoom out, push in, pull out, dolly, dolly in, dolly out, crane, pan, tilt, whip pan, close-up insert, reframe, second camera, multi-camera, picture-in-picture";
     const POSITIVE_CLEAN_CUE =
       ", clean cinematic composition, natural environment";
@@ -621,7 +635,7 @@ serve(async (req) => {
       // natural, lip-ready neutral expression with the mouth area clearly
       // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
       // constraints live exclusively in the negative_prompt.
-      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. EVERY visible person independently and continuously shows subtle idle motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), small natural head bobs and weight shifts, occasional blinks and gentle eye movement, no person ever fully static or statue-like. Each face must move at least slightly every second. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral position with a soft visible teeth gap and a softly mobile jaw — small, subtle, natural idle mouth and jaw motion (the character should be speaking naturally, no specific words, no exaggerated speech). EVERY visible person independently and continuously shows subtle idle motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), small natural head bobs and weight shifts, occasional blinks and gentle eye movement, no person ever fully static or statue-like. Each face must move at least slightly every second. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
@@ -648,7 +662,14 @@ serve(async (req) => {
       // negative prompt forbids talking/mouth-flap, but the positive prompt
       // must not over-constrain the mouth or Sync.so produces ventriloquist
       // motion.
-      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft and clearly visible.`;
+      //
+      // v112 — Append the official Sync.so AI-video hint verbatim
+      // (sync.so/docs/compatibility-and-tips/media-content-tips):
+      // *"the character should be speaking naturally"* — this produces the
+      // small idle mouth/jaw motion that sync-3 requires to drive
+      // lipsync on AI-generated plates. Without it, plates render with a
+      // statically closed mouth and sync-3 returns the input unchanged.
+      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft and clearly visible. Every visible character should be speaking naturally with subtle, natural idle mouth and jaw movements throughout the entire clip (no specific words, no exaggerated speech — just lightweight, lifelike mouth motion).`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */

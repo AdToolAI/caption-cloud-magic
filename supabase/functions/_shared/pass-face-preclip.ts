@@ -121,10 +121,17 @@ export async function renderPassFacePreclip(
   const sW = evenDimension(srcWidth, 1280);
   const sH = evenDimension(srcHeight, 720);
   const crop0 = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
-  // v109 — No synthetic upscale. Preclip output edge = crop.size (min 256, even).
-  // Sync-3's face detector loses fidelity on 220→512 bicubic upscales (mouth-static
-  // "done" no-op). Pass real pixels at native crop resolution instead.
-  const nativeOut = Math.max(256, crop0.size);
+  // v112 — Sync.so docs explicitly require ≥480p for reliable face detection
+  // (sync.so/docs/compatibility-and-tips/improving-lip-sync-quality:
+  // "Use at least 480p resolution for reliable face detection. […]
+  //  We recommend 1080p as the best balance"). The v109 native-resolution
+  // policy (max(256, crop.size)) frequently produced 220–360px preclips,
+  // well under the 480p floor → sync-3 completed COMPLETED but emitted the
+  // preclip unchanged ("mouths don't move"). v112 targets a 720p floor
+  // (safety margin above 480p) and caps at 1280p so cost/latency stay
+  // bounded. Lanczos upscale lives in the Remotion DialogTurnFaceCropVideo
+  // composition via width/height inputProps below.
+  const nativeOut = Math.min(1280, Math.max(720, crop0.size));
   const evenNative = nativeOut % 2 === 0 ? nativeOut : nativeOut - 1;
   const crop = { ...crop0, outputSize: evenNative };
   const outW = crop.outputSize;
