@@ -3472,6 +3472,27 @@ serve(async (req) => {
           voiced_sec: Number.isFinite(finalVoicedSec) ? finalVoicedSec : 0,
           longest_voiced_run: Number.isFinite(finalLongestRun) ? finalLongestRun : 0,
         },
+        // v116 (Fix D) — per-pass identity/preclip diagnostics so a future
+        // failure can be debugged in <5 min from syncso_dispatch_log alone.
+        v116_diag: {
+          asd_mode: usePassPreclip
+            ? "preclip_auto_detect"
+            : (syncOptions.active_speaker_detection?.bounding_boxes_url
+              ? "bbox_url"
+              : syncOptions.active_speaker_detection?.bounding_boxes
+                ? "bbox_inline"
+                : syncOptions.active_speaker_detection?.coordinates
+                  ? "coords_point"
+                  : "auto_detect"),
+          coords_sent: syncOptions.active_speaker_detection?.coordinates ?? null,
+          preclip_face_count: (pass as any).preclip_face_count ?? null,
+          preclip_crop: (pass as any).preclip_crop ?? null,
+          preclip_repair_attempts: (pass as any).preclip_repair_attempts ?? 0,
+          coord_source: coordSources[Number(pass.speaker_idx ?? -1)] ?? "unknown",
+          plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
+          plate_identity_total: plateIdentityMap?.faces?.length ?? 0,
+          plate_dims: plateDims ?? null,
+        },
         video_probe: videoProbe,
         audio_diagnostics: audioDiagnostics.find((d) => d.pass === pass.idx) ?? null,
         // v102 Step A — alignment probe persisted on every DISPATCHED row so
