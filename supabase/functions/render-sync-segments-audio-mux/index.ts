@@ -304,8 +304,19 @@ serve(async (req) => {
       shots: fanoutShots,
     };
 
+    const shotSummary = fanoutShots.map((shot: any, idx: number) => ({
+      idx,
+      startSec: shot.startSec,
+      endSec: shot.endSec,
+      sourceTiming: shot.sourceTiming,
+      sourceStartSec: shot.sourceStartSec ?? 0,
+      crop: shot.crop ?? null,
+      faceMask: shot.faceMask ?? null,
+      outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
+    }));
+
     console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
+      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length} summary=${JSON.stringify(shotSummary)}`,
     );
 
     const renderId = crypto.randomUUID();
@@ -337,6 +348,7 @@ serve(async (req) => {
           totalDuration: totalSec,
           composer_scene_id: sceneId,
           stage: "sync_segments_audio_mux",
+          shots: shotSummary,
         },
         subtitle_config: {},
       });

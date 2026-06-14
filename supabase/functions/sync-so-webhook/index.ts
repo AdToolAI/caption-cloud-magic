@@ -30,6 +30,7 @@ import {
   recordCircuitSuccess,
   logSyncDispatch,
 } from "../_shared/syncso-preflight.ts";
+import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 
 
 const corsHeaders = {
@@ -140,6 +141,22 @@ function triggerV5Advance(supabaseUrl: string, serviceKey: string, sceneId: stri
     body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: passIdx }),
   }).catch(() => {});
   console.log(`[sync-so-webhook] v5 scene=${sceneId} advancing pending pass ${passIdx + 1}/${totalPasses}`);
+}
+
+async function headAsset(url: string | null | undefined): Promise<{ bytes: number | null; contentType: string | null; etag: string | null } | null> {
+  if (!url) return null;
+  try {
+    const r = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(8_000) });
+    if (!r.ok) return null;
+    const len = Number(r.headers.get("content-length") ?? NaN);
+    return {
+      bytes: Number.isFinite(len) ? len : null,
+      contentType: r.headers.get("content-type"),
+      etag: r.headers.get("etag"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function terminalV5Counts(passes: any[]) {
@@ -450,12 +467,60 @@ serve(async (req) => {
       const freshDonePasses: any[] = Array.isArray(freshDoneState?.passes)
         ? freshDoneState.passes.map((p: any) => ({ ...p }))
         : passes;
+      const passBeforeDone = freshDonePasses[currentPass] ?? null;
+      const inputPreclipUrl = String(passBeforeDone?.preclip_url ?? passBeforeDone?._v105_probe?.payload_video_url ?? "");
+      const [inputHead, outputHead, inputDims, outputDims] = await Promise.all([
+        headAsset(inputPreclipUrl),
+        headAsset(rehostedUrl ?? outputUrl),
+        inputPreclipUrl ? probeMp4Dims(inputPreclipUrl).catch(() => null) : Promise.resolve(null),
+        probeMp4Dims(rehostedUrl ?? outputUrl).catch(() => null),
+      ]);
+      const minOutputAxis = Math.min(Number(outputDims?.width ?? 0), Number(outputDims?.height ?? 0));
+      const expectedPreclipAxis = Number(passBeforeDone?.preclip_crop?.outputSize ?? 0);
+      const syncOutputUnchanged = !!(
+        inputHead && outputHead &&
+        ((inputHead.etag && outputHead.etag && inputHead.etag === outputHead.etag) ||
+          (inputHead.bytes != null && outputHead.bytes != null && inputHead.bytes === outputHead.bytes))
+      );
+      const syncOutputResolutionRegression = expectedPreclipAxis >= 720 && minOutputAxis > 0 && minOutputAxis < 720;
+      if ((syncOutputUnchanged || syncOutputResolutionRegression) && Number(passBeforeDone?.retry_count ?? 0) < 2) {
+        const retryPasses = freshDonePasses.map((p: any, i: number) => i === currentPass
+          ? {
+              ...p,
+              status: "retrying",
+              retry_count: Number(p?.retry_count ?? 0) + 1,
+              retry_variant: "coords-pro",
+              output_url: null,
+              sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
+              last_error: syncOutputResolutionRegression ? "sync_output_resolution_regression" : "sync_output_unchanged",
+              last_error_class: "sync_completed_noop",
+              preclip_url: null,
+            }
+          : p);
+        await supabase.from("composer_scenes").update({
+          dialog_shots: { ...freshDoneState, passes: retryPasses, status: "retrying", last_error_class: "sync_completed_noop" },
+          lip_sync_status: "running",
+          twoshot_stage: `syncso_noop_retry_pass_${currentPass + 1}_of_${totalPasses}`,
+          updated_at: nowIso,
+        }).eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, job_id: jobId, engine: "sync-segments", sync_status: "COMPLETED_NOOP_RETRY",
+          error_class: "sync_completed_noop", meta: { pass_idx: currentPass, inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
+        });
+        fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: "coords-pro", pass_idx: currentPass }),
+        }).catch(() => {});
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, retried: true, reason: "sync_completed_noop" });
+      }
       if (freshDonePasses[currentPass]) {
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
           status: "done",
           output_url: rehostedUrl ?? outputUrl,
           rehosted: !!rehostedUrl,
+          sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
           finished_at: nowIso,
         };
       }

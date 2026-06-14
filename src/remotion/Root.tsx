@@ -538,6 +538,7 @@ export const RemotionRoot: React.FC = () => {
           masterVideoUrl: 'https://example.com/master.mp4',
           startSec: 0,
           endSec: 2,
+          outputSize: 720,
           srcWidth: 1280,
           srcHeight: 720,
           cropX: 384,

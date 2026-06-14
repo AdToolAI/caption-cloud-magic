@@ -19,6 +19,8 @@ export const DialogTurnFaceCropVideoSchema = z.object({
   masterVideoUrl: z.string().url(),
   startSec: z.number().min(0),
   endSec: z.number().min(0),
+  /** Square output size in pixels; must be forwarded so Lambda metadata does not fall back to 512. */
+  outputSize: z.number().positive().optional(),
   /** Source-master dims in pixels. */
   srcWidth: z.number().positive(),
   srcHeight: z.number().positive(),

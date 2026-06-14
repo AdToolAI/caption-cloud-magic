@@ -1,71 +1,96 @@
-# v112 — Was `auto_detect` zu sehen bekommt verbessern
+## Befund
 
-`auto_detect: true` bleibt (offiziell empfohlen für sync-3). Der Fehler liegt am **Input** in den Preclip, nicht in der Speaker-Selection-Logik.
+Wir haben tatsächlich etwas Entscheidendes übersehen: Die Pipeline glaubt, sie rendert Preclips mit `outputSize: 720`, aber die echten Dateien, die Sync.so bekommen hat, sind weiterhin **512×512**.
 
-## Beleg aus der offiziellen Sync.so-Doku
+Beleg aus dem aktuellen Run `3da688ef-e467-45e7-a6a7-503c1432270a`:
+- `dialog_shots.passes[*].preclip_crop.outputSize = 720`
+- `video_renders.format_config.width/height = 720`
+- aber `ffprobe` auf die echten Preclip-URLs zeigt: **512×512**
+- Sync.so-Outputs sind ebenfalls **512×512** und unterscheiden sich nur minimal vom Input (`mean_diff ~1–2`) → praktisch No-op / kaum sichtbare Mundbewegung
 
-Quellen: `sync.so/docs/compatibility-and-tips/improving-lip-sync-quality`, `.../media-content-tips`.
+Ursache im Code:
+- `pass-face-preclip.ts` berechnet zwar `outputSize: 720`, gibt diesen Wert aber **nicht** an die Remotion-Komposition weiter.
+- `DialogTurnFaceCropVideo` / `Root.tsx` fällt dadurch auf `outputSize`-Fallback **512** zurück.
 
-1. **Auflösung** — "Use at least **480p resolution for reliable face detection**. Higher resolutions up to 4K supported. We recommend **1080p as the best balance**."
-   → Unsere Preclips rendern aktuell mit `outputSize = max(256, cropSize)`, also oft **256×256**. Das liegt **deutlich unter** der Mindestanforderung. Auto-detect findet das Gesicht zwar (Crop ist face-centered), aber die Lippen-Generation hat zu wenig Pixeldichte → "COMPLETED" aber Mund bleibt sichtbar unverändert.
+Zusätzlich bestätigt die offizielle Sync.so-Doku:
+- mindestens **480p** für zuverlässige Face Detection, empfohlen **1080p**
+- AI-generierte Videos sollen enthalten: `"the character should be speaking naturally"`
+- bei mehreren Personen: Speaker Selection oder Segments API nutzen; `auto_detect` ist nur für single/obvious speaker ideal
 
-2. **AI-generierte Plates** — Wörtliches Zitat: *"When creating videos with third-party AI video generation models, include this instruction in the text prompt: **'the character should be speaking naturally'**. The generated AI video will have some random mouth movements, which are necessary to get the best results from our lipsync model."*
-   → Unser Hailuo-i2v-Plate-Prompt enthält das aktuell **nicht**. Ohne idle-Mund-Mikrobewegungen tut sich sync-3 sehr schwer, die Lippen zu animieren — genau das beobachtete Symptom.
+## Plan v113
 
-3. **Single face in frame** — Wird durch unseren face-zentrierten Crop bereits erfüllt; `auto_detect` ist hier korrekt und idiomatisch.
+### 1. Preclip-Auflösung wirklich auf 720p bringen
 
-## Änderungen (gezielt, klein)
+Ändern:
+- `supabase/functions/_shared/pass-face-preclip.ts`
+  - `outputSize` in `inputProps` aufnehmen.
+- `src/remotion/templates/DialogTurnFaceCropVideo.tsx`
+  - Schema um `outputSize` erweitern, damit die Komposition den Wert sauber akzeptiert.
+- `src/remotion/Root.tsx`
+  - vorhandene `calculateMetadata`-Logik beibehalten, aber sicherstellen, dass `props.outputSize` zuverlässig aus dem Payload kommt.
 
-### A) Preclip-Auflösung auf ≥720p anheben
+Ziel:
+- Echter Preclip muss per `ffprobe` **720×720** oder größer sein, nicht nur DB-Metadata.
 
-Datei: `supabase/functions/compose-dialog-segments/pass-face-preclip.ts` (Crop-Renderer / `outputSize`-Berechnung).
+### 2. Harte Preclip-Verifikation vor Sync.so-Dispatch
 
-- Neue Regel: `outputSize = clamp(roundEven(cropSize × upscaleFactor), min=720, max=1280)`
-  - Wenn `cropSize ≥ 720` → 1:1 (kein Upscale, keine Distortion).
-  - Wenn `cropSize < 720` → ffmpeg-Upscale via `scale=720:720:flags=lanczos` (gleiches Seitenverhältnis 1:1 bleibt).
-- v109-Lehre (kein synthetisches Mega-Upscale) bleibt gewahrt: Cap bei 1280, Lanczos statt bicubic, kein Sharpen-Filter.
-- Kommentar im Code: "Sync.so docs require ≥480p for reliable face detection; we target 720p for sync-3 quality margin."
+Nach `renderPassFacePreclip`:
+- echte Video-Dimensionen über vorhandene Probe/ffprobe-ähnliche Helfer prüfen.
+- wenn `< 480px`: nicht an Sync.so schicken.
+- wenn `< 720px`: als Regression loggen und fail-safe blocken oder neu rendern.
 
-### B) "Speaking naturally"-Hint im Plate-Prompt
+Damit verhindern wir, dass DB-Metadata wieder grün aussieht, obwohl Sync.so effektiv zu kleine Inputs bekommt.
 
-Datei: `supabase/functions/compose-dialog-scene/index.ts` (Hailuo-i2v-Prompt-Builder für Dialog-Plates) und/oder `supabase/functions/_shared/dialog-plate-prompt.ts`.
+### 3. Sync.so No-op-Erkennung im Webhook
 
-- Append (idempotent, einmalig) am Ende des Plate-Prompts für **alle** Dialog-Plates:
-  `", the character should be speaking naturally with subtle natural mouth movements"`
-- Nur Plates aus dem Dialog-Pipeline-Pfad (kein Eingriff in normale Composer-Clips).
+In `sync-so-webhook` bei `COMPLETED`:
+- Input-Preclip und Sync.so-Output vergleichen:
+  - Dimensionen
+  - Dauer
+  - optional mehrere Frames im Mund-/Facebereich per Pixel-Diff
+- wenn Output fast identisch zum Input ist:
+  - Pass nicht als erfolgreich werten
+  - `sync_output_unchanged: true` speichern
+  - Retry/Fallback auslösen statt finalen Mux zu bauen
 
-### C) Logging zur Verifikation
+Das ist wichtig, weil Sync.so bei solchen Fällen `COMPLETED` liefern kann, obwohl visuell nichts passiert.
 
-In `pass-face-preclip.ts` und `sync-so-webhook` ergänzen:
-- `preclip_dims: { width, height }` im `syncso_dispatch_log`
-- `preclip_face_box_ratio` (Crop-Größe / Output-Größe), damit Future-Regressionen sofort sichtbar werden.
+### 4. Fallback-Strategie doc-konform verbessern
 
-### D) Reset der betroffenen Szene
+Wenn ein Preclip trotz 720p als No-op zurückkommt:
+- erster Retry: Full-plate `sync-3` mit `segments[]` + `optionsOverride.active_speaker_detection` pro Segment prüfen/verwenden, statt weiter blind einzelne No-op-Preclips zu muxen.
+- Grund: Sync.so-Doku beschreibt Segments offiziell für Multi-Speaker und pro Segment andere Speaker-Selection.
+- `auto_detect` bleibt nur für echte single-face Preclips; für Multi-Face/Segment-Fallback nutzen wir deterministische `coordinates`/`frame_number` oder `bounding_boxes_url`.
 
-Migration: Reset `e57ef6dd-31a4-4b9d-9b49-5894d64bea7d`:
-- `dialog_shots = NULL`, `clip_url = NULL`, `clip_status = NULL`, `lip_sync_status = NULL`, `twoshot_stage = NULL`, `lip_sync_applied_at = NULL`, `replicate_prediction_id = NULL`
-- Credit-Refund über bestehende deterministische UUID-Logik (idempotent).
-- `scene_anchor_cache`-Eintrag bleibt (Anchor ist korrekt, nur Lipsync-Plate wird neu).
+### 5. Overlay/Mux absichern
 
-### E) Memory + Deploy
+In `render-sync-segments-audio-mux` / `DialogStitchVideo`:
+- sicherstellen, dass 720p Sync-Outputs wieder korrekt auf den ursprünglichen Crop `x/y/size` skaliert werden.
+- Log erweitern: `output_url`, `crop`, `preclip_input_dims`, `sync_output_dims`, `shot window`.
 
-- `mem/architecture/lipsync/v112-preclip-resolution-and-speaking-natural-plate.md`:
-  - Offizielle Doku-Zitate (≥480p, "speaking naturally")
-  - Wahl: Target 720p (Sicherheitsmarge), Cap 1280p (Cost/Latency)
-  - `auto_detect: true` bleibt offizieller Default
-- `mem/index.md`: Eintrag unter v111
-- Deploy: `compose-dialog-segments`, `compose-dialog-scene`
+### 6. Betroffene Szenen sauber resetten
 
-## Out of Scope
+Für die zuletzt getesteten Szenen:
+- `dialog_shots`, `lip_sync_status`, `twoshot_stage`, `clip_url` resetten.
+- vorhandene 512×512 Preclip-URLs verwerfen.
+- Master-Plate/Anchor nur neu rendern, wenn sie noch vor dem `speaking naturally` Prompt erzeugt wurde.
 
-- Speaker-Selection-Modus (bleibt `auto_detect: true`)
-- Sync.so-Modell (bleibt `sync-3`)
-- Audio-Mux / Stitcher / `audio_plan`
-- Composer-Clip-Auflösungen (nur Dialog-Preclips)
-- Bestehende erfolgreiche Lipsync-Renders (kein Backfill)
+### 7. Deployment & Verifikation
 
-## Wird das das Problem wirklich beheben?
+Deploy:
+- `compose-dialog-segments`
+- `sync-so-webhook`
+- `render-sync-segments-audio-mux`
+- Remotion Bundle neu deployen, weil `DialogTurnFaceCropVideo`/`Root.tsx` geändert werden.
 
-Hohe Konfidenz: **A** behebt die Hauptursache (zu kleines Inputbild für sync-3). **B** ist der zweite Doku-konforme Hebel speziell für AI-Plates. Beide werden in der offiziellen Doku explizit als Bedingungen für funktionierende Lippenbewegung genannt. **C** macht jedes künftige Regress sofort sichtbar.
+Verifikation am nächsten Run:
+- `ffprobe(preclip) = 720×720`
+- Sync.so-Output ist nicht nahezu identisch zum Preclip
+- Mux-Shots verwenden 4 sichtbare Crop-Overlays
+- Finalclip zeigt Mundbewegung in den jeweiligen Sprecherfenstern
 
-Soll ich es so bauen?
+## Nicht ändern
+
+- Kein Entfernen von `auto_detect` auf echten single-face Preclips.
+- Kein Zurück zu `temperature` oder `occlusion_detection_enabled` bei `sync-3`.
+- Kein weiterer Prompt-only-Fix als alleinige Maßnahme — der aktuelle Beweis zeigt einen technischen Render-/Payload-Fehler.

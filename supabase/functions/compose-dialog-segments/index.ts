@@ -2490,6 +2490,15 @@ serve(async (req) => {
         90_000,
       );
       if (preclip.ok && preclip.preclipUrl && preclip.crop) {
+        const preclipDims = await probeMp4Dims(preclip.preclipUrl).catch(() => null);
+        const minPreclipAxis = Math.min(Number(preclipDims?.width ?? 0), Number(preclipDims?.height ?? 0));
+        (pass as any).preclip_dims = preclipDims ?? null;
+        if (!preclipDims || minPreclipAxis < 720) {
+          (pass as any).preclip_error = `preclip_resolution_too_small:${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"}`;
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v113_preclip_resolution_BLOCK actual=${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"} expected>=720 url=${preclip.preclipUrl.slice(0, 100)}`,
+          );
+        } else {
         // v77 — Validate the preclip actually shows EXACTLY one face before
         // shipping to Sync.so. If the crop is empty (wrong coords) or
         // contains two heads (sibling cap failed), Sync.so would happily
@@ -2541,6 +2550,7 @@ serve(async (req) => {
           console.warn(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_face_gate_BLOCK faces=${preclipFaceCount} — falling back to full-plate dispatch with plate coords`,
           );
+        }
         }
 
       } else {
@@ -2704,6 +2714,9 @@ serve(async (req) => {
         audio_voiced_sec: tightAudioInfo?.durSec ?? null,
         audio_full_sec: audioFullSec,
         video_dur_sec: videoDurSec,
+        preclip_crop_size: (pass as any).preclip_crop?.size ?? null,
+        preclip_output_size: (pass as any).preclip_crop?.outputSize ?? null,
+        preclip_dims: (pass as any).preclip_dims ?? null,
         video_frames_expected: videoDurSec != null
           ? Math.max(1, Math.ceil(videoDurSec * 30))
           : null,
@@ -3278,6 +3291,8 @@ serve(async (req) => {
         v103_probe: (pass as any)._v102_probe ?? null,
         v105_probe: (pass as any)._v105_probe ?? null,
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
+        preclip_dims: (pass as any).preclip_dims ?? null,
+        preclip_crop: (pass as any).preclip_crop ?? null,
         dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
         payload_summary: {
           model: payload.model,
