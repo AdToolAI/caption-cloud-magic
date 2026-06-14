@@ -167,16 +167,40 @@ export async function resolvePlateFaceIdentities(params: {
   if (!plateMap || plateMap.faces.length === 0) return null;
 
   let identityBySlot = new Map<number, { characterId: string; confidence: number }>();
-  const idTsHint = Math.max(0.2, params.midDurationSec * 0.5);
   if (plateMap.frame_url && params.characters.length >= 1 && plateMap.faces.length >= 2) {
     identityBySlot = await askGeminiForPlateIdentity(
       plateMap.frame_url,
       params.characters,
       plateMap.faces,
-      idTsHint,
+      plateMap.width,
+      plateMap.height,
     );
   } else if (params.characters.length === 1 && plateMap.faces.length >= 1) {
     identityBySlot.set(0, { characterId: params.characters[0].characterId, confidence: 0.9 });
+  }
+
+  // v117 — Deterministic slot-order fallback. When Gemini returned nothing
+  // AND the number of detected faces matches the number of characters,
+  // assume left-to-right speaker order matches left-to-right slot order
+  // (this is how the cast is typically composed into the plate by Nano
+  // Banana 2 / Hailuo). Confidence is intentionally low so logging /
+  // downstream gates can tell this apart from a confident Gemini match,
+  // but it's still far safer than the anchor-rescale drift.
+  let slotOrderFallback = false;
+  if (
+    identityBySlot.size === 0 &&
+    plateMap.faces.length === params.characters.length &&
+    params.characters.length >= 2
+  ) {
+    slotOrderFallback = true;
+    const sortedFaces = [...plateMap.faces].sort((a, b) => a.slot - b.slot);
+    params.characters.forEach((c, i) => {
+      const f = sortedFaces[i];
+      if (f) identityBySlot.set(f.slot, { characterId: c.characterId, confidence: 0.4 });
+    });
+    console.warn(
+      `[plate-face-identity] gemini matched 0/${params.characters.length} — v117 slot-order fallback applied`,
+    );
   }
 
   const faces: PlateIdentityFace[] = plateMap.faces.map((f) => {
@@ -208,5 +232,6 @@ export async function resolvePlateFaceIdentities(params: {
     frame_url: plateMap.frame_url,
     cached: plateMap.cached,
     resolvedCount,
-  };
+    slotOrderFallback,
+  } as PlateIdentityMap & { slotOrderFallback?: boolean };
 }
