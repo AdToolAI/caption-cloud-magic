@@ -2714,6 +2714,9 @@ serve(async (req) => {
         audio_voiced_sec: tightAudioInfo?.durSec ?? null,
         audio_full_sec: audioFullSec,
         video_dur_sec: videoDurSec,
+        preclip_crop_size: (pass as any).preclip_crop?.size ?? null,
+        preclip_output_size: (pass as any).preclip_crop?.outputSize ?? null,
+        preclip_dims: (pass as any).preclip_dims ?? null,
         video_frames_expected: videoDurSec != null
           ? Math.max(1, Math.ceil(videoDurSec * 30))
           : null,
@@ -3288,6 +3291,8 @@ serve(async (req) => {
         v103_probe: (pass as any)._v102_probe ?? null,
         v105_probe: (pass as any)._v105_probe ?? null,
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
+        preclip_dims: (pass as any).preclip_dims ?? null,
+        preclip_crop: (pass as any).preclip_crop ?? null,
         dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
         payload_summary: {
           model: payload.model,
