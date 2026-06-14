@@ -2195,7 +2195,11 @@ serve(async (req) => {
     const havePlateIdentityForDispatch =
       !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
     const hasPassPreclipForDispatch = !!(pass as any).preclip_url;
+    // v120: when preclip-forcing is active we MUST NOT pick bbox-url-pro;
+    // the whole point is to switch this pass onto the single-face preclip
+    // path that worked for Passes 2/3 on the same plate.
     const freshDefaultVariant: RetryVariant =
+      !v120ForcePreclip &&
       speakers.length >= 2 &&
       !!plateDims &&
       havePlateIdentityForDispatch &&
