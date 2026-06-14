@@ -56,6 +56,16 @@ export interface PassPreclipInput {
   /** Render window for this speaker's turn(s) in scene seconds. */
   startSec: number;
   endSec: number;
+  /**
+   * v116 (Fix B — Face-Gate Self-Repair). Multiplier applied to the
+   * computed crop `size` AFTER computeFaceCrop. Used by the dispatcher
+   * to re-render a wider crop (more headroom/chinroom) when the prior
+   * preclip's face-gate returned `faces=0` (face was just outside the
+   * crop). 1.0 = no change (default). 1.4 / 1.8 are the dispatcher's
+   * standard repair steps. Crop is re-centered on `coords` and clamped
+   * to source bounds; never includes a neighbor's coordinate.
+   */
+  cropExpansionFactor?: number;
 }
 
 export interface PassPreclipResult {
