@@ -17626,6 +17626,7 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      lipsync_watchdog_15min: { Args: never; Returns: undefined }
       match_ai_cache: {
         Args: {
           match_count?: number
