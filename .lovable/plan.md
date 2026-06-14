@@ -1,105 +1,92 @@
-# v116 — Sync-3 Official Segments API (Multi-Speaker Primary)
+# v116 — Identity-Lock Fix (im Einklang mit Sync.so 3 Doku)
 
 ## Ziel
-Die 4-Personen-Pipeline wieder stabil zum Laufen bringen, indem wir Multi-Speaker (N≥2) **in einem einzigen Sync.so-Call** über die offizielle **Segments-API mit `sync-3`** abwickeln — exakt nach https://sync.so/docs/developer-guides/segments + speaker-selection. Der heutige v60 serielle Per-Speaker-Chain wird zum Fallback degradiert.
+4-Personen-Lip-Sync stabil zum Laufen bringen, ohne erneut an der Dispatch-Architektur zu rütteln. Wir behalten den bewährten **v60 Serial-Chain mit `sync-3`** (genau wie Sync.so es für Multi-Person/Static-Plates empfiehlt) und fixen chirurgisch die **echte Root Cause** der Failures: das Speaker→Face-Mapping driftet bei N=4 vom realen Plate-Frame ab, deshalb landet jeder zweite Pass auf dem falschen Gesicht (`provider_unknown_error`) oder im leeren Hintergrund (`faces=0`).
 
-## Warum (Doc-Begründung)
-Die Sync.so-Doku beschreibt Segments als **die offiziell empfohlene Methode** für Multi-Speaker-Szenen:
-- 1 Video + N Audios (`input[]` mit `refId`).
-- `segments[]` mit `startTime`/`endTime` + `audioInput.refId` + per-Segment `optionsOverride.active_speaker_detection`.
-- `sync-3` Modell — von Sync.so explizit empfohlen für „multi-person, static, occluded, partial-face shots" und kann **stumme Lippen öffnen** (im Gegensatz zu lipsync-2-pro „Still Frame Limitation").
-- ASD pro Segment mit `auto_detect:false` + `frame_number` + `coordinates:[cx,cy]` (oder `bounding_boxes_url` für lange/komplexe Plates).
+## Sync.so-Doku als Anker
+Die offizielle Doku (https://sync.so/docs/models/lipsync, /developer-guides/speaker-selection, /developer-guides/segments) sagt für unseren Use-Case:
 
-Unser v60-Chain umgeht das mit N seriellen Calls → 4× Sync.so-Slots verbrannt, 4× Race-Risiko, lange Wallclock. v82 hat zwar `bbox-url-pro` als Primary, aber immer noch **pro Pass** statt einem einzigen Multi-Segment-Call.
+1. **Modell**: `sync-3` für static / multi-person / occluded plates (kann stumme Lippen öffnen). ✅ haben wir bereits seit v62.
+2. **ASD bei Multi-Face**: deterministisch (`auto_detect:false` + `frame_number` + `coordinates`) **oder** `bounding_boxes_url`. ✅ haben wir bereits (v82 `bbox-url-pro`).
+3. **ASD bei Single-Face Crop**: `auto_detect:true` ist explizit empfohlen. ✅ haben wir seit v115.
+4. **Plate-Qualität**: ≥480p (1080p empfohlen), Gesicht klar sichtbar, kein Motion-Blur, nicht abgeschnitten. ⚠️ **prüfen wir aktuell NICHT vor dem Dispatch.**
+5. **Doc-strict Options**: nur `sync_mode` + `active_speaker_detection`, sonst nichts. ✅ v106.
+6. **Segments-API mit 1 Call**: dokumentiert für `lipsync-2`, mit `sync-3` historisch instabil (v41/v54/v56/v58 → `provider_unknown_error`, in v79 entfernt, FROZEN I.2). **Bleibt verboten** für N≥2.
 
-## Aktueller Stand (Ist)
-- `compose-dialog-segments` dispatcht heute für N≥2 **N getrennte Sync.so-Jobs** (v60 unified chain), jeder mit eigenem ASD (bbox-url-pro / coords-pro).
-- v55/v56 `sync-official-segments-v55` existiert im Code als „official segments" Pfad, ist aber für N≥2 hart deaktiviert (`useV41Official = false`, FROZEN I.2).
-- Webhook (`sync-so-webhook`) erwartet pro Pass einen Sync.so-Job und chained den nächsten in `pendingIdxs[0]`.
+Was uns also fehlt sind nicht „mehr Sync.so-Features", sondern **bessere Inputs**.
 
-## Soll (v116)
+## Root Cause Analyse (DB-Beweis, Szene `7470be0d…`)
+- **Pass 4 (Sarah)** — preclip-face-gate `faces=0`: Cached `faceMap` zeigte auf eine Bounding-Box, die im realen Plate-Frame leer war. Crop enthielt Hintergrund statt Sarah.
+- **Pass 2 (Matthew)** — `provider_unknown_error`: v114 center-coords landeten auf einem **anderen** Gesicht (vermutlich Sprecher 3). Sync.so beschwert sich, weil ASD-Box ≠ erwartetes Gesicht.
 
-### Dispatch-Logik (compose-dialog-segments)
-1. **N=1**: unverändert (v5 single pass, sync-3 default, Preclip + auto_detect bei 1 validiertem Gesicht — v115).
-2. **N≥2** neuer Primary `segments-v116`:
-   - **Ein** Sync.so-Generation-Call mit:
-     ```json
-     {
-       "model": "sync-3",
-       "input": [
-         { "type": "video", "url": "<plate_720p_mp4>", "refId": "plate" },
-         { "type": "audio", "url": "<speaker0.wav>", "refId": "spk0" },
-         { "type": "audio", "url": "<speaker1.wav>", "refId": "spk1" },
-         "..."
-       ],
-       "segments": [
-         {
-           "startTime": 0.0,
-           "endTime": 2.4,
-           "audioInput": { "refId": "spk0" },
-           "optionsOverride": {
-             "active_speaker_detection": {
-               "auto_detect": false,
-               "frame_number": 0,
-               "coordinates": [cx0, cy0]
-             }
-           }
-         },
-         "... per turn ..."
-       ],
-       "options": { "sync_mode": "cut_off" },
-       "webhookUrl": "<sync-so-webhook>"
-     }
-     ```
-   - **Doc-strict**: nur `sync_mode` + `active_speaker_detection`, **kein** `temperature`, **kein** `occlusion_detection_enabled` (v106).
-   - **Bei plateDims + resolvedPlateIdentity** → `bounding_boxes_url` statt `coordinates` (per Segment via `optionsOverride.active_speaker_detection.bounding_boxes_url`, JSON in `composer-frames/<userId>/<projectId>/asd/<sceneId>-<turnIdx>-<ts>.json`).
-   - **`audioInput` strikt `{ refId }`** (v55 — keine `startTime`/`endTime` im audioInput, Crop nur über `segments[].startTime/endTime`).
+Beide Failures = **dasselbe Problem**: die cached Identity-Map (`audio_plan.twoshot.faceMap`) wurde einmal pro Szene mit Gemini Vision gebaut und nie gegen den realen Plate-Frame verifiziert. Bei 4 Personen ist die Map oft falsch zugeordnet (Symmetrie, Hairstyle-Mismatch, gleiche Wardrobe).
 
-### State / DB
-- `dialog_shots.engine = 'sync-3-segments-v116'`, `version = 116`, `audio_input_mode = 'ref_only'`.
-- **Ein einziger** `sync_so_job_id` pro Szene (statt 1 pro Pass).
-- `passes[]` bleibt mit N Einträgen (für Coords/Audio-URLs), aber alle teilen `sync_so_job_id`.
-- Neuer Marker `dispatch_mode = 'single-call-segments'` vs `'serial-chain'` (Fallback).
+## Soll (3 chirurgische Fixes, alle innerhalb v60-Chain)
 
-### Webhook (sync-so-webhook)
-- Neuer Branch `engine === 'sync-3-segments-v116'`:
-  - COMPLETED → Sync.so-MP4 nach `ai-videos/composer/{userId}/{sceneId}-lipsync.mp4` rehosten, `clip_url` setzen, **keine** weiteren Passes triggern (alle Sprecher sind im selben Output enthalten).
-  - FAILED / provider_unknown_error → **automatischer Fallback** auf v60 serial chain: `engine = 'sync-3-serial-v60'`, `passes` resetten, ersten Pass mit `bbox-url-pro` re-dispatchen. Refund nur wenn auch Chain-Fallback failed.
-- Bestehende v60-Chain-Logik bleibt unangetastet (Fallback-Pfad).
+### Fix A — Live Identity-Verifikation pro Pass (Pflicht)
+**Datei**: `supabase/functions/_shared/twoshot-face-map.ts` + `compose-dialog-segments/index.ts` (~Zeile 1800–1900, vor Pass-Dispatch).
 
-### Frozen-Invariants Update
-- I.2 ergänzen: `useV41Official` darf für N≥2 wieder `true` werden, **aber nur** über den neuen v116 Code-Pfad (Model `sync-3`, `audio_input_mode='ref_only'`, doc-strict options).
-- I.9 ergänzen: kein parallel fan-out — Segments-API ist `1 Call`, nicht N parallel.
-- Neue I.10: v116 Fallback-Kette MUSS bei provider_unknown_error nach v60 serial chain wechseln, sonst Refund.
+- Vor jedem Pass-Dispatch: Plate-Frame an Position `pass.reference_frame_number` ziehen (FFmpeg-Lambda gibt es schon via `composer-frames` bucket).
+- Gemini Vision (`gemini-2.5-flash`) mit Prompt: *„Welche der folgenden Personen ist im Bounding-Box [x1,y1,x2,y2] zu sehen? Antworte mit character_id."* Cache als `dialog_shots.passes[i].verified_identity`.
+- **Mismatch** → Coords aus aktuellem Plate-Frame neu berechnen (Gemini Vision: `"Wo ist character X im Frame? Box-Koordinaten."`) bevor wir Sync.so callen.
+- Cost: ~€0.001/Pass × 4 Passes = vernachlässigbar.
 
-### Retry-Ladder
-- v116 segments-Call hat **eigene** kurze Ladder:
-  1. `segments-bbox-url` (sync-3, per-segment `bounding_boxes_url`)
-  2. `segments-coords` (sync-3, per-segment `frame_number+coordinates`)
-  3. Fallback → v60 serial chain (`bbox-url-pro` → komplette v82-Ladder pro Pass)
-  4. Refund
+### Fix B — Face-Gate Self-Repair (statt Hard-Fail)
+**Datei**: `supabase/functions/_shared/pass-face-preclip.ts`.
+
+Aktuell: Preclip-Crop hat `faces=0` → Pass failed, ganzer Chain bricht ab.
+Neu: bei `faces=0`:
+1. Crop um +30% expandieren (mehr Headroom + Chinroom), erneut Face-Detection.
+2. Wenn immer noch 0 → +60% expandieren.
+3. Wenn nach 2 Repair-Versuchen weiterhin 0 → erst dann failen mit klarer Message (*„Plate enthält Charakter X nicht erkennbar — Plate neu rendern"*).
+
+### Fix C — Plate-Quality-Gate VOR Sync.so-Dispatch
+**Datei**: neue `supabase/functions/_shared/plate-quality-gate.ts`, eingehängt in `compose-dialog-segments` direkt nach `probeMp4Dims`.
+
+Vor dem ersten Sync.so-Call einmalig prüfen:
+- Auflösung ≥720p (sonst Plate-Re-Render auslösen).
+- Plate-Face-Detect: Anzahl Gesichter ≥ Anzahl Sprecher und keines „cut at edge" oder kleiner als 8% der Plate-Höhe (Sync.so-Doku-Schwelle).
+- Wenn Gate failed → `clip_status='pending'`, `clip_url=null`, klarer User-Error („4 Personen müssen alle im Frame sein, Plate wird neu gerendert"), **kein Sync.so-Call, keine Credits verbrannt**.
+
+Damit fangen wir das Sora-typische „Person teilweise out of frame" Problem ab, **bevor** Sync.so Geld kostet.
+
+### Fix D — Per-Pass Diagnostics (zum Lernen)
+**Datei**: `syncso_dispatch_log` (Tabelle existiert).
+
+Persist pro Pass:
+- ASD-Mode, `face_count_in_crop`, `crop_box`, `coords_sent`, `verified_identity_match` (boolean), `repair_attempts`.
+- Damit sehen wir endlich nach jedem Run, OB die richtigen Coords ankamen — kein Blindflug mehr.
 
 ## Was NICHT geändert wird
-- Preclip-Pfad (v115) bleibt für N=1.
-- Audio-Mux (`render-sync-segments-audio-mux`) unverändert — Output ist eine MP4, kein Mux nötig.
-- Pricing: `ceil(durSec) × 9 × N_speakers` Credits bleibt (Sync.so rechnet pro Speaker-Segment ab).
-- Idempotenter Refund (v23 server-owned state) unverändert.
-- Locked-camera Plate-Prompt unverändert.
+- **Dispatch-Architektur**: v60 Serial-Chain mit `sync-3` bleibt — Sync.so-doku-konform und stabil für N=1/2/3.
+- **Segments-API mit 1 Call**: bleibt verboten für N≥2 (FROZEN I.2, historisch instabil mit `sync-3`).
+- **v115 Preclip auto_detect**: bleibt für N=1.
+- **v82 bbox-url-pro Ladder**: bleibt unverändert.
+- **Pricing, Refunds, Locks, Webhook-Chain**: alles unverändert.
+
+## Erwartetes Ergebnis nach v116
+- N=4 Szene `7470be0d…`: Fix A fängt die Sarah-Map ab und korrigiert auf reale Box → preclip-faces=1 → auto_detect:true → Pass durch. Matthew-Pass bekommt verifizierte Coords statt center-fallback → kein `provider_unknown_error`.
+- N=4 mit kaputtem Plate (Person out of frame): Fix C blockt Dispatch, refundet 0 Credits, zwingt Plate-Re-Render.
+- Diagnostics zeigen pro Pass: gesendete Coords vs. erkannte Identität vs. Sync.so-Ergebnis → wir können künftig in 5 min debuggen statt in 5 Stunden.
 
 ## Betroffene Dateien
-- `supabase/functions/compose-dialog-segments/index.ts` (v116-Branch + Segments-Builder + Fallback-Marker)
-- `supabase/functions/sync-so-webhook/index.ts` (v116-Branch + Auto-Fallback auf v60)
-- `supabase/functions/_shared/twoshot-face-map.ts` (per-Segment Coords/BBox-Resolver — kleine Erweiterung)
-- `mem/architecture/lipsync/v116-sync3-official-segments-multispeaker.md` (neu)
-- `mem/architecture/lipsync/FROZEN-INVARIANTS.md` (I.2/I.9 update, neue I.10)
-- `mem/index.md`
+- `supabase/functions/_shared/twoshot-face-map.ts` — neue `verifySpeakerIdentity()` + `recomputeCoordsFromPlate()`.
+- `supabase/functions/_shared/pass-face-preclip.ts` — Self-Repair Loop (3 Versuche).
+- `supabase/functions/_shared/plate-quality-gate.ts` — neu.
+- `supabase/functions/compose-dialog-segments/index.ts` — Plate-Gate vor Dispatch, Live-Verify vor jedem Pass, erweiterte `syncso_dispatch_log` Felder.
+- `mem/architecture/lipsync/v116-identity-lock-and-plate-gate.md` — neu.
+- `mem/index.md` — Eintrag.
 
 ## Verifizierung
-1. 4-Speaker-Szene: Edge-Logs zeigen **1** `sync.so/v2/generate` POST mit `segments.length === 4` und `input.length === 5` (1 video + 4 audio). Webhook empfängt **1** COMPLETED → 1 finales MP4.
-2. 2-Speaker-Szene: gleicher Pfad, `segments.length === 2`, `input.length === 3`.
-3. Bei künstlich provoziertem `provider_unknown_error` (z. B. ungültige coords): Webhook setzt `engine='sync-3-serial-v60'` und dispatched ersten Pass mit `bbox-url-pro`. UI zeigt „Fallback auf serielle Chain".
-4. N=1 unverändert (single v5 pass).
-5. Pricing-Check: 4-Speaker × 6s = 4 × 6 × 9 = 216 credits gleich wie heute.
+1. Szene `7470be0d…` resetten (`reset-lipsync-scene`), `dialog_shots`+`scene_anchor_cache` clearen, neu dispatchen.
+2. `syncso_dispatch_log` zeigt für jeden Pass: `verified_identity_match=true`, `face_count_in_crop=1`, kein `provider_unknown_error`.
+3. Künstlich kaputten Plate (Person außerhalb Frame) hochladen → Plate-Gate failt, 0 Credits abgebucht, klarer User-Error.
+4. N=1/2/3 Regression-Check: alle bisherigen Tests grün (kein Pfadwechsel bei diesen Counts).
 
-## Rollback
-- Feature-Flag `FORCE_V60_SERIAL = true` in `compose-dialog-segments` setzt sofort zurück auf v60 Chain ohne Code-Revert.
+## Was wenn N=4 trotzdem failed?
+Dann ist das Problem **nicht mehr in unserer Pipeline**, sondern auf Sync.so-Seite — und wir haben mit Fix D den ersten echten Beweis dafür (Coords waren korrekt, Identität verified, trotzdem Fail). Erst dann macht ein Ticket bei Sync.so Support Sinn, vorher würden sie uns abwimmeln.
+
+## Risiko / Rollback
+- Fix A/B/D sind additiv und betreffen nur den Multi-Speaker-Pfad. N=1 unverändert.
+- Fix C kann via `FORCE_SKIP_PLATE_GATE=true` env-Flag deaktiviert werden, falls zu strikt.
+- Kein Replicate/Provider-Wechsel, keine Schema-Migration nötig.
