@@ -2661,8 +2661,10 @@ serve(async (req) => {
     // Wir routen jeden Multi-Speaker-Pass auf den bbox-url-pro Pfad,
     // wenn er verfügbar ist. Single-Speaker und Szenen ohne plate-identity
     // fallen weiterhin auf den preclip-Pfad zurück (unverändert).
+    // v120: when preclip-forcing is active, ignore the edge-speaker bypass —
+    // we explicitly want the single-face preclip render here.
     const skipPreclipForEdgeSpeaker =
-      speakerIsEdgePositioned && haveBboxUrlPathForEdge;
+      !v120ForcePreclip && speakerIsEdgePositioned && haveBboxUrlPathForEdge;
     // v107 — Hard-preclip enforcement: every multi-speaker pass MUST go
     // through the single-face preclip path. v105 force-fullplate was the
     // root cause of the "2 mouths closed, 2 mouths speak everyone's lines"
