@@ -30,6 +30,7 @@ import {
   recordCircuitSuccess,
   logSyncDispatch,
 } from "../_shared/syncso-preflight.ts";
+import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 
 
 const corsHeaders = {
@@ -140,6 +141,22 @@ function triggerV5Advance(supabaseUrl: string, serviceKey: string, sceneId: stri
     body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: passIdx }),
   }).catch(() => {});
   console.log(`[sync-so-webhook] v5 scene=${sceneId} advancing pending pass ${passIdx + 1}/${totalPasses}`);
+}
+
+async function headAsset(url: string | null | undefined): Promise<{ bytes: number | null; contentType: string | null; etag: string | null } | null> {
+  if (!url) return null;
+  try {
+    const r = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(8_000) });
+    if (!r.ok) return null;
+    const len = Number(r.headers.get("content-length") ?? NaN);
+    return {
+      bytes: Number.isFinite(len) ? len : null,
+      contentType: r.headers.get("content-type"),
+      etag: r.headers.get("etag"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function terminalV5Counts(passes: any[]) {
