@@ -1048,6 +1048,112 @@ serve(async (req) => {
       );
     }
 
+    // ── v116 (Fix C) — Plate-Quality Gate for N≥3 ────────────────────────
+    // For 3+ speaker scenes, if plate-side face detection couldn't resolve
+    // identity for every speaker (faces missing or fewer detected faces
+    // than speakers), the anchor-rescale fallback drifts hard enough to
+    // routinely land Sync.so coords on the WRONG face → provider_unknown
+    // / wrong-mouth-moves. Per Sync.so docs (improving-lip-sync-quality):
+    // "All speakers must be clearly visible." Burning credits on an
+    // un-resolvable plate is wasted money — block early, refund, and
+    // force the user to re-render the scene clip.
+    //
+    // Gate fires only on the FIRST dispatch attempt (not advance/retry) so
+    // re-tries that webhook chains in carry forward.
+    const PLATE_GATE_DISABLED = (Deno.env.get("FORCE_SKIP_PLATE_GATE") ?? "").toLowerCase() === "true";
+    if (
+      !PLATE_GATE_DISABLED &&
+      !isAdvance &&
+      !isRetry &&
+      !isV41Retry &&
+      speakers.length >= 3 &&
+      plateDims
+    ) {
+      const detectedFaces = plateIdentityMap?.faces?.length ?? 0;
+      const resolvedFaces = plateIdentityMap?.resolvedCount ?? 0;
+      const gateFails =
+        !plateIdentityMap ||
+        detectedFaces < speakers.length ||
+        resolvedFaces < speakers.length;
+      if (gateFails) {
+        const reason = !plateIdentityMap
+          ? "plate_identity_unavailable"
+          : detectedFaces < speakers.length
+            ? `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`
+            : `plate_identity_unresolved(resolved=${resolvedFaces}/${speakers.length})`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate_BLOCK ${reason} — refunding ${totalCost} credits and forcing plate re-render`,
+        );
+        // Refund the wallet debit (line ~824 already deducted totalCost).
+        try {
+          const { data: w } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(w?.balance ?? 0) + Number(totalCost ?? 0),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        } catch (refundErr) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate refund failed: ${(refundErr as Error)?.message}`,
+          );
+        }
+        // Reset clip so the user / Composer re-renders the plate.
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: 0,
+              refunded: true,
+              error: `v116_plate_quality_gate:${reason}`,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_status: "pending",
+            clip_url: null,
+            lip_sync_source_clip_url: null,
+            clip_error: `Plate-Quality-Gate (v116): Auf dem aktuellen Scene-Clip wurden nicht alle ${speakers.length} Charaktere als eindeutige Gesichter erkannt (erkannt: ${detectedFaces}, zuordenbar: ${resolvedFaces}). Sync.so würde mit hoher Wahrscheinlichkeit das falsche Gesicht animieren. Bitte die Szene neu rendern (alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe). Credits wurden zurückerstattet.`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "PREFLIGHT_BLOCKED",
+            error_class: "v116_plate_quality_gate",
+            error_message: reason,
+            meta: {
+              speakers: speakers.length,
+              detected_faces: detectedFaces,
+              resolved_faces: resolvedFaces,
+              plate_url: sourceClipUrl,
+              plate_dims: plateDims,
+              refunded_credits: totalCost,
+            },
+          });
+        } catch (_) { /* best-effort */ }
+        return json(
+          {
+            error: "v116_plate_quality_gate",
+            message: `Plate enthält ${detectedFaces} Gesichter, erwartet ${speakers.length}. Bitte Szene neu rendern.`,
+            detected_faces: detectedFaces,
+            resolved_faces: resolvedFaces,
+            expected: speakers.length,
+            refunded: totalCost,
+          },
+          422,
+        );
+      }
+    }
+
+
     // Final safety fallback: evenly spaced along the horizontal midline so
     // 3+ speakers never collide on the same x.
     for (let i = 0; i < speakerCoords.length; i++) {
