@@ -912,11 +912,31 @@ serve(async (req) => {
           );
         }
       }
+      // v121 — `provider_unknown_error` Stop-Loss.
+      // After a single retry of the same pass with an opaque
+      // `provider_unknown_error` (no `error_code`, generic message), further
+      // variant-churn on full-plate ↔ preclip routinely keeps the scene
+      // running for 10+ minutes without ever recovering (DB-confirmed across
+      // scenes ec4290f2, 0207e3a4). Doc-strict Sync.so payload is already
+      // sent; the failure is upstream and not addressable by another retry.
+      // Stop here so the scene goes terminal-failed + refund kicks in.
+      const v121StopLoss =
+        codeBucket === "unknown" &&
+        errClass === "provider_unknown_error" &&
+        !errorCode &&
+        passRetryCount >= 1;
+      if (v121StopLoss) {
+        console.warn(
+          `[sync-so-webhook] v121 scene=${sceneId} pass=${currentPass} stop-loss on provider_unknown_error (no code, retry=${passRetryCount}) → no more variant churn`,
+        );
+      }
       // fail_fast codes short-circuit the ladder entirely.
       const canRetry = codeBucket !== "fail_fast"
+        && !v121StopLoss
         && (treatAsTransient || forceCoordsRepair)
         && passRetryCount < MAX_V5_RETRIES
         && nextVariant !== null;
+
 
       if (canRetry) {
         const needsAudioRepair = codeBucket === "retry_with_repair" || forceCoordsRepair;
