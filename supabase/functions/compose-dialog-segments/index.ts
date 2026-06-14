@@ -1133,7 +1133,7 @@ serve(async (req) => {
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-segments",
             sync_status: "PREFLIGHT_BLOCKED",
-            error_class: "v116_plate_quality_gate",
+            error_class: "v117_plate_quality_gate",
             error_message: reason,
             meta: {
               speakers: speakers.length,
@@ -1147,7 +1147,7 @@ serve(async (req) => {
         } catch (_) { /* best-effort */ }
         return json(
           {
-            error: "v116_plate_quality_gate",
+            error: "v117_plate_quality_gate",
             message: `Plate enthält ${detectedFaces} Gesichter, erwartet ${speakers.length}. Bitte Szene neu rendern.`,
             detected_faces: detectedFaces,
             resolved_faces: resolvedFaces,
