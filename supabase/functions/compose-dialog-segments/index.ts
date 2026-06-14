@@ -2418,6 +2418,26 @@ serve(async (req) => {
       !!tightAudioInfo &&
       !skipPreclipForEdgeSpeaker;
 
+    // v114 — On retry the cached preclip_url may be a Supabase signed URL
+    // that has expired (24h TTL). If Sync.so can't fetch it we get
+    // `generation_input_video_download_error` and the pass silently dies.
+    // HEAD-probe the cached URL on retry; clear it so we re-render fresh.
+    if (isRetry && (pass as any).preclip_url) {
+      try {
+        const head = await fetch(String((pass as any).preclip_url), { method: "HEAD" });
+        if (!head.ok) {
+          console.log(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v114_preclip_url_stale status=${head.status} → re-render`);
+          (pass as any).preclip_url = null;
+          (pass as any).preclip_render_id = null;
+          (pass as any).preclip_crop = null;
+        }
+      } catch (_) {
+        (pass as any).preclip_url = null;
+        (pass as any).preclip_render_id = null;
+        (pass as any).preclip_crop = null;
+      }
+    }
+
     if (wantPassPreclip && !(pass as any).preclip_url) {
       // v94: Window spans the UNION of all turns for this speaker, not just
       // the first turn. Sync.so with sync_mode=cut_off caps output at
