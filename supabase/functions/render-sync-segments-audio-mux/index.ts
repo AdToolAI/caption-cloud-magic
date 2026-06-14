@@ -200,11 +200,13 @@ serve(async (req) => {
       : finalLipsyncUrl;
 
     const minAxis = Math.min(width, height);
-    const radiusForCount =
-      donePasses.length === 1 ? minAxis * 0.28 :
-      donePasses.length <= 2 ? minAxis * 0.22 :
-      donePasses.length === 3 ? minAxis * 0.18 :
-      minAxis * 0.15;
+    // v114 — Floor radius at 0.28 regardless of speaker count. The previous
+    // 0.15..0.22 floor for ≥3 speakers produced 108–158 px masks on a 720 px
+    // axis, which routinely clipped the chin/mouth (radial gradient inner
+    // edge at 68% radius → ~73–107 px). The mouth movement was happening in
+    // the Sync.so output but hidden behind the mask edge. We trade a bit of
+    // overlap risk between adjacent speakers for guaranteed mouth visibility.
+    const radiusForCount = minAxis * 0.28;
 
     // Keep overlays windowed to the actual speaker turns. This is the
     // Sync.so-compliant behavior: target face + target audio + exact timeline
