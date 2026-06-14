@@ -2051,7 +2051,9 @@ serve(async (req) => {
       !hasPassPreclipForDispatch
         ? "bbox-url-pro"
         : "coords-pro";
-    const retryVariant: RetryVariant = isRetry
+    // v118 — mutable so the preclip-facegate bypass guard (~L2843) can
+    // re-route a failing preclip pass to `bbox-url-pro` on the full plate.
+    let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
 
