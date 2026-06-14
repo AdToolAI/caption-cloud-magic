@@ -507,7 +507,11 @@ serve(async (req) => {
           scene_id: sceneId, job_id: jobId, engine: "sync-segments", sync_status: "COMPLETED_NOOP_RETRY",
           error_class: "sync_completed_noop", meta: { pass_idx: currentPass, inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
         });
-        triggerV5Advance(supabaseUrl, serviceKey, sceneId, currentPass, totalPasses);
+        fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: "coords-pro", pass_idx: currentPass }),
+        }).catch(() => {});
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, retried: true, reason: "sync_completed_noop" });
       }
       if (freshDonePasses[currentPass]) {
