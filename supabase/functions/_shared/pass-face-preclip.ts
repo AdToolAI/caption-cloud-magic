@@ -145,6 +145,7 @@ export async function renderPassFacePreclip(
     masterVideoUrl,
     startSec,
     endSec,
+    outputSize: crop.outputSize,
     srcWidth: sW,
     srcHeight: sH,
     cropX: crop.x,
