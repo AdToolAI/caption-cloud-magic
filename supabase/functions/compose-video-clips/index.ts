@@ -648,7 +648,14 @@ serve(async (req) => {
       // negative prompt forbids talking/mouth-flap, but the positive prompt
       // must not over-constrain the mouth or Sync.so produces ventriloquist
       // motion.
-      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft and clearly visible.`;
+      //
+      // v112 — Append the official Sync.so AI-video hint verbatim
+      // (sync.so/docs/compatibility-and-tips/media-content-tips):
+      // *"the character should be speaking naturally"* — this produces the
+      // small idle mouth/jaw motion that sync-3 requires to drive
+      // lipsync on AI-generated plates. Without it, plates render with a
+      // statically closed mouth and sync-3 returns the input unchanged.
+      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft and clearly visible. Every visible character should be speaking naturally with subtle, natural idle mouth and jaw movements throughout the entire clip (no specific words, no exaggerated speech — just lightweight, lifelike mouth motion).`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
