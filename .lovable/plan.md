@@ -1,37 +1,54 @@
-# v120 — Lipsync Zombie-Fix + Pass-4 Root-Cause-Pfad
-
 ## Ziel
-1. **Kernfehler beheben**: Sarah's Pass 4 läuft auf `bbox-url-pro` reproduzierbar in `provider_unknown_error` → künftig nach 2 stillen Fails automatisch auf den funktionierenden Preclip-Pfad (Single-Face-Crop) zwingen, mit dem Pass 2/3 erfolgreich liefen.
-2. **Zombie-Symptom abschalten**: Stale `retrying`-Passes ohne aktiven Provider-Job dürfen das Szenen-Terminal nicht mehr blockieren; Watchdog erkennt auch `lip_sync_status='running'` bei `clip_status='ready'`.
+Die Lip-Sync-Pipeline wird wieder auf die aktuelle Sync.so-3-Dokumentation ausgerichtet und die aktuelle 95%-Hänge-Situation wird nicht weiter durch Heuristik-Retries kaschiert.
 
-## Änderungen
+## Befund
+- Die offizielle Sync.so-Doku sagt jetzt klar: `segments[].optionsOverride.active_speaker_detection` ist unterstützt.
+- Unser Code-Kommentar und Teile der Architektur basieren noch auf der alten Annahme, dass Active-Speaker-Detection nur top-level möglich ist.
+- Aktuelle Live-Szene `0207e3a4...` hängt bei v5-Fanout: Pass 1 ist nach `bbox-url-pro`/`coords-pro` wieder in `retrying`, während Pass 4 bereits dispatched ist. Dadurch ist die State-Machine weiterhin anfällig für Zombie-/Mischzustände.
+- Der Payload ist formal fast doc-strict (`model: sync-3`, `input`, `options.sync_mode`, `active_speaker_detection`; keine `temperature`/`occlusion_detection_enabled`), aber die Pipeline weicht strukturell von der aktuellen Doku ab, weil wir Multi-Speaker weiter über chained per-pass full/preclip calls statt über dokumentierte Segmente mit per-segment `optionsOverride` behandeln.
 
-### 1. `compose-dialog-segments/index.ts` — Pass-4-Pfad reparieren (Kernfix)
-- Vor jedem Sync.so-Dispatch pro Pass prüfen: Zähle in `syncso_dispatch_log` die letzten Fails desselben `(scene_id, speaker_index, retry_variant='bbox-url-pro')` mit `error_code IN ('provider_unknown_error', NULL)`.
-- Wenn `>=2`: erzwinge `retry_variant='preclip-single'` (Single-Face-Crop dieses Sprechers aus der Plate, gleicher Pfad wie Pass 2/3) und logge `v120_pass4_preclip_forced`.
-- Sarahs `bounding_boxes_url`-Box zusätzlich loggen (x,y,w,h relativ zum Plate-Frame) für spätere Diagnose, ohne sie zu verändern.
+## Plan
 
-### 2. `sync-so-webhook/index.ts` — Terminal-Logic härten
-- Im Fan-Out-Branch: ein `retrying`-Pass zählt nur dann als "blocking", wenn in `syncso_inflight_jobs` ein Eintrag mit `provider_job_id` und Alter `<10min` existiert. Sonst gilt der Pass als endgültig `failed`.
-- Wenn alle mandatorischen Passes terminal `failed` sind → Szene `clip_status='failed'`, `lip_sync_status='failed'`, `twoshot_stage='terminal_failed_v120'`, idempotenter Refund über deterministische UUID `(scene_id, 'v120_terminal')`.
+### 1. Sync.so-3 Payload-Builder korrigieren
+- In `compose-dialog-segments/index.ts` eine neue doc-current Dispatch-Route einführen:
+  - `model: "sync-3"`
+  - `input`: ein Video + mehrere Audio-Inputs mit eindeutigen `refId`s
+  - `segments`: je Sprecher-/Turn-Fenster mit `audioInput.refId`
+  - `segments[].optionsOverride.active_speaker_detection` pro Segment setzen
+  - `options.sync_mode` nur top-level setzen, ohne sync-3-unsupported Optionen
+- Segment-ASD bevorzugt mit `frame_number + coordinates`; `bounding_boxes_url` nur nutzen, wenn es exakt zur Dispatch-Video-Zeitbasis passt.
 
-### 3. `lipsync-watchdog/index.ts` + SQL-Watchdog
-- Bedingung erweitern: trigger auch wenn `lip_sync_status='running'` AND `last_lipsync_update < now()-interval '12 min'`, unabhängig von `clip_status`.
-- SQL-Watchdog `lipsync_watchdog_15min` analog erweitern (zusätzliche OR-Klausel, nicht ersetzen).
-- Bei Treffer: Szene als `terminal_failed_v120_watchdog` markieren + Refund.
+### 2. Alte falsche Annahme entfernen
+- Den Kommentar/Invariant entfernen oder korrigieren, der behauptet, Sync.so habe keine segmentweise ASD.
+- Die Retry-Ladder so ändern, dass sie nicht mehr von `bbox-url-pro → coords-pro → coords-pro-box` auf Full-Plate zombie-routet, wenn Sync.so bereits `provider_unknown_error` zurückgibt.
 
-### 4. Cleanup der aktuell hängenden Szene
-- Szene `ec4290f2-d555-4a3c-af44-9413e467fd2f` einmalig terminal `failed` + Refund, damit der User die Szene neu starten kann (frischer Versuch profitiert dann sofort von #1).
+### 3. Audio-Diagnostik auf tatsächliche Payload-Audio-Datei umstellen
+- `audioDiagnostics` aktuell vor dem Tight-Slicing auf Vollspur-WAVs basiert und dadurch Live-Logs irreführend 9s/Lead-In zeigen.
+- Nach dem Tight-Slicing eine zweite, payload-nahe Diagnose loggen:
+  - tatsächliche Payload-Audio-Dauer
+  - voiced seconds
+  - lead-in
+  - Audio-vs-Video-Window-Abgleich
+- Guards auf diese tatsächliche Payload-Audio-Datei stützen, nicht auf die alte Vollspur.
 
-## Akzeptanzkriterien
-- Keine Szene bleibt länger als 12 min in `lip_sync_status='running'` ohne aktiven Provider-Job.
-- Pass 4 für Sarah loopt nicht mehr in `provider_unknown_error`: nach max. 2 Fails Preclip-Pfad, der nachweislich funktioniert.
-- Refund läuft idempotent (keine doppelte Gutschrift bei mehrfachem Webhook).
+### 4. Zombie-State hart schließen
+- Wenn ein Pass `provider_unknown_error` zweimal mit doc-current Payload liefert, wird nicht mehr weiter zwischen Full-Plate/Preclip hin- und hergeschaltet.
+- Szene wird terminal `failed`, alle offenen/inflight Sync.so Jobs werden freigegeben, Credits werden idempotent erstattet.
+- Watchdog bleibt als letzte Sicherung, aber die State-Machine soll bereits im Webhook terminal entscheiden.
 
-## Out of Scope
-- Keine Änderung am Plate-Builder oder an der Box-Berechnung (Box-Validierung nur als Logging, nicht als Auto-Fix).
-- Keine Änderungen an Engine-Auswahl, Cinematic-Sync oder UI.
+### 5. Live-Szene bereinigen
+- Die aktuelle hängende Szene `0207e3a4...` nach dem Patch sauber terminal markieren/refunden oder zurücksetzen, damit ein neuer Render die korrigierte Route nutzt.
 
-## Technische Notizen
-- Betroffene Files: `supabase/functions/compose-dialog-segments/index.ts`, `supabase/functions/sync-so-webhook/index.ts`, `supabase/functions/lipsync-watchdog/index.ts`, neue Migration für SQL-Watchdog-Bedingung, `mem/architecture/lipsync/v120-zombie-failsafe-and-pass4-preclip-forcing.md`, `mem/index.md`.
-- Refund nutzt vorhandenes Pattern aus v118 (deterministische UUID, `credit_transactions` upsert).
+## Technische Details
+- Hauptdateien:
+  - `supabase/functions/compose-dialog-segments/index.ts`
+  - `supabase/functions/sync-so-webhook/index.ts`
+  - `supabase/functions/lipsync-watchdog/index.ts`
+  - neues Memory-Dokument zur Sync.so-3-doc-current-Pipeline
+- Keine UI-Änderung.
+- Keine Provider-/Key-Änderung.
+- Keine Migration geplant, außer beim Implementieren zeigt sich, dass ein Status-/Log-Feld strukturell fehlt.
+
+## Validierung
+- Edge-Function-Logs müssen zeigen, dass der ausgehende Payload der aktuellen Doku entspricht: `segments[].optionsOverride.active_speaker_detection` vorhanden, keine sync-3-unsupported Optionen.
+- Eine neue Testausführung darf nicht mehr bei 95% hängen bleiben; sie muss entweder abgeschlossen oder sauber terminal failed + refunded sein.
