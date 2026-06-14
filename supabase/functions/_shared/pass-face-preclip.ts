@@ -56,6 +56,16 @@ export interface PassPreclipInput {
   /** Render window for this speaker's turn(s) in scene seconds. */
   startSec: number;
   endSec: number;
+  /**
+   * v116 (Fix B — Face-Gate Self-Repair). Multiplier applied to the
+   * computed crop `size` AFTER computeFaceCrop. Used by the dispatcher
+   * to re-render a wider crop (more headroom/chinroom) when the prior
+   * preclip's face-gate returned `faces=0` (face was just outside the
+   * crop). 1.0 = no change (default). 1.4 / 1.8 are the dispatcher's
+   * standard repair steps. Crop is re-centered on `coords` and clamped
+   * to source bounds; never includes a neighbor's coordinate.
+   */
+  cropExpansionFactor?: number;
 }
 
 export interface PassPreclipResult {
@@ -105,6 +115,7 @@ export async function renderPassFacePreclip(
     siblingCoords,
     startSec,
     endSec,
+    cropExpansionFactor,
   } = input;
 
   if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
@@ -121,6 +132,31 @@ export async function renderPassFacePreclip(
   const sW = evenDimension(srcWidth, 1280);
   const sH = evenDimension(srcHeight, 720);
   const crop0 = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
+
+  // v116 (Fix B) — expand the crop on repair retries. We multiply `size`
+  // around the same center coords and re-clamp to source bounds. This is
+  // the cheapest way to give Sync.so + Gemini face-detect more margin
+  // when the original crop missed the face. We deliberately ignore the
+  // neighbor cap on expansion: when faces=0 in the first crop, including
+  // a sibling face is preferable to producing a useless empty crop —
+  // the downstream face-gate will still validate count===1.
+  const expandFactor = Number.isFinite(cropExpansionFactor) && (cropExpansionFactor as number) > 1
+    ? Math.min(2.5, Number(cropExpansionFactor))
+    : 1;
+  let expandedSize = crop0.size;
+  let expandedX = crop0.x;
+  let expandedY = crop0.y;
+  if (expandFactor > 1) {
+    const centerX = crop0.x + crop0.size / 2;
+    const centerY = crop0.y + crop0.size / 2;
+    const target = Math.min(Math.min(sW, sH), Math.round(crop0.size * expandFactor));
+    expandedSize = target % 2 === 0 ? target : target - 1;
+    expandedX = Math.max(0, Math.min(sW - expandedSize, Math.round(centerX - expandedSize / 2)));
+    expandedY = Math.max(0, Math.min(sH - expandedSize, Math.round(centerY - expandedSize / 2)));
+    expandedX = expandedX % 2 === 0 ? expandedX : Math.max(0, expandedX - 1);
+    expandedY = expandedY % 2 === 0 ? expandedY : Math.max(0, expandedY - 1);
+  }
+
   // v112 — Sync.so docs explicitly require ≥480p for reliable face detection
   // (sync.so/docs/compatibility-and-tips/improving-lip-sync-quality:
   // "Use at least 480p resolution for reliable face detection. […]
@@ -131,9 +167,9 @@ export async function renderPassFacePreclip(
   // (safety margin above 480p) and caps at 1280p so cost/latency stay
   // bounded. Lanczos upscale lives in the Remotion DialogTurnFaceCropVideo
   // composition via width/height inputProps below.
-  const nativeOut = Math.min(1280, Math.max(720, crop0.size));
+  const nativeOut = Math.min(1280, Math.max(720, expandedSize));
   const evenNative = nativeOut % 2 === 0 ? nativeOut : nativeOut - 1;
-  const crop = { ...crop0, outputSize: evenNative };
+  const crop = { x: expandedX, y: expandedY, size: expandedSize, outputSize: evenNative };
   const outW = crop.outputSize;
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));

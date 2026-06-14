@@ -1048,6 +1048,112 @@ serve(async (req) => {
       );
     }
 
+    // ── v116 (Fix C) — Plate-Quality Gate for N≥3 ────────────────────────
+    // For 3+ speaker scenes, if plate-side face detection couldn't resolve
+    // identity for every speaker (faces missing or fewer detected faces
+    // than speakers), the anchor-rescale fallback drifts hard enough to
+    // routinely land Sync.so coords on the WRONG face → provider_unknown
+    // / wrong-mouth-moves. Per Sync.so docs (improving-lip-sync-quality):
+    // "All speakers must be clearly visible." Burning credits on an
+    // un-resolvable plate is wasted money — block early, refund, and
+    // force the user to re-render the scene clip.
+    //
+    // Gate fires only on the FIRST dispatch attempt (not advance/retry) so
+    // re-tries that webhook chains in carry forward.
+    const PLATE_GATE_DISABLED = (Deno.env.get("FORCE_SKIP_PLATE_GATE") ?? "").toLowerCase() === "true";
+    if (
+      !PLATE_GATE_DISABLED &&
+      !isAdvance &&
+      !isRetry &&
+      !isV41Retry &&
+      speakers.length >= 3 &&
+      plateDims
+    ) {
+      const detectedFaces = plateIdentityMap?.faces?.length ?? 0;
+      const resolvedFaces = plateIdentityMap?.resolvedCount ?? 0;
+      const gateFails =
+        !plateIdentityMap ||
+        detectedFaces < speakers.length ||
+        resolvedFaces < speakers.length;
+      if (gateFails) {
+        const reason = !plateIdentityMap
+          ? "plate_identity_unavailable"
+          : detectedFaces < speakers.length
+            ? `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`
+            : `plate_identity_unresolved(resolved=${resolvedFaces}/${speakers.length})`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate_BLOCK ${reason} — refunding ${totalCost} credits and forcing plate re-render`,
+        );
+        // Refund the wallet debit (line ~824 already deducted totalCost).
+        try {
+          const { data: w } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(w?.balance ?? 0) + Number(totalCost ?? 0),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        } catch (refundErr) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate refund failed: ${(refundErr as Error)?.message}`,
+          );
+        }
+        // Reset clip so the user / Composer re-renders the plate.
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: 0,
+              refunded: true,
+              error: `v116_plate_quality_gate:${reason}`,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_status: "pending",
+            clip_url: null,
+            lip_sync_source_clip_url: null,
+            clip_error: `Plate-Quality-Gate (v116): Auf dem aktuellen Scene-Clip wurden nicht alle ${speakers.length} Charaktere als eindeutige Gesichter erkannt (erkannt: ${detectedFaces}, zuordenbar: ${resolvedFaces}). Sync.so würde mit hoher Wahrscheinlichkeit das falsche Gesicht animieren. Bitte die Szene neu rendern (alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe). Credits wurden zurückerstattet.`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "PREFLIGHT_BLOCKED",
+            error_class: "v116_plate_quality_gate",
+            error_message: reason,
+            meta: {
+              speakers: speakers.length,
+              detected_faces: detectedFaces,
+              resolved_faces: resolvedFaces,
+              plate_url: sourceClipUrl,
+              plate_dims: plateDims,
+              refunded_credits: totalCost,
+            },
+          });
+        } catch (_) { /* best-effort */ }
+        return json(
+          {
+            error: "v116_plate_quality_gate",
+            message: `Plate enthält ${detectedFaces} Gesichter, erwartet ${speakers.length}. Bitte Szene neu rendern.`,
+            detected_faces: detectedFaces,
+            resolved_faces: resolvedFaces,
+            expected: speakers.length,
+            refunded: totalCost,
+          },
+          422,
+        );
+      }
+    }
+
+
     // Final safety fallback: evenly spaced along the horizontal midline so
     // 3+ speakers never collide on the same x.
     for (let i = 0; i < speakerCoords.length; i++) {
@@ -2489,43 +2595,65 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} siblings=${siblingCoordsForPass.length} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
       );
-      const preclip = await renderPassFacePreclip(
-        supabase,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-        Deno.env.get("SUPABASE_URL") ?? "",
-        {
-          sceneId,
-          projectId: (scene as any).project_id,
-          userId,
-          passIdx: currentPassIdx,
-          masterVideoUrl: sourceClipUrl,
-          srcWidth: plateDims!.width,
-          srcHeight: plateDims!.height,
-          coords: pass.coords as [number, number],
-          bbox: bboxForCrop,
-          siblingCoords: siblingCoordsForPass,
-          startSec: winStartSec,
-          endSec: winEndSec,
-        },
-        90_000,
-      );
-      if (preclip.ok && preclip.preclipUrl && preclip.crop) {
-        const preclipDims = await probeMp4Dims(preclip.preclipUrl).catch(() => null);
-        const minPreclipAxis = Math.min(Number(preclipDims?.width ?? 0), Number(preclipDims?.height ?? 0));
-        (pass as any).preclip_dims = preclipDims ?? null;
-        if (!preclipDims || minPreclipAxis < 720) {
-          (pass as any).preclip_error = `preclip_resolution_too_small:${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"}`;
-          console.error(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v113_preclip_resolution_BLOCK actual=${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"} expected>=720 url=${preclip.preclipUrl.slice(0, 100)}`,
+
+      // v116 (Fix B) — Face-Gate Self-Repair: render preclip; if the
+      // face-gate finds 0 faces (coords/bbox missed the actual face on
+      // the moving plate), re-render with an expanded crop (×1.4, then
+      // ×1.8) and re-validate. This rescues the multi-speaker failure
+      // mode where Sarah / late-pass speakers came back with faces=0
+      // and the chain hard-failed. We DO NOT retry on faces>1 (that's
+      // a real "two heads in crop" condition — bigger crop would only
+      // make it worse). Total worst-case = 3 Lambda renders / ~3 min.
+      const EXPANSION_LADDER = [1.0, 1.4, 1.8];
+      let preclip: Awaited<ReturnType<typeof renderPassFacePreclip>> | null = null;
+      let preclipDims: Awaited<ReturnType<typeof probeMp4Dims>> | null = null;
+      let preclipFaceOk = true;
+      let preclipFaceCount: number | null = null;
+      let repairAttempts = 0;
+      let resolutionBlocked = false;
+
+      for (let attempt = 0; attempt < EXPANSION_LADDER.length; attempt++) {
+        const factor = EXPANSION_LADDER[attempt];
+        if (attempt > 0) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v116_face_gate_repair attempt=${attempt + 1}/${EXPANSION_LADDER.length} factor=${factor.toFixed(2)} (prev faces=${preclipFaceCount})`,
           );
-        } else {
-        // v77 — Validate the preclip actually shows EXACTLY one face before
-        // shipping to Sync.so. If the crop is empty (wrong coords) or
-        // contains two heads (sibling cap failed), Sync.so would happily
-        // animate the wrong region, producing the "Lip-Sync hit no avatar"
-        // failure mode the user reported.
-        let preclipFaceOk = true;
-        let preclipFaceCount: number | null = null;
+          repairAttempts = attempt;
+        }
+        preclip = await renderPassFacePreclip(
+          supabase,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+          Deno.env.get("SUPABASE_URL") ?? "",
+          {
+            sceneId,
+            projectId: (scene as any).project_id,
+            userId,
+            passIdx: currentPassIdx,
+            masterVideoUrl: sourceClipUrl,
+            srcWidth: plateDims!.width,
+            srcHeight: plateDims!.height,
+            coords: pass.coords as [number, number],
+            bbox: bboxForCrop,
+            siblingCoords: siblingCoordsForPass,
+            startSec: winStartSec,
+            endSec: winEndSec,
+            cropExpansionFactor: factor,
+          },
+          90_000,
+        );
+        if (!preclip.ok || !preclip.preclipUrl || !preclip.crop) {
+          // Render-level failure — no point expanding the crop; abort the loop.
+          break;
+        }
+        preclipDims = await probeMp4Dims(preclip.preclipUrl).catch(() => null);
+        const minPreclipAxis = Math.min(Number(preclipDims?.width ?? 0), Number(preclipDims?.height ?? 0));
+        if (!preclipDims || minPreclipAxis < 720) {
+          resolutionBlocked = true;
+          break;
+        }
+        // Face-gate (v77): require exactly 1 face for multi-speaker.
+        preclipFaceOk = true;
+        preclipFaceCount = null;
         if (speakers.length >= 2) {
           try {
             const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
@@ -2546,6 +2674,21 @@ serve(async (req) => {
             );
           }
         }
+        if (preclipFaceOk) break;
+        // Only retry-with-expansion when face was missed entirely (count 0).
+        // count>1 → bigger crop won't help, drop straight through.
+        if (preclipFaceCount !== 0) break;
+      }
+
+      if (resolutionBlocked) {
+        (pass as any).preclip_dims = preclipDims ?? null;
+        (pass as any).preclip_error = `preclip_resolution_too_small:${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"}`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v113_preclip_resolution_BLOCK actual=${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"} expected>=720`,
+        );
+      } else if (preclip && preclip.ok && preclip.preclipUrl && preclip.crop) {
+        (pass as any).preclip_dims = preclipDims ?? null;
+        (pass as any).preclip_repair_attempts = repairAttempts;
         if (preclipFaceOk) {
           (pass as any).preclip_url = preclip.preclipUrl;
           (pass as any).preclip_render_id = preclip.preclipRenderId ?? null;
@@ -2555,28 +2698,25 @@ serve(async (req) => {
             size: preclip.crop.size,
             outputSize: preclip.crop.outputSize,
           };
-          // v102 Step A — persist preclip duration (see batch path above).
           (pass as any).preclip_duration_sec = typeof preclip.durationSec === "number"
             ? preclip.durationSec
             : null;
           (pass as any).preclip_error = null;
           (pass as any).preclip_face_count = preclipFaceCount;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_ready faces=${preclipFaceCount ?? "skip"} url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_ready faces=${preclipFaceCount ?? "skip"} repair_attempts=${repairAttempts} url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
           );
         } else {
-          (pass as any).preclip_error = `face_gate_failed:count=${preclipFaceCount}`;
+          (pass as any).preclip_error = `face_gate_failed:count=${preclipFaceCount} (after ${repairAttempts} v116 repair attempts)`;
           (pass as any).preclip_face_count = preclipFaceCount;
           console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_face_gate_BLOCK faces=${preclipFaceCount} — falling back to full-plate dispatch with plate coords`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v116_preclip_face_gate_BLOCK faces=${preclipFaceCount} repair_attempts=${repairAttempts} — full-plate fallback`,
           );
         }
-        }
-
       } else {
-        (pass as any).preclip_error = preclip.error ?? "unknown";
+        (pass as any).preclip_error = (preclip?.error ?? "unknown");
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified_failed ${preclip.errorClass ?? "?"}: ${preclip.error ?? "?"} — falling back to full-plate dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified_failed ${preclip?.errorClass ?? "?"}: ${preclip?.error ?? "?"} — falling back to full-plate dispatch`,
         );
       }
     }
@@ -3331,6 +3471,27 @@ serve(async (req) => {
           peak_dbfs: Number.isFinite(finalPeakDbFs) ? finalPeakDbFs : null,
           voiced_sec: Number.isFinite(finalVoicedSec) ? finalVoicedSec : 0,
           longest_voiced_run: Number.isFinite(finalLongestRun) ? finalLongestRun : 0,
+        },
+        // v116 (Fix D) — per-pass identity/preclip diagnostics so a future
+        // failure can be debugged in <5 min from syncso_dispatch_log alone.
+        v116_diag: {
+          asd_mode: usePassPreclip
+            ? "preclip_auto_detect"
+            : (syncOptions.active_speaker_detection?.bounding_boxes_url
+              ? "bbox_url"
+              : syncOptions.active_speaker_detection?.bounding_boxes
+                ? "bbox_inline"
+                : syncOptions.active_speaker_detection?.coordinates
+                  ? "coords_point"
+                  : "auto_detect"),
+          coords_sent: syncOptions.active_speaker_detection?.coordinates ?? null,
+          preclip_face_count: (pass as any).preclip_face_count ?? null,
+          preclip_crop: (pass as any).preclip_crop ?? null,
+          preclip_repair_attempts: (pass as any).preclip_repair_attempts ?? 0,
+          coord_source: coordSources[Number(pass.speaker_idx ?? -1)] ?? "unknown",
+          plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
+          plate_identity_total: plateIdentityMap?.faces?.length ?? 0,
+          plate_dims: plateDims ?? null,
         },
         video_probe: videoProbe,
         audio_diagnostics: audioDiagnostics.find((d) => d.pass === pass.idx) ?? null,
