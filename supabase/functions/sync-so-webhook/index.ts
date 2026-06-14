@@ -1049,6 +1049,10 @@ serve(async (req) => {
       // dead-ended. Don't count it as `alive`, otherwise the scene hangs
       // forever in lip_sync_status='running' because aliveSiblings>0 blocks
       // the refund+failure path.
+      // v120 — Also discount passes that are `retrying` but have no live
+      // provider job (no `job_id` or job_id matches our just-failed pass).
+      // Without this, a sibling that webhook-set to `retrying` but never
+      // got re-dispatched (silent invoke loss) blocks the scene forever.
       const aliveSiblings = freshFailPasses
         .map((p: any, i: number) => ({ p, i }))
         .filter(({ p, i }) => {
@@ -1057,6 +1061,12 @@ serve(async (req) => {
           if (!["rendering", "retrying", "pending"].includes(st)) return false;
           const rc = Number(p?.retry_count ?? 0);
           if (st === "retrying" && rc >= MAX_V5_RETRIES) return false;
+          // v120: stale retrying with no fresh job_id → treat as dead.
+          if (st === "retrying") {
+            const lastStarted = typeof p?.started_at === "string" ? Date.parse(p.started_at) : NaN;
+            const stale = Number.isFinite(lastStarted) && (Date.now() - lastStarted) > 8 * 60_000;
+            if (stale) return false;
+          }
           return true;
         });
       const doneSiblings = freshFailPasses.filter((p: any, i: number) => i !== currentPass && p?.status === "done").length;
