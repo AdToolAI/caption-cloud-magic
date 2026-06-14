@@ -2004,6 +2004,96 @@ serve(async (req) => {
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
 
+    // ── v118 — Pass-level Sync.so circuit breaker ────────────────────────
+    // Stop the silent dispatch→FAILED→dispatch loop that previously ran
+    // until the user manually reset the scene. Cap each (scene, pass) at
+    // 5 FAILED Sync.so dispatches; after that refund credits idempotently,
+    // mark the scene `failed`, and bail. The Composer UI surfaces
+    // `clip_error` automatically and the user can hit "Sauber neu starten".
+    try {
+      const PASS_FAIL_CAP = 5;
+      const { count: passFailCount } = await supabase
+        .from("syncso_dispatch_log")
+        .select("id", { count: "exact", head: true })
+        .eq("scene_id", sceneId)
+        .eq("sync_status", "FAILED")
+        .filter("meta->>pass_idx", "eq", String(currentPassIdx));
+      if ((passFailCount ?? 0) >= PASS_FAIL_CAP) {
+        const reason = `lipsync_exhausted_pass_${currentPassIdx + 1}_speaker_${pass.speaker_name ?? "?"}_after_${passFailCount}_failures`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v118_circuit_breaker pass=${currentPassIdx + 1} fails=${passFailCount} — refunding ${totalCost} and marking scene failed`,
+        );
+        const alreadyRefundedCB = !!(existing as any)?.refunded;
+        if (!alreadyRefundedCB) {
+          try {
+            const { data: wCB } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wCB?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (refundErr) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v118_circuit_breaker refund failed: ${(refundErr as Error)?.message}`,
+            );
+          }
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: 0,
+              refunded: true,
+              error: `v118_circuit_breaker:${reason}`,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_status: "failed",
+            clip_error: `Lip-Sync abgebrochen: Sync.so hat für Sprecher „${pass.speaker_name ?? `Pass ${currentPassIdx + 1}`}" ${passFailCount}× hintereinander mit „provider_unknown_error" abgebrochen. Credits wurden zurückerstattet. Bitte drücke „Sauber neu starten" oder render die Plate neu, falls das Gesicht nicht klar erkennbar ist.`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "CIRCUIT_BREAKER_OPEN",
+            error_class: "v118_pass_circuit_breaker",
+            error_message: reason,
+            meta: {
+              pass_idx: currentPassIdx,
+              total_passes: passes.length,
+              speaker: pass.speaker_name,
+              failures_observed: passFailCount,
+              cap: PASS_FAIL_CAP,
+              refunded_credits: alreadyRefundedCB ? 0 : totalCost,
+            },
+          });
+        } catch (_) { /* best-effort */ }
+        return json(
+          {
+            error: "v118_pass_circuit_breaker",
+            reason,
+            refunded: alreadyRefundedCB ? 0 : totalCost,
+          },
+          422,
+        );
+      }
+    } catch (cbErr) {
+      // Circuit-breaker failure must NEVER block dispatch — just log.
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v118_circuit_breaker probe failed: ${(cbErr as Error)?.message}`,
+      );
+    }
+
+
     // ── v40 — Canonical audio restore (FIX for v39 retry bug) ────────────
     // v39 bug: the first dispatch overwrote `pass.audio_url` with the
     // sliced "tight" WAV (turn-only, ~3.27s). On retry the cloned pass
@@ -2051,7 +2141,9 @@ serve(async (req) => {
       !hasPassPreclipForDispatch
         ? "bbox-url-pro"
         : "coords-pro";
-    const retryVariant: RetryVariant = isRetry
+    // v118 — mutable so the preclip-facegate bypass guard (~L2843) can
+    // re-route a failing preclip pass to `bbox-url-pro` on the full plate.
+    let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
 
@@ -2730,7 +2822,9 @@ serve(async (req) => {
     // When preclip is available, swap the Sync.so video input + force
     // auto_detect (the cropped 512x512 frame has exactly ONE face).
     const passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
-    const usePassPreclip = !!passPreclipUrl;
+    // v118 — mutable; the face-gate bypass below can disable the preclip
+    // dispatch path when the cropped frame validated 0 or >1 faces.
+    let usePassPreclip = !!passPreclipUrl;
 
     // ── v107 — Hard-fail Multi-Speaker without preclip ───────────────────
     // For N>=2 we forbid full-plate dispatch unless the pass is explicitly
@@ -2836,6 +2930,42 @@ serve(async (req) => {
       // pass of multi-speaker scenes (DB-verified for scene 720fd0b1…).
       temperature: 0.5,
     };
+    // ── v118 — Preclip face-gate bypass ─────────────────────────────────
+    // v115 routes the preclip path to `auto_detect: true` only when the
+    // face-gate confirmed exactly 1 face in the cropped frame. The legacy
+    // fallback for face_count !== 1 was a hard-coded ASD center pointer
+    // (`coordinates: [outSize/2, outSize/2]` = [360,360] on a 720 preclip).
+    // DB-verified (scene 4fb6b816…, pass 2 Kailee, June 14 2026): that
+    // center pointer hits empty pixels and Sync.so loops
+    // `provider_unknown_error` forever. Route every face_count != 1 pass
+    // back to the full-plate `bbox-url-pro` path, which has the real
+    // per-frame face box from `faceMap` and works deterministically on
+    // multi-face plates.
+    if (usePassPreclip) {
+      const v118FaceCount = Number((pass as any).preclip_face_count ?? 0);
+      if (v118FaceCount !== 1) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v118_preclip_facegate_bypass face_count=${v118FaceCount} speaker=${pass.speaker_name} — routing to full-plate bbox-url-pro`,
+        );
+        usePassPreclip = false;
+        (pass as any).preclip_url = null;
+        if (retryVariant !== "bbox-url-pro" && retryVariant !== "coords-pro-box") {
+          retryVariant = "bbox-url-pro";
+          pass.retry_variant = retryVariant;
+        }
+      } else if (retryVariant !== "coords-pro" && retryVariant !== "sync3-coords" && retryVariant !== "coords-pro-lp2pro") {
+        // v118 — preclip is only safe with auto_detect or coords-pro on the
+        // crop. If the webhook escalated to a bbox/auto-standard variant,
+        // drop the preclip so the full-plate variant path runs.
+        if (retryVariant === "auto-pro" || retryVariant === "auto-standard" || retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box") {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v118_preclip_dropped_for_variant variant=${retryVariant} — routing to full-plate`,
+          );
+          usePassPreclip = false;
+          (pass as any).preclip_url = null;
+        }
+      }
+    }
     // Occlusion detection is only meaningful on multi-face / hand-over-mouth
     // plates. For the 512×512 single-face preclip path we leave it OFF — it
     // slows sync-3 measurably and adds no quality on a clean head-and-shoulders
