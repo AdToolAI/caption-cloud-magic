@@ -1,76 +1,106 @@
 
-# v117 — Plate-Quality-Gate Soft-Fail + Identity-Resolver Repair
+# v118 — Sync.so Preclip Silent-Loop Fix
 
-## Was du gesehen hast
-Toast: `Lip-Sync fehlgeschlagen — v116_plate_quality_gate`.
+## Was wirklich passiert (4-Personen-Szene `4fb6b816…`)
+Die UI zeigt seit ~10 min „Lip-Sync läuft 95%" — sie läuft NICHT, sie hängt in einer stillen Endlosschleife.
 
-Die Plate ist objektiv in Ordnung (4 Personen frontal sichtbar, 1376×768). DB-Log zeigt:
-
+DB-Beweis (`syncso_dispatch_log`, Pass 2 / Kailee, letzte 3 Versuche):
 ```
-detected_faces = 4   ← Face-Detector hat alle 4 Köpfe gefunden ✅
-resolved_faces = 0   ← Gemini Vision konnte 0 davon einem Charakter zuordnen ❌
-→ v116-Gate blockt, refundet 324 Credits, zwingt Plate-Re-Render
+retry_variant    | active_speaker_detection                                           | result
+coords-pro       | {auto_detect:false, coordinates:[360,360], frame_number:0}        | FAILED provider_unknown_error
+coords-pro       | {auto_detect:false, coordinates:[360,360], frame_number:0}        | FAILED provider_unknown_error
+coords-pro-box   | {auto_detect:false, coordinates:[360,360], frame_number:0}        | FAILED provider_unknown_error
 ```
 
-Die Plate ist also nicht das Problem — der **Identity-Resolver** versagt. Der v116-Gate ist zu strikt: er verweigert Dispatch, obwohl alle 4 Gesichter da sind.
+Jeder Pass schickt **identische** Payload an Sync.so → identischer Fehler → Endlosretry.
 
-## Root Cause (in `_shared/plate-face-identity.ts`)
-1. **Verwirrender Gemini-Prompt**: Text sagt *„FIRST attachment is a video; look at frame at timestamp X.XXs"* — wir schicken aber einen **einzelnen Still-Frame** (kein Video). Gemini fragt sich, wo das Video ist, antwortet leer/unzuverlässig → JSON-Parse failed → `out` bleibt leer → `resolvedCount=0`.
-2. **Threshold 0.45 zu strikt** für ähnlich aussehende Hailuo-Plates (gleiche Beleuchtung, gleiche Wardrobe-Family).
-3. **Kein Fallback** wenn Gemini 0 zurückgibt — wir haben aber eine extrem robuste Heuristik im Skript: Sprecher-Reihenfolge im Drehbuch ≈ left-to-right Slot-Order in der Plate.
-4. **Gate ist binär** — blockt auch wenn `detectedFaces == speakers.length` (Plate ist real OK).
+## Root Cause (compose-dialog-segments/index.ts, Zeilen 2846–2891)
+Die v115-Preclip-Branch läuft VOR der `retry_variant`-elseif-Kette (Zeile 2929 ff.). Wenn `usePassPreclip === true`:
 
-## Fixes (alle innerhalb v116-Architektur, kein Provider-/Schema-Wechsel)
+1. **`passFaceCount === 1`** (Preclip-Face-Gate hat genau 1 Gesicht bestätigt) → `auto_detect: true` ✅
+2. **`passFaceCount !== 1`** (0 oder >1 Gesichter) → Hardcoded Fallback:
+   ```ts
+   coordinates: [outSize/2, outSize/2]  // [360, 360] auf 720er Preclip
+   ```
+   Sync.so akzeptiert (HTTP 201), pollt das Video, findet kein Gesicht am Center-Point → `provider_unknown_error`. Der `retry_variant` Wert wird in dieser Branch **ignoriert**, weil das if/elseif ab 2929 nie erreicht wird.
 
-### Fix A — Gemini-Identity-Prompt reparieren
-`supabase/functions/_shared/plate-face-identity.ts`:
-- Prompt umschreiben: *„The first image is a single frame from a scene. The remaining images are reference portraits."* (kein „video"/„timestamp" mehr).
-- `slotDescriptions` mit echten Pixel-Boxen statt der kaputten Normalisierung (`/Math.max(1, center*2)` ergibt fast immer Nonsense).
-- Confidence-Threshold von **0.45 → 0.30**. Bei N=4 will man im Zweifel die wahrscheinlichste Zuordnung, nicht „null". Sync.so sync-3 verzeiht 10–15px Drift.
-- Bei N≥3 zusätzlich Gemini 2.5 **Pro** statt Flash (besser bei Multi-Face Identity, ~€0.005 statt €0.001 pro Szene — vernachlässigbar).
-- Bessere JSON-Extraktion (Greedy-Brace-Match + Fallback bei `assignments: []`).
+Zusätzlich: **kein Circuit-Breaker** auf Pass-Ebene. `total_passes=4`, jeder Pass darf unbegrenzt retryen. Webhook re-invokes dispatcher, dispatcher schickt erneut identische Payload, Schleife läuft bis User abbricht. Kein Refund, kein `clip_status='failed'`.
 
-### Fix B — Deterministischer Slot-Order Fallback
-In `resolvePlateFaceIdentities`: wenn Gemini `identityBySlot.size === 0` **und** `plateMap.faces.length === characters.length`:
-- Sortiere `characters` nach Sprech-Reihenfolge im Skript (kommt schon sortiert rein) → mappe 1:1 auf left-to-right Slots (`f.slot` ist bereits left-to-right sortiert).
-- Markiere mit `matchConfidence: 0.4` und `slot_order_fallback: true` im Diagnostics-Log.
-- Damit wird `resolvedCount = N` und Dispatch läuft mit korrekten Plate-Pixel-Coords (statt Anker-Rescale-Drift).
+## Fix-Plan (alles innerhalb v60 serial-chain, sync-3, ohne Schema-Wechsel)
 
-### Fix C — Gate von „hard block" auf „soft warn" umstellen
-`compose-dialog-segments/index.ts` Zeile 1051–1150:
-- Nur blocken wenn **`detectedFaces < speakers.length`** (echte fehlende Person, Sora-Out-of-Frame-Bug). Das ist der reale „Plate ist kaputt"-Fall.
-- Wenn `detectedFaces >= speakers.length` aber `resolvedFaces < speakers.length` (nach Fix B unwahrscheinlich) → **kein Block**, sondern Warnung in `v116_diag` + dispatch mit Slot-Order-Fallback aus Fix B.
-- Gate-Reason und Fehlermeldung im Toast / `clip_error` so umschreiben, dass „4 erkannt, 0 zuordenbar" nicht mehr abbricht.
+### Fix A — Preclip-Branch nur bei verifiziertem Single-Face nehmen
+`compose-dialog-segments/index.ts` ~2846:
+- Wenn `usePassPreclip && passFaceCount === 1` → wie bisher: `auto_detect: true` ✅
+- Wenn `usePassPreclip && passFaceCount !== 1` → **NICHT** mehr Center-Fallback. Stattdessen `usePassPreclip = false` für diesen Pass setzen und in die **Full-Plate `bbox-url-pro` Branch** fallen (Zeilen 2941+). Die nutzt echte Plate-Pixel-Box aus `faceMap` per `bounding_boxes_url` — Sync.so kann darauf zuverlässig das Gesicht finden.
+- Plate-URL ist bereits in Scope (`videoUrl` ≠ `preclipUrl`), kein zusätzlicher Render nötig.
+- Diagnose-Log: `asd_mode='preclip_facegate_failed_routed_to_bbox_url_pro'` + `preclip_face_count`.
 
-### Fix D — Manueller Override-Button (Notausgang)
-In `useResetLipSync` + `reset-lipsync-scene` (oder neuer Param am Composer-UI):
-- Neuer Button „Trotzdem dispatchen (Plate ignorieren)" der `FORCE_SKIP_PLATE_GATE=true` per Request-Header (`x-skip-plate-gate`) für genau diesen einen Run setzt.
-- Pure Client→Edge-Function Param, kein Env-Toggle nötig.
-- Sicher: gilt nur für die nächste Dispatch-Attempt, keine permanente Deaktivierung.
+### Fix B — `retry_variant` muss im Preclip-Pfad wirken
+Wenn der Webhook nach einem ersten Preclip-Fail einen `retry_variant` (z.B. `coords-pro-lp2pro`, `auto-pro`) setzt:
+- Im `usePassPreclip`-Zweig **vorher prüfen**: `if (retryVariant && retryVariant !== "preclip-default") { usePassPreclip = false; /* fall through to retry-variant chain */ }`.
+- Damit eskaliert die Ladder (v84) auch bei Preclip-Szenen wie dokumentiert (`bbox-url-pro` → `coords-pro` → `coords-pro-box` → `coords-pro-lp2pro` → `auto-pro` → `auto-standard`).
+
+### Fix C — Pass-Level Circuit-Breaker (Endlosschleife stoppen)
+Neuer harter Cap pro `(scene_id, pass_idx)`: **max. 5 FAILED-Dispatches** in `syncso_dispatch_log`. Implementierung in `compose-dialog-segments/index.ts` direkt nach dem Lock-Acquire:
+
+```ts
+const { count: passFailCount } = await supabase
+  .from("syncso_dispatch_log")
+  .select("id", { count: "exact", head: true })
+  .eq("scene_id", sceneId)
+  .eq("meta->>pass_idx", String(currentPassIdx + 1))
+  .eq("sync_status", "FAILED");
+
+if ((passFailCount ?? 0) >= 5) {
+  await refundOnceForScene(sceneId, userId, totalCost, "v118_pass_circuit_breaker");
+  await supabase.from("composer_scenes").update({
+    clip_status: "failed",
+    clip_error: `lipsync_exhausted_pass_${currentPassIdx + 1}_speaker_${pass.speaker_name}`,
+  }).eq("id", sceneId);
+  await logDispatch({ sync_status: "CIRCUIT_BREAKER_OPEN", error_class: "v118_pass_circuit_breaker", ... });
+  releaseLock();
+  return json({ error: "v118_pass_circuit_breaker", refunded: totalCost }, 422);
+}
+```
+
+Refund ist idempotent (existierende `refundOnceForScene` Helper). Gilt **vor** jedem neuen Sync.so-Call → keine weiteren Kosten.
+
+### Fix D — Globaler Szene-Watchdog (Belt & Braces)
+Neue `pg_cron` Job alle 2 min (oder vorhandenen `qa-watchdog` erweitern):
+```sql
+UPDATE composer_scenes
+SET clip_status='failed', clip_error='watchdog_lipsync_stuck_15min'
+WHERE dialog_mode=true
+  AND clip_status IN ('processing','dispatching')
+  AND updated_at < NOW() - INTERVAL '15 minutes';
+```
++ einmaliger Refund-Trigger via vorhandenem `refund-stuck-lipsync-scenes` Edge-Hook (falls existiert; sonst inline). Damit kann eine festhängende Szene niemals länger als 15 min stehen.
+
+### Fix E — UI surface
+`useTwoShotAutoTrigger` / Lipsync-Tab zeigt schon `clip_error` an. Mit Fix C/D wird `clip_status='failed'` gesetzt → bestehende Toast/Banner-Logik triggert automatisch. Zusätzlich Reset-Button (`useResetLipSync`) bleibt verfügbar.
 
 ## Was NICHT geändert wird
-- Sync.so-Dispatch-Chain (v60 serial + sync-3 + auto_detect bei N=1 + bbox-url-pro bei N≥2) bleibt 1:1.
-- v82 bbox-url-pro Ladder, v115 single-face auto_detect, Pricing, Refunds, Locks, Webhook — unverändert.
-- v116 Fix A (Live-Identity-Verify) und Fix B (Face-Gate Self-Repair) bleiben — sie kommen erst NACH Fix C zum Tragen.
+- v60 serial chain, sync-3 model, v115 single-face `auto_detect:true`, v82 `bbox-url-pro` Ladder, v106 doc-strict options, v116/v117 Plate-Quality-Gate.
+- Sync.so Optionen-Format, Webhook-Chain, Pricing, Refund-Helper.
 
 ## Erwartetes Ergebnis
-- Szene `b4ad868b…` / `7470be0d…` neu dispatchen → Gemini matcht jetzt 4/4 (Fix A) oder Slot-Order-Fallback greift (Fix B) → `resolvedCount=4` → Gate winkt durch → Sync.so läuft mit korrekten Plate-Pixel-Boxen statt Anker-Drift.
-- Falls Gemini *wirklich* mal 0 trifft und Plate echt korrupt ist (Person out of frame): Gate blockt weiterhin, aber mit präziser Message und refundet sauber.
-- N=1/2/3 Regression bleibt grün (kein Pfadwechsel bei diesen Counts).
+1. Szene `4fb6b816…` resetten → Pass 2 (Kailee) führt nicht mehr in Center-Fallback. Stattdessen `bbox-url-pro` auf der Original-Plate mit echten Kailee-Koordinaten aus `faceMap` → Sync.so liefert sauberen Lipsync.
+2. Falls Sync.so trotzdem 5× failt → Circuit-Breaker → Refund + sichtbarer Fehler im UI nach ~75 s statt 10+ min.
+3. Watchdog garantiert: keine Szene bleibt jemals > 15 min in `processing`.
 
 ## Verifizierung
-1. `psql` resetten (`reset-lipsync-scene`) und neu dispatchen → `syncso_dispatch_log` zeigt `resolved_faces=4`, kein PREFLIGHT_BLOCKED.
-2. Künstlich Plate mit nur 3 sichtbaren Personen testen → Gate blockt mit `plate_faces_missing(detected=3, expected=4)` (real-positive).
-3. Override-Button drücken → Dispatch läuft trotz Gate-Warn.
+1. Scene reset, Edge-Logs zeigen `asd_mode=preclip_facegate_failed_routed_to_bbox_url_pro` für Kailee.
+2. `syncso_dispatch_log` neue Zeile mit `bbox-url-pro`, Payload enthält `bounding_boxes_url`, ASD-Coords sind nicht mehr `[360,360]`.
+3. Künstlicher 5-Fail-Test → `clip_status='failed'`, Wallet-Balance zurück.
+4. 1-/2-/3-Sprecher Regression unverändert (Preclip-Pfad bleibt für `passFaceCount === 1`).
 
 ## Betroffene Dateien
-- `supabase/functions/_shared/plate-face-identity.ts` — Prompt-Repair + Slot-Order-Fallback + Gemini Pro für N≥3.
-- `supabase/functions/compose-dialog-segments/index.ts` (Zeilen 1051–1150) — Gate-Logik soft.
-- `supabase/functions/compose-dialog-segments/index.ts` (Header-Read) — `x-skip-plate-gate` Override.
-- `src/hooks/useResetLipSync.ts` + UI-Button im Lipsync-Tab — „Trotzdem dispatchen".
-- `mem/architecture/lipsync/v117-plate-gate-soft-and-identity-repair.md` + `mem/index.md`.
+- `supabase/functions/compose-dialog-segments/index.ts` (Zeilen ~2846–2891 + neuer Circuit-Breaker-Block früh).
+- `supabase/migrations/<ts>_lipsync_watchdog.sql` — pg_cron Job.
+- `mem/architecture/lipsync/v118-preclip-loop-breaker-and-circuit.md` + `mem/index.md`.
 
 ## Rollback
-- Fix A/B sind additiv. Falls Gemini Pro Probleme macht → eine Zeile auf Flash zurück.
-- Fix C kann via Re-aktivierung der strikten Bedingung in einer Zeile rückgängig gemacht werden.
-- Fix D ist ein neuer optionaler Header, default off.
+- Fix A/B: eine Zeile zurück (`if (usePassPreclip)` ohne retry_variant Guard).
+- Fix C: Cap auf 999 stellen ⇒ effektiv aus.
+- Fix D: `DROP` des cron Jobs.
+
