@@ -2678,21 +2678,28 @@ serve(async (req) => {
       syncOptions.occlusion_detection_enabled = true;
     }
     if (usePassPreclip) {
-      // v103 — DB-verified root cause: sync-3 returns `provider_unknown_error`
-      // (HTTP 200, webhook FAILED) whenever we attach explicit
-      // `bounding_boxes` to its payload. Per Sync.so docs `bounding_boxes`
-      // is a `lipsync-2-pro` feature ONLY — sync-3 silently rejects it.
-      // The 18:06 dispatches for scene f67d51ba sent sync-3 + 56-frame bbox
-      // (perfectly aligned to the 56-frame preclip) and every pass failed
-      // with provider_unknown_error. Drop bbox entirely on the preclip path:
-      // the 512×512 single-face crop has exactly ONE face, so auto_detect
-      // is unambiguous and safe.
-      syncOptions.active_speaker_detection = { auto_detect: true };
+      // v114 — Sync.so Support KB ("Why is my lip-sync not working / no mouth
+      // movement?") explicitly recommends MANUAL `coordinates` for tight
+      // single-face crops where `auto_detect` may fail to lock onto the
+      // speaker if the midpoint frame happens to have a closed/idle mouth
+      // (very common on Hailuo "speaking naturally" plates). v103/v104 used
+      // `auto_detect: true` on the preclip, which produced silent passes
+      // (job COMPLETED, mouth unchanged) when the audio-motion correlation
+      // could not be established. We now pin ASD to the geometric center of
+      // the preclip at frame 0 — guaranteed to land on the only face in the
+      // 720×720 single-face crop. Doc-strict for sync-3 (only sync_mode +
+      // active_speaker_detection are allowed; temperature/occlusion are
+      // stripped). See mem/architecture/lipsync/sync-3-doc-strict-options-v106.
+      const outSize = Number((pass as any).preclip_crop?.outputSize)
+        || Number((pass as any).preclip_crop?.size)
+        || 720;
+      const center = Math.max(8, Math.floor(outSize / 2));
+      syncOptions.active_speaker_detection = {
+        auto_detect: false,
+        frame_number: 0,
+        coordinates: [center, center],
+      };
 
-      // v104 — sync-3 preclip must be doc-strict. Sync.so manages
-      // temperature/occlusion internally for sync-3, and historical runs show
-      // the tight WAV duration matches the preclip window. Keep `cut_off` so
-      // the lipsynced crop remains pass-local; do NOT loop to full scene audio.
       delete syncOptions.temperature;
       delete syncOptions.occlusion_detection_enabled;
       syncOptions.sync_mode = "cut_off";
@@ -2705,10 +2712,11 @@ serve(async (req) => {
         return typeof wavDur === "number" ? wavDur : null;
       })();
       (pass as any)._v102_probe = {
-        stage: "preclip-sync3-autodetect-v104",
+        stage: "preclip-sync3-coords-center-v114",
         model_intent: "sync-3",
         payload_model: "sync-3",
-        asd_mode: "auto_detect",
+        asd_mode: "coords_center",
+        asd_coords: [center, center],
         sync_mode: syncOptions.sync_mode,
         bbox_count: 0,
         audio_voiced_sec: tightAudioInfo?.durSec ?? null,
@@ -2725,7 +2733,7 @@ serve(async (req) => {
           : null,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v104_preclip_sync3_autodetect speaker=${pass.speaker_name} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v114_preclip_sync3_coords_center speaker=${pass.speaker_name} center=[${center},${center}] sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
       );
     }
 
