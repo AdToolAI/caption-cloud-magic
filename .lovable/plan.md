@@ -1,96 +1,37 @@
-## Diagnose
-
-**Do I know what the issue is?** Ja.
-
-Der neue Fehler ist **nicht** mehr der v118-Endlosloop. Er passiert früher: `compose-dialog-segments` blockiert schon im eigenen Face-Gate, bevor Sync.so überhaupt einen Job bekommt.
-
-**Konkreter Fall:** Szene `90116518-0630-4379-b2da-b0e02b3b2026`
-
-- Lovable Cloud Logs zeigen:
-  - `plate-identity faces=4 resolved=4/4`
-  - alle vier Gesichter wurden auf der gerenderten Plate erkannt
-  - trotzdem blockiert das lokale Gate mit `plate_target_face_missing` für Samuel, Kailee und Sarah
-- Offizielle Sync.so-Anleitung sagt:
-  - Für Multi-Personen-Videos entweder `frame_number + coordinates` auf einem Frame verwenden, wo der Zielsprecher sichtbar ist
-  - oder `bounding_boxes_url` verwenden; dann ersetzt die Bounding-Box-Datei `frame_number + coordinates`
-- Unser Code macht aktuell zusätzlich ein eigenes striktes Multi-Frame-Target-Gate. Dieses Gate ist bei der Szene ein False Positive, obwohl `plate_identity=4/4` sauber ist.
+# v120 — Lipsync Zombie-Fix + Pass-4 Root-Cause-Pfad
 
 ## Ziel
+1. **Kernfehler beheben**: Sarah's Pass 4 läuft auf `bbox-url-pro` reproduzierbar in `provider_unknown_error` → künftig nach 2 stillen Fails automatisch auf den funktionierenden Preclip-Pfad (Single-Face-Crop) zwingen, mit dem Pass 2/3 erfolgreich liefen.
+2. **Zombie-Symptom abschalten**: Stale `retrying`-Passes ohne aktiven Provider-Job dürfen das Szenen-Terminal nicht mehr blockieren; Watchdog erkennt auch `lip_sync_status='running'` bei `clip_status='ready'`.
 
-Lip-Sync darf nicht mehr an unserem eigenen Gate scheitern, wenn die finale Plate bereits alle erwarteten Gesichter erkannt und zugeordnet hat. Danach muss Sync.so mit einem offiziellen, deterministischen Payload angesteuert werden.
+## Änderungen
 
-## Umsetzung v119
+### 1. `compose-dialog-segments/index.ts` — Pass-4-Pfad reparieren (Kernfix)
+- Vor jedem Sync.so-Dispatch pro Pass prüfen: Zähle in `syncso_dispatch_log` die letzten Fails desselben `(scene_id, speaker_index, retry_variant='bbox-url-pro')` mit `error_code IN ('provider_unknown_error', NULL)`.
+- Wenn `>=2`: erzwinge `retry_variant='preclip-single'` (Single-Face-Crop dieses Sprechers aus der Plate, gleicher Pfad wie Pass 2/3) und logge `v120_pass4_preclip_forced`.
+- Sarahs `bounding_boxes_url`-Box zusätzlich loggen (x,y,w,h relativ zum Plate-Frame) für spätere Diagnose, ohne sie zu verändern.
 
-### 1. Strict Face-Gate entschärfen
+### 2. `sync-so-webhook/index.ts` — Terminal-Logic härten
+- Im Fan-Out-Branch: ein `retrying`-Pass zählt nur dann als "blocking", wenn in `syncso_inflight_jobs` ein Eintrag mit `provider_job_id` und Alter `<10min` existiert. Sonst gilt der Pass als endgültig `failed`.
+- Wenn alle mandatorischen Passes terminal `failed` sind → Szene `clip_status='failed'`, `lip_sync_status='failed'`, `twoshot_stage='terminal_failed_v120'`, idempotenter Refund über deterministische UUID `(scene_id, 'v120_terminal')`.
 
-In `supabase/functions/compose-dialog-segments/index.ts`:
+### 3. `lipsync-watchdog/index.ts` + SQL-Watchdog
+- Bedingung erweitern: trigger auch wenn `lip_sync_status='running'` AND `last_lipsync_update < now()-interval '12 min'`, unabhängig von `clip_status`.
+- SQL-Watchdog `lipsync_watchdog_15min` analog erweitern (zusätzliche OR-Klausel, nicht ersetzen).
+- Bei Treffer: Szene als `terminal_failed_v120_watchdog` markieren + Refund.
 
-- Wenn `plateIdentityMap.resolvedCount >= speakers.length`, wird `plate_target_face_missing` **nicht mehr hart geblockt**.
-- Das Gate wird dann nur noch als Diagnose geloggt: `v119_face_gate_SOFT_WARN`.
-- Hart geblockt wird weiterhin nur, wenn wirklich zu wenige Gesichter auf der Plate erkannt wurden.
+### 4. Cleanup der aktuell hängenden Szene
+- Szene `ec4290f2-d555-4a3c-af44-9413e467fd2f` einmalig terminal `failed` + Refund, damit der User die Szene neu starten kann (frischer Versuch profitiert dann sofort von #1).
 
-### 2. Offiziellen Sync.so-Pfad bevorzugen
+## Akzeptanzkriterien
+- Keine Szene bleibt länger als 12 min in `lip_sync_status='running'` ohne aktiven Provider-Job.
+- Pass 4 für Sarah loopt nicht mehr in `provider_unknown_error`: nach max. 2 Fails Preclip-Pfad, der nachweislich funktioniert.
+- Refund läuft idempotent (keine doppelte Gutschrift bei mehrfachem Webhook).
 
-Für Multi-Speaker mit sauberer `plateIdentityMap`:
+## Out of Scope
+- Keine Änderung am Plate-Builder oder an der Box-Berechnung (Box-Validierung nur als Logging, nicht als Auto-Fix).
+- Keine Änderungen an Engine-Auswahl, Cinematic-Sync oder UI.
 
-- Default-Dispatch auf `bbox-url-pro` setzen.
-- `options.active_speaker_detection` bekommt:
-  - `auto_detect: false`
-  - `bounding_boxes_url: <JSON URL>`
-- Kein `frame_number` und keine `coordinates`, weil Sync.so laut offizieller Anleitung bei Bounding Boxes genau diesen Pfad vorsieht.
-
-### 3. Bounding-Boxes direkt aus Plate-Identity verwenden
-
-- Für jeden Speaker wird die erkannte echte Plate-BBox genutzt, nicht die Anchor-reskalierte FaceMap.
-- Die JSON-Datei bleibt im offiziellen Format:
-
-```json
-{
-  "bounding_boxes": [[x1, y1, x2, y2], null]
-}
-```
-
-- Ein Eintrag pro Frame, wie Sync.so es verlangt.
-
-### 4. Sync-3 Payload doc-strict halten
-
-Für `sync-3`:
-
-- Nur dokumentierte Optionen verwenden:
-  - `sync_mode`
-  - `active_speaker_detection`
-- Keine experimentellen Optionen wie `temperature` oder `occlusion_detection_enabled` in diesem Pfad.
-
-### 5. Fehlerstatus sauber machen
-
-- `clip_error` soll künftig klar sagen, ob es ein echter Plate-Fehler war oder nur ein Gate-Warnhinweis.
-- Keine erneute Credit-Belastung bei Retry/Reset.
-- Idempotenter Refund bleibt für echte Provider-/Render-Failures bestehen.
-
-### 6. Szene nach Implementierung zurücksetzen
-
-Nach dem Code-Fix:
-
-- Szene `90116518-0630-4379-b2da-b0e02b3b2026` aus dem falschen `plate_target_face_missing`-Status lösen.
-- Lip-Sync-Status auf retry-fähig setzen, damit „Sauber neu starten“ oder Auto-Trigger den neuen v119-Pfad nutzt.
-
-## Validierung
-
-Nach Umsetzung prüfe ich:
-
-- Edge-Function-Logs enthalten keinen `FACE-GATE BLOCK` mehr für diese Szene.
-- Es wird ein Sync.so Dispatch mit `bbox-url-pro` und `bounding_boxes_url` erzeugt.
-- Bei Sync.so wird nicht mehr unser eigener `plate_target_face_missing` vorab ausgelöst.
-- Falls Sync.so selbst fehlschlägt, greift Circuit Breaker + Refund statt Endloslauf.
-
-## Rückfalloption
-
-Falls Sync.so trotz offiziellem `bounding_boxes_url` auf voller 4-Personen-Plate scheitert, bleibt als nächster Schritt nur eine klare Architekturentscheidung: pro Speaker ein echter einzelner Dialog-Shot/Plate-Crop, dann Sync.so `auto_detect:true`, danach Stitching zurück in die Szene. Das wäre stabiler, aber teurer/langsamer.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+## Technische Notizen
+- Betroffene Files: `supabase/functions/compose-dialog-segments/index.ts`, `supabase/functions/sync-so-webhook/index.ts`, `supabase/functions/lipsync-watchdog/index.ts`, neue Migration für SQL-Watchdog-Bedingung, `mem/architecture/lipsync/v120-zombie-failsafe-and-pass4-preclip-forcing.md`, `mem/index.md`.
+- Refund nutzt vorhandenes Pattern aus v118 (deterministische UUID, `credit_transactions` upsert).
