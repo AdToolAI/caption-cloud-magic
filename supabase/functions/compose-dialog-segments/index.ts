@@ -2004,6 +2004,96 @@ serve(async (req) => {
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
 
+    // ── v118 — Pass-level Sync.so circuit breaker ────────────────────────
+    // Stop the silent dispatch→FAILED→dispatch loop that previously ran
+    // until the user manually reset the scene. Cap each (scene, pass) at
+    // 5 FAILED Sync.so dispatches; after that refund credits idempotently,
+    // mark the scene `failed`, and bail. The Composer UI surfaces
+    // `clip_error` automatically and the user can hit "Sauber neu starten".
+    try {
+      const PASS_FAIL_CAP = 5;
+      const { count: passFailCount } = await supabase
+        .from("syncso_dispatch_log")
+        .select("id", { count: "exact", head: true })
+        .eq("scene_id", sceneId)
+        .eq("sync_status", "FAILED")
+        .filter("meta->>pass_idx", "eq", String(currentPassIdx));
+      if ((passFailCount ?? 0) >= PASS_FAIL_CAP) {
+        const reason = `lipsync_exhausted_pass_${currentPassIdx + 1}_speaker_${pass.speaker_name ?? "?"}_after_${passFailCount}_failures`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v118_circuit_breaker pass=${currentPassIdx + 1} fails=${passFailCount} — refunding ${totalCost} and marking scene failed`,
+        );
+        const alreadyRefundedCB = !!(existing as any)?.refunded;
+        if (!alreadyRefundedCB) {
+          try {
+            const { data: wCB } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wCB?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (refundErr) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v118_circuit_breaker refund failed: ${(refundErr as Error)?.message}`,
+            );
+          }
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: 0,
+              refunded: true,
+              error: `v118_circuit_breaker:${reason}`,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_status: "failed",
+            clip_error: `Lip-Sync abgebrochen: Sync.so hat für Sprecher „${pass.speaker_name ?? `Pass ${currentPassIdx + 1}`}" ${passFailCount}× hintereinander mit „provider_unknown_error" abgebrochen. Credits wurden zurückerstattet. Bitte drücke „Sauber neu starten" oder render die Plate neu, falls das Gesicht nicht klar erkennbar ist.`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "CIRCUIT_BREAKER_OPEN",
+            error_class: "v118_pass_circuit_breaker",
+            error_message: reason,
+            meta: {
+              pass_idx: currentPassIdx,
+              total_passes: passes.length,
+              speaker: pass.speaker_name,
+              failures_observed: passFailCount,
+              cap: PASS_FAIL_CAP,
+              refunded_credits: alreadyRefundedCB ? 0 : totalCost,
+            },
+          });
+        } catch (_) { /* best-effort */ }
+        return json(
+          {
+            error: "v118_pass_circuit_breaker",
+            reason,
+            refunded: alreadyRefundedCB ? 0 : totalCost,
+          },
+          422,
+        );
+      }
+    } catch (cbErr) {
+      // Circuit-breaker failure must NEVER block dispatch — just log.
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v118_circuit_breaker probe failed: ${(cbErr as Error)?.message}`,
+      );
+    }
+
+
     // ── v40 — Canonical audio restore (FIX for v39 retry bug) ────────────
     // v39 bug: the first dispatch overwrote `pass.audio_url` with the
     // sliced "tight" WAV (turn-only, ~3.27s). On retry the cloned pass
