@@ -1086,11 +1086,9 @@ serve(async (req) => {
       if (gateFails) {
         const reason = !plateIdentityMap
           ? "plate_identity_unavailable"
-          : detectedFaces < speakers.length
-            ? `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`
-            : `plate_identity_unresolved(resolved=${resolvedFaces}/${speakers.length})`;
+          : `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`;
         console.error(
-          `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate_BLOCK ${reason} — refunding ${totalCost} credits and forcing plate re-render`,
+          `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate_BLOCK ${reason} — refunding ${totalCost} credits and forcing plate re-render`,
         );
         // Refund the wallet debit (line ~824 already deducted totalCost).
         try {
@@ -1105,7 +1103,7 @@ serve(async (req) => {
             .eq("user_id", userId);
         } catch (refundErr) {
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate refund failed: ${(refundErr as Error)?.message}`,
+            `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate refund failed: ${(refundErr as Error)?.message}`,
           );
         }
         // Reset clip so the user / Composer re-renders the plate.
@@ -1119,7 +1117,7 @@ serve(async (req) => {
               status: "failed",
               cost_credits: 0,
               refunded: true,
-              error: `v116_plate_quality_gate:${reason}`,
+              error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
             },
             lip_sync_status: "failed",
@@ -1127,7 +1125,7 @@ serve(async (req) => {
             clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
-            clip_error: `Plate-Quality-Gate (v116): Auf dem aktuellen Scene-Clip wurden nicht alle ${speakers.length} Charaktere als eindeutige Gesichter erkannt (erkannt: ${detectedFaces}, zuordenbar: ${resolvedFaces}). Sync.so würde mit hoher Wahrscheinlichkeit das falsche Gesicht animieren. Bitte die Szene neu rendern (alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe). Credits wurden zurückerstattet.`,
+            clip_error: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
