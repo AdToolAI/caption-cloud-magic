@@ -2032,6 +2032,39 @@ serve(async (req) => {
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
 
+    // ── v120 — Pass-4 / silent-bbox-url-pro Preclip-Forcing ──────────────
+    // Root cause for the ec4290f2… zombie: Sarah's Pass 4 reproducibly
+    // failed on `bbox-url-pro` with `provider_unknown_error` (no error_code)
+    // while Passes 2/3 succeeded via the preclip path. After 2 silent
+    // bbox-url-pro fails for this pass, force the dispatch onto the
+    // single-face preclip path that works on this exact plate.
+    let v120ForcePreclip = false;
+    try {
+      const { count: silentBboxFails } = await supabase
+        .from("syncso_dispatch_log")
+        .select("id", { count: "exact", head: true })
+        .eq("scene_id", sceneId)
+        .eq("sync_status", "FAILED")
+        .eq("error_class", "provider_unknown_error")
+        .filter("meta->>pass_idx", "eq", String(currentPassIdx))
+        .filter("meta->>retry_variant", "eq", "bbox-url-pro");
+      if ((silentBboxFails ?? 0) >= 2) {
+        v120ForcePreclip = true;
+        // Drop any cached preclip so the renderer rebuilds fresh below
+        // (also dodges expired-signed-URL traps).
+        (pass as any).preclip_url = null;
+        (pass as any).preclip_render_id = null;
+        (pass as any).preclip_crop = null;
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v120_pass4_preclip_forced silent_bbox_url_pro_fails=${silentBboxFails} — switching to single-face preclip path`,
+        );
+      }
+    } catch (e) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v120 preclip-force probe failed: ${(e as Error)?.message}`,
+      );
+    }
+
     // ── v118 — Pass-level Sync.so circuit breaker ────────────────────────
     // Stop the silent dispatch→FAILED→dispatch loop that previously ran
     // until the user manually reset the scene. Cap each (scene, pass) at
