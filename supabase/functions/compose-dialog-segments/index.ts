@@ -13,9 +13,12 @@
  *      regression). Removing ASD makes the call complete BUT Sync.so
  *      then picks the audio→face mapping itself and routinely swaps
  *      speakers — exactly the bug the user reported.
- *   2. There is no per-segment ASD field in the documented schema:
- *      https://sync.so/docs/developer-guides/speaker-selection (top-level
- *      `options.active_speaker_detection` only).
+ *   2. NOTE (v121, Juni 2026): The Sync.so docs DO document per-segment
+ *      ASD via `segments[].optionsOverride.active_speaker_detection` today.
+ *      Migrating the chained-pass dispatcher to that single-call route is
+ *      tracked in plan v121 (compose-dialog-segments doc-current route);
+ *      this comment block is retained to explain the historic chain.
+
  *
  * The only stable multi-speaker pattern is the one v4 used: one Sync.so
  * call per speaker, each with single-coord ASD pointing at THAT speaker's
