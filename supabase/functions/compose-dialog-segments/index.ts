@@ -1048,15 +1048,16 @@ serve(async (req) => {
       );
     }
 
-    // ── v116 (Fix C) — Plate-Quality Gate for N≥3 ────────────────────────
-    // For 3+ speaker scenes, if plate-side face detection couldn't resolve
-    // identity for every speaker (faces missing or fewer detected faces
-    // than speakers), the anchor-rescale fallback drifts hard enough to
-    // routinely land Sync.so coords on the WRONG face → provider_unknown
-    // / wrong-mouth-moves. Per Sync.so docs (improving-lip-sync-quality):
-    // "All speakers must be clearly visible." Burning credits on an
-    // un-resolvable plate is wasted money — block early, refund, and
-    // force the user to re-render the scene clip.
+    // ── v117 — Plate-Quality Gate (soft) for N≥3 ─────────────────────────
+    // v116 blocked whenever Gemini Vision failed to *resolve* identities
+    // even when all faces were physically present, producing false-positive
+    // "plate is bad" refunds on perfectly fine 4-person plates. v117 narrows
+    // the block to the only failure mode where Sync.so genuinely cannot
+    // recover: fewer detected faces than expected speakers (e.g. Sora
+    // out-of-frame bug). When face *count* matches but identity assignment
+    // is shaky, the slot-order fallback in resolvePlateFaceIdentities
+    // (also v117) already injects a deterministic mapping, so dispatch is
+    // safe to proceed.
     //
     // Gate fires only on the FIRST dispatch attempt (not advance/retry) so
     // re-tries that webhook chains in carry forward.
@@ -1071,18 +1072,23 @@ serve(async (req) => {
     ) {
       const detectedFaces = plateIdentityMap?.faces?.length ?? 0;
       const resolvedFaces = plateIdentityMap?.resolvedCount ?? 0;
+      // v117: only hard-block when faces are physically missing or the
+      // plate-side detection failed entirely. Identity-resolution shortfall
+      // alone is NOT a block (slot-order fallback covers it).
       const gateFails =
         !plateIdentityMap ||
-        detectedFaces < speakers.length ||
-        resolvedFaces < speakers.length;
+        detectedFaces < speakers.length;
+      if (resolvedFaces < speakers.length && detectedFaces >= speakers.length) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate_SOFT_WARN detected=${detectedFaces}/${speakers.length} resolved=${resolvedFaces}/${speakers.length} — dispatch proceeds with slot-order coords`,
+        );
+      }
       if (gateFails) {
         const reason = !plateIdentityMap
           ? "plate_identity_unavailable"
-          : detectedFaces < speakers.length
-            ? `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`
-            : `plate_identity_unresolved(resolved=${resolvedFaces}/${speakers.length})`;
+          : `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`;
         console.error(
-          `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate_BLOCK ${reason} — refunding ${totalCost} credits and forcing plate re-render`,
+          `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate_BLOCK ${reason} — refunding ${totalCost} credits and forcing plate re-render`,
         );
         // Refund the wallet debit (line ~824 already deducted totalCost).
         try {
@@ -1097,7 +1103,7 @@ serve(async (req) => {
             .eq("user_id", userId);
         } catch (refundErr) {
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v116_plate_quality_gate refund failed: ${(refundErr as Error)?.message}`,
+            `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate refund failed: ${(refundErr as Error)?.message}`,
           );
         }
         // Reset clip so the user / Composer re-renders the plate.
@@ -1111,7 +1117,7 @@ serve(async (req) => {
               status: "failed",
               cost_credits: 0,
               refunded: true,
-              error: `v116_plate_quality_gate:${reason}`,
+              error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
             },
             lip_sync_status: "failed",
@@ -1119,7 +1125,7 @@ serve(async (req) => {
             clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
-            clip_error: `Plate-Quality-Gate (v116): Auf dem aktuellen Scene-Clip wurden nicht alle ${speakers.length} Charaktere als eindeutige Gesichter erkannt (erkannt: ${detectedFaces}, zuordenbar: ${resolvedFaces}). Sync.so würde mit hoher Wahrscheinlichkeit das falsche Gesicht animieren. Bitte die Szene neu rendern (alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe). Credits wurden zurückerstattet.`,
+            clip_error: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -1127,7 +1133,7 @@ serve(async (req) => {
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-segments",
             sync_status: "PREFLIGHT_BLOCKED",
-            error_class: "v116_plate_quality_gate",
+            error_class: "v117_plate_quality_gate",
             error_message: reason,
             meta: {
               speakers: speakers.length,
@@ -1141,7 +1147,7 @@ serve(async (req) => {
         } catch (_) { /* best-effort */ }
         return json(
           {
-            error: "v116_plate_quality_gate",
+            error: "v117_plate_quality_gate",
             message: `Plate enthält ${detectedFaces} Gesichter, erwartet ${speakers.length}. Bitte Szene neu rendern.`,
             detected_faces: detectedFaces,
             resolved_faces: resolvedFaces,

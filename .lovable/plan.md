@@ -1,92 +1,76 @@
-# v116 — Identity-Lock Fix (im Einklang mit Sync.so 3 Doku)
 
-## Ziel
-4-Personen-Lip-Sync stabil zum Laufen bringen, ohne erneut an der Dispatch-Architektur zu rütteln. Wir behalten den bewährten **v60 Serial-Chain mit `sync-3`** (genau wie Sync.so es für Multi-Person/Static-Plates empfiehlt) und fixen chirurgisch die **echte Root Cause** der Failures: das Speaker→Face-Mapping driftet bei N=4 vom realen Plate-Frame ab, deshalb landet jeder zweite Pass auf dem falschen Gesicht (`provider_unknown_error`) oder im leeren Hintergrund (`faces=0`).
+# v117 — Plate-Quality-Gate Soft-Fail + Identity-Resolver Repair
 
-## Sync.so-Doku als Anker
-Die offizielle Doku (https://sync.so/docs/models/lipsync, /developer-guides/speaker-selection, /developer-guides/segments) sagt für unseren Use-Case:
+## Was du gesehen hast
+Toast: `Lip-Sync fehlgeschlagen — v116_plate_quality_gate`.
 
-1. **Modell**: `sync-3` für static / multi-person / occluded plates (kann stumme Lippen öffnen). ✅ haben wir bereits seit v62.
-2. **ASD bei Multi-Face**: deterministisch (`auto_detect:false` + `frame_number` + `coordinates`) **oder** `bounding_boxes_url`. ✅ haben wir bereits (v82 `bbox-url-pro`).
-3. **ASD bei Single-Face Crop**: `auto_detect:true` ist explizit empfohlen. ✅ haben wir seit v115.
-4. **Plate-Qualität**: ≥480p (1080p empfohlen), Gesicht klar sichtbar, kein Motion-Blur, nicht abgeschnitten. ⚠️ **prüfen wir aktuell NICHT vor dem Dispatch.**
-5. **Doc-strict Options**: nur `sync_mode` + `active_speaker_detection`, sonst nichts. ✅ v106.
-6. **Segments-API mit 1 Call**: dokumentiert für `lipsync-2`, mit `sync-3` historisch instabil (v41/v54/v56/v58 → `provider_unknown_error`, in v79 entfernt, FROZEN I.2). **Bleibt verboten** für N≥2.
+Die Plate ist objektiv in Ordnung (4 Personen frontal sichtbar, 1376×768). DB-Log zeigt:
 
-Was uns also fehlt sind nicht „mehr Sync.so-Features", sondern **bessere Inputs**.
+```
+detected_faces = 4   ← Face-Detector hat alle 4 Köpfe gefunden ✅
+resolved_faces = 0   ← Gemini Vision konnte 0 davon einem Charakter zuordnen ❌
+→ v116-Gate blockt, refundet 324 Credits, zwingt Plate-Re-Render
+```
 
-## Root Cause Analyse (DB-Beweis, Szene `7470be0d…`)
-- **Pass 4 (Sarah)** — preclip-face-gate `faces=0`: Cached `faceMap` zeigte auf eine Bounding-Box, die im realen Plate-Frame leer war. Crop enthielt Hintergrund statt Sarah.
-- **Pass 2 (Matthew)** — `provider_unknown_error`: v114 center-coords landeten auf einem **anderen** Gesicht (vermutlich Sprecher 3). Sync.so beschwert sich, weil ASD-Box ≠ erwartetes Gesicht.
+Die Plate ist also nicht das Problem — der **Identity-Resolver** versagt. Der v116-Gate ist zu strikt: er verweigert Dispatch, obwohl alle 4 Gesichter da sind.
 
-Beide Failures = **dasselbe Problem**: die cached Identity-Map (`audio_plan.twoshot.faceMap`) wurde einmal pro Szene mit Gemini Vision gebaut und nie gegen den realen Plate-Frame verifiziert. Bei 4 Personen ist die Map oft falsch zugeordnet (Symmetrie, Hairstyle-Mismatch, gleiche Wardrobe).
+## Root Cause (in `_shared/plate-face-identity.ts`)
+1. **Verwirrender Gemini-Prompt**: Text sagt *„FIRST attachment is a video; look at frame at timestamp X.XXs"* — wir schicken aber einen **einzelnen Still-Frame** (kein Video). Gemini fragt sich, wo das Video ist, antwortet leer/unzuverlässig → JSON-Parse failed → `out` bleibt leer → `resolvedCount=0`.
+2. **Threshold 0.45 zu strikt** für ähnlich aussehende Hailuo-Plates (gleiche Beleuchtung, gleiche Wardrobe-Family).
+3. **Kein Fallback** wenn Gemini 0 zurückgibt — wir haben aber eine extrem robuste Heuristik im Skript: Sprecher-Reihenfolge im Drehbuch ≈ left-to-right Slot-Order in der Plate.
+4. **Gate ist binär** — blockt auch wenn `detectedFaces == speakers.length` (Plate ist real OK).
 
-## Soll (3 chirurgische Fixes, alle innerhalb v60-Chain)
+## Fixes (alle innerhalb v116-Architektur, kein Provider-/Schema-Wechsel)
 
-### Fix A — Live Identity-Verifikation pro Pass (Pflicht)
-**Datei**: `supabase/functions/_shared/twoshot-face-map.ts` + `compose-dialog-segments/index.ts` (~Zeile 1800–1900, vor Pass-Dispatch).
+### Fix A — Gemini-Identity-Prompt reparieren
+`supabase/functions/_shared/plate-face-identity.ts`:
+- Prompt umschreiben: *„The first image is a single frame from a scene. The remaining images are reference portraits."* (kein „video"/„timestamp" mehr).
+- `slotDescriptions` mit echten Pixel-Boxen statt der kaputten Normalisierung (`/Math.max(1, center*2)` ergibt fast immer Nonsense).
+- Confidence-Threshold von **0.45 → 0.30**. Bei N=4 will man im Zweifel die wahrscheinlichste Zuordnung, nicht „null". Sync.so sync-3 verzeiht 10–15px Drift.
+- Bei N≥3 zusätzlich Gemini 2.5 **Pro** statt Flash (besser bei Multi-Face Identity, ~€0.005 statt €0.001 pro Szene — vernachlässigbar).
+- Bessere JSON-Extraktion (Greedy-Brace-Match + Fallback bei `assignments: []`).
 
-- Vor jedem Pass-Dispatch: Plate-Frame an Position `pass.reference_frame_number` ziehen (FFmpeg-Lambda gibt es schon via `composer-frames` bucket).
-- Gemini Vision (`gemini-2.5-flash`) mit Prompt: *„Welche der folgenden Personen ist im Bounding-Box [x1,y1,x2,y2] zu sehen? Antworte mit character_id."* Cache als `dialog_shots.passes[i].verified_identity`.
-- **Mismatch** → Coords aus aktuellem Plate-Frame neu berechnen (Gemini Vision: `"Wo ist character X im Frame? Box-Koordinaten."`) bevor wir Sync.so callen.
-- Cost: ~€0.001/Pass × 4 Passes = vernachlässigbar.
+### Fix B — Deterministischer Slot-Order Fallback
+In `resolvePlateFaceIdentities`: wenn Gemini `identityBySlot.size === 0` **und** `plateMap.faces.length === characters.length`:
+- Sortiere `characters` nach Sprech-Reihenfolge im Skript (kommt schon sortiert rein) → mappe 1:1 auf left-to-right Slots (`f.slot` ist bereits left-to-right sortiert).
+- Markiere mit `matchConfidence: 0.4` und `slot_order_fallback: true` im Diagnostics-Log.
+- Damit wird `resolvedCount = N` und Dispatch läuft mit korrekten Plate-Pixel-Coords (statt Anker-Rescale-Drift).
 
-### Fix B — Face-Gate Self-Repair (statt Hard-Fail)
-**Datei**: `supabase/functions/_shared/pass-face-preclip.ts`.
+### Fix C — Gate von „hard block" auf „soft warn" umstellen
+`compose-dialog-segments/index.ts` Zeile 1051–1150:
+- Nur blocken wenn **`detectedFaces < speakers.length`** (echte fehlende Person, Sora-Out-of-Frame-Bug). Das ist der reale „Plate ist kaputt"-Fall.
+- Wenn `detectedFaces >= speakers.length` aber `resolvedFaces < speakers.length` (nach Fix B unwahrscheinlich) → **kein Block**, sondern Warnung in `v116_diag` + dispatch mit Slot-Order-Fallback aus Fix B.
+- Gate-Reason und Fehlermeldung im Toast / `clip_error` so umschreiben, dass „4 erkannt, 0 zuordenbar" nicht mehr abbricht.
 
-Aktuell: Preclip-Crop hat `faces=0` → Pass failed, ganzer Chain bricht ab.
-Neu: bei `faces=0`:
-1. Crop um +30% expandieren (mehr Headroom + Chinroom), erneut Face-Detection.
-2. Wenn immer noch 0 → +60% expandieren.
-3. Wenn nach 2 Repair-Versuchen weiterhin 0 → erst dann failen mit klarer Message (*„Plate enthält Charakter X nicht erkennbar — Plate neu rendern"*).
-
-### Fix C — Plate-Quality-Gate VOR Sync.so-Dispatch
-**Datei**: neue `supabase/functions/_shared/plate-quality-gate.ts`, eingehängt in `compose-dialog-segments` direkt nach `probeMp4Dims`.
-
-Vor dem ersten Sync.so-Call einmalig prüfen:
-- Auflösung ≥720p (sonst Plate-Re-Render auslösen).
-- Plate-Face-Detect: Anzahl Gesichter ≥ Anzahl Sprecher und keines „cut at edge" oder kleiner als 8% der Plate-Höhe (Sync.so-Doku-Schwelle).
-- Wenn Gate failed → `clip_status='pending'`, `clip_url=null`, klarer User-Error („4 Personen müssen alle im Frame sein, Plate wird neu gerendert"), **kein Sync.so-Call, keine Credits verbrannt**.
-
-Damit fangen wir das Sora-typische „Person teilweise out of frame" Problem ab, **bevor** Sync.so Geld kostet.
-
-### Fix D — Per-Pass Diagnostics (zum Lernen)
-**Datei**: `syncso_dispatch_log` (Tabelle existiert).
-
-Persist pro Pass:
-- ASD-Mode, `face_count_in_crop`, `crop_box`, `coords_sent`, `verified_identity_match` (boolean), `repair_attempts`.
-- Damit sehen wir endlich nach jedem Run, OB die richtigen Coords ankamen — kein Blindflug mehr.
+### Fix D — Manueller Override-Button (Notausgang)
+In `useResetLipSync` + `reset-lipsync-scene` (oder neuer Param am Composer-UI):
+- Neuer Button „Trotzdem dispatchen (Plate ignorieren)" der `FORCE_SKIP_PLATE_GATE=true` per Request-Header (`x-skip-plate-gate`) für genau diesen einen Run setzt.
+- Pure Client→Edge-Function Param, kein Env-Toggle nötig.
+- Sicher: gilt nur für die nächste Dispatch-Attempt, keine permanente Deaktivierung.
 
 ## Was NICHT geändert wird
-- **Dispatch-Architektur**: v60 Serial-Chain mit `sync-3` bleibt — Sync.so-doku-konform und stabil für N=1/2/3.
-- **Segments-API mit 1 Call**: bleibt verboten für N≥2 (FROZEN I.2, historisch instabil mit `sync-3`).
-- **v115 Preclip auto_detect**: bleibt für N=1.
-- **v82 bbox-url-pro Ladder**: bleibt unverändert.
-- **Pricing, Refunds, Locks, Webhook-Chain**: alles unverändert.
+- Sync.so-Dispatch-Chain (v60 serial + sync-3 + auto_detect bei N=1 + bbox-url-pro bei N≥2) bleibt 1:1.
+- v82 bbox-url-pro Ladder, v115 single-face auto_detect, Pricing, Refunds, Locks, Webhook — unverändert.
+- v116 Fix A (Live-Identity-Verify) und Fix B (Face-Gate Self-Repair) bleiben — sie kommen erst NACH Fix C zum Tragen.
 
-## Erwartetes Ergebnis nach v116
-- N=4 Szene `7470be0d…`: Fix A fängt die Sarah-Map ab und korrigiert auf reale Box → preclip-faces=1 → auto_detect:true → Pass durch. Matthew-Pass bekommt verifizierte Coords statt center-fallback → kein `provider_unknown_error`.
-- N=4 mit kaputtem Plate (Person out of frame): Fix C blockt Dispatch, refundet 0 Credits, zwingt Plate-Re-Render.
-- Diagnostics zeigen pro Pass: gesendete Coords vs. erkannte Identität vs. Sync.so-Ergebnis → wir können künftig in 5 min debuggen statt in 5 Stunden.
-
-## Betroffene Dateien
-- `supabase/functions/_shared/twoshot-face-map.ts` — neue `verifySpeakerIdentity()` + `recomputeCoordsFromPlate()`.
-- `supabase/functions/_shared/pass-face-preclip.ts` — Self-Repair Loop (3 Versuche).
-- `supabase/functions/_shared/plate-quality-gate.ts` — neu.
-- `supabase/functions/compose-dialog-segments/index.ts` — Plate-Gate vor Dispatch, Live-Verify vor jedem Pass, erweiterte `syncso_dispatch_log` Felder.
-- `mem/architecture/lipsync/v116-identity-lock-and-plate-gate.md` — neu.
-- `mem/index.md` — Eintrag.
+## Erwartetes Ergebnis
+- Szene `b4ad868b…` / `7470be0d…` neu dispatchen → Gemini matcht jetzt 4/4 (Fix A) oder Slot-Order-Fallback greift (Fix B) → `resolvedCount=4` → Gate winkt durch → Sync.so läuft mit korrekten Plate-Pixel-Boxen statt Anker-Drift.
+- Falls Gemini *wirklich* mal 0 trifft und Plate echt korrupt ist (Person out of frame): Gate blockt weiterhin, aber mit präziser Message und refundet sauber.
+- N=1/2/3 Regression bleibt grün (kein Pfadwechsel bei diesen Counts).
 
 ## Verifizierung
-1. Szene `7470be0d…` resetten (`reset-lipsync-scene`), `dialog_shots`+`scene_anchor_cache` clearen, neu dispatchen.
-2. `syncso_dispatch_log` zeigt für jeden Pass: `verified_identity_match=true`, `face_count_in_crop=1`, kein `provider_unknown_error`.
-3. Künstlich kaputten Plate (Person außerhalb Frame) hochladen → Plate-Gate failt, 0 Credits abgebucht, klarer User-Error.
-4. N=1/2/3 Regression-Check: alle bisherigen Tests grün (kein Pfadwechsel bei diesen Counts).
+1. `psql` resetten (`reset-lipsync-scene`) und neu dispatchen → `syncso_dispatch_log` zeigt `resolved_faces=4`, kein PREFLIGHT_BLOCKED.
+2. Künstlich Plate mit nur 3 sichtbaren Personen testen → Gate blockt mit `plate_faces_missing(detected=3, expected=4)` (real-positive).
+3. Override-Button drücken → Dispatch läuft trotz Gate-Warn.
 
-## Was wenn N=4 trotzdem failed?
-Dann ist das Problem **nicht mehr in unserer Pipeline**, sondern auf Sync.so-Seite — und wir haben mit Fix D den ersten echten Beweis dafür (Coords waren korrekt, Identität verified, trotzdem Fail). Erst dann macht ein Ticket bei Sync.so Support Sinn, vorher würden sie uns abwimmeln.
+## Betroffene Dateien
+- `supabase/functions/_shared/plate-face-identity.ts` — Prompt-Repair + Slot-Order-Fallback + Gemini Pro für N≥3.
+- `supabase/functions/compose-dialog-segments/index.ts` (Zeilen 1051–1150) — Gate-Logik soft.
+- `supabase/functions/compose-dialog-segments/index.ts` (Header-Read) — `x-skip-plate-gate` Override.
+- `src/hooks/useResetLipSync.ts` + UI-Button im Lipsync-Tab — „Trotzdem dispatchen".
+- `mem/architecture/lipsync/v117-plate-gate-soft-and-identity-repair.md` + `mem/index.md`.
 
-## Risiko / Rollback
-- Fix A/B/D sind additiv und betreffen nur den Multi-Speaker-Pfad. N=1 unverändert.
-- Fix C kann via `FORCE_SKIP_PLATE_GATE=true` env-Flag deaktiviert werden, falls zu strikt.
-- Kein Replicate/Provider-Wechsel, keine Schema-Migration nötig.
+## Rollback
+- Fix A/B sind additiv. Falls Gemini Pro Probleme macht → eine Zeile auf Flash zurück.
+- Fix C kann via Re-aktivierung der strikten Bedingung in einer Zeile rückgängig gemacht werden.
+- Fix D ist ein neuer optionaler Header, default off.
