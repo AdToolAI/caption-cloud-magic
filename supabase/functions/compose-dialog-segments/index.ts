@@ -1985,7 +1985,11 @@ serve(async (req) => {
 
 
     // ── Concurrency guard ────────────────────────────────────────────────
-    const MAX_INFLIGHT = 4; // v98: raised from 3 so 4-speaker scenes dispatch in one wave
+    // v127: raised 4 → 6 (Sync.so Creator+ $49 plan = 6 concurrent slots).
+    // Lets 5- and 6-speaker scenes dispatch in a single wave and keeps 2
+    // slots free for a parallel composer run / retry. See
+    // mem/architecture/lipsync/v127-parallel-6-slots.md
+    const MAX_INFLIGHT = 6;
     const inflightCount = await countInflightSyncJobs(supabase, 10);
     if (inflightCount >= MAX_INFLIGHT) {
       console.warn(
@@ -3989,7 +3993,8 @@ serve(async (req) => {
       const rawCap = (cFlag as any)?.value;
       const parsedCap = typeof rawCap === "number" ? rawCap : Number(rawCap);
       if (Number.isFinite(parsedCap) && parsedCap >= 1) {
-        concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
+        // v127: hard ceiling raised 4 → 6 to match Sync.so Creator+ plan.
+        concurrencyCap = Math.min(6, Math.max(1, Math.floor(parsedCap)));
       }
     } catch { /* defaults */ }
     const fanOutAllowed = parallelFlagOn && passes.length >= 2;
