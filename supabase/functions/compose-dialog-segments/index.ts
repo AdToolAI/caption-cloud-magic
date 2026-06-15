@@ -2605,21 +2605,10 @@ serve(async (req) => {
       const renderOnePassPreclip = async (p: PassState, idx: number) => {
         try {
           if ((p as any).preclip_url) return { idx, status: "already" as const };
-          // Edge-speaker skip (mirrors per-pass v88 guard).
-          if (Array.isArray(p.coords) && p.coords.length === 2) {
-            const cx = Number(p.coords[0]);
-            const cy = Number(p.coords[1]);
-            if (Number.isFinite(cx) && Number.isFinite(cy)) {
-              const xFrac = cx / plateDims!.width;
-              const yFrac = cy / plateDims!.height;
-              const edge =
-                xFrac < _EDGE_X || xFrac > 1 - _EDGE_X ||
-                yFrac < _EDGE_Y || yFrac > 1 - _EDGE_Y;
-              if (edge && _haveBboxUrlPath) {
-                return { idx, status: "skip_edge" as const };
-              }
-            }
-          } else {
+          // v126 — Edge-speaker skip REMOVED. Every speaker, regardless of
+          // position on the plate, gets a single-face preclip. The full-plate
+          // bbox-url-pro path is no longer used as a first-dispatch option.
+          if (!Array.isArray(p.coords) || p.coords.length !== 2) {
             return { idx, status: "skip_no_coords" as const };
           }
           // v94: span ALL turns of this speaker (union of segments) so the
