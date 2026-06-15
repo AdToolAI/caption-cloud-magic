@@ -3097,20 +3097,24 @@ serve(async (req) => {
     // dispatch path when the cropped frame validated 0 or >1 faces.
     let usePassPreclip = !!passPreclipUrl;
 
-    // ── v107 — Hard-fail Multi-Speaker without preclip ───────────────────
-    // For N>=2 we forbid full-plate dispatch unless the pass is explicitly
-    // on the doc-compliant edge-speaker bbox-url-pro path. Anything else
-    // (preclip render failed, face-gate blocked, coords missing, tight
-    // audio missing) means Sync.so would otherwise see the multi-face
-    // plate with ambiguous coords → wrong-face / morph bug. Fail clean.
+    // ── v126 — Hard-fail when preclip is required but missing ─────────────
+    // Unified pipeline: every pass (N=1..4) that has tight audio + coords
+    // MUST go through single-face preclip. Full-plate dispatch is removed.
+    // If preclip render or face-gate blocked, refund cleanly — never
+    // silently dispatch the full multi-face plate (that path is what
+    // produced the opaque `provider_unknown_error` loop).
+    const v126PreclipExpected =
+      Array.isArray(pass.coords) &&
+      Number.isFinite(Number(pass.coords?.[0])) &&
+      Number.isFinite(Number(pass.coords?.[1])) &&
+      !!tightAudioInfo;
     if (
-      speakers.length >= 2 &&
-      !usePassPreclip &&
-      !skipPreclipForEdgeSpeaker
+      v126PreclipExpected &&
+      !usePassPreclip
     ) {
       const failReason = (pass as any).preclip_error ?? "preclip_prerequisites_missing";
       console.error(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v107_multispeaker_preclip_required_BLOCK reason=${failReason} — refusing full-plate dispatch`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v126_preclip_required_BLOCK speakers=${speakers.length} reason=${failReason} — refusing full-plate dispatch`,
       );
       const existingDsLocal: any = (scene as any)?.dialog_shots ?? existing ?? {};
       const alreadyRefunded107 = !!existingDsLocal?.refunded;
