@@ -3210,8 +3210,19 @@ serve(async (req) => {
     // per-frame face box from `faceMap` and works deterministically on
     // multi-face plates.
     if (usePassPreclip) {
-      const v118FaceCount = Number((pass as any).preclip_face_count ?? 0);
-      if (v118FaceCount !== 1) {
+      // v125 — null/unknown face_count = "validator did not run / soft-failed".
+      // Treat it as trustworthy preclip (auto_detect), NOT as zero-faces.
+      // Previous behaviour (`?? 0`) routed valid preclips back to full-plate
+      // bbox-url-pro on edge speakers and re-triggered the
+      // `provider_unknown_error` loop that took down scene 34757e6a…
+      const rawFc = (pass as any).preclip_face_count;
+      const v118FaceCount: number | null =
+        rawFc === null || rawFc === undefined || !Number.isFinite(Number(rawFc))
+          ? null
+          : Number(rawFc);
+      const shouldBypassPreclip =
+        v118FaceCount !== null && v118FaceCount !== 1;
+      if (shouldBypassPreclip) {
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v118_preclip_facegate_bypass face_count=${v118FaceCount} speaker=${pass.speaker_name} — routing to full-plate bbox-url-pro`,
         );
