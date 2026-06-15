@@ -407,7 +407,7 @@ export default function SceneInlinePlayer({
 
 
         {/* Center generate / re-roll CTA — hidden while playing */}
-        {!isWorking && (!isReady || hovering) && (
+        {!isWorking && !isFailed && (!isReady || hovering) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
             <Button
               size="sm"
