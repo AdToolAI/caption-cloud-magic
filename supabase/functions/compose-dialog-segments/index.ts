@@ -3992,8 +3992,8 @@ serve(async (req) => {
       const rawCap = (cFlag as any)?.value;
       const parsedCap = typeof rawCap === "number" ? rawCap : Number(rawCap);
       if (Number.isFinite(parsedCap) && parsedCap >= 1) {
-        // v127: hard ceiling raised 4 → 6 to match Sync.so Creator+ plan.
-        concurrencyCap = Math.min(6, Math.max(1, Math.floor(parsedCap)));
+        // v126 recovery: hard ceiling reverted 6 → 4 (Sync.so Creator $19 plan).
+        concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
       }
     } catch { /* defaults */ }
     const fanOutAllowed = parallelFlagOn && passes.length >= 2;
