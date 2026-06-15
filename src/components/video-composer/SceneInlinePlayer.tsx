@@ -101,9 +101,11 @@ export default function SceneInlinePlayer({
     lipSyncStatus === 'running' ||
     (twoshotStage && twoshotStage !== 'failed' && twoshotStage !== 'done' && twoshotStage !== 'complete');
   const isWorking =
-    isGenerating ||
-    (status === 'generating' && hasActiveBackendJob) ||
-    lipsyncRunning;
+    !isFailed && (
+      isGenerating ||
+      (status === 'generating' && hasActiveBackendJob) ||
+      lipsyncRunning
+    );
 
   // ── Plan v72 — Start-Limbo detection ────────────────────────────────────
   // A scene parked in `master_clip` with NO provider job for >3 min means the
