@@ -259,15 +259,28 @@ async function uploadBoundingBoxesJson(
     passIdx: number;
     box: [number, number, number, number];
     frameCount: number;
+    // v124 — when provided, build per-frame array with `null` outside the
+    // speaker's voiced windows. Sync.so requires this to avoid animating
+    // neighbour faces during turns this speaker is silent.
+    voicedWindowsSec?: Array<[number, number]>;
+    fps?: number;
   },
-): Promise<string | null> {
+): Promise<{ url: string | null; nonNullFrames: number; totalFrames: number }> {
   try {
     const sub = params.projectId || "shared";
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
-    const payload = {
-      bounding_boxes: new Array(Math.max(1, params.frameCount)).fill(params.box),
-    };
+    const totalFrames = Math.max(1, params.frameCount);
+    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
+      ? buildPerFrameBoxes({
+          box: params.box,
+          frameCount: totalFrames,
+          fps: params.fps,
+          voicedWindowsSec: params.voicedWindowsSec,
+        })
+      : new Array(totalFrames).fill(params.box);
+    const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
+    const payload = { bounding_boxes: boxes };
     const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
     const { error: upErr } = await supabase.storage
       .from("composer-frames")
@@ -278,13 +291,13 @@ async function uploadBoundingBoxesJson(
       });
     if (upErr) {
       console.warn(`[compose-dialog-segments] bbox-url upload failed: ${upErr.message}`);
-      return null;
+      return { url: null, nonNullFrames, totalFrames };
     }
     const { data: pub } = supabase.storage.from("composer-frames").getPublicUrl(path);
-    return pub?.publicUrl ?? null;
+    return { url: pub?.publicUrl ?? null, nonNullFrames, totalFrames };
   } catch (e) {
     console.warn(`[compose-dialog-segments] bbox-url upload threw: ${(e as Error).message}`);
-    return null;
+    return { url: null, nonNullFrames: 0, totalFrames: Math.max(1, params.frameCount) };
   }
 }
 
