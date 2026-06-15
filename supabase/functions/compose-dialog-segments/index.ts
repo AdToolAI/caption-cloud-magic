@@ -3275,11 +3275,18 @@ serve(async (req) => {
       // Doc-strict for sync-3: ONLY sync_mode + active_speaker_detection are
       // allowed; temperature/occlusion are stripped here.
       // See mem/architecture/lipsync/sync-3-doc-strict-options-v106.
-      const passFaceCount = Number((pass as any).preclip_face_count ?? 0);
+      // v125 — null/undefined means the validator did not run, NOT zero faces.
+      // Treat unknown as "trust the preclip" (auto_detect) — only fall back to
+      // center coords if we actually saw 0 or >1 faces.
+      const rawPassFc = (pass as any).preclip_face_count;
+      const passFaceCount: number | null =
+        rawPassFc === null || rawPassFc === undefined || !Number.isFinite(Number(rawPassFc))
+          ? null
+          : Number(rawPassFc);
       const outSize = Number((pass as any).preclip_crop?.outputSize)
         || Number((pass as any).preclip_crop?.size)
         || 720;
-      const useAutoDetect = passFaceCount === 1;
+      const useAutoDetect = passFaceCount === 1 || passFaceCount === null;
       let asdMode: string;
       if (useAutoDetect) {
         syncOptions.active_speaker_detection = { auto_detect: true };
