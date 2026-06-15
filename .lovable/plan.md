@@ -1,54 +1,45 @@
-## Ziel
-Die Lip-Sync-Pipeline wird wieder auf die aktuelle Sync.so-3-Dokumentation ausgerichtet und die aktuelle 95%-Hänge-Situation wird nicht weiter durch Heuristik-Retries kaschiert.
 
-## Befund
-- Die offizielle Sync.so-Doku sagt jetzt klar: `segments[].optionsOverride.active_speaker_detection` ist unterstützt.
-- Unser Code-Kommentar und Teile der Architektur basieren noch auf der alten Annahme, dass Active-Speaker-Detection nur top-level möglich ist.
-- Aktuelle Live-Szene `0207e3a4...` hängt bei v5-Fanout: Pass 1 ist nach `bbox-url-pro`/`coords-pro` wieder in `retrying`, während Pass 4 bereits dispatched ist. Dadurch ist die State-Machine weiterhin anfällig für Zombie-/Mischzustände.
-- Der Payload ist formal fast doc-strict (`model: sync-3`, `input`, `options.sync_mode`, `active_speaker_detection`; keine `temperature`/`occlusion_detection_enabled`), aber die Pipeline weicht strukturell von der aktuellen Doku ab, weil wir Multi-Speaker weiter über chained per-pass full/preclip calls statt über dokumentierte Segmente mit per-segment `optionsOverride` behandeln.
+## Symptom
 
-## Plan
+In Multi-Speaker-Szenen (3–4 Sprecher) animiert Sync.so nur den letzten Sprecher korrekt; alle anderen behalten geschlossene Münder. Beispiel-Szene `cf3cb5d2…`: nur Pass 3 hat `preclip_crop` deckungsgleich mit `coords`; Pass 1+2 liegen 130–300 px daneben → Preclip enthält das Nachbargesicht, Sync.so lippt am falschen Mund.
 
-### 1. Sync.so-3 Payload-Builder korrigieren
-- In `compose-dialog-segments/index.ts` eine neue doc-current Dispatch-Route einführen:
-  - `model: "sync-3"`
-  - `input`: ein Video + mehrere Audio-Inputs mit eindeutigen `refId`s
-  - `segments`: je Sprecher-/Turn-Fenster mit `audioInput.refId`
-  - `segments[].optionsOverride.active_speaker_detection` pro Segment setzen
-  - `options.sync_mode` nur top-level setzen, ohne sync-3-unsupported Optionen
-- Segment-ASD bevorzugt mit `frame_number + coordinates`; `bounding_boxes_url` nur nutzen, wenn es exakt zur Dispatch-Video-Zeitbasis passt.
+## Ursache
 
-### 2. Alte falsche Annahme entfernen
-- Den Kommentar/Invariant entfernen oder korrigieren, der behauptet, Sync.so habe keine segmentweise ASD.
-- Die Retry-Ladder so ändern, dass sie nicht mehr von `bbox-url-pro → coords-pro → coords-pro-box` auf Full-Plate zombie-routet, wenn Sync.so bereits `provider_unknown_error` zurückgibt.
+`compose-dialog-segments/index.ts` baut den Preclip aus `bboxForCrop` (Plate-Bbox aus Face-Map oder `speakerPlateBboxes[speaker_idx]`). Wenn diese Bbox driftet oder falsch zugeordnet ist, crop'd der Renderer um den Nachbarn. Der `validateFrameFace`-Gate prüft nur "genau 1 Gesicht", nicht ob es der **richtige** Sprecher ist. Beim Mux überlagert `render-sync-segments-audio-mux` den Sync.so-Output an `preclip_crop` (nicht an `coords`) → Lipsync landet sichtbar an der falschen Stelle, der echte Sprecher bleibt stumm.
 
-### 3. Audio-Diagnostik auf tatsächliche Payload-Audio-Datei umstellen
-- `audioDiagnostics` aktuell vor dem Tight-Slicing auf Vollspur-WAVs basiert und dadurch Live-Logs irreführend 9s/Lead-In zeigen.
-- Nach dem Tight-Slicing eine zweite, payload-nahe Diagnose loggen:
-  - tatsächliche Payload-Audio-Dauer
-  - voiced seconds
-  - lead-in
-  - Audio-vs-Video-Window-Abgleich
-- Guards auf diese tatsächliche Payload-Audio-Datei stützen, nicht auf die alte Vollspur.
+## Fix (v122) — drei Stellen
 
-### 4. Zombie-State hart schließen
-- Wenn ein Pass `provider_unknown_error` zweimal mit doc-current Payload liefert, wird nicht mehr weiter zwischen Full-Plate/Preclip hin- und hergeschaltet.
-- Szene wird terminal `failed`, alle offenen/inflight Sync.so Jobs werden freigegeben, Credits werden idempotent erstattet.
-- Watchdog bleibt als letzte Sicherung, aber die State-Machine soll bereits im Webhook terminal entscheiden.
+### 1. `supabase/functions/compose-dialog-segments/index.ts` (~Zeile 2495–2540, vor `renderPassFacePreclip`)
 
-### 5. Live-Szene bereinigen
-- Die aktuelle hängende Szene `0207e3a4...` nach dem Patch sauber terminal markieren/refunden oder zurücksetzen, damit ein neuer Render die korrigierte Route nutzt.
+Coords als Single-Source-of-Truth durchsetzen:
 
-## Technische Details
-- Hauptdateien:
-  - `supabase/functions/compose-dialog-segments/index.ts`
-  - `supabase/functions/sync-so-webhook/index.ts`
-  - `supabase/functions/lipsync-watchdog/index.ts`
-  - neues Memory-Dokument zur Sync.so-3-doc-current-Pipeline
-- Keine UI-Änderung.
-- Keine Provider-/Key-Änderung.
-- Keine Migration geplant, außer beim Implementieren zeigt sich, dass ein Status-/Log-Feld strukturell fehlt.
+- Nach Berechnung von `bboxForCrop` einen **Coords-Containment-Check** ergänzen:
+  - Berechne den Crop, den `renderPassFacePreclip` aus `bbox` ableiten würde (gleiche Padding-/Square-Logik). 
+  - Wenn `coords` außerhalb dieses Crop-Quadrats liegt (oder >25 % Abstand zum Crop-Zentrum), verwirf `bboxForCrop` und übergib `null` → Renderer fällt auf den coords-zentrierten Square-Crop zurück (die Logik existiert bereits für den `null`-Fall).
+  - Log: `v122_bbox_drift_rejected speaker=${p.speaker_idx} coords=${coords} bbox_center=${cx,cy} delta_px=${d}`.
 
-## Validierung
-- Edge-Function-Logs müssen zeigen, dass der ausgehende Payload der aktuellen Doku entspricht: `segments[].optionsOverride.active_speaker_detection` vorhanden, keine sync-3-unsupported Optionen.
-- Eine neue Testausführung darf nicht mehr bei 95% hängen bleiben; sie muss entweder abgeschlossen oder sauber terminal failed + refunded sein.
+### 2. Face-Gate verschärfen (~Zeile 2545–2565)
+
+Nach `validateFrameFace` zusätzlich `targetCoords` übergeben (heute `null`):
+
+- Übergib die **preclip-lokalen** Koordinaten des Sprechers (coords − crop.x/y, skaliert auf `outputSize`).
+- Wenn das detektierte Gesicht im Preclip mehr als ~30 % der `outputSize` von diesen Soll-Koordinaten entfernt ist, markiere den Preclip als `face_gate_wrong_speaker` und re-rendere **einmal** mit erzwungenem coords-Crop (`bbox = null`). Erst wenn auch das fehlschlägt: `preclip_error` setzen und Pass auf full-plate `coords-pro` (Variante wie Pass 0 in der Beispiel-Szene) zurückfallen lassen.
+
+### 3. `render-sync-segments-audio-mux/index.ts` (Zeile 236–256) — Defense in Depth
+
+Im `hasPreclipCrop`-Zweig zusätzlich prüfen, ob `coords` innerhalb des `preclip_crop`-Quadrats liegen. Wenn nicht, **ignoriere** `preclip_crop` und nutze stattdessen den `faceMask`-Zweig (Kreis um die echten `coords`). Verhindert, dass historisch falsch geschriebene Passes (wie `cf3cb5d2…`) beim Re-Mux erneut am falschen Ort landen.
+
+## Verifizierung
+
+1. Reset & Re-Run der Beispiel-Szene `cf3cb5d2…` und einer fresh 4-Sprecher-Szene.
+2. Edge-Logs prüfen: jeder Pass sollte `v122_preclip_crop_centered_on_coords` oder `v122_bbox_drift_rejected` loggen.
+3. Im finalen Mux: alle 4 Sprecher bewegen den Mund in ihrem jeweiligen Turn.
+4. DB-Spot-Check: für jeden `done` Pass mit `preclip_crop` muss `|coords − crop_center| < crop.size/2` gelten.
+
+## Memory
+
+Neue Doku unter `mem/architecture/lipsync/v122-coords-as-preclip-truth.md`; `mem/index.md` aktualisieren.
+
+## Out of Scope
+
+- Sync.so v3 `v3: true` ASD-Flag, `webhook_url`-Dublette, hardcoded 24 fps für `bounding_boxes_url`, `/v2/generate` vs `/v2/generations` Pfad — alles aus dem Audit, aber **unabhängig** vom aktuellen "falscher Mund"-Symptom. Eigene Iteration.
