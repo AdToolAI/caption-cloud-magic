@@ -2339,22 +2339,25 @@ serve(async (req) => {
     const havePlateIdentityForDispatch =
       !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
     const hasPassPreclipForDispatch = !!(pass as any).preclip_url;
-    // v120: when preclip-forcing is active we MUST NOT pick bbox-url-pro;
-    // the whole point is to switch this pass onto the single-face preclip
-    // path that worked for Passes 2/3 on the same plate.
-    const freshDefaultVariant: RetryVariant =
-      !v120ForcePreclip &&
-      speakers.length >= 2 &&
-      !!plateDims &&
-      havePlateIdentityForDispatch &&
-      !hasPassPreclipForDispatch
-        ? "bbox-url-pro"
-        : "coords-pro";
-    // v118 — mutable so the preclip-facegate bypass guard (~L2843) can
-    // re-route a failing preclip pass to `bbox-url-pro` on the full plate.
+    // v126 — Unified single-face preclip pipeline for ALL N (1..4).
+    // Variant is diagnostic-only now: dispatch payload is ALWAYS
+    // preclip + sync-3 + auto_detect + cut_off (see usePassPreclip block).
+    // Full-plate `bbox-url-pro` is removed as a first-dispatch option — it
+    // was the root cause of Samuel's `provider_unknown_error` on scene
+    // cba18767 (DB-verified June 15 2026). If a preclip cannot be produced
+    // we fail clean + refund, never silently fall back to full-plate.
+    void v120ForcePreclip;
+    void havePlateIdentityForDispatch;
+    void hasPassPreclipForDispatch;
+    const freshDefaultVariant: RetryVariant = "coords-pro";
     let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
+    // v126 — Normalize legacy full-plate variants from older retries back to
+    // the unified preclip path. Webhook may still hand us "bbox-url-pro" etc.
+    if (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box" || retryVariant === "auto-pro" || retryVariant === "auto-standard") {
+      retryVariant = "coords-pro";
+    }
 
     // v85 (Mini-Phase 2.5) — Structured gate-decision log so we can answer
     // "why didn't bbox-url-pro fire?" without re-reading the source. Emitted
