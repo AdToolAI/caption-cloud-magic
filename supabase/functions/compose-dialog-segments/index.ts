@@ -3201,53 +3201,14 @@ serve(async (req) => {
       // pass of multi-speaker scenes (DB-verified for scene 720fd0b1…).
       temperature: 0.5,
     };
-    // ── v118 — Preclip face-gate bypass ─────────────────────────────────
-    // v115 routes the preclip path to `auto_detect: true` only when the
-    // face-gate confirmed exactly 1 face in the cropped frame. The legacy
-    // fallback for face_count !== 1 was a hard-coded ASD center pointer
-    // (`coordinates: [outSize/2, outSize/2]` = [360,360] on a 720 preclip).
-    // DB-verified (scene 4fb6b816…, pass 2 Kailee, June 14 2026): that
-    // center pointer hits empty pixels and Sync.so loops
-    // `provider_unknown_error` forever. Route every face_count != 1 pass
-    // back to the full-plate `bbox-url-pro` path, which has the real
-    // per-frame face box from `faceMap` and works deterministically on
-    // multi-face plates.
-    if (usePassPreclip) {
-      // v125 — null/unknown face_count = "validator did not run / soft-failed".
-      // Treat it as trustworthy preclip (auto_detect), NOT as zero-faces.
-      // Previous behaviour (`?? 0`) routed valid preclips back to full-plate
-      // bbox-url-pro on edge speakers and re-triggered the
-      // `provider_unknown_error` loop that took down scene 34757e6a…
-      const rawFc = (pass as any).preclip_face_count;
-      const v118FaceCount: number | null =
-        rawFc === null || rawFc === undefined || !Number.isFinite(Number(rawFc))
-          ? null
-          : Number(rawFc);
-      const shouldBypassPreclip =
-        v118FaceCount !== null && v118FaceCount !== 1;
-      if (shouldBypassPreclip) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v118_preclip_facegate_bypass face_count=${v118FaceCount} speaker=${pass.speaker_name} — routing to full-plate bbox-url-pro`,
-        );
-        usePassPreclip = false;
-        (pass as any).preclip_url = null;
-        if (retryVariant !== "bbox-url-pro" && retryVariant !== "coords-pro-box") {
-          retryVariant = "bbox-url-pro";
-          pass.retry_variant = retryVariant;
-        }
-      } else if (retryVariant !== "coords-pro" && retryVariant !== "sync3-coords" && retryVariant !== "coords-pro-lp2pro") {
-        // v118 — preclip is only safe with auto_detect or coords-pro on the
-        // crop. If the webhook escalated to a bbox/auto-standard variant,
-        // drop the preclip so the full-plate variant path runs.
-        if (retryVariant === "auto-pro" || retryVariant === "auto-standard" || retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box") {
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v118_preclip_dropped_for_variant variant=${retryVariant} — routing to full-plate`,
-          );
-          usePassPreclip = false;
-          (pass as any).preclip_url = null;
-        }
-      }
-    }
+    // ── v126 — Preclip-bypass blocks REMOVED ────────────────────────────
+    // Previously v118 routed `face_count !== 1` (incl. null) or variant
+    // escalation back to full-plate `bbox-url-pro`. That re-introduced the
+    // exact `provider_unknown_error` Sync.so returns on full multi-face
+    // plates. Under v126 we never drop a valid preclip. If preclip is
+    // missing the v107/v126 hard-fail block below refunds cleanly — no
+    // silent full-plate dispatch.
+    void usePassPreclip;
     // Occlusion detection is only meaningful on multi-face / hand-over-mouth
     // plates. For the 512×512 single-face preclip path we leave it OFF — it
     // slows sync-3 measurably and adds no quality on a clean head-and-shoulders
