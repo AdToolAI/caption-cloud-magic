@@ -2518,48 +2518,93 @@ serve(async (req) => {
               Number.isFinite(Number(other.coords[1])),
             )
             .map((other) => [Number(other.coords[0]), Number(other.coords[1])] as [number, number]);
-          const preclip = await renderPassFacePreclip(
-            supabase,
-            serviceKey,
-            supabaseUrl,
+          // v122 — Coords-as-Truth: render once, verify `coords` is inside
+          // the returned crop. If a drifted `bbox` placed the crop on a
+          // neighbor, re-render once with `bbox=null` (forces coords-centered
+          // square crop in computeFaceCrop). Without this guard Sync.so
+          // animates the wrong face and the audio-mux overlays it back at
+          // the wrong screen position → "speaker N's mouth never moves".
+          const cx = Number((p.coords as any)?.[0]);
+          const cy = Number((p.coords as any)?.[1]);
+          const coordsInsideCrop = (crop: { x: number; y: number; size: number }) => {
+            if (!Number.isFinite(cx) || !Number.isFinite(cy)) return true;
+            const cxc = crop.x + crop.size / 2;
+            const cyc = crop.y + crop.size / 2;
+            const dx = Math.abs(cx - cxc);
+            const dy = Math.abs(cy - cyc);
+            const halfMargin = crop.size * 0.35; // 70% inner band
+            return dx <= halfMargin && dy <= halfMargin;
+          };
+          let preclip = await renderPassFacePreclip(
+            supabase, serviceKey, supabaseUrl,
             {
-              sceneId,
-              projectId: (scene as any).project_id,
-              userId,
-              passIdx: idx,
+              sceneId, projectId: (scene as any).project_id, userId, passIdx: idx,
               masterVideoUrl: sourceClipUrl,
-              srcWidth: plateDims!.width,
-              srcHeight: plateDims!.height,
+              srcWidth: plateDims!.width, srcHeight: plateDims!.height,
               coords: p.coords as [number, number],
               bbox: bboxForCrop,
               siblingCoords,
-              startSec: winStartSec,
-              endSec: winEndSec,
+              startSec: winStartSec, endSec: winEndSec,
             },
             90_000,
           );
+          if (preclip.ok && preclip.crop && !coordsInsideCrop(preclip.crop) && bboxForCrop) {
+            const cropCx = preclip.crop.x + preclip.crop.size / 2;
+            const cropCy = preclip.crop.y + preclip.crop.size / 2;
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} pass=${idx + 1} v122_bbox_drift_rejected ` +
+              `speaker=${p.speaker_idx} coords=[${cx},${cy}] crop_center=[${Math.round(cropCx)},${Math.round(cropCy)}] ` +
+              `delta_px=[${Math.round(Math.abs(cx - cropCx))},${Math.round(Math.abs(cy - cropCy))}] size=${preclip.crop.size} — re-rendering bbox=null`,
+            );
+            (p as any).preclip_bbox_drift_rejected = true;
+            preclip = await renderPassFacePreclip(
+              supabase, serviceKey, supabaseUrl,
+              {
+                sceneId, projectId: (scene as any).project_id, userId, passIdx: idx,
+                masterVideoUrl: sourceClipUrl,
+                srcWidth: plateDims!.width, srcHeight: plateDims!.height,
+                coords: p.coords as [number, number],
+                bbox: null,
+                siblingCoords,
+                startSec: winStartSec, endSec: winEndSec,
+              },
+              90_000,
+            );
+          }
           if (!preclip.ok || !preclip.preclipUrl || !preclip.crop) {
             (p as any).preclip_error = preclip.error ?? "unknown";
             return { idx, status: "render_failed" as const, err: preclip.error };
           }
           // Mirror per-pass face-gate (validates exactly 1 face in preclip mid-frame).
+          // v122 — pass preclip-local normalized coords as targetCoords so the
+          // detector can flag wrong-speaker preclips via `coordsMatch=false`.
           let faceOk = true;
           let faceCount: number | null = null;
+          let coordsMatch: boolean | null = null;
+          const localTargetCoords = (() => {
+            if (!Number.isFinite(cx) || !Number.isFinite(cy) || !preclip.crop) return null;
+            const lx = (cx - preclip.crop.x) / preclip.crop.size;
+            const ly = (cy - preclip.crop.y) / preclip.crop.size;
+            if (lx < 0 || lx > 1 || ly < 0 || ly > 1) return null;
+            return [lx, ly] as [number, number];
+          })();
           try {
             const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
             const v = await validateFrameFace({
               supabaseUrl, serviceKey,
               videoUrl: preclip.preclipUrl,
               frameNumber: midFrame, fps: 30,
-              targetCoords: null,
+              targetCoords: localTargetCoords,
             });
             if (v.ok) {
               faceCount = Number(v.faceCount ?? 0);
+              coordsMatch = v.coordsMatch;
               if (faceCount === 0 || faceCount > 1) faceOk = false;
+              if (coordsMatch === false) faceOk = false;
             }
           } catch (_) { /* validation soft-fail → trust the preclip */ }
           if (!faceOk) {
-            (p as any).preclip_error = `face_gate_failed:count=${faceCount}`;
+            (p as any).preclip_error = `face_gate_failed:count=${faceCount}:coordsMatch=${coordsMatch}`;
             (p as any).preclip_face_count = faceCount;
             return { idx, status: "face_gate_blocked" as const, faceCount };
           }
