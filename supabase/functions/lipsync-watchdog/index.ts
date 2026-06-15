@@ -33,7 +33,7 @@ const corsHeaders = {
 // TTLs (ms): a `running` scene with no measurable progress beyond this is dead.
 const STALE_PROVIDER_MS = 10 * 60_000;   // Sync.so jobs in flight w/o update
 const STALE_PREFLIGHT_MS = 4 * 60_000;   // running but never produced a provider job
-const STALE_HARD_MS = 20 * 60_000;       // safety cap regardless of state
+const STALE_HARD_MS = 25 * 60_000;       // v126: 20→25 min — one extra cron tick for recovery
 // Plan v71: `pending + master_clip + clip_url + audio_plan` with NO dispatch yet
 // means compose-dialog-segments was never called (lost client invoke / 202 race).
 // v94: 90s → 30s. Sync.so normal render is 25-45s; with the cron also tightened
