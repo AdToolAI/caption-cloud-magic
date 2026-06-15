@@ -2850,10 +2850,22 @@ serve(async (req) => {
     // Wir routen jeden Multi-Speaker-Pass auf den bbox-url-pro Pfad,
     // wenn er verfügbar ist. Single-Speaker und Szenen ohne plate-identity
     // fallen weiterhin auf den preclip-Pfad zurück (unverändert).
-    // v120: when preclip-forcing is active, ignore the edge-speaker bypass —
-    // we explicitly want the single-face preclip render here.
-    const skipPreclipForEdgeSpeaker =
-      !v120ForcePreclip && speakerIsEdgePositioned && haveBboxUrlPathForEdge;
+    // v125 (June 15 2026) — Edge-speaker preclip skip DISABLED.
+    // Root cause for scene 34757e6a… (DB-verified): Samuel sat at x≈306 on
+    // a 1376px-wide plate (xFrac ≈ 0.22 < 0.25), so v88 routed him to the
+    // full-plate `bbox-url-pro` path. Both attempts returned
+    // `provider_unknown_error` while the other 3 speakers (preclip path)
+    // succeeded → scene died as `multi_speaker_incomplete_3_of_4`.
+    // The v116 face-gate self-repair (expansion ladder 1.0/1.4/1.8) handles
+    // edge crops correctly, so there is no reason to skip the preclip just
+    // because the speaker sits near the rim. We keep `speakerIsEdgePositioned`
+    // as a diagnostic but force `skipPreclipForEdgeSpeaker` to false so v107
+    // (hard preclip enforcement) is the only gate.
+    // v120's preclip-forcing branch is preserved (silentBboxFails detector
+    // still clears any cached preclip when bbox-url-pro had two silent fails).
+    const skipPreclipForEdgeSpeaker = false;
+    void speakerIsEdgePositioned;
+    void haveBboxUrlPathForEdge;
     // v107 — Hard-preclip enforcement: every multi-speaker pass MUST go
     // through the single-face preclip path. v105 force-fullplate was the
     // root cause of the "2 mouths closed, 2 mouths speak everyone's lines"
@@ -3198,8 +3210,19 @@ serve(async (req) => {
     // per-frame face box from `faceMap` and works deterministically on
     // multi-face plates.
     if (usePassPreclip) {
-      const v118FaceCount = Number((pass as any).preclip_face_count ?? 0);
-      if (v118FaceCount !== 1) {
+      // v125 — null/unknown face_count = "validator did not run / soft-failed".
+      // Treat it as trustworthy preclip (auto_detect), NOT as zero-faces.
+      // Previous behaviour (`?? 0`) routed valid preclips back to full-plate
+      // bbox-url-pro on edge speakers and re-triggered the
+      // `provider_unknown_error` loop that took down scene 34757e6a…
+      const rawFc = (pass as any).preclip_face_count;
+      const v118FaceCount: number | null =
+        rawFc === null || rawFc === undefined || !Number.isFinite(Number(rawFc))
+          ? null
+          : Number(rawFc);
+      const shouldBypassPreclip =
+        v118FaceCount !== null && v118FaceCount !== 1;
+      if (shouldBypassPreclip) {
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v118_preclip_facegate_bypass face_count=${v118FaceCount} speaker=${pass.speaker_name} — routing to full-plate bbox-url-pro`,
         );
@@ -3252,11 +3275,18 @@ serve(async (req) => {
       // Doc-strict for sync-3: ONLY sync_mode + active_speaker_detection are
       // allowed; temperature/occlusion are stripped here.
       // See mem/architecture/lipsync/sync-3-doc-strict-options-v106.
-      const passFaceCount = Number((pass as any).preclip_face_count ?? 0);
+      // v125 — null/undefined means the validator did not run, NOT zero faces.
+      // Treat unknown as "trust the preclip" (auto_detect) — only fall back to
+      // center coords if we actually saw 0 or >1 faces.
+      const rawPassFc = (pass as any).preclip_face_count;
+      const passFaceCount: number | null =
+        rawPassFc === null || rawPassFc === undefined || !Number.isFinite(Number(rawPassFc))
+          ? null
+          : Number(rawPassFc);
       const outSize = Number((pass as any).preclip_crop?.outputSize)
         || Number((pass as any).preclip_crop?.size)
         || 720;
-      const useAutoDetect = passFaceCount === 1;
+      const useAutoDetect = passFaceCount === 1 || passFaceCount === null;
       let asdMode: string;
       if (useAutoDetect) {
         syncOptions.active_speaker_detection = { auto_detect: true };
