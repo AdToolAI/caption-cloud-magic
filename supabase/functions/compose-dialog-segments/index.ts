@@ -2565,7 +2565,7 @@ serve(async (req) => {
             },
             90_000,
           );
-          if (preclip.ok && preclip.crop && !coordsInsideCrop(preclip.crop) && bboxForCrop) {
+          if (preclip.ok && preclip.crop && !coordsInsideCrop(preclip.crop)) {
             const cropCx = preclip.crop.x + preclip.crop.size / 2;
             const cropCy = preclip.crop.y + preclip.crop.size / 2;
             console.log(
