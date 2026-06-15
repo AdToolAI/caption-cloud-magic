@@ -2850,10 +2850,22 @@ serve(async (req) => {
     // Wir routen jeden Multi-Speaker-Pass auf den bbox-url-pro Pfad,
     // wenn er verfügbar ist. Single-Speaker und Szenen ohne plate-identity
     // fallen weiterhin auf den preclip-Pfad zurück (unverändert).
-    // v120: when preclip-forcing is active, ignore the edge-speaker bypass —
-    // we explicitly want the single-face preclip render here.
-    const skipPreclipForEdgeSpeaker =
-      !v120ForcePreclip && speakerIsEdgePositioned && haveBboxUrlPathForEdge;
+    // v125 (June 15 2026) — Edge-speaker preclip skip DISABLED.
+    // Root cause for scene 34757e6a… (DB-verified): Samuel sat at x≈306 on
+    // a 1376px-wide plate (xFrac ≈ 0.22 < 0.25), so v88 routed him to the
+    // full-plate `bbox-url-pro` path. Both attempts returned
+    // `provider_unknown_error` while the other 3 speakers (preclip path)
+    // succeeded → scene died as `multi_speaker_incomplete_3_of_4`.
+    // The v116 face-gate self-repair (expansion ladder 1.0/1.4/1.8) handles
+    // edge crops correctly, so there is no reason to skip the preclip just
+    // because the speaker sits near the rim. We keep `speakerIsEdgePositioned`
+    // as a diagnostic but force `skipPreclipForEdgeSpeaker` to false so v107
+    // (hard preclip enforcement) is the only gate.
+    // v120's preclip-forcing branch is preserved (silentBboxFails detector
+    // still clears any cached preclip when bbox-url-pro had two silent fails).
+    const skipPreclipForEdgeSpeaker = false;
+    void speakerIsEdgePositioned;
+    void haveBboxUrlPathForEdge;
     // v107 — Hard-preclip enforcement: every multi-speaker pass MUST go
     // through the single-face preclip path. v105 force-fullplate was the
     // root cause of the "2 mouths closed, 2 mouths speak everyone's lines"
