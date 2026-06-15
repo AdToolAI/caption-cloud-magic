@@ -101,9 +101,11 @@ export default function SceneInlinePlayer({
     lipSyncStatus === 'running' ||
     (twoshotStage && twoshotStage !== 'failed' && twoshotStage !== 'done' && twoshotStage !== 'complete');
   const isWorking =
-    isGenerating ||
-    (status === 'generating' && hasActiveBackendJob) ||
-    lipsyncRunning;
+    !isFailed && (
+      isGenerating ||
+      (status === 'generating' && hasActiveBackendJob) ||
+      lipsyncRunning
+    );
 
   // ── Plan v72 — Start-Limbo detection ────────────────────────────────────
   // A scene parked in `master_clip` with NO provider job for >3 min means the
@@ -367,9 +369,45 @@ export default function SceneInlinePlayer({
           )}
         </AnimatePresence>
 
+        {/* v124 — Failure overlay: shows the actual backend error (e.g.
+            anchor_identity_failed) plus a Re-Render button, instead of an
+            endless "Szene wird gebaut…" spinner. */}
+        {isFailed && (() => {
+          const rawErr = String(
+            (scene as any).clipError ?? (scene as any).clip_error ?? '',
+          ).trim();
+          const friendly = rawErr
+            ? rawErr.length > 220 ? rawErr.slice(0, 220) + '…' : rawErr
+            : 'Render fehlgeschlagen.';
+          return (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-destructive/30 via-black/70 to-destructive/30 backdrop-blur-[2px] px-3 text-center">
+              <AlertTriangle className="h-7 w-7 text-destructive mb-1.5" />
+              <p className="text-[11px] font-semibold text-destructive-foreground">
+                Szene fehlgeschlagen
+              </p>
+              <p className="mt-1 text-[9px] leading-snug text-foreground/80 line-clamp-4">
+                {friendly}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGenerate();
+                }}
+                className="mt-2 h-6 px-2 text-[10px] gap-1 bg-destructive/10 border-destructive/40 text-destructive-foreground hover:bg-destructive/20"
+              >
+                <RefreshCw className="h-2.5 w-2.5" />
+                Neu rendern
+              </Button>
+            </div>
+          );
+        })()}
+
+
 
         {/* Center generate / re-roll CTA — hidden while playing */}
-        {!isWorking && (!isReady || hovering) && (
+        {!isWorking && !isFailed && (!isReady || hovering) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
             <Button
               size="sm"

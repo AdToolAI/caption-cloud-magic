@@ -132,6 +132,117 @@ const RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-c
 type RetryVariant = typeof RETRY_VARIANTS[number];
 
 /**
+ * v124 — Sync-3 doc-strict whitelist sanitizer + ASD mutex.
+ *
+ * Per https://sync.so/docs/models/sync-3 the ONLY accepted `options` keys
+ * for `model: "sync-3"` are `sync_mode` and `active_speaker_detection`.
+ * `temperature`, `reasoning_enabled`, `occlusion_detection_enabled` are
+ * explicitly NOT applicable and reproducibly trigger `provider_unknown_error`
+ * on the provider job (validator returns 201, then the job dies).
+ *
+ * Per https://sync.so/docs/developer-guides/speaker-selection the ASD DTO
+ * has three mutually exclusive shapes:
+ *   (a) `{ auto_detect: true }` — video only
+ *   (b) `{ auto_detect: false, frame_number, coordinates }`
+ *   (c) `{ auto_detect: false, bounding_boxes }` OR `{ ..., bounding_boxes_url }`
+ *       — when boxes are provided, `frame_number`/`coordinates` are dropped.
+ *
+ * Logs `v124_sync3_sanitize` with the stripped keys so any future doc-drift
+ * is visible at dispatch time.
+ */
+function sanitizeSync3Options(
+  model: string,
+  options: Record<string, unknown>,
+  ctx: { scene: string; pass: number; speaker: string },
+): { options: Record<string, unknown>; strippedOpts: string[]; strippedAsd: string[] } {
+  const strippedOpts: string[] = [];
+  const strippedAsd: string[] = [];
+  if (model !== SYNC3_MODEL) {
+    return { options, strippedOpts, strippedAsd };
+  }
+  const allowedTop = new Set(["sync_mode", "active_speaker_detection"]);
+  const cleaned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(options ?? {})) {
+    if (allowedTop.has(k)) {
+      cleaned[k] = v;
+    } else {
+      strippedOpts.push(k);
+    }
+  }
+  const asd: any = cleaned.active_speaker_detection;
+  if (asd && typeof asd === "object") {
+    const hasBoxes =
+      Array.isArray(asd.bounding_boxes) ||
+      typeof asd.bounding_boxes_url === "string";
+    if (hasBoxes) {
+      if ("frame_number" in asd) { delete asd.frame_number; strippedAsd.push("frame_number"); }
+      if ("coordinates" in asd) { delete asd.coordinates; strippedAsd.push("coordinates"); }
+    }
+    if (asd.auto_detect === true) {
+      // auto_detect must be alone — no coordinates/boxes
+      if ("frame_number" in asd) { delete asd.frame_number; strippedAsd.push("frame_number_with_auto_detect"); }
+      if ("coordinates" in asd) { delete asd.coordinates; strippedAsd.push("coordinates_with_auto_detect"); }
+      if ("bounding_boxes" in asd) { delete asd.bounding_boxes; strippedAsd.push("bounding_boxes_with_auto_detect"); }
+      if ("bounding_boxes_url" in asd) { delete asd.bounding_boxes_url; strippedAsd.push("bounding_boxes_url_with_auto_detect"); }
+    }
+    // unknown ASD keys
+    const allowedAsd = new Set([
+      "auto_detect", "v3", "frame_number", "coordinates",
+      "bounding_boxes", "bounding_boxes_url",
+    ]);
+    for (const k of Object.keys(asd)) {
+      if (!allowedAsd.has(k)) {
+        strippedAsd.push(k);
+        delete asd[k];
+      }
+    }
+  }
+  if (strippedOpts.length > 0 || strippedAsd.length > 0) {
+    console.log(
+      `[compose-dialog-segments] scene=${ctx.scene} pass=${ctx.pass} speaker=${ctx.speaker} v124_sync3_sanitize stripped_opts=${JSON.stringify(strippedOpts)} stripped_asd=${JSON.stringify(strippedAsd)}`,
+    );
+  }
+  return { options: cleaned, strippedOpts, strippedAsd };
+}
+
+/**
+ * v124 — Build per-frame `bounding_boxes` array honoring the speaker's
+ * voiced windows. Frames inside any voiced window get the speaker's plate
+ * box; frames outside get `null`. Per Sync.so docs (Speaker Selection,
+ * "null where no box is present"), this prevents sync-3 from animating
+ * neighbour faces during turns the speaker is silent — the root cause
+ * of "pixelated overlay on other speakers' mouths" in multi-speaker scenes.
+ */
+function buildPerFrameBoxes(params: {
+  box: [number, number, number, number];
+  frameCount: number;
+  fps: number;
+  voicedWindowsSec: Array<[number, number]>;
+  padFrames?: number; // small padding to be safe at boundaries
+}): Array<[number, number, number, number] | null> {
+  const pad = Math.max(0, Math.floor(params.padFrames ?? 2));
+  const windows = (params.voicedWindowsSec ?? [])
+    .map(([s, e]) => {
+      const fs = Math.max(0, Math.floor(s * params.fps) - pad);
+      const fe = Math.min(params.frameCount - 1, Math.ceil(e * params.fps) + pad);
+      return [fs, fe] as [number, number];
+    })
+    .filter(([fs, fe]) => Number.isFinite(fs) && Number.isFinite(fe) && fe >= fs);
+  const out: Array<[number, number, number, number] | null> =
+    new Array(Math.max(1, params.frameCount)).fill(null);
+  if (windows.length === 0) {
+    // No voiced windows known → preserve legacy behaviour (full-fill) so
+    // we don't accidentally produce an all-null array that would silently
+    // disable lip-sync entirely.
+    return out.map(() => params.box);
+  }
+  for (const [fs, fe] of windows) {
+    for (let i = fs; i <= fe; i++) out[i] = params.box;
+  }
+  return out;
+}
+
+/**
  * v82 — Uploads a Sync.so-compliant per-frame bounding_boxes JSON to the
  * `composer-frames` bucket and returns its public URL. Schema:
  *   { bounding_boxes: ([x1,y1,x2,y2] | null)[] }   // length === frame count
@@ -148,15 +259,28 @@ async function uploadBoundingBoxesJson(
     passIdx: number;
     box: [number, number, number, number];
     frameCount: number;
+    // v124 — when provided, build per-frame array with `null` outside the
+    // speaker's voiced windows. Sync.so requires this to avoid animating
+    // neighbour faces during turns this speaker is silent.
+    voicedWindowsSec?: Array<[number, number]>;
+    fps?: number;
   },
-): Promise<string | null> {
+): Promise<{ url: string | null; nonNullFrames: number; totalFrames: number }> {
   try {
     const sub = params.projectId || "shared";
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
-    const payload = {
-      bounding_boxes: new Array(Math.max(1, params.frameCount)).fill(params.box),
-    };
+    const totalFrames = Math.max(1, params.frameCount);
+    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
+      ? buildPerFrameBoxes({
+          box: params.box,
+          frameCount: totalFrames,
+          fps: params.fps,
+          voicedWindowsSec: params.voicedWindowsSec,
+        })
+      : new Array(totalFrames).fill(params.box);
+    const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
+    const payload = { bounding_boxes: boxes };
     const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
     const { error: upErr } = await supabase.storage
       .from("composer-frames")
@@ -167,13 +291,13 @@ async function uploadBoundingBoxesJson(
       });
     if (upErr) {
       console.warn(`[compose-dialog-segments] bbox-url upload failed: ${upErr.message}`);
-      return null;
+      return { url: null, nonNullFrames, totalFrames };
     }
     const { data: pub } = supabase.storage.from("composer-frames").getPublicUrl(path);
-    return pub?.publicUrl ?? null;
+    return { url: pub?.publicUrl ?? null, nonNullFrames, totalFrames };
   } catch (e) {
     console.warn(`[compose-dialog-segments] bbox-url upload threw: ${(e as Error).message}`);
-    return null;
+    return { url: null, nonNullFrames: 0, totalFrames: Math.max(1, params.frameCount) };
   }
 }
 
@@ -3249,16 +3373,26 @@ serve(async (req) => {
       }
       const frameCount = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
 
+      // v124 — Per-frame array honoring this speaker's voiced windows.
+      // Frames outside the windows become `null` so sync-3 cannot animate
+      // a neighbour face during turns the speaker is silent.
+      const v124VoicedWindows = speakerWindowsSecs.slice();
+
       let usedUrl: string | null = null;
+      let nonNullFrames = frameCount;
       if (retryVariant === "bbox-url-pro") {
-        usedUrl = await uploadBoundingBoxesJson(supabase, {
+        const up = await uploadBoundingBoxesJson(supabase, {
           userId,
           projectId: String((scene as any).project_id ?? ""),
           sceneId,
           passIdx: currentPassIdx,
           box,
           frameCount,
+          voicedWindowsSec: v124VoicedWindows,
+          fps: ASSUMED_FPS,
         });
+        usedUrl = up.url;
+        nonNullFrames = up.nonNullFrames;
       }
 
       if (usedUrl) {
@@ -3267,17 +3401,26 @@ serve(async (req) => {
           bounding_boxes_url: usedUrl,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} url=…${usedUrl.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl.slice(-60)}`,
         );
       } else {
         // graceful degrade — inline bounding_boxes (legacy coords-pro-box path)
-        const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
+        const boundingBoxes: ([number, number, number, number] | null)[] =
+          v124VoicedWindows.length > 0
+            ? buildPerFrameBoxes({
+                box,
+                frameCount,
+                fps: ASSUMED_FPS,
+                voicedWindowsSec: v124VoicedWindows,
+              })
+            : new Array(frameCount).fill(box);
+        const inlineNonNull = boundingBoxes.reduce((a, v) => a + (v ? 1 : 0), 0);
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes: boundingBoxes,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-bbox-fallback)" : ""}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-fallback)" : ""}`,
         );
       }
 
@@ -3436,25 +3579,24 @@ serve(async (req) => {
     // the lipsynced crop back at preclip_crop on the original plate.
     const dispatchVideoUrl = usePassPreclip ? (passPreclipUrl as string) : passInputUrl;
     const videoInput: Record<string, unknown> = { type: "video", url: dispatchVideoUrl };
-    // v106 — Doc-strict options scrub. The official Sync.so sync-3 reference
-    // (https://sync.so/docs/models/sync-3 + /api-reference/api/generate-api/create)
-    // lists ONLY `sync_mode` and `active_speaker_detection` under `options` for
-    // sync-3. `temperature` and `occlusion_detection_enabled` belong to the
-    // lipsync-2 / lipsync-2-pro family. Sending them with `model: "sync-3"`
-    // is accepted by the validator (HTTP 201) but the provider job then
-    // terminates with `provider_unknown_error` — DB-verified on scene
-    // c8fb1fe6 across 4/4 coords-pro full-plate passes (2026-06-11).
-    if (payloadModel === SYNC3_MODEL) {
-      delete (syncOptions as any).temperature;
-      delete (syncOptions as any).occlusion_detection_enabled;
-    }
+    // v124 — Hard whitelist sanitizer + ASD mutex. Supersedes the partial
+    // v106 blacklist scrub. For `model: "sync-3"` ONLY `sync_mode` and
+    // `active_speaker_detection` survive the call. When ASD has
+    // `bounding_boxes`/`bounding_boxes_url`, `frame_number`/`coordinates`
+    // are dropped (mutex). Stripped keys are logged with `v124_sync3_sanitize`.
+    const v124Sanitized = sanitizeSync3Options(payloadModel, syncOptions, {
+      scene: sceneId,
+      pass: currentPassIdx + 1,
+      speaker: String(pass.speaker_name ?? ""),
+    });
+    const payloadOptions = v124Sanitized.options;
     const payload: Record<string, unknown> = {
       model: payloadModel,
       input: [
         videoInput,
         { type: "audio", url: pass.audio_url },
       ],
-      options: syncOptions,
+      options: payloadOptions,
       webhookUrl: diagnosticWebhookUrl,
       webhook_url: diagnosticWebhookUrl,
     };
@@ -3492,8 +3634,9 @@ serve(async (req) => {
       payload_video_url: dispatchVideoUrl,
       // v106 — full options-key list so any future doc-drift (unsupported
       // field smuggled into sync-3) is visible in dispatch logs.
-      options_keys: Object.keys(syncOptions),
-      v106_doc_strict_scrub: payloadModel === SYNC3_MODEL,
+      options_keys: Object.keys(payloadOptions),
+      v124_stripped_opts: v124Sanitized.strippedOpts,
+      v124_stripped_asd: v124Sanitized.strippedAsd,
     };
     (pass as any)._v105_probe = v105Probe;
     (pass as any)._v106_probe = v105Probe;
