@@ -959,12 +959,24 @@ serve(async (req) => {
                 ...p,
                 status: "retrying",
                 retry_count: passRetryCount + 1,
-                retry_variant: nextVariant,
+                // v126 — Force preclip-autodetect path on every retry.
+                retry_variant: "coords-pro",
                 last_error: rawErr.slice(0, 200),
                 last_error_class: errClass,
                 sync_error_code: errorCode ?? null,
                 sync_error_bucket: codeBucket,
                 repair_audio: needsAudioRepair || !!p.repair_audio,
+                // v126 — Clear the dead provider state so compose-dialog-segments
+                // re-renders the preclip and dispatches a fresh sync-3 job.
+                job_id: null,
+                output_url: null,
+                started_at: null,
+                finished_at: null,
+                preclip_url: null,
+                preclip_render_id: null,
+                preclip_crop: null,
+                preclip_face_count: null,
+                preclip_error: null,
               }
             : p,
         );
@@ -1025,7 +1037,8 @@ serve(async (req) => {
             body: JSON.stringify({
               scene_id: sceneId,
               retry: true,
-              retry_variant: nextVariant,
+              // v126 — always force unified preclip-autodetect path.
+              retry_variant: "coords-pro",
               repair_audio: needsAudioRepair,
               pass_idx: currentPass,
               ...(carryForceMultipass ? { force_multipass: true } : {}),

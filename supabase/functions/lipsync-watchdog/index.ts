@@ -33,7 +33,7 @@ const corsHeaders = {
 // TTLs (ms): a `running` scene with no measurable progress beyond this is dead.
 const STALE_PROVIDER_MS = 10 * 60_000;   // Sync.so jobs in flight w/o update
 const STALE_PREFLIGHT_MS = 4 * 60_000;   // running but never produced a provider job
-const STALE_HARD_MS = 20 * 60_000;       // safety cap regardless of state
+const STALE_HARD_MS = 25 * 60_000;       // v126: 20→25 min — one extra cron tick for recovery
 // Plan v71: `pending + master_clip + clip_url + audio_plan` with NO dispatch yet
 // means compose-dialog-segments was never called (lost client invoke / 202 race).
 // v94: 90s → 30s. Sync.so normal render is 25-45s; with the cron also tightened
@@ -262,8 +262,17 @@ serve(async (req) => {
     // compose-dialog-segments would just hit the circuit again and reset
     // updated_at, masking the real TTL.
     if (isV5Fanout && d.twoshot_stage !== "circuit_open") {
+      // v126 — Also pick up `retrying` passes with no live job_id. Previously
+      // a pass set to `retrying` by the webhook but with a lost re-dispatch
+      // invoke would sit idle until the watchdog killed the whole scene.
       const pendingIdxs = (ds.passes as any[])
-        .map((p, i) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
+        .map((p, i) => {
+          const st = String(p?.status ?? "");
+          if (st === "done" || st === "rendering" || st === "failed" || st === "canceled_by_scene_failure") return -1;
+          if (st === "pending" || !p?.job_id) return i;
+          if (st === "retrying" && !p?.job_id) return i;
+          return -1;
+        })
         .filter((i) => i >= 0);
       if (pendingIdxs.length > 0) {
         const next = pendingIdxs[0];

@@ -1,105 +1,78 @@
-## Diagnose
-
 Do I know what the issue is? Yes.
 
-Die betroffene Szene `34757e6a-e919-45fe-98e9-2484a8cf652d` ist nicht wegen Audio-Mux fehlgeschlagen, sondern bereits im Sync.so-Pass für **Samuel Dusatko**:
+The pipeline was working when **every** pass — single- or multi-speaker — went through the single-face preclip with `sync-3 + auto_detect + cut_off`. Recent changes re-introduced full-plate `bbox-url-pro` paths and per-variant escape hatches. For scene `cba18767-be99-454a-95b8-939d6ad6f107` the very first dispatch was `dispatch_video_kind: full_plate` with `bounding_boxes_url` → `provider_unknown_error` in 20s, then the pass stayed in `retrying` with the dead `job_id` until the watchdog killed the scene at ~10 min. The other 3 speakers, which did go through preclip+auto_detect, all succeeded.
 
-- `clip_status`: ready
-- `lip_sync_status`: failed
-- Fehler: `multi_speaker_incomplete_3_of_4`
-- 3 von 4 Sprecher-Pässen wurden erfolgreich gerendert.
-- Pass 1 / Samuel ist zweimal mit Sync.so `provider_unknown_error` fehlgeschlagen.
-
-Der konkrete Root Cause im Code:
-
-- Samuel sitzt links am Bildrand (`x≈306` bei 1376px Breite).
-- Der Code aktiviert für Edge-Speaker den `skipPreclipForEdgeSpeaker`-Pfad.
-- Dadurch wird **kein Single-Face-Preclip** gerendert, sondern die volle 4-Personen-Plate an Sync.so geschickt:
-  - erster Versuch: `bbox-url-pro` auf Full-Plate
-  - zweiter Versuch: `coords-pro` auf Full-Plate
-- Genau diese Full-Plate-Pfade liefern bei dieser Szene `provider_unknown_error`.
-- Die anderen Sprecher liefen über Single-Face-Preclips und kamen durch.
-
-Damit widersprechen sich zwei Schutzlogiken im aktuellen Code:
-
-```text
-v88: Edge-Speaker sollen Preclip überspringen und Full-Plate bbox-url-pro nutzen.
-v107: Multi-Speaker müssen über Single-Face-Preclip laufen, sonst falsche Gesichter/Morphing.
-Live-Ergebnis: Edge-Speaker-Full-Plate bricht ab, 3/4 fertig, Szene failed.
-```
+Goal: collapse the dispatch matrix to exactly **one** code path for N = 1..4.
 
 ## Plan
 
-### 1. Edge-Speaker-Pfad korrigieren
+### 1. One pipeline for all speakers (the only Sync.so payload shape we send)
 
-In `supabase/functions/compose-dialog-segments/index.ts` entferne ich den automatischen Full-Plate-Bypass für Edge-Speaker als Standardverhalten.
+For every pass, regardless of N:
 
-Neues Verhalten:
+- Render a single-face square preclip via Remotion Lambda (existing `pass-face-preclip.ts`).
+- Send the preclip to Sync.so with:
+  - `model: "sync-3"`
+  - `options.sync_mode: "cut_off"`
+  - `options.active_speaker_detection: { auto_detect: true }`
+  - no `temperature`, no `occlusion_detection_enabled`, no `bounding_boxes*`, no `coordinates`, no `frame_number`.
 
-- Auch Edge-Speaker bekommen zuerst einen Single-Face-Preclip.
-- `bbox-url-pro` auf Full-Plate wird nur noch als expliziter letzter Fallback genutzt, nicht als Default.
-- Wenn der Preclip wegen Rand-Crop zu klein/leer ist, wird der Crop repariert statt direkt auf Full-Plate zu wechseln.
+Remove from `compose-dialog-segments`:
 
-### 2. Preclip-Crop für Randgesichter robuster machen
+- The `bbox-url-pro` / `coords-pro-box` / `coords-pro` / `sync3-coords` / `coords-pro-lp2pro` / `auto-pro` / `auto-standard` retry-variant branches that build full-plate payloads.
+- The `v118_preclip_facegate_bypass` block that drops a valid preclip and routes the pass to `bbox-url-pro` when `preclip_face_count != 1`.
+- The `v118_preclip_dropped_for_variant` block that drops a valid preclip when the webhook escalated to a bbox variant.
+- The batch preclip "edge-speaker skip" (`status: "skip_edge"`) — edge speakers must also get preclips.
+- The `v107_multispeaker_preclip_required_BLOCK` becomes "any N: preclip required or fail clean".
 
-In `supabase/functions/_shared/pass-face-preclip.ts` bzw. im Call-Site-Setup:
+Remove from `sync-so-webhook`:
 
-- Für Randgesichter den Crop nicht kleiner gegen den Rand quetschen.
-- Mindestgröße bleibt ≥720p Output.
-- Wenn das Gesicht nah am Rand liegt, Crop zentriert so weit wie möglich und mit größerem Expansion-Faktor rendern.
-- Ziel: Genau ein Gesicht im Preclip, aber genug Kopf/Mund sichtbar.
+- The `V5_RETRY_VARIANTS` ladder. The only allowed retry is "re-render preclip and resend with the same auto_detect payload".
+- The `prepareRetryFromWebhook` `coords` / bbox repair logic.
 
-### 3. Retry-Logik für `provider_unknown_error` ändern
+If a preclip cannot be produced after the existing v116 expansion ladder (1.0/1.4/1.8) → fail the pass cleanly and refund. No silent full-plate dispatch.
 
-In `supabase/functions/sync-so-webhook/index.ts`:
+### 2. Retry must clear the dead provider state
 
-- Wenn ein Full-Plate-`bbox-url-pro`/`coords-pro`-Pass mit `provider_unknown_error` fehlschlägt, retry nicht wieder Full-Plate.
-- Stattdessen Retry erzwingen mit:
-  - frischem Single-Face-Preclip
-  - `sync-3`
-  - `auto_detect: true`
-  - `sync_mode: cut_off`
-- Für 3+ Sprecher bleibt `auto-*` auf Full-Plate blockiert.
+In `sync-so-webhook`, when a pass is marked `retrying`:
 
-### 4. Teilfertige 3/4-Szenen sauber recovern
+- Clear `job_id`, `output_url`, `started_at`, `finished_at`.
+- Clear `preclip_url` (force a fresh preclip render so a stale Lambda URL or stale face-gate result cannot wedge the retry).
+- Keep `done` sibling passes untouched.
 
-Wenn 3 von 4 Pässen erfolgreich sind und ein Pass failed:
+In `compose-dialog-segments` `isRetry` path: re-render the preclip if `preclip_url` is null; do not reuse the dead `job_id`.
 
-- Nur den fehlgeschlagenen Pass zurück auf `pending` setzen.
-- Erfolgreiche Pass-Outputs behalten.
-- Den erneuten Render auf den fehlgeschlagenen Sprecher beschränken.
-- Erst wenn alle 4 done sind, Audio-Mux starten.
+### 3. Watchdog — recover, don't kill
 
-### 5. Aktuelle Szene zurücksetzbar machen
+In `lipsync-watchdog`:
 
-Für die aktuelle Szene wird beim Fix eine Recovery-Aktion vorgesehen:
+- Treat a `retrying` pass with no live/current `job_id` as dispatchable: invoke `compose-dialog-segments` for that pass.
+- Only fail the scene as `watchdog_provider_timeout` when **all** non-done passes have either truly stale `job_id`s OR are exhausted on retry budget.
+- Keep current 10-minute provider TTL for live jobs (sync-3 typical runtime is under that for the short single-face preclips we send — minutes, not the 10-15 min the docs quote for a full 30s video).
+- Increase only the safety-cap `STALE_HARD_MS` from 20 → 25 minutes to give the recovery one extra cycle on slow ticks. No other timeout changes.
 
-- Samuel-Pass zurücksetzen: `status=pending`, `job_id/output_url/error` löschen.
-- vorhandene Matthew/Kailee/Sarah-Pässe behalten.
-- Szene zurück auf `lip_sync_status=running` oder `pending` setzen.
-- Danach startet nur Samuel neu mit dem korrigierten Preclip-Pfad.
+### 4. Recover the current failed scene `cba18767-be99-454a-95b8-939d6ad6f107`
 
-### 6. Dokumentation / Memory aktualisieren
+- Reset only Samuel's pass (idx 0): `status='pending'`, `job_id=null`, `output_url=null`, `preclip_url=null`, `last_error=null`, `last_error_class=null`, `retry_count=0`.
+- Preserve Matthew / Kailee / Sarah as `done` with their `output_url`s.
+- Scene: `lip_sync_status='running'`, `twoshot_stage='syncso_fanout_3_of_4'`, `clip_error=null`, `dialog_shots.status='rendering'`, `dialog_shots.refunded=false`, clear `dialog_shots.error` and `dialog_shots.finished_at`.
 
-Eine neue Memory-Regel ergänzen:
+This lets the watchdog/dispatcher run only Samuel through the new unified preclip path, then trigger audio-mux when all 4 are done.
 
-- Multi-Speaker: Single-Face-Preclip ist Standard auch für Edge-Speaker.
-- Full-Plate `bbox-url-pro` ist nur letzter Fallback.
-- Keine Rückkehr zu Full-Plate-Default für Randgesichter, weil das live `provider_unknown_error` und 3/4-Partial-Fails erzeugt.
+### 5. Documentation
 
-## Validierung
+- New `mem://architecture/lipsync/v126-unified-preclip-pipeline.md`: "All N (1..4) use single-face preclip + sync-3 + auto_detect + cut_off. Full-plate dispatch and variant ladder removed. Refund + clean fail if preclip cannot be produced."
+- Update `mem://index.md` entry for sync-3 doc-strict options.
 
-Nach Umsetzung prüfe ich:
+## Technical Notes
 
-- Edge-Function-Logs zeigen für Samuel `dispatch_video_kind: preclip` statt `full_plate`.
-- Sync.so Payload für Samuel ist doc-strict:
-  - `model: sync-3`
-  - `options.sync_mode: cut_off`
-  - `active_speaker_detection.auto_detect: true`
-  - keine `temperature`, keine `occlusion_detection_enabled`
-- Szene erreicht nicht mehr `multi_speaker_incomplete_3_of_4`.
-- Alle 4 Passes werden `done`, danach startet `render-sync-segments-audio-mux`.
+- `pass-face-preclip.ts` already handles 720p+ output and the v116 face-gate expansion ladder; no change needed.
+- `sanitizeSync3Options` already strips disallowed keys; with the variant branches removed the sanitizer becomes a belt-and-suspenders check.
+- `update_dialog_pass_slot` RPC stays the only write path for per-pass patches; sibling races stay safe.
+- `MAX_INFLIGHT = 4` Sync.so concurrency guard, `update_dialog_pass_slot`, audio-mux dispatch, refund logic — all unchanged.
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+## Validation
+
+- DB: next `syncso_dispatch_log` rows for any new pass must have `meta.dispatch_video_kind='preclip'`, `meta.payload_summary.options.active_speaker_detection.auto_detect=true`, no `bounding_boxes_url`, no `bounding_boxes`, no `coordinates`.
+- Scene `cba18767…` finishes (`lip_sync_status='applied'`, `clip_url` set) within ~3-5 minutes after Samuel re-dispatch.
+- No `provider_unknown_error` retries on a pass that still has a valid preclip.
