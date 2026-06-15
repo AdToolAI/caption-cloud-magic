@@ -1,85 +1,105 @@
-## Sync.so 3 — Offizielle Anleitung vs. unsere Pipeline
+## Diagnose
 
-Quelle: `https://sync.so/docs/models/sync-3.md` + `https://sync.so/docs/developer-guides/speaker-selection.md` + `…/api/generate-api/create.md`.
+Do I know what the issue is? Yes.
 
-### Was die offizielle sync-3 Doc sagt
+Die betroffene Szene `34757e6a-e919-45fe-98e9-2484a8cf652d` ist nicht wegen Audio-Mux fehlgeschlagen, sondern bereits im Sync.so-Pass für **Samuel Dusatko**:
 
-1. **Endpunkt unverändert**: `POST /v2/generate`, nur `"model": "sync-3"`. ✅ Bei uns korrekt (`SYNC3_MODEL = "sync-3"`).
-2. **Verbotene Options für sync-3** (explizit "not applicable"):
-   - `temperature`
-   - `reasoning_enabled`
-   - `occlusion_detection_enabled`
-3. **Erlaubte Options**: `sync_mode` (für Video) + `active_speaker_detection` (ASD).
-4. **ASD — exklusive Felder**: entweder
-   - `auto_detect: true` (nur Video, single/obvious speaker), **oder**
-   - `frame_number` + `coordinates` (eine Referenz, in Pixel-Space des Videos), **oder**
-   - `bounding_boxes` / `bounding_boxes_url` (eine Box **pro Frame**, `null` wenn kein Gesicht in dem Frame). Wenn Boxes gesetzt sind, **kein** `frame_number`/`coordinates` mehr nötig.
-5. **Image-Input** (nur sync-3): `frame_number: 0` + `coordinates`; `auto_detect` ist verboten. `sync_mode` wird ignoriert.
+- `clip_status`: ready
+- `lip_sync_status`: failed
+- Fehler: `multi_speaker_incomplete_3_of_4`
+- 3 von 4 Sprecher-Pässen wurden erfolgreich gerendert.
+- Pass 1 / Samuel ist zweimal mit Sync.so `provider_unknown_error` fehlgeschlagen.
 
-### Gaps in unserer Pipeline (verifiziert in `compose-dialog-segments/index.ts`)
+Der konkrete Root Cause im Code:
 
-| # | Doc-Anforderung | Aktuell | Wo | Konsequenz |
-|---|---|---|---|---|
-| G1 | `temperature` ist für sync-3 verboten | Wird im Default-Payload gesetzt (`syncOptions = { sync_mode, temperature: 0.5 }`) und nur im **Preclip-Branch** wieder gelöscht | L3057-3064, Delete nur in L3154 | Im Full-Plate-Path (`!usePassPreclip`) geht `temperature` mit raus → reproducible `provider_unknown_error` (eigene Memory v106 dokumentiert es bereits) |
-| G2 | `occlusion_detection_enabled` ist für sync-3 verboten | Wird im Full-Plate-Path **explizit aktiviert** | L3105-3107 | Gleiches `provider_unknown_error`-Risiko wie G1; Doc sagt: ist in sync-3 automatisch eingebaut |
-| G3 | `bounding_boxes` ist eine **Per-Frame**-Liste mit `null` wo der Sprecher nicht im Bild ist | Wir füllen jedes Frame mit **derselben statischen Box** (`new Array(frameCount).fill(box)`) | L158, `uploadBoundingBoxesJson` | Sync.so sieht "Sprecher A ist überall" und kann in Frames, wo A's Mund verdeckt/abgewandt ist, an einem **Nachbargesicht** lippensynchronisieren → "pixelige Pflanze über Mund" / "nur Sprecher 4 spricht" |
-| G4 | Bei vorhandenen `bounding_boxes` **kein** zusätzliches `frame_number`/`coordinates` setzen | Wir setzen in einigen Retry-Varianten beides | L3198-3201 vs. L3203+ | Sync.so dokumentiert die Felder als sich ausschließend |
-| G5 | Wenn Preclip face-count !== 1 → wir fallen auf `bbox-url-pro` zurück (gut), aber `temperature`/`occlusion` werden vor diesem Fallback **nicht** wieder gestrippt | L3076-3100 (Reset von Variant, nicht von Options) | Re-trigger geht mit toxischen Defaults raus |
-| G6 | Vor sync.so kommt unsere **Anchor-Stage** — aktuell `anchor_identity_failed` bei Szene 90d620a6 (Samuel männlich → Frau, Kailee dunkel → blond) | Anchor-Stage gibt nach 2 Retries auf, UI zeigt aber endlos "Szene wird gebaut…" | `compose-dialog-scene` / `SceneCard.tsx` | Sync.so wird gar nicht erst erreicht; UI-State-Bug verschleiert das |
+- Samuel sitzt links am Bildrand (`x≈306` bei 1376px Breite).
+- Der Code aktiviert für Edge-Speaker den `skipPreclipForEdgeSpeaker`-Pfad.
+- Dadurch wird **kein Single-Face-Preclip** gerendert, sondern die volle 4-Personen-Plate an Sync.so geschickt:
+  - erster Versuch: `bbox-url-pro` auf Full-Plate
+  - zweiter Versuch: `coords-pro` auf Full-Plate
+- Genau diese Full-Plate-Pfade liefern bei dieser Szene `provider_unknown_error`.
+- Die anderen Sprecher liefen über Single-Face-Preclips und kamen durch.
 
-### Plan (v124 — "sync-3 doc-strict end-to-end")
+Damit widersprechen sich zwei Schutzlogiken im aktuellen Code:
 
-#### 1. `supabase/functions/compose-dialog-segments/index.ts` — Payload-Sanitizer
-- **Single Source of Truth** für `model === "sync-3"`: direkt vor dem `fetch(SYNC_API_BASE + "/generate")` einen `sanitizeSync3Options(options)` einfügen, der unwiderruflich entfernt:
-  - `temperature`
-  - `reasoning_enabled`
-  - `occlusion_detection_enabled`
-  - jegliche Felder, die nicht in `{ sync_mode, active_speaker_detection }` whitelisted sind
-- ASD-Mutex: wenn `active_speaker_detection.bounding_boxes` **oder** `bounding_boxes_url` gesetzt sind, `frame_number` und `coordinates` löschen.
-- Falls `coordinates` fehlt aber `auto_detect: false` → harter Throw (statt Sync.so 500).
-- Initialer Default in L3057 wird auf `{ sync_mode: payloadSyncMode }` reduziert (kein `temperature` mehr by default).
-- Log-Tag: `v124_sync3_sanitize` (vor jedem fetch) mit den gestrippten Keys.
+```text
+v88: Edge-Speaker sollen Preclip überspringen und Full-Plate bbox-url-pro nutzen.
+v107: Multi-Speaker müssen über Single-Face-Preclip laufen, sonst falsche Gesichter/Morphing.
+Live-Ergebnis: Edge-Speaker-Full-Plate bricht ab, 3/4 fertig, Szene failed.
+```
 
-#### 2. Per-Frame Bounding-Boxes statt Static-Fill
-- In `uploadBoundingBoxesJson` (~L135-160) und dem inline `bounding_boxes`-Pfad (`coords-pro-box`, ~L3203+):
-  - Pro Pass den **Voiced-Window-Range** (`frame_start..frame_end` aus `pass.frames` / tightAudioInfo) berechnen.
-  - Frames **innerhalb** des Windows → Per-Frame-Box aus `faceMap[frame]` (falls vorhanden) oder Fallback auf die statische Box.
-  - Frames **außerhalb** → `null`.
-  - Schema: `{ bounding_boxes: ([x1,y1,x2,y2] | null)[] }`, Länge === totalFrames.
-- Memory-Note: Doc-Beispiel L116-126 ist genau dieses Muster ("`null` where no box is present").
+## Plan
 
-#### 3. ASD-Mutex im Code statt nur in Reviews
-- In den Retry-Varianten `coords-pro` / `sync3-coords` / `coords-pro-lp2pro` (L3191-3202) UND `coords-pro-box`/`bbox-url-pro` (L3203+) sicherstellen, dass nur **eine** ASD-Form pro Request reingeht. Beide Wege bauen das ASD-Objekt jetzt **neu** statt zu mergen.
+### 1. Edge-Speaker-Pfad korrigieren
 
-#### 4. Anchor-Stage-Failure sichtbar machen (UI-State-Sync)
-- `src/components/composer/SceneCard.tsx`: Wenn `clip_status === 'failed'` mit `clip_error` → statt Spinner eine rote/gelbe Fehlerbox + "🎥 Clip + Lip-Sync neu rendern"-Button rendern. Realtime-Channel `composer_scenes` auf `clip_status`/`clip_error` lauschen.
-- Watchdog im Frontend: wenn Scene >3min im `pending/generating` ohne `updated_at`-Bump → DB neu fetchen.
+In `supabase/functions/compose-dialog-segments/index.ts` entferne ich den automatischen Full-Plate-Bypass für Edge-Speaker als Standardverhalten.
 
-#### 5. One-shot DB-Recovery für die hängende Szene
-- SQL für `90d620a6-8abd-4210-b210-fc558de0c62e`:
-  - `clip_status = 'pending'`, `clip_error = NULL`, `twoshot_stage = NULL`, `lip_sync_status = NULL`.
-  - Eintrag in `scene_anchor_cache` für diese Szene `DELETE`, damit der nächste Render einen frischen Anchor versucht (oder direkt full-plate ohne Anchor, wenn die Identitäts-Reproduktion weiter scheitert).
+Neues Verhalten:
 
-#### 6. Memory & Index
-- Neu: `mem/architecture/lipsync/v124-sync3-doc-strict-end-to-end.md` mit:
-  - Liste der erlaubten/verbotenen Options (kopiert aus Doc),
-  - Per-Frame-Bbox-Schema,
-  - ASD-Mutex-Regel,
-  - Pointer auf v106 (vorgänger), das nur den Preclip-Branch gefixt hatte.
-- `mem/index.md` Eintrag.
+- Auch Edge-Speaker bekommen zuerst einen Single-Face-Preclip.
+- `bbox-url-pro` auf Full-Plate wird nur noch als expliziter letzter Fallback genutzt, nicht als Default.
+- Wenn der Preclip wegen Rand-Crop zu klein/leer ist, wird der Crop repariert statt direkt auf Full-Plate zu wechseln.
 
-#### 7. Deployment & Verifikation
-- Deploy: `compose-dialog-segments`.
-- Re-trigger Szene `90d620a6`. In den Function-Logs nach `v124_sync3_sanitize stripped=[temperature,occlusion_detection_enabled]` greppen → Beweis, dass kein doc-illegales Feld mehr rausgeht.
-- DB-Check: nach 5 min `pass_idx 0..3` aller `dialog_shots` von Szene `90d620a6` → alle `status='done'` mit eigenem `output_url`, keiner mehr `provider_unknown_error`.
+### 2. Preclip-Crop für Randgesichter robuster machen
 
-### Was bewusst NICHT in diesem Plan ist
+In `supabase/functions/_shared/pass-face-preclip.ts` bzw. im Call-Site-Setup:
 
-- Anchor-Identity-Reproduktion (Nano Banana 2 verwechselt Geschlecht/Haar): separater Fix-Track, hier nur UI-Sichtbarkeit + DB-Reset, damit Sync.so überhaupt erreicht wird.
-- Migration der Legacy `lipsync-2`/`lipsync-2-pro`-Calls in `lip-sync-video/index.ts` (anderer Code-Pfad, nicht im Composer-Dialog).
+- Für Randgesichter den Crop nicht kleiner gegen den Rand quetschen.
+- Mindestgröße bleibt ≥720p Output.
+- Wenn das Gesicht nah am Rand liegt, Crop zentriert so weit wie möglich und mit größerem Expansion-Faktor rendern.
+- Ziel: Genau ein Gesicht im Preclip, aber genug Kopf/Mund sichtbar.
 
-### Erwartetes Resultat
+### 3. Retry-Logik für `provider_unknown_error` ändern
 
-- Keine `provider_unknown_error` mehr durch doc-illegale Options.
-- Multi-Speaker-Szenen: jeder Sprecher animiert in seinem eigenen Voiced-Window, Nachbargesichter werden während fremder Turns auf `null` gesetzt → keine "Pflanze über Sprecher 2/3"-Artefakte mehr.
-- Anchor-Fail wird sofort in der UI sichtbar mit Re-Render-Knopf, kein 8-min-Spinner mehr.
+In `supabase/functions/sync-so-webhook/index.ts`:
+
+- Wenn ein Full-Plate-`bbox-url-pro`/`coords-pro`-Pass mit `provider_unknown_error` fehlschlägt, retry nicht wieder Full-Plate.
+- Stattdessen Retry erzwingen mit:
+  - frischem Single-Face-Preclip
+  - `sync-3`
+  - `auto_detect: true`
+  - `sync_mode: cut_off`
+- Für 3+ Sprecher bleibt `auto-*` auf Full-Plate blockiert.
+
+### 4. Teilfertige 3/4-Szenen sauber recovern
+
+Wenn 3 von 4 Pässen erfolgreich sind und ein Pass failed:
+
+- Nur den fehlgeschlagenen Pass zurück auf `pending` setzen.
+- Erfolgreiche Pass-Outputs behalten.
+- Den erneuten Render auf den fehlgeschlagenen Sprecher beschränken.
+- Erst wenn alle 4 done sind, Audio-Mux starten.
+
+### 5. Aktuelle Szene zurücksetzbar machen
+
+Für die aktuelle Szene wird beim Fix eine Recovery-Aktion vorgesehen:
+
+- Samuel-Pass zurücksetzen: `status=pending`, `job_id/output_url/error` löschen.
+- vorhandene Matthew/Kailee/Sarah-Pässe behalten.
+- Szene zurück auf `lip_sync_status=running` oder `pending` setzen.
+- Danach startet nur Samuel neu mit dem korrigierten Preclip-Pfad.
+
+### 6. Dokumentation / Memory aktualisieren
+
+Eine neue Memory-Regel ergänzen:
+
+- Multi-Speaker: Single-Face-Preclip ist Standard auch für Edge-Speaker.
+- Full-Plate `bbox-url-pro` ist nur letzter Fallback.
+- Keine Rückkehr zu Full-Plate-Default für Randgesichter, weil das live `provider_unknown_error` und 3/4-Partial-Fails erzeugt.
+
+## Validierung
+
+Nach Umsetzung prüfe ich:
+
+- Edge-Function-Logs zeigen für Samuel `dispatch_video_kind: preclip` statt `full_plate`.
+- Sync.so Payload für Samuel ist doc-strict:
+  - `model: sync-3`
+  - `options.sync_mode: cut_off`
+  - `active_speaker_detection.auto_detect: true`
+  - keine `temperature`, keine `occlusion_detection_enabled`
+- Szene erreicht nicht mehr `multi_speaker_incomplete_3_of_4`.
+- Alle 4 Passes werden `done`, danach startet `render-sync-segments-audio-mux`.
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
