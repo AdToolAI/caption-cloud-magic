@@ -3373,16 +3373,26 @@ serve(async (req) => {
       }
       const frameCount = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
 
+      // v124 — Per-frame array honoring this speaker's voiced windows.
+      // Frames outside the windows become `null` so sync-3 cannot animate
+      // a neighbour face during turns the speaker is silent.
+      const v124VoicedWindows = speakerWindowsSecs.slice();
+
       let usedUrl: string | null = null;
+      let nonNullFrames = frameCount;
       if (retryVariant === "bbox-url-pro") {
-        usedUrl = await uploadBoundingBoxesJson(supabase, {
+        const up = await uploadBoundingBoxesJson(supabase, {
           userId,
           projectId: String((scene as any).project_id ?? ""),
           sceneId,
           passIdx: currentPassIdx,
           box,
           frameCount,
+          voicedWindowsSec: v124VoicedWindows,
+          fps: ASSUMED_FPS,
         });
+        usedUrl = up.url;
+        nonNullFrames = up.nonNullFrames;
       }
 
       if (usedUrl) {
@@ -3391,17 +3401,26 @@ serve(async (req) => {
           bounding_boxes_url: usedUrl,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} url=…${usedUrl.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl.slice(-60)}`,
         );
       } else {
         // graceful degrade — inline bounding_boxes (legacy coords-pro-box path)
-        const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
+        const boundingBoxes: ([number, number, number, number] | null)[] =
+          v124VoicedWindows.length > 0
+            ? buildPerFrameBoxes({
+                box,
+                frameCount,
+                fps: ASSUMED_FPS,
+                voicedWindowsSec: v124VoicedWindows,
+              })
+            : new Array(frameCount).fill(box);
+        const inlineNonNull = boundingBoxes.reduce((a, v) => a + (v ? 1 : 0), 0);
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes: boundingBoxes,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-bbox-fallback)" : ""}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-fallback)" : ""}`,
         );
       }
 
