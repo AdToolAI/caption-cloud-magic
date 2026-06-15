@@ -1,75 +1,78 @@
-# Revert auf v126 Recovery-State (Code-basiert)
+Do I know what the issue is? Yes.
 
-Statt manuell in der History zurückzuspringen, setze ich die Lipsync-Pipeline im Code 1:1 auf den dokumentierten v126-Stand aus `mem/architecture/lipsync/v126-recovery-reference.md` zurück. Damit verschwinden alle Änderungen aus v127 (Parallel-6-Slots) und alle danach diskutierten v128-Ideen (bbox_url, soft-fallback, auto_detect-Varianten).
+The pipeline was working when **every** pass — single- or multi-speaker — went through the single-face preclip with `sync-3 + auto_detect + cut_off`. Recent changes re-introduced full-plate `bbox-url-pro` paths and per-variant escape hatches. For scene `cba18767-be99-454a-95b8-939d6ad6f107` the very first dispatch was `dispatch_video_kind: full_plate` with `bounding_boxes_url` → `provider_unknown_error` in 20s, then the pass stayed in `retrying` with the dead `job_id` until the watchdog killed the scene at ~10 min. The other 3 speakers, which did go through preclip+auto_detect, all succeeded.
 
-## Was wiederhergestellt wird (v126-Invariants)
+Goal: collapse the dispatch matrix to exactly **one** code path for N = 1..4.
 
-1. **Eine Pipeline für alle 1..N Sprecher**: single-face square **preclip** via Remotion Lambda → Sync.so mit Preclip-Video.
-2. **Niemals** `full_plate` + `bounding_boxes*` / `coordinates` / `frame_number` an Sync.so.
-3. Sync.so options **doc-strict**: nur `sync_mode: "cut_off"` + `active_speaker_detection: { auto_detect: true }`. Kein `temperature`, kein `occlusion_detection_enabled`, kein `bounding_boxes*`.
-4. Model: `sync-3`.
-5. Preclip nicht produzierbar → Pass failt **clean mit Refund**, kein full_plate Fallback.
+## Plan
 
-## Konkrete Code-Änderungen
+### 1. One pipeline for all speakers (the only Sync.so payload shape we send)
 
-### A) `supabase/functions/compose-dialog-segments/index.ts`
-- `freshDefaultVariant = "coords-pro"` für **alle** Dispatches (Initial + Retry).
-- Entfernen aller Auto-Routen: `bbox-url-pro`, `sync3-coords`, `coords-pro-lp2pro`, `auto-pro`, `auto-standard`.
-- Entfernen: `v118_preclip_facegate_bypass`, `v118_preclip_dropped_for_variant`, edge-speaker-skip Block in Batch-Preclip-Logik.
-- `v107_multispeaker_preclip_required_BLOCK` → `v126_preclip_required_BLOCK` (für **jedes N**, nicht nur N≥2).
-- v127-Parallelisierung (6 gleichzeitige Sync.so Slots, MAX_INFLIGHT=6) **entfernen** → zurück auf serielle / v126-konforme Dispatch-Reihenfolge.
-- Alle v128-Diskussionsreste (preflight_soft_fallback, generate-speaker-bbox-track Aufrufe, bbox_per_frame_dispatch Flag) entfernen, falls vorhanden.
+For every pass, regardless of N:
 
-### B) `supabase/functions/sync-so-webhook/index.ts`
-Bei `retrying` Pass **alle** folgenden Felder clearen:
-- `job_id = null`, `output_url = null`, `started_at = null`, `finished_at = null`
-- `preclip_url = null`, `preclip_face_count = null`, `last_error = null`
-- `retry_count` **bleibt** (Budget-Tracking).
-- Retry-Variant erzwungen `coords-pro` (keine Variant-Escalation mehr).
+- Render a single-face square preclip via Remotion Lambda (existing `pass-face-preclip.ts`).
+- Send the preclip to Sync.so with:
+  - `model: "sync-3"`
+  - `options.sync_mode: "cut_off"`
+  - `options.active_speaker_detection: { auto_detect: true }`
+  - no `temperature`, no `occlusion_detection_enabled`, no `bounding_boxes*`, no `coordinates`, no `frame_number`.
 
-### C) `supabase/functions/lipsync-watchdog/index.ts`
-- Cron alle 2 min.
-- `retrying` ohne live `job_id` → **re-dispatch** (`advance`), nicht killen.
-- Provider-TTL: **10 min**.
-- `STALE_HARD_MS`: **25 min**.
-- Scene-Fail (`watchdog_provider_timeout`) erst wenn **alle** non-done passes stale.
+Remove from `compose-dialog-segments`:
 
-### D) Edge Functions deployen
-Alle drei Functions neu deployen.
+- The `bbox-url-pro` / `coords-pro-box` / `coords-pro` / `sync3-coords` / `coords-pro-lp2pro` / `auto-pro` / `auto-standard` retry-variant branches that build full-plate payloads.
+- The `v118_preclip_facegate_bypass` block that drops a valid preclip and routes the pass to `bbox-url-pro` when `preclip_face_count != 1`.
+- The `v118_preclip_dropped_for_variant` block that drops a valid preclip when the webhook escalated to a bbox variant.
+- The batch preclip "edge-speaker skip" (`status: "skip_edge"`) — edge speakers must also get preclips.
+- The `v107_multispeaker_preclip_required_BLOCK` becomes "any N: preclip required or fail clean".
 
-### E) Stuck Scenes resetten
-Für die aktuell hängende Scene (und alle weiteren betroffenen) den SQL-Reset aus dem Recovery-Doc fahren:
-```sql
-UPDATE dialog_shots SET
-  status='pending', job_id=NULL, output_url=NULL,
-  preclip_url=NULL, preclip_face_count=NULL, last_error=NULL,
-  retry_count=0, started_at=NULL, finished_at=NULL
-WHERE scene_id = '<scene-uuid>' AND status <> 'done';
+Remove from `sync-so-webhook`:
 
-UPDATE composer_scenes SET lip_sync_status='running'
-WHERE id = '<scene-uuid>';
-```
-Watchdog manuell triggern.
+- The `V5_RETRY_VARIANTS` ladder. The only allowed retry is "re-render preclip and resend with the same auto_detect payload".
+- The `prepareRetryFromWebhook` `coords` / bbox repair logic.
 
-### F) DB-Validierung nach erstem neuen Dispatch
-Query aus Recovery-Doc Abschnitt 6 fahren. Erwartet pro Row:
-- `meta.dispatch_video_kind == 'preclip'`
-- `payload_summary.options.active_speaker_detection.auto_detect == true`
-- `payload_summary.options.sync_mode == 'cut_off'`
-- **fehlen**: `bounding_boxes_url`, `bounding_boxes`, `coordinates`, `frame_number`, `temperature`, `occlusion_detection_enabled`
+If a preclip cannot be produced after the existing v116 expansion ladder (1.0/1.4/1.8) → fail the pass cleanly and refund. No silent full-plate dispatch.
 
-Wenn ein Feld auftaucht → Regression, sofort stoppen.
+### 2. Retry must clear the dead provider state
 
-## Memory-Updates
-- `mem/architecture/lipsync/v127-parallel-6-slots.md` → als **superseded** markieren (nicht löschen, nur Hinweis dass Pipeline auf v126 zurückgesetzt).
-- `mem/architecture/lipsync/v126-recovery-reference.md` → bleibt unverändert (ist die Source of Truth).
-- `mem/index.md` → v127-Eintrag entsprechend annotieren.
+In `sync-so-webhook`, when a pass is marked `retrying`:
 
-## Welche Scene(s) reseten?
-Brauche kurz die Scene-UUID(s) die aktuell hängen (oder „alle non-done dialog_shots der letzten 24 h"). Default falls keine Angabe: nur die letzte fehlgeschlagene Scene aus dem aktuellen Vorfall (`9a1787ae-c83b-4fd8-af7d-de6ab2d54518`).
+- Clear `job_id`, `output_url`, `started_at`, `finished_at`.
+- Clear `preclip_url` (force a fresh preclip render so a stale Lambda URL or stale face-gate result cannot wedge the retry).
+- Keep `done` sibling passes untouched.
 
-## Nicht angefasst
-- Pricing/Plan (`sync-so-pro-model-policy`)
-- Webhook-Stage-5 Logik außerhalb des Retry-Clear-Blocks
-- Credit-Refund Idempotenz
-- Composer-Scenes / Frontend
+In `compose-dialog-segments` `isRetry` path: re-render the preclip if `preclip_url` is null; do not reuse the dead `job_id`.
+
+### 3. Watchdog — recover, don't kill
+
+In `lipsync-watchdog`:
+
+- Treat a `retrying` pass with no live/current `job_id` as dispatchable: invoke `compose-dialog-segments` for that pass.
+- Only fail the scene as `watchdog_provider_timeout` when **all** non-done passes have either truly stale `job_id`s OR are exhausted on retry budget.
+- Keep current 10-minute provider TTL for live jobs (sync-3 typical runtime is under that for the short single-face preclips we send — minutes, not the 10-15 min the docs quote for a full 30s video).
+- Increase only the safety-cap `STALE_HARD_MS` from 20 → 25 minutes to give the recovery one extra cycle on slow ticks. No other timeout changes.
+
+### 4. Recover the current failed scene `cba18767-be99-454a-95b8-939d6ad6f107`
+
+- Reset only Samuel's pass (idx 0): `status='pending'`, `job_id=null`, `output_url=null`, `preclip_url=null`, `last_error=null`, `last_error_class=null`, `retry_count=0`.
+- Preserve Matthew / Kailee / Sarah as `done` with their `output_url`s.
+- Scene: `lip_sync_status='running'`, `twoshot_stage='syncso_fanout_3_of_4'`, `clip_error=null`, `dialog_shots.status='rendering'`, `dialog_shots.refunded=false`, clear `dialog_shots.error` and `dialog_shots.finished_at`.
+
+This lets the watchdog/dispatcher run only Samuel through the new unified preclip path, then trigger audio-mux when all 4 are done.
+
+### 5. Documentation
+
+- New `mem://architecture/lipsync/v126-unified-preclip-pipeline.md`: "All N (1..4) use single-face preclip + sync-3 + auto_detect + cut_off. Full-plate dispatch and variant ladder removed. Refund + clean fail if preclip cannot be produced."
+- Update `mem://index.md` entry for sync-3 doc-strict options.
+
+## Technical Notes
+
+- `pass-face-preclip.ts` already handles 720p+ output and the v116 face-gate expansion ladder; no change needed.
+- `sanitizeSync3Options` already strips disallowed keys; with the variant branches removed the sanitizer becomes a belt-and-suspenders check.
+- `update_dialog_pass_slot` RPC stays the only write path for per-pass patches; sibling races stay safe.
+- `MAX_INFLIGHT = 4` Sync.so concurrency guard, `update_dialog_pass_slot`, audio-mux dispatch, refund logic — all unchanged.
+
+## Validation
+
+- DB: next `syncso_dispatch_log` rows for any new pass must have `meta.dispatch_video_kind='preclip'`, `meta.payload_summary.options.active_speaker_detection.auto_detect=true`, no `bounding_boxes_url`, no `bounding_boxes`, no `coordinates`.
+- Scene `cba18767…` finishes (`lip_sync_status='applied'`, `clip_url` set) within ~3-5 minutes after Samuel re-dispatch.
+- No `provider_unknown_error` retries on a pass that still has a valid preclip.

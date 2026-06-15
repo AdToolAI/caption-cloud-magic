@@ -1985,10 +1985,7 @@ serve(async (req) => {
 
 
     // ── Concurrency guard ────────────────────────────────────────────────
-    // v126 recovery: cap reverted 6 → 4 (Sync.so Creator $19 plan = 4 slots).
-    // v127 (parallel 6-slot) is SUPERSEDED — see
-    // mem/architecture/lipsync/v126-recovery-reference.md
-    const MAX_INFLIGHT = 4;
+    const MAX_INFLIGHT = 4; // v98: raised from 3 so 4-speaker scenes dispatch in one wave
     const inflightCount = await countInflightSyncJobs(supabase, 10);
     if (inflightCount >= MAX_INFLIGHT) {
       console.warn(
@@ -3992,7 +3989,6 @@ serve(async (req) => {
       const rawCap = (cFlag as any)?.value;
       const parsedCap = typeof rawCap === "number" ? rawCap : Number(rawCap);
       if (Number.isFinite(parsedCap) && parsedCap >= 1) {
-        // v126 recovery: hard ceiling reverted 6 → 4 (Sync.so Creator $19 plan).
         concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
       }
     } catch { /* defaults */ }
