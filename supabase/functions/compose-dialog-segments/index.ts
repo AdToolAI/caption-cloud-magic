@@ -1987,10 +1987,27 @@ serve(async (req) => {
           Math.round(Number(oldCoord[0])) !== Math.round(Number(freshCoord[0])) ||
           Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
         if (changed) {
+          // v123 — Stale-Preclip Invalidation: alle vom alten coord abhängigen
+          // Felder löschen, sonst reuse renderPassFacePreclip den bereits
+          // gerenderten Crop (zentriert auf OLD coords) → Sync.so animiert
+          // den falschen Bereich, audio-mux pasted Garbage (z.B. Pflanzen-
+          // Overlay) zurück. Vergleiche dialog_shots für Scene 785168d1…
+          (p as any).preclip_url = null;
+          (p as any).preclip_crop = null;
+          (p as any).preclip_render_id = null;
+          (p as any).preclip_bbox_drift_rejected = false;
+          (p as any).preclip_error = null;
+          (p as any).preclip_face_count = null;
+          if (p.status === "done" || p.status === "failed") {
+            (p as any).output_url = null;
+            (p as any).job_id = null;
+            (p as any).last_error = null;
+            p.status = "pending";
+          }
           p.coords = [freshCoord[0], freshCoord[1]];
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} ADVANCE COORDS REFRESH pass=${p.idx} ` +
-            `speaker=${p.speaker_name} old=${JSON.stringify(oldCoord)} new=${JSON.stringify(p.coords)} source=${freshSource}`,
+            `[compose-dialog-segments] scene=${sceneId} v123 ADVANCE COORDS REFRESH + PRECLIP INVALIDATE ` +
+            `pass=${p.idx} speaker=${p.speaker_name} old=${JSON.stringify(oldCoord)} new=${JSON.stringify(p.coords)} source=${freshSource}`,
           );
         }
       }
