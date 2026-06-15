@@ -1,10 +1,12 @@
 ---
-name: v127 Parallel 6-Slot Dispatch
-description: Sync.so concurrency cap raised 4→6 to match Creator+ $49/mo plan; 5- and 6-speaker scenes now dispatch in one wave
+name: v127 Parallel 6-Slot Dispatch (SUPERSEDED)
+description: SUPERSEDED — Sync.so concurrency cap reverted 6 → 4 after multi-speaker regressions. See v126-recovery-reference.md. Kept for historical context only.
 type: feature
 ---
 
-# v127 — Parallel 6-Slot Dispatch (Sync.so Creator+ Plan)
+# v127 — Parallel 6-Slot Dispatch (SUPERSEDED — reverted to v126 cap=4)
+
+> **STATUS: SUPERSEDED.** The 6-slot cap caused multi-speaker scene failures. The pipeline is back on v126 (MAX_INFLIGHT=4, Math.min(4,…), system_config = 4). Do NOT re-raise the cap without a full reproduction plan. Source of truth: `v126-recovery-reference.md`.
 
 **Activated:** June 15, 2026. Builds on top of v126 (FROZEN — see `v126-recovery-reference.md`).
 
