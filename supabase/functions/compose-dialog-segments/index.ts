@@ -3634,8 +3634,9 @@ serve(async (req) => {
       payload_video_url: dispatchVideoUrl,
       // v106 — full options-key list so any future doc-drift (unsupported
       // field smuggled into sync-3) is visible in dispatch logs.
-      options_keys: Object.keys(syncOptions),
-      v106_doc_strict_scrub: payloadModel === SYNC3_MODEL,
+      options_keys: Object.keys(payloadOptions),
+      v124_stripped_opts: v124Sanitized.strippedOpts,
+      v124_stripped_asd: v124Sanitized.strippedAsd,
     };
     (pass as any)._v105_probe = v105Probe;
     (pass as any)._v106_probe = v105Probe;
