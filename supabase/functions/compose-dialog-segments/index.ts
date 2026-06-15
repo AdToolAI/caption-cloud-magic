@@ -1985,11 +1985,10 @@ serve(async (req) => {
 
 
     // ── Concurrency guard ────────────────────────────────────────────────
-    // v127: raised 4 → 6 (Sync.so Creator+ $49 plan = 6 concurrent slots).
-    // Lets 5- and 6-speaker scenes dispatch in a single wave and keeps 2
-    // slots free for a parallel composer run / retry. See
-    // mem/architecture/lipsync/v127-parallel-6-slots.md
-    const MAX_INFLIGHT = 6;
+    // v126 recovery: cap reverted 6 → 4 (Sync.so Creator $19 plan = 4 slots).
+    // v127 (parallel 6-slot) is SUPERSEDED — see
+    // mem/architecture/lipsync/v126-recovery-reference.md
+    const MAX_INFLIGHT = 4;
     const inflightCount = await countInflightSyncJobs(supabase, 10);
     if (inflightCount >= MAX_INFLIGHT) {
       console.warn(
