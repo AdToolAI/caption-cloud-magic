@@ -1037,7 +1037,8 @@ serve(async (req) => {
             body: JSON.stringify({
               scene_id: sceneId,
               retry: true,
-              retry_variant: nextVariant,
+              // v126 — always force unified preclip-autodetect path.
+              retry_variant: "coords-pro",
               repair_audio: needsAudioRepair,
               pass_idx: currentPass,
               ...(carryForceMultipass ? { force_multipass: true } : {}),
