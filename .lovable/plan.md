@@ -1,45 +1,86 @@
+# v123 — Stale-Preclip Invalidation on Coords Refresh
 
 ## Symptom
+Im Multi-Speaker-Dialog (4 Sprecher) bewegt nur Sprecher 4 die Lippen. Bei Sprecher 1–3 erscheint ein verpixeltes Overlay (z. B. Pflanze) — kein animierter Mund.
 
-In Multi-Speaker-Szenen (3–4 Sprecher) animiert Sync.so nur den letzten Sprecher korrekt; alle anderen behalten geschlossene Münder. Beispiel-Szene `cf3cb5d2…`: nur Pass 3 hat `preclip_crop` deckungsgleich mit `coords`; Pass 1+2 liegen 130–300 px daneben → Preclip enthält das Nachbargesicht, Sync.so lippt am falschen Mund.
+## Root Cause (verifiziert an Scene `785168d1…`)
+Im Edge-Log sieht man:
 
-## Ursache
+```text
+ADVANCE COORDS REFRESH pass=0 speaker=Samuel old=[618,377] new=[839,202] source=identity
+ADVANCE COORDS REFRESH pass=3 speaker=Sarah  old=[1045,375] new=[204,232] source=identity
+```
 
-`compose-dialog-segments/index.ts` baut den Preclip aus `bboxForCrop` (Plate-Bbox aus Face-Map oder `speakerPlateBboxes[speaker_idx]`). Wenn diese Bbox driftet oder falsch zugeordnet ist, crop'd der Renderer um den Nachbarn. Der `validateFrameFace`-Gate prüft nur "genau 1 Gesicht", nicht ob es der **richtige** Sprecher ist. Beim Mux überlagert `render-sync-segments-audio-mux` den Sync.so-Output an `preclip_crop` (nicht an `coords`) → Lipsync landet sichtbar an der falschen Stelle, der echte Sprecher bleibt stumm.
+In der DB (`dialog_shots.passes`):
 
-## Fix (v122) — drei Stellen
+| Pass | persisted coords | preclip_crop center | passt? |
+|------|------------------|--------------------|--------|
+| 0    | (618, 377)       | (618, 376)          | passt zu **alten** coords, neue coords (839,202) liegen außerhalb |
+| 1    | (536, 200)       | (758, 372)          | drift ~220 px — Crop liegt auf Hintergrund (Pflanze) |
+| 2    | (1173, 235)      | (902, 374)          | drift ~270 px — gleiches Muster |
+| 3    | (204, 232)       | (204, 232)          | korrekt (frisch gerendert nach Refresh) |
 
-### 1. `supabase/functions/compose-dialog-segments/index.ts` (~Zeile 2495–2540, vor `renderPassFacePreclip`)
+`v87 — ADVANCE COORDS REFRESH` (compose-dialog-segments, Z. 1976–1997) aktualisiert nur `p.coords`, **invalidiert aber nicht** den bereits gerenderten Preclip (`preclip_url`, `preclip_crop`, `preclip_render_id`, `output_url`, `status`). Folge:
+1. Pass läuft mit alten Koordinaten durch, Preclip wird gerendert + als `status='done'` persistiert.
+2. Auf der nächsten Dispatcher-Iteration werden coords per `v87` korrigiert.
+3. Das bestehende Preclip-Asset bleibt gespeichert — Sync.so animiert weiter den falschen Ausschnitt, Audio-Mux klebt den animierten Crop wieder auf die alte (jetzt falsche) Position → "Pflanzen-Overlay".
 
-Coords als Single-Source-of-Truth durchsetzen:
+Zusätzlich greift `v122 coordsInsideCrop` nur, wenn `bboxForCrop` gesetzt ist (`&& bboxForCrop`, Z. 2551). Wenn der stale Crop coords-zentriert war (Pass 0) ODER coords sich nach dem Preclip-Bake noch ändern, läuft der Re-Render-Guard nie.
 
-- Nach Berechnung von `bboxForCrop` einen **Coords-Containment-Check** ergänzen:
-  - Berechne den Crop, den `renderPassFacePreclip` aus `bbox` ableiten würde (gleiche Padding-/Square-Logik). 
-  - Wenn `coords` außerhalb dieses Crop-Quadrats liegt (oder >25 % Abstand zum Crop-Zentrum), verwirf `bboxForCrop` und übergib `null` → Renderer fällt auf den coords-zentrierten Square-Crop zurück (die Logik existiert bereits für den `null`-Fall).
-  - Log: `v122_bbox_drift_rejected speaker=${p.speaker_idx} coords=${coords} bbox_center=${cx,cy} delta_px=${d}`.
+## Fix v123
 
-### 2. Face-Gate verschärfen (~Zeile 2545–2565)
+### 1. `compose-dialog-segments/index.ts` (~Z. 1976–1997)
+Im v87-Refresh-Block: wenn sich `coords` für einen Pass effektiv ändert, vor dem `console.log` zusätzlich:
 
-Nach `validateFrameFace` zusätzlich `targetCoords` übergeben (heute `null`):
+```ts
+if (changed) {
+  // Stale-Preclip invalidieren — alle Felder, die mit den alten coords
+  // gebacken wurden, müssen weg, damit renderPassFacePreclip neu rendert.
+  (p as any).preclip_url = null;
+  (p as any).preclip_crop = null;
+  (p as any).preclip_render_id = null;
+  (p as any).preclip_bbox_drift_rejected = false;
+  (p as any).preclip_error = null;
+  (p as any).preclip_face_count = null;
+  // Wenn der Pass schon „done" war, zurücksetzen, damit der Dispatcher
+  // ihn neu in die Render-Queue nimmt.
+  if (p.status === "done" || p.status === "failed") {
+    (p as any).output_url = null;
+    (p as any).job_id = null;
+    (p as any).last_error = null;
+    p.status = "pending";
+  }
+  p.coords = [freshCoord[0], freshCoord[1]];
+  console.log(
+    `[compose-dialog-segments] scene=${sceneId} v123 ADVANCE COORDS REFRESH + PRECLIP INVALIDATE ` +
+    `pass=${p.idx} speaker=${p.speaker_name} old=${JSON.stringify(oldCoord)} new=${JSON.stringify(p.coords)} source=${freshSource}`,
+  );
+}
+```
 
-- Übergib die **preclip-lokalen** Koordinaten des Sprechers (coords − crop.x/y, skaliert auf `outputSize`).
-- Wenn das detektierte Gesicht im Preclip mehr als ~30 % der `outputSize` von diesen Soll-Koordinaten entfernt ist, markiere den Preclip als `face_gate_wrong_speaker` und re-rendere **einmal** mit erzwungenem coords-Crop (`bbox = null`). Erst wenn auch das fehlschlägt: `preclip_error` setzen und Pass auf full-plate `coords-pro` (Variante wie Pass 0 in der Beispiel-Szene) zurückfallen lassen.
+### 2. `compose-dialog-segments/index.ts` (~Z. 2551)
+v122-Guard härten — `&& bboxForCrop` entfernen, damit jeder Drift ≥ 35 % zu einem Re-Render mit `bbox=null` führt (auch wenn der ursprüngliche Crop bereits coords-zentriert war, kann nach Refresh ein Drift entstehen):
 
-### 3. `render-sync-segments-audio-mux/index.ts` (Zeile 236–256) — Defense in Depth
+```ts
+if (preclip.ok && preclip.crop && !coordsInsideCrop(preclip.crop)) {
+  // ...re-render mit bbox=null erzwingt coords-zentrierten Crop
+}
+```
 
-Im `hasPreclipCrop`-Zweig zusätzlich prüfen, ob `coords` innerhalb des `preclip_crop`-Quadrats liegen. Wenn nicht, **ignoriere** `preclip_crop` und nutze stattdessen den `faceMask`-Zweig (Kreis um die echten `coords`). Verhindert, dass historisch falsch geschriebene Passes (wie `cf3cb5d2…`) beim Re-Mux erneut am falschen Ort landen.
+### 3. Recovery für die laufende Scene
+Einmalig SQL: für `785168d1-066e-440f-9a1f-850d29080e55` (und ggf. andere Scenes mit `coords` außerhalb `preclip_crop`) `passes[i].status='pending'`, `preclip_*=null`, `output_url=null` setzen und `lip_sync_status=null`, dann `compose-dialog-segments` per `pass_idx=0` neu antriggern. UI re-rendert automatisch via Webhook.
 
-## Verifizierung
-
-1. Reset & Re-Run der Beispiel-Szene `cf3cb5d2…` und einer fresh 4-Sprecher-Szene.
-2. Edge-Logs prüfen: jeder Pass sollte `v122_preclip_crop_centered_on_coords` oder `v122_bbox_drift_rejected` loggen.
-3. Im finalen Mux: alle 4 Sprecher bewegen den Mund in ihrem jeweiligen Turn.
-4. DB-Spot-Check: für jeden `done` Pass mit `preclip_crop` muss `|coords − crop_center| < crop.size/2` gelten.
-
-## Memory
-
-Neue Doku unter `mem/architecture/lipsync/v122-coords-as-preclip-truth.md`; `mem/index.md` aktualisieren.
+### 4. Memory + Deploy
+- Neue Datei `mem/architecture/lipsync/v123-stale-preclip-invalidation.md` mit Symptom, Root Cause, Fix, „Frozen Invariant: coords-change MUST clear preclip".
+- `mem/index.md` Eintrag.
+- Deploy `compose-dialog-segments`.
 
 ## Out of Scope
+- Warum die initialen coords (vor `identity`-Refresh) so weit drifteten — separate Identity/Anchor-Caching-Untersuchung.
+- Verbesserung der `speakerPlateBboxes`-Generierung (uniformer Stride statt echter Face-Detection).
+- `render-sync-segments-audio-mux` — die v122-„Defense in depth"-Maßnahme bleibt unverändert wirksam für Altscenes.
 
-- Sync.so v3 `v3: true` ASD-Flag, `webhook_url`-Dublette, hardcoded 24 fps für `bounding_boxes_url`, `/v2/generate` vs `/v2/generations` Pfad — alles aus dem Audit, aber **unabhängig** vom aktuellen "falscher Mund"-Symptom. Eigene Iteration.
+## Verification
+- Edge-Log: bei jedem `v87`-Refresh erscheint zusätzlich `v123 … PRECLIP INVALIDATE`.
+- DB-Spot-Check: nach Re-Run von `785168d1…` muss für jeden Pass mit `status='done'` gelten: `|coords − crop_center| ≤ crop.size * 0.35`.
+- Visueller Check: alle 4 Sprecher animieren ihre Münder, kein Pflanzen-/Hintergrund-Overlay.
