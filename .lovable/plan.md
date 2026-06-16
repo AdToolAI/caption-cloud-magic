@@ -1,103 +1,173 @@
-# v129.0 — Sync.so Output Authenticity & Payload Contract (start NOW, read-only)
+# v129.1 — Sync.so Payload-Contract Hotfix (Surgical)
 
-**Updated rule:** v128 soak no longer blocks read-only forensics or a narrowly-scoped, proven payload fix. It still blocks any change to state machine, Watchdog, locking, retry, Plan-D.
+**Gate:** v129.0 Classification A accepted (16/17 Multi-Speaker passes dispatched with `auto_detect:true` + `coords_sent:null`, violating v106 doc-strict).
 
-> *v128 prevented the pipeline from looping on itself. Now we must prevent it from stably producing wrong results.*
+**Goal:** Force Sync.so to receive deterministic target-speaker coordinates in Preclip-space for every Multi-Speaker pass that has persisted plate-space coords. Nothing else.
 
-## 1. Reframe the v128 soak
+---
 
-- Soak continues **as background telemetry only**.
-- Validity signals unchanged: zero terminal recycles, zero duplicate dispatches, zero lock bypasses, zero Watchdog redispatches, zero Plan-D dispatches.
-- Soak does **not** gate forensics anymore.
+## Hard Scope Boundary
 
-## 2. Close Stitch Forensics track
+**In scope** (touch ONLY these):
+- Sync.so request builder for Multi-Speaker passes inside `compose-dialog-segments` (the function that builds `options.active_speaker_detection`)
+- Dispatch-time preflight assertion
+- `syncso_dispatch_log.meta` payload persistence (no schema change — column is already `jsonb`)
+- Idempotent credit refund path on preflight block (re-use existing refund util)
 
-Already done — `docs/lipsync/v128-stitch-forensics.md` is marked CLOSED (Classification E confirmed). No further work on Stitch/Composite/Lambda.
+**Out of scope — do NOT modify:**
+- State Machine / pass status enum (beyond reusing existing `PASS_FAILED_PROVIDER` with new meta)
+- `transitionPass`, `withDialogLock`
+- Watchdog (`poll-dialog-shots`), Plan-D, Terminal-Protection
+- Retry logic, user-retry UI
+- Model selection (no `lipsync-2-pro` swap, no `sync-2`)
+- Segments API
+- Stage 4 A/B
+- `bounding_boxes_url` default behavior (preserve existing explicit path; do not promote)
+- SUSPECT-Badge or any UI work
+- Stitch / Composite / Lambda
+- v128 invariants
 
-## 3. v129.0 — start immediately, read-only
+---
 
-**Goal:** prove what the actual outbound Sync.so request looks like per pass, and why `output_url` ≈ `input_url`.
+## Implementation
 
-### 3.1 Allowed (read-only)
+### 1. Plate → Preclip coordinate transform
 
-- SELECT on `composer_scenes`, `syncso_dispatch_log`, `syncso_inflight_jobs`, `dialog_dispatch_locks`.
-- HTTP `GET https://api.sync.so/v2/generate/:id` for known `provider_job_id` (using existing `SYNCSO_API_KEY`).
-- Download `input_preclip_url`, `sync_output_url`, `audio_url` to `/tmp/v129/`.
-- ffprobe / ffmpeg / PIL for pixel + audio diffs.
-- Writes only to `docs/lipsync/v129-syncso-output-authenticity.md` and `/mnt/documents/v129-syncso-rois/`.
+For each Multi-Speaker pass with persisted `meta.coords` (plate-space) AND `meta.preclip_crop`:
 
-### 3.2 Forbidden (hard guardrails)
-
-- No edits to: state machine, `transitionPass`, `withDialogLock`, Watchdog, Plan-D kill-switch, retry logic, dispatch logic.
-- No edits to: `compose-dialog-segments`, `compose-dialog-scene`, `poll-dialog-shots`, `sync-so-webhook`, `render-sync-segments-audio-mux`, Lambda templates.
-- No edits to Sync.so request builder / v105 / v106 / v124 / v126 paths.
-- No DB mutation, re-render, model swap (lipsync-2-pro), Segments API experiment, Stage 4 A/B, User-Retry, SUSPECT badge UI.
-
-### 3.3 Sample set
-
-- Scene N: `225ea521-7e18-4a02-b279-6f172db4ffd0` (re-use Stitch-Forensik data).
-- ≥ 2 additional dialog scenes from the most recent 48h, each with multiple passes and ≥ 2 speakers.
-
-### 3.4 Per-pass evidence table
-
-One row per `(scene_id, pass_idx, speaker_id)`:
-
-| field | source |
-|---|---|
-| scene_id, pass_idx, speaker_id | composer_scenes |
-| provider_job_id | syncso_dispatch_log |
-| input_preclip_url, sync_output_url, audio_url | dispatch log / pass record |
-| persisted coords + preclip_crop | composer_scenes |
-| **actual `options.active_speaker_detection`** | `syncso_dispatch_log.request_payload` |
-| Sync.so GET `/v2/generate/:id` options | provider API |
-| `_v105_probe.asd_auto_detect`, `asd_has_coordinates` | dispatch log |
-| input↔output mean pixel diff | ffmpeg/PIL |
-| mouth/face ROI diff (audio-active frames) | ffmpeg/PIL |
-| audio RMS / non-silent, audio duration vs preclip | ffprobe |
-| **classification A/B/C/D** | analysis |
-
-### 3.5 Classification
-
-- **A — Internal builder bug.** Actual request has `auto_detect:true` and no coords despite persisted coords. → triggers v129.1 hotfix (see §4).
-- **B — Coordinate-space / frame bug.** Coords present but in wrong space (plate-space vs 720×720) or invalid `frame_number`. → triggers v129.1 hotfix (see §4).
-- **C — Provider no-op.** Request is doc-strict, audio non-silent, preclip valid — Sync.so still returns passthrough. → Sync.so support escalation bundle (`provider_job_id`, request JSON, input/output URLs, ROI-diff PNG). **No code change.**
-- **D — Validator gap.** No-op currently classified as `PASS_DONE` instead of `PASS_DONE_SUSPECT`. → Backlog as Stage 3.5 Pixel Authenticity Validator (separate later track).
-
-## 4. Conditional v129.1 — Payload Contract Hotfix (only if A or B is proven)
-
-**Gate:** at least one row in v129.0 classified A or B with linked evidence.
-
-**Tight scope:**
-- Sync.so request builder / ASD payload only.
-- Enforce doc-strict ASD: when persisted coords exist for a multipass pass, send `auto_detect:false` + valid `frame_number` + `coordinates:[x,y]`; never send `auto_detect:true` alongside known coords.
-- Add `actual_sync_request.json` persistence at dispatch time (insert into existing `syncso_dispatch_log.request_payload`; no new table, no schema change).
-- Preflight assertion: if persisted coords exist but payload would omit them → log + block dispatch for that pass (pass goes to `PASS_FAILED_PAYLOAD_PRECHECK`, idempotent refund via existing automation, no retry).
-
-**Out of scope for v129.1:**
-- State machine, Watchdog, locking, retry, Plan-D.
-- Model swap, Segments, bounding_boxes_url, Stage 4 A/B.
-- UI changes, SUSPECT badge.
-
-**Rollout:**
-- Canary on a single user / single scene.
-- Compare `actual_sync_request.options.active_speaker_detection` before/after fix.
-- Compare `sync_output_url` mouth-ROI diff vs `input_preclip_url` to confirm Sync.so now produces motion.
-
-## 5. Files touched by this plan
-
-- `docs/lipsync/v129-syncso-output-authenticity.md` — **already exists as skeleton**; will be filled with real rows + classifications as v129.0 runs.
-- `/mnt/documents/v129-syncso-rois/` — pixel evidence per pass.
-- `.lovable/plan.md` — updated to reflect "start NOW, soak is background-only".
-- No production source files touched in v129.0. v129.1 file scope is decided only after A/B proof.
-
-## 6. Decision flow
-
-```text
-v129.0 forensics (now, read-only)
-        │
-        ├── A or B proven ──► v129.1 hotfix (surgical, payload only) ──► canary
-        ├── C proven ──────► Sync.so support escalation, no code change
-        └── D only ────────► backlog Stage 3.5 Pixel Authenticity Validator
+```ts
+const scale = preclip_crop.outputSize / preclip_crop.size;
+const xPrime = Math.round((plateX - preclip_crop.x) * scale);
+const yPrime = Math.round((plateY - preclip_crop.y) * scale);
 ```
 
-Stage 4 A/B (manual coords vs bounding_boxes_url vs hybrid) remains deferred until v129.0 classification is in hand.
+Build payload:
+
+```json
+{
+  "options": {
+    "active_speaker_detection": {
+      "auto_detect": false,
+      "frame_number": <persisted>,
+      "coordinates": [xPrime, yPrime]
+    }
+  }
+}
+```
+
+`preclip_auto_detect` branch is **disabled** for Multi-Speaker when coords + preclip_crop exist.
+
+### 2. Bounds check — no silent clamping
+
+If `xPrime` or `yPrime` lies outside `[0, outputSize)`:
+- **Do not clamp.**
+- Block dispatch (see §4).
+
+### 3. Precedence (preserve bbox_url outlier)
+
+1. Explicit valid `bounding_boxes_url` set → use it unchanged.
+2. Else, persisted coords + preclip_crop present → doc-strict transform (§1).
+3. Else → `DISPATCH_BLOCKED_PAYLOAD_PRECHECK`.
+
+`bbox_url` is **not** promoted to default. Stage 4 territory.
+
+### 4. Preflight assertion (hard block)
+
+Before any Sync.so HTTP call, assert:
+
+- If persisted coords exist AND payload would send `auto_detect:true` → block.
+- If transformed coords out of bounds → block.
+
+On block:
+- No Sync.so request issued.
+- No retry, no `transitionPass` to retry state.
+- Mark `sync_status = 'DISPATCH_BLOCKED_PAYLOAD_PRECHECK'` on dispatch log.
+- Pass-level status: reuse existing `PASS_FAILED_PROVIDER` (avoid new enum value to keep scope tight) with meta:
+  ```json
+  {
+    "error_class": "internal_payload_contract_violation",
+    "provider_call_made": false,
+    "refund_reason": "dispatch_blocked_payload_precheck"
+  }
+  ```
+- Idempotent refund via existing reservation refund util (keyed on `reservation_id` to stay safe under re-dispatch).
+
+### 5. Outbound payload persistence
+
+On every dispatch (success path or block), write to `syncso_dispatch_log.meta`:
+
+```json
+{
+  "v1291_payload_contract": true,
+  "outbound_payload": { "model": "sync-3", "options": { ... full options ... } },
+  "coord_transform": {
+    "source_space": "plate",
+    "target_space": "preclip",
+    "plate_coords": [302, 103],
+    "preclip_crop": { "x": 184, "y": 0, "size": 234, "outputSize": 720 },
+    "scale": 3.0769,
+    "transformed_coords_float": [363.07, 316.92],
+    "transformed_coords_int": [363, 317]
+  }
+}
+```
+
+Signed URLs in payload are redacted; `options.active_speaker_detection` is stored verbatim.
+
+Update `meta.v116_diag`:
+- `coords_sent`: now the transformed `[x', y']`
+- `asd_mode`: `"preclip_coords_doc_strict"` (was `"preclip_auto_detect"`)
+
+---
+
+## Canary
+
+- **1 user / 1 new Multi-Speaker scene**, sync-3, cut_off, existing `force_multipass`.
+- No model swap, no A/B.
+
+### Pre-deploy log signature
+```
+asd_mode = preclip_auto_detect
+coords_sent = null
+active_speaker_detection.auto_detect = true
+```
+
+### Post-deploy log signature
+```
+asd_mode = preclip_coords_doc_strict
+coords_sent = [x', y']
+active_speaker_detection.auto_detect = false
+frame_number = <int>
+```
+
+### Success criteria (ALL must hold)
+1. `meta.outbound_payload.options.active_speaker_detection.auto_detect === false` and transformed `coordinates` present.
+2. No `DISPATCH_BLOCKED_PAYLOAD_PRECHECK` on the canary scene.
+3. Sync.so returns `completed`.
+4. **Mouth/face ROI diff** between `sync_output_url` and `input_preclip_url` during audio-active frames is non-trivial (per-frame diff, not whole-image mean).
+5. `final_url` composites Sync.so output as before — no Stitch regression.
+6. v128 invariants intact: no terminal recycles, no duplicate dispatches, no lock bypass, no Plan-D escapes, no Watchdog redispatches.
+
+### If still no-op after doc-strict payload
+- Do NOT swap model.
+- Reopen as Classification B/C:
+  - Re-verify coords actually land on face in preclip frame_number.
+  - Re-verify audio non-silent / duration match / preclip integrity.
+- Only then prepare Sync.so support bundle.
+
+---
+
+## Files touched
+
+- `supabase/functions/compose-dialog-segments/index.ts` — request builder + preflight only (around existing `sanitizeSync3Options` / ASD construction).
+- `docs/lipsync/v129-implementation.md` — new, documents transform formula, preflight, log signatures, canary.
+- `.lovable/plan.md` — flip v129.1 from "Conditional" to "Active", document canary plan.
+- `mem://architecture/lipsync/sync-3-doc-strict-options-v106` — append v129.1 enforcement note.
+
+No DB migration. No new edge function. No new table. No new column.
+
+---
+
+## Explicit non-goals (re-stated)
+
+No State Machine, no Watchdog, no Retry, no Plan-D, no User-Retry, no `lipsync-2-pro`, no Segments, no Stage 4 A/B, no SUSPECT UI, no `bbox_url` promotion, no Stitch touch, no v128 changes.
