@@ -379,20 +379,17 @@ serve(async (req) => {
       } catch (e) {
         console.warn(`[lipsync-watchdog] dispatch-recovery crash scene=${d.id}: ${(e as Error).message}`);
       }
-      continue; // give it a tick before considering failure
+      return; // give it a tick before considering failure
     }
 
     // ── (3) Stale-failure (last resort, only past hard TTL or true preflight) ─
-    if (ageMs < STALE_PREFLIGHT_MS) continue;
+    if (ageMs < STALE_PREFLIGHT_MS) return;
     const hasJob = await hasRecordedProviderJob(supabase, d);
 
     let reason: string | null = null;
     if (ageMs > STALE_HARD_MS) {
       reason = "watchdog_hard_timeout";
     } else if (d.twoshot_stage === "circuit_open" && ageMs > STALE_PROVIDER_MS) {
-      // v32: a scene parked on circuit_open past the 10-min provider TTL is
-      // never going to recover — the Sync.so 3-speaker plate was rejected
-      // without an error_code. Fail terminal so the user sees a real reason.
       reason = "syncso_provider_unknown_no_code_after_retries";
     } else if (!hasJob && ageMs > STALE_PREFLIGHT_MS) {
       reason = "watchdog_preflight_aborted";
@@ -400,10 +397,6 @@ serve(async (req) => {
       const polledThisTick = polled.some((p) => p.scene_id === d.id);
       if (!polledThisTick) reason = "watchdog_provider_timeout";
     } else if (isV5Fanout && ageMs > 12 * 60_000) {
-      // v120 — Zombie guard. Scene running >12min: if NO pass is currently
-      // `rendering` with a live job_id (i.e. only `retrying`/`pending` ghosts
-      // or exhausted `failed`), AND there are recent FAILED dispatch_log
-      // rows in the last 5min, terminate with refund.
       const passes120: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
       const liveRendering = passes120.some((p) => {
         if (String(p?.status ?? "") !== "rendering") return false;
@@ -426,7 +419,7 @@ serve(async (req) => {
         } catch { /* tolerate */ }
       }
     }
-    if (!reason) continue;
+    if (!reason) return;
 
     const uid = await userIdForProject(supabase, d.project_id);
     const refundCredits = Number(d.dialog_shots?.cost_credits) || 0;
@@ -439,6 +432,7 @@ serve(async (req) => {
       syncApiKey,
     });
     failed.push({ scene_id: d.id, reason });
+    }, { ttlSeconds: 30, maxAttempts: 3 });
   }
 
   console.log(
