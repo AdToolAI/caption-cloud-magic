@@ -483,16 +483,40 @@ serve(async (req) => {
           (inputHead.bytes != null && outputHead.bytes != null && inputHead.bytes === outputHead.bytes))
       );
       const syncOutputResolutionRegression = expectedPreclipAxis >= 720 && minOutputAxis > 0 && minOutputAxis < 720;
-      if ((syncOutputUnchanged || syncOutputResolutionRegression) && Number(passBeforeDone?.retry_count ?? 0) < 2) {
+      // v127 — Re-encoded-but-passthrough sniff. Sync.so sync-3 can return
+      // COMPLETED with a fully re-encoded MP4 that contains ZERO lip motion
+      // when the source plate is a near-static Hailuo render (no natural face
+      // motion for sync-3's auto_detect tracker to lock on). The byte-equal
+      // check above misses this because the file IS different (re-mux).
+      // Heuristic: when the output bytes are within ±35% of input bytes AND we
+      // haven't already tried lipsync-2-pro, eskalate to `coords-pro-lp2pro`
+      // (uses lipsync-2-pro) — handles near-static plates better in practice
+      // (verified on scene cba18767, Samuel + Matthew passes via local ffmpeg
+      // probe: mean pre↔out mouth-region delta ≈ 1.2 = re-encode noise floor,
+      // vs Kailee/Sarah ≈ 2.5+ = real lip motion).
+      const inBytes = Number(inputHead?.bytes ?? 0);
+      const outBytes = Number(outputHead?.bytes ?? 0);
+      const sizeRatio = inBytes > 0 && outBytes > 0 ? outBytes / inBytes : 0;
+      const priorVariant = String(passBeforeDone?.retry_variant ?? "");
+      const reencodedPassthroughSuspect = !syncOutputUnchanged &&
+        sizeRatio >= 0.65 && sizeRatio <= 1.35 &&
+        priorVariant !== "coords-pro-lp2pro";
+      const escalateToLp2pro = reencodedPassthroughSuspect;
+      const nextRetryVariant = escalateToLp2pro ? "coords-pro-lp2pro" : "coords-pro";
+      if ((syncOutputUnchanged || syncOutputResolutionRegression || reencodedPassthroughSuspect) && Number(passBeforeDone?.retry_count ?? 0) < 2) {
         const retryPasses = freshDonePasses.map((p: any, i: number) => i === currentPass
           ? {
               ...p,
               status: "retrying",
               retry_count: Number(p?.retry_count ?? 0) + 1,
-              retry_variant: "coords-pro",
+              retry_variant: nextRetryVariant,
               output_url: null,
-              sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
-              last_error: syncOutputResolutionRegression ? "sync_output_resolution_regression" : "sync_output_unchanged",
+              sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression, reencodedPassthroughSuspect, sizeRatio },
+              last_error: syncOutputResolutionRegression
+                ? "sync_output_resolution_regression"
+                : syncOutputUnchanged
+                  ? "sync_output_unchanged"
+                  : "sync_output_reencoded_passthrough_suspect",
               last_error_class: "sync_completed_noop",
               preclip_url: null,
             }
@@ -500,19 +524,19 @@ serve(async (req) => {
         await supabase.from("composer_scenes").update({
           dialog_shots: { ...freshDoneState, passes: retryPasses, status: "retrying", last_error_class: "sync_completed_noop" },
           lip_sync_status: "running",
-          twoshot_stage: `syncso_noop_retry_pass_${currentPass + 1}_of_${totalPasses}`,
+          twoshot_stage: `syncso_noop_retry_pass_${currentPass + 1}_of_${totalPasses}_${nextRetryVariant}`,
           updated_at: nowIso,
         }).eq("id", sceneId);
         await logSyncDispatch(supabase, {
           scene_id: sceneId, job_id: jobId, engine: "sync-segments", sync_status: "COMPLETED_NOOP_RETRY",
-          error_class: "sync_completed_noop", meta: { pass_idx: currentPass, inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
+          error_class: "sync_completed_noop", meta: { pass_idx: currentPass, inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression, reencodedPassthroughSuspect, sizeRatio, nextRetryVariant },
         });
         fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: "coords-pro", pass_idx: currentPass }),
+          body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: nextRetryVariant, pass_idx: currentPass }),
         }).catch(() => {});
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, retried: true, reason: "sync_completed_noop" });
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, retried: true, reason: nextRetryVariant === "coords-pro-lp2pro" ? "reencoded_passthrough_suspect" : "sync_completed_noop" });
       }
       if (freshDonePasses[currentPass]) {
         freshDonePasses[currentPass] = {
