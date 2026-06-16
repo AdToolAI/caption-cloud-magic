@@ -58,6 +58,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
   detectVoicedFrames,
+  detectVoicedRange,
   countInflightSyncJobs,
   emitSystemAlert,
   evaluateCircuit,
