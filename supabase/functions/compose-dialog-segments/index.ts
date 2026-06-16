@@ -2111,26 +2111,54 @@ serve(async (req) => {
           Math.round(Number(oldCoord[0])) !== Math.round(Number(freshCoord[0])) ||
           Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
         if (changed) {
-          // v123 — Stale-Preclip Invalidation: alle vom alten coord abhängigen
-          // Felder löschen, sonst reuse renderPassFacePreclip den bereits
-          // gerenderten Crop (zentriert auf OLD coords) → Sync.so animiert
-          // den falschen Bereich, audio-mux pasted Garbage (z.B. Pflanzen-
-          // Overlay) zurück. Vergleiche dialog_shots für Scene 785168d1…
+          // v128 — Alpha-Plan v3.1 §1.8: terminal coord-refresh guard.
+          // For terminal passes (done/failed) the v123 reset logic would
+          // silently flip status back to `pending`, violating the
+          // "terminal means terminal" invariant. We now record the new
+          // coord as a `candidate_coords` debug field, log a warning event,
+          // and leave the terminal pass UNTOUCHED. Only non-terminal
+          // passes get the legacy preclip-invalidate + coord-update.
+          const isTerminal = p.status === "done" || p.status === "failed";
+          if (isTerminal) {
+            (p as any).candidate_coords = [freshCoord[0], freshCoord[1]];
+            (p as any).candidate_coords_at = new Date().toISOString();
+            (p as any).candidate_coords_source = freshSource;
+            try {
+              await logSyncDispatch(supabase, {
+                scene_id: sceneId,
+                user_id: userId,
+                engine: "sync-segments",
+                sync_status: "COORD_REFRESH_SKIPPED",
+                error_class: "coord_refresh_terminal_blocked",
+                meta: {
+                  v128_guard: true,
+                  pass_idx: p.idx,
+                  speaker_idx: idx,
+                  speaker_name: p.speaker_name,
+                  old_coord: oldCoord,
+                  new_coord: [freshCoord[0], freshCoord[1]],
+                  source: freshSource,
+                  terminal_status: p.status,
+                  dispatch_source: "coord-refresh-skipped",
+                },
+              });
+            } catch { /* best-effort */ }
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v128 COORD-REFRESH-SKIPPED ` +
+              `pass=${p.idx} speaker=${p.speaker_name} status=${p.status} (terminal, candidate stored)`,
+            );
+            continue;
+          }
+          // Non-terminal: legacy v123 stale-preclip invalidation path.
           (p as any).preclip_url = null;
           (p as any).preclip_crop = null;
           (p as any).preclip_render_id = null;
           (p as any).preclip_bbox_drift_rejected = false;
           (p as any).preclip_error = null;
           (p as any).preclip_face_count = null;
-          if (p.status === "done" || p.status === "failed") {
-            (p as any).output_url = null;
-            (p as any).job_id = null;
-            (p as any).last_error = null;
-            p.status = "pending";
-          }
           p.coords = [freshCoord[0], freshCoord[1]];
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v123 ADVANCE COORDS REFRESH + PRECLIP INVALIDATE ` +
+            `[compose-dialog-segments] scene=${sceneId} v128 ADVANCE COORDS REFRESH (non-terminal) + PRECLIP INVALIDATE ` +
             `pass=${p.idx} speaker=${p.speaker_name} old=${JSON.stringify(oldCoord)} new=${JSON.stringify(p.coords)} source=${freshSource}`,
           );
         }
