@@ -3483,10 +3483,12 @@ serve(async (req) => {
           ? Number((audioFullSec - videoDurSec).toFixed(3))
           : null,
         v1291: v1291Diag,
+        preclip_ambiguity: v1291Ambiguity,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v1291_preclip_sync3 speaker=${pass.speaker_name} asd_mode=${asdMode} face_count=${passFaceCount} multi_speaker=${isMultiSpeaker} v1291=${JSON.stringify(v1291Diag)} block=${JSON.stringify((pass as any)._v1291_block ?? null)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v1291_preclip_sync3 speaker=${pass.speaker_name} asd_mode=${asdMode} face_count=${passFaceCount} multi_speaker=${isMultiSpeaker} ambiguity=${JSON.stringify(v1291Ambiguity)} v1291=${JSON.stringify(v1291Diag)} block=${JSON.stringify((pass as any)._v1291_block ?? null)}`,
       );
+
     }
 
     else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
