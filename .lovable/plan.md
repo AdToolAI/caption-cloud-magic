@@ -1,78 +1,76 @@
-Do I know what the issue is? Yes.
+# v127 — Center-Speaker Lip-Passthrough Fix
 
-The pipeline was working when **every** pass — single- or multi-speaker — went through the single-face preclip with `sync-3 + auto_detect + cut_off`. Recent changes re-introduced full-plate `bbox-url-pro` paths and per-variant escape hatches. For scene `cba18767-be99-454a-95b8-939d6ad6f107` the very first dispatch was `dispatch_video_kind: full_plate` with `bounding_boxes_url` → `provider_unknown_error` in 20s, then the pass stayed in `retrying` with the dead `job_id` until the watchdog killed the scene at ~10 min. The other 3 speakers, which did go through preclip+auto_detect, all succeeded.
+## Symptom (verified by user)
+Scene `cba18767…`: Audio läuft, **Lippen bewegen sich nicht** für Sprecher 1 (Samuel, slotIndex 2 / center-right) und Sprecher 2 (Matthew, slotIndex 1 / center-left). Sprecher 3 (Kailee, edge-right) und 4 (Sarah, edge-left) lipsyncen sauber.
 
-Goal: collapse the dispatch matrix to exactly **one** code path for N = 1..4.
+Alle 4 Passes liefen über die v126 unified Pipeline:
+`preclip 720×720 + sync-3 + active_speaker_detection.auto_detect:true + sync_mode:cut_off`, `preclip_face_count=1`, `status=done`, jede mit eigenem tight-WAV + eigener output_url.
 
-## Plan
+Das ist exakt das v112-Failure-Pattern: *„sync-3 returned COMPLETED but emitted the preclip unchanged"* — also **Passthrough**, kein echter Lipsync. Nur passiert er aktuell selektiv für die zwei mittleren Sprecher.
 
-### 1. One pipeline for all speakers (the only Sync.so payload shape we send)
+## Plan (3 Stages)
 
-For every pass, regardless of N:
+### Stage A — Forensic Probe (read-only)
+Bestätige Passthrough, bevor wir an der Pipeline drehen.
 
-- Render a single-face square preclip via Remotion Lambda (existing `pass-face-preclip.ts`).
-- Send the preclip to Sync.so with:
-  - `model: "sync-3"`
-  - `options.sync_mode: "cut_off"`
-  - `options.active_speaker_detection: { auto_detect: true }`
-  - no `temperature`, no `occlusion_detection_enabled`, no `bounding_boxes*`, no `coordinates`, no `frame_number`.
+1. Neue Edge Function `probe-lipsync-output`:
+   - Input: `{ outputUrl, audioUrl, preclipUrl }`
+   - Lädt ein 256 KiB-Segment der ersten und letzten 0.5 s beider Videos (`outputUrl` vs `preclipUrl`).
+   - Vergleicht mittels Pixel-Hash (Crop auf untere Gesichtshälfte) ob die Mund-Region zwischen sync-3-Output und Original-Preclip identisch ist.
+   - Schreibt Ergebnis in `dialog_shots.passes[].lip_motion_probe = { delta_score, is_passthrough, sampled_frames }`.
+2. Aufruf einmalig für alle 4 Passes der betroffenen Szene → wir wissen objektiv welche passthrough'd sind.
 
-Remove from `compose-dialog-segments`:
+Wir gehen nicht zu Stage B über, bevor wir wissen ob das Problem (a) Sync.so liefert wirklich Passthrough für 1+2, oder (b) Lipsync ist da, aber der Stitcher pastet falsch.
 
-- The `bbox-url-pro` / `coords-pro-box` / `coords-pro` / `sync3-coords` / `coords-pro-lp2pro` / `auto-pro` / `auto-standard` retry-variant branches that build full-plate payloads.
-- The `v118_preclip_facegate_bypass` block that drops a valid preclip and routes the pass to `bbox-url-pro` when `preclip_face_count != 1`.
-- The `v118_preclip_dropped_for_variant` block that drops a valid preclip when the webhook escalated to a bbox variant.
-- The batch preclip "edge-speaker skip" (`status: "skip_edge"`) — edge speakers must also get preclips.
-- The `v107_multispeaker_preclip_required_BLOCK` becomes "any N: preclip required or fail clean".
+### Stage B — Passthrough-Auto-Retry mit Crop-Expansion
+Wenn Stage A Passthrough bestätigt:
 
-Remove from `sync-so-webhook`:
+1. `sync-so-webhook`: Nach Sync.so `COMPLETED` direkt `probe-lipsync-output` aufrufen. Bei `is_passthrough=true`:
+   - Erhöhe `retry_count` (max 2).
+   - Setze `retry_variant = "preclip-wider-crop"` und `crop_expansion_factor = 1.5` (passes 1 / 2 / 3 → 1.0 / 1.5 / 2.0).
+   - Clear `job_id`, `output_url`, `preclip_url` (v126 retry-clear-path).
+2. `compose-dialog-segments` liest `pass.crop_expansion_factor` und übergibt ihn an `renderPassFacePreclip(..., { cropExpansionFactor })` — der Hook existiert bereits seit v116.
+3. Bei `retry_count >= 2` ohne Erfolg → `status=failed`, sauberer Refund über die existierende `pass.refund_handle`.
 
-- The `V5_RETRY_VARIANTS` ladder. The only allowed retry is "re-render preclip and resend with the same auto_detect payload".
-- The `prepareRetryFromWebhook` `coords` / bbox repair logic.
+### Stage C — Stitcher-Defense
+Selbst wenn Sync.so passthrough'd: der Stitcher überlagert dann das Original. Damit der User nicht stillschweigend "lipsync done" sieht:
 
-If a preclip cannot be produced after the existing v116 expansion ladder (1.0/1.4/1.8) → fail the pass cleanly and refund. No silent full-plate dispatch.
+1. `render-sync-segments-audio-mux`: Wenn ein Pass `lip_motion_probe.is_passthrough=true` UND `retry_count` erschöpft → markiere die Szene als `lip_sync_status='partial'` und ergänze `scene.lip_sync_warning = ['passthrough', 'passthrough', …]` (pro Sprecher-Index).
+2. UI (`SceneCard` / `DialogStitchPanel`): zeige einen Warn-Badge "⚠️ Sprecher X kein Lipsync — neu rendern" mit Retry-Button (ruft `reset-lipsync-scene` mit speaker-filter auf).
 
-### 2. Retry must clear the dead provider state
+### Stage D — Recovery für aktuelle Szene
+Nur Samuel + Matthew (passes 0, 1) auf `pending` setzen, `job_id`, `output_url`, `preclip_url` clearen, `crop_expansion_factor=1.5` setzen. Watchdog dispatched mit gewideter Crop. Kailee + Sarah bleiben `done`.
 
-In `sync-so-webhook`, when a pass is marked `retrying`:
+## Technical Details
 
-- Clear `job_id`, `output_url`, `started_at`, `finished_at`.
-- Clear `preclip_url` (force a fresh preclip render so a stale Lambda URL or stale face-gate result cannot wedge the retry).
-- Keep `done` sibling passes untouched.
+**Files touched**
+- `supabase/functions/probe-lipsync-output/index.ts` (neu)
+- `supabase/functions/sync-so-webhook/index.ts` (Probe-Hook + Retry-Branch)
+- `supabase/functions/compose-dialog-segments/index.ts` (lese `crop_expansion_factor` aus pass)
+- `supabase/functions/render-sync-segments-audio-mux/index.ts` (partial-status + warnings)
+- `src/components/composer/scenes/SceneCard.tsx` (Warn-Badge + per-Speaker-Retry)
+- `mem/architecture/lipsync/v127-passthrough-detection-and-crop-expansion.md` (neu)
+- `mem/index.md` (Eintrag)
 
-In `compose-dialog-segments` `isRetry` path: re-render the preclip if `preclip_url` is null; do not reuse the dead `job_id`.
+**DB-Spalte (composer_scenes.dialog_shots JSONB)**
+- pro Pass: `lip_motion_probe`, `crop_expansion_factor`, `retry_variant`
+- pro Szene: `lip_sync_warning: string[]`
 
-### 3. Watchdog — recover, don't kill
+**Probe-Heuristik (Stage A)**
+- ffmpeg via Deno-WASM oder serverless: 2 Frames bei `t=startSec+0.2s` und `t=startSec+(dur*0.7)` aus beiden Videos.
+- Mundregion = unteres Drittel des Frames, mittlere 60% horizontal.
+- Pixel-Diff (Y-Channel), Schwelle: mean abs diff < 4 → passthrough.
+- Schwellen-Tuning kommt später; Stage A loggt rohe Werte für 4 Passes der Test-Szene.
 
-In `lipsync-watchdog`:
-
-- Treat a `retrying` pass with no live/current `job_id` as dispatchable: invoke `compose-dialog-segments` for that pass.
-- Only fail the scene as `watchdog_provider_timeout` when **all** non-done passes have either truly stale `job_id`s OR are exhausted on retry budget.
-- Keep current 10-minute provider TTL for live jobs (sync-3 typical runtime is under that for the short single-face preclips we send — minutes, not the 10-15 min the docs quote for a full 30s video).
-- Increase only the safety-cap `STALE_HARD_MS` from 20 → 25 minutes to give the recovery one extra cycle on slow ticks. No other timeout changes.
-
-### 4. Recover the current failed scene `cba18767-be99-454a-95b8-939d6ad6f107`
-
-- Reset only Samuel's pass (idx 0): `status='pending'`, `job_id=null`, `output_url=null`, `preclip_url=null`, `last_error=null`, `last_error_class=null`, `retry_count=0`.
-- Preserve Matthew / Kailee / Sarah as `done` with their `output_url`s.
-- Scene: `lip_sync_status='running'`, `twoshot_stage='syncso_fanout_3_of_4'`, `clip_error=null`, `dialog_shots.status='rendering'`, `dialog_shots.refunded=false`, clear `dialog_shots.error` and `dialog_shots.finished_at`.
-
-This lets the watchdog/dispatcher run only Samuel through the new unified preclip path, then trigger audio-mux when all 4 are done.
-
-### 5. Documentation
-
-- New `mem://architecture/lipsync/v126-unified-preclip-pipeline.md`: "All N (1..4) use single-face preclip + sync-3 + auto_detect + cut_off. Full-plate dispatch and variant ladder removed. Refund + clean fail if preclip cannot be produced."
-- Update `mem://index.md` entry for sync-3 doc-strict options.
-
-## Technical Notes
-
-- `pass-face-preclip.ts` already handles 720p+ output and the v116 face-gate expansion ladder; no change needed.
-- `sanitizeSync3Options` already strips disallowed keys; with the variant branches removed the sanitizer becomes a belt-and-suspenders check.
-- `update_dialog_pass_slot` RPC stays the only write path for per-pass patches; sibling races stay safe.
-- `MAX_INFLIGHT = 4` Sync.so concurrency guard, `update_dialog_pass_slot`, audio-mux dispatch, refund logic — all unchanged.
+**Nicht angefasst**
+- v126 unified preclip dispatch path bleibt.
+- Watchdog Logik bleibt (außer Retry mit `crop_expansion_factor` wird unterstützt).
+- Refund-Pfade unverändert.
 
 ## Validation
+1. Stage A für Szene `cba18767…` → erwartet `is_passthrough=true` für passes 0+1, `false` für passes 2+3.
+2. Stage D Recovery → Samuel + Matthew laufen mit cropExpansionFactor=1.5; probe danach `is_passthrough=false` → grüner Mux.
+3. Neuer 4-Sprecher Dialog (frische Szene) durchläuft Stage B automatisch — falls Passthrough auftritt, wird transparent retried, sonst keine Verhaltensänderung.
 
-- DB: next `syncso_dispatch_log` rows for any new pass must have `meta.dispatch_video_kind='preclip'`, `meta.payload_summary.options.active_speaker_detection.auto_detect=true`, no `bounding_boxes_url`, no `bounding_boxes`, no `coordinates`.
-- Scene `cba18767…` finishes (`lip_sync_status='applied'`, `clip_url` set) within ~3-5 minutes after Samuel re-dispatch.
-- No `provider_unknown_error` retries on a pass that still has a valid preclip.
+## Open Question für dich
+Stage A (Probe) zuerst alleine deployen und Ergebnis abwarten? Oder Stages A+B+D in einem Rutsch?
