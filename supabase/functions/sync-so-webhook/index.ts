@@ -1322,6 +1322,10 @@ serve(async (req) => {
       }
     }
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
+      },
+      { ttlSeconds: 30, maxAttempts: 4 },
+    );
+    return __v5Result;
   }
 
   // ── v70: legacy v4 per-turn chain removed ─────────────────────────────
