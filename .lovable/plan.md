@@ -1,177 +1,107 @@
-# Alpha-Plan v3.1 — Sync.so Pipeline Hardening (Implementierungsvertrag)
+# Alpha-Plan v128 — Phase B (Architectural Hardening)
 
-**Implementierungsvertrag (nicht verhandelbar):**
-> Ein terminaler Pass bleibt terminal. Jeder neue Dispatch nach Terminalzustand braucht eine neue `attempt_id` und eine explizite User-Aktion.
+**Zentraler Satz:** Erst wenn Lock + Transition-Guard + Watchdog-Reduktion drin sind, ist v128 wirklich stabilisierend.
 
-**Status:** v2 verworfen, v3 freigegeben, v3.1 = Implementierungsbasis für v128.
+Phase A (NOOP→SUSPECT, FAILED-Ladder weg, Coord-Refresh-Guard) ist deployed. Phase B schließt die strukturellen Lücken, die Stage 0.5 aufgedeckt hat: Webhook ohne Lock, Watchdog kann racen, Plan-D ist ein zweiter Dispatch-Pfad, Terminal-Transitions sind nicht zentral abgesichert.
 
----
+## A2-Klarstellung (bestätigt, vor B1 verifizieren)
 
-## Stage 1 (v128) — Terminal-Outcome-Hardening
+`PASS_FAILED_PROVIDER_UNKNOWN` ist **pass-terminal**, nicht automatisch **scene-fatal**.
+- Pass wird terminal failed, Refund idempotent.
+- Scene läuft mit Fallback / rotem Badge weiter, sofern ein Fallback existiert.
+- Scene wird nur dann global abgebrochen, wenn es bewusst keinen Scene-Fallback gibt (z. B. Single-Pass-Scene ohne Alternative).
 
-### 1.1 Terminal-Outcome-Taxonomie
+Verifikation in `sync-so-webhook` + `compose-dialog-segments`: nach Pass-Fail wird `scene.status` nur dann auf `failed` gesetzt, wenn alle Passes terminal failed sind ODER kein Fallback definiert ist. Sonst bleibt Scene in `degraded` / `partial`.
 
-| Webhook/Polling-Signal | Status | Badge | Auto-Refund | Mutiert dialog_passes? |
-|---|---|---|---|---|
-| `sync_completed` (valide) | `PASS_DONE` | grün | nein | ja |
-| `sync_completed_noop` | `PASS_DONE_SUSPECT` | gelb | **nein** | ja |
-| `provider_unknown_error` | `PASS_FAILED_PROVIDER_UNKNOWN` | rot | ja | ja |
-| `watchdog_provider_timeout` | `PASS_FAILED_TIMEOUT` | rot | ja | ja |
-| `provider_failed` / `rejected` | `PASS_FAILED_PROVIDER` | rot | ja | ja |
-| `429` / `rate_limited` | `QUEUED_BACKOFF` (nicht-terminal) | gelb | nein | ja |
-| `stale_webhook` (Korrektur 1) | **log-only Event** | — | nein | **nein** |
+## Reihenfolge (strikt sequentiell)
 
-`PASS_FAILED_QUALITY_CONFIRMED` ist als Status reserviert, wird in v128 **nur manuell/Admin** gesetzt (siehe Stage 3.5).
+### B1 — Transition-Helper / Terminal-Guard
 
-### 1.2 Alle Recycle-Pfade schließen
+Zentraler `transitionPass(passIdx, fromStatus, toStatus, ctx)` Helper in `supabase/functions/_shared/dialogPassTransition.ts`.
 
-In v128 entfernt/deaktiviert:
+**Erlaubt:**
+- `pending → dispatched → done | failed_* | done_suspect`
+- `queued_backoff → dispatched`
+- Jede terminale → terminale Transition ist **blockiert**.
+- Jede terminale → non-terminale Transition (`pending`, `retrying`, `dispatched`) erfordert:
+  - `ctx.user_retry_flag === true`
+  - `ctx.new_attempt_id !== currentPass.attempt_id`
+  - `ctx.credit_charge_result === 'success'`
+  - `currentPass.active_provider_job_id == null`
 
-- **Webhook NOOP-Recovery** (`sync-so-webhook/index.ts` L486–538) → entfernen
-- **Webhook FAILED-Retry-Ladder** für `provider_unknown_error` (L1055–1070) → entfernen
-- **D6 Plan-D fan-out** → **komplett deaktiviert (Entscheidung 1)**, Feature-Flag `FEATURE_PLAN_D_FANOUT=false`; falls Pfad doch erreicht wird: log `PLAN_D_FANOUT_BLOCKED_V128`, kein Dispatch
-- **D7 Watchdog** → kein direkter Sync.so-Dispatch mehr (siehe 1.4)
-- **v87 Coord-Refresh-Reset** (L2125–2131) → siehe 1.8
+**Bei Verstoß:** Sentry P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED` + `syncso_dispatch_log` Event + return ohne Mutation.
 
-### 1.3 Source of Truth + Log-Alias
+Alle Pass-Status-Writes in `sync-so-webhook`, `compose-dialog-segments`, `compose-dialog-scene`, `poll-dialog-shots`, Watchdog müssen über diesen Helper laufen.
 
-- **Operativ:** `composer_scenes.dialog_passes[passIdx]`
-- **Forensik:** `syncso_dispatch_log`
+### B2 — withDialogLock im sync-so-webhook
 
-Jeder Dispatch ab v128 schreibt `syncso_dispatch_log.meta`:
+`sync-so-webhook` darf `composer_scenes.dialog_passes` nur noch unter `withDialogLock(scene_id)` lesen+schreiben.
 
-```json
-{
-  "variant": "...",
-  "retry_variant": "...",
-  "model": "...",
-  "payload_hash": "...",
-  "pass_idx": 0,
-  "attempt_id": "...",
-  "provider_job_id": "...",
-  "dispatch_source": "d1-compose | webhook | watchdog | user-retry"
-}
-```
+- Lock-Acquire vor SoT-Read.
+- Pass-Mutation + `dialog_shots`-Update unter demselben Lock.
+- Lock-Timeout: 10s; bei Timeout → 503 retry für Sync.so-Webhook (Sync.so retried).
+- `dialog_dispatch_locks` Tabelle existiert bereits.
 
-CI-Check `meta.variant != NULL` gilt nur für `created_at >= v128_deployed_at`. Legacy 87 Rows bleiben unangefasst.
+### B3 — Watchdog-Reduktion
 
-### 1.4 Scene-Level Lock + Watchdog-Reduktion (Entscheidung 2)
+`poll-dialog-shots` (pg_cron) darf **nicht mehr direkt Sync.so dispatchen**.
 
-`withDialogLock(scene_id)` verbindlich überall, wo `composer_scenes` mutiert oder dispatch-relevant gelesen wird.
+Erlaubt unter `withDialogLock`:
+- Setzt `PASS_FAILED_TIMEOUT` (terminal) für Passes mit `dispatched_at < now() - 8min` und `provider_job_id` ohne Webhook-Antwort.
+- Für `pending` / `queued_backoff` Passes: invoke `compose-dialog-scene` (D1), kein direkter POST.
 
-**Watchdog (`poll-dialog-shots`) ab v128 darf nur noch:**
+Verboten:
+- Direkter `fetch('https://api.sync.so/...')`.
+- Touch auf `PASS_DONE`, `PASS_DONE_SUSPECT`, `PASS_FAILED_*`.
 
-1. Unter Scene-Lock terminale Timeouts setzen:
-   - `DISPATCHED`/`PROCESSING` mit `expired provider deadline` → `PASS_FAILED_TIMEOUT` + idempotenter Auto-Refund
-2. Nicht-terminale Kandidaten an D1 übergeben:
-   - `pending`/`ready`/`preclip_pending`/`queued_backoff` → invoke `compose-dialog-segments`
-   - **Kein direkter POST zu Sync.so aus dem Watchdog**
+### B4 — Plan-D-Fanout per Flag komplett deaktivieren
 
-**Watchdog darf niemals anfassen:** `PASS_DONE`, `PASS_DONE_SUSPECT`, `PASS_FAILED_*`.
+`FEATURE_PLAN_D_FANOUT=false` als Env-Var in `compose-dialog-scene`.
 
-**Zielbild:**
-- D1 = einziger aktiver Dispatch-Pfad
-- Watchdog = Health-Checker + Timeout-Marker + D1-Invoker
-- Webhook = Result-Writer unter Scene-Lock
+- Code-Pfad bleibt erhalten (für spätere Re-Aktivierung), aber Guard `if (!FEATURE_PLAN_D_FANOUT) return;` vor Fan-out.
+- Bei jedem unterdrückten Fan-out: `syncso_dispatch_log` Event `PLAN_D_FANOUT_BLOCKED_V128` mit `scene_id`, `pass_idx`, `reason`.
 
-Webhook (`sync-so-webhook`): `withDialogLock` ist bereits importiert, ab v128 verbindlich aufgerufen für alle `composer_scenes.dialog_shots`-Writes.
+## UI-Begleitung (parallel, nicht-blockierend)
 
-### 1.5 Circuit-Breaker zeitlich scopen
+- **PASS_DONE_SUSPECT Badge:** gelb, sichtbar, Tooltip "Provider returned without lip motion — review manually". Sofort umsetzen, sonst silent degraded.
+- **User-Retry-Button:** **hidden / feature-flagged** bis alle Vorbedingungen erfüllt sind:
+  - `attempt_id` first-class
+  - Credit-Charge idempotent
+  - Transition-Guard aktiv (= B1 deployed)
+  - Garantierte neue `attempt_id`
+  - `active_provider_job_id == null`
+- Bis dahin: Badge zeigt "Contact support to retry" o.ä.
 
-```sql
-WHERE syncso_dispatch_log.created_at > composer_scenes.last_reset_at
-```
+## Exit-Kriterien Phase B (24h Beobachtung nach Deploy)
 
-Fallback: `scene.created_at`. `run_id`/`generation_session_id` ist out-of-scope für v128 (Stage 5).
+- `0` `PASS_* → pending/retrying/dispatched` ohne `user_retry_flag`
+- `0` `(pass_idx, attempt_id)` mit >1 `provider_job_id`
+- `0` Webhook-Writes auf `composer_scenes` außerhalb `withDialogLock`
+- `0` Watchdog-Re-Dispatches auf terminale Passes
+- `0` Plan-D-Fanout-Dispatches (nur `PLAN_D_FANOUT_BLOCKED_V128` Events)
+- `100%` neue `syncso_dispatch_log` Rows mit `meta.variant`, `meta.model`, `meta.attempt_id`, `meta.pass_idx`
+- `0` Sentry P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED`
 
-### 1.6 Auto-Refund
+## Out-of-Scope (explizit nicht in Phase B)
 
-**Triggert bei:** `PASS_FAILED_PROVIDER_UNKNOWN`, `PASS_FAILED_TIMEOUT`, `PASS_FAILED_PROVIDER`.
-**Nicht bei:** `PASS_DONE_SUSPECT`, `QUEUED_BACKOFF`.
-Idempotent via deterministische UUID aus `(scene_id, pass_idx, attempt_id)`.
+- Stage 4 A/B-Test
+- Speed/Parallelisierung
+- Segments-Refactor
+- Model-Wechsel (lipsync-2-pro)
+- Confirmed-NOOP-Automatik / Validator (Stage 3.5)
+- User-Retry-Button Aktivierung (separater Folge-PR nach Bedingungserfüllung)
 
-### 1.7 User-Retry-Mechanik
+## Reihenfolge global
 
-UI-Button auf jedem terminalen Pass (`PASS_DONE_SUSPECT`, `PASS_FAILED_*`):
-- erzeugt neue `attempt_id`
-- bucht Credits erneut
-- setzt Pass auf `pending` mit `previous_attempt_id` archiviert
-- **einziger** legaler Weg, einen terminalen Pass zu verlassen
+v128 Phase A ✅ → **v128 Phase B (jetzt)** → 24h Observe → Stage 2+3 → Stage 3.5 → Stage 4 A/B → Stage 5 → Stage 6
 
-### 1.8 v87 Coord-Refresh-Härtung
+## Betroffene Files
 
-**Erlaubt** (Coord-Update + ggf. Status bleibt nicht-terminal):
-- `pass.status ∈ {pending, ready, preclip_pending, queued_backoff}`
-- UND `pass.active_provider_job_id == null`
-
-**Verboten** für `PASS_DONE`/`PASS_DONE_SUSPECT`/`PASS_FAILED_*`:
-- Status bleibt unverändert
-- Neue Coords landen in `pass.candidate_coords` + `candidate_coords_at`
-- Warning-Event `dispatch_source = 'coord-refresh-skipped'`
-- Gelber Admin-Badge "new coords detected after terminal pass"
-
-### 1.9 Terminal Transition Guard (Korrektur 2)
-
-`PASS_* → pending/retrying/dispatched` ist nur erlaubt, wenn ALLE Bedingungen erfüllt:
-
-```
-user_retry_flag == true
-AND new_attempt_id != previous_attempt_id
-AND credit_charge_result == success
-AND active_provider_job_id == null
-```
-
-Implementierung:
-- Zentrale `transitionPass(scene_id, pass_idx, from, to, context)` Helper-Funktion
-- **Keine direkten Status-Writes außerhalb dieser Funktion** (lint-rule + Code-Review)
-- Illegale Transition → Block + Sentry P1 + log `ILLEGAL_TERMINAL_TRANSITION_BLOCKED`
-
-DB-Trigger auf JSONB optional, falls Aufwand gerechtfertigt. Minimum: zentrale Helper-Funktion + Sentry P1.
-
-### 1.10 Stale Webhook Handling (Korrektur 1)
-
-```
-if webhook.attempt_id !== current_attempt_id:
-  insert syncso_dispatch_log event 'STALE_WEBHOOK_IGNORED'
-  return 200
-  # composer_scenes.dialog_passes wird NICHT mutiert
-```
-
-`IGNORE_STALE_WEBHOOK` ist kein Pass-Status, sondern reines Log-Event.
-
----
-
-## Exit-Kriterien Stage 1 (48h Produktion)
-
-- **0** `(pass_idx, attempt_id)`-Kombinationen mit mehr als einem `provider_job_id`
-- **0** Übergänge `PASS_* → pending/retrying/dispatched` ohne User-Retry-Flag
-- **0** Writes auf `composer_scenes` aus dispatch-relevanten Pfaden außerhalb `withDialogLock`
-- **0** Coord-Refresh-Resets auf terminale Passes
-- **0** direkte Sync.so-POSTs aus Watchdog
-- **0** Mutationen auf `dialog_passes` durch Stale-Webhooks
-- **0** Sentry P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED`
-- **100%** neuer `syncso_dispatch_log`-Rows mit `meta.variant`, `meta.model`, `meta.attempt_id`, `meta.pass_idx`
-
----
-
-## Reihenfolge
-
-1. **v3.1-Freigabe** (dieser Plan)
-2. **Stage 1 / v128** — Implementierung
-3. **Stage 2+3** — Observability + Admin-Cockpit (neue Terminal-States, gelbe Badges, Retry-Button)
-4. **Stage 3.5** — CONFIRMED-NOOP-Validator (Phase 1 Admin-Review, Phase 2 dry-run Telemetrie, Phase 3 ggf. Auto-Promotion) — **nicht in v128** (Entscheidung 3)
-5. **Stage 4** — A/B-Test sync-3 vs lipsync-2-pro (~€9, 30 Renders), erst nach 48h grünem v128
-6. **Stage 5** — `run_id`/`generation_session_id` + `SYNC_SO_MAX_INFLIGHT` als Env (nicht hardcoden)
-7. **Stage 6** — Pass-Level Lock + Performance-Tuning
-
----
-
-## Out-of-Scope für v128
-
-- Pass-Level Lock (Stage 6)
-- `run_id`/`generation_session_id` first-class (Stage 5)
-- `SYNC_SO_MAX_INFLIGHT` Env-Konfiguration (Stage 5)
-- CONFIRMED-NOOP-Auto-Promotion (Stage 3.5)
-- `lipsync-2-pro` Produktions-Migration (Stage 4)
-- Bulk-Backfill der 87 Legacy `syncso_dispatch_log`-Rows
-- Reaktivierung D6 Plan-D fan-out (architektonisch verworfen)
+- `supabase/functions/_shared/dialogPassTransition.ts` (neu, B1)
+- `supabase/functions/_shared/withDialogLock.ts` (existiert, in Webhook einziehen, B2)
+- `supabase/functions/sync-so-webhook/index.ts` (B1 + B2)
+- `supabase/functions/compose-dialog-segments/index.ts` (B1)
+- `supabase/functions/compose-dialog-scene/index.ts` (B1 + B4)
+- `supabase/functions/poll-dialog-shots/index.ts` (B1 + B3)
+- `src/components/composer/.../DialogPassBadge.tsx` (UI, SUSPECT-Badge)
+- `docs/lipsync/v128-implementation.md` (Update Phase-B-Status)

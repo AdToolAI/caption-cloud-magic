@@ -24,6 +24,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
+import { withDialogLock } from "../_shared/dialog-lock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -203,6 +204,14 @@ serve(async (req) => {
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
+    // v128 Phase B3 — wrap every mutation on this scene in the per-scene
+    // dialog lock. Previously the watchdog mutated `composer_scenes` and
+    // dispatched advance invokes without holding the lock, so it could
+    // race the sync-so-webhook (now locked in B2) and compose-dialog-
+    // segments (already locked) and either clobber a freshly-set pass
+    // status OR re-dispatch a pass that the webhook had just marked
+    // terminal in the same window.
+    await withDialogLock(supabase, d.id, "lipsync-watchdog", async () => {
     const ds: any = d.dialog_shots ?? {};
     // Liveness anchor: prefer first_started_at, fall back to started_at,
     // then earliest pass started_at, then updated_at (last resort).
@@ -237,7 +246,7 @@ serve(async (req) => {
         })
         .eq("id", d.id);
       failed.push({ scene_id: d.id, reason: "orphaned_lipsync_pending_no_clip" });
-      continue;
+      return;
     }
 
     // ── (1) v25 Polling fallback: forward terminal Sync.so jobs we missed ──
@@ -265,10 +274,18 @@ serve(async (req) => {
       // v126 — Also pick up `retrying` passes with no live job_id. Previously
       // a pass set to `retrying` by the webhook but with a lost re-dispatch
       // invoke would sit idle until the watchdog killed the whole scene.
+      // v128 Phase B3 — `done_suspect` is also terminal (Alpha-Plan v3.1
+      // §1.6 / PASS_DONE_SUSPECT); never advance a suspect pass.
       const pendingIdxs = (ds.passes as any[])
         .map((p, i) => {
           const st = String(p?.status ?? "");
-          if (st === "done" || st === "rendering" || st === "failed" || st === "canceled_by_scene_failure") return -1;
+          if (
+            st === "done" ||
+            st === "done_suspect" ||
+            st === "rendering" ||
+            st === "failed" ||
+            st === "canceled_by_scene_failure"
+          ) return -1;
           if (st === "pending" || !p?.job_id) return i;
           if (st === "retrying" && !p?.job_id) return i;
           return -1;
@@ -362,20 +379,17 @@ serve(async (req) => {
       } catch (e) {
         console.warn(`[lipsync-watchdog] dispatch-recovery crash scene=${d.id}: ${(e as Error).message}`);
       }
-      continue; // give it a tick before considering failure
+      return; // give it a tick before considering failure
     }
 
     // ── (3) Stale-failure (last resort, only past hard TTL or true preflight) ─
-    if (ageMs < STALE_PREFLIGHT_MS) continue;
+    if (ageMs < STALE_PREFLIGHT_MS) return;
     const hasJob = await hasRecordedProviderJob(supabase, d);
 
     let reason: string | null = null;
     if (ageMs > STALE_HARD_MS) {
       reason = "watchdog_hard_timeout";
     } else if (d.twoshot_stage === "circuit_open" && ageMs > STALE_PROVIDER_MS) {
-      // v32: a scene parked on circuit_open past the 10-min provider TTL is
-      // never going to recover — the Sync.so 3-speaker plate was rejected
-      // without an error_code. Fail terminal so the user sees a real reason.
       reason = "syncso_provider_unknown_no_code_after_retries";
     } else if (!hasJob && ageMs > STALE_PREFLIGHT_MS) {
       reason = "watchdog_preflight_aborted";
@@ -383,10 +397,6 @@ serve(async (req) => {
       const polledThisTick = polled.some((p) => p.scene_id === d.id);
       if (!polledThisTick) reason = "watchdog_provider_timeout";
     } else if (isV5Fanout && ageMs > 12 * 60_000) {
-      // v120 — Zombie guard. Scene running >12min: if NO pass is currently
-      // `rendering` with a live job_id (i.e. only `retrying`/`pending` ghosts
-      // or exhausted `failed`), AND there are recent FAILED dispatch_log
-      // rows in the last 5min, terminate with refund.
       const passes120: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
       const liveRendering = passes120.some((p) => {
         if (String(p?.status ?? "") !== "rendering") return false;
@@ -409,7 +419,7 @@ serve(async (req) => {
         } catch { /* tolerate */ }
       }
     }
-    if (!reason) continue;
+    if (!reason) return;
 
     const uid = await userIdForProject(supabase, d.project_id);
     const refundCredits = Number(d.dialog_shots?.cost_credits) || 0;
@@ -422,6 +432,7 @@ serve(async (req) => {
       syncApiKey,
     });
     failed.push({ scene_id: d.id, reason });
+    }, { ttlSeconds: 30, maxAttempts: 3 });
   }
 
   console.log(

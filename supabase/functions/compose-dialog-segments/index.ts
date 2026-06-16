@@ -90,6 +90,7 @@ import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 
 
 
@@ -612,6 +613,44 @@ serve(async (req) => {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} dispatch_attempt_log_failed: ${(e as Error)?.message ?? e}`,
       );
+    }
+
+    // ── v128 Phase B1 — Terminal-Transition Guard at dispatch entry ──────
+    // Alpha-Plan v3.1 §1.9: a pass that is currently terminal (done /
+    // done_suspect / failed / canceled_by_scene_failure) cannot leave
+    // terminal unless the caller passes `user_retry_flag=true` + a fresh
+    // `new_attempt_id` (and credits were re-debited externally). The
+    // automatic webhook retry ladder + Plan-D fan-out used to call us with
+    // `advance:true` / `retry:true` on already-terminal passes; the guard
+    // logs Sentry-P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED` and returns
+    // without re-dispatch so the pass stays terminal.
+    if ((isAdvance || isRetry) && typeof body?.pass_idx === "number") {
+      const guard = await assertSafeDispatchEntry(
+        supabase,
+        {
+          scene_id: sceneId,
+          pass_idx: Number(body.pass_idx),
+          source: isAdvance ? "compose-dialog-segments:advance" : "compose-dialog-segments:retry",
+          user_retry_flag: body?.user_retry_flag === true,
+          new_attempt_id: typeof body?.new_attempt_id === "string" ? body.new_attempt_id : null,
+          credit_charge_result: body?.user_retry_flag === true ? "success" : "skip",
+        },
+        isRetry ? "retrying" : "dispatched",
+      );
+      if (!guard.ok && guard.blocked) {
+        return json(
+          {
+            ok: false,
+            status: "terminal_transition_blocked",
+            scene_id: sceneId,
+            pass_idx: Number(body.pass_idx),
+            current_status: guard.currentStatus,
+            reason: guard.reason,
+            hint: "pass is terminal; only an explicit user-retry with a fresh attempt_id may re-dispatch",
+          },
+          409,
+        );
+      }
     }
 
     // ── Validate audio plan ───────────────────────────────────────────────
@@ -4020,7 +4059,42 @@ serve(async (req) => {
         concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
       }
     } catch { /* defaults */ }
-    const fanOutAllowed = parallelFlagOn && passes.length >= 2;
+    // v128 Phase B4 — Plan-D fan-out is HARD-DISABLED by default per
+    // Alpha-Plan v3.1 §1.2. The DB flag `composer.parallel_sync_so_passes`
+    // alone is insufficient because Stage 0.5 found it can be flipped from
+    // multiple admin paths without going through change review. The env
+    // flag `FEATURE_PLAN_D_FANOUT` is the explicit kill-switch and must
+    // also be `true` for fan-out to dispatch. When fan-out WOULD have run
+    // (parallelFlagOn + multi-pass) but the env flag is off, log the
+    // suppression so we can monitor the exit criterion (`0` Plan-D
+    // dispatches over 24h observation window).
+    const planDFanoutEnvOn = (Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "false")
+      .toLowerCase() === "true";
+    const fanOutAllowed = planDFanoutEnvOn && parallelFlagOn && passes.length >= 2;
+    if (parallelFlagOn && passes.length >= 2 && !planDFanoutEnvOn && !isAdvance && !isRetry) {
+      try {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId,
+          engine: "sync-segments",
+          sync_status: "PLAN_D_FANOUT_BLOCKED_V128",
+          meta: {
+            v128_terminal: true,
+            pass_idx: currentPassIdx,
+            total_passes: passes.length,
+            attempt_id: pass?.attempt_id ?? null,
+            variant: pass?.retry_variant ?? null,
+            model: pass?.retry_variant ?? null,
+            dispatch_source: "compose-dialog-segments",
+            reason: "FEATURE_PLAN_D_FANOUT=false",
+          },
+        });
+      } catch { /* ignore log errors */ }
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} PLAN_D_FANOUT_BLOCKED_V128 ` +
+          `(env flag off, ${passes.length} passes) — webhook will chain serially`,
+      );
+    }
     if (!isAdvance && !isRetry && fanOutAllowed) {
       // Pass 0 was just dispatched above. Fan out passes [1 .. cap-1] now;
       // any beyond cap remain `pending` and get kicked by the webhook.
