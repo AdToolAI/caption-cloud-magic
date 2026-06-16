@@ -4037,7 +4037,7 @@ serve(async (req) => {
       model: payloadModel,
       input: [
         videoInput,
-        { type: "audio", url: pass.audio_url },
+        { type: "audio", url: (pass as any).sync_audio_url ?? pass.audio_url },
       ],
       options: payloadOptions,
       webhookUrl: diagnosticWebhookUrl,
