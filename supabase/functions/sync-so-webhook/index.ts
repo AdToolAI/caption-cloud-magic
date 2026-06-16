@@ -389,7 +389,21 @@ serve(async (req) => {
 
   // ── v5: Sync.so Segments (1-call pipeline) ────────────────────────────
   // No per-turn shots; the webhook output IS the final clip.
+  // v128 Phase B2 — wrap the entire v5 read-modify-write block in
+  // `withDialogLock(scene_id)`. Previously the webhook patched
+  // `composer_scenes.dialog_shots` without holding the per-scene lock, so a
+  // poller / compose-dialog-segments / sibling-pass webhook running in the
+  // same ~ms window could observe a stale snapshot and either skip a
+  // pending-pass kick OR overwrite a sibling's job_id. The lock serializes
+  // every mutation on dialog_shots.passes[]; on contention we proceed
+  // without it (poller reconciliation is the safety net) so Sync.so never
+  // sees a 5xx and starts retrying.
   if (state.version === 5 && state.engine === "sync-segments") {
+    const { result: __v5Result } = await withDialogLock(
+      supabase,
+      sceneId,
+      "sync-so-webhook",
+      async () => {
     // v25 Fan-Out: match the job_id against passes[].job_id (preferred) OR
     // the legacy top-level state.sync_job_id (single-pass scenes). Previously
     // we required state.sync_job_id === jobId which dropped EVERY pass
