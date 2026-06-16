@@ -1,123 +1,90 @@
-# Track B — v128 Stitch Forensics (read-only, parallel zu Soak)
+# v129.0 — Sync.so Output Authenticity & Payload Contract
 
-**Report-Datei:** `docs/lipsync/v128-stitch-forensics.md`
-**Titel (neutral, bis bewiesen):** *"v128 Stitch Forensics — Are Sync.so pass outputs used in final mux?"*
+**Status:** Queued. Will only start after v128 soak exits green (48h window). No code changes during soak.
 
-Track A (v128 Soak) läuft unverändert weiter. Diese Szene gilt **nicht** als Soak-Fail, solange keine Terminal-Recycle / Doppel-Dispatches / Lock-Bypässe / Watchdog-Redispatches / Plan-D-Dispatches passieren.
+## 1. Close Stitch Forensics Track
 
-## Hard No-Go (während des Soaks)
+- Mark `docs/lipsync/v128-stitch-forensics.md` as **CLOSED — Classification E confirmed**.
+  - Composite/Stitch is innocent: `final_url` correctly references `passes[].output_url`.
+  - The Sync.so pass output itself is visually ≈ Sync.so input/preclip.
+- Add a one-line pointer at the bottom: "Continued in `docs/lipsync/v129-syncso-output-authenticity.md`".
+- No retitling, no rewrite — just status + pointer.
 
-- Kein Edit an Edge-Functions, Lambda, Webhook, Watchdog, State-Maschine, Pass-Transition, Retry-Logik, Engine-Auswahl.
-- Keine DB-Mutation, kein Re-Render, kein User-Retry, kein Engine-Wechsel.
-- Track B ist rein read-only: Code lesen, DB lesen, fertige Videos herunterladen und mit ffmpeg/Python analysieren.
+## 2. v128 Soak Discipline (unchanged)
 
-## Untersuchungs-Scope
+Hands off. No edits to:
+- state machine / `transitionPass` / `withDialogLock`
+- Watchdog, Plan-D fan-out kill-switch
+- compose-dialog-segments, render-sync-segments-audio-mux
+- Sync.so request builder, v105/v106/v124/v126 paths
+- DB mutations on `composer_scenes`, `syncso_dispatch_log`, `syncso_inflight_jobs`
 
-Zwei Szenen vergleichen:
-- **Scene N (neu):** `225ea521-7e18-4a02-b279-6f172db4ffd0` — `lip_sync_status=done`, User-Symptom: keine sichtbare Lippensynchronisation.
-- **Scene O (alt):** `a68624ff-66ab-4171-9190-eb5805d042cb` — `lip_sync_status=done`, Status zum Lipsync-Verhalten unbekannt, dient als Gegenprobe.
+Soak remains valid as long as: no terminal recycle, no duplicate dispatch, no lock bypass, no Watchdog redispatch, no Plan-D dispatch.
 
-## 4 Beweis-Ebenen
+## 3. v129.0 Track — Read-Only Forensics
 
-### 1. Code-Beweis
-Im Report werden diese acht Fragen explizit beantwortet, jeweils mit Datei-Pfad + Zeilennummer:
+**Goal:** Prove what payload we actually send to Sync.so, and why output ≈ input comes back.
 
-1. Wer erzeugt `final_url` (`dialog-stitch-muxed-*.mp4`)?
-2. Welches Manifest bekommt der Stitch-Renderer?
-3. Enthält das Manifest `passes[].output_url`?
-4. Enthält es `preclip_crop { x, y, size, outputSize }`?
-5. Wird `output_url` im Renderer wirklich geladen?
-6. Wird der Crop zurück in die Wide Plate composited?
-7. Gibt es einen "plate-only mux" Fallback-Pfad?
-8. Wann wird dieser Fallback aktiviert?
+**Hard scope:** read-only. No edge function edits, no Lambda, no DB writes, no re-renders, no model swap, no Stage 4 A/B, no User-Retry, no lipsync-2-pro fallback, no Segments API experiment.
 
-Gezielt suchen nach Branches wie:
-```
-if (multipass_fallback_attempted) ...
-if (engine === 'sync-segments') ...
-if (!pass.output_url) ...
-if (force_multipass) ...
-if (stitchMode === 'audio_only') ...
-if (skipComposite | renderFallback) ...
-```
+### 3.1 Evidence sources (read-only)
 
-### 2. Manifest-Beweis
-Anonymisiertes/gekürztes Stitch-Input-Manifest für Scene N im Report einbetten:
-```
-{
-  "scene_id": "225ea521-...",
-  "final_url": "dialog-stitch-muxed-...",
-  "engine": "sync-segments",
-  "multi_pass": true,
-  "force_multipass": true,
-  "plate_url": "...",
-  "audio_url": "...",
-  "passes": [
-    { "pass_idx": 0, "speaker": "...", "status": "done",
-      "output_url": "...-lipsync-pass-0.mp4",
-      "preclip_crop": { "x": 184, "y": 0, "size": 234, "outputSize": 720 } },
-    ...
-  ]
-}
-```
-Sofort sichtbar, ob der Stitch überhaupt die richtigen Inputs sieht.
+1. **Persisted intent** — `composer_scenes.dialog_turns[].sync_pass_state[].asd`, `preclip_crop`, `speaker_id`.
+2. **Actual outbound request** — `syncso_dispatch_log` rows: full `request_payload`, especially `options.active_speaker_detection`, `options.model`, `frame_number`, `bounding_boxes`, `bounding_boxes_url`.
+3. **Provider truth** — Sync.so `GET /v2/generate/:id` for each `provider_job_id` (if API allows retrieval of submitted options — record whatever the response exposes).
+4. **`_v105_probe`** snapshot: `asd_auto_detect`, `asd_has_coordinates`, `asd_source`, any builder-path tag.
+5. **Assets** — `input_preclip_url`, `sync_output_url`, `audio_url` downloaded to `/tmp/v129/`.
+6. **Pixel evidence** — input vs output mean diff, mouth/face ROI diff during audio-active frames.
+7. **Audio evidence** — RMS / non-silent check, duration vs preclip duration.
 
-### 3. Pixel / ROI-Beweis (Kernstück)
-Für jeden der 4 Pässe (Sprecher) der Scene N drei Frames vergleichen, jeweils an `turn_start + Δ` für den richtigen Sprecher-Turn:
+### 3.2 Sample set
 
-- **A** = original wide plate crop an `preclip_crop {x, y, size}`
-- **B** = Sync.so `pass.output_url`, zurückskaliert von `outputSize=720` auf `size × size`
-- **C** = `final_url` crop an derselben `{x, y, size}` Position, gleicher Zeitstempel
+- ≥ 3 recent "done" dialog scenes with multiple passes (target Scene N `225ea521…` + 2 fresh ones from post-soak window).
+- Per scene: every pass, every speaker.
 
-Differenzen `diff(C, A)` und `diff(C, B)` numerisch (SSIM oder MSE) + visuelle Side-by-Side-Strips in den Report.
+### 3.3 Deliverable
 
-**Interpretation:**
-- `C ≈ A` und `C ≠ B` → final nutzt Original-Plate, ignoriert Sync.so-Output.
-- `C ≈ B` → synced Crop wird tatsächlich composited.
-- `B` selbst zeigt keine Mundbewegung → Problem ist upstream (Targeting/Preclip/Sync.so), nicht Stitch.
-- `C ≠ A` und `C ≠ B` → Geometrie/Timing/Scaling mismatch.
+`docs/lipsync/v129-syncso-output-authenticity.md` with one table row per `(scene_id, pass_idx, speaker_id)`:
 
-**Wichtig:** nur Frames innerhalb des jeweiligen Sprecher-Turns vergleichen (Δ relativ zum `turn_start`), nicht globaler t=0, sonst verfälscht Timing-Offset alles.
+| column | source |
+|---|---|
+| scene_id, pass_idx, speaker_id/name | composer_scenes |
+| provider_job_id | syncso_dispatch_log |
+| input_preclip_url, sync_output_url, audio_url | dispatch log / pass record |
+| persisted coords, persisted preclip_crop | composer_scenes |
+| actual `options.active_speaker_detection` | syncso_dispatch_log.request_payload |
+| Sync.so GET `/v2/generate/:id` options | provider API (if available) |
+| `_v105_probe.asd_auto_detect`, `asd_has_coordinates` | dispatch log |
+| input_vs_output mean diff | ffmpeg/PIL |
+| mouth/face ROI diff (audio-active frames) | ffmpeg/PIL |
+| audio RMS / non-silent | ffprobe |
+| classification | A / B / C / D |
 
-### 4. Audio / Mux-Beweis
-`ffprobe` und ffmpeg-Logs (falls verfügbar) für `final_url` prüfen:
-- Video-Stream: copy oder re-encode?
-- Wenn `-c:v copy` plus nur Audio neu gemuxt → starker Hinweis auf plate-only mux.
-- Audio-Track entspricht Voiceover-Mix, nicht den Pass-Audios?
+### 3.4 Classification (must end with exactly one per row)
 
-Verdächtiges Pattern:
-```
-ffmpeg -i plate.mp4 -i dialog_audio.wav -c:v copy -c:a aac dialog-stitch-muxed.mp4
-```
+- **A — Internal builder bug.** Actual request has `auto_detect:true` and no coords, despite persisted coords. Root cause inside v105/v106/v126 request builder or variant mapping.
+- **B — Coordinate-space / frame bug.** Actual request has coords but in wrong space (plate-space vs 720×720), invalid `frame_number`, or coord not on the target face.
+- **C — Provider no-op.** Request is doc-strict, audio is non-silent and correct duration, preclip contains target face — and Sync.so still returns passthrough. → Prepare Sync.so support escalation bundle (`provider_job_id`, request JSON, input URL, output URL, ROI-diff PNG).
+- **D — Validator gap.** No-op currently classified as `PASS_DONE` instead of `PASS_DONE_SUSPECT`. Logged as **Stage 3.5 backlog item: Pixel Authenticity Validator** (input vs output diff + mouth ROI + motion-during-audio). Default reaction later: `PASS_DONE_SUSPECT` → no auto-retry, no auto-refund, yellow badge.
 
-## Vergleichs-Tabelle Scene N vs Scene O
+### 3.5 Out of scope for v129.0
 
-| | Scene N (225ea521) | Scene O (a68624ff) |
-|---|---|---|
-| Pass-Outputs existieren? | | |
-| Manifest referenziert output_url? | | |
-| final_url nutzt Pass-Output (ROI-Diff)? | | |
-| Visuelles Symptom (Münder bewegen sich)? | | |
-| force_multipass / multipass_fallback_attempted | | |
+- Doc-strict ASD enforcement code (only proposed in report; not implemented).
+- Preflight dispatch-blocker for missing coords (only proposed).
+- `actual_sync_request.json` persistence at dispatch time (only proposed).
+- Stage 4 A/B (manual coords / bounding_boxes_url / hybrid) — explicitly deferred until Classification result is known.
+- SUSPECT badge UI — stays gated behind `attempt_id` + credit-charging + transition-guard combined test, as previously agreed.
 
-- Beide gleich → dauerhafter Stitch-Bug der `sync-segments`/multipass Engine.
-- Nur N betroffen → Regression durch `force_multipass` oder spezifischen Fallback-Branch; Diff der Manifeste ist der Schlüssel.
-- Nur O funktioniert → Diff zwischen N und O liefert die Root-Cause-Flag.
+## 4. Entry / Exit gates
 
-## Pflicht-Schluss: explizite Klassifizierung
+- **Entry:** v128 soak exits green at 48h (zero illegal transitions, zero blocked fan-outs, zero terminal recycles in observation queries).
+- **Exit of v129.0 forensics:** every sampled `(scene, pass, speaker)` row carries an A/B/C/D classification with linked evidence artifact in `/mnt/documents/v129-syncso-rois/`.
+- **Next track unlocked by result:** A → internal payload-contract fix PR; B → coord-transform fix PR; C → Sync.so support ticket; D → Stage 3.5 Validator design doc.
 
-Der Report **muss** mit genau einer dieser Diagnosen enden:
+## 5. Files touched in this plan
 
-- **A** — Manifest referenziert `pass.output_url` gar nicht. *(Bug in Manifest-Erzeugung)*
-- **B** — Manifest hat `output_url`, aber Renderer ignoriert es. *(Bug in Lambda/Remotion Composition)*
-- **C** — `output_url` wird geladen, aber `preclip_crop` fehlt/falsch. *(Re-Composite-Geometrie)*
-- **D** — Crop wird composited, aber falsche Position/Skalierung. *(Coordinate-space / scaling)*
-- **E** — Composite korrekt, aber Pass-Output selbst nicht synced. *(Problem upstream: Targeting/Preclip/Sync.so)*
-- **F** — Final ist bewusst Plate-only Fallback. *(Fallback-Condition falsch oder zu breit)*
+- `docs/lipsync/v128-stitch-forensics.md` — append CLOSED status + pointer line only.
+- `docs/lipsync/v129-syncso-output-authenticity.md` — **new**, empty skeleton with the table headers and classification legend; rows filled post-soak.
+- `.lovable/plan.md` — update tracker: Stitch Forensics CLOSED, v129.0 QUEUED, gated on v128 48h green.
 
-Keine Spekulation, keine Vorschläge zur Implementierung im Report — nur Befund + Klassifizierung. Ein Hotfix-Plan kommt **separat nach Soak-Exit (48h grün)**.
-
-## Deliverables
-
-1. `docs/lipsync/v128-stitch-forensics.md` mit allen 4 Beweis-Ebenen, Vergleichstabelle und A–F Klassifizierung.
-2. Optional `/mnt/documents/v128-stitch-rois/` — Side-by-Side PNG-Strips pro Pass (A | B | C) für die im Report referenzierten Frames.
+No other files. No code. No DB writes.

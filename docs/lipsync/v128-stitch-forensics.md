@@ -207,3 +207,13 @@ A follow-up read-only forensics on the upstream side should look at:
 - Whether the 4 lipsync-pass-N.mp4 files are stored in Supabase Storage as fetched from Sync.so verbatim, or whether they're a fallback copy of the preclip after an upstream error.
 
 These belong to a separate "Sync.so output authenticity" track and explicitly stay parked until v128 Soak exits (48h green).
+
+---
+
+## STATUS: CLOSED — Classification E confirmed
+
+- Composite/Stitch is innocent: `final_url` correctly references `passes[].output_url` and overlays them via `<CroppedOverlay>` at the persisted `preclip_crop` geometry.
+- Root cause is **upstream of Stitch**: Sync.so pass `output_url` is visually ≈ Sync.so input/preclip (effective no-op / passthrough).
+- The suspicious datapoint — `_v105_probe.asd_auto_detect=true` and `asd_has_coordinates=false` despite persisted coords — points at the actual outbound Sync.so request, not at Stitch.
+
+Continued in `docs/lipsync/v129-syncso-output-authenticity.md`.
