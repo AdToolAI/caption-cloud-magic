@@ -542,6 +542,7 @@ serve(async (req) => {
           rehosted: !!rehostedUrl,
           sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
           finished_at: nowIso,
+          ...noopSuspectFlags,
         };
       }
 
