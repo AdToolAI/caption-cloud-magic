@@ -3309,8 +3309,75 @@ serve(async (req) => {
         ? Number(referenceFrameNumber)
         : 0;
 
+      // v129.2.1 — Preclip Ambiguity Diagnostic.
+      // For every Multi-Speaker preclip pass, project each *other* face-map
+      // face center into plate-space and test whether it falls inside the
+      // preclip crop rect. If yes, the crop is ambiguous: Sync.so with
+      // `auto_detect:true` will routinely select the wrong face. We persist
+      // this diagnostic and use it in the v129.1 payload-contract preflight
+      // as an additional hard-block trigger (auto_detect_with_ambiguous_crop)
+      // so we never burn a Sync.so call on a crop we already know is unsafe.
+      let v1291Ambiguity: any = null;
+      if (cropOk) {
+        const cx0 = Number(crop.x);
+        const cy0 = Number(crop.y);
+        const cS = Number(crop.size);
+        const cx1 = cx0 + cS;
+        const cy1 = cy0 + cS;
+        const fmFacesAmb: any[] = Array.isArray((faceMap as any)?.faces)
+          ? (faceMap as any).faces
+          : [];
+        const fmWAmb = Number((faceMap as any)?.width) || (plateDims?.width ?? 0);
+        const fmHAmb = Number((faceMap as any)?.height) || (plateDims?.height ?? 0);
+        const dimsWAmb = plateDims?.width ?? fmWAmb;
+        const dimsHAmb = plateDims?.height ?? fmHAmb;
+        const selfId = (pass as any).character_id ?? null;
+        const selfSlot = Number((pass as any).speaker_idx);
+        const siblingsInside: any[] = [];
+        let nearest = Infinity;
+        if (fmWAmb > 0 && fmHAmb > 0 && dimsWAmb > 0 && dimsHAmb > 0) {
+          const sx = dimsWAmb / fmWAmb;
+          const sy = dimsHAmb / fmHAmb;
+          for (const f of fmFacesAmb) {
+            if (!f || !Array.isArray(f.bbox) || f.bbox.length !== 4) continue;
+            const isSelf =
+              (f.characterId && selfId && f.characterId === selfId) ||
+              (Number.isFinite(Number(f.slotIndex)) && Number(f.slotIndex) === selfSlot);
+            if (isSelf) continue;
+            const fcx = ((Number(f.bbox[0]) + Number(f.bbox[2])) / 2) * sx;
+            const fcy = ((Number(f.bbox[1]) + Number(f.bbox[3])) / 2) * sy;
+            const inside = fcx >= cx0 && fcx < cx1 && fcy >= cy0 && fcy < cy1;
+            if (inside) {
+              siblingsInside.push({
+                slotIndex: Number.isFinite(Number(f.slotIndex)) ? Number(f.slotIndex) : null,
+                characterId: f.characterId ?? null,
+                center: [Math.round(fcx), Math.round(fcy)],
+              });
+            }
+            if (plateCoords) {
+              const d = Math.hypot(fcx - plateCoords[0], fcy - plateCoords[1]);
+              if (d < nearest) nearest = d;
+            }
+          }
+        }
+        v1291Ambiguity = {
+          sibling_centers_inside_crop: siblingsInside.length > 0,
+          siblings_inside: siblingsInside,
+          min_neighbor_dist:
+            nearest === Infinity ? null : Number(nearest.toFixed(2)),
+          crop_size: cS,
+          crop_x: cx0,
+          crop_y: cy0,
+          preclip_face_count: passFaceCount,
+          risk: siblingsInside.length > 0 ? "neighbor_inside_crop" : "clean",
+        };
+        (pass as any)._v1291_ambiguity = v1291Ambiguity;
+      }
+
       let asdMode: string;
       let v1291Diag: any = null;
+
+
 
       if (isMultiSpeaker && plateCoords && cropOk) {
         // Plate → Preclip transform.
