@@ -1,3 +1,13 @@
+# v129.2.0 — Forensik ABGESCHLOSSEN — Classification A bestätigt
+
+**Ergebnis:** Root-Cause ist nicht v129.1-bezogen. Per-Pass Single-Face-Preclip-Pipeline (`renderPassFacePreclip` + `auto_detect:true`) ist aktiv. Pass-0 Crop schluckt vertikal benachbarten Sprecher, weil `computeFaceCrop` v92-Floor (220 px) den Neighbor-Cap (`0.88 × gap`) bei Δy ≈ 35–81 px überschreibt → Sync.so animiert die falsche Face an Pass-0-Position.
+
+**Voller Beweis:** `docs/lipsync/v129-2-speaker0-forensics.md` (Crop-Geometrie, DB-Evidence, Math, Hotfix-Vorschlag).
+
+**Empfohlener Hotfix v129.2.1:** 1 File (`supabase/functions/_shared/face-crop.ts`), ~6 Zeilen, härtet den Neighbor-Cap gegen den 220-Floor. Wartet auf User-Freigabe.
+
+---
+
 # v129.2 — Speaker-0 Lipsync Asymmetry: Forensics-First, kein Blind-Fix
 
 ## Signal vom User
