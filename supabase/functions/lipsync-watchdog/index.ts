@@ -204,6 +204,14 @@ serve(async (req) => {
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
+    // v128 Phase B3 — wrap every mutation on this scene in the per-scene
+    // dialog lock. Previously the watchdog mutated `composer_scenes` and
+    // dispatched advance invokes without holding the lock, so it could
+    // race the sync-so-webhook (now locked in B2) and compose-dialog-
+    // segments (already locked) and either clobber a freshly-set pass
+    // status OR re-dispatch a pass that the webhook had just marked
+    // terminal in the same window.
+    await withDialogLock(supabase, d.id, "lipsync-watchdog", async () => {
     const ds: any = d.dialog_shots ?? {};
     // Liveness anchor: prefer first_started_at, fall back to started_at,
     // then earliest pass started_at, then updated_at (last resort).
@@ -238,7 +246,7 @@ serve(async (req) => {
         })
         .eq("id", d.id);
       failed.push({ scene_id: d.id, reason: "orphaned_lipsync_pending_no_clip" });
-      continue;
+      return;
     }
 
     // ── (1) v25 Polling fallback: forward terminal Sync.so jobs we missed ──
@@ -266,10 +274,18 @@ serve(async (req) => {
       // v126 — Also pick up `retrying` passes with no live job_id. Previously
       // a pass set to `retrying` by the webhook but with a lost re-dispatch
       // invoke would sit idle until the watchdog killed the whole scene.
+      // v128 Phase B3 — `done_suspect` is also terminal (Alpha-Plan v3.1
+      // §1.6 / PASS_DONE_SUSPECT); never advance a suspect pass.
       const pendingIdxs = (ds.passes as any[])
         .map((p, i) => {
           const st = String(p?.status ?? "");
-          if (st === "done" || st === "rendering" || st === "failed" || st === "canceled_by_scene_failure") return -1;
+          if (
+            st === "done" ||
+            st === "done_suspect" ||
+            st === "rendering" ||
+            st === "failed" ||
+            st === "canceled_by_scene_failure"
+          ) return -1;
           if (st === "pending" || !p?.job_id) return i;
           if (st === "retrying" && !p?.job_id) return i;
           return -1;
