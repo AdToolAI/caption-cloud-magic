@@ -3768,6 +3768,37 @@ serve(async (req) => {
         { v105_probe: v105Probe },
       );
     }
+
+    // v129.1 — Payload-Contract Preflight (DISPATCH_BLOCKED_PAYLOAD_PRECHECK).
+    // Refuses to call Sync.so when a Multi-Speaker preclip pass would either:
+    //  (a) send auto_detect:true despite persisted plate-space coords + crop, or
+    //  (b) carry transformed coordinates that fall outside the preclip canvas, or
+    //  (c) be missing the coords/crop required for the v106 doc-strict transform.
+    // No retry. Idempotent refund via failBeforeProviderDispatch.
+    // See docs/lipsync/v129-implementation.md.
+    const v1291Diag = (pass as any)._v1291 ?? null;
+    const v1291Block = (pass as any)._v1291_block ?? null;
+    if (usePassPreclip && speakers.length >= 2) {
+      const hasCoords = !!v1291Diag && Array.isArray(v1291Diag.plate_coords);
+      const wouldAutoDetect = asdForProbe?.auto_detect === true;
+      if (v1291Block || (hasCoords && wouldAutoDetect)) {
+        return await failBeforeProviderDispatch(
+          "DISPATCH_BLOCKED_PAYLOAD_PRECHECK",
+          "internal_payload_contract_violation",
+          v1291Block
+            ? `v129.1 preflight blocked dispatch: ${v1291Block.reason}`
+            : "v129.1 preflight blocked dispatch: Multi-Speaker preclip would send auto_detect:true despite persisted plate-space coords.",
+          500,
+          {
+            v1291: v1291Diag,
+            v1291_block: v1291Block,
+            v105_probe: v105Probe,
+            provider_call_made: false,
+            refund_reason: "dispatch_blocked_payload_precheck",
+          },
+        );
+      }
+    }
     console.log(
       `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_doc_strict ${JSON.stringify(v105Probe)} tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "none"} windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
     );
