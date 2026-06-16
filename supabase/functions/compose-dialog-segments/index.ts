@@ -90,6 +90,7 @@ import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 
 
 
