@@ -1,107 +1,123 @@
-# Alpha-Plan v128 — Phase B (Architectural Hardening)
+# Track B — v128 Stitch Forensics (read-only, parallel zu Soak)
 
-**Zentraler Satz:** Erst wenn Lock + Transition-Guard + Watchdog-Reduktion drin sind, ist v128 wirklich stabilisierend.
+**Report-Datei:** `docs/lipsync/v128-stitch-forensics.md`
+**Titel (neutral, bis bewiesen):** *"v128 Stitch Forensics — Are Sync.so pass outputs used in final mux?"*
 
-Phase A (NOOP→SUSPECT, FAILED-Ladder weg, Coord-Refresh-Guard) ist deployed. Phase B schließt die strukturellen Lücken, die Stage 0.5 aufgedeckt hat: Webhook ohne Lock, Watchdog kann racen, Plan-D ist ein zweiter Dispatch-Pfad, Terminal-Transitions sind nicht zentral abgesichert.
+Track A (v128 Soak) läuft unverändert weiter. Diese Szene gilt **nicht** als Soak-Fail, solange keine Terminal-Recycle / Doppel-Dispatches / Lock-Bypässe / Watchdog-Redispatches / Plan-D-Dispatches passieren.
 
-## A2-Klarstellung (bestätigt, vor B1 verifizieren)
+## Hard No-Go (während des Soaks)
 
-`PASS_FAILED_PROVIDER_UNKNOWN` ist **pass-terminal**, nicht automatisch **scene-fatal**.
-- Pass wird terminal failed, Refund idempotent.
-- Scene läuft mit Fallback / rotem Badge weiter, sofern ein Fallback existiert.
-- Scene wird nur dann global abgebrochen, wenn es bewusst keinen Scene-Fallback gibt (z. B. Single-Pass-Scene ohne Alternative).
+- Kein Edit an Edge-Functions, Lambda, Webhook, Watchdog, State-Maschine, Pass-Transition, Retry-Logik, Engine-Auswahl.
+- Keine DB-Mutation, kein Re-Render, kein User-Retry, kein Engine-Wechsel.
+- Track B ist rein read-only: Code lesen, DB lesen, fertige Videos herunterladen und mit ffmpeg/Python analysieren.
 
-Verifikation in `sync-so-webhook` + `compose-dialog-segments`: nach Pass-Fail wird `scene.status` nur dann auf `failed` gesetzt, wenn alle Passes terminal failed sind ODER kein Fallback definiert ist. Sonst bleibt Scene in `degraded` / `partial`.
+## Untersuchungs-Scope
 
-## Reihenfolge (strikt sequentiell)
+Zwei Szenen vergleichen:
+- **Scene N (neu):** `225ea521-7e18-4a02-b279-6f172db4ffd0` — `lip_sync_status=done`, User-Symptom: keine sichtbare Lippensynchronisation.
+- **Scene O (alt):** `a68624ff-66ab-4171-9190-eb5805d042cb` — `lip_sync_status=done`, Status zum Lipsync-Verhalten unbekannt, dient als Gegenprobe.
 
-### B1 — Transition-Helper / Terminal-Guard
+## 4 Beweis-Ebenen
 
-Zentraler `transitionPass(passIdx, fromStatus, toStatus, ctx)` Helper in `supabase/functions/_shared/dialogPassTransition.ts`.
+### 1. Code-Beweis
+Im Report werden diese acht Fragen explizit beantwortet, jeweils mit Datei-Pfad + Zeilennummer:
 
-**Erlaubt:**
-- `pending → dispatched → done | failed_* | done_suspect`
-- `queued_backoff → dispatched`
-- Jede terminale → terminale Transition ist **blockiert**.
-- Jede terminale → non-terminale Transition (`pending`, `retrying`, `dispatched`) erfordert:
-  - `ctx.user_retry_flag === true`
-  - `ctx.new_attempt_id !== currentPass.attempt_id`
-  - `ctx.credit_charge_result === 'success'`
-  - `currentPass.active_provider_job_id == null`
+1. Wer erzeugt `final_url` (`dialog-stitch-muxed-*.mp4`)?
+2. Welches Manifest bekommt der Stitch-Renderer?
+3. Enthält das Manifest `passes[].output_url`?
+4. Enthält es `preclip_crop { x, y, size, outputSize }`?
+5. Wird `output_url` im Renderer wirklich geladen?
+6. Wird der Crop zurück in die Wide Plate composited?
+7. Gibt es einen "plate-only mux" Fallback-Pfad?
+8. Wann wird dieser Fallback aktiviert?
 
-**Bei Verstoß:** Sentry P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED` + `syncso_dispatch_log` Event + return ohne Mutation.
+Gezielt suchen nach Branches wie:
+```
+if (multipass_fallback_attempted) ...
+if (engine === 'sync-segments') ...
+if (!pass.output_url) ...
+if (force_multipass) ...
+if (stitchMode === 'audio_only') ...
+if (skipComposite | renderFallback) ...
+```
 
-Alle Pass-Status-Writes in `sync-so-webhook`, `compose-dialog-segments`, `compose-dialog-scene`, `poll-dialog-shots`, Watchdog müssen über diesen Helper laufen.
+### 2. Manifest-Beweis
+Anonymisiertes/gekürztes Stitch-Input-Manifest für Scene N im Report einbetten:
+```
+{
+  "scene_id": "225ea521-...",
+  "final_url": "dialog-stitch-muxed-...",
+  "engine": "sync-segments",
+  "multi_pass": true,
+  "force_multipass": true,
+  "plate_url": "...",
+  "audio_url": "...",
+  "passes": [
+    { "pass_idx": 0, "speaker": "...", "status": "done",
+      "output_url": "...-lipsync-pass-0.mp4",
+      "preclip_crop": { "x": 184, "y": 0, "size": 234, "outputSize": 720 } },
+    ...
+  ]
+}
+```
+Sofort sichtbar, ob der Stitch überhaupt die richtigen Inputs sieht.
 
-### B2 — withDialogLock im sync-so-webhook
+### 3. Pixel / ROI-Beweis (Kernstück)
+Für jeden der 4 Pässe (Sprecher) der Scene N drei Frames vergleichen, jeweils an `turn_start + Δ` für den richtigen Sprecher-Turn:
 
-`sync-so-webhook` darf `composer_scenes.dialog_passes` nur noch unter `withDialogLock(scene_id)` lesen+schreiben.
+- **A** = original wide plate crop an `preclip_crop {x, y, size}`
+- **B** = Sync.so `pass.output_url`, zurückskaliert von `outputSize=720` auf `size × size`
+- **C** = `final_url` crop an derselben `{x, y, size}` Position, gleicher Zeitstempel
 
-- Lock-Acquire vor SoT-Read.
-- Pass-Mutation + `dialog_shots`-Update unter demselben Lock.
-- Lock-Timeout: 10s; bei Timeout → 503 retry für Sync.so-Webhook (Sync.so retried).
-- `dialog_dispatch_locks` Tabelle existiert bereits.
+Differenzen `diff(C, A)` und `diff(C, B)` numerisch (SSIM oder MSE) + visuelle Side-by-Side-Strips in den Report.
 
-### B3 — Watchdog-Reduktion
+**Interpretation:**
+- `C ≈ A` und `C ≠ B` → final nutzt Original-Plate, ignoriert Sync.so-Output.
+- `C ≈ B` → synced Crop wird tatsächlich composited.
+- `B` selbst zeigt keine Mundbewegung → Problem ist upstream (Targeting/Preclip/Sync.so), nicht Stitch.
+- `C ≠ A` und `C ≠ B` → Geometrie/Timing/Scaling mismatch.
 
-`poll-dialog-shots` (pg_cron) darf **nicht mehr direkt Sync.so dispatchen**.
+**Wichtig:** nur Frames innerhalb des jeweiligen Sprecher-Turns vergleichen (Δ relativ zum `turn_start`), nicht globaler t=0, sonst verfälscht Timing-Offset alles.
 
-Erlaubt unter `withDialogLock`:
-- Setzt `PASS_FAILED_TIMEOUT` (terminal) für Passes mit `dispatched_at < now() - 8min` und `provider_job_id` ohne Webhook-Antwort.
-- Für `pending` / `queued_backoff` Passes: invoke `compose-dialog-scene` (D1), kein direkter POST.
+### 4. Audio / Mux-Beweis
+`ffprobe` und ffmpeg-Logs (falls verfügbar) für `final_url` prüfen:
+- Video-Stream: copy oder re-encode?
+- Wenn `-c:v copy` plus nur Audio neu gemuxt → starker Hinweis auf plate-only mux.
+- Audio-Track entspricht Voiceover-Mix, nicht den Pass-Audios?
 
-Verboten:
-- Direkter `fetch('https://api.sync.so/...')`.
-- Touch auf `PASS_DONE`, `PASS_DONE_SUSPECT`, `PASS_FAILED_*`.
+Verdächtiges Pattern:
+```
+ffmpeg -i plate.mp4 -i dialog_audio.wav -c:v copy -c:a aac dialog-stitch-muxed.mp4
+```
 
-### B4 — Plan-D-Fanout per Flag komplett deaktivieren
+## Vergleichs-Tabelle Scene N vs Scene O
 
-`FEATURE_PLAN_D_FANOUT=false` als Env-Var in `compose-dialog-scene`.
+| | Scene N (225ea521) | Scene O (a68624ff) |
+|---|---|---|
+| Pass-Outputs existieren? | | |
+| Manifest referenziert output_url? | | |
+| final_url nutzt Pass-Output (ROI-Diff)? | | |
+| Visuelles Symptom (Münder bewegen sich)? | | |
+| force_multipass / multipass_fallback_attempted | | |
 
-- Code-Pfad bleibt erhalten (für spätere Re-Aktivierung), aber Guard `if (!FEATURE_PLAN_D_FANOUT) return;` vor Fan-out.
-- Bei jedem unterdrückten Fan-out: `syncso_dispatch_log` Event `PLAN_D_FANOUT_BLOCKED_V128` mit `scene_id`, `pass_idx`, `reason`.
+- Beide gleich → dauerhafter Stitch-Bug der `sync-segments`/multipass Engine.
+- Nur N betroffen → Regression durch `force_multipass` oder spezifischen Fallback-Branch; Diff der Manifeste ist der Schlüssel.
+- Nur O funktioniert → Diff zwischen N und O liefert die Root-Cause-Flag.
 
-## UI-Begleitung (parallel, nicht-blockierend)
+## Pflicht-Schluss: explizite Klassifizierung
 
-- **PASS_DONE_SUSPECT Badge:** gelb, sichtbar, Tooltip "Provider returned without lip motion — review manually". Sofort umsetzen, sonst silent degraded.
-- **User-Retry-Button:** **hidden / feature-flagged** bis alle Vorbedingungen erfüllt sind:
-  - `attempt_id` first-class
-  - Credit-Charge idempotent
-  - Transition-Guard aktiv (= B1 deployed)
-  - Garantierte neue `attempt_id`
-  - `active_provider_job_id == null`
-- Bis dahin: Badge zeigt "Contact support to retry" o.ä.
+Der Report **muss** mit genau einer dieser Diagnosen enden:
 
-## Exit-Kriterien Phase B (24h Beobachtung nach Deploy)
+- **A** — Manifest referenziert `pass.output_url` gar nicht. *(Bug in Manifest-Erzeugung)*
+- **B** — Manifest hat `output_url`, aber Renderer ignoriert es. *(Bug in Lambda/Remotion Composition)*
+- **C** — `output_url` wird geladen, aber `preclip_crop` fehlt/falsch. *(Re-Composite-Geometrie)*
+- **D** — Crop wird composited, aber falsche Position/Skalierung. *(Coordinate-space / scaling)*
+- **E** — Composite korrekt, aber Pass-Output selbst nicht synced. *(Problem upstream: Targeting/Preclip/Sync.so)*
+- **F** — Final ist bewusst Plate-only Fallback. *(Fallback-Condition falsch oder zu breit)*
 
-- `0` `PASS_* → pending/retrying/dispatched` ohne `user_retry_flag`
-- `0` `(pass_idx, attempt_id)` mit >1 `provider_job_id`
-- `0` Webhook-Writes auf `composer_scenes` außerhalb `withDialogLock`
-- `0` Watchdog-Re-Dispatches auf terminale Passes
-- `0` Plan-D-Fanout-Dispatches (nur `PLAN_D_FANOUT_BLOCKED_V128` Events)
-- `100%` neue `syncso_dispatch_log` Rows mit `meta.variant`, `meta.model`, `meta.attempt_id`, `meta.pass_idx`
-- `0` Sentry P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED`
+Keine Spekulation, keine Vorschläge zur Implementierung im Report — nur Befund + Klassifizierung. Ein Hotfix-Plan kommt **separat nach Soak-Exit (48h grün)**.
 
-## Out-of-Scope (explizit nicht in Phase B)
+## Deliverables
 
-- Stage 4 A/B-Test
-- Speed/Parallelisierung
-- Segments-Refactor
-- Model-Wechsel (lipsync-2-pro)
-- Confirmed-NOOP-Automatik / Validator (Stage 3.5)
-- User-Retry-Button Aktivierung (separater Folge-PR nach Bedingungserfüllung)
-
-## Reihenfolge global
-
-v128 Phase A ✅ → **v128 Phase B (jetzt)** → 24h Observe → Stage 2+3 → Stage 3.5 → Stage 4 A/B → Stage 5 → Stage 6
-
-## Betroffene Files
-
-- `supabase/functions/_shared/dialogPassTransition.ts` (neu, B1)
-- `supabase/functions/_shared/withDialogLock.ts` (existiert, in Webhook einziehen, B2)
-- `supabase/functions/sync-so-webhook/index.ts` (B1 + B2)
-- `supabase/functions/compose-dialog-segments/index.ts` (B1)
-- `supabase/functions/compose-dialog-scene/index.ts` (B1 + B4)
-- `supabase/functions/poll-dialog-shots/index.ts` (B1 + B3)
-- `src/components/composer/.../DialogPassBadge.tsx` (UI, SUSPECT-Badge)
-- `docs/lipsync/v128-implementation.md` (Update Phase-B-Status)
+1. `docs/lipsync/v128-stitch-forensics.md` mit allen 4 Beweis-Ebenen, Vergleichstabelle und A–F Klassifizierung.
+2. Optional `/mnt/documents/v128-stitch-rois/` — Side-by-Side PNG-Strips pro Pass (A | B | C) für die im Report referenzierten Frames.
