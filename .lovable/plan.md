@@ -1,177 +1,102 @@
-# v129.1 — Sync.so Payload-Contract Hotfix (Surgical) — **SHIPPED**
+# v129.2.0 — Forensik ABGESCHLOSSEN — Classification A bestätigt
 
-> Implementation: `docs/lipsync/v129-implementation.md`. Edits confined to `supabase/functions/compose-dialog-segments/index.ts`.
-> Canary criteria & queries in the implementation doc. v128 soak continues as background telemetry.
+**Ergebnis:** Root-Cause ist nicht v129.1-bezogen. Per-Pass Single-Face-Preclip-Pipeline (`renderPassFacePreclip` + `auto_detect:true`) ist aktiv. Pass-0 Crop schluckt vertikal benachbarten Sprecher, weil `computeFaceCrop` v92-Floor (220 px) den Neighbor-Cap (`0.88 × gap`) bei Δy ≈ 35–81 px überschreibt → Sync.so animiert die falsche Face an Pass-0-Position.
 
+**Voller Beweis:** `docs/lipsync/v129-2-speaker0-forensics.md` (Crop-Geometrie, DB-Evidence, Math, Hotfix-Vorschlag).
 
-**Gate:** v129.0 Classification A accepted (16/17 Multi-Speaker passes dispatched with `auto_detect:true` + `coords_sent:null`, violating v106 doc-strict).
-
-**Goal:** Force Sync.so to receive deterministic target-speaker coordinates in Preclip-space for every Multi-Speaker pass that has persisted plate-space coords. Nothing else.
+**Empfohlener Hotfix v129.2.1:** 1 File (`supabase/functions/_shared/face-crop.ts`), ~6 Zeilen, härtet den Neighbor-Cap gegen den 220-Floor. Wartet auf User-Freigabe.
 
 ---
 
-## Hard Scope Boundary
+# v129.2 — Speaker-0 Lipsync Asymmetry: Forensics-First, kein Blind-Fix
 
-**In scope** (touch ONLY these):
-- Sync.so request builder for Multi-Speaker passes inside `compose-dialog-segments` (the function that builds `options.active_speaker_detection`)
-- Dispatch-time preflight assertion
-- `syncso_dispatch_log.meta` payload persistence (no schema change — column is already `jsonb`)
-- Idempotent credit refund path on preflight block (re-use existing refund util)
+## Signal vom User
+Nach v129.1 Canary: **Lipsync funktioniert für alle Sprecher ausser Sprecher 1 (slotIndex 0).**
+Sprecher 2..N zeigen sichtbare Mouth-ROI-Bewegung, Sprecher 1 ist no-op / falscher Mund / falsches Gesicht.
 
-**Out of scope — do NOT modify:**
-- State Machine / pass status enum (beyond reusing existing `PASS_FAILED_PROVIDER` with new meta)
-- `transitionPass`, `withDialogLock`
-- Watchdog (`poll-dialog-shots`), Plan-D, Terminal-Protection
-- Retry logic, user-retry UI
-- Model selection (no `lipsync-2-pro` swap, no `sync-2`)
-- Segments API
-- Stage 4 A/B
-- `bounding_boxes_url` default behavior (preserve existing explicit path; do not promote)
-- SUSPECT-Badge or any UI work
-- Stitch / Composite / Lambda
-- v128 invariants
+Das ist ein **enormer Fortschritt**: v129.1 Payload-Contract greift grundsätzlich (Sync.so akzeptiert doc-strict Coords und animiert). Aber es gibt eine **slot-spezifische Asymmetrie** ausschliesslich beim ersten Pass.
 
----
+## Hypothesen (müssen bewiesen werden, nicht geraten)
 
-## Implementation
+**H1 — Face-Map Slot 0 Mis-Assignment**
+Gemini-Vision liefert `assignments[]`, aber `slotIndex === 0` wird systematisch dem falschen Charakter / der falschen Bbox zugeordnet. Ursachen denkbar:
+- Legacy `left|right` Backward-Compat-Parser mappt `left → slotIndex 0` ohne Identity-Check
+- `pickSpeakerCoordinates` Fallback "evenly spaced" greift bei Slot 0 zu früh
+- N-Slot Schema verwendet `slot: 0` aber Gemini gibt `slot: 1`-based zurück → off-by-one
 
-### 1. Plate → Preclip coordinate transform
+**H2 — Coord-Transform am Frame-Rand**
+Speaker 0 sitzt typischerweise links. Wenn `crop.x > plateX_speaker0`, wird `x'` negativ → in v129.1 zwar geblockt, aber falls die persistierten Coords bereits "korrigiert" wurden (z.B. auf 0 geclamped beim Schreiben), zeigt der Transform auf eine valide aber falsche Region.
 
-For each Multi-Speaker pass with persisted `meta.coords` (plate-space) AND `meta.preclip_crop`:
+**H3 — Multipass Pass-0 Spezialfall**
+`force_multipass` Pass 0 verwendet eventuell andere Defaults (z.B. erster Pass nimmt `input_preclip_url` direkt, weitere Passes nehmen vorherigen `sync_output_url`). Wenn die Speaker-Reihenfolge an die Pass-Reihenfolge gekoppelt ist, würde Pass 0 immer Speaker 0 bekommen — und nur dort schlägt Coords-Auswahl fehl.
 
-```ts
-const scale = preclip_crop.outputSize / preclip_crop.size;
-const xPrime = Math.round((plateX - preclip_crop.x) * scale);
-const yPrime = Math.round((plateY - preclip_crop.y) * scale);
+**H4 — `active_speaker_detection.frame_number` Off-by-One für Pass 0**
+`frame_number` referenziert eventuell den Frame im Original-Plate, aber Sync.so erwartet ihn relativ zum Preclip. Wenn nur Pass 0 mit `frame_number = 0` läuft und Sync.so dort eine andere Interpretation hat, fällt es auf Auto-Detect zurück (silent).
+
+**H5 — Audio-Mux Off-by-One (nicht Sync.so, sondern Stitch)**
+Sync.so animiert korrekt, aber im finalen Stitch wird Speaker 0's lipsync-output durch das Original-Plate überschrieben (z.B. weil `audio_clips[0]` als "base track" behandelt wird).
+
+## Plan: Read-only-Forensik (v129.2.0), KEIN Code-Change
+
+### Stufe 1 — DB-Forensik (sofort, ohne neues Render)
+Aus `syncso_dispatch_log` der letzten erfolgreichen Multi-Speaker-Runs ziehen:
+
+```sql
+SELECT
+  pass_index,
+  meta->'v116_diag'->>'asd_mode'     AS asd_mode,
+  meta->'v116_diag'->>'coords_sent'  AS coords_sent,
+  meta->'outbound_payload'->'options' AS opts,
+  meta->'coord_transform'            AS transform,
+  meta->'face_map'                   AS face_map,
+  sync_input_url, sync_output_url
+FROM syncso_dispatch_log
+WHERE created_at > now() - interval '24 hours'
+  AND meta ? 'coord_transform'
+ORDER BY scene_id, pass_index;
 ```
 
-Build payload:
+Vergleich Pass 0 vs Pass 1..N pro Szene auf:
+- `asd_mode` (muss `preclip_coords_doc_strict` sein für ALLE Passes)
+- `coords_sent[0]` vs Speaker-Identity in `face_map`
+- `transform.scale` und `transform.crop` Konsistenz
+- `frame_number` Wert
 
-```json
-{
-  "options": {
-    "active_speaker_detection": {
-      "auto_detect": false,
-      "frame_number": <persisted>,
-      "coordinates": [xPrime, yPrime]
-    }
-  }
-}
-```
+### Stufe 2 — Face-Map Audit
+Aus `dialog_shots` / Anchor-Cache: Für die Canary-Szene das gespeicherte `face_map`-Objekt extrahieren und manuell prüfen:
+- Hat `slotIndex: 0` die korrekte `characterId`?
+- Stimmt `bbox` für Slot 0 visuell mit Speaker 0 im Plate überein (Screenshot-Overlay)?
 
-`preclip_auto_detect` branch is **disabled** for Multi-Speaker when coords + preclip_crop exist.
+### Stufe 3 — Output-Diff Speaker 0 vs Speaker N
+Frame-Extraktion aus `sync_output_url` Pass 0 vs Pass 1:
+- ROI um `coords_sent` herum
+- Pixel-Diff zwischen `input_preclip_url` und `sync_output_url` in genau dieser ROI während Audio-Active-Frames
+- Wenn Diff bei Pass 0 ≈ 0 aber bei Pass 1 hoch → Sync.so hat Pass 0 ignoriert (Hypothese H1/H3/H4)
+- Wenn Diff bei Pass 0 hoch, aber an FALSCHER Position → Coords zeigen auf falsches Gesicht (Hypothese H1/H2)
 
-### 2. Bounds check — no silent clamping
+### Stufe 4 — Klassifikation
+| Befund | Klassifikation | Nächster Schritt |
+|---|---|---|
+| Pass 0 coords zeigen auf Speaker 1's Bbox | **A — Face-Map Slot-0 Bug** | v129.2.1 Hotfix in `_shared/twoshot-face-map.ts` `pickSpeakerCoordinates` |
+| Pass 0 `asd_mode != preclip_coords_doc_strict` | **B — Request-Builder Pass-0-Fallthrough** | v129.2.1 Hotfix in `compose-dialog-segments` Pass-0-Branch |
+| Pass 0 Sync.so output identisch zu Input bei valider Bbox | **C — Sync.so frame_number Interpretation** | Support-Bundle + Plan-Pivot |
+| Pass 0 ok, aber Stitch überschreibt | **D — Audio-Mux Speaker-0-Override** | v129.2.1 Hotfix in `render-sync-segments-audio-mux` |
 
-If `xPrime` or `yPrime` lies outside `[0, outputSize)`:
-- **Do not clamp.**
-- Block dispatch (see §4).
+## Out of Scope (v129.2.0)
+- Kein Code-Change. Forensik liefert Beweise, dann erst Hotfix-Plan.
+- State Machine, Retry, Watchdog, Plan-D, UI bleiben unverändert.
+- `lipsync-2-pro` Swap, Stage 4 A/B, Segments API bleiben deferred.
+- v128 Soak läuft weiter als Hintergrund-Telemetrie.
 
-### 3. Precedence (preserve bbox_url outlier)
+## Deliverables
+1. `docs/lipsync/v129-2-speaker0-forensics.md` — neu, mit Query-Resultaten, Frame-Diffs, Klassifikation
+2. `.lovable/plan.md` — Active-Sektion auf v129.2.0 Forensics aktualisiert
+3. Memory-Update erst NACH Klassifikation, nicht spekulativ
 
-1. Explicit valid `bounding_boxes_url` set → use it unchanged.
-2. Else, persisted coords + preclip_crop present → doc-strict transform (§1).
-3. Else → `DISPATCH_BLOCKED_PAYLOAD_PRECHECK`.
+## Erfolgskriterium
+Eine eindeutige Klassifikation (A/B/C/D) mit Datenbeleg — **kein Hotfix ohne bewiesenen Root-Cause**.
+Wenn A/B/D: minimaler v129.2.1 in genau einem File, danach Canary-Repeat mit 1 User / 1 Szene / 3+ Speaker.
+Wenn C: Plan-Stop, Support-Bundle für Sync.so.
 
-`bbox_url` is **not** promoted to default. Stage 4 territory.
-
-### 4. Preflight assertion (hard block)
-
-Before any Sync.so HTTP call, assert:
-
-- If persisted coords exist AND payload would send `auto_detect:true` → block.
-- If transformed coords out of bounds → block.
-
-On block:
-- No Sync.so request issued.
-- No retry, no `transitionPass` to retry state.
-- Mark `sync_status = 'DISPATCH_BLOCKED_PAYLOAD_PRECHECK'` on dispatch log.
-- Pass-level status: reuse existing `PASS_FAILED_PROVIDER` (avoid new enum value to keep scope tight) with meta:
-  ```json
-  {
-    "error_class": "internal_payload_contract_violation",
-    "provider_call_made": false,
-    "refund_reason": "dispatch_blocked_payload_precheck"
-  }
-  ```
-- Idempotent refund via existing reservation refund util (keyed on `reservation_id` to stay safe under re-dispatch).
-
-### 5. Outbound payload persistence
-
-On every dispatch (success path or block), write to `syncso_dispatch_log.meta`:
-
-```json
-{
-  "v1291_payload_contract": true,
-  "outbound_payload": { "model": "sync-3", "options": { ... full options ... } },
-  "coord_transform": {
-    "source_space": "plate",
-    "target_space": "preclip",
-    "plate_coords": [302, 103],
-    "preclip_crop": { "x": 184, "y": 0, "size": 234, "outputSize": 720 },
-    "scale": 3.0769,
-    "transformed_coords_float": [363.07, 316.92],
-    "transformed_coords_int": [363, 317]
-  }
-}
-```
-
-Signed URLs in payload are redacted; `options.active_speaker_detection` is stored verbatim.
-
-Update `meta.v116_diag`:
-- `coords_sent`: now the transformed `[x', y']`
-- `asd_mode`: `"preclip_coords_doc_strict"` (was `"preclip_auto_detect"`)
-
----
-
-## Canary
-
-- **1 user / 1 new Multi-Speaker scene**, sync-3, cut_off, existing `force_multipass`.
-- No model swap, no A/B.
-
-### Pre-deploy log signature
-```
-asd_mode = preclip_auto_detect
-coords_sent = null
-active_speaker_detection.auto_detect = true
-```
-
-### Post-deploy log signature
-```
-asd_mode = preclip_coords_doc_strict
-coords_sent = [x', y']
-active_speaker_detection.auto_detect = false
-frame_number = <int>
-```
-
-### Success criteria (ALL must hold)
-1. `meta.outbound_payload.options.active_speaker_detection.auto_detect === false` and transformed `coordinates` present.
-2. No `DISPATCH_BLOCKED_PAYLOAD_PRECHECK` on the canary scene.
-3. Sync.so returns `completed`.
-4. **Mouth/face ROI diff** between `sync_output_url` and `input_preclip_url` during audio-active frames is non-trivial (per-frame diff, not whole-image mean).
-5. `final_url` composites Sync.so output as before — no Stitch regression.
-6. v128 invariants intact: no terminal recycles, no duplicate dispatches, no lock bypass, no Plan-D escapes, no Watchdog redispatches.
-
-### If still no-op after doc-strict payload
-- Do NOT swap model.
-- Reopen as Classification B/C:
-  - Re-verify coords actually land on face in preclip frame_number.
-  - Re-verify audio non-silent / duration match / preclip integrity.
-- Only then prepare Sync.so support bundle.
-
----
-
-## Files touched
-
-- `supabase/functions/compose-dialog-segments/index.ts` — request builder + preflight only (around existing `sanitizeSync3Options` / ASD construction).
-- `docs/lipsync/v129-implementation.md` — new, documents transform formula, preflight, log signatures, canary.
-- `.lovable/plan.md` — flip v129.1 from "Conditional" to "Active", document canary plan.
-- `mem://architecture/lipsync/sync-3-doc-strict-options-v106` — append v129.1 enforcement note.
-
-No DB migration. No new edge function. No new table. No new column.
-
----
-
-## Explicit non-goals (re-stated)
-
-No State Machine, no Watchdog, no Retry, no Plan-D, no User-Retry, no `lipsync-2-pro`, no Segments, no Stage 4 A/B, no SUSPECT UI, no `bbox_url` promotion, no Stitch touch, no v128 changes.
+## Warum kein direkter Fix
+v129.1 hat gezeigt, dass auch ein "offensichtlicher" Payload-Bug erst nach belastbarer Forensik korrekt isoliert werden kann. Speaker-0-Asymmetrie hat mindestens 5 plausible Ursachen in mindestens 3 verschiedenen Modulen (Face-Map, Request-Builder, Audio-Mux). Ein blinder Fix in der falschen Schicht zerstört die v129.1-Erfolge der anderen Sprecher.
