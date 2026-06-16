@@ -615,6 +615,44 @@ serve(async (req) => {
       );
     }
 
+    // ── v128 Phase B1 — Terminal-Transition Guard at dispatch entry ──────
+    // Alpha-Plan v3.1 §1.9: a pass that is currently terminal (done /
+    // done_suspect / failed / canceled_by_scene_failure) cannot leave
+    // terminal unless the caller passes `user_retry_flag=true` + a fresh
+    // `new_attempt_id` (and credits were re-debited externally). The
+    // automatic webhook retry ladder + Plan-D fan-out used to call us with
+    // `advance:true` / `retry:true` on already-terminal passes; the guard
+    // logs Sentry-P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED` and returns
+    // without re-dispatch so the pass stays terminal.
+    if ((isAdvance || isRetry) && typeof body?.pass_idx === "number") {
+      const guard = await assertSafeDispatchEntry(
+        supabase,
+        {
+          scene_id: sceneId,
+          pass_idx: Number(body.pass_idx),
+          source: isAdvance ? "compose-dialog-segments:advance" : "compose-dialog-segments:retry",
+          user_retry_flag: body?.user_retry_flag === true,
+          new_attempt_id: typeof body?.new_attempt_id === "string" ? body.new_attempt_id : null,
+          credit_charge_result: body?.user_retry_flag === true ? "success" : "skip",
+        },
+        isRetry ? "retrying" : "dispatched",
+      );
+      if (!guard.ok && guard.blocked) {
+        return json(
+          {
+            ok: false,
+            status: "terminal_transition_blocked",
+            scene_id: sceneId,
+            pass_idx: Number(body.pass_idx),
+            current_status: guard.currentStatus,
+            reason: guard.reason,
+            hint: "pass is terminal; only an explicit user-retry with a fresh attempt_id may re-dispatch",
+          },
+          409,
+        );
+      }
+    }
+
     // ── Validate audio plan ───────────────────────────────────────────────
     const plan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
     const twoshot = (plan.twoshot ?? {}) as Record<string, any>;
