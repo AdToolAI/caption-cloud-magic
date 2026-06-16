@@ -1,4 +1,8 @@
-# v129.1 — Sync.so Payload-Contract Hotfix (Surgical)
+# v129.1 — Sync.so Payload-Contract Hotfix (Surgical) — **SHIPPED**
+
+> Implementation: `docs/lipsync/v129-implementation.md`. Edits confined to `supabase/functions/compose-dialog-segments/index.ts`.
+> Canary criteria & queries in the implementation doc. v128 soak continues as background telemetry.
+
 
 **Gate:** v129.0 Classification A accepted (16/17 Multi-Speaker passes dispatched with `auto_detect:true` + `coords_sent:null`, violating v106 doc-strict).
 
