@@ -3277,49 +3277,104 @@ serve(async (req) => {
       syncOptions.occlusion_detection_enabled = true;
     }
     if (usePassPreclip) {
-      // v115 — Back to Sync.so's official guidance for single/obvious speaker
-      // clips. The Speaker-Selection doc
-      // (https://sync.so/docs/developer-guides/speaker-selection) is explicit:
+      // v129.1 — Payload-contract enforcement for Multi-Speaker preclip passes.
+      // v129.0 forensics (docs/lipsync/v129-syncso-output-authenticity.md)
+      // proved 16/17 dispatched passes used auto_detect:true on a multi-face
+      // preclip context, so Sync.so silently selected the wrong / no face and
+      // returned visually no-op output. v106 doc-strict forbids
+      // `auto_detect:true` for Multi-Speaker passes — we must transform the
+      // persisted plate-space coords into preclip-space and send
+      // `{ auto_detect:false, frame_number, coordinates:[x',y'] }`.
       //
-      //   "Auto-detect (video only): fastest setup; best for single/obvious
-      //    speaker clips. Set auto_detect: true and skip manual fields."
-      //
-      // Our preclip is exactly that: a 720p+ tight single-face crop that the
-      // preclip face-gate already validated as faces === 1. v114 tried to
-      // pin ASD to the geometric center on the assumption that auto_detect
-      // could fail on closed-mouth midframes, but DB-confirmed runs (scene
-      // 7470be0d…, pass 2 Matthew) show coords_center on a single-face
-      // preclip reproducibly returns `provider_unknown_error`. Auto-detect
-      // on a verified single-face crop is the doc-correct, stable path.
-      //
-      // The retry ladder (RETRY_VARIANTS) still includes `coords-pro` /
-      // `sync3-coords` as targeted fallbacks for the rare case where
-      // auto_detect itself fails on this specific preclip.
-      //
-      // Doc-strict for sync-3: ONLY sync_mode + active_speaker_detection are
-      // allowed; temperature/occlusion are stripped here.
-      // See mem/architecture/lipsync/sync-3-doc-strict-options-v106.
-      // v125 — null/undefined means the validator did not run, NOT zero faces.
-      // Treat unknown as "trust the preclip" (auto_detect) — only fall back to
-      // center coords if we actually saw 0 or >1 faces.
+      // Single-Speaker (N=1) keeps the v115 auto_detect path: exactly one face
+      // in the preclip means there is nothing to disambiguate.
       const rawPassFc = (pass as any).preclip_face_count;
       const passFaceCount: number | null =
         rawPassFc === null || rawPassFc === undefined || !Number.isFinite(Number(rawPassFc))
           ? null
           : Number(rawPassFc);
-      const outSize = Number((pass as any).preclip_crop?.outputSize)
-        || Number((pass as any).preclip_crop?.size)
-        || 720;
-      const useAutoDetect = passFaceCount === 1 || passFaceCount === null;
+      const crop = (pass as any).preclip_crop;
+      const outSize = Number(crop?.outputSize) || Number(crop?.size) || 720;
+      const isMultiSpeaker = speakers.length >= 2;
+      const plateCoords = Array.isArray(pass.coords) && pass.coords.length === 2
+        && Number.isFinite(Number(pass.coords[0])) && Number.isFinite(Number(pass.coords[1]))
+        ? [Number(pass.coords[0]), Number(pass.coords[1])] as [number, number]
+        : null;
+      const cropOk = !!crop
+        && Number.isFinite(Number(crop.x))
+        && Number.isFinite(Number(crop.y))
+        && Number.isFinite(Number(crop.size))
+        && Number(crop.size) > 0;
+      const refFrame = Number.isFinite(Number(referenceFrameNumber))
+        ? Number(referenceFrameNumber)
+        : 0;
+
       let asdMode: string;
-      if (useAutoDetect) {
+      let v1291Diag: any = null;
+
+      if (isMultiSpeaker && plateCoords && cropOk) {
+        // Plate → Preclip transform.
+        const cx = Number(crop.x);
+        const cy = Number(crop.y);
+        const cSize = Number(crop.size);
+        const scale = outSize / cSize;
+        const xFloat = (plateCoords[0] - cx) * scale;
+        const yFloat = (plateCoords[1] - cy) * scale;
+        const xInt = Math.round(xFloat);
+        const yInt = Math.round(yFloat);
+        const inBounds = xInt >= 0 && xInt < outSize && yInt >= 0 && yInt < outSize;
+        v1291Diag = {
+          enabled: true,
+          source_space: "plate",
+          target_space: "preclip",
+          plate_coords: plateCoords,
+          preclip_crop: { x: cx, y: cy, size: cSize, outputSize: outSize },
+          scale: Number(scale.toFixed(4)),
+          transformed_coords_float: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
+          transformed_coords_int: [xInt, yInt],
+          in_bounds: inBounds,
+          frame_number: refFrame,
+        };
+        (pass as any)._v1291 = v1291Diag;
+        if (!inBounds) {
+          // v129.1 — Do NOT silently clamp. Mark for preflight block.
+          (pass as any)._v1291_block = {
+            reason: "transformed_coords_out_of_bounds",
+            details: v1291Diag,
+          };
+          // Set a doc-strict payload anyway so log evidence is consistent;
+          // the preflight assertion will refuse to dispatch.
+          syncOptions.active_speaker_detection = {
+            auto_detect: false,
+            frame_number: refFrame,
+            coordinates: [xInt, yInt],
+          };
+          asdMode = "preclip_coords_oob_blocked";
+        } else {
+          syncOptions.active_speaker_detection = {
+            auto_detect: false,
+            frame_number: refFrame,
+            coordinates: [xInt, yInt],
+          };
+          asdMode = "preclip_coords_doc_strict";
+        }
+      } else if (isMultiSpeaker && (!plateCoords || !cropOk)) {
+        // v129.1 — Multi-Speaker without persisted coords/crop is an internal
+        // contract violation: upstream MUST have persisted them. Mark for
+        // preflight block; do not fall back to auto_detect.
+        (pass as any)._v1291_block = {
+          reason: "multi_speaker_missing_coords_or_crop",
+          has_plate_coords: !!plateCoords,
+          has_preclip_crop: !!cropOk,
+        };
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        asdMode = "v1291_missing_inputs_blocked";
+      } else if (passFaceCount === 1 || passFaceCount === null) {
+        // Single-Speaker preclip — auto_detect remains doc-correct (v115).
         syncOptions.active_speaker_detection = { auto_detect: true };
         asdMode = "auto_detect";
       } else {
-        // Fallback only when preclip face-gate could not confirm exactly one
-        // face (e.g. validator skipped, or 0/>1 detected). We still send
-        // center coords as a hard pointer to the geometric middle so Sync.so
-        // has *some* anchor instead of silently picking nothing.
+        // Single-Speaker fallback: face-gate saw 0 or >1 faces. Center coords.
         const center = Math.max(8, Math.floor(outSize / 2));
         syncOptions.active_speaker_detection = {
           auto_detect: false,
@@ -3341,7 +3396,7 @@ serve(async (req) => {
         return typeof wavDur === "number" ? wavDur : null;
       })();
       (pass as any)._v102_probe = {
-        stage: "preclip-sync3-auto-detect-v115",
+        stage: "preclip-sync3-v1291",
         model_intent: "sync-3",
         payload_model: "sync-3",
         asd_mode: asdMode,
@@ -3360,9 +3415,10 @@ serve(async (req) => {
         audio_vs_video_delta_sec: audioFullSec != null && videoDurSec != null
           ? Number((audioFullSec - videoDurSec).toFixed(3))
           : null,
+        v1291: v1291Diag,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v115_preclip_sync3 speaker=${pass.speaker_name} asd_mode=${asdMode} face_count=${passFaceCount} sync_mode=${syncOptions.sync_mode} ${JSON.stringify((pass as any)._v102_probe)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v1291_preclip_sync3 speaker=${pass.speaker_name} asd_mode=${asdMode} face_count=${passFaceCount} multi_speaker=${isMultiSpeaker} v1291=${JSON.stringify(v1291Diag)} block=${JSON.stringify((pass as any)._v1291_block ?? null)}`,
       );
     }
 
