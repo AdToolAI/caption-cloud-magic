@@ -3309,8 +3309,75 @@ serve(async (req) => {
         ? Number(referenceFrameNumber)
         : 0;
 
+      // v129.2.1 — Preclip Ambiguity Diagnostic.
+      // For every Multi-Speaker preclip pass, project each *other* face-map
+      // face center into plate-space and test whether it falls inside the
+      // preclip crop rect. If yes, the crop is ambiguous: Sync.so with
+      // `auto_detect:true` will routinely select the wrong face. We persist
+      // this diagnostic and use it in the v129.1 payload-contract preflight
+      // as an additional hard-block trigger (auto_detect_with_ambiguous_crop)
+      // so we never burn a Sync.so call on a crop we already know is unsafe.
+      let v1291Ambiguity: any = null;
+      if (cropOk) {
+        const cx0 = Number(crop.x);
+        const cy0 = Number(crop.y);
+        const cS = Number(crop.size);
+        const cx1 = cx0 + cS;
+        const cy1 = cy0 + cS;
+        const fmFacesAmb: any[] = Array.isArray((faceMap as any)?.faces)
+          ? (faceMap as any).faces
+          : [];
+        const fmWAmb = Number((faceMap as any)?.width) || (plateDims?.width ?? 0);
+        const fmHAmb = Number((faceMap as any)?.height) || (plateDims?.height ?? 0);
+        const dimsWAmb = plateDims?.width ?? fmWAmb;
+        const dimsHAmb = plateDims?.height ?? fmHAmb;
+        const selfId = (pass as any).character_id ?? null;
+        const selfSlot = Number((pass as any).speaker_idx);
+        const siblingsInside: any[] = [];
+        let nearest = Infinity;
+        if (fmWAmb > 0 && fmHAmb > 0 && dimsWAmb > 0 && dimsHAmb > 0) {
+          const sx = dimsWAmb / fmWAmb;
+          const sy = dimsHAmb / fmHAmb;
+          for (const f of fmFacesAmb) {
+            if (!f || !Array.isArray(f.bbox) || f.bbox.length !== 4) continue;
+            const isSelf =
+              (f.characterId && selfId && f.characterId === selfId) ||
+              (Number.isFinite(Number(f.slotIndex)) && Number(f.slotIndex) === selfSlot);
+            if (isSelf) continue;
+            const fcx = ((Number(f.bbox[0]) + Number(f.bbox[2])) / 2) * sx;
+            const fcy = ((Number(f.bbox[1]) + Number(f.bbox[3])) / 2) * sy;
+            const inside = fcx >= cx0 && fcx < cx1 && fcy >= cy0 && fcy < cy1;
+            if (inside) {
+              siblingsInside.push({
+                slotIndex: Number.isFinite(Number(f.slotIndex)) ? Number(f.slotIndex) : null,
+                characterId: f.characterId ?? null,
+                center: [Math.round(fcx), Math.round(fcy)],
+              });
+            }
+            if (plateCoords) {
+              const d = Math.hypot(fcx - plateCoords[0], fcy - plateCoords[1]);
+              if (d < nearest) nearest = d;
+            }
+          }
+        }
+        v1291Ambiguity = {
+          sibling_centers_inside_crop: siblingsInside.length > 0,
+          siblings_inside: siblingsInside,
+          min_neighbor_dist:
+            nearest === Infinity ? null : Number(nearest.toFixed(2)),
+          crop_size: cS,
+          crop_x: cx0,
+          crop_y: cy0,
+          preclip_face_count: passFaceCount,
+          risk: siblingsInside.length > 0 ? "neighbor_inside_crop" : "clean",
+        };
+        (pass as any)._v1291_ambiguity = v1291Ambiguity;
+      }
+
       let asdMode: string;
       let v1291Diag: any = null;
+
+
 
       if (isMultiSpeaker && plateCoords && cropOk) {
         // Plate → Preclip transform.
@@ -3416,10 +3483,12 @@ serve(async (req) => {
           ? Number((audioFullSec - videoDurSec).toFixed(3))
           : null,
         v1291: v1291Diag,
+        preclip_ambiguity: v1291Ambiguity,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v1291_preclip_sync3 speaker=${pass.speaker_name} asd_mode=${asdMode} face_count=${passFaceCount} multi_speaker=${isMultiSpeaker} v1291=${JSON.stringify(v1291Diag)} block=${JSON.stringify((pass as any)._v1291_block ?? null)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v1291_preclip_sync3 speaker=${pass.speaker_name} asd_mode=${asdMode} face_count=${passFaceCount} multi_speaker=${isMultiSpeaker} ambiguity=${JSON.stringify(v1291Ambiguity)} v1291=${JSON.stringify(v1291Diag)} block=${JSON.stringify((pass as any)._v1291_block ?? null)}`,
       );
+
     }
 
     else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
@@ -3778,20 +3847,35 @@ serve(async (req) => {
     // See docs/lipsync/v129-implementation.md.
     const v1291Diag = (pass as any)._v1291 ?? null;
     const v1291Block = (pass as any)._v1291_block ?? null;
+    const v1291Ambig = (pass as any)._v1291_ambiguity ?? null;
     if (usePassPreclip && speakers.length >= 2) {
       const hasCoords = !!v1291Diag && Array.isArray(v1291Diag.plate_coords);
       const wouldAutoDetect = asdForProbe?.auto_detect === true;
-      if (v1291Block || (hasCoords && wouldAutoDetect)) {
+      // v129.2.1 — Belt-and-Suspenders Ambiguity Guard.
+      // Even if the v1291 branch didn't classify this as a coords-bearing
+      // multi-speaker pass, refuse to send auto_detect:true into a preclip
+      // crop that we *know* contains a sibling face center. This is the
+      // forensic root cause from v129.2.0 (Samuel/Sarah, Samuel/Kailee 2x2
+      // stacks): the 220px floor in computeFaceCrop pulls the neighbour into
+      // the crop, and Sync.so then animates the wrong face. Block + refund
+      // before dispatch instead of burning the call.
+      const ambiguousAutoDetect =
+        wouldAutoDetect && !!v1291Ambig?.sibling_centers_inside_crop;
+      if (v1291Block || (hasCoords && wouldAutoDetect) || ambiguousAutoDetect) {
+        const reasonLabel = v1291Block
+          ? v1291Block.reason
+          : ambiguousAutoDetect
+            ? "auto_detect_with_ambiguous_crop"
+            : "auto_detect_with_persisted_coords";
         return await failBeforeProviderDispatch(
           "DISPATCH_BLOCKED_PAYLOAD_PRECHECK",
           "internal_payload_contract_violation",
-          v1291Block
-            ? `v129.1 preflight blocked dispatch: ${v1291Block.reason}`
-            : "v129.1 preflight blocked dispatch: Multi-Speaker preclip would send auto_detect:true despite persisted plate-space coords.",
+          `v129.2.1 preflight blocked dispatch: ${reasonLabel}`,
           500,
           {
             v1291: v1291Diag,
             v1291_block: v1291Block,
+            v1291_ambiguity: v1291Ambig,
             v105_probe: v105Probe,
             provider_call_made: false,
             refund_reason: "dispatch_blocked_payload_precheck",
@@ -3799,6 +3883,7 @@ serve(async (req) => {
         );
       }
     }
+
     console.log(
       `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v105_doc_strict ${JSON.stringify(v105Probe)} tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "none"} windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
     );
