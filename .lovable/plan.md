@@ -1,172 +1,177 @@
-# Alpha-Plan v2 — Sync.so Multi-Speaker Pipeline
+# Alpha-Plan v3.1 — Sync.so Pipeline Hardening (Implementierungsvertrag)
 
-## Leitprinzip für v128
-**Terminal means terminal.** Kein Provider-Outcome (COMPLETED, NOOP, UNKNOWN_ERROR, TIMEOUT) darf nach Eintragung in `composer_scenes.dialog_passes[i].status` jemals automatisch einen neuen Dispatch auslösen. Re-Dispatch ist ausschließlich expliziter User-Action vorbehalten.
+**Implementierungsvertrag (nicht verhandelbar):**
+> Ein terminaler Pass bleibt terminal. Jeder neue Dispatch nach Terminalzustand braucht eine neue `attempt_id` und eine explizite User-Aktion.
 
----
-
-## Stage 0.5 — Dispatch-Lock-Forensik (read-only, MANDATORY, vor v128)
-
-**Ziel:** Vollständiges Mapping aller Codepfade, die Sync.so callen, und der Lock-Semantik. Erst danach darf v128 geschrieben werden.
-
-**Deliverable:** `docs/lipsync/v127.5-dispatch-paths.md` mit:
-
-1. **Dispatch-Path-Inventar** — alle Edge-Functions/Cron-Jobs, die `POST sync.so/v2/generate` (oder verwandte Endpoints) auslösen:
-   - `compose-dialog-segments` (4094 LOC) — Erst-Dispatch
-   - `poll-dialog-shots` (Cron) — Timeout-/Watchdog-Pfade
-   - `sync-so-webhook` — NOOP-Retry-Pfad (Zeilen 486–537)
-   - `compose-dialog-scene` — Stage 5 Multi-Speaker-Entry
-   - Jeder weitere RPC/Function-Call, der `dispatchSyncSo()` o.ä. nutzt (grep nach `sync.so`, `lipsync-2`, `sync-3`)
-
-2. **Lock-Semantik-Matrix** pro Pfad:
-   | Pfad | Liest `dialog_dispatch_locks`? | Schreibt? | Lock-Key (scene/shot/pass/attempt)? | Atomar (INSERT … ON CONFLICT)? | Released wann? |
-   |------|-------------------------------|-----------|--------------------------------------|-------------------------------|----------------|
-
-3. **Loop-Forensik** für Scene `cba18767`:
-   - Warum 21 Attempts? Welcher Pfad re-dispatchte nach `sync_completed_noop`?
-   - Welcher Pfad re-dispatchte nach `provider_unknown_error`?
-   - Wurde derselbe `passIdx` mehrfach mit neuem `provider_job_id` belegt?
-
-4. **Terminal-Outcome-Audit** — grep nach allen Stellen, die `dialog_passes[i].status` mit terminalen Werten überschreiben UND danach erneut dispatchen können. Erwarteter Output: Liste der „Recycle-Stellen" im Code.
-
-5. **Akzeptanzkriterien:**
-   - ✅ Wir können exakt benennen: welche Pfade dispatchen, welche Locks benutzen, welche umgehen.
-   - ✅ Wir kennen den genauen Codepfad jeder Recycle-Stelle (NOOP→Retry, UNKNOWN→Retry).
-   - ✅ Wir wissen, ob `dialog_dispatch_locks` leer ist wegen „nie benutzt" oder „sauber released".
-
-**Tool:** read-only Code-Walk via `acp_subagent--explore` + gezielte SQL-Audits. Keine Code-Änderungen.
-
-**Geschätzte Dauer:** 60–90 Min.
+**Status:** v2 verworfen, v3 freigegeben, v3.1 = Implementierungsbasis für v128.
 
 ---
 
-## Stage 1 — v128 Hotfix (nach Stage 0.5)
+## Stage 1 (v128) — Terminal-Outcome-Hardening
 
-### 1.1 Terminal-Status-Taxonomie (erweitert)
+### 1.1 Terminal-Outcome-Taxonomie
 
-Neuer Enum für `dialog_passes[i].status`:
+| Webhook/Polling-Signal | Status | Badge | Auto-Refund | Mutiert dialog_passes? |
+|---|---|---|---|---|
+| `sync_completed` (valide) | `PASS_DONE` | grün | nein | ja |
+| `sync_completed_noop` | `PASS_DONE_SUSPECT` | gelb | **nein** | ja |
+| `provider_unknown_error` | `PASS_FAILED_PROVIDER_UNKNOWN` | rot | ja | ja |
+| `watchdog_provider_timeout` | `PASS_FAILED_TIMEOUT` | rot | ja | ja |
+| `provider_failed` / `rejected` | `PASS_FAILED_PROVIDER` | rot | ja | ja |
+| `429` / `rate_limited` | `QUEUED_BACKOFF` (nicht-terminal) | gelb | nein | ja |
+| `stale_webhook` (Korrektur 1) | **log-only Event** | — | nein | **nein** |
 
-| Provider-Outcome | Neuer Status | Terminal? | Auto-Refund? | UI |
-|-----------------|--------------|-----------|--------------|-----|
-| `sync_completed` (valid) | `PASS_DONE` | ✅ | nein | grün |
-| `sync_completed_noop` (sizeRatio≈1.0, low confidence) | `PASS_DONE_SUSPECT` | ✅ | **nein** | **gelber Badge „degraded"** |
-| `sync_completed_noop` (CONFIRMED via 2nd-pass-validation) | `PASS_FAILED_QUALITY_CONFIRMED` | ✅ | ✅ | rot |
-| `provider_unknown_error` | `PASS_FAILED_PROVIDER_UNKNOWN` | ✅ | ✅ | rot |
-| `watchdog_provider_timeout` (8min) | `PASS_FAILED_TIMEOUT` | ✅ | ✅ | rot |
-| `provider_failed` / `rejected` | `PASS_FAILED_PROVIDER` | ✅ | ✅ | rot |
-| `429` / `rate_limited` | `QUEUED_BACKOFF` | ❌ | nein | gelb („queued") |
-| stale webhook (älter als aktuelle `attempt_id`) | `IGNORE_STALE_WEBHOOK` | n/a | nein | (logged) |
+`PASS_FAILED_QUALITY_CONFIRMED` ist als Status reserviert, wird in v128 **nur manuell/Admin** gesetzt (siehe Stage 3.5).
 
-**Invariant:** Kein `PASS_*` darf irgendwo im Code zu `DISPATCHED` zurückgesetzt werden außer durch expliziten User-Retry (neuer `attempt_id`).
+### 1.2 Alle Recycle-Pfade schließen
 
-### 1.2 NOOP- & Unknown-Error-Loops entfernen
+In v128 entfernt/deaktiviert:
 
-- `sync-so-webhook/index.ts:486–537`: NOOP-Recovery-Block **entfernen**. NOOP → terminal mit `PASS_DONE_SUSPECT` (oder confirmed-fail nach Validation, siehe 1.6).
-- Jede Stelle aus Stage-0.5-Audit, die nach `provider_unknown_error` neu dispatcht: entfernen. UNKNOWN → terminal.
+- **Webhook NOOP-Recovery** (`sync-so-webhook/index.ts` L486–538) → entfernen
+- **Webhook FAILED-Retry-Ladder** für `provider_unknown_error` (L1055–1070) → entfernen
+- **D6 Plan-D fan-out** → **komplett deaktiviert (Entscheidung 1)**, Feature-Flag `FEATURE_PLAN_D_FANOUT=false`; falls Pfad doch erreicht wird: log `PLAN_D_FANOUT_BLOCKED_V128`, kein Dispatch
+- **D7 Watchdog** → kein direkter Sync.so-Dispatch mehr (siehe 1.4)
+- **v87 Coord-Refresh-Reset** (L2125–2131) → siehe 1.8
 
-### 1.3 Source-of-Truth-Konsistenz
+### 1.3 Source of Truth + Log-Alias
 
-- **Read** Pass-State: ausschließlich aus `composer_scenes.dialog_passes[passIdx]`.
-- **Write** jeder Dispatch zusätzlich in `syncso_dispatch_log.meta`:
-  ```json
-  { "model", "variant", "payload_hash", "pass_idx", "attempt_id",
-    "provider_job_id", "dispatch_source" }
-  ```
-- Migration: Backfill ist nicht nötig (87 alte Rows bleiben NULL); ab v128 müssen alle neuen Rows vollständig sein. CI-Check (siehe 1.7) failed bei NULL.
+- **Operativ:** `composer_scenes.dialog_passes[passIdx]`
+- **Forensik:** `syncso_dispatch_log`
 
-### 1.4 Lock-Härtung (Scope abhängig von Stage 0.5)
+Jeder Dispatch ab v128 schreibt `syncso_dispatch_log.meta`:
 
-Erst spezifizieren **nach** Stage-0.5-Output. Zielbild (vorläufig):
-- Unique-Constraint `(scene_id, pass_idx, attempt_id)` mit TTL 8min.
-- Atomarer Claim via `INSERT … ON CONFLICT DO NOTHING RETURNING id`.
-- Alle dispatchenden Pfade (compose-dialog-segments, poll-dialog-shots, webhook-Retry — falls noch existent) MÜSSEN denselben Claim respektieren.
-- Cleanup-Cron alle 2 min für abgelaufene Locks.
-- Konkrete Implementation wird erst nach Code-Walk fixiert.
-
-### 1.5 sizeRatio = log-only
-
-`sizeRatio`-Heuristik triggert **keinen** Retry mehr. Wird nur in `syncso_dispatch_log.meta.quality_metrics` geschrieben für spätere Analyse.
-
-### 1.6 SUSPECT vs CONFIRMED — Validation-Pfad
-
-Für v128 minimal:
-- Default: NOOP → `PASS_DONE_SUSPECT` (kein Refund, gelber Badge).
-- `PASS_FAILED_QUALITY_CONFIRMED` ist als Status definiert, aber der automatische Validator (2nd-pass face-detection auf Output) kommt erst in einer späteren Stage. Bis dahin: nur manueller Admin-Trigger setzt CONFIRMED.
-
-### 1.7 Guard-Rails
-
-- DB-Constraint / Trigger: blockiert UPDATE von `PASS_*` zurück auf `DISPATCHED` außer bei explizitem User-Retry-Flag.
-- Edge-Function-Test: `syncso_dispatch_log.meta.variant IS NOT NULL` für jede neue Row (CI-fail bei NULL).
-- Sentry-Alert: jeder Status-Übergang `PASS_* → DISPATCHED` ohne User-Retry-Flag = P1.
-
-### Exit-Kriterien Stage 1
-- 5 aufeinanderfolgende 3-Speaker-Renders ≤ 4 min ohne Loops.
-- 0 Pass mit > 2 `provider_job_id`s in `syncso_dispatch_log` über 24h.
-- Center-Speaker-Sync darf weiterhin schlecht sein (das löst Stage 4).
-
----
-
-## Stage 2 — Audit-Layer (unverändert)
-
-Per-pass Debug-Artefakte in `composer-debug` Bucket: `preflight.json`, `faces.json`, `sync_request.json`, `sync_response.json`. `debug_path` Spalte in `syncso_dispatch_log`. Cleanup-Cron > 14d.
-
----
-
-## Stage 3 — UI / Refund (angepasst an 5-Status-Taxonomie)
-
-- `PASS_DONE` → grün, kein Hinweis.
-- `PASS_DONE_SUSPECT` → gelber Badge „Lipsync degraded — bitte prüfen", Re-Render-Button (kostet erneut), **kein Auto-Refund**.
-- `PASS_FAILED_*` → roter Badge + Original-Plate-Audio als Fallback + **Auto-Refund** (`ceil(passSec)*9` Credits, idempotent über `(shot_id, pass_idx, attempt_id)`).
-- `QUEUED_BACKOFF` → gelb „queued, retrying".
-
----
-
-## Stage 4 — v129 Targeting A/B (Budget freigegeben, ABER erst nach v128-Stabilisierung)
-
-**Gate:** Start frühestens, wenn Stage-1-Exit-Kriterien 48h grün laufen.
-
-3 isolierte Edge-Functions auf 5 fixed Plates (2/3/4 Speaker, edge cases):
-- **A:** `frame_number` + `coords` (current)
-- **B:** `bounding_boxes_url` (deterministic ASD)
-- **C:** Hybrid (bboxes_url + coords als fallback)
-
-Metriken: `completion_outcome`, visual sync score 1–5, latency, refund rate. Winner → production, Verlierer → dokumentierter Fallback. Budget ~€9.
-
----
-
-## Stage 5–7 (unverändert vs. Alpha-Plan v1)
-
-- **Stage 5 v130 Speed:** Global semaphore (MAX_INFLIGHT=6), per-user cap (3), `Promise.allSettled` pass-parallelism, 429-backoff 1s–16s/max 3.
-- **Stage 6 Observability:** Sentry-Cron, QA-Dashboard, daily digest, kill-switch.
-- **Stage 7 Not done:** kein Model-Swap-Recovery, kein Segments-API, kein Client-Polling, keine Speculative Pre-Renders.
-
----
-
-## Reihenfolge (verbindlich)
-
-```text
-Stage 0.5 (read-only, 60-90min)
-        │
-        ▼  Code-Walk-Report approved by user
-Stage 1 / v128 Hotfix
-        │
-        ▼  Exit-Kriterien 48h grün
-Stage 2 + 3 (Audit + UI/Refund)
-        │
-        ▼
-Stage 4 / v129 A/B Targeting   (Budget €9)
-        │
-        ▼  Winner deployed
-Stage 5 / v130 Speed
-        │
-        ▼
-Stage 6 Observability
+```json
+{
+  "variant": "...",
+  "retry_variant": "...",
+  "model": "...",
+  "payload_hash": "...",
+  "pass_idx": 0,
+  "attempt_id": "...",
+  "provider_job_id": "...",
+  "dispatch_source": "d1-compose | webhook | watchdog | user-retry"
+}
 ```
 
+CI-Check `meta.variant != NULL` gilt nur für `created_at >= v128_deployed_at`. Legacy 87 Rows bleiben unangefasst.
+
+### 1.4 Scene-Level Lock + Watchdog-Reduktion (Entscheidung 2)
+
+`withDialogLock(scene_id)` verbindlich überall, wo `composer_scenes` mutiert oder dispatch-relevant gelesen wird.
+
+**Watchdog (`poll-dialog-shots`) ab v128 darf nur noch:**
+
+1. Unter Scene-Lock terminale Timeouts setzen:
+   - `DISPATCHED`/`PROCESSING` mit `expired provider deadline` → `PASS_FAILED_TIMEOUT` + idempotenter Auto-Refund
+2. Nicht-terminale Kandidaten an D1 übergeben:
+   - `pending`/`ready`/`preclip_pending`/`queued_backoff` → invoke `compose-dialog-segments`
+   - **Kein direkter POST zu Sync.so aus dem Watchdog**
+
+**Watchdog darf niemals anfassen:** `PASS_DONE`, `PASS_DONE_SUSPECT`, `PASS_FAILED_*`.
+
+**Zielbild:**
+- D1 = einziger aktiver Dispatch-Pfad
+- Watchdog = Health-Checker + Timeout-Marker + D1-Invoker
+- Webhook = Result-Writer unter Scene-Lock
+
+Webhook (`sync-so-webhook`): `withDialogLock` ist bereits importiert, ab v128 verbindlich aufgerufen für alle `composer_scenes.dialog_shots`-Writes.
+
+### 1.5 Circuit-Breaker zeitlich scopen
+
+```sql
+WHERE syncso_dispatch_log.created_at > composer_scenes.last_reset_at
+```
+
+Fallback: `scene.created_at`. `run_id`/`generation_session_id` ist out-of-scope für v128 (Stage 5).
+
+### 1.6 Auto-Refund
+
+**Triggert bei:** `PASS_FAILED_PROVIDER_UNKNOWN`, `PASS_FAILED_TIMEOUT`, `PASS_FAILED_PROVIDER`.
+**Nicht bei:** `PASS_DONE_SUSPECT`, `QUEUED_BACKOFF`.
+Idempotent via deterministische UUID aus `(scene_id, pass_idx, attempt_id)`.
+
+### 1.7 User-Retry-Mechanik
+
+UI-Button auf jedem terminalen Pass (`PASS_DONE_SUSPECT`, `PASS_FAILED_*`):
+- erzeugt neue `attempt_id`
+- bucht Credits erneut
+- setzt Pass auf `pending` mit `previous_attempt_id` archiviert
+- **einziger** legaler Weg, einen terminalen Pass zu verlassen
+
+### 1.8 v87 Coord-Refresh-Härtung
+
+**Erlaubt** (Coord-Update + ggf. Status bleibt nicht-terminal):
+- `pass.status ∈ {pending, ready, preclip_pending, queued_backoff}`
+- UND `pass.active_provider_job_id == null`
+
+**Verboten** für `PASS_DONE`/`PASS_DONE_SUSPECT`/`PASS_FAILED_*`:
+- Status bleibt unverändert
+- Neue Coords landen in `pass.candidate_coords` + `candidate_coords_at`
+- Warning-Event `dispatch_source = 'coord-refresh-skipped'`
+- Gelber Admin-Badge "new coords detected after terminal pass"
+
+### 1.9 Terminal Transition Guard (Korrektur 2)
+
+`PASS_* → pending/retrying/dispatched` ist nur erlaubt, wenn ALLE Bedingungen erfüllt:
+
+```
+user_retry_flag == true
+AND new_attempt_id != previous_attempt_id
+AND credit_charge_result == success
+AND active_provider_job_id == null
+```
+
+Implementierung:
+- Zentrale `transitionPass(scene_id, pass_idx, from, to, context)` Helper-Funktion
+- **Keine direkten Status-Writes außerhalb dieser Funktion** (lint-rule + Code-Review)
+- Illegale Transition → Block + Sentry P1 + log `ILLEGAL_TERMINAL_TRANSITION_BLOCKED`
+
+DB-Trigger auf JSONB optional, falls Aufwand gerechtfertigt. Minimum: zentrale Helper-Funktion + Sentry P1.
+
+### 1.10 Stale Webhook Handling (Korrektur 1)
+
+```
+if webhook.attempt_id !== current_attempt_id:
+  insert syncso_dispatch_log event 'STALE_WEBHOOK_IGNORED'
+  return 200
+  # composer_scenes.dialog_passes wird NICHT mutiert
+```
+
+`IGNORE_STALE_WEBHOOK` ist kein Pass-Status, sondern reines Log-Event.
+
 ---
 
-## Offene Punkte (vor Stage 1 Implementation zu klären)
+## Exit-Kriterien Stage 1 (48h Produktion)
 
-1. **Stage-0.5-Output:** Welche Lock-Härtung konkret nötig? (Wird erst nach Code-Walk-Report beantwortet.)
-2. **CONFIRMED-NOOP-Validator:** Welcher Mechanismus (2nd-pass face-detection, Heuristik, manuelle Admin-Review) entscheidet `PASS_DONE_SUSPECT → PASS_FAILED_QUALITY_CONFIRMED`? Aktueller Vorschlag: v128 nur SUSPECT; CONFIRMED-Pfad in eigener Stage 3.5.
-3. **User-Retry-Flag:** Wie exposed? Button „Re-render with new attempt" auf SUSPECT/FAILED-Badge? (Vorschlag: ja, kostet erneut Credits, erzeugt neue `attempt_id`.)
+- **0** `(pass_idx, attempt_id)`-Kombinationen mit mehr als einem `provider_job_id`
+- **0** Übergänge `PASS_* → pending/retrying/dispatched` ohne User-Retry-Flag
+- **0** Writes auf `composer_scenes` aus dispatch-relevanten Pfaden außerhalb `withDialogLock`
+- **0** Coord-Refresh-Resets auf terminale Passes
+- **0** direkte Sync.so-POSTs aus Watchdog
+- **0** Mutationen auf `dialog_passes` durch Stale-Webhooks
+- **0** Sentry P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED`
+- **100%** neuer `syncso_dispatch_log`-Rows mit `meta.variant`, `meta.model`, `meta.attempt_id`, `meta.pass_idx`
+
+---
+
+## Reihenfolge
+
+1. **v3.1-Freigabe** (dieser Plan)
+2. **Stage 1 / v128** — Implementierung
+3. **Stage 2+3** — Observability + Admin-Cockpit (neue Terminal-States, gelbe Badges, Retry-Button)
+4. **Stage 3.5** — CONFIRMED-NOOP-Validator (Phase 1 Admin-Review, Phase 2 dry-run Telemetrie, Phase 3 ggf. Auto-Promotion) — **nicht in v128** (Entscheidung 3)
+5. **Stage 4** — A/B-Test sync-3 vs lipsync-2-pro (~€9, 30 Renders), erst nach 48h grünem v128
+6. **Stage 5** — `run_id`/`generation_session_id` + `SYNC_SO_MAX_INFLIGHT` als Env (nicht hardcoden)
+7. **Stage 6** — Pass-Level Lock + Performance-Tuning
+
+---
+
+## Out-of-Scope für v128
+
+- Pass-Level Lock (Stage 6)
+- `run_id`/`generation_session_id` first-class (Stage 5)
+- `SYNC_SO_MAX_INFLIGHT` Env-Konfiguration (Stage 5)
+- CONFIRMED-NOOP-Auto-Promotion (Stage 3.5)
+- `lipsync-2-pro` Produktions-Migration (Stage 4)
+- Bulk-Backfill der 87 Legacy `syncso_dispatch_log`-Rows
+- Reaktivierung D6 Plan-D fan-out (architektonisch verworfen)

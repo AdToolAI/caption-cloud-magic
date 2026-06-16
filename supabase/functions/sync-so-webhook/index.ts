@@ -483,61 +483,57 @@ serve(async (req) => {
           (inputHead.bytes != null && outputHead.bytes != null && inputHead.bytes === outputHead.bytes))
       );
       const syncOutputResolutionRegression = expectedPreclipAxis >= 720 && minOutputAxis > 0 && minOutputAxis < 720;
-      // v127 — Re-encoded-but-passthrough sniff. Sync.so sync-3 can return
-      // COMPLETED with a fully re-encoded MP4 that contains ZERO lip motion
-      // when the source plate is a near-static Hailuo render (no natural face
-      // motion for sync-3's auto_detect tracker to lock on). The byte-equal
-      // check above misses this because the file IS different (re-mux).
-      // Heuristic: when the output bytes are within ±35% of input bytes AND we
-      // haven't already tried lipsync-2-pro, eskalate to `coords-pro-lp2pro`
-      // (uses lipsync-2-pro) — handles near-static plates better in practice
-      // (verified on scene cba18767, Samuel + Matthew passes via local ffmpeg
-      // probe: mean pre↔out mouth-region delta ≈ 1.2 = re-encode noise floor,
-      // vs Kailee/Sarah ≈ 2.5+ = real lip motion).
+      // v128 — Re-encoded-but-passthrough sniff retained for diagnostics only.
+      // The auto-retry ladder (v127) has been removed per Alpha-Plan v3.1
+      // §1.2: terminal means terminal. A NOOP-suspect output is now marked
+      // `PASS_DONE_SUSPECT` (status=done + sync_noop_suspect=true) so the UI
+      // can render a yellow "degraded" badge and the user can explicitly
+      // trigger a retry (new attempt_id). No automatic re-dispatch.
       const inBytes = Number(inputHead?.bytes ?? 0);
       const outBytes = Number(outputHead?.bytes ?? 0);
       const sizeRatio = inBytes > 0 && outBytes > 0 ? outBytes / inBytes : 0;
-      const priorVariant = String(passBeforeDone?.retry_variant ?? "");
       const reencodedPassthroughSuspect = !syncOutputUnchanged &&
-        sizeRatio >= 0.65 && sizeRatio <= 1.35 &&
-        priorVariant !== "coords-pro-lp2pro";
-      const escalateToLp2pro = reencodedPassthroughSuspect;
-      const nextRetryVariant = escalateToLp2pro ? "coords-pro-lp2pro" : "coords-pro";
-      if ((syncOutputUnchanged || syncOutputResolutionRegression || reencodedPassthroughSuspect) && Number(passBeforeDone?.retry_count ?? 0) < 2) {
-        const retryPasses = freshDonePasses.map((p: any, i: number) => i === currentPass
-          ? {
-              ...p,
-              status: "retrying",
-              retry_count: Number(p?.retry_count ?? 0) + 1,
-              retry_variant: nextRetryVariant,
-              output_url: null,
-              sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression, reencodedPassthroughSuspect, sizeRatio },
-              last_error: syncOutputResolutionRegression
-                ? "sync_output_resolution_regression"
-                : syncOutputUnchanged
-                  ? "sync_output_unchanged"
-                  : "sync_output_reencoded_passthrough_suspect",
-              last_error_class: "sync_completed_noop",
-              preclip_url: null,
-            }
-          : p);
-        await supabase.from("composer_scenes").update({
-          dialog_shots: { ...freshDoneState, passes: retryPasses, status: "retrying", last_error_class: "sync_completed_noop" },
-          lip_sync_status: "running",
-          twoshot_stage: `syncso_noop_retry_pass_${currentPass + 1}_of_${totalPasses}_${nextRetryVariant}`,
-          updated_at: nowIso,
-        }).eq("id", sceneId);
+        sizeRatio >= 0.65 && sizeRatio <= 1.35;
+      const noopSuspect = syncOutputUnchanged || syncOutputResolutionRegression || reencodedPassthroughSuspect;
+      if (noopSuspect) {
+        const noopReason = syncOutputResolutionRegression
+          ? "sync_output_resolution_regression"
+          : syncOutputUnchanged
+            ? "sync_output_unchanged"
+            : "sync_output_reencoded_passthrough_suspect";
         await logSyncDispatch(supabase, {
-          scene_id: sceneId, job_id: jobId, engine: "sync-segments", sync_status: "COMPLETED_NOOP_RETRY",
-          error_class: "sync_completed_noop", meta: { pass_idx: currentPass, inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression, reencodedPassthroughSuspect, sizeRatio, nextRetryVariant },
+          scene_id: sceneId, job_id: jobId, engine: "sync-segments",
+          sync_status: "COMPLETED_NOOP_SUSPECT",
+          error_class: "sync_completed_noop",
+          meta: {
+            v128_terminal: true,
+            pass_idx: currentPass,
+            attempt_id: passBeforeDone?.attempt_id ?? null,
+            model: passBeforeDone?.retry_variant ?? null,
+            variant: passBeforeDone?.retry_variant ?? null,
+            retry_variant: passBeforeDone?.retry_variant ?? null,
+            dispatch_source: "webhook",
+            inputHead, outputHead, inputDims, outputDims,
+            syncOutputUnchanged, syncOutputResolutionRegression,
+            reencodedPassthroughSuspect, sizeRatio,
+            reason: noopReason,
+          },
         });
-        fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: nextRetryVariant, pass_idx: currentPass }),
-        }).catch(() => {});
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, retried: true, reason: nextRetryVariant === "coords-pro-lp2pro" ? "reencoded_passthrough_suspect" : "sync_completed_noop" });
+        console.warn(
+          `[sync-so-webhook] v128 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → PASS_DONE_SUSPECT (no auto-retry, awaiting user retry)`,
+        );
+        // Fall through to mark this pass `done` with `sync_noop_suspect: true`
+        // (patched in the freshDonePasses update below).
       }
+      const noopSuspectFlags = noopSuspect ? {
+        sync_noop_suspect: true,
+        noop_reason: syncOutputResolutionRegression
+          ? "sync_output_resolution_regression"
+          : syncOutputUnchanged
+            ? "sync_output_unchanged"
+            : "sync_output_reencoded_passthrough_suspect",
+        noop_size_ratio: sizeRatio,
+      } : {};
       if (freshDonePasses[currentPass]) {
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
@@ -546,6 +542,7 @@ serve(async (req) => {
           rehosted: !!rehostedUrl,
           sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
           finished_at: nowIso,
+          ...noopSuspectFlags,
         };
       }
 
@@ -954,12 +951,16 @@ serve(async (req) => {
           `[sync-so-webhook] v121 scene=${sceneId} pass=${currentPass} stop-loss on provider_unknown_error (no code, retry=${passRetryCount}) → no more variant churn`,
         );
       }
-      // fail_fast codes short-circuit the ladder entirely.
-      const canRetry = codeBucket !== "fail_fast"
-        && !v121StopLoss
-        && (treatAsTransient || forceCoordsRepair)
-        && passRetryCount < MAX_V5_RETRIES
-        && nextVariant !== null;
+      // v128 — Alpha-Plan v3.1 §1.2: terminal means terminal.
+      // The automatic retry ladder (variant churn, repair_audio, sync-3
+      // fallback, lipsync-2-pro fallback, partial-mux) has been removed.
+      // FAILED/REJECTED/CANCELED is now terminal on first dispatch.
+      // The user explicitly triggers a retry via the UI, which creates a
+      // new `attempt_id` and re-charges credits. Fall through to refund
+      // + scene-fail handling unchanged below.
+      const canRetry = false;
+      // Diagnostic flags kept for `syncso_dispatch_log` only.
+      void v121StopLoss; void treatAsTransient; void forceCoordsRepair; void nextVariant;
 
 
       if (canRetry) {
