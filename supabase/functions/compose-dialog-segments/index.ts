@@ -3715,6 +3715,269 @@ serve(async (req) => {
       );
     }
 
+    // ── v129.3 — Sync-Audio Normalization (provider input only) ─────────
+    // Root cause for scene `7aed09f4-…` (Sarah pass-4 → terminal
+    // `provider_unknown_error`): the per-turn WAV upstream of this dispatch
+    // still carried 6.7s of leading silence relative to a 1.78s preclip.
+    // Sync.so sync-3 with `cut_off` rejects that input.
+    //
+    // We DO NOT mutate `pass.audio_url` (audio-mux Lambda needs the
+    // original timeline-aligned WAV for the final mux). Instead we build a
+    // dedicated `sync_audio_url`, scoped to the Sync.so payload only.
+    //
+    // Strategy: voiced-window trim with 150ms pre-roll + 200ms post-roll.
+    // If the trimmed audio still doesn't fit the preclip, the post-trim
+    // preflight gate (below) blocks the dispatch terminal with refund.
+    try {
+      const preclipDurForGate = typeof (pass as any).preclip_duration_sec === "number"
+        && Number.isFinite((pass as any).preclip_duration_sec)
+        && (pass as any).preclip_duration_sec > 0
+        ? Number((pass as any).preclip_duration_sec)
+        : null;
+      const syncAudioWavResp = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
+      if (!syncAudioWavResp.ok) throw new Error(`sync_audio_fetch_${syncAudioWavResp.status}`);
+      const syncAudioBytes = new Uint8Array(await syncAudioWavResp.arrayBuffer());
+      const preInfo = inspectWav(syncAudioBytes);
+      const preRange = detectVoicedRange(syncAudioBytes);
+      const preLeadIn = preRange.firstVoicedSec >= 0 ? preRange.firstVoicedSec : preInfo.leadInSec;
+      const preVoicedEnd = preRange.lastVoicedSec >= 0
+        ? preRange.lastVoicedSec
+        : preInfo.durSec;
+      const preFullSec = preInfo.durSec;
+
+      // Heuristic trigger: trim ONLY when we have a useful gain. If the
+      // file is already tight (leadIn < 0.5s AND voicedEnd within preclip),
+      // skip the slice/upload roundtrip entirely.
+      const needsTrim =
+        preRange.firstVoicedSec >= 0 &&
+        preRange.lastVoicedSec >= 0 &&
+        (preLeadIn > 0.5 ||
+          (preclipDurForGate != null && preVoicedEnd > preclipDurForGate + 0.25) ||
+          (preFullSec - (preVoicedEnd - preLeadIn) > 0.6));
+
+      let normMeta: Record<string, unknown> = {
+        mode: "skipped",
+        original_full_sec: Number(preFullSec.toFixed(3)),
+        original_lead_in_sec: Number(Math.max(0, preLeadIn).toFixed(3)),
+        original_voiced_end_sec: Number(Math.max(0, preVoicedEnd).toFixed(3)),
+        original_tail_silence_sec: Number(preRange.tailSilenceSec.toFixed(3)),
+        pre_roll_sec: 0,
+        post_roll_sec: 0,
+        removed_lead_sec: 0,
+        removed_tail_sec: 0,
+        trimmed_full_sec: Number(preFullSec.toFixed(3)),
+        first_voiced_sec_after_trim: Number(Math.max(0, preLeadIn).toFixed(3)),
+        last_voiced_sec_after_trim: Number(Math.max(0, preVoicedEnd).toFixed(3)),
+        used_for: "syncso_input_only",
+        preclip_duration_sec: preclipDurForGate,
+      };
+
+      if (needsTrim) {
+        const preRoll = 0.15;
+        const postRoll = 0.20;
+        const startSec = Math.max(0, preRange.firstVoicedSec - preRoll);
+        const endSec = Math.min(preFullSec, preRange.lastVoicedSec + postRoll);
+        let slicedBytes: Uint8Array;
+        let slicedDurSec: number;
+        try {
+          const sliced = sliceWavToWindows(
+            syncAudioBytes,
+            [{ startSec, endSec }],
+            { gapSec: 0 },
+          );
+          slicedBytes = sliced.bytes;
+          slicedDurSec = sliced.durSec;
+        } catch (sliceErr) {
+          // Fail-safe: unsupported WAV format / slice math problem →
+          // terminal, refund, no provider call. Never ship half-corrupt WAV.
+          return await failBeforeProviderDispatch(
+            "sync_audio_trim_failed",
+            "unsupported_wav_format_for_trim",
+            `v129.3 sync-audio normalization failed to slice WAV: ${(sliceErr as Error)?.message ?? sliceErr}`,
+            422,
+            {
+              v1293: true,
+              audio_normalization: { ...normMeta, error: (sliceErr as Error)?.message ?? String(sliceErr) },
+              attempt_id: (pass as any).attempt_id ?? null,
+              pass_idx: currentPassIdx,
+              speaker_name: pass.speaker_name,
+            },
+          );
+        }
+
+        // Deterministic filename hash so user-retries with identical inputs
+        // upsert the same object (avoids storage bloat). Resolution rounded
+        // to 50ms — finer than human-perceivable, coarser than fp jitter.
+        const hashKey = `${sceneId}:${currentPassIdx}:${Math.round(startSec * 20)}:${Math.round(endSec * 20)}`;
+        const hashBuf = await crypto.subtle.digest(
+          "SHA-1",
+          new TextEncoder().encode(hashKey),
+        );
+        const hashHex = Array.from(new Uint8Array(hashBuf))
+          .slice(0, 6)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        const syncPath = `${userId}/twoshot-vo/${sceneId}-pass-${currentPassIdx + 1}-sync-${hashHex}.wav`;
+        const up = await supabase.storage.from("voiceover-audio").upload(
+          syncPath,
+          slicedBytes,
+          { contentType: "audio/wav", upsert: true },
+        );
+        if (up.error && !/already exists|duplicate/i.test(up.error.message)) {
+          return await failBeforeProviderDispatch(
+            "sync_audio_upload_failed",
+            "sync_audio_upload_failed",
+            `v129.3 sync-audio upload failed: ${up.error.message}`,
+            500,
+            {
+              v1293: true,
+              audio_normalization: normMeta,
+              attempt_id: (pass as any).attempt_id ?? null,
+            },
+          );
+        }
+        const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(syncPath);
+        if (!pub?.publicUrl) {
+          return await failBeforeProviderDispatch(
+            "sync_audio_publicurl_missing",
+            "sync_audio_upload_failed",
+            "v129.3 sync-audio public URL missing after upload",
+            500,
+            { v1293: true, audio_normalization: normMeta },
+          );
+        }
+
+        // Re-inspect the trimmed bytes so the gate runs on POST-trim
+        // diagnostics, never on stale pre-trim values.
+        const postInfo = inspectWav(slicedBytes);
+        const postRange = detectVoicedRange(slicedBytes);
+        const postLeadIn = postRange.firstVoicedSec >= 0 ? postRange.firstVoicedSec : postInfo.leadInSec;
+        const postVoicedEnd = postRange.lastVoicedSec >= 0 ? postRange.lastVoicedSec : postInfo.durSec;
+
+        normMeta = {
+          ...normMeta,
+          mode: "voiced_window",
+          pre_roll_sec: preRoll,
+          post_roll_sec: postRoll,
+          removed_lead_sec: Number((preRange.firstVoicedSec - startSec >= 0
+            ? startSec
+            : 0).toFixed(3)),
+          removed_tail_sec: Number(Math.max(0, preFullSec - endSec).toFixed(3)),
+          trimmed_full_sec: Number(slicedDurSec.toFixed(3)),
+          first_voiced_sec_after_trim: Number(Math.max(0, postLeadIn).toFixed(3)),
+          last_voiced_sec_after_trim: Number(Math.max(0, postVoicedEnd).toFixed(3)),
+          trimmed_tail_silence_sec: Number(postRange.tailSilenceSec.toFixed(3)),
+          sync_audio_url: pub.publicUrl,
+        };
+        (pass as any).sync_audio_url = pub.publicUrl;
+        (pass as any).audio_normalization = normMeta;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v1293_sync_audio_normalized ` +
+          `original=${preFullSec.toFixed(2)}s leadIn=${preLeadIn.toFixed(2)}s → trimmed=${slicedDurSec.toFixed(2)}s ` +
+          `voiced=${(postVoicedEnd - postLeadIn).toFixed(2)}s preclipDur=${preclipDurForGate ?? "?"}s`,
+        );
+      } else {
+        (pass as any).audio_normalization = normMeta;
+      }
+
+      // ── v129.3 Change C — Post-trim preflight gate ──────────────────
+      const gateAudioBytes = needsTrim
+        ? await fetch(((pass as any).sync_audio_url as string), { signal: AbortSignal.timeout(20_000) })
+            .then((r) => r.arrayBuffer())
+            .then((b) => new Uint8Array(b))
+        : syncAudioBytes;
+      const gateRange = detectVoicedRange(gateAudioBytes);
+      const gateInfo = inspectWav(gateAudioBytes);
+      const gateFirst = gateRange.firstVoicedSec >= 0 ? gateRange.firstVoicedSec : gateInfo.leadInSec;
+      const gateLast = gateRange.lastVoicedSec >= 0 ? gateRange.lastVoicedSec : gateInfo.durSec;
+      const gateVoicedSec = gateRange.voicedSec;
+      const gateFull = gateInfo.durSec;
+
+      if (gateVoicedSec < 0.15) {
+        return await failBeforeProviderDispatch(
+          "audio_too_silent_post_trim",
+          "audio_too_silent",
+          `v129.3 post-trim audio has only ${gateVoicedSec.toFixed(3)}s of voiced content (<0.15s); skipping Sync.so to avoid provider_unknown_error.`,
+          422,
+          {
+            v1293: true,
+            preflight: "audio_too_silent",
+            audio_normalization: (pass as any).audio_normalization ?? normMeta,
+            attempt_id: (pass as any).attempt_id ?? null,
+            pass_idx: currentPassIdx,
+            speaker_name: pass.speaker_name,
+          },
+        );
+      }
+      if (gateFirst > 0.5) {
+        return await failBeforeProviderDispatch(
+          "audio_leadin_too_long_after_trim",
+          "audio_leadin_too_long_after_trim",
+          `v129.3 post-trim audio still has ${gateFirst.toFixed(3)}s of leading silence (>0.5s); Sync.so would reject.`,
+          422,
+          {
+            v1293: true,
+            preflight: "audio_leadin_too_long_after_trim",
+            audio_normalization: (pass as any).audio_normalization ?? normMeta,
+            attempt_id: (pass as any).attempt_id ?? null,
+            pass_idx: currentPassIdx,
+            speaker_name: pass.speaker_name,
+          },
+        );
+      }
+      if (preclipDurForGate != null && gateLast > preclipDurForGate + 0.25) {
+        return await failBeforeProviderDispatch(
+          "audio_voiced_exceeds_video",
+          "audio_voiced_exceeds_video",
+          `v129.3 post-trim audio voiced-end ${gateLast.toFixed(2)}s exceeds preclip duration ${preclipDurForGate.toFixed(2)}s + 0.25s tolerance.`,
+          422,
+          {
+            v1293: true,
+            preflight: "audio_voiced_exceeds_video",
+            gate_voiced_end_sec: Number(gateLast.toFixed(3)),
+            preclip_duration_sec: preclipDurForGate,
+            audio_normalization: (pass as any).audio_normalization ?? normMeta,
+            attempt_id: (pass as any).attempt_id ?? null,
+            pass_idx: currentPassIdx,
+            speaker_name: pass.speaker_name,
+          },
+        );
+      }
+      if (preclipDurForGate != null && gateFull > preclipDurForGate + 0.5
+          && gateRange.tailSilenceSec < 0.2) {
+        return await failBeforeProviderDispatch(
+          "audio_overflow_unverifiable_tail",
+          "audio_overflow_unverifiable_tail",
+          `v129.3 post-trim audio is ${gateFull.toFixed(2)}s but preclip is only ${preclipDurForGate.toFixed(2)}s and tail silence (${gateRange.tailSilenceSec.toFixed(2)}s) is too small to be safely cut off.`,
+          422,
+          {
+            v1293: true,
+            preflight: "audio_overflow_unverifiable_tail",
+            gate_full_sec: Number(gateFull.toFixed(3)),
+            gate_tail_silence_sec: Number(gateRange.tailSilenceSec.toFixed(3)),
+            preclip_duration_sec: preclipDurForGate,
+            audio_normalization: (pass as any).audio_normalization ?? normMeta,
+            attempt_id: (pass as any).attempt_id ?? null,
+            pass_idx: currentPassIdx,
+            speaker_name: pass.speaker_name,
+          },
+        );
+      }
+    } catch (normErr) {
+      // Best-effort. If normalization itself throws (network hiccup,
+      // unparseable WAV) we fall through to the legacy SILENT_AUDIO_GATE
+      // path which is the safe pre-v129.3 behaviour. We log so this is
+      // visible in dispatch logs.
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v1293_normalization_skipped: ${(normErr as Error)?.message ?? normErr}`,
+      );
+      (pass as any).audio_normalization = {
+        mode: "skipped_on_error",
+        error: (normErr as Error)?.message ?? String(normErr),
+        used_for: "syncso_input_only",
+      };
+    }
+
     const finalAudioDiag = await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
