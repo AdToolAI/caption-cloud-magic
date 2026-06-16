@@ -4073,7 +4073,9 @@ serve(async (req) => {
       asd_frame_number: asdForProbe?.frame_number ?? null,
       sync_mode: (syncOptions as any).sync_mode,
       speakers: speakers.length,
-      payload_audio_url: pass.audio_url,
+      payload_audio_url: (pass as any).sync_audio_url ?? pass.audio_url,
+      payload_audio_normalized: !!(pass as any).sync_audio_url,
+      audio_normalization: (pass as any).audio_normalization ?? null,
       payload_video_url: dispatchVideoUrl,
       // v106 — full options-key list so any future doc-drift (unsupported
       // field smuggled into sync-3) is visible in dispatch logs.
