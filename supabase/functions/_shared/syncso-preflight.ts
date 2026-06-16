@@ -460,6 +460,72 @@ export function detectVoicedFrames(wav: Uint8Array): VadResult {
   };
 }
 
+// ── VAD voiced-range (v129.3) ───────────────────────────────────────────
+
+export interface VoicedRange {
+  /** Seconds from t=0 to the first voiced 20ms window. -1 if no voice. */
+  firstVoicedSec: number;
+  /** Seconds from t=0 to the END of the last voiced 20ms window. -1 if none. */
+  lastVoicedSec: number;
+  /** Total voiced seconds (== voicedWindows * 0.02). */
+  voicedSec: number;
+  /** Total audio duration in seconds. */
+  totalSec: number;
+  /** Tail silence in seconds (totalSec - lastVoicedSec). */
+  tailSilenceSec: number;
+}
+
+/**
+ * v129.3 — Walk the same 20ms energy-gate as `detectVoicedFrames`, but
+ * return the first/last voiced window timestamps so callers can build a
+ * "voiced-window" sync audio: slice `[max(first - pre, 0), min(last + post, total)]`
+ * before sending to Sync.so. Avoids feeding a 9s timeline-style WAV with
+ * 6.7s leading silence into a 1.78s preclip (root cause of scene
+ * `7aed09f4-…` `provider_unknown_error` terminal in June 2026).
+ */
+export function detectVoicedRange(wav: Uint8Array): VoicedRange {
+  const info = inspectWav(wav);
+  const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  const frameLenSec = 0.02;
+  const framesPerWindow = Math.max(1, Math.floor(info.sampleRate * frameLenSec));
+  const voicedThresh = 10 ** (-35 / 20);
+  let firstVoicedWindowIdx = -1;
+  let lastVoicedWindowIdx = -1;
+  let voicedWindows = 0;
+  let windowIdx = 0;
+  for (let f = 0; f < info.totalFrames; f += framesPerWindow) {
+    const end = Math.min(info.totalFrames, f + framesPerWindow);
+    let peak = 0;
+    for (let g = f; g < end; g += 2) {
+      let maxC = 0;
+      for (let c = 0; c < info.channels; c++) {
+        const s = dv.getInt16(info.dataOff + (g * info.channels + c) * 2, true);
+        const a = Math.abs(s) / 32768;
+        if (a > maxC) maxC = a;
+      }
+      if (maxC > peak) peak = maxC;
+    }
+    if (peak >= voicedThresh) {
+      if (firstVoicedWindowIdx < 0) firstVoicedWindowIdx = windowIdx;
+      lastVoicedWindowIdx = windowIdx;
+      voicedWindows++;
+    }
+    windowIdx++;
+  }
+  const firstVoicedSec = firstVoicedWindowIdx >= 0 ? firstVoicedWindowIdx * frameLenSec : -1;
+  const lastVoicedSec = lastVoicedWindowIdx >= 0 ? (lastVoicedWindowIdx + 1) * frameLenSec : -1;
+  const tailSilenceSec = lastVoicedSec >= 0
+    ? Math.max(0, info.durSec - lastVoicedSec)
+    : info.durSec;
+  return {
+    firstVoicedSec,
+    lastVoicedSec,
+    voicedSec: voicedWindows * frameLenSec,
+    totalSec: info.durSec,
+    tailSilenceSec,
+  };
+}
+
 // ── Coords sanity ───────────────────────────────────────────────────────
 
 export interface CoordsCheck {
