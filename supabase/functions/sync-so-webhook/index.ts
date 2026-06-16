@@ -951,12 +951,16 @@ serve(async (req) => {
           `[sync-so-webhook] v121 scene=${sceneId} pass=${currentPass} stop-loss on provider_unknown_error (no code, retry=${passRetryCount}) → no more variant churn`,
         );
       }
-      // fail_fast codes short-circuit the ladder entirely.
-      const canRetry = codeBucket !== "fail_fast"
-        && !v121StopLoss
-        && (treatAsTransient || forceCoordsRepair)
-        && passRetryCount < MAX_V5_RETRIES
-        && nextVariant !== null;
+      // v128 — Alpha-Plan v3.1 §1.2: terminal means terminal.
+      // The automatic retry ladder (variant churn, repair_audio, sync-3
+      // fallback, lipsync-2-pro fallback, partial-mux) has been removed.
+      // FAILED/REJECTED/CANCELED is now terminal on first dispatch.
+      // The user explicitly triggers a retry via the UI, which creates a
+      // new `attempt_id` and re-charges credits. Fall through to refund
+      // + scene-fail handling unchanged below.
+      const canRetry = false;
+      // Diagnostic flags kept for `syncso_dispatch_log` only.
+      void v121StopLoss; void treatAsTransient; void forceCoordsRepair; void nextVariant;
 
 
       if (canRetry) {
