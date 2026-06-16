@@ -4020,7 +4020,42 @@ serve(async (req) => {
         concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
       }
     } catch { /* defaults */ }
-    const fanOutAllowed = parallelFlagOn && passes.length >= 2;
+    // v128 Phase B4 — Plan-D fan-out is HARD-DISABLED by default per
+    // Alpha-Plan v3.1 §1.2. The DB flag `composer.parallel_sync_so_passes`
+    // alone is insufficient because Stage 0.5 found it can be flipped from
+    // multiple admin paths without going through change review. The env
+    // flag `FEATURE_PLAN_D_FANOUT` is the explicit kill-switch and must
+    // also be `true` for fan-out to dispatch. When fan-out WOULD have run
+    // (parallelFlagOn + multi-pass) but the env flag is off, log the
+    // suppression so we can monitor the exit criterion (`0` Plan-D
+    // dispatches over 24h observation window).
+    const planDFanoutEnvOn = (Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "false")
+      .toLowerCase() === "true";
+    const fanOutAllowed = planDFanoutEnvOn && parallelFlagOn && passes.length >= 2;
+    if (parallelFlagOn && passes.length >= 2 && !planDFanoutEnvOn && !isAdvance && !isRetry) {
+      try {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId,
+          engine: "sync-segments",
+          sync_status: "PLAN_D_FANOUT_BLOCKED_V128",
+          meta: {
+            v128_terminal: true,
+            pass_idx: currentPassIdx,
+            total_passes: passes.length,
+            attempt_id: pass?.attempt_id ?? null,
+            variant: pass?.retry_variant ?? null,
+            model: pass?.retry_variant ?? null,
+            dispatch_source: "compose-dialog-segments",
+            reason: "FEATURE_PLAN_D_FANOUT=false",
+          },
+        });
+      } catch { /* ignore log errors */ }
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} PLAN_D_FANOUT_BLOCKED_V128 ` +
+          `(env flag off, ${passes.length} passes) — webhook will chain serially`,
+      );
+    }
     if (!isAdvance && !isRetry && fanOutAllowed) {
       // Pass 0 was just dispatched above. Fan out passes [1 .. cap-1] now;
       // any beyond cap remain `pending` and get kicked by the webhook.
