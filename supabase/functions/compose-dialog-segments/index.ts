@@ -4027,15 +4027,24 @@ serve(async (req) => {
         // v116 (Fix D) — per-pass identity/preclip diagnostics so a future
         // failure can be debugged in <5 min from syncso_dispatch_log alone.
         v116_diag: {
-          asd_mode: usePassPreclip
-            ? "preclip_auto_detect"
-            : (syncOptions.active_speaker_detection?.bounding_boxes_url
-              ? "bbox_url"
-              : syncOptions.active_speaker_detection?.bounding_boxes
-                ? "bbox_inline"
-                : syncOptions.active_speaker_detection?.coordinates
-                  ? "coords_point"
-                  : "auto_detect"),
+          // v129.1 — asd_mode now reflects doc-strict coordinate dispatch.
+          // For multi-speaker preclip passes the value is
+          // "preclip_coords_doc_strict" (was "preclip_auto_detect" in v116).
+          asd_mode: (() => {
+            const asd = (syncOptions as any).active_speaker_detection ?? {};
+            if (usePassPreclip) {
+              if (asd.auto_detect === false && Array.isArray(asd.coordinates)) {
+                return "preclip_coords_doc_strict";
+              }
+              if (asd.bounding_boxes_url) return "preclip_bbox_url";
+              if (Array.isArray(asd.bounding_boxes)) return "preclip_bbox_inline";
+              return "preclip_auto_detect";
+            }
+            if (asd.bounding_boxes_url) return "bbox_url";
+            if (asd.bounding_boxes) return "bbox_inline";
+            if (asd.coordinates) return "coords_point";
+            return "auto_detect";
+          })(),
           coords_sent: syncOptions.active_speaker_detection?.coordinates ?? null,
           preclip_face_count: (pass as any).preclip_face_count ?? null,
           preclip_crop: (pass as any).preclip_crop ?? null,
@@ -4045,6 +4054,17 @@ serve(async (req) => {
           plate_identity_total: plateIdentityMap?.faces?.length ?? 0,
           plate_dims: plateDims ?? null,
         },
+        // v129.1 — Outbound payload contract evidence. `outbound_payload`
+        // captures the EXACT options dispatched to Sync.so (URLs intentionally
+        // omitted — they are already on `video_url` / `payload_video_url`).
+        // `coord_transform` proves the plate→preclip math per pass.
+        v1291_payload_contract: true,
+        outbound_payload: {
+          model: payload.model,
+          options: payload.options,
+        },
+        coord_transform: (pass as any)._v1291 ?? null,
+        v1291_block: (pass as any)._v1291_block ?? null,
         video_probe: videoProbe,
         audio_diagnostics: audioDiagnostics.find((d) => d.pass === pass.idx) ?? null,
         // v102 Step A — alignment probe persisted on every DISPATCHED row so
