@@ -77,3 +77,24 @@ select scene_id, count(distinct meta->>'pass_idx') as recycled_passes
      and count(*) filter (where sync_status in ('DISPATCHED','SUBMITTED') and created_at > min(created_at) filter (where sync_status='FAILED')) > 0;
 -- expect: 0 rows
 ```
+
+## Phase B — Architectural Hardening (deployed)
+
+- **B1 Transition-Guard** — `supabase/functions/_shared/dialogPassTransition.ts` (new). `assertSafeDispatchEntry` wired into `compose-dialog-segments` advance/retry entry: terminal pass + no `user_retry_flag` → 409 `terminal_transition_blocked` + Sentry-P1 `ILLEGAL_TERMINAL_TRANSITION_BLOCKED` row in `syncso_dispatch_log`.
+- **B2 withDialogLock in sync-so-webhook** — entire v5 read-modify-write block wrapped in `withDialogLock(scene_id, "sync-so-webhook", …, { ttlSeconds: 30, maxAttempts: 4 })`. All `composer_scenes.dialog_shots` mutations now serialized against poller + compose-dialog-segments.
+- **B3 Watchdog reduction** — `lipsync-watchdog` per-scene body wrapped in `withDialogLock`. `done_suspect` added to the terminal-status filter so it's never picked up for advance. No direct Sync.so POST exists (poll = GET only; advance = invokes `compose-dialog-segments` D1).
+- **B4 Plan-D fan-out kill-switch** — `FEATURE_PLAN_D_FANOUT` env var (default `false`) gates the fan-out path in `compose-dialog-segments`. When suppressed, logs `PLAN_D_FANOUT_BLOCKED_V128` to `syncso_dispatch_log`.
+
+### A2 confirmation
+`PASS_FAILED_PROVIDER_UNKNOWN` remains pass-terminal, not scene-fatal: existing `sceneWillFail = aliveSiblings.length === 0 && doneSiblings === 0` logic in `sync-so-webhook` keeps the scene alive (or runs partial-mux for ≤2 speakers) when other passes can still complete. Scene only goes terminal-failed when no alive siblings remain or 3+ speaker partial mux is refused per v36/v48.
+
+### UI follow-up (not in this phase)
+- `PASS_DONE_SUSPECT` yellow badge: ship soon (separate UI PR).
+- User-Retry button: keep **hidden / feature-flagged** until `attempt_id` is first-class, credit-charge is idempotent, and the guard accepts `user_retry_flag` end-to-end.
+
+### 24h observation queries
+```sql
+-- exit criteria
+select count(*) from syncso_dispatch_log where sync_status='ILLEGAL_TERMINAL_TRANSITION_BLOCKED' and created_at > now()-interval '24h';
+select count(*) from syncso_dispatch_log where sync_status='PLAN_D_FANOUT_BLOCKED_V128' and created_at > now()-interval '24h';  -- expected >0 (= guard active)
+```
