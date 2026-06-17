@@ -700,7 +700,7 @@ function PreflightPanel({
                   {c.note && <div className="text-foreground/90 mb-1">{c.note}</div>}
                   {typeof c.frame_jpeg_url === 'string' && c.frame_jpeg_url && (
                     <div className="my-2">
-                      <div className="text-[10px] uppercase tracking-wide mb-1">extracted frame (v129.14 · ffmpeg.wasm)</div>
+                      <div className="text-[10px] uppercase tracking-wide mb-1">extracted frame (v129.14 · client canvas)</div>
                       <img
                         src={c.frame_jpeg_url}
                         alt="ASD frame"
