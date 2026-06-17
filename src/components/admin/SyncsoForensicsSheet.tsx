@@ -102,11 +102,48 @@ export function SyncsoForensicsSheet({
   const runPreflight = async () => {
     setPreflightLoading(true);
     try {
+      // Pass 1 — no probe frame; the server tells us video_url + frame.
       const { data, error } = await supabase.functions.invoke('syncso-preflight', {
         body: { scene_id: sceneId, pass_index: passIndex },
       });
       if (error) throw error;
       setPreflightResult(data);
+
+      // Pass 2 — if face probe failed because the server can't extract
+      // a JPEG (v129.14: Edge runtime has no ffmpeg), do it client-side
+      // with <video>+<canvas>, upload to composer-frames and re-run.
+      const face = data?.checks?.face_at_frame;
+      const needsClientFrame =
+        !!face &&
+        face.status !== 'pass' &&
+        !face.frame_jpeg_url &&
+        typeof data?.resolved?.video_url === 'string' &&
+        Number.isFinite(data?.resolved?.frame_number);
+      if (needsClientFrame) {
+        try {
+          const jpegUrl = await extractFrameClientSide({
+            videoUrl: data.resolved.video_url,
+            frameNumber: Number(data.resolved.frame_number),
+            fps: 30,
+            sceneId,
+          });
+          if (jpegUrl) {
+            const { data: data2, error: err2 } = await supabase.functions.invoke(
+              'syncso-preflight',
+              {
+                body: {
+                  scene_id: sceneId,
+                  pass_index: passIndex,
+                  probe_frame_url: jpegUrl,
+                },
+              },
+            );
+            if (!err2 && data2) setPreflightResult(data2);
+          }
+        } catch (e) {
+          console.warn('[Forensics] client frame extraction failed:', e);
+        }
+      }
     } catch (e: any) {
       const details = await extractFunctionsErrorDetails(e);
       setPreflightResult({ verdict: 'fail', error: details.message, edge_status: details.status });
