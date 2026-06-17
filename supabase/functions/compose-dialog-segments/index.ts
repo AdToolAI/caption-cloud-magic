@@ -4185,6 +4185,63 @@ serve(async (req) => {
       `frame=${referenceFrameNumber} sync_mode=${String(syncOptions.sync_mode)} input=${dispatchVideoUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
+    // v129.9 — Live Face-Gate: run Gemini Vision on the EXACT video URL
+    // + frame + coord we are about to send. If Gemini is confident the
+    // promise won't hold (no_face / yes_but_not_at_coord / multi_face in
+    // multi-speaker context) refund + fail BEFORE we burn a Sync.so credit.
+    {
+      const gateAsd: any = (syncOptions as any)?.active_speaker_detection ?? {};
+      const gateFrame: number | null = Number.isFinite(gateAsd?.frame_number)
+        ? Number(gateAsd.frame_number)
+        : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : null);
+      const gateCoord: [number, number] | null = Array.isArray(gateAsd?.coordinates) && gateAsd.coordinates.length >= 2
+        ? [Number(gateAsd.coordinates[0]), Number(gateAsd.coordinates[1])]
+        : null;
+      const gateMulti = speakers.length >= 2;
+      const gate = await verifyFaceBeforeDispatch({
+        videoUrl: dispatchVideoUrl,
+        frameNumber: gateFrame,
+        coord: gateCoord,
+        isMultiSpeakerContext: gateMulti,
+      });
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v129.9_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
+      );
+      if (!gate.ok) {
+        const reason = `face_gate_${gate.code}:${(gate.reason ?? "").slice(0, 180)}`;
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_source_kind: "segments", video_url: dispatchVideoUrl,
+          coords: gateCoord, frame_number: gateFrame,
+          http_status: 0, sync_status: "FACE_GATE_BLOCKED",
+          error_class: "face_validation_failed",
+          error_message: reason,
+          meta: {
+            diagnostic_id: diagnosticId,
+            retry_variant: retryVariant,
+            pass_idx: currentPassIdx,
+            total_passes: passes.length,
+            face_gate: { code: gate.code, reason: gate.reason, raw_reply: gate.raw_reply },
+            outbound_payload_intent: { model: payload.model, options: payload.options },
+          },
+        });
+        pass.status = "failed";
+        pass.error = reason;
+        await failLipSync({
+          supabase,
+          sceneId,
+          reason,
+          userId,
+          refundCredits: totalCost,
+          syncApiKey,
+        });
+        return json(
+          { error: "face_gate_blocked", code: gate.code, reason: gate.reason ?? null, provider_error_code: "no_face_pre_sync" },
+          422,
+        );
+      }
+    }
+
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
       headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
