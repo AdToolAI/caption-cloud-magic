@@ -371,6 +371,21 @@ serve(async (req) => {
     return ok({ ok: true, skipped: "canceled", scene_id: sceneId });
   }
 
+  // v129.4a — Late-webhook guard for already-terminal scenes.
+  // The webhook is the single source of truth for scene terminalisation
+  // (Watchdog defers to it). A FAILED/COMPLETED arriving after the scene
+  // is already failed must not flip it to done (partial output) or replay
+  // refund logic. Ack 200 so Sync.so stops retrying, no state mutation.
+  if (
+    (scene as any).lip_sync_status === "failed" ||
+    (scene.dialog_shots as any)?.status === "failed"
+  ) {
+    console.log(
+      `[sync-so-webhook] v129.4a ignored_due_scene_failed scene=${sceneId} job=${jobId} status=${status}`,
+    );
+    return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
+  }
+
   const state = scene.dialog_shots ?? null;
   if (!state) {
     return ok({ ok: true, skipped: "no_state" });
