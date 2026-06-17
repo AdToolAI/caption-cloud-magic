@@ -281,8 +281,22 @@ async function probeFaceAtFrame(
     });
     const body = await r.json().catch(() => null);
     if (!r.ok) {
-      return { status: "skip", note: `gemini_http_${r.status}`, frame: frameNumber, coord, was_inferred: wasInferred, raw: body };
+      // v129.10: The Lovable AI gateway routes google/gemini-* via
+      // OpenRouter which only accepts IMAGE URLs in `image_url`. A
+      // video/mp4 URL reliably returns HTTP 400. Surface this as WARN
+      // (not SKIP) so the Preflight UI no longer pretends the face
+      // probe passed.
+      return {
+        status: "warn",
+        note: `face_probe_unavailable_gemini_http_${r.status} — video URLs cannot be probed via the AI gateway; install a frame-extraction step to make this check meaningful.`,
+        frame: frameNumber,
+        coord,
+        was_inferred: wasInferred,
+        http_status: r.status,
+        raw: typeof body === "object" ? body : String(body ?? "").slice(0, 200),
+      };
     }
+
     const txt: string = (body?.choices?.[0]?.message?.content ?? "").trim();
     if (coord && frameNumber != null) {
       const t = txt.toLowerCase();
