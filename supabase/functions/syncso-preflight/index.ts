@@ -251,22 +251,33 @@ function sniffAudio(b: Uint8Array, totalBytes: number | null): AudioInfo {
   return out;
 }
 
-// ---------- Face probe at frame (v129.11 — extract JPEG first) ----------
+// ---------- Face probe at frame (v129.14 — client-side JPEG) ----------
 async function probeFaceAtFrame(
   videoUrl: string,
   frameNumber: number | null,
   coord: [number, number] | null,
   wasInferred: boolean = false,
+  prebuiltFrameUrl: string | null = null,
 ): Promise<CheckResult> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord, was_inferred: wasInferred };
-  if (!videoUrl) return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
+  if (!videoUrl && !prebuiltFrameUrl) {
+    return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
+  }
 
-  // ── v129.11 Stage 1: extract a real JPEG of the ASD frame ────────
-  let frameJpegUrl: string | undefined;
+  // v129.14: the Forensics Sheet extracts the JPEG client-side with a
+  // <video> + <canvas>, uploads it to the `composer-frames` bucket and
+  // passes the public URL here. Server-side extraction (ffmpeg.wasm /
+  // Replicate) is permanently disabled — both options proved unreliable
+  // in the Deno Edge runtime.
+  let frameJpegUrl: string | undefined =
+    typeof prebuiltFrameUrl === "string" && prebuiltFrameUrl.length > 0
+      ? prebuiltFrameUrl
+      : undefined;
   let extractMs = 0;
-  let frameCached = false;
-  if (frameNumber != null) {
+  let frameCached = !!frameJpegUrl;
+
+  if (!frameJpegUrl && frameNumber != null) {
     const extracted = await extractFrameForFaceProbe({
       videoUrl,
       frameNumber,
@@ -276,11 +287,14 @@ async function probeFaceAtFrame(
     if (!extracted.ok || !extracted.frameUrl) {
       return {
         status: "warn",
-        note: `frame_extract_unavailable: ${extracted.reason ?? "unknown"} — face probe cannot run.`,
+        note:
+          "frame_extract_unavailable: server cannot extract a JPEG (Edge runtime has no ffmpeg). " +
+          "Open the Forensik-Sheet so the browser extracts the frame and re-runs the preflight.",
         frame: frameNumber,
         coord,
         was_inferred: wasInferred,
         extract_ms: extractMs,
+        extract_reason: extracted.reason ?? null,
       };
     }
     frameJpegUrl = extracted.frameUrl;
@@ -391,6 +405,12 @@ serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
   const sceneId: string | undefined = body?.scene_id;
   const passIndex: number = Number.isInteger(body?.pass_index) ? body.pass_index : 0;
+  // v129.14 — Admin can pass a pre-extracted JPEG (client-side canvas
+  // capture) to skip the broken server-side ffmpeg path.
+  const probeFrameUrl: string | null =
+    typeof body?.probe_frame_url === "string" && body.probe_frame_url.length > 0
+      ? body.probe_frame_url
+      : null;
   if (!sceneId) return json({ error: "missing_scene_id" }, 400);
 
   // Resolve pass + dispatch (same chain as support-bundle)
@@ -480,7 +500,7 @@ serve(async (req) => {
     }
   }
 
-  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred);
+  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred, probeFrameUrl);
 
   // video_fetchable
   const video_fetchable: CheckResult = vFetch.ok
@@ -605,6 +625,7 @@ serve(async (req) => {
     provider_job_id: providerJobId,
     resolved: {
       video_url_present: !!videoUrl,
+      video_url: videoUrl || null,
       audio_url_present: !!audioUrl,
       frame_number: frameNumber,
       coord,
