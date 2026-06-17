@@ -99,14 +99,22 @@ export async function verifyFaceBeforeDispatch(
 
   const rawBody = await r.text().catch(() => "");
   if (!r.ok) {
+    // The Lovable AI gateway routes google/gemini-* via OpenRouter which
+    // only accepts IMAGE URLs in image_url blocks. A video/mp4 URL
+    // deterministically returns HTTP 400 here. We MUST NOT hard-block the
+    // dispatch on probe_unavailable, otherwise lipsync stops working for
+    // every user. Instead we surface it as a non-blocking signal: caller
+    // logs FACE_GATE_PROBE_UNAVAILABLE, lets the dispatch proceed, and the
+    // user sees an honest "probe unavailable" line in the Preflight UI.
     return {
-      ok: false,
+      ok: true,
       code: "probe_unavailable",
-      reason: `gemini_http_${r.status} — face probe could not run on the video URL via the Lovable AI gateway. Refusing dispatch to avoid burning Sync.so credits.`,
+      reason: `gemini_http_${r.status} — face probe cannot run on a video URL via the Lovable AI gateway (OpenRouter passthrough rejects video/mp4 in image_url). Dispatch will proceed unchecked.`,
       http_status: r.status,
       raw_error: rawBody.slice(0, 400),
     };
   }
+
 
   let body: any = null;
   try { body = JSON.parse(rawBody); } catch { /* fallthrough */ }
