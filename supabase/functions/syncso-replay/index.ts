@@ -1,0 +1,385 @@
+/**
+ * syncso-replay — v129.5
+ *
+ * Admin-only forensic tool: re-dispatches a single Sync.so /generate call
+ * based on an existing failed pass, with one of 7 documented override
+ * presets. STRICTLY ISOLATED from production:
+ *
+ *   - never writes to composer_scenes, dialog_shots, syncso_dispatch_log
+ *   - never refunds, never wakes the watchdog
+ *   - webhookUrl ALWAYS points to syncso-replay-webhook, NEVER production
+ *   - results land only in syncso_replay_log
+ *
+ * Body: { scene_id, pass_index, preset, overrides_json?, reason, confirm }
+ */
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+function getSyncApiKey(): string {
+  return (
+    Deno.env.get("SYNC_API_KEY") ??
+    Deno.env.get("SYNC_SO_API_KEY") ??
+    Deno.env.get("SYNCSO_API_KEY") ??
+    ""
+  );
+}
+
+const ALLOWED_MODELS = new Set(["sync-3", "lipsync-2-pro", "lipsync-2"]);
+const ALLOWED_PRESETS = new Set([
+  "exact",
+  "omit_sync_mode",
+  "loop",
+  "bboxes",
+  "auto_detect",
+  "lipsync_2_pro",
+  "lipsync_2",
+  "custom",
+]);
+
+const MAX_REPLAYS_PER_PASS_PER_HOUR = 5;
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(text),
+  );
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function probeHash(url: string): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) return null;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    const buf = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return null;
+  }
+}
+
+async function urlReachable(url: string): Promise<boolean> {
+  if (!url) return false;
+  try {
+    const r = await fetch(url, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (r.ok) return true;
+    // S3 sometimes 403s on HEAD; try GET range 0-1
+    const r2 = await fetch(url, {
+      headers: { Range: "bytes=0-1" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    await r2.body?.cancel();
+    return r2.ok || r2.status === 206;
+  } catch {
+    return false;
+  }
+}
+
+function buildAsd(
+  preset: string,
+  v1291: any,
+  videoFrameCount: number | null,
+): any | undefined {
+  // Default: doc-strict coordinates from v1291
+  if (preset === "auto_detect") {
+    return { auto_detect: true };
+  }
+  if (preset === "bboxes") {
+    // Construct a per-frame bbox list from plate_coords (constant box).
+    // Sync.so docs: bounding_boxes_url accepts a JSON of frame→[x,y,w,h].
+    // We can also pass `bounding_boxes` inline for short clips.
+    const coords = v1291?.transformed_coords_int ?? [360, 360];
+    const half = 110; // ~same scale as the 220px crop in v129.1
+    const x = Math.max(0, coords[0] - half);
+    const y = Math.max(0, coords[1] - half);
+    const box = [x, y, half * 2, half * 2];
+    const frames = Math.max(1, videoFrameCount ?? 75);
+    const bounding_boxes = [];
+    for (let f = 0; f < frames; f++) {
+      bounding_boxes.push({ frame_number: f, box });
+    }
+    return { bounding_boxes };
+  }
+  if (v1291) {
+    return {
+      frame_number: v1291.frame_number ?? 5,
+      coordinates: v1291.transformed_coords_int ?? [360, 360],
+      auto_detect: false,
+    };
+  }
+  return undefined;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: claims, error: claimsErr } = await userClient.auth.getClaims(
+    authHeader.replace("Bearer ", ""),
+  );
+  if (claimsErr || !claims?.claims?.sub) return json({ error: "unauthorized" }, 401);
+  const userId = claims.claims.sub as string;
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: isAdmin } = await admin.rpc("has_role", {
+    _user_id: userId,
+    _role: "admin",
+  });
+  if (!isAdmin) return json({ error: "forbidden_admin_only" }, 403);
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_json" }, 400);
+  }
+  const sceneId: string | undefined = body?.scene_id;
+  const passIndex: number = Number.isInteger(body?.pass_index) ? body.pass_index : 0;
+  const preset: string = body?.preset ?? "exact";
+  const overridesJson: Record<string, unknown> = body?.overrides_json ?? {};
+  const reason: string = body?.reason ?? "";
+  const confirm: boolean = body?.confirm === true;
+  if (!sceneId) return json({ error: "missing_scene_id" }, 400);
+  if (!ALLOWED_PRESETS.has(preset)) {
+    return json({ error: "invalid_preset", allowed: [...ALLOWED_PRESETS] }, 400);
+  }
+  if (!reason || reason.length < 5) {
+    return json({ error: "reason_required_min_5_chars" }, 400);
+  }
+  if (!confirm) {
+    return json({ error: "confirm_required", note: "set confirm: true to dispatch" }, 400);
+  }
+
+  // Load pass (read-only)
+  const { data: scene, error: sceneErr } = await admin
+    .from("composer_scenes")
+    .select("id, dialog_shots")
+    .eq("id", sceneId)
+    .maybeSingle();
+  if (sceneErr || !scene) return json({ error: "scene_not_found" }, 404);
+  const passes = scene.dialog_shots?.passes ?? [];
+  const pass = passes[passIndex];
+  if (!pass) return json({ error: "pass_not_found", available: passes.length }, 404);
+  const passId = `${sceneId}:${passIndex}`;
+
+  // Original Job ID (for audit)
+  const originalProviderJobId: string | null =
+    pass.provider_job_id ?? pass.job_id ?? null;
+
+  // Rate-limit: max N replays per pass per hour
+  const { count: recentCount } = await admin
+    .from("syncso_replay_log")
+    .select("id", { count: "exact", head: true })
+    .eq("pass_id", passId)
+    .gte("created_at", new Date(Date.now() - 3_600_000).toISOString());
+  if ((recentCount ?? 0) >= MAX_REPLAYS_PER_PASS_PER_HOUR) {
+    return json(
+      { error: "rate_limited", limit: MAX_REPLAYS_PER_PASS_PER_HOUR, window: "1h" },
+      429,
+    );
+  }
+
+  // Resolve original payload pieces
+  const videoUrl: string = pass.payload_video_url ?? "";
+  const audioUrl: string = pass.payload_audio_url ?? "";
+  if (!videoUrl || !audioUrl) {
+    return json({ error: "missing_payload_urls" }, 400);
+  }
+
+  // Pre-dispatch asset reachability check (cheap)
+  const [vOk, aOk] = await Promise.all([urlReachable(videoUrl), urlReachable(audioUrl)]);
+  if (!vOk || !aOk) {
+    return json({
+      error: "asset_unreachable",
+      video_ok: vOk,
+      audio_ok: aOk,
+    }, 422);
+  }
+
+  // Determine model
+  let model: string =
+    pass.payload_model ?? pass._v106_probe?.payload_model ?? "sync-3";
+  if (preset === "lipsync_2_pro") model = "lipsync-2-pro";
+  if (preset === "lipsync_2") model = "lipsync-2";
+  if (typeof overridesJson.model === "string") model = overridesJson.model as string;
+  if (!ALLOWED_MODELS.has(model)) {
+    return json(
+      { error: "unsupported_model", model, allowed: [...ALLOWED_MODELS] },
+      400,
+    );
+  }
+
+  // Build options
+  const v1291 = pass._v1291 ?? null;
+  const videoFrames = Number(pass._v105_probe?.video_frames_expected ?? 75);
+  const options: any = {};
+  // sync_mode
+  if (preset !== "omit_sync_mode") {
+    let sm = pass.sync_mode ?? "cut_off";
+    if (preset === "loop") sm = "loop";
+    if (typeof overridesJson.sync_mode === "string") sm = overridesJson.sync_mode as string;
+    options.sync_mode = sm;
+  }
+  // ASD
+  const asd = buildAsd(preset, v1291, videoFrames);
+  if (asd) options.active_speaker_detection = asd;
+
+  // Replay webhook (NEVER production webhook)
+  const replayWebhookSecret = Deno.env.get("REPLAY_WEBHOOK_SECRET") ?? "";
+  const replayWebhookUrl =
+    `${SUPABASE_URL}/functions/v1/syncso-replay-webhook` +
+    (replayWebhookSecret ? `?token=${encodeURIComponent(replayWebhookSecret)}` : "");
+
+  const payload: any = {
+    model,
+    options,
+    input: [
+      { type: "video", url: videoUrl },
+      { type: "audio", url: audioUrl },
+    ],
+    webhookUrl: replayWebhookUrl,
+  };
+
+  const sentPayloadJson = JSON.parse(JSON.stringify(payload));
+  // Strip secret before hashing/logging
+  delete sentPayloadJson.webhookUrl;
+  const sentPayloadHash = await sha256Hex(JSON.stringify(sentPayloadJson));
+
+  const [videoSha, audioSha] = await Promise.all([
+    probeHash(videoUrl),
+    probeHash(audioUrl),
+  ]);
+
+  // Insert pending row FIRST so the replay-webhook can correlate by replay_provider_job_id later
+  const { data: row, error: insertErr } = await admin
+    .from("syncso_replay_log")
+    .insert({
+      pass_id: passId,
+      scene_id: sceneId,
+      original_provider_job_id: originalProviderJobId,
+      created_by: userId,
+      override_preset: preset,
+      overrides_json: overridesJson,
+      sent_payload_json: sentPayloadJson,
+      sent_payload_hash: sentPayloadHash,
+      video_sha256: videoSha,
+      audio_sha256: audioSha,
+      provider_status: "dispatching",
+      reason,
+    })
+    .select("id")
+    .single();
+  if (insertErr || !row) {
+    return json({ error: "log_insert_failed", detail: insertErr?.message }, 500);
+  }
+
+  // Dispatch to Sync.so
+  const apiKey = getSyncApiKey();
+  if (!apiKey) {
+    await admin
+      .from("syncso_replay_log")
+      .update({
+        provider_status: "config_error",
+        provider_error: "missing SYNC_API_KEY",
+      })
+      .eq("id", row.id);
+    return json({ error: "missing_sync_api_key" }, 500);
+  }
+
+  const startedAt = Date.now();
+  let providerJobId: string | null = null;
+  let providerStatus = "dispatched";
+  let providerError: string | null = null;
+  let providerErrorCode: string | null = null;
+  let responseJson: any = null;
+  let httpStatus = 0;
+
+  try {
+    const r = await fetch("https://api.sync.so/v2/generate", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(30_000),
+    });
+    httpStatus = r.status;
+    responseJson = await r.json().catch(() => ({ raw: "non_json" }));
+    providerJobId = responseJson?.id ?? responseJson?.job_id ?? null;
+    providerError = responseJson?.error ?? null;
+    providerErrorCode = responseJson?.error_code ?? responseJson?.errorCode ?? null;
+    if (!r.ok) {
+      providerStatus = "dispatch_failed";
+    }
+  } catch (e) {
+    providerStatus = "dispatch_crash";
+    providerError = (e as Error)?.message ?? String(e);
+    responseJson = { fetch_error: providerError };
+  }
+
+  const durationMs = Date.now() - startedAt;
+
+  await admin
+    .from("syncso_replay_log")
+    .update({
+      replay_provider_job_id: providerJobId,
+      provider_status: providerStatus,
+      provider_error: providerError,
+      provider_error_code: providerErrorCode,
+      response_json: responseJson,
+      duration_ms: durationMs,
+    })
+    .eq("id", row.id);
+
+  return json({
+    ok: true,
+    replay_log_id: row.id,
+    pass_id: passId,
+    replay_provider_job_id: providerJobId,
+    original_provider_job_id: originalProviderJobId,
+    http_status: httpStatus,
+    provider_status: providerStatus,
+    provider_error: providerError,
+    provider_error_code: providerErrorCode,
+    duration_ms: durationMs,
+    sent_payload: sentPayloadJson,
+    response: responseJson,
+    isolation: {
+      production_webhook_used: false,
+      replay_webhook_used: true,
+      no_scene_mutation: true,
+      no_refund: true,
+    },
+  });
+});
