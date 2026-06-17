@@ -255,10 +255,11 @@ async function probeFaceAtFrame(
   videoUrl: string,
   frameNumber: number | null,
   coord: [number, number] | null,
+  wasInferred: boolean = false,
 ): Promise<CheckResult> {
   const apiKey = getGeminiApiKey();
-  if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord };
-  if (!videoUrl) return { status: "skip", note: "no_video_url", frame: frameNumber, coord };
+  if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord, was_inferred: wasInferred };
+  if (!videoUrl) return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
   const question = coord && frameNumber != null
     ? `This is a short video clip. Around frame ${frameNumber} (≈${(frameNumber / 30).toFixed(2)}s), is there a single clearly visible human face near image coordinates x=${coord[0]}, y=${coord[1]}? Reply with EXACTLY one of: "yes_one_face_at_coord", "yes_but_not_at_coord", "multiple_faces", "no_face". No other text.`
     : `Count distinct human faces clearly visible in any frame of this short video clip. Reply with ONLY a single integer (0, 1, 2, ...). No words.`;
@@ -280,34 +281,34 @@ async function probeFaceAtFrame(
     });
     const body = await r.json().catch(() => null);
     if (!r.ok) {
-      return { status: "skip", note: `gemini_http_${r.status}`, frame: frameNumber, coord, raw: body };
+      return { status: "skip", note: `gemini_http_${r.status}`, frame: frameNumber, coord, was_inferred: wasInferred, raw: body };
     }
     const txt: string = (body?.choices?.[0]?.message?.content ?? "").trim();
     if (coord && frameNumber != null) {
       const t = txt.toLowerCase();
       if (t.includes("yes_one_face_at_coord")) {
-        return { status: "pass", verdict: "yes_one_face_at_coord", frame: frameNumber, coord };
+        return { status: "pass", verdict: "yes_one_face_at_coord", frame: frameNumber, coord, was_inferred: wasInferred };
       }
       if (t.includes("yes_but_not_at_coord")) {
-        return { status: "fail", verdict: "yes_but_not_at_coord", frame: frameNumber, coord, note: "Face exists but not at the active_speaker_detection coordinate." };
+        return { status: "fail", verdict: "yes_but_not_at_coord", frame: frameNumber, coord, was_inferred: wasInferred, note: "Face exists but not at the active_speaker_detection coordinate." };
       }
       if (t.includes("multiple_faces")) {
-        return { status: "fail", verdict: "multiple_faces", frame: frameNumber, coord, note: "Multiple faces — Sync.so ASD with fixed coord may pick wrong subject." };
+        return { status: "fail", verdict: "multiple_faces", frame: frameNumber, coord, was_inferred: wasInferred, note: "Multiple faces — Sync.so ASD with fixed coord may pick wrong subject." };
       }
       if (t.includes("no_face")) {
-        return { status: "fail", verdict: "no_face", frame: frameNumber, coord, note: "No human face detected in the video — Sync.so cannot lipsync." };
+        return { status: "fail", verdict: "no_face", frame: frameNumber, coord, was_inferred: wasInferred, note: "No human face detected in the video — Sync.so cannot lipsync." };
       }
-      return { status: "warn", verdict: "unparsed", frame: frameNumber, coord, raw_reply: txt.slice(0, 120) };
+      return { status: "warn", verdict: "unparsed", frame: frameNumber, coord, was_inferred: wasInferred, raw_reply: txt.slice(0, 120) };
     } else {
       const m = txt.match(/\d+/);
       const n = m ? Number(m[0]) : null;
-      if (n === 0) return { status: "fail", faces: 0, note: "No face in video." };
-      if (n != null && n > 1) return { status: "warn", faces: n, note: `${n} faces — ambiguous for single-speaker lipsync.` };
-      if (n === 1) return { status: "pass", faces: 1 };
-      return { status: "warn", faces: null, raw_reply: txt.slice(0, 120) };
+      if (n === 0) return { status: "fail", faces: 0, note: "No face in video.", was_inferred: wasInferred };
+      if (n != null && n > 1) return { status: "warn", faces: n, note: `${n} faces — ambiguous for single-speaker lipsync.`, was_inferred: wasInferred };
+      if (n === 1) return { status: "pass", faces: 1, was_inferred: wasInferred };
+      return { status: "warn", faces: null, raw_reply: txt.slice(0, 120), was_inferred: wasInferred };
     }
   } catch (e) {
-    return { status: "skip", note: `gemini_error_${(e as Error)?.message ?? String(e)}`, frame: frameNumber, coord };
+    return { status: "skip", note: `gemini_error_${(e as Error)?.message ?? String(e)}`, frame: frameNumber, coord, was_inferred: wasInferred };
   }
 }
 
@@ -368,18 +369,65 @@ serve(async (req) => {
     pass.payload_video_url ?? pass._v106_probe?.payload_video_url ?? dispatch?.video_url ?? pass.input_url ?? "";
   const audioUrl: string =
     pass.payload_audio_url ?? pass._v106_probe?.payload_audio_url ?? dispatch?.audio_url ?? pass.audio_url ?? "";
-  const frameNumber: number | null =
-    dispatch?.frame_number ?? pass?.frame_number ?? pass?._v106_probe?.frame_number ?? null;
-  const rawCoord = dispatch?.coords ?? pass?.coords ?? pass?._v106_probe?.coords ?? null;
+
+  // v129.9 — Also peek into dispatch.meta because the production write path
+  // historically only stored ASD coords/frame inside meta.outbound_payload
+  // and meta.v116_diag, leaving the top-level columns null. Without this
+  // fallback the face probe SKIPped on every real failure.
+  const meta: any = dispatch?.meta ?? {};
+  const metaAsd: any = meta?.outbound_payload?.options?.active_speaker_detection ?? {};
+  const metaV116: any = meta?.v116_diag ?? {};
+
+  let frameNumber: number | null =
+    dispatch?.frame_number
+    ?? meta?.reference_frame_number
+    ?? metaAsd?.frame_number
+    ?? pass?.frame_number
+    ?? pass?._v106_probe?.frame_number
+    ?? null;
+  let rawCoord =
+    dispatch?.coords
+    ?? metaAsd?.coordinates
+    ?? metaV116?.coords_sent
+    ?? meta?.coords
+    ?? pass?.coords
+    ?? pass?._v106_probe?.coords
+    ?? null;
   let coord: [number, number] | null = null;
   if (Array.isArray(rawCoord) && rawCoord.length >= 2) coord = [Number(rawCoord[0]), Number(rawCoord[1])];
 
-  // 1+2 video range + parse | 3+4 audio range + parse | 5 face probe in parallel
-  const [vFetch, aFetch, faceProbe] = await Promise.all([
+  // 1+2 video range + parse | 3+4 audio range — sequential video first so we
+  // can infer frame/coord from parsed MP4 dims before running the face probe.
+  const [vFetch, aFetch] = await Promise.all([
     rangeFetch(videoUrl),
     rangeFetch(audioUrl),
-    probeFaceAtFrame(videoUrl, frameNumber, coord),
   ]);
+
+  // v129.9 — Infer missing frame_number from parsed duration (mid-clip)
+  // and missing coord from the preclip's output size (assume square center).
+  let faceWasInferred = false;
+  if ((frameNumber == null || coord == null) && vFetch.ok && vFetch.bytes) {
+    const earlyInfo = parseMp4Head(vFetch.bytes);
+    if (frameNumber == null && earlyInfo.duration_s != null) {
+      frameNumber = Math.max(0, Math.floor(earlyInfo.duration_s * 30 / 2));
+      faceWasInferred = true;
+    }
+    if (coord == null) {
+      // Preclips are square; output size is encoded in meta.v116_diag.preclip_crop
+      // when known. Fall back to a centered 256/256 (matches the legacy 512px
+      // preclip canvas after the 720p safety floor — Gemini just needs a
+      // ballpark for the spatial question).
+      const outputSize: number | null =
+        Number(metaV116?.preclip_crop?.outputSize)
+        || Number(meta?.v1291_diag?.preclip_crop?.outputSize)
+        || null;
+      const c = outputSize && Number.isFinite(outputSize) ? Math.floor(outputSize / 2) : 256;
+      coord = [c, c];
+      faceWasInferred = true;
+    }
+  }
+
+  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred);
 
   // video_fetchable
   const video_fetchable: CheckResult = vFetch.ok

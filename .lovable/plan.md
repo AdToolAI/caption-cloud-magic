@@ -1,73 +1,58 @@
-# Sync.so Root-Cause-Isolation — Binary Search in max. 2 Replays
+## Befund aus dem Forensik-Screenshot
 
-## Die Fehlerklassen sind endlich
+Preflight v129.8 zeigt für Scene `85e38890…` Pass 0:
+- 5/6 Checks **PASS** (Video URL, Audio URL, Audio Format, Video Codec, Dauer)
+- **`Gesicht am ASD-Frame` = SKIP** mit `frame=—` (kein frame_number)
+- Coord ist `[256, 221]` — Production-Logs zeigen aber `frame_number=50, coord=[360, 363]` an Sync.so
 
-`generation_unknown_error` ist Sync.so's Catch-all. Laut deren Doku + Community gibt es genau **6 Ursachen**:
+Damit ist die Diagnose eindeutig: Die Face-Targeting-Daten, die an Sync.so geschickt werden, stammen aus **stale State** (alter Hailuo-Take, anderer Plate, andere Auflösung) und passen nicht zum Frame, der gerade gerendert wurde → Sync.so antwortet mit `generation_unknown_error`, weil an `frame_number=50 / x=360 / y=363` schlicht kein Gesicht ist.
 
-| # | Klasse | Sync.so-Symptom | Lokal vor Dispatch prüfbar? |
-|---|---|---|---|
-| 1 | Video-URL nicht von Sync.so fetchbar | 401/403/Timeout auf deren Side | ✅ ja |
-| 2 | Video-Codec/Container nicht akzeptiert (nur H.264/MP4 zuverlässig) | Decode-Fail | ✅ ja (ftyp + codec_string) |
-| 3 | Audio-URL nicht fetchbar oder falscher Content-Type | Decode-Fail | ✅ ja |
-| 4 | Audio enthält keine erkennbare Sprache / zu leise / zu kurz | STT-Fail | ✅ ja (RMS + Duration) |
-| 5 | Im Video kein Gesicht am angegebenen Frame/Koord | ASD-Fail | ✅ ja (Gemini-Face-Probe v129.6 existiert schon) |
-| 6 | Video-/Audio-Duration-Mismatch > Toleranz | Sync-Fail | ✅ ja |
+Das ist Klasse 5 der 6 dokumentierten Ursachen — und gleichzeitig die einzige, die Preflight aktuell nicht prüfen konnte, weil der Dispatch-Row gar kein `frame_number` enthielt.
 
-**Alle 6 sind vor dem Dispatch deterministisch erkennbar.** Wir brauchen keine 3 Trial-and-Error-Replays — wir brauchen einen **Preflight, der vor jedem Replay läuft und uns sagt, welche der 6 Klassen failed**. Falls Preflight grün ist und Sync.so trotzdem `generation_unknown_error` returnt → echter Provider-Bug, dann Sync.so-Support mit Bundle.
+## Ziel
 
-## Lösung in zwei Bausteinen
+1. Preflight darf nicht mehr SKIP geben — `frame_number` und `coord` müssen IMMER mitkommen.
+2. Produktion darf vor dem Sync.so-Call **nicht mehr blind alte ASD-Werte verwenden** — sie muss auf dem tatsächlich frisch gerenderten Plate-Video eine Face-Probe machen und `active_speaker_detection` aus dem Resultat ableiten.
+3. Wenn Gemini sagt „no_face / multiple_faces / yes_but_not_at_coord", muss der Pass **mit klarem Fehler** abgebrochen werden (kein Sync.so-Call, automatischer Refund) — nicht erst auf `generation_unknown_error` warten.
 
-### Baustein A — `syncso-preflight` Edge-Function (neu, read-only)
+## Scope (was angefasst wird)
 
-Eine reine Diagnose-Function, kein Sync.so-Call, kein Credit-Spend. Input: `{ pass_id, scene_id }`. Output: 6 Check-Resultate mit `pass/fail/warn` + Detail.
+### A) `syncso-preflight` — Face-Probe nie mehr SKIP
+- Wenn `dispatch.frame_number` fehlt, **selbst** einen Default berechnen: `Math.floor(plate_duration * 30 / 2)` (Mitte) und `coord = [video_width/2, video_height/2]` aus ffprobe-Header.
+- Skip nur noch wenn `LOVABLE_API_KEY` fehlt oder Video nicht fetchbar — sonst immer echte Antwort.
+- Neues Feld `face_probe.was_inferred: true` damit UI „inferred (no dispatch coord)" anzeigen kann.
 
-```text
-GET https://.../syncso-preflight?pass_id=…
-{
-  "video_fetchable":   { status:"pass", http:200, content_type:"video/mp4", bytes:4823100 },
-  "video_codec":       { status:"pass", brand:"isom", codec:"avc1.640028", w:1080, h:1920, fps:30 },
-  "audio_fetchable":   { status:"pass", http:200, content_type:"audio/mpeg", bytes:142336 },
-  "audio_speech":      { status:"warn", duration_s:8.9, rms_db:-32.1, note:"leise aber ok" },
-  "face_at_frame":     { status:"fail", frame:50, coord:[360,363], gemini_face_bbox:null, note:"kein Gesicht erkannt" },
-  "duration_match":    { status:"pass", video_s:9.0, audio_s:8.9, delta_s:0.1 },
-  "verdict":           "fail",
-  "first_blocker":     "face_at_frame"
-}
-```
+### B) `compose-dialog-scene` — Live-Face-Detect statt stale ASD
+Genau ein neuer Schritt direkt vor jedem Sync.so-Call (auch in `poll-dialog-shots`, das die Sync.so-Generierung tatsächlich auslöst):
 
-Implementierung pro Check:
-1. **video_fetchable / audio_fetchable**: Range-GET (Bytes 0-65535) + Content-Type-Header
-2. **video_codec**: aus den 64 KB die `ftyp`-Box + `moov.trak.mdia.minf.stbl.stsd.avcC` parsen (kein ffmpeg nötig, ~80 Zeilen pure TS — Brand muss in `[isom, mp42, iso5]`, codec muss `avc1.*` sein)
-3. **audio_speech**: erste 256 KB laden, bei MP3/WAV grobes RMS aus Sample-Frames (oder als Shortcut: einfach Duration aus Header + warn wenn < 0.4s)
-4. **face_at_frame**: existiert bereits in v129.6 als optionale Gemini-Probe — hier **immer** ausführen
-5. **duration_match**: Video aus `moov.mvhd`, Audio aus Container-Header
+1. Plate-URL aus dem gerade abgeschlossenen Hailuo-Job lesen.
+2. Aufruf `detect-face-for-lipsync` (neue interne Helper-Funktion, kein neuer User-Endpoint):
+   - lädt Frame `Math.floor(plate_duration*30 / 2)` via ffmpeg→PNG aus dem Plate
+   - schickt PNG an Gemini Vision (`google/gemini-2.5-flash`) mit Frage „Wo ist das Gesicht des Hauptsprechers? Antworte mit JSON `{x,y,confidence}` normiert 0–1."
+   - mapped Ergebnis auf Pixel-Koordinaten der Plate-Auflösung
+3. Resultat:
+   - `confidence ≥ 0.6` → `active_speaker_detection: { frame_number, coord }` mit den **frischen** Werten an Sync.so
+   - `confidence < 0.6` oder „no_face" → Sync.so-Call **wird übersprungen**, Pass wird als `failed` mit `provider_error_code = "no_face_pre_sync"` markiert, Wallet refundiert via bestehende `syncso-refund` Helper-Logik
+4. Cache: Ergebnis pro `plate_url` in `plate_face_cache` (Tabelle existiert bereits) speichern, damit Retries denselben Wert nehmen.
 
-### Baustein B — Forensik-Sheet zeigt Preflight oben, Replay erst danach
+### C) `dialog_shots` / `syncso_dispatch_log` — Persistenz
+- `syncso_dispatch_log` bekommt die finalen, live-detektierten `frame_number` und `coords` (statt der stale Werte) — Preflight liest dann automatisch das Richtige.
+- Kein Schema-Change nötig, die Spalten existieren.
 
-Im `SyncsoForensicsSheet.tsx`:
-- Beim Öffnen automatisch `syncso-preflight` aufrufen
-- Resultat als Ampel-Tabelle oben anzeigen (6 Zeilen, grün/gelb/rot, je mit Detail-Tooltip)
-- Wenn `verdict=fail` → großer Banner: "Blocker erkannt: <first_blocker>". Replay-Button bleibt nutzbar, aber sekundär.
-- Wenn `verdict=pass` und Sync.so trotzdem `generation_unknown_error` returnt → Banner: "Preflight grün — wahrscheinlich Sync.so-Bug. Bundle exportieren und Sync.so-Support."
+### D) `SyncsoForensicsSheet` — UI-Klarheit
+- Wenn `face_probe.was_inferred` → kleine Notiz „Coord aus Video-Mitte abgeleitet (kein Dispatch-Frame vorhanden)".
+- Wenn neuer `provider_error_code = "no_face_pre_sync"` → roter Banner „Kein Sync.so-Call gemacht — Gemini hat kein Gesicht im Plate-Frame gefunden. Credits wurden refundiert."
 
-## Was das löst
+## Explizit NICHT in Scope
 
-- **Keine Trial-and-Error-Replays mehr.** Eine Sheet-Öffnung sagt dir in <2s welche der 6 Klassen failed.
-- **Wir kennen die Antwort, bevor wir Credits ausgeben.**
-- Falls Sync.so trotz grünem Preflight failed: wir haben ein wasserdichtes Bundle für deren Support — das ist genau die Diagnostik, die andere Teams ebenfalls fahren.
-- Für die aktuelle Scene `85e38890…` Pass 0 (Frame 50, Koord 360/363, Hailuo-9s-Vertical): mein starker Verdacht ist Klasse 5 (kein Face am Frame) oder Klasse 2 (Hailuo-Output-Codec). Preflight wird's binnen Sekunden zeigen.
+- Keine Änderung an Sync.so-Payload-Format außer `active_speaker_detection.frame_number/coord`-Werten
+- Kein Wechsel auf `bounding_boxes_url`, kein `auto_detect: true` (verboten laut Memory `sync-3-doc-strict-options-v106`)
+- Keine Änderung an Hailuo-Plate-Generierung, Refund-Logik, Watchdog-Intervallen
+- Keine neuen Replay-Presets — Preflight reicht jetzt
+- Keine Sync.so-API-Version-Migration
 
-## Reihenfolge
+## Erwartetes Ergebnis
 
-1. `supabase/functions/syncso-preflight/index.ts` neu (read-only, kein Wallet)
-2. `SyncsoForensicsSheet.tsx`: Preflight-Panel oben einbauen, `useQuery` mit `staleTime: 0`
-3. Manual: Sheet für betroffene Scene öffnen → Diagnose ablesen → echte Ursache benennen
-
-## Explizit NICHT im Scope
-
-- Keine Production-Dispatch-Änderung
-- Keine neuen Replay-Presets (die aus v129.5/7 reichen)
-- Kein Sync.so-API-Version-Wechsel
-- Keine ffmpeg-Integration (Container-Parsing in TS reicht für H.264/MP4)
-- Keine Gemini-Calls außer dem bereits existierenden Face-Probe
-- Keine Wallet-/Refund-/Watchdog-Logik
+- Forensik zeigt für `85e38890…` entweder „PASS" mit echten Koordinaten → Sync.so akzeptiert den Call,
+- oder „FAIL: no_face" → Pass scheitert sauber **bevor** Geld bei Sync.so verbrannt wird, mit klarer Fehlermeldung im UI.
+- `generation_unknown_error` verschwindet als „mysteriöse" Klasse vollständig — entweder ist Preflight rot (= unsere Schuld, klar diagnostiziert), oder Preflight ist grün und der seltene Restfall ist eindeutig ein Sync.so-Bug, den wir mit Bundle melden können.
