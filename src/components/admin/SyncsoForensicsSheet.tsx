@@ -78,6 +78,77 @@ const VERDICT_STYLE: Record<string, string> = {
   gray: 'border-muted bg-muted/30 text-muted-foreground',
 };
 
+/**
+ * v129.14 — Client-side frame extraction.
+ * The Edge runtime cannot run ffmpeg.wasm and the Replicate model used in
+ * v129.11/12 is gone (404). We grab the ASD frame here with a regular
+ * <video> + <canvas>, upload the JPEG to the existing `composer-frames`
+ * bucket, and hand the public URL to syncso-preflight via `probe_frame_url`.
+ */
+async function extractFrameClientSide(params: {
+  videoUrl: string;
+  frameNumber: number;
+  fps?: number;
+  sceneId: string;
+}): Promise<string | null> {
+  const { videoUrl, frameNumber, sceneId } = params;
+  const fps = params.fps && params.fps > 0 ? params.fps : 30;
+  const targetSec = Math.max(0.05, frameNumber / fps);
+
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth?.user?.id;
+  if (!userId) throw new Error('not authenticated');
+
+  let video: HTMLVideoElement | null = null;
+  try {
+    video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.src = videoUrl;
+
+    await new Promise<void>((resolve, reject) => {
+      video!.addEventListener('loadedmetadata', () => resolve(), { once: true });
+      video!.addEventListener('error', () => reject(new Error('video load failed (CORS?)')), { once: true });
+      setTimeout(() => reject(new Error('video load timeout')), 15000);
+    });
+
+    const dur = video.duration || targetSec + 1;
+    const seekTo = Math.min(Math.max(0.05, targetSec), Math.max(0.05, dur - 0.05));
+    await new Promise<void>((resolve, reject) => {
+      video!.addEventListener('seeked', () => resolve(), { once: true });
+      video!.addEventListener('error', () => reject(new Error('seek failed')), { once: true });
+      try { video!.currentTime = seekTo; } catch (e) { reject(e as Error); }
+      setTimeout(() => reject(new Error('seek timeout')), 10000);
+    });
+
+    const w = video.videoWidth || 1280;
+    const h = video.videoHeight || 720;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('no canvas ctx');
+    ctx.drawImage(video, 0, 0, w, h);
+    const blob: Blob = await new Promise((resolve, reject) =>
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.88),
+    );
+
+    const path = `${userId}/face-probe/${sceneId}-f${frameNumber}.jpg`;
+    const { error: upErr } = await supabase.storage
+      .from('composer-frames')
+      .upload(path, blob, { contentType: 'image/jpeg', upsert: true, cacheControl: '31536000' });
+    if (upErr) throw new Error(`upload failed: ${upErr.message}`);
+    const { data: pub } = supabase.storage.from('composer-frames').getPublicUrl(path);
+    return pub?.publicUrl ?? null;
+  } finally {
+    if (video) {
+      try { video.src = ''; video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
+    }
+  }
+}
+
 export function SyncsoForensicsSheet({
   open,
   onOpenChange,
