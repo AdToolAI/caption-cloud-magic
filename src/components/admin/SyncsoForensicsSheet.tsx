@@ -590,8 +590,19 @@ function PreflightPanel({
                 </summary>
                 <div className="px-2 pb-2 pt-1 space-y-0.5 text-[11px] text-muted-foreground border-t border-border/30">
                   {c.note && <div className="text-foreground/90 mb-1">{c.note}</div>}
+                  {typeof c.frame_jpeg_url === 'string' && c.frame_jpeg_url && (
+                    <div className="my-2">
+                      <div className="text-[10px] uppercase tracking-wide mb-1">extracted frame (v129.11)</div>
+                      <img
+                        src={c.frame_jpeg_url}
+                        alt="ASD frame"
+                        className="max-h-40 rounded border border-border/40"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                   {Object.entries(c)
-                    .filter(([key]) => key !== 'status' && key !== 'note')
+                    .filter(([key]) => key !== 'status' && key !== 'note' && key !== 'frame_jpeg_url')
                     .map(([key, val]) => (
                       <div key={key} className="flex gap-2">
                         <span className="text-[10px] uppercase tracking-wide w-32 shrink-0">{key}</span>
