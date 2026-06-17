@@ -251,22 +251,33 @@ function sniffAudio(b: Uint8Array, totalBytes: number | null): AudioInfo {
   return out;
 }
 
-// ---------- Face probe at frame (v129.11 — extract JPEG first) ----------
+// ---------- Face probe at frame (v129.14 — client-side JPEG) ----------
 async function probeFaceAtFrame(
   videoUrl: string,
   frameNumber: number | null,
   coord: [number, number] | null,
   wasInferred: boolean = false,
+  prebuiltFrameUrl: string | null = null,
 ): Promise<CheckResult> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord, was_inferred: wasInferred };
-  if (!videoUrl) return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
+  if (!videoUrl && !prebuiltFrameUrl) {
+    return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
+  }
 
-  // ── v129.11 Stage 1: extract a real JPEG of the ASD frame ────────
-  let frameJpegUrl: string | undefined;
+  // v129.14: the Forensics Sheet extracts the JPEG client-side with a
+  // <video> + <canvas>, uploads it to the `composer-frames` bucket and
+  // passes the public URL here. Server-side extraction (ffmpeg.wasm /
+  // Replicate) is permanently disabled — both options proved unreliable
+  // in the Deno Edge runtime.
+  let frameJpegUrl: string | undefined =
+    typeof prebuiltFrameUrl === "string" && prebuiltFrameUrl.length > 0
+      ? prebuiltFrameUrl
+      : undefined;
   let extractMs = 0;
-  let frameCached = false;
-  if (frameNumber != null) {
+  let frameCached = !!frameJpegUrl;
+
+  if (!frameJpegUrl && frameNumber != null) {
     const extracted = await extractFrameForFaceProbe({
       videoUrl,
       frameNumber,
@@ -276,11 +287,14 @@ async function probeFaceAtFrame(
     if (!extracted.ok || !extracted.frameUrl) {
       return {
         status: "warn",
-        note: `frame_extract_unavailable: ${extracted.reason ?? "unknown"} — face probe cannot run.`,
+        note:
+          "frame_extract_unavailable: server cannot extract a JPEG (Edge runtime has no ffmpeg). " +
+          "Open the Forensik-Sheet so the browser extracts the frame and re-runs the preflight.",
         frame: frameNumber,
         coord,
         was_inferred: wasInferred,
         extract_ms: extractMs,
+        extract_reason: extracted.reason ?? null,
       };
     }
     frameJpegUrl = extracted.frameUrl;
