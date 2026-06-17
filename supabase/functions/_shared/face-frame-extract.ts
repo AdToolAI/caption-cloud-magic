@@ -109,7 +109,7 @@ export async function extractFrameForFaceProbe(
   }
 
   // ── Replicate extract ─────────────────────────────────────────────
-  const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
+  const replicate = new Replicate({ auth: REPLICATE_API_KEY });
   const started = Date.now();
   let frameOutput: unknown;
   try {
