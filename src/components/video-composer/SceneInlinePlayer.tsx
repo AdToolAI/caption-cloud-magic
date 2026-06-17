@@ -392,21 +392,46 @@ export default function SceneInlinePlayer({
               <p className="mt-1 text-[9px] leading-snug text-foreground/80 line-clamp-4">
                 {friendly}
               </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onGenerate();
-                }}
-                className="mt-2 h-6 px-2 text-[10px] gap-1 bg-destructive/10 border-destructive/40 text-destructive-foreground hover:bg-destructive/20"
-              >
-                <RefreshCw className="h-2.5 w-2.5" />
-                Neu rendern
-              </Button>
+              <div className="mt-2 flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onGenerate();
+                  }}
+                  className="h-6 px-2 text-[10px] gap-1 bg-destructive/10 border-destructive/40 text-destructive-foreground hover:bg-destructive/20"
+                >
+                  <RefreshCw className="h-2.5 w-2.5" />
+                  Neu rendern
+                </Button>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setForensicsOpen(true);
+                    }}
+                    title="Sync.so Forensik (Admin)"
+                    className="h-6 px-2 text-[10px] gap-1 bg-amber-500/10 border-amber-500/40 text-amber-200 hover:bg-amber-500/20"
+                  >
+                    <FlaskConical className="h-2.5 w-2.5" />
+                    Forensik
+                  </Button>
+                )}
+              </div>
             </div>
           );
         })()}
+
+        {isAdmin && forensicsOpen && (
+          <SyncsoForensicsSheet
+            open={forensicsOpen}
+            onOpenChange={setForensicsOpen}
+            sceneId={scene.id}
+          />
+        )}
 
 
 
