@@ -1157,7 +1157,27 @@ serve(async (req) => {
           return true;
         });
       const doneSiblings = freshFailPasses.filter((p: any, i: number) => i !== currentPass && p?.status === "done").length;
-      const sceneWillFail = aliveSiblings.length === 0 && doneSiblings === 0;
+      let sceneWillFail = aliveSiblings.length === 0 && doneSiblings === 0;
+
+      // v129.4a — Terminal Scene Aggregation (Option A).
+      // For 3+ speaker scenes the v36 honesty policy already mandates a
+      // scene-wide failure when a pflicht-pass fails (partial mux is not an
+      // acceptable final result). Previously this only fired in the
+      // `mustFailScene` branch, which required `allTerminal` — so a terminal
+      // `provider_unknown_error` left pending siblings alive, the scene stayed
+      // `running`, and the Watchdog later overwrote the root cause with
+      // `watchdog_provider_timeout` ~10 min later. We now terminalise the
+      // scene immediately in the webhook, under the dialog lock, with the
+      // real `provider_unknown_error` reason preserved. Non-terminal sibling
+      // passes are cancelled below via the existing `sceneWillFail` branch.
+      const v1294RequiredPassFail = speakerCount >= 3;
+      if (v1294RequiredPassFail && !sceneWillFail) {
+        console.warn(
+          `[sync-so-webhook] v129.4a scene=${sceneId} required-pass failure on ${speakerCount}-speaker scene → terminalising scene now ` +
+          `(was alive=${aliveSiblings.length}, done=${doneSiblings}, errClass=${errClass}, bucket=${effectiveBucket})`,
+        );
+        sceneWillFail = true;
+      }
 
 
       if (sceneWillFail && cost > 0 && !alreadyRefunded) {
