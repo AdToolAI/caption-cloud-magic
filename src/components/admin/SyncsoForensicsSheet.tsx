@@ -549,7 +549,7 @@ function PreflightPanel({
         <div className="flex items-center gap-2 text-sm font-medium">
           <ShieldCheck className="h-4 w-4" />
           Preflight
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">v129.8</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">v129.10</span>
         </div>
         <Button size="sm" variant="ghost" onClick={onRerun} disabled={loading} className="h-7">
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
