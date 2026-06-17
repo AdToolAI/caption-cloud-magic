@@ -1,58 +1,44 @@
-## Befund aus dem Forensik-Screenshot
+## Befund
 
-Preflight v129.8 zeigt für Scene `85e38890…` Pass 0:
-- 5/6 Checks **PASS** (Video URL, Audio URL, Audio Format, Video Codec, Dauer)
-- **`Gesicht am ASD-Frame` = SKIP** mit `frame=—` (kein frame_number)
-- Coord ist `[256, 221]` — Production-Logs zeigen aber `frame_number=50, coord=[360, 363]` an Sync.so
+Der neue Face-Gate läuft bereits im aktiven Produktionspfad, aber er schützt uns nicht:
 
-Damit ist die Diagnose eindeutig: Die Face-Targeting-Daten, die an Sync.so geschickt werden, stammen aus **stale State** (alter Hailuo-Take, anderer Plate, andere Auflösung) und passen nicht zum Frame, der gerade gerendert wurde → Sync.so antwortet mit `generation_unknown_error`, weil an `frame_number=50 / x=360 / y=363` schlicht kein Gesicht ist.
+- `compose-dialog-segments` loggt `v129.9_face_gate ... code=skipped reason=gemini_http_400`
+- Danach wird trotzdem an Sync.so dispatcht
+- Sync.so fällt wieder mit `generation_unknown_error`
+- In der Forensik bleibt `Gesicht am ASD-Frame = SKIP`
 
-Das ist Klasse 5 der 6 dokumentierten Ursachen — und gleichzeitig die einzige, die Preflight aktuell nicht prüfen konnte, weil der Dispatch-Row gar kein `frame_number` enthielt.
+Damit ist die aktuelle Fehlerursache isoliert: Nicht Sync.so ist an dieser Stelle das erste Problem, sondern unser Gemini-Vision-Request ist falsch geformt. Wir senden die Video-URL als `image_url`; Google/Gateway akzeptiert das nicht für MP4 und antwortet 400. Deshalb kann weder Preflight noch Face-Gate zuverlässig prüfen, ob am ASD-Frame ein Gesicht sitzt.
 
-## Ziel
+## Plan
 
-1. Preflight darf nicht mehr SKIP geben — `frame_number` und `coord` müssen IMMER mitkommen.
-2. Produktion darf vor dem Sync.so-Call **nicht mehr blind alte ASD-Werte verwenden** — sie muss auf dem tatsächlich frisch gerenderten Plate-Video eine Face-Probe machen und `active_speaker_detection` aus dem Resultat ableiten.
-3. Wenn Gemini sagt „no_face / multiple_faces / yes_but_not_at_coord", muss der Pass **mit klarem Fehler** abgebrochen werden (kein Sync.so-Call, automatischer Refund) — nicht erst auf `generation_unknown_error` warten.
+1. **Gemini-Vision Payload korrigieren**
+   - In `syncso-preflight` und `_shared/syncso-face-gate` keine MP4-URL mehr als `image_url` senden.
+   - Stattdessen einen echten Frame aus dem Video extrahieren oder auf eine gültige multimodale Payload-Form umstellen, die das Gateway akzeptiert.
+   - Für unseren Zweck bevorzugt: deterministisches Frame-Bild zum angegebenen `frame_number` erzeugen/verwenden und als Bild prüfen.
 
-## Scope (was angefasst wird)
+2. **Face-Gate darf nicht still überspringen bei HTTP 400**
+   - `gemini_http_400` wird als Konfigurations-/Payload-Fehler sichtbar gemacht, nicht als „ok, weiter zu Sync.so“.
+   - Bei 400 blocken wir vor Sync.so mit einem internen Fehler wie `face_gate_probe_payload_invalid`, damit keine weiteren Sync.so-Credits verbrannt werden.
 
-### A) `syncso-preflight` — Face-Probe nie mehr SKIP
-- Wenn `dispatch.frame_number` fehlt, **selbst** einen Default berechnen: `Math.floor(plate_duration * 30 / 2)` (Mitte) und `coord = [video_width/2, video_height/2]` aus ffprobe-Header.
-- Skip nur noch wenn `LOVABLE_API_KEY` fehlt oder Video nicht fetchbar — sonst immer echte Antwort.
-- Neues Feld `face_probe.was_inferred: true` damit UI „inferred (no dispatch coord)" anzeigen kann.
+3. **Preflight-Anzeige ehrlich machen**
+   - `Gesicht am ASD-Frame` darf nur noch `SKIP` zeigen, wenn wirklich kein AI-Key/keine URL vorhanden ist.
+   - Bei Gemini-400 soll die UI `FAIL/WARN` mit Grund anzeigen: „Face-Probe request invalid“, nicht grün wirken.
+   - Badge-Version im Forensics Sheet auf die neue Version anheben, damit wir im Screenshot sofort sehen, welcher Code aktiv ist.
 
-### B) `compose-dialog-scene` — Live-Face-Detect statt stale ASD
-Genau ein neuer Schritt direkt vor jedem Sync.so-Call (auch in `poll-dialog-shots`, das die Sync.so-Generierung tatsächlich auslöst):
+4. **Dispatch-Logging verbessern**
+   - `FACE_GATE_BLOCKED` oder `FACE_GATE_PROBE_ERROR` mit `http_status`, Gateway-Body und exaktem `frame_number/coords/video_kind` in `syncso_dispatch_log.meta` persistieren.
+   - So sehen wir künftig in einer DB-Zeile, ob der Gate blockt, skipped oder sauber bestätigt.
 
-1. Plate-URL aus dem gerade abgeschlossenen Hailuo-Job lesen.
-2. Aufruf `detect-face-for-lipsync` (neue interne Helper-Funktion, kein neuer User-Endpoint):
-   - lädt Frame `Math.floor(plate_duration*30 / 2)` via ffmpeg→PNG aus dem Plate
-   - schickt PNG an Gemini Vision (`google/gemini-2.5-flash`) mit Frage „Wo ist das Gesicht des Hauptsprechers? Antworte mit JSON `{x,y,confidence}` normiert 0–1."
-   - mapped Ergebnis auf Pixel-Koordinaten der Plate-Auflösung
-3. Resultat:
-   - `confidence ≥ 0.6` → `active_speaker_detection: { frame_number, coord }` mit den **frischen** Werten an Sync.so
-   - `confidence < 0.6` oder „no_face" → Sync.so-Call **wird übersprungen**, Pass wird als `failed` mit `provider_error_code = "no_face_pre_sync"` markiert, Wallet refundiert via bestehende `syncso-refund` Helper-Logik
-4. Cache: Ergebnis pro `plate_url` in `plate_face_cache` (Tabelle existiert bereits) speichern, damit Retries denselben Wert nehmen.
+5. **Edge Functions deployen und validieren**
+   - Betroffene Functions deployen: `syncso-preflight`, `compose-dialog-segments`.
+   - Danach gezielt für Szene `ea542657...` prüfen:
+     - keine `gemini_http_400` Logs mehr
+     - Preflight Face-Probe ist nicht mehr `SKIP`
+     - Produktion dispatcht nur noch, wenn Face-Gate `ok` ist
 
-### C) `dialog_shots` / `syncso_dispatch_log` — Persistenz
-- `syncso_dispatch_log` bekommt die finalen, live-detektierten `frame_number` und `coords` (statt der stale Werte) — Preflight liest dann automatisch das Richtige.
-- Kein Schema-Change nötig, die Spalten existieren.
+## Nicht im Scope
 
-### D) `SyncsoForensicsSheet` — UI-Klarheit
-- Wenn `face_probe.was_inferred` → kleine Notiz „Coord aus Video-Mitte abgeleitet (kein Dispatch-Frame vorhanden)".
-- Wenn neuer `provider_error_code = "no_face_pre_sync"` → roter Banner „Kein Sync.so-Call gemacht — Gemini hat kein Gesicht im Plate-Frame gefunden. Credits wurden refundiert."
-
-## Explizit NICHT in Scope
-
-- Keine Änderung an Sync.so-Payload-Format außer `active_speaker_detection.frame_number/coord`-Werten
-- Kein Wechsel auf `bounding_boxes_url`, kein `auto_detect: true` (verboten laut Memory `sync-3-doc-strict-options-v106`)
-- Keine Änderung an Hailuo-Plate-Generierung, Refund-Logik, Watchdog-Intervallen
-- Keine neuen Replay-Presets — Preflight reicht jetzt
-- Keine Sync.so-API-Version-Migration
-
-## Erwartetes Ergebnis
-
-- Forensik zeigt für `85e38890…` entweder „PASS" mit echten Koordinaten → Sync.so akzeptiert den Call,
-- oder „FAIL: no_face" → Pass scheitert sauber **bevor** Geld bei Sync.so verbrannt wird, mit klarer Fehlermeldung im UI.
-- `generation_unknown_error` verschwindet als „mysteriöse" Klasse vollständig — entweder ist Preflight rot (= unsere Schuld, klar diagnostiziert), oder Preflight ist grün und der seltene Restfall ist eindeutig ein Sync.so-Bug, den wir mit Bundle melden können.
+- Kein erneuter Umbau der Sync.so Payload-Optionen.
+- Kein Wechsel auf `bounding_boxes_url`.
+- Kein Replay-Experiment, solange unsere eigene Face-Probe noch 400 produziert.
+- Keine Änderung an Hailuo/Preclip-Geometrie, bevor der Face-Gate valide misst.
