@@ -69,11 +69,14 @@ async function publicUrlExists(url: string): Promise<boolean> {
 export async function extractFrameForFaceProbe(
   input: ExtractInput,
 ): Promise<ExtractResult> {
-  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  // Project convention: secret is REPLICATE_API_KEY (all other 11 provider
+  // functions read this name). Accept REPLICATE_API_TOKEN as fallback.
+  const REPLICATE_API_KEY =
+    Deno.env.get("REPLICATE_API_KEY") ?? Deno.env.get("REPLICATE_API_TOKEN");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!REPLICATE_API_TOKEN) {
-    return { ok: false, reason: "replicate_api_token_missing" };
+  if (!REPLICATE_API_KEY) {
+    return { ok: false, reason: "replicate_api_key_missing" };
   }
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return { ok: false, reason: "supabase_service_env_missing" };
@@ -106,7 +109,7 @@ export async function extractFrameForFaceProbe(
   }
 
   // ── Replicate extract ─────────────────────────────────────────────
-  const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
+  const replicate = new Replicate({ auth: REPLICATE_API_KEY });
   const started = Date.now();
   let frameOutput: unknown;
   try {
