@@ -496,3 +496,123 @@ function Field({
     </div>
   );
 }
+
+const CHECK_ORDER = [
+  'video_fetchable',
+  'audio_fetchable',
+  'audio_format',
+  'video_codec',
+  'face_at_frame',
+  'duration_match',
+] as const;
+
+const CHECK_LABEL: Record<string, string> = {
+  video_fetchable: 'Video URL fetchbar',
+  audio_fetchable: 'Audio URL fetchbar',
+  audio_format: 'Audio Format & Dauer',
+  video_codec: 'Video Codec (MP4/H.264)',
+  face_at_frame: 'Gesicht am ASD-Frame',
+  duration_match: 'Dauer Video ↔ Audio',
+};
+
+function statusDot(status: string | undefined): { Icon: typeof ShieldCheck; cls: string; label: string } {
+  switch (status) {
+    case 'pass': return { Icon: ShieldCheck, cls: 'text-emerald-400', label: 'pass' };
+    case 'warn': return { Icon: ShieldAlert, cls: 'text-amber-400', label: 'warn' };
+    case 'fail': return { Icon: ShieldX, cls: 'text-red-400', label: 'fail' };
+    default: return { Icon: ShieldAlert, cls: 'text-muted-foreground', label: 'skip' };
+  }
+}
+
+function PreflightPanel({
+  loading,
+  result,
+  onRerun,
+}: {
+  loading: boolean;
+  result: any;
+  onRerun: () => void;
+}) {
+  const verdict = result?.verdict as 'pass' | 'warn' | 'fail' | undefined;
+  const banner =
+    verdict === 'fail'
+      ? { cls: 'border-red-500/40 bg-red-500/10 text-red-200', text: `Blocker erkannt: ${result.first_blocker ?? 'unknown'}` }
+      : verdict === 'warn'
+      ? { cls: 'border-amber-500/40 bg-amber-500/10 text-amber-200', text: 'Preflight grün mit Warnungen — Replay sollte funktionieren.' }
+      : verdict === 'pass'
+      ? { cls: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200', text: 'Preflight grün — wenn Sync.so trotzdem failed, ist es ein Provider-Bug. Bundle exportieren & Sync.so-Support.' }
+      : null;
+
+  return (
+    <div className="mt-3 rounded border bg-muted/20 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <ShieldCheck className="h-4 w-4" />
+          Preflight
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">v129.8</span>
+        </div>
+        <Button size="sm" variant="ghost" onClick={onRerun} disabled={loading} className="h-7">
+          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+        </Button>
+      </div>
+
+      {loading && !result && (
+        <p className="text-xs text-muted-foreground">6 Checks laufen (Range-GET + ftyp + Gemini-Face-Probe)…</p>
+      )}
+
+      {result?.error && (
+        <div className="rounded border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-200">
+          {result.error}
+          {result.edge_status ? ` (HTTP ${result.edge_status})` : ''}
+        </div>
+      )}
+
+      {banner && (
+        <div className={`rounded border px-2 py-1.5 text-xs ${banner.cls}`}>{banner.text}</div>
+      )}
+
+      {result?.checks && (
+        <div className="space-y-1">
+          {CHECK_ORDER.map((k) => {
+            const c = result.checks[k];
+            if (!c) return null;
+            const { Icon, cls, label } = statusDot(c.status);
+            const isBlocker = result.first_blocker === k;
+            return (
+              <details
+                key={k}
+                className={`rounded border ${isBlocker ? 'border-red-500/60 bg-red-500/5' : 'border-border/50 bg-background/40'}`}
+              >
+                <summary className="flex items-center gap-2 cursor-pointer px-2 py-1.5 text-xs">
+                  <Icon className={`h-3.5 w-3.5 ${cls}`} />
+                  <span className="font-medium flex-1">{CHECK_LABEL[k]}</span>
+                  <span className={`text-[10px] uppercase tracking-wide ${cls}`}>{label}</span>
+                </summary>
+                <div className="px-2 pb-2 pt-1 space-y-0.5 text-[11px] text-muted-foreground border-t border-border/30">
+                  {c.note && <div className="text-foreground/90 mb-1">{c.note}</div>}
+                  {Object.entries(c)
+                    .filter(([key]) => key !== 'status' && key !== 'note')
+                    .map(([key, val]) => (
+                      <div key={key} className="flex gap-2">
+                        <span className="text-[10px] uppercase tracking-wide w-32 shrink-0">{key}</span>
+                        <span className="font-mono break-all">
+                          {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      )}
+
+      {result?.resolved && (
+        <div className="pt-1 text-[10px] text-muted-foreground border-t border-border/30">
+          frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}] ·
+          {' '}job={result.provider_job_id?.slice(0, 8) ?? '—'}…
+        </div>
+      )}
+    </div>
+  );
+}
