@@ -79,25 +79,57 @@ const VERDICT_STYLE: Record<string, string> = {
 };
 
 /**
- * v129.14 — Client-side frame extraction.
- * The Edge runtime cannot run ffmpeg.wasm and the Replicate model used in
- * v129.11/12 is gone (404). We grab the ASD frame here with a regular
- * <video> + <canvas>, upload the JPEG to the existing `composer-frames`
- * bucket, and hand the public URL to syncso-preflight via `probe_frame_url`.
+ * v129.15 — Client-side frame extraction via proxy-video-bytes.
+ * The Edge runtime cannot run ffmpeg.wasm. We grab the ASD frame here
+ * with a regular <video> + <canvas>. Source videos from replicate.delivery
+ * or Lambda-S3 do NOT send Access-Control-Allow-Origin → canvas would be
+ * tainted and toBlob() throws SecurityError. We route those hosts through
+ * the existing `proxy-video-bytes` edge function which adds CORS headers.
  */
+const PROXY_HOSTS = [
+  'replicate.delivery',
+  's3.amazonaws.com',
+  's3.eu-central-1.amazonaws.com',
+];
+
+function needsProxy(rawUrl: string): boolean {
+  try {
+    const u = new URL(rawUrl);
+    if (u.hostname.includes('supabase.co') || u.hostname.includes('supabase.in')) return false;
+    return (
+      PROXY_HOSTS.some(h => u.hostname === h || u.hostname.endsWith('.' + h)) ||
+      /remotionlambda.*\.s3\..*\.amazonaws\.com$/.test(u.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function buildProxyUrl(rawUrl: string): string {
+  if (!needsProxy(rawUrl)) return rawUrl;
+  const base = import.meta.env.VITE_SUPABASE_URL as string;
+  const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+  const q = new URLSearchParams({ url: rawUrl });
+  if (apikey) q.set('apikey', apikey);
+  return `${base}/functions/v1/proxy-video-bytes?${q.toString()}`;
+}
+
 async function extractFrameClientSide(params: {
   videoUrl: string;
   frameNumber: number;
   fps?: number;
   sceneId: string;
-}): Promise<string | null> {
+}): Promise<{ url: string | null; reason?: string }> {
   const { videoUrl, frameNumber, sceneId } = params;
   const fps = params.fps && params.fps > 0 ? params.fps : 30;
   const targetSec = Math.max(0.05, frameNumber / fps);
 
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth?.user?.id;
-  if (!userId) throw new Error('not authenticated');
+  if (!userId) return { url: null, reason: 'not_authenticated' };
+
+  const loadUrl = buildProxyUrl(videoUrl);
+  const viaProxy = loadUrl !== videoUrl;
 
   let video: HTMLVideoElement | null = null;
   try {
@@ -106,22 +138,30 @@ async function extractFrameClientSide(params: {
     video.muted = true;
     video.playsInline = true;
     video.preload = 'auto';
-    video.src = videoUrl;
+    video.src = loadUrl;
 
-    await new Promise<void>((resolve, reject) => {
-      video!.addEventListener('loadedmetadata', () => resolve(), { once: true });
-      video!.addEventListener('error', () => reject(new Error('video load failed (CORS?)')), { once: true });
-      setTimeout(() => reject(new Error('video load timeout')), 15000);
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        video!.addEventListener('loadedmetadata', () => resolve(), { once: true });
+        video!.addEventListener('error', () => reject(new Error(`video_load_failed${viaProxy ? '_via_proxy' : '_cors'}`)), { once: true });
+        setTimeout(() => reject(new Error('video_load_timeout')), 20000);
+      });
+    } catch (e) {
+      return { url: null, reason: (e as Error).message };
+    }
 
     const dur = video.duration || targetSec + 1;
     const seekTo = Math.min(Math.max(0.05, targetSec), Math.max(0.05, dur - 0.05));
-    await new Promise<void>((resolve, reject) => {
-      video!.addEventListener('seeked', () => resolve(), { once: true });
-      video!.addEventListener('error', () => reject(new Error('seek failed')), { once: true });
-      try { video!.currentTime = seekTo; } catch (e) { reject(e as Error); }
-      setTimeout(() => reject(new Error('seek timeout')), 10000);
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        video!.addEventListener('seeked', () => resolve(), { once: true });
+        video!.addEventListener('error', () => reject(new Error('seek_failed')), { once: true });
+        try { video!.currentTime = seekTo; } catch (e) { reject(e as Error); }
+        setTimeout(() => reject(new Error('seek_timeout')), 10000);
+      });
+    } catch (e) {
+      return { url: null, reason: (e as Error).message };
+    }
 
     const w = video.videoWidth || 1280;
     const h = video.videoHeight || 720;
@@ -129,25 +169,33 @@ async function extractFrameClientSide(params: {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('no canvas ctx');
+    if (!ctx) return { url: null, reason: 'no_canvas_ctx' };
     ctx.drawImage(video, 0, 0, w, h);
-    const blob: Blob = await new Promise((resolve, reject) =>
-      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.88),
-    );
+    let blob: Blob;
+    try {
+      blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob_null'))), 'image/jpeg', 0.88),
+      );
+    } catch (e) {
+      // Most likely cause: tainted canvas (SecurityError) because the
+      // <video> source did not honor CORS even via the proxy.
+      return { url: null, reason: `canvas_tainted_or_toBlob_failed: ${(e as Error).message}` };
+    }
 
     const path = `${userId}/face-probe/${sceneId}-f${frameNumber}.jpg`;
     const { error: upErr } = await supabase.storage
       .from('composer-frames')
       .upload(path, blob, { contentType: 'image/jpeg', upsert: true, cacheControl: '31536000' });
-    if (upErr) throw new Error(`upload failed: ${upErr.message}`);
+    if (upErr) return { url: null, reason: `upload_failed: ${upErr.message}` };
     const { data: pub } = supabase.storage.from('composer-frames').getPublicUrl(path);
-    return pub?.publicUrl ?? null;
+    return { url: pub?.publicUrl ?? null };
   } finally {
     if (video) {
       try { video.src = ''; video.removeAttribute('src'); video.load(); } catch { /* ignore */ }
     }
   }
 }
+
 
 export function SyncsoForensicsSheet({
   open,
