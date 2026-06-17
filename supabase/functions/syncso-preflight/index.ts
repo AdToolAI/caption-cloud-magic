@@ -500,7 +500,7 @@ serve(async (req) => {
     }
   }
 
-  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred);
+  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred, probeFrameUrl);
 
   // video_fetchable
   const video_fetchable: CheckResult = vFetch.ok
