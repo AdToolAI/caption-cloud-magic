@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 
 interface Props {
   open: boolean;
@@ -143,7 +144,16 @@ export function SyncsoForensicsSheet({
         toast.message(`Status: ${status}`);
       }
     } catch (e: any) {
-      toast.error(`Replay-Fehler: ${e?.message ?? e}`);
+      const details = await extractFunctionsErrorDetails(e);
+      setReplayResult({
+        provider_status: 'edge_function_error',
+        provider_error: details.message,
+        provider_error_code: (details.body as any)?.error ?? undefined,
+        duration_ms: 0,
+        response: details.body ?? details.rawBody ?? null,
+        edge_status: details.status ?? null,
+      });
+      toast.error(`Replay-Fehler: ${details.message}`);
     } finally {
       setReplayLoading(false);
     }
@@ -401,10 +411,13 @@ export function SyncsoForensicsSheet({
                   danger={!replayResult.provider_error_code && !!replayResult.provider_error}
                 />
                 <Field label="error" value={replayResult.provider_error ?? '—'} />
+                {replayResult.edge_status && (
+                  <Field label="edge status" value={String(replayResult.edge_status)} danger />
+                )}
                 <Field label="duration" value={`${replayResult.duration_ms ?? 0} ms`} />
                 <details className="mt-2">
                   <summary className="cursor-pointer text-muted-foreground">
-                    Raw response
+                    Raw response / Edge details
                   </summary>
                   <pre className="mt-1 overflow-x-auto bg-background p-2 rounded text-[10px]">
                     {JSON.stringify(replayResult.response, null, 2)}
