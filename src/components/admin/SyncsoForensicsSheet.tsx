@@ -231,6 +231,12 @@ export function SyncsoForensicsSheet({
           <span className="text-xs text-muted-foreground">scene: {sceneId.slice(0, 8)}…</span>
         </div>
 
+        <PreflightPanel
+          loading={preflightLoading}
+          result={preflightResult}
+          onRerun={runPreflight}
+        />
+
         <Tabs defaultValue="bundle" className="mt-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="bundle">
