@@ -4423,6 +4423,14 @@ serve(async (req) => {
       video_url: dispatchVideoUrl,
       video_bytes: videoProbe.bytes,
       video_content_type: videoProbe.contentType,
+      // v129.9 — Persist final ASD top-level so syncso-preflight reads the
+      // exact frame/coord we sent (not stale pass.coords).
+      coords: Array.isArray((syncOptions as any)?.active_speaker_detection?.coordinates)
+        ? (syncOptions as any).active_speaker_detection.coordinates as [number, number]
+        : (Array.isArray(pass.coords) ? pass.coords as [number, number] : null),
+      frame_number: Number.isFinite((syncOptions as any)?.active_speaker_detection?.frame_number)
+        ? Number((syncOptions as any).active_speaker_detection.frame_number)
+        : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : null),
       window_start_sec: 0, window_end_sec: totalSec,
       http_status: resp.status, sync_status: "DISPATCHED",
       meta: {
