@@ -1227,6 +1227,17 @@ serve(async (req) => {
       });
 
       if (sceneWillFail) {
+        // v129.4a — Consistent failure fields. Provider_unknown_error without
+        // an error_code gets the dedicated `terminal_provider_unknown_no_retry`
+        // bucket; everything else keeps the existing classification. The
+        // `scene_failure_source` + `watchdog_finalized:false` lets the
+        // Watchdog distinguish webhook-finalised scenes from its own.
+        const v1294Bucket =
+          codeBucket === "unknown" &&
+          errClass === "provider_unknown_error" &&
+          !errorCode
+            ? "terminal_provider_unknown_no_retry"
+            : effectiveBucket;
         await supabase
           .from("composer_scenes")
           .update({
@@ -1239,8 +1250,11 @@ serve(async (req) => {
               error: reason,
               last_error_class: errClass,
               sync_error_code: errorCode ?? null,
-              sync_error_bucket: effectiveBucket,
+              sync_error_bucket: v1294Bucket,
               sync_error_explain: codeExplain ?? null,
+              scene_failure_source: "sync-so-webhook",
+              watchdog_finalized: false,
+              ...(v1294RequiredPassFail ? { v1294_required_pass_failure: true } : {}),
             },
             lip_sync_status: "failed",
             twoshot_stage: "failed",
@@ -1249,7 +1263,7 @@ serve(async (req) => {
           })
           .eq("id", sceneId);
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
+          `[sync-so-webhook] v5/v129.4a scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${v1294Bucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
         );
       } else {
         // Roll back the refund decision: scene still has alive siblings, so
