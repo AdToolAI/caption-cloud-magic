@@ -53,8 +53,10 @@ export default function SceneInlinePlayer({
 }: Props) {
   const { t } = useTranslation();
   const { reset: resetLipSync, resettingId } = useResetLipSync();
+  const { isAdmin } = useUserRoles();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
+  const [forensicsOpen, setForensicsOpen] = useState(false);
 
   const clipUrl = scene.clipUrl;
   const posterUrl =
