@@ -322,8 +322,9 @@ async function probeFaceAtFrame(
       return { status: "warn", faces: null, raw_reply: txt.slice(0, 120), was_inferred: wasInferred };
     }
   } catch (e) {
-    return { status: "skip", note: `gemini_error_${(e as Error)?.message ?? String(e)}`, frame: frameNumber, coord, was_inferred: wasInferred };
+    return { status: "warn", note: `face_probe_unavailable_${(e as Error)?.message ?? String(e)}`, frame: frameNumber, coord, was_inferred: wasInferred };
   }
+
 }
 
 // ---------- Main ----------
