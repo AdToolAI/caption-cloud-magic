@@ -625,6 +625,7 @@ serve(async (req) => {
     provider_job_id: providerJobId,
     resolved: {
       video_url_present: !!videoUrl,
+      video_url: videoUrl || null,
       audio_url_present: !!audioUrl,
       frame_number: frameNumber,
       coord,
