@@ -239,14 +239,33 @@ export function SyncsoForensicsSheet({
         typeof data?.resolved?.video_url === 'string' &&
         Number.isFinite(data?.resolved?.frame_number);
       if (needsClientFrame) {
+        const surfaceFailure = (reason: string) => {
+          setPreflightResult((prev: any) => {
+            const base = prev ?? data;
+            return {
+              ...base,
+              checks: {
+                ...(base?.checks ?? {}),
+                face_at_frame: {
+                  ...(base?.checks?.face_at_frame ?? {}),
+                  status: 'warn',
+                  reason: `client_extract_failed: ${reason}`,
+                  client_attempt: 'v129.15',
+                },
+              },
+            };
+          });
+        };
         try {
-          const jpegUrl = await extractFrameClientSide({
+          const { url: jpegUrl, reason } = await extractFrameClientSide({
             videoUrl: data.resolved.video_url,
             frameNumber: Number(data.resolved.frame_number),
             fps: 30,
             sceneId,
           });
-          if (jpegUrl) {
+          if (!jpegUrl) {
+            surfaceFailure(reason ?? 'unknown');
+          } else {
             const { data: data2, error: err2 } = await supabase.functions.invoke(
               'syncso-preflight',
               {
@@ -257,12 +276,19 @@ export function SyncsoForensicsSheet({
                 },
               },
             );
-            if (!err2 && data2) setPreflightResult(data2);
+            if (err2) {
+              const det = await extractFunctionsErrorDetails(err2);
+              surfaceFailure(`repreflight_failed: ${det.message}`);
+            } else if (data2) {
+              setPreflightResult(data2);
+            }
           }
-        } catch (e) {
+        } catch (e: any) {
           console.warn('[Forensics] client frame extraction failed:', e);
+          surfaceFailure(e?.message ?? 'thrown');
         }
       }
+
     } catch (e: any) {
       const details = await extractFunctionsErrorDetails(e);
       setPreflightResult({ verdict: 'fail', error: details.message, edge_status: details.status });
