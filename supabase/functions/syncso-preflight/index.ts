@@ -369,18 +369,65 @@ serve(async (req) => {
     pass.payload_video_url ?? pass._v106_probe?.payload_video_url ?? dispatch?.video_url ?? pass.input_url ?? "";
   const audioUrl: string =
     pass.payload_audio_url ?? pass._v106_probe?.payload_audio_url ?? dispatch?.audio_url ?? pass.audio_url ?? "";
-  const frameNumber: number | null =
-    dispatch?.frame_number ?? pass?.frame_number ?? pass?._v106_probe?.frame_number ?? null;
-  const rawCoord = dispatch?.coords ?? pass?.coords ?? pass?._v106_probe?.coords ?? null;
+
+  // v129.9 — Also peek into dispatch.meta because the production write path
+  // historically only stored ASD coords/frame inside meta.outbound_payload
+  // and meta.v116_diag, leaving the top-level columns null. Without this
+  // fallback the face probe SKIPped on every real failure.
+  const meta: any = dispatch?.meta ?? {};
+  const metaAsd: any = meta?.outbound_payload?.options?.active_speaker_detection ?? {};
+  const metaV116: any = meta?.v116_diag ?? {};
+
+  let frameNumber: number | null =
+    dispatch?.frame_number
+    ?? meta?.reference_frame_number
+    ?? metaAsd?.frame_number
+    ?? pass?.frame_number
+    ?? pass?._v106_probe?.frame_number
+    ?? null;
+  let rawCoord =
+    dispatch?.coords
+    ?? metaAsd?.coordinates
+    ?? metaV116?.coords_sent
+    ?? meta?.coords
+    ?? pass?.coords
+    ?? pass?._v106_probe?.coords
+    ?? null;
   let coord: [number, number] | null = null;
   if (Array.isArray(rawCoord) && rawCoord.length >= 2) coord = [Number(rawCoord[0]), Number(rawCoord[1])];
 
-  // 1+2 video range + parse | 3+4 audio range + parse | 5 face probe in parallel
-  const [vFetch, aFetch, faceProbe] = await Promise.all([
+  // 1+2 video range + parse | 3+4 audio range — sequential video first so we
+  // can infer frame/coord from parsed MP4 dims before running the face probe.
+  const [vFetch, aFetch] = await Promise.all([
     rangeFetch(videoUrl),
     rangeFetch(audioUrl),
-    probeFaceAtFrame(videoUrl, frameNumber, coord),
   ]);
+
+  // v129.9 — Infer missing frame_number from parsed duration (mid-clip)
+  // and missing coord from the preclip's output size (assume square center).
+  let faceWasInferred = false;
+  if ((frameNumber == null || coord == null) && vFetch.ok && vFetch.bytes) {
+    const earlyInfo = parseMp4Head(vFetch.bytes);
+    if (frameNumber == null && earlyInfo.duration_s != null) {
+      frameNumber = Math.max(0, Math.floor(earlyInfo.duration_s * 30 / 2));
+      faceWasInferred = true;
+    }
+    if (coord == null) {
+      // Preclips are square; output size is encoded in meta.v116_diag.preclip_crop
+      // when known. Fall back to a centered 256/256 (matches the legacy 512px
+      // preclip canvas after the 720p safety floor — Gemini just needs a
+      // ballpark for the spatial question).
+      const outputSize: number | null =
+        Number(metaV116?.preclip_crop?.outputSize)
+        || Number(meta?.v1291_diag?.preclip_crop?.outputSize)
+        || null;
+      const c = outputSize && Number.isFinite(outputSize) ? Math.floor(outputSize / 2) : 256;
+      coord = [c, c];
+      faceWasInferred = true;
+    }
+  }
+
+  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred);
 
   // video_fetchable
   const video_fetchable: CheckResult = vFetch.ok
