@@ -4205,13 +4205,12 @@ serve(async (req) => {
         isMultiSpeakerContext: gateMulti,
       });
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} v129.10_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
+        `[compose-dialog-segments] scene=${sceneId} v129.11_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
       // Honest non-blocking signal: when the Lovable AI gateway can't probe
-      // a video URL (gemini_http_400 because OpenRouter only accepts image
-      // URLs), log it but let the dispatch through. Otherwise lipsync would
-      // be permanently disabled. The Forensik UI surfaces this clearly so
-      // we don't silently pretend the probe passed.
+      // (extract failure or transient 5xx), log it but let the dispatch
+      // through. The Forensik UI surfaces this clearly so we don't silently
+      // pretend the probe passed.
       if (gate.ok && gate.code === "probe_unavailable") {
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -4226,11 +4225,16 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
+              version: "v129.11",
               code: gate.code,
               reason: gate.reason,
               raw_reply: gate.raw_reply,
               raw_error: gate.raw_error,
               http_status: gate.http_status,
+              frame_jpeg_url: gate.frame_jpeg_url,
+              frame_cached: gate.frame_cached,
+              extract_ms: gate.extract_ms,
+              gemini_ms: gate.gemini_ms,
             },
             non_blocking: true,
           },
@@ -4250,7 +4254,16 @@ serve(async (req) => {
             retry_variant: retryVariant,
             pass_idx: currentPassIdx,
             total_passes: passes.length,
-            face_gate: { code: gate.code, reason: gate.reason, raw_reply: gate.raw_reply },
+            face_gate: {
+              version: "v129.11",
+              code: gate.code,
+              reason: gate.reason,
+              raw_reply: gate.raw_reply,
+              frame_jpeg_url: gate.frame_jpeg_url,
+              frame_cached: gate.frame_cached,
+              extract_ms: gate.extract_ms,
+              gemini_ms: gate.gemini_ms,
+            },
             outbound_payload_intent: { model: payload.model, options: payload.options },
           },
         });
