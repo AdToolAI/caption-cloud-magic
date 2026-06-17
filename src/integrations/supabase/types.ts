@@ -13897,6 +13897,81 @@ export type Database = {
         }
         Relationships: []
       }
+      syncso_replay_log: {
+        Row: {
+          audio_sha256: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          duration_ms: number | null
+          id: string
+          notes: string | null
+          original_provider_job_id: string | null
+          output_url: string | null
+          override_preset: string
+          overrides_json: Json
+          pass_id: string | null
+          provider_error: string | null
+          provider_error_code: string | null
+          provider_status: string | null
+          reason: string | null
+          replay_provider_job_id: string | null
+          response_json: Json | null
+          scene_id: string | null
+          sent_payload_hash: string | null
+          sent_payload_json: Json
+          video_sha256: string | null
+        }
+        Insert: {
+          audio_sha256?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_ms?: number | null
+          id?: string
+          notes?: string | null
+          original_provider_job_id?: string | null
+          output_url?: string | null
+          override_preset: string
+          overrides_json?: Json
+          pass_id?: string | null
+          provider_error?: string | null
+          provider_error_code?: string | null
+          provider_status?: string | null
+          reason?: string | null
+          replay_provider_job_id?: string | null
+          response_json?: Json | null
+          scene_id?: string | null
+          sent_payload_hash?: string | null
+          sent_payload_json?: Json
+          video_sha256?: string | null
+        }
+        Update: {
+          audio_sha256?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_ms?: number | null
+          id?: string
+          notes?: string | null
+          original_provider_job_id?: string | null
+          output_url?: string | null
+          override_preset?: string
+          overrides_json?: Json
+          pass_id?: string | null
+          provider_error?: string | null
+          provider_error_code?: string | null
+          provider_status?: string | null
+          reason?: string | null
+          replay_provider_job_id?: string | null
+          response_json?: Json | null
+          scene_id?: string | null
+          sent_payload_hash?: string | null
+          sent_payload_json?: Json
+          video_sha256?: string | null
+        }
+        Relationships: []
+      }
       syncso_tuning_hints: {
         Row: {
           avoid_mode: string | null
