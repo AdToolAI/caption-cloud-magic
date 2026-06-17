@@ -4512,6 +4512,8 @@ serve(async (req) => {
           coordinates: pass.coords,
           options: payload.options,
         },
+        // v129.4b — Provider input fingerprint (telemetry only, no behavior).
+        provider_input_fingerprint: providerInputFingerprint,
       },
     });
 
