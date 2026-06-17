@@ -213,6 +213,21 @@ serve(async (req) => {
     // terminal in the same window.
     await withDialogLock(supabase, d.id, "lipsync-watchdog", async () => {
     const ds: any = d.dialog_shots ?? {};
+
+    // v129.4a — Terminal no-op guard.
+    // The sync-so-webhook is the single source of truth for scene
+    // terminalisation. If it has already marked this scene `failed` /
+    // `applied` / `canceled`, the Watchdog must NOT overwrite the real
+    // root cause (e.g. `provider_unknown_error`) with its own generic
+    // `watchdog_provider_timeout` / `watchdog_hard_timeout`. Skip the row.
+    const lipStatus = String(d.lip_sync_status ?? "");
+    const dsStatus = String(ds?.status ?? "");
+    if (
+      lipStatus === "failed" || lipStatus === "applied" || lipStatus === "canceled" ||
+      dsStatus === "failed" || dsStatus === "done" || dsStatus === "canceled"
+    ) {
+      return;
+    }
     // Liveness anchor: prefer first_started_at, fall back to started_at,
     // then earliest pass started_at, then updated_at (last resort).
     const passStarts = Array.isArray(ds?.passes)

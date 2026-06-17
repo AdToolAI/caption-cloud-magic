@@ -4342,6 +4342,81 @@ serve(async (req) => {
         : {}),
     } as SegmentsState;
 
+    // v129.4b — Provider Input Fingerprint (telemetry only).
+    // Single structured block per dispatch so a future Sync.so support
+    // bundle can be assembled from `syncso_dispatch_log` alone, without
+    // grepping edge logs or replaying probes. No behaviour change.
+    const hashUrl = async (u: string | null | undefined): Promise<string | null> => {
+      if (!u || typeof u !== "string") return null;
+      try {
+        const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(u));
+        return Array.from(new Uint8Array(buf)).slice(0, 6)
+          .map((b) => b.toString(16).padStart(2, "0")).join("");
+      } catch { return null; }
+    };
+    const fpAudioDiag = audioDiagnostics.find((dx) => dx.pass === pass.idx) as any;
+    const fpNorm = (pass as any).audio_normalization ?? null;
+    const fpVideoUrl = dispatchVideoUrl;
+    const fpAudioUrl = ((pass as any).sync_audio_url ?? pass.audio_url) as string;
+    const fpAsd: any = (syncOptions as any).active_speaker_detection ?? {};
+    const fpVideoDurSec = typeof (pass as any).preclip_duration_sec === "number"
+      ? Number((pass as any).preclip_duration_sec)
+      : null;
+    const fpVideoDims = (pass as any).preclip_dims ?? plateDims ?? videoDims ?? null;
+    const fpVideoFps = 30;
+    const fpVideoFrameCount = fpVideoDurSec != null
+      ? Math.max(1, Math.ceil(fpVideoDurSec * fpVideoFps))
+      : null;
+    const fpAsdCoords = Array.isArray(fpAsd.coordinates) ? fpAsd.coordinates : null;
+    const fpAsdInBounds = (() => {
+      if (!fpAsdCoords || !fpVideoDims) return null;
+      const w = Number(fpVideoDims?.width ?? 0);
+      const h = Number(fpVideoDims?.height ?? 0);
+      if (!w || !h) return null;
+      const [x, y] = fpAsdCoords;
+      return Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x < w && y >= 0 && y < h;
+    })();
+    const providerInputFingerprint = {
+      model: payload.model,
+      sync_mode: (syncOptions as any).sync_mode ?? null,
+      dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+      video: {
+        url_hash: await hashUrl(fpVideoUrl),
+        duration_sec: fpVideoDurSec,
+        width: fpVideoDims?.width ?? null,
+        height: fpVideoDims?.height ?? null,
+        fps: fpVideoFps,
+        frame_count: fpVideoFrameCount,
+        bytes: videoProbe?.bytes ?? null,
+        content_type: videoProbe?.contentType ?? null,
+      },
+      audio: {
+        url_hash: await hashUrl(fpAudioUrl),
+        normalized: !!(pass as any).sync_audio_url,
+        duration_sec: fpAudioDiag?.wav?.durSec ?? null,
+        lead_in_sec: fpAudioDiag?.wav?.leadInSec ?? null,
+        voiced_end_sec: fpNorm?.last_voiced_sec_after_trim ?? null,
+        peak_dbfs: fpAudioDiag?.wav?.peakDbFs ?? null,
+        sample_rate: fpAudioDiag?.wav?.sampleRate ?? null,
+        channels: fpAudioDiag?.wav?.channels ?? null,
+        bits_per_sample: fpAudioDiag?.wav?.bitsPerSample ?? null,
+        codec: "pcm_s16le",
+        bytes: audioProbes[audioProbeIdx]?.bytes ?? null,
+      },
+      asd: {
+        auto_detect: !!fpAsd.auto_detect,
+        frame_number: fpAsd.frame_number ?? null,
+        coordinates: fpAsdCoords,
+        has_bounding_boxes_url: !!fpAsd.bounding_boxes_url,
+        has_bounding_boxes_inline: Array.isArray(fpAsd.bounding_boxes),
+        coord_in_bounds: fpAsdInBounds,
+      },
+      preclip_ambiguity: (pass as any)._v1291_ambiguity ?? null,
+      speakers: speakers.length,
+      retry_variant: retryVariant,
+      v1294_fingerprint: true,
+    };
+
     await logSyncDispatch(supabase, {
       scene_id: sceneId, user_id: userId, engine: "sync-segments",
       job_id: jobId, sync_source_kind: "segments",
@@ -4437,6 +4512,8 @@ serve(async (req) => {
           coordinates: pass.coords,
           options: payload.options,
         },
+        // v129.4b — Provider input fingerprint (telemetry only, no behavior).
+        provider_input_fingerprint: providerInputFingerprint,
       },
     });
 
