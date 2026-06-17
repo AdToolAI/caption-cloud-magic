@@ -212,11 +212,24 @@ serve(async (req) => {
     );
   }
 
-  // Resolve original payload pieces
-  const videoUrl: string = pass.payload_video_url ?? "";
-  const audioUrl: string = pass.payload_audio_url ?? "";
+  // Resolve original payload pieces (v129.7.1: fallback chain for current pass shape)
+  const videoUrl: string =
+    pass.payload_video_url
+    ?? pass._v105_probe?.payload_video_url
+    ?? pass.input_url
+    ?? "";
+  const audioUrl: string =
+    pass.payload_audio_url
+    ?? pass._v105_probe?.payload_audio_url
+    ?? pass.audio_url
+    ?? "";
   if (!videoUrl || !audioUrl) {
-    return json({ error: "missing_payload_urls" }, 400);
+    return json({
+      error: "missing_payload_urls",
+      video_url_present: Boolean(videoUrl),
+      audio_url_present: Boolean(audioUrl),
+      available_pass_keys: Object.keys(pass ?? {}),
+    }, 400);
   }
 
   // Pre-dispatch asset reachability check (cheap)
@@ -229,9 +242,13 @@ serve(async (req) => {
     }, 422);
   }
 
-  // Determine model
+  // Determine model (v129.7.1: extended fallback)
   let model: string =
-    pass.payload_model ?? pass._v106_probe?.payload_model ?? "sync-3";
+    pass.payload_model
+    ?? pass._v106_probe?.payload_model
+    ?? pass._v105_probe?.payload_model
+    ?? pass._v102_probe?.payload_model
+    ?? "sync-3";
   if (preset === "lipsync_2_pro") model = "lipsync-2-pro";
   if (preset === "lipsync_2") model = "lipsync-2";
   if (typeof overridesJson.model === "string") model = overridesJson.model as string;
@@ -244,11 +261,14 @@ serve(async (req) => {
 
   // Build options
   const v1291 = pass._v1291 ?? null;
-  const videoFrames = Number(pass._v105_probe?.video_frames_expected ?? 75);
+  const videoFrames = Number(pass._v105_probe?.video_frames_expected ?? pass._v102_probe?.video_frames_expected ?? 75);
   const options: any = {};
-  // sync_mode
+  // sync_mode (v129.7.1: extended fallback)
   if (preset !== "omit_sync_mode") {
-    let sm = pass.sync_mode ?? "cut_off";
+    let sm = pass.sync_mode
+      ?? pass._v105_probe?.sync_mode
+      ?? pass._v102_probe?.sync_mode
+      ?? "cut_off";
     if (preset === "loop") sm = "loop";
     if (typeof overridesJson.sync_mode === "string") sm = overridesJson.sync_mode as string;
     options.sync_mode = sm;
