@@ -428,6 +428,11 @@ serve(async (req) => {
     provider_error: providerError,
     provider_error_code: providerErrorCode,
     duration_ms: durationMs,
+    asset_reachability: {
+      video: videoProbe,
+      audio: audioProbe,
+      dispatched_despite_probe_failure: !videoProbe.reachable || !audioProbe.reachable,
+    },
     sent_payload: sentPayloadJson,
     response: responseJson,
     isolation: {
