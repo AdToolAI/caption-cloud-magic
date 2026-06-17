@@ -1,44 +1,54 @@
-## Befund
+# v129.11 — Deterministic Face-Probe via Frame Extraction
 
-Der neue Face-Gate läuft bereits im aktiven Produktionspfad, aber er schützt uns nicht:
+## Problem (Status Quo)
+Die Face-Probe schickt aktuell MP4-URLs als `image_url` an Gemini Vision → HTTP 400 → `probe_unavailable` (warn) → Dispatch geht trotzdem an Sync.so → `generation_unknown_error` → Credit weg.
 
-- `compose-dialog-segments` loggt `v129.9_face_gate ... code=skipped reason=gemini_http_400`
-- Danach wird trotzdem an Sync.so dispatcht
-- Sync.so fällt wieder mit `generation_unknown_error`
-- In der Forensik bleibt `Gesicht am ASD-Frame = SKIP`
+Der Face-Gate ist damit **kosmetisch**, nicht **schützend**. Bevor wir einen weiteren Genery-Versuch starten, muss die Probe deterministisch funktionieren — sonst verbrennen wir wieder Credits am gleichen Symptom.
 
-Damit ist die aktuelle Fehlerursache isoliert: Nicht Sync.so ist an dieser Stelle das erste Problem, sondern unser Gemini-Vision-Request ist falsch geformt. Wir senden die Video-URL als `image_url`; Google/Gateway akzeptiert das nicht für MP4 und antwortet 400. Deshalb kann weder Preflight noch Face-Gate zuverlässig prüfen, ob am ASD-Frame ein Gesicht sitzt.
+## Ziel
+Face-Gate wird **echt blockierend**: Gemini bekommt ein JPEG des exakten ASD-Frames + Koordinaten und gibt ein verbindliches Urteil (`ok` / `no_face` / `not_at_coord`). Erst dann darf Sync.so dispatchen.
 
-## Plan
+## Lösung
 
-1. **Gemini-Vision Payload korrigieren**
-   - In `syncso-preflight` und `_shared/syncso-face-gate` keine MP4-URL mehr als `image_url` senden.
-   - Stattdessen einen echten Frame aus dem Video extrahieren oder auf eine gültige multimodale Payload-Form umstellen, die das Gateway akzeptiert.
-   - Für unseren Zweck bevorzugt: deterministisches Frame-Bild zum angegebenen `frame_number` erzeugen/verwenden und als Bild prüfen.
+### 1. Neue Edge-Function `extract-video-frame`
+- Input: `{ video_url, frame_number, fps }` (oder `time_sec`)
+- Lädt MP4 per Range-Request, extrahiert den Frame via `ffmpeg` (Deno-WASM oder `npm:fluent-ffmpeg` Fallback → einfacher: `npm:@ffmpeg-installer/ffmpeg` + child_process; oder Replicate-Helper falls FFmpeg in Deno-Edge zu schwer)
+- **Bevorzugt**: Server-seitige Lösung über bestehende `frame_face_cache` Tabelle + Storage-Bucket `composer-frames` (existiert bereits aus Continuity Guardian) → Upload JPEG, return public URL
+- Cache: `frame_face_cache` (existiert, 13 cols) — Key: `(video_url, frame_number)`
 
-2. **Face-Gate darf nicht still überspringen bei HTTP 400**
-   - `gemini_http_400` wird als Konfigurations-/Payload-Fehler sichtbar gemacht, nicht als „ok, weiter zu Sync.so“.
-   - Bei 400 blocken wir vor Sync.so mit einem internen Fehler wie `face_gate_probe_payload_invalid`, damit keine weiteren Sync.so-Credits verbrannt werden.
+### 2. `_shared/syncso-face-gate.ts` umstellen
+- Statt `image_url: videoUrl` → erst `extract-video-frame` aufrufen, dann `image_url: jpegUrl`
+- Probe sendet zusätzlich die normalisierten Koordinaten als Text-Hinweis im Prompt ("Is there a face at normalized coords x=0.5, y=0.45 with tolerance ±0.15?")
+- Verdict-Mapping bleibt: `ok` → pass, `no_face` / `not_at_coord` → **hard block + refund** (status 422, `provider_error_code: no_face_pre_sync`)
+- Gemini 5xx / Timeout → weiterhin silent fallback (kein false negative)
+- Gemini 400 **auf gültiger JPEG-URL** → jetzt fatal (Konfig-Bug), kein silent pass
 
-3. **Preflight-Anzeige ehrlich machen**
-   - `Gesicht am ASD-Frame` darf nur noch `SKIP` zeigen, wenn wirklich kein AI-Key/keine URL vorhanden ist.
-   - Bei Gemini-400 soll die UI `FAIL/WARN` mit Grund anzeigen: „Face-Probe request invalid“, nicht grün wirken.
-   - Badge-Version im Forensics Sheet auf die neue Version anheben, damit wir im Screenshot sofort sehen, welcher Code aktiv ist.
+### 3. `syncso-preflight/index.ts`
+- Selber Frame-Extract-Path, damit Forensik exakt das sieht, was der Gate sieht
+- UI-Status: `ok` (grün) / `blocked` (rot) / `warn` (gelb, nur bei Gemini-Outage) — kein `skip` mehr im Normalfall
 
-4. **Dispatch-Logging verbessern**
-   - `FACE_GATE_BLOCKED` oder `FACE_GATE_PROBE_ERROR` mit `http_status`, Gateway-Body und exaktem `frame_number/coords/video_kind` in `syncso_dispatch_log.meta` persistieren.
-   - So sehen wir künftig in einer DB-Zeile, ob der Gate blockt, skipped oder sauber bestätigt.
+### 4. `compose-dialog-segments` Logging
+- `syncso_dispatch_log.meta`: `frame_jpeg_url`, `face_gate_verdict`, `gemini_latency_ms`, `gemini_raw_response`
+- Neuer Status: `FACE_GATE_BLOCKED` (mit refund_id) vs. `FACE_GATE_PASSED`
 
-5. **Edge Functions deployen und validieren**
-   - Betroffene Functions deployen: `syncso-preflight`, `compose-dialog-segments`.
-   - Danach gezielt für Szene `ea542657...` prüfen:
-     - keine `gemini_http_400` Logs mehr
-     - Preflight Face-Probe ist nicht mehr `SKIP`
-     - Produktion dispatcht nur noch, wenn Face-Gate `ok` ist
+### 5. `SyncsoForensicsSheet.tsx` (v129.11)
+- Zeigt extrahiertes Frame-JPEG inline (klein, mit ASD-Box-Overlay)
+- Verdict-Badge: PASS / BLOCKED / WARN mit Begründung
 
-## Nicht im Scope
+## Validierung (nach Deploy)
+1. Manueller Re-Dispatch für Scene `ea542657…` → erwartet: entweder PASS+erfolgreicher Sync.so-Run, oder BLOCKED (422, kein Credit-Loss).
+2. Forensik-Sheet zeigt JPEG des ASD-Frames, kein `skip` / `gemini_http_400` mehr.
+3. Erst wenn (1) sauber durchläuft → **neuer Genery-Versuch** mit echter Szene.
 
-- Kein erneuter Umbau der Sync.so Payload-Optionen.
-- Kein Wechsel auf `bounding_boxes_url`.
-- Kein Replay-Experiment, solange unsere eigene Face-Probe noch 400 produziert.
-- Keine Änderung an Hailuo/Preclip-Geometrie, bevor der Face-Gate valide misst.
+## Out of Scope
+- Sync.so Payload-Änderungen
+- ASD-Algorithmus-Wechsel
+- Hailuo/Preclip Geometrie
+- Replay-Experimente
+
+## Risiken
+- FFmpeg in Deno-Edge: ggf. zu schwergewichtig → Fallback: Frame-Extract als kleiner Node-kompatibler Replicate-Call oder über bestehenden `extract-video-frames` Helper (falls vorhanden, muss verifiziert werden).
+- Gemini-Latenz +500–1500 ms pro Dispatch → akzeptabel, weil Block 9 Credits/s spart.
+
+## Empfehlung
+**Erst v129.11 implementieren, dann Genery-Re-Test.** Ein weiterer Genery-Versuch ohne echte Probe würde mit hoher Wahrscheinlichkeit erneut Credits verbrennen, ohne neue Erkenntnis zu liefern.

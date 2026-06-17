@@ -20,6 +20,7 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+import { extractFrameForFaceProbe } from "../_shared/face-frame-extract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -250,7 +251,7 @@ function sniffAudio(b: Uint8Array, totalBytes: number | null): AudioInfo {
   return out;
 }
 
-// ---------- Face probe at frame ----------
+// ---------- Face probe at frame (v129.11 — extract JPEG first) ----------
 async function probeFaceAtFrame(
   videoUrl: string,
   frameNumber: number | null,
@@ -260,9 +261,38 @@ async function probeFaceAtFrame(
   const apiKey = getGeminiApiKey();
   if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord, was_inferred: wasInferred };
   if (!videoUrl) return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
+
+  // ── v129.11 Stage 1: extract a real JPEG of the ASD frame ────────
+  let frameJpegUrl: string | undefined;
+  let extractMs = 0;
+  let frameCached = false;
+  if (frameNumber != null) {
+    const extracted = await extractFrameForFaceProbe({
+      videoUrl,
+      frameNumber,
+      fps: 30,
+    });
+    extractMs = extracted.latencyMs ?? 0;
+    if (!extracted.ok || !extracted.frameUrl) {
+      return {
+        status: "warn",
+        note: `frame_extract_unavailable: ${extracted.reason ?? "unknown"} — face probe cannot run.`,
+        frame: frameNumber,
+        coord,
+        was_inferred: wasInferred,
+        extract_ms: extractMs,
+      };
+    }
+    frameJpegUrl = extracted.frameUrl;
+    frameCached = !!extracted.cached;
+  }
+
+  const probeUrl = frameJpegUrl ?? videoUrl;
   const question = coord && frameNumber != null
-    ? `This is a short video clip. Around frame ${frameNumber} (≈${(frameNumber / 30).toFixed(2)}s), is there a single clearly visible human face near image coordinates x=${coord[0]}, y=${coord[1]}? Reply with EXACTLY one of: "yes_one_face_at_coord", "yes_but_not_at_coord", "multiple_faces", "no_face". No other text.`
-    : `Count distinct human faces clearly visible in any frame of this short video clip. Reply with ONLY a single integer (0, 1, 2, ...). No words.`;
+    ? `You are looking at a single video frame extracted at frame ${frameNumber}. Is there exactly one clearly visible human face whose center is near normalized image coordinates x=${coord[0]}, y=${coord[1]} (tolerance ±0.15)? Reply with EXACTLY one of: "yes_one_face_at_coord", "yes_but_not_at_coord", "multiple_faces", "no_face". No other text.`
+    : `Count distinct human faces clearly visible in this still image. Reply with ONLY a single integer (0, 1, 2, ...). No words.`;
+
+  const geminiStart = Date.now();
   try {
     const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -274,57 +304,65 @@ async function probeFaceAtFrame(
           role: "user",
           content: [
             { type: "text", text: question },
-            { type: "image_url", image_url: { url: videoUrl } },
+            { type: "image_url", image_url: { url: probeUrl } },
           ],
         }],
       }),
     });
+    const geminiMs = Date.now() - geminiStart;
     const body = await r.json().catch(() => null);
     if (!r.ok) {
-      // v129.10: The Lovable AI gateway routes google/gemini-* via
-      // OpenRouter which only accepts IMAGE URLs in `image_url`. A
-      // video/mp4 URL reliably returns HTTP 400. Surface this as WARN
-      // (not SKIP) so the Preflight UI no longer pretends the face
-      // probe passed.
       return {
         status: "warn",
-        note: `face_probe_unavailable_gemini_http_${r.status} — video URLs cannot be probed via the AI gateway; install a frame-extraction step to make this check meaningful.`,
+        note: `face_probe_gemini_http_${r.status} on ${frameJpegUrl ? "extracted_jpeg" : "raw_video_url"} — dispatch would proceed unchecked.`,
         frame: frameNumber,
         coord,
         was_inferred: wasInferred,
         http_status: r.status,
+        frame_jpeg_url: frameJpegUrl,
+        frame_cached: frameCached,
+        extract_ms: extractMs,
+        gemini_ms: geminiMs,
         raw: typeof body === "object" ? body : String(body ?? "").slice(0, 200),
       };
     }
 
-    const txt: string = (body?.choices?.[0]?.message?.content ?? "").trim();
+    const txt: string = ((body as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]?.message?.content ?? "").trim();
+    const baseMeta = {
+      frame: frameNumber,
+      coord,
+      was_inferred: wasInferred,
+      frame_jpeg_url: frameJpegUrl,
+      frame_cached: frameCached,
+      extract_ms: extractMs,
+      gemini_ms: geminiMs,
+    } as const;
     if (coord && frameNumber != null) {
       const t = txt.toLowerCase();
-      if (t.includes("yes_one_face_at_coord")) {
-        return { status: "pass", verdict: "yes_one_face_at_coord", frame: frameNumber, coord, was_inferred: wasInferred };
-      }
-      if (t.includes("yes_but_not_at_coord")) {
-        return { status: "fail", verdict: "yes_but_not_at_coord", frame: frameNumber, coord, was_inferred: wasInferred, note: "Face exists but not at the active_speaker_detection coordinate." };
-      }
-      if (t.includes("multiple_faces")) {
-        return { status: "fail", verdict: "multiple_faces", frame: frameNumber, coord, was_inferred: wasInferred, note: "Multiple faces — Sync.so ASD with fixed coord may pick wrong subject." };
-      }
-      if (t.includes("no_face")) {
-        return { status: "fail", verdict: "no_face", frame: frameNumber, coord, was_inferred: wasInferred, note: "No human face detected in the video — Sync.so cannot lipsync." };
-      }
-      return { status: "warn", verdict: "unparsed", frame: frameNumber, coord, was_inferred: wasInferred, raw_reply: txt.slice(0, 120) };
-    } else {
-      const m = txt.match(/\d+/);
-      const n = m ? Number(m[0]) : null;
-      if (n === 0) return { status: "fail", faces: 0, note: "No face in video.", was_inferred: wasInferred };
-      if (n != null && n > 1) return { status: "warn", faces: n, note: `${n} faces — ambiguous for single-speaker lipsync.`, was_inferred: wasInferred };
-      if (n === 1) return { status: "pass", faces: 1, was_inferred: wasInferred };
-      return { status: "warn", faces: null, raw_reply: txt.slice(0, 120), was_inferred: wasInferred };
+      if (t.includes("yes_one_face_at_coord")) return { status: "pass", verdict: "yes_one_face_at_coord", ...baseMeta };
+      if (t.includes("yes_but_not_at_coord")) return { status: "fail", verdict: "yes_but_not_at_coord", note: "Face exists but not at the active_speaker_detection coordinate.", ...baseMeta };
+      if (t.includes("multiple_faces")) return { status: "fail", verdict: "multiple_faces", note: "Multiple faces — Sync.so ASD with fixed coord may pick wrong subject.", ...baseMeta };
+      if (t.includes("no_face")) return { status: "fail", verdict: "no_face", note: "No human face detected in the extracted ASD frame — Sync.so cannot lipsync.", ...baseMeta };
+      return { status: "warn", verdict: "unparsed", raw_reply: txt.slice(0, 120), ...baseMeta };
     }
+    const m = txt.match(/\d+/);
+    const n = m ? Number(m[0]) : null;
+    if (n === 0) return { status: "fail", faces: 0, note: "No face in extracted frame.", ...baseMeta };
+    if (n != null && n > 1) return { status: "warn", faces: n, note: `${n} faces — ambiguous for single-speaker lipsync.`, ...baseMeta };
+    if (n === 1) return { status: "pass", faces: 1, ...baseMeta };
+    return { status: "warn", faces: null, raw_reply: txt.slice(0, 120), ...baseMeta };
   } catch (e) {
-    return { status: "warn", note: `face_probe_unavailable_${(e as Error)?.message ?? String(e)}`, frame: frameNumber, coord, was_inferred: wasInferred };
+    return {
+      status: "warn",
+      note: `face_probe_unavailable_${(e as Error)?.message ?? String(e)}`,
+      frame: frameNumber,
+      coord,
+      was_inferred: wasInferred,
+      frame_jpeg_url: frameJpegUrl,
+      frame_cached: frameCached,
+      extract_ms: extractMs,
+    };
   }
-
 }
 
 // ---------- Main ----------
