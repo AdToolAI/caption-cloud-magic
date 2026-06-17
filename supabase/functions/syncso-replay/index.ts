@@ -76,23 +76,51 @@ async function probeHash(url: string): Promise<string | null> {
   }
 }
 
-async function urlReachable(url: string): Promise<boolean> {
-  if (!url) return false;
+interface UrlProbeResult {
+  url_present: boolean;
+  valid_url: boolean;
+  reachable: boolean;
+  method?: string;
+  http_status?: number;
+  range_status?: number;
+  error?: string;
+}
+
+async function probeUrl(url: string): Promise<UrlProbeResult> {
+  if (!url) return { url_present: false, valid_url: false, reachable: false, error: "empty_url" };
+  try {
+    new URL(url);
+  } catch {
+    return { url_present: true, valid_url: false, reachable: false, error: "invalid_url" };
+  }
   try {
     const r = await fetch(url, {
       method: "HEAD",
       signal: AbortSignal.timeout(8_000),
     });
-    if (r.ok) return true;
+    if (r.ok) return { url_present: true, valid_url: true, reachable: true, method: "HEAD", http_status: r.status };
     // S3 sometimes 403s on HEAD; try GET range 0-1
     const r2 = await fetch(url, {
       headers: { Range: "bytes=0-1" },
       signal: AbortSignal.timeout(8_000),
     });
     await r2.body?.cancel();
-    return r2.ok || r2.status === 206;
-  } catch {
-    return false;
+    return {
+      url_present: true,
+      valid_url: true,
+      reachable: r2.ok || r2.status === 206,
+      method: "GET_RANGE",
+      http_status: r.status,
+      range_status: r2.status,
+      error: r2.ok || r2.status === 206 ? undefined : `head_${r.status}_range_${r2.status}`,
+    };
+  } catch (e) {
+    return {
+      url_present: true,
+      valid_url: true,
+      reachable: false,
+      error: (e as Error)?.message ?? String(e),
+    };
   }
 }
 
@@ -232,14 +260,18 @@ serve(async (req) => {
     }, 400);
   }
 
-  // Pre-dispatch asset reachability check (cheap)
-  const [vOk, aOk] = await Promise.all([urlReachable(videoUrl), urlReachable(audioUrl)]);
-  if (!vOk || !aOk) {
+  // Pre-dispatch asset reachability probe (diagnostic, not a brittle hard gate for valid URLs)
+  const [videoProbe, audioProbe] = await Promise.all([probeUrl(videoUrl), probeUrl(audioUrl)]);
+  if (!videoProbe.valid_url || !audioProbe.valid_url) {
+    console.error("[syncso-replay] invalid_asset_url", { sceneId, passIndex, video: videoProbe, audio: audioProbe });
     return json({
-      error: "asset_unreachable",
-      video_ok: vOk,
-      audio_ok: aOk,
+      error: "invalid_asset_url",
+      video: videoProbe,
+      audio: audioProbe,
     }, 422);
+  }
+  if (!videoProbe.reachable || !audioProbe.reachable) {
+    console.error("[syncso-replay] asset_probe_unreachable_continuing", { sceneId, passIndex, video: videoProbe, audio: audioProbe });
   }
 
   // Determine model (v129.7.1: extended fallback)
@@ -396,6 +428,11 @@ serve(async (req) => {
     provider_error: providerError,
     provider_error_code: providerErrorCode,
     duration_ms: durationMs,
+    asset_reachability: {
+      video: videoProbe,
+      audio: audioProbe,
+      dispatched_despite_probe_failure: !videoProbe.reachable || !audioProbe.reachable,
+    },
     sent_payload: sentPayloadJson,
     response: responseJson,
     isolation: {
