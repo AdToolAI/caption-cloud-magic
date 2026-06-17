@@ -92,6 +92,7 @@ import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
+import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 
 
 
