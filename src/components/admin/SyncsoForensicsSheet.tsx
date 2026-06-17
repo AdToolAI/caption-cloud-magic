@@ -211,7 +211,7 @@ export function SyncsoForensicsSheet({
           <SheetTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5" />
             Sync.so Forensik
-            <Badge variant="outline" className="ml-2">v129.6</Badge>
+            <Badge variant="outline" className="ml-2">v129.10</Badge>
           </SheetTitle>
           <SheetDescription>
             Admin-Werkzeug. Strikt isoliert von Produktion: keine Mutation an
