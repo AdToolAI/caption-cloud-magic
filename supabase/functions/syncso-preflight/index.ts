@@ -405,6 +405,12 @@ serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
   const sceneId: string | undefined = body?.scene_id;
   const passIndex: number = Number.isInteger(body?.pass_index) ? body.pass_index : 0;
+  // v129.14 — Admin can pass a pre-extracted JPEG (client-side canvas
+  // capture) to skip the broken server-side ffmpeg path.
+  const probeFrameUrl: string | null =
+    typeof body?.probe_frame_url === "string" && body.probe_frame_url.length > 0
+      ? body.probe_frame_url
+      : null;
   if (!sceneId) return json({ error: "missing_scene_id" }, 400);
 
   // Resolve pass + dispatch (same chain as support-bundle)
