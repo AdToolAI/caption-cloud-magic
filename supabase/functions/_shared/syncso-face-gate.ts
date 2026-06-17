@@ -151,10 +151,11 @@ export async function verifyFaceBeforeDispatch(
     }
     if (n != null && n >= 1) return { ok: true, code: "ok", raw_reply: txt.slice(0, 80) };
     return {
-      ok: false,
+      ok: true,
       code: "unparsed",
-      reason: `Gemini reply not recognized: "${txt.slice(0, 80)}" — refusing dispatch.`,
+      reason: `Gemini reply not recognized: "${txt.slice(0, 80)}" — dispatch will proceed unchecked.`,
       raw_reply: txt.slice(0, 80),
     };
+
   }
 }
