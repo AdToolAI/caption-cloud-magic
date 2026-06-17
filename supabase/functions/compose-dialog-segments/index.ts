@@ -4205,8 +4205,37 @@ serve(async (req) => {
         isMultiSpeakerContext: gateMulti,
       });
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} v129.9_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
+        `[compose-dialog-segments] scene=${sceneId} v129.10_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
+      // Honest non-blocking signal: when the Lovable AI gateway can't probe
+      // a video URL (gemini_http_400 because OpenRouter only accepts image
+      // URLs), log it but let the dispatch through. Otherwise lipsync would
+      // be permanently disabled. The Forensik UI surfaces this clearly so
+      // we don't silently pretend the probe passed.
+      if (gate.ok && gate.code === "probe_unavailable") {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_source_kind: "segments", video_url: dispatchVideoUrl,
+          coords: gateCoord, frame_number: gateFrame,
+          http_status: gate.http_status ?? 0, sync_status: "FACE_GATE_PROBE_UNAVAILABLE",
+          error_class: "face_probe_unavailable",
+          error_message: (gate.reason ?? "face_probe_unavailable").slice(0, 240),
+          meta: {
+            diagnostic_id: diagnosticId,
+            retry_variant: retryVariant,
+            pass_idx: currentPassIdx,
+            total_passes: passes.length,
+            face_gate: {
+              code: gate.code,
+              reason: gate.reason,
+              raw_reply: gate.raw_reply,
+              raw_error: gate.raw_error,
+              http_status: gate.http_status,
+            },
+            non_blocking: true,
+          },
+        });
+      }
       if (!gate.ok) {
         const reason = `face_gate_${gate.code}:${(gate.reason ?? "").slice(0, 180)}`;
         await logSyncDispatch(supabase, {
