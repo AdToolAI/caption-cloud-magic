@@ -223,26 +223,29 @@ serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   // Auth: validate user + admin role
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: claims, error: claimsErr } = await userClient.auth.getClaims(
-    authHeader.replace("Bearer ", ""),
-  );
-  if (claimsErr || !claims?.claims?.sub) return json({ error: "unauthorized" }, 401);
-  const userId = claims.claims.sub as string;
+  const token = authHeader.replace("Bearer ", "");
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const { data: isAdmin } = await admin.rpc("has_role", {
+  const { data: userData, error: userErr } = await admin.auth.getUser(token);
+  if (userErr || !userData?.user?.id) {
+    console.error("[syncso-support-bundle] auth_failed", userErr?.message);
+    return json({ error: "unauthorized", detail: userErr?.message ?? null }, 401);
+  }
+  const userId = userData.user.id;
+
+  const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
     _user_id: userId,
     _role: "admin",
   });
+  if (roleErr) {
+    console.error("[syncso-support-bundle] has_role_error", roleErr.message);
+    return json({ error: "role_check_failed", detail: roleErr.message }, 500);
+  }
   if (!isAdmin) return json({ error: "forbidden_admin_only" }, 403);
 
   let body: any;
