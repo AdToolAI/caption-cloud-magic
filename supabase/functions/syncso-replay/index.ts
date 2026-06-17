@@ -212,11 +212,24 @@ serve(async (req) => {
     );
   }
 
-  // Resolve original payload pieces
-  const videoUrl: string = pass.payload_video_url ?? "";
-  const audioUrl: string = pass.payload_audio_url ?? "";
+  // Resolve original payload pieces (v129.7.1: fallback chain for current pass shape)
+  const videoUrl: string =
+    pass.payload_video_url
+    ?? pass._v105_probe?.payload_video_url
+    ?? pass.input_url
+    ?? "";
+  const audioUrl: string =
+    pass.payload_audio_url
+    ?? pass._v105_probe?.payload_audio_url
+    ?? pass.audio_url
+    ?? "";
   if (!videoUrl || !audioUrl) {
-    return json({ error: "missing_payload_urls" }, 400);
+    return json({
+      error: "missing_payload_urls",
+      video_url_present: Boolean(videoUrl),
+      audio_url_present: Boolean(audioUrl),
+      available_pass_keys: Object.keys(pass ?? {}),
+    }, 400);
   }
 
   // Pre-dispatch asset reachability check (cheap)
