@@ -91,11 +91,12 @@ export async function verifyFaceBeforeDispatch(
     });
   } catch (e) {
     return {
-      ok: false,
+      ok: true,
       code: "probe_unavailable",
-      reason: `gemini_network_error: ${(e as Error)?.message ?? String(e)}`,
+      reason: `gemini_network_error: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
     };
   }
+
 
   const rawBody = await r.text().catch(() => "");
   if (!r.ok) {
