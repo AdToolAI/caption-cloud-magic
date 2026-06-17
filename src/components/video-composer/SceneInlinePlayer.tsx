@@ -15,11 +15,13 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
+import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResetLipSync } from '@/hooks/useResetLipSync';
+import { useUserRoles } from '@/hooks/useUserRoles';
+import { SyncsoForensicsSheet } from '@/components/admin/SyncsoForensicsSheet';
 import type { ComposerScene } from '@/types/video-composer';
 
 interface Props {
