@@ -8,7 +8,7 @@
  *
  * Strictly informational — never affects live scene state.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -37,6 +37,10 @@ import {
   AlertCircle,
   Copy,
   CheckCircle2,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldX,
+  RefreshCw,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -91,6 +95,34 @@ export function SyncsoForensicsSheet({
   const [replayLoading, setReplayLoading] = useState(false);
   const [replayResult, setReplayResult] = useState<any>(null);
   const [curlCopied, setCurlCopied] = useState(false);
+
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightResult, setPreflightResult] = useState<any>(null);
+
+  const runPreflight = async () => {
+    setPreflightLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('syncso-preflight', {
+        body: { scene_id: sceneId, pass_index: passIndex },
+      });
+      if (error) throw error;
+      setPreflightResult(data);
+    } catch (e: any) {
+      const details = await extractFunctionsErrorDetails(e);
+      setPreflightResult({ verdict: 'fail', error: details.message, edge_status: details.status });
+      toast.error(`Preflight: ${details.message}`);
+    } finally {
+      setPreflightLoading(false);
+    }
+  };
+
+  // Auto-run preflight when sheet opens or pass changes
+  useEffect(() => {
+    if (!open) return;
+    setPreflightResult(null);
+    runPreflight();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sceneId, passIndex]);
 
   const generateBundle = async () => {
     setBundleLoading(true);
