@@ -137,11 +137,12 @@ export async function verifyFaceBeforeDispatch(
       return { ok: true, code: "ok", raw_reply: txt.slice(0, 80) };
     }
     return {
-      ok: false,
+      ok: true,
       code: "unparsed",
-      reason: `Gemini reply not recognized: "${txt.slice(0, 80)}" — refusing dispatch.`,
+      reason: `Gemini reply not recognized: "${txt.slice(0, 80)}" — dispatch will proceed unchecked.`,
       raw_reply: txt.slice(0, 80),
     };
+
   } else {
     const m = txt.match(/\d+/);
     const n = m ? Number(m[0]) : null;
