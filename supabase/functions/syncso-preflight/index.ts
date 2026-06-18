@@ -881,6 +881,6 @@ serve(async (req) => {
     checks,
     verdict,
     first_blocker: firstBlocker,
-    preflight_version: "v129.21.4",
+    preflight_version: "v129.22.3",
   });
 });
