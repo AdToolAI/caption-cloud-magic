@@ -24,7 +24,13 @@
  */
 import Replicate from "npm:replicate@0.25.2";
 
-const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+// v129.21.1: Project secret is `REPLICATE_API_KEY` (see secrets manifest).
+// Older Replicate-using functions read `REPLICATE_API_TOKEN`. Accept both so
+// that an env-name mismatch never silently disables the primary detector again.
+const REPLICATE_TOKEN =
+  Deno.env.get("REPLICATE_API_KEY") ??
+  Deno.env.get("REPLICATE_API_TOKEN") ??
+  "";
 
 const FRAME_EXTRACT_MODEL = "lucataco/ffmpeg-extract-frame";
 // chigozienri/mediapipe-face returns a JSON list of detections with a
@@ -201,11 +207,12 @@ export async function detectFacesMediaPipe(opts: {
   frameTimestamps?: number[];
 }): Promise<MediaPipeDetectResult> {
   const t0 = Date.now();
-  if (!REPLICATE_API_TOKEN) {
+  if (!REPLICATE_TOKEN) {
+    console.warn("[mp-detect] no replicate token (checked REPLICATE_API_KEY + REPLICATE_API_TOKEN) — primary detector disabled");
     return { ok: false, faces: [], framesScanned: 0, unionBbox: null, source: "error", ms: 0, error: "no_replicate_token" };
   }
 
-  const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
+  const replicate = new Replicate({ auth: REPLICATE_TOKEN });
   const W = Math.max(1, opts.plateWidth);
   const H = Math.max(1, opts.plateHeight);
   const dur = Math.max(0.5, opts.durationSec);
