@@ -27,13 +27,18 @@
  * The caller (compose-dialog-segments v51) decides how to map speakers
  * to detected boxes (characterId via reference portrait → left-to-right
  * ordering of plate boxes is the safest deterministic mapping).
+ *
+ * v129.21 — MediaPipe is now the PRIMARY detector via
+ * `_shared/face-detect-mediapipe.ts`. Gemini Vision on mp4 URL stays as
+ * fallback when Replicate is down / model errors. MediaPipe is what
+ * Sync.so / HeyGen / Hedra use internally; Gemini was the dominant cause
+ * of "no face / wrong face" coordinate drift in production.
  */
+import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
 
 // v98 — Frame extraction via Gemini Vision directly on the video URL.
-// Replicate's `lucataco/ffmpeg-extract-frame` and `lucataco/frame-extractor`
-// both 404 (models removed). `validate-frame-face` proves Gemini 2.5 Flash
-// accepts an mp4 URL as `image_url` and returns face bboxes for the
-// referenced timestamp — no Replicate call, no PNG rehost needed.
+// `validate-frame-face` proves Gemini 2.5 Flash accepts an mp4 URL as
+// `image_url` and returns face bboxes for the referenced timestamp.
 
 const LOVABLE_GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_TIMEOUT_MS = 30_000;
