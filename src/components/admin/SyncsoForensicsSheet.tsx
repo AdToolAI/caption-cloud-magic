@@ -788,8 +788,13 @@ function PreflightPanel({
                       >
                         face probe: {c.source ?? 'unknown'}
                       </span>
+                      {typeof (c as any).face_detect_provider === 'string' && (
+                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
+                          provider: {(c as any).face_detect_provider}
+                        </span>
+                      )}
                       <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/50 text-muted-foreground">
-                        v129.21.5 · mediapipe uses canvas frame
+                        v129.22 · AWS Rekognition primary
                       </span>
                     </div>
                   )}
