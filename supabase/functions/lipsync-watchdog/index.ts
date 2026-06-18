@@ -401,13 +401,32 @@ serve(async (req) => {
     if (ageMs < STALE_PREFLIGHT_MS) return;
     const hasJob = await hasRecordedProviderJob(supabase, d);
 
+    // v129.21.2 — Don't treat "no provider job yet" as a preflight abort
+    // while the upstream master-clip (Hailuo i2v) is still rendering at the
+    // provider. The dispatch-recovery branch above only fires once
+    // twoshot_stage='master_clip' AND clip_url is set; before that, the
+    // Replicate prediction is still in flight (typical 6-10 min for 4-cast
+    // anchor scenes) and we must not kill the scene. The HARD timeout
+    // (25 min) below still catches genuine Hailuo hangs + refunds.
+    const masterClipInFlight =
+      d.twoshot_stage === "master_clip" &&
+      !d.clip_url &&
+      typeof d.replicate_prediction_id === "string" &&
+      d.replicate_prediction_id.length > 0;
+
     let reason: string | null = null;
     if (ageMs > STALE_HARD_MS) {
       reason = "watchdog_hard_timeout";
     } else if (d.twoshot_stage === "circuit_open" && ageMs > STALE_PROVIDER_MS) {
       reason = "syncso_provider_unknown_no_code_after_retries";
-    } else if (!hasJob && ageMs > STALE_PREFLIGHT_MS) {
+    } else if (!hasJob && !masterClipInFlight && ageMs > STALE_PREFLIGHT_MS) {
       reason = "watchdog_preflight_aborted";
+    } else if (!hasJob && masterClipInFlight && ageMs > STALE_PREFLIGHT_MS) {
+      console.log(
+        `[lipsync-watchdog] preflight-skip scene=${d.id} ` +
+        `reason=master_clip_in_flight age=${Math.round(ageMs / 1000)}s ` +
+        `pred=${d.replicate_prediction_id}`,
+      );
     } else if (hasJob && ageMs > STALE_PROVIDER_MS) {
       const polledThisTick = polled.some((p) => p.scene_id === d.id);
       if (!polledThisTick) reason = "watchdog_provider_timeout";
