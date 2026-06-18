@@ -1,103 +1,36 @@
-# v129.22.3 — Auto-Snap auf Rekognition-Center bei `WAS_INFERRED=true`
+## Antwort auf "ist das korrekt?"
 
-## Was die Forensics jetzt zeigt
+**Ja — die Daten sind korrekt, aber widersprüchlich präsentiert.** Die zwei Blöcke beschreiben zwei verschiedene Zeitpunkte:
 
-| Feld | Wert | Bedeutung |
-|---|---|---|
-| `PROVIDER` | `AWS_REKOGNITION` ✅ | AWS funktioniert seit deinem IAM-Fix |
-| `MEDIAPIPE_FACES` | `1` | Rekognition findet das Gesicht |
-| `MEDIAPIPE_OK` | `true` | Erkennung sauber, Plate hat genau 1 Person |
-| `COORD` | `[152, 144]` | **Intent-Koord**, an die wir Sync.so schicken wollten |
-| `WAS_INFERRED` | **`true`** | Diese Koord stammt aus einem Heuristik-Fallback, **nicht** aus Rekognition |
-| `VERDICT` | `yes_but_not_at_coord` | Gesicht da, aber nicht an `[152, 144]` |
+1. **"Gesicht am ASD-Frame" (grün, PASS)** — das ist die **Live-Probe jetzt**. AWS Rekognition findet 1 Face bei `[364,621]`, Snap von `[152,144]` (Δ522px) funktioniert sauber. v129.22.3 würde einen frischen Dispatch korrekt durchlassen.
 
-## Root-Cause
+2. **"Preclip nicht dispatcht" (rot)** — das beschreibt den **historischen Pass-Record** (job `bc8ca39a…`). Der wurde *vor* v129.22.3 mit `status: face_gate_blocked` markiert und hat nie einen Preclip an Sync.so gesendet. `dispatch_never_happened: true` ist für diesen alten Record technisch korrekt.
 
-Beim ursprünglichen Dispatch (vor dem IAM-Fix) hat Rekognition `AccessDenied`
-geworfen → `detectPlateFaces` lieferte `null` → `compose-dialog-segments` ist in
-den **Heuristik-Fallback** in `index.ts:1379-1401` gefallen (gleichmäßig
-verteilte Slots auf der Horizontal-Mittellinie + 5 % Margin-Clamp). Dabei kam
-für Sarah `[~144, ~360]` raus, das wurde auf `[152, 144]` geclamped/persistiert.
+Das Problem ist nicht das Backend — Snap & Gate stimmen. Das Problem ist die **UI-Logik im Forensics-Sheet**: sie zeigt den roten Crop-Bug-Banner auch dann noch, wenn die Live-Probe bereits beweist, dass v129.22.3 self-healed hat. Der Banner sollte sich in einen klaren "Re-Dispatch jetzt möglich"-Zustand wandeln.
 
-Diese **inferred Koord ist jetzt im DB-State der Szene gespeichert.** Beim
-Re-Preflight läuft Rekognition zwar grün, das echte Face sitzt aber bei
-~`[360, 360]` (Bildmitte) — Verdict `yes_but_not_at_coord`. Sync.so kriegt
-weiter die alte Heuristik-Koord, der Face-Gate blockt korrekt, Preclip wird
-nicht dispatcht.
+## Plan: Banner-Status an Snap-Realität koppeln
 
-Das ist **kein neuer Bug**, sondern stale Daten. Aber: würde die Logik nach
-einem fehlgeschlagenen Run einfach die echte Rekognition-Koord übernehmen,
-wäre das Problem selbstheilend.
+### Änderung 1 — `src/components/admin/SyncsoForensicsSheet.tsx` (Zeilen 848–857)
 
-## Fix in 3 Teilen
+Bedingung `result.resolved.dispatch_never_happened` aufsplitten in zwei UI-Zustände:
 
-### 1. Self-healing Coord-Refresh in `syncso-preflight/index.ts`
+- **Wenn `face_probe.verdict === "yes_one_face_at_coord_after_snap"`** (oder generell `face_probe.status === "pass"` mit `snapped_coord` vorhanden):
+  → **Grüner Banner** "✅ Self-healed — Re-Dispatch jetzt möglich" mit Hinweis, dass der historische Pass blockiert war, die Snap-Logik aber jetzt greift. Inkl. Delta-Anzeige `[152,144] → [364,621]`.
 
-In `probeFaceAtFrame` (Zeilen ~323-348): wenn
-- `mp.faces.length === 1` (genau ein Gesicht erkannt) UND
-- `wasInferred === true` (Intent-Koord war Heuristik) UND
-- die echte Rekognition-Koord innerhalb der **erweiterten Plate-Bounds** liegt
-  (also ein plausibles Face auf der Plate, kein Geister-Detect),
+- **Sonst (alter Zustand)**:
+  → Bisheriger roter "Crop-Bug vor Versand"-Banner bleibt wie er ist.
 
-dann **nicht** `yes_but_not_at_coord` failen. Stattdessen:
-- Verdict `yes_one_face_at_coord_after_snap` (neu, status `pass`)
-- Im Result-Objekt zusätzlich `snapped_coord: [face.cx, face.cy]` ausgeben
-- Im Log-Event `face_gate_snap` mit alt/neu/delta tracken
+### Änderung 2 — optional, gleicher File
 
-Im Forensics-UI bekommt das einen gelben „**Auto-snapped**"-Badge + den
-Delta-Vektor (alt → neu), damit transparent bleibt was passiert ist.
+Im resolved-Footer `coord=[152,144]` zusätzlich `→ snapped=[364,621]` einblenden, wenn `face_probe.snapped_coord` vorhanden ist, damit auf einen Blick klar ist, welche Koord beim nächsten Dispatch fliegen wird.
 
-### 2. Caller (`compose-dialog-segments`) übernimmt den Snap
+## Was NICHT geändert wird
 
-`syncso-preflight` wird vom Caller über `wasInferred` informiert (heute schon
-so). Wenn der Preflight `snapped_coord` zurückgibt:
-- `compose-dialog-segments` überschreibt vor dem Sync.so-Dispatch die
-  `pass.coords` mit dem Snap-Wert (per-pass, terminal-safe → die v128-Guard
-  von Zeile 2208 bleibt aktiv, nur nicht-terminale Passes werden refreshed).
-- Loggt `COORD_AUTO_SNAPPED` mit `source: "preflight-snap"`.
+- Keine Edge-Function-Änderungen (`syncso-preflight`, `compose-dialog-segments` bleiben v129.22.3).
+- Keine DB-Migrationen, keine Pass-Record-Rewrites — der historische `face_gate_blocked`-Status bleibt für Audit-Zwecke erhalten.
+- Kein Auto-Re-Dispatch — der User triggert Re-Render bewusst über den existierenden "Replay"-Button unten rechts.
 
-### 3. Plate-Face-Cache für betroffene Szene einmalig invalidieren
+## Verifikation nach Build
 
-Damit die aktuelle Szene `bc8ca39a…` **sofort** läuft, ohne dass du noch
-einen kompletten Re-Render brauchst, invalidiere ich einmalig den
-`plate_face_cache`-Eintrag für deren Plate-URL. Beim nächsten Replay läuft
-Rekognition frisch durch und liefert die echte Koord.
-
-```sql
-DELETE FROM plate_face_cache
-WHERE plate_url_hash IN (
-  SELECT plate_url_hash FROM plate_face_cache
-  WHERE plate_url = '<die plate_url aus dem aktuellen dialog_shot>'
-);
-```
-(Ich lese die exakte URL über `read_query` bevor ich das laufen lasse — keine
-fremden Cache-Einträge werden angefasst.)
-
-## Was sich NICHT ändert
-
-- AWS Rekognition bleibt Primary (läuft jetzt grün).
-- IAM-Policy bleibt wie eingerichtet.
-- Die v128-Guard für **terminale** Passes (`status: done|failed`) bleibt aktiv
-  — der Auto-Snap greift nur für nicht-terminale Passes vor dem Dispatch.
-- Multi-Speaker-Verdict `multiple_faces` bleibt unverändert (snap macht nur
-  Sinn bei `faces.length === 1`).
-- Keine neuen AWS-Permissions, keine neuen Secrets, keine neuen Provider.
-
-## Versionierung
-
-- `face-detect-mediapipe.ts` → unverändert (läuft sauber).
-- `syncso-preflight/index.ts` → v129.22.3 (Snap-Logik).
-- `compose-dialog-segments/index.ts` → v129.22.3 (Snap-Übernahme).
-- `SyncsoForensicsSheet.tsx` → v129.22.3 + „Auto-snapped"-Badge.
-
-## Verification nach Deploy
-
-1. Cache-Invalidate für die aktuelle Szene (einmalig per SQL).
-2. Replay in der UI starten.
-3. Forensics zeigt:
-   - `PROVIDER: AWS_REKOGNITION` (grün, wie jetzt)
-   - `VERDICT: yes_one_face_at_coord_after_snap` (neu, grün)
-   - Gelber Badge „**Auto-snapped** [152,144] → [≈360,≈360]"
-   - **Preclip wird dispatcht**, roter „Crop-Bug"-Banner verschwindet.
-4. Preclip-URL erscheint, Sync.so läuft durch, finaler Clip hat synchrone
-   Lippen.
+1. Forensics-Sheet auf derselben Szene öffnen → roter Crop-Bug-Banner ist weg, stattdessen grüner "Self-healed"-Banner mit Delta-Vector.
+2. Replay-Button drücken → neuer Pass-Record entsteht mit `coords_snapped_at` / `coords_snap_origin` gesetzt, `video_source_kind: "preclip"`, kein `dispatch_never_happened`.
