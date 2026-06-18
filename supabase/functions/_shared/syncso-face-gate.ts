@@ -86,6 +86,14 @@ export interface FaceGateInput {
   timeoutMs?: number;
   /** Optional fps hint for the frame extractor. Defaults to 30. */
   fps?: number;
+  /** Pre-extracted JPEG/PNG URL. Dispatch should pass this when available so
+   *  the gate probes exactly the frame that preflight/forensics use. */
+  prebuiltFrameUrl?: string;
+  /** Optional stable cache path parts for server-side extraction. */
+  userId?: string;
+  projectId?: string;
+  sceneId?: string;
+  passIdx?: number;
   /** v129.22.3 — Plate pixel dims required for AWS Rekognition auto-snap.
    *  When omitted, "yes_but_not_at_coord" stays a hard fail (legacy v129.11
    *  behaviour). Callers with plate dims handy should pass them to enable
@@ -111,11 +119,18 @@ export async function verifyFaceBeforeDispatch(
   let frameJpegUrl: string | undefined;
   let frameCached = false;
   let extractMs = 0;
-  if (frame != null) {
+  if (typeof input.prebuiltFrameUrl === "string" && input.prebuiltFrameUrl.startsWith("http")) {
+    frameJpegUrl = input.prebuiltFrameUrl;
+    frameCached = true;
+  } else if (frame != null) {
     const extracted = await extractFrameForFaceProbe({
       videoUrl: input.videoUrl,
       frameNumber: frame,
       fps: input.fps ?? 30,
+      userId: input.userId,
+      projectId: input.projectId,
+      sceneId: input.sceneId,
+      passIdx: input.passIdx,
     });
     extractMs = extracted.latencyMs ?? 0;
     if (!extracted.ok || !extracted.frameUrl) {
