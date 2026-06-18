@@ -406,6 +406,9 @@ interface PassState {
   preclip_url?: string;
   preclip_render_id?: string;
   preclip_crop?: { x: number; y: number; size: number; outputSize: number };
+  probe_frame_url?: string;
+  coords_snapped_at?: string;
+  coords_snap_origin?: [number, number] | null;
   preclip_error?: string;
   audio_url_full?: string;
   audio_tight?: { url: string; dur_sec: number; windows_secs: Array<[number, number]>; output_offsets_sec?: number[] };
