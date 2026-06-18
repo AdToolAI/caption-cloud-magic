@@ -24,7 +24,13 @@
  */
 import Replicate from "npm:replicate@0.25.2";
 
-const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+// v129.21.1: Project secret is `REPLICATE_API_KEY` (see secrets manifest).
+// Older Replicate-using functions read `REPLICATE_API_TOKEN`. Accept both so
+// that an env-name mismatch never silently disables the primary detector again.
+const REPLICATE_TOKEN =
+  Deno.env.get("REPLICATE_API_KEY") ??
+  Deno.env.get("REPLICATE_API_TOKEN") ??
+  "";
 
 const FRAME_EXTRACT_MODEL = "lucataco/ffmpeg-extract-frame";
 // chigozienri/mediapipe-face returns a JSON list of detections with a
