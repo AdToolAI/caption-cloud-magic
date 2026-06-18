@@ -595,7 +595,7 @@ serve(async (req) => {
   // Resolve pass + dispatch (same chain as support-bundle)
   const { data: scene } = await admin
     .from("composer_scenes")
-    .select("id, dialog_shots")
+    .select("id, user_id, project_id, dialog_shots")
     .eq("id", sceneId)
     .maybeSingle();
   if (!scene) return json({ error: "scene_not_found" }, 404);
@@ -730,6 +730,12 @@ serve(async (req) => {
     plateW,
     plateH,
     plateDur,
+    {
+      userId: (scene as any)?.user_id,
+      projectId: (scene as any)?.project_id,
+      sceneId,
+      passIdx: passIndex,
+    },
   );
 
 
