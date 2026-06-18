@@ -287,28 +287,32 @@ async function probeFaceAtFrame(
   else if (frameNumber == null) mediapipeSkippedReason = "no_frame_number";
   else if (!plateWidth || plateWidth <= 0 || !plateHeight || plateHeight <= 0) mediapipeSkippedReason = "missing_video_dims";
   else if (!durationSec || durationSec <= 0) mediapipeSkippedReason = "missing_duration";
+  // v129.21.5: require prebuilt frame URL (client-canvas JPEG). Server-side
+  // Replicate frame extractor (`lucataco/ffmpeg-extract-frame`) has been
+  // 404 since v129.14 — don't waste 3 round-trips per probe.
+  else if (!prebuiltFrameUrl) mediapipeSkippedReason = "no_probe_frame_url";
 
   if (mediapipeSkippedReason) {
-    console.warn(`[syncso-preflight] mediapipe skipped reason=${mediapipeSkippedReason} w=${plateWidth} h=${plateHeight} dur=${durationSec} frame=${frameNumber}`);
+    console.warn(`[syncso-preflight] mediapipe skipped reason=${mediapipeSkippedReason} w=${plateWidth} h=${plateHeight} dur=${durationSec} frame=${frameNumber} prebuilt=${!!prebuiltFrameUrl}`);
     mediapipeMeta = { mediapipe_skipped_reason: mediapipeSkippedReason };
   } else {
     try {
-      const tsSec = Math.max(0.05, (frameNumber as number) / 30);
       const mp = await detectFacesMediaPipe({
         videoUrl,
         plateWidth: plateWidth as number,
         plateHeight: plateHeight as number,
         durationSec: durationSec as number,
-        frameTimestamps: [tsSec],
+        prebuiltFrameUrls: [prebuiltFrameUrl as string],
       });
       mediapipeMeta = {
         mediapipe_ms: mp.ms,
         mediapipe_faces: mp.faces.length,
         mediapipe_ok: mp.ok,
         mediapipe_error: mp.error ?? null,
+        mediapipe_source: "prebuilt_frame",
       };
       console.log(
-        `[syncso-preflight] mediapipe primary ok=${mp.ok} faces=${mp.faces.length} ms=${mp.ms} err=${mp.error ?? "none"}`,
+        `[syncso-preflight] v129.21.5 mediapipe primary ok=${mp.ok} faces=${mp.faces.length} ms=${mp.ms} err=${mp.error ?? "none"}`,
       );
 
       if (mp.ok && mp.faces.length > 0 && coord) {
