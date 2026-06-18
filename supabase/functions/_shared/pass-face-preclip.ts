@@ -224,6 +224,13 @@ export async function renderPassFacePreclip(
     inputProps: { type: "payload", payload: JSON.stringify(inputProps) },
     codec: "h264",
     imageFormat: "jpeg",
+    // v129.23.3 — force TV-range yuv420p instead of jpeg-range yuvj420p.
+    // Sync.so's decoder/face-tracker silently fails with
+    // generation_unknown_error on yuvj420p, even though ffmpeg/Chrome
+    // accept it. Without these two fields the Lambda h264 encoder
+    // inherits PC-range from the JPEG frame source.
+    pixelFormat: "yuv420p",
+    colorSpace: "bt709",
     maxRetries: 1,
     privacy: "public",
     logLevel: "warn",
@@ -242,6 +249,7 @@ export async function renderPassFacePreclip(
     timeoutInMilliseconds: 180_000,
     concurrencyPerLambda: 1,
     downloadBehavior: { type: "play-in-browser" },
+
     webhook: {
       url: webhookUrl,
       secret: null,
