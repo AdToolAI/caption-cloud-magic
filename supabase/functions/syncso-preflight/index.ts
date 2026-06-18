@@ -362,7 +362,7 @@ async function probeFaceAtFrame(
 
   // ── Stage 2: Gemini fallback (original v129.14 logic) ───────────────
   const apiKey = getGeminiApiKey();
-  const source: "gemini" | "gemini_fallback" = mediapipeMeta ? "gemini_fallback" : "gemini";
+  const source: "gemini" | "gemini_fallback" = (mediapipeMeta && !mediapipeSkippedReason) ? "gemini_fallback" : "gemini";
   if (!apiKey) {
     return {
       status: "skip",
