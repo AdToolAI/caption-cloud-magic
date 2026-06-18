@@ -2780,9 +2780,13 @@ serve(async (req) => {
           // Mirror per-pass face-gate (validates exactly 1 face in preclip mid-frame).
           // v122 — pass preclip-local normalized coords as targetCoords so the
           // detector can flag wrong-speaker preclips via `coordsMatch=false`.
+          // v129.18 — check FIRST + MID + LAST frame so a face entering/leaving
+          // the crop mid-turn is caught before dispatch (root cause of the
+          // "frame 35 coords below face" generation_unknown_error).
           let faceOk = true;
           let faceCount: number | null = null;
           let coordsMatch: boolean | null = null;
+          let failedGateFrame: "first" | "mid" | "last" | null = null;
           const localTargetCoords = (() => {
             if (!Number.isFinite(cx) || !Number.isFinite(cy) || !preclip.crop) return null;
             const lx = (cx - preclip.crop.x) / preclip.crop.size;
@@ -2791,23 +2795,38 @@ serve(async (req) => {
             return [lx, ly] as [number, number];
           })();
           try {
-            const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
-            const v = await validateFrameFace({
-              supabaseUrl, serviceKey,
-              videoUrl: preclip.preclipUrl,
-              frameNumber: midFrame, fps: 30,
-              targetCoords: localTargetCoords,
-            });
-            if (v.ok) {
-              faceCount = Number(v.faceCount ?? 0);
-              coordsMatch = v.coordsMatch;
-              if (faceCount === 0 || faceCount > 1) faceOk = false;
-              if (coordsMatch === false) faceOk = false;
+            const totalFrames = Math.max(2, Math.round((preclip.durationSec ?? 1) * 30));
+            const frameSet: Array<{ tag: "first" | "mid" | "last"; n: number }> = [
+              { tag: "first", n: 1 },
+              { tag: "mid", n: Math.max(1, Math.round(totalFrames / 2)) },
+              { tag: "last", n: Math.max(1, totalFrames - 1) },
+            ];
+            for (const f of frameSet) {
+              const v = await validateFrameFace({
+                supabaseUrl, serviceKey,
+                videoUrl: preclip.preclipUrl,
+                frameNumber: f.n, fps: 30,
+                targetCoords: localTargetCoords,
+              });
+              if (!v.ok) continue;
+              const c = Number(v.faceCount ?? 0);
+              if (f.tag === "mid") {
+                faceCount = c;
+                coordsMatch = v.coordsMatch;
+              }
+              if (c === 0 || c > 1 || v.coordsMatch === false) {
+                faceOk = false;
+                failedGateFrame = f.tag;
+                if (faceCount === null) faceCount = c;
+                if (coordsMatch === null) coordsMatch = v.coordsMatch;
+                break;
+              }
             }
           } catch (_) { /* validation soft-fail → trust the preclip */ }
           if (!faceOk) {
-            (p as any).preclip_error = `face_gate_failed:count=${faceCount}:coordsMatch=${coordsMatch}`;
+            (p as any).preclip_error = `face_gate_failed:frame=${failedGateFrame}:count=${faceCount}:coordsMatch=${coordsMatch}`;
             (p as any).preclip_face_count = faceCount;
+            (p as any).preclip_face_gate_failed_frame = failedGateFrame;
             return { idx, status: "face_gate_blocked" as const, faceCount };
           }
           (p as any).preclip_url = preclip.preclipUrl;
@@ -3079,21 +3098,36 @@ serve(async (req) => {
           break;
         }
         // Face-gate (v77): require exactly 1 face for multi-speaker.
+        // v129.18 — validate FIRST + MID + LAST frame, not just mid; a face
+        // entering/leaving the crop mid-turn was the actual root cause of
+        // the Sync.so `generation_unknown_error` (ASD frame N coords below
+        // the face → Sync.so sees pullover, not face).
         preclipFaceOk = true;
         preclipFaceCount = null;
         if (speakers.length >= 2) {
           try {
-            const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
-            const v = await validateFrameFace({
-              supabaseUrl, serviceKey,
-              videoUrl: preclip.preclipUrl,
-              frameNumber: midFrame, fps: 30,
-              targetCoords: null,
-            });
-            if (v.ok) {
-              preclipFaceCount = Number(v.faceCount ?? 0);
-              if (preclipFaceCount === 0) preclipFaceOk = false;
-              if (preclipFaceCount > 1) preclipFaceOk = false;
+            const totalFrames = Math.max(2, Math.round((preclip.durationSec ?? 1) * 30));
+            const frameSet: Array<{ tag: "first" | "mid" | "last"; n: number }> = [
+              { tag: "first", n: 1 },
+              { tag: "mid", n: Math.max(1, Math.round(totalFrames / 2)) },
+              { tag: "last", n: Math.max(1, totalFrames - 1) },
+            ];
+            for (const f of frameSet) {
+              const v = await validateFrameFace({
+                supabaseUrl, serviceKey,
+                videoUrl: preclip.preclipUrl,
+                frameNumber: f.n, fps: 30,
+                targetCoords: null,
+              });
+              if (!v.ok) continue;
+              const c = Number(v.faceCount ?? 0);
+              if (f.tag === "mid") preclipFaceCount = c;
+              if (c === 0 || c > 1) {
+                preclipFaceOk = false;
+                if (preclipFaceCount === null) preclipFaceCount = c;
+                (pass as any).preclip_face_gate_failed_frame = f.tag;
+                break;
+              }
             }
           } catch (e) {
             console.warn(
