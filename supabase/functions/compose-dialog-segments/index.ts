@@ -4292,6 +4292,9 @@ serve(async (req) => {
       const gateHeight = usePassPreclip
         ? Number(preclipDimsForGate?.height ?? preclipCropForGate?.outputSize ?? 0)
         : Number(plateDims?.height ?? 0);
+      const preclipTrustedForGate = usePassPreclip &&
+        Number((pass as any).preclip_face_count ?? 0) === 1 &&
+        String((pass as any)._v1291_ambiguity?.risk ?? "clean") === "clean";
       const gate = await verifyFaceBeforeDispatch({
         videoUrl: dispatchVideoUrl,
         frameNumber: gateFrame,
@@ -4305,13 +4308,14 @@ serve(async (req) => {
         projectId: String((scene as any).project_id ?? "shared"),
         sceneId,
         passIdx: currentPassIdx,
+        preclipTrusted: preclipTrustedForGate,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
         (pass as any).probe_frame_cached = !!gate.frame_cached;
       }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} v129.23_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
+        `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
       // v129.22.3 — Auto-snap path: rewrite ASD coords with the
       // Rekognition-derived center and proceed to dispatch.
