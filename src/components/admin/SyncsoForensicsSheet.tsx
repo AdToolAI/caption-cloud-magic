@@ -393,7 +393,7 @@ export function SyncsoForensicsSheet({
           <SheetTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5" />
             Sync.so Forensik
-            <Badge variant="outline" className="ml-2">v129.22.1</Badge>
+            <Badge variant="outline" className="ml-2">v129.22.2</Badge>
           </SheetTitle>
           <SheetDescription>
             Admin-Werkzeug. Strikt isoliert von Produktion: keine Mutation an
@@ -731,7 +731,7 @@ function PreflightPanel({
         <div className="flex items-center gap-2 text-sm font-medium">
           <ShieldCheck className="h-4 w-4" />
           Preflight
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.22.1'}</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.22.2'}</span>
           <span className="text-[10px] text-cyan-300/80" title="Primary face detector since v129.22">· detector: aws rekognition → gemini fallback</span>
         </div>
         <Button size="sm" variant="ghost" onClick={onRerun} disabled={loading} className="h-7">
@@ -794,7 +794,7 @@ function PreflightPanel({
                         </span>
                       )}
                       <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/50 text-muted-foreground">
-                        v129.22.1 · AWS Rekognition primary
+                        v129.22.2 · AWS Rekognition primary
                       </span>
                     </div>
                   )}
