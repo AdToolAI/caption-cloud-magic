@@ -801,9 +801,22 @@ function PreflightPanel({
       )}
 
       {result?.resolved && (
-        <div className="pt-1 text-[10px] text-muted-foreground border-t border-border/30">
-          frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}] ·
-          {' '}job={result.provider_job_id?.slice(0, 8) ?? '—'}…
+        <div className="pt-1 text-[10px] text-muted-foreground border-t border-border/30 space-y-0.5">
+          <div>
+            source=<span className={result.resolved.video_source_kind === 'preclip' ? 'text-emerald-400' : 'text-amber-400'}>
+              {result.resolved.video_source_kind ?? '—'}
+            </span> · frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}] · job={result.provider_job_id?.slice(0, 8) ?? '—'}…
+          </div>
+          {result.resolved.video_source_kind === 'plate' && (
+            <div className="text-amber-300">
+              ⚠ outbound (preclip) payload nicht im Dispatch-Log — Preflight validiert die Plate. Nicht zwingend = was Sync.so sah.
+            </div>
+          )}
+          {result.resolved.preclip_crop && (
+            <div className="font-mono">
+              preclip_crop={JSON.stringify(result.resolved.preclip_crop)}
+            </div>
+          )}
         </div>
       )}
     </div>
