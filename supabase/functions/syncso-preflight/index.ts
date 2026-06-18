@@ -1,5 +1,5 @@
 /**
- * syncso-preflight — v129.19
+ * syncso-preflight — v129.21.3
  *
  * Admin-only diagnostic: runs the 6 deterministic checks that cover
  * every known cause of Sync.so `generation_unknown_error`, WITHOUT
@@ -10,8 +10,13 @@
  *   2. video_codec        — ftyp brand + first MP4 atom sanity
  *   3. audio_fetchable    — Range-GET 0-65535, Content-Type, Content-Length
  *   4. audio_format       — WAV/MP3/M4A header sniff + size sanity
- *   5. face_at_frame      — Gemini Vision face count on the video URL
+ *   5. face_at_frame      — MediaPipe (primary) → Gemini Vision (fallback)
  *   6. duration_match     — abs(video_duration - audio_duration) tolerance
+ *
+ * v129.21.3 — Aligns the forensics face probe with the dispatch path
+ * (compose-dialog-segments), which has used MediaPipe as primary detector
+ * since v129.21. Gemini only runs when MediaPipe returns 0 faces or
+ * errors (no Replicate token, frame extract fail, etc.).
  *
  * Body: { scene_id, pass_index? }
  * Output: { checks, verdict, first_blocker }
@@ -21,6 +26,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { extractFrameForFaceProbe } from "../_shared/face-frame-extract.ts";
+import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
