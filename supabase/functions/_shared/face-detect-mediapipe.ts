@@ -205,6 +205,13 @@ export async function detectFacesMediaPipe(opts: {
   plateHeight: number;
   durationSec: number;
   frameTimestamps?: number[];
+  /**
+   * v129.21.5: Pre-extracted frame URLs (e.g. client-side Canvas JPEG passed
+   * as `probe_frame_url`). When provided we SKIP the broken
+   * `lucataco/ffmpeg-extract-frame` Replicate model (404 since v129.14) and
+   * call MediaPipe directly on these URLs.
+   */
+  prebuiltFrameUrls?: string[];
 }): Promise<MediaPipeDetectResult> {
   const t0 = Date.now();
   if (!REPLICATE_TOKEN) {
@@ -217,17 +224,25 @@ export async function detectFacesMediaPipe(opts: {
   const H = Math.max(1, opts.plateHeight);
   const dur = Math.max(0.5, opts.durationSec);
 
-  const stamps = opts.frameTimestamps ?? [
-    0.1,
-    Math.max(0.2, dur * 0.5),
-    Math.max(0.3, dur - 0.1),
-  ];
+  let validFrames: { url: string; i: number }[] = [];
 
-  // 1) Extract frames in parallel.
-  const frameUrls = await Promise.all(stamps.map((ts) => extractFrame(replicate, opts.videoUrl, ts)));
-  const validFrames = frameUrls
-    .map((url, i) => (url ? { url, i } : null))
-    .filter((v): v is { url: string; i: number } => v !== null);
+  if (opts.prebuiltFrameUrls && opts.prebuiltFrameUrls.length > 0) {
+    validFrames = opts.prebuiltFrameUrls
+      .filter((u) => typeof u === "string" && u.startsWith("http"))
+      .map((url, i) => ({ url, i }));
+    console.log(`[mp-detect] v129.21.5 using ${validFrames.length} prebuilt frame url(s) — skipping Replicate extractor`);
+  } else {
+    console.warn("[mp-detect] no prebuiltFrameUrls — falling back to lucataco/ffmpeg-extract-frame (known-broken since v129.14, will likely 404)");
+    const stamps = opts.frameTimestamps ?? [
+      0.1,
+      Math.max(0.2, dur * 0.5),
+      Math.max(0.3, dur - 0.1),
+    ];
+    const frameUrls = await Promise.all(stamps.map((ts) => extractFrame(replicate, opts.videoUrl, ts)));
+    validFrames = frameUrls
+      .map((url, i) => (url ? { url, i } : null))
+      .filter((v): v is { url: string; i: number } => v !== null);
+  }
 
   if (validFrames.length === 0) {
     return {
