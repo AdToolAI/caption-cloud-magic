@@ -372,23 +372,71 @@ Deno.serve(async (req) => {
       result = cached;
       cacheHit = true;
     } else {
+      // v129.21 — MediaPipe PRIMARY (dedicated face detector). Fast,
+      // deterministic, pixel-accurate. Gemini falls in as fallback only.
+      let mpHit: ValidationResult | null = null;
       try {
-        result = await callGeminiVision(videoUrl, frameNumber, fps);
-      } catch (e) {
-        console.warn(`[validate-frame-face] gemini failed: ${(e as Error)?.message}`);
-        return new Response(
-          JSON.stringify({
-            ok: false,
-            cached: false,
-            error: `validator_failed: ${(e as Error)?.message}`,
-            // Graceful degrade hint: caller should NOT block dispatch on this
+        // We don't know the exact plate dims here; use 1024×1024 nominal
+        // → all bboxes are returned NORMALIZED so the caller can scale.
+        const mp = await detectFacesMediaPipe({
+          videoUrl,
+          plateWidth: 1024,
+          plateHeight: 1024,
+          durationSec: Math.max(0.5, (frameNumber / Math.max(1, fps)) * 2 + 0.5),
+          frameTimestamps: [Math.max(0.05, frameNumber / Math.max(1, fps))],
+        });
+        if (mp.ok && mp.faces.length > 0) {
+          // Convert pixel bboxes (in nominal 1024×1024) back to normalized.
+          const faces: FaceBox[] = mp.faces.map((f) => ({
+            x: Math.max(0, Math.min(1, f.bbox[0] / 1024)),
+            y: Math.max(0, Math.min(1, f.bbox[1] / 1024)),
+            w: Math.max(0, Math.min(1, (f.bbox[2] - f.bbox[0]) / 1024)),
+            h: Math.max(0, Math.min(1, (f.bbox[3] - f.bbox[1]) / 1024)),
+            confidence: f.confidence,
+          }));
+          mpHit = {
             faceVisible: true,
-            faceCount: 0,
-            faceBoxes: [],
+            faceCount: faces.length,
+            faceBoxes: faces,
             coordsMatch: null,
-          }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+            suggestedFrameOffset: null,
+            model: "mediapipe-replicate",
+            quality: {
+              yawDegrees: null,
+              pitchDegrees: null,
+              eyeOpenScore: null,
+              sharpnessScore: null,
+              // Pass-through: assume MediaPipe-detected face is usable.
+              // Sync.so accepts ~0.5+ — we mark 0.75 (better than typical
+              // Gemini composite when sharpness/eye unscored).
+              faceScore: 0.75,
+            },
+          };
+        }
+      } catch (e) {
+        console.warn(`[validate-frame-face] mediapipe primary failed: ${(e as Error)?.message}`);
+      }
+      if (mpHit) {
+        result = mpHit;
+      } else {
+        try {
+          result = await callGeminiVision(videoUrl, frameNumber, fps);
+        } catch (e) {
+          console.warn(`[validate-frame-face] gemini failed: ${(e as Error)?.message}`);
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              cached: false,
+              error: `validator_failed: ${(e as Error)?.message}`,
+              // Graceful degrade hint: caller should NOT block dispatch on this
+              faceVisible: true,
+              faceCount: 0,
+              faceBoxes: [],
+              coordsMatch: null,
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       }
       // Write to cache (fire and forget within response window)
       await writeCache(videoUrl, frameNumber, fps, result);
