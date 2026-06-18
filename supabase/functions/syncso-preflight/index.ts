@@ -673,10 +673,10 @@ serve(async (req) => {
 
   // video_codec
   let video_codec: CheckResult;
-  if (!vFetch.ok || !vFetch.bytes) {
+  if (!vFetch.ok || !vFetch.bytes || !mp4Info) {
     video_codec = { status: "skip", note: "video not fetchable" };
   } else {
-    const info = parseMp4Head(vFetch.bytes);
+    const info = mp4Info;
     const brand = info.ftyp_brand;
     const allBrands = [brand, ...info.compatible_brands].filter(Boolean) as string[];
     const accepted = allBrands.some((br) => ACCEPTED_VIDEO_BRANDS.has(br));
