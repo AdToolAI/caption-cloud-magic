@@ -8,6 +8,8 @@
  * already present; it never calls Replicate/lucataco.
  */
 
+import { createClient } from "npm:@supabase/supabase-js@2";
+
 const MODEL_TAG = "client-canvas:composer-frames@v129.23.2";
 
 export interface ExtractInput {
@@ -37,10 +39,11 @@ export async function extractFrameForFaceProbe(
   const t0 = Date.now();
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     if (!input.videoUrl || !/^https?:\/\//i.test(input.videoUrl)) {
       return { ok: false, reason: "invalid_video_url", model: MODEL_TAG, latencyMs: Date.now() - t0 };
     }
-    if (!supabaseUrl) {
+    if (!supabaseUrl || !serviceKey) {
       return { ok: false, reason: "storage_env_missing", model: MODEL_TAG, latencyMs: Date.now() - t0 };
     }
 
@@ -51,13 +54,14 @@ export async function extractFrameForFaceProbe(
     const passIdx = Number.isFinite(Number(input.passIdx)) ? Math.max(0, Number(input.passIdx)) : 0;
     const cachePath = `${userId}/${projectId}/probe-frames/${sceneId}-p${passIdx + 1}-f${frame}.png`;
 
-    const publicUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/composer-frames/${cachePath}`;
-    const cached = await fetch(publicUrl, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(5_000),
-    }).catch(() => null);
-    if (cached?.ok) {
-      return { ok: true, frameUrl: publicUrl, cached: true, model: MODEL_TAG, latencyMs: Date.now() - t0 };
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const signed = await supabase.storage
+      .from("composer-frames")
+      .createSignedUrl(cachePath, 60 * 30);
+    if (!signed.error && signed.data?.signedUrl) {
+      return { ok: true, frameUrl: signed.data.signedUrl, cached: true, model: MODEL_TAG, latencyMs: Date.now() - t0 };
     }
     return {
       ok: false,
