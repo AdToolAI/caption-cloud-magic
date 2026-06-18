@@ -643,15 +643,41 @@ serve(async (req) => {
     }
   }
 
+  // v129.21.4 — parseMp4Head() only reads the first 64KB and never sets
+  // width/height; Hailuo plates also place `moov` at the file end so duration
+  // is missing too. Fall back to the production-grade probeMp4Dims (4-phase
+  // box-walker + sample-entry scan) so MediaPipe preconditions actually hold.
+  let plateW: number | null = mp4Info?.width ?? null;
+  let plateH: number | null = mp4Info?.height ?? null;
+  let plateDur: number | null = mp4Info?.duration_s ?? null;
+  if ((!plateW || !plateH) && videoUrl) {
+    try {
+      const dims = await probeMp4Dims(videoUrl);
+      if (dims) {
+        plateW = dims.width;
+        plateH = dims.height;
+        console.log(`[syncso-preflight] probeMp4Dims hit ${dims.width}x${dims.height}`);
+      } else {
+        console.warn(`[syncso-preflight] probeMp4Dims returned null for ${videoUrl.slice(0, 80)}`);
+      }
+    } catch (e) {
+      console.warn(`[syncso-preflight] probeMp4Dims threw: ${(e as Error)?.message ?? e}`);
+    }
+  }
+  if (!plateDur || plateDur <= 0) {
+    const passDur = Number((pass as any)?.duration_seconds ?? (pass as any)?.duration_s);
+    if (Number.isFinite(passDur) && passDur > 0) plateDur = passDur;
+  }
+
   const faceProbe = await probeFaceAtFrame(
     videoUrl,
     frameNumber,
     coord,
     faceWasInferred,
     probeFrameUrl,
-    mp4Info?.width ?? null,
-    mp4Info?.height ?? null,
-    mp4Info?.duration_s ?? null,
+    plateW,
+    plateH,
+    plateDur,
   );
 
 
