@@ -376,10 +376,16 @@ async function probeFaceAtFrame(
       ...(mediapipeMeta ?? {}),
     };
   }
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord, was_inferred: wasInferred };
   if (!videoUrl && !prebuiltFrameUrl) {
-    return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
+    return {
+      status: "skip",
+      note: "no_video_url",
+      frame: frameNumber,
+      coord,
+      was_inferred: wasInferred,
+      source,
+      ...(mediapipeMeta ?? {}),
+    };
   }
 
   // v129.14: the Forensics Sheet extracts the JPEG client-side with a
