@@ -44,9 +44,7 @@ export async function extractFrameForFaceProbe(
       return { ok: false, reason: "storage_env_missing", model: MODEL_TAG, latencyMs: Date.now() - t0 };
     }
 
-    const fps = Math.max(1, Number(input.fps ?? 30));
     const frame = Math.max(0, Math.round(Number(input.frameNumber ?? 0)));
-    const timestamp = Math.max(0.033, frame / fps);
     const userId = safeSegment(input.userId) || "system";
     const projectId = safeSegment(input.projectId) || "shared";
     const sceneId = safeSegment(input.sceneId) || "unknown-scene";
