@@ -1,51 +1,25 @@
-## Problem
+## Bestätigte Root Cause
+`syncso-preflight/index.ts` ruft MediaPipe nur auf, wenn `plateWidth`, `plateHeight` und `durationSec` aus dem lokalen `parseMp4Head()` kommen. Dieser Parser setzt `width`/`height` **nie** (Felder in `Mp4Info` deklariert, im Parser nicht befüllt) und findet `duration_s` bei Hailuo-Plates (`moov` am Dateiende) oft nicht im 64KB-Head. Pre-Condition immer false → MediaPipe wird übersprungen → Gemini. `REPLICATE_API_KEY` ist gesetzt, also kein zusätzliches Secret-Risiko.
 
-Forensics-Panel zeigt `GEMINI_MS: 1509` und `EXTRACTED FRAME (V129.18 · CLIENT CANVAS)` → MediaPipe wird **im Forensics-Pfad nicht** verwendet.
+## Fix (v129.21.4)
 
-Du hast recht: v129.21 hat MediaPipe nur in `compose-dialog-segments` (= echter Dispatch) zum Primär-Detector gemacht. Das Forensics-Sheet ruft aber `syncso-preflight` auf, und dort gibt es eine eigene `probeFaceAtFrame()`-Funktion, die **direkt Gemini** anspricht — weder `detectFacesMediaPipe` noch das bereits MediaPipe-fähige `validate-frame-face` werden genutzt.
+### 1. `supabase/functions/syncso-preflight/index.ts`
+- Import `probeMp4Dims` aus `../_shared/twoshot-face-map.ts` (bestehender 4-Phasen-Prober, produktionserprobt auf Hailuo).
+- Vor dem `probeFaceAtFrame(...)`-Aufruf:
+  - Falls `mp4Info?.width/height` fehlen → `probeMp4Dims(videoUrl)` aufrufen und Ergebnis als `plateWidth`/`plateHeight` durchreichen.
+  - Falls `mp4Info?.duration_s` fehlt → Fallback in dieser Reihenfolge: `audioDurationS` (wird unten ohnehin geparst, einmal vorziehen), dann `pass.duration_seconds`, dann Default `5` (nur als letzter Notnagel).
+- In der MediaPipe-Pre-Condition (Zeile 284–290) zusätzlich loggen, **warum** ggf. übersprungen wird, und das Ergebnis als `mediapipe_skipped_reason` in das `face_at_frame` Result schreiben (`missing_video_dims` | `missing_duration` | `no_video_url`). Damit ist ein stiller Gemini-Fallback nie wieder unsichtbar.
 
-```
-Echter Dispatch  →  compose-dialog-segments  →  MediaPipe ✓  (Gemini Fallback)
-Forensics-Probe  →  syncso-preflight         →  Gemini ✗   ← hier liegt der Bug
-```
+### 2. `src/components/admin/SyncsoForensicsSheet.tsx`
+- Version-Badge auf `v129.21.4 · mediapipe preconditions fixed` bumpen.
+- Falls `face_at_frame.mediapipe_skipped_reason` vorhanden → kleine Diagnose-Zeile darstellen: `MEDIAPIPE SKIPPED: <reason>`.
 
-## Fix (v129.21.3 — Forensics-Preflight angleichen)
-
-Eine Datei: `supabase/functions/syncso-preflight/index.ts`
-
-**Reihenfolge in `probeFaceAtFrame()`:**
-
-1. **MediaPipe-Primary:** `detectFacesMediaPipe({ videoUrl, plateWidth, plateHeight, durationSec, frameTimestamps: [frameNumber/30] })` — gleiche Helper wie der Dispatch-Pfad. Liefert Faces inkl. Bounding Boxes für den Ziel-Timestamp.
-   - 1 Face am ASD-Coord (±0.15) → `verdict: yes_one_face_at_coord`, `status: pass`, `source: "mediapipe"`.
-   - 1 Face, aber außerhalb Toleranz → `yes_but_not_at_coord`, `status: fail`.
-   - ≥2 Faces → `multiple_faces`, `status: fail`.
-   - 0 Faces → **kein** Sofort-Fail, sondern Gemini-Fallback (MediaPipe hat höhere False-Negative-Rate bei seitlichen Gesichtern, siehe v129.21-Memo).
-2. **Gemini-Fallback** (bestehende Logik): nur wenn MediaPipe `ok:false` ODER 0 Faces. Antwort markiert mit `source: "gemini_fallback"`.
-3. **Skip-Pfad** unverändert wenn weder Replicate-Token noch Gemini-Key gesetzt.
-
-**Probe-Frame-Strategie:**
-- Wenn `probe_frame_url` (Client-Canvas-JPEG) vorhanden ist, **MediaPipe trotzdem** auf das volle Plate-Video laufen lassen — Replicate-MediaPipe braucht ein Video, kein Einzel-JPEG. Der Client-JPEG bleibt nur für den Gemini-Fallback relevant (so wie heute).
-
-**Result-Schema-Erweiterung** (`face_at_frame.*`):
-- Neue Felder: `source: "mediapipe" | "gemini" | "gemini_fallback" | "skipped"`, `mediapipe_ms`, `mediapipe_faces`, `mediapipe_error?`.
-- `gemini_ms` bleibt erhalten (nur befüllt wenn Gemini auch lief).
-
-## UI-Sync (Forensics-Sheet)
-
-`src/components/admin/SyncsoForensicsSheet.tsx`:
-- Label `EXTRACTED FRAME (V129.18 · CLIENT CANVAS)` → `FACE PROBE (V129.21.3 · MEDIAPIPE PRIMARY)` und Quelle (`SOURCE` Zeile) aus `face_at_frame.source` einblenden.
-- Felder `MEDIAPIPE_MS` + `GEMINI_MS` nebeneinander anzeigen (`—` wenn nicht gelaufen).
-- Roter "Preclip nicht dispatcht"-Banner unverändert (das ist eine andere Stage).
-
-## Verifikation
-
-1. Forensics-Sheet auf bestehender Szene öffnen → `SOURCE = mediapipe`, `MEDIAPIPE_MS` ~600–1500ms, `GEMINI_MS = —`.
-2. Künstlicher Test mit gesichtsloser Plate (z. B. Landschaft) → MediaPipe 0 Faces → Gemini Fallback läuft → `SOURCE = gemini_fallback`, beide MS-Werte gesetzt.
-3. Ohne Replicate-Token (lokaler Edge-Test) → `SOURCE = gemini`, alter Pfad bleibt funktional.
-4. Edge-Logs zeigen `[syncso-preflight] face-probe source=mediapipe verdict=yes_one_face_at_coord ms=...`.
+### 3. Verifikation
+- `syncso-preflight` deployen.
+- Auf derselben Szene Forensik erneut ausführen.
+- Erwartung: `FACE PROBE: MEDIAPIPE` mit `MEDIAPIPE_MS` ~1500–4000ms, `SOURCE = mediapipe`. Falls MediaPipe trotzdem 0 Faces findet → `gemini_fallback` mit beiden MS-Werten (statt heute nur Gemini).
 
 ## Nicht enthalten
-
-- Keine Änderung am Dispatch-Pfad (`compose-dialog-segments` ist seit v129.21 schon korrekt).
-- Keine neuen Watchdog-Regeln (v129.21.2 bleibt aktiv).
-- Keine UI/UX-Änderungen außerhalb des Forensics-Sheets.
+- Kein Dispatch-Logik-Wechsel (compose-dialog-segments unverändert — nutzt MediaPipe schon korrekt).
+- Keine Watchdog-Änderung.
+- Kein neuer Provider, keine Schema-Migration.

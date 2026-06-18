@@ -27,6 +27,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { extractFrameForFaceProbe } from "../_shared/face-frame-extract.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
+import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -281,20 +282,23 @@ async function probeFaceAtFrame(
 ): Promise<CheckResult> {
   // ── Stage 1: MediaPipe primary ──────────────────────────────────────
   let mediapipeMeta: Record<string, unknown> | null = null;
-  if (
-    videoUrl &&
-    frameNumber != null &&
-    plateWidth && plateWidth > 0 &&
-    plateHeight && plateHeight > 0 &&
-    durationSec && durationSec > 0
-  ) {
+  let mediapipeSkippedReason: string | null = null;
+  if (!videoUrl) mediapipeSkippedReason = "no_video_url";
+  else if (frameNumber == null) mediapipeSkippedReason = "no_frame_number";
+  else if (!plateWidth || plateWidth <= 0 || !plateHeight || plateHeight <= 0) mediapipeSkippedReason = "missing_video_dims";
+  else if (!durationSec || durationSec <= 0) mediapipeSkippedReason = "missing_duration";
+
+  if (mediapipeSkippedReason) {
+    console.warn(`[syncso-preflight] mediapipe skipped reason=${mediapipeSkippedReason} w=${plateWidth} h=${plateHeight} dur=${durationSec} frame=${frameNumber}`);
+    mediapipeMeta = { mediapipe_skipped_reason: mediapipeSkippedReason };
+  } else {
     try {
-      const tsSec = Math.max(0.05, frameNumber / 30);
+      const tsSec = Math.max(0.05, (frameNumber as number) / 30);
       const mp = await detectFacesMediaPipe({
         videoUrl,
-        plateWidth,
-        plateHeight,
-        durationSec,
+        plateWidth: plateWidth as number,
+        plateHeight: plateHeight as number,
+        durationSec: durationSec as number,
         frameTimestamps: [tsSec],
       });
       mediapipeMeta = {
@@ -308,11 +312,7 @@ async function probeFaceAtFrame(
       );
 
       if (mp.ok && mp.faces.length > 0 && coord) {
-        // coord is in pixel space matching the same video the dispatch
-        // sees (preclip output or plate). MediaPipe bboxes are in pixel
-        // space too.  Tolerance ±15 % of min(W,H) — matches the existing
-        // Gemini prompt tolerance of ±0.15 normalized.
-        const tolPx = Math.max(40, Math.min(plateWidth, plateHeight) * 0.15);
+        const tolPx = Math.max(40, Math.min(plateWidth as number, plateHeight as number) * 0.15);
         const [cx, cy] = coord;
         const matches = mp.faces.filter((f) => {
           const dx = f.center[0] - cx;
@@ -362,7 +362,7 @@ async function probeFaceAtFrame(
 
   // ── Stage 2: Gemini fallback (original v129.14 logic) ───────────────
   const apiKey = getGeminiApiKey();
-  const source: "gemini" | "gemini_fallback" = mediapipeMeta ? "gemini_fallback" : "gemini";
+  const source: "gemini" | "gemini_fallback" = (mediapipeMeta && !mediapipeSkippedReason) ? "gemini_fallback" : "gemini";
   if (!apiKey) {
     return {
       status: "skip",
@@ -643,15 +643,41 @@ serve(async (req) => {
     }
   }
 
+  // v129.21.4 — parseMp4Head() only reads the first 64KB and never sets
+  // width/height; Hailuo plates also place `moov` at the file end so duration
+  // is missing too. Fall back to the production-grade probeMp4Dims (4-phase
+  // box-walker + sample-entry scan) so MediaPipe preconditions actually hold.
+  let plateW: number | null = mp4Info?.width ?? null;
+  let plateH: number | null = mp4Info?.height ?? null;
+  let plateDur: number | null = mp4Info?.duration_s ?? null;
+  if ((!plateW || !plateH) && videoUrl) {
+    try {
+      const dims = await probeMp4Dims(videoUrl);
+      if (dims) {
+        plateW = dims.width;
+        plateH = dims.height;
+        console.log(`[syncso-preflight] probeMp4Dims hit ${dims.width}x${dims.height}`);
+      } else {
+        console.warn(`[syncso-preflight] probeMp4Dims returned null for ${videoUrl.slice(0, 80)}`);
+      }
+    } catch (e) {
+      console.warn(`[syncso-preflight] probeMp4Dims threw: ${(e as Error)?.message ?? e}`);
+    }
+  }
+  if (!plateDur || plateDur <= 0) {
+    const passDur = Number((pass as any)?.duration_seconds ?? (pass as any)?.duration_s);
+    if (Number.isFinite(passDur) && passDur > 0) plateDur = passDur;
+  }
+
   const faceProbe = await probeFaceAtFrame(
     videoUrl,
     frameNumber,
     coord,
     faceWasInferred,
     probeFrameUrl,
-    mp4Info?.width ?? null,
-    mp4Info?.height ?? null,
-    mp4Info?.duration_s ?? null,
+    plateW,
+    plateH,
+    plateDur,
   );
 
 
@@ -812,6 +838,6 @@ serve(async (req) => {
     checks,
     verdict,
     first_blocker: firstBlocker,
-    preflight_version: "v129.21.3",
+    preflight_version: "v129.21.4",
   });
 });
