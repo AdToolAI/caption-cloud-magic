@@ -1,5 +1,5 @@
 /**
- * Sync.so Live Face-Gate — v129.22.3 (Auto-Snap on Rekognition Center)
+ * Sync.so Live Face-Gate — v129.23.2 (Client-Canvas/AWS only)
  *
  * Runs Gemini Vision on the EXACT frame + coord we are about to send to
  * Sync.so, BEFORE the dispatch call.
@@ -13,11 +13,11 @@
  * The caller MUST replace the active_speaker_detection.coordinates with
  * snapped_coord before dispatching to Sync.so.
  *
- * v129.11 fix: instead of handing Gemini an MP4 URL (which OpenRouter
- * deterministically rejects with HTTP 400 → silent skip → wasted Sync.so
- * credit), we first extract the JPEG at frame_number via Replicate's
- * `lucataco/ffmpeg-extract-frame`, upload it to `composer-frames` and
- * send THAT image. Gemini now produces a real verdict.
+ * v129.23.2 fix: do not server-extract MP4 frames via Replicate/lucataco and
+ * do not use video fallback as hard proof. The supported probe source is a
+ * client-canvas JPEG/PNG in `composer-frames` (or an already cached frame).
+ * If no real still image exists, return `probe_unavailable` and proceed,
+ * especially for preclip-validated passes.
  *
  * Verdict mapping:
  *   - ok: true,  code: "ok"                                 → safe to dispatch
@@ -94,76 +94,14 @@ export interface FaceGateInput {
   projectId?: string;
   sceneId?: string;
   passIdx?: number;
+  /** True when the preclip was already validated as exactly one clean face. */
+  preclipTrusted?: boolean;
   /** v129.22.3 — Plate pixel dims required for AWS Rekognition auto-snap.
    *  When omitted, "yes_but_not_at_coord" stays a hard fail (legacy v129.11
    *  behaviour). Callers with plate dims handy should pass them to enable
    *  self-healing. */
   plateWidth?: number;
   plateHeight?: number;
-}
-
-async function videoFaceFallback(input: FaceGateInput, apiKey: string, frame: number, coord: [number, number], extractReason: string): Promise<FaceGateResult | null> {
-  const W = Number(input.plateWidth ?? 0);
-  const H = Number(input.plateHeight ?? 0);
-  if (!W || !H) return null;
-  const fps = Math.max(1, Number(input.fps ?? 30));
-  const timestampSec = frame / fps;
-  const prompt = `Analyze the exact video frame at timestamp ${timestampSec.toFixed(3)}s (frame ${frame} at ${fps}fps). Return ONLY strict JSON: {"faceCount":number,"faces":[{"x":0..1,"y":0..1,"w":0..1,"h":0..1,"confidence":0..1}]}. Count clearly visible human faces only.`;
-  try {
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(input.timeoutMs ?? 15_000),
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: [
-          { type: "text", text: prompt },
-          { type: "input_video", input_video: { url: input.videoUrl } } as unknown,
-        ] }],
-        temperature: 0,
-      }),
-    });
-    const raw = await r.text().catch(() => "");
-    if (!r.ok) return null;
-    const body = JSON.parse(raw || "{}") as any;
-    const txt = String(body?.choices?.[0]?.message?.content ?? "").trim();
-    const jsonText = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
-    const parsed = JSON.parse(jsonText) as any;
-    const faces = Array.isArray(parsed?.faces) ? parsed.faces : [];
-    const count = Number(parsed?.faceCount ?? faces.length);
-    if (count <= 0 || faces.length === 0) {
-      return { ok: false, code: "no_face", reason: `Video fallback saw no face after extract failed: ${extractReason}`, raw_reply: txt.slice(0, 80), extract_ms: 0, gemini_ms: 0 };
-    }
-    if (count > 1 || faces.length > 1) {
-      return input.isMultiSpeakerContext
-        ? { ok: false, code: "multiple_faces", reason: `Video fallback saw ${count} faces after extract failed: ${extractReason}`, raw_reply: txt.slice(0, 80), extract_ms: 0, gemini_ms: 0 }
-        : { ok: true, code: "ok", raw_reply: txt.slice(0, 80), extract_ms: 0, gemini_ms: 0 };
-    }
-    const f = faces[0] ?? {};
-    const cx = (Number(f.x ?? 0) + Number(f.w ?? 0) / 2) * W;
-    const cy = (Number(f.y ?? 0) + Number(f.h ?? 0) / 2) * H;
-    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
-    const snapped: [number, number] = [Math.round(cx), Math.round(cy)];
-    const dist = Math.round(Math.hypot(snapped[0] - coord[0], snapped[1] - coord[1]));
-    const tol = Math.max(40, Math.min(W, H) * 0.15);
-    if (dist <= tol) {
-      return { ok: true, code: "ok", raw_reply: "video_fallback_one_face_at_coord", extract_ms: 0, gemini_ms: 0 };
-    }
-    return {
-      ok: true,
-      code: "ok_after_snap",
-      reason: `Frame extraction failed (${extractReason}); Gemini video fallback snapped to [${snapped[0]},${snapped[1]}] (${dist}px delta).`,
-      raw_reply: txt.slice(0, 80),
-      snapped_coord: snapped,
-      original_coord: [coord[0], coord[1]],
-      snap_distance_px: dist,
-      extract_ms: 0,
-      gemini_ms: 0,
-    };
-  } catch (e) {
-    console.warn(`[face-gate] v129.23 video fallback failed: ${(e as Error)?.message ?? e}`);
-    return null;
-  }
 }
 
 export async function verifyFaceBeforeDispatch(
@@ -178,8 +116,9 @@ export async function verifyFaceBeforeDispatch(
     ? [Number(input.coord[0]), Number(input.coord[1])] as [number, number]
     : null;
 
-  // ── Stage 1 — extract a real JPEG of the ASD frame ──────────────
-  // Without this Gemini receives the MP4 URL and the gateway returns 400.
+  // ── Stage 1 — resolve a real still image of the ASD frame ───────
+  // Client-canvas frames are authoritative. Server extraction only checks
+  // the deterministic cache path; it never calls Replicate/lucataco.
   let frameJpegUrl: string | undefined;
   let frameCached = false;
   let extractMs = 0;
@@ -198,19 +137,24 @@ export async function verifyFaceBeforeDispatch(
     });
     extractMs = extracted.latencyMs ?? 0;
     if (!extracted.ok || !extracted.frameUrl) {
-      if (coord) {
-        const fallback = await videoFaceFallback(input, apiKey, frame, coord, extracted.reason ?? "unknown");
-        if (fallback) return fallback;
-      }
       return {
         ok: true,
         code: "probe_unavailable",
-        reason: `frame_extract_unavailable: ${extracted.reason ?? "unknown"} — dispatch will proceed unchecked.`,
+        reason: `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
         extract_ms: extractMs,
       };
     }
     frameJpegUrl = extracted.frameUrl;
     frameCached = !!extracted.cached;
+  }
+
+  if (!frameJpegUrl) {
+    return {
+      ok: true,
+      code: "probe_unavailable",
+      reason: `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+      extract_ms: extractMs,
+    };
   }
 
   // ── Stage 2 — ask Gemini about the extracted frame ───────────────
@@ -219,12 +163,7 @@ export async function verifyFaceBeforeDispatch(
     : `Count distinct human faces clearly visible in this still image. Reply with ONLY a single integer (0, 1, 2, ...). No words.`;
 
   const userContent: Array<Record<string, unknown>> = [{ type: "text", text: question }];
-  if (frameJpegUrl) {
-    userContent.push({ type: "image_url", image_url: { url: frameJpegUrl } });
-  } else {
-    // No frame_number available → fall back to legacy video-URL probe.
-    userContent.push({ type: "image_url", image_url: { url: input.videoUrl } });
-  }
+  userContent.push({ type: "image_url", image_url: { url: frameJpegUrl } });
 
   const geminiStart = Date.now();
   let r: Response;
