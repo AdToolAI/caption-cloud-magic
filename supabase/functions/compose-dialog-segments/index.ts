@@ -4286,10 +4286,63 @@ serve(async (req) => {
         frameNumber: gateFrame,
         coord: gateCoord,
         isMultiSpeakerContext: gateMulti,
+        // v129.22.3 — enable auto-snap on heuristic/inferred coords
+        plateWidth: plateDims?.width,
+        plateHeight: plateDims?.height,
       });
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} v129.11_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
+        `[compose-dialog-segments] scene=${sceneId} v129.22.3_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
+      // v129.22.3 — Auto-snap path: rewrite ASD coords with the
+      // Rekognition-derived center and proceed to dispatch.
+      if (gate.ok && gate.code === "ok_after_snap" && Array.isArray(gate.snapped_coord)) {
+        const newCoord: [number, number] = [
+          Number(gate.snapped_coord[0]),
+          Number(gate.snapped_coord[1]),
+        ];
+        try {
+          if ((syncOptions as any)?.active_speaker_detection) {
+            (syncOptions as any).active_speaker_detection.coordinates = newCoord;
+          }
+          const payloadAsd = (payload as any)?.options?.active_speaker_detection;
+          if (payloadAsd) {
+            payloadAsd.coordinates = newCoord;
+          }
+          // Persist on the pass so subsequent retries see the corrected coord.
+          (pass as any).coords = newCoord;
+          (pass as any).coords_snapped_at = new Date().toISOString();
+          (pass as any).coords_snap_origin = gate.original_coord ?? null;
+        } catch (mutErr) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v129.22.3 ASD coord mutation failed: ${(mutErr as Error)?.message}`,
+          );
+        }
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_source_kind: "segments", video_url: dispatchVideoUrl,
+          coords: newCoord, frame_number: gateFrame,
+          http_status: 0, sync_status: "COORD_AUTO_SNAPPED",
+          error_class: "coord_auto_snap",
+          error_message: (gate.reason ?? "auto_snapped").slice(0, 240),
+          meta: {
+            diagnostic_id: diagnosticId,
+            retry_variant: retryVariant,
+            pass_idx: currentPassIdx,
+            total_passes: passes.length,
+            face_gate: {
+              version: "v129.22.3",
+              code: gate.code,
+              snapped_coord: newCoord,
+              original_coord: gate.original_coord ?? gateCoord,
+              snap_distance_px: gate.snap_distance_px ?? null,
+              frame_jpeg_url: gate.frame_jpeg_url,
+              extract_ms: gate.extract_ms,
+              gemini_ms: gate.gemini_ms,
+            },
+            source: "preflight-snap",
+          },
+        });
+      }
       // Honest non-blocking signal: when the Lovable AI gateway can't probe
       // (extract failure or transient 5xx), log it but let the dispatch
       // through. The Forensik UI surfaces this clearly so we don't silently
@@ -4308,7 +4361,7 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
-              version: "v129.11",
+              version: "v129.22.3",
               code: gate.code,
               reason: gate.reason,
               raw_reply: gate.raw_reply,

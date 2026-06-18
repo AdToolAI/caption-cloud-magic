@@ -339,10 +339,44 @@ async function probeFaceAtFrame(
           return { status: "pass", verdict: "yes_one_face_at_coord", ...baseMeta };
         }
         if (mp.faces.length === 1 && matches.length === 0) {
+          // v129.22.3 — Auto-snap: if intent coord was inferred/heuristic
+          // AND the single detected face sits in the safe-zone of the
+          // plate, treat as pass and surface the snapped coord so the
+          // dispatcher can override ASD coordinates.
+          const f = mp.faces[0];
+          const W = plateWidth as number;
+          const H = plateHeight as number;
+          const inBounds = f.center[0] >= W * 0.05 && f.center[0] <= W * 0.95 &&
+                           f.center[1] >= H * 0.05 && f.center[1] <= H * 0.95;
+          if (wasInferred && inBounds) {
+            const snapped: [number, number] = [
+              Math.round(f.center[0]),
+              Math.round(f.center[1]),
+            ];
+            const dist = Math.round(Math.hypot(
+              snapped[0] - cx,
+              snapped[1] - cy,
+            ));
+            console.log(
+              `[syncso-preflight] v129.22.3 AUTO_SNAP intent=[${cx},${cy}] → ` +
+              `rekognition=[${snapped[0]},${snapped[1]}] dist=${dist}px (was_inferred=true)`,
+            );
+            return {
+              status: "pass",
+              verdict: "yes_one_face_at_coord_after_snap",
+              note: `Intent coord missed face by ${dist}px — auto-snapped to Rekognition center.`,
+              snapped_coord: snapped,
+              original_coord: [cx, cy],
+              snap_distance_px: dist,
+              ...baseMeta,
+            };
+          }
           return {
             status: "fail",
             verdict: "yes_but_not_at_coord",
-            note: "Face exists but not at the active_speaker_detection coordinate (MediaPipe).",
+            note: wasInferred
+              ? "Face exists but not at the inferred coordinate (snap refused — out of safe-zone)."
+              : "Face exists but not at the active_speaker_detection coordinate (MediaPipe).",
             ...baseMeta,
           };
         }
@@ -847,6 +881,6 @@ serve(async (req) => {
     checks,
     verdict,
     first_blocker: firstBlocker,
-    preflight_version: "v129.21.4",
+    preflight_version: "v129.22.3",
   });
 });
