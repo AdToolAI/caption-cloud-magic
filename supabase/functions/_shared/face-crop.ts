@@ -63,8 +63,26 @@ export function computeFaceCrop(
 ): FaceCropRegion {
   const safeW = Math.max(2, Math.floor(srcW));
   const safeH = Math.max(2, Math.floor(srcH));
-  const cx = clampInt(coords?.[0] ?? safeW / 2, 0, safeW);
-  const cy = clampInt(coords?.[1] ?? safeH / 2, 0, safeH);
+  // v129.18 — When a valid bbox is provided, derive the crop CENTER from
+  // the bbox center (not from `coords`). The ASD `coords` point often
+  // lands on mouth / chin / neck, so coords-centered crops with a fixed
+  // 720×720 edge can clip the forehead off-frame — Sync.so then sees
+  // a pullover and emits `generation_unknown_error`. Bbox-center keeps
+  // the face geometrically inside the square regardless of where the
+  // speaker is in the source plate.
+  const hasBbox = Array.isArray(bbox) && bbox.length === 4 && bbox.every((v) => Number.isFinite(v));
+  const bboxCx = hasBbox ? (Number(bbox![0]) + Number(bbox![2])) / 2 : null;
+  const bboxCy = hasBbox ? (Number(bbox![1]) + Number(bbox![3])) / 2 : null;
+  const cx = clampInt(
+    bboxCx !== null ? bboxCx : (coords?.[0] ?? safeW / 2),
+    0,
+    safeW,
+  );
+  const cy = clampInt(
+    bboxCy !== null ? bboxCy : (coords?.[1] ?? safeH / 2),
+    0,
+    safeH,
+  );
 
   // ── Neighbor distance (v76) ───────────────────────────────────────
   const sibs = Array.isArray(siblingCoords)
@@ -89,12 +107,15 @@ export function computeFaceCrop(
   const tightFloor = sibs.length >= 2;
 
   let rawSize: number;
-  if (Array.isArray(bbox) && bbox.length === 4 && bbox.every((v) => Number.isFinite(v))) {
-    const bw = Math.abs(Number(bbox[2]) - Number(bbox[0]));
-    const bh = Math.abs(Number(bbox[3]) - Number(bbox[1]));
-    const diag = Math.sqrt(bw * bw + bh * bh);
+  if (hasBbox) {
+    // v129.18 — size based on the LARGER bbox axis (not diagonal) ×2.0.
+    // Diagonal-based sizing under-cropped tall portrait bboxes; max-axis
+    // guarantees both axes have ≥50 % padding (forehead + chin headroom).
+    const bw = Math.abs(Number(bbox![2]) - Number(bbox![0]));
+    const bh = Math.abs(Number(bbox![3]) - Number(bbox![1]));
+    const maxAxis = Math.max(bw, bh);
     const floor = tightFloor ? safeH * 0.35 : safeH * 0.55;
-    rawSize = Math.max(diag * 2.0, floor);
+    rawSize = Math.max(maxAxis * 2.0, floor);
   } else {
     rawSize = tightFloor ? safeH * 0.4 : safeH * 0.6;
   }
