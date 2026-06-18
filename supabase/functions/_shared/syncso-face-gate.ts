@@ -116,8 +116,9 @@ export async function verifyFaceBeforeDispatch(
     ? [Number(input.coord[0]), Number(input.coord[1])] as [number, number]
     : null;
 
-  // ── Stage 1 — extract a real JPEG of the ASD frame ──────────────
-  // Without this Gemini receives the MP4 URL and the gateway returns 400.
+  // ── Stage 1 — resolve a real still image of the ASD frame ───────
+  // Client-canvas frames are authoritative. Server extraction only checks
+  // the deterministic cache path; it never calls Replicate/lucataco.
   let frameJpegUrl: string | undefined;
   let frameCached = false;
   let extractMs = 0;
@@ -136,19 +137,24 @@ export async function verifyFaceBeforeDispatch(
     });
     extractMs = extracted.latencyMs ?? 0;
     if (!extracted.ok || !extracted.frameUrl) {
-      if (coord) {
-        const fallback = await videoFaceFallback(input, apiKey, frame, coord, extracted.reason ?? "unknown");
-        if (fallback) return fallback;
-      }
       return {
         ok: true,
         code: "probe_unavailable",
-        reason: `frame_extract_unavailable: ${extracted.reason ?? "unknown"} — dispatch will proceed unchecked.`,
+        reason: `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
         extract_ms: extractMs,
       };
     }
     frameJpegUrl = extracted.frameUrl;
     frameCached = !!extracted.cached;
+  }
+
+  if (!frameJpegUrl) {
+    return {
+      ok: true,
+      code: "probe_unavailable",
+      reason: `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+      extract_ms: extractMs,
+    };
   }
 
   // ── Stage 2 — ask Gemini about the extracted frame ───────────────
@@ -157,12 +163,7 @@ export async function verifyFaceBeforeDispatch(
     : `Count distinct human faces clearly visible in this still image. Reply with ONLY a single integer (0, 1, 2, ...). No words.`;
 
   const userContent: Array<Record<string, unknown>> = [{ type: "text", text: question }];
-  if (frameJpegUrl) {
-    userContent.push({ type: "image_url", image_url: { url: frameJpegUrl } });
-  } else {
-    // No frame_number available → fall back to legacy video-URL probe.
-    userContent.push({ type: "image_url", image_url: { url: input.videoUrl } });
-  }
+  userContent.push({ type: "image_url", image_url: { url: frameJpegUrl } });
 
   const geminiStart = Date.now();
   let r: Response;
