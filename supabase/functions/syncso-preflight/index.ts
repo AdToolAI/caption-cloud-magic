@@ -305,14 +305,19 @@ async function probeFaceAtFrame(
         prebuiltFrameUrls: [prebuiltFrameUrl as string],
       });
       mediapipeMeta = {
+        // Keys preserved for backwards compatibility with the Forensics UI
+        // (it reads `MEDIAPIPE_*`). Under the hood this is now AWS Rekognition.
         mediapipe_ms: mp.ms,
         mediapipe_faces: mp.faces.length,
         mediapipe_ok: mp.ok,
         mediapipe_error: mp.error ?? null,
         mediapipe_source: "prebuilt_frame",
+        // v129.22: surface the real provider so forensics is honest.
+        face_detect_provider: mp.source, // "aws_rekognition" | "error"
+        face_detect_model: "rekognition.DetectFaces",
       };
       console.log(
-        `[syncso-preflight] v129.21.5 mediapipe primary ok=${mp.ok} faces=${mp.faces.length} ms=${mp.ms} err=${mp.error ?? "none"}`,
+        `[syncso-preflight] v129.22 face-detect provider=${mp.source} ok=${mp.ok} faces=${mp.faces.length} ms=${mp.ms} err=${mp.error ?? "none"}`,
       );
 
       if (mp.ok && mp.faces.length > 0 && coord) {
