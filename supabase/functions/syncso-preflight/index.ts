@@ -279,6 +279,7 @@ async function probeFaceAtFrame(
   plateWidth: number | null = null,
   plateHeight: number | null = null,
   durationSec: number | null = null,
+  extractContext: { userId?: string; projectId?: string; sceneId?: string; passIdx?: number } = {},
 ): Promise<CheckResult> {
   // ── Stage 1: MediaPipe primary ──────────────────────────────────────
   let mediapipeMeta: Record<string, unknown> | null = null;
@@ -448,6 +449,10 @@ async function probeFaceAtFrame(
       videoUrl,
       frameNumber,
       fps: 30,
+      userId: extractContext.userId,
+      projectId: extractContext.projectId,
+      sceneId: extractContext.sceneId,
+      passIdx: extractContext.passIdx,
     });
     extractMs = extracted.latencyMs ?? 0;
     if (!extracted.ok || !extracted.frameUrl) {
