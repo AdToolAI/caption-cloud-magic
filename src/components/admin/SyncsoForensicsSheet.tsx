@@ -839,35 +839,62 @@ function PreflightPanel({
       )}
 
       {result?.resolved && (() => {
+        const resolved: any = (result as any)?.resolved ?? {};
         const faceProbe: any = (result as any)?.checks?.face_at_frame ?? {};
-        const snapped: number[] | null = Array.isArray(faceProbe.snapped_coord) ? faceProbe.snapped_coord : null;
-        const original: number[] | null = Array.isArray(faceProbe.original_coord) ? faceProbe.original_coord : null;
-        const snapHealed =
+        const snapped: number[] | null = Array.isArray(resolved.dispatch_coords_snapped)
+          ? resolved.dispatch_coords_snapped
+          : Array.isArray(faceProbe.snapped_coord)
+            ? faceProbe.snapped_coord
+            : null;
+        const original: number[] | null = Array.isArray(resolved.coords_snap_origin)
+          ? resolved.coords_snap_origin
+          : Array.isArray(faceProbe.original_coord)
+            ? faceProbe.original_coord
+            : null;
+        const liveSnapCandidate =
           faceProbe.verdict === 'yes_one_face_at_coord_after_snap' ||
           (faceProbe.status === 'pass' && !!snapped);
+        const dispatchSnapApplied = !!resolved.coords_snapped_at;
+        const dispatchNeverHappened = !!resolved.dispatch_never_happened;
         return (
           <div className="pt-1 text-[10px] text-muted-foreground border-t border-border/30 space-y-0.5">
             <div>
-              source=<span className={result.resolved.video_source_kind === 'preclip' ? 'text-emerald-400' : 'text-amber-400'}>
-                {result.resolved.video_source_kind ?? '—'}
-              </span> · frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}]
+              source=<span className={resolved.video_source_kind === 'preclip' ? 'text-emerald-400' : 'text-amber-400'}>
+                {resolved.video_source_kind ?? '—'}
+              </span> · frame={resolved.frame_number ?? '—'} · coord=[{resolved.coord?.join(',') ?? '—'}]
               {snapped && (
                 <span className="text-emerald-300"> → snapped=[{snapped.join(',')}]</span>
               )}
               {' '}· job={result.provider_job_id?.slice(0, 8) ?? '—'}…
             </div>
-            {result.resolved.dispatch_never_happened && snapHealed && (
+            {dispatchSnapApplied && !dispatchNeverHappened && (
               <div className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-emerald-300">
-                <div className="font-semibold">✅ Self-healed — Re-Dispatch jetzt möglich</div>
+                <div className="font-semibold">✅ Snap angewandt — Sync.so wurde mit korrigierter Koord dispatcht</div>
                 <div className="mt-0.5 text-[10px] opacity-90">
-                  Der historische Pass wurde vor v129.22.3 vom Face-Gate blockiert (kein Preclip an Sync.so gesendet).
-                  Die Live-Probe bestätigt: Rekognition findet jetzt genau 1 Face in der Safe-Zone und snapt die Koord
-                  {original && snapped ? <> von <span className="font-mono">[{original.join(',')}]</span> → <span className="font-mono">[{snapped.join(',')}]</span></> : null}.
-                  Auf <strong>Replay</strong> klicken, um den Pass mit der korrigierten Koord neu zu dispatchen.
+                  Der Dispatch-Pass enthält <span className="font-mono">coords_snapped_at</span>
+                  {original && snapped ? <>: <span className="font-mono">[{original.join(',')}]</span> → <span className="font-mono">[{snapped.join(',')}]</span></> : null}.
                 </div>
               </div>
             )}
-            {result.resolved.dispatch_never_happened && !snapHealed && (
+            {dispatchSnapApplied && dispatchNeverHappened && (
+              <div className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-amber-200">
+                <div className="font-semibold">⚠️ Snap gespeichert — aber dieser Pass wurde noch nicht dispatcht</div>
+                <div className="mt-0.5 text-[10px] opacity-90">
+                  Der korrigierte Wert liegt im Pass, aber es gibt keinen Sync.so-Provider-Job für diesen Versuch. Replay startet den echten Dispatch.
+                </div>
+              </div>
+            )}
+            {!dispatchSnapApplied && liveSnapCandidate && (
+              <div className="rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1.5 text-sky-200">
+                <div className="font-semibold">ℹ️ Snap-Kandidat erkannt — noch nicht im Dispatch angewandt</div>
+                <div className="mt-0.5 text-[10px] opacity-90">
+                  Die Forensik-Probe findet eine korrigierbare Koord
+                  {original && snapped ? <> <span className="font-mono">[{original.join(',')}]</span> → <span className="font-mono">[{snapped.join(',')}]</span></> : null},
+                  aber der historische Sync.so-Pass enthält noch kein <span className="font-mono">coords_snapped_at</span>.
+                </div>
+              </div>
+            )}
+            {dispatchNeverHappened && !liveSnapCandidate && !dispatchSnapApplied && (
               <div className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-red-300">
                 <div className="font-semibold">⛔ Preclip nicht dispatcht — Crop-Bug vor Versand</div>
                 <div className="mt-0.5 text-[10px] opacity-90">
@@ -877,14 +904,14 @@ function PreflightPanel({
                 </div>
               </div>
             )}
-            {!result.resolved.dispatch_never_happened && result.resolved.video_source_kind === 'plate' && (
+            {!dispatchNeverHappened && resolved.video_source_kind === 'plate' && (
               <div className="text-amber-300">
                 ⚠ outbound (preclip) payload nicht im Dispatch-Log — Preflight validiert die Plate. Nicht zwingend = was Sync.so sah.
               </div>
             )}
-            {result.resolved.preclip_crop && (
+            {resolved.preclip_crop && (
               <div className="font-mono">
-                preclip_crop={JSON.stringify(result.resolved.preclip_crop)}
+                preclip_crop={JSON.stringify(resolved.preclip_crop)}
               </div>
             )}
           </div>
