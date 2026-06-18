@@ -393,7 +393,7 @@ export function SyncsoForensicsSheet({
           <SheetTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5" />
             Sync.so Forensik
-            <Badge variant="outline" className="ml-2">v129.19</Badge>
+            <Badge variant="outline" className="ml-2">v129.20</Badge>
           </SheetTitle>
           <SheetDescription>
             Admin-Werkzeug. Strikt isoliert von Produktion: keine Mutation an
@@ -731,7 +731,7 @@ function PreflightPanel({
         <div className="flex items-center gap-2 text-sm font-medium">
           <ShieldCheck className="h-4 w-4" />
           Preflight
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.19'}</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.20'}</span>
         </div>
         <Button size="sm" variant="ghost" onClick={onRerun} disabled={loading} className="h-7">
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
@@ -807,7 +807,16 @@ function PreflightPanel({
               {result.resolved.video_source_kind ?? '—'}
             </span> · frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}] · job={result.provider_job_id?.slice(0, 8) ?? '—'}…
           </div>
-          {result.resolved.video_source_kind === 'plate' && (
+          {result.resolved.dispatch_never_happened && (
+            <div className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-red-300">
+              <div className="font-semibold">⛔ Preclip nicht dispatcht — Crop-Bug vor Versand</div>
+              <div className="mt-0.5 text-[10px] opacity-90">
+                Der Face-Gate hat den Dispatch blockiert, weil die Intent-Koord auf der Plate kein Gesicht trifft.
+                v129.20 läuft jetzt Plate-Face-Detection auch für Single-Speaker-Szenen — bitte Re-Dispatch triggern.
+              </div>
+            </div>
+          )}
+          {!result.resolved.dispatch_never_happened && result.resolved.video_source_kind === 'plate' && (
             <div className="text-amber-300">
               ⚠ outbound (preclip) payload nicht im Dispatch-Log — Preflight validiert die Plate. Nicht zwingend = was Sync.so sah.
             </div>

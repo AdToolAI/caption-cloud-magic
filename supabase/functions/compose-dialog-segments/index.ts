@@ -1157,16 +1157,18 @@ serve(async (req) => {
       return picked?.coords ?? null;
     });
 
-    // ── Plate-native identity override (v77) ──────────────────────────────
+    // ── Plate-native identity override (v77, v129.20) ────────────────────
     // Anchor coords drift 5–15 % vs the rendered Hailuo plate. For multi-
     // speaker scenes that drift routinely lands the Sync.so target on the
-    // WRONG face. Detect faces on the ACTUAL plate frame and identity-match
-    // against the character portraits, then replace anchor coords with
-    // plate-pixel-space coords/bbox per character.
+    // WRONG face. v129.20: also run for SINGLE-speaker scenes — anchor
+    // rescale alone produced coords that miss the face (e.g. [204,171] on
+    // a plate where the face actually sits upper-right), which then trips
+    // our pre-dispatch face-gate. Plate-native detection is now mandatory
+    // for every speaker count ≥ 1.
     const speakerPlateBboxes: Array<[number, number, number, number] | null> =
       new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
-    if (!isAdvance && speakers.length >= 2 && plateDims && sourceClipUrl) {
+    if (!isAdvance && speakers.length >= 1 && plateDims && sourceClipUrl) {
       try {
         plateIdentityMap = await resolvePlateFaceIdentities({
           supabase,
@@ -1190,7 +1192,17 @@ serve(async (req) => {
         if (f.characterId) byId.set(String(f.characterId).toLowerCase(), f);
       }
       // Slot-fallback for any face the identity step couldn't label.
+      // v129.20: for single-speaker scenes sort unlabeled faces by bbox
+      // area (largest first) so spurious detections (mirror, background
+      // person) lose to the actual subject.
       const unlabeled = plateIdentityMap.faces.filter((f) => !f.characterId);
+      if (speakers.length === 1 && unlabeled.length > 1) {
+        unlabeled.sort((a, b) => {
+          const areaA = (a.bbox[2] - a.bbox[0]) * (a.bbox[3] - a.bbox[1]);
+          const areaB = (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1]);
+          return areaB - areaA;
+        });
+      }
       speakers.forEach((sp, idx) => {
         const cid = sp.character_id ? String(sp.character_id).toLowerCase() : "";
         let plateFace: PlateIdentityFace | undefined = cid ? byId.get(cid) : undefined;
@@ -1213,6 +1225,40 @@ serve(async (req) => {
     } else if (speakers.length >= 2 && !isAdvance) {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
+      );
+    }
+
+    // ── v129.20 — Single-speaker no-face hard refund ─────────────────────
+    // If Hailuo rendered a plate with zero detectable faces (e.g. subject
+    // walked out of frame, extreme back-shot), anchor-rescale would just
+    // hand Sync.so a coordinate pointing at empty pixels. Refund and ask
+    // the user to re-render the plate instead.
+    if (
+      !isAdvance &&
+      !isRetry &&
+      speakers.length === 1 &&
+      plateIdentityMap &&
+      plateIdentityMap.faces.length === 0
+    ) {
+      const reason = "plate_face_missing_single_speaker";
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} v129.20_single_speaker_no_face — refunding ${totalCost} credits`,
+      );
+      await failLipSync({
+        supabase,
+        sceneId,
+        reason,
+        userId,
+        refundCredits: totalCost,
+        syncApiKey,
+      });
+      return json(
+        {
+          error: "plate_face_missing_single_speaker",
+          message: "Plate enthält kein erkennbares Gesicht. Bitte Szene neu rendern.",
+          refunded: totalCost,
+        },
+        422,
       );
     }
 
