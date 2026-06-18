@@ -3478,16 +3478,31 @@ serve(async (req) => {
       // crop is unambiguous, send `auto_detect:true` — even in
       // Multi-Speaker scene context. The crop has already done the
       // disambiguation; coords are redundant *and* harmful.
+      //
+      // v129.25 (2026-06-18) — Broaden trust: `preclip_face_count` is often
+      // persisted as `null` when the Gemini validator was permissive or the
+      // probe step was skipped, even though the crop itself is provably
+      // clean (no sibling face center inside crop). In that case the
+      // previous v129.24 condition fell back to explicit coordinates, which
+      // reproducibly triggers Sync.so `generation_unknown_error` on tight
+      // single-face crops. Treat `face_count === 1` OR (`face_count == null`
+      // && ambiguity == clean) as unambiguous. Only `face_count > 1` or
+      // sibling-inside-crop is treated as genuine ambiguity.
+      const ambiguityClean =
+        v1291Ambiguity === null || v1291Ambiguity?.risk === "clean";
+      const preclipFaceCountConfirmedMulti =
+        passFaceCount !== null && passFaceCount > 1;
       const preclipUnambiguous =
-        passFaceCount === 1 &&
-        (v1291Ambiguity?.risk === "clean" || v1291Ambiguity === null);
+        ambiguityClean && !preclipFaceCountConfirmedMulti && passFaceCount !== 0;
 
       if (preclipUnambiguous) {
         // Single-face preclip → ASD coords/bboxes are harmful on Sync.so.
         // Use auto_detect:true regardless of scene-level multi-speaker flag.
         syncOptions.active_speaker_detection = { auto_detect: true };
         asdMode = isMultiSpeaker
-          ? "auto_detect_preclip_unambiguous_v12924"
+          ? (passFaceCount === 1
+              ? "auto_detect_preclip_unambiguous_v12924"
+              : "auto_detect_preclip_clean_unknown_count_v12925")
           : "auto_detect";
         // Still compute v1291Diag for log parity when multi-speaker context
         // exists, so we keep ambiguity / transform observability.
