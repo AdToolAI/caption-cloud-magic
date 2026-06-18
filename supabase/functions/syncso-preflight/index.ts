@@ -282,20 +282,22 @@ async function probeFaceAtFrame(
 ): Promise<CheckResult> {
   // ── Stage 1: MediaPipe primary ──────────────────────────────────────
   let mediapipeMeta: Record<string, unknown> | null = null;
-  if (
-    videoUrl &&
-    frameNumber != null &&
-    plateWidth && plateWidth > 0 &&
-    plateHeight && plateHeight > 0 &&
-    durationSec && durationSec > 0
-  ) {
+  let mediapipeSkippedReason: string | null = null;
+  if (!videoUrl) mediapipeSkippedReason = "no_video_url";
+  else if (frameNumber == null) mediapipeSkippedReason = "no_frame_number";
+  else if (!plateWidth || plateWidth <= 0 || !plateHeight || plateHeight <= 0) mediapipeSkippedReason = "missing_video_dims";
+  else if (!durationSec || durationSec <= 0) mediapipeSkippedReason = "missing_duration";
+
+  if (mediapipeSkippedReason) {
+    console.warn(`[syncso-preflight] mediapipe skipped reason=${mediapipeSkippedReason} w=${plateWidth} h=${plateHeight} dur=${durationSec} frame=${frameNumber}`);
+  } else {
     try {
-      const tsSec = Math.max(0.05, frameNumber / 30);
+      const tsSec = Math.max(0.05, (frameNumber as number) / 30);
       const mp = await detectFacesMediaPipe({
         videoUrl,
-        plateWidth,
-        plateHeight,
-        durationSec,
+        plateWidth: plateWidth as number,
+        plateHeight: plateHeight as number,
+        durationSec: durationSec as number,
         frameTimestamps: [tsSec],
       });
       mediapipeMeta = {
@@ -309,11 +311,7 @@ async function probeFaceAtFrame(
       );
 
       if (mp.ok && mp.faces.length > 0 && coord) {
-        // coord is in pixel space matching the same video the dispatch
-        // sees (preclip output or plate). MediaPipe bboxes are in pixel
-        // space too.  Tolerance ±15 % of min(W,H) — matches the existing
-        // Gemini prompt tolerance of ±0.15 normalized.
-        const tolPx = Math.max(40, Math.min(plateWidth, plateHeight) * 0.15);
+        const tolPx = Math.max(40, Math.min(plateWidth as number, plateHeight as number) * 0.15);
         const [cx, cy] = coord;
         const matches = mp.faces.filter((f) => {
           const dx = f.center[0] - cx;
