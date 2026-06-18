@@ -1,5 +1,5 @@
 /**
- * syncso-preflight — v129.19
+ * syncso-preflight — v129.21.3
  *
  * Admin-only diagnostic: runs the 6 deterministic checks that cover
  * every known cause of Sync.so `generation_unknown_error`, WITHOUT
@@ -10,8 +10,13 @@
  *   2. video_codec        — ftyp brand + first MP4 atom sanity
  *   3. audio_fetchable    — Range-GET 0-65535, Content-Type, Content-Length
  *   4. audio_format       — WAV/MP3/M4A header sniff + size sanity
- *   5. face_at_frame      — Gemini Vision face count on the video URL
+ *   5. face_at_frame      — MediaPipe (primary) → Gemini Vision (fallback)
  *   6. duration_match     — abs(video_duration - audio_duration) tolerance
+ *
+ * v129.21.3 — Aligns the forensics face probe with the dispatch path
+ * (compose-dialog-segments), which has used MediaPipe as primary detector
+ * since v129.21. Gemini only runs when MediaPipe returns 0 faces or
+ * errors (no Replicate token, frame extract fail, etc.).
  *
  * Body: { scene_id, pass_index? }
  * Output: { checks, verdict, first_blocker }
@@ -21,6 +26,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { extractFrameForFaceProbe } from "../_shared/face-frame-extract.ts";
+import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -251,18 +257,135 @@ function sniffAudio(b: Uint8Array, totalBytes: number | null): AudioInfo {
   return out;
 }
 
-// ---------- Face probe at frame (v129.14 — client-side JPEG) ----------
+// ---------- Face probe at frame (v129.21.3 — MediaPipe primary) ----------
+//
+// Strategy mirrors compose-dialog-segments dispatch path:
+//   1) MediaPipe on the plate video at the ASD timestamp (requires
+//      Replicate token + plate dimensions + duration).
+//   2) If MediaPipe is decisive (1+ face detected) we answer from it.
+//   3) Otherwise (MediaPipe ok:false, 0 faces, or pre-conditions missing)
+//      we fall back to the original Gemini Vision probe — MediaPipe has
+//      a higher false-negative rate on profile/turned faces.
+//
+// `source` in the returned CheckResult is one of:
+//   "mediapipe" | "gemini_fallback" | "gemini" | "skipped"
 async function probeFaceAtFrame(
   videoUrl: string,
   frameNumber: number | null,
   coord: [number, number] | null,
   wasInferred: boolean = false,
   prebuiltFrameUrl: string | null = null,
+  plateWidth: number | null = null,
+  plateHeight: number | null = null,
+  durationSec: number | null = null,
 ): Promise<CheckResult> {
+  // ── Stage 1: MediaPipe primary ──────────────────────────────────────
+  let mediapipeMeta: Record<string, unknown> | null = null;
+  if (
+    videoUrl &&
+    frameNumber != null &&
+    plateWidth && plateWidth > 0 &&
+    plateHeight && plateHeight > 0 &&
+    durationSec && durationSec > 0
+  ) {
+    try {
+      const tsSec = Math.max(0.05, frameNumber / 30);
+      const mp = await detectFacesMediaPipe({
+        videoUrl,
+        plateWidth,
+        plateHeight,
+        durationSec,
+        frameTimestamps: [tsSec],
+      });
+      mediapipeMeta = {
+        mediapipe_ms: mp.ms,
+        mediapipe_faces: mp.faces.length,
+        mediapipe_ok: mp.ok,
+        mediapipe_error: mp.error ?? null,
+      };
+      console.log(
+        `[syncso-preflight] mediapipe primary ok=${mp.ok} faces=${mp.faces.length} ms=${mp.ms} err=${mp.error ?? "none"}`,
+      );
+
+      if (mp.ok && mp.faces.length > 0 && coord) {
+        // coord is in pixel space matching the same video the dispatch
+        // sees (preclip output or plate). MediaPipe bboxes are in pixel
+        // space too.  Tolerance ±15 % of min(W,H) — matches the existing
+        // Gemini prompt tolerance of ±0.15 normalized.
+        const tolPx = Math.max(40, Math.min(plateWidth, plateHeight) * 0.15);
+        const [cx, cy] = coord;
+        const matches = mp.faces.filter((f) => {
+          const dx = f.center[0] - cx;
+          const dy = f.center[1] - cy;
+          return Math.hypot(dx, dy) <= tolPx;
+        });
+        const baseMeta = {
+          frame: frameNumber,
+          coord,
+          was_inferred: wasInferred,
+          source: "mediapipe" as const,
+          ...mediapipeMeta,
+        };
+        if (mp.faces.length === 1 && matches.length === 1) {
+          return { status: "pass", verdict: "yes_one_face_at_coord", ...baseMeta };
+        }
+        if (mp.faces.length === 1 && matches.length === 0) {
+          return {
+            status: "fail",
+            verdict: "yes_but_not_at_coord",
+            note: "Face exists but not at the active_speaker_detection coordinate (MediaPipe).",
+            ...baseMeta,
+          };
+        }
+        if (mp.faces.length > 1) {
+          return {
+            status: matches.length === 1 ? "warn" : "fail",
+            verdict: "multiple_faces",
+            faces: mp.faces.length,
+            faces_at_coord: matches.length,
+            note: `${mp.faces.length} faces detected — Sync.so ASD with fixed coord may pick wrong subject.`,
+            ...baseMeta,
+          };
+        }
+      }
+      // mp.faces.length === 0 → fall through to Gemini fallback
+    } catch (e) {
+      mediapipeMeta = {
+        mediapipe_ms: 0,
+        mediapipe_faces: 0,
+        mediapipe_ok: false,
+        mediapipe_error: (e as Error)?.message ?? String(e),
+      };
+      console.warn(`[syncso-preflight] mediapipe primary threw: ${(e as Error)?.message ?? e}`);
+    }
+  }
+
+  // ── Stage 2: Gemini fallback (original v129.14 logic) ───────────────
   const apiKey = getGeminiApiKey();
-  if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord, was_inferred: wasInferred };
+  const source: "gemini" | "gemini_fallback" = mediapipeMeta ? "gemini_fallback" : "gemini";
+  if (!apiKey) {
+    return {
+      status: "skip",
+      note: mediapipeMeta
+        ? "mediapipe_inconclusive_and_no_gemini_key"
+        : "no_gemini_api_key",
+      frame: frameNumber,
+      coord,
+      was_inferred: wasInferred,
+      source: mediapipeMeta ? "mediapipe" : "skipped",
+      ...(mediapipeMeta ?? {}),
+    };
+  }
   if (!videoUrl && !prebuiltFrameUrl) {
-    return { status: "skip", note: "no_video_url", frame: frameNumber, coord, was_inferred: wasInferred };
+    return {
+      status: "skip",
+      note: "no_video_url",
+      frame: frameNumber,
+      coord,
+      was_inferred: wasInferred,
+      source,
+      ...(mediapipeMeta ?? {}),
+    };
   }
 
   // v129.14: the Forensics Sheet extracts the JPEG client-side with a
@@ -295,6 +418,8 @@ async function probeFaceAtFrame(
         was_inferred: wasInferred,
         extract_ms: extractMs,
         extract_reason: extracted.reason ?? null,
+        source,
+        ...(mediapipeMeta ?? {}),
       };
     }
     frameJpegUrl = extracted.frameUrl;
@@ -337,6 +462,8 @@ async function probeFaceAtFrame(
         frame_cached: frameCached,
         extract_ms: extractMs,
         gemini_ms: geminiMs,
+        source,
+        ...(mediapipeMeta ?? {}),
         raw: typeof body === "object" ? body : String(body ?? "").slice(0, 200),
       };
     }
@@ -350,6 +477,8 @@ async function probeFaceAtFrame(
       frame_cached: frameCached,
       extract_ms: extractMs,
       gemini_ms: geminiMs,
+      source,
+      ...(mediapipeMeta ?? {}),
     } as const;
     if (coord && frameNumber != null) {
       const t = txt.toLowerCase();
@@ -375,6 +504,8 @@ async function probeFaceAtFrame(
       frame_jpeg_url: frameJpegUrl,
       frame_cached: frameCached,
       extract_ms: extractMs,
+      source,
+      ...(mediapipeMeta ?? {}),
     };
   }
 }
@@ -488,11 +619,13 @@ serve(async (req) => {
 
   // v129.9 — Infer missing frame_number from parsed duration (mid-clip)
   // and missing coord from the preclip's output size (assume square center).
+  // v129.21.3 — Parse MP4 head once so we can also feed plate dims +
+  // duration to the MediaPipe primary detector.
+  const mp4Info = vFetch.ok && vFetch.bytes ? parseMp4Head(vFetch.bytes) : null;
   let faceWasInferred = false;
-  if ((frameNumber == null || coord == null) && vFetch.ok && vFetch.bytes) {
-    const earlyInfo = parseMp4Head(vFetch.bytes);
-    if (frameNumber == null && earlyInfo.duration_s != null) {
-      frameNumber = Math.max(0, Math.floor(earlyInfo.duration_s * 30 / 2));
+  if ((frameNumber == null || coord == null) && mp4Info) {
+    if (frameNumber == null && mp4Info.duration_s != null) {
+      frameNumber = Math.max(0, Math.floor(mp4Info.duration_s * 30 / 2));
       faceWasInferred = true;
     }
     if (coord == null) {
@@ -510,7 +643,17 @@ serve(async (req) => {
     }
   }
 
-  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred, probeFrameUrl);
+  const faceProbe = await probeFaceAtFrame(
+    videoUrl,
+    frameNumber,
+    coord,
+    faceWasInferred,
+    probeFrameUrl,
+    mp4Info?.width ?? null,
+    mp4Info?.height ?? null,
+    mp4Info?.duration_s ?? null,
+  );
+
 
   // video_fetchable
   const video_fetchable: CheckResult = vFetch.ok
@@ -530,10 +673,10 @@ serve(async (req) => {
 
   // video_codec
   let video_codec: CheckResult;
-  if (!vFetch.ok || !vFetch.bytes) {
+  if (!vFetch.ok || !vFetch.bytes || !mp4Info) {
     video_codec = { status: "skip", note: "video not fetchable" };
   } else {
-    const info = parseMp4Head(vFetch.bytes);
+    const info = mp4Info;
     const brand = info.ftyp_brand;
     const allBrands = [brand, ...info.compatible_brands].filter(Boolean) as string[];
     const accepted = allBrands.some((br) => ACCEPTED_VIDEO_BRANDS.has(br));
@@ -669,6 +812,6 @@ serve(async (req) => {
     checks,
     verdict,
     first_blocker: firstBlocker,
-    preflight_version: "v129.20",
+    preflight_version: "v129.21.3",
   });
 });

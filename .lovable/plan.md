@@ -1,79 +1,51 @@
-## Was passiert ist
+## Problem
 
-Watchdog hat die Szene `4e9f8c73…` nach 4 min als `watchdog_preflight_aborted` gekillt — **bevor** Hailuo den Master-Clip fertig hatte. Sync.so wurde nie disponiert.
+Forensics-Panel zeigt `GEMINI_MS: 1509` und `EXTRACTED FRAME (V129.18 · CLIENT CANVAS)` → MediaPipe wird **im Forensics-Pfad nicht** verwendet.
 
-### Timeline
+Du hast recht: v129.21 hat MediaPipe nur in `compose-dialog-segments` (= echter Dispatch) zum Primär-Detector gemacht. Das Forensics-Sheet ruft aber `syncso-preflight` auf, und dort gibt es eine eigene `probeFaceAtFrame()`-Funktion, die **direkt Gemini** anspricht — weder `detectFacesMediaPipe` noch das bereits MediaPipe-fähige `validate-frame-face` werden genutzt.
 
-| Zeit | Event |
-|------|-------|
-| 13:01:31 | `compose-video-clips` startet Hailuo i2v (`twoshot_stage='master_clip'`, `clip_url=null`) |
-| 13:07:01 | `lipsync-watchdog` → `watchdog_preflight_aborted` → Szene `failed`, Refund |
-| 13:09:42 | Hailuo-Webhook landet → `compose-clip-webhook` ruft `compose-dialog-segments` → **409 `reset_required`** |
-
-Forensik zeigt deshalb `pass_not_found (HTTP 404)`: `dialog_shots.passes = []`. MediaPipe / v129.21.1 sind nicht involviert — der Pfad wurde nie erreicht.
-
-### Root Cause
-
-`supabase/functions/lipsync-watchdog/index.ts` Zeile 409:
-```ts
-} else if (!hasJob && ageMs > STALE_PREFLIGHT_MS) {
-  reason = "watchdog_preflight_aborted";
-}
 ```
-Kein Guard für „Master-Clip rendert noch beim Provider". `STALE_PREFLIGHT_MS = 4 min` ist zu kurz für Hailuo i2v mit 4-Personen-Anchor (typisch 6–10 min).
+Echter Dispatch  →  compose-dialog-segments  →  MediaPipe ✓  (Gemini Fallback)
+Forensics-Probe  →  syncso-preflight         →  Gemini ✗   ← hier liegt der Bug
+```
 
----
+## Fix (v129.21.3 — Forensics-Preflight angleichen)
 
-## Fix (v129.21.2 — eine Datei)
+Eine Datei: `supabase/functions/syncso-preflight/index.ts`
 
-`supabase/functions/lipsync-watchdog/index.ts`:
+**Reihenfolge in `probeFaceAtFrame()`:**
 
-1. **Helper im Filter-Loop** (vor dem Stale-Block):
-   ```ts
-   const masterClipInFlight =
-     d.twoshot_stage === "master_clip" &&
-     !d.clip_url &&
-     typeof d.replicate_prediction_id === "string" &&
-     d.replicate_prediction_id.length > 0;
-   ```
+1. **MediaPipe-Primary:** `detectFacesMediaPipe({ videoUrl, plateWidth, plateHeight, durationSec, frameTimestamps: [frameNumber/30] })` — gleiche Helper wie der Dispatch-Pfad. Liefert Faces inkl. Bounding Boxes für den Ziel-Timestamp.
+   - 1 Face am ASD-Coord (±0.15) → `verdict: yes_one_face_at_coord`, `status: pass`, `source: "mediapipe"`.
+   - 1 Face, aber außerhalb Toleranz → `yes_but_not_at_coord`, `status: fail`.
+   - ≥2 Faces → `multiple_faces`, `status: fail`.
+   - 0 Faces → **kein** Sofort-Fail, sondern Gemini-Fallback (MediaPipe hat höhere False-Negative-Rate bei seitlichen Gesichtern, siehe v129.21-Memo).
+2. **Gemini-Fallback** (bestehende Logik): nur wenn MediaPipe `ok:false` ODER 0 Faces. Antwort markiert mit `source: "gemini_fallback"`.
+3. **Skip-Pfad** unverändert wenn weder Replicate-Token noch Gemini-Key gesetzt.
 
-2. **Zeile 409 erweitern** — Preflight-Abort nur, wenn der Master-Clip **nicht** noch beim Provider hängt:
-   ```ts
-   } else if (!hasJob && !masterClipInFlight && ageMs > STALE_PREFLIGHT_MS) {
-     reason = "watchdog_preflight_aborted";
-   }
-   ```
+**Probe-Frame-Strategie:**
+- Wenn `probe_frame_url` (Client-Canvas-JPEG) vorhanden ist, **MediaPipe trotzdem** auf das volle Plate-Video laufen lassen — Replicate-MediaPipe braucht ein Video, kein Einzel-JPEG. Der Client-JPEG bleibt nur für den Gemini-Fallback relevant (so wie heute).
 
-3. **Diagnostik-Log**, wenn der Skip greift:
-   ```ts
-   if (masterClipInFlight && !hasJob && ageMs > STALE_PREFLIGHT_MS) {
-     console.log(
-       `[lipsync-watchdog] preflight-skip scene=${d.id} ` +
-       `reason=master_clip_in_flight age=${Math.round(ageMs/1000)}s pred=${d.replicate_prediction_id}`
-     );
-   }
-   ```
+**Result-Schema-Erweiterung** (`face_at_frame.*`):
+- Neue Felder: `source: "mediapipe" | "gemini" | "gemini_fallback" | "skipped"`, `mediapipe_ms`, `mediapipe_faces`, `mediapipe_error?`.
+- `gemini_ms` bleibt erhalten (nur befüllt wenn Gemini auch lief).
 
-**Failsafe**: `STALE_HARD_MS = 25 min` bleibt unverändert → echte Hailuo-Hänger werden weiterhin gekillt + refundiert (Zeile 405/406).
+## UI-Sync (Forensics-Sheet)
 
-Keine Änderungen an: `compose-dialog-segments`, `compose-clip-webhook`, MediaPipe/Face-Detect, Forensik-UI, Wallet, Refund-Logik, oder anderen Edge-Functions.
-
----
+`src/components/admin/SyncsoForensicsSheet.tsx`:
+- Label `EXTRACTED FRAME (V129.18 · CLIENT CANVAS)` → `FACE PROBE (V129.21.3 · MEDIAPIPE PRIMARY)` und Quelle (`SOURCE` Zeile) aus `face_at_frame.source` einblenden.
+- Felder `MEDIAPIPE_MS` + `GEMINI_MS` nebeneinander anzeigen (`—` wenn nicht gelaufen).
+- Roter "Preclip nicht dispatcht"-Banner unverändert (das ist eine andere Stage).
 
 ## Verifikation
 
-1. Neue 4-Sprecher-Test-Szene starten (gleiches Setup wie `4e9f8c73…`).
-2. Erwartung nach ~6–10 min:
-   - `compose-dialog-segments` läuft durch
-   - `dialog_shots.passes` füllt sich
-   - Sync.so dispatched korrekt
-3. Watchdog-Logs prüfen: `[lipsync-watchdog] preflight-skip … reason=master_clip_in_flight` darf 1–3× erscheinen, `watchdog_preflight_aborted` nicht.
-4. Failsafe-Test (optional): künstlich Hailuo-Hang → nach 25 min muss `watchdog_hard_timeout` greifen + Refund.
+1. Forensics-Sheet auf bestehender Szene öffnen → `SOURCE = mediapipe`, `MEDIAPIPE_MS` ~600–1500ms, `GEMINI_MS = —`.
+2. Künstlicher Test mit gesichtsloser Plate (z. B. Landschaft) → MediaPipe 0 Faces → Gemini Fallback läuft → `SOURCE = gemini_fallback`, beide MS-Werte gesetzt.
+3. Ohne Replicate-Token (lokaler Edge-Test) → `SOURCE = gemini`, alter Pfad bleibt funktional.
+4. Edge-Logs zeigen `[syncso-preflight] face-probe source=mediapipe verdict=yes_one_face_at_coord ms=...`.
 
----
+## Nicht enthalten
 
-## Bewusst NICHT Teil dieses Fixes
-
-- Speed-Optimierung (Fast-Lane / HeyGen-Mode) — du hast „max Qualität" gewählt, Pipeline bleibt 8–12 min.
-- MediaPipe-Detector (läuft bereits korrekt seit v129.21.1).
-- Forensik-Sheet (404 verschwindet automatisch, sobald wieder Passes existieren).
+- Keine Änderung am Dispatch-Pfad (`compose-dialog-segments` ist seit v129.21 schon korrekt).
+- Keine neuen Watchdog-Regeln (v129.21.2 bleibt aktiv).
+- Keine UI/UX-Änderungen außerhalb des Forensics-Sheets.
