@@ -1,5 +1,5 @@
 /**
- * syncso-preflight — v129.8
+ * syncso-preflight — v129.19
  *
  * Admin-only diagnostic: runs the 6 deterministic checks that cover
  * every known cause of Sync.so `generation_unknown_error`, WITHOUT
