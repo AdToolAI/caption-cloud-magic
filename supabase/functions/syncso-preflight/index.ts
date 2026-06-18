@@ -27,6 +27,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { extractFrameForFaceProbe } from "../_shared/face-frame-extract.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
+import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
