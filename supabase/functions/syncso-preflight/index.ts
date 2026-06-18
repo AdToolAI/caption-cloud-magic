@@ -834,9 +834,9 @@ serve(async (req) => {
   // provider bug.
   const noOutboundPayload = videoSourceKind === "plate" && !preclipVideoUrl;
   const passStatus: string = String((pass as any)?.status ?? "");
-  const dispatchNeverHappened = noOutboundPayload && (
-    !providerJobId || passStatus === "failed" || passStatus === "face_gate_blocked"
-  );
+  const dispatchNeverHappened =
+    !providerJobId ||
+    (noOutboundPayload && (passStatus === "failed" || passStatus === "face_gate_blocked"));
   if (dispatchNeverHappened && faceProbe && faceProbe.status === "fail") {
     (faceProbe as any).status = "warn";
     (faceProbe as any).verdict_pre_v12920 = (faceProbe as any).verdict ?? null;
