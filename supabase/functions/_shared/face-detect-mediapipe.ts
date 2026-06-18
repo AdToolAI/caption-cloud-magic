@@ -314,7 +314,7 @@ export async function detectFacesMediaPipe(opts: {
   }
 
   console.log(
-    `[face-detect/aws] v129.22 rekognition primary plate=${W}x${H} ` +
+    `[face-detect/aws] v129.22.1 rekognition primary plate=${W}x${H} ` +
     `region=${REKOGNITION_REGION_RESOLVED} frames=${urls.length}`,
   );
 
