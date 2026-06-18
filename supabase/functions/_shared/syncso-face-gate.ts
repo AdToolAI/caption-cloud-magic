@@ -1,8 +1,17 @@
 /**
- * Sync.so Live Face-Gate — v129.11 (Deterministic Frame-Probe)
+ * Sync.so Live Face-Gate — v129.22.3 (Auto-Snap on Rekognition Center)
  *
  * Runs Gemini Vision on the EXACT frame + coord we are about to send to
  * Sync.so, BEFORE the dispatch call.
+ *
+ * v129.22.3 self-healing: when Gemini says "yes_but_not_at_coord" (a face
+ * is on the frame but not at the intent coord — typically because the
+ * intent coord came from a heuristic fallback, see compose-dialog-segments
+ * lines ~1379-1401), we run AWS Rekognition on the same JPEG. If exactly
+ * one face is detected and it sits at a plausible plate position, we return
+ * `code: "ok_after_snap"` with the Rekognition center as `snapped_coord`.
+ * The caller MUST replace the active_speaker_detection.coordinates with
+ * snapped_coord before dispatching to Sync.so.
  *
  * v129.11 fix: instead of handing Gemini an MP4 URL (which OpenRouter
  * deterministically rejects with HTTP 400 → silent skip → wasted Sync.so
@@ -12,6 +21,8 @@
  *
  * Verdict mapping:
  *   - ok: true,  code: "ok"                                 → safe to dispatch
+ *   - ok: true,  code: "ok_after_snap", snapped_coord       → caller MUST
+ *       override ASD coordinates with snapped_coord (v129.22.3)
  *   - ok: true,  code: "skipped"                            → preflight
  *       constraint (no API key / no video URL); never seen in production
  *   - ok: true,  code: "probe_unavailable"                  → frame extract
@@ -23,9 +34,11 @@
  */
 
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
+import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
 
 export type FaceGateCode =
   | "ok"
+  | "ok_after_snap"
   | "no_face"
   | "not_at_coord"
   | "multiple_faces"
@@ -48,6 +61,13 @@ export interface FaceGateResult {
   /** Replicate + Gemini wall-clock for forensic logging. */
   extract_ms?: number;
   gemini_ms?: number;
+  /** v129.22.3 — Rekognition-derived plate-pixel center to use instead of
+   *  the original intent coord. Only set when code === "ok_after_snap". */
+  snapped_coord?: [number, number];
+  /** v129.22.3 — Original intent coord before snap (log/UI delta). */
+  original_coord?: [number, number];
+  /** v129.22.3 — Pixel distance between original and snapped coord. */
+  snap_distance_px?: number;
 }
 
 function getApiKey(): string {
@@ -66,6 +86,12 @@ export interface FaceGateInput {
   timeoutMs?: number;
   /** Optional fps hint for the frame extractor. Defaults to 30. */
   fps?: number;
+  /** v129.22.3 — Plate pixel dims required for AWS Rekognition auto-snap.
+   *  When omitted, "yes_but_not_at_coord" stays a hard fail (legacy v129.11
+   *  behaviour). Callers with plate dims handy should pass them to enable
+   *  self-healing. */
+  plateWidth?: number;
+  plateHeight?: number;
 }
 
 export async function verifyFaceBeforeDispatch(
