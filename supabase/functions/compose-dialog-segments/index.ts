@@ -3143,14 +3143,17 @@ serve(async (req) => {
           resolutionBlocked = true;
           break;
         }
-        // Face-gate (v77): require exactly 1 face for multi-speaker.
+        // Face-gate (v77 / v129.21): require exactly 1 face — now also
+        // active for SINGLE-speaker preclips (v129.21 removed the
+        // `speakers.length >= 2` guard, since MediaPipe-backed detection
+        // is reliable enough for N=1 and catches subject-walk-off-frame).
         // v129.18 — validate FIRST + MID + LAST frame, not just mid; a face
         // entering/leaving the crop mid-turn was the actual root cause of
         // the Sync.so `generation_unknown_error` (ASD frame N coords below
         // the face → Sync.so sees pullover, not face).
         preclipFaceOk = true;
         preclipFaceCount = null;
-        if (speakers.length >= 2) {
+        if (speakers.length >= 1) {
           try {
             const totalFrames = Math.max(2, Math.round((preclip.durationSec ?? 1) * 30));
             const frameSet: Array<{ tag: "first" | "mid" | "last"; n: number }> = [
