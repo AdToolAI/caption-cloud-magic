@@ -1,36 +1,57 @@
-## Antwort auf "ist das korrekt?"
+## Problem
 
-**Ja — die Daten sind korrekt, aber widersprüchlich präsentiert.** Die zwei Blöcke beschreiben zwei verschiedene Zeitpunkte:
+Die Szene `a6ce3a99…` ist **erneut** vor Sync.so geblockt, obwohl die Forensik „✅ Self-healed" anzeigt. Edge-Logs beweisen die Ursache:
 
-1. **"Gesicht am ASD-Frame" (grün, PASS)** — das ist die **Live-Probe jetzt**. AWS Rekognition findet 1 Face bei `[364,621]`, Snap von `[152,144]` (Δ522px) funktioniert sauber. v129.22.3 würde einen frischen Dispatch korrekt durchlassen.
+```
+v129.22.3_face_gate pass=1 code=probe_unavailable ok=true jpeg=no snap=no
+reason=server_extractor_disabled_v129_14: edge runtime cannot run ffmpeg.wasm
+DISPATCH pass=1/4 coords=[337,144] frame=52 sync_mode=cut_off
+```
 
-2. **"Preclip nicht dispatcht" (rot)** — das beschreibt den **historischen Pass-Record** (job `bc8ca39a…`). Der wurde *vor* v129.22.3 mit `status: face_gate_blocked` markiert und hat nie einen Preclip an Sync.so gesendet. `dispatch_never_happened: true` ist für diesen alten Record technisch korrekt.
+- Beim **Dispatch** kann die Edge-Function `compose-dialog-segments` **keinen JPEG aus dem Preclip ziehen** → Face-Gate fällt auf `probe_unavailable` zurück → Dispatch geht **ungeprüft** mit der falschen Koord `[337,144]` raus → Sync.so antwortet `generation_unknown_error`.
+- Das **Forensik-Panel** läuft danach in einem anderen Pfad (mit serverseitigem Frame via `extract-video-frames` bzw. Live-Probe) → dort klappt der Snap → grünes Banner.
 
-Das Problem ist nicht das Backend — Snap & Gate stimmen. Das Problem ist die **UI-Logik im Forensics-Sheet**: sie zeigt den roten Crop-Bug-Banner auch dann noch, wenn die Live-Probe bereits beweist, dass v129.22.3 self-healed hat. Der Banner sollte sich in einen klaren "Re-Dispatch jetzt möglich"-Zustand wandeln.
+Ergebnis: Die Pipeline **heilt sich nur im UI, nicht im Dispatch**. Jeder echte Render bleibt am gleichen Bug hängen.
 
-## Plan: Banner-Status an Snap-Realität koppeln
+## Lösung
 
-### Änderung 1 — `src/components/admin/SyncsoForensicsSheet.tsx` (Zeilen 848–857)
+Den **gleichen Snap-Pfad in den Dispatch** holen, indem `compose-dialog-segments` vor jeder Pass-Dispatch garantiert eine `probe_frame_url` besitzt — entweder vom Client mitgegeben oder serverseitig gerendert.
 
-Bedingung `result.resolved.dispatch_never_happened` aufsplitten in zwei UI-Zustände:
+### Schritte
 
-- **Wenn `face_probe.verdict === "yes_one_face_at_coord_after_snap"`** (oder generell `face_probe.status === "pass"` mit `snapped_coord` vorhanden):
-  → **Grüner Banner** "✅ Self-healed — Re-Dispatch jetzt möglich" mit Hinweis, dass der historische Pass blockiert war, die Snap-Logik aber jetzt greift. Inkl. Delta-Anzeige `[152,144] → [364,621]`.
+1. **Server-seitiger Still-Extractor** (`_shared/face-frame-extract.ts` erweitern):
+   - Neue Funktion `getOrExtractProbeFrame({ videoUrl, frameNumber, fps, sceneId, passIdx })` mit 24h-Cache in `composer-frames/probe-frames/{sceneId}-p{idx}-f{frame}.png`.
+   - Primär: Replicate `lucataco/ffmpeg-extract-frame` mit `timestamp = frameNumber / fps`.
+   - Fallback (wenn Replicate 404 / 5xx): Remotion Lambda `renderStillOnLambda` gegen eine Mini-Komposition `<Video src={url}/>` bei frame `frameNumber`.
+   - Idempotent: prüft Bucket vor Re-Render.
 
-- **Sonst (alter Zustand)**:
-  → Bisheriger roter "Crop-Bug vor Versand"-Banner bleibt wie er ist.
+2. **Dispatch-Pfad in `compose-dialog-segments`** (vor `verifyFaceBeforeDispatch`-Aufruf, ~Zeile 4275):
+   - Wenn `pass.probe_frame_url` fehlt → `await getOrExtractProbeFrame(...)`, URL auf Pass schreiben.
+   - `verifyFaceBeforeDispatch` erhält den neuen Parameter `prebuiltFrameUrl`.
+   - `_shared/syncso-face-gate.ts`: `verifyFaceBeforeDispatch` akzeptiert `prebuiltFrameUrl` und gibt ihn an `detectFacesMediaPipe(prebuiltFrameUrls: [url])` weiter — gleicher Code-Pfad wie heute in `syncso-preflight`. Damit greift der existierende `ok_after_snap`-Zweig (Zeilen 230-289) statt `not_at_coord` zu werfen.
 
-### Änderung 2 — optional, gleicher File
+3. **Pass-Persistenz**: `dialog_shots`/`pass`-Row bekommt Spalte `probe_frame_url` (Migration), damit Retries und der Forensik-UI dieselbe URL benutzen — kein doppelter Extract.
 
-Im resolved-Footer `coord=[152,144]` zusätzlich `→ snapped=[364,621]` einblenden, wenn `face_probe.snapped_coord` vorhanden ist, damit auf einen Blick klar ist, welche Koord beim nächsten Dispatch fliegen wird.
+4. **Refund-Sicherheit**: Bleibt unverändert. Schlägt der Extractor + Fallback komplett fehl, läuft heutiges `probe_unavailable`-Verhalten weiter (Dispatch ungeprüft, später Refund bei Sync.so-Fehler) — also keine Regression.
 
-## Was NICHT geändert wird
+5. **Forensik-UI** (`SyncsoForensicsSheet.tsx`): Das grüne „Self-healed"-Banner nur dann zeigen, wenn der Snap **am Dispatch** tatsächlich angewandt wurde (`pass.coords_snapped_at IS NOT NULL` AND `dispatch_never_happened === false`). Das gestrige Banner war optimistisch — neue Logik:
+   - `coords_snapped_at` gesetzt + Dispatch passiert → grün „Snap angewandt, Sync.so lief".
+   - `coords_snapped_at` gesetzt + dispatch_never_happened → orange „Snap bereit, aber Dispatch fehlt — Replay nötig".
+   - Snap nur in Live-Probe (nicht in DB) → blau „Snap-Kandidat erkannt, beim nächsten Render anwendbar".
 
-- Keine Edge-Function-Änderungen (`syncso-preflight`, `compose-dialog-segments` bleiben v129.22.3).
-- Keine DB-Migrationen, keine Pass-Record-Rewrites — der historische `face_gate_blocked`-Status bleibt für Audit-Zwecke erhalten.
-- Kein Auto-Re-Dispatch — der User triggert Re-Render bewusst über den existierenden "Replay"-Button unten rechts.
+## Dateien
 
-## Verifikation nach Build
+- `supabase/functions/_shared/face-frame-extract.ts` (erweitern oder neue Helper-Datei)
+- `supabase/functions/_shared/syncso-face-gate.ts` (neuer Param `prebuiltFrameUrl`)
+- `supabase/functions/compose-dialog-segments/index.ts` (Frame-Extract vor Face-Gate, Pass-Update)
+- `supabase/migrations/<ts>_dialog_shot_probe_frame.sql` (Spalte `probe_frame_url`)
+- `src/components/admin/SyncsoForensicsSheet.tsx` (Banner-Logik präzisieren)
 
-1. Forensics-Sheet auf derselben Szene öffnen → roter Crop-Bug-Banner ist weg, stattdessen grüner "Self-healed"-Banner mit Delta-Vector.
-2. Replay-Button drücken → neuer Pass-Record entsteht mit `coords_snapped_at` / `coords_snap_origin` gesetzt, `video_source_kind: "preclip"`, kein `dispatch_never_happened`.
+## Validierung
+
+- Replay der gleichen Szene `a6ce3a99…` → Logs zeigen `v129.22.3_face_gate code=ok_after_snap snap=[457,593]` → DISPATCH mit `[457,593]` → Sync.so 200 OK.
+- Neue Szene mit 4 Sprechern → alle 4 Passes haben `probe_frame_url`, keine `FACE_GATE_PROBE_UNAVAILABLE`-Einträge mehr in `sync_dispatch_log`.
+
+## Kosten
+
+- ~€0.001/Pass für Replicate (oder ~€0.002 für Lambda-Still), gecached pro Pass → einmalig pro Szene/Sprecher.
