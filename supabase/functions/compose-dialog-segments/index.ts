@@ -4273,7 +4273,12 @@ serve(async (req) => {
         rawPassFc === null || rawPassFc === undefined || !Number.isFinite(Number(rawPassFc))
           ? null
           : Number(rawPassFc);
-      const preclipUnambiguous = passFcNum === 1;
+      // v129.25 — clean crop with unknown face_count is also "unambiguous".
+      // Only confirmed multi-face crops force the explicit-ASD path.
+      const ambiguityCleanPre =
+        v1291Ambig === null || v1291Ambig?.risk === "clean";
+      const preclipUnambiguous =
+        ambiguityCleanPre && passFcNum !== 0 && !(passFcNum !== null && passFcNum > 1);
       const ambiguousAutoDetect =
         wouldAutoDetect &&
         !!v1291Ambig?.sibling_centers_inside_crop &&
