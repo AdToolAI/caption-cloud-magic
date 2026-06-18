@@ -4247,17 +4247,25 @@ serve(async (req) => {
     if (usePassPreclip && speakers.length >= 2) {
       const hasCoords = !!v1291Diag && Array.isArray(v1291Diag.plate_coords);
       const wouldAutoDetect = asdForProbe?.auto_detect === true;
-      // v129.2.1 — Belt-and-Suspenders Ambiguity Guard.
-      // Even if the v1291 branch didn't classify this as a coords-bearing
-      // multi-speaker pass, refuse to send auto_detect:true into a preclip
-      // crop that we *know* contains a sibling face center. This is the
-      // forensic root cause from v129.2.0 (Samuel/Sarah, Samuel/Kailee 2x2
-      // stacks): the 220px floor in computeFaceCrop pulls the neighbour into
-      // the crop, and Sync.so then animates the wrong face. Block + refund
-      // before dispatch instead of burning the call.
+      // v129.24 — auto_detect:true on a single-face preclip is now the
+      // CORRECT path (reproduced 2026-06-18: explicit ASD coords cause
+      // `generation_unknown_error` while auto_detect succeeds). The legacy
+      // v129.2.1 block treated `wouldAutoDetect && hasCoords` as a contract
+      // violation — invert that: it's only a violation when the preclip
+      // ALSO has more than one face (genuine ambiguity).
+      const rawPassFc = (pass as any).preclip_face_count;
+      const passFcNum =
+        rawPassFc === null || rawPassFc === undefined || !Number.isFinite(Number(rawPassFc))
+          ? null
+          : Number(rawPassFc);
+      const preclipUnambiguous = passFcNum === 1;
       const ambiguousAutoDetect =
-        wouldAutoDetect && !!v1291Ambig?.sibling_centers_inside_crop;
-      if (v1291Block || (hasCoords && wouldAutoDetect) || ambiguousAutoDetect) {
+        wouldAutoDetect &&
+        !!v1291Ambig?.sibling_centers_inside_crop &&
+        !preclipUnambiguous;
+      const wrongAutoDetect =
+        hasCoords && wouldAutoDetect && !preclipUnambiguous;
+      if (v1291Block || wrongAutoDetect || ambiguousAutoDetect) {
         const reasonLabel = v1291Block
           ? v1291Block.reason
           : ambiguousAutoDetect
@@ -4266,13 +4274,14 @@ serve(async (req) => {
         return await failBeforeProviderDispatch(
           "DISPATCH_BLOCKED_PAYLOAD_PRECHECK",
           "internal_payload_contract_violation",
-          `v129.2.1 preflight blocked dispatch: ${reasonLabel}`,
+          `v129.24 preflight blocked dispatch: ${reasonLabel}`,
           500,
           {
             v1291: v1291Diag,
             v1291_block: v1291Block,
             v1291_ambiguity: v1291Ambig,
             v105_probe: v105Probe,
+            preclip_face_count: passFcNum,
             provider_call_made: false,
             refund_reason: "dispatch_blocked_payload_precheck",
           },
