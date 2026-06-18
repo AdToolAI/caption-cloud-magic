@@ -393,7 +393,7 @@ export function SyncsoForensicsSheet({
           <SheetTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5" />
             Sync.so Forensik
-            <Badge variant="outline" className="ml-2">v129.22.3</Badge>
+            <Badge variant="outline" className="ml-2">v129.23.0</Badge>
           </SheetTitle>
           <SheetDescription>
             Admin-Werkzeug. Strikt isoliert von Produktion: keine Mutation an
@@ -794,7 +794,7 @@ function PreflightPanel({
                         </span>
                       )}
                       <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/50 text-muted-foreground">
-                        v129.22.3 · AWS Rekognition + auto-snap
+                        v129.23.0 · dispatch probe-frame + auto-snap
                       </span>
                       {Array.isArray((c as any).snapped_coord) && (
                         <span
@@ -899,7 +899,7 @@ function PreflightPanel({
                 <div className="font-semibold">⛔ Preclip nicht dispatcht — Crop-Bug vor Versand</div>
                 <div className="mt-0.5 text-[10px] opacity-90">
                   Der Face-Gate hat den Dispatch blockiert, weil die Intent-Koord auf der Plate kein Gesicht trifft.
-                  v129.22.3 self-healed: erkennt Rekognition genau 1 Face innerhalb der Safe-Zone, wird die Koord
+                  v129.23.0 self-healed: erkennt Rekognition genau 1 Face innerhalb der Safe-Zone, wird die Koord
                   automatisch auf das echte Gesicht gesnapt (Badge „auto-snapped" oben). Re-Dispatch jetzt starten.
                 </div>
               </div>
