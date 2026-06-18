@@ -1,39 +1,37 @@
 /**
- * face-detect-mediapipe.ts (v129.22) — Managed Face Detector adapter.
+ * face-detect-mediapipe.ts (v129.22.1) — Managed Face Detector adapter.
  *
- * HISTORY
- *   - v129.21   used `chigozienri/mediapipe-face` on Replicate as primary.
- *   - v129.21.x added prebuilt-frame support, retried multiple lucataco
- *               models. ALL of them produced silent 404 / wrong-schema /
- *               zero-faces failures because they are community / marketplace
- *               models without stability guarantees.
- *   - v129.22   (this file) replaces the Replicate path entirely with
- *               **AWS Rekognition DetectFaces** — a managed production API.
- *               Optional Gemini fallback stays in the caller (syncso-preflight),
- *               not here. The function signature and return shape are
- *               preserved so callers don't change.
- *
- * WHY AWS REKOGNITION
- *   - It is the same class of detector Artlist / HeyGen / Sync.so use
- *     internally (managed CV, not a community ML model).
- *   - We already have `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
- *     `AWS_REGION` configured for Remotion Lambda, so no new secrets.
- *   - Deterministic: same image -> same bbox.
- *   - Multi-face native, pixel bboxes derived from normalized {Left,Top,Width,Height}.
- *
- * EXPECTED INPUT
- *   - `prebuiltFrameUrls` is REQUIRED (client-side canvas JPEG already
- *     uploaded to the `composer-frames` bucket by the Forensics sheet /
- *     compose-dialog-segments). We no longer attempt server-side frame
- *     extraction at all.
+ * v129.22.1: harden region resolution. Workspace had AWS_REGION="Global"
+ * (legacy S3/CloudFront convention) which produced the bogus host
+ * `rekognition.global.amazonaws.com` and every request died with DNS error.
+ * Now we validate AWS_REGION against the real AWS region pattern and fall
+ * back to `us-east-1`. An optional `REKOGNITION_REGION` secret overrides.
  */
 
-// AWS region + credentials. AWS_REGION may be `us-east-1`, `eu-central-1`, …
-const AWS_REGION = Deno.env.get("AWS_REGION") ?? "eu-central-1";
+// Resolve a real AWS region for Rekognition. AWS_REGION in this workspace
+// can contain non-region strings like "Global" — those would build an
+// invalid host. Prefer an explicit REKOGNITION_REGION override, then a
+// validated AWS_REGION, then us-east-1.
+const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
+function resolveRekognitionRegion(): string {
+  const override = (Deno.env.get("REKOGNITION_REGION") ?? "").trim();
+  if (override && AWS_REGION_PATTERN.test(override)) return override;
+  const raw = (Deno.env.get("AWS_REGION") ?? "").trim();
+  if (raw && AWS_REGION_PATTERN.test(raw)) return raw;
+  if (raw) {
+    console.warn(
+      `[face-detect/aws] AWS_REGION='${raw}' is not a valid Rekognition region — falling back to us-east-1. ` +
+      `Set REKOGNITION_REGION to override.`,
+    );
+  }
+  return "us-east-1";
+}
+
+const REKOGNITION_REGION_RESOLVED = resolveRekognitionRegion();
 const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID") ?? "";
 const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
 
-const REKOGNITION_HOST = `rekognition.${AWS_REGION}.amazonaws.com`;
+const REKOGNITION_HOST = `rekognition.${REKOGNITION_REGION_RESOLVED}.amazonaws.com`;
 const REKOGNITION_ENDPOINT = `https://${REKOGNITION_HOST}/`;
 const REKOGNITION_TARGET = "RekognitionService.DetectFaces";
 
@@ -131,7 +129,7 @@ async function signedRekognitionRequest(payloadJson: string): Promise<Response> 
     payloadHash,
   ].join("\n");
 
-  const credentialScope = `${dateStamp}/${AWS_REGION}/rekognition/aws4_request`;
+  const credentialScope = `${dateStamp}/${REKOGNITION_REGION_RESOLVED}/rekognition/aws4_request`;
   const stringToSign = [
     "AWS4-HMAC-SHA256",
     amzDate,
@@ -139,7 +137,7 @@ async function signedRekognitionRequest(payloadJson: string): Promise<Response> 
     await sha256Hex(canonicalRequest),
   ].join("\n");
 
-  const sigKey = await signingKey(AWS_SECRET_ACCESS_KEY, dateStamp, AWS_REGION, "rekognition");
+  const sigKey = await signingKey(AWS_SECRET_ACCESS_KEY, dateStamp, REKOGNITION_REGION_RESOLVED, "rekognition");
   const sigBytes = await hmac(sigKey, stringToSign);
   const signature = Array.from(new Uint8Array(sigBytes))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -316,8 +314,8 @@ export async function detectFacesMediaPipe(opts: {
   }
 
   console.log(
-    `[face-detect/aws] v129.22 rekognition primary plate=${W}x${H} ` +
-    `region=${AWS_REGION} frames=${urls.length}`,
+    `[face-detect/aws] v129.22.1 rekognition primary plate=${W}x${H} ` +
+    `region=${REKOGNITION_REGION_RESOLVED} frames=${urls.length}`,
   );
 
   // Fetch all frames in parallel, then call Rekognition in parallel.
