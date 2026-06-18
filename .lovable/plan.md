@@ -1,145 +1,61 @@
-## Analyse
+## Diagnose
 
-**Ja, ich weiß jetzt, was der aktuelle Fehler ist.**
+Looked at the last dialog scene `0145fdc4…b276` (4 speakers). For each turn Sync.so returned an output, but turns 2 (Matthew) and 4 (Sarah) carry `sync_noop_suspect: true` / `noop_reason: "sync_output_reencoded_passthrough_suspect"` — Sync.so re-encoded the preclip without actually moving the mouth.
 
-Der neueste Abbruch ist nicht durch „sensitive content“ entstanden. In den letzten 24h gibt es in `syncso_dispatch_log` **0 sensitive-content Treffer**, aber **18 `generation_unknown_error` Treffer**.
+Common factor for the two bad turns:
+- Very short voiced audio (Matthew: 0.46s voiced inside a 1.09s preclip; Sarah: 1.46s voiced)
+- Both still dispatched with `active_speaker_detection: { auto_detect: true }` — even though they were tagged `retry_variant: "coords-pro"`.
 
-### Was konkret passiert ist
+That's the bug introduced together with the v129.24 fix: the "preclip is unambiguous → force `auto_detect: true`" rule we added in `compose-dialog-segments` runs **before** the retry-variant check, so the `coords-pro` fallback never actually sends coordinates. Every attempt for turns 2/4 ended up being the same auto-detect call that Sync-3 silently no-ops on short outer-edge crops, and the muxer accepted the noop output as the final clip.
 
-Bei der gezeigten Szene `2363b3f1-d2c4-485b-90ff-aae78a3a3aad` lief die Pipeline so:
+Turns 1 & 3 look identical in payload shape but had longer voiced segments (≥2.3s on a near-square crop), so Sync-3 happened to detect motion and produced real lipsync. That matches what you see in the video.
 
-1. Die Szene hat 4 Sprecher und nutzt korrekt die Single-Face-Preclip-Pipeline.
-2. Für Pass 2/3 wurde ein Preclip erstellt:
-   - `dispatch_video_kind: preclip`
-   - Crop sauber/isoliert: `preclip_ambiguity.risk = clean`
-   - Kein Nachbar im Crop
-3. Die Face-Validation des Preclips hat aber `preclip_face_count = null` gespeichert.
-   - Das bedeutet nicht „kein Gesicht“.
-   - Es bedeutet: Der Validator konnte den Face-Count nicht sicher liefern / hat permissiv weitergemacht.
-4. Weil `preclip_face_count` nicht exakt `1` war, hat die neue v129.24-Logik **nicht** den erfolgreichen `auto_detect:true` Pfad genommen.
-5. Stattdessen wurde wieder das alte schädliche Payload gesendet:
+## Plan
 
-```text
-model: sync-3
-active_speaker_detection: {
-  auto_detect: false,
-  frame_number: 153,
-  coordinates: [362, 360]
-}
-```
+### 1. Honor `coords-pro` retry variant in `compose-dialog-segments`
 
-6. Genau dieser Payload-Typ war in unserem manuellen Test bereits als Ursache identifiziert: **Sync.so bricht auf engen Single-Face-Preclips mit expliziten Koordinaten häufig intern mit `generation_unknown_error` ab.**
+In the dispatch builder, evaluate retry-variant **before** the "preclip unambiguous → auto_detect" branch:
+- When `retry_variant === "coords-pro"` and we have valid `_v1291.transformed_coords_int` + `frame_number` (both already computed for every turn): build the payload with
+  ```ts
+  active_speaker_detection: {
+    auto_detect: false,
+    coordinates: [x, y],
+    frame_number: f,
+  }
+  ```
+  and tag `asd_mode = "coords_pro_preclip_v12925"`.
+- Mirror the same precedence in the v129.1 payload-contract preflight so it doesn't strip the coords back out.
 
-### Warum es lange läuft und dann abbricht
+The first preclip pass still uses `auto_detect: true` for clean preclips (keeps the v129.24 fix for the original `generation_unknown_error` regression intact).
 
-Der Fehler entsteht nicht sofort in unserer Edge Function. Sync.so nimmt den Job zuerst mit `HTTP 201` an, verarbeitet dann serverseitig länger und schickt später per Webhook:
+### 2. Auto-escalate to `coords-pro` on noop detection
 
-```text
-generation_unknown_error
-Something went wrong while processing this generation. Please try again.
-```
+In the multipass orchestrator (same file, post-poll branch that sets `sync_noop_suspect`), when:
+- `sync_noop_suspect === true`, AND
+- `retry_variant !== "coords-pro"`, AND
+- `_v1291.in_bounds === true`
 
-Darum sieht es aus wie „läuft lange, dann bricht es ab“.
+immediately re-queue the turn with `retry_variant: "coords-pro"` and replace the pass's `output_url` only after the retry resolves to a non-noop output (check `sync_output_probe.syncOutputUnchanged === false` AND the new clip is not flagged noop). If the retry also noops twice, fall back to the original muxed preclip (silent video) so we don't ship a re-encoded "fake lipsync" clip — and log `lipsync_final_fallback: "silent_preclip"` on the pass.
 
-### Warum der Screenshot `face_at_frame` zeigt
+### 3. Pad ultra-short voiced audio before dispatch
 
-Der Forensics-Screenshot zeigt zusätzlich einen Preflight-Blocker:
+For preclips where `audio_voiced_sec < 0.8s` (Matthew turn falls here): add 200ms of digital silence head + 200ms tail to the tight WAV before sending to Sync.so. Sync-3 needs ~1s of motion context to commit to lip movement; this stops the no-op on tiny utterances without changing the muxed timeline (the silence is trimmed off when the lipsync output is sliced back into the stitched timeline using `audio_tight.windows_secs`, which already drives the cut).
 
-```text
-Blocker erkannt: face_at_frame
-Face exists but not at the active_speaker_detection coordinate
-```
+Implementation: extend the existing `audio_normalization` block (already passes through ffmpeg) to apply `apad`/`adelay` when `audio_voiced_sec < 0.8`. Mode becomes `"padded_short_voiced_v12925"`.
 
-Das passt zum gleichen Muster: Die Pipeline hängt noch an Koordinatenprüfungen für einen Preclip, obwohl der sichere Weg bei einem sauberen Single-Face-Preclip laut Sync.so-Doku und unserem Repro-Test `auto_detect:true` ist.
+### 4. Recover the failing scene + verify
 
-Sync.so selbst sagt in der aktuellen Speaker-Selection-Doku:
+- Reset `dialog_shots.passes[1]` and `passes[3]` of scene `0145fdc4…b276` to `status: "queued"` with `retry_variant: "coords-pro"` and clear `final_url`, so the existing poller picks them up under the new logic.
+- After re-dispatch, confirm in `syncso_dispatch_log` that the new attempts for turns 2 and 4 carry `coords != null` and `frame_number != null`, the webhook reports `COMPLETED` (not COMPLETED_NOOP_SUSPECT), and `sync_output_probe.syncOutputUnchanged === false`.
+- Visually confirm in the re-rendered stitched MP4 that Matthew and Sarah now have proper lip movement matching their VO segments.
 
-- `auto_detect:true` ist für Single-/obvious-speaker Video-Clips gedacht.
-- Manuelle `coordinates` sind für Mehrpersonen-Clips gedacht, wenn deterministische Auswahl nötig ist.
+## Files touched
 
-Unsere Preclips sind aber bereits auf **eine Person** zugeschnitten. Die Koordinate ist dort redundant und in der Praxis schädlich.
+- `supabase/functions/compose-dialog-segments/index.ts` — retry-variant precedence, noop-escalation branch, short-voiced padding.
+- (No frontend changes; no DB schema changes; no other edge functions.)
 
-## Fix-Plan
+## What this does NOT change
 
-### 1. Dispatch-Regel korrigieren
-
-In `compose-dialog-segments` ändere ich die Entscheidung so:
-
-```text
-Wenn usePassPreclip=true
-UND der Crop laut Ambiguity-Check sauber ist
-UND kein Nachbar-Gesicht im Crop liegt
-UND preclip_face_count nicht explizit > 1 ist:
-  immer active_speaker_detection = { auto_detect: true }
-```
-
-Das bedeutet:
-
-- `preclip_face_count = 1` → auto-detect
-- `preclip_face_count = null` + clean crop → auto-detect
-- `preclip_face_count = 0` → nicht an Sync.so schicken; sauber vorher failen/refunden oder Preclip reparieren
-- `preclip_face_count > 1` oder Nachbar im Crop → nicht auto-detect; blocken oder deterministisch behandeln
-
-### 2. Live Face-Gate an Auto-Detect anpassen
-
-Wenn das finale Payload `auto_detect:true` nutzt, darf die Live Face-Gate nicht mehr „Gesicht an Koordinate“ prüfen, weil es dann keine Koordinate gibt.
-
-Stattdessen:
-
-- Bei `auto_detect:true`: nur prüfen, ob mindestens ein Gesicht im Preclip sichtbar ist, falls ein Frame verfügbar ist.
-- Wenn keine Probe verfügbar ist, darf der saubere Preclip weiterlaufen.
-- Kein `face_at_frame` Blocker für Single-Face-AutoDetect-Preclips.
-
-### 3. Preclip-Face-Count robuster speichern
-
-Bei Preclip-Validierung:
-
-- Wenn der Validator keinen sicheren Count liefert, aber der Crop sauber ist und die Preclip-Renderdaten stimmen, wird der Count als `unknown_trusted` geloggt statt als `null`, damit spätere Logik nicht wieder in den Koordinatenpfad fällt.
-- Die Forensics-Anzeige soll klar unterscheiden:
-  - „kein Gesicht erkannt“
-  - „Probe nicht verfügbar“
-  - „sauberer Single-Face-Preclip, AutoDetect genutzt“
-
-### 4. Audio/Video-Längen-Falle entschärfen
-
-In den Logs ist zusätzlich auffällig:
-
-```text
-audio_full_sec: 9
-video_dur_sec: 3.132
-audio_vs_video_delta_sec: 5.868
-```
-
-Das kann zu langen Jobs, `cut_off`-Verhalten und instabiler Provider-Verarbeitung führen. Ich prüfe und korrigiere im selben Fix nur die Übergabe, damit Sync.so wirklich die passende Tight-Audio-Datei bzw. passende Dauer bekommt und nicht wieder eine 9s-Datei gegen einen 3.1s-Preclip läuft.
-
-### 5. Bestehende kaputte Szene zurücksetzbar machen
-
-Nach dem Codefix setze ich die betroffene fehlgeschlagene Szene optional auf einen retry-fähigen Zustand zurück, damit du nicht alles neu bauen musst.
-
-Dabei werden keine Credits doppelt belastet; bestehende Refund-/Idempotenzlogik bleibt erhalten.
-
-### 6. Validierung nach dem Fix
-
-Ich prüfe danach per Datenbank/Logs:
-
-- neues Dispatch-Payload enthält bei Preclip:
-
-```text
-active_speaker_detection: { auto_detect: true }
-```
-
-- kein `coordinates`/`frame_number` im Sync.so-Payload für saubere Single-Face-Preclips
-- kein `face_at_frame` Blocker für AutoDetect-Preclips
-- Webhook endet nicht mehr mit `generation_unknown_error`
-
-## Erwartetes Ergebnis
-
-Die Pipeline soll nicht mehr minutenlang in Sync.so laufen und dann wegen eines internen `generation_unknown_error` abbrechen, sondern saubere Single-Face-Preclips direkt mit dem stabilen AutoDetect-Payload verarbeiten.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+- The v129.24 fix for clean single-face preclips (auto_detect on first attempt) stays.
+- Multi-speaker ambiguous preclips still hit the existing coordinate path with the existing guards.
+- No model swap (we keep `sync-3`) — switching to `lipsync-2-pro` would double the spend per turn and isn't needed once the coords retry actually executes.
