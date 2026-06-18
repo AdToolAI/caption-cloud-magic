@@ -290,6 +290,7 @@ async function probeFaceAtFrame(
 
   if (mediapipeSkippedReason) {
     console.warn(`[syncso-preflight] mediapipe skipped reason=${mediapipeSkippedReason} w=${plateWidth} h=${plateHeight} dur=${durationSec} frame=${frameNumber}`);
+    mediapipeMeta = { mediapipe_skipped_reason: mediapipeSkippedReason };
   } else {
     try {
       const tsSec = Math.max(0.05, (frameNumber as number) / 30);
