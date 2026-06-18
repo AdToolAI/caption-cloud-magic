@@ -279,6 +279,7 @@ async function probeFaceAtFrame(
   plateWidth: number | null = null,
   plateHeight: number | null = null,
   durationSec: number | null = null,
+  extractContext: { userId?: string; projectId?: string; sceneId?: string; passIdx?: number } = {},
 ): Promise<CheckResult> {
   // ── Stage 1: MediaPipe primary ──────────────────────────────────────
   let mediapipeMeta: Record<string, unknown> | null = null;
@@ -448,6 +449,10 @@ async function probeFaceAtFrame(
       videoUrl,
       frameNumber,
       fps: 30,
+      userId: extractContext.userId,
+      projectId: extractContext.projectId,
+      sceneId: extractContext.sceneId,
+      passIdx: extractContext.passIdx,
     });
     extractMs = extracted.latencyMs ?? 0;
     if (!extracted.ok || !extracted.frameUrl) {
@@ -590,10 +595,19 @@ serve(async (req) => {
   // Resolve pass + dispatch (same chain as support-bundle)
   const { data: scene } = await admin
     .from("composer_scenes")
-    .select("id, dialog_shots")
+    .select("id, project_id, dialog_shots")
     .eq("id", sceneId)
     .maybeSingle();
   if (!scene) return json({ error: "scene_not_found" }, 404);
+  let sceneUserId: string | null = null;
+  if ((scene as any)?.project_id) {
+    const { data: project } = await admin
+      .from("composer_projects")
+      .select("user_id")
+      .eq("id", (scene as any).project_id)
+      .maybeSingle();
+    sceneUserId = typeof (project as any)?.user_id === "string" ? (project as any).user_id : null;
+  }
   const passes = scene.dialog_shots?.passes ?? [];
   const pass = passes[passIndex];
   if (!pass) return json({ error: "pass_not_found", available: passes.length }, 404);
@@ -623,9 +637,13 @@ serve(async (req) => {
 
   const preclipVideoUrl: string | null =
     (typeof payloadSummary?.input_video === "string" && payloadSummary.input_video) ||
+    (pass?._v106_probe?.dispatch_video_kind === "preclip" && typeof pass?._v106_probe?.payload_video_url === "string"
+      ? pass._v106_probe.payload_video_url
+      : null) ||
+    (typeof pass?.preclip_url === "string" && pass.preclip_url ? pass.preclip_url : null) ||
     null;
   const plateVideoUrl: string =
-    pass.payload_video_url ?? pass._v106_probe?.payload_video_url ?? dispatch?.video_url ?? pass.input_url ?? "";
+    pass.payload_video_url ?? dispatch?.video_url ?? pass.input_url ?? "";
   const videoUrl: string = preclipVideoUrl ?? plateVideoUrl;
   const videoSourceKind: "preclip" | "plate" = preclipVideoUrl ? "preclip" : "plate";
 
@@ -721,6 +739,12 @@ serve(async (req) => {
     plateW,
     plateH,
     plateDur,
+    {
+      userId: sceneUserId ?? undefined,
+      projectId: (scene as any)?.project_id,
+      sceneId,
+      passIdx: passIndex,
+    },
   );
 
 
@@ -830,9 +854,9 @@ serve(async (req) => {
   // provider bug.
   const noOutboundPayload = videoSourceKind === "plate" && !preclipVideoUrl;
   const passStatus: string = String((pass as any)?.status ?? "");
-  const dispatchNeverHappened = noOutboundPayload && (
-    !providerJobId || passStatus === "failed" || passStatus === "face_gate_blocked"
-  );
+  const dispatchNeverHappened =
+    !providerJobId ||
+    (noOutboundPayload && (passStatus === "failed" || passStatus === "face_gate_blocked"));
   if (dispatchNeverHappened && faceProbe && faceProbe.status === "fail") {
     (faceProbe as any).status = "warn";
     (faceProbe as any).verdict_pre_v12920 = (faceProbe as any).verdict ?? null;
@@ -871,6 +895,12 @@ serve(async (req) => {
       video_url: videoUrl || null,
       video_source_kind: videoSourceKind,
       dispatch_never_happened: dispatchNeverHappened,
+      pass_status: passStatus,
+      coords_snapped_at: pass?.coords_snapped_at ?? null,
+      coords_snap_origin: pass?.coords_snap_origin ?? null,
+      coords_snap_space: pass?.coords_snap_space ?? null,
+      dispatch_coords_snapped: pass?.dispatch_coords_snapped ?? null,
+      probe_frame_url: pass?.probe_frame_url ?? null,
       plate_video_url: plateVideoUrl || null,
       preclip_video_url: preclipVideoUrl,
       audio_url_present: !!audioUrl,
@@ -881,6 +911,6 @@ serve(async (req) => {
     checks,
     verdict,
     first_blocker: firstBlocker,
-    preflight_version: "v129.22.3",
+    preflight_version: "v129.23.0",
   });
 });

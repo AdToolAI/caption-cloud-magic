@@ -406,6 +406,9 @@ interface PassState {
   preclip_url?: string;
   preclip_render_id?: string;
   preclip_crop?: { x: number; y: number; size: number; outputSize: number };
+  probe_frame_url?: string;
+  coords_snapped_at?: string;
+  coords_snap_origin?: [number, number] | null;
   preclip_error?: string;
   audio_url_full?: string;
   audio_tight?: { url: string; dur_sec: number; windows_secs: Array<[number, number]>; output_offsets_sec?: number[] };
@@ -4281,17 +4284,34 @@ serve(async (req) => {
         ? [Number(gateAsd.coordinates[0]), Number(gateAsd.coordinates[1])]
         : null;
       const gateMulti = speakers.length >= 2;
+      const preclipDimsForGate = (pass as any).preclip_dims ?? null;
+      const preclipCropForGate = (pass as any).preclip_crop ?? null;
+      const gateWidth = usePassPreclip
+        ? Number(preclipDimsForGate?.width ?? preclipCropForGate?.outputSize ?? 0)
+        : Number(plateDims?.width ?? 0);
+      const gateHeight = usePassPreclip
+        ? Number(preclipDimsForGate?.height ?? preclipCropForGate?.outputSize ?? 0)
+        : Number(plateDims?.height ?? 0);
       const gate = await verifyFaceBeforeDispatch({
         videoUrl: dispatchVideoUrl,
         frameNumber: gateFrame,
         coord: gateCoord,
         isMultiSpeakerContext: gateMulti,
         // v129.22.3 — enable auto-snap on heuristic/inferred coords
-        plateWidth: plateDims?.width,
-        plateHeight: plateDims?.height,
+        plateWidth: Number.isFinite(gateWidth) && gateWidth > 0 ? gateWidth : undefined,
+        plateHeight: Number.isFinite(gateHeight) && gateHeight > 0 ? gateHeight : undefined,
+        prebuiltFrameUrl: typeof (pass as any).probe_frame_url === "string" ? (pass as any).probe_frame_url : undefined,
+        userId,
+        projectId: String((scene as any).project_id ?? "shared"),
+        sceneId,
+        passIdx: currentPassIdx,
       });
+      if (gate.frame_jpeg_url) {
+        (pass as any).probe_frame_url = gate.frame_jpeg_url;
+        (pass as any).probe_frame_cached = !!gate.frame_cached;
+      }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} v129.22.3_face_gate pass=${currentPassIdx + 1} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
+        `[compose-dialog-segments] scene=${sceneId} v129.23_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
       // v129.22.3 — Auto-snap path: rewrite ASD coords with the
       // Rekognition-derived center and proceed to dispatch.
@@ -4309,9 +4329,14 @@ serve(async (req) => {
             payloadAsd.coordinates = newCoord;
           }
           // Persist on the pass so subsequent retries see the corrected coord.
-          (pass as any).coords = newCoord;
+          if (!usePassPreclip) {
+            (pass as any).coords = newCoord;
+          } else {
+            (pass as any).dispatch_coords_snapped = newCoord;
+          }
           (pass as any).coords_snapped_at = new Date().toISOString();
           (pass as any).coords_snap_origin = gate.original_coord ?? null;
+          (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
         } catch (mutErr) {
           console.warn(
             `[compose-dialog-segments] scene=${sceneId} v129.22.3 ASD coord mutation failed: ${(mutErr as Error)?.message}`,
