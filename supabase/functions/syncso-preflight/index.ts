@@ -636,12 +636,17 @@ serve(async (req) => {
     resolved: {
       video_url_present: !!videoUrl,
       video_url: videoUrl || null,
+      video_source_kind: videoSourceKind,
+      plate_video_url: plateVideoUrl || null,
+      preclip_video_url: preclipVideoUrl,
       audio_url_present: !!audioUrl,
       frame_number: frameNumber,
       coord,
+      preclip_crop: meta?.preclip_crop ?? meta?.v1291_diag?.preclip_crop ?? metaV116?.preclip_crop ?? null,
     },
     checks,
     verdict,
     first_blocker: firstBlocker,
+    preflight_version: "v129.19",
   });
 });
