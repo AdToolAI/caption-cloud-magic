@@ -609,6 +609,27 @@ serve(async (req) => {
     };
   }
 
+  // v129.20 — When we had to fall back to the plate because the outbound
+  // payload was never logged (face-gate blocked the dispatch, or the pass
+  // failed before any /generate call), the face_at_frame probe is checking
+  // the WRONG artifact — it's measuring the plate at a coord that's only
+  // an intent, not what Sync.so actually saw. Downgrade the probe to
+  // "warn" with an explicit explanation so the sheet doesn't read as a
+  // provider bug.
+  const noOutboundPayload = videoSourceKind === "plate" && !preclipVideoUrl;
+  const passStatus: string = String((pass as any)?.status ?? "");
+  const dispatchNeverHappened = noOutboundPayload && (
+    !providerJobId || passStatus === "failed" || passStatus === "face_gate_blocked"
+  );
+  if (dispatchNeverHappened && faceProbe && faceProbe.status === "fail") {
+    (faceProbe as any).status = "warn";
+    (faceProbe as any).verdict_pre_v12920 = (faceProbe as any).verdict ?? null;
+    (faceProbe as any).note =
+      "Preclip wurde nie an Sync.so gesendet (vor Dispatch blockiert). " +
+      "Validierung läuft auf der Plate mit Intent-Koord — nicht aussagekräftig " +
+      "für den tatsächlichen Provider-Input. Re-Dispatch nach Crop-Fix.";
+  }
+
   const checks: Record<string, CheckResult> = {
     video_fetchable,
     video_codec,
@@ -637,6 +658,7 @@ serve(async (req) => {
       video_url_present: !!videoUrl,
       video_url: videoUrl || null,
       video_source_kind: videoSourceKind,
+      dispatch_never_happened: dispatchNeverHappened,
       plate_video_url: plateVideoUrl || null,
       preclip_video_url: preclipVideoUrl,
       audio_url_present: !!audioUrl,
@@ -647,6 +669,6 @@ serve(async (req) => {
     checks,
     verdict,
     first_blocker: firstBlocker,
-    preflight_version: "v129.19",
+    preflight_version: "v129.20",
   });
 });
