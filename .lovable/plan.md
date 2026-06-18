@@ -1,49 +1,30 @@
-# v129.22.1 — Rekognition Region Hardening
+## Plan: v129.22.2 — Rekognition Region auf `eu-central-1` (Frankfurt) angleichen
 
-## Problem
+Du hast recht: Unser AWS-Stack (Remotion Lambda) läuft in **`eu-central-1`** (Frankfurt). Den gleichen Region-Wert sollten wir auch für Rekognition nehmen — sonst geht jedes Frame quer durch den Atlantik nach Virginia, was Latenz, Kosten und (wegen GDPR) Compliance unnötig verschlechtert.
 
-Edge-Logs zeigen:
+### Was sich ändert
 
-```
-[face-detect/aws] v129.22 rekognition primary plate=720x720 region=Global frames=1
-[face-detect/aws] rekognition request failed frame=0:
-  dns error: failed to lookup address information for
-  rekognition.global.amazonaws.com
-```
+**1. `supabase/functions/_shared/face-detect-mediapipe.ts`**
+- Default-Fallback in `resolveRekognitionRegion()` von `"us-east-1"` → `"eu-central-1"`.
+- Reihenfolge bleibt: `REKOGNITION_REGION` (override) → validiertes `AWS_REGION` → **`eu-central-1`** (Default).
+- Damit gilt: solange `AWS_REGION="Global"` bleibt, baut die Funktion automatisch den Host `rekognition.eu-central-1.amazonaws.com` und signiert mit `eu-central-1`.
+- Der `console.warn` bleibt, ändert nur den Hinweistext auf den neuen Default.
 
-Das Secret `AWS_REGION` enthält den String `"Global"` (vermutlich historisch für S3/CloudFront gesetzt). Daraus baut `face-detect-mediapipe.ts` den Host `rekognition.global.amazonaws.com` — diese Region/dieser Host existiert bei AWS Rekognition nicht. Jeder Request scheitert mit DNS-Fehler → `rekognition_zero_faces` → Gemini-Fallback → Forensics zeigt `PROVIDER: ERROR` und der rote "Crop-Bug vor Versand"-Banner bleibt.
+**2. `src/components/admin/SyncsoForensicsSheet.tsx`**
+- Version-Bump auf `v129.22.2` (nur Anzeige).
+- Keine UI-Logikänderung — `PROVIDER: AWS_REKOGNITION` wird grün, sobald Detection klappt.
 
-**AWS wird also aufgerufen, der Call kommt aber nie bei AWS an.**
+### Was sich NICHT ändert
+- Keine neuen Secrets nötig. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY funktionieren regions­übergreifend (IAM ist global, Rekognition hat in `eu-central-1` `DetectFaces` voll verfügbar).
+- `AWS_REGION="Global"` lassen wir bewusst unangetastet, weil andere Module (S3/CloudFront/Lambda-Helper) es so erwarten.
+- Keine Änderung an Dispatch, Refund, Watchdog, Sync.so, Composer, Director's Cut, neuen Providern.
 
-## Fix (1 Datei, ~10 Zeilen)
+### Verifikation nach Deploy
+Im Forensics-Sheet einer Szene:
+- `REGION: eu-central-1` (neues Detail im Log)
+- `PROVIDER: AWS_REKOGNITION` (grün)
+- `MEDIAPIPE_FACES ≥ 1`, `MEDIAPIPE_MS ≈ 150–600 ms` (deutlich schneller als us-east-1, da EU-EU statt EU-US)
+- Rotes "Crop-Bug vor Versand" verschwindet, sobald BBox = Intent-Koordinaten matcht. Falls es bleibt → reiner Coord-Transform-Bug, separat fixbar.
 
-### `supabase/functions/_shared/face-detect-mediapipe.ts`
-
-1. Neue Helper `resolveRekognitionRegion()`:
-   - Erst `REKOGNITION_REGION` lesen (optionaler Override).
-   - Sonst `AWS_REGION` lesen, aber **nur wenn** sie zum Regex `^[a-z]{2}-[a-z]+-\d$` passt (`us-east-1`, `eu-central-1`, …).
-   - Sonst Fallback `"us-east-1"` (Rekognition ist dort verfügbar und am günstigsten).
-   - Einmaliger `console.warn` wenn `AWS_REGION` gesetzt aber ungültig war ("AWS_REGION='Global' is not a valid Rekognition region, falling back to us-east-1").
-2. `AWS_REGION` Konstante durch `REKOGNITION_REGION_RESOLVED` ersetzen — überall in der Datei (Host, Signing, Logs).
-3. Versions-Bump im Top-Kommentar + Log-Prefix auf `v129.22.1`.
-
-### `src/components/admin/SyncsoForensicsSheet.tsx`
-
-- Header-Badge `V129.22 · AWS REKOGNITION PRIMARY` → `V129.22.1 · AWS REKOGNITION PRIMARY`.
-- Sonst keine UI-Änderung — wenn der Fix greift, zeigt das Sheet automatisch `PROVIDER: AWS_REKOGNITION` (grün) statt `PROVIDER: ERROR`.
-
-## Bewusst NICHT in diesem Fix
-
-- Kein neues Secret zwingend nötig — User kann `REKOGNITION_REGION` setzen, muss aber nicht.
-- Kein Anfassen von `syncso-preflight`, Dispatch, Refund, Watchdog, Sync.so-Payload.
-- Kein Face-Gate / Crop-Transform-Fix — das ist Folge-Bug, der erst sichtbar wird wenn Rekognition wieder Treffer liefert.
-- Kein Wechsel zu Google Vision / Replicate.
-
-## Verifikation
-
-Nach Deploy in derselben Forensics-Szene auf einem Sprecher klicken:
-
-- Edge-Log: `[face-detect/aws] v129.22.1 rekognition primary plate=… region=us-east-1 frames=1`
-- Edge-Log: `[face-detect/aws] rekognition ok plate=… raw=1 merged=1`
-- Sheet zeigt `PROVIDER: AWS_REKOGNITION` (grün), `MEDIAPIPE_FACES ≥ 1`, `MEDIAPIPE_MS ≈ 300–1200ms`, `SOURCE: aws_rekognition`.
-- Roter "Crop-Bug vor Versand" verschwindet wenn die detektierte Bbox die Intent-Koord trifft. Wenn er bleibt, ist es der erwartete Folge-Bug (Coord-Transformation), den wir dann separat angehen.
+### Optional (nicht in diesem Schritt)
+Falls du möchtest, können wir später `REKOGNITION_REGION` als explizites Secret setzen, um die Region nicht im Code zu hardcoden — aber für jetzt ist der `eu-central-1`-Default sauber und reicht.
