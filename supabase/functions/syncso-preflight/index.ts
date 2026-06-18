@@ -595,10 +595,19 @@ serve(async (req) => {
   // Resolve pass + dispatch (same chain as support-bundle)
   const { data: scene } = await admin
     .from("composer_scenes")
-    .select("id, user_id, project_id, dialog_shots")
+    .select("id, project_id, dialog_shots")
     .eq("id", sceneId)
     .maybeSingle();
   if (!scene) return json({ error: "scene_not_found" }, 404);
+  let sceneUserId: string | null = null;
+  if ((scene as any)?.project_id) {
+    const { data: project } = await admin
+      .from("composer_projects")
+      .select("user_id")
+      .eq("id", (scene as any).project_id)
+      .maybeSingle();
+    sceneUserId = typeof (project as any)?.user_id === "string" ? (project as any).user_id : null;
+  }
   const passes = scene.dialog_shots?.passes ?? [];
   const pass = passes[passIndex];
   if (!pass) return json({ error: "pass_not_found", available: passes.length }, 404);
@@ -731,7 +740,7 @@ serve(async (req) => {
     plateH,
     plateDur,
     {
-      userId: (scene as any)?.user_id,
+      userId: sceneUserId ?? undefined,
       projectId: (scene as any)?.project_id,
       sceneId,
       passIdx: passIndex,
