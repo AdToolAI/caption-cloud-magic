@@ -27,13 +27,18 @@
  * The caller (compose-dialog-segments v51) decides how to map speakers
  * to detected boxes (characterId via reference portrait → left-to-right
  * ordering of plate boxes is the safest deterministic mapping).
+ *
+ * v129.21 — MediaPipe is now the PRIMARY detector via
+ * `_shared/face-detect-mediapipe.ts`. Gemini Vision on mp4 URL stays as
+ * fallback when Replicate is down / model errors. MediaPipe is what
+ * Sync.so / HeyGen / Hedra use internally; Gemini was the dominant cause
+ * of "no face / wrong face" coordinate drift in production.
  */
+import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
 
 // v98 — Frame extraction via Gemini Vision directly on the video URL.
-// Replicate's `lucataco/ffmpeg-extract-frame` and `lucataco/frame-extractor`
-// both 404 (models removed). `validate-frame-face` proves Gemini 2.5 Flash
-// accepts an mp4 URL as `image_url` and returns face bboxes for the
-// referenced timestamp — no Replicate call, no PNG rehost needed.
+// `validate-frame-face` proves Gemini 2.5 Flash accepts an mp4 URL as
+// `image_url` and returns face bboxes for the referenced timestamp.
 
 const LOVABLE_GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_TIMEOUT_MS = 30_000;
@@ -277,49 +282,87 @@ export async function detectPlateFaces(params: {
     console.warn(`${tag} cache read failed: ${(e as Error)?.message}`);
   }
 
-  // 2. v98: no Replicate extraction — Gemini reads the mp4 directly.
-  const frameUrl = resolveFrameUrl(params.plateUrl);
-  const tsHint = Math.max(0.2, params.midDurationSec * 0.5);
-  console.log(`${tag} gemini-direct-mp4 ts≈${tsHint.toFixed(2)}s url=${frameUrl.slice(0, 100)}`);
-
-  // 3. Ask Gemini Vision for face bboxes on the real plate frame.
-  const rawFaces = await askGeminiForPlateFaces(frameUrl, params.expectedCount, tsHint);
-  if (rawFaces.length === 0) {
-    console.warn(`${tag} gemini returned 0 faces — caller should fall back`);
-    return null;
+  // 2. v129.21 — Try MediaPipe FIRST (dedicated face detector, pixel-bbox,
+  //    multi-frame union). Falls back to Gemini direct-mp4 on any failure.
+  let detectorUsed = "gemini-2.5-flash";
+  let mpFaces: PlateFaceBox[] | null = null;
+  try {
+    const mp = await detectFacesMediaPipe({
+      videoUrl: params.plateUrl,
+      plateWidth: params.plateWidth,
+      plateHeight: params.plateHeight,
+      durationSec: Math.max(0.5, params.midDurationSec * 2),
+    });
+    if (mp.ok && mp.faces.length > 0) {
+      mpFaces = mp.faces
+        .map((f, idx) => ({
+          bbox: f.bbox,
+          center: f.center,
+          slot: idx,
+          confidence: f.confidence,
+        }))
+        .sort((a, b) => a.center[0] - b.center[0])
+        .map((f, idx) => ({ ...f, slot: idx }));
+      detectorUsed = `mediapipe-${mp.framesScanned}f`;
+      console.log(
+        `${tag} mediapipe PRIMARY ok faces=${mpFaces.length} frames=${mp.framesScanned} ms=${mp.ms}`,
+      );
+    } else {
+      console.warn(
+        `${tag} mediapipe PRIMARY miss (${mp.error ?? "0 faces"}) — falling back to gemini`,
+      );
+    }
+  } catch (e) {
+    console.warn(`${tag} mediapipe PRIMARY threw: ${(e as Error)?.message} — falling back to gemini`);
   }
 
-  // 4. Normalize → plate pixel space. Sort left-to-right. Re-assign slots.
+  // Gemini path — fallback OR when MediaPipe returned 0 faces.
+  let faces: PlateFaceBox[];
+  if (mpFaces && mpFaces.length > 0) {
+    faces = mpFaces;
+  } else {
+    const frameUrl = resolveFrameUrl(params.plateUrl);
+    const tsHint = Math.max(0.2, params.midDurationSec * 0.5);
+    console.log(`${tag} gemini-direct-mp4 ts≈${tsHint.toFixed(2)}s url=${frameUrl.slice(0, 100)}`);
+
+    const rawFaces = await askGeminiForPlateFaces(frameUrl, params.expectedCount, tsHint);
+    if (rawFaces.length === 0) {
+      console.warn(`${tag} gemini also returned 0 faces — caller should fall back`);
+      return null;
+    }
+
+    const W = Math.max(1, params.plateWidth);
+    const H = Math.max(1, params.plateHeight);
+    faces = rawFaces
+      .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
+      .map((f) => {
+        const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
+        const x1 = Math.round(nx1 * W);
+        const y1 = Math.round(ny1 * H);
+        const x2 = Math.round(nx2 * W);
+        const y2 = Math.round(ny2 * H);
+        return {
+          bbox: [x1, y1, x2, y2] as [number, number, number, number],
+          center: [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)] as [number, number],
+          slot: 0,
+          confidence: typeof f.confidence === "number" ? f.confidence : undefined,
+        };
+      })
+      .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
+      .sort((a, b) => a.center[0] - b.center[0])
+      .map((f, idx) => ({ ...f, slot: idx }));
+  }
+
   const W = Math.max(1, params.plateWidth);
   const H = Math.max(1, params.plateHeight);
-  const faces: PlateFaceBox[] = rawFaces
-    .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
-    .map((f) => {
-      const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
-      const x1 = Math.round(nx1 * W);
-      const y1 = Math.round(ny1 * H);
-      const x2 = Math.round(nx2 * W);
-      const y2 = Math.round(ny2 * H);
-      const cx = Math.round((x1 + x2) / 2);
-      const cy = Math.round((y1 + y2) / 2);
-      return {
-        bbox: [x1, y1, x2, y2] as [number, number, number, number],
-        center: [cx, cy] as [number, number],
-        slot: 0, // re-computed after sorting
-        confidence: typeof f.confidence === "number" ? f.confidence : undefined,
-      };
-    })
-    .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
-    .sort((a, b) => a.center[0] - b.center[0])
-    .map((f, idx) => ({ ...f, slot: idx }));
 
   if (faces.length === 0) {
-    console.warn(`${tag} all gemini boxes degenerate — caller should fall back`);
+    console.warn(`${tag} all detector boxes degenerate — caller should fall back`);
     return null;
   }
 
   console.log(
-    `${tag} detected ${faces.length} face(s) plate=${W}x${H} ` +
+    `${tag} detected ${faces.length} face(s) via ${detectorUsed} plate=${W}x${H} ` +
     `boxes=${JSON.stringify(faces.map((f) => f.bbox))}`,
   );
 
@@ -333,13 +376,13 @@ export async function detectPlateFaces(params: {
         width: W,
         height: H,
         faces,
-        detector: "gemini-2.5-flash",
-        frame_url: frameUrl,
+        detector: detectorUsed,
+        frame_url: params.plateUrl,
         expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
       }, { onConflict: "plate_url_hash" });
   } catch (e) {
     console.warn(`${tag} cache write failed: ${(e as Error)?.message}`);
   }
 
-  return { faces, width: W, height: H, detector: "gemini-2.5-flash", frame_url: frameUrl, cached: false };
+  return { faces, width: W, height: H, detector: detectorUsed, frame_url: params.plateUrl, cached: false };
 }
