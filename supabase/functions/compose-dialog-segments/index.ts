@@ -3495,7 +3495,61 @@ serve(async (req) => {
       const preclipUnambiguous =
         ambiguityClean && !preclipFaceCountConfirmedMulti && passFaceCount !== 0;
 
-      if (preclipUnambiguous) {
+      // v129.26 — Honor `coords-pro` retry inside the preclip path.
+      // The v129.24 fix forces auto_detect:true for clean single-face
+      // preclips on the FIRST attempt (avoids `generation_unknown_error`).
+      // But sync-3 occasionally NOOPs on short / outer-edge crops with
+      // auto_detect — Sync.so's internal face selector silently
+      // re-encodes the preclip unchanged (DB-verified for speakers 2 & 4
+      // of scene 0145fdc4… on 2026-06-18). When the webhook flags such a
+      // NOOP-suspect, it bumps `retry_variant` to `coords-pro` and calls
+      // us back. On THAT retry we MUST send explicit preclip-space
+      // coordinates + frame_number so Sync.so skips its own detector and
+      // animates the locked face. Without this branch the retry repeats
+      // the same auto_detect call and noops again.
+      const coordsProRetry =
+        (retryVariant === "coords-pro" ||
+         retryVariant === "sync3-coords" ||
+         retryVariant === "coords-pro-lp2pro") &&
+        isRetry === true && plateCoords && cropOk;
+      let coordsProInBounds = false;
+      if (coordsProRetry) {
+        const cx = Number(crop.x);
+        const cy = Number(crop.y);
+        const cSize = Number(crop.size);
+        const scale = outSize / cSize;
+        const xFloat = (plateCoords[0] - cx) * scale;
+        const yFloat = (plateCoords[1] - cy) * scale;
+        const xInt = Math.round(xFloat);
+        const yInt = Math.round(yFloat);
+        const inBounds = xInt >= 0 && xInt < outSize && yInt >= 0 && yInt < outSize;
+        v1291Diag = {
+          enabled: true,
+          source_space: "plate",
+          target_space: "preclip",
+          plate_coords: plateCoords,
+          preclip_crop: { x: cx, y: cy, size: cSize, outputSize: outSize },
+          scale: Number(scale.toFixed(4)),
+          transformed_coords_float: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
+          transformed_coords_int: [xInt, yInt],
+          in_bounds: inBounds,
+          frame_number: refFrame,
+          retry_variant: retryVariant,
+        };
+        (pass as any)._v1291 = v1291Diag;
+        coordsProInBounds = inBounds;
+      }
+
+      if (coordsProRetry && coordsProInBounds) {
+        const xInt = (v1291Diag as any).transformed_coords_int[0];
+        const yInt = (v1291Diag as any).transformed_coords_int[1];
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          frame_number: refFrame,
+          coordinates: [xInt, yInt],
+        };
+        asdMode = "coords_pro_preclip_v12926";
+      } else if (preclipUnambiguous) {
         // Single-face preclip → ASD coords/bboxes are harmful on Sync.so.
         // Use auto_detect:true regardless of scene-level multi-speaker flag.
         syncOptions.active_speaker_detection = { auto_detect: true };
