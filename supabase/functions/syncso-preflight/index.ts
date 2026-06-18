@@ -257,14 +257,125 @@ function sniffAudio(b: Uint8Array, totalBytes: number | null): AudioInfo {
   return out;
 }
 
-// ---------- Face probe at frame (v129.14 — client-side JPEG) ----------
+// ---------- Face probe at frame (v129.21.3 — MediaPipe primary) ----------
+//
+// Strategy mirrors compose-dialog-segments dispatch path:
+//   1) MediaPipe on the plate video at the ASD timestamp (requires
+//      Replicate token + plate dimensions + duration).
+//   2) If MediaPipe is decisive (1+ face detected) we answer from it.
+//   3) Otherwise (MediaPipe ok:false, 0 faces, or pre-conditions missing)
+//      we fall back to the original Gemini Vision probe — MediaPipe has
+//      a higher false-negative rate on profile/turned faces.
+//
+// `source` in the returned CheckResult is one of:
+//   "mediapipe" | "gemini_fallback" | "gemini" | "skipped"
 async function probeFaceAtFrame(
   videoUrl: string,
   frameNumber: number | null,
   coord: [number, number] | null,
   wasInferred: boolean = false,
   prebuiltFrameUrl: string | null = null,
+  plateWidth: number | null = null,
+  plateHeight: number | null = null,
+  durationSec: number | null = null,
 ): Promise<CheckResult> {
+  // ── Stage 1: MediaPipe primary ──────────────────────────────────────
+  let mediapipeMeta: Record<string, unknown> | null = null;
+  if (
+    videoUrl &&
+    frameNumber != null &&
+    plateWidth && plateWidth > 0 &&
+    plateHeight && plateHeight > 0 &&
+    durationSec && durationSec > 0
+  ) {
+    try {
+      const tsSec = Math.max(0.05, frameNumber / 30);
+      const mp = await detectFacesMediaPipe({
+        videoUrl,
+        plateWidth,
+        plateHeight,
+        durationSec,
+        frameTimestamps: [tsSec],
+      });
+      mediapipeMeta = {
+        mediapipe_ms: mp.ms,
+        mediapipe_faces: mp.faces.length,
+        mediapipe_ok: mp.ok,
+        mediapipe_error: mp.error ?? null,
+      };
+      console.log(
+        `[syncso-preflight] mediapipe primary ok=${mp.ok} faces=${mp.faces.length} ms=${mp.ms} err=${mp.error ?? "none"}`,
+      );
+
+      if (mp.ok && mp.faces.length > 0 && coord) {
+        // coord is in pixel space matching the same video the dispatch
+        // sees (preclip output or plate). MediaPipe bboxes are in pixel
+        // space too.  Tolerance ±15 % of min(W,H) — matches the existing
+        // Gemini prompt tolerance of ±0.15 normalized.
+        const tolPx = Math.max(40, Math.min(plateWidth, plateHeight) * 0.15);
+        const [cx, cy] = coord;
+        const matches = mp.faces.filter((f) => {
+          const dx = f.center[0] - cx;
+          const dy = f.center[1] - cy;
+          return Math.hypot(dx, dy) <= tolPx;
+        });
+        const baseMeta = {
+          frame: frameNumber,
+          coord,
+          was_inferred: wasInferred,
+          source: "mediapipe" as const,
+          ...mediapipeMeta,
+        };
+        if (mp.faces.length === 1 && matches.length === 1) {
+          return { status: "pass", verdict: "yes_one_face_at_coord", ...baseMeta };
+        }
+        if (mp.faces.length === 1 && matches.length === 0) {
+          return {
+            status: "fail",
+            verdict: "yes_but_not_at_coord",
+            note: "Face exists but not at the active_speaker_detection coordinate (MediaPipe).",
+            ...baseMeta,
+          };
+        }
+        if (mp.faces.length > 1) {
+          return {
+            status: matches.length === 1 ? "warn" : "fail",
+            verdict: "multiple_faces",
+            faces: mp.faces.length,
+            faces_at_coord: matches.length,
+            note: `${mp.faces.length} faces detected — Sync.so ASD with fixed coord may pick wrong subject.`,
+            ...baseMeta,
+          };
+        }
+      }
+      // mp.faces.length === 0 → fall through to Gemini fallback
+    } catch (e) {
+      mediapipeMeta = {
+        mediapipe_ms: 0,
+        mediapipe_faces: 0,
+        mediapipe_ok: false,
+        mediapipe_error: (e as Error)?.message ?? String(e),
+      };
+      console.warn(`[syncso-preflight] mediapipe primary threw: ${(e as Error)?.message ?? e}`);
+    }
+  }
+
+  // ── Stage 2: Gemini fallback (original v129.14 logic) ───────────────
+  const apiKey = getGeminiApiKey();
+  const source: "gemini" | "gemini_fallback" = mediapipeMeta ? "gemini_fallback" : "gemini";
+  if (!apiKey) {
+    return {
+      status: "skip",
+      note: mediapipeMeta
+        ? "mediapipe_inconclusive_and_no_gemini_key"
+        : "no_gemini_api_key",
+      frame: frameNumber,
+      coord,
+      was_inferred: wasInferred,
+      source: mediapipeMeta ? "mediapipe" : "skipped",
+      ...(mediapipeMeta ?? {}),
+    };
+  }
   const apiKey = getGeminiApiKey();
   if (!apiKey) return { status: "skip", note: "no_gemini_api_key", frame: frameNumber, coord, was_inferred: wasInferred };
   if (!videoUrl && !prebuiltFrameUrl) {
