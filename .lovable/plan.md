@@ -1,54 +1,79 @@
-# v129.21.1 — MediaPipe Env-Variable Hotfix
+## Was passiert ist
 
-## Root Cause (bestätigt aus Logs)
+Watchdog hat die Szene `4e9f8c73…` nach 4 min als `watchdog_preflight_aborted` gekillt — **bevor** Hailuo den Master-Clip fertig hatte. Sync.so wurde nie disponiert.
 
-Edge-Function-Log von `compose-dialog-segments` für die fehlgeschlagene Szene:
+### Timeline
 
+| Zeit | Event |
+|------|-------|
+| 13:01:31 | `compose-video-clips` startet Hailuo i2v (`twoshot_stage='master_clip'`, `clip_url=null`) |
+| 13:07:01 | `lipsync-watchdog` → `watchdog_preflight_aborted` → Szene `failed`, Refund |
+| 13:09:42 | Hailuo-Webhook landet → `compose-clip-webhook` ruft `compose-dialog-segments` → **409 `reset_required`** |
+
+Forensik zeigt deshalb `pass_not_found (HTTP 404)`: `dialog_shots.passes = []`. MediaPipe / v129.21.1 sind nicht involviert — der Pfad wurde nie erreicht.
+
+### Root Cause
+
+`supabase/functions/lipsync-watchdog/index.ts` Zeile 409:
+```ts
+} else if (!hasJob && ageMs > STALE_PREFLIGHT_MS) {
+  reason = "watchdog_preflight_aborted";
+}
 ```
-[plate-face-detect] scene=a15d732a-... mediapipe PRIMARY miss (no_replicate_token) — falling back to gemini
-```
+Kein Guard für „Master-Clip rendert noch beim Provider". `STALE_PREFLIGHT_MS = 4 min` ist zu kurz für Hailuo i2v mit 4-Personen-Anchor (typisch 6–10 min).
 
-MediaPipe ist korrekt verdrahtet (Detection-Code, Cache, Multi-Frame-Union, Fallback-Chain — alles aus v129.21 läuft). Aber das Modul liest die falsche Umgebungsvariable:
+---
 
-- `face-detect-mediapipe.ts` liest `Deno.env.get("REPLICATE_API_TOKEN")` → **existiert nicht**
-- Im Projekt heißt der Secret aber `REPLICATE_API_KEY` (bestätigt via secrets-Liste)
+## Fix (v129.21.2 — eine Datei)
 
-Ergebnis: MediaPipe failt sofort mit `no_replicate_token` → Gemini-Fallback läuft (mit den bekannten 10–20% Drift-Problemen) → Pre-Dispatch-Gate findet Intent-Koord außerhalb der Gemini-Bbox → Crop-Bug wird vor Versand blockiert. Genau das, was die Forensik zeigt: "detector: mediapipe → gemini fallback" + "Preclip nicht dispatcht".
+`supabase/functions/lipsync-watchdog/index.ts`:
 
-Fazit: MediaPipe hat in Produktion noch kein einziges Mal echt gelaufen. Die ~19%→~4% Failure-Rate-Verbesserung kann erst jetzt greifen.
-
-## Fix (minimal, ein Modul)
-
-In `supabase/functions/_shared/face-detect-mediapipe.ts`:
-
-- Token-Read auf beide Varianten erweitern (Reihenfolge wie überall sonst im Repo):
-  ```ts
-  const REPLICATE_TOKEN =
-    Deno.env.get("REPLICATE_API_KEY") ??
-    Deno.env.get("REPLICATE_API_TOKEN") ??
-    "";
-  ```
-- Alle Stellen, die bisher `REPLICATE_API_TOKEN` verwenden (Client-Init + Guard), auf `REPLICATE_TOKEN` umstellen.
-- Fehler-Tag bleibt `no_replicate_token` (Forensik-Kompatibilität), Log-Nachricht ergänzt um "checked REPLICATE_API_KEY + REPLICATE_API_TOKEN" damit so ein Mismatch nicht nochmal 24h kostet.
-
-## Nicht im Scope
-
-- Keine Änderung an Detection-Logik, Multi-Frame-Union, Cache, Fallback-Chain, Pre-Dispatch-Gate, UI/Forensics-Sheet.
-- Keine Änderung an anderen Replicate-nutzenden Edge-Functions (`extract-video-frames`, `normalize-master-clip` etc.) — die liefen offenbar bisher okay; wenn sie still fehlen, separater Sweep.
-
-## Verification
-
-1. Deploy `compose-dialog-segments`, `validate-frame-face` (beide importieren das Shared-Modul → Bundle-Refresh nötig).
-2. Re-Dispatch der gleichen Szene `a15d732a-...`.
-3. Erwartete Log-Zeile:
+1. **Helper im Filter-Loop** (vor dem Stale-Block):
+   ```ts
+   const masterClipInFlight =
+     d.twoshot_stage === "master_clip" &&
+     !d.clip_url &&
+     typeof d.replicate_prediction_id === "string" &&
+     d.replicate_prediction_id.length > 0;
    ```
-   [plate-face-detect] scene=... mediapipe PRIMARY ok faces=N frames=3 ms=...
+
+2. **Zeile 409 erweitern** — Preflight-Abort nur, wenn der Master-Clip **nicht** noch beim Provider hängt:
+   ```ts
+   } else if (!hasJob && !masterClipInFlight && ageMs > STALE_PREFLIGHT_MS) {
+     reason = "watchdog_preflight_aborted";
+   }
    ```
-4. Forensics-Sheet sollte als `detector: mediapipe-3f` ausweisen (nicht mehr "mediapipe → gemini fallback").
-5. Preclip läuft durch, Sync.so croppt korrekt auf das echte Gesicht.
 
-## Files
+3. **Diagnostik-Log**, wenn der Skip greift:
+   ```ts
+   if (masterClipInFlight && !hasJob && ageMs > STALE_PREFLIGHT_MS) {
+     console.log(
+       `[lipsync-watchdog] preflight-skip scene=${d.id} ` +
+       `reason=master_clip_in_flight age=${Math.round(ageMs/1000)}s pred=${d.replicate_prediction_id}`
+     );
+   }
+   ```
 
-- `supabase/functions/_shared/face-detect-mediapipe.ts` (4 Zeilen Diff)
+**Failsafe**: `STALE_HARD_MS = 25 min` bleibt unverändert → echte Hailuo-Hänger werden weiterhin gekillt + refundiert (Zeile 405/406).
 
-Danach erst sehen wir, ob MediaPipe die versprochene Recall-Verbesserung wirklich liefert.
+Keine Änderungen an: `compose-dialog-segments`, `compose-clip-webhook`, MediaPipe/Face-Detect, Forensik-UI, Wallet, Refund-Logik, oder anderen Edge-Functions.
+
+---
+
+## Verifikation
+
+1. Neue 4-Sprecher-Test-Szene starten (gleiches Setup wie `4e9f8c73…`).
+2. Erwartung nach ~6–10 min:
+   - `compose-dialog-segments` läuft durch
+   - `dialog_shots.passes` füllt sich
+   - Sync.so dispatched korrekt
+3. Watchdog-Logs prüfen: `[lipsync-watchdog] preflight-skip … reason=master_clip_in_flight` darf 1–3× erscheinen, `watchdog_preflight_aborted` nicht.
+4. Failsafe-Test (optional): künstlich Hailuo-Hang → nach 25 min muss `watchdog_hard_timeout` greifen + Refund.
+
+---
+
+## Bewusst NICHT Teil dieses Fixes
+
+- Speed-Optimierung (Fast-Lane / HeyGen-Mode) — du hast „max Qualität" gewählt, Pipeline bleibt 8–12 min.
+- MediaPipe-Detector (läuft bereits korrekt seit v129.21.1).
+- Forensik-Sheet (404 verschwindet automatisch, sobald wieder Passes existieren).
