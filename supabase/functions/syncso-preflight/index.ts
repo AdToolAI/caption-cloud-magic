@@ -504,6 +504,8 @@ async function probeFaceAtFrame(
       frame_jpeg_url: frameJpegUrl,
       frame_cached: frameCached,
       extract_ms: extractMs,
+      source,
+      ...(mediapipeMeta ?? {}),
     };
   }
 }
