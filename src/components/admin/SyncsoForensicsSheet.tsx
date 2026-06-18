@@ -731,8 +731,8 @@ function PreflightPanel({
         <div className="flex items-center gap-2 text-sm font-medium">
           <ShieldCheck className="h-4 w-4" />
           Preflight
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.21'}</span>
-          <span className="text-[10px] text-cyan-300/80" title="Primary face detector since v129.21">· detector: mediapipe → gemini fallback</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.22'}</span>
+          <span className="text-[10px] text-cyan-300/80" title="Primary face detector since v129.22">· detector: aws rekognition → gemini fallback</span>
         </div>
         <Button size="sm" variant="ghost" onClick={onRerun} disabled={loading} className="h-7">
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
