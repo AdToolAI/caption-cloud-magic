@@ -1,18 +1,18 @@
 /**
- * face-detect-mediapipe.ts (v129.22.1) — Managed Face Detector adapter.
+ * face-detect-mediapipe.ts (v129.22.2) — Managed Face Detector adapter.
  *
- * v129.22.1: harden region resolution. Workspace had AWS_REGION="Global"
- * (legacy S3/CloudFront convention) which produced the bogus host
- * `rekognition.global.amazonaws.com` and every request died with DNS error.
- * Now we validate AWS_REGION against the real AWS region pattern and fall
- * back to `us-east-1`. An optional `REKOGNITION_REGION` secret overrides.
+ * v129.22.2: Default-Region auf eu-central-1 (Frankfurt) — gleiche Region wie
+ * unser Remotion-Lambda-Stack. Vermeidet EU→US-Roundtrip und hält Frames in
+ * der EU (GDPR-friendly). AWS_REGION="Global" (legacy S3/CloudFront) wird
+ * weiterhin als ungültig erkannt und auf eu-central-1 gemappt.
  */
 
 // Resolve a real AWS region for Rekognition. AWS_REGION in this workspace
 // can contain non-region strings like "Global" — those would build an
 // invalid host. Prefer an explicit REKOGNITION_REGION override, then a
-// validated AWS_REGION, then us-east-1.
+// validated AWS_REGION, then eu-central-1 (Frankfurt — matches Lambda).
 const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
+const DEFAULT_REKOGNITION_REGION = "eu-central-1";
 function resolveRekognitionRegion(): string {
   const override = (Deno.env.get("REKOGNITION_REGION") ?? "").trim();
   if (override && AWS_REGION_PATTERN.test(override)) return override;
@@ -20,11 +20,11 @@ function resolveRekognitionRegion(): string {
   if (raw && AWS_REGION_PATTERN.test(raw)) return raw;
   if (raw) {
     console.warn(
-      `[face-detect/aws] AWS_REGION='${raw}' is not a valid Rekognition region — falling back to us-east-1. ` +
+      `[face-detect/aws] AWS_REGION='${raw}' is not a valid Rekognition region — falling back to ${DEFAULT_REKOGNITION_REGION}. ` +
       `Set REKOGNITION_REGION to override.`,
     );
   }
-  return "us-east-1";
+  return DEFAULT_REKOGNITION_REGION;
 }
 
 const REKOGNITION_REGION_RESOLVED = resolveRekognitionRegion();
