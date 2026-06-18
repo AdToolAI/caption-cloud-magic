@@ -61,7 +61,13 @@ export async function extractFrameForFaceProbe(
       .from("composer-frames")
       .createSignedUrl(cachePath, 60 * 30);
     if (!signed.error && signed.data?.signedUrl) {
-      return { ok: true, frameUrl: signed.data.signedUrl, cached: true, model: MODEL_TAG, latencyMs: Date.now() - t0 };
+      const exists = await fetch(signed.data.signedUrl, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(5_000),
+      }).catch(() => null);
+      if (exists?.ok) {
+        return { ok: true, frameUrl: signed.data.signedUrl, cached: true, model: MODEL_TAG, latencyMs: Date.now() - t0 };
+      }
     }
     return {
       ok: false,
