@@ -623,9 +623,13 @@ serve(async (req) => {
 
   const preclipVideoUrl: string | null =
     (typeof payloadSummary?.input_video === "string" && payloadSummary.input_video) ||
+    (pass?._v106_probe?.dispatch_video_kind === "preclip" && typeof pass?._v106_probe?.payload_video_url === "string"
+      ? pass._v106_probe.payload_video_url
+      : null) ||
+    (typeof pass?.preclip_url === "string" && pass.preclip_url ? pass.preclip_url : null) ||
     null;
   const plateVideoUrl: string =
-    pass.payload_video_url ?? pass._v106_probe?.payload_video_url ?? dispatch?.video_url ?? pass.input_url ?? "";
+    pass.payload_video_url ?? dispatch?.video_url ?? pass.input_url ?? "";
   const videoUrl: string = preclipVideoUrl ?? plateVideoUrl;
   const videoSourceKind: "preclip" | "plate" = preclipVideoUrl ? "preclip" : "plate";
 
@@ -871,6 +875,12 @@ serve(async (req) => {
       video_url: videoUrl || null,
       video_source_kind: videoSourceKind,
       dispatch_never_happened: dispatchNeverHappened,
+      pass_status: passStatus,
+      coords_snapped_at: pass?.coords_snapped_at ?? null,
+      coords_snap_origin: pass?.coords_snap_origin ?? null,
+      coords_snap_space: pass?.coords_snap_space ?? null,
+      dispatch_coords_snapped: pass?.dispatch_coords_snapped ?? null,
+      probe_frame_url: pass?.probe_frame_url ?? null,
       plate_video_url: plateVideoUrl || null,
       preclip_video_url: preclipVideoUrl,
       audio_url_present: !!audioUrl,
