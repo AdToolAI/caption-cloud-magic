@@ -418,6 +418,8 @@ async function probeFaceAtFrame(
         was_inferred: wasInferred,
         extract_ms: extractMs,
         extract_reason: extracted.reason ?? null,
+        source,
+        ...(mediapipeMeta ?? {}),
       };
     }
     frameJpegUrl = extracted.frameUrl;
