@@ -393,7 +393,7 @@ export function SyncsoForensicsSheet({
           <SheetTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5" />
             Sync.so Forensik
-            <Badge variant="outline" className="ml-2">v129.21</Badge>
+            <Badge variant="outline" className="ml-2">v129.22</Badge>
           </SheetTitle>
           <SheetDescription>
             Admin-Werkzeug. Strikt isoliert von Produktion: keine Mutation an
@@ -731,8 +731,8 @@ function PreflightPanel({
         <div className="flex items-center gap-2 text-sm font-medium">
           <ShieldCheck className="h-4 w-4" />
           Preflight
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.21'}</span>
-          <span className="text-[10px] text-cyan-300/80" title="Primary face detector since v129.21">· detector: mediapipe → gemini fallback</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.22'}</span>
+          <span className="text-[10px] text-cyan-300/80" title="Primary face detector since v129.22">· detector: aws rekognition → gemini fallback</span>
         </div>
         <Button size="sm" variant="ghost" onClick={onRerun} disabled={loading} className="h-7">
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
@@ -788,8 +788,13 @@ function PreflightPanel({
                       >
                         face probe: {c.source ?? 'unknown'}
                       </span>
+                      {typeof (c as any).face_detect_provider === 'string' && (
+                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
+                          provider: {(c as any).face_detect_provider}
+                        </span>
+                      )}
                       <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/50 text-muted-foreground">
-                        v129.21.5 · mediapipe uses canvas frame
+                        v129.22 · AWS Rekognition primary
                       </span>
                     </div>
                   )}
@@ -835,7 +840,7 @@ function PreflightPanel({
               <div className="font-semibold">⛔ Preclip nicht dispatcht — Crop-Bug vor Versand</div>
               <div className="mt-0.5 text-[10px] opacity-90">
                 Der Face-Gate hat den Dispatch blockiert, weil die Intent-Koord auf der Plate kein Gesicht trifft.
-                v129.21 nutzt MediaPipe als Primär-Detector (Gemini nur noch Fallback) — Re-Dispatch sollte jetzt grün durchlaufen.
+                v129.22 nutzt AWS Rekognition als Primär-Detector (Gemini nur noch semantischer Fallback) — Re-Dispatch sollte jetzt grün durchlaufen.
               </div>
             </div>
           )}

@@ -1,61 +1,61 @@
 /**
- * face-detect-mediapipe.ts (v129.21) — Dedicated face detector.
+ * face-detect-mediapipe.ts (v129.22) — Managed Face Detector adapter.
  *
- * WHY: Gemini Vision is a semantic VLM, not a face detector. Its bboxes
- * drift 10-20%, recall on profile/low-light is ~70%, and it's the dominant
- * cause of "Sync.so animated the wrong face / no face" failures.
+ * HISTORY
+ *   - v129.21   used `chigozienri/mediapipe-face` on Replicate as primary.
+ *   - v129.21.x added prebuilt-frame support, retried multiple lucataco
+ *               models. ALL of them produced silent 404 / wrong-schema /
+ *               zero-faces failures because they are community / marketplace
+ *               models without stability guarantees.
+ *   - v129.22   (this file) replaces the Replicate path entirely with
+ *               **AWS Rekognition DetectFaces** — a managed production API.
+ *               Optional Gemini fallback stays in the caller (syncso-preflight),
+ *               not here. The function signature and return shape are
+ *               preserved so callers don't change.
  *
- * Production face detectors (Sync.so / HeyGen / Hedra all use these
- * internally): MediaPipe / RetinaFace / InsightFace. We adopt the same
- * primary detector via Replicate (`chigozienri/mediapipe-face`, public
- * since 2022, ~$0.0005/run, ~1s p50, deterministic pixel-bboxes).
+ * WHY AWS REKOGNITION
+ *   - It is the same class of detector Artlist / HeyGen / Sync.so use
+ *     internally (managed CV, not a community ML model).
+ *   - We already have `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+ *     `AWS_REGION` configured for Remotion Lambda, so no new secrets.
+ *   - Deterministic: same image -> same bbox.
+ *   - Multi-face native, pixel bboxes derived from normalized {Left,Top,Width,Height}.
  *
- * Pipeline (per plate):
- *   1. Extract N frames (first/mid/last) via `lucataco/ffmpeg-extract-frame`
- *   2. Run MediaPipe on each PNG in parallel
- *   3. Merge: per-detection-cluster Union-bbox + median center
- *
- * Fallback chain:
- *   - Replicate timeout / 5xx / model crash → caller falls back to
- *     Gemini Vision (existing path in plate-face-detect.ts).
- *
- * Cost: 3× frame-extract ($0.0003) + 3× mediapipe ($0.0005) ≈ $0.0024
- * per plate. Cache-hit rate is high (plate URLs are stable per render).
+ * EXPECTED INPUT
+ *   - `prebuiltFrameUrls` is REQUIRED (client-side canvas JPEG already
+ *     uploaded to the `composer-frames` bucket by the Forensics sheet /
+ *     compose-dialog-segments). We no longer attempt server-side frame
+ *     extraction at all.
  */
-import Replicate from "npm:replicate@0.25.2";
 
-// v129.21.1: Project secret is `REPLICATE_API_KEY` (see secrets manifest).
-// Older Replicate-using functions read `REPLICATE_API_TOKEN`. Accept both so
-// that an env-name mismatch never silently disables the primary detector again.
-const REPLICATE_TOKEN =
-  Deno.env.get("REPLICATE_API_KEY") ??
-  Deno.env.get("REPLICATE_API_TOKEN") ??
-  "";
+// AWS region + credentials. AWS_REGION may be `us-east-1`, `eu-central-1`, …
+const AWS_REGION = Deno.env.get("AWS_REGION") ?? "eu-central-1";
+const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID") ?? "";
+const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
 
-const FRAME_EXTRACT_MODEL = "lucataco/ffmpeg-extract-frame";
-// chigozienri/mediapipe-face returns a JSON list of detections with a
-// normalized bbox `{xmin, ymin, width, height}` per face plus a landmark
-// list (eye / nose / mouth). We map this into our canonical PlateFaceBox.
-const MEDIAPIPE_MODEL = "chigozienri/mediapipe-face";
+const REKOGNITION_HOST = `rekognition.${AWS_REGION}.amazonaws.com`;
+const REKOGNITION_ENDPOINT = `https://${REKOGNITION_HOST}/`;
+const REKOGNITION_TARGET = "RekognitionService.DetectFaces";
 
-const FRAME_TIMEOUT_MS = 25_000;
-const MP_TIMEOUT_MS = 20_000;
+const FETCH_TIMEOUT_MS = 12_000;
+const REK_TIMEOUT_MS = 15_000;
+const MIN_CONFIDENCE = 80; // %
 
 export interface MediaPipeFace {
   /** Pixel-space [x1, y1, x2, y2] within the source plate dimensions. */
   bbox: [number, number, number, number];
   /** Pixel-space [cx, cy]. */
   center: [number, number];
-  /** 0..1 detector confidence (1.0 when MediaPipe didn't supply one). */
+  /** 0..1 detector confidence. */
   confidence: number;
-  /** Optional landmark dict — present only when MediaPipe returned them. */
+  /** Optional landmark dict — present when Rekognition returned them. */
   landmarks?: {
     leftEye?: [number, number];
     rightEye?: [number, number];
     nose?: [number, number];
     mouth?: [number, number];
   };
-  /** Which frame index this detection came from (0/1/2 for first/mid/last). */
+  /** Which frame index this detection came from. */
   frameSeen: number;
 }
 
@@ -65,7 +65,8 @@ export interface MediaPipeDetectResult {
   framesScanned: number;
   /** Plate-pixel union of all face bboxes + 10% padding. null when no faces. */
   unionBbox: [number, number, number, number] | null;
-  source: "mediapipe" | "error";
+  /** Provider tag — useful for forensics. */
+  source: "aws_rekognition" | "error";
   ms: number;
   error?: string;
 }
@@ -73,200 +74,281 @@ export interface MediaPipeDetectResult {
 function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`${tag}_timeout_${ms}ms`)), ms);
-    p.then((v) => { clearTimeout(t); resolve(v); }).catch((e) => { clearTimeout(t); reject(e); });
+    p.then((v) => { clearTimeout(t); resolve(v); })
+     .catch((e) => { clearTimeout(t); reject(e); });
   });
 }
 
-/** Extract a single PNG frame at `timestampSec` via Replicate. */
-async function extractFrame(
-  replicate: Replicate,
-  videoUrl: string,
-  timestampSec: number,
-): Promise<string | null> {
-  try {
-    const out: any = await withTimeout(
-      replicate.run(FRAME_EXTRACT_MODEL as `${string}/${string}`, {
-        input: { video: videoUrl, timestamp: Math.max(0.05, timestampSec) },
-      }),
-      FRAME_TIMEOUT_MS,
-      "frame_extract",
-    );
-    const url = typeof out === "string"
-      ? out
-      : Array.isArray(out)
-      ? out[0]
-      : out?.url?.() ?? out?.url ?? "";
-    return typeof url === "string" && url.startsWith("http") ? url : null;
-  } catch (e) {
-    console.warn(`[mp-detect] frame extract t=${timestampSec.toFixed(2)}s failed: ${(e as Error).message}`);
-    return null;
+// ── AWS SigV4 helpers (no SDK — keeps Edge bundle small) ────────────────
+async function sha256Hex(data: Uint8Array | string): Promise<string> {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hmac(key: ArrayBuffer | Uint8Array, data: string): Promise<ArrayBuffer> {
+  const k = await crypto.subtle.importKey(
+    "raw",
+    key instanceof Uint8Array ? key : new Uint8Array(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(data));
+}
+
+async function signingKey(secret: string, dateStamp: string, region: string, service: string) {
+  const kDate = await hmac(new TextEncoder().encode("AWS4" + secret), dateStamp);
+  const kRegion = await hmac(kDate, region);
+  const kService = await hmac(kRegion, service);
+  return await hmac(kService, "aws4_request");
+}
+
+async function signedRekognitionRequest(payloadJson: string): Promise<Response> {
+  if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+    throw new Error("aws_credentials_missing");
   }
+  const amzDate = new Date()
+    .toISOString()
+    .replace(/[:-]|\.\d{3}/g, ""); // 20260618T151230Z
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = await sha256Hex(payloadJson);
+
+  const canonicalHeaders =
+    `content-type:application/x-amz-json-1.1\n` +
+    `host:${REKOGNITION_HOST}\n` +
+    `x-amz-date:${amzDate}\n` +
+    `x-amz-target:${REKOGNITION_TARGET}\n`;
+  const signedHeaders = "content-type;host;x-amz-date;x-amz-target";
+  const canonicalRequest = [
+    "POST",
+    "/",
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+
+  const credentialScope = `${dateStamp}/${AWS_REGION}/rekognition/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+
+  const sigKey = await signingKey(AWS_SECRET_ACCESS_KEY, dateStamp, AWS_REGION, "rekognition");
+  const sigBytes = await hmac(sigKey, stringToSign);
+  const signature = Array.from(new Uint8Array(sigBytes))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const authorization =
+    `AWS4-HMAC-SHA256 Credential=${AWS_ACCESS_KEY_ID}/${credentialScope}, ` +
+    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  return await fetch(REKOGNITION_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-amz-json-1.1",
+      "X-Amz-Date": amzDate,
+      "X-Amz-Target": REKOGNITION_TARGET,
+      "Authorization": authorization,
+    },
+    body: payloadJson,
+  });
 }
 
-interface MpRawFace {
-  // chigozienri/mediapipe-face output shape (most common): normalized box
-  xmin?: number; ymin?: number; width?: number; height?: number;
-  // Some MediaPipe wrappers return absolute pixel coords instead — handle both.
-  x?: number; y?: number; w?: number; h?: number;
-  confidence?: number; score?: number;
-  // Landmarks: array of {x,y} or keyed dict.
-  landmarks?: Array<{ x: number; y: number; name?: string }>
-    | Record<string, { x: number; y: number }>;
+interface RekFaceDetail {
+  BoundingBox?: { Left: number; Top: number; Width: number; Height: number };
+  Confidence?: number;
+  Landmarks?: Array<{ Type: string; X: number; Y: number }>;
 }
 
-/** Call MediaPipe on a single frame PNG; return raw detections. */
-async function callMediaPipe(
-  replicate: Replicate,
-  frameUrl: string,
+async function callRekognition(
+  imageBytes: Uint8Array,
   frameIndex: number,
   imgW: number,
   imgH: number,
 ): Promise<MediaPipeFace[]> {
-  let raw: any;
+  // Rekognition wants base64 in JSON. btoa requires binary string.
+  let bin = "";
+  for (let i = 0; i < imageBytes.length; i++) {
+    bin += String.fromCharCode(imageBytes[i]);
+  }
+  const b64 = btoa(bin);
+  const payload = JSON.stringify({
+    Image: { Bytes: b64 },
+    Attributes: ["DEFAULT"],
+  });
+
+  let res: Response;
   try {
-    raw = await withTimeout(
-      replicate.run(MEDIAPIPE_MODEL as `${string}/${string}`, {
-        input: { image: frameUrl },
-      }),
-      MP_TIMEOUT_MS,
-      "mediapipe",
-    );
+    res = await withTimeout(signedRekognitionRequest(payload), REK_TIMEOUT_MS, "rekognition");
   } catch (e) {
-    console.warn(`[mp-detect] mediapipe frame=${frameIndex} failed: ${(e as Error).message}`);
+    console.warn(`[face-detect/aws] rekognition request failed frame=${frameIndex}: ${(e as Error).message}`);
     return [];
   }
 
-  // chigozienri/mediapipe-face returns either:
-  //   - an array of detection objects, OR
-  //   - { detections: [...] }, OR
-  //   - a URL pointing to a JSON file with the detections.
-  let detections: MpRawFace[] = [];
-  if (Array.isArray(raw)) {
-    detections = raw as MpRawFace[];
-  } else if (Array.isArray((raw as any)?.detections)) {
-    detections = (raw as any).detections as MpRawFace[];
-  } else if (Array.isArray((raw as any)?.faces)) {
-    detections = (raw as any).faces as MpRawFace[];
-  } else if (typeof raw === "string" && raw.startsWith("http")) {
-    try {
-      const r = await fetch(raw, { signal: AbortSignal.timeout(8000) });
-      const j = await r.json();
-      detections = Array.isArray(j) ? j : (j?.detections ?? j?.faces ?? []);
-    } catch (e) {
-      console.warn(`[mp-detect] follow-up JSON fetch failed: ${(e as Error).message}`);
-    }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.warn(`[face-detect/aws] rekognition ${res.status} frame=${frameIndex}: ${body.slice(0, 400)}`);
+    return [];
   }
 
+  let json: { FaceDetails?: RekFaceDetail[] };
+  try {
+    json = await res.json();
+  } catch (e) {
+    console.warn(`[face-detect/aws] rekognition JSON parse failed frame=${frameIndex}: ${(e as Error).message}`);
+    return [];
+  }
+
+  const details = Array.isArray(json.FaceDetails) ? json.FaceDetails : [];
   const out: MediaPipeFace[] = [];
-  for (const d of detections) {
-    // Resolve bbox in pixel space.
-    let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
-    const xmin = Number(d.xmin ?? d.x);
-    const ymin = Number(d.ymin ?? d.y);
-    const w = Number(d.width ?? d.w);
-    const h = Number(d.height ?? d.h);
-    if (!Number.isFinite(xmin) || !Number.isFinite(ymin) || !Number.isFinite(w) || !Number.isFinite(h)) {
-      continue;
-    }
-    // Heuristic: if all values ≤1, treat as normalized; else absolute pixels.
-    const isNorm = xmin <= 1.0 && ymin <= 1.0 && w <= 1.0 && h <= 1.0;
-    if (isNorm) {
-      x1 = Math.round(xmin * imgW); y1 = Math.round(ymin * imgH);
-      x2 = Math.round((xmin + w) * imgW); y2 = Math.round((ymin + h) * imgH);
-    } else {
-      x1 = Math.round(xmin); y1 = Math.round(ymin);
-      x2 = Math.round(xmin + w); y2 = Math.round(ymin + h);
-    }
+  for (const d of details) {
+    if (!d.BoundingBox) continue;
+    const conf = Number(d.Confidence ?? 0);
+    if (conf < MIN_CONFIDENCE) continue;
+    const { Left, Top, Width, Height } = d.BoundingBox;
+    let x1 = Math.round(Left * imgW);
+    let y1 = Math.round(Top * imgH);
+    let x2 = Math.round((Left + Width) * imgW);
+    let y2 = Math.round((Top + Height) * imgH);
     x1 = Math.max(0, Math.min(imgW, x1));
     y1 = Math.max(0, Math.min(imgH, y1));
     x2 = Math.max(0, Math.min(imgW, x2));
     y2 = Math.max(0, Math.min(imgH, y2));
     if (x2 - x1 < 8 || y2 - y1 < 8) continue;
 
+    const lm: MediaPipeFace["landmarks"] = {};
+    if (Array.isArray(d.Landmarks)) {
+      for (const l of d.Landmarks) {
+        const px: [number, number] = [
+          Math.round(l.X * imgW),
+          Math.round(l.Y * imgH),
+        ];
+        if (l.Type === "eyeLeft") lm.leftEye = px;
+        else if (l.Type === "eyeRight") lm.rightEye = px;
+        else if (l.Type === "nose") lm.nose = px;
+        else if (l.Type === "mouthLeft" || l.Type === "mouthDown" || l.Type === "mouthRight") {
+          // Use any mouth landmark as a coarse mouth anchor.
+          lm.mouth ||= px;
+        }
+      }
+    }
+
     out.push({
       bbox: [x1, y1, x2, y2],
       center: [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)],
-      confidence: Math.max(0, Math.min(1, Number(d.confidence ?? d.score ?? 1))),
+      confidence: Math.max(0, Math.min(1, conf / 100)),
+      landmarks: Object.keys(lm).length ? lm : undefined,
       frameSeen: frameIndex,
     });
   }
   return out;
 }
 
+/** Fetch a remote image (https URL) into bytes for Rekognition. */
+async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
+  try {
+    const r = await withTimeout(
+      fetch(url, { method: "GET" }),
+      FETCH_TIMEOUT_MS,
+      "frame_fetch",
+    );
+    if (!r.ok) {
+      console.warn(`[face-detect/aws] frame fetch ${r.status} url=${url.slice(0, 120)}`);
+      return null;
+    }
+    const buf = await r.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch (e) {
+    console.warn(`[face-detect/aws] frame fetch failed: ${(e as Error).message}`);
+    return null;
+  }
+}
+
 /**
- * Detect faces on a plate video using MediaPipe.
+ * Detect faces on a plate frame using AWS Rekognition.
  *
- * @param opts.frameTimestamps Seconds offsets to sample (first/mid/last typical).
- *                              Default [0.1, mid, last-0.1].
+ * Function name preserved for backwards compatibility — under the hood it
+ * is no longer MediaPipe; it is AWS Rekognition DetectFaces.
+ *
+ * Required: `prebuiltFrameUrls` (one or more https JPEG URLs uploaded by
+ * the caller). If absent or empty we return an explicit error so the
+ * caller can fall through to Gemini Vision — we do NOT attempt server-side
+ * frame extraction (every option we tried in Deno Edge runtime was
+ * unreliable).
  */
 export async function detectFacesMediaPipe(opts: {
-  videoUrl: string;
+  videoUrl: string;            // unused now, kept for signature compat
   plateWidth: number;
   plateHeight: number;
-  durationSec: number;
-  frameTimestamps?: number[];
-  /**
-   * v129.21.5: Pre-extracted frame URLs (e.g. client-side Canvas JPEG passed
-   * as `probe_frame_url`). When provided we SKIP the broken
-   * `lucataco/ffmpeg-extract-frame` Replicate model (404 since v129.14) and
-   * call MediaPipe directly on these URLs.
-   */
+  durationSec: number;         // unused now, kept for signature compat
+  frameTimestamps?: number[];  // unused now, kept for signature compat
   prebuiltFrameUrls?: string[];
 }): Promise<MediaPipeDetectResult> {
   const t0 = Date.now();
-  if (!REPLICATE_TOKEN) {
-    console.warn("[mp-detect] no replicate token (checked REPLICATE_API_KEY + REPLICATE_API_TOKEN) — primary detector disabled");
-    return { ok: false, faces: [], framesScanned: 0, unionBbox: null, source: "error", ms: 0, error: "no_replicate_token" };
+
+  if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+    console.warn("[face-detect/aws] AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY missing — detector disabled");
+    return {
+      ok: false, faces: [], framesScanned: 0, unionBbox: null,
+      source: "error", ms: 0, error: "aws_credentials_missing",
+    };
   }
 
-  const replicate = new Replicate({ auth: REPLICATE_TOKEN });
   const W = Math.max(1, opts.plateWidth);
   const H = Math.max(1, opts.plateHeight);
-  const dur = Math.max(0.5, opts.durationSec);
 
-  let validFrames: { url: string; i: number }[] = [];
+  const urls = (opts.prebuiltFrameUrls ?? [])
+    .filter((u) => typeof u === "string" && u.startsWith("http"));
 
-  if (opts.prebuiltFrameUrls && opts.prebuiltFrameUrls.length > 0) {
-    validFrames = opts.prebuiltFrameUrls
-      .filter((u) => typeof u === "string" && u.startsWith("http"))
-      .map((url, i) => ({ url, i }));
-    console.log(`[mp-detect] v129.21.5 using ${validFrames.length} prebuilt frame url(s) — skipping Replicate extractor`);
-  } else {
-    console.warn("[mp-detect] no prebuiltFrameUrls — falling back to lucataco/ffmpeg-extract-frame (known-broken since v129.14, will likely 404)");
-    const stamps = opts.frameTimestamps ?? [
-      0.1,
-      Math.max(0.2, dur * 0.5),
-      Math.max(0.3, dur - 0.1),
-    ];
-    const frameUrls = await Promise.all(stamps.map((ts) => extractFrame(replicate, opts.videoUrl, ts)));
-    validFrames = frameUrls
-      .map((url, i) => (url ? { url, i } : null))
-      .filter((v): v is { url: string; i: number } => v !== null);
+  if (urls.length === 0) {
+    return {
+      ok: false, faces: [], framesScanned: 0, unionBbox: null,
+      source: "error", ms: Date.now() - t0,
+      error: "no_prebuilt_frame_url",
+    };
   }
+
+  console.log(
+    `[face-detect/aws] v129.22 rekognition primary plate=${W}x${H} ` +
+    `region=${AWS_REGION} frames=${urls.length}`,
+  );
+
+  // Fetch all frames in parallel, then call Rekognition in parallel.
+  const frames = await Promise.all(urls.map((url) => fetchImageBytes(url)));
+  const validFrames = frames
+    .map((bytes, i) => (bytes ? { bytes, i } : null))
+    .filter((v): v is { bytes: Uint8Array; i: number } => v !== null);
 
   if (validFrames.length === 0) {
     return {
       ok: false, faces: [], framesScanned: 0, unionBbox: null,
-      source: "error", ms: Date.now() - t0, error: "frame_extract_failed_all",
+      source: "error", ms: Date.now() - t0,
+      error: "frame_fetch_failed_all",
     };
   }
 
-  // 2) Run MediaPipe on each frame in parallel.
   const perFrameResults = await Promise.all(
-    validFrames.map((f) => callMediaPipe(replicate, f.url, f.i, W, H)),
+    validFrames.map((f) => callRekognition(f.bytes, f.i, W, H)),
   );
   const allFaces = perFrameResults.flat();
 
   if (allFaces.length === 0) {
     return {
       ok: false, faces: [], framesScanned: validFrames.length, unionBbox: null,
-      source: "error", ms: Date.now() - t0, error: "mediapipe_zero_faces",
+      source: "error", ms: Date.now() - t0,
+      error: "rekognition_zero_faces",
     };
   }
 
-  // 3) Cluster faces across frames by center distance (simple greedy).
-  //    For the same person seen in 3 frames, we take the median center and
-  //    the union bbox (+ small padding) — captures subject motion.
+  // Cluster faces across frames by center distance (same person seen in
+  // 2 frames -> 1 cluster; identical to v129.21 behaviour).
   const PAIR_RADIUS_PX = Math.max(40, Math.min(W, H) * 0.08);
   const clusters: MediaPipeFace[][] = [];
   for (const f of allFaces) {
@@ -280,7 +362,6 @@ export async function detectFacesMediaPipe(opts: {
     if (!placed) clusters.push([f]);
   }
 
-  // 4) Merge each cluster → one MediaPipeFace (union bbox + median center).
   const mergedFaces: MediaPipeFace[] = clusters.map((cluster) => {
     const xs1 = cluster.map((f) => f.bbox[0]);
     const ys1 = cluster.map((f) => f.bbox[1]);
@@ -290,7 +371,6 @@ export async function detectFacesMediaPipe(opts: {
     const uy1 = Math.min(...ys1);
     const ux2 = Math.max(...xs2);
     const uy2 = Math.max(...ys2);
-    // 10% padding inside plate bounds.
     const padX = Math.round((ux2 - ux1) * 0.10);
     const padY = Math.round((uy2 - uy1) * 0.10);
     const x1 = Math.max(0, ux1 - padX);
@@ -302,18 +382,19 @@ export async function detectFacesMediaPipe(opts: {
     const medianCx = cxs[Math.floor(cxs.length / 2)];
     const medianCy = cys[Math.floor(cys.length / 2)];
     const avgConf = cluster.reduce((s, f) => s + f.confidence, 0) / cluster.length;
+    // Prefer landmarks from the highest-confidence detection in the cluster.
+    const best = [...cluster].sort((a, b) => b.confidence - a.confidence)[0];
     return {
       bbox: [x1, y1, x2, y2] as [number, number, number, number],
       center: [medianCx, medianCy] as [number, number],
       confidence: avgConf,
+      landmarks: best.landmarks,
       frameSeen: cluster[0].frameSeen,
     };
   });
 
-  // 5) Sort left-to-right (matches plate-face-detect slot order convention).
   mergedFaces.sort((a, b) => a.center[0] - b.center[0]);
 
-  // 6) Global union of all merged faces (caller may use for crop hints).
   const ux1 = Math.min(...mergedFaces.map((f) => f.bbox[0]));
   const uy1 = Math.min(...mergedFaces.map((f) => f.bbox[1]));
   const ux2 = Math.max(...mergedFaces.map((f) => f.bbox[2]));
@@ -321,7 +402,7 @@ export async function detectFacesMediaPipe(opts: {
 
   const ms = Date.now() - t0;
   console.log(
-    `[mp-detect] mediapipe ok plate=${W}x${H} frames=${validFrames.length} ` +
+    `[face-detect/aws] rekognition ok plate=${W}x${H} frames=${validFrames.length} ` +
     `raw=${allFaces.length} merged=${mergedFaces.length} ms=${ms}`,
   );
   return {
@@ -329,7 +410,7 @@ export async function detectFacesMediaPipe(opts: {
     faces: mergedFaces,
     framesScanned: validFrames.length,
     unionBbox: [ux1, uy1, ux2, uy2],
-    source: "mediapipe",
+    source: "aws_rekognition",
     ms,
   };
 }
