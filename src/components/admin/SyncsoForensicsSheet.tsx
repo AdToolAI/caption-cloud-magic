@@ -789,7 +789,7 @@ function PreflightPanel({
                         face probe: {c.source ?? 'unknown'}
                       </span>
                       <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/50 text-muted-foreground">
-                        v129.21.4 · mediapipe preconditions fixed
+                        v129.21.5 · mediapipe uses canvas frame
                       </span>
                     </div>
                   )}
