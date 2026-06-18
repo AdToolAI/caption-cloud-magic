@@ -215,6 +215,78 @@ export async function verifyFaceBeforeDispatch(
       };
     }
     if (tl.includes("yes_but_not_at_coord")) {
+      // v129.22.3 — Auto-snap: ask AWS Rekognition for the actual face
+      // center on the same JPEG. If exactly one face is found and it's
+      // a plausible plate position, return ok_after_snap so the caller
+      // can override the ASD coords instead of failing the dispatch.
+      // This rescues runs where the original plate-face detector wasn't
+      // available (e.g. AWS IAM not yet granted) and the inferred coord
+      // landed off-face.
+      const W = Number(input.plateWidth ?? 0);
+      const H = Number(input.plateHeight ?? 0);
+      const canSnap = frameJpegUrl && W > 0 && H > 0;
+      if (canSnap) {
+        try {
+          const snap = await detectFacesMediaPipe({
+            videoUrl: input.videoUrl,
+            plateWidth: W,
+            plateHeight: H,
+            durationSec: 1,
+            prebuiltFrameUrls: [frameJpegUrl as string],
+          });
+          if (snap.ok && snap.faces.length === 1) {
+            const f = snap.faces[0];
+            // Sanity: face must sit inside the 5%-95% safe zone, otherwise
+            // we're likely snapping onto a background detection artefact.
+            const minX = W * 0.05;
+            const maxX = W * 0.95;
+            const minY = H * 0.05;
+            const maxY = H * 0.95;
+            const inBounds = f.center[0] >= minX && f.center[0] <= maxX &&
+                             f.center[1] >= minY && f.center[1] <= maxY;
+            if (inBounds) {
+              const dist = Math.round(Math.hypot(
+                f.center[0] - coord[0],
+                f.center[1] - coord[1],
+              ));
+              const snapped: [number, number] = [
+                Math.round(f.center[0]),
+                Math.round(f.center[1]),
+              ];
+              console.log(
+                `[face-gate] v129.22.3 AUTO_SNAP intent=[${coord[0]},${coord[1]}] ` +
+                `→ rekognition=[${snapped[0]},${snapped[1]}] dist=${dist}px plate=${W}x${H}`,
+              );
+              return {
+                ok: true,
+                code: "ok_after_snap",
+                reason: `Intent coord [${coord[0]},${coord[1]}] missed the face. ` +
+                  `Rekognition snapped to [${snapped[0]},${snapped[1]}] (${dist}px delta).`,
+                raw_reply: txt.slice(0, 80),
+                snapped_coord: snapped,
+                original_coord: [coord[0], coord[1]],
+                snap_distance_px: dist,
+                ...baseMeta,
+              };
+            }
+            console.warn(
+              `[face-gate] v129.22.3 snap candidate [${f.center[0]},${f.center[1]}] ` +
+              `outside safe-zone on plate ${W}x${H} — refusing snap, failing hard.`,
+            );
+          } else if (snap.ok && snap.faces.length > 1) {
+            console.warn(
+              `[face-gate] v129.22.3 snap aborted — rekognition saw ${snap.faces.length} faces, ` +
+              `ambiguous which to snap to.`,
+            );
+          } else {
+            console.warn(
+              `[face-gate] v129.22.3 snap aborted — rekognition error: ${snap.error ?? "0 faces"}`,
+            );
+          }
+        } catch (e) {
+          console.warn(`[face-gate] v129.22.3 snap threw: ${(e as Error)?.message ?? e}`);
+        }
+      }
       return {
         ok: false,
         code: "not_at_coord",
