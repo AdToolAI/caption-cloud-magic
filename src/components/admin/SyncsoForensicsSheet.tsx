@@ -850,7 +850,8 @@ function PreflightPanel({
               <div className="font-semibold">⛔ Preclip nicht dispatcht — Crop-Bug vor Versand</div>
               <div className="mt-0.5 text-[10px] opacity-90">
                 Der Face-Gate hat den Dispatch blockiert, weil die Intent-Koord auf der Plate kein Gesicht trifft.
-                v129.22 nutzt AWS Rekognition als Primär-Detector (Gemini nur noch semantischer Fallback) — Re-Dispatch sollte jetzt grün durchlaufen.
+                v129.22.3 self-healed: erkennt Rekognition genau 1 Face innerhalb der Safe-Zone, wird die Koord
+                automatisch auf das echte Gesicht gesnapt (Badge „auto-snapped" oben). Re-Dispatch jetzt starten.
               </div>
             </div>
           )}
