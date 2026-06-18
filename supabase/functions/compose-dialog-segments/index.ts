@@ -3098,21 +3098,36 @@ serve(async (req) => {
           break;
         }
         // Face-gate (v77): require exactly 1 face for multi-speaker.
+        // v129.18 — validate FIRST + MID + LAST frame, not just mid; a face
+        // entering/leaving the crop mid-turn was the actual root cause of
+        // the Sync.so `generation_unknown_error` (ASD frame N coords below
+        // the face → Sync.so sees pullover, not face).
         preclipFaceOk = true;
         preclipFaceCount = null;
         if (speakers.length >= 2) {
           try {
-            const midFrame = Math.max(1, Math.round(((preclip.durationSec ?? 1) / 2) * 30));
-            const v = await validateFrameFace({
-              supabaseUrl, serviceKey,
-              videoUrl: preclip.preclipUrl,
-              frameNumber: midFrame, fps: 30,
-              targetCoords: null,
-            });
-            if (v.ok) {
-              preclipFaceCount = Number(v.faceCount ?? 0);
-              if (preclipFaceCount === 0) preclipFaceOk = false;
-              if (preclipFaceCount > 1) preclipFaceOk = false;
+            const totalFrames = Math.max(2, Math.round((preclip.durationSec ?? 1) * 30));
+            const frameSet: Array<{ tag: "first" | "mid" | "last"; n: number }> = [
+              { tag: "first", n: 1 },
+              { tag: "mid", n: Math.max(1, Math.round(totalFrames / 2)) },
+              { tag: "last", n: Math.max(1, totalFrames - 1) },
+            ];
+            for (const f of frameSet) {
+              const v = await validateFrameFace({
+                supabaseUrl, serviceKey,
+                videoUrl: preclip.preclipUrl,
+                frameNumber: f.n, fps: 30,
+                targetCoords: null,
+              });
+              if (!v.ok) continue;
+              const c = Number(v.faceCount ?? 0);
+              if (f.tag === "mid") preclipFaceCount = c;
+              if (c === 0 || c > 1) {
+                preclipFaceOk = false;
+                if (preclipFaceCount === null) preclipFaceCount = c;
+                (pass as any).preclip_face_gate_failed_frame = f.tag;
+                break;
+              }
             }
           } catch (e) {
             console.warn(
