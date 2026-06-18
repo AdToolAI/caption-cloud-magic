@@ -1,57 +1,70 @@
-## Problem
+# Plan: Preflight 404 "pass_not_found" beheben
 
-Die Szene `a6ce3a99…` ist **erneut** vor Sync.so geblockt, obwohl die Forensik „✅ Self-healed" anzeigt. Edge-Logs beweisen die Ursache:
+## Was ich gemessen habe
 
+- DB-Check für die im Screenshot gezeigte Szene `5813e9bb-30e1-4569-b469-2b78121af3ec`:
+  - `clip_status = ready`, `lip_sync_status = failed`
+  - `dialog_shots` ist ein Objekt, `dialog_shots.passes` ist ein Array mit **4 Einträgen**, `current_pass = 0`.
+- Quellcode `supabase/functions/syncso-preflight/index.ts` (v129.23.0) liest exakt diese Struktur (`scene.dialog_shots?.passes ?? []`) und sollte `passes[0]` problemlos finden.
+- Die UI bekommt aber HTTP 404 mit Body `{"error":"pass_not_found"}` zurück (Toast + roter Block + "Blocker erkannt: unknown" weil `verdict='fail'` im Catch-Pfad gesetzt wird).
+- In den Edge-Function-Logs für `syncso-preflight` taucht **keine einzige Zeile** unserer Version auf (weder "v129", noch "preflight", noch "scene"). Das passt zur Hypothese, dass die letzte Deployment-Runde der Function nicht durchkam (Source ist v129.23.0, die Live-Function ist offenbar älter und/oder loggt nichts).
+
+## Was ich ändern will
+
+### 1. `supabase/functions/syncso-preflight/index.ts` — minimal-invasive Diagnose
+
+Direkt nach dem Body-Parsing (vor dem `composer_scenes`-Select) eine einzige Log-Zeile, damit wir bei der nächsten Forensik-Öffnung in den Logs sehen, was die deployte Version wirklich macht:
+
+```ts
+console.log(
+  `[syncso-preflight] v129.23.1 sceneId=${sceneId} passIndex=${passIndex}`,
+);
 ```
-v129.22.3_face_gate pass=1 code=probe_unavailable ok=true jpeg=no snap=no
-reason=server_extractor_disabled_v129_14: edge runtime cannot run ffmpeg.wasm
-DISPATCH pass=1/4 coords=[337,144] frame=52 sync_mode=cut_off
+
+Direkt nach `const passes = scene.dialog_shots?.passes ?? [];` zusätzlich:
+
+```ts
+console.log(
+  `[syncso-preflight] v129.23.1 passes_resolved=${Array.isArray(passes) ? passes.length : "non-array:" + typeof passes} dialog_shots_type=${typeof scene.dialog_shots}`,
+);
 ```
 
-- Beim **Dispatch** kann die Edge-Function `compose-dialog-segments` **keinen JPEG aus dem Preclip ziehen** → Face-Gate fällt auf `probe_unavailable` zurück → Dispatch geht **ungeprüft** mit der falschen Koord `[337,144]` raus → Sync.so antwortet `generation_unknown_error`.
-- Das **Forensik-Panel** läuft danach in einem anderen Pfad (mit serverseitigem Frame via `extract-video-frames` bzw. Live-Probe) → dort klappt der Snap → grünes Banner.
+Und im 404-Return die Info mitgeben, damit der UI-Banner mehr sagt als nur "unknown":
 
-Ergebnis: Die Pipeline **heilt sich nur im UI, nicht im Dispatch**. Jeder echte Render bleibt am gleichen Bug hängen.
+```ts
+if (!pass) {
+  return json(
+    { error: "pass_not_found", available: passes.length, scene_has_dialog_shots: !!scene.dialog_shots, dialog_shots_keys: scene.dialog_shots ? Object.keys(scene.dialog_shots) : [] },
+    404,
+  );
+}
+```
 
-## Lösung
+Version-String unten auf `"v129.23.1"` ziehen, damit wir in der UI sofort sehen, ob die neue Version live ist (heute zeigt sie weiterhin `v129.23.0` — also nicht aktualisiert).
 
-Den **gleichen Snap-Pfad in den Dispatch** holen, indem `compose-dialog-segments` vor jeder Pass-Dispatch garantiert eine `probe_frame_url` besitzt — entweder vom Client mitgegeben oder serverseitig gerendert.
+### 2. Function neu deployen
 
-### Schritte
+`syncso-preflight` per `supabase--deploy_edge_functions` erneut deployen. Wenn der Deploy mit 500/Internal failt, `deno.lock` der Function prüfen/entfernen (siehe Lovable-Hinweis "Edge Function Deploy Troubleshooting") und nochmal deployen.
 
-1. **Server-seitiger Still-Extractor** (`_shared/face-frame-extract.ts` erweitern):
-   - Neue Funktion `getOrExtractProbeFrame({ videoUrl, frameNumber, fps, sceneId, passIdx })` mit 24h-Cache in `composer-frames/probe-frames/{sceneId}-p{idx}-f{frame}.png`.
-   - Primär: Replicate `lucataco/ffmpeg-extract-frame` mit `timestamp = frameNumber / fps`.
-   - Fallback (wenn Replicate 404 / 5xx): Remotion Lambda `renderStillOnLambda` gegen eine Mini-Komposition `<Video src={url}/>` bei frame `frameNumber`.
-   - Idempotent: prüft Bucket vor Re-Render.
+### 3. Verifikation
 
-2. **Dispatch-Pfad in `compose-dialog-segments`** (vor `verifyFaceBeforeDispatch`-Aufruf, ~Zeile 4275):
-   - Wenn `pass.probe_frame_url` fehlt → `await getOrExtractProbeFrame(...)`, URL auf Pass schreiben.
-   - `verifyFaceBeforeDispatch` erhält den neuen Parameter `prebuiltFrameUrl`.
-   - `_shared/syncso-face-gate.ts`: `verifyFaceBeforeDispatch` akzeptiert `prebuiltFrameUrl` und gibt ihn an `detectFacesMediaPipe(prebuiltFrameUrls: [url])` weiter — gleicher Code-Pfad wie heute in `syncso-preflight`. Damit greift der existierende `ok_after_snap`-Zweig (Zeilen 230-289) statt `not_at_coord` zu werfen.
+1. Nach Deploy direkt einmal `syncso-preflight` invoke testen (curl mit Admin-JWT ist sandbox-seitig nicht möglich, deshalb über die UI).
+2. Edge-Function-Logs lesen: erwartete Zeile `v129.23.1 sceneId=5813e9bb-… passIndex=0 … passes_resolved=4`.
+3. Bei `passes_resolved=4` muss die UI `verdict !== 'fail'` zeigen → Preflight-Checks werden ausgeführt.
+4. Bei `passes_resolved=0` oder `non-array:…` wissen wir, dass das deployte Postgrest-Result anders aussieht als unsere SQL-Probe — dann ziehen wir den Select auf `dialog_shots->'passes'` explizit um. Aktuell ist das **nicht** Teil des Plans, weil unsere DB-Probe sauber ein Array zurückliefert.
 
-3. **Pass-Persistenz**: `dialog_shots`/`pass`-Row bekommt Spalte `probe_frame_url` (Migration), damit Retries und der Forensik-UI dieselbe URL benutzen — kein doppelter Extract.
+### 4. UI: kein Code-Change geplant
 
-4. **Refund-Sicherheit**: Bleibt unverändert. Schlägt der Extractor + Fallback komplett fehl, läuft heutiges `probe_unavailable`-Verhalten weiter (Dispatch ungeprüft, später Refund bei Sync.so-Fehler) — also keine Regression.
+Der Forensik-Sheet-Renderer ist korrekt. Wenn nach Deploy `available` mit im 404 kommt, wird `result.error` immer noch "pass_not_found" zeigen, aber der Debug-Inhalt steht im Detail-JSON unter dem Sheet (Bundle / Replay-Sektion zeigen das Raw-Result). Optional könnten wir die `available`-Zahl klein anhängen ("pass_not_found · 0/4 verfügbar"), das ist aber nur kosmetisch und kann nach der Diagnose dazukommen.
 
-5. **Forensik-UI** (`SyncsoForensicsSheet.tsx`): Das grüne „Self-healed"-Banner nur dann zeigen, wenn der Snap **am Dispatch** tatsächlich angewandt wurde (`pass.coords_snapped_at IS NOT NULL` AND `dispatch_never_happened === false`). Das gestrige Banner war optimistisch — neue Logik:
-   - `coords_snapped_at` gesetzt + Dispatch passiert → grün „Snap angewandt, Sync.so lief".
-   - `coords_snapped_at` gesetzt + dispatch_never_happened → orange „Snap bereit, aber Dispatch fehlt — Replay nötig".
-   - Snap nur in Live-Probe (nicht in DB) → blau „Snap-Kandidat erkannt, beim nächsten Render anwendbar".
+## Kosten / Risiko
 
-## Dateien
+- Keine Migration, keine Wallet-/Credit-Pfade berührt.
+- Reiner Edge-Function-Redeploy + 2 console.log + 1 erweitertes Fehlerobjekt.
+- Keine Änderung an `compose-dialog-segments`, an Sync.so-Dispatch oder am DB-Schema.
 
-- `supabase/functions/_shared/face-frame-extract.ts` (erweitern oder neue Helper-Datei)
-- `supabase/functions/_shared/syncso-face-gate.ts` (neuer Param `prebuiltFrameUrl`)
-- `supabase/functions/compose-dialog-segments/index.ts` (Frame-Extract vor Face-Gate, Pass-Update)
-- `supabase/migrations/<ts>_dialog_shot_probe_frame.sql` (Spalte `probe_frame_url`)
-- `src/components/admin/SyncsoForensicsSheet.tsx` (Banner-Logik präzisieren)
+## Was ich **nicht** anfasse
 
-## Validierung
-
-- Replay der gleichen Szene `a6ce3a99…` → Logs zeigen `v129.22.3_face_gate code=ok_after_snap snap=[457,593]` → DISPATCH mit `[457,593]` → Sync.so 200 OK.
-- Neue Szene mit 4 Sprechern → alle 4 Passes haben `probe_frame_url`, keine `FACE_GATE_PROBE_UNAVAILABLE`-Einträge mehr in `sync_dispatch_log`.
-
-## Kosten
-
-- ~€0.001/Pass für Replicate (oder ~€0.002 für Lambda-Still), gecached pro Pass → einmalig pro Szene/Sprecher.
+- Die Dispatch-Logik / Auto-Snap (v129.23 bleibt unverändert).
+- `dialog_shots`-Struktur / Migrations.
+- Forensik-Sheet-Logik außer optional ein kleines `available`-Suffix nach der Diagnose.
