@@ -102,6 +102,70 @@ export interface FaceGateInput {
   plateHeight?: number;
 }
 
+async function videoFaceFallback(input: FaceGateInput, apiKey: string, frame: number, coord: [number, number], extractReason: string): Promise<FaceGateResult | null> {
+  const W = Number(input.plateWidth ?? 0);
+  const H = Number(input.plateHeight ?? 0);
+  if (!W || !H) return null;
+  const fps = Math.max(1, Number(input.fps ?? 30));
+  const timestampSec = frame / fps;
+  const prompt = `Analyze the exact video frame at timestamp ${timestampSec.toFixed(3)}s (frame ${frame} at ${fps}fps). Return ONLY strict JSON: {"faceCount":number,"faces":[{"x":0..1,"y":0..1,"w":0..1,"h":0..1,"confidence":0..1}]}. Count clearly visible human faces only.`;
+  try {
+    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(input.timeoutMs ?? 15_000),
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: [
+          { type: "text", text: prompt },
+          { type: "input_video", input_video: { url: input.videoUrl } } as unknown,
+        ] }],
+        temperature: 0,
+      }),
+    });
+    const raw = await r.text().catch(() => "");
+    if (!r.ok) return null;
+    const body = JSON.parse(raw || "{}") as any;
+    const txt = String(body?.choices?.[0]?.message?.content ?? "").trim();
+    const jsonText = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+    const parsed = JSON.parse(jsonText) as any;
+    const faces = Array.isArray(parsed?.faces) ? parsed.faces : [];
+    const count = Number(parsed?.faceCount ?? faces.length);
+    if (count <= 0 || faces.length === 0) {
+      return { ok: false, code: "no_face", reason: `Video fallback saw no face after extract failed: ${extractReason}`, raw_reply: txt.slice(0, 80), extract_ms: 0, gemini_ms: 0 };
+    }
+    if (count > 1 || faces.length > 1) {
+      return input.isMultiSpeakerContext
+        ? { ok: false, code: "multiple_faces", reason: `Video fallback saw ${count} faces after extract failed: ${extractReason}`, raw_reply: txt.slice(0, 80), extract_ms: 0, gemini_ms: 0 }
+        : { ok: true, code: "ok", raw_reply: txt.slice(0, 80), extract_ms: 0, gemini_ms: 0 };
+    }
+    const f = faces[0] ?? {};
+    const cx = (Number(f.x ?? 0) + Number(f.w ?? 0) / 2) * W;
+    const cy = (Number(f.y ?? 0) + Number(f.h ?? 0) / 2) * H;
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+    const snapped: [number, number] = [Math.round(cx), Math.round(cy)];
+    const dist = Math.round(Math.hypot(snapped[0] - coord[0], snapped[1] - coord[1]));
+    const tol = Math.max(40, Math.min(W, H) * 0.15);
+    if (dist <= tol) {
+      return { ok: true, code: "ok", raw_reply: "video_fallback_one_face_at_coord", extract_ms: 0, gemini_ms: 0 };
+    }
+    return {
+      ok: true,
+      code: "ok_after_snap",
+      reason: `Frame extraction failed (${extractReason}); Gemini video fallback snapped to [${snapped[0]},${snapped[1]}] (${dist}px delta).`,
+      raw_reply: txt.slice(0, 80),
+      snapped_coord: snapped,
+      original_coord: [coord[0], coord[1]],
+      snap_distance_px: dist,
+      extract_ms: 0,
+      gemini_ms: 0,
+    };
+  } catch (e) {
+    console.warn(`[face-gate] v129.23 video fallback failed: ${(e as Error)?.message ?? e}`);
+    return null;
+  }
+}
+
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
@@ -134,6 +198,10 @@ export async function verifyFaceBeforeDispatch(
     });
     extractMs = extracted.latencyMs ?? 0;
     if (!extracted.ok || !extracted.frameUrl) {
+      if (coord) {
+        const fallback = await videoFaceFallback(input, apiKey, frame, coord, extracted.reason ?? "unknown");
+        if (fallback) return fallback;
+      }
       return {
         ok: true,
         code: "probe_unavailable",
