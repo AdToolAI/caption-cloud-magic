@@ -1,5 +1,5 @@
 /**
- * syncso-preflight — v129.8
+ * syncso-preflight — v129.19
  *
  * Admin-only diagnostic: runs the 6 deterministic checks that cover
  * every known cause of Sync.so `generation_unknown_error`, WITHOUT
@@ -438,30 +438,40 @@ serve(async (req) => {
     dispatch = d;
   }
 
-  const videoUrl: string =
+  // v129.19 — Preflight MUST validate the artifact Sync.so actually
+  // receives (preclip MP4 + transformed coords + frame_number from the
+  // outbound payload), not the plate. The plate has its own face at a
+  // different coord/frame; validating it is misleading-green.
+  const meta: any = dispatch?.meta ?? {};
+  const outboundAsd: any = meta?.outbound_payload?.options?.active_speaker_detection ?? {};
+  const payloadSummary: any = meta?.payload_summary ?? {};
+  const metaV116: any = meta?.v116_diag ?? {};
+
+  const preclipVideoUrl: string | null =
+    (typeof payloadSummary?.input_video === "string" && payloadSummary.input_video) ||
+    null;
+  const plateVideoUrl: string =
     pass.payload_video_url ?? pass._v106_probe?.payload_video_url ?? dispatch?.video_url ?? pass.input_url ?? "";
+  const videoUrl: string = preclipVideoUrl ?? plateVideoUrl;
+  const videoSourceKind: "preclip" | "plate" = preclipVideoUrl ? "preclip" : "plate";
+
   const audioUrl: string =
     pass.payload_audio_url ?? pass._v106_probe?.payload_audio_url ?? dispatch?.audio_url ?? pass.audio_url ?? "";
 
-  // v129.9 — Also peek into dispatch.meta because the production write path
-  // historically only stored ASD coords/frame inside meta.outbound_payload
-  // and meta.v116_diag, leaving the top-level columns null. Without this
-  // fallback the face probe SKIPped on every real failure.
-  const meta: any = dispatch?.meta ?? {};
-  const metaAsd: any = meta?.outbound_payload?.options?.active_speaker_detection ?? {};
-  const metaV116: any = meta?.v116_diag ?? {};
-
+  // Frame + coord — prefer outbound ASD (preclip-space). Only fall back
+  // to plate-space when the outbound payload was not logged.
+  const outboundFrame =
+    Number.isFinite(Number(outboundAsd?.frame_number)) ? Number(outboundAsd.frame_number) : null;
   let frameNumber: number | null =
-    dispatch?.frame_number
+    outboundFrame
+    ?? (videoSourceKind === "plate" ? (dispatch?.frame_number ?? null) : null)
     ?? meta?.reference_frame_number
-    ?? metaAsd?.frame_number
     ?? pass?.frame_number
     ?? pass?._v106_probe?.frame_number
     ?? null;
   let rawCoord =
-    dispatch?.coords
-    ?? metaAsd?.coordinates
-    ?? metaV116?.coords_sent
+    outboundAsd?.coordinates
+    ?? (videoSourceKind === "plate" ? (dispatch?.coords ?? metaV116?.coords_sent ?? null) : null)
     ?? meta?.coords
     ?? pass?.coords
     ?? pass?._v106_probe?.coords
@@ -626,12 +636,17 @@ serve(async (req) => {
     resolved: {
       video_url_present: !!videoUrl,
       video_url: videoUrl || null,
+      video_source_kind: videoSourceKind,
+      plate_video_url: plateVideoUrl || null,
+      preclip_video_url: preclipVideoUrl,
       audio_url_present: !!audioUrl,
       frame_number: frameNumber,
       coord,
+      preclip_crop: meta?.preclip_crop ?? meta?.v1291_diag?.preclip_crop ?? metaV116?.preclip_crop ?? null,
     },
     checks,
     verdict,
     first_blocker: firstBlocker,
+    preflight_version: "v129.19",
   });
 });

@@ -393,7 +393,7 @@ export function SyncsoForensicsSheet({
           <SheetTitle className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5" />
             Sync.so Forensik
-            <Badge variant="outline" className="ml-2">v129.18</Badge>
+            <Badge variant="outline" className="ml-2">v129.19</Badge>
           </SheetTitle>
           <SheetDescription>
             Admin-Werkzeug. Strikt isoliert von Produktion: keine Mutation an
@@ -731,7 +731,7 @@ function PreflightPanel({
         <div className="flex items-center gap-2 text-sm font-medium">
           <ShieldCheck className="h-4 w-4" />
           Preflight
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">v129.18</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{result?.preflight_version ?? 'v129.19'}</span>
         </div>
         <Button size="sm" variant="ghost" onClick={onRerun} disabled={loading} className="h-7">
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
@@ -801,9 +801,22 @@ function PreflightPanel({
       )}
 
       {result?.resolved && (
-        <div className="pt-1 text-[10px] text-muted-foreground border-t border-border/30">
-          frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}] ·
-          {' '}job={result.provider_job_id?.slice(0, 8) ?? '—'}…
+        <div className="pt-1 text-[10px] text-muted-foreground border-t border-border/30 space-y-0.5">
+          <div>
+            source=<span className={result.resolved.video_source_kind === 'preclip' ? 'text-emerald-400' : 'text-amber-400'}>
+              {result.resolved.video_source_kind ?? '—'}
+            </span> · frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}] · job={result.provider_job_id?.slice(0, 8) ?? '—'}…
+          </div>
+          {result.resolved.video_source_kind === 'plate' && (
+            <div className="text-amber-300">
+              ⚠ outbound (preclip) payload nicht im Dispatch-Log — Preflight validiert die Plate. Nicht zwingend = was Sync.so sah.
+            </div>
+          )}
+          {result.resolved.preclip_crop && (
+            <div className="font-mono">
+              preclip_crop={JSON.stringify(result.resolved.preclip_crop)}
+            </div>
+          )}
         </div>
       )}
     </div>
