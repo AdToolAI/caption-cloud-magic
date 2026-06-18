@@ -554,6 +554,104 @@ serve(async (req) => {
         // Fall through to mark this pass `done` with `sync_noop_suspect: true`
         // (patched in the freshDonePasses update below).
       }
+
+      // v129.26 — Auto-escalate NOOP-suspect preclip passes to `coords-pro`.
+      // v128 declared "terminal means terminal" for noop suspects, but the
+      // v129.24 fix forces `auto_detect:true` on clean preclips on the
+      // FIRST attempt. Sync-3 deterministically noops a small fraction of
+      // those calls (short voiced segments, outer-edge crops). Without an
+      // automatic retry, the user sees frozen lips on speakers 2/4 of a
+      // 4-speaker scene even though all other dispatch state is healthy.
+      // We bump the variant to `coords-pro` (transformed preclip-space
+      // coordinates + frame_number, see compose-dialog-segments v129.26)
+      // and re-dispatch THIS pass exactly once. `noop_retry_attempted`
+      // is the one-shot guard — a second noop on the coords-pro retry
+      // falls through to the legacy PASS_DONE_SUSPECT path.
+      const prevNoopRetried = !!passBeforeDone?.noop_retry_attempted;
+      const havePlateCoords = Array.isArray(passBeforeDone?.coords) &&
+        passBeforeDone.coords.length === 2;
+      const havePreclipCrop = !!passBeforeDone?.preclip_crop &&
+        Number.isFinite(Number(passBeforeDone.preclip_crop.size));
+      const canEscalateCoordsPro = noopSuspect && !prevNoopRetried &&
+        havePlateCoords && havePreclipCrop &&
+        Number.isFinite(Number(passBeforeDone?.reference_frame_number));
+
+      if (canEscalateCoordsPro) {
+        const newAttemptId = crypto.randomUUID();
+        const escalationPatch = {
+          ...freshDonePasses[currentPass],
+          status: "pending",
+          job_id: null,
+          output_url: null,
+          finished_at: null,
+          retry_variant: "coords-pro",
+          noop_retry_attempted: true,
+          noop_retry_attempt_id: newAttemptId,
+          noop_retry_reason: syncOutputResolutionRegression
+            ? "sync_output_resolution_regression"
+            : syncOutputUnchanged
+              ? "sync_output_unchanged"
+              : "sync_output_reencoded_passthrough_suspect",
+          previous_noop_output_url: rehostedUrl ?? outputUrl,
+          previous_noop_size_ratio: sizeRatio,
+        };
+        freshDonePasses[currentPass] = escalationPatch;
+        try {
+          await supabase.rpc("update_dialog_pass_slot", {
+            _scene_id: sceneId,
+            _pass_idx: currentPass,
+            _patch: {
+              status: "pending",
+              job_id: null,
+              output_url: null,
+              finished_at: null,
+              retry_variant: "coords-pro",
+              noop_retry_attempted: true,
+              noop_retry_attempt_id: newAttemptId,
+            },
+          });
+        } catch (e) {
+          // Fallback to whole-array write
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: { ...freshDoneState, passes: freshDonePasses, updated_at: nowIso },
+              updated_at: nowIso,
+            })
+            .eq("id", sceneId);
+        }
+        // Fire-and-forget re-dispatch with user_retry_flag so the
+        // safe-entry guard lets us back through.
+        try {
+          fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              scene_id: sceneId,
+              retry: true,
+              pass_idx: currentPass,
+              retry_variant: "coords-pro",
+              user_retry_flag: true,
+              new_attempt_id: newAttemptId,
+              credit_charge_result: "skip",
+              noop_auto_escalation: true,
+            }),
+          }).catch(() => {});
+        } catch { /* ignore */ }
+        console.warn(
+          `[sync-so-webhook] v129.26 scene=${sceneId} pass=${currentPass} NOOP → auto-escalating to coords-pro (attempt_id=${newAttemptId})`,
+        );
+        return ok({
+          ok: true,
+          scene_id: sceneId,
+          job_id: jobId,
+          status,
+          engine: "sync-segments",
+          escalated: "coords_pro_v12926",
+          pass_idx: currentPass,
+        });
+      }
+
       const noopSuspectFlags = noopSuspect ? {
         sync_noop_suspect: true,
         noop_reason: syncOutputResolutionRegression
