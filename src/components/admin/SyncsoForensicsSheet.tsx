@@ -807,7 +807,16 @@ function PreflightPanel({
               {result.resolved.video_source_kind ?? '—'}
             </span> · frame={result.resolved.frame_number ?? '—'} · coord=[{result.resolved.coord?.join(',') ?? '—'}] · job={result.provider_job_id?.slice(0, 8) ?? '—'}…
           </div>
-          {result.resolved.video_source_kind === 'plate' && (
+          {result.resolved.dispatch_never_happened && (
+            <div className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-red-300">
+              <div className="font-semibold">⛔ Preclip nicht dispatcht — Crop-Bug vor Versand</div>
+              <div className="mt-0.5 text-[10px] opacity-90">
+                Der Face-Gate hat den Dispatch blockiert, weil die Intent-Koord auf der Plate kein Gesicht trifft.
+                v129.20 läuft jetzt Plate-Face-Detection auch für Single-Speaker-Szenen — bitte Re-Dispatch triggern.
+              </div>
+            </div>
+          )}
+          {!result.resolved.dispatch_never_happened && result.resolved.video_source_kind === 'plate' && (
             <div className="text-amber-300">
               ⚠ outbound (preclip) payload nicht im Dispatch-Log — Preflight validiert die Plate. Nicht zwingend = was Sync.so sah.
             </div>
