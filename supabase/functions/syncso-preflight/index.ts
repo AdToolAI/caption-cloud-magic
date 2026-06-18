@@ -592,6 +592,10 @@ serve(async (req) => {
       : null;
   if (!sceneId) return json({ error: "missing_scene_id" }, 400);
 
+  console.log(
+    `[syncso-preflight] v129.23.1 sceneId=${sceneId} passIndex=${passIndex}`,
+  );
+
   // Resolve pass + dispatch (same chain as support-bundle)
   const { data: scene } = await admin
     .from("composer_scenes")
@@ -609,8 +613,24 @@ serve(async (req) => {
     sceneUserId = typeof (project as any)?.user_id === "string" ? (project as any).user_id : null;
   }
   const passes = scene.dialog_shots?.passes ?? [];
+  console.log(
+    `[syncso-preflight] v129.23.1 passes_resolved=${Array.isArray(passes) ? passes.length : "non-array:" + typeof passes} dialog_shots_type=${typeof scene.dialog_shots}`,
+  );
   const pass = passes[passIndex];
-  if (!pass) return json({ error: "pass_not_found", available: passes.length }, 404);
+  if (!pass) {
+    return json(
+      {
+        error: "pass_not_found",
+        available: Array.isArray(passes) ? passes.length : 0,
+        scene_has_dialog_shots: !!scene.dialog_shots,
+        dialog_shots_keys:
+          scene.dialog_shots && typeof scene.dialog_shots === "object"
+            ? Object.keys(scene.dialog_shots)
+            : [],
+      },
+      404,
+    );
+  }
 
   const providerJobId: string | null =
     pass.provider_job_id ?? pass.job_id ?? pass._v106_probe?.provider_job_id ?? null;
