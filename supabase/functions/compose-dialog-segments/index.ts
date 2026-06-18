@@ -3465,10 +3465,61 @@ serve(async (req) => {
       let asdMode: string;
       let v1291Diag: any = null;
 
+      // v129.24 — Empirical evidence (manual reproduction against Sync.so
+      // 2026-06-18) proves that sync-3 with `active_speaker_detection`
+      // {auto_detect:false, coordinates|bounding_boxes} on a SINGLE-FACE
+      // preclip crop deterministically fails with `generation_unknown_error`,
+      // while the identical video+audio with `auto_detect:true` COMPLETES.
+      // Hypothesis: the explicit-speaker DTO is intended for multi-face
+      // plates; on a tight 1-face crop it triggers an internal selector
+      // failure inside Sync.so.
+      //
+      // Therefore: whenever the PRECLIP itself has exactly one face and the
+      // crop is unambiguous, send `auto_detect:true` — even in
+      // Multi-Speaker scene context. The crop has already done the
+      // disambiguation; coords are redundant *and* harmful.
+      const preclipUnambiguous =
+        passFaceCount === 1 &&
+        (v1291Ambiguity?.risk === "clean" || v1291Ambiguity === null);
 
-
-      if (isMultiSpeaker && plateCoords && cropOk) {
-        // Plate → Preclip transform.
+      if (preclipUnambiguous) {
+        // Single-face preclip → ASD coords/bboxes are harmful on Sync.so.
+        // Use auto_detect:true regardless of scene-level multi-speaker flag.
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        asdMode = isMultiSpeaker
+          ? "auto_detect_preclip_unambiguous_v12924"
+          : "auto_detect";
+        // Still compute v1291Diag for log parity when multi-speaker context
+        // exists, so we keep ambiguity / transform observability.
+        if (isMultiSpeaker && plateCoords && cropOk) {
+          const cx = Number(crop.x);
+          const cy = Number(crop.y);
+          const cSize = Number(crop.size);
+          const scale = outSize / cSize;
+          const xFloat = (plateCoords[0] - cx) * scale;
+          const yFloat = (plateCoords[1] - cy) * scale;
+          const xInt = Math.round(xFloat);
+          const yInt = Math.round(yFloat);
+          v1291Diag = {
+            enabled: false,
+            skipped_reason: "preclip_unambiguous_auto_detect_v12924",
+            source_space: "plate",
+            target_space: "preclip",
+            plate_coords: plateCoords,
+            preclip_crop: { x: cx, y: cy, size: cSize, outputSize: outSize },
+            scale: Number(scale.toFixed(4)),
+            transformed_coords_float: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
+            transformed_coords_int: [xInt, yInt],
+            in_bounds: xInt >= 0 && xInt < outSize && yInt >= 0 && yInt < outSize,
+            frame_number: refFrame,
+          };
+          (pass as any)._v1291 = v1291Diag;
+        }
+      } else if (isMultiSpeaker && plateCoords && cropOk) {
+        // Multi-speaker preclip with sibling face(s) INSIDE the crop —
+        // genuine ambiguity. Use doc-strict transform. (Empirically rare on
+        // our 220×220 tight crops, but kept as the safe fallback for those
+        // cases where face-gate counts >1.)
         const cx = Number(crop.x);
         const cy = Number(crop.y);
         const cSize = Number(crop.size);
@@ -3492,13 +3543,10 @@ serve(async (req) => {
         };
         (pass as any)._v1291 = v1291Diag;
         if (!inBounds) {
-          // v129.1 — Do NOT silently clamp. Mark for preflight block.
           (pass as any)._v1291_block = {
             reason: "transformed_coords_out_of_bounds",
             details: v1291Diag,
           };
-          // Set a doc-strict payload anyway so log evidence is consistent;
-          // the preflight assertion will refuse to dispatch.
           syncOptions.active_speaker_detection = {
             auto_detect: false,
             frame_number: refFrame,
@@ -3515,28 +3563,23 @@ serve(async (req) => {
         }
       } else if (isMultiSpeaker && (!plateCoords || !cropOk)) {
         // v129.1 — Multi-Speaker without persisted coords/crop is an internal
-        // contract violation: upstream MUST have persisted them. Mark for
-        // preflight block; do not fall back to auto_detect.
+        // contract violation. Fall back to auto_detect (now safe per v129.24).
         (pass as any)._v1291_block = {
           reason: "multi_speaker_missing_coords_or_crop",
           has_plate_coords: !!plateCoords,
           has_preclip_crop: !!cropOk,
         };
         syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "v1291_missing_inputs_blocked";
-      } else if (passFaceCount === 1 || passFaceCount === null) {
-        // Single-Speaker preclip — auto_detect remains doc-correct (v115).
+        asdMode = "v1291_missing_inputs_blocked_autodetect";
+      } else if (passFaceCount === null) {
+        // Probe unavailable — auto_detect is the safest default per v129.24.
         syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "auto_detect";
+        asdMode = "auto_detect_probe_unavailable";
       } else {
-        // Single-Speaker fallback: face-gate saw 0 or >1 faces. Center coords.
-        const center = Math.max(8, Math.floor(outSize / 2));
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          frame_number: 0,
-          coordinates: [center, center],
-        };
-        asdMode = "coords_center_fallback";
+        // passFaceCount === 0 (no face in crop) — let Sync.so auto-detect
+        // and fail visibly rather than locking a bogus center coord.
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        asdMode = "auto_detect_zero_face_preclip";
       }
 
       delete syncOptions.temperature;
