@@ -460,6 +460,8 @@ async function probeFaceAtFrame(
         frame_cached: frameCached,
         extract_ms: extractMs,
         gemini_ms: geminiMs,
+        source,
+        ...(mediapipeMeta ?? {}),
         raw: typeof body === "object" ? body : String(body ?? "").slice(0, 200),
       };
     }
@@ -473,6 +475,8 @@ async function probeFaceAtFrame(
       frame_cached: frameCached,
       extract_ms: extractMs,
       gemini_ms: geminiMs,
+      source,
+      ...(mediapipeMeta ?? {}),
     } as const;
     if (coord && frameNumber != null) {
       const t = txt.toLowerCase();
