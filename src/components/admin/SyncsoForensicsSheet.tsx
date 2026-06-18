@@ -773,9 +773,31 @@ function PreflightPanel({
                 </summary>
                 <div className="px-2 pb-2 pt-1 space-y-0.5 text-[11px] text-muted-foreground border-t border-border/30">
                   {c.note && <div className="text-foreground/90 mb-1">{c.note}</div>}
+                  {k === 'face_at_frame' && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      <span
+                        className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${
+                          c.source === 'mediapipe'
+                            ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300'
+                            : c.source === 'gemini_fallback'
+                            ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                            : c.source === 'gemini'
+                            ? 'border-sky-500/40 bg-sky-500/10 text-sky-300'
+                            : 'border-border/50 text-muted-foreground'
+                        }`}
+                      >
+                        face probe: {c.source ?? 'unknown'}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/50 text-muted-foreground">
+                        v129.21.3 · mediapipe primary
+                      </span>
+                    </div>
+                  )}
                   {typeof c.frame_jpeg_url === 'string' && c.frame_jpeg_url && (
                     <div className="my-2">
-                      <div className="text-[10px] uppercase tracking-wide mb-1">extracted frame (v129.18 · client canvas)</div>
+                      <div className="text-[10px] uppercase tracking-wide mb-1">
+                        gemini fallback frame (v129.18 · client canvas)
+                      </div>
                       <img
                         src={c.frame_jpeg_url}
                         alt="ASD frame"
