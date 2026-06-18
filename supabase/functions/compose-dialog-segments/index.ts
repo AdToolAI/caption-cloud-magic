@@ -4359,7 +4359,7 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
-              version: "v129.22.3",
+              version: "v129.23.2",
               code: gate.code,
               snapped_coord: newCoord,
               original_coord: gate.original_coord ?? gateCoord,
@@ -4390,7 +4390,7 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
-              version: "v129.22.3",
+              version: "v129.23.2",
               code: gate.code,
               reason: gate.reason,
               raw_reply: gate.raw_reply,
@@ -4420,7 +4420,7 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
-              version: "v129.11",
+              version: "v129.23.2",
               code: gate.code,
               reason: gate.reason,
               raw_reply: gate.raw_reply,
