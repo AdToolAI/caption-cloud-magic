@@ -840,7 +840,7 @@ function PreflightPanel({
               <div className="font-semibold">⛔ Preclip nicht dispatcht — Crop-Bug vor Versand</div>
               <div className="mt-0.5 text-[10px] opacity-90">
                 Der Face-Gate hat den Dispatch blockiert, weil die Intent-Koord auf der Plate kein Gesicht trifft.
-                v129.21 nutzt MediaPipe als Primär-Detector (Gemini nur noch Fallback) — Re-Dispatch sollte jetzt grün durchlaufen.
+                v129.22 nutzt AWS Rekognition als Primär-Detector (Gemini nur noch semantischer Fallback) — Re-Dispatch sollte jetzt grün durchlaufen.
               </div>
             </div>
           )}
