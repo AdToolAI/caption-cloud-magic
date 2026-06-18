@@ -619,11 +619,13 @@ serve(async (req) => {
 
   // v129.9 — Infer missing frame_number from parsed duration (mid-clip)
   // and missing coord from the preclip's output size (assume square center).
+  // v129.21.3 — Parse MP4 head once so we can also feed plate dims +
+  // duration to the MediaPipe primary detector.
+  const mp4Info = vFetch.ok && vFetch.bytes ? parseMp4Head(vFetch.bytes) : null;
   let faceWasInferred = false;
-  if ((frameNumber == null || coord == null) && vFetch.ok && vFetch.bytes) {
-    const earlyInfo = parseMp4Head(vFetch.bytes);
-    if (frameNumber == null && earlyInfo.duration_s != null) {
-      frameNumber = Math.max(0, Math.floor(earlyInfo.duration_s * 30 / 2));
+  if ((frameNumber == null || coord == null) && mp4Info) {
+    if (frameNumber == null && mp4Info.duration_s != null) {
+      frameNumber = Math.max(0, Math.floor(mp4Info.duration_s * 30 / 2));
       faceWasInferred = true;
     }
     if (coord == null) {
@@ -641,7 +643,17 @@ serve(async (req) => {
     }
   }
 
-  const faceProbe = await probeFaceAtFrame(videoUrl, frameNumber, coord, faceWasInferred, probeFrameUrl);
+  const faceProbe = await probeFaceAtFrame(
+    videoUrl,
+    frameNumber,
+    coord,
+    faceWasInferred,
+    probeFrameUrl,
+    mp4Info?.width ?? null,
+    mp4Info?.height ?? null,
+    mp4Info?.duration_s ?? null,
+  );
+
 
   // video_fetchable
   const video_fetchable: CheckResult = vFetch.ok
