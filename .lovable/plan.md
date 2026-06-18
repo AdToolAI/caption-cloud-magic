@@ -1,31 +1,54 @@
-# Plan: Sync.so Face-Gate ohne lucataco/Replicate
+## Diagnose
 
-## Umgesetzt
+Forensics zeigt alle Checks **PASS** — der Snap-Hinweis im UI ist nur informativ und betrifft eine andere Probe-Koordinate (Frame 36) als der echte Dispatch (Frame 52). Der Dispatch ging mit `coords=[360,363]` sauber raus (HTTP 201, `DISPATCHED`).
 
-- `supabase/functions/_shared/face-frame-extract.ts`
-  - Replicate/lucataco-Frame-Extraction vollständig entfernt.
-  - Server-Pfad prüft nur noch bereits vorhandene Client-Canvas Frames im `composer-frames` Bucket.
-  - Wenn kein Frame vorhanden ist: deterministisch `server_extract_disabled_use_client_canvas`.
+Der eigentliche Bruch passiert **bei Sync.so selbst**, nicht im Face-Gate. Webhook-Payload für jeden FAIL:
 
-- `supabase/functions/_shared/syncso-face-gate.ts`
-  - Video-Fallback entfernt, damit ein MP4/Gemini-Hinweis nie mehr als harter `no_face`-Blocker zählt.
-  - Harte Blocks (`no_face`, `not_at_coord`, `multiple_faces`) entstehen nur noch nach echter Still-Image-Prüfung.
-  - Ohne Client-Canvas/Cache-Frame wird sauber `probe_unavailable` zurückgegeben und Dispatch läuft weiter.
-  - Preclip-validierte Runs werden im Grund als `source=preclip-validated` geloggt.
+```
+status: "FAILED"
+errorCode: "generation_unknown_error"
+error: "Something went wrong while processing this generation. Please try again."
+```
 
-- `supabase/functions/compose-dialog-segments/index.ts`
-  - Übergibt `preclipTrusted` an den Face-Gate, wenn `preclip_face_count === 1` und die Preclip-Ambiguity `risk === "clean"` ist.
-  - Logs auf `v129.23.2_face_gate` angehoben, inklusive `preclip_trusted=true/false`.
-  - Face-Gate-Meta-Version auf `v129.23.2` aktualisiert.
+Das passiert seit Stunden **bei jedem Dispatch** (mehrere Scenes, identischer Code). Sync.so-Doku (`GET /v2/errors`) sagt: "Retry. Falls reproduzierbar → Eingabe ist defekt".
 
-## Erwartetes Verhalten
+`ffprobe` auf dem realen Preclip (`dialog-pass-preclip-bfa65e55-…-p0.mp4`):
 
-- Kein `replicate_create_404` mehr im Sync.so Face-Gate-Pfad.
-- Kein harter `FACE_GATE_BLOCKED` mehr nur deshalb, weil serverseitig kein MP4-Frame extrahiert werden konnte.
-- Saubere Preclips (`face_count=1`, `risk=clean`) laufen bei fehlendem Probe-JPEG als `FACE_GATE_PROBE_UNAVAILABLE` weiter bis zum Sync.so Dispatch.
+```
+codec_name=h264
+pix_fmt=yuvj420p          ← JPEG-Range YUV (Full-Range)
+width=720  height=720
+nb_frames=73  fps=30  duration=2.43s
+streams: 1 (video only, no audio — by design, ok)
+```
 
-## Nicht geändert
+**Root Cause:** Remotion-Lambda rendert die Preclips mit `imageFormat: "jpeg"` und ohne explizites `pixelFormat`. Ergebnis ist `pix_fmt=yuvj420p` (JPEG/PC-Range statt TV-Range). Sync.so's Decoder/Face-Tracker akzeptiert `yuvj420p` nicht zuverlässig und failed silent mit dem generischen `generation_unknown_error`. Die Forensics-Pre-Checks erkennen das nicht, weil ffmpeg/Chrome beides problemlos lesen — nur Sync.so's Pipeline bricht.
 
-- Kein Umbau von AWS Rekognition.
-- Kein Umbau der Client-Canvas/Continuity-Guardian-Erzeugung.
-- Keine Migration, keine Credits-/Refund-Logik und keine Sync.so Payload-Optionen verändert.
+`normalize-master-clip` re-encodet bereits explizit auf `format=yuv420p` für andere Pfade — die Dialog-Preclips waren von dieser Vorgabe ausgenommen.
+
+## Fix (sehr klein, nur Render-Config)
+
+**`supabase/functions/_shared/pass-face-preclip.ts`** — im `lambdaPayload` zwei Felder hinzufügen:
+
+```ts
+pixelFormat: "yuv420p",     // ← erzwingt TV-Range, fixt Sync.so
+colorSpace: "bt709",        // ← deterministischer Farbraum
+```
+
+Optional zusätzlich `imageFormat: "png"` (kostet ~30% Render-Zeit, daher nur als Fallback dokumentieren — `pixelFormat: "yuv420p"` reicht).
+
+Version-Tag im Log: `v129.23.3_preclip_pixfmt`.
+
+## Verify
+
+1. Deploy `compose-dialog-segments` (zieht das `_shared/pass-face-preclip.ts` mit).
+2. Neue Test-Szene rendern → erwartetes Ergebnis:
+   - `ffprobe` neuer Preclip → `pix_fmt=yuv420p` (kein j).
+   - Sync.so-Webhook → `status: "COMPLETED"` statt `generation_unknown_error`.
+3. Falls Sync.so trotzdem failed: Generation-ID an Support melden (Sync.so-interner Bug). Dann zweite Stufe planen: Re-encode Preclip durch `normalize-master-clip` vor Dispatch.
+
+## Out of Scope
+
+- Keine Änderung am Face-Gate (v129.23.2 bleibt).
+- Keine Änderung am ASD-Coord-Snap (Forensics-Hinweis ist ein Cosmetics-Issue, nicht der Failure-Grund).
+- Keine Änderung an `normalize-master-clip`, `remotion-webhook`, oder am Webhook-Polling.
