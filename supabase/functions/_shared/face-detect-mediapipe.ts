@@ -129,7 +129,7 @@ async function signedRekognitionRequest(payloadJson: string): Promise<Response> 
     payloadHash,
   ].join("\n");
 
-  const credentialScope = `${dateStamp}/${AWS_REGION}/rekognition/aws4_request`;
+  const credentialScope = `${dateStamp}/${REKOGNITION_REGION_RESOLVED}/rekognition/aws4_request`;
   const stringToSign = [
     "AWS4-HMAC-SHA256",
     amzDate,
@@ -137,7 +137,7 @@ async function signedRekognitionRequest(payloadJson: string): Promise<Response> 
     await sha256Hex(canonicalRequest),
   ].join("\n");
 
-  const sigKey = await signingKey(AWS_SECRET_ACCESS_KEY, dateStamp, AWS_REGION, "rekognition");
+  const sigKey = await signingKey(AWS_SECRET_ACCESS_KEY, dateStamp, REKOGNITION_REGION_RESOLVED, "rekognition");
   const sigBytes = await hmac(sigKey, stringToSign);
   const signature = Array.from(new Uint8Array(sigBytes))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -315,7 +315,7 @@ export async function detectFacesMediaPipe(opts: {
 
   console.log(
     `[face-detect/aws] v129.22 rekognition primary plate=${W}x${H} ` +
-    `region=${AWS_REGION} frames=${urls.length}`,
+    `region=${REKOGNITION_REGION_RESOLVED} frames=${urls.length}`,
   );
 
   // Fetch all frames in parallel, then call Rekognition in parallel.
