@@ -1469,6 +1469,7 @@ serve(async (req) => {
                     );
                   }
                   await invalidateCache();
+                  const anchorAttempts: Array<Record<string, unknown>> = [];
                   composedUrl = await composeAnchor("attempt-1");
 
                   if (composedUrl && LOVABLE_API_KEY) {
@@ -1478,6 +1479,13 @@ serve(async (req) => {
                     identityFailure = e1.identity;
                     identityNotes = e1.notes;
                     identityMismatched = e1.mismatched ?? [];
+                    anchorAttempts.push({
+                      attempt: 1, mode: "normal",
+                      identity: identityFailure ?? "ok",
+                      faces: faceCount, humans: humanCount,
+                      mismatched: identityMismatched,
+                      at: new Date().toISOString(),
+                    });
 
                     const needsRetry =
                       identityFailure !== null ||
@@ -1503,9 +1511,55 @@ serve(async (req) => {
                         identityFailure = e2.identity;
                         identityNotes = e2.notes;
                         identityMismatched = e2.mismatched ?? [];
+                        anchorAttempts.push({
+                          attempt: 2, mode: isSwap ? "swap" : "strict",
+                          identity: identityFailure ?? "ok",
+                          faces: faceCount, humans: humanCount,
+                          mismatched: identityMismatched,
+                          at: new Date().toISOString(),
+                        });
+                      }
+
+                      // v131.6 — third (final) auto-recovery attempt with
+                      // FACE-LOCK mode when attempt-2 still shows an
+                      // identity SWAP. Clones/extras/missing are not
+                      // retried again because they need different fixes
+                      // (count or composition, not face-pixel-copy).
+                      if (
+                        identityFailure === "swap" &&
+                        identityPortraitUrls.length === portraitUrls.length
+                      ) {
+                        console.log(
+                          `[compose-video-clips] anchor scene ${scene.id}: attempt-2 still swap → attempt-3 face-lock`,
+                        );
+                        await invalidateCache();
+                        const lockUrl = await composeAnchor(
+                          "attempt-3",
+                          false,
+                          true,
+                          identityMismatched,
+                          true, // faceLock
+                        );
+                        if (lockUrl) {
+                          const e3 = await evaluate(lockUrl, "attempt-3");
+                          composedUrl = lockUrl;
+                          faceCount = e3.faceCount;
+                          humanCount = e3.humanCount;
+                          identityFailure = e3.identity;
+                          identityNotes = e3.notes;
+                          identityMismatched = e3.mismatched ?? [];
+                          anchorAttempts.push({
+                            attempt: 3, mode: "face-lock",
+                            identity: identityFailure ?? "ok",
+                            faces: faceCount, humans: humanCount,
+                            mismatched: identityMismatched,
+                            at: new Date().toISOString(),
+                          });
+                        }
                       }
                     }
                   }
+                  (scene as any).__anchorAttempts = anchorAttempts;
                 }
 
                 if (composedUrl) {
