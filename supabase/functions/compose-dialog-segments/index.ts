@@ -3579,6 +3579,18 @@ serve(async (req) => {
           : "clean"
         : null;
 
+      // v131.1 — preclip trust signal independent of face-probe count.
+      // When the preclip pipeline (v69/v77/v116) emitted a clean URL with
+      // no `preclip_error`, the crop is by construction centered on a
+      // validated single face. That trust unlocks Rule 0 even when the
+      // server face-probe is unavailable on Preclip assets.
+      const preclipTrust: "verified" | "probe-confirmed" | "unknown" =
+        (pass as any).preclip_url && !(pass as any).preclip_error
+          ? "verified"
+          : passFaceCount === 1
+          ? "probe-confirmed"
+          : "unknown";
+
       const strategy = buildAsdStrategy({
         preflight: preflightFromSnap,
         geometry: {
@@ -3594,11 +3606,13 @@ serve(async (req) => {
               }
             : null,
           asdFrameNumber: clampedAsdFrame,
+          preclipTrust,
         },
         retryVariant,
         isMultiSpeaker,
         usePreclip: true,
       });
+
 
       syncOptions.active_speaker_detection = strategy.asd;
       asdMode = `v130_${strategy.mode}`;
