@@ -4946,10 +4946,15 @@ serve(async (req) => {
         v102_probe: (pass as any)._v102_probe ?? null,
         v103_probe: (pass as any)._v102_probe ?? null,
         v105_probe: (pass as any)._v105_probe ?? null,
+        // v131.1 — top-level keys for fast SQL filtering (no jsonb traversal)
+        asd_mode_chosen: (pass as any)._v130_asd_strategy?.mode ?? null,
+        asd_rule_fired: (pass as any)._v1291?.rule ?? null,
+        preclip_trust: (pass as any)._v1291?.preclip_trust ?? null,
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
         preclip_dims: (pass as any).preclip_dims ?? null,
         preclip_crop: (pass as any).preclip_crop ?? null,
         dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+
         payload_summary: {
           model: payload.model,
           input_video: dispatchVideoUrl,
