@@ -3567,7 +3567,26 @@ serve(async (req) => {
         coordsProInBounds = inBounds;
       }
 
-      if (coordsProRetry && coordsProInBounds) {
+      if (coordsProRetry && preclipUnambiguous) {
+        // v129.28 — DO NOT send explicit coords on a clean single-face
+        // preclip. Empirically (and per the v129.24 comment block above)
+        // sync-3 with `auto_detect:false + coordinates|bbox` on a tight
+        // 1-face crop deterministically returns `generation_unknown_error`.
+        // The previous v129.26 path retried with explicit coords after a
+        // sync-3 NOOP and reliably failed (see DB row for scene 21eed4c2…
+        // pass 2: payload=sync-3+coords [363,363] frame 16 → FAILED).
+        //
+        // The webhook escalated to `coords-pro` because the FIRST sync-3
+        // auto_detect attempt NOOP'd. Repeating sync-3 auto_detect would
+        // very likely NOOP again. So instead, we switch to the lipsync-2
+        // fallback model with auto_detect:true on this retry — different
+        // model, different lip generation, no known crash on clean preclips.
+        // The `coords-pro-lp2pro` variant remains available for the
+        // genuinely ambiguous (multi-face crop) path further down.
+        (pass as any)._force_lipsync2_clean_preclip_retry_v12928 = true;
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        asdMode = "lipsync2_auto_detect_clean_preclip_retry_v12928";
+      } else if (coordsProRetry && coordsProInBounds) {
         const xInt = (v1291Diag as any).transformed_coords_int[0];
         const yInt = (v1291Diag as any).transformed_coords_int[1];
         syncOptions.active_speaker_detection = {
@@ -3578,14 +3597,14 @@ serve(async (req) => {
         asdMode = refFrameInPreclipRange
           ? "coords_pro_preclip_v12926"
           : "coords_pro_preclip_v12927_clamped";
-      } else if (coordsProRetry && !coordsProInBounds && preclipUnambiguous) {
+      } else if (coordsProRetry && !coordsProInBounds) {
         // v129.27 — coords-pro requested but the transformed coord falls
         // outside the preclip crop. Dispatching it would either crash
-        // Sync.so or animate the wrong region. Since the preclip itself
-        // is provably clean, fall back to the safe auto_detect path
-        // instead of sending bad coordinates.
+        // Sync.so or animate the wrong region. Fall back to lipsync-2
+        // auto_detect (v129.28) instead of sending bad coordinates.
+        (pass as any)._force_lipsync2_clean_preclip_retry_v12928 = true;
         syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "auto_detect_coords_pro_oob_fallback_v12927";
+        asdMode = "lipsync2_auto_detect_coords_pro_oob_fallback_v12928";
       } else if (preclipUnambiguous) {
         // Single-face preclip → ASD coords/bboxes are harmful on Sync.so.
         // Use auto_detect:true regardless of scene-level multi-speaker flag.
@@ -3868,7 +3887,15 @@ serve(async (req) => {
     // stills where lipsync-2-pro's "Still Frame Limitation" silently fails.
     // sync-3 handles both static and motion plates natively. lipsync-2-pro
     // remains reachable only via the explicit `coords-pro-lp2pro` fallback.
-    const payloadModel = usePassPreclip
+    // v129.28 — clean-preclip coords-pro retry overrides any other model
+    // choice and forces lipsync-2 + auto_detect:true (set above). This
+    // breaks the sync-3 NOOP→generation_unknown_error loop documented in
+    // the v129.26/v129.27 comment blocks.
+    const forceLipsync2Fallback =
+      (pass as any)._force_lipsync2_clean_preclip_retry_v12928 === true;
+    const payloadModel = forceLipsync2Fallback
+      ? LIPSYNC_FALLBACK_MODEL
+      : usePassPreclip
       ? SYNC3_MODEL
       : retryVariant === "sync3-coords"
         ? SYNC3_MODEL
