@@ -4,15 +4,21 @@
  * Combines `detectPlateFaces` (real face boxes on the RENDERED video plate)
  * with Gemini Vision identity matching against the character portraits.
  *
- * Why: the existing `faceMap` lives in ANCHOR-image space (Nano Banana 2
- * still). Hailuo/i2v plates drift 5-15% relative to that anchor, so
- * rescaling anchor coords onto the plate routinely puts the Sync.so
- * target on the WRONG face — the bug the user sees as "Lip-Sync hat
- * keinen Avatar getroffen".
+ * v133 (June 2026) — Per-Character Identity Probe + Hungarian Assignment.
  *
- * This helper returns per-character plate-pixel-space coords + bbox,
- * never the anchor's. Callers fall back to the anchor faceMap only when
- * plate detection genuinely cannot resolve a character.
+ *   Root cause of "voice swap" bug (characters 1 ↔ 4 vertauscht in
+ *   4-speaker scenes): the legacy single-call multi-slot Gemini prompt
+ *   suffers from positional bias when 4 visually-similar portraits are
+ *   passed in a list. Edge slots (0, N-1) get swapped routinely.
+ *
+ *   The fix: for N≥3 we now run ONE Gemini call PER character (parallel),
+ *   build an N×N confidence matrix, and solve the global-optimal 1:1
+ *   assignment with a Hungarian-style brute-force search (N≤6 → ≤720
+ *   permutations, instantaneous). A second cross-check Gemini call is
+ *   issued when the resulting assignment is ambiguous (min-confidence
+ *   < 0.55 or first-vs-second margin < 0.15).
+ *
+ *   N==2 and N==1 keep the old behaviour: cheap & already-reliable.
  */
 import { detectPlateFaces, PlateFaceBox, PlateFaceMap } from "./plate-face-detect.ts";
 
@@ -33,8 +39,34 @@ export interface PlateIdentityMap {
   cached: boolean;
   /** Number of speakers we could resolve to a distinct plate face. */
   resolvedCount: number;
+  /** v133 — Identity-resolution method that produced this map. */
+  identityMethod?:
+    | "single"
+    | "gemini-multi"
+    | "per-char-hungarian"
+    | "per-char-hungarian+crosscheck"
+    | "slot-order"
+    | "unknown";
+  /** v133 — Minimum confidence across all assigned characters. */
+  minConfidence?: number;
+  /** v133 — Smallest first-vs-second margin across characters. */
+  minMargin?: number;
+  /**
+   * v133 — True when the resolved mapping is not reliably distinguishable.
+   * Caller (compose-dialog-segments) MUST refuse to dispatch and refund
+   * instead of risking a voice-swap.
+   */
+  ambiguous?: boolean;
+  /** v133 — Per-character × per-slot confidence matrix (debug). */
+  scoreMatrix?: number[][];
+  /** v133 — Cross-check Gemini verdict, if invoked. */
+  crossCheck?: "confirmed" | "swapped" | "rejected" | "skipped";
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Legacy single-call multi-slot prompt — kept for 2-speaker scenes where
+// positional bias is irrelevant and 1 call is cheaper.
+// ─────────────────────────────────────────────────────────────────────────────
 async function askGeminiForPlateIdentity(
   frameUrl: string,
   characters: Array<{ characterId: string; portraitUrl: string }>,
@@ -46,17 +78,12 @@ async function askGeminiForPlateIdentity(
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey || characters.length === 0 || faces.length === 0) return out;
 
-  // v117 — Use Gemini 2.5 Pro for multi-face (N≥3) identity. Flash routinely
-  // returns empty assignments on 4-person Hailuo plates because faces share
-  // lighting/wardrobe. Pro is ~5× more expensive (€0.005 vs €0.001/scene)
-  // but eliminates the dominant cause of false plate-quality-gate blocks.
   const model = faces.length >= 3
     ? "google/gemini-2.5-pro"
     : "google/gemini-2.5-flash";
 
   try {
     const ids = characters.map((c) => c.characterId);
-    // v117 — real pixel-space bboxes (the old normalization produced nonsense).
     const slotDescriptions = faces
       .map((f) => {
         const [x1, y1, x2, y2] = f.bbox;
@@ -65,7 +92,6 @@ async function askGeminiForPlateIdentity(
       .join("; ");
     const content: any[] = [
       {
-        // v117 — corrected: this is ONE still image, not a video.
         type: "text",
         text:
           `IMAGE 1 (below) is a single still frame from a scene of ${plateWidth}×${plateHeight} pixels. ` +
@@ -84,10 +110,7 @@ async function askGeminiForPlateIdentity(
     const resp = await fetch(LOVABLE_GW, {
       method: "POST",
       headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content }],
-      }),
+      body: JSON.stringify({ model, messages: [{ role: "user", content }] }),
       signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
     });
     if (!resp.ok) {
@@ -96,19 +119,11 @@ async function askGeminiForPlateIdentity(
     }
     const j = await resp.json();
     const txt = j?.choices?.[0]?.message?.content ?? "";
-    // v117 — greedy brace match: take the LONGEST {...} chunk in case the
-    // model wraps JSON in chatty prose.
     const matches = String(txt).match(/\{[\s\S]*\}/g);
-    if (!matches || matches.length === 0) {
-      console.warn(`[plate-face-identity] gemini ${model} returned no JSON: ${String(txt).slice(0, 200)}`);
-      return out;
-    }
+    if (!matches || matches.length === 0) return out;
     const m = matches.sort((a, b) => b.length - a.length)[0];
     let parsed: any;
-    try { parsed = JSON.parse(m); } catch (e) {
-      console.warn(`[plate-face-identity] gemini ${model} JSON.parse failed: ${(e as Error).message}`);
-      return out;
-    }
+    try { parsed = JSON.parse(m); } catch { return out; }
     const allowed = new Set(ids.map((id) => id.toLowerCase()));
     const seen = new Set<string>();
     if (Array.isArray(parsed?.assignments)) {
@@ -118,23 +133,191 @@ async function askGeminiForPlateIdentity(
         const conf = Number(a?.confidence);
         if (!Number.isFinite(slot)) continue;
         if (!cid || !allowed.has(cid) || seen.has(cid)) continue;
-        // v117 — threshold relaxed 0.45 → 0.30. sync-3 forgives 10-15px drift;
-        // a low-confidence guess is still ~3× safer than the anchor-rescale
-        // fallback drifting onto the wrong face.
         if (Number.isFinite(conf) && conf < 0.30) continue;
         seen.add(cid);
         out.set(slot, { characterId: cid, confidence: Number.isFinite(conf) ? conf : 0.6 });
       }
     }
-    if (out.size === 0) {
-      console.warn(
-        `[plate-face-identity] gemini ${model} parsed ok but produced 0 valid assignments — payload: ${m.slice(0, 300)}`,
-      );
-    }
   } catch (err) {
     console.warn(`[plate-face-identity] gemini call threw: ${(err as Error)?.message}`);
   }
   return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v133 — Per-character probe: for ONE character, score how well each of the
+// N detected plate faces matches its portrait. Returns confidence per slot.
+// Position-bias-free because every call only sees ONE reference portrait.
+// ─────────────────────────────────────────────────────────────────────────────
+async function probeCharacterOnPlate(params: {
+  frameUrl: string;
+  faces: PlateFaceBox[];
+  plateWidth: number;
+  plateHeight: number;
+  characterId: string;
+  portraitUrl: string;
+}): Promise<Map<number, number>> {
+  const scores = new Map<number, number>();
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return scores;
+
+  const slotDescriptions = params.faces
+    .map((f) => {
+      const [x1, y1, x2, y2] = f.bbox;
+      return `slot ${f.slot} [x=${x1}-${x2}, y=${y1}-${y2}]`;
+    })
+    .join("; ");
+
+  const content: any[] = [
+    {
+      type: "text",
+      text:
+        `IMAGE 1 is a still frame of ${params.plateWidth}×${params.plateHeight} pixels containing ${params.faces.length} face(s) at: ${slotDescriptions}. ` +
+        `IMAGE 2 is a reference portrait of the SINGLE character we are looking for ("${params.characterId}"). ` +
+        `Task: for EACH slot in IMAGE 1, score how likely that slot's face is the SAME PERSON as the portrait. ` +
+        `Score 0.0 = clearly different person, 1.0 = clearly same person. ` +
+        `Pay attention to facial geometry, eye/nose/jaw shape, distinctive marks. Ignore lighting, expression, angle. ` +
+        `Return STRICT JSON only: {"scores":[{"slot":<int>,"score":<0.0..1.0>}]} — one entry per slot, no missing slots.`,
+    },
+    { type: "image_url", image_url: { url: params.frameUrl } },
+    { type: "image_url", image_url: { url: params.portraitUrl } },
+  ];
+
+  try {
+    const resp = await fetch(LOVABLE_GW, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: [{ role: "user", content }] }),
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    });
+    if (!resp.ok) {
+      console.warn(`[plate-face-identity] probe ${params.characterId} HTTP ${resp.status}`);
+      return scores;
+    }
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const matches = String(txt).match(/\{[\s\S]*\}/g);
+    if (!matches || matches.length === 0) return scores;
+    const m = matches.sort((a, b) => b.length - a.length)[0];
+    const parsed = JSON.parse(m);
+    if (Array.isArray(parsed?.scores)) {
+      for (const s of parsed.scores) {
+        const slot = Number(s?.slot);
+        const score = Number(s?.score);
+        if (Number.isFinite(slot) && Number.isFinite(score)) {
+          scores.set(slot, Math.min(1, Math.max(0, score)));
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[plate-face-identity] probe ${params.characterId} threw: ${(err as Error)?.message}`);
+  }
+  return scores;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v133 — Brute-force global-optimal assignment (N ≤ 6 → ≤ 720 perms).
+// scores[i][j] = confidence that character i belongs to slot j.
+// Returns slotOfCharacter[i] = best slot for character i.
+// ─────────────────────────────────────────────────────────────────────────────
+function optimalAssignment(scores: number[][]): number[] {
+  const n = scores.length;
+  if (n === 0) return [];
+  const m = scores[0]?.length ?? 0;
+  if (m === 0) return new Array(n).fill(-1);
+
+  let bestPerm: number[] | null = null;
+  let bestSum = -Infinity;
+  const slots = Array.from({ length: m }, (_, i) => i);
+
+  function permute(picked: number[], remaining: number[]) {
+    if (picked.length === n) {
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += scores[i][picked[i]] ?? 0;
+      if (sum > bestSum) {
+        bestSum = sum;
+        bestPerm = picked.slice();
+      }
+      return;
+    }
+    for (let k = 0; k < remaining.length; k++) {
+      const s = remaining[k];
+      picked.push(s);
+      const next = remaining.slice(0, k).concat(remaining.slice(k + 1));
+      permute(picked, next);
+      picked.pop();
+    }
+  }
+  permute([], slots);
+  return bestPerm ?? new Array(n).fill(-1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v133 — Cross-check: confirm the assignment, or report a swap pair.
+// ─────────────────────────────────────────────────────────────────────────────
+async function crossCheckAssignment(params: {
+  frameUrl: string;
+  plateWidth: number;
+  plateHeight: number;
+  faces: PlateFaceBox[];
+  assignments: Array<{ slot: number; characterId: string; portraitUrl: string }>;
+}): Promise<"confirmed" | { swap: [string, string] } | "rejected"> {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return "rejected";
+
+  const slotMap = new Map(params.faces.map((f) => [f.slot, f]));
+  const assignDescr = params.assignments
+    .map((a) => {
+      const f = slotMap.get(a.slot);
+      if (!f) return `${a.characterId}→slot${a.slot}(?)`;
+      const [x1, y1, x2, y2] = f.bbox;
+      return `${a.characterId}→slot${a.slot} [x=${x1}-${x2}, y=${y1}-${y2}]`;
+    })
+    .join("; ");
+
+  const content: any[] = [
+    {
+      type: "text",
+      text:
+        `IMAGE 1 is a still frame of ${params.plateWidth}×${params.plateHeight} pixels. ` +
+        `Proposed slot→character assignment: ${assignDescr}. ` +
+        `IMAGES 2..${params.assignments.length + 1} are the reference portraits in this order: ` +
+        params.assignments.map((a, i) => `image ${i + 2} = "${a.characterId}"`).join("; ") + ". " +
+        `Task: verify the assignment by comparing each slot's face to its assigned portrait. ` +
+        `Respond STRICT JSON only with ONE of these forms: ` +
+        `{"verdict":"confirmed"} | {"verdict":"swap","characterA":"<id>","characterB":"<id>"} | {"verdict":"rejected"}. ` +
+        `Use "swap" if exactly two characters are mutually mis-assigned. Use "rejected" if more than two are wrong.`,
+    },
+    { type: "image_url", image_url: { url: params.frameUrl } },
+    ...params.assignments.map((a) => ({ type: "image_url", image_url: { url: a.portraitUrl } })),
+  ];
+
+  try {
+    const resp = await fetch(LOVABLE_GW, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "google/gemini-2.5-pro", messages: [{ role: "user", content }] }),
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    });
+    if (!resp.ok) return "rejected";
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const matches = String(txt).match(/\{[\s\S]*\}/g);
+    if (!matches || matches.length === 0) return "rejected";
+    const parsed = JSON.parse(matches.sort((a, b) => b.length - a.length)[0]);
+    const verdict = String(parsed?.verdict ?? "").toLowerCase();
+    if (verdict === "confirmed") return "confirmed";
+    if (verdict === "swap") {
+      const a = String(parsed?.characterA ?? "").toLowerCase().trim();
+      const b = String(parsed?.characterB ?? "").toLowerCase().trim();
+      if (a && b && a !== b) return { swap: [a, b] };
+      return "rejected";
+    }
+    return "rejected";
+  } catch (err) {
+    console.warn(`[plate-face-identity] crossCheck threw: ${(err as Error)?.message}`);
+    return "rejected";
+  }
 }
 
 /**
@@ -166,8 +349,22 @@ export async function resolvePlateFaceIdentities(params: {
   });
   if (!plateMap || plateMap.faces.length === 0) return null;
 
+  const N = params.characters.length;
   let identityBySlot = new Map<number, { characterId: string; confidence: number }>();
-  if (plateMap.frame_url && params.characters.length >= 1 && plateMap.faces.length >= 2) {
+  let identityMethod: PlateIdentityMap["identityMethod"] = "unknown";
+  let scoreMatrix: number[][] | undefined;
+  let minConfidence = 1;
+  let minMargin = 1;
+  let crossCheck: PlateIdentityMap["crossCheck"] = "skipped";
+
+  // ── N == 1 ──────────────────────────────────────────────────────────────
+  if (N === 1 && plateMap.faces.length >= 1) {
+    identityBySlot.set(0, { characterId: params.characters[0].characterId, confidence: 0.9 });
+    identityMethod = "single";
+    minConfidence = 0.9;
+  }
+  // ── N == 2 — legacy single-call (positional bias minimal) ──────────────
+  else if (N === 2 && plateMap.frame_url) {
     identityBySlot = await askGeminiForPlateIdentity(
       plateMap.frame_url,
       params.characters,
@@ -175,33 +372,128 @@ export async function resolvePlateFaceIdentities(params: {
       plateMap.width,
       plateMap.height,
     );
-  } else if (params.characters.length === 1 && plateMap.faces.length >= 1) {
-    identityBySlot.set(0, { characterId: params.characters[0].characterId, confidence: 0.9 });
+    identityMethod = "gemini-multi";
+    if (identityBySlot.size > 0) {
+      const confs = Array.from(identityBySlot.values()).map((v) => v.confidence);
+      minConfidence = Math.min(...confs);
+    }
+  }
+  // ── N >= 3 — v133 Per-Character Probe + Hungarian ──────────────────────
+  else if (N >= 3 && plateMap.frame_url && plateMap.faces.length >= N) {
+    console.log(
+      `[plate-face-identity] scene=${params.sceneId} v133_per_char_probe N=${N} faces=${plateMap.faces.length}`,
+    );
+    const probeResults = await Promise.all(
+      params.characters.map((c) =>
+        probeCharacterOnPlate({
+          frameUrl: plateMap.frame_url!,
+          faces: plateMap.faces,
+          plateWidth: plateMap.width,
+          plateHeight: plateMap.height,
+          characterId: c.characterId,
+          portraitUrl: c.portraitUrl,
+        }),
+      ),
+    );
+
+    // Build N × M score matrix. Slot indices are the actual face.slot values.
+    const slotIds = plateMap.faces.map((f) => f.slot);
+    scoreMatrix = probeResults.map((m) => slotIds.map((s) => m.get(s) ?? 0));
+
+    // Sanity: if every probe returned all-zero, fail back to legacy multi-call.
+    const allZero = scoreMatrix.every((row) => row.every((v) => v === 0));
+    if (allZero) {
+      console.warn(
+        `[plate-face-identity] scene=${params.sceneId} v133 all-zero probe matrix — falling back to legacy multi-call`,
+      );
+      identityBySlot = await askGeminiForPlateIdentity(
+        plateMap.frame_url,
+        params.characters,
+        plateMap.faces,
+        plateMap.width,
+        plateMap.height,
+      );
+      identityMethod = "gemini-multi";
+      if (identityBySlot.size > 0) {
+        const confs = Array.from(identityBySlot.values()).map((v) => v.confidence);
+        minConfidence = Math.min(...confs);
+      }
+    } else {
+      const slotPickIdx = optimalAssignment(scoreMatrix);
+      // Compute confidence + margin per character.
+      let minConf = 1;
+      let minMar = 1;
+      params.characters.forEach((c, i) => {
+        const pickIdx = slotPickIdx[i];
+        const conf = scoreMatrix![i][pickIdx] ?? 0;
+        const sorted = scoreMatrix![i].slice().sort((a, b) => b - a);
+        const margin = (sorted[0] ?? 0) - (sorted[1] ?? 0);
+        if (conf < minConf) minConf = conf;
+        if (margin < minMar) minMar = margin;
+        const slotId = slotIds[pickIdx];
+        if (slotId != null) {
+          identityBySlot.set(slotId, { characterId: c.characterId, confidence: conf });
+        }
+      });
+      identityMethod = "per-char-hungarian";
+      minConfidence = minConf;
+      minMargin = minMar;
+
+      const isAmbiguous = minConf < 0.55 || minMar < 0.15;
+      if (isAmbiguous) {
+        console.warn(
+          `[plate-face-identity] scene=${params.sceneId} v133 ambiguous (minConf=${minConf.toFixed(2)}, minMargin=${minMar.toFixed(2)}) — running cross-check`,
+        );
+        // Build assignment list in slot-sorted order for the cross-check.
+        const assignments: Array<{ slot: number; characterId: string; portraitUrl: string }> = [];
+        const portraitById = new Map(params.characters.map((c) => [c.characterId.toLowerCase(), c.portraitUrl]));
+        for (const [slot, v] of identityBySlot.entries()) {
+          const pu = portraitById.get(v.characterId.toLowerCase()) ?? "";
+          assignments.push({ slot, characterId: v.characterId, portraitUrl: pu });
+        }
+        const verdict = await crossCheckAssignment({
+          frameUrl: plateMap.frame_url,
+          plateWidth: plateMap.width,
+          plateHeight: plateMap.height,
+          faces: plateMap.faces,
+          assignments,
+        });
+        if (verdict === "confirmed") {
+          crossCheck = "confirmed";
+          identityMethod = "per-char-hungarian+crosscheck";
+        } else if (typeof verdict === "object" && verdict.swap) {
+          const [a, b] = verdict.swap;
+          // Find the two slots assigned to characters a and b, swap them.
+          let slotA: number | null = null;
+          let slotB: number | null = null;
+          for (const [slot, v] of identityBySlot.entries()) {
+            if (v.characterId.toLowerCase() === a) slotA = slot;
+            if (v.characterId.toLowerCase() === b) slotB = slot;
+          }
+          if (slotA != null && slotB != null) {
+            const va = identityBySlot.get(slotA)!;
+            const vb = identityBySlot.get(slotB)!;
+            identityBySlot.set(slotA, { ...vb });
+            identityBySlot.set(slotB, { ...va });
+            crossCheck = "swapped";
+            identityMethod = "per-char-hungarian+crosscheck";
+            console.log(
+              `[plate-face-identity] scene=${params.sceneId} v133 cross-check applied swap ${a}↔${b}`,
+            );
+          } else {
+            crossCheck = "rejected";
+          }
+        } else {
+          crossCheck = "rejected";
+        }
+      }
+    }
   }
 
-  // v117 — Deterministic slot-order fallback. When Gemini returned nothing
-  // AND the number of detected faces matches the number of characters,
-  // assume left-to-right speaker order matches left-to-right slot order
-  // (this is how the cast is typically composed into the plate by Nano
-  // Banana 2 / Hailuo). Confidence is intentionally low so logging /
-  // downstream gates can tell this apart from a confident Gemini match,
-  // but it's still far safer than the anchor-rescale drift.
-  let slotOrderFallback = false;
-  if (
-    identityBySlot.size === 0 &&
-    plateMap.faces.length === params.characters.length &&
-    params.characters.length >= 2
-  ) {
-    slotOrderFallback = true;
-    const sortedFaces = [...plateMap.faces].sort((a, b) => a.slot - b.slot);
-    params.characters.forEach((c, i) => {
-      const f = sortedFaces[i];
-      if (f) identityBySlot.set(f.slot, { characterId: c.characterId, confidence: 0.4 });
-    });
-    console.warn(
-      `[plate-face-identity] gemini matched 0/${params.characters.length} — v117 slot-order fallback applied`,
-    );
-  }
+  const ambiguousFinal =
+    N >= 3 &&
+    (crossCheck === "rejected" ||
+      (identityMethod === "per-char-hungarian" && (minConfidence < 0.55 || minMargin < 0.15)));
 
   const faces: PlateIdentityFace[] = plateMap.faces.map((f) => {
     const hit = identityBySlot.get(f.slot);
@@ -232,6 +524,11 @@ export async function resolvePlateFaceIdentities(params: {
     frame_url: plateMap.frame_url,
     cached: plateMap.cached,
     resolvedCount,
-    slotOrderFallback,
-  } as PlateIdentityMap & { slotOrderFallback?: boolean };
+    identityMethod,
+    minConfidence,
+    minMargin,
+    ambiguous: ambiguousFinal,
+    scoreMatrix,
+    crossCheck,
+  };
 }
