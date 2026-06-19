@@ -376,14 +376,51 @@ serve(async (req) => {
   // (Watchdog defers to it). A FAILED/COMPLETED arriving after the scene
   // is already failed must not flip it to done (partial output) or replay
   // refund logic. Ack 200 so Sync.so stops retrying, no state mutation.
+  //
+  // v131.8 — Ausnahme: wenn die Szene NUR wegen unseres eigenen
+  // `watchdog_provider_timeout` als failed markiert wurde UND Sync.so jetzt
+  // doch `COMPLETED` für einen Pass liefert, der in `dialog_shots.passes[]`
+  // bekannt ist, dürfen wir die Szene aus failed zurückholen. Sonst
+  // verlieren wir gesunde Provider-Outputs durch unsere eigene zu strenge
+  // Liveness-Heuristik. Echte Sync.so-Failures bleiben terminal.
+  const sceneFailedSelfInflicted =
+    ((scene as any).lip_sync_status === "failed" ||
+      (scene.dialog_shots as any)?.status === "failed") &&
+    typeof (scene as any).clip_error === "string" &&
+    /^watchdog_(provider_timeout|auto_retry_|hard_timeout)/.test((scene as any).clip_error ?? "");
+  const dsForRecover: any = scene.dialog_shots ?? {};
+  const passesForRecover: any[] = Array.isArray(dsForRecover?.passes) ? dsForRecover.passes : [];
+  const jobKnown = passesForRecover.some((p: any) => p?.job_id === jobId) ||
+    dsForRecover?.sync_job_id === jobId;
+
   if (
-    (scene as any).lip_sync_status === "failed" ||
-    (scene.dialog_shots as any)?.status === "failed"
+    ((scene as any).lip_sync_status === "failed" ||
+      (scene.dialog_shots as any)?.status === "failed")
   ) {
-    console.log(
-      `[sync-so-webhook] v129.4a ignored_due_scene_failed scene=${sceneId} job=${jobId} status=${status}`,
-    );
-    return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
+    if (status === "COMPLETED" && outputUrl && sceneFailedSelfInflicted && jobKnown) {
+      console.log(
+        `[sync-so-webhook] v131.8 recover_from_self_inflicted_fail scene=${sceneId} job=${jobId} ` +
+        `prev_clip_error=${(scene as any).clip_error} — resetting status to running and continuing pass merge`,
+      );
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "running",
+          twoshot_stage: dsForRecover?.engine === "sync-segments" ? "syncso_fanout_recovering" : "running",
+          clip_error: null,
+          dialog_shots: { ...dsForRecover, status: "rendering", recovered_from_watchdog_at: new Date().toISOString() },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      (scene as any).lip_sync_status = "running";
+      (scene.dialog_shots as any).status = "rendering";
+      // fall through into the normal v5 success branch below
+    } else {
+      console.log(
+        `[sync-so-webhook] v129.4a ignored_due_scene_failed scene=${sceneId} job=${jobId} status=${status}`,
+      );
+      return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
+    }
   }
 
   const state = scene.dialog_shots ?? null;
