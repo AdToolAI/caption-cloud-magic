@@ -4986,6 +4986,9 @@ serve(async (req) => {
       window_start_sec: 0, window_end_sec: totalSec,
       http_status: resp.status, sync_status: "DISPATCHED",
       meta: {
+        // v131.5 — version pin for forensic attribution
+        compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+        v131_5_final_override: (pass as any)._v131_5_final_override ?? null,
         diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,
         total_passes: passes.length,
