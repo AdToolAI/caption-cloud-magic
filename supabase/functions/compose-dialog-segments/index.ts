@@ -2541,14 +2541,20 @@ serve(async (req) => {
           Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
         if (changed) {
           // v128 — Alpha-Plan v3.1 §1.8: terminal coord-refresh guard.
-          // For terminal passes (done/failed) the v123 reset logic would
-          // silently flip status back to `pending`, violating the
-          // "terminal means terminal" invariant. We now record the new
-          // coord as a `candidate_coords` debug field, log a warning event,
-          // and leave the terminal pass UNTOUCHED. Only non-terminal
-          // passes get the legacy preclip-invalidate + coord-update.
+          // v134 §2 — Exception: if THIS pass is currently in an active
+          // NOOP-retry cycle (status was reset to pending by sync-so-webhook
+          // and a fresh noop_retry_attempt_id was issued), then the pass
+          // is no longer terminal — it's just been re-opened for the
+          // explicit purpose of changing the input vector. Block the
+          // refresh only for truly terminal (done/failed without an active
+          // retry) passes, where flipping coords would silently mutate
+          // a finished result.
           const isTerminal = p.status === "done" || p.status === "failed";
-          if (isTerminal) {
+          const inActiveNoopRetry =
+            !!(p as any).noop_retry_attempt_id &&
+            Number((p as any).noop_escalation_step ?? 0) > 0 &&
+            p.status === "pending";
+          if (isTerminal && !inActiveNoopRetry) {
             (p as any).candidate_coords = [freshCoord[0], freshCoord[1]];
             (p as any).candidate_coords_at = new Date().toISOString();
             (p as any).candidate_coords_source = freshSource;
@@ -2577,6 +2583,12 @@ serve(async (req) => {
               `pass=${p.idx} speaker=${p.speaker_name} status=${p.status} (terminal, candidate stored)`,
             );
             continue;
+          }
+          if (inActiveNoopRetry) {
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} v134 COORD-REFRESH-ALLOWED (active NOOP retry) ` +
+              `pass=${p.idx} speaker=${p.speaker_name} step=${(p as any).noop_escalation_step} old=${JSON.stringify(oldCoord)} new=${JSON.stringify([freshCoord[0], freshCoord[1]])}`,
+            );
           }
           // Non-terminal: legacy v123 stale-preclip invalidation path.
           (p as any).preclip_url = null;
