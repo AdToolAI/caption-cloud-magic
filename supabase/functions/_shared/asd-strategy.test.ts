@@ -328,3 +328,42 @@ Deno.test("v131.1 — preclipTrust='verified' but faceCount=2 → Rule 0 blocked
   assert(r.diagnostics.rule !== "rule_0_preclip_probe_unavailable");
 });
 
+// ── v131.2 — Rule 0 unconditional on preclip (drop trust gate) ─────────────
+
+
+
+Deno.test("v131.2 — multi-speaker + face probe unavailable + clean ambiguity → Rule 0 fires (no trust required)", () => {
+  // Reproduces prod scene 793aef02-…: 4-speaker hook, server face probe
+  // returned FACE_GATE_PROBE_UNAVAILABLE, preclipTrust='unknown', and
+  // v131.1 incorrectly fell through to Rule 3 strict-coords.
+  const r = buildAsdStrategy(
+    input({
+      isMultiSpeaker: true,
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: 0,
+        preclipAmbiguityRisk: "clean",
+        preclipTrust: "unknown",
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
+  assert(String(r.diagnostics.rule).startsWith("rule_0_"));
+});
+
+Deno.test("v131.2 — multi-speaker + neighbor_inside_crop still blocks Rule 0", () => {
+  const r = buildAsdStrategy(
+    input({
+      isMultiSpeaker: true,
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: 1,
+        preclipAmbiguityRisk: "neighbor_inside_crop",
+      },
+    }),
+  );
+  assert(!String(r.diagnostics.rule ?? "").startsWith("rule_0_"));
+});
+
+
