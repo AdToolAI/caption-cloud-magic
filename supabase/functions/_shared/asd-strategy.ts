@@ -222,47 +222,42 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
     // through to remaining rules with a diagnostic.
   }
 
-  // ── Rule 0 (v131 + v131.1): Preclip → auto_detect PRIMARY.
-  // Empirically (Replay-Lab 2026-06-19) sync-3 fails with
-  // `generation_unknown_error` on the (coordinates, frame_number) tuple
-  // even when the coord is on-face, while `auto_detect:true` and
-  // `bounding_boxes_url` both succeed on the SAME asset. Since v69 the
-  // preclip is by construction a single-face square crop, so there is no
-  // ambiguity to disambiguate — Sync.so's own detector is the safer
-  // primary path.
+  // ── Rule 0 (v131.2): Preclip → auto_detect PRIMARY (unconditional).
+  // Empirically (Replay-Lab + 2026-06-19 prod dispatch on scene
+  // 793aef02-…) sync-3 fails with `generation_unknown_error` on the
+  // (coordinates, frame_number) tuple even when the coord is on-face,
+  // while `auto_detect:true` and `bounding_boxes_url` both succeed on
+  // the SAME asset.
   //
-  // v131.1 — Rule 0 also fires when:
-  //   - the face probe is unavailable (`preclipFaceCount === null`), or
-  //   - the preclip carries explicit "verified" trust from the upstream
-  //     face-center pipeline (preclip-validated / v116 face-gate).
-  // In both cases we have no positive evidence AGAINST auto_detect,
-  // and the legacy coord/frame fallback is exactly the path that
-  // reproduces `generation_unknown_error` in production.
+  // The per-speaker preclip is by construction a single-face square
+  // crop (v69 face-center pipeline) — regardless of how many speakers
+  // the scene has overall. Multi-speaker scenes still produce a SINGLE
+  // face per preclip. Therefore Rule 0 fires for EVERY preclip
+  // dispatch except:
   //
-  // Hard gates that still block Rule 0:
-  //   - Multi-speaker scene without verified single-face crop → coords/bbox needed
-  //   - Ambiguity risk "neighbor_inside_crop" → bbox needed (Rule 3)
-  //   - Explicit coords-pro / bbox retry variants → caller intent
+  //   - Explicit coords-pro / bbox-url retry variants (admin intent)
+  //   - Ambiguity risk "neighbor_inside_crop" (second face actually
+  //     intruded into the crop → Rule 2/3 handles it)
+  //   - Probe confirmed >1 face inside the crop
+  //
+  // v131.1's `hasPositiveTrust` gate proved too tight in production:
+  // when the server face-probe is disabled (FACE_GATE_PROBE_UNAVAILABLE)
+  // AND the upstream face-center pipeline doesn't set the verified flag,
+  // the dispatch silently fell back to Rule 3 strict-coords and hit the
+  // exact provider error this rule exists to avoid.
   const preclipTrust = geometry.preclipTrust ?? "unknown";
   const ambiguityBlocks =
     geometry.preclipAmbiguityRisk === "neighbor_inside_crop";
   const multiFaceBlocks =
     typeof geometry.preclipFaceCount === "number" &&
     geometry.preclipFaceCount > 1;
-  const hasPositiveTrust =
-    (geometry.preclipFaceCount === 1 &&
-      geometry.preclipAmbiguityRisk === "clean") ||
-    geometry.preclipFaceCount === null ||
-    preclipTrust === "verified" ||
-    preclipTrust === "probe-confirmed";
 
   const rule0Eligible =
     usePreclip &&
     !isCoordsProRetry(retryVariant) &&
     !isBboxRetry(retryVariant) &&
     !ambiguityBlocks &&
-    !multiFaceBlocks &&
-    hasPositiveTrust;
+    !multiFaceBlocks;
 
   if (rule0Eligible) {
     const ruleName =
@@ -271,9 +266,11 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
         ? "rule_0_preclip_single_face_verified"
         : preclipTrust === "verified"
         ? "rule_0_preclip_verified"
+        : preclipTrust === "probe-confirmed"
+        ? "rule_0_preclip_probe_confirmed"
         : geometry.preclipFaceCount === null
         ? "rule_0_preclip_probe_unavailable"
-        : "rule_0_preclip_probe_confirmed";
+        : "rule_0_preclip_unconditional";
 
     return {
       mode: "single_face_auto",
@@ -288,11 +285,12 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
         face_count_in_crop: geometry.preclipFaceCount,
         ambiguity_risk: geometry.preclipAmbiguityRisk,
         preclip_trust: preclipTrust,
-        reason: "v131_1_auto_detect_primary_on_preclip",
+        reason: "v131_2_auto_detect_unconditional_on_preclip",
         had_preflight_coord: !!(preflight?.faceFound && preflight.coord),
       },
     };
   }
+
 
   // ── Rule 1: Preflight Face Coord (PRIMARY when available)
   // When the Gemini probe locked onto a face, that coord is authoritative
