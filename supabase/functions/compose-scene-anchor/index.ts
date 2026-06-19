@@ -404,6 +404,9 @@ serve(async (req) => {
           model: "google/gemini-3.1-flash-image-preview",
           messages: [{ role: "user", content: userContent }],
           modalities: ["image", "text"],
+          // v131.6 — force deterministic generation for the final face-lock
+          // attempt so the model does not "creatively reinterpret" identity.
+          ...(faceLockMode ? { temperature: 0 } : {}),
         }),
         signal: ac.signal,
       });
