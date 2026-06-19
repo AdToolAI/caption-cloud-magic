@@ -380,6 +380,31 @@ serve(async (req) => {
   let httpStatus = 0;
 
   try {
+    // v131.5 — Final ASD mutex: auto_detect:true MUST NOT carry coords/frame.
+    // Mirrors the guard in compose-dialog-segments so manual replays can't
+    // re-dispatch a doc-violating shape that triggers generation_unknown_error.
+    {
+      const replayAsd: any = (payload as any)?.options?.active_speaker_detection;
+      if (replayAsd && replayAsd.auto_detect === true) {
+        if ("coordinates" in replayAsd) delete replayAsd.coordinates;
+        if ("frame_number" in replayAsd) delete replayAsd.frame_number;
+        if ("bounding_boxes" in replayAsd) delete replayAsd.bounding_boxes;
+        if ("bounding_boxes_url" in replayAsd) delete replayAsd.bounding_boxes_url;
+      }
+      if (
+        replayAsd?.auto_detect === true &&
+        (Array.isArray(replayAsd?.coordinates) || replayAsd?.frame_number != null)
+      ) {
+        await admin
+          .from("syncso_replay_log")
+          .update({
+            provider_status: "blocked_v1315_assert",
+            provider_error: "auto_detect:true must not carry coordinates/frame_number",
+          })
+          .eq("id", row.id);
+        return json({ error: "v131_5_assert_violation", asd: replayAsd }, 500);
+      }
+    }
     const r = await fetch("https://api.sync.so/v2/generate", {
       method: "POST",
       headers: {
