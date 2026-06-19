@@ -93,6 +93,10 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
+import {
+  buildAsdStrategy,
+  type PreflightFaceResult,
+} from "../_shared/asd-strategy.ts";
 
 
 
@@ -3462,240 +3466,128 @@ serve(async (req) => {
         (pass as any)._v1291_ambiguity = v1291Ambiguity;
       }
 
+      // ── v130 — Single-Source ASD Builder ─────────────────────────
+      // Replaces the v115 → v129.30 if/else cascade (~230 lines) with
+      // one call to a pure, deterministic strategy function. See
+      // `_shared/asd-strategy.ts` and
+      // `mem://architecture/lipsync/sync-3-only-dialog-pipeline.md`.
+      //
+      // The previous code path made three uncoordinated decisions:
+      //   1. Block A (here) — initial ASD selection per pass
+      //   2. Block B (below) — multi-speaker bbox-url override
+      //   3. Block C (Face-Gate, ~line 4441) — nachträgliche Mutation
+      //      when Gemini Vision returned ok_after_snap
+      // The v124 sync-3 sanitizer could silently strip the snap when
+      // auto_detect:true was still in the payload, producing the
+      // "Snap-Kandidat erkannt, noch nicht im Dispatch angewandt"
+      // forensic warning. v130 collapses all three into one builder.
+
       let asdMode: string;
       let v1291Diag: any = null;
 
-      // v129.24 — Empirical evidence (manual reproduction against Sync.so
-      // 2026-06-18) proves that sync-3 with `active_speaker_detection`
-      // {auto_detect:false, coordinates|bounding_boxes} on a SINGLE-FACE
-      // preclip crop deterministically fails with `generation_unknown_error`,
-      // while the identical video+audio with `auto_detect:true` COMPLETES.
-      // Hypothesis: the explicit-speaker DTO is intended for multi-face
-      // plates; on a tight 1-face crop it triggers an internal selector
-      // failure inside Sync.so.
-      //
-      // Therefore: whenever the PRECLIP itself has exactly one face and the
-      // crop is unambiguous, send `auto_detect:true` — even in
-      // Multi-Speaker scene context. The crop has already done the
-      // disambiguation; coords are redundant *and* harmful.
-      //
-      // v129.25 (2026-06-18) — Broaden trust: `preclip_face_count` is often
-      // persisted as `null` when the Gemini validator was permissive or the
-      // probe step was skipped, even though the crop itself is provably
-      // clean (no sibling face center inside crop). In that case the
-      // previous v129.24 condition fell back to explicit coordinates, which
-      // reproducibly triggers Sync.so `generation_unknown_error` on tight
-      // single-face crops. Treat `face_count === 1` OR (`face_count == null`
-      // && ambiguity == clean) as unambiguous. Only `face_count > 1` or
-      // sibling-inside-crop is treated as genuine ambiguity.
-      const ambiguityClean =
-        v1291Ambiguity === null || v1291Ambiguity?.risk === "clean";
-      const preclipFaceCountConfirmedMulti =
-        passFaceCount !== null && passFaceCount > 1;
-      const preclipUnambiguous =
-        ambiguityClean && !preclipFaceCountConfirmedMulti && passFaceCount !== 0;
-
-      // v129.26 — Honor `coords-pro` retry inside the preclip path.
-      // The v129.24 fix forces auto_detect:true for clean single-face
-      // preclips on the FIRST attempt (avoids `generation_unknown_error`).
-      // But sync-3 occasionally NOOPs on short / outer-edge crops with
-      // auto_detect — Sync.so's internal face selector silently
-      // re-encodes the preclip unchanged (DB-verified for speakers 2 & 4
-      // of scene 0145fdc4… on 2026-06-18). When the webhook flags such a
-      // NOOP-suspect, it bumps `retry_variant` to `coords-pro` and calls
-      // us back. On THAT retry we MUST send explicit preclip-space
-      // coordinates + frame_number so Sync.so skips its own detector and
-      // animates the locked face. Without this branch the retry repeats
-      // the same auto_detect call and noops again.
-      const coordsProRetry =
-        (retryVariant === "coords-pro" ||
-         retryVariant === "sync3-coords" ||
-         retryVariant === "coords-pro-lp2pro") &&
-        isRetry === true && plateCoords && cropOk;
-
-      // v129.27 — Clamp ASD frame_number to the PRECLIP frame range.
-      // `referenceFrameNumber` was computed against the original plate
-      // timeline (e.g. f=47 inside a 9s scene at 30fps). The preclip is a
-      // much shorter independent video (e.g. 33 frames). Sending the plate
-      // frame to Sync.so against the preclip put the ASD probe far past
-      // EOS → Face-Gate `no_face` → Sync.so `generation_unknown_error`.
-      // Always compute the preclip-relative frame from preclip_duration_sec
-      // and clamp into [0, preclipFrameCount-1]; prefer the mid frame as a
-      // stable visible anchor.
+      // Clamp the ASD frame anchor into the preclip frame range (was
+      // previously v129.27 inside the cascade — now a precondition).
       const preclipDurSec = Number((pass as any).preclip_duration_sec);
       const preclipFrameCount =
         Number.isFinite(preclipDurSec) && preclipDurSec > 0
           ? Math.max(1, Math.round(preclipDurSec * 30))
           : null;
       const safeMidFrame = preclipFrameCount
-        ? Math.max(0, Math.min(preclipFrameCount - 1, Math.floor(preclipFrameCount / 2)))
+        ? Math.max(
+            0,
+            Math.min(preclipFrameCount - 1, Math.floor(preclipFrameCount / 2)),
+          )
         : 0;
-      const rawRefFrame = refFrame;
       const refFrameInPreclipRange =
         preclipFrameCount === null ||
-        (rawRefFrame >= 0 && rawRefFrame < preclipFrameCount);
-      const preclipAsdFrame = refFrameInPreclipRange ? rawRefFrame : safeMidFrame;
+        (refFrame >= 0 && refFrame < preclipFrameCount);
+      const clampedAsdFrame = refFrameInPreclipRange ? refFrame : safeMidFrame;
 
-      let coordsProInBounds = false;
-      if (coordsProRetry) {
-        const cx = Number(crop.x);
-        const cy = Number(crop.y);
-        const cSize = Number(crop.size);
-        const scale = outSize / cSize;
-        const xFloat = (plateCoords[0] - cx) * scale;
-        const yFloat = (plateCoords[1] - cy) * scale;
-        const xInt = Math.round(xFloat);
-        const yInt = Math.round(yFloat);
-        const inBounds = xInt >= 0 && xInt < outSize && yInt >= 0 && yInt < outSize;
-        v1291Diag = {
-          enabled: true,
-          source_space: "plate",
-          target_space: "preclip",
-          plate_coords: plateCoords,
-          preclip_crop: { x: cx, y: cy, size: cSize, outputSize: outSize },
-          scale: Number(scale.toFixed(4)),
-          transformed_coords_float: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
-          transformed_coords_int: [xInt, yInt],
-          in_bounds: inBounds,
-          frame_number: preclipAsdFrame,
-          raw_reference_frame: rawRefFrame,
-          preclip_frame_count: preclipFrameCount,
-          frame_source: refFrameInPreclipRange ? "reference_frame_in_range" : "clamped_to_preclip_mid_v12927",
-          retry_variant: retryVariant,
-        };
-        (pass as any)._v1291 = v1291Diag;
-        coordsProInBounds = inBounds;
-      }
+      // Snap-driven retry: when a previous dispatch persisted a snapped
+      // coord (Face-Gate's `ok_after_snap` path, see line ~4490 below),
+      // the watchdog re-enqueues the pass with retry_variant
+      // "preflight-snap" so Rule 1 of the strategy picks the snapped
+      // coord directly — no in-place mutation needed.
+      const persistedSnap: [number, number] | null = Array.isArray(
+        (pass as any).dispatch_coords_snapped,
+      ) &&
+        Number.isFinite(Number((pass as any).dispatch_coords_snapped[0])) &&
+        Number.isFinite(Number((pass as any).dispatch_coords_snapped[1]))
+        ? [
+            Number((pass as any).dispatch_coords_snapped[0]),
+            Number((pass as any).dispatch_coords_snapped[1]),
+          ]
+        : null;
+      const preflightFromSnap: PreflightFaceResult | null =
+        retryVariant === "preflight-snap" && persistedSnap
+          ? {
+              faceFound: true,
+              coord: persistedSnap,
+              frame: clampedAsdFrame,
+              snapped: true,
+              originalCoord: ((pass as any).coords_snap_origin ?? undefined) as
+                | [number, number]
+                | undefined,
+            }
+          : null;
 
-      if (coordsProRetry && preclipUnambiguous) {
-        // v129.29 — SYNC-3-ONLY policy (user-directive 2026-06-19).
-        // The v129.28 lipsync-2 fallback is removed. For clean single-face
-        // preclips we stay on sync-3 with `auto_detect: true` on the
-        // coords-pro retry. Repeated NOOPs escalate to `bbox-url` then
-        // `expanded-crop-auto` further up the ladder. lipsync-2 is no
-        // longer reachable from the dialog pipeline.
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "sync3_auto_detect_coords_pro_retry_v12929";
-      } else if (coordsProRetry && coordsProInBounds) {
-        // Diagnostic B path — keep explicit coords + frame_number so we
-        // can observe whether the same preclip behaves differently with
-        // point-ASD vs auto_detect (logged in syncso_dispatch_log).
-        const xInt = (v1291Diag as any).transformed_coords_int[0];
-        const yInt = (v1291Diag as any).transformed_coords_int[1];
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          frame_number: preclipAsdFrame,
-          coordinates: [xInt, yInt],
-        };
-        asdMode = refFrameInPreclipRange
-          ? "coords_pro_preclip_v12926"
-          : "coords_pro_preclip_v12927_clamped";
-      } else if (coordsProRetry && !coordsProInBounds) {
-        // v129.29 — coords out of bounds → fall back to sync-3 auto_detect
-        // instead of lipsync-2.
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "sync3_auto_detect_coords_pro_oob_fallback_v12929";
-      } else if (preclipUnambiguous) {
-        // Single-face preclip → ASD coords/bboxes are harmful on Sync.so.
-        // Use auto_detect:true regardless of scene-level multi-speaker flag.
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = isMultiSpeaker
-          ? (passFaceCount === 1
-              ? "auto_detect_preclip_unambiguous_v12924"
-              : "auto_detect_preclip_clean_unknown_count_v12925")
-          : "auto_detect";
-        // Still compute v1291Diag for log parity when multi-speaker context
-        // exists, so we keep ambiguity / transform observability.
-        if (isMultiSpeaker && plateCoords && cropOk) {
-          const cx = Number(crop.x);
-          const cy = Number(crop.y);
-          const cSize = Number(crop.size);
-          const scale = outSize / cSize;
-          const xFloat = (plateCoords[0] - cx) * scale;
-          const yFloat = (plateCoords[1] - cy) * scale;
-          const xInt = Math.round(xFloat);
-          const yInt = Math.round(yFloat);
-          v1291Diag = {
-            enabled: false,
-            skipped_reason: "preclip_unambiguous_auto_detect_v12924",
-            source_space: "plate",
-            target_space: "preclip",
-            plate_coords: plateCoords,
-            preclip_crop: { x: cx, y: cy, size: cSize, outputSize: outSize },
-            scale: Number(scale.toFixed(4)),
-            transformed_coords_float: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
-            transformed_coords_int: [xInt, yInt],
-            in_bounds: xInt >= 0 && xInt < outSize && yInt >= 0 && yInt < outSize,
-            frame_number: refFrame,
-          };
-          (pass as any)._v1291 = v1291Diag;
-        }
-      } else if (isMultiSpeaker && plateCoords && cropOk) {
-        // Multi-speaker preclip with sibling face(s) INSIDE the crop —
-        // genuine ambiguity. Use doc-strict transform. (Empirically rare on
-        // our 220×220 tight crops, but kept as the safe fallback for those
-        // cases where face-gate counts >1.)
-        const cx = Number(crop.x);
-        const cy = Number(crop.y);
-        const cSize = Number(crop.size);
-        const scale = outSize / cSize;
-        const xFloat = (plateCoords[0] - cx) * scale;
-        const yFloat = (plateCoords[1] - cy) * scale;
-        const xInt = Math.round(xFloat);
-        const yInt = Math.round(yFloat);
-        const inBounds = xInt >= 0 && xInt < outSize && yInt >= 0 && yInt < outSize;
-        v1291Diag = {
-          enabled: true,
-          source_space: "plate",
-          target_space: "preclip",
-          plate_coords: plateCoords,
-          preclip_crop: { x: cx, y: cy, size: cSize, outputSize: outSize },
-          scale: Number(scale.toFixed(4)),
-          transformed_coords_float: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
-          transformed_coords_int: [xInt, yInt],
-          in_bounds: inBounds,
-          frame_number: refFrame,
-        };
-        (pass as any)._v1291 = v1291Diag;
-        if (!inBounds) {
-          (pass as any)._v1291_block = {
-            reason: "transformed_coords_out_of_bounds",
-            details: v1291Diag,
-          };
-          syncOptions.active_speaker_detection = {
-            auto_detect: false,
-            frame_number: refFrame,
-            coordinates: [xInt, yInt],
-          };
-          asdMode = "preclip_coords_oob_blocked";
-        } else {
-          syncOptions.active_speaker_detection = {
-            auto_detect: false,
-            frame_number: refFrame,
-            coordinates: [xInt, yInt],
-          };
-          asdMode = "preclip_coords_doc_strict";
-        }
-      } else if (isMultiSpeaker && (!plateCoords || !cropOk)) {
-        // v129.1 — Multi-Speaker without persisted coords/crop is an internal
-        // contract violation. Fall back to auto_detect (now safe per v129.24).
+      const ambiguityRiskForStrategy:
+        | "clean"
+        | "neighbor_inside_crop"
+        | null = v1291Ambiguity
+        ? v1291Ambiguity.risk === "neighbor_inside_crop"
+          ? "neighbor_inside_crop"
+          : "clean"
+        : null;
+
+      const strategy = buildAsdStrategy({
+        preflight: preflightFromSnap,
+        geometry: {
+          preclipFaceCount: passFaceCount,
+          preclipAmbiguityRisk: ambiguityRiskForStrategy,
+          plateCoord: plateCoords,
+          preclipCrop: cropOk
+            ? {
+                x: Number(crop.x),
+                y: Number(crop.y),
+                size: Number(crop.size),
+                outputSize: outSize,
+              }
+            : null,
+          asdFrameNumber: clampedAsdFrame,
+        },
+        retryVariant,
+        isMultiSpeaker,
+        usePreclip: true,
+      });
+
+      syncOptions.active_speaker_detection = strategy.asd;
+      asdMode = `v130_${strategy.mode}`;
+      v1291Diag = {
+        version: "v130",
+        ...strategy.diagnostics,
+        mode: strategy.mode,
+        source: strategy.source,
+        coord_space: strategy.coordSpace,
+        frame_number: strategy.frameNumber,
+        raw_reference_frame: refFrame,
+        preclip_frame_count: preclipFrameCount,
+        frame_clamped: !refFrameInPreclipRange,
+      };
+      (pass as any)._v1291 = v1291Diag;
+      (pass as any)._v130_asd_strategy = {
+        mode: strategy.mode,
+        source: strategy.source,
+        coord_space: strategy.coordSpace,
+        frame_number: strategy.frameNumber,
+      };
+      if (strategy.mode === "last_resort_auto") {
         (pass as any)._v1291_block = {
-          reason: "multi_speaker_missing_coords_or_crop",
-          has_plate_coords: !!plateCoords,
-          has_preclip_crop: !!cropOk,
+          reason: strategy.diagnostics.reason ?? "last_resort_auto",
+          details: strategy.diagnostics,
         };
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "v1291_missing_inputs_blocked_autodetect";
-      } else if (passFaceCount === null) {
-        // Probe unavailable — auto_detect is the safest default per v129.24.
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "auto_detect_probe_unavailable";
-      } else {
-        // passFaceCount === 0 (no face in crop) — let Sync.so auto-detect
-        // and fail visibly rather than locking a bogus center coord.
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "auto_detect_zero_face_preclip";
       }
+
 
       delete syncOptions.temperature;
       delete syncOptions.occlusion_detection_enabled;
@@ -4484,18 +4376,22 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
-      // v129.22.3 — Auto-snap path: rewrite ASD coords with the
-      // Rekognition-derived center and proceed to dispatch.
-      // v129.30 (2026-06-19) — HARD-OVERRIDE: previously we only patched
-      // `coordinates` while leaving `auto_detect: true` in place. The v124
-      // sync-3 sanitizer then stripped the coords back out, so Sync.so
-      // still received `{ auto_detect: true }` and ignored the snap —
-      // exactly matching the "Snap-Kandidat erkannt, noch nicht im
-      // Dispatch angewandt" forensic warning + the reported lip-sync
-      // failure. We now REPLACE the ASD with doc-strict point-ASD so the
-      // snap is the payload Sync.so actually receives.
+      // ── v130 — Post-Probe Snap as a Re-Invocation of the Same Strategy ──
+      // Previously (v129.22.3 → v129.30) the Face-Gate's `ok_after_snap`
+      // branch was an ad-hoc patch: it overwrote `syncOptions` and
+      // `payload.options` inline, with shape decisions duplicated from
+      // Block A. That created two sources of truth and was the root
+      // cause of "Snap-Kandidat erkannt, noch nicht im Dispatch
+      // angewandt" (v124 sanitizer stripping mismatched coords).
+      //
+      // v130 collapses this: when the gate snaps, we re-invoke the SAME
+      // `buildAsdStrategy` function with the snapped coord injected as a
+      // `preflight` input. The strategy returns mode `preflight_coord`
+      // with a doc-strict ASD — structurally identical to a fresh
+      // first-attempt dispatch where preflight had succeeded. Single
+      // source of truth, no shape drift possible.
       if (gate.ok && gate.code === "ok_after_snap" && Array.isArray(gate.snapped_coord)) {
-        const newCoord: [number, number] = [
+        const snappedCoord: [number, number] = [
           Number(gate.snapped_coord[0]),
           Number(gate.snapped_coord[1]),
         ];
@@ -4504,40 +4400,68 @@ serve(async (req) => {
           : (Number.isFinite((syncOptions as any)?.active_speaker_detection?.frame_number)
               ? Number((syncOptions as any).active_speaker_detection.frame_number)
               : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : 0));
-        const docStrictAsd: Record<string, unknown> = {
-          auto_detect: false,
-          frame_number: snapFrame,
-          coordinates: newCoord,
-        };
+
+        const snapStrategy = buildAsdStrategy({
+          preflight: {
+            faceFound: true,
+            coord: snappedCoord,
+            frame: snapFrame,
+            snapped: true,
+            originalCoord: (gate.original_coord ?? gateCoord ?? undefined) as
+              | [number, number]
+              | undefined,
+            snapDistancePx: gate.snap_distance_px ?? undefined,
+          },
+          geometry: {
+            preclipFaceCount: Number.isFinite(Number((pass as any).preclip_face_count))
+              ? Number((pass as any).preclip_face_count)
+              : null,
+            preclipAmbiguityRisk: null,
+            plateCoord: null,
+            preclipCrop: null,
+            asdFrameNumber: snapFrame,
+          },
+          retryVariant,
+          isMultiSpeaker: speakers.length >= 2,
+          usePreclip: usePassPreclip,
+        });
+
         try {
-          (syncOptions as any).active_speaker_detection = docStrictAsd;
+          syncOptions.active_speaker_detection = snapStrategy.asd;
           if ((payload as any)?.options) {
-            (payload as any).options.active_speaker_detection = { ...docStrictAsd };
+            (payload as any).options.active_speaker_detection = snapStrategy.asd;
           }
-          // Persist on the pass so subsequent retries see the corrected coord.
           if (!usePassPreclip) {
-            (pass as any).coords = newCoord;
+            (pass as any).coords = snappedCoord;
           } else {
-            (pass as any).dispatch_coords_snapped = newCoord;
+            (pass as any).dispatch_coords_snapped = snappedCoord;
           }
           (pass as any).coords_snapped_at = new Date().toISOString();
           (pass as any).coords_snap_origin = gate.original_coord ?? null;
           (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
           (pass as any).snap_applied_to_dispatch = true;
+          (pass as any)._v130_asd_strategy = {
+            mode: snapStrategy.mode,
+            source: snapStrategy.source,
+            coord_space: snapStrategy.coordSpace,
+            frame_number: snapStrategy.frameNumber,
+            re_strategy: true,
+            re_strategy_trigger: "face_gate_snap",
+          };
         } catch (mutErr) {
           console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v129.30 ASD coord mutation failed: ${(mutErr as Error)?.message}`,
+            `[compose-dialog-segments] scene=${sceneId} v130 ASD re-strategy mutation failed: ${(mutErr as Error)?.message}`,
           );
         }
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v129.30_snap_applied pass=${currentPassIdx + 1} ` +
-          `snapped=[${newCoord[0]},${newCoord[1]}] frame=${snapFrame} space=${usePassPreclip ? "preclip" : "plate"} ` +
-          `delta_px=${gate.snap_distance_px ?? "?"} — doc-strict ASD enforced`,
+          `[compose-dialog-segments] scene=${sceneId} v130_snap_via_strategy pass=${currentPassIdx + 1} ` +
+          `mode=${snapStrategy.mode} snapped=[${snappedCoord[0]},${snappedCoord[1]}] frame=${snapFrame} ` +
+          `space=${usePassPreclip ? "preclip" : "plate"} delta_px=${gate.snap_distance_px ?? "?"}`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_source_kind: "segments", video_url: dispatchVideoUrl,
-          coords: newCoord, frame_number: snapFrame,
+          coords: snappedCoord, frame_number: snapFrame,
           http_status: 0, sync_status: "COORD_AUTO_SNAPPED",
           error_class: "coord_auto_snap",
           error_message: (gate.reason ?? "auto_snapped").slice(0, 240),
@@ -4547,9 +4471,9 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
-              version: "v129.30",
+              version: "v130",
               code: gate.code,
-              snapped_coord: newCoord,
+              snapped_coord: snappedCoord,
               original_coord: gate.original_coord ?? gateCoord,
               snap_distance_px: gate.snap_distance_px ?? null,
               frame_jpeg_url: gate.frame_jpeg_url,
@@ -4557,11 +4481,17 @@ serve(async (req) => {
               gemini_ms: gate.gemini_ms,
             },
             snap_applied_to_dispatch: true,
-            asd_after_snap: docStrictAsd,
+            asd_strategy: {
+              mode: snapStrategy.mode,
+              source: snapStrategy.source,
+              coord_space: snapStrategy.coordSpace,
+              diagnostics: snapStrategy.diagnostics,
+            },
             source: "preflight-snap",
           },
         });
       }
+
       // Honest non-blocking signal: when the Lovable AI gateway can't probe
       // (extract failure or transient 5xx), log it but let the dispatch
       // through. The Forensik UI surfaces this clearly so we don't silently
