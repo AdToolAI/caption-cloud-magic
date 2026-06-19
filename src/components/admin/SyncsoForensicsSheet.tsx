@@ -481,14 +481,18 @@ export function SyncsoForensicsSheet({
         />
 
         <Tabs defaultValue="bundle" className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="bundle">
               <FileJson className="h-4 w-4 mr-1" />
-              Diagnose-Bundle
+              Diagnose
             </TabsTrigger>
             <TabsTrigger value="replay">
               <FlaskConical className="h-4 w-4 mr-1" />
               Replay
+            </TabsTrigger>
+            <TabsTrigger value="lab">
+              <FlaskConical className="h-4 w-4 mr-1" />
+              Root-Cause Lab
             </TabsTrigger>
           </TabsList>
 
