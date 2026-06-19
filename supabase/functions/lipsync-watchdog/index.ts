@@ -516,20 +516,46 @@ serve(async (req) => {
             } catch { /* tolerate */ }
           }
 
+          // v131.8 — Pass-erhaltender Auto-Retry. Der alte v131.7-Code hat
+          // `passes: []` gesetzt und damit fertige Sprecher verloren +
+          // Forensik mit `pass_not_found` kaputt gemacht. Neu: nur die
+          // tatsächlich hängenden rendering-Passes auf pending zurücksetzen,
+          // erfolgreich abgeschlossene `done`-Passes bleiben unverändert.
+          const passesNow: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+          const passesPatched = passesNow.map((p: any, i: number) => {
+            const st = String(p?.status ?? "");
+            if (st !== "rendering") return p;
+            return {
+              ...p,
+              status: "pending",
+              job_id: null,
+              output_url: null,
+              started_at: null,
+              finished_at: null,
+              watchdog_retry_attempted: true,
+              watchdog_retry_at: new Date().toISOString(),
+              error: `retrying_after_watchdog_provider_timeout`,
+              _retry_idx: i,
+            };
+          });
+          const hasStuckPass = passesPatched.some(
+            (p: any, i: number) => p?.watchdog_retry_attempted && passesNow[i]?.status === "rendering",
+          );
+          // Wenn nichts mehr "rendering" war, gibt es nichts zu retryen — falle
+          // auf den ursprünglichen Re-Dispatch-Pfad zurück (passes leer lassen).
+          const newPasses = hasStuckPass ? passesPatched : passesNow;
+
           await supabase
             .from("composer_scenes")
             .update({
               lip_sync_status: "pending",
-              twoshot_stage: "master_clip",
+              twoshot_stage: hasStuckPass ? (d.twoshot_stage ?? "master_clip") : "master_clip",
               clip_error: `watchdog_auto_retry_${prevRetries + 1}_of_1`,
-              replicate_prediction_id: null,
               dialog_shots: {
                 ...(ds || {}),
+                passes: newPasses,
                 watchdog_retries: prevRetries + 1,
                 watchdog_retry_at: new Date().toISOString(),
-                // passes-Liste leeren, damit advance-dispatch oben (2)
-                // beim nächsten Tick einen sauberen pass=0 macht.
-                passes: [],
                 recovery_dispatched_at: null,
               },
               updated_at: new Date().toISOString(),
@@ -537,8 +563,9 @@ serve(async (req) => {
             .eq("id", d.id);
 
           console.log(
-            `[lipsync-watchdog] v131.7 auto-retry scene=${d.id} ` +
-            `prev_retries=${prevRetries} → reset to pending (dispatch-recovery wird nächsten Tick anwerfen)`,
+            `[lipsync-watchdog] v131.8 auto-retry scene=${d.id} ` +
+            `prev_retries=${prevRetries} mode=${hasStuckPass ? "per-pass" : "full-redispatch"} ` +
+            `→ reset to pending`,
           );
           advanced.push({ scene_id: d.id, pass_idx: -2 });
           return; // skip failLipSync
