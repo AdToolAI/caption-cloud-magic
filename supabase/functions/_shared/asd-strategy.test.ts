@@ -174,10 +174,10 @@ Deno.test("Rule 3 — multi-speaker with sibling inside crop → doc-strict", ()
   assertEquals(r.asd.coordinates, [393, 393]);
 });
 
-Deno.test("Rule 3 — coords-pro retry forces strict even without sibling", () => {
+Deno.test("Rule 3 — sync3-coords retry forces strict even without sibling (v131.3: was coords-pro)", () => {
   const r = buildAsdStrategy(
     input({
-      retryVariant: "coords-pro",
+      retryVariant: "sync3-coords",
       isMultiSpeaker: true,
     }),
   );
@@ -185,10 +185,10 @@ Deno.test("Rule 3 — coords-pro retry forces strict even without sibling", () =
   assertEquals(r.source, "retry");
 });
 
-Deno.test("Rule 3 OOB → falls through to last_resort_auto", () => {
+Deno.test("Rule 3 OOB → falls through to last_resort_auto (v131.3: use sync3-coords)", () => {
   const r = buildAsdStrategy(
     input({
-      retryVariant: "coords-pro",
+      retryVariant: "sync3-coords",
       isMultiSpeaker: true,
       geometry: {
         ...baseGeometry,
