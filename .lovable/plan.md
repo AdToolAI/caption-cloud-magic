@@ -1,81 +1,34 @@
-## Problem
+# v134 NOOP Escalation Ladder — IMPLEMENTED
 
-Bei der 4-Sprecher-Szene wurde Lip-Sync technisch sauber gerendert, aber **Charakter 1 und Charakter 4 wurden vertauscht** (beide mit der jeweils falschen Stimme). Charakter 2 und 3 stimmten. Das ist kein Sync.so-Bug, sondern ein **Identity-Mapping-Bug** in `_shared/plate-face-identity.ts`.
+Status: shipped 2026-06-19
 
-## Root Cause
+## What changed
 
-`askGeminiForPlateIdentity()` schickt EINEN Multi-Image-Prompt an Gemini ("welcher Slot = welcher Charakter?"). Bei 4 ähnlichen Plate-Faces produziert Gemini regelmäßig partielle Verwechslungen — typischerweise an den Rändern (Slot 0 ↔ Slot N-1), weil die Reference-Portraits in einer Liste durchgereicht werden und Position-Bias entsteht.
+### `supabase/functions/sync-so-webhook/index.ts`
+Replaced the v129.26 single-shot escalation block (lines 595–690) with a deterministic 2-rung ladder driven by `noop_escalation_step: 0|1|2`:
+- Step 0 → variant `bbox-url-pro` (per-frame bounding_boxes_url, sync-3)
+- Step 1 → variant `coords-pro-box` (bounding-box ASD, sync-3)
+- Step 2 → HARD FAIL + idempotent refund + `twoshot_stage='needs_clip_rerender'` + German user message naming speaker & turn timestamp.
 
-Zusätzlich:
-- **Slot-Order-Fallback (v117)** ordnet Faces nach `slot` L→R und Speakers nach Array-Position. Wenn `speakers[]` aber NICHT in Bildreihenfolge sortiert ist (z. B. nach Dialog-Reihenfolge), entsteht garantiert ein Swap.
-- Es gibt **keine Verifikation** des Gemini-Outputs — niedrige Confidence (z. B. 0.5) wird genauso behandelt wie 0.95.
-- Die Coords pro Speaker werden direkt aus `plateIdentityMap.faces[].center` übernommen — ein einziger Mismatch verteilt sich auf den gesamten Pass.
+No model swap (stays on sync-3 per v129.29 directive). Both `NOOP_ESCALATING` and `NOOP_LADDER_EXHAUSTED` log rows carry `turn_idx`, `meta.speaker_name`, `meta.from_variant`, `meta.to_variant`, `meta.rung_label`, `meta.attempt_id`.
 
-## Fix-Plan v133
+### `supabase/functions/compose-dialog-segments/index.ts`
+- Bumped `COMPOSE_DIALOG_SEGMENTS_VERSION` → `v134.0`.
+- Terminal coord-refresh guard (v128) now carves out an exception when a pass is in an active NOOP-retry cycle (`status=pending` + `noop_escalation_step > 0` + `noop_retry_attempt_id` set). Lets the escalation actually use better coords.
+- `DISPATCH_ATTEMPT_STARTED` log populates `turn_idx` from `body.pass_idx` and threads `noop_auto_escalation` / `noop_escalation_step` / `requested_retry_variant` into meta.
+- `DISPATCHED` log populates `turn_idx` from `currentPassIdx`.
 
-### 1. Per-Character Identity-Probe (statt 1× Multi-Slot)
+### `src/components/video-composer/SceneInlinePlayer.tsx`
+New banner state: when any pass has `noop_escalation_step > 0` + status pending/rendering, the spinner shows `NOOP-Retry läuft (Stufe N/2)` and names the speaker + rung label. Default `Lip-Sync läuft…` line now shows `Pass N/M` instead of generic `~60 s pro Sprecher-Turn` when pass count is known.
 
-Neuer Helper `probeCharacterOnPlate()` in `_shared/plate-face-identity.ts`:
-- Pro Charakter EIN separater Gemini-Call: "Im Plate-Frame siehst du N Boxen (1..N). Welche Box zeigt dieselbe Person wie das Portrait? Antworte `{slot, confidence}`."
-- N Charaktere × 1 Call = N Calls parallel (Promise.all). Bei 4 Speakern: 4 parallele Calls statt 1 Combined-Call.
-- Position-Bias entfällt, weil jeder Charakter isoliert mit allen Boxen verglichen wird.
+### `mem/architecture/lipsync/v134-noop-escalation-ladder.md`
+Created — full architectural doc, wall-time table, validation checklist.
 
-### 2. Hungarian-Assignment statt Greedy
+### `mem/index.md`
+Added v134 entry under the lipsync section.
 
-Aus den N×N Confidence-Werten eine Score-Matrix bauen und mit **Munkres / Hungarian-Algorithmus** die global-optimale 1:1-Zuordnung lösen.
-- Verhindert dass 2 Charaktere demselben Slot zugewiesen werden.
-- Verhindert dass ein lokal-bester Match einen anderen Charakter "blockiert" der diesen Slot eigentlich braucht.
-- Kleine 4×4-Matrix → triviale Implementierung inline (~40 LOC).
+## Validation steps for the user
 
-### 3. Confidence-Gate + Cross-Check
-
-- Wenn `min(assignedConfidence) < 0.55` oder `max - secondBest < 0.15` (ambiguous) bei ≥3 Speakern:
-  - Zweite Gemini-Pass als **Cross-Check**: "Hier sind die finalen Zuordnungen Slot→CharacterId. Ist das korrekt? Antworte nur `confirmed` oder `swap:slotA<->slotB`."
-  - Bei `swap:`-Antwort die zwei Slots tauschen und neu validieren.
-  - Bei wiederholter Ambiguität → **Hard-Fail + Refund** mit klarer Meldung ("Charaktere auf dem Plate nicht eindeutig unterscheidbar — bitte Szene neu rendern mit deutlicheren Posen/Outfits").
-
-### 4. Slot-Order-Fallback für ≥3 Speaker entfernen
-
-Der v117-Fallback (`L→R Slot = L→R Speaker-Array-Order`) ist bei ≥3 Speakern eine ~17% Swap-Wahrscheinlichkeit. Stattdessen:
-- Bei 1 Speaker: behalten (trivial).
-- Bei 2 Speakern: behalten (50/50 ist schon falsch, aber mit Cross-Check abgefangen).
-- Bei ≥3 Speakern: **entfernen** — wenn Per-Character-Probe fehlschlägt, kein Dispatch, sondern Refund + UI-Hinweis.
-
-### 5. Forensik & Cache
-
-- `plate_face_cache` um `identity_method` (`per-char-hungarian` | `slot-order` | `single`), `min_confidence`, `cross_check_result` erweitern.
-- Beim "Sauber neu starten" Button: Cache-Eintrag für die Szene löschen damit ein neuer Probe-Lauf startet (statt verstauten Identity-Mismatch aus dem Cache zu ziehen).
-
-### 6. UI
-
-`SceneInlinePlayer` Forensics-Panel zeigt:
-- Identity-Methode (`per-char-hungarian@conf=0.87`)
-- Bei ambiguösem Match: gelbes Warning-Badge "Identity-Confidence niedrig — bei Voice-Swap bitte neu rendern".
-
-## Technische Details
-
-**Dateien:**
-- `supabase/functions/_shared/plate-face-identity.ts` — neuer `probeCharacterOnPlate`, Hungarian-Solver, Cross-Check, refactor `resolvePlateFaceIdentities`
-- `supabase/functions/compose-dialog-segments/index.ts` — Hard-Fail-Branch bei `identity_ambiguous` (Refund + Status-Update analog v132 Turn-Visibility-Gate)
-- `supabase/functions/lipsync-reset-scene/index.ts` (oder Äquivalent) — `plate_face_cache` row mit-löschen
-- `src/components/video-composer/SceneInlinePlayer.tsx` — Forensics-Anzeige für `identity_method` + Confidence
-- Migration: `plate_face_cache` Spalten `identity_method TEXT`, `min_confidence NUMERIC`, `cross_check_result TEXT`
-- Memory: `mem/architecture/lipsync/v133-per-character-identity-matching.md` + Index-Eintrag
-
-**Kosten-Impact:**
-- 4 Gemini-Calls statt 1 pro Szene → ~$0.004 statt $0.001 → vernachlässigbar.
-- Spart aber ~30€ Re-Renders pro Voice-Swap-Vorfall.
-
-**Backward-Compat:**
-- Single-Speaker und 2-Speaker-Pfade verhalten sich identisch (kein Regression-Risk).
-- Nur 3+ Speaker bekommen die neue Pipeline aktiviert.
-
-## Was NICHT in v133
-
-- Sync.so-Pipeline-Änderungen (läuft bereits korrekt).
-- Watchdog/Retry-Logik (v131.8/v132 bleiben).
-- Pre-Clip-Generation (v107) bleibt unverändert.
-
-## Validierung
-
-Nach Deploy: User rendert dieselbe 4-Sprecher-Szene neu mit "Sauber neu starten". Erwartung: Identity-Methode = `per-char-hungarian`, alle 4 Stimmen korrekt zugeordnet. Im Forensics-Panel sichtbar welche Confidence pro Charakter erzielt wurde.
+1. Sofort: Sprecher 2 in der betroffenen Szene `6b4fda29…` ist mit NOOP-Output ausgeliefert worden. Bitte diese Szene über `Lip-Sync zurücksetzen` neu laufen lassen — der neue Code räumt die NOOPs sauber auf.
+2. Bei der nächsten Multi-Speaker-Szene: Forensik in `syncso_dispatch_log` sollte bei jedem Eintrag `turn_idx` gefüllt zeigen und im NOOP-Fall die neuen Statuswerte `NOOP_ESCALATING` / `NOOP_LADDER_EXHAUSTED`.
+3. UI zeigt `NOOP-Retry läuft (Stufe N/2)` während der Eskalation — kein stummer Spinner mehr.

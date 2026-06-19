@@ -120,7 +120,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v131.5";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v134.0";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // v37 — `sync3-coords` added as the Sync.so-recommended fallback for
@@ -605,10 +605,15 @@ serve(async (req) => {
     //   3) DISPATCHED                    → Sync.so was actually called
     // Best-effort; failures are logged but don't block the run.
     try {
+      const entryTurnIdx = typeof body?.pass_idx === "number" && Number.isFinite(body.pass_idx)
+        ? Number(body.pass_idx)
+        : null;
       await logSyncDispatch(supabase, {
         scene_id: sceneId,
         user_id: userId,
         engine: "sync-segments",
+        // v134 §3 — turn_idx populated whenever the caller knows which pass.
+        turn_idx: entryTurnIdx,
         sync_status: "DISPATCH_ATTEMPT_STARTED",
         meta: {
           is_retry: isRetry,
@@ -621,6 +626,10 @@ serve(async (req) => {
           lip_sync_status_at_entry: (scene as any).lip_sync_status ?? null,
           existing_state_version: (scene as any).dialog_shots?.version ?? null,
           existing_state_status: (scene as any).dialog_shots?.status ?? null,
+          // v134 §3 — Forensik-friendly noop tracking
+          noop_auto_escalation: body?.noop_auto_escalation === true,
+          noop_escalation_step: typeof body?.noop_escalation_step === "number" ? body.noop_escalation_step : null,
+          requested_retry_variant: typeof body?.retry_variant === "string" ? body.retry_variant : null,
         },
       });
     } catch (e) {
@@ -2541,14 +2550,20 @@ serve(async (req) => {
           Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
         if (changed) {
           // v128 — Alpha-Plan v3.1 §1.8: terminal coord-refresh guard.
-          // For terminal passes (done/failed) the v123 reset logic would
-          // silently flip status back to `pending`, violating the
-          // "terminal means terminal" invariant. We now record the new
-          // coord as a `candidate_coords` debug field, log a warning event,
-          // and leave the terminal pass UNTOUCHED. Only non-terminal
-          // passes get the legacy preclip-invalidate + coord-update.
+          // v134 §2 — Exception: if THIS pass is currently in an active
+          // NOOP-retry cycle (status was reset to pending by sync-so-webhook
+          // and a fresh noop_retry_attempt_id was issued), then the pass
+          // is no longer terminal — it's just been re-opened for the
+          // explicit purpose of changing the input vector. Block the
+          // refresh only for truly terminal (done/failed without an active
+          // retry) passes, where flipping coords would silently mutate
+          // a finished result.
           const isTerminal = p.status === "done" || p.status === "failed";
-          if (isTerminal) {
+          const inActiveNoopRetry =
+            !!(p as any).noop_retry_attempt_id &&
+            Number((p as any).noop_escalation_step ?? 0) > 0 &&
+            p.status === "pending";
+          if (isTerminal && !inActiveNoopRetry) {
             (p as any).candidate_coords = [freshCoord[0], freshCoord[1]];
             (p as any).candidate_coords_at = new Date().toISOString();
             (p as any).candidate_coords_source = freshSource;
@@ -2577,6 +2592,12 @@ serve(async (req) => {
               `pass=${p.idx} speaker=${p.speaker_name} status=${p.status} (terminal, candidate stored)`,
             );
             continue;
+          }
+          if (inActiveNoopRetry) {
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} v134 COORD-REFRESH-ALLOWED (active NOOP retry) ` +
+              `pass=${p.idx} speaker=${p.speaker_name} step=${(p as any).noop_escalation_step} old=${JSON.stringify(oldCoord)} new=${JSON.stringify([freshCoord[0], freshCoord[1]])}`,
+            );
           }
           // Non-terminal: legacy v123 stale-preclip invalidation path.
           (p as any).preclip_url = null;
@@ -5307,6 +5328,9 @@ serve(async (req) => {
         ? Number((syncOptions as any).active_speaker_detection.frame_number)
         : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : null),
       window_start_sec: 0, window_end_sec: totalSec,
+      // v134 §3 — Populate dedicated turn_idx column so SQL forensics no longer
+      // requires pulling pass_idx out of meta JSON.
+      turn_idx: Number.isFinite(currentPassIdx) ? Number(currentPassIdx) : null,
       http_status: resp.status, sync_status: "DISPATCHED",
       meta: {
         // v131.5 — version pin for forensic attribution
