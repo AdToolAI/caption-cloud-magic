@@ -1,37 +1,41 @@
-Do I know what the issue is? Yes.
+## Ziel
+Den Lip-Sync-Fehler nicht nur umgehen, sondern die tatsächliche Ursache eingrenzen und danach einen stabilen **sync-3-only** Ablauf herstellen. Kein `lipsync-2` Fallback bleibt aktiv.
 
-The current failure is not the old out-of-range-frame bug anymore. The database shows scene `21eed4c2-...` failed on pass 2 / Matthew after dispatching `sync-3` with explicit preclip coordinates:
+## Plan
 
-```text
-video: preclip, duration ~1.09s / 33 frames
-ASD: auto_detect:false, frame_number:16, coordinates:[363,363]
-provider result: generation_unknown_error
-```
+1. **Sync-2-Fallback zurücknehmen**
+   - Entferne den zuletzt eingeführten `lipsync-2` Override aus `compose-dialog-segments`.
+   - Stelle sicher, dass alle Dialog-/Multi-Speaker-Pfade ausschließlich `sync-3` verwenden.
 
-So v129.27 fixed the frame range, but the retry still sends explicit `coordinates` into a tight single-face preclip. We already documented and observed that `sync-3` can fail on tight one-face preclips when explicit ASD is used. The screenshot’s `face_at_frame` blocker is also confusing because the forensics panel is looking at pass index 0 by default while the actual failed pass is index 1.
+2. **Kontrollierte A/B-Diagnose einbauen**
+   - Für denselben Preclip + dieselbe Audio-Datei zwei gezielte Test-Dispatches ermöglichen:
+     - **A:** `sync-3` mit `active_speaker_detection: { auto_detect: true }`
+     - **B:** `sync-3` mit den aktuell berechneten `frame_number + coordinates`
+   - Beide Dispatches sauber in `syncso_dispatch_log` protokollieren: Modell, Retry-Variante, ASD-Modus, Frame, Koordinaten, Clip-Metadaten, Job-ID, Fehlertext.
 
-Plan:
+3. **Ursache sichtbar machen**
+   - Wenn A funktioniert und B scheitert, liegt die Ursache sehr wahrscheinlich in Frame-Index oder Koordinaten-Transformation.
+   - Wenn beide scheitern, liegt die Ursache eher bei Preclip-Encoding, Clip-Dauer, Audio-Input oder Provider-Status.
+   - Wenn beide funktionieren, ist der Fehler wahrscheinlich im Retry-/Webhook-State-Handling.
 
-1. **Stop using explicit point-ASD on clean preclips**
-   - In `compose-dialog-segments`, change `coords-pro` preclip retry behavior for clean/tight single-face crops.
-   - Instead of sending `auto_detect:false + coordinates`, use a safer recovery ladder:
-     - first retry: regenerate/expand the preclip crop if needed, then `auto_detect:true`
-     - only use explicit coords when the crop is truly multi-face/ambiguous and the coordinate is verified on the exact preclip frame.
+4. **Sync-3-only Retry-Ladder implementieren**
+   - Stufe 1: Für saubere Single-Face-Preclips standardmäßig `auto_detect: true` verwenden.
+   - Stufe 2: Bei erneutem `generation_unknown_error` auf deterministische `bounding_boxes_url` wechseln, statt `coordinates` zu wiederholen.
+   - Stufe 3: Falls nötig, Preclip-Crop leicht erweitern und erneut mit `auto_detect: true` versuchen.
+   - Nach maximal 3 sync-3 Versuchen sauber fehlschlagen und Credits idempotent erstatten.
 
-2. **Add a hard provider-safe fallback for this failure**
-   - In `sync-so-webhook`, when `sync-3` fails with `generation_unknown_error` on a preclip explicit-coord retry, do not retry the same payload.
-   - Move to a different variant, preferably `auto-standard` / lipsync-2 fallback on the preclip, or a full-plate/bbox route, depending on available metadata.
-   - This avoids looping back into the same known-bad Sync.so payload shape.
+5. **Webhook/Watchdog anpassen**
+   - `sync-so-webhook` darf bei `generation_unknown_error` keinen `lipsync-2` Retry mehr erzwingen.
+   - Stattdessen setzt er den nächsten sync-3 Retry-State (`coords-pro-auto`, danach `bbox-url`, danach `expanded-crop-auto`).
+   - Der bestehende 8-Minuten-Watchdog und Refund-Mechanismus bleiben erhalten.
 
-3. **Make Face-Gate not block clean preclip auto paths incorrectly**
-   - For `auto_detect:true` preclip dispatches, do not ask the preflight/face-gate to validate a fixed coordinate.
-   - Validate only “face exists in preclip frame” for auto-detect paths; keep coordinate checks only for explicit ASD.
+6. **Letzten fehlgeschlagenen Job recovern**
+   - Den zuletzt fehlgeschlagenen Dialog-Job zurück auf `pending` setzen.
+   - Mit der neuen Diagnose/Retry-Logik neu dispatchen.
+   - Danach anhand der Logs prüfen, welcher Pfad erfolgreich war.
 
-4. **Improve forensics so the screenshot points at the real failed pass**
-   - Update the forensics sheet to default/select the failed pass when a scene failed, instead of showing pass index 0.
-   - Label whether the check is validating the actual provider payload or only a diagnostic probe.
+7. **Memory aktualisieren**
+   - Projektregel speichern: Dialog-Shot/Lip-Sync Pipeline bleibt `sync-3`-only; kein automatischer `lipsync-2` Fallback für diese Pipeline.
 
-5. **Recover the current failed run**
-   - Reset scene `21eed4c2-...` from failed to pending at the failed pass.
-   - Clear the invalid explicit-preclip retry metadata and redispatch with the new safe fallback.
-   - Confirm in logs that the next payload no longer sends the known-bad `sync-3 + explicit coords on single-face preclip` shape.
+## Erwartetes Ergebnis
+Wir wissen danach, ob der echte Fehler in `coordinates/frame_number`, Preclip-Encoding oder State-Handling liegt. Gleichzeitig läuft die Produktion wieder über einen robusteren sync-3-only Pfad.
