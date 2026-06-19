@@ -45,6 +45,12 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
+import {
+  classifyReplayBatch,
+  LAB_PRESETS,
+  type ReplayRow,
+  type Verdict as LabVerdict,
+} from '@/lib/syncReplayClassify';
 
 interface Props {
   open: boolean;
@@ -217,6 +223,61 @@ export function SyncsoForensicsSheet({
 
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightResult, setPreflightResult] = useState<any>(null);
+
+  // Replay-Lab (Root-Cause Matrix)
+  const [labLoading, setLabLoading] = useState(false);
+  const [labBatchId, setLabBatchId] = useState<string | null>(null);
+  const [labReason, setLabReason] = useState('');
+  const [labConfirm, setLabConfirm] = useState(false);
+  const [labRows, setLabRows] = useState<ReplayRow[]>([]);
+  const [labDispatch, setLabDispatch] = useState<any[] | null>(null);
+
+  // Poll lab batch rows until all terminal
+  useEffect(() => {
+    if (!labBatchId) return;
+    let cancelled = false;
+    const tick = async () => {
+      const { data } = await supabase
+        .from('syncso_replay_log')
+        .select('override_preset, provider_status, provider_error, provider_error_code, output_url')
+        .ilike('notes', `lab:${labBatchId}:%`);
+      if (cancelled) return;
+      setLabRows((data ?? []) as ReplayRow[]);
+    };
+    tick();
+    const i = setInterval(tick, 4000);
+    return () => { cancelled = true; clearInterval(i); };
+  }, [labBatchId]);
+
+  const runLab = async () => {
+    if (!labConfirm) { toast.error('Bitte Bestätigungs-Checkbox setzen'); return; }
+    if (labReason.trim().length < 5) { toast.error('Grund benötigt (min. 5 Zeichen)'); return; }
+    setLabLoading(true);
+    setLabRows([]);
+    setLabBatchId(null);
+    setLabDispatch(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('syncso-replay-lab', {
+        body: {
+          scene_id: sceneId,
+          pass_index: passIndex,
+          reason: labReason.trim(),
+          confirm: true,
+        },
+      });
+      if (error) throw error;
+      setLabBatchId(data?.batch_id ?? null);
+      setLabDispatch(data?.dispatched ?? []);
+      toast.success(`Matrix dispatched (${(data?.dispatched ?? []).length} Varianten) — Ergebnisse laufen rein`);
+    } catch (e: any) {
+      const details = await extractFunctionsErrorDetails(e);
+      toast.error(`Lab-Fehler: ${details.message}`);
+    } finally {
+      setLabLoading(false);
+    }
+  };
+
+  const labVerdict: LabVerdict | null = labRows.length ? classifyReplayBatch(labRows) : null;
 
   const runPreflight = async () => {
     setPreflightLoading(true);
