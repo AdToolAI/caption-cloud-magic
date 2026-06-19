@@ -498,9 +498,16 @@ export default function VideoComposerDashboard() {
             clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
             lipSyncWithVoiceover: resolveLipSyncValue(row.id, (row as any).lip_sync_with_voiceover === true),
+            // v131.7: DB-first für ALLE Lifecycle-Felder (lipsync/twoshot/clipError/dialogShots).
+            // Vorher: clipError, dialogShots fehlten hier — ein Realtime-Tick nach
+            // watchdog_provider_timeout hat zwar lipSyncStatus='failed' gesetzt, aber
+            // clipError leer gelassen → UI zeigte „Lip-Sync läuft…" weiter, weil die
+            // Forensic-Felder zur Anzeige des Failure-Banners fehlten.
             lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
             lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
             lipSyncStatus: (row as any).lip_sync_status ?? null,
+            clipError: (row as any).clip_error ?? null,
+            dialogShots: (row as any).dialog_shots ?? null,
             aiPrompt: pickText(row.id, 'aiPrompt', row.ai_prompt as any, local?.aiPrompt),
             stockKeywords: pickText(row.id, 'stockKeywords', row.stock_keywords as any, local?.stockKeywords),
             uploadUrl: row.upload_url ?? local?.uploadUrl,
