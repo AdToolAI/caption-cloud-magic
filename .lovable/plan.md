@@ -1,87 +1,157 @@
-# Plan: Group-Plate Anti-Split-Screen Fix
+## Ziel
 
-## Symptom
-Bei 4-Sprecher-Hook ist der gerenderte Hailuo-Plate ein **echter 4-Panel Split-Screen** (vier vertikale Streifen, jede Person isoliert). Folge:
+Nicht weiter an Face-Detection-Symptomen drehen. Wir isolieren die echte Ursache des `generation_unknown_error`, indem wir dieselben fehlgeschlagenen Assets kontrolliert mit Varianten erneut testen und die Unterschiede beweisbar loggen.
 
-- Sync.so Face-Gate blockiert Pass 2 (Kailee) und Pass 3 (Sarah) mit `plate_target_face_missing` — die Gesichter sind zwar im Bild, aber an festen Spalten-Positionen die nicht zu den per-Speaker-Koordinaten passen.
-- Pass 1 fällt mit `syncso_segments_FAILED: generation_unknown_error` (Sync.so kann die Quad-Split-Composition nicht parsen).
-- Folge-Pässe werden mit `canceled_by_scene_failure` abgebrochen.
+Wichtig: Ich kenne kein externes/geheimes Referenzprojekt außerhalb dieses Projekts. Was wir aber haben, ist diese konkrete Pipeline, echte Dispatch-Logs und die fehlgeschlagenen Szenen. Daraus bauen wir jetzt eine belastbare Forensik.
 
-## Root Cause
-`neutralTwoShotPrompt()` in `supabase/functions/compose-video-clips/index.ts` (Z. 616–639) baut für n≥3 diesen Positiv-Prompt:
+## Beobachtung aus den aktuellen Daten
 
-> *"arranged in a single horizontal line, left-to-right, with **equal screen share** and **clear gaps between them** (no overlap, no person standing in front of another)"*
+Bei den zwei aktuellen Szenen ist der harte Fehler nicht `no_face`, sondern Sync.so selbst:
 
-Hailuo (und Nano Banana 2 als Anchor-Composer) interpretieren `equal screen share` + `clear gaps` + `no overlap` zunehmend **wörtlich als Split-Screen-Layout** statt als ein gemeinsames Group-Foto. Das negativ-Prompt-Block `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` (Z. 326–349) enthält nur `picture-in-picture`, aber keine expliziten Sperren für Split-Screen / Panel-Grid / Photo-Collage.
+- `33427056-3a18-4685-b975-7f611f069751`
+- `ec23f623-bca0-42f0-a7d3-5e0d84cdd407`
 
-## Lösung (4 Stufen)
+Beide wurden mit ungefähr diesem Muster geschickt:
 
-### 1. Group-Framing-Prompt umschreiben (n ≥ 3)
-`supabase/functions/compose-video-clips/index.ts` — `neutralTwoShotPrompt`, n≥3-Branch:
-
-Neue Formulierung betont **einen gemeinsamen physischen Raum, eine durchgehende Kamera, ein Take**:
-
-```
-all standing together in the same physical room as a natural group, captured in
-one continuous cinematic frame by a single locked camera in one take.
-Wide medium group shot, ensemble composition: every person occupies real
-shared 3D space (overlapping depth planes, natural personal distance ≈
-shoulder-width, slight depth stagger so nobody is perfectly side-by-side).
-Each face stays clearly visible, front- or three-quarter-facing, mouth and
-jaw unobstructed. Identical ambient lighting across the whole room.
+```text
+model: sync-3
+sync_mode: cut_off
+video: dialog-pass-preclip-...mp4
+audio: ...pass-1-tight-...wav
+active_speaker_detection:
+  auto_detect: false
+  coordinates: [360, 360]
+  frame_number: 3 oder 52
+provider result: FAILED / Something went wrong while processing this generation
 ```
 
-Entfernt: `single horizontal line`, `equal screen share`, `clear gaps between them`. Diese drei Phrasen sind die direkten Trigger für das Split-Screen-Misinterpretation.
+Auffällig:
 
-### 2. Negative-Prompt härten
-Im `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` (Z. 349) anhängen:
+- Es ist der erste Sprecher/erste Pass, nicht vier fertige Speaker-Pässe.
+- Die echte Provider-Antwort ist generisch, deshalb müssen wir über A/B-Replays herausfinden, ob Audio, Preclip, Frame-Anchor, ASD-Koordinaten, Codec oder `sync-3 + coords` der Auslöser ist.
+- Die bisherigen Logs speichern noch zu wenig technische Messwerte (`audio_dur_sec`, `audio_peak_dbfs` etc. sind bei diesen Zeilen leer), also fehlt genau die Evidenz, die wir brauchen.
 
+## Plan
+
+### 1. Failed-Scene Snapshot vervollständigen
+
+Für fehlgeschlagene Dialog-Szenen wird ein vollständiger technischer Snapshot gespeichert:
+
+- Provider-Payload exakt wie gesendet
+- Video-URL, Audio-URL
+- Video-Dauer, Auflösung, FPS, Codec, Framecount
+- Audio-Dauer, Sample-Rate, Kanäle, Peak/RMS, Voice-Window-Länge
+- Audio-vs-Video-Differenz
+- Preclip-Crop-Daten und Preclip-Dimensionen
+- ASD-Frame und ASD-Koordinaten
+- ob Koordinaten in Plate- oder Preclip-Space liegen
+- Face-Probe-Status getrennt nach `plate` und `preclip`
+
+Damit hört das Rätselraten auf: Jede Failure-Zeile muss erklären, was Sync.so wirklich bekommen hat.
+
+### 2. Sync.so Replay-Lab für kontrollierte A/B-Tests bauen
+
+Ein admin/debug-only Replay-Pfad testet dieselben Assets der fehlgeschlagenen Szene mit einer kleinen Varianten-Matrix. Kein breites Retry-Chaos, sondern exakt isolierte Experimente.
+
+Varianten:
+
+```text
+A  original payload
+   preclip + tight audio + sync-3 + coords + original frame
+
+B  frame anchor changed
+   same video/audio, but frame_number = safe mid-frame with visible face
+
+C  audio trimmed/normalized
+   same video/frame, but audio trimmed to voiced window and normalized
+
+D  audio duration matched to video
+   same video/frame, but audio length <= preclip duration or explicit cut_off-safe window
+
+E  ASD mode changed
+   same video/audio, but auto_detect:true on clean single-face preclip
+
+F  source changed
+   master plate instead of preclip, same speaker coordinate transformed correctly
+
+G  codec normalization
+   re-encoded preclip/audio with conservative settings, same semantic content
 ```
-, split screen, split-screen composition, split-frame, multi-panel layout,
-panel grid, photo grid, brady bunch grid, photo collage, composite of
-separate portraits, isolated character cutouts, vertical divider lines,
-visible seams between people, four-up grid, two-up grid, side-by-side panels,
-each person in their own frame, individual portrait panels
+
+Each run logs:
+
+- submitted payload hash
+- provider job id
+- provider status/error
+- output duration/url when successful
+- changed variable compared to original
+- pass/fail classification
+
+### 3. Root-cause classifier statt generischem `other`
+
+Wenn ein Replay-Ergebnis zurückkommt, wird es automatisch eingeordnet:
+
+```text
+original fails + mid-frame passes
+=> root cause: bad/unsafe frame anchor
+
+original fails + audio-trim passes
+=> root cause: audio/video duration or silence/voiced-window mismatch
+
+original fails + auto_detect passes
+=> root cause: sync-3 coords/ASD incompatibility on preclip
+
+original fails + normalized codec passes
+=> root cause: preclip/audio container or codec issue
+
+all variants fail
+=> root cause likely provider-side incompatibility with generated plate/preclip; production fallback must avoid this provider path for that asset class
 ```
 
-Diese Begriffe werden zusätzlich an `negativeFor()` für i2v-Calls geroutet (bestehender Pfad — keine Strukturänderung).
+### 4. Nur den bewiesenen Produktionsfix einbauen
 
-### 3. ANCHOR_AUDIT_VERSION 8 → 9
-`supabase/functions/compose-video-clips/index.ts` Z. 37:
+Erst nach den Replay-Ergebnissen wird der eigentliche Fix gesetzt:
 
-```ts
-const ANCHOR_AUDIT_VERSION = 9;
+- Bei Frame-Ursache: nie Frame `3`/Randframes verwenden; nur validierte Mid-Frames mit sichtbarem Gesicht.
+- Bei Audio-Ursache: tight audio auf voiced window trimmen/normalisieren und Länge an Preclip/`cut_off` anpassen.
+- Bei ASD-Ursache: für saubere Single-Face-Preclips `auto_detect:true` oder dokumentiert stabile Variante statt `coords-pro` verwenden.
+- Bei Codec-Ursache: Preclip/audio vor Sync.so immer konservativ re-encoden.
+- Bei Provider-Inkompatibilität: deterministischer Fallback-Pfad statt blindem Retry derselben Variante.
+
+### 5. Forensik-False-Positives separat entschärfen
+
+Parallel, aber nicht als Hauptfix:
+
+- `no_face` darf nicht mehr als harte Ursache angezeigt werden, wenn `preclip_face_count=1` bereits validiert wurde.
+- Anzeige unterscheidet klar:
+  - `provider_failed`
+  - `face_probe_unavailable`
+  - `probe_inconclusive`
+  - `real_no_face`
+- Die Forensics-Sheet zeigt, ob die Prüfung auf Plate oder Preclip lief.
+
+### 6. Stop-Loss gegen Kosten und Endlosschleifen
+
+Der Replay-Pfad bekommt harte Grenzen:
+
+- nur admin/debug
+- nur für eine konkrete failed scene
+- kleine maximale Variantenzahl
+- jeder Provider-Call wird mit Variante und Kostenabsicht geloggt
+- keine automatische breite Fanout-Wiederholung
+- Refund bleibt idempotent für echte Produktionsfehler
+
+## Ergebnis nach Umsetzung
+
+Nach der Umsetzung können wir für eine fehlgeschlagene Szene sagen:
+
+```text
+Die Ursache war nicht allgemein “Face Detection”, sondern exakt:
+- Frame-Anchor, oder
+- Audio/Video-Längenmismatch, oder
+- Sync-3 ASD-Mode, oder
+- Codec/Container, oder
+- Provider-Inkompatibilität mit dieser Preclip-Klasse.
 ```
 
-Bewirkt dass alle bereits gecachten Quad-Split-Plates beim nächsten Cinematic-Sync-Render automatisch verworfen und mit dem neuen Prompt neu komponiert werden — ohne dass User manuell "Neu rendern" klicken müssen.
-
-### 4. Plate-Quality-Gate erweitern (optionaler Split-Screen-Detector)
-`supabase/functions/compose-dialog-segments/index.ts` v117/v119 Plate-Quality-Gate (Z. 1291–1376):
-
-Wenn bei n≥3 alle erkannten Face-Boxes
-- **gleiche y-Achse** haben (Center-y ± 5 % der Frame-Höhe) UND
-- **gleichmäßig in x verteilt** sind (Abstände untereinander ± 8 % gleich) UND
-- **Box-Höhen ± 10 % identisch** sind
-
-→ als `split_screen_layout` klassifizieren und mit eigenem `clip_error` markieren:
-
-> *"Plate wurde als Split-Screen-Layout erkannt — Sync.so kann Einzel-Panels nicht lipsyncen. Bitte Szene neu rendern (alle Personen müssen im selben Raum stehen, nicht in getrennten Panels)."*
-
-Credits werden über den bestehenden Refund-Pfad zurückerstattet (identisch zu `plate_faces_missing`).
-
-## Files
-- `supabase/functions/compose-video-clips/index.ts` — Prompt + Negative + Audit-Version
-- `supabase/functions/compose-dialog-segments/index.ts` — Split-Screen-Heuristik im Plate-Quality-Gate
-- `mem/architecture/lipsync/anti-split-screen-group-plate-v9.md` — neue Memory
-- `mem/index.md` — Eintrag hinzufügen
-
-## Outside scope
-- Sync.so `generation_unknown_error` selbst — das ist ein nachgelagertes Symptom, das mit korrektem Group-Plate verschwindet. Kein eigener Retry-Pfad nötig.
-- N-Slot Face-Map Architektur — bleibt unverändert; die Koordinaten waren korrekt, nur der Plate war falsch komponiert.
-- FROZEN-INVARIANTS (I.4) — `LOCKED static camera` und alle Framing-Change-Keywords bleiben verbatim erhalten.
-
-## Verification
-1. Edge-Functions deployen (`compose-video-clips`, `compose-dialog-segments`).
-2. User klickt "Sauber neu starten" auf der Lipsync-Bar → Plate wird wegen Audit v9 neu komponiert.
-3. Erwarten: Group-Shot im gemeinsamen Raum (kein Split), Face-Gate findet alle 4 Gesichter, Sync.so läuft durch.
-4. Falls Hailuo trotzdem splittet: Split-Screen-Detector blockt vor Sync.so-Dispatch mit klarer Fehlermeldung statt `generation_unknown_error`.
+Dann wird nur dieser bewiesene Pfad produktiv geändert, statt weiter blind an der Pipeline zu drehen.
