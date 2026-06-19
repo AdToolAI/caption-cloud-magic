@@ -1425,6 +1425,191 @@ serve(async (req) => {
     }
 
 
+    // ── v132 — Turn-Visibility Pre-Gate (root-cause fix) ──────────────────
+    // BEFORE rendering any per-pass preclip (3 × Lambda, ~3 min each) and
+    // BEFORE dispatching to Sync.so, validate that every speaker is actually
+    // visible AT THEIR OWN TURN TIMESTAMP on the plate. The historical
+    // failure mode this catches: pass 1–3 render fine, then pass 4's preclip
+    // returns `face_gate_failed:count=0 (after 2 v116 repair attempts)` →
+    // the entire scene fails with `v107_preclip_required_for_multispeaker`
+    // after wasting 10+ minutes of Lambda time and Watchdog ticks.
+    //
+    // We probe the plate at each speaker's turn-mid timestamp using
+    // `validate-frame-face` (same Gemini Vision detector used downstream).
+    // A speaker whose face is undetectable in their own turn frame will
+    // also fail downstream; refunding now is cheaper for both the user
+    // (no 10-min wait) and the platform (no 3-Lambda × 4-pass burn).
+    //
+    // Permissive on probe errors (validator returns ok:false): we never
+    // block on a flaky vision model, only on confirmed faceCount===0.
+    // First-attempt only; advance/retry skips the gate (already validated).
+    const TURN_GATE_DISABLED =
+      (Deno.env.get("FORCE_SKIP_TURN_VISIBILITY_GATE") ?? "").toLowerCase() === "true";
+    if (
+      !TURN_GATE_DISABLED &&
+      !isAdvance &&
+      !isRetry &&
+      !isV41Retry &&
+      speakers.length >= 2 &&
+      plateDims &&
+      sourceClipUrl
+    ) {
+      const FPS = 30;
+      const failures: Array<{
+        speaker: string;
+        character_id: string | null;
+        turn_sec: number;
+        frame: number;
+        face_count: number;
+      }> = [];
+      const probes: Array<{
+        speaker: string;
+        turn_sec: number;
+        face_count: number | null;
+        ok: boolean;
+      }> = [];
+      for (let i = 0; i < speakers.length; i++) {
+        const sp = speakers[i] as any;
+        const turns = Array.isArray(sp?.voicedRange?.turns) ? sp.voicedRange.turns : [];
+        if (turns.length === 0) continue;
+        // First turn mid — most stable; speaker is unlikely to have walked
+        // out of frame yet and the plate is freshest at this point.
+        const t0 = turns[0];
+        const startSec = Math.max(0, Number(t0?.startSec) || 0);
+        const endSec = Math.max(startSec + 0.2, Number(t0?.endSec) || startSec + 0.5);
+        const midSec = (startSec + endSec) / 2;
+        const frameNum = Math.max(1, Math.round(midSec * FPS));
+        try {
+          const v = await validateFrameFace({
+            supabaseUrl,
+            serviceKey,
+            videoUrl: sourceClipUrl,
+            frameNumber: frameNum,
+            fps: FPS,
+            targetCoords: null,
+          });
+          const faceCount = Number(v.faceCount ?? 0);
+          probes.push({
+            speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
+            turn_sec: Math.round(midSec * 100) / 100,
+            face_count: v.ok ? faceCount : null,
+            ok: !!v.ok,
+          });
+          if (v.ok && faceCount < 1) {
+            failures.push({
+              speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
+              character_id: sp?.character_id ?? null,
+              turn_sec: Math.round(midSec * 100) / 100,
+              frame: frameNum,
+              face_count: faceCount,
+            });
+          }
+        } catch (e) {
+          // Probe exception — permissive (do not block on detector outage).
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v132_turn_gate probe threw for speaker=${i}: ${(e as Error)?.message}`,
+          );
+        }
+      }
+      if (failures.length > 0) {
+        const detail = failures
+          .map((f) => `${f.speaker}@${f.turn_sec}s(faces=${f.face_count})`)
+          .join(", ");
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v132_turn_visibility_BLOCK ${detail} — refunding ${totalCost} credits and forcing plate re-render`,
+        );
+        // Refund wallet (debit happened at ~line 1024).
+        const alreadyRefunded = !!(existing as any)?.refunded;
+        if (!alreadyRefunded) {
+          try {
+            const { data: w } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(w?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (refundErr) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v132 refund failed: ${(refundErr as Error)?.message}`,
+            );
+          }
+        }
+        const speakerList =
+          failures.length === 1
+            ? `Sprecher „${failures[0].speaker}" ist bei Sekunde ${failures[0].turn_sec} (Dialog-Turn) nicht im Bild`
+            : `${failures.length} Sprecher sind während ihres Dialog-Turns nicht im Bild: ${failures.map((f) => `${f.speaker} @ ${f.turn_sec}s`).join(", ")}`;
+        const userMsg =
+          `Lip-Sync wurde nicht gestartet: ${speakerList}. ` +
+          `Sync.so kann ein Gesicht nur animieren, wenn es in genau diesem Moment sichtbar ist. ` +
+          `Bitte die Szene neu rendern — alle Sprecher müssen während ihres Dialog-Turns frontal und unverdeckt im Bild sein (keine Kameraschwenks weg, keine Cuts, keine angeschnittenen Köpfe). ` +
+          `Credits wurden vollständig zurückerstattet.`;
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: 0,
+              refunded: true,
+              error: `v132_turn_visibility:${detail}`,
+              v132_turn_gate: { failures, probes },
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "needs_clip_rerender",
+            clip_status: "pending",
+            clip_url: null,
+            lip_sync_source_clip_url: null,
+            clip_error: userMsg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId,
+            engine: "sync-segments",
+            sync_status: "PREFLIGHT_BLOCKED",
+            error_class: "v132_turn_visibility",
+            error_message: detail,
+            meta: {
+              failures,
+              probes,
+              speakers: speakers.length,
+              plate_dims: plateDims,
+              plate_url: sourceClipUrl,
+              refunded_credits: totalCost,
+              note:
+                "Turn-Visibility-Gate: speaker not detectable at their own dialog turn frame on the plate. Re-render required.",
+            },
+          });
+        } catch (_) {
+          /* best-effort */
+        }
+        return json(
+          {
+            error: "v132_turn_visibility",
+            message: userMsg,
+            failures,
+            probes,
+            refunded: alreadyRefunded ? 0 : totalCost,
+          },
+          422,
+        );
+      }
+      if (probes.length > 0) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v132_turn_visibility OK probes=${JSON.stringify(probes)}`,
+        );
+      }
+    }
+
+
     // Final safety fallback: evenly spaced along the horizontal midline so
     // 3+ speakers never collide on the same x.
     for (let i = 0; i < speakerCoords.length; i++) {
