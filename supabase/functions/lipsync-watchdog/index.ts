@@ -428,8 +428,39 @@ serve(async (req) => {
         `pred=${d.replicate_prediction_id}`,
       );
     } else if (hasJob && ageMs > STALE_PROVIDER_MS) {
+      // v131.8 — Pass-level liveness. Previously we measured Provider-Timeout
+      // gegen das Szenen-Alter (first_started_at). Bei 4-Sprecher-Szenen ist
+      // Pass 4 erst nach ~10-12 Minuten überhaupt dispatcht — der alte Code
+      // hat ihn nach <60s als "timeout" gekillt, obwohl er gesund lief.
+      // Neue Regel: solange irgendein aktiver Pass jünger als STALE_PROVIDER_MS
+      // ist, wartet der Watchdog. Nur wenn ALLE rendering-Passes älter als
+      // STALE_PROVIDER_MS sind (oder gar keiner mehr lebt), schlagen wir zu.
+      const passesForLiveness: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+      const renderingPasses = passesForLiveness.filter(
+        (p) => String(p?.status ?? "") === "rendering" && typeof p?.job_id === "string",
+      );
+      const youngestRenderingMs = renderingPasses.length === 0
+        ? Infinity
+        : Math.min(
+            ...renderingPasses.map((p) => {
+              const sa = typeof p?.started_at === "string" ? Date.parse(p.started_at) : NaN;
+              return Number.isFinite(sa) ? (now - sa) : Infinity;
+            }),
+          );
       const polledThisTick = polled.some((p) => p.scene_id === d.id);
-      if (!polledThisTick) reason = "watchdog_provider_timeout";
+      if (renderingPasses.length === 0) {
+        // Kein lebender Pass mehr — alter Pfad ist okay, aber wir geben uns
+        // dem v5-Fanout-Branch (unten) den Vortritt, der den dispatch_log
+        // gegencheckt. Hier kein Timeout setzen.
+      } else if (!polledThisTick && youngestRenderingMs > STALE_PROVIDER_MS) {
+        reason = "watchdog_provider_timeout";
+      } else if (renderingPasses.length > 0 && youngestRenderingMs <= STALE_PROVIDER_MS) {
+        console.log(
+          `[lipsync-watchdog] v131.8 pass-level wait scene=${d.id} ` +
+          `youngest_rendering_age=${Math.round(youngestRenderingMs / 1000)}s ` +
+          `rendering_passes=${renderingPasses.length} — skipping provider-timeout`,
+        );
+      }
     } else if (isV5Fanout && ageMs > 12 * 60_000) {
       const passes120: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
       const liveRendering = passes120.some((p) => {
