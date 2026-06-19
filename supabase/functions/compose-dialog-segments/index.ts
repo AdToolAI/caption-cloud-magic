@@ -4376,18 +4376,22 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
-      // v129.22.3 — Auto-snap path: rewrite ASD coords with the
-      // Rekognition-derived center and proceed to dispatch.
-      // v129.30 (2026-06-19) — HARD-OVERRIDE: previously we only patched
-      // `coordinates` while leaving `auto_detect: true` in place. The v124
-      // sync-3 sanitizer then stripped the coords back out, so Sync.so
-      // still received `{ auto_detect: true }` and ignored the snap —
-      // exactly matching the "Snap-Kandidat erkannt, noch nicht im
-      // Dispatch angewandt" forensic warning + the reported lip-sync
-      // failure. We now REPLACE the ASD with doc-strict point-ASD so the
-      // snap is the payload Sync.so actually receives.
+      // ── v130 — Post-Probe Snap as a Re-Invocation of the Same Strategy ──
+      // Previously (v129.22.3 → v129.30) the Face-Gate's `ok_after_snap`
+      // branch was an ad-hoc patch: it overwrote `syncOptions` and
+      // `payload.options` inline, with shape decisions duplicated from
+      // Block A. That created two sources of truth and was the root
+      // cause of "Snap-Kandidat erkannt, noch nicht im Dispatch
+      // angewandt" (v124 sanitizer stripping mismatched coords).
+      //
+      // v130 collapses this: when the gate snaps, we re-invoke the SAME
+      // `buildAsdStrategy` function with the snapped coord injected as a
+      // `preflight` input. The strategy returns mode `preflight_coord`
+      // with a doc-strict ASD — structurally identical to a fresh
+      // first-attempt dispatch where preflight had succeeded. Single
+      // source of truth, no shape drift possible.
       if (gate.ok && gate.code === "ok_after_snap" && Array.isArray(gate.snapped_coord)) {
-        const newCoord: [number, number] = [
+        const snappedCoord: [number, number] = [
           Number(gate.snapped_coord[0]),
           Number(gate.snapped_coord[1]),
         ];
@@ -4396,40 +4400,68 @@ serve(async (req) => {
           : (Number.isFinite((syncOptions as any)?.active_speaker_detection?.frame_number)
               ? Number((syncOptions as any).active_speaker_detection.frame_number)
               : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : 0));
-        const docStrictAsd: Record<string, unknown> = {
-          auto_detect: false,
-          frame_number: snapFrame,
-          coordinates: newCoord,
-        };
+
+        const snapStrategy = buildAsdStrategy({
+          preflight: {
+            faceFound: true,
+            coord: snappedCoord,
+            frame: snapFrame,
+            snapped: true,
+            originalCoord: (gate.original_coord ?? gateCoord ?? undefined) as
+              | [number, number]
+              | undefined,
+            snapDistancePx: gate.snap_distance_px ?? undefined,
+          },
+          geometry: {
+            preclipFaceCount: Number.isFinite(Number((pass as any).preclip_face_count))
+              ? Number((pass as any).preclip_face_count)
+              : null,
+            preclipAmbiguityRisk: null,
+            plateCoord: null,
+            preclipCrop: null,
+            asdFrameNumber: snapFrame,
+          },
+          retryVariant,
+          isMultiSpeaker: speakers.length >= 2,
+          usePreclip: usePassPreclip,
+        });
+
         try {
-          (syncOptions as any).active_speaker_detection = docStrictAsd;
+          syncOptions.active_speaker_detection = snapStrategy.asd;
           if ((payload as any)?.options) {
-            (payload as any).options.active_speaker_detection = { ...docStrictAsd };
+            (payload as any).options.active_speaker_detection = snapStrategy.asd;
           }
-          // Persist on the pass so subsequent retries see the corrected coord.
           if (!usePassPreclip) {
-            (pass as any).coords = newCoord;
+            (pass as any).coords = snappedCoord;
           } else {
-            (pass as any).dispatch_coords_snapped = newCoord;
+            (pass as any).dispatch_coords_snapped = snappedCoord;
           }
           (pass as any).coords_snapped_at = new Date().toISOString();
           (pass as any).coords_snap_origin = gate.original_coord ?? null;
           (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
           (pass as any).snap_applied_to_dispatch = true;
+          (pass as any)._v130_asd_strategy = {
+            mode: snapStrategy.mode,
+            source: snapStrategy.source,
+            coord_space: snapStrategy.coordSpace,
+            frame_number: snapStrategy.frameNumber,
+            re_strategy: true,
+            re_strategy_trigger: "face_gate_snap",
+          };
         } catch (mutErr) {
           console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v129.30 ASD coord mutation failed: ${(mutErr as Error)?.message}`,
+            `[compose-dialog-segments] scene=${sceneId} v130 ASD re-strategy mutation failed: ${(mutErr as Error)?.message}`,
           );
         }
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v129.30_snap_applied pass=${currentPassIdx + 1} ` +
-          `snapped=[${newCoord[0]},${newCoord[1]}] frame=${snapFrame} space=${usePassPreclip ? "preclip" : "plate"} ` +
-          `delta_px=${gate.snap_distance_px ?? "?"} — doc-strict ASD enforced`,
+          `[compose-dialog-segments] scene=${sceneId} v130_snap_via_strategy pass=${currentPassIdx + 1} ` +
+          `mode=${snapStrategy.mode} snapped=[${snappedCoord[0]},${snappedCoord[1]}] frame=${snapFrame} ` +
+          `space=${usePassPreclip ? "preclip" : "plate"} delta_px=${gate.snap_distance_px ?? "?"}`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_source_kind: "segments", video_url: dispatchVideoUrl,
-          coords: newCoord, frame_number: snapFrame,
+          coords: snappedCoord, frame_number: snapFrame,
           http_status: 0, sync_status: "COORD_AUTO_SNAPPED",
           error_class: "coord_auto_snap",
           error_message: (gate.reason ?? "auto_snapped").slice(0, 240),
@@ -4439,9 +4471,9 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
-              version: "v129.30",
+              version: "v130",
               code: gate.code,
-              snapped_coord: newCoord,
+              snapped_coord: snappedCoord,
               original_coord: gate.original_coord ?? gateCoord,
               snap_distance_px: gate.snap_distance_px ?? null,
               frame_jpeg_url: gate.frame_jpeg_url,
@@ -4449,11 +4481,17 @@ serve(async (req) => {
               gemini_ms: gate.gemini_ms,
             },
             snap_applied_to_dispatch: true,
-            asd_after_snap: docStrictAsd,
+            asd_strategy: {
+              mode: snapStrategy.mode,
+              source: snapStrategy.source,
+              coord_space: snapStrategy.coordSpace,
+              diagnostics: snapStrategy.diagnostics,
+            },
             source: "preflight-snap",
           },
         });
       }
+
       // Honest non-blocking signal: when the Lovable AI gateway can't probe
       // (extract failure or transient 5xx), log it but let the dispatch
       // through. The Forensik UI surfaces this clearly so we don't silently
