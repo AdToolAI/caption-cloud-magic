@@ -154,11 +154,16 @@ function transformPlateCoordToPreclip(
 }
 
 function isCoordsProRetry(variant: string | null): boolean {
+  // v131.3 — "coords-pro" is the fresh-default label and MUST NOT force
+  // strict coordinates on the preclip path. Sync.so reproducibly returns
+  // `generation_unknown_error` for the (coordinates, frame_number) tuple
+  // on preclips, even when the coord is on-face (confirmed 2026-06-19,
+  // scene b3e17a9d-… outbound payload `[360,363] @ frame 50`).
+  // Only true admin / explicit-coord retries remain coord-forcing here.
   return (
-    variant === "coords-pro" ||
     variant === "sync3-coords" ||
     variant === "coords-pro-lp2pro" ||
-    variant === "preflight-snap" // new in v130 — explicit snap-driven retry
+    variant === "preflight-snap" // explicit snap-driven retry (v130)
   );
 }
 
