@@ -1580,6 +1580,9 @@ serve(async (req) => {
                         notes: identityNotes || undefined,
                         at: new Date().toISOString(),
                       },
+                      // v131.6 — forensic trail per compose attempt.
+                      anchor_attempts:
+                        ((scene as any).__anchorAttempts as Array<Record<string, unknown>>) ?? [],
                     };
                     const { data: currentPlanRow } = await supabaseAdmin
                       .from("composer_scenes")
