@@ -1,157 +1,88 @@
+# Fix: Sync.so Preclip-Pass auf `auto_detect` als Primary-Pfad umstellen
+
+## Diagnose (aus Root-Cause Lab bestätigt)
+
+| Variante         | Ergebnis     | Relevanz für Prod |
+| ---------------- | ------------ | ----------------- |
+| `exact` (coords + frame_number) | FAILED — generation_unknown_error | **heutiger Default** |
+| `omit_sync_mode` | FAILED | trägt dieselben falschen Coords |
+| `auto_detect`    | **COMPLETED** | ✅ funktioniert |
+| `bboxes`         | **COMPLETED** | ✅ funktioniert, aber teurer (Upload pro Pass) |
+| `lipsync_2_pro`  | FAILED | nicht in der Pipeline, ignorieren |
+
+**Klare Schlussfolgerung:** Das `(coordinates, frame_number)`-Tupel ist die einzige Ursache. Sync.so kommt mit Asset, Audio und Crop einwandfrei klar, sobald es das Gesicht selbst suchen darf. Da unser Preclip per Konstruktion bereits ein **Single-Face Square-Crop** ist (v69-Unified, siehe `mem/architecture/lipsync/v69-unified-single-face-preclip.md`), gibt es im Bild gar keine Ambiguität, die wir per Coords disambiguieren müssten.
+
+→ `auto_detect: true` ist auf dem Preclip-Pass nicht nur sicher, sondern strukturell **korrekter** als unsere selbst gerechneten Coords.
+
 ## Ziel
 
-Nicht weiter an Face-Detection-Symptomen drehen. Wir isolieren die echte Ursache des `generation_unknown_error`, indem wir dieselben fehlgeschlagenen Assets kontrolliert mit Varianten erneut testen und die Unterschiede beweisbar loggen.
-
-Wichtig: Ich kenne kein externes/geheimes Referenzprojekt außerhalb dieses Projekts. Was wir aber haben, ist diese konkrete Pipeline, echte Dispatch-Logs und die fehlgeschlagenen Szenen. Daraus bauen wir jetzt eine belastbare Forensik.
-
-## Beobachtung aus den aktuellen Daten
-
-Bei den zwei aktuellen Szenen ist der harte Fehler nicht `no_face`, sondern Sync.so selbst:
-
-- `33427056-3a18-4685-b975-7f611f069751`
-- `ec23f623-bca0-42f0-a7d3-5e0d84cdd407`
-
-Beide wurden mit ungefähr diesem Muster geschickt:
-
-```text
-model: sync-3
-sync_mode: cut_off
-video: dialog-pass-preclip-...mp4
-audio: ...pass-1-tight-...wav
-active_speaker_detection:
-  auto_detect: false
-  coordinates: [360, 360]
-  frame_number: 3 oder 52
-provider result: FAILED / Something went wrong while processing this generation
-```
-
-Auffällig:
-
-- Es ist der erste Sprecher/erste Pass, nicht vier fertige Speaker-Pässe.
-- Die echte Provider-Antwort ist generisch, deshalb müssen wir über A/B-Replays herausfinden, ob Audio, Preclip, Frame-Anchor, ASD-Koordinaten, Codec oder `sync-3 + coords` der Auslöser ist.
-- Die bisherigen Logs speichern noch zu wenig technische Messwerte (`audio_dur_sec`, `audio_peak_dbfs` etc. sind bei diesen Zeilen leer), also fehlt genau die Evidenz, die wir brauchen.
+`auto_detect: true` wird der **Primary-Pfad** für den Preclip-Pass. Coords/Frame-Anchor werden nur noch als kontrollierter Fallback gefahren, falls `auto_detect` mal scheitert.
 
 ## Plan
 
-### 1. Failed-Scene Snapshot vervollständigen
+### 1. ASD-Strategy-Builder umpolen
 
-Für fehlgeschlagene Dialog-Szenen wird ein vollständiger technischer Snapshot gespeichert:
+In `_shared/asd-strategy.ts` (siehe `.lovable/mem/architecture/lipsync/asd-strategy-single-source-builder-v130.md`):
 
-- Provider-Payload exakt wie gesendet
-- Video-URL, Audio-URL
-- Video-Dauer, Auflösung, FPS, Codec, Framecount
-- Audio-Dauer, Sample-Rate, Kanäle, Peak/RMS, Voice-Window-Länge
-- Audio-vs-Video-Differenz
-- Preclip-Crop-Daten und Preclip-Dimensionen
-- ASD-Frame und ASD-Koordinaten
-- ob Koordinaten in Plate- oder Preclip-Space liegen
-- Face-Probe-Status getrennt nach `plate` und `preclip`
+- Neue **Rule 0 (höchste Priorität)** für den Preclip-Pass: 
+  - Wenn `context === 'preclip'` und der Preclip ein verifizierter Single-Face-Crop ist (v69-Pfad, `preclip_face_count === 1`, `preclip_ambiguity === false`) → Strategy = `auto_detect`.
+- Die bisherigen Rules 1–5 (Coords aus Plate, Snap-to-Preclip, BBox-URL etc.) rutschen eine Ebene tiefer und gelten nur noch, wenn Rule 0 nicht greift oder als Fallback explizit angefordert wird.
+- Unit-Tests in `_shared/asd-strategy.test.ts` ergänzen:
+  - Single-Face-Preclip → `auto_detect`
+  - Ambiguer Preclip → unverändert Coords-Pfad
+  - Multi-Face Plate (non-preclip) → unverändert wie bisher
 
-Damit hört das Rätselraten auf: Jede Failure-Zeile muss erklären, was Sync.so wirklich bekommen hat.
+### 2. Payload-Bereinigung in `compose-dialog-segments`
 
-### 2. Sync.so Replay-Lab für kontrollierte A/B-Tests bauen
+- Wenn Strategy `auto_detect`: 
+  - `active_speaker_detection: { auto_detect: true }`
+  - **keine** `coordinates`, **kein** `frame_number`, **kein** `bounding_boxes_url` im Payload.
+- Sicherstellen, dass der v124 sync-3 Sanitizer keine alten Felder wieder reinmischt (Test hinzufügen).
+- `sync_mode: 'cut_off'` bleibt unverändert (das war nie das Problem, `omit_sync_mode` ist nur fehlgeschlagen, weil es dieselben falschen Coords trug).
 
-Ein admin/debug-only Replay-Pfad testet dieselben Assets der fehlgeschlagenen Szene mit einer kleinen Varianten-Matrix. Kein breites Retry-Chaos, sondern exakt isolierte Experimente.
+### 3. Fallback-Ladder (klein halten)
 
-Varianten:
+Wenn `auto_detect` auf einem konkreten Pass `generation_unknown_error` liefert (selten, aber möglich z. B. bei sehr dunklem Frame):
 
-```text
-A  original payload
-   preclip + tight audio + sync-3 + coords + original frame
+1. **Pass 2:** `bounding_boxes_url` aus den face-probe Frames bauen und hochladen (`bboxes`-Pfad, im Replay-Lab grün).
+2. **Pass 3:** Voller Plate ohne Preclip (bestehender v69-Fallback).
 
-B  frame anchor changed
-   same video/audio, but frame_number = safe mid-frame with visible face
+Coords + frame_number werden **nicht** mehr als Fallback genutzt — sie waren der Trigger der Failures.
 
-C  audio trimmed/normalized
-   same video/frame, but audio trimmed to voiced window and normalized
+### 4. Preflight & Logging
 
-D  audio duration matched to video
-   same video/frame, but audio length <= preclip duration or explicit cut_off-safe window
+- `v1291` Preflight-Guard:
+  - Neuer Block: bei Strategy `auto_detect` muss `preclip_face_count === 1` und `preclip_ambiguity === false` sein, sonst → Strategy-Downgrade auf `bboxes`.
+  - Bestehender `auto_detect_with_ambiguous_crop` Guard bleibt (greift jetzt nur noch im Multi-Face-Plate-Fall).
+- `syncso_dispatch_log` Felder erweitern:
+  - `asd_mode_chosen` (`auto_detect` | `coords` | `bboxes` | `plate_fallback`)
+  - `asd_rule_fired` (`rule_0_preclip_single_face` | …)
+  - `preclip_single_face_verified` (bool)
 
-E  ASD mode changed
-   same video/audio, but auto_detect:true on clean single-face preclip
+### 5. Forensics & Replay-Lab
 
-F  source changed
-   master plate instead of preclip, same speaker coordinate transformed correctly
+- `SyncsoForensicsSheet` Diagnose-Tab zeigt `asd_mode_chosen` + `asd_rule_fired` prominent.
+- `syncReplayClassify` bekommt zusätzlichen Verdict-Zweig `legacy_coords_pre_v131` → wenn `auto_detect` grün und `exact` rot war und der Dispatch vor Deploy v131 lag → markiert als „behoben durch v131".
+- Replay-Lab bleibt 5-Varianten; `lipsync_2_pro` wird im UI als „Diagnostik, nicht prod-relevant" gekennzeichnet (Tooltip), damit künftige Reads das richtig einordnen.
 
-G  codec normalization
-   re-encoded preclip/audio with conservative settings, same semantic content
-```
+### 6. Verifikation
 
-Each run logs:
+- Nach Deploy: Replay-Lab erneut für `33427056…` und `ec23f623…` → der echte Prod-Dispatch (`exact` aus dem Live-Pfad) muss jetzt COMPLETED liefern.
+- 24h Canary: Anteil `provider_unknown_error` auf Preclip-Passes vor/nach Deploy. Erwartet: < 1 %.
+- Cost-Check: `auto_detect` ist kein zusätzlicher Sync.so-Call, also netto **gleich teuer** wie `exact` (ohne unsere Coords-Compute-Kosten). `bboxes`-Fallback nur bei Fehlern, also marginal.
 
-- submitted payload hash
-- provider job id
-- provider status/error
-- output duration/url when successful
-- changed variable compared to original
-- pass/fail classification
+## Technische Notizen
 
-### 3. Root-cause classifier statt generischem `other`
+- Änderungen ausschließlich in:
+  - `supabase/functions/_shared/asd-strategy.ts` (Rule 0 + Tests)
+  - `supabase/functions/compose-dialog-segments/index.ts` (Payload-Bereinigung, Fallback-Ladder, Preflight, Logging)
+  - `src/components/admin/SyncsoForensicsSheet.tsx` (neue Felder anzeigen, lipsync_2_pro-Tooltip)
+  - `src/lib/syncReplayClassify.ts` (neuer Verdict-Zweig)
+- Keine Schema-Migration nötig (neue Felder gehen in bestehendes `payload` JSONB).
+- Memory-Update nach Deploy: `mem://architecture/lipsync/v131-auto-detect-primary-on-preclip.md` mit Verweis auf v69 (Single-Face-Preclip-Garantie) als Vorbedingung.
 
-Wenn ein Replay-Ergebnis zurückkommt, wird es automatisch eingeordnet:
+## Was bewusst NICHT geändert wird
 
-```text
-original fails + mid-frame passes
-=> root cause: bad/unsafe frame anchor
-
-original fails + audio-trim passes
-=> root cause: audio/video duration or silence/voiced-window mismatch
-
-original fails + auto_detect passes
-=> root cause: sync-3 coords/ASD incompatibility on preclip
-
-original fails + normalized codec passes
-=> root cause: preclip/audio container or codec issue
-
-all variants fail
-=> root cause likely provider-side incompatibility with generated plate/preclip; production fallback must avoid this provider path for that asset class
-```
-
-### 4. Nur den bewiesenen Produktionsfix einbauen
-
-Erst nach den Replay-Ergebnissen wird der eigentliche Fix gesetzt:
-
-- Bei Frame-Ursache: nie Frame `3`/Randframes verwenden; nur validierte Mid-Frames mit sichtbarem Gesicht.
-- Bei Audio-Ursache: tight audio auf voiced window trimmen/normalisieren und Länge an Preclip/`cut_off` anpassen.
-- Bei ASD-Ursache: für saubere Single-Face-Preclips `auto_detect:true` oder dokumentiert stabile Variante statt `coords-pro` verwenden.
-- Bei Codec-Ursache: Preclip/audio vor Sync.so immer konservativ re-encoden.
-- Bei Provider-Inkompatibilität: deterministischer Fallback-Pfad statt blindem Retry derselben Variante.
-
-### 5. Forensik-False-Positives separat entschärfen
-
-Parallel, aber nicht als Hauptfix:
-
-- `no_face` darf nicht mehr als harte Ursache angezeigt werden, wenn `preclip_face_count=1` bereits validiert wurde.
-- Anzeige unterscheidet klar:
-  - `provider_failed`
-  - `face_probe_unavailable`
-  - `probe_inconclusive`
-  - `real_no_face`
-- Die Forensics-Sheet zeigt, ob die Prüfung auf Plate oder Preclip lief.
-
-### 6. Stop-Loss gegen Kosten und Endlosschleifen
-
-Der Replay-Pfad bekommt harte Grenzen:
-
-- nur admin/debug
-- nur für eine konkrete failed scene
-- kleine maximale Variantenzahl
-- jeder Provider-Call wird mit Variante und Kostenabsicht geloggt
-- keine automatische breite Fanout-Wiederholung
-- Refund bleibt idempotent für echte Produktionsfehler
-
-## Ergebnis nach Umsetzung
-
-Nach der Umsetzung können wir für eine fehlgeschlagene Szene sagen:
-
-```text
-Die Ursache war nicht allgemein “Face Detection”, sondern exakt:
-- Frame-Anchor, oder
-- Audio/Video-Längenmismatch, oder
-- Sync-3 ASD-Mode, oder
-- Codec/Container, oder
-- Provider-Inkompatibilität mit dieser Preclip-Klasse.
-```
-
-Dann wird nur dieser bewiesene Pfad produktiv geändert, statt weiter blind an der Pipeline zu drehen.
+- `lipsync_2_pro` bleibt aus der Pipeline. Im Replay-Lab dient es nur als Provider-Vergleich.
+- Coords-Berechnung & Snap-to-Preclip bleiben als Code-Pfade für den Nicht-Preclip / Multi-Face-Plate Fall erhalten.
+- v69 Single-Face-Preclip-Rendering bleibt unverändert — Voraussetzung für Rule 0.
