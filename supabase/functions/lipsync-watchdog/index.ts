@@ -455,6 +455,75 @@ serve(async (req) => {
     }
     if (!reason) return;
 
+    // ── v131.7 — Auto-Retry on watchdog_provider_timeout (one shot) ──────
+    // Sync.so returnt manchmal HTTP 201 + job_id, liefert dann aber 10 min
+    // lang nichts (Webhook + Polling beide leer). Vor v131.7 hieß das
+    // sofort terminal-fail + refund. v131.7: 1× automatischer Re-Dispatch
+    // (Job cancellen, Slot freigeben, `lip_sync_status='pending'` +
+    // `twoshot_stage='master_clip'` → useTwoShotAutoTrigger picks it up).
+    // Erhöht die End-to-end-Erfolgsquote bei flaky Sync.so deutlich, ohne
+    // dass der User den roten "Re-Render"-Button drücken muss.
+    if (reason === "watchdog_provider_timeout") {
+      const prevRetries = Number(ds?.watchdog_retries ?? 0);
+      if (prevRetries < 1) {
+        try {
+          // Best-effort: bestehenden Sync.so-Job cancellen, damit kein
+          // Geist-Webhook später noch den frischen Run überschreibt.
+          const liveJobs: string[] = [];
+          if (typeof d.replicate_prediction_id === "string" && d.replicate_prediction_id.startsWith("sync:")) {
+            liveJobs.push(d.replicate_prediction_id.slice("sync:".length));
+          }
+          const passes: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+          for (const p of passes) if (p?.job_id) liveJobs.push(String(p.job_id));
+          for (const jid of new Set(liveJobs)) {
+            try {
+              await fetch(`${SYNC_API_BASE}/generations/${jid}/cancel`, {
+                method: "POST",
+                headers: { "x-api-key": syncApiKey },
+              });
+              await releaseInflightSyncJob(supabase, jid).catch(() => {});
+            } catch { /* tolerate */ }
+          }
+
+          await supabase
+            .from("composer_scenes")
+            .update({
+              lip_sync_status: "pending",
+              twoshot_stage: "master_clip",
+              clip_error: `watchdog_auto_retry_${prevRetries + 1}_of_1`,
+              replicate_prediction_id: null,
+              dialog_shots: {
+                ...(ds || {}),
+                watchdog_retries: prevRetries + 1,
+                watchdog_retry_at: new Date().toISOString(),
+                // passes-Liste leeren, damit advance-dispatch oben (2)
+                // beim nächsten Tick einen sauberen pass=0 macht.
+                passes: [],
+                recovery_dispatched_at: null,
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", d.id);
+
+          console.log(
+            `[lipsync-watchdog] v131.7 auto-retry scene=${d.id} ` +
+            `prev_retries=${prevRetries} → reset to pending (dispatch-recovery wird nächsten Tick anwerfen)`,
+          );
+          advanced.push({ scene_id: d.id, pass_idx: -2 });
+          return; // skip failLipSync
+        } catch (e) {
+          console.warn(
+            `[lipsync-watchdog] v131.7 auto-retry crash scene=${d.id}: ${(e as Error).message} — falling through to hard fail`,
+          );
+        }
+      } else {
+        console.log(
+          `[lipsync-watchdog] v131.7 auto-retry budget exhausted scene=${d.id} ` +
+          `(prev_retries=${prevRetries}) — proceeding with terminal failLipSync`,
+        );
+      }
+    }
+
     const uid = await userIdForProject(supabase, d.project_id);
     const refundCredits = Number(d.dialog_shots?.cost_credits) || 0;
     await failLipSync({
