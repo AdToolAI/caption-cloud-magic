@@ -5319,6 +5319,9 @@ serve(async (req) => {
         ? Number((syncOptions as any).active_speaker_detection.frame_number)
         : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : null),
       window_start_sec: 0, window_end_sec: totalSec,
+      // v134 §3 — Populate dedicated turn_idx column so SQL forensics no longer
+      // requires pulling pass_idx out of meta JSON.
+      turn_idx: Number.isFinite(currentPassIdx) ? Number(currentPassIdx) : null,
       http_status: resp.status, sync_status: "DISPATCHED",
       meta: {
         // v131.5 — version pin for forensic attribution
