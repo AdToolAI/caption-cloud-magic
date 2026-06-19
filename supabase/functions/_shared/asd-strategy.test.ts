@@ -50,10 +50,30 @@ Deno.test("Rule 0 (v131) — multi-speaker scene with verified single-face crop 
   assertEquals(r.diagnostics.rule, "rule_0_preclip_single_face_verified");
 });
 
-Deno.test("Rule 0 (v131) — explicit coords-pro retry bypasses Rule 0 → Rule 1/3 still works", () => {
+Deno.test("Rule 0 (v131.3) — coords-pro is the fresh-default label and NO LONGER forces strict coords; preflight still wins (Rule 1 below Rule 0 only fires when Rule 0 ineligible)", () => {
+  // With v131.3, coords-pro on the preclip path flows through Rule 0
+  // → auto_detect:true (even when preflight has a coord, because Rule 0
+  // comes before Rule 1 in the strategy order). This is the entire
+  // point of the fix: stop sending `[x,y]+frame_number` payloads that
+  // Sync.so reproducibly rejects with generation_unknown_error.
   const r = buildAsdStrategy(
     input({
       retryVariant: "coords-pro",
+      preflight: {
+        faceFound: true,
+        coord: [360, 360],
+        frame: 7,
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
+});
+
+Deno.test("Rule 0 (v131.3) — explicit sync3-coords retry STILL bypasses Rule 0 → preflight (Rule 1) fires", () => {
+  const r = buildAsdStrategy(
+    input({
+      retryVariant: "sync3-coords",
       preflight: {
         faceFound: true,
         coord: [360, 360],
