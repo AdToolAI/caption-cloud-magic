@@ -222,23 +222,59 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
     // through to remaining rules with a diagnostic.
   }
 
-  // ── Rule 0 (v131): Verified single-face preclip → auto_detect PRIMARY.
+  // ── Rule 0 (v131 + v131.1): Preclip → auto_detect PRIMARY.
   // Empirically (Replay-Lab 2026-06-19) sync-3 fails with
   // `generation_unknown_error` on the (coordinates, frame_number) tuple
   // even when the coord is on-face, while `auto_detect:true` and
   // `bounding_boxes_url` both succeed on the SAME asset. Since v69 the
   // preclip is by construction a single-face square crop, so there is no
   // ambiguity to disambiguate — Sync.so's own detector is the safer
-  // primary path. Coord/frame paths remain available as explicit retry
-  // fallbacks (coords-pro / bbox-url retry variants).
+  // primary path.
+  //
+  // v131.1 — Rule 0 also fires when:
+  //   - the face probe is unavailable (`preclipFaceCount === null`), or
+  //   - the preclip carries explicit "verified" trust from the upstream
+  //     face-center pipeline (preclip-validated / v116 face-gate).
+  // In both cases we have no positive evidence AGAINST auto_detect,
+  // and the legacy coord/frame fallback is exactly the path that
+  // reproduces `generation_unknown_error` in production.
+  //
+  // Hard gates that still block Rule 0:
+  //   - Multi-speaker scene without verified single-face crop → coords/bbox needed
+  //   - Ambiguity risk "neighbor_inside_crop" → bbox needed (Rule 3)
+  //   - Explicit coords-pro / bbox retry variants → caller intent
+  const preclipTrust = geometry.preclipTrust ?? "unknown";
+  const ambiguityBlocks =
+    geometry.preclipAmbiguityRisk === "neighbor_inside_crop";
+  const multiFaceBlocks =
+    typeof geometry.preclipFaceCount === "number" &&
+    geometry.preclipFaceCount > 1;
+  const hasPositiveTrust =
+    (geometry.preclipFaceCount === 1 &&
+      geometry.preclipAmbiguityRisk === "clean") ||
+    geometry.preclipFaceCount === null ||
+    preclipTrust === "verified" ||
+    preclipTrust === "probe-confirmed";
+
   const rule0Eligible =
     usePreclip &&
     !isCoordsProRetry(retryVariant) &&
     !isBboxRetry(retryVariant) &&
-    geometry.preclipFaceCount === 1 &&
-    geometry.preclipAmbiguityRisk === "clean";
+    !ambiguityBlocks &&
+    !multiFaceBlocks &&
+    hasPositiveTrust;
 
   if (rule0Eligible) {
+    const ruleName =
+      geometry.preclipFaceCount === 1 &&
+      geometry.preclipAmbiguityRisk === "clean"
+        ? "rule_0_preclip_single_face_verified"
+        : preclipTrust === "verified"
+        ? "rule_0_preclip_verified"
+        : geometry.preclipFaceCount === null
+        ? "rule_0_preclip_probe_unavailable"
+        : "rule_0_preclip_probe_confirmed";
+
     return {
       mode: "single_face_auto",
       asd: { auto_detect: true },
@@ -246,13 +282,13 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
       coordSpace: "none",
       source: "default",
       diagnostics: {
-        rule: "rule_0_preclip_single_face_verified",
+        rule: ruleName,
         retry_variant: retryVariant,
         is_multi_speaker_scene: isMultiSpeaker,
         face_count_in_crop: geometry.preclipFaceCount,
         ambiguity_risk: geometry.preclipAmbiguityRisk,
-        preclip_single_face_verified: true,
-        reason: "v131_auto_detect_primary_on_verified_single_face_preclip",
+        preclip_trust: preclipTrust,
+        reason: "v131_1_auto_detect_primary_on_preclip",
         had_preflight_coord: !!(preflight?.faceFound && preflight.coord),
       },
     };
@@ -265,6 +301,7 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
   if (preflight?.faceFound && Array.isArray(preflight.coord)) {
     const frame = Number.isFinite(preflight.frame)
       ? Number(preflight.frame)
+
       : geometry.asdFrameNumber;
     return {
       mode: "preflight_coord",
