@@ -1598,6 +1598,7 @@ serve(async (req) => {
                       syncJobs: _staleSyncJobs,
                       heartbeat: _staleHeartbeat,
                       anchor_face_audit: _oldAnchorAudit,
+                      anchor_attempts: _oldAnchorAttempts,
                       ...twoshotWithoutAnchorDerivedState
                     } = (baseAudioPlan.twoshot ?? {}) as Record<string, any>;
                     await supabaseAdmin
