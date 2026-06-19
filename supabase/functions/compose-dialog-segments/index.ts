@@ -3512,6 +3512,30 @@ serve(async (req) => {
          retryVariant === "sync3-coords" ||
          retryVariant === "coords-pro-lp2pro") &&
         isRetry === true && plateCoords && cropOk;
+
+      // v129.27 — Clamp ASD frame_number to the PRECLIP frame range.
+      // `referenceFrameNumber` was computed against the original plate
+      // timeline (e.g. f=47 inside a 9s scene at 30fps). The preclip is a
+      // much shorter independent video (e.g. 33 frames). Sending the plate
+      // frame to Sync.so against the preclip put the ASD probe far past
+      // EOS → Face-Gate `no_face` → Sync.so `generation_unknown_error`.
+      // Always compute the preclip-relative frame from preclip_duration_sec
+      // and clamp into [0, preclipFrameCount-1]; prefer the mid frame as a
+      // stable visible anchor.
+      const preclipDurSec = Number((pass as any).preclip_duration_sec);
+      const preclipFrameCount =
+        Number.isFinite(preclipDurSec) && preclipDurSec > 0
+          ? Math.max(1, Math.round(preclipDurSec * 30))
+          : null;
+      const safeMidFrame = preclipFrameCount
+        ? Math.max(0, Math.min(preclipFrameCount - 1, Math.floor(preclipFrameCount / 2)))
+        : 0;
+      const rawRefFrame = refFrame;
+      const refFrameInPreclipRange =
+        preclipFrameCount === null ||
+        (rawRefFrame >= 0 && rawRefFrame < preclipFrameCount);
+      const preclipAsdFrame = refFrameInPreclipRange ? rawRefFrame : safeMidFrame;
+
       let coordsProInBounds = false;
       if (coordsProRetry) {
         const cx = Number(crop.x);
@@ -3533,7 +3557,10 @@ serve(async (req) => {
           transformed_coords_float: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
           transformed_coords_int: [xInt, yInt],
           in_bounds: inBounds,
-          frame_number: refFrame,
+          frame_number: preclipAsdFrame,
+          raw_reference_frame: rawRefFrame,
+          preclip_frame_count: preclipFrameCount,
+          frame_source: refFrameInPreclipRange ? "reference_frame_in_range" : "clamped_to_preclip_mid_v12927",
           retry_variant: retryVariant,
         };
         (pass as any)._v1291 = v1291Diag;
@@ -3545,10 +3572,20 @@ serve(async (req) => {
         const yInt = (v1291Diag as any).transformed_coords_int[1];
         syncOptions.active_speaker_detection = {
           auto_detect: false,
-          frame_number: refFrame,
+          frame_number: preclipAsdFrame,
           coordinates: [xInt, yInt],
         };
-        asdMode = "coords_pro_preclip_v12926";
+        asdMode = refFrameInPreclipRange
+          ? "coords_pro_preclip_v12926"
+          : "coords_pro_preclip_v12927_clamped";
+      } else if (coordsProRetry && !coordsProInBounds && preclipUnambiguous) {
+        // v129.27 — coords-pro requested but the transformed coord falls
+        // outside the preclip crop. Dispatching it would either crash
+        // Sync.so or animate the wrong region. Since the preclip itself
+        // is provably clean, fall back to the safe auto_detect path
+        // instead of sending bad coordinates.
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        asdMode = "auto_detect_coords_pro_oob_fallback_v12927";
       } else if (preclipUnambiguous) {
         // Single-face preclip → ASD coords/bboxes are harmful on Sync.so.
         // Use auto_detect:true regardless of scene-level multi-speaker flag.
