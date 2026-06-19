@@ -1274,6 +1274,112 @@ serve(async (req) => {
       );
     }
 
+    // ── v133 — Identity-Ambiguity Hard-Fail (3+ speakers) ───────────────
+    // Per-character probe + Hungarian assignment runs inside
+    // resolvePlateFaceIdentities for N≥3. If the resulting mapping is
+    // ambiguous (min-confidence < 0.55 OR margin < 0.15) AND the cross-
+    // check Gemini call could neither confirm nor pinpoint a single swap,
+    // refuse to dispatch — the alternative is a voice-swap (e.g. char 1
+    // speaks with char 4's voice). Refund and surface a clear message.
+    if (
+      !isAdvance &&
+      !isRetry &&
+      speakers.length >= 3 &&
+      plateIdentityMap &&
+      (plateIdentityMap as any).ambiguous === true
+    ) {
+      const minConf = Number((plateIdentityMap as any).minConfidence ?? 0);
+      const minMar = Number((plateIdentityMap as any).minMargin ?? 0);
+      const method = String((plateIdentityMap as any).identityMethod ?? "unknown");
+      const xc = String((plateIdentityMap as any).crossCheck ?? "skipped");
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} v133_identity_ambiguous method=${method} minConf=${minConf.toFixed(2)} minMargin=${minMar.toFixed(2)} crossCheck=${xc} — refunding ${totalCost} credits`,
+      );
+      await failLipSync({
+        supabase,
+        sceneId,
+        reason: "identity_ambiguous_multi_speaker",
+        userId,
+        refundCredits: totalCost,
+        syncApiKey,
+      });
+      const userMsg =
+        `Lip-Sync wurde nicht gestartet: Die Charaktere auf dem gerenderten Scene-Clip ` +
+        `sind nicht eindeutig voneinander unterscheidbar (Identitäts-Confidence ${(minConf * 100).toFixed(0)}%, Margin ${(minMar * 100).toFixed(0)}%). ` +
+        `Eine automatische Zuweisung birgt das Risiko, dass Stimmen vertauscht werden. ` +
+        `Bitte die Szene neu rendern — mit deutlich unterschiedlichen Posen, Kleidung oder Kamera-Winkeln pro Charakter, sodass jede Person klar identifizierbar ist. ` +
+        `Credits wurden vollständig zurückerstattet.`;
+      try {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: 0,
+              refunded: true,
+              error: `v133_identity_ambiguous:method=${method},minConf=${minConf.toFixed(2)},minMargin=${minMar.toFixed(2)},crossCheck=${xc}`,
+              v133_identity_audit: {
+                method,
+                minConfidence: minConf,
+                minMargin: minMar,
+                crossCheck: xc,
+                resolvedCount: plateIdentityMap.resolvedCount,
+                faces: plateIdentityMap.faces.length,
+                scoreMatrix: (plateIdentityMap as any).scoreMatrix ?? null,
+              },
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "needs_clip_rerender",
+            clip_status: "pending",
+            clip_url: null,
+            lip_sync_source_clip_url: null,
+            clip_error: userMsg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+      } catch (_) { /* best-effort */ }
+      try {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId,
+          engine: "sync-segments",
+          sync_status: "PREFLIGHT_BLOCKED",
+          error_class: "v133_identity_ambiguous",
+          error_message: `method=${method} minConf=${minConf} minMargin=${minMar} crossCheck=${xc}`,
+          meta: {
+            speakers: speakers.length,
+            plate_dims: plateDims,
+            plate_url: sourceClipUrl,
+            refunded_credits: totalCost,
+            identity_method: method,
+            min_confidence: minConf,
+            min_margin: minMar,
+            cross_check: xc,
+            score_matrix: (plateIdentityMap as any).scoreMatrix ?? null,
+            note:
+              "v133 Identity-Gate: per-character probe + Hungarian assignment returned ambiguous mapping; cross-check could not resolve. Refusing dispatch to prevent voice-swap.",
+          },
+        });
+      } catch (_) { /* best-effort */ }
+      return json(
+        {
+          error: "v133_identity_ambiguous",
+          message: userMsg,
+          identity_method: method,
+          min_confidence: minConf,
+          min_margin: minMar,
+          cross_check: xc,
+          refunded: totalCost,
+        },
+        422,
+      );
+    }
+
+
+
     // ── v117 — Plate-Quality Gate (soft) for N≥3 ─────────────────────────
     // v116 blocked whenever Gemini Vision failed to *resolve* identities
     // even when all faces were physically present, producing false-positive
