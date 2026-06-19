@@ -3877,25 +3877,12 @@ serve(async (req) => {
     // stills where lipsync-2-pro's "Still Frame Limitation" silently fails.
     // sync-3 handles both static and motion plates natively. lipsync-2-pro
     // remains reachable only via the explicit `coords-pro-lp2pro` fallback.
-    // v129.28 — clean-preclip coords-pro retry overrides any other model
-    // choice and forces lipsync-2 + auto_detect:true (set above). This
-    // breaks the sync-3 NOOP→generation_unknown_error loop documented in
-    // the v129.26/v129.27 comment blocks.
-    const forceLipsync2Fallback =
-      (pass as any)._force_lipsync2_clean_preclip_retry_v12928 === true;
-    const payloadModel = forceLipsync2Fallback
-      ? LIPSYNC_FALLBACK_MODEL
-      : usePassPreclip
-      ? SYNC3_MODEL
-      : retryVariant === "sync3-coords"
-        ? SYNC3_MODEL
-        : retryVariant === "auto-standard"
-          ? LIPSYNC_FALLBACK_MODEL
-          : retryVariant === "coords-pro-lp2pro"
-            ? LIPSYNC_MODEL
-            : (retryVariant === "coords-pro" || retryVariant === "coords-pro-box")
-              ? SYNC3_MODEL
-              : SYNC3_MODEL;
+    // v129.29 — SYNC-3-ONLY policy (user-directive 2026-06-19).
+    // All dialog-shot passes dispatch on sync-3, regardless of retry
+    // variant. lipsync-2 / lipsync-2-pro fallbacks are disabled for this
+    // pipeline. Retry differentiation happens via ASD shape
+    // (auto_detect → bbox-url → expanded-crop-auto), not via model swap.
+    const payloadModel = SYNC3_MODEL;
 
     const failBeforeProviderDispatch = async (
       reason: string,
