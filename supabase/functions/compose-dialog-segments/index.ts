@@ -3452,6 +3452,119 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} siblings=${siblingCoordsForPass.length} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
       );
 
+      // ── v135 — Pre-Crop Coord Snap ─────────────────────────────────────
+      // Forensik der v107_preclip_required_for_multispeaker Fails zeigte:
+      // ASD-Coord [301,171] lag daneben, Rekognition fand 1 Gesicht auf
+      // der Plate, aber der 228×228-Crop um die FALSCHE Coord schnitt das
+      // echte Gesicht weg → Face-Gate sah 0 Gesichter → Hard-Fail.
+      //
+      // Die Snap-Logik (v129.22.3 in syncso-face-gate.ts) griff erst beim
+      // Sync.so-Dispatch, also NACH dem kaputten Preclip-Render. Wir
+      // verschieben sie nach VORNE: Rekognition läuft auf der Plate vor
+      // dem Crop, korrigiert die Coord, der Crop landet auf dem Gesicht.
+      //
+      // Frame-URL Quelle: plate-face-identity hat die Plate bereits via
+      // `faceMap.frame_url` extrahiert (für Cast-Identifizierung). Wir
+      // re-usen genau diese URL — kein zusätzlicher Extraktion-Call.
+      try {
+        const plateFrameUrl: string | null =
+          (typeof (pass as any).probe_frame_url === "string" && (pass as any).probe_frame_url) ||
+          (typeof (faceMap as any)?.frame_url === "string" && (faceMap as any).frame_url) ||
+          null;
+        const haveCoords =
+          Array.isArray(pass.coords) &&
+          Number.isFinite(Number(pass.coords?.[0])) &&
+          Number.isFinite(Number(pass.coords?.[1]));
+        if (plateFrameUrl && haveCoords && plateDims?.width && plateDims?.height) {
+          const snapT0 = Date.now();
+          const W = plateDims.width;
+          const H = plateDims.height;
+          const cx = Number(pass.coords[0]);
+          const cy = Number(pass.coords[1]);
+          const probe = await detectFacesMediaPipe({
+            videoUrl: sourceClipUrl,
+            plateWidth: W,
+            plateHeight: H,
+            durationSec: 1,
+            prebuiltFrameUrls: [plateFrameUrl],
+          });
+          if (probe.ok && probe.faces.length > 0) {
+            // Nearest-neighbour: even on multi-face plates, pick the
+            // Rekognition face nearest to the original ASD coord — that
+            // is the speaker the ASD pipeline intended to target.
+            let bestFace = probe.faces[0];
+            let bestDist = Math.hypot(bestFace.center[0] - cx, bestFace.center[1] - cy);
+            for (let i = 1; i < probe.faces.length; i++) {
+              const f = probe.faces[i];
+              const d = Math.hypot(f.center[0] - cx, f.center[1] - cy);
+              if (d < bestDist) {
+                bestDist = d;
+                bestFace = f;
+              }
+            }
+            const dist = Math.round(bestDist);
+            const fx = bestFace.center[0];
+            const fy = bestFace.center[1];
+            // Safe-zone: face center must lie inside 5%-95% of the plate.
+            // Outside → likely background artefact; refuse to snap.
+            const inBounds =
+              fx >= W * 0.05 && fx <= W * 0.95 &&
+              fy >= H * 0.05 && fy <= H * 0.95;
+            // Distance bands:
+            //   ≤60px: no snap needed (within Rekognition jitter).
+            //   60..200px: snap (this rescues the v107 fail mode).
+            //   >200px: too far — likely wrong face / background hit.
+            if (!inBounds) {
+              (pass as any).coord_snap_skipped_reason = "out_of_safe_zone";
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap SKIP face=[${Math.round(fx)},${Math.round(fy)}] outside safe-zone plate=${W}x${H} (${Date.now() - snapT0}ms)`,
+              );
+            } else if (dist <= 60) {
+              (pass as any).coord_snap_skipped_reason = `within_jitter:${dist}px`;
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap NOOP dist=${dist}px ≤60px (${Date.now() - snapT0}ms)`,
+              );
+            } else if (dist > 200) {
+              (pass as any).coord_snap_skipped_reason = `distance_too_large:${dist}px`;
+              console.warn(
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap SKIP dist=${dist}px >200px — keeping original (${Date.now() - snapT0}ms)`,
+              );
+            } else {
+              const snapped: [number, number] = [Math.round(fx), Math.round(fy)];
+              const original: [number, number] = [Math.round(cx), Math.round(cy)];
+              (pass as any).coords_snap_origin = original;
+              (pass as any).coords_snapped_at = new Date().toISOString();
+              (pass as any).coord_snap_distance_px = dist;
+              (pass as any).coord_snap_source = "v135_pre_crop_rekognition";
+              (pass as any).coord_snap_face_count = probe.faces.length;
+              pass.coords = snapped as any;
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap APPLIED intent=[${original[0]},${original[1]}] → rekognition=[${snapped[0]},${snapped[1]}] dist=${dist}px faces=${probe.faces.length} (${Date.now() - snapT0}ms)`,
+              );
+            }
+          } else {
+            (pass as any).coord_snap_skipped_reason = probe.ok
+              ? "rekognition_zero_faces"
+              : `rekognition_error:${probe.error ?? "unknown"}`;
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap NO_FACE — expansion ladder will handle (${Date.now() - snapT0}ms) reason=${(pass as any).coord_snap_skipped_reason}`,
+            );
+          }
+        } else {
+          (pass as any).coord_snap_skipped_reason = !plateFrameUrl
+            ? "no_plate_frame_url"
+            : !haveCoords
+              ? "no_coords"
+              : "no_plate_dims";
+        }
+      } catch (e) {
+        (pass as any).coord_snap_skipped_reason = `threw:${(e as Error)?.message ?? "unknown"}`;
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap threw: ${(e as Error)?.message ?? e}`,
+        );
+      }
+
+
       // v116 (Fix B) — Face-Gate Self-Repair: render preclip; if the
       // face-gate finds 0 faces (coords/bbox missed the actual face on
       // the moving plate), re-render with an expanded crop (×1.4, then
