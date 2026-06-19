@@ -1,0 +1,403 @@
+// =============================================================
+// supabase/functions/_shared/asd-strategy.ts
+// -------------------------------------------------------------
+// Single Source of Truth for Sync.so `active_speaker_detection`
+// (ASD) decisions in the dialog-segments pipeline.
+//
+// Replaces the v115 → v129.30 if/else cascade in
+// `compose-dialog-segments/index.ts` (~230 lines) with a pure,
+// deterministic function whose output is the exact ASD object
+// Sync.so receives.
+//
+// Design goals:
+//   * One function decides ASD per pass — no nachträgliche Mutation.
+//   * Inputs are explicit: preflight result, pass geometry, retry
+//     variant, multi-speaker flag, preclip-vs-plate dispatch.
+//   * Outputs include diagnostics for `syncso_dispatch_log.meta`.
+//   * Pure: no DB, no fetch, no side effects → fully unit-testable.
+//
+// The function expresses the 5 rules from
+// `mem://architecture/lipsync/sync-3-only-dialog-pipeline.md`:
+//
+//   1) preflight_coord      — Gemini Vision returned a snapped/locked
+//                              coord. doc-strict ASD with that coord.
+//   2) bbox_url             — Multi-Speaker with uploaded per-frame
+//                              bounding_boxes_url (set by caller before
+//                              strategy runs; strategy preserves it).
+//   3) preclip_coord_strict — Multi-Speaker preclip with sibling face(s)
+//                              inside crop → doc-strict transformed
+//                              preclip-space coord.
+//   4) single_face_auto     — Clean 1-face preclip / single-speaker.
+//                              `{ auto_detect: true }` — Sync.so's own
+//                              detector finds the only face safely.
+//   5) last_resort_auto     — Unknown / missing inputs. `auto_detect`
+//                              with explicit `last_resort` diagnostic.
+// =============================================================
+
+export type AsdMode =
+  | "preflight_coord"
+  | "bbox_url"
+  | "preclip_coord_strict"
+  | "single_face_auto"
+  | "last_resort_auto";
+
+export type AsdCoord = [number, number];
+
+/** Exact shape sent to Sync.so under `options.active_speaker_detection`. */
+export type SyncSoAsd =
+  | { auto_detect: true }
+  | { auto_detect: false; frame_number: number; coordinates: AsdCoord }
+  | { auto_detect: false; bounding_boxes_url: string }
+  | {
+      auto_detect: false;
+      bounding_boxes: ([number, number, number, number] | null)[];
+    };
+
+export interface PreflightFaceResult {
+  /** True when a face was confidently located in the dispatched video. */
+  faceFound: boolean;
+  /** Authoritative coord, in the SAME space as the dispatched video
+   *  (preclip-space when `usePreclip=true`, plate-space otherwise).
+   *  Set when the preflight probe snapped to an actual face, or when
+   *  the original intent coord was validated as on-face. */
+  coord?: AsdCoord;
+  /** Frame number where the coord is visible. */
+  frame?: number;
+  /** True when `coord` is a snap correction of the original intent. */
+  snapped?: boolean;
+  /** Original intent coord before snap (forensics only). */
+  originalCoord?: AsdCoord;
+  /** Pixel distance between original and snapped coord (forensics only). */
+  snapDistancePx?: number;
+}
+
+export interface PassGeometry {
+  /** Number of faces validated inside the preclip crop, or null when
+   *  the probe was skipped/permissive. */
+  preclipFaceCount: number | null;
+  /** v129.2.1 risk classification: "clean" | "neighbor_inside_crop" | null. */
+  preclipAmbiguityRisk: "clean" | "neighbor_inside_crop" | null;
+  /** Speaker plate coord (always plate-space). */
+  plateCoord: AsdCoord | null;
+  /** Preclip crop rect (plate space → preclip output). */
+  preclipCrop: {
+    x: number;
+    y: number;
+    size: number;
+    outputSize: number;
+  } | null;
+  /** Frame number to anchor the ASD probe on. Already clamped into the
+   *  dispatched video's frame range by the caller. */
+  asdFrameNumber: number;
+  /** When set, the caller has already prepared a multi-speaker per-frame
+   *  bounding_boxes_url payload (Rule 2). */
+  prebuiltBoundingBoxesUrl?: string;
+  /** Inline per-frame bounding boxes (graceful-degrade fallback for Rule 2). */
+  prebuiltBoundingBoxes?: ([number, number, number, number] | null)[];
+}
+
+export interface BuildAsdInput {
+  /** Result of the Gemini Vision preflight probe. `null` when the probe
+   *  was skipped (e.g. no API key) or unavailable. */
+  preflight: PreflightFaceResult | null;
+  /** Pass-level geometry and counts. */
+  geometry: PassGeometry;
+  /** Retry variant for this pass, or null on first attempt. */
+  retryVariant: string | null;
+  /** True when the scene has ≥2 named speakers. */
+  isMultiSpeaker: boolean;
+  /** True when dispatching the per-pass preclip crop; false for the
+   *  full plate (legacy plate-path retries). */
+  usePreclip: boolean;
+}
+
+export interface AsdStrategyResult {
+  mode: AsdMode;
+  asd: SyncSoAsd;
+  /** Frame anchor that ended up in the payload (null for auto_detect). */
+  frameNumber: number | null;
+  /** Coordinate space of any coord in `asd` ("none" when no coord). */
+  coordSpace: "plate" | "preclip" | "none";
+  /** Provenance of the chosen ASD. */
+  source: "preflight" | "pass" | "retry" | "default";
+  /** Diagnostics for `syncso_dispatch_log.meta.asd_strategy`. Always set. */
+  diagnostics: Record<string, unknown>;
+}
+
+// -------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------
+
+function transformPlateCoordToPreclip(
+  plateCoord: AsdCoord,
+  crop: NonNullable<PassGeometry["preclipCrop"]>,
+): { coord: AsdCoord; inBounds: boolean; floatCoord: [number, number] } {
+  const scale = crop.outputSize / crop.size;
+  const xFloat = (plateCoord[0] - crop.x) * scale;
+  const yFloat = (plateCoord[1] - crop.y) * scale;
+  const xInt = Math.round(xFloat);
+  const yInt = Math.round(yFloat);
+  const inBounds =
+    xInt >= 0 && xInt < crop.outputSize && yInt >= 0 && yInt < crop.outputSize;
+  return {
+    coord: [xInt, yInt],
+    inBounds,
+    floatCoord: [Number(xFloat.toFixed(2)), Number(yFloat.toFixed(2))],
+  };
+}
+
+function isCoordsProRetry(variant: string | null): boolean {
+  return (
+    variant === "coords-pro" ||
+    variant === "sync3-coords" ||
+    variant === "coords-pro-lp2pro" ||
+    variant === "preflight-snap" // new in v130 — explicit snap-driven retry
+  );
+}
+
+function isBboxRetry(variant: string | null): boolean {
+  return variant === "coords-pro-box" || variant === "bbox-url-pro";
+}
+
+// -------------------------------------------------------------
+// Main builder
+// -------------------------------------------------------------
+
+export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
+  const { preflight, geometry, retryVariant, isMultiSpeaker, usePreclip } =
+    input;
+
+  // ── Rule 2: bbox-url / inline bounding_boxes (multi-speaker explicit DTO)
+  // Caller pre-built the bbox payload (upload to storage etc.) — strategy
+  // just selects it. This must come before Rule 1 because bbox retries
+  // are an explicit caller decision that overrides preflight.
+  if (isBboxRetry(retryVariant)) {
+    if (geometry.prebuiltBoundingBoxesUrl) {
+      return {
+        mode: "bbox_url",
+        asd: {
+          auto_detect: false,
+          bounding_boxes_url: geometry.prebuiltBoundingBoxesUrl,
+        },
+        frameNumber: null,
+        coordSpace: "none",
+        source: "retry",
+        diagnostics: {
+          retry_variant: retryVariant,
+          bbox_source: "url",
+          url_tail: geometry.prebuiltBoundingBoxesUrl.slice(-60),
+        },
+      };
+    }
+    if (geometry.prebuiltBoundingBoxes && geometry.prebuiltBoundingBoxes.length > 0) {
+      const nonNull = geometry.prebuiltBoundingBoxes.reduce(
+        (a, v) => a + (v ? 1 : 0),
+        0,
+      );
+      return {
+        mode: "bbox_url",
+        asd: {
+          auto_detect: false,
+          bounding_boxes: geometry.prebuiltBoundingBoxes,
+        },
+        frameNumber: null,
+        coordSpace: "none",
+        source: "retry",
+        diagnostics: {
+          retry_variant: retryVariant,
+          bbox_source: "inline",
+          frame_count: geometry.prebuiltBoundingBoxes.length,
+          non_null_frames: nonNull,
+        },
+      };
+    }
+    // bbox retry requested but caller failed to prepare a payload — fall
+    // through to remaining rules with a diagnostic.
+  }
+
+  // ── Rule 1: Preflight Face Coord (PRIMARY when available)
+  // When the Gemini probe locked onto a face, that coord is authoritative
+  // regardless of multi-speaker context. The probe ran on the EXACT
+  // dispatched video; its coord is in the dispatched space.
+  if (preflight?.faceFound && Array.isArray(preflight.coord)) {
+    const frame = Number.isFinite(preflight.frame)
+      ? Number(preflight.frame)
+      : geometry.asdFrameNumber;
+    return {
+      mode: "preflight_coord",
+      asd: {
+        auto_detect: false,
+        frame_number: frame,
+        coordinates: [
+          Number(preflight.coord[0]),
+          Number(preflight.coord[1]),
+        ],
+      },
+      frameNumber: frame,
+      coordSpace: usePreclip ? "preclip" : "plate",
+      source: "preflight",
+      diagnostics: {
+        snapped: !!preflight.snapped,
+        original_coord: preflight.originalCoord ?? null,
+        snap_distance_px: preflight.snapDistancePx ?? null,
+        retry_variant: retryVariant,
+        face_count_in_crop: geometry.preclipFaceCount,
+      },
+    };
+  }
+
+  // ── Rule 3: Multi-Speaker preclip with sibling inside crop (genuine
+  // ambiguity). Use doc-strict transformed coords so Sync.so locks the
+  // intended face instead of picking a neighbour with auto_detect.
+  // Also reached on coords-pro retries when the preflight probe was
+  // unavailable but plate coords + crop are valid.
+  const wantsExplicitCoords =
+    isMultiSpeaker &&
+    geometry.preclipAmbiguityRisk === "neighbor_inside_crop";
+  const coordsProForcesStrict =
+    isCoordsProRetry(retryVariant) &&
+    !!geometry.plateCoord &&
+    !!geometry.preclipCrop;
+
+  if (
+    usePreclip &&
+    (wantsExplicitCoords || coordsProForcesStrict) &&
+    geometry.plateCoord &&
+    geometry.preclipCrop
+  ) {
+    const t = transformPlateCoordToPreclip(
+      geometry.plateCoord,
+      geometry.preclipCrop,
+    );
+    if (t.inBounds) {
+      return {
+        mode: "preclip_coord_strict",
+        asd: {
+          auto_detect: false,
+          frame_number: geometry.asdFrameNumber,
+          coordinates: t.coord,
+        },
+        frameNumber: geometry.asdFrameNumber,
+        coordSpace: "preclip",
+        source: coordsProForcesStrict ? "retry" : "pass",
+        diagnostics: {
+          retry_variant: retryVariant,
+          plate_coord: geometry.plateCoord,
+          preclip_coord: t.coord,
+          preclip_coord_float: t.floatCoord,
+          crop: geometry.preclipCrop,
+          ambiguity_risk: geometry.preclipAmbiguityRisk,
+          reason: wantsExplicitCoords
+            ? "sibling_inside_crop"
+            : "coords_pro_retry",
+        },
+      };
+    }
+    // Out-of-bounds → fall through to auto_detect with a diagnostic flag.
+    return {
+      mode: "last_resort_auto",
+      asd: { auto_detect: true },
+      frameNumber: null,
+      coordSpace: "none",
+      source: "default",
+      diagnostics: {
+        retry_variant: retryVariant,
+        reason: "preclip_coord_out_of_bounds",
+        plate_coord: geometry.plateCoord,
+        attempted_preclip_coord: t.coord,
+        crop: geometry.preclipCrop,
+        last_resort: true,
+      },
+    };
+  }
+
+  // Plate path (legacy / non-preclip dispatch) coords-pro retry —
+  // doc-strict with plate-space coord.
+  if (
+    !usePreclip &&
+    coordsProForcesStrict &&
+    geometry.plateCoord
+  ) {
+    return {
+      mode: "preclip_coord_strict",
+      asd: {
+        auto_detect: false,
+        frame_number: geometry.asdFrameNumber,
+        coordinates: geometry.plateCoord,
+      },
+      frameNumber: geometry.asdFrameNumber,
+      coordSpace: "plate",
+      source: "retry",
+      diagnostics: {
+        retry_variant: retryVariant,
+        plate_coord: geometry.plateCoord,
+        reason: "plate_coords_pro_retry",
+      },
+    };
+  }
+
+  // ── Rule 4: Clean single-face preclip / single-speaker → auto_detect.
+  // Empirically (v129.24) explicit coords on a tight 1-face crop trigger
+  // Sync.so `generation_unknown_error`; auto_detect is the safe default.
+  const ambiguityClean =
+    geometry.preclipAmbiguityRisk === null ||
+    geometry.preclipAmbiguityRisk === "clean";
+  const notConfirmedMulti =
+    geometry.preclipFaceCount === null || geometry.preclipFaceCount <= 1;
+  const hasAFace =
+    geometry.preclipFaceCount === null || geometry.preclipFaceCount >= 1;
+
+  if (usePreclip && ambiguityClean && notConfirmedMulti && hasAFace) {
+    return {
+      mode: "single_face_auto",
+      asd: { auto_detect: true },
+      frameNumber: null,
+      coordSpace: "none",
+      source: "default",
+      diagnostics: {
+        retry_variant: retryVariant,
+        is_multi_speaker_scene: isMultiSpeaker,
+        face_count_in_crop: geometry.preclipFaceCount,
+        ambiguity_risk: geometry.preclipAmbiguityRisk,
+        reason: "preclip_unambiguous_single_face",
+      },
+    };
+  }
+
+  if (!usePreclip && !isMultiSpeaker) {
+    return {
+      mode: "single_face_auto",
+      asd: { auto_detect: true },
+      frameNumber: null,
+      coordSpace: "none",
+      source: "default",
+      diagnostics: {
+        retry_variant: retryVariant,
+        reason: "plate_single_speaker_default",
+      },
+    };
+  }
+
+  // ── Rule 5: Last resort — auto_detect with explicit diagnostic.
+  // Reached when: preclip probe says 0 faces, or multi-speaker plate
+  // without coords/crop, or any other ambiguous state that the upstream
+  // ladder will escalate (bbox-url, expanded-crop) on retry.
+  return {
+    mode: "last_resort_auto",
+    asd: { auto_detect: true },
+    frameNumber: null,
+    coordSpace: "none",
+    source: "default",
+    diagnostics: {
+      retry_variant: retryVariant,
+      is_multi_speaker_scene: isMultiSpeaker,
+      face_count_in_crop: geometry.preclipFaceCount,
+      ambiguity_risk: geometry.preclipAmbiguityRisk,
+      has_plate_coord: !!geometry.plateCoord,
+      has_preclip_crop: !!geometry.preclipCrop,
+      use_preclip: usePreclip,
+      last_resort: true,
+      reason: "no_clear_strategy_applies",
+    },
+  };
+}
