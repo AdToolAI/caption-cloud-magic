@@ -26,6 +26,55 @@ function input(overrides: Partial<BuildAsdInput> = {}): BuildAsdInput {
   };
 }
 
+Deno.test("Rule 0 (v131) — verified single-face preclip → auto_detect even when preflight has coord", () => {
+  const r = buildAsdStrategy(
+    input({
+      preflight: {
+        faceFound: true,
+        coord: [360, 360],
+        frame: 5,
+      },
+      // first attempt, no retry variant
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_single_face_verified");
+  assertEquals(r.diagnostics.preclip_single_face_verified, true);
+  assertEquals(r.diagnostics.had_preflight_coord, true);
+});
+
+Deno.test("Rule 0 (v131) — multi-speaker scene with verified single-face crop → auto_detect", () => {
+  const r = buildAsdStrategy(input({ isMultiSpeaker: true }));
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_single_face_verified");
+});
+
+Deno.test("Rule 0 (v131) — explicit coords-pro retry bypasses Rule 0 → Rule 1/3 still works", () => {
+  const r = buildAsdStrategy(
+    input({
+      retryVariant: "coords-pro",
+      preflight: {
+        faceFound: true,
+        coord: [360, 360],
+        frame: 7,
+      },
+    }),
+  );
+  assertEquals(r.mode, "preflight_coord");
+});
+
+Deno.test("Rule 0 (v131) — not eligible when preclip face count is null/unknown", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: { ...baseGeometry, preclipFaceCount: null },
+    }),
+  );
+  // Falls through; Rule 4 still gives single_face_auto but without rule_0 diagnostic
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.diagnostics.rule ?? null, null);
+});
+
 Deno.test("Rule 1 — preflight face coord wins over everything", () => {
   const r = buildAsdStrategy(
     input({
