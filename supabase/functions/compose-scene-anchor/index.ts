@@ -301,8 +301,17 @@ serve(async (req) => {
     // v111 — STRICT SWAP RETRY: the previous attempt rendered the WRONG face
     // for one or more named characters (e.g. a woman's head on a male
     // reference). Name the offenders explicitly.
-    const STRICT_SWAP_SUFFIX = swapMode && isMulti
+    const STRICT_SWAP_SUFFIX = (swapMode || faceLockMode) && isMulti
       ? ` STRICT IDENTITY SWAP RETRY — the previous attempt rendered the WRONG PERSON in the slot of: ${swapMismatches.length > 0 ? swapMismatches.join(", ") : "one or more characters"}. Read carefully: every named reference person above has a CANONICAL IDENTITY headshot supplied later in the image list — that IDENTITY image is the ground truth for that person's FACE (sex, age, hair color, hair length, skin tone, jawline, nose, eye color, beard/stubble). Do NOT swap, replace, regender, or substitute any character with a different person. If a reference looks androgynous, follow the IDENTITY headshot's apparent sex and age STRICTLY. Wardrobe and body shape may come from the outfit-cover image for that character, but the FACE must match the IDENTITY headshot pixel-for-pixel. Double-check before output: does each named character's face actually match THEIR identity headshot? If not, regenerate the face from the identity headshot.`
+      : "";
+
+    // v131.6 — FACE LOCK SUFFIX: final-attempt hard pixel-copy directive.
+    // Used only after attempt-1 (normal) and attempt-2 (strict-swap) have
+    // both failed the identity audit. Demands the model copy the face
+    // straight from the IDENTITY headshot of each slot with zero creative
+    // interpretation. Combined with temperature: 0 below.
+    const FACE_LOCK_SUFFIX = faceLockMode && isMulti && identityPortraits.length === portraits.length
+      ? ` FINAL FACE-LOCK MODE — the previous TWO attempts both produced the wrong face in at least one slot${swapMismatches.length > 0 ? ` (offenders: ${swapMismatches.join(", ")})` : ""}. For each numbered reference slot, COPY THE FACE DIRECTLY FROM THAT SLOT'S IDENTITY HEADSHOT pixel-for-pixel — same geometry, same jaw, same eyes, same nose, same hairline, same skin tone, same age, same sex. NO creative interpretation of faces. NO blending. NO substitution. NO "improvement". The IDENTITY headshot IS the face — paste it. Outfits come from the wardrobe references (Image #1..#${portraits.length}), but every face is a direct copy from its IDENTITY headshot. If you cannot copy a face exactly from its identity headshot, leave that character out rather than substitute a different person.`
       : "";
 
     // Per-character action clause — protected from the dialog stripper and
