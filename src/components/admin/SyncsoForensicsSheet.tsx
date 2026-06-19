@@ -45,6 +45,12 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
+import {
+  classifyReplayBatch,
+  LAB_PRESETS,
+  type ReplayRow,
+  type Verdict as LabVerdict,
+} from '@/lib/syncReplayClassify';
 
 interface Props {
   open: boolean;
@@ -217,6 +223,61 @@ export function SyncsoForensicsSheet({
 
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightResult, setPreflightResult] = useState<any>(null);
+
+  // Replay-Lab (Root-Cause Matrix)
+  const [labLoading, setLabLoading] = useState(false);
+  const [labBatchId, setLabBatchId] = useState<string | null>(null);
+  const [labReason, setLabReason] = useState('');
+  const [labConfirm, setLabConfirm] = useState(false);
+  const [labRows, setLabRows] = useState<ReplayRow[]>([]);
+  const [labDispatch, setLabDispatch] = useState<any[] | null>(null);
+
+  // Poll lab batch rows until all terminal
+  useEffect(() => {
+    if (!labBatchId) return;
+    let cancelled = false;
+    const tick = async () => {
+      const { data } = await supabase
+        .from('syncso_replay_log')
+        .select('override_preset, provider_status, provider_error, provider_error_code, output_url')
+        .ilike('notes', `lab:${labBatchId}:%`);
+      if (cancelled) return;
+      setLabRows((data ?? []) as ReplayRow[]);
+    };
+    tick();
+    const i = setInterval(tick, 4000);
+    return () => { cancelled = true; clearInterval(i); };
+  }, [labBatchId]);
+
+  const runLab = async () => {
+    if (!labConfirm) { toast.error('Bitte Bestätigungs-Checkbox setzen'); return; }
+    if (labReason.trim().length < 5) { toast.error('Grund benötigt (min. 5 Zeichen)'); return; }
+    setLabLoading(true);
+    setLabRows([]);
+    setLabBatchId(null);
+    setLabDispatch(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('syncso-replay-lab', {
+        body: {
+          scene_id: sceneId,
+          pass_index: passIndex,
+          reason: labReason.trim(),
+          confirm: true,
+        },
+      });
+      if (error) throw error;
+      setLabBatchId(data?.batch_id ?? null);
+      setLabDispatch(data?.dispatched ?? []);
+      toast.success(`Matrix dispatched (${(data?.dispatched ?? []).length} Varianten) — Ergebnisse laufen rein`);
+    } catch (e: any) {
+      const details = await extractFunctionsErrorDetails(e);
+      toast.error(`Lab-Fehler: ${details.message}`);
+    } finally {
+      setLabLoading(false);
+    }
+  };
+
+  const labVerdict: LabVerdict | null = labRows.length ? classifyReplayBatch(labRows) : null;
 
   const runPreflight = async () => {
     setPreflightLoading(true);
@@ -420,14 +481,18 @@ export function SyncsoForensicsSheet({
         />
 
         <Tabs defaultValue="bundle" className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="bundle">
               <FileJson className="h-4 w-4 mr-1" />
-              Diagnose-Bundle
+              Diagnose
             </TabsTrigger>
             <TabsTrigger value="replay">
               <FlaskConical className="h-4 w-4 mr-1" />
               Replay
+            </TabsTrigger>
+            <TabsTrigger value="lab">
+              <FlaskConical className="h-4 w-4 mr-1" />
+              Root-Cause Lab
             </TabsTrigger>
           </TabsList>
 
@@ -643,6 +708,110 @@ export function SyncsoForensicsSheet({
                     {JSON.stringify(replayResult.response, null, 2)}
                   </pre>
                 </details>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="lab" className="space-y-3">
+            <div className="rounded border border-muted bg-muted/20 p-2 text-xs leading-tight">
+              <div className="font-medium mb-1">Root-Cause Matrix</div>
+              Feuert dieselbe fehlgeschlagene Pass-Konfiguration mit 5 kontrollierten
+              Varianten an Sync.so (exact, omit_sync_mode, auto_detect, bboxes,
+              lipsync-2-pro) und leitet aus dem Ergebnis die echte Ursache von
+              <code className="mx-1">generation_unknown_error</code> ab. Kosten:
+              ca. 5× ein Sync.so-Job. Ergebnisse landen ausschließlich in
+              <code className="mx-1">syncso_replay_log</code>.
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Grund (Pflicht, min. 5 Zeichen)</label>
+              <Textarea
+                value={labReason}
+                onChange={(e) => setLabReason(e.target.value)}
+                placeholder="z.B. Ursache provider_unknown_error scene 33427056"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="confirm-lab"
+                checked={labConfirm}
+                onCheckedChange={(v) => setLabConfirm(!!v)}
+              />
+              <label htmlFor="confirm-lab" className="text-xs leading-tight">
+                Ich bestätige: 5 echte Sync.so-Jobs werden ausgelöst (~5× Kosten
+                eines Single-Replays). Keine Produktions-Mutation, kein Refund.
+              </label>
+            </div>
+
+            <Button
+              onClick={runLab}
+              disabled={labLoading || !labConfirm || labReason.trim().length < 5}
+              className="w-full"
+              variant="destructive"
+            >
+              {labLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FlaskConical className="h-4 w-4 mr-2" />
+              )}
+              Matrix ausführen
+            </Button>
+
+            {labBatchId && (
+              <div className="text-[10px] text-muted-foreground font-mono">
+                batch: {labBatchId}
+              </div>
+            )}
+
+            {labVerdict && (
+              <div
+                className={`rounded border p-3 ${
+                  labVerdict.ready
+                    ? labVerdict.rootCause === 'baseline_passed_transient'
+                      ? VERDICT_STYLE.yellow
+                      : VERDICT_STYLE.red
+                    : VERDICT_STYLE.blue
+                }`}
+              >
+                <div className="font-semibold text-sm mb-1">
+                  {labVerdict.ready ? 'Verdict: ' : ''}{labVerdict.rootCauseLabel}
+                </div>
+                <div className="text-xs opacity-90">{labVerdict.recommendedFix}</div>
+              </div>
+            )}
+
+            {(labRows.length > 0 || labDispatch) && (
+              <div className="rounded border bg-muted/20 p-2 text-xs">
+                <div className="font-medium mb-2">Varianten</div>
+                <div className="space-y-1">
+                  {LAB_PRESETS.map((p) => {
+                    const row = labRows.find((r) => r.override_preset === p);
+                    const status = row?.provider_status ?? 'pending';
+                    const outcome = labVerdict?.outcomes?.[p] ?? 'pending';
+                    const dot =
+                      outcome === 'pass'
+                        ? 'bg-emerald-500'
+                        : outcome === 'fail'
+                        ? 'bg-red-500'
+                        : outcome === 'missing'
+                        ? 'bg-muted'
+                        : 'bg-amber-500 animate-pulse';
+                    return (
+                      <div key={p} className="flex items-center gap-2">
+                        <span className={`inline-block h-2 w-2 rounded-full ${dot}`} />
+                        <span className="font-mono w-32 shrink-0">{p}</span>
+                        <span className="opacity-70">{status}</span>
+                        {row?.provider_error_code && (
+                          <Badge variant="outline" className="ml-auto text-[10px]">
+                            {row.provider_error_code}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </TabsContent>
