@@ -532,7 +532,10 @@ export default function VideoComposerDashboard() {
             })(),
             transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
-            replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
+            // v131.7: DB-first für replicatePredictionId — lokaler Stale-Wert
+            // (z. B. `sync:0b09b825…` nach Watchdog-Reset) hat sonst die
+            // gerade von der DB gelöschte ID neu „zurück­fallen" lassen.
+            replicatePredictionId: row.replicate_prediction_id ?? null,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
