@@ -1329,9 +1329,10 @@ serve(async (req) => {
                   strict = false,
                   swap = false,
                   swapMismatches: string[] = [],
+                  faceLock = false,
                 ): Promise<string | null> => {
                   console.log(
-                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}]`,
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}]`,
                   );
                   const sceneDesc = stripExtraHumansForAnchor(
                     stripDialogForAnchor(scene.aiPrompt || ""),
@@ -1361,8 +1362,9 @@ serve(async (req) => {
                         aspectRatio: "16:9",
                         shotType: scene.characterShot?.shotType,
                         strictNoDuplicates: strict,
-                        strictSwapMode: swap,
+                        strictSwapMode: swap || faceLock,
                         swapMismatches,
+                        faceLockMode: faceLock,
                       }),
                     },
                   );
