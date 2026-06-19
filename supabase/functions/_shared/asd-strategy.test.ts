@@ -50,10 +50,30 @@ Deno.test("Rule 0 (v131) — multi-speaker scene with verified single-face crop 
   assertEquals(r.diagnostics.rule, "rule_0_preclip_single_face_verified");
 });
 
-Deno.test("Rule 0 (v131) — explicit coords-pro retry bypasses Rule 0 → Rule 1/3 still works", () => {
+Deno.test("Rule 0 (v131.3) — coords-pro is the fresh-default label and NO LONGER forces strict coords; preflight still wins (Rule 1 below Rule 0 only fires when Rule 0 ineligible)", () => {
+  // With v131.3, coords-pro on the preclip path flows through Rule 0
+  // → auto_detect:true (even when preflight has a coord, because Rule 0
+  // comes before Rule 1 in the strategy order). This is the entire
+  // point of the fix: stop sending `[x,y]+frame_number` payloads that
+  // Sync.so reproducibly rejects with generation_unknown_error.
   const r = buildAsdStrategy(
     input({
       retryVariant: "coords-pro",
+      preflight: {
+        faceFound: true,
+        coord: [360, 360],
+        frame: 7,
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
+});
+
+Deno.test("Rule 0 (v131.3) — explicit sync3-coords retry STILL bypasses Rule 0 → preflight (Rule 1) fires", () => {
+  const r = buildAsdStrategy(
+    input({
+      retryVariant: "sync3-coords",
       preflight: {
         faceFound: true,
         coord: [360, 360],
@@ -75,7 +95,7 @@ Deno.test("Rule 0 (v131.1) — face count null now fires Rule 0 as probe_unavail
 });
 
 
-Deno.test("Rule 1 — preflight face coord wins over everything", () => {
+Deno.test("Rule 1 — preflight face coord wins over everything (v131.3: use sync3-coords to bypass Rule 0)", () => {
   const r = buildAsdStrategy(
     input({
       preflight: {
@@ -87,7 +107,7 @@ Deno.test("Rule 1 — preflight face coord wins over everything", () => {
         snapDistancePx: 120,
       },
       isMultiSpeaker: true,
-      retryVariant: "coords-pro",
+      retryVariant: "sync3-coords",
     }),
   );
   assertEquals(r.mode, "preflight_coord");
@@ -154,10 +174,10 @@ Deno.test("Rule 3 — multi-speaker with sibling inside crop → doc-strict", ()
   assertEquals(r.asd.coordinates, [393, 393]);
 });
 
-Deno.test("Rule 3 — coords-pro retry forces strict even without sibling", () => {
+Deno.test("Rule 3 — sync3-coords retry forces strict even without sibling (v131.3: was coords-pro)", () => {
   const r = buildAsdStrategy(
     input({
-      retryVariant: "coords-pro",
+      retryVariant: "sync3-coords",
       isMultiSpeaker: true,
     }),
   );
@@ -165,10 +185,10 @@ Deno.test("Rule 3 — coords-pro retry forces strict even without sibling", () =
   assertEquals(r.source, "retry");
 });
 
-Deno.test("Rule 3 OOB → falls through to last_resort_auto", () => {
+Deno.test("Rule 3 OOB → falls through to last_resort_auto (v131.3: use sync3-coords)", () => {
   const r = buildAsdStrategy(
     input({
-      retryVariant: "coords-pro",
+      retryVariant: "sync3-coords",
       isMultiSpeaker: true,
       geometry: {
         ...baseGeometry,
@@ -202,7 +222,11 @@ Deno.test("Rule 4 — multi-speaker scene with unambiguous crop → auto_detect"
   assertEquals(r.mode, "single_face_auto");
 });
 
-Deno.test("Rule 5 — zero-face preclip → last_resort_auto", () => {
+Deno.test("Rule 0 (v131.2/3) — zero-face preclip → auto_detect (Sync.so auto-detector is safe default; previously last_resort)", () => {
+  // v131.2 made Rule 0 unconditional on preclips. A faceCount=0 preclip
+  // hits Rule 0's `rule_0_preclip_unconditional` branch with
+  // `auto_detect:true`. Empirically (see asd-strategy comments) sync-3
+  // handles a no-face preclip more gracefully than an invented coord.
   const r = buildAsdStrategy(
     input({
       geometry: {
@@ -211,8 +235,8 @@ Deno.test("Rule 5 — zero-face preclip → last_resort_auto", () => {
       },
     }),
   );
-  assertEquals(r.mode, "last_resort_auto");
-  assertEquals(r.diagnostics.last_resort, true);
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
 });
 
 Deno.test("Rule 5 — multi-speaker plate without coords → last_resort_auto", () => {
