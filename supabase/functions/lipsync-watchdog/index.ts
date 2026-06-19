@@ -428,8 +428,39 @@ serve(async (req) => {
         `pred=${d.replicate_prediction_id}`,
       );
     } else if (hasJob && ageMs > STALE_PROVIDER_MS) {
+      // v131.8 — Pass-level liveness. Previously we measured Provider-Timeout
+      // gegen das Szenen-Alter (first_started_at). Bei 4-Sprecher-Szenen ist
+      // Pass 4 erst nach ~10-12 Minuten überhaupt dispatcht — der alte Code
+      // hat ihn nach <60s als "timeout" gekillt, obwohl er gesund lief.
+      // Neue Regel: solange irgendein aktiver Pass jünger als STALE_PROVIDER_MS
+      // ist, wartet der Watchdog. Nur wenn ALLE rendering-Passes älter als
+      // STALE_PROVIDER_MS sind (oder gar keiner mehr lebt), schlagen wir zu.
+      const passesForLiveness: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+      const renderingPasses = passesForLiveness.filter(
+        (p) => String(p?.status ?? "") === "rendering" && typeof p?.job_id === "string",
+      );
+      const youngestRenderingMs = renderingPasses.length === 0
+        ? Infinity
+        : Math.min(
+            ...renderingPasses.map((p) => {
+              const sa = typeof p?.started_at === "string" ? Date.parse(p.started_at) : NaN;
+              return Number.isFinite(sa) ? (now - sa) : Infinity;
+            }),
+          );
       const polledThisTick = polled.some((p) => p.scene_id === d.id);
-      if (!polledThisTick) reason = "watchdog_provider_timeout";
+      if (renderingPasses.length === 0) {
+        // Kein lebender Pass mehr — alter Pfad ist okay, aber wir geben uns
+        // dem v5-Fanout-Branch (unten) den Vortritt, der den dispatch_log
+        // gegencheckt. Hier kein Timeout setzen.
+      } else if (!polledThisTick && youngestRenderingMs > STALE_PROVIDER_MS) {
+        reason = "watchdog_provider_timeout";
+      } else if (renderingPasses.length > 0 && youngestRenderingMs <= STALE_PROVIDER_MS) {
+        console.log(
+          `[lipsync-watchdog] v131.8 pass-level wait scene=${d.id} ` +
+          `youngest_rendering_age=${Math.round(youngestRenderingMs / 1000)}s ` +
+          `rendering_passes=${renderingPasses.length} — skipping provider-timeout`,
+        );
+      }
     } else if (isV5Fanout && ageMs > 12 * 60_000) {
       const passes120: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
       const liveRendering = passes120.some((p) => {
@@ -485,20 +516,46 @@ serve(async (req) => {
             } catch { /* tolerate */ }
           }
 
+          // v131.8 — Pass-erhaltender Auto-Retry. Der alte v131.7-Code hat
+          // `passes: []` gesetzt und damit fertige Sprecher verloren +
+          // Forensik mit `pass_not_found` kaputt gemacht. Neu: nur die
+          // tatsächlich hängenden rendering-Passes auf pending zurücksetzen,
+          // erfolgreich abgeschlossene `done`-Passes bleiben unverändert.
+          const passesNow: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+          const passesPatched = passesNow.map((p: any, i: number) => {
+            const st = String(p?.status ?? "");
+            if (st !== "rendering") return p;
+            return {
+              ...p,
+              status: "pending",
+              job_id: null,
+              output_url: null,
+              started_at: null,
+              finished_at: null,
+              watchdog_retry_attempted: true,
+              watchdog_retry_at: new Date().toISOString(),
+              error: `retrying_after_watchdog_provider_timeout`,
+              _retry_idx: i,
+            };
+          });
+          const hasStuckPass = passesPatched.some(
+            (p: any, i: number) => p?.watchdog_retry_attempted && passesNow[i]?.status === "rendering",
+          );
+          // Wenn nichts mehr "rendering" war, gibt es nichts zu retryen — falle
+          // auf den ursprünglichen Re-Dispatch-Pfad zurück (passes leer lassen).
+          const newPasses = hasStuckPass ? passesPatched : passesNow;
+
           await supabase
             .from("composer_scenes")
             .update({
               lip_sync_status: "pending",
-              twoshot_stage: "master_clip",
+              twoshot_stage: hasStuckPass ? (d.twoshot_stage ?? "master_clip") : "master_clip",
               clip_error: `watchdog_auto_retry_${prevRetries + 1}_of_1`,
-              replicate_prediction_id: null,
               dialog_shots: {
                 ...(ds || {}),
+                passes: newPasses,
                 watchdog_retries: prevRetries + 1,
                 watchdog_retry_at: new Date().toISOString(),
-                // passes-Liste leeren, damit advance-dispatch oben (2)
-                // beim nächsten Tick einen sauberen pass=0 macht.
-                passes: [],
                 recovery_dispatched_at: null,
               },
               updated_at: new Date().toISOString(),
@@ -506,8 +563,9 @@ serve(async (req) => {
             .eq("id", d.id);
 
           console.log(
-            `[lipsync-watchdog] v131.7 auto-retry scene=${d.id} ` +
-            `prev_retries=${prevRetries} → reset to pending (dispatch-recovery wird nächsten Tick anwerfen)`,
+            `[lipsync-watchdog] v131.8 auto-retry scene=${d.id} ` +
+            `prev_retries=${prevRetries} mode=${hasStuckPass ? "per-pass" : "full-redispatch"} ` +
+            `→ reset to pending`,
           );
           advanced.push({ scene_id: d.id, pass_idx: -2 });
           return; // skip failLipSync
