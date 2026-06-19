@@ -222,7 +222,11 @@ Deno.test("Rule 4 — multi-speaker scene with unambiguous crop → auto_detect"
   assertEquals(r.mode, "single_face_auto");
 });
 
-Deno.test("Rule 5 — zero-face preclip → last_resort_auto", () => {
+Deno.test("Rule 0 (v131.2/3) — zero-face preclip → auto_detect (Sync.so auto-detector is safe default; previously last_resort)", () => {
+  // v131.2 made Rule 0 unconditional on preclips. A faceCount=0 preclip
+  // hits Rule 0's `rule_0_preclip_unconditional` branch with
+  // `auto_detect:true`. Empirically (see asd-strategy comments) sync-3
+  // handles a no-face preclip more gracefully than an invented coord.
   const r = buildAsdStrategy(
     input({
       geometry: {
@@ -231,8 +235,8 @@ Deno.test("Rule 5 — zero-face preclip → last_resort_auto", () => {
       },
     }),
   );
-  assertEquals(r.mode, "last_resort_auto");
-  assertEquals(r.diagnostics.last_resort, true);
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
 });
 
 Deno.test("Rule 5 — multi-speaker plate without coords → last_resort_auto", () => {
