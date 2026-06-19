@@ -3627,12 +3627,40 @@ serve(async (req) => {
         preclip_frame_count: preclipFrameCount,
         frame_clamped: !refFrameInPreclipRange,
       };
+
+      // v131.4 — Dispatch-path safety override for the production failure
+      // seen on scene 83145f34…: even after the shared strategy was updated,
+      // the deployed function still emitted `coords-pro → coordinates` for a
+      // clean single-face preclip. `coords-pro` is the fresh/default label, not
+      // an explicit coordinate retry. On a clean preclip it must be
+      // `{ auto_detect:true }` with no frame/coord fields.
+      const v1314ConfirmedAmbiguousCrop =
+        ambiguityRiskForStrategy === "neighbor_inside_crop" ||
+        (typeof passFaceCount === "number" && passFaceCount > 1);
+      if (retryVariant === "coords-pro" && !v1314ConfirmedAmbiguousCrop) {
+        const previousAsd = syncOptions.active_speaker_detection;
+        syncOptions.active_speaker_detection = { auto_detect: true };
+        asdMode = "v131_4_single_face_auto_forced";
+        v1291Diag = {
+          ...v1291Diag,
+          rule: "rule_0_preclip_coords_pro_forced_auto",
+          mode: "single_face_auto",
+          source: "default",
+          coord_space: "none",
+          frame_number: null,
+          reason: "v131_4_dispatch_path_safety_override",
+          retry_variant: retryVariant,
+          original_strategy_mode: strategy.mode,
+          original_asd: previousAsd,
+        };
+      }
       (pass as any)._v1291 = v1291Diag;
       (pass as any)._v130_asd_strategy = {
-        mode: strategy.mode,
-        source: strategy.source,
-        coord_space: strategy.coordSpace,
-        frame_number: strategy.frameNumber,
+        mode: v1291Diag?.mode ?? strategy.mode,
+        source: v1291Diag?.source ?? strategy.source,
+        coord_space: v1291Diag?.coord_space ?? strategy.coordSpace,
+        frame_number: v1291Diag?.frame_number ?? strategy.frameNumber,
+        preclip_trust: v1291Diag?.preclip_trust ?? preclipTrust,
       };
       if (strategy.mode === "last_resort_auto") {
         (pass as any)._v1291_block = {
