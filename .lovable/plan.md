@@ -1,61 +1,61 @@
-## Diagnose
+## Analyse
 
-Looked at the last dialog scene `0145fdc4…b276` (4 speakers). For each turn Sync.so returned an output, but turns 2 (Matthew) and 4 (Sarah) carry `sync_noop_suspect: true` / `noop_reason: "sync_output_reencoded_passthrough_suspect"` — Sync.so re-encoded the preclip without actually moving the mouth.
+Der neue Fehler ist nicht mehr der alte `auto_detect`-NOOP, sondern ein neuer Sonderfall im `coords-pro` Retry:
 
-Common factor for the two bad turns:
-- Very short voiced audio (Matthew: 0.46s voiced inside a 1.09s preclip; Sarah: 1.46s voiced)
-- Both still dispatched with `active_speaker_detection: { auto_detect: true }` — even though they were tagged `retry_variant: "coords-pro"`.
+- Der Screenshot zeigt: `Gesicht am ASD-Frame: FAIL`, `verdict=no_face`.
+- Der geprüfte Frame zeigt nur Körper/Arme, kein Gesicht.
+- In den Logs zum aktuellen Scene-Run `6a8b4584-...` steht:
+  - Preclip hat nur `33` Frames (`duration_sec=1.089`, `fps=30`).
+  - Retry wurde aber mit `frame_number=47` an Sync.so geschickt.
+  - Das ist außerhalb des Preclips. Der Face-Probe / Sync.so schaut dadurch auf einen ungültigen bzw. falschen Framebereich.
+  - Zusätzlich liegt die transformierte Koordinate bei `[363,360]` auf einem Crop, dessen sichtbarer Probe-Frame im Screenshot deutlich den Oberkörper statt Gesicht zeigt.
 
-That's the bug introduced together with the v129.24 fix: the "preclip is unambiguous → force `auto_detect: true`" rule we added in `compose-dialog-segments` runs **before** the retry-variant check, so the `coords-pro` fallback never actually sends coordinates. Every attempt for turns 2/4 ended up being the same auto-detect call that Sync-3 silently no-ops on short outer-edge crops, and the muxer accepted the noop output as the final clip.
+## Ursache
 
-Turns 1 & 3 look identical in payload shape but had longer voiced segments (≥2.3s on a near-square crop), so Sync-3 happened to detect motion and produced real lipsync. That matches what you see in the video.
+Der v129.26-Fix hat `coords-pro` korrekt aktiviert, aber dafür den falschen Frame-Raum übernommen:
 
-## Plan
+- `referenceFrameNumber` stammt aus der originalen Plate-/Turn-Timeline.
+- Beim Preclip beginnt das Video aber wieder bei Frame `0` und ist viel kürzer.
+- Beim Retry muss `frame_number` deshalb relativ zum Preclip sein und auf einen sicher sichtbaren Face-Frame geklemmt werden, nicht der absolute/alte Frame.
 
-### 1. Honor `coords-pro` retry variant in `compose-dialog-segments`
+Damit kam es zu:
 
-In the dispatch builder, evaluate retry-variant **before** the "preclip unambiguous → auto_detect" branch:
-- When `retry_variant === "coords-pro"` and we have valid `_v1291.transformed_coords_int` + `frame_number` (both already computed for every turn): build the payload with
-  ```ts
-  active_speaker_detection: {
-    auto_detect: false,
-    coordinates: [x, y],
-    frame_number: f,
-  }
-  ```
-  and tag `asd_mode = "coords_pro_preclip_v12925"`.
-- Mirror the same precedence in the v129.1 payload-contract preflight so it doesn't strip the coords back out.
+```text
+preclip frames: 0..32
+gesendet: frame_number=47
+Folge: Face-Gate sieht keinen Kopf / Sync.so bricht mit generation_unknown_error ab
+```
 
-The first preclip pass still uses `auto_detect: true` for clean preclips (keeps the v129.24 fix for the original `generation_unknown_error` regression intact).
+## Implementierungsplan
 
-### 2. Auto-escalate to `coords-pro` on noop detection
+1. **Preclip-ASD-Frame normalisieren**
+   - In `compose-dialog-segments/index.ts` für den `coords-pro` Preclip-Retry einen eigenen `preclipAsdFrame` berechnen.
+   - Basis: `preclip_duration_sec * 30` oder geprüfte `preclip_dims/probe`-Frames.
+   - Frame immer clampen: `0 <= frame <= preclipFrameCount - 1`.
+   - Für kurze Preclips bevorzugt ein stabiler früher/mittlerer Frame, z. B. `min(mid, frameCount - 2)`, statt altem Plate-Frame.
 
-In the multipass orchestrator (same file, post-poll branch that sets `sync_noop_suspect`), when:
-- `sync_noop_suspect === true`, AND
-- `retry_variant !== "coords-pro"`, AND
-- `_v1291.in_bounds === true`
+2. **Face-Gate vor `coords-pro` Retry hart machen**
+   - Vor dem Sync.so Dispatch bei `coords-pro_preclip` prüfen: enthält der gewählte Preclip-Frame wirklich ein Gesicht an/nahe der transformierten Koordinate?
+   - Wenn `no_face`, nicht an Sync.so schicken.
+   - Stattdessen entweder:
+     - auf `auto_detect:true` zurückfallen, wenn der Preclip als clean/unambiguous markiert ist, oder
+     - Preclip neu rendern / sauber mit Refund abbrechen, wenn der Crop wirklich falsch ist.
 
-immediately re-queue the turn with `retry_variant: "coords-pro"` and replace the pass's `output_url` only after the retry resolves to a non-noop output (check `sync_output_probe.syncOutputUnchanged === false` AND the new clip is not flagged noop). If the retry also noops twice, fall back to the original muxed preclip (silent video) so we don't ship a re-encoded "fake lipsync" clip — and log `lipsync_final_fallback: "silent_preclip"` on the pass.
+3. **Koordinate bei Preclip-Retry nicht blind verwenden**
+   - Wenn die transformierte Koordinate zwar in-bounds ist, aber Face-Gate `not_at_coord` oder `no_face` meldet, darf sie nicht als ASD-Koordinate an Sync.so gehen.
+   - Falls ein Snap möglich ist, die gesnappte Face-Koordinate verwenden.
+   - Falls nicht, `coords-pro` für diesen Pass blocken und kontrolliert fallbacken.
 
-### 3. Pad ultra-short voiced audio before dispatch
+4. **Logging/Forensik verbessern**
+   - `syncso_dispatch_log.meta.coord_transform` um `preclip_frame_count`, `raw_reference_frame`, `clamped_preclip_frame` und `frame_source` erweitern.
+   - Dadurch sieht man sofort, ob ein zukünftiger Fehler an Frame-Clamping, Crop oder Provider liegt.
 
-For preclips where `audio_voiced_sec < 0.8s` (Matthew turn falls here): add 200ms of digital silence head + 200ms tail to the tight WAV before sending to Sync.so. Sync-3 needs ~1s of motion context to commit to lip movement; this stops the no-op on tiny utterances without changing the muxed timeline (the silence is trimmed off when the lipsync output is sliced back into the stitched timeline using `audio_tight.windows_secs`, which already drives the cut).
+5. **Aktuellen fehlgeschlagenen Run recovern**
+   - Nach Deployment den fehlgeschlagenen Pass 2 (`Matthew`) auf pending setzen, `retry_variant=coords-pro` beibehalten, aber gecachte falsche Dispatch-/Job-Felder leeren.
+   - Neu starten und prüfen, dass der Dispatch nicht mehr `frame_number=47`, sondern einen gültigen Preclip-Frame innerhalb `0..32` sendet.
 
-Implementation: extend the existing `audio_normalization` block (already passes through ffmpeg) to apply `apad`/`adelay` when `audio_voiced_sec < 0.8`. Mode becomes `"padded_short_voiced_v12925"`.
+## Erwartetes Ergebnis
 
-### 4. Recover the failing scene + verify
-
-- Reset `dialog_shots.passes[1]` and `passes[3]` of scene `0145fdc4…b276` to `status: "queued"` with `retry_variant: "coords-pro"` and clear `final_url`, so the existing poller picks them up under the new logic.
-- After re-dispatch, confirm in `syncso_dispatch_log` that the new attempts for turns 2 and 4 carry `coords != null` and `frame_number != null`, the webhook reports `COMPLETED` (not COMPLETED_NOOP_SUSPECT), and `sync_output_probe.syncOutputUnchanged === false`.
-- Visually confirm in the re-rendered stitched MP4 that Matthew and Sarah now have proper lip movement matching their VO segments.
-
-## Files touched
-
-- `supabase/functions/compose-dialog-segments/index.ts` — retry-variant precedence, noop-escalation branch, short-voiced padding.
-- (No frontend changes; no DB schema changes; no other edge functions.)
-
-## What this does NOT change
-
-- The v129.24 fix for clean single-face preclips (auto_detect on first attempt) stays.
-- Multi-speaker ambiguous preclips still hit the existing coordinate path with the existing guards.
-- No model swap (we keep `sync-3`) — switching to `lipsync-2-pro` would double the spend per turn and isn't needed once the coords retry actually executes.
+- Kein `Gesicht am ASD-Frame: FAIL` mehr durch out-of-range Frames.
+- Sync.so bekommt beim `coords-pro` Retry nur noch gültige Preclip-Frames.
+- Wenn der Crop wirklich kein Gesicht enthält, wird vor Provider-Kosten kontrolliert geblockt/repariert statt nach langem Lauf abzubrechen.
