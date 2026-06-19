@@ -146,9 +146,9 @@ export function classifyReplayBatch(rows: ReplayRow[]): Verdict {
       ready,
       outcomes,
       rootCause: "asd_coords_or_frame",
-      rootCauseLabel: "ASD-Koordinaten/Frame falsch",
+      rootCauseLabel: "ASD-Koordinaten/Frame falsch — behoben durch v131",
       recommendedFix:
-        "auto_detect funktioniert → die expliziten Koordinaten/frame_number sind das Problem. Fix: für saubere Single-Face-Preclips auto_detect verwenden ODER coords in Preclip-Space transformieren und Frame mid-clip wählen.",
+        "auto_detect funktioniert → die expliziten Koordinaten/frame_number sind das Problem. Seit v131 ist auto_detect der Primary-Pfad für verifizierte Single-Face-Preclips (Rule 0). Falls dieser Dispatch vor dem v131-Deploy lief, wird er beim nächsten Lauf automatisch über Rule 0 gerettet.",
       notes,
     };
   }
