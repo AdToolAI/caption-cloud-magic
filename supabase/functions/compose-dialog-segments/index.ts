@@ -3511,6 +3511,25 @@ serve(async (req) => {
           ? { ...p, status: "failed" as const, last_error: failReason, last_error_class: "v107_preclip_required" }
           : p,
       );
+      // v132 — Human-readable error: name the actual speaker + turn time,
+      // not just "preclip_required". Operators / customers can now see
+      // exactly which speaker needs to stay in frame on the re-render.
+      const failedSpeakerName = String(
+        (pass as any)?.speaker_name ?? `Sprecher ${currentPassIdx + 1}`,
+      );
+      const passSegs0 = Array.isArray(pass.segments) ? pass.segments : [];
+      const turnStartSec =
+        passSegs0.length > 0 ? Number(passSegs0[0].startTime) : null;
+      const turnEndSec =
+        passSegs0.length > 0 ? Number(passSegs0[0].endTime) : null;
+      const turnLabel =
+        turnStartSec != null && turnEndSec != null
+          ? ` (Dialog-Turn ${turnStartSec.toFixed(1)}s–${turnEndSec.toFixed(1)}s)`
+          : "";
+      const friendlyClipError =
+        `Lip-Sync abgebrochen: „${failedSpeakerName}"${turnLabel} ist im aktuellen Scene-Clip nicht erkennbar ` +
+        `(${failReason}). Bitte Szene neu rendern — alle Sprecher müssen während ihres Turns frontal und unverdeckt im Bild sein. ` +
+        `Credits wurden zurückerstattet.`;
       await supabase
         .from("composer_scenes")
         .update({
@@ -3523,14 +3542,27 @@ serve(async (req) => {
             cost_credits: Number(existingDsLocal?.cost_credits ?? totalCost ?? 0),
             refunded: !alreadyRefunded107,
             error: `v107_preclip_required_pass_${currentPassIdx + 1}:${failReason}`,
+            v107_failed_speaker: {
+              speaker: failedSpeakerName,
+              character_id: (pass as any)?.character_id ?? null,
+              pass_idx: currentPassIdx,
+              turn_start_sec: turnStartSec,
+              turn_end_sec: turnEndSec,
+              preclip_face_count: (pass as any).preclip_face_count ?? null,
+              preclip_error: (pass as any).preclip_error ?? null,
+            },
             finished_at: new Date().toISOString(),
           },
           lip_sync_status: "failed",
-          twoshot_stage: "failed",
-          clip_error: `v107_preclip_required_for_multispeaker:${failReason}`,
+          twoshot_stage: "needs_clip_rerender",
+          clip_status: "pending",
+          clip_url: null,
+          lip_sync_source_clip_url: null,
+          clip_error: friendlyClipError,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
+
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "PREFLIGHT_BLOCKED",
