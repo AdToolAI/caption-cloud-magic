@@ -4091,30 +4091,48 @@ serve(async (req) => {
         frame_clamped: !refFrameInPreclipRange,
       };
 
-      // v131.4 — Dispatch-path safety override for the production failure
-      // seen on scene 83145f34…: even after the shared strategy was updated,
-      // the deployed function still emitted `coords-pro → coordinates` for a
-      // clean single-face preclip. `coords-pro` is the fresh/default label, not
-      // an explicit coordinate retry. On a clean preclip it must be
-      // `{ auto_detect:true }` with no frame/coord fields.
-      const v1314ConfirmedAmbiguousCrop =
-        ambiguityRiskForStrategy === "neighbor_inside_crop" ||
-        (typeof passFaceCount === "number" && passFaceCount > 1);
-      if (retryVariant === "coords-pro" && !v1314ConfirmedAmbiguousCrop) {
+      // v136 — Preclip-Centered Coords (supersedes v131.4 auto_detect override)
+      // Root cause discovered 2026-06-19 on scene af3901da: Sync.so sync-3
+      // with `{ auto_detect: true }` on a 720×720 face-cropped preclip
+      // silently returns the input video unchanged (no lip animation) for
+      // ~all passes. Forensic PSNR(preclip→output) measured 33–43 dB across
+      // all 4 speaker passes — no mouth movement.
+      //
+      // The preclip is by construction a one-face square centered on that
+      // speaker's face (see preclip builder, ~line 4047). We can dispatch
+      // explicit, in-preclip coordinates at the geometric center of the
+      // output frame, removing all guessing on Sync.so's side. This applies
+      // to BOTH single- and multi-speaker passes because the preclip is the
+      // same shape in both cases.
+      //
+      // Safety net: Sync.so's auto-snap (v129.22.3, ok_after_snap branch
+      // below at ~line 4950) still corrects any sub-frame drift, and the
+      // pre-snap (v135) still runs on plate-space ambiguous crops.
+      if (usePassPreclip && retryVariant === "coords-pro") {
         const previousAsd = syncOptions.active_speaker_detection;
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "v131_4_single_face_auto_forced";
+        const outSizeForCenter = Number((pass as any).preclip_crop?.outputSize) || 720;
+        const centerXY = Math.round(outSizeForCenter / 2);
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          frame_number: 0,
+          coordinates: [[centerXY, centerXY]],
+        };
+        asdMode = "v136_preclip_centered_coords";
+        (pass as any).preclip_asd_source = "v136_preclip_center";
+        (pass as any).preclip_asd_coords = [centerXY, centerXY];
         v1291Diag = {
           ...v1291Diag,
-          rule: "rule_0_preclip_coords_pro_forced_auto",
-          mode: "single_face_auto",
-          source: "default",
-          coord_space: "none",
-          frame_number: null,
-          reason: "v131_4_dispatch_path_safety_override",
+          rule: "v136_preclip_centered_coords",
+          mode: "preclip_center",
+          source: "preclip_geometric_center",
+          coord_space: "preclip_output",
+          frame_number: 0,
+          reason: "v136_supersedes_v131_4_auto_detect_silent_noop",
           retry_variant: retryVariant,
           original_strategy_mode: strategy.mode,
           original_asd: previousAsd,
+          preclip_output_size: outSizeForCenter,
+          centered_coord: [centerXY, centerXY],
         };
       }
       (pass as any)._v1291 = v1291Diag;
@@ -4898,20 +4916,11 @@ serve(async (req) => {
       const preclipTrustedForGate = usePassPreclip &&
         Number((pass as any).preclip_face_count ?? 0) === 1 &&
         String((pass as any)._v1291_ambiguity?.risk ?? "clean") === "clean";
-      const autoDetectPreclipNoHardGate =
-        usePassPreclip &&
-        gateAsd?.auto_detect === true &&
-        String((pass as any)._v1291_ambiguity?.risk ?? "clean") !== "neighbor_inside_crop" &&
-        !(Number.isFinite(Number((pass as any).preclip_face_count)) && Number((pass as any).preclip_face_count) > 1);
-      const gate = autoDetectPreclipNoHardGate
-        ? {
-            ok: true,
-            code: "auto_detect_preclip_trusted",
-            reason: "v131.4: auto_detect preclip skips coordinate face-gate",
-            extract_ms: 0,
-            gemini_ms: 0,
-          } as any
-        : await verifyFaceBeforeDispatch({
+      // v136 — Always run the face-gate. The previous "auto_detect preclip
+      // trusted" short-circuit (v131.4) is gone because we no longer dispatch
+      // auto_detect on preclips; we send explicit center coords and the gate
+      // (+ Sync.so auto-snap) is the safety net against drift.
+      const gate = await verifyFaceBeforeDispatch({
         videoUrl: dispatchVideoUrl,
         frameNumber: gateFrame,
         coord: gateCoord,
@@ -5126,48 +5135,15 @@ serve(async (req) => {
       }
     }
 
-    // ── v131.5 — FINAL dispatch-path safety override ────────────────────
-    // Last-line defence against any code path that re-introduces explicit
-    // coordinates AFTER v131.4's override at line ~3640 (most notably the
-    // snap-via-strategy block at ~4498, which legitimately overwrites
-    // `syncOptions.active_speaker_detection` post-snap). On a clean
-    // single-face preclip with `retryVariant === "coords-pro"` (the fresh
-    // default, NOT an explicit coordinate retry), Sync.so rejects
-    // `{ auto_detect:false, coordinates, frame_number }` with
-    // `generation_unknown_error`. The doc-strict shape for that geometry is
-    // `{ auto_detect: true }` alone. We force it here, strip coords/frame
-    // from the actual payload object, null `pass.coords` so telemetry can't
-    // mislead, and HARD-ASSERT before the fetch.
+    // ── v136 — Doc-strict ASD sanitizer (replaces v131.5 final override) ──
+    // With v136 we dispatch explicit preclip-centered coordinates on preclip
+    // passes, so the previous "force auto_detect:true at the wire" override
+    // no longer applies — that override was the very thing causing Sync.so
+    // sync-3 to silently no-op on every speaker. We keep ONLY the mutex
+    // sanitizer + the doc-strict shape assertion so that any code path
+    // intentionally using auto_detect:true (e.g. the post-snap re-strategy
+    // when no coord is available) still sends a legal payload.
     {
-      const finalAsd: any = (payload.options as any)?.active_speaker_detection ?? {};
-      const passFcFinal = Number((pass as any).preclip_face_count ?? 0);
-      const ambigFinal = String((pass as any)._v1291_ambiguity?.risk ?? "clean");
-      const cleanSingleFacePreclip =
-        usePassPreclip &&
-        retryVariant === "coords-pro" &&
-        ambigFinal !== "neighbor_inside_crop" &&
-        !(Number.isFinite(passFcFinal) && passFcFinal > 1);
-
-      if (cleanSingleFacePreclip && finalAsd?.auto_detect !== true) {
-        const previousAsd = { ...finalAsd };
-        const overrideAsd: Record<string, unknown> = { auto_detect: true };
-        (payload.options as any).active_speaker_detection = overrideAsd;
-        (syncOptions as any).active_speaker_detection = overrideAsd;
-        asdMode = "v131_5_dispatch_path_final_override";
-        (pass as any)._v131_5_final_override = {
-          reason: "post_snap_or_strategy_reintroduced_coords",
-          previous_asd: previousAsd,
-          retry_variant: retryVariant,
-          preclip_face_count: passFcFinal,
-          ambiguity_risk: ambigFinal,
-        };
-        (pass as any).coords = null;
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v131_5_FINAL_OVERRIDE forced auto_detect:true (was=${JSON.stringify(previousAsd)})`,
-        );
-      }
-
-      // Mutex sanitize: auto_detect:true MUST NOT carry coords/frame.
       const sanAsd: any = (payload.options as any)?.active_speaker_detection;
       if (sanAsd && sanAsd.auto_detect === true) {
         if ("coordinates" in sanAsd) delete sanAsd.coordinates;
@@ -5176,23 +5152,21 @@ serve(async (req) => {
         if ("bounding_boxes_url" in sanAsd) delete sanAsd.bounding_boxes_url;
       }
 
-      // Hard pre-flight assertion — refuses to call Sync.so with a
-      // doc-violating ASD shape. Refund happens via the catch + existing
-      // failBeforeProviderDispatch path on the surrounding try/catch.
       const assertAsd: any = (payload.options as any)?.active_speaker_detection;
       if (
         assertAsd?.auto_detect === true &&
         (Array.isArray(assertAsd?.coordinates) || assertAsd?.frame_number != null)
       ) {
         return await failBeforeProviderDispatch(
-          "DISPATCH_BLOCKED_V1315_ASSERT",
+          "DISPATCH_BLOCKED_V136_ASSERT",
           "asd_auto_detect_with_coords_violation",
-          "v131.5 assert: active_speaker_detection.auto_detect=true must not carry coordinates/frame_number",
+          "v136 assert: active_speaker_detection.auto_detect=true must not carry coordinates/frame_number",
           500,
           { final_asd: assertAsd, retry_variant: retryVariant, compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION },
         );
       }
     }
+
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
