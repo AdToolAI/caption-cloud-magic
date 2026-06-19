@@ -1296,16 +1296,53 @@ serve(async (req) => {
       // v117: only hard-block when faces are physically missing or the
       // plate-side detection failed entirely. Identity-resolution shortfall
       // alone is NOT a block (slot-order fallback covers it).
+      //
+      // v9 (Jun 19 2026) — Split-Screen-Detector: when N>=3 and detection
+      // *did* find all faces but they're arranged in a perfect grid
+      // (same y, equal x-spacing, identical box height) the plate is a
+      // quad/triptych split-screen layout. Sync.so cannot lipsync isolated
+      // panels — block before dispatch with a clear error.
+      const detectSplitScreenLayout = (): string | null => {
+        if (!plateDims || !plateIdentityMap?.faces || plateIdentityMap.faces.length < 3) return null;
+        const faces = plateIdentityMap.faces as Array<{ bbox?: { x: number; y: number; width: number; height: number } }>;
+        const boxes = faces.map((f) => f.bbox).filter((b): b is { x: number; y: number; width: number; height: number } => !!b);
+        if (boxes.length < 3 || boxes.length !== faces.length) return null;
+        const W = plateDims.width;
+        const H = plateDims.height;
+        const centers = boxes.map((b) => ({ cx: b.x + b.width / 2, cy: b.y + b.height / 2, h: b.height }));
+        // Sort left-to-right by cx
+        centers.sort((a, b) => a.cx - b.cx);
+        const ys = centers.map((c) => c.cy);
+        const yMean = ys.reduce((a, b) => a + b, 0) / ys.length;
+        const ySpreadPct = Math.max(...ys.map((y) => Math.abs(y - yMean))) / H;
+        // Equal x-spacing: gaps between consecutive centers within ±8% of mean gap
+        const gaps: number[] = [];
+        for (let i = 1; i < centers.length; i++) gaps.push(centers[i].cx - centers[i - 1].cx);
+        const gapMean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+        const gapSpreadPct = gapMean > 0 ? Math.max(...gaps.map((g) => Math.abs(g - gapMean))) / gapMean : 1;
+        // Identical box heights: ±10% of mean
+        const hs = centers.map((c) => c.h);
+        const hMean = hs.reduce((a, b) => a + b, 0) / hs.length;
+        const hSpreadPct = hMean > 0 ? Math.max(...hs.map((h) => Math.abs(h - hMean))) / hMean : 1;
+        if (ySpreadPct <= 0.05 && gapSpreadPct <= 0.08 && hSpreadPct <= 0.10) {
+          return `split_screen_layout(faces=${centers.length}, y_spread=${(ySpreadPct * 100).toFixed(1)}%, gap_spread=${(gapSpreadPct * 100).toFixed(1)}%, h_spread=${(hSpreadPct * 100).toFixed(1)}%)`;
+        }
+        return null;
+      };
+      const splitScreenReason = detectSplitScreenLayout();
       const gateFails =
         !plateIdentityMap ||
-        detectedFaces < speakers.length;
-      if (resolvedFaces < speakers.length && detectedFaces >= speakers.length) {
+        detectedFaces < speakers.length ||
+        !!splitScreenReason;
+      if (resolvedFaces < speakers.length && detectedFaces >= speakers.length && !splitScreenReason) {
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} v117_plate_quality_gate_SOFT_WARN detected=${detectedFaces}/${speakers.length} resolved=${resolvedFaces}/${speakers.length} — dispatch proceeds with slot-order coords`,
         );
       }
       if (gateFails) {
-        const reason = !plateIdentityMap
+        const reason = splitScreenReason
+          ? splitScreenReason
+          : !plateIdentityMap
           ? "plate_identity_unavailable"
           : `plate_faces_missing(detected=${detectedFaces}, expected=${speakers.length})`;
         console.error(
@@ -1346,7 +1383,9 @@ serve(async (req) => {
             clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
-            clip_error: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`,
+            clip_error: splitScreenReason
+              ? `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`
+              : `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);

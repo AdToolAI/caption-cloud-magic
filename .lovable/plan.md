@@ -1,145 +1,87 @@
+# Plan: Group-Plate Anti-Split-Screen Fix
 
-# Strukturelle Aufräumung der ASD-Pipeline (v130)
+## Symptom
+Bei 4-Sprecher-Hook ist der gerenderte Hailuo-Plate ein **echter 4-Panel Split-Screen** (vier vertikale Streifen, jede Person isoliert). Folge:
 
-## Problem heute
+- Sync.so Face-Gate blockiert Pass 2 (Kailee) und Pass 3 (Sarah) mit `plate_target_face_missing` — die Gesichter sind zwar im Bild, aber an festen Spalten-Positionen die nicht zu den per-Speaker-Koordinaten passen.
+- Pass 1 fällt mit `syncso_segments_FAILED: generation_unknown_error` (Sync.so kann die Quad-Split-Composition nicht parsen).
+- Folge-Pässe werden mit `canceled_by_scene_failure` abgebrochen.
 
-`compose-dialog-segments/index.ts` baut die `active_speaker_detection` (ASD) in **drei** unkoordinierten Schritten:
+## Root Cause
+`neutralTwoShotPrompt()` in `supabase/functions/compose-video-clips/index.ts` (Z. 616–639) baut für n≥3 diesen Positiv-Prompt:
 
-1. **Block A** (Z. 3470–3698) — eine ca. 230-Zeilen `if/else if`-Kette mit v124, v129.1, v129.24, v129.25, v129.26, v129.27, v129.29 Pfaden, die initial ASD setzt (oft `auto_detect: true`).
-2. **Block B** (Z. 3700–3855) — Multi-Speaker / bbox-url Pfade überschreiben Teile davon.
-3. **Block C — Face-Gate Snap** (Z. 4441–4564, v129.30) — *nach* dem Payload-Build erkennt Gemini Vision, dass die Coord nicht ins Gesicht zeigt, und **mutiert** `syncOptions` + `payload.options` nachträglich.
+> *"arranged in a single horizontal line, left-to-right, with **equal screen share** and **clear gaps between them** (no overlap, no person standing in front of another)"*
 
-Folgen:
-- v124 Sanitizer kann den Snap stillschweigend strippen, wenn `auto_detect: true` noch drin steht (genau der gerade gefixte Bug).
-- "Snap erkannt aber nicht angewandt"-UI-Warnungen, weil zwei Wahrheitsquellen existieren.
-- Jeder neue Edge-Case (z. B. Snap-Coord liegt selbst nicht im Face) erzwingt einen weiteren Versions-Patch.
-- Forensik-Log und tatsächlicher Outbound-Payload können auseinanderlaufen.
+Hailuo (und Nano Banana 2 als Anchor-Composer) interpretieren `equal screen share` + `clear gaps` + `no overlap` zunehmend **wörtlich als Split-Screen-Layout** statt als ein gemeinsames Group-Foto. Das negativ-Prompt-Block `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` (Z. 326–349) enthält nur `picture-in-picture`, aber keine expliziten Sperren für Split-Screen / Panel-Grid / Photo-Collage.
 
-## Zielarchitektur
+## Lösung (4 Stufen)
 
-Eine einzige, deterministische Funktion bestimmt ASD **vor** dem Payload-Build aus drei klar getrennten Inputs:
+### 1. Group-Framing-Prompt umschreiben (n ≥ 3)
+`supabase/functions/compose-video-clips/index.ts` — `neutralTwoShotPrompt`, n≥3-Branch:
 
-```text
-┌─────────────────┐   ┌────────────────────┐   ┌──────────────────┐
-│ Preflight Face  │   │ Pass Geometrie     │   │ Retry Variant    │
-│ (Gemini Vision: │   │ (preclip dims,     │   │ (auto / coords / │
-│  found + coord  │   │  crop, plate dims, │   │  bbox-url /      │
-│  + frame)       │   │  speakers.length)  │   │  expanded-crop)  │
-└────────┬────────┘   └─────────┬──────────┘   └────────┬─────────┘
-         │                      │                       │
-         └──────────┬───────────┴───────────────────────┘
-                    ▼
-        ┌──────────────────────────┐
-        │  buildAsdStrategy()      │
-        │  → { mode, asd, frame,   │
-        │      space, source }     │
-        └──────────┬───────────────┘
-                   ▼
-        ┌──────────────────────────┐
-        │  Sync-3 Payload (final)  │
-        │  → sanitize → dispatch   │
-        └──────────────────────────┘
+Neue Formulierung betont **einen gemeinsamen physischen Raum, eine durchgehende Kamera, ein Take**:
+
+```
+all standing together in the same physical room as a natural group, captured in
+one continuous cinematic frame by a single locked camera in one take.
+Wide medium group shot, ensemble composition: every person occupies real
+shared 3D space (overlapping depth planes, natural personal distance ≈
+shoulder-width, slight depth stagger so nobody is perfectly side-by-side).
+Each face stays clearly visible, front- or three-quarter-facing, mouth and
+jaw unobstructed. Identical ambient lighting across the whole room.
 ```
 
-Regeln (Priorität von oben nach unten):
+Entfernt: `single horizontal line`, `equal screen share`, `clear gaps between them`. Diese drei Phrasen sind die direkten Trigger für das Split-Screen-Misinterpretation.
 
-1. **Preflight Face vorhanden + im Bild** → `{ auto_detect: false, frame_number, coordinates: <preflight-coord> }` (doc-strict).
-2. **Multi-Speaker mit bbox-url** (Retry `bbox-url`) → `{ auto_detect: false, bounding_boxes_url }`.
-3. **Multi-Speaker mit Plate-Coords + Crop in-bounds** (Retry `coords-pro`) → doc-strict mit transformierten Preclip-Coords.
-4. **Single-Face Preclip, kein Preflight nötig** → `{ auto_detect: true }` (sicherer Default für 1-Face Crops).
-5. **Letzter Ausweg** (kein Face, Probe unavailable, Multi-Speaker ohne Coords) → `{ auto_detect: true }` mit explizitem `last_resort` Tag.
+### 2. Negative-Prompt härten
+Im `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` (Z. 349) anhängen:
 
-**Keine nachträgliche Mutation mehr.** Der Face-Gate (Z. 4441 ff.) wird zu einem reinen **Validator** — er bestätigt nur noch, dass die *bereits* gesetzte Coord ins Gesicht zeigt. Bei `ok_after_snap` blockiert er und löst einen Retry mit Variant `preflight-snap` aus, statt heimlich umzuschreiben.
+```
+, split screen, split-screen composition, split-frame, multi-panel layout,
+panel grid, photo grid, brady bunch grid, photo collage, composite of
+separate portraits, isolated character cutouts, vertical divider lines,
+visible seams between people, four-up grid, two-up grid, side-by-side panels,
+each person in their own frame, individual portrait panels
+```
 
-## Umsetzung
+Diese Begriffe werden zusätzlich an `negativeFor()` für i2v-Calls geroutet (bestehender Pfad — keine Strukturänderung).
 
-### 1) Neue Helper-Datei `_shared/asd-strategy.ts`
-
-Exportiert:
+### 3. ANCHOR_AUDIT_VERSION 8 → 9
+`supabase/functions/compose-video-clips/index.ts` Z. 37:
 
 ```ts
-export type AsdStrategy = {
-  mode:
-    | "preflight_coord"        // Regel 1
-    | "bbox_url"               // Regel 2
-    | "preclip_coord_strict"   // Regel 3
-    | "single_face_auto"       // Regel 4
-    | "last_resort_auto";      // Regel 5
-  asd: SyncSoAsd;              // exakt das was Sync.so bekommt
-  frameNumber: number | null;
-  coordSpace: "plate" | "preclip" | "none";
-  source: "preflight" | "pass" | "retry" | "default";
-  diagnostics: Record<string, unknown>; // für syncso_dispatch_log
-};
-
-export function buildAsdStrategy(input: {
-  preflight: { faceFound: boolean; coord?: [number,number]; frame?: number } | null;
-  pass: PassRecord;             // mit preclip_*, plate_*, coords, crop
-  retryVariant: string | null;
-  isMultiSpeaker: boolean;
-  usePreclip: boolean;
-}): AsdStrategy;
+const ANCHOR_AUDIT_VERSION = 9;
 ```
 
-Die Funktion ist **pure** (keine DB-Zugriffe, keine Mutations), testbar, und ersetzt die 230-Zeilen `if/else if`-Kette komplett.
+Bewirkt dass alle bereits gecachten Quad-Split-Plates beim nächsten Cinematic-Sync-Render automatisch verworfen und mit dem neuen Prompt neu komponiert werden — ohne dass User manuell "Neu rendern" klicken müssen.
 
-### 2) Preflight als primäre Quelle nutzen
+### 4. Plate-Quality-Gate erweitern (optionaler Split-Screen-Detector)
+`supabase/functions/compose-dialog-segments/index.ts` v117/v119 Plate-Quality-Gate (Z. 1291–1376):
 
-Der Face-Gate Probe (`verifyFaceBeforeDispatch` in `_shared/syncso-face-gate.ts`) wird in **zwei** Aufrufe gespalten:
+Wenn bei n≥3 alle erkannten Face-Boxes
+- **gleiche y-Achse** haben (Center-y ± 5 % der Frame-Höhe) UND
+- **gleichmäßig in x verteilt** sind (Abstände untereinander ± 8 % gleich) UND
+- **Box-Höhen ± 10 % identisch** sind
 
-- **`probeFaceForPlanning(...)`** — neuer Helper, läuft **vor** `buildAsdStrategy`. Liefert ehrliches `{ faceFound, coord, frame }` oder `null` bei Probe-Unavailable.
-- **`validateAsdBeforeDispatch(...)`** — der bisherige `verifyFaceBeforeDispatch` ohne Snap-Mutation-Logik. Liefert nur noch `ok / blocked / probe_unavailable`. Wenn er `not_at_coord` meldet, fail mit Refund und Webhook-Retry-Hint `preflight-snap` (statt im selben Aufruf umzuschreiben).
+→ als `split_screen_layout` klassifizieren und mit eigenem `clip_error` markieren:
 
-### 3) `compose-dialog-segments/index.ts` umbauen
+> *"Plate wurde als Split-Screen-Layout erkannt — Sync.so kann Einzel-Panels nicht lipsyncen. Bitte Szene neu rendern (alle Personen müssen im selben Raum stehen, nicht in getrennten Panels)."*
 
-- **Löschen**: Block A (Z. 3470–3698) und Block C Snap-Mutation (Z. 4487–4564).
-- **Ersetzen** durch:
-  ```ts
-  const preflight = await probeFaceForPlanning({ ... });
-  const strategy = buildAsdStrategy({
-    preflight, pass, retryVariant, isMultiSpeaker, usePreclip: usePassPreclip,
-  });
-  syncOptions.active_speaker_detection = strategy.asd;
-  asdMode = strategy.mode;
-  (pass as any)._asd_diagnostics = strategy.diagnostics;
-  ```
-- **Behalten**: v124 Sanitizer (Z. 156, Z. 4270) bleibt als Defense-in-Depth.
-- **Validator-Aufruf** (Z. 4441) ruft jetzt `validateAsdBeforeDispatch` mit dem **bereits final gesetzten** Coord auf. Wenn er `ok_after_snap` zurückgibt, ist das ein Bug in `buildAsdStrategy` — log + refund + retry, niemals stillschweigend patchen.
+Credits werden über den bestehenden Refund-Pfad zurückerstattet (identisch zu `plate_faces_missing`).
 
-### 4) Retry-Variant `preflight-snap`
+## Files
+- `supabase/functions/compose-video-clips/index.ts` — Prompt + Negative + Audit-Version
+- `supabase/functions/compose-dialog-segments/index.ts` — Split-Screen-Heuristik im Plate-Quality-Gate
+- `mem/architecture/lipsync/anti-split-screen-group-plate-v9.md` — neue Memory
+- `mem/index.md` — Eintrag hinzufügen
 
-Neuer Variant-Wert, den der Lipsync-Watchdog setzt, wenn der Validator `not_at_coord` mit verfügbarer Snap-Coord meldet. Beim nächsten Run nutzt `buildAsdStrategy` Regel 1 mit der gespeicherten Snap-Coord. So bleibt der Pfad deterministisch und im Dispatch-Log nachvollziehbar.
+## Outside scope
+- Sync.so `generation_unknown_error` selbst — das ist ein nachgelagertes Symptom, das mit korrektem Group-Plate verschwindet. Kein eigener Retry-Pfad nötig.
+- N-Slot Face-Map Architektur — bleibt unverändert; die Koordinaten waren korrekt, nur der Plate war falsch komponiert.
+- FROZEN-INVARIANTS (I.4) — `LOCKED static camera` und alle Framing-Change-Keywords bleiben verbatim erhalten.
 
-### 5) Forensik & UI
-
-- `syncso_dispatch_log.meta.asd_strategy` enthält `{ mode, source, coordSpace, diagnostics }`.
-- UI-Komponente, die heute "Snap erkannt aber nicht angewandt" anzeigt, wird auf `strategy.source === "preflight"` umgestellt — Grün wenn Preflight die Coord lieferte, Gelb bei `single_face_auto`, Rot bei `last_resort_auto`.
-
-### 6) Aufräumen / Memory
-
-- `mem://architecture/lipsync/sync-3-only-dialog-pipeline.md` aktualisieren auf v130 (Single-Source ASD-Builder).
-- `mem://architecture/lipsync/sync-3-doc-strict-options-v106` Eintrag erweitern um Verweis auf neuen Strategy-Builder.
-- Veraltete Versions-Kommentare (v115, v119, v124, v125, v129.1, v129.24-30) in der gelöschten Block-A-Sektion entfallen automatisch.
-
-### 7) Testing
-
-- Deno-Tests für `buildAsdStrategy` mit Fixtures pro Regel (5 Pfade × Multi/Single × Retry-Variants).
-- E2E: zuletzt fehlgeschlagene Szene `21eed4c2-9abf-44ed-bba3-ed2dc63e35e6` re-dispatchen, im Log prüfen dass `asd_strategy.mode === "preflight_coord"` und Sync.so 200 OK.
-
-## Was bewusst NICHT geändert wird
-
-- v124 Sanitizer (bleibt als zweite Verteidigungslinie).
-- bbox-url / expanded-crop Eskalationsladder im Webhook.
-- Audio-Preflight, Face-Gate JPEG-Cache, Refund-Logik.
-- Frontend des Director's Cut Studio (nur die ASD-Status-Pille wird umverdrahtet).
-
-## Risiko & Migration
-
-- Single Edge Function (`compose-dialog-segments`) — Deploy ist atomar.
-- Bei Regression sofortiger Rollback auf v129.30 möglich (Git-Revert der drei Files).
-- Bestehende `pending`/`generating` Passes laufen unverändert weiter, weil der Strategy-Builder identische Payloads erzeugt wie die heute *intendierten* Pfade — nur deterministischer.
-
-## Geschätzter Aufwand
-
-- ~250 Zeilen löschen, ~180 Zeilen neuer Strategy-Builder + Tests, ~40 Zeilen Validator-Slim-Down.
-- Ein Deploy von `compose-dialog-segments`, eine Memory-Aktualisierung.
+## Verification
+1. Edge-Functions deployen (`compose-video-clips`, `compose-dialog-segments`).
+2. User klickt "Sauber neu starten" auf der Lipsync-Bar → Plate wird wegen Audit v9 neu komponiert.
+3. Erwarten: Group-Shot im gemeinsamen Raum (kein Split), Face-Gate findet alle 4 Gesichter, Sync.so läuft durch.
+4. Falls Hailuo trotzdem splittet: Split-Screen-Detector blockt vor Sync.so-Dispatch mit klarer Fehlermeldung statt `generation_unknown_error`.

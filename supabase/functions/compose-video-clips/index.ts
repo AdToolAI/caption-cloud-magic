@@ -34,7 +34,7 @@ import {
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 8;
+const ANCHOR_AUDIT_VERSION = 9;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -346,7 +346,13 @@ serve(async (req) => {
       // form of in-clip framing change for cinematic-sync master plates.
       // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.4):
       // every framing-change keyword below MUST stay.
-      ", camera cut, scene change, shot change, new shot, different angle, edit cut, hard cut, jump cut, zoom in, zoom out, push in, pull out, dolly, dolly in, dolly out, crane, pan, tilt, whip pan, close-up insert, reframe, second camera, multi-camera, picture-in-picture";
+      ", camera cut, scene change, shot change, new shot, different angle, edit cut, hard cut, jump cut, zoom in, zoom out, push in, pull out, dolly, dolly in, dolly out, crane, pan, tilt, whip pan, close-up insert, reframe, second camera, multi-camera, picture-in-picture" +
+      // v9 (Jun 19 2026) — Anti-Split-Screen guard. Hailuo/Nano-Banana-2 were
+      // interpreting the prior n>=3 positive prompt ("equal screen share /
+      // clear gaps / no overlap") as a literal quad-split layout. These
+      // tokens hard-block any panel/grid/collage composition so the model
+      // produces ONE shared physical room instead.
+      ", split screen, split-screen composition, split-frame, multi-panel layout, panel grid, photo grid, brady bunch grid, photo collage, composite of separate portraits, isolated character cutouts, vertical divider lines, visible seams between people, four-up grid, two-up grid, side-by-side panels, each person in their own frame, individual portrait panels";
     const POSITIVE_CLEAN_CUE =
       ", clean cinematic composition, natural environment";
     // Positive cue appended ONLY for i2v requests — biases the model toward
@@ -628,7 +634,15 @@ serve(async (req) => {
         ? "framed in a clean front, three-quarter or natural profile angle (sync-3 handles profile and partial-occlusion natively) so the mouth and jaw remain clearly visible and unobstructed by hands, microphones or props"
         : n === 2
           ? "each visible exactly once, in a natural two-shot — front, three-quarter, profile or over-the-shoulder angles are all acceptable (sync-3 handles profile/OTS natively); the mouth and jaw of every person must stay clearly visible and unobstructed by hands, microphones or props"
-          : `arranged in a single horizontal line, left-to-right, with equal screen share and clear gaps between them (no overlap, no person standing in front of another). Wide medium group shot, each face shown clean and front-facing, full mouth and jaw of every person clearly visible and unobstructed by hands, microphones or props. Identical lighting on every face`;
+          // v9 (Jun 19 2026) — anti-split-screen ensemble framing. The prior
+          // wording ("single horizontal line / equal screen share / clear
+          // gaps / no overlap") was being interpreted literally by Hailuo
+          // and Nano-Banana-2 as a quad-split-screen layout (each person
+          // in their own vertical panel with hard seams). Replaced with
+          // language that emphasises ONE shared physical room and one
+          // continuous camera take. Negative prompt still hard-blocks
+          // panel/grid/collage compositions.
+          : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
       // IMPORTANT: do NOT instruct the model to keep lips closed or "rest" the
       // mouth posture — that produces a frozen, ventriloquist-style face that
       // Sync.so cannot meaningfully animate on top of. We only ask for a
