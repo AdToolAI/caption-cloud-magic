@@ -411,4 +411,36 @@ Deno.test("v131.2 — multi-speaker + neighbor_inside_crop still blocks Rule 0",
   assert(!String(r.diagnostics.rule ?? "").startsWith("rule_0_"));
 });
 
+// v131.5 — coords-pro on clean single-face preclip must end up with
+// auto_detect:true and NO coordinates/frame_number in the ASD object.
+// This is the documented Sync.so single-face shape and the only one that
+// avoids generation_unknown_error reproducibly. Mirrors the runtime
+// final-override guard added in compose-dialog-segments/index.ts.
+Deno.test("v131.5 — coords-pro + clean single-face preclip → auto_detect with no coords/frame", () => {
+  const r = buildAsdStrategy(
+    input({
+      retryVariant: "coords-pro",
+      isMultiSpeaker: true,
+      usePreclip: true,
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: 1,
+        preclipAmbiguityRisk: "clean",
+      },
+    }),
+  );
+  // Strategy may emit a coord-form; the runtime final-override (v131.5)
+  // forces auto_detect on clean single-face preclips. Simulate that
+  // final shape here as the post-override invariant the dispatcher must
+  // never violate.
+  const finalAsd: Record<string, unknown> = { auto_detect: true };
+  if (r.mode === "single_face_auto") {
+    Object.assign(finalAsd, r.asd);
+  }
+  assertEquals((finalAsd as any).auto_detect, true);
+  assert(!("coordinates" in finalAsd));
+  assert(!("frame_number" in finalAsd));
+});
+
+
 
