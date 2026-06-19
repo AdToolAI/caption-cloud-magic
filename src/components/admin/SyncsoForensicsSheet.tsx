@@ -1083,6 +1083,14 @@ function PreflightPanel({
                 preclip_crop={JSON.stringify(resolved.preclip_crop)}
               </div>
             )}
+            {(resolved.asd_mode_chosen || resolved.asd_rule_fired || resolved.preclip_trust) && (
+              <div className="rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 mt-1 font-mono text-[10px] text-amber-200">
+                ASD strategy: mode=<span className="text-amber-100">{resolved.asd_mode_chosen ?? '—'}</span>
+                {' '}· rule=<span className="text-amber-100">{resolved.asd_rule_fired ?? '—'}</span>
+                {' '}· preclip_trust=<span className="text-amber-100">{resolved.preclip_trust ?? '—'}</span>
+              </div>
+            )}
+
           </div>
         );
       })()}

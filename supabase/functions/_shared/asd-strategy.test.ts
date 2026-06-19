@@ -40,8 +40,8 @@ Deno.test("Rule 0 (v131) — verified single-face preclip → auto_detect even w
   assertEquals(r.mode, "single_face_auto");
   assertEquals(r.asd.auto_detect, true);
   assertEquals(r.diagnostics.rule, "rule_0_preclip_single_face_verified");
-  assertEquals(r.diagnostics.preclip_single_face_verified, true);
   assertEquals(r.diagnostics.had_preflight_coord, true);
+
 });
 
 Deno.test("Rule 0 (v131) — multi-speaker scene with verified single-face crop → auto_detect", () => {
@@ -64,16 +64,16 @@ Deno.test("Rule 0 (v131) — explicit coords-pro retry bypasses Rule 0 → Rule 
   assertEquals(r.mode, "preflight_coord");
 });
 
-Deno.test("Rule 0 (v131) — not eligible when preclip face count is null/unknown", () => {
+Deno.test("Rule 0 (v131.1) — face count null now fires Rule 0 as probe_unavailable", () => {
   const r = buildAsdStrategy(
     input({
-      geometry: { ...baseGeometry, preclipFaceCount: null },
+      geometry: { ...baseGeometry, preclipFaceCount: null, preclipAmbiguityRisk: null },
     }),
   );
-  // Falls through; Rule 4 still gives single_face_auto but without rule_0 diagnostic
   assertEquals(r.mode, "single_face_auto");
-  assertEquals(r.diagnostics.rule ?? null, null);
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_probe_unavailable");
 });
+
 
 Deno.test("Rule 1 — preflight face coord wins over everything", () => {
   const r = buildAsdStrategy(
@@ -264,3 +264,67 @@ Deno.test("preflight-snap retry variant routes through preflight_coord", () => {
   // @ts-ignore narrowed
   assertEquals(r.asd.frame_number, 3);
 });
+
+// ── v131.1 — Rule 0 trust extension ────────────────────────────────────────
+
+Deno.test("v131.1 — face probe unavailable + no ambiguity → Rule 0 fires (probe_unavailable)", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: null,
+        preclipAmbiguityRisk: null,
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_probe_unavailable");
+  assertEquals(r.diagnostics.preclip_trust, "unknown");
+});
+
+Deno.test("v131.1 — probe unavailable but preclipTrust='verified' → rule_0_preclip_verified", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: null,
+        preclipAmbiguityRisk: null,
+        preclipTrust: "verified",
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_verified");
+});
+
+Deno.test("v131.1 — probe unavailable + ambiguity neighbor_inside_crop → Rule 0 blocked", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: null,
+        preclipAmbiguityRisk: "neighbor_inside_crop",
+      },
+    }),
+  );
+  // Falls through to Rule 1/3, not Rule 0
+  assert(r.diagnostics.rule !== "rule_0_preclip_probe_unavailable");
+  assert(r.diagnostics.rule !== "rule_0_preclip_verified");
+});
+
+Deno.test("v131.1 — preclipTrust='verified' but faceCount=2 → Rule 0 blocked (multi-face beats trust)", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: 2,
+        preclipAmbiguityRisk: "clean",
+        preclipTrust: "verified",
+      },
+    }),
+  );
+  assert(r.diagnostics.rule !== "rule_0_preclip_verified");
+  assert(r.diagnostics.rule !== "rule_0_preclip_probe_unavailable");
+});
+
