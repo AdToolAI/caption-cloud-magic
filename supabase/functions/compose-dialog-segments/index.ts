@@ -3887,7 +3887,15 @@ serve(async (req) => {
     // stills where lipsync-2-pro's "Still Frame Limitation" silently fails.
     // sync-3 handles both static and motion plates natively. lipsync-2-pro
     // remains reachable only via the explicit `coords-pro-lp2pro` fallback.
-    const payloadModel = usePassPreclip
+    // v129.28 — clean-preclip coords-pro retry overrides any other model
+    // choice and forces lipsync-2 + auto_detect:true (set above). This
+    // breaks the sync-3 NOOP→generation_unknown_error loop documented in
+    // the v129.26/v129.27 comment blocks.
+    const forceLipsync2Fallback =
+      (pass as any)._force_lipsync2_clean_preclip_retry_v12928 === true;
+    const payloadModel = forceLipsync2Fallback
+      ? LIPSYNC_FALLBACK_MODEL
+      : usePassPreclip
       ? SYNC3_MODEL
       : retryVariant === "sync3-coords"
         ? SYNC3_MODEL
