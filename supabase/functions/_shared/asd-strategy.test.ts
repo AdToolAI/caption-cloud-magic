@@ -64,16 +64,16 @@ Deno.test("Rule 0 (v131) — explicit coords-pro retry bypasses Rule 0 → Rule 
   assertEquals(r.mode, "preflight_coord");
 });
 
-Deno.test("Rule 0 (v131) — not eligible when preclip face count is null/unknown", () => {
+Deno.test("Rule 0 (v131.1) — face count null now fires Rule 0 as probe_unavailable", () => {
   const r = buildAsdStrategy(
     input({
-      geometry: { ...baseGeometry, preclipFaceCount: null },
+      geometry: { ...baseGeometry, preclipFaceCount: null, preclipAmbiguityRisk: null },
     }),
   );
-  // Falls through; Rule 4 still gives single_face_auto but without rule_0 diagnostic
   assertEquals(r.mode, "single_face_auto");
-  assertEquals(r.diagnostics.rule ?? null, null);
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_probe_unavailable");
 });
+
 
 Deno.test("Rule 1 — preflight face coord wins over everything", () => {
   const r = buildAsdStrategy(
