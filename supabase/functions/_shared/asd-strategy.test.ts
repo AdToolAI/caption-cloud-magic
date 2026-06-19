@@ -264,3 +264,67 @@ Deno.test("preflight-snap retry variant routes through preflight_coord", () => {
   // @ts-ignore narrowed
   assertEquals(r.asd.frame_number, 3);
 });
+
+// ── v131.1 — Rule 0 trust extension ────────────────────────────────────────
+
+Deno.test("v131.1 — face probe unavailable + no ambiguity → Rule 0 fires (probe_unavailable)", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: null,
+        preclipAmbiguityRisk: null,
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd.auto_detect, true);
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_probe_unavailable");
+  assertEquals(r.diagnostics.preclip_trust, "unknown");
+});
+
+Deno.test("v131.1 — probe unavailable but preclipTrust='verified' → rule_0_preclip_verified", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: null,
+        preclipAmbiguityRisk: null,
+        preclipTrust: "verified",
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.diagnostics.rule, "rule_0_preclip_verified");
+});
+
+Deno.test("v131.1 — probe unavailable + ambiguity neighbor_inside_crop → Rule 0 blocked", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: null,
+        preclipAmbiguityRisk: "neighbor_inside_crop",
+      },
+    }),
+  );
+  // Falls through to Rule 1/3, not Rule 0
+  assert(r.diagnostics.rule !== "rule_0_preclip_probe_unavailable");
+  assert(r.diagnostics.rule !== "rule_0_preclip_verified");
+});
+
+Deno.test("v131.1 — preclipTrust='verified' but faceCount=2 → Rule 0 blocked (multi-face beats trust)", () => {
+  const r = buildAsdStrategy(
+    input({
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: 2,
+        preclipAmbiguityRisk: "clean",
+        preclipTrust: "verified",
+      },
+    }),
+  );
+  assert(r.diagnostics.rule !== "rule_0_preclip_verified");
+  assert(r.diagnostics.rule !== "rule_0_preclip_probe_unavailable");
+});
+
