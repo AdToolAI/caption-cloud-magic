@@ -1,59 +1,57 @@
-## Befund
+# Plan v131.5 — auto_detect:true zuverlässig an Sync.so durchreichen
 
-Das aktuelle Fehlschlagen ist **nicht mehr nur der Screenshot-Face-Gate-Fehler**, sondern weiterhin der alte Root Cause im echten Provider-Payload:
+## Problem (Forensik aus `syncso_dispatch_log`)
+Letzter Dispatch (scene `83145f34…`, 17:21:52) zeigt trotz v131.4-Edits:
+- `v102_probe.asd_mode = v130_preclip_coord_strict` (nicht `v131_4_single_face_auto_forced`)
+- `payload.options.active_speaker_detection = { auto_detect:false, coordinates:[360,363], frame_number:2 }`
+- `coords` / `frame_number` Spalten = `[360,363]` / `2`
+- `sync_status = FAILED`
 
-- Letzter Dispatch `scene=83145f34...`, `pass=1`, `variant=coords-pro`
-- Sync.so bekam weiterhin:
-  ```json
-  "active_speaker_detection": {
-    "auto_detect": false,
-    "coordinates": [360,363],
-    "frame_number": 2
-  }
-  ```
-- Ergebnis: `generation_unknown_error`
+→ Der v131.4-Override greift im Live-Pfad **nicht**. Drei plausible Ursachen, die wir gleichzeitig schließen.
 
-Wichtig: In der Source-Datei ist `asd-strategy.ts` bereits richtig vorbereitet, aber **die deployte Edge Function läuft offenbar noch mit alter/bundled Logik** (`v130_preclip_coord_strict`, `reason: coords_pro_retry`). Deshalb hat der letzte Versuch die Produktionsfunktion nicht effektiv umgestellt.
+## Änderungen
 
-## Plan
+### 1. Hard Re-Deploy + Versions-Pin
+- `COMPOSE_DIALOG_SEGMENTS_VERSION = "v131.5"` als Konstante in `compose-dialog-segments/index.ts`.
+- In jeden `syncso_dispatch_log`-Insert: `meta.compose_version = v131.5` schreiben — damit wir in einer SQL-Abfrage sofort sehen, welcher Build dispatched hat.
 
-1. **Fix direkt im Dispatch-Pfad erzwingen**
-   - In `compose-dialog-segments/index.ts` nach `buildAsdStrategy(...)` eine harte Safety-Normalisierung einbauen:
-     - Wenn `usePassPreclip === true`
-     - und `retryVariant === "coords-pro"`
-     - und keine echte Mehrgesicht-Ambiguität vorliegt
-     - dann wird `syncOptions.active_speaker_detection` zwingend auf `{ auto_detect: true }` gesetzt.
-   - Damit kann keine alte `coords-pro → coordinates` Entscheidung mehr bis zum Sync.so Payload durchrutschen.
+### 2. Override-Härtung (Reihenfolge + Coord-Nulling)
+In `compose-dialog-segments/index.ts`:
+- Den v131.4-Block (`retryVariant === "coords-pro"` + clean preclip → `auto_detect:true`) **vor** `_v102_probe`-Logging und vor dem Payload-Bau ausführen.
+- Synchron `pass.coords = null`, `clampedAsdFrame = null`, `v1291.reason = null`, `v1291.coord_space = "none"` setzen, damit weder Telemetrie noch Payload alte `[360,363]`/`2`-Werte führen.
+- Neuer Diag-Flag `v131_5_dispatch_path_safety_override = true`.
+- Asserts vor `fetch` zu sync.so: wenn `asd.auto_detect === true` → werfen, falls `coordinates` oder `frame_number` im Payload-Objekt existieren.
 
-2. **Face-Gate an Auto-Detect anpassen**
-   - Der Live Face-Gate darf bei `{ auto_detect:true }` keinen erfundenen/inferierten Koordinatenpunkt mehr prüfen.
-   - Für Auto-Detect-Preclips wird nur geprüft: Preclip ist da, keine bestätigte Mehrgesicht-Ambiguität; kein Hard-Fail wegen `recognition_zero_faces` aus einem unzuverlässigen Probe-Frame.
-   - Das verhindert den Screenshot-Fall „Gesicht am ASD-Frame FAIL“ als Blocker, wenn der tatsächliche Provider-Payload Auto-Detect nutzt.
+### 3. Audit aller Dispatch-Pfade
+Identische Rule-0-Logik (coords-pro + single-face clean preclip → `auto_detect:true`, coords/frame_number raus) in:
+- `supabase/functions/lipsync-watchdog/index.ts`
+- `supabase/functions/syncso-replay/index.ts`
+- `supabase/functions/syncso-preflight/index.ts`
 
-3. **Forensik-Logging eindeutig machen**
-   - `syncso_dispatch_log.meta` soll klar zeigen:
-     - `asd_rule_fired: rule_0_preclip_coords_pro_forced_auto`
-     - `asd_mode_chosen: single_face_auto`
-     - outbound payload ohne `coordinates` und ohne `frame_number`
-   - So können wir nach dem nächsten „Sauber neu starten“ beweisen, ob Sync.so wirklich den neuen Payload bekommen hat.
+→ stellt sicher, dass kein Retry-/Replay-/Watchdog-Pfad den alten Strict-Payload re-dispatched.
 
-4. **Tests ergänzen**
-   - Test für den aktuellen Produktionsfall:
-     - Multi-Speaker
-     - Preclip
-     - `retryVariant: "coords-pro"`
-     - `preclipFaceCount: 1`
-     - `ambiguity: clean`
-     - Erwartung: `{ auto_detect: true }`, keine Koordinaten.
-   - Test/Assertion für den Face-Gate-Bypass bei Auto-Detect-Preclip, soweit sauber isolierbar.
+### 4. Test + Doku
+- Neuer Unit-Test in `_shared/asd-strategy.test.ts`: `coords-pro` + clean preclip → Payload enthält **kein** `coordinates`/`frame_number`.
+- Memory-Update: `mem/architecture/lipsync/v131-5-force-redeploy-and-coord-nulling.md` + Index-Eintrag.
 
-5. **Deploy & Verifikation**
-   - `compose-dialog-segments` deployen.
-   - Danach Logs/DB prüfen: Der nächste Dispatch muss `asd_auto_detect:true`, `asd_has_coordinates:false` zeigen.
-   - Wenn Sync.so danach noch fehlschlägt, ist es ein echter Provider-/Asset-Fall; aber dann haben wir den bisherigen Koordinaten-Root-Cause sicher ausgeschlossen.
+## Verifikation
+Nach Deploy + „Sauber neu starten":
+```sql
+select meta->>'compose_version', v102_probe->>'asd_mode',
+       payload_summary->'options'->'active_speaker_detection',
+       coords, frame_number, sync_status
+from syncso_dispatch_log
+order by created_at desc limit 5;
+```
+Erwartung: `compose_version=v131.5`, `asd_mode=v131_4_single_face_auto_forced`, `asd={auto_detect:true}` (ohne coords/frame), `coords=NULL`, `frame_number=NULL`, `sync_status=DISPATCHED → COMPLETED`.
 
-## Nicht ändern
+## Files
+- edit: `supabase/functions/compose-dialog-segments/index.ts`
+- edit: `supabase/functions/lipsync-watchdog/index.ts`
+- edit: `supabase/functions/syncso-replay/index.ts`
+- edit: `supabase/functions/syncso-preflight/index.ts`
+- edit: `supabase/functions/_shared/asd-strategy.test.ts`
+- create: `mem/architecture/lipsync/v131-5-force-redeploy-and-coord-nulling.md`
+- edit: `mem/index.md`
 
-- Kein Umbau der doppelten Bild-/Plate-Erzeugung.
-- Keine Änderung an Credits/Refunds.
-- Keine Änderung am Avatar-/Preclip-Rendering selbst.
+Keine Schema-Änderungen.
