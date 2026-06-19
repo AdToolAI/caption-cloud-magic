@@ -5364,7 +5364,12 @@ serve(async (req) => {
           coord_source: coordSources[Number(pass.speaker_idx ?? -1)] ?? "unknown",
           plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
           plate_identity_total: plateIdentityMap?.faces?.length ?? 0,
+          plate_identity_method: (plateIdentityMap as any)?.identityMethod ?? null,
+          plate_identity_min_conf: (plateIdentityMap as any)?.minConfidence ?? null,
+          plate_identity_min_margin: (plateIdentityMap as any)?.minMargin ?? null,
+          plate_identity_cross_check: (plateIdentityMap as any)?.crossCheck ?? null,
           plate_dims: plateDims ?? null,
+
         },
         // v129.1 — Outbound payload contract evidence. `outbound_payload`
         // captures the EXACT options dispatched to Sync.so (URLs intentionally
