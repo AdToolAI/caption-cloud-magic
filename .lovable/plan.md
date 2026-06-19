@@ -1,112 +1,81 @@
-## Befund
+## Problem
 
-**Do I know what the issue is?** Ja.
+Bei der 4-Sprecher-Szene wurde Lip-Sync technisch sauber gerendert, aber **Charakter 1 und Charakter 4 wurden vertauscht** (beide mit der jeweils falschen Stimme). Charakter 2 und 3 stimmten. Das ist kein Sync.so-Bug, sondern ein **Identity-Mapping-Bug** in `_shared/plate-face-identity.ts`.
 
-Der neue Fehler ist **nicht** der Watchdog/20-Minuten-Timeout. Der Screenshot zeigt:
+## Root Cause
 
-`v107_preclip_required_for_multispeaker: face_gate_failed:count=0`
+`askGeminiForPlateIdentity()` schickt EINEN Multi-Image-Prompt an Gemini ("welcher Slot = welcher Charakter?"). Bei 4 ähnlichen Plate-Faces produziert Gemini regelmäßig partielle Verwechslungen — typischerweise an den Rändern (Slot 0 ↔ Slot N-1), weil die Reference-Portraits in einer Liste durchgereicht werden und Position-Bias entsteht.
 
-Das bedeutet: Die Pipeline hat für die 4. Sprecherin einen Single-Face-Preclip gebaut, aber beim Face-Gate wurden **0 Gesichter** im Preclip gefunden. Deshalb wurde **vor** dem Sync.so-Dispatch hart abgebrochen. Es ist also ein **Master-Plate / Preclip-Visibility-Problem**, nicht primär ein Lip-Sync-Provider-Problem.
+Zusätzlich:
+- **Slot-Order-Fallback (v117)** ordnet Faces nach `slot` L→R und Speakers nach Array-Position. Wenn `speakers[]` aber NICHT in Bildreihenfolge sortiert ist (z. B. nach Dialog-Reihenfolge), entsteht garantiert ein Swap.
+- Es gibt **keine Verifikation** des Gemini-Outputs — niedrige Confidence (z. B. 0.5) wird genauso behandelt wie 0.95.
+- Die Coords pro Speaker werden direkt aus `plateIdentityMap.faces[].center` übernommen — ein einziger Mismatch verteilt sich auf den gesamten Pass.
 
-Konkret zur aktuellen Szene:
-- Pass 1–3 wurden erzeugt.
-- Pass 4 / Sarah scheitert vor Provider-Start.
-- Sarah sitzt sehr weit oben/links im Bild; ihr Turn ist spät im Clip.
-- Die aktuelle Pipeline prüft die Plate vorher nur zu grob, aber nicht zuverlässig je Sprecher im tatsächlichen Turn-Fenster.
-- Dadurch starten wir Lip-Sync auf einer Szene, die für den betroffenen Sprecher zur Sprechzeit nicht stabil/erkennbar genug ist.
+## Fix-Plan v133
 
-## Ziel
+### 1. Per-Character Identity-Probe (statt 1× Multi-Slot)
 
-Nicht mehr mit Retries auf kaputte Eingangsvideos reagieren, sondern **vor dem ersten kostenpflichtigen Lip-Sync-Start** sicherstellen, dass alle Sprecher im jeweiligen Dialog-Turn sichtbar sind — oder automatisch auf eine stabile Dialog-Plate gehen.
+Neuer Helper `probeCharacterOnPlate()` in `_shared/plate-face-identity.ts`:
+- Pro Charakter EIN separater Gemini-Call: "Im Plate-Frame siehst du N Boxen (1..N). Welche Box zeigt dieselbe Person wie das Portrait? Antworte `{slot, confidence}`."
+- N Charaktere × 1 Call = N Calls parallel (Promise.all). Bei 4 Speakern: 4 parallele Calls statt 1 Combined-Call.
+- Position-Bias entfällt, weil jeder Charakter isoliert mit allen Boxen verglichen wird.
 
-## Plan
+### 2. Hungarian-Assignment statt Greedy
 
-### 1. Turn-Level Plate-Gate vor Lip-Sync einbauen
+Aus den N×N Confidence-Werten eine Score-Matrix bauen und mit **Munkres / Hungarian-Algorithmus** die global-optimale 1:1-Zuordnung lösen.
+- Verhindert dass 2 Charaktere demselben Slot zugewiesen werden.
+- Verhindert dass ein lokal-bester Match einen anderen Charakter "blockiert" der diesen Slot eigentlich braucht.
+- Kleine 4×4-Matrix → triviale Implementierung inline (~40 LOC).
 
-In der Dialog-Lip-Sync-Funktion wird vor dem ersten Sync-Dispatch für jeden Sprecher geprüft:
+### 3. Confidence-Gate + Cross-Check
 
-- Sprecher-Koordinate vorhanden
-- Turn-Zeitfenster vorhanden
-- Face sichtbar am Anfang/Mitte/Ende des Sprecher-Turns
-- Bei 3–4 Personen: alle erwarteten Gesichter bleiben in den relevanten Turn-Frames detektierbar
+- Wenn `min(assignedConfidence) < 0.55` oder `max - secondBest < 0.15` (ambiguous) bei ≥3 Speakern:
+  - Zweite Gemini-Pass als **Cross-Check**: "Hier sind die finalen Zuordnungen Slot→CharacterId. Ist das korrekt? Antworte nur `confirmed` oder `swap:slotA<->slotB`."
+  - Bei `swap:`-Antwort die zwei Slots tauschen und neu validieren.
+  - Bei wiederholter Ambiguität → **Hard-Fail + Refund** mit klarer Meldung ("Charaktere auf dem Plate nicht eindeutig unterscheidbar — bitte Szene neu rendern mit deutlicheren Posen/Outfits").
 
-Wenn ein Sprecher im Turn nicht sichtbar ist, startet Lip-Sync **gar nicht**. Stattdessen:
+### 4. Slot-Order-Fallback für ≥3 Speaker entfernen
 
-- Credits direkt zurückgeben
-- Szene als `needs_clip_rerender` / `failed` mit klarer Ursache markieren
-- UI-Fehler verständlich machen: „Sprecher im Scene-Clip nicht sichtbar — Scene-Plate neu rendern“
+Der v117-Fallback (`L→R Slot = L→R Speaker-Array-Order`) ist bei ≥3 Speakern eine ~17% Swap-Wahrscheinlichkeit. Stattdessen:
+- Bei 1 Speaker: behalten (trivial).
+- Bei 2 Speakern: behalten (50/50 ist schon falsch, aber mit Cross-Check abgefangen).
+- Bei ≥3 Speakern: **entfernen** — wenn Per-Character-Probe fehlschlägt, kein Dispatch, sondern Refund + UI-Hinweis.
 
-### 2. Stable-Dialog-Plate Fallback statt Provider-Retry
+### 5. Forensik & Cache
 
-Für 3–4 Sprecher-Dialoge wird ein stabiler Fallback aktiviert:
+- `plate_face_cache` um `identity_method` (`per-char-hungarian` | `slot-order` | `single`), `min_confidence`, `cross_check_result` erweitern.
+- Beim "Sauber neu starten" Button: Cache-Eintrag für die Szene löschen damit ein neuer Probe-Lauf startet (statt verstauten Identity-Mismatch aus dem Cache zu ziehen).
 
-- Wenn die bewegte Hailuo/Video-Plate beim Turn-Level-Gate scheitert, verwendet die Pipeline eine stabile Referenz-/Anchor-Plate als Dialog-Master.
-- Preclips werden dann aus einem stabilen Bild/Frame erzeugt, in dem alle Sprecher sichtbar sind.
-- Der finale Dialog-Stitch nutzt dieselbe stabile Dialog-Plate, damit der Lip-Sync nicht gegen eine bewegte Plate mismatcht.
+### 6. UI
 
-Das ist der eigentliche Ursachen-Fix: Der Kunde bekommt kein 20-Minuten-Retry-Verhalten, sondern eine deterministische Dialog-Plate, die beim ersten Versuch lip-syncbar ist.
+`SceneInlinePlayer` Forensics-Panel zeigt:
+- Identity-Methode (`per-char-hungarian@conf=0.87`)
+- Bei ambiguösem Match: gelbes Warning-Badge "Identity-Confidence niedrig — bei Voice-Swap bitte neu rendern".
 
-### 3. Clip-Generation für Multi-Speaker-Dialoge härten
+## Technische Details
 
-In der Scene-Clip-Generierung werden für Dialog-Szenen mit mehreren Sprechern härtere Prompt-/Engine-Regeln gesetzt:
+**Dateien:**
+- `supabase/functions/_shared/plate-face-identity.ts` — neuer `probeCharacterOnPlate`, Hungarian-Solver, Cross-Check, refactor `resolvePlateFaceIdentities`
+- `supabase/functions/compose-dialog-segments/index.ts` — Hard-Fail-Branch bei `identity_ambiguous` (Refund + Status-Update analog v132 Turn-Visibility-Gate)
+- `supabase/functions/lipsync-reset-scene/index.ts` (oder Äquivalent) — `plate_face_cache` row mit-löschen
+- `src/components/video-composer/SceneInlinePlayer.tsx` — Forensics-Anzeige für `identity_method` + Confidence
+- Migration: `plate_face_cache` Spalten `identity_method TEXT`, `min_confidence NUMERIC`, `cross_check_result TEXT`
+- Memory: `mem/architecture/lipsync/v133-per-character-identity-matching.md` + Index-Eintrag
 
-- locked camera
-- all speakers visible for entire duration
-- no cuts, no camera pan away
-- faces unobstructed
-- no split-screen/panel layout
-- group composition in one continuous frame
+**Kosten-Impact:**
+- 4 Gemini-Calls statt 1 pro Szene → ~$0.004 statt $0.001 → vernachlässigbar.
+- Spart aber ~30€ Re-Renders pro Voice-Swap-Vorfall.
 
-Wenn ein Modell trotzdem eine schlechte Plate liefert, blockt das neue Turn-Level-Gate sofort und triggert Re-Render statt Lip-Sync.
+**Backward-Compat:**
+- Single-Speaker und 2-Speaker-Pfade verhalten sich identisch (kein Regression-Risk).
+- Nur 3+ Speaker bekommen die neue Pipeline aktiviert.
 
-### 4. Fehlertext und Forensik klar machen
+## Was NICHT in v133
 
-Der aktuelle kryptische Fehler wird ersetzt/ergänzt durch:
+- Sync.so-Pipeline-Änderungen (läuft bereits korrekt).
+- Watchdog/Retry-Logik (v131.8/v132 bleiben).
+- Pre-Clip-Generation (v107) bleibt unverändert.
 
-- betroffener Sprecher
-- betroffener Turn-Zeitraum
-- erkanntes Problem: `face_missing_in_turn_frame`
-- empfohlene Aktion: Scene-Plate neu rendern oder Stable-Dialog-Plate verwenden
+## Validierung
 
-Das Forensik-Panel soll nicht nur `face_gate_failed:count=0` zeigen, sondern direkt sagen: **„Der Sprecher war im eigentlichen Sprechfenster nicht detektierbar.“**
-
-### 5. Aktuelle Szene reparierbar machen
-
-Für bereits fehlgeschlagene Szenen wie diese:
-
-- `Sauber neu starten` soll stale Preclips und kaputte Pass-Daten entfernen.
-- Der nächste Lauf soll nicht wieder in denselben Preclip-Fehler laufen, sondern erst das neue Turn-Level-Gate verwenden.
-- Wenn nötig wird die Scene-Plate automatisch neu gerendert oder auf die Stable-Dialog-Plate gewechselt.
-
-### 6. Regression absichern
-
-Tests/Fälle:
-
-- 4 Sprecher, letzter Sprecher oben am Bildrand → kein Provider-Start, wenn Gesicht im Turn fehlt.
-- 4 Sprecher mit stabiler Anchor-Plate → Lip-Sync startet beim ersten Versuch.
-- Pass 1–3 done, Pass 4 preclip count=0 → kein Watchdog-Loop, keine Provider-Retries, klare Refund-/Rerender-Aktion.
-- Existing watchdog/pass-level fixes bleiben erhalten.
-
-## Wahrscheinliche Dateien
-
-- Backend function: Dialog-Lip-Sync / Segment-Composer
-- Shared preclip renderer
-- Shared face-gate / plate-face detection
-- Clip-generation function für Dialog-Scene-Prompts
-- UI: Scene error / Forensics display
-- Memory-Dokumentation für die neue v132-Regel
-
-## Was ich bewusst nicht mache
-
-- Kein 20-Minuten-Timeout erhöhen.
-- Keine weiteren blinden Provider-Retries.
-- Kein Full-Plate-Fallback, der wieder falsche Münder animiert.
-- Keine Abrechnung, wenn die Eingangsszene nicht lip-syncbar ist.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Nach Deploy: User rendert dieselbe 4-Sprecher-Szene neu mit "Sauber neu starten". Erwartung: Identity-Methode = `per-char-hungarian`, alle 4 Stimmen korrekt zugeordnet. Im Forensics-Panel sichtbar welche Confidence pro Charakter erzielt wurde.
