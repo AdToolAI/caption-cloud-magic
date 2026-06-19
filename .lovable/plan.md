@@ -1,67 +1,59 @@
 ## Befund
 
-Punkt 2 (zwei sichtbare Szenen) ist normal: erst der generische Plate-Render, dann der character-anchored Plate, der den ersten ersetzt. Kein Bug, kein Fix nötig.
+Das aktuelle Fehlschlagen ist **nicht mehr nur der Screenshot-Face-Gate-Fehler**, sondern weiterhin der alte Root Cause im echten Provider-Payload:
 
-Punkt 1 (Lip-Sync) ist weiterhin kaputt. Die Live-Daten aus `syncso_dispatch_log` der gerade fehlgeschlagenen Szene zeigen exakt:
+- Letzter Dispatch `scene=83145f34...`, `pass=1`, `variant=coords-pro`
+- Sync.so bekam weiterhin:
+  ```json
+  "active_speaker_detection": {
+    "auto_detect": false,
+    "coordinates": [360,363],
+    "frame_number": 2
+  }
+  ```
+- Ergebnis: `generation_unknown_error`
 
-```text
-FACE_GATE_PROBE_UNAVAILABLE   (server_extract_disabled_use_client_canvas)
-↓
-DISPATCHED  model=sync-3
-  active_speaker_detection = { auto_detect:false, coordinates:[360,363], frame_number:52 }
-  v102_probe.asd_mode = "v130_preclip_coord_strict"
-↓
-FAILED  http=200  error_class=other
-  "Something went wrong while processing this generation. Please try again."
-```
-
-Bedeutet:
-- `buildAsdStrategy()` mit Rule 0 ist im Code, aber im Live-Pfad fällt der Dispatch trotzdem in `preclip_coord_strict` (Rule 3) statt Rule 0 (`auto_detect:true`).
-- `asd_mode_chosen` / `asd_rule_fired` / `preclip_trust` werden in `meta` immer noch nicht gesetzt (alle `nil`).
-- Folge: Sync.so bekommt wieder `(coordinates, frame_number)` und antwortet mit dem bekannten `provider_unknown_error`.
-
-Root cause am wahrscheinlichsten: In `compose-dialog-segments` läuft für Multi-Speaker (`isMultiSpeaker=true`) der Rule-3-Zweig, weil v131.1 Rule 0 nur bei `!isMultiSpeaker` ODER bei verifiziertem Single-Face-Crop greift. Bei dieser Szene sind 4 Sprecher → Rule 0 blockt → Rule 3 schickt strict coords → Sync.so kippt.
+Wichtig: In der Source-Datei ist `asd-strategy.ts` bereits richtig vorbereitet, aber **die deployte Edge Function läuft offenbar noch mit alter/bundled Logik** (`v130_preclip_coord_strict`, `reason: coords_pro_retry`). Deshalb hat der letzte Versuch die Produktionsfunktion nicht effektiv umgestellt.
 
 ## Plan
 
-### 1. Rule 0 auch für Multi-Speaker-Preclips zulassen, wenn der Preclip Single-Face ist
-Der per-Speaker-Preclip ist per Konstruktion (v69) ein Single-Face-Square-Crop, auch wenn die Szene mehrere Sprecher hat. Das Multi-Speaker-Flag darf Rule 0 nicht mehr blockieren, solange:
-- `usePreclip === true`
-- `preclipTrust === "verified"` (Preclip wurde sauber generiert) ODER `preclipFaceCount === 1`
-- `preclipAmbiguityRisk !== "neighbor_inside_crop"`
-- kein expliziter `coords-pro` / `bbox-url-pro` Retry
+1. **Fix direkt im Dispatch-Pfad erzwingen**
+   - In `compose-dialog-segments/index.ts` nach `buildAsdStrategy(...)` eine harte Safety-Normalisierung einbauen:
+     - Wenn `usePassPreclip === true`
+     - und `retryVariant === "coords-pro"`
+     - und keine echte Mehrgesicht-Ambiguität vorliegt
+     - dann wird `syncOptions.active_speaker_detection` zwingend auf `{ auto_detect: true }` gesetzt.
+   - Damit kann keine alte `coords-pro → coordinates` Entscheidung mehr bis zum Sync.so Payload durchrutschen.
 
-In diesen Fällen: `{ auto_detect: true }`, keine `coordinates`, kein `frame_number`.
+2. **Face-Gate an Auto-Detect anpassen**
+   - Der Live Face-Gate darf bei `{ auto_detect:true }` keinen erfundenen/inferierten Koordinatenpunkt mehr prüfen.
+   - Für Auto-Detect-Preclips wird nur geprüft: Preclip ist da, keine bestätigte Mehrgesicht-Ambiguität; kein Hard-Fail wegen `recognition_zero_faces` aus einem unzuverlässigen Probe-Frame.
+   - Das verhindert den Screenshot-Fall „Gesicht am ASD-Frame FAIL“ als Blocker, wenn der tatsächliche Provider-Payload Auto-Detect nutzt.
 
-Multi-Speaker bleibt nur dann auf Rule 3 (strict coords) / Rule 2 (bbox), wenn der Preclip tatsächlich einen zweiten Sibling-Face im Crop hat (`neighbor_inside_crop`).
+3. **Forensik-Logging eindeutig machen**
+   - `syncso_dispatch_log.meta` soll klar zeigen:
+     - `asd_rule_fired: rule_0_preclip_coords_pro_forced_auto`
+     - `asd_mode_chosen: single_face_auto`
+     - outbound payload ohne `coordinates` und ohne `frame_number`
+   - So können wir nach dem nächsten „Sauber neu starten“ beweisen, ob Sync.so wirklich den neuen Payload bekommen hat.
 
-### 2. Diagnostics im Live-Pfad sicherstellen
-`syncso_dispatch_log.meta` muss bei jedem Dispatch enthalten:
-- `asd_mode_chosen`
-- `asd_rule_fired`
-- `preclip_trust`
-- finales `outbound_payload.options.active_speaker_detection`
+4. **Tests ergänzen**
+   - Test für den aktuellen Produktionsfall:
+     - Multi-Speaker
+     - Preclip
+     - `retryVariant: "coords-pro"`
+     - `preclipFaceCount: 1`
+     - `ambiguity: clean`
+     - Erwartung: `{ auto_detect: true }`, keine Koordinaten.
+   - Test/Assertion für den Face-Gate-Bypass bei Auto-Detect-Preclip, soweit sauber isolierbar.
 
-Aktuell sind diese Felder bei DISPATCHED-Zeilen `nil` — das Schreiben dieser Felder wird hart in den Pfad gezogen, damit man künftig sofort sieht, welche Rule gefeuert hat.
+5. **Deploy & Verifikation**
+   - `compose-dialog-segments` deployen.
+   - Danach Logs/DB prüfen: Der nächste Dispatch muss `asd_auto_detect:true`, `asd_has_coordinates:false` zeigen.
+   - Wenn Sync.so danach noch fehlschlägt, ist es ein echter Provider-/Asset-Fall; aber dann haben wir den bisherigen Koordinaten-Root-Cause sicher ausgeschlossen.
 
-### 3. Sicherheitsnetz für `FACE_GATE_PROBE_UNAVAILABLE`
-Wenn der Face-Probe `frame_probe_unavailable` zurückgibt, aber der Preclip eine gültige `preclip_url` ohne `preclip_error` hat, gilt `preclipTrust = "verified"` und Rule 0 greift. Das ist genau der Fall der fehlgeschlagenen Szene.
+## Nicht ändern
 
-### 4. Verifikation
-- Edge Function `compose-dialog-segments` deployen.
-- Die fehlgeschlagene Hook-Szene über „Sauber neu starten“ neu lipsyncen.
-- In `syncso_dispatch_log` prüfen:
-  - `meta->>'asd_rule_fired'` beginnt mit `rule_0_`
-  - `meta->'outbound_payload'->'options'->'active_speaker_detection'` = `{ "auto_detect": true }`
-  - `coords` und `frame_number` sind `NULL`
-  - `sync_status` = `COMPLETED` statt `FAILED`
-
-## Technische Details (für später)
-
-Dateien, die geändert werden:
-- `supabase/functions/_shared/asd-strategy.ts` — Rule 0 Eligibility: `isMultiSpeaker` darf nicht mehr blockieren, solange Single-Face-Trust vorliegt.
-- `supabase/functions/_shared/asd-strategy.test.ts` — neue Tests für Multi-Speaker + verified Preclip.
-- `supabase/functions/compose-dialog-segments/index.ts` — beim `logSyncDispatch` für DISPATCHED/FAILED die `asd_mode_chosen`, `asd_rule_fired`, `preclip_trust` Top-Level in `meta` setzen.
-- `mem/architecture/lipsync/v131-2-rule-0-multi-speaker-preclip.md` (neu) + Index-Update.
-
-Keine Schemaänderungen, keine Auswirkungen auf andere Studios.
+- Kein Umbau der doppelten Bild-/Plate-Erzeugung.
+- Keine Änderung an Credits/Refunds.
+- Keine Änderung am Avatar-/Preclip-Rendering selbst.
