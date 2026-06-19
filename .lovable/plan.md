@@ -1,88 +1,110 @@
-# Fix: Sync.so Preclip-Pass auf `auto_detect` als Primary-Pfad umstellen
+# v131.1 — Rule 0 Trust-Erweiterung für Preclip ohne Probe
 
-## Diagnose (aus Root-Cause Lab bestätigt)
+## Diagnose (gerade aus den Live-Logs bestätigt)
 
-| Variante         | Ergebnis     | Relevanz für Prod |
-| ---------------- | ------------ | ----------------- |
-| `exact` (coords + frame_number) | FAILED — generation_unknown_error | **heutiger Default** |
-| `omit_sync_mode` | FAILED | trägt dieselben falschen Coords |
-| `auto_detect`    | **COMPLETED** | ✅ funktioniert |
-| `bboxes`         | **COMPLETED** | ✅ funktioniert, aber teurer (Upload pro Pass) |
-| `lipsync_2_pro`  | FAILED | nicht in der Pipeline, ignorieren |
+`syncso_dispatch_log` zeigt für die letzten Failures genau das Muster, das wir eigentlich loswerden wollten:
 
-**Klare Schlussfolgerung:** Das `(coordinates, frame_number)`-Tupel ist die einzige Ursache. Sync.so kommt mit Asset, Audio und Crop einwandfrei klar, sobald es das Gesicht selbst suchen darf. Da unser Preclip per Konstruktion bereits ein **Single-Face Square-Crop** ist (v69-Unified, siehe `mem/architecture/lipsync/v69-unified-single-face-preclip.md`), gibt es im Bild gar keine Ambiguität, die wir per Coords disambiguieren müssten.
+```
+sync_status:      FACE_GATE_PROBE_UNAVAILABLE
+                  → DISPATCHED  (coords=[360,360], frame_number=3, sync_source_kind=segments)
+                  → FAILED      (http=200, error_class=other, "Something went wrong …")
+```
 
-→ `auto_detect: true` ist auf dem Preclip-Pass nicht nur sicher, sondern strukturell **korrekter** als unsere selbst gerechneten Coords.
+`asd_mode_chosen`, `rule`, `preclip_face_count`, `preclip_ambiguity` sind in `meta` **leer**.
+
+Ursache:
+- Der serverseitige Face-Probe ist auf Preclip-Assets bewusst deaktiviert
+  (`server_extract_disabled_use_client_canvas`) → `passFaceCount` bleibt `null`.
+- Damit ist in `compose-dialog-segments/index.ts:3585` `preclipFaceCount=null`
+  und `ambiguityRiskForStrategy=null`.
+- In `_shared/asd-strategy.ts:231` verlangt Rule 0 **hart** `=== 1` und
+  `=== "clean"`. Beide false → Rule 0 feuert nicht → Fallback in Rule 1
+  baut wieder das `(coordinates, frame_number)`‑Tupel, das laut Replay-Lab
+  reproduzierbar `generation_unknown_error` triggert.
+
+Kurz: v131 ist deployed, wird aber im Preclip-Pfad nie aktiv, weil die
+einzige Quelle, die Rule 0 freischalten könnte, in Production gar nicht
+existiert.
 
 ## Ziel
 
-`auto_detect: true` wird der **Primary-Pfad** für den Preclip-Pass. Coords/Frame-Anchor werden nur noch als kontrollierter Fallback gefahren, falls `auto_detect` mal scheitert.
+`auto_detect` muss der **Default** für jeden Preclip-Pass werden, sobald
+keine konkrete Gegenanzeige (Multi-Face im Crop, Ambiguity) vorliegt — auch
+wenn der Face-Probe keine Zahl liefert. Coords/Frame nur noch, wenn wir
+positive Evidenz **gegen** auto_detect haben (Multi-Speaker mit
+verifiziertem Crop ODER explizite Retry-Variante).
 
-## Plan
+## Änderungen
 
-### 1. ASD-Strategy-Builder umpolen
+### 1) `supabase/functions/_shared/asd-strategy.ts`
+- Neues Feld `preclipTrust: "verified" | "probe-confirmed" | "unknown"`
+  im `BuildAsdInput.geometry` (default `"unknown"`, abwärtskompatibel).
+- Rule 0 fire-Bedingung wird umgebaut auf:
+  ```
+  usePreclip
+  && !isMultiSpeaker
+  && retryVariant nicht "coords-pro" / "preflight-snap"
+  && preclipAmbiguityRisk !== "neighbor_inside_crop"
+  && (
+       (preclipFaceCount === 1 && preclipAmbiguityRisk === "clean")   // alter v131-Pfad
+       || preclipFaceCount === null                                   // Probe nicht verfügbar
+       || preclipTrust === "verified"                                 // Preclip aus Face-Center-Pipeline
+     )
+  ```
+- Diagnostics-Feld `rule` erhält neue Werte:
+  `rule_0_preclip_probe_unavailable`, `rule_0_preclip_verified`,
+  zusätzlich zum bestehenden `rule_0_preclip_single_face_verified`.
+- Unit-Tests in `_shared/asd-strategy.test.ts`:
+  - `faceCount=null + ambiguity=null + !multiSpeaker → auto_detect, rule_0_preclip_probe_unavailable`
+  - `faceCount=null + ambiguity="neighbor_inside_crop" → kein Rule 0`
+  - `faceCount=null + multiSpeaker → kein Rule 0`
+  - `preclipTrust="verified" + faceCount=2 → kein Rule 0` (Multi-Face schlägt Trust)
+  - Bestehende 16 Tests müssen weiter grün sein.
 
-In `_shared/asd-strategy.ts` (siehe `.lovable/mem/architecture/lipsync/asd-strategy-single-source-builder-v130.md`):
+### 2) `supabase/functions/compose-dialog-segments/index.ts`
+- An der Call-Site (~Zeile 3582) `preclipTrust` mitschicken:
+  - `"verified"` wenn `preclip.source === "preclip-validated"` oder das
+    upstream-Crop aus dem Face-Gate-Repair-Loop (v116) kommt
+    (`repairAttempts >= 0 && preclip.preclipUrl` gesetzt und kein
+    `preclip_error`).
+  - `"probe-confirmed"` wenn `passFaceCount === 1` (alter Pfad).
+  - sonst `"unknown"`.
+- Snap-Pfad bei Zeile ~4455 bleibt unverändert (`preclipTrust: "unknown"`
+  reicht, weil Rule 1 dort sowieso über `preflight` triggert).
+- Neues `meta`-Feld in `syncso_dispatch_log` über bestehenden Logger:
+  `preclip_trust`, `asd_rule_fired` (kommt aus `strategy.diagnostics.rule`),
+  `asd_mode_chosen` (aus `strategy.mode`). Kein Schema-Change nötig — geht
+  in `meta` jsonb.
 
-- Neue **Rule 0 (höchste Priorität)** für den Preclip-Pass: 
-  - Wenn `context === 'preclip'` und der Preclip ein verifizierter Single-Face-Crop ist (v69-Pfad, `preclip_face_count === 1`, `preclip_ambiguity === false`) → Strategy = `auto_detect`.
-- Die bisherigen Rules 1–5 (Coords aus Plate, Snap-to-Preclip, BBox-URL etc.) rutschen eine Ebene tiefer und gelten nur noch, wenn Rule 0 nicht greift oder als Fallback explizit angefordert wird.
-- Unit-Tests in `_shared/asd-strategy.test.ts` ergänzen:
-  - Single-Face-Preclip → `auto_detect`
-  - Ambiguer Preclip → unverändert Coords-Pfad
-  - Multi-Face Plate (non-preclip) → unverändert wie bisher
+### 3) Forensik / UI (read-only Anpassung)
+- `src/components/admin/SyncsoForensicsSheet.tsx`: in der "Strategy"-Zeile
+  zusätzlich `preclip_trust` und `asd_rule_fired` anzeigen (beide aus
+  `meta`), damit man sofort sieht, warum Rule 0 (nicht) gefeuert hat.
+- `src/lib/syncReplayClassify.ts`: neuen Verdict-Branch
+  `legacy_coords_probe_unavailable` für historische Rows ohne `preclip_trust`,
+  damit alte Failures korrekt als "vor v131.1" gelabelt werden.
 
-### 2. Payload-Bereinigung in `compose-dialog-segments`
+### 4) Verifikation
+1. Nach Deploy: 1 Hook-Szene mit gleichem Asset re-rendern.
+2. SQL-Check: in `syncso_dispatch_log` darf für neue Dispatches **kein**
+   `coords` mehr gesetzt sein (außer bei `retry_variant` snap/coords-pro
+   oder Multi-Speaker mit verifiziertem Crop).
+3. `meta->>'asd_rule_fired'` muss
+   `rule_0_preclip_probe_unavailable` oder `rule_0_preclip_verified`
+   enthalten.
+4. 24h-Canary: `error_class='other' AND error_message ILIKE '%Something went wrong%'`
+   auf Preclip-Passes < 1%.
+5. Abort-Kriterium: > 5% neue Failures mit `asd_mode=auto_detect` →
+   Rollback durch Setzen eines Feature-Flags (folgt in v131.2 falls nötig).
 
-- Wenn Strategy `auto_detect`: 
-  - `active_speaker_detection: { auto_detect: true }`
-  - **keine** `coordinates`, **kein** `frame_number`, **kein** `bounding_boxes_url` im Payload.
-- Sicherstellen, dass der v124 sync-3 Sanitizer keine alten Felder wieder reinmischt (Test hinzufügen).
-- `sync_mode: 'cut_off'` bleibt unverändert (das war nie das Problem, `omit_sync_mode` ist nur fehlgeschlagen, weil es dieselben falschen Coords trug).
+## Files
 
-### 3. Fallback-Ladder (klein halten)
+- `supabase/functions/_shared/asd-strategy.ts` (Rule 0 erweitern, Diagnostics)
+- `supabase/functions/_shared/asd-strategy.test.ts` (4 neue Tests)
+- `supabase/functions/compose-dialog-segments/index.ts` (preclipTrust + meta-Logging)
+- `src/components/admin/SyncsoForensicsSheet.tsx` (2 neue Felder anzeigen)
+- `src/lib/syncReplayClassify.ts` (Verdict-Branch)
+- `mem/architecture/lipsync/v131-1-rule-0-trust-extension.md` (neu, kurz)
+- `mem/index.md` (Eintrag aktualisieren)
 
-Wenn `auto_detect` auf einem konkreten Pass `generation_unknown_error` liefert (selten, aber möglich z. B. bei sehr dunklem Frame):
-
-1. **Pass 2:** `bounding_boxes_url` aus den face-probe Frames bauen und hochladen (`bboxes`-Pfad, im Replay-Lab grün).
-2. **Pass 3:** Voller Plate ohne Preclip (bestehender v69-Fallback).
-
-Coords + frame_number werden **nicht** mehr als Fallback genutzt — sie waren der Trigger der Failures.
-
-### 4. Preflight & Logging
-
-- `v1291` Preflight-Guard:
-  - Neuer Block: bei Strategy `auto_detect` muss `preclip_face_count === 1` und `preclip_ambiguity === false` sein, sonst → Strategy-Downgrade auf `bboxes`.
-  - Bestehender `auto_detect_with_ambiguous_crop` Guard bleibt (greift jetzt nur noch im Multi-Face-Plate-Fall).
-- `syncso_dispatch_log` Felder erweitern:
-  - `asd_mode_chosen` (`auto_detect` | `coords` | `bboxes` | `plate_fallback`)
-  - `asd_rule_fired` (`rule_0_preclip_single_face` | …)
-  - `preclip_single_face_verified` (bool)
-
-### 5. Forensics & Replay-Lab
-
-- `SyncsoForensicsSheet` Diagnose-Tab zeigt `asd_mode_chosen` + `asd_rule_fired` prominent.
-- `syncReplayClassify` bekommt zusätzlichen Verdict-Zweig `legacy_coords_pre_v131` → wenn `auto_detect` grün und `exact` rot war und der Dispatch vor Deploy v131 lag → markiert als „behoben durch v131".
-- Replay-Lab bleibt 5-Varianten; `lipsync_2_pro` wird im UI als „Diagnostik, nicht prod-relevant" gekennzeichnet (Tooltip), damit künftige Reads das richtig einordnen.
-
-### 6. Verifikation
-
-- Nach Deploy: Replay-Lab erneut für `33427056…` und `ec23f623…` → der echte Prod-Dispatch (`exact` aus dem Live-Pfad) muss jetzt COMPLETED liefern.
-- 24h Canary: Anteil `provider_unknown_error` auf Preclip-Passes vor/nach Deploy. Erwartet: < 1 %.
-- Cost-Check: `auto_detect` ist kein zusätzlicher Sync.so-Call, also netto **gleich teuer** wie `exact` (ohne unsere Coords-Compute-Kosten). `bboxes`-Fallback nur bei Fehlern, also marginal.
-
-## Technische Notizen
-
-- Änderungen ausschließlich in:
-  - `supabase/functions/_shared/asd-strategy.ts` (Rule 0 + Tests)
-  - `supabase/functions/compose-dialog-segments/index.ts` (Payload-Bereinigung, Fallback-Ladder, Preflight, Logging)
-  - `src/components/admin/SyncsoForensicsSheet.tsx` (neue Felder anzeigen, lipsync_2_pro-Tooltip)
-  - `src/lib/syncReplayClassify.ts` (neuer Verdict-Zweig)
-- Keine Schema-Migration nötig (neue Felder gehen in bestehendes `payload` JSONB).
-- Memory-Update nach Deploy: `mem://architecture/lipsync/v131-auto-detect-primary-on-preclip.md` mit Verweis auf v69 (Single-Face-Preclip-Garantie) als Vorbedingung.
-
-## Was bewusst NICHT geändert wird
-
-- `lipsync_2_pro` bleibt aus der Pipeline. Im Replay-Lab dient es nur als Provider-Vergleich.
-- Coords-Berechnung & Snap-to-Preclip bleiben als Code-Pfade für den Nicht-Preclip / Multi-Face-Plate Fall erhalten.
-- v69 Single-Face-Preclip-Rendering bleibt unverändert — Voraussetzung für Rule 0.
+Keine Schema-Migration, keine Provider-Änderung.
