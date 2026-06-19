@@ -4486,18 +4486,33 @@ serve(async (req) => {
       );
       // v129.22.3 — Auto-snap path: rewrite ASD coords with the
       // Rekognition-derived center and proceed to dispatch.
+      // v129.30 (2026-06-19) — HARD-OVERRIDE: previously we only patched
+      // `coordinates` while leaving `auto_detect: true` in place. The v124
+      // sync-3 sanitizer then stripped the coords back out, so Sync.so
+      // still received `{ auto_detect: true }` and ignored the snap —
+      // exactly matching the "Snap-Kandidat erkannt, noch nicht im
+      // Dispatch angewandt" forensic warning + the reported lip-sync
+      // failure. We now REPLACE the ASD with doc-strict point-ASD so the
+      // snap is the payload Sync.so actually receives.
       if (gate.ok && gate.code === "ok_after_snap" && Array.isArray(gate.snapped_coord)) {
         const newCoord: [number, number] = [
           Number(gate.snapped_coord[0]),
           Number(gate.snapped_coord[1]),
         ];
+        const snapFrame: number = Number.isFinite(gateFrame as number)
+          ? Number(gateFrame)
+          : (Number.isFinite((syncOptions as any)?.active_speaker_detection?.frame_number)
+              ? Number((syncOptions as any).active_speaker_detection.frame_number)
+              : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : 0));
+        const docStrictAsd: Record<string, unknown> = {
+          auto_detect: false,
+          frame_number: snapFrame,
+          coordinates: newCoord,
+        };
         try {
-          if ((syncOptions as any)?.active_speaker_detection) {
-            (syncOptions as any).active_speaker_detection.coordinates = newCoord;
-          }
-          const payloadAsd = (payload as any)?.options?.active_speaker_detection;
-          if (payloadAsd) {
-            payloadAsd.coordinates = newCoord;
+          (syncOptions as any).active_speaker_detection = docStrictAsd;
+          if ((payload as any)?.options) {
+            (payload as any).options.active_speaker_detection = { ...docStrictAsd };
           }
           // Persist on the pass so subsequent retries see the corrected coord.
           if (!usePassPreclip) {
@@ -4508,15 +4523,21 @@ serve(async (req) => {
           (pass as any).coords_snapped_at = new Date().toISOString();
           (pass as any).coords_snap_origin = gate.original_coord ?? null;
           (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
+          (pass as any).snap_applied_to_dispatch = true;
         } catch (mutErr) {
           console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v129.22.3 ASD coord mutation failed: ${(mutErr as Error)?.message}`,
+            `[compose-dialog-segments] scene=${sceneId} v129.30 ASD coord mutation failed: ${(mutErr as Error)?.message}`,
           );
         }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v129.30_snap_applied pass=${currentPassIdx + 1} ` +
+          `snapped=[${newCoord[0]},${newCoord[1]}] frame=${snapFrame} space=${usePassPreclip ? "preclip" : "plate"} ` +
+          `delta_px=${gate.snap_distance_px ?? "?"} — doc-strict ASD enforced`,
+        );
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_source_kind: "segments", video_url: dispatchVideoUrl,
-          coords: newCoord, frame_number: gateFrame,
+          coords: newCoord, frame_number: snapFrame,
           http_status: 0, sync_status: "COORD_AUTO_SNAPPED",
           error_class: "coord_auto_snap",
           error_message: (gate.reason ?? "auto_snapped").slice(0, 240),
@@ -4526,7 +4547,7 @@ serve(async (req) => {
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             face_gate: {
-              version: "v129.23.2",
+              version: "v129.30",
               code: gate.code,
               snapped_coord: newCoord,
               original_coord: gate.original_coord ?? gateCoord,
@@ -4535,6 +4556,8 @@ serve(async (req) => {
               extract_ms: gate.extract_ms,
               gemini_ms: gate.gemini_ms,
             },
+            snap_applied_to_dispatch: true,
+            asd_after_snap: docStrictAsd,
             source: "preflight-snap",
           },
         });

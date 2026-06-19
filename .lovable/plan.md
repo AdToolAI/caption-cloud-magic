@@ -1,41 +1,39 @@
-## Ziel
-Den Lip-Sync-Fehler nicht nur umgehen, sondern die tatsächliche Ursache eingrenzen und danach einen stabilen **sync-3-only** Ablauf herstellen. Kein `lipsync-2` Fallback bleibt aktiv.
+## Befund
+
+Ja — im Screenshot ist der entscheidende Hinweis schon sichtbar: Der Preflight ist grün, aber darunter steht sinngemäß: **Snap-Kandidat erkannt — noch nicht im Dispatch angewandt**.
+
+Das bedeutet: Die Forensik erkennt korrekt, dass die ursprüngliche Koordinate `[273,215]` nicht auf dem Gesicht liegt und auf `[120,440]` gesnappt werden sollte. In den aktuellen Dispatch-Logs wurde Sync.so aber weiterhin mit `auto_detect:true` bzw. ohne diese korrigierte Koordinate losgeschickt. Deshalb kann alles im Preflight normal aussehen, Sync.so aber trotzdem fehlschlagen oder ein No-Op erzeugen.
 
 ## Plan
 
-1. **Sync-2-Fallback zurücknehmen**
-   - Entferne den zuletzt eingeführten `lipsync-2` Override aus `compose-dialog-segments`.
-   - Stelle sicher, dass alle Dialog-/Multi-Speaker-Pfade ausschließlich `sync-3` verwenden.
+1. **Snap als harte Dispatch-Korrektur anwenden**
+   - In `compose-dialog-segments` die Face-Gate-Auto-Snap-Koordinate nicht nur loggen, sondern vor dem Sync.so-Request zuverlässig in den finalen Payload übernehmen.
+   - Für Preclip-Dispatches die gesnappte Koordinate korrekt im **Preclip-Koordinatenraum** behandeln, nicht versehentlich als Plate-Koordinate.
 
-2. **Kontrollierte A/B-Diagnose einbauen**
-   - Für denselben Preclip + dieselbe Audio-Datei zwei gezielte Test-Dispatches ermöglichen:
-     - **A:** `sync-3` mit `active_speaker_detection: { auto_detect: true }`
-     - **B:** `sync-3` mit den aktuell berechneten `frame_number + coordinates`
-   - Beide Dispatches sauber in `syncso_dispatch_log` protokollieren: Modell, Retry-Variante, ASD-Modus, Frame, Koordinaten, Clip-Metadaten, Job-ID, Fehlertext.
+2. **Auto-Detect bei Snap-Fällen vermeiden**
+   - Wenn der Preflight `ok_after_snap` liefert, nicht mehr mit `{ auto_detect: true }` dispatchen.
+   - Stattdessen `sync-3` mit doc-striktem ASD verwenden:
+     - `auto_detect: false`
+     - `frame_number`
+     - `coordinates: snapped_coord`
+   - Kein `lipsync-2` / `lipsync-2-pro` Fallback.
 
-3. **Ursache sichtbar machen**
-   - Wenn A funktioniert und B scheitert, liegt die Ursache sehr wahrscheinlich in Frame-Index oder Koordinaten-Transformation.
-   - Wenn beide scheitern, liegt die Ursache eher bei Preclip-Encoding, Clip-Dauer, Audio-Input oder Provider-Status.
-   - Wenn beide funktionieren, ist der Fehler wahrscheinlich im Retry-/Webhook-State-Handling.
+3. **Forensik-Log eindeutig machen**
+   - `syncso_dispatch_log.meta.outbound_payload.options.active_speaker_detection` muss nachher die tatsächlich gesendete korrigierte Koordinate enthalten.
+   - Zusätzlich `snap_applied_to_dispatch: true` loggen, damit UI/DB nicht mehr nur „Kandidat erkannt“ zeigen.
 
-4. **Sync-3-only Retry-Ladder implementieren**
-   - Stufe 1: Für saubere Single-Face-Preclips standardmäßig `auto_detect: true` verwenden.
-   - Stufe 2: Bei erneutem `generation_unknown_error` auf deterministische `bounding_boxes_url` wechseln, statt `coordinates` zu wiederholen.
-   - Stufe 3: Falls nötig, Preclip-Crop leicht erweitern und erneut mit `auto_detect: true` versuchen.
-   - Nach maximal 3 sync-3 Versuchen sauber fehlschlagen und Credits idempotent erstatten.
+4. **UI-Status korrigieren**
+   - Die Preflight-Anzeige soll unterscheiden:
+     - Snap erkannt und **angewandt** = grün / sicherer Dispatch
+     - Snap erkannt aber **nicht angewandt** = gelb/rot, kein irreführendes „alles normal“
 
-5. **Webhook/Watchdog anpassen**
-   - `sync-so-webhook` darf bei `generation_unknown_error` keinen `lipsync-2` Retry mehr erzwingen.
-   - Stattdessen setzt er den nächsten sync-3 Retry-State (`coords-pro-auto`, danach `bbox-url`, danach `expanded-crop-auto`).
-   - Der bestehende 8-Minuten-Watchdog und Refund-Mechanismus bleiben erhalten.
+5. **Letzte fehlgeschlagene Szene recovern**
+   - Nach der Codeänderung die betroffene Szene/Passes zurück auf pending setzen bzw. über den bestehenden Reset-Flow neu dispatchen.
+   - Danach prüfen, dass der neue Logeintrag nicht mehr `auto_detect:true`, sondern die gesnappte ASD-Koordinate enthält.
 
-6. **Letzten fehlgeschlagenen Job recovern**
-   - Den zuletzt fehlgeschlagenen Dialog-Job zurück auf `pending` setzen.
-   - Mit der neuen Diagnose/Retry-Logik neu dispatchen.
-   - Danach anhand der Logs prüfen, welcher Pfad erfolgreich war.
+## Technische Details
 
-7. **Memory aktualisieren**
-   - Projektregel speichern: Dialog-Shot/Lip-Sync Pipeline bleibt `sync-3`-only; kein automatischer `lipsync-2` Fallback für diese Pipeline.
-
-## Erwartetes Ergebnis
-Wir wissen danach, ob der echte Fehler in `coordinates/frame_number`, Preclip-Encoding oder State-Handling liegt. Gleichzeitig läuft die Produktion wieder über einen robusteren sync-3-only Pfad.
+- Hauptdatei: `supabase/functions/compose-dialog-segments/index.ts`
+- Relevanter Bereich: Face-Gate nach Payload-Erstellung, aktuell um die Auto-Snap-Mutation.
+- Wichtig: Der Screenshot-Job `2ea6981e...` war ein älterer Dispatch; neuere Logs zeigen weiter `outbound_asd: { auto_detect: true }`, was die Ursache bestätigt.
+- Deployment: Danach `compose-dialog-segments` deployen und die betroffene Szene erneut anstoßen.
