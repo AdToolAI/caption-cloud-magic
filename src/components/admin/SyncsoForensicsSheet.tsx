@@ -72,7 +72,7 @@ const PRESETS: PresetOption[] = [
   { value: 'loop', label: '3. sync_mode: loop', description: 'Timing-Experiment — ändert Output-Dauer-Logik', warn: 'Output-Dauer kann anders sein als bei cut_off.' },
   { value: 'bboxes', label: '4. bounding_boxes', description: 'Per-Frame Boxes statt frame_number+coordinates.' },
   { value: 'auto_detect', label: '5. auto_detect', description: 'Sync.so detektiert Sprecher selbst.', warn: 'NICHT für Produktion — multi-speaker unsicher.' },
-  { value: 'lipsync_2_pro', label: '6. lipsync-2-pro', description: 'Modellwechsel-Vergleich.' },
+  { value: 'lipsync_2_pro', label: '6. lipsync-2-pro', description: 'Diagnostik, nicht prod-relevant — Modellvergleich gegen sync-3. Pipeline nutzt sync-3.' },
   { value: 'lipsync_2', label: '7. lipsync-2', description: 'Modellwechsel-Vergleich.' },
 ];
 
