@@ -4435,7 +4435,20 @@ serve(async (req) => {
       const preclipTrustedForGate = usePassPreclip &&
         Number((pass as any).preclip_face_count ?? 0) === 1 &&
         String((pass as any)._v1291_ambiguity?.risk ?? "clean") === "clean";
-      const gate = await verifyFaceBeforeDispatch({
+      const autoDetectPreclipNoHardGate =
+        usePassPreclip &&
+        gateAsd?.auto_detect === true &&
+        String((pass as any)._v1291_ambiguity?.risk ?? "clean") !== "neighbor_inside_crop" &&
+        !(Number.isFinite(Number((pass as any).preclip_face_count)) && Number((pass as any).preclip_face_count) > 1);
+      const gate = autoDetectPreclipNoHardGate
+        ? {
+            ok: true,
+            code: "auto_detect_preclip_trusted",
+            reason: "v131.4: auto_detect preclip skips coordinate face-gate",
+            extract_ms: 0,
+            gemini_ms: 0,
+          } as any
+        : await verifyFaceBeforeDispatch({
         videoUrl: dispatchVideoUrl,
         frameNumber: gateFrame,
         coord: gateCoord,
