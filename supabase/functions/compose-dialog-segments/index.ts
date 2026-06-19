@@ -5135,48 +5135,15 @@ serve(async (req) => {
       }
     }
 
-    // ── v131.5 — FINAL dispatch-path safety override ────────────────────
-    // Last-line defence against any code path that re-introduces explicit
-    // coordinates AFTER v131.4's override at line ~3640 (most notably the
-    // snap-via-strategy block at ~4498, which legitimately overwrites
-    // `syncOptions.active_speaker_detection` post-snap). On a clean
-    // single-face preclip with `retryVariant === "coords-pro"` (the fresh
-    // default, NOT an explicit coordinate retry), Sync.so rejects
-    // `{ auto_detect:false, coordinates, frame_number }` with
-    // `generation_unknown_error`. The doc-strict shape for that geometry is
-    // `{ auto_detect: true }` alone. We force it here, strip coords/frame
-    // from the actual payload object, null `pass.coords` so telemetry can't
-    // mislead, and HARD-ASSERT before the fetch.
+    // ── v136 — Doc-strict ASD sanitizer (replaces v131.5 final override) ──
+    // With v136 we dispatch explicit preclip-centered coordinates on preclip
+    // passes, so the previous "force auto_detect:true at the wire" override
+    // no longer applies — that override was the very thing causing Sync.so
+    // sync-3 to silently no-op on every speaker. We keep ONLY the mutex
+    // sanitizer + the doc-strict shape assertion so that any code path
+    // intentionally using auto_detect:true (e.g. the post-snap re-strategy
+    // when no coord is available) still sends a legal payload.
     {
-      const finalAsd: any = (payload.options as any)?.active_speaker_detection ?? {};
-      const passFcFinal = Number((pass as any).preclip_face_count ?? 0);
-      const ambigFinal = String((pass as any)._v1291_ambiguity?.risk ?? "clean");
-      const cleanSingleFacePreclip =
-        usePassPreclip &&
-        retryVariant === "coords-pro" &&
-        ambigFinal !== "neighbor_inside_crop" &&
-        !(Number.isFinite(passFcFinal) && passFcFinal > 1);
-
-      if (cleanSingleFacePreclip && finalAsd?.auto_detect !== true) {
-        const previousAsd = { ...finalAsd };
-        const overrideAsd: Record<string, unknown> = { auto_detect: true };
-        (payload.options as any).active_speaker_detection = overrideAsd;
-        (syncOptions as any).active_speaker_detection = overrideAsd;
-        asdMode = "v131_5_dispatch_path_final_override";
-        (pass as any)._v131_5_final_override = {
-          reason: "post_snap_or_strategy_reintroduced_coords",
-          previous_asd: previousAsd,
-          retry_variant: retryVariant,
-          preclip_face_count: passFcFinal,
-          ambiguity_risk: ambigFinal,
-        };
-        (pass as any).coords = null;
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v131_5_FINAL_OVERRIDE forced auto_detect:true (was=${JSON.stringify(previousAsd)})`,
-        );
-      }
-
-      // Mutex sanitize: auto_detect:true MUST NOT carry coords/frame.
       const sanAsd: any = (payload.options as any)?.active_speaker_detection;
       if (sanAsd && sanAsd.auto_detect === true) {
         if ("coordinates" in sanAsd) delete sanAsd.coordinates;
@@ -5185,23 +5152,21 @@ serve(async (req) => {
         if ("bounding_boxes_url" in sanAsd) delete sanAsd.bounding_boxes_url;
       }
 
-      // Hard pre-flight assertion — refuses to call Sync.so with a
-      // doc-violating ASD shape. Refund happens via the catch + existing
-      // failBeforeProviderDispatch path on the surrounding try/catch.
       const assertAsd: any = (payload.options as any)?.active_speaker_detection;
       if (
         assertAsd?.auto_detect === true &&
         (Array.isArray(assertAsd?.coordinates) || assertAsd?.frame_number != null)
       ) {
         return await failBeforeProviderDispatch(
-          "DISPATCH_BLOCKED_V1315_ASSERT",
+          "DISPATCH_BLOCKED_V136_ASSERT",
           "asd_auto_detect_with_coords_violation",
-          "v131.5 assert: active_speaker_detection.auto_detect=true must not carry coordinates/frame_number",
+          "v136 assert: active_speaker_detection.auto_detect=true must not carry coordinates/frame_number",
           500,
           { final_asd: assertAsd, retry_variant: retryVariant, compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION },
         );
       }
     }
+
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
