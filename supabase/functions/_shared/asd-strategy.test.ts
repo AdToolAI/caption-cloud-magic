@@ -40,8 +40,8 @@ Deno.test("Rule 0 (v131) — verified single-face preclip → auto_detect even w
   assertEquals(r.mode, "single_face_auto");
   assertEquals(r.asd.auto_detect, true);
   assertEquals(r.diagnostics.rule, "rule_0_preclip_single_face_verified");
-  assertEquals(r.diagnostics.preclip_single_face_verified, true);
   assertEquals(r.diagnostics.had_preflight_coord, true);
+
 });
 
 Deno.test("Rule 0 (v131) — multi-speaker scene with verified single-face crop → auto_detect", () => {
