@@ -605,10 +605,15 @@ serve(async (req) => {
     //   3) DISPATCHED                    → Sync.so was actually called
     // Best-effort; failures are logged but don't block the run.
     try {
+      const entryTurnIdx = typeof body?.pass_idx === "number" && Number.isFinite(body.pass_idx)
+        ? Number(body.pass_idx)
+        : null;
       await logSyncDispatch(supabase, {
         scene_id: sceneId,
         user_id: userId,
         engine: "sync-segments",
+        // v134 §3 — turn_idx populated whenever the caller knows which pass.
+        turn_idx: entryTurnIdx,
         sync_status: "DISPATCH_ATTEMPT_STARTED",
         meta: {
           is_retry: isRetry,
@@ -621,6 +626,10 @@ serve(async (req) => {
           lip_sync_status_at_entry: (scene as any).lip_sync_status ?? null,
           existing_state_version: (scene as any).dialog_shots?.version ?? null,
           existing_state_status: (scene as any).dialog_shots?.status ?? null,
+          // v134 §3 — Forensik-friendly noop tracking
+          noop_auto_escalation: body?.noop_auto_escalation === true,
+          noop_escalation_step: typeof body?.noop_escalation_step === "number" ? body.noop_escalation_step : null,
+          requested_retry_variant: typeof body?.retry_variant === "string" ? body.retry_variant : null,
         },
       });
     } catch (e) {
