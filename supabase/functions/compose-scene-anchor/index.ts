@@ -47,6 +47,10 @@ interface Body {
    *  the previous attempt. */
   strictSwapMode?: boolean;
   swapMismatches?: string[];
+  /** v131.6 — FINAL face-lock attempt after swap-retry failed. Adds a
+   *  pixel-copy-from-identity-headshot clause and forces deterministic
+   *  generation (temperature: 0). Implies strictSwapMode. */
+  faceLockMode?: boolean;
   /** Stage A — World Assets as Visual References. */
   locationUrls?: string[];
   buildingUrls?: string[];
