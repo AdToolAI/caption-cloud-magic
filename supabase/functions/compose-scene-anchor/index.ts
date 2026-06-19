@@ -47,6 +47,10 @@ interface Body {
    *  the previous attempt. */
   strictSwapMode?: boolean;
   swapMismatches?: string[];
+  /** v131.6 — FINAL face-lock attempt after swap-retry failed. Adds a
+   *  pixel-copy-from-identity-headshot clause and forces deterministic
+   *  generation (temperature: 0). Implies strictSwapMode. */
+  faceLockMode?: boolean;
   /** Stage A — World Assets as Visual References. */
   locationUrls?: string[];
   buildingUrls?: string[];
@@ -209,6 +213,7 @@ serve(async (req) => {
     const swapMismatches = Array.isArray(body.swapMismatches)
       ? body.swapMismatches.filter((s) => typeof s === "string" && s.length > 0)
       : [];
+    const faceLockMode = body.faceLockMode === true;
     const worldRefSig = `loc=${locationUrls.join(',')}|bld=${buildingUrls.join(',')}|prop=${propUrls.join(',')}`;
     const identitySig = identityPortraits.length > 0
       ? `id=${identityPortraits.join(',')}`
@@ -217,10 +222,9 @@ serve(async (req) => {
       .map((c) => `${c.name.toLowerCase()}:${c.action.toLowerCase()}`)
       .sort()
       .join('|');
-    // v15 — adds canonical identity reference portraits (separate from
-    // outfit-cover wardrobe refs) + identity-swap strict retry mode.
+    // v16 — adds face-lock mode (v131.6).
     const promptHash = await sha1(
-      `v15|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}`,
+      `v16|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}`,
     );
 
     const { data: cached } = await admin
@@ -297,8 +301,17 @@ serve(async (req) => {
     // v111 — STRICT SWAP RETRY: the previous attempt rendered the WRONG face
     // for one or more named characters (e.g. a woman's head on a male
     // reference). Name the offenders explicitly.
-    const STRICT_SWAP_SUFFIX = swapMode && isMulti
+    const STRICT_SWAP_SUFFIX = (swapMode || faceLockMode) && isMulti
       ? ` STRICT IDENTITY SWAP RETRY — the previous attempt rendered the WRONG PERSON in the slot of: ${swapMismatches.length > 0 ? swapMismatches.join(", ") : "one or more characters"}. Read carefully: every named reference person above has a CANONICAL IDENTITY headshot supplied later in the image list — that IDENTITY image is the ground truth for that person's FACE (sex, age, hair color, hair length, skin tone, jawline, nose, eye color, beard/stubble). Do NOT swap, replace, regender, or substitute any character with a different person. If a reference looks androgynous, follow the IDENTITY headshot's apparent sex and age STRICTLY. Wardrobe and body shape may come from the outfit-cover image for that character, but the FACE must match the IDENTITY headshot pixel-for-pixel. Double-check before output: does each named character's face actually match THEIR identity headshot? If not, regenerate the face from the identity headshot.`
+      : "";
+
+    // v131.6 — FACE LOCK SUFFIX: final-attempt hard pixel-copy directive.
+    // Used only after attempt-1 (normal) and attempt-2 (strict-swap) have
+    // both failed the identity audit. Demands the model copy the face
+    // straight from the IDENTITY headshot of each slot with zero creative
+    // interpretation. Combined with temperature: 0 below.
+    const FACE_LOCK_SUFFIX = faceLockMode && isMulti && identityPortraits.length === portraits.length
+      ? ` FINAL FACE-LOCK MODE — the previous TWO attempts both produced the wrong face in at least one slot${swapMismatches.length > 0 ? ` (offenders: ${swapMismatches.join(", ")})` : ""}. For each numbered reference slot, COPY THE FACE DIRECTLY FROM THAT SLOT'S IDENTITY HEADSHOT pixel-for-pixel — same geometry, same jaw, same eyes, same nose, same hairline, same skin tone, same age, same sex. NO creative interpretation of faces. NO blending. NO substitution. NO "improvement". The IDENTITY headshot IS the face — paste it. Outfits come from the wardrobe references (Image #1..#${portraits.length}), but every face is a direct copy from its IDENTITY headshot. If you cannot copy a face exactly from its identity headshot, leave that character out rather than substitute a different person.`
       : "";
 
     // Per-character action clause — protected from the dialog stripper and
@@ -351,7 +364,7 @@ serve(async (req) => {
     }
 
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${worldClause}${identityClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
@@ -391,6 +404,9 @@ serve(async (req) => {
           model: "google/gemini-3.1-flash-image-preview",
           messages: [{ role: "user", content: userContent }],
           modalities: ["image", "text"],
+          // v131.6 — force deterministic generation for the final face-lock
+          // attempt so the model does not "creatively reinterpret" identity.
+          ...(faceLockMode ? { temperature: 0 } : {}),
         }),
         signal: ac.signal,
       });
@@ -417,7 +433,7 @@ serve(async (req) => {
       );
     }
     console.log(
-      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} strict=${strictMode ? 1 : 0} elapsedMs=${Date.now() - t0}`,
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} elapsedMs=${Date.now() - t0}`,
     );
 
     const aiJson = await aiResp.json();
