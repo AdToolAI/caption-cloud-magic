@@ -70,6 +70,27 @@ Deno.test("Rule 0 (v131.3) — coords-pro is the fresh-default label and NO LONG
   assertEquals(r.asd.auto_detect, true);
 });
 
+Deno.test("v131.4 regression — production coords-pro clean 4-speaker preclip sends auto_detect only", () => {
+  const r = buildAsdStrategy(
+    input({
+      retryVariant: "coords-pro",
+      isMultiSpeaker: true,
+      geometry: {
+        preclipFaceCount: 1,
+        preclipAmbiguityRisk: "clean",
+        plateCoord: [618, 313],
+        preclipCrop: { x: 504, y: 198, size: 228, outputSize: 720 },
+        asdFrameNumber: 2,
+        preclipTrust: "verified",
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_auto");
+  assertEquals(r.asd, { auto_detect: true });
+  assert(!("coordinates" in r.asd));
+  assert(!("frame_number" in r.asd));
+});
+
 Deno.test("Rule 0 (v131.3) — explicit sync3-coords retry STILL bypasses Rule 0 → preflight (Rule 1) fires", () => {
   const r = buildAsdStrategy(
     input({
