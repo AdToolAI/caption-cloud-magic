@@ -95,7 +95,7 @@ Deno.test("Rule 0 (v131.1) — face count null now fires Rule 0 as probe_unavail
 });
 
 
-Deno.test("Rule 1 — preflight face coord wins over everything", () => {
+Deno.test("Rule 1 — preflight face coord wins over everything (v131.3: use sync3-coords to bypass Rule 0)", () => {
   const r = buildAsdStrategy(
     input({
       preflight: {
@@ -107,7 +107,7 @@ Deno.test("Rule 1 — preflight face coord wins over everything", () => {
         snapDistancePx: 120,
       },
       isMultiSpeaker: true,
-      retryVariant: "coords-pro",
+      retryVariant: "sync3-coords",
     }),
   );
   assertEquals(r.mode, "preflight_coord");
