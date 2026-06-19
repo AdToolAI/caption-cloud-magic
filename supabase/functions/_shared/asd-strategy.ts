@@ -215,6 +215,42 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
     // through to remaining rules with a diagnostic.
   }
 
+  // ── Rule 0 (v131): Verified single-face preclip → auto_detect PRIMARY.
+  // Empirically (Replay-Lab 2026-06-19) sync-3 fails with
+  // `generation_unknown_error` on the (coordinates, frame_number) tuple
+  // even when the coord is on-face, while `auto_detect:true` and
+  // `bounding_boxes_url` both succeed on the SAME asset. Since v69 the
+  // preclip is by construction a single-face square crop, so there is no
+  // ambiguity to disambiguate — Sync.so's own detector is the safer
+  // primary path. Coord/frame paths remain available as explicit retry
+  // fallbacks (coords-pro / bbox-url retry variants).
+  const rule0Eligible =
+    usePreclip &&
+    !isCoordsProRetry(retryVariant) &&
+    !isBboxRetry(retryVariant) &&
+    geometry.preclipFaceCount === 1 &&
+    geometry.preclipAmbiguityRisk === "clean";
+
+  if (rule0Eligible) {
+    return {
+      mode: "single_face_auto",
+      asd: { auto_detect: true },
+      frameNumber: null,
+      coordSpace: "none",
+      source: "default",
+      diagnostics: {
+        rule: "rule_0_preclip_single_face_verified",
+        retry_variant: retryVariant,
+        is_multi_speaker_scene: isMultiSpeaker,
+        face_count_in_crop: geometry.preclipFaceCount,
+        ambiguity_risk: geometry.preclipAmbiguityRisk,
+        preclip_single_face_verified: true,
+        reason: "v131_auto_detect_primary_on_verified_single_face_preclip",
+        had_preflight_coord: !!(preflight?.faceFound && preflight.coord),
+      },
+    };
+  }
+
   // ── Rule 1: Preflight Face Coord (PRIMARY when available)
   // When the Gemini probe locked onto a face, that coord is authoritative
   // regardless of multi-speaker context. The probe ran on the EXACT
