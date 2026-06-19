@@ -1,61 +1,37 @@
-## Analyse
+Do I know what the issue is? Yes.
 
-Der neue Fehler ist nicht mehr der alte `auto_detect`-NOOP, sondern ein neuer Sonderfall im `coords-pro` Retry:
-
-- Der Screenshot zeigt: `Gesicht am ASD-Frame: FAIL`, `verdict=no_face`.
-- Der geprüfte Frame zeigt nur Körper/Arme, kein Gesicht.
-- In den Logs zum aktuellen Scene-Run `6a8b4584-...` steht:
-  - Preclip hat nur `33` Frames (`duration_sec=1.089`, `fps=30`).
-  - Retry wurde aber mit `frame_number=47` an Sync.so geschickt.
-  - Das ist außerhalb des Preclips. Der Face-Probe / Sync.so schaut dadurch auf einen ungültigen bzw. falschen Framebereich.
-  - Zusätzlich liegt die transformierte Koordinate bei `[363,360]` auf einem Crop, dessen sichtbarer Probe-Frame im Screenshot deutlich den Oberkörper statt Gesicht zeigt.
-
-## Ursache
-
-Der v129.26-Fix hat `coords-pro` korrekt aktiviert, aber dafür den falschen Frame-Raum übernommen:
-
-- `referenceFrameNumber` stammt aus der originalen Plate-/Turn-Timeline.
-- Beim Preclip beginnt das Video aber wieder bei Frame `0` und ist viel kürzer.
-- Beim Retry muss `frame_number` deshalb relativ zum Preclip sein und auf einen sicher sichtbaren Face-Frame geklemmt werden, nicht der absolute/alte Frame.
-
-Damit kam es zu:
+The current failure is not the old out-of-range-frame bug anymore. The database shows scene `21eed4c2-...` failed on pass 2 / Matthew after dispatching `sync-3` with explicit preclip coordinates:
 
 ```text
-preclip frames: 0..32
-gesendet: frame_number=47
-Folge: Face-Gate sieht keinen Kopf / Sync.so bricht mit generation_unknown_error ab
+video: preclip, duration ~1.09s / 33 frames
+ASD: auto_detect:false, frame_number:16, coordinates:[363,363]
+provider result: generation_unknown_error
 ```
 
-## Implementierungsplan
+So v129.27 fixed the frame range, but the retry still sends explicit `coordinates` into a tight single-face preclip. We already documented and observed that `sync-3` can fail on tight one-face preclips when explicit ASD is used. The screenshot’s `face_at_frame` blocker is also confusing because the forensics panel is looking at pass index 0 by default while the actual failed pass is index 1.
 
-1. **Preclip-ASD-Frame normalisieren**
-   - In `compose-dialog-segments/index.ts` für den `coords-pro` Preclip-Retry einen eigenen `preclipAsdFrame` berechnen.
-   - Basis: `preclip_duration_sec * 30` oder geprüfte `preclip_dims/probe`-Frames.
-   - Frame immer clampen: `0 <= frame <= preclipFrameCount - 1`.
-   - Für kurze Preclips bevorzugt ein stabiler früher/mittlerer Frame, z. B. `min(mid, frameCount - 2)`, statt altem Plate-Frame.
+Plan:
 
-2. **Face-Gate vor `coords-pro` Retry hart machen**
-   - Vor dem Sync.so Dispatch bei `coords-pro_preclip` prüfen: enthält der gewählte Preclip-Frame wirklich ein Gesicht an/nahe der transformierten Koordinate?
-   - Wenn `no_face`, nicht an Sync.so schicken.
-   - Stattdessen entweder:
-     - auf `auto_detect:true` zurückfallen, wenn der Preclip als clean/unambiguous markiert ist, oder
-     - Preclip neu rendern / sauber mit Refund abbrechen, wenn der Crop wirklich falsch ist.
+1. **Stop using explicit point-ASD on clean preclips**
+   - In `compose-dialog-segments`, change `coords-pro` preclip retry behavior for clean/tight single-face crops.
+   - Instead of sending `auto_detect:false + coordinates`, use a safer recovery ladder:
+     - first retry: regenerate/expand the preclip crop if needed, then `auto_detect:true`
+     - only use explicit coords when the crop is truly multi-face/ambiguous and the coordinate is verified on the exact preclip frame.
 
-3. **Koordinate bei Preclip-Retry nicht blind verwenden**
-   - Wenn die transformierte Koordinate zwar in-bounds ist, aber Face-Gate `not_at_coord` oder `no_face` meldet, darf sie nicht als ASD-Koordinate an Sync.so gehen.
-   - Falls ein Snap möglich ist, die gesnappte Face-Koordinate verwenden.
-   - Falls nicht, `coords-pro` für diesen Pass blocken und kontrolliert fallbacken.
+2. **Add a hard provider-safe fallback for this failure**
+   - In `sync-so-webhook`, when `sync-3` fails with `generation_unknown_error` on a preclip explicit-coord retry, do not retry the same payload.
+   - Move to a different variant, preferably `auto-standard` / lipsync-2 fallback on the preclip, or a full-plate/bbox route, depending on available metadata.
+   - This avoids looping back into the same known-bad Sync.so payload shape.
 
-4. **Logging/Forensik verbessern**
-   - `syncso_dispatch_log.meta.coord_transform` um `preclip_frame_count`, `raw_reference_frame`, `clamped_preclip_frame` und `frame_source` erweitern.
-   - Dadurch sieht man sofort, ob ein zukünftiger Fehler an Frame-Clamping, Crop oder Provider liegt.
+3. **Make Face-Gate not block clean preclip auto paths incorrectly**
+   - For `auto_detect:true` preclip dispatches, do not ask the preflight/face-gate to validate a fixed coordinate.
+   - Validate only “face exists in preclip frame” for auto-detect paths; keep coordinate checks only for explicit ASD.
 
-5. **Aktuellen fehlgeschlagenen Run recovern**
-   - Nach Deployment den fehlgeschlagenen Pass 2 (`Matthew`) auf pending setzen, `retry_variant=coords-pro` beibehalten, aber gecachte falsche Dispatch-/Job-Felder leeren.
-   - Neu starten und prüfen, dass der Dispatch nicht mehr `frame_number=47`, sondern einen gültigen Preclip-Frame innerhalb `0..32` sendet.
+4. **Improve forensics so the screenshot points at the real failed pass**
+   - Update the forensics sheet to default/select the failed pass when a scene failed, instead of showing pass index 0.
+   - Label whether the check is validating the actual provider payload or only a diagnostic probe.
 
-## Erwartetes Ergebnis
-
-- Kein `Gesicht am ASD-Frame: FAIL` mehr durch out-of-range Frames.
-- Sync.so bekommt beim `coords-pro` Retry nur noch gültige Preclip-Frames.
-- Wenn der Crop wirklich kein Gesicht enthält, wird vor Provider-Kosten kontrolliert geblockt/repariert statt nach langem Lauf abzubrechen.
+5. **Recover the current failed run**
+   - Reset scene `21eed4c2-...` from failed to pending at the failed pass.
+   - Clear the invalid explicit-preclip retry metadata and redispatch with the new safe fallback.
+   - Confirm in logs that the next payload no longer sends the known-bad `sync-3 + explicit coords on single-face preclip` shape.
