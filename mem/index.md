@@ -134,3 +134,6 @@ Updated: today
 
 
 
+
+- [v134 NOOP Escalation Ladder](mem://architecture/lipsync/v134-noop-escalation-ladder) — Sync.so NOOP wird mit deterministischer 2-Step-Ladder eskaliert (bbox-url-pro → coords-pro-box → Hard-Fail+Refund), `coord_refresh_terminal_blocked` während aktiver NOOP-Retry-Cycles aufgehoben, `turn_idx` in jedem dispatch_log, UI-Banner zeigt NOOP-Retry-Stufe.
+- [v135 Pre-Crop Coord Snap](mem://architecture/lipsync/v135-pre-crop-coord-snap) — AWS Rekognition snappt ASD-Coords auf das tatsächliche Plate-Gesicht VOR dem Preclip-Render statt erst beim Sync.so-Dispatch. Behebt Forensik-Case `VERDICT=yes_but_not_at_coord` + `MEDIAPIPE_FACES=1` wo der Crop um die falsche Coord das echte Gesicht wegschnitt und Face-Gate dann count=0 sah. Nearest-Neighbour Match, Distance-Bands (≤60px noop / 60-200px snap / >200px skip), Safe-Zone 5-95%. Persistiert `coords_snap_origin` + `coord_snap_distance_px` + `coord_snap_skipped_reason`. Kein neuer Provider.
