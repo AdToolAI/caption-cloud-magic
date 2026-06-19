@@ -4091,30 +4091,48 @@ serve(async (req) => {
         frame_clamped: !refFrameInPreclipRange,
       };
 
-      // v131.4 — Dispatch-path safety override for the production failure
-      // seen on scene 83145f34…: even after the shared strategy was updated,
-      // the deployed function still emitted `coords-pro → coordinates` for a
-      // clean single-face preclip. `coords-pro` is the fresh/default label, not
-      // an explicit coordinate retry. On a clean preclip it must be
-      // `{ auto_detect:true }` with no frame/coord fields.
-      const v1314ConfirmedAmbiguousCrop =
-        ambiguityRiskForStrategy === "neighbor_inside_crop" ||
-        (typeof passFaceCount === "number" && passFaceCount > 1);
-      if (retryVariant === "coords-pro" && !v1314ConfirmedAmbiguousCrop) {
+      // v136 — Preclip-Centered Coords (supersedes v131.4 auto_detect override)
+      // Root cause discovered 2026-06-19 on scene af3901da: Sync.so sync-3
+      // with `{ auto_detect: true }` on a 720×720 face-cropped preclip
+      // silently returns the input video unchanged (no lip animation) for
+      // ~all passes. Forensic PSNR(preclip→output) measured 33–43 dB across
+      // all 4 speaker passes — no mouth movement.
+      //
+      // The preclip is by construction a one-face square centered on that
+      // speaker's face (see preclip builder, ~line 4047). We can dispatch
+      // explicit, in-preclip coordinates at the geometric center of the
+      // output frame, removing all guessing on Sync.so's side. This applies
+      // to BOTH single- and multi-speaker passes because the preclip is the
+      // same shape in both cases.
+      //
+      // Safety net: Sync.so's auto-snap (v129.22.3, ok_after_snap branch
+      // below at ~line 4950) still corrects any sub-frame drift, and the
+      // pre-snap (v135) still runs on plate-space ambiguous crops.
+      if (usePassPreclip && retryVariant === "coords-pro") {
         const previousAsd = syncOptions.active_speaker_detection;
-        syncOptions.active_speaker_detection = { auto_detect: true };
-        asdMode = "v131_4_single_face_auto_forced";
+        const outSizeForCenter = Number((pass as any).preclip_crop?.outputSize) || 720;
+        const centerXY = Math.round(outSizeForCenter / 2);
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          frame_number: 0,
+          coordinates: [[centerXY, centerXY]],
+        };
+        asdMode = "v136_preclip_centered_coords";
+        (pass as any).preclip_asd_source = "v136_preclip_center";
+        (pass as any).preclip_asd_coords = [centerXY, centerXY];
         v1291Diag = {
           ...v1291Diag,
-          rule: "rule_0_preclip_coords_pro_forced_auto",
-          mode: "single_face_auto",
-          source: "default",
-          coord_space: "none",
-          frame_number: null,
-          reason: "v131_4_dispatch_path_safety_override",
+          rule: "v136_preclip_centered_coords",
+          mode: "preclip_center",
+          source: "preclip_geometric_center",
+          coord_space: "preclip_output",
+          frame_number: 0,
+          reason: "v136_supersedes_v131_4_auto_detect_silent_noop",
           retry_variant: retryVariant,
           original_strategy_mode: strategy.mode,
           original_asd: previousAsd,
+          preclip_output_size: outSizeForCenter,
+          centered_coord: [centerXY, centerXY],
         };
       }
       (pass as any)._v1291 = v1291Diag;
