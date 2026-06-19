@@ -326,8 +326,11 @@ Deno.test("v131.1 — preclipTrust='verified' but faceCount=2 → Rule 0 blocked
   );
   assert(r.diagnostics.rule !== "rule_0_preclip_verified");
   assert(r.diagnostics.rule !== "rule_0_preclip_probe_unavailable");
+});
 
 // ── v131.2 — Rule 0 unconditional on preclip (drop trust gate) ─────────────
+
+
 
 Deno.test("v131.2 — multi-speaker + face probe unavailable + clean ambiguity → Rule 0 fires (no trust required)", () => {
   // Reproduces prod scene 793aef02-…: 4-speaker hook, server face probe
