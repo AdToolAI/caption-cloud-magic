@@ -146,12 +146,13 @@ export function classifyReplayBatch(rows: ReplayRow[]): Verdict {
       ready,
       outcomes,
       rootCause: "asd_coords_or_frame",
-      rootCauseLabel: "ASD-Koordinaten/Frame falsch — behoben durch v131",
+      rootCauseLabel: "ASD-Koordinaten/Frame falsch — behoben durch v131 / v131.1",
       recommendedFix:
-        "auto_detect funktioniert → die expliziten Koordinaten/frame_number sind das Problem. Seit v131 ist auto_detect der Primary-Pfad für verifizierte Single-Face-Preclips (Rule 0). Falls dieser Dispatch vor dem v131-Deploy lief, wird er beim nächsten Lauf automatisch über Rule 0 gerettet.",
+        "auto_detect funktioniert → die expliziten Koordinaten/frame_number sind das Problem. Seit v131 ist auto_detect der Primary-Pfad für verifizierte Single-Face-Preclips (Rule 0). v131.1 erweitert Rule 0 zusätzlich auf den Fall, dass der serverseitige Face-Probe gar nicht verfügbar ist (`preclipFaceCount=null`) oder der Preclip aus der validierten Face-Center-Pipeline kommt (`preclipTrust='verified'`). Falls dieser Dispatch vor v131.1 lief, wird er beim nächsten Lauf automatisch über Rule 0 gerettet.",
       notes,
     };
   }
+
   if (outcomes.bboxes === "pass") {
     return {
       ready,
