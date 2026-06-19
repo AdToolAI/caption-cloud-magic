@@ -1,77 +1,112 @@
-# v131.6 — Anchor Identity Auto-Recovery (3rd Attempt + Per-Slot Face-Lock)
+Du hast recht: Das darf kein 20-Minuten-/Retry-Produkt werden. Bei der aktuellen Szene sieht es nach einem **selbst verursachten Pipeline-Fehler** aus, nicht nach “Sync.so kann es grundsätzlich nicht”.
 
-## Problem
+## Warum der Fehler überhaupt kommt
 
-Im Composer rendert Nano Banana 2 für `cinematic-sync`-Szenen mit ≥2 Cast-Mitgliedern manchmal **fremde Gesichter** statt der gewählten Avatare (Sarah/Matthew/Samuel/Kailee). Heutiger Ablauf in `compose-video-clips/index.ts`:
+Die Szene hat mehrere Sprecher. Unsere Pipeline verarbeitet dafür mehrere Lip-Sync-Pässe.
+
+Der kritische Punkt:
+
+- Pass 4 wurde um ca. `19:41:01` an Sync.so geschickt.
+- Der Watchdog hat die Szene um ca. `19:42:03` als Timeout fehlgeschlagen markiert.
+- Der Sync.so-Job kam danach erfolgreich zurück, wurde aber ignoriert, weil die Szene schon auf `failed` stand.
+
+Das heißt: **Der letzte Sprecher hatte nur etwa 60 Sekunden Zeit**, obwohl der Watchdog eigentlich 10 Minuten Provider-Zeit geben sollte.
+
+Die Ursache ist sehr wahrscheinlich:
+
+> Der Watchdog misst den Timeout ab dem Start der gesamten Szene / des ersten Passes, nicht sauber ab dem Start des aktuell laufenden Passes.
+
+Bei 4 Sprechern ist die Szene also schon “alt”, bevor der letzte Pass überhaupt richtig läuft. Dann killt der Watchdog einen gesunden Job zu früh.
+
+Zusätzlich hat der vorherige Auto-Retry-Fix die Pass-Liste teilweise kaputt zurückgesetzt. Deshalb zeigt das Forensik-Panel jetzt `pass_not_found`.
+
+## Ziel
+
+Nicht mehr “mehr Retries”, sondern:
+
+- erster Lauf soll stabil durchlaufen
+- kein vorzeitiger Watchdog-Kill
+- kein kaputter `passes[]` Zustand
+- erfolgreiche späte Webhooks dürfen nicht weggeworfen werden, wenn sie zu einem aktiven aktuellen Pass gehören
+- echte Provider-Ausfälle bleiben trotzdem abgesichert und werden refundet
+
+## Plan v131.8: Ursachenfix statt Retry-Workaround
+
+### 1. Watchdog auf Pass-Level umstellen
+
+In `lipsync-watchdog` wird der Timeout nicht mehr primär anhand von `dialog_shots.first_started_at` oder Szenenalter berechnet.
+
+Stattdessen:
+
+- Für jeden `rendering` Pass wird `pass.started_at` gelesen.
+- Nur dieser konkrete Pass darf wegen Provider-Timeout bewertet werden.
+- Ein Pass wird erst nach z. B. 10 Minuten seit seinem eigenen `started_at` als Provider-Timeout behandelt.
+- Solange irgendein aktueller Pass jünger als TTL ist, darf die Szene nicht terminal scheitern.
+
+Damit bekommt Pass 4 dieselbe faire Laufzeit wie Pass 1.
+
+### 2. Auto-Retry entschärfen oder für diesen Fall deaktivieren
+
+Der Auto-Retry darf nicht mehr die komplette `passes[]` Liste leeren.
+
+Stattdessen:
+
+- Nur den betroffenen Pass zurück auf `pending` setzen.
+- Die übrigen erfolgreichen Passes behalten.
+- `watchdog_retry_attempted` direkt am Pass speichern.
+- Keine sparse/null Pass-Liste erzeugen.
+
+Optional: Für Multi-Speaker-Szenen mit bereits erfolgreichen Passes wird Auto-Retry erst einmal stark konservativ gemacht, damit wir nicht mehr fertige Sprecher verlieren.
+
+### 3. Late-success Webhook darf recovern
+
+Wenn Sync.so nach einem zu frühen Watchdog-Fail doch `COMPLETED` liefert:
+
+- Wenn die `job_id` noch in `dialog_shots.passes[]` bekannt ist, darf der Webhook nicht pauschal ignoriert werden.
+- Er soll den Pass als `done` markieren oder die Szene aus `failed` zurückholen, sofern der Fehler nur `watchdog_provider_timeout` war.
+- Echte harte Fehler bleiben weiterhin terminal.
+
+Das verhindert, dass ein erfolgreicher erster Providerlauf durch unsere eigene State-Machine verloren geht.
+
+### 4. Forensik `pass_not_found` reparieren
+
+Das Forensik-Panel soll bei fehlendem/null Pass nicht nur 404 zeigen.
+
+Stattdessen:
+
+- aus `syncso_dispatch_log` den letzten bekannten Pass rekonstruieren
+- anzeigen, ob der Pass später `COMPLETED` kam
+- Warnung ausgeben: `Watchdog killed pass before pass TTL elapsed`
+
+Das macht die Diagnose eindeutig und verhindert falsche Schlüsse.
+
+### 5. Test absichern
+
+Ein Regressionstest simuliert genau diesen Fall:
 
 ```text
-attempt-1  → audit (Gemini Vision) → swap erkannt
-attempt-2  → swap-retry mit mismatch-Liste → audit
-            ├─ ok   → weiter zu Hailuo/Sync.so
-            └─ fail → HARD-FAIL „anchor_identity_failed" + Re-Render-Button
+Pass 1 startet bei Minute 0 und wird done.
+Pass 2/3 folgen.
+Pass 4 startet bei Minute 11.
+Watchdog läuft bei Minute 12.
+Erwartung: Szene darf NICHT failen, weil Pass 4 erst 1 Minute alt ist.
 ```
 
-User-Beobachtung: „meistens wird sie dann korrekt ersetzt" — der Swap-Retry funktioniert normalerweise. Diesmal hat aber auch Attempt 2 den Swap nicht aufgelöst (Screenshot: ref #1 = Samuel und ref #4 = Sarah waren mit fremden Personen vertauscht), und die Szene endet als roter Fehler bevor überhaupt ein Hailuo-Credit ausgegeben wird.
+Zusätzlich:
 
-Das ist ärgerlich, weil:
-- der Re-Render-Klick fast immer beim 3. Versuch durchgeht → der User macht effektiv nur, was wir auch automatisch machen könnten
-- es bricht die „one-click stitch all"-Pipeline, sobald **eine** Szene swappt
-- es wirkt wie ein Lip-Sync-Problem, ist aber rein im Anchor-Compose
-
-## Lösung — Auto-Recovery 3. Versuch + Per-Slot Face-Lock
-
-### 1. Dritter Compose-Versuch mit verschärftem Prompt
-
-In `compose-video-clips/index.ts` direkt nach attempt-2 einen `attempt-3` einbauen, **nur** wenn `identityFailure === "swap"` (clone/missing/extra haben andere Ursachen und profitieren nicht von einer 3. Runde). Stufung:
-
-| Versuch | Modus | Prompt-Schärfe |
-|---|---|---|
-| 1 | normal | Standard-Framing |
-| 2 | `strictSwapMode: true` mit Mismatch-Liste | „diese Slots wurden vertauscht — neu rendern" |
-| 3 (**neu**) | `strictSwapMode: true` + `faceLockMode: true` | „pro Slot **face-only crop** des Identity-Portraits direkt übernehmen, keine kreative Interpretation der Gesichter" |
-
-### 2. Neuer `faceLockMode` in `compose-scene-anchor`
-
-`compose-scene-anchor/index.ts` erweitern um Flag `faceLockMode: boolean`. Wenn true:
-- Identity-Portraits als **dedizierte „face exemplar"-Bilder** vor das Compose schicken (zusätzlich zu den Wardrobe-Refs)
-- Prompt-Suffix: `"For each numbered reference, copy the FACE from the identity exemplar EXACTLY (geometry, jaw, eyes, nose, hairline). Do not invent new faces, do not blend faces, do not substitute. Outfits come from the wardrobe references."`
-- `temperature: 0` für Gemini Image (deterministischer)
-
-### 3. Forensik-Trail
-
-Jeder Attempt schreibt einen Eintrag in `composer_scenes.audio_plan.twoshot.anchor_attempts[]`:
-```json
-{ "attempt": 3, "mode": "face-lock", "identity": "ok", "faces": 4, "humans": 4, "at": "..." }
+```text
+Auto-Retry darf passes[] nicht leeren und keine null Slots erzeugen.
+Late COMPLETED webhook für watchdog_provider_timeout darf recovern.
 ```
-Damit sieht der „Forensik"-Button im UI sofort, wie viele Runden gebraucht wurden.
 
-### 4. UI: stiller Fortschritt statt rotem Fehler während Retry
+## Erwartetes Ergebnis
 
-`SceneCard` (Composer): wenn `twoshot_stage === "anchor"` und `clip_status === "in_progress"` → bestehender goldener Spinner bleibt. Erst wenn nach Attempt-3 noch `identityFailure` gesetzt ist, wird der bisherige rote „Re-Render empfohlen"-Block angezeigt (Logik unverändert, aber feuert seltener).
+Nach diesem Fix sollte diese Art Szene nicht mehr wegen “Gesamtzeit zu alt” abbrechen. Der erste Lauf bekommt realistische Chancen, sauber fertig zu werden, ohne dass der Kunde 20 Minuten warten oder 3 Retries sehen muss.
 
-### 5. Tests + Doku
+## Dateien
 
-- Neuer Unit-Test `_shared/identity-audit.test.ts` (existiert noch nicht) — verifiziert swap-Erkennung
-- Neuer Doku-Eintrag `mem/architecture/video-composer/v131-6-anchor-auto-recovery.md`
-- `mem/index.md` aktualisieren
-
-## Geänderte Dateien
-
-- `supabase/functions/compose-video-clips/index.ts` — Attempt-3 Block + `anchor_attempts[]` Log
-- `supabase/functions/compose-scene-anchor/index.ts` — neues `faceLockMode` Flag
-- `src/components/video-composer/SceneCard.tsx` (oder äquivalente Fehler-UI) — keine sichtbare Änderung außer dass Fehler später erscheint
-- `mem/architecture/video-composer/v131-6-anchor-auto-recovery.md` (neu)
-- `mem/index.md`
-
-## Was bewusst NICHT geändert wird
-
-- Lip-Sync-Pipeline (v131.5 bleibt unangetastet — anderes Subsystem)
-- Credit-Logik: Hailuo/Sync.so werden weiterhin erst NACH bestandenem Audit dispatched, kein zusätzlicher Spend
-- Audit-Schwellen in `identity-audit.ts` — Erkennung war korrekt, nur Recovery hat gefehlt
-
-## Verifikation
-
-Nach Deploy + „Clip neu rendern" auf einer betroffenen Szene erwarten wir im Forensik-Log:
-- `anchor_attempts.length ≤ 3`
-- letzter Eintrag mit `identity: "ok"`
-- `clip_status` läuft direkt zu `rendering` weiter, kein roter Toast mehr für ≥95 % der Fälle.
+- `supabase/functions/lipsync-watchdog/index.ts`
+- `supabase/functions/sync-so-webhook/index.ts`
+- Forensik-Funktion/Panel für Sync.so Preflight bzw. Diagnose
+- passende Edge-/Unit-Tests
+- Memory-Notiz `v131-8-pass-level-watchdog-timeout.md`
