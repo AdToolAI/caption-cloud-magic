@@ -1398,10 +1398,12 @@ serve(async (req) => {
             },
             lip_sync_status: "failed",
             twoshot_stage: "failed",
-            clip_error:
-              "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
-              "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
-              "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
+            clip_error: speakers.length === 1
+              ? "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
+                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist."
+              : "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
+                "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
+                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
