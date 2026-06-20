@@ -2784,29 +2784,35 @@ serve(async (req) => {
       );
     }
 
-    // ── v150 — Fresh-Dispatch Preclip-Bypass für Multi-Speaker bbox-url-pro
-    // v147 hat bbox-url-pro als PRIMARY für N>=2 Speaker etabliert, aber der
-    // Single-Face-Preclip-Pfad (Rule 0 v131.2) gewinnt auf Fresh-Dispatch
-    // weiterhin und kollabiert die ASD wieder auf `auto_detect`. Das macht
-    // v147 auf Fresh-Dispatch wirkungslos und führt zur ersten NOOP-Welle,
-    // bevor die v134-Ladder überhaupt eingreift.
+    // ── v152 — Unified bbox-url-pro Pipeline (N=1..4) ────────────────────
+    // Einheitlicher Sync.so-Pfad für ALLE Dialog-Pässe: Full-Plate +
+    // `bounding_boxes_url`. Single-Speaker und Multi-Speaker laufen über
+    // genau denselben Code. Preclip-Render + Face-Gate verschwinden aus
+    // dem Standardpfad (Legacy-Loop bleibt nur als Fallback für explizite
+    // noop_auto_escalation Retries und non-bbox Retry-Variants).
     //
-    // Fix: Bei Fresh-Dispatch mit Multi-Speaker + Plate-Identity + Plate-Dims
-    // droppen wir den Preclip lokal, damit Full-Plate bbox-url-pro greift.
-    // Auf Single-Speaker Plates bleibt der Preclip-Pfad (= sicherer Default).
-    const v150FreshBboxEligible =
+    // N=1: keine Identity-Disambiguation nötig (1 Gesicht, 1 Sprecher,
+    //      bbox aus pass.coords + plate dims via synthetic fallback).
+    // N>=2: Plate-Identity-Map weiterhin erforderlich für deterministische
+    //       Box-Zuordnung (sonst greift v126-Guard).
+    const v152UnifiedBboxEligible =
       !isRetry &&
       body?.noop_auto_escalation !== true &&
-      speakers.length >= 2 &&
+      speakers.length >= 1 &&
       !!plateDims &&
-      !!plateIdentityMap && plateIdentityMap.resolvedCount > 0 &&
-      !!(pass as any).preclip_url;
-    if (v150FreshBboxEligible) {
+      Array.isArray(pass.coords) &&
+      Number.isFinite(Number(pass.coords?.[0])) &&
+      Number.isFinite(Number(pass.coords?.[1])) &&
+      (speakers.length === 1 ||
+        (!!plateIdentityMap && plateIdentityMap.resolvedCount > 0));
+    if (v152UnifiedBboxEligible) {
       (pass as any).preclip_url = null;
       (pass as any).preclip_render_id = null;
       (pass as any).preclip_crop = null;
+      (pass as any).preclip_error = null;
+      (pass as any)._v152BboxPrimary = true;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v150_fresh_bypass_preclip_for_bbox_url_pro speakers=${speakers.length} resolved=${plateIdentityMap.resolvedCount} speaker=${pass.speaker_name ?? "?"} — dropping preclip for full-plate bbox-url-pro PRIMARY`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_unified_bbox_primary speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? "n=1"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro PRIMARY (no preclip render)`,
       );
     }
 
