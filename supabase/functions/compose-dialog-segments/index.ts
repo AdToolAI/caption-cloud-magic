@@ -4405,13 +4405,23 @@ serve(async (req) => {
       // stiller inline-Fallback, der bei kaputter URL den v126-Provider-
       // Unknown wieder triggern würde).
       const v147BboxValid = !!usedUrl && nonNullFrames >= 1;
-      if (v147BboxValid) {
+      // v152 — Bbox-Geometrie Sanity-Gate: Box muss zwischen 0.2% und 45%
+      // der Plate-Fläche liegen. Außerhalb dieses Bandes ist sie entweder
+      // ein Detection-Artefakt (zu klein) oder ein Vollbild-False-Positive
+      // (zu groß). Beides würde Sync.so unzuverlässig machen.
+      const dimsArea = Math.max(1, (plateDims?.width ?? 0) * (plateDims?.height ?? 0));
+      const boxArea = box ? Math.max(0, (box[2] - box[0]) * (box[3] - box[1])) : 0;
+      const boxAreaPct = boxArea / dimsArea;
+      const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= 0.45;
+      (pass as any)._v152BboxAreaPct = Number(boxAreaPct.toFixed(4));
+
+      if (v147BboxValid && v152BboxSane) {
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes_url: usedUrl!,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_URL_PRIMARY speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_URL_PRIMARY speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (retryVariant === "coords-pro-box") {
         // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.
@@ -4432,12 +4442,46 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}`,
         );
+      } else if ((pass as any)._v152BboxPrimary) {
+        // v152 — Hard-Fail statt Silent-Downgrade. Lieber sofort transparent
+        // abbrechen + refunden + klare User-Message als 30 min später mit
+        // einem stillen Pseudo-Lipsync zu enden.
+        const v152FailReason = !usedUrl
+          ? "bbox_url_upload_failed"
+          : nonNullFrames < 1
+            ? "bbox_zero_voiced_frames"
+            : `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`;
+        (pass as any)._v152HardFail = {
+          reason: v152FailReason,
+          errorClass: "v152_bbox_hard_fail",
+          message:
+            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" konnte nicht vorbereitet werden ` +
+            `(${v152FailReason}). Bitte Szene neu rendern — Sprecher muss frontal und unverdeckt im Bild sein. ` +
+            `Credits wurden zurückerstattet.`,
+          meta: {
+            v152_unified_path: true,
+            usedUrl: !!usedUrl,
+            non_null_frames: nonNullFrames,
+            frame_count: frameCount,
+            box,
+            bbox_source: bboxSource,
+            bbox_area_pct: Number(boxAreaPct.toFixed(4)),
+            plate_dims: plateDims ?? null,
+          },
+        };
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_BBOX_HARD_FAIL reason=${v152FailReason} usedUrl=${!!usedUrl} non_null=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} — refund + abort, no silent downgrade`,
+        );
+        // Defer the actual refund/return until failBeforeProviderDispatch
+        // is declared (~ line 4486). syncOptions wird unten überschrieben.
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          bounding_boxes_url: "deferred-v152-hard-fail",
+        };
       } else {
-        // v147 — bbox-url-pro Upload failed oder 0 voiced frames → downgrade
-        // auf coords-pro statt blind inline-fallback. coords-pro nutzt
-        // pass.coords direkt und ist der nächst-sichere Stage.
+        // Legacy (non-v152) Pfad: bestehender silent downgrade auf coords-pro.
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_DOWNGRADE_TO_COORDS_PRO reason=${!usedUrl ? "upload_failed" : "zero_voiced_frames"} non_null=${nonNullFrames}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_DOWNGRADE_TO_COORDS_PRO reason=${!usedUrl ? "upload_failed" : !v152BboxSane ? `geometry_insane_area=${(boxAreaPct * 100).toFixed(2)}` : "zero_voiced_frames"} non_null=${nonNullFrames}`,
         );
         retryVariant = "coords-pro";
         pass.retry_variant = "coords-pro";
