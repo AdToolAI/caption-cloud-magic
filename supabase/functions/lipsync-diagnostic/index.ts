@@ -17,7 +17,8 @@ const corsHeaders = {
 };
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
-const VERSION = "v145.0";
+const VERSION = "v146.0";
+const REPLICATE_GATEWAY_BASE = "https://connector-gateway.lovable.dev/replicate/v1";
 
 console.log(`[lipsync-diagnostic] BOOT ${VERSION} deploy=${Date.now()}`);
 
