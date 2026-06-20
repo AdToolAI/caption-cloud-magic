@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v144.0";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.0";
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
@@ -1322,6 +1322,114 @@ serve(async (req) => {
         422,
       );
     }
+
+    // ── v153 — Multi-Speaker Pre-Flight Hard-Fail ───────────────────────
+    // SINGLE-PATH-POLICY: jeder Sprecher MUSS eine eigene plate-native Box
+    // bekommen (aus resolvePlateFaceIdentities oder Slot-Fallback). Wenn
+    // nicht, würde der bbox-url-pro Pfad mehrere Sprecher auf dieselbe
+    // Box mappen → genau der "Sprecher 1 spricht für 1+2"-Bug.
+    // Lieber sofort hart abbrechen + refund + klare Meldung, statt 20 min
+    // später ein falsch gemixtes Video zu liefern.
+    if (
+      !isAdvance &&
+      !isRetry &&
+      speakers.length >= 2 &&
+      !!plateDims
+    ) {
+      const missingBoxIdx: number[] = [];
+      for (let i = 0; i < speakers.length; i++) {
+        const b = speakerPlateBboxes?.[i];
+        if (!Array.isArray(b) || b.length !== 4) missingBoxIdx.push(i);
+      }
+      // Zusätzlich: distinkte Boxen verlangen (zwei Speaker dürfen nicht
+      // auf exakt dieselben Pixel mappen). Toleranz: center-Distanz <8px.
+      const boxes = speakerPlateBboxes
+        .map((b, i) => (Array.isArray(b) && b.length === 4 ? { i, b } : null))
+        .filter(Boolean) as Array<{ i: number; b: number[] }>;
+      const dupeIdx: number[] = [];
+      for (let a = 0; a < boxes.length; a++) {
+        for (let c = a + 1; c < boxes.length; c++) {
+          const ca = [(boxes[a].b[0] + boxes[a].b[2]) / 2, (boxes[a].b[1] + boxes[a].b[3]) / 2];
+          const cc = [(boxes[c].b[0] + boxes[c].b[2]) / 2, (boxes[c].b[1] + boxes[c].b[3]) / 2];
+          const dx = ca[0] - cc[0];
+          const dy = ca[1] - cc[1];
+          if (Math.hypot(dx, dy) < 8) {
+            dupeIdx.push(boxes[c].i);
+          }
+        }
+      }
+      if (missingBoxIdx.length > 0 || dupeIdx.length > 0) {
+        const reason = missingBoxIdx.length > 0
+          ? `v153_plate_box_missing_for_speakers=[${missingBoxIdx.join(",")}]`
+          : `v153_plate_box_duplicate_for_speakers=[${dupeIdx.join(",")}]`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v153_preflight_BLOCK ${reason} — refunding ${totalCost} credits, no dispatch`,
+        );
+        const alreadyRefundedPF = !!(existing as any)?.refunded;
+        if (!alreadyRefundedPF) {
+          try {
+            const { data: wPF } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wPF?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (e) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v153 preflight refund failed: ${(e as Error)?.message}`,
+            );
+          }
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+              refunded: true,
+              error: reason,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error:
+              "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
+              "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
+              "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_status: "PREFLIGHT_BLOCKED", error_class: "v153_preflight_block",
+          error_message: reason,
+          meta: {
+            speakers: speakers.length,
+            missing_box_idx: missingBoxIdx,
+            duplicate_box_idx: dupeIdx,
+            plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
+            plate_identity_faces: plateIdentityMap?.faces?.length ?? 0,
+            refunded_credits: alreadyRefundedPF ? 0 : totalCost,
+          },
+        });
+        return json(
+          {
+            error: "v153_preflight_block",
+            reason,
+            refunded: alreadyRefundedPF ? 0 : totalCost,
+          },
+          422,
+        );
+      }
+    }
+
+
 
     // ── v133 — Identity-Ambiguity Hard-Fail (3+ speakers) ───────────────
     // Per-character probe + Hungarian assignment runs inside
@@ -2784,35 +2892,37 @@ serve(async (req) => {
       );
     }
 
-    // ── v152 — Unified bbox-url-pro Pipeline (N=1..4) ────────────────────
-    // Einheitlicher Sync.so-Pfad für ALLE Dialog-Pässe: Full-Plate +
-    // `bounding_boxes_url`. Single-Speaker und Multi-Speaker laufen über
-    // genau denselben Code. Preclip-Render + Face-Gate verschwinden aus
-    // dem Standardpfad (Legacy-Loop bleibt nur als Fallback für explizite
-    // noop_auto_escalation Retries und non-bbox Retry-Variants).
+    // ── v153 — Single-Path bbox-url-pro Pipeline (N=1..4) ────────────────
+    // PRECLIP IS DEAD. Es gibt nur noch einen einzigen Dispatch-Pfad:
+    // Full-Plate + `bounding_boxes_url` mit plate-nativer Box pro Sprecher.
     //
-    // N=1: keine Identity-Disambiguation nötig (1 Gesicht, 1 Sprecher,
-    //      bbox aus pass.coords + plate dims via synthetic fallback).
-    // N>=2: Plate-Identity-Map weiterhin erforderlich für deterministische
-    //       Box-Zuordnung (sonst greift v126-Guard).
-    const v152UnifiedBboxEligible =
-      !isRetry &&
+    // Aktivierung: jede frische (nicht-noop-escalation) Dispatch braucht
+    //  - plateDims (sonst hat die Scene-Pre-Flight längst hart gefailt)
+    //  - eine plate-native Box für diesen Sprecher (N>=2) oder pass.coords (N=1)
+    //
+    // Wenn das nicht erfüllt ist, hat die Scene-Pre-Flight (Z. ~1325)
+    // bereits hart gefailt + refunded. Hier ist es daher ein simples Flag.
+    const v153HasPlateBox =
+      speakers.length === 1 ||
+      (Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
+        (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4);
+    const v153UnifiedBboxEligible =
       body?.noop_auto_escalation !== true &&
       speakers.length >= 1 &&
       !!plateDims &&
       Array.isArray(pass.coords) &&
       Number.isFinite(Number(pass.coords?.[0])) &&
       Number.isFinite(Number(pass.coords?.[1])) &&
-      (speakers.length === 1 ||
-        (!!plateIdentityMap && plateIdentityMap.resolvedCount > 0));
-    if (v152UnifiedBboxEligible) {
+      v153HasPlateBox;
+    if (v153UnifiedBboxEligible) {
       (pass as any).preclip_url = null;
       (pass as any).preclip_render_id = null;
       (pass as any).preclip_crop = null;
       (pass as any).preclip_error = null;
-      (pass as any)._v152BboxPrimary = true;
+      (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
+      (pass as any)._v153BboxPrimary = true;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_unified_bbox_primary speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? "n=1"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro PRIMARY (no preclip render)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153_unified_bbox_primary speakers=${speakers.length} plate_box=${v153HasPlateBox ? "yes" : "synthetic"} resolved=${plateIdentityMap?.resolvedCount ?? "n=1"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect)`,
       );
     }
 
@@ -2969,21 +3079,26 @@ serve(async (req) => {
       havePlateIdentityForDispatch &&
       !!plateDims &&
       !hasPassPreclipForDispatch;
-    const freshDefaultVariant: RetryVariant = v147BboxEligible
+    // v153 — Wenn der unified-bbox-Pfad aktiv ist, IMMER bbox-url-pro.
+    // Kein Fallback auf coords-pro mehr im Live-Pfad.
+    const v153Active = !!(pass as any)._v153BboxPrimary;
+    const freshDefaultVariant: RetryVariant = (v153Active || v147BboxEligible)
       ? "bbox-url-pro"
       : "coords-pro";
     let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
-    // v147 — Collapse-Gate Update: bbox-url-pro auf Fresh-Dispatch NICHT
-    // mehr nach coords-pro umleiten. Nur Legacy-Retries (die nicht aus
-    // dem NOOP-Ladder kommen UND nicht der frische v147-Default sind)
-    // werden gekappt, um den v126-Provider-Unknown-Loop zu vermeiden.
+    // v153 — Bei aktivem unified-Pfad auch Retries auf bbox-url-pro zwingen.
+    // Die NOOP-Ladder darf weiterhin bbox-url-pro / coords-pro-box wählen.
+    if (v153Active && !isRetry) {
+      retryVariant = "bbox-url-pro";
+    }
     const noopAutoEscalation = body?.noop_auto_escalation === true;
     const isFreshBboxPrimary = !isRetry && freshDefaultVariant === "bbox-url-pro";
     if (
       !noopAutoEscalation &&
       !isFreshBboxPrimary &&
+      !v153Active &&
       (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box" || retryVariant === "auto-pro" || retryVariant === "auto-standard")
     ) {
       retryVariant = "coords-pro";
@@ -2995,7 +3110,7 @@ serve(async (req) => {
     }
     if (isFreshBboxPrimary) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_bbox_url_pro_primary speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153_bbox_url_pro_primary speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} plate_box=${(pass as any)._v153BboxPrimary ? "plate-native" : "facemap-fallback"}`,
       );
     }
 
@@ -4337,35 +4452,66 @@ serve(async (req) => {
       const dims = plateDims ?? videoDims;
       let box: [number, number, number, number] | null = null;
       let bboxSource = "synthetic";
-      const fmFaces: any[] = Array.isArray((faceMap as any)?.faces)
-        ? (faceMap as any).faces
-        : [];
-      const matchedFace =
-        fmFaces.find((f) => f?.characterId && f.characterId === pass.character_id) ??
-        fmFaces.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
-        null;
-      const fmW = Number((faceMap as any)?.width) || dims.width;
-      const fmH = Number((faceMap as any)?.height) || dims.height;
-      if (
-        matchedFace &&
-        Array.isArray(matchedFace.bbox) &&
-        matchedFace.bbox.length === 4 &&
-        fmW > 0 && fmH > 0
-      ) {
-        const [bx1, by1, bx2, by2] = matchedFace.bbox.map((n: any) => Number(n));
-        const sx = dims.width / fmW;
-        const sy = dims.height / fmH;
-        const padX = (bx2 - bx1) * 0.15;
-        const padY = (by2 - by1) * 0.15;
-        const x1 = Math.max(0, Math.round((bx1 - padX) * sx));
-        const y1 = Math.max(0, Math.round((by1 - padY) * sy));
-        const x2 = Math.min(dims.width, Math.round((bx2 + padX) * sx));
-        const y2 = Math.min(dims.height, Math.round((by2 + padY) * sy));
-        if (x2 > x1 + 4 && y2 > y1 + 4) {
-          box = [x1, y1, x2, y2];
-          bboxSource = `facemap:${matchedFace.matchSource ?? "unknown"}`;
+
+      // v153 — PRIMÄRE Quelle: plate-native box pro Sprecher
+      // (aus resolvePlateFaceIdentities slot/identity fallback).
+      // Garantiert distinkte Boxen pro Sprecher und behebt den
+      // "Sprecher 1 spricht für Sprecher 1+2"-Bug, weil bisher der
+      // faceMap-Match-Loop für mehrere Speaker auf derselben Box landen
+      // konnte wenn characterId nicht gesetzt war.
+      const platePassBox = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
+      if (Array.isArray(platePassBox) && platePassBox.length === 4) {
+        const [bx1, by1, bx2, by2] = platePassBox.map((n: any) => Number(n));
+        if (Number.isFinite(bx1) && Number.isFinite(by1) && Number.isFinite(bx2) && Number.isFinite(by2)) {
+          const padX = (bx2 - bx1) * 0.15;
+          const padY = (by2 - by1) * 0.15;
+          const x1 = Math.max(0, Math.round(bx1 - padX));
+          const y1 = Math.max(0, Math.round(by1 - padY));
+          const x2 = Math.min(dims.width, Math.round(bx2 + padX));
+          const y2 = Math.min(dims.height, Math.round(by2 + padY));
+          if (x2 > x1 + 4 && y2 > y1 + 4) {
+            box = [x1, y1, x2, y2];
+            bboxSource = "plate-native";
+          }
         }
       }
+
+      // Sekundär: anchor faceMap (kann bei N=1 helfen oder wenn plate-native fehlt).
+      if (!box) {
+        const fmFaces: any[] = Array.isArray((faceMap as any)?.faces)
+          ? (faceMap as any).faces
+          : [];
+        const matchedFace =
+          fmFaces.find((f) => f?.characterId && f.characterId === pass.character_id) ??
+          fmFaces.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
+          null;
+        const fmW = Number((faceMap as any)?.width) || dims.width;
+        const fmH = Number((faceMap as any)?.height) || dims.height;
+        if (
+          matchedFace &&
+          Array.isArray(matchedFace.bbox) &&
+          matchedFace.bbox.length === 4 &&
+          fmW > 0 && fmH > 0
+        ) {
+          const [bx1, by1, bx2, by2] = matchedFace.bbox.map((n: any) => Number(n));
+          const sx = dims.width / fmW;
+          const sy = dims.height / fmH;
+          const padX = (bx2 - bx1) * 0.15;
+          const padY = (by2 - by1) * 0.15;
+          const x1 = Math.max(0, Math.round((bx1 - padX) * sx));
+          const y1 = Math.max(0, Math.round((by1 - padY) * sy));
+          const x2 = Math.min(dims.width, Math.round((bx2 + padX) * sx));
+          const y2 = Math.min(dims.height, Math.round((by2 + padY) * sy));
+          if (x2 > x1 + 4 && y2 > y1 + 4) {
+            box = [x1, y1, x2, y2];
+            bboxSource = `facemap:${matchedFace.matchSource ?? "unknown"}`;
+          }
+        }
+      }
+
+      // Letzter Notanker: synthetisch aus coords (nur N=1 erlaubt).
+      // Für N>=2 würde das pro Sprecher auf identische Boxen mappen
+      // wenn coords nicht plate-native sind — daher Hard-Fail unten.
       if (!box) {
         const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
         const boxW = Math.round(dims.width * 0.18);
