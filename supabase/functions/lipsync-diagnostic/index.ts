@@ -421,12 +421,11 @@ async function analyzeFrameWithGemini(params: {
   }
 }
 
-// v146.1 — Direct video analysis via Gemini (no Replicate frame extraction).
-// Gemini 2.5 Pro accepts video input via OpenRouter chat-completions using
-// the `image_url` block with the mp4 URL. We send the whole rehosted plate
-// once and ask for a per-sample-time face count (early/mid/late).
+// v146.2 — Video analysis via Replicate's Gemini 2.5 Flash wrapper.
+// Native `videos[]` input handles mp4 URLs directly; no frame extraction
+// needed and OpenRouter's "Unsupported image format" issue is bypassed.
 async function analyzeVideoWithGemini(params: {
-  apiKey: string;
+  replicateToken: string;
   videoUrl: string;
   durationSec: number;
   expectedSpeakers: number;
@@ -436,19 +435,19 @@ async function analyzeVideoWithGemini(params: {
   raw?: string;
   error?: string;
 }> {
+  const tEarly = 0.1;
+  const tMid = Math.max(0.5, params.durationSec / 2);
+  const tLate = Math.max(1.0, params.durationSec - 0.3);
   const empty = (err: string) => ({
     samples: [
-      { label: "early", t_sec: 0.1, count: null, faces: [] },
-      { label: "mid",   t_sec: Math.max(0.5, params.durationSec / 2), count: null, faces: [] },
-      { label: "late",  t_sec: Math.max(1.0, params.durationSec - 0.3), count: null, faces: [] },
+      { label: "early", t_sec: tEarly, count: null, faces: [] },
+      { label: "mid",   t_sec: tMid,   count: null, faces: [] },
+      { label: "late",  t_sec: tLate,  count: null, faces: [] },
     ],
     maxCount: 0,
     error: err,
   });
   try {
-    const tEarly = 0.1;
-    const tMid = Math.max(0.5, params.durationSec / 2);
-    const tLate = Math.max(1.0, params.durationSec - 0.3);
     const prompt =
       `You receive a short video where ${params.expectedSpeakers} distinct speakers are expected. ` +
       `Sample the video at THREE timestamps: t=${tEarly.toFixed(2)}s (early), t=${tMid.toFixed(2)}s (mid), t=${tLate.toFixed(2)}s (late). ` +
@@ -458,31 +457,24 @@ async function analyzeVideoWithGemini(params: {
       `Return STRICT JSON only, no prose: ` +
       `{"early":{"count":<int>,"faces":[{"x_pct":<int>,"y_pct":<int>,"area_pct":<number>,"mouth_visible":<bool>}]},` +
       `"mid":{...},"late":{...}}`;
-    const resp = await fetch(LOVABLE_AI_GATEWAY, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${params.apiKey}`,
-        "Content-Type": "application/json",
+
+    const replicate = new Replicate({ auth: params.replicateToken });
+    const out: any = await replicate.run(
+      "google/gemini-2.5-flash" as `${string}/${string}`,
+      {
+        input: {
+          prompt,
+          videos: [params.videoUrl],
+          temperature: 0.2,
+          max_output_tokens: 2048,
+        },
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: params.videoUrl } },
-            ],
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(90_000),
-    });
-    if (!resp.ok) {
-      return empty(`gemini HTTP ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
-    }
-    const j = await resp.json();
-    const txt = String(j?.choices?.[0]?.message?.content ?? "");
+    );
+
+    const txt =
+      typeof out === "string" ? out
+      : Array.isArray(out) ? out.join("")
+      : String(out ?? "");
     const m = txt.match(/\{[\s\S]*\}/);
     if (!m) return { ...empty("no_json_in_response"), raw: txt.slice(0, 400) };
     const parsed = JSON.parse(m[0]);
