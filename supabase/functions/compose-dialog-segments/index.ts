@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.1";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.2";
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
@@ -490,6 +490,16 @@ interface SegmentsState {
   finished_at?: string;
   final_url?: string | null;
   error?: string;
+  plate_identity?: {
+    version: "v153.2";
+    dims: { width: number; height: number } | null;
+    bboxes: Array<[number, number, number, number] | null>;
+    faces?: unknown[];
+    resolvedCount?: number;
+    cached?: boolean;
+    sourceClipUrl?: string | null;
+    hydratedAt?: string;
+  };
 }
 
 function uniqueSortedFrames(frames: number[]): number[] {
@@ -1197,6 +1207,23 @@ serve(async (req) => {
         422,
       );
     }
+    const persistedPlateIdentity = ((existing as any)?.plate_identity ?? null) as any;
+    const persistedPlateDims = persistedPlateIdentity?.dims;
+    if (
+      !plateDims &&
+      Number.isFinite(Number(persistedPlateDims?.width)) &&
+      Number.isFinite(Number(persistedPlateDims?.height))
+    ) {
+      plateDims = {
+        width: Math.round(Number(persistedPlateDims.width)),
+        height: Math.round(Number(persistedPlateDims.height)),
+      };
+      plateDimsSource = "anchor_facemap_fallback";
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v153.2_plate_hydration source=persisted-dims dims=${plateDims.width}x${plateDims.height}`,
+      );
+    }
+
     const videoDims = plateDims ?? {
       width: Number((existing as any)?.video_width) || 1280,
       height: Number((existing as any)?.video_height) || 720,
@@ -1229,7 +1256,29 @@ serve(async (req) => {
     const speakerPlateBboxes: Array<[number, number, number, number] | null> =
       new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
-    if (!isAdvance && speakers.length >= 1 && plateDims && sourceClipUrl) {
+    let plateHydrationSource: "persisted" | "live" | "missing" = "missing";
+    const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes)
+      ? persistedPlateIdentity.bboxes
+      : [];
+    if (persistedBboxes.length >= speakers.length) {
+      for (let i = 0; i < speakers.length; i++) {
+        const b = persistedBboxes[i];
+        if (Array.isArray(b) && b.length === 4 && b.every((n: unknown) => Number.isFinite(Number(n)))) {
+          speakerPlateBboxes[i] = [
+            Math.round(Number(b[0])),
+            Math.round(Number(b[1])),
+            Math.round(Number(b[2])),
+            Math.round(Number(b[3])),
+          ];
+          const cx = Math.round((speakerPlateBboxes[i]![0] + speakerPlateBboxes[i]![2]) / 2);
+          const cy = Math.round((speakerPlateBboxes[i]![1] + speakerPlateBboxes[i]![3]) / 2);
+          speakerCoords[i] = clampSyncCoords([cx, cy]);
+          coordSources[i] = "plate-persisted";
+        }
+      }
+      plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "persisted" : "missing";
+    }
+    if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
       try {
         plateIdentityMap = await resolvePlateFaceIdentities({
           supabase,
@@ -1279,6 +1328,7 @@ serve(async (req) => {
           coordSources[idx] = source;
         }
       });
+      plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "live" : "missing";
       console.log(
         `[compose-dialog-segments] scene=${sceneId} plate-identity faces=${plateIdentityMap.faces.length} ` +
         `resolved=${plateIdentityMap.resolvedCount}/${speakers.length} cached=${plateIdentityMap.cached}`,
@@ -1288,6 +1338,19 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
       );
     }
+    const v153PlateIdentitySnapshot = {
+      version: "v153.2" as const,
+      dims: plateDims,
+      bboxes: speakerPlateBboxes,
+      faces: plateIdentityMap?.faces ?? persistedPlateIdentity?.faces ?? [],
+      resolvedCount: plateIdentityMap?.resolvedCount ?? persistedPlateIdentity?.resolvedCount ?? 0,
+      cached: plateIdentityMap?.cached ?? persistedPlateIdentity?.cached ?? false,
+      sourceClipUrl,
+      hydratedAt: new Date().toISOString(),
+    };
+    console.warn(
+      `[compose-dialog-segments] scene=${sceneId} v153.2_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
+    );
 
     // ── v129.20 — Single-speaker no-face hard refund ─────────────────────
     // If Hailuo rendered a plate with zero detectable faces (e.g. subject
@@ -1332,11 +1395,10 @@ serve(async (req) => {
     // + refund + klare Meldung, statt 20 min später ein falsch gemixtes
     // Video zu liefern.
     if (
-      !isAdvance &&
-      !isRetry &&
       speakers.length >= 1
     ) {
       const missingBoxIdx: number[] = [];
+      const plateDimsMissing = !plateDims;
       for (let i = 0; i < speakers.length; i++) {
         const b = speakerPlateBboxes?.[i];
         if (!Array.isArray(b) || b.length !== 4) missingBoxIdx.push(i);
@@ -1358,12 +1420,14 @@ serve(async (req) => {
           }
         }
       }
-      if (missingBoxIdx.length > 0 || dupeIdx.length > 0) {
-        const reason = missingBoxIdx.length > 0
+      if (plateDimsMissing || missingBoxIdx.length > 0 || dupeIdx.length > 0) {
+        const reason = plateDimsMissing
+          ? "v153_plate_dims_missing"
+          : missingBoxIdx.length > 0
           ? `v153_plate_box_missing_for_speakers=[${missingBoxIdx.join(",")}]`
           : `v153_plate_box_duplicate_for_speakers=[${dupeIdx.join(",")}]`;
         console.error(
-          `[compose-dialog-segments] scene=${sceneId} v153_preflight_BLOCK ${reason} — refunding ${totalCost} credits, no dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} v153.2_preflight_BLOCK ${reason} hydration=${plateHydrationSource} — refunding ${totalCost} credits, no dispatch`,
         );
         const alreadyRefundedPF = !!(existing as any)?.refunded;
         if (!alreadyRefundedPF) {
@@ -1413,6 +1477,8 @@ serve(async (req) => {
           error_message: reason,
           meta: {
             speakers: speakers.length,
+              plate_dims_missing: plateDimsMissing,
+              plate_hydration_source: plateHydrationSource,
             missing_box_idx: missingBoxIdx,
             duplicate_box_idx: dupeIdx,
             plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
@@ -2924,7 +2990,7 @@ serve(async (req) => {
       (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
       (pass as any)._v153BboxPrimary = true;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.1_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.2_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
       );
     }
 
@@ -3087,15 +3153,15 @@ serve(async (req) => {
     const freshDefaultVariant: RetryVariant = (v153Active || v147BboxEligible)
       ? "bbox-url-pro"
       : "coords-pro";
+    const noopAutoEscalation = body?.noop_auto_escalation === true;
     let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
-    // v153 — Bei aktivem unified-Pfad auch Retries auf bbox-url-pro zwingen.
-    // Die NOOP-Ladder darf weiterhin bbox-url-pro / coords-pro-box wählen.
-    if (v153Active && !isRetry) {
+    // v153.2 — Bei aktivem unified-Pfad auch Advance/Retry auf bbox-url-pro zwingen.
+    // Die NOOP-Ladder darf weiterhin explizite Diagnose-Varianten wählen.
+    if (v153Active && !noopAutoEscalation) {
       retryVariant = "bbox-url-pro";
     }
-    const noopAutoEscalation = body?.noop_auto_escalation === true;
     const isFreshBboxPrimary = !isRetry && freshDefaultVariant === "bbox-url-pro";
     if (
       !noopAutoEscalation &&
@@ -4648,7 +4714,26 @@ serve(async (req) => {
 
 
     } else {
-      syncOptions.active_speaker_detection = { auto_detect: true };
+      (pass as any)._v153LegacyBranchHardFail = {
+        reason: "v153_unexpected_legacy_branch",
+        errorClass: "v153_auto_detect_blocked",
+        message:
+          "v153.2 blocked a legacy auto_detect dispatch before provider call. " +
+          "Every dialog pass must use bbox-url-pro with a plate-native speaker box.",
+        meta: {
+          retry_variant: retryVariant,
+          plate_hydration_source: plateHydrationSource,
+          speaker_plate_boxes: speakerPlateBboxes,
+          plate_dims: plateDims,
+          is_advance: isAdvance,
+          is_retry: isRetry,
+        },
+      };
+      syncOptions.active_speaker_detection = {
+        auto_detect: false,
+        frame_number: referenceFrameNumber,
+        coordinates: clampSyncCoords(pass.coords) ?? [Math.round(videoDims.width / 2), Math.round(videoDims.height / 2)],
+      };
     }
 
     const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
@@ -4723,6 +4808,7 @@ serve(async (req) => {
             segments: pass.segments,
             cost_credits: costCredits,
             refunded: !alreadyRefunded,
+            plate_identity: v153PlateIdentitySnapshot,
             error: reason,
             finished_at: new Date().toISOString(),
           },
@@ -4753,6 +4839,17 @@ serve(async (req) => {
         hf.errorClass,
         hf.message,
         422,
+        hf.meta ?? {},
+      );
+    }
+
+    if ((pass as any)._v153LegacyBranchHardFail) {
+      const hf = (pass as any)._v153LegacyBranchHardFail;
+      return await failBeforeProviderDispatch(
+        hf.reason,
+        hf.errorClass,
+        hf.message,
+        500,
         hf.meta ?? {},
       );
     }
@@ -5482,6 +5579,22 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v140_ASD_CANONICAL asd=${JSON.stringify(canonicalAsd)}`,
       );
+      if ((canonicalAsd as any)?.auto_detect === true) {
+        return await failBeforeProviderDispatch(
+          "v153_auto_detect_wire_blocked",
+          "v153_auto_detect_blocked",
+          "v153.2 assert: auto_detect:true is forbidden in dialog lip-sync; expected bbox-url-pro.",
+          500,
+          {
+            retry_variant: retryVariant,
+            plate_hydration_source: plateHydrationSource,
+            speaker_plate_boxes: speakerPlateBboxes,
+            plate_dims: plateDims,
+            is_advance: isAdvance,
+            is_retry: isRetry,
+          },
+        );
+      }
     } catch (canonErr) {
       return await failBeforeProviderDispatch(
         "DISPATCH_BLOCKED_V140_CANONICAL_ASD",
@@ -5726,6 +5839,7 @@ serve(async (req) => {
       // pickSpeakerCoordinates produces plate-space coords.
       video_width: videoDims.width,
       video_height: videoDims.height,
+      plate_identity: v153PlateIdentitySnapshot,
       // v59 carry-over: keep multipass markers across retries.
       ...(carryForceMultipass ? { force_multipass: true } : {}),
       ...(carryMultipassAttempted ? { multipass_fallback_attempted: true } : {}),
