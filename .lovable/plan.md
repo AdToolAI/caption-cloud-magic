@@ -1,95 +1,108 @@
-# Antwort auf deine zwei Fragen
+## Ehrliche Antwort zu deiner Frage
 
-## 1. Wird damit das Hauptproblem behoben?
+Deine Einschätzung (40-50% Sync.so / 50-60% Pipeline) ist auf Basis dessen, was im Code steht, **nicht mehr fair zu Sync.so**. Stand heute liegt das Verhältnis bei uns realistischer eher bei:
 
-Ja, sehr wahrscheinlich. Die aktuelle Analyse zeigt: Sync.so läuft durch, aber die ersten zwei Sprecher bekommen sehr wahrscheinlich falsche/verschobene Face-Crops.
+- **~70-80% Pipeline-Komplexität**
+- **~20-30% echte Sync.so-Edge-Cases** (z.B. silent NOOP bei `auto_detect:true` auf kleinen Crops — das ist real)
 
-In der letzten erfolgreichen Szene `731a4a05` sind die gespeicherten Sprecher-Koordinaten auffällig:
+Der Hauptgrund: wir haben eine sehr saubere Idee (Single-Face-Crop + tight audio + sync-3 + cut_off) unter 80+ Versionsschichten (v41 bis v137) begraben. Die Pipeline ist nicht falsch — sie ist **überlagert**.
 
-| Sprecher | Koordinate | Bewertung |
-|---|---:|---|
-| Samuel | `[618,313]` | verdächtig: viel zu tief / mittig |
-| Matthew | `[550,154]` | plausibel, aber links von Samuel |
-| Kailee | `[798,169]` | plausibel |
-| Sarah | `[1032,161]` | plausibel |
+## Was die Audits zeigen
 
-Das passt exakt zum Symptom: Sprecher 3 und 4 sprechen, Sprecher 1 und 2 nicht. Der Fehler hängt also wahrscheinlich vor Sync.so: beim Mapping `Sprecher -> Gesicht -> Preclip`, nicht primär beim Sync.so-Payload.
+- `compose-dialog-segments/index.ts` hat **5.766 Zeilen** für eine konzeptionell kleine Aufgabe.
+- In `mem/architecture/lipsync/` liegen **80+ Memory-Dateien** zu derselben Pipeline (v41 bis v137).
+- Es gibt mindestens **5 parallel lebende ASD-Strategien** (auto_detect, bbox-url, bbox-inline, coords, coords-pro, v131.4 forced auto, v136 centered) — die meisten widersprechen sich teilweise.
+- Im `sync-so-webhook` liegen **~110 Zeilen toter Retry-Code** hinter `canRetry = false`.
+- Die NOOP-Eskalationsleiter (v134) kann ein NOOP-Ergebnis als `done` akzeptieren, wenn `canEscalate=false` getroffen wird — genau das, was bei Samuel & Matthew passiert ist.
 
-## 2. Wird die Pipeline damit schneller?
+## Konkrete Ursache des aktuellen Runs (Szene `70555e30…`, 17 min)
 
-Der Mapping-Fix allein macht sie nicht wesentlich schneller. Er verhindert falsche/no-op Läufe.
+1. **Sprecher 3+4 sprechen, 1+2 nicht** → Pass 0 und 1 sind durch den `COMPLETED_NOOP_SUSPECT`-Pfad gelaufen und am Ende trotzdem als `done` geschrieben worden. Das ist nicht Sync.so, das ist unser eigener "soft accept".
+2. **17 statt 6-8 Minuten** → Plan-D-Fanout war im letzten Run weiterhin **nicht aktiv** (Logs zeigen `PLAN_D_FANOUT_BLOCKED_V128`), obwohl die DB-Flags `true` sind. Bedeutet: deployte Funktion las den neuen DB-Switch noch nicht. Plus 1-2 NOOP-Retry-Zyklen pro betroffenem Sprecher = `~3-5 min` extra pro Sprecher.
+3. **`audio_vs_video_delta_sec = 5-8s`** ist nicht das Problem — das ist nur ein Diagnose-Feld (Voll-WAV vs Preclip-Dauer) und unter `cut_off` normal.
 
-Die 23 Minuten kommen zusätzlich daher, dass die vier Sync.so-Passes aktuell faktisch seriell laufen. Im Code existiert zwar bereits ein Parallel-Fanout (`composer.parallel_sync_so_passes=true`), aber er ist durch einen zweiten Kill-Switch blockiert: `FEATURE_PLAN_D_FANOUT=false`. Dadurch wird trotz aktivem DB-Flag weiter passweise verkettet.
+## Antwort auf deine Kernfrage
 
-## Plan v137
+> Haben wir die Pipeline sauber genug aufgesetzt?
 
-### A. Hauptproblem: Speaker-Face-Mapping reparieren
+Konzept: **ja**. Implementierung: **nein, nicht mehr**. Wir haben jede Stufe sauber gebaut, aber nie zurückgeschnitten. Jeder neue Fix lebt parallel zu den alten Fixen. Das ist der eigentliche Grund, warum "alles, was schiefgehen kann, schiefgeht": es gibt zu viele Pfade, von denen mehrere veraltet sind.
 
-1. In `twoshot-face-map.ts` die Face-Auswahl härten:
-   - erkannte Plate-Faces nach robustem y-Band filtern, damit Ausreißer-/Hintergrund-Bboxes nicht als Sprecher-Slot zählen
-   - danach strikt links-nach-rechts auf die tatsächliche Sprecheranzahl mappen
-   - wenn weniger valide Faces als Sprecher vorhanden sind: klarer Forensik-Fehler statt stiller Heuristik
+## Plan v138 — Konsolidierung statt nochmal-Fix
 
-2. In `plate-face-identity.ts` Identity-Matching absichern:
-   - Top-1/Top-2 Similarity-Margin prüfen
-   - bei ambigen Matches, besonders ähnlichen Gesichtern, nicht blind dieselbe Face-ID mehrfach verwenden
-   - Ambiguity als Telemetrie speichern
+Drei Sachen, keine vierte.
 
-3. In `pass-face-preclip.ts` jeden 720x720 Preclip validieren:
-   - Face nach dem Crop erkennen
-   - prüfen, ob das dominante Gesicht nahe am Crop-Zentrum liegt
-   - wenn nicht: einmal mit korrigierter Koordinate recenter/retry
+### A. Konsolidieren (Code shrinken, kein neues Feature)
 
-4. In `compose-dialog-segments/index.ts` Forensik pro Pass speichern:
-   - `coord_source`
-   - `plate_face_count`
-   - `plate_face_bboxes`
-   - `mapping_decision_log`
-   - `preclip_face_centroid`
-   - `preclip_recenter_attempts`
+`compose-dialog-segments` auf einen einzigen Dispatch-Pfad reduzieren:
 
-### B. Geschwindigkeit: Parallelisierung sicher aktivieren
+```text
+für jeden Sprecher-Turn:
+  1. plate-face-identity (Hungarian) lockt coords  [behalten]
+  2. Single-Face-Preclip rendern                   [behalten]
+  3. tight WAV slicen                              [behalten]
+  4. Sync.so payload:
+       model: sync-3
+       sync_mode: cut_off
+       active_speaker_detection:
+         auto_detect: false
+         frame_number: 0
+         coordinates: [[size/2, size/2]]           [v136, einziger Pfad]
+  5. dispatch
+```
 
-1. Den bestehenden Parallel-Fanout wieder nutzbar machen:
-   - `composer.parallel_sync_so_passes` bleibt Feature-Flag
-   - zusätzlich eine sichere Code-Konfiguration statt blockierendem Env-Kill-Switch verwenden
-   - Concurrency-Cap erstmal konservativ auf 2 setzen
+Was rausfliegt:
+- `resolveSceneFaceMap` (Anchor-Faces) — wird seit v129.20 von `resolvePlateFaceIdentities` ersetzt
+- `bbox-url-pro`, `coords-pro-box`, `auto-pro`, `auto-standard` als First-Dispatch-Varianten
+- v131.4-`auto_detect:true`-Pfad auf Preclips
+- Full-Plate-Coords-Fallback ohne Preclip
+- Toter Retry-Ladder im sync-so-webhook (`canRetry = false`-Block)
+- `isV41Retry`, `forceMultipass`, `retryNoAsd` Body-Flags
 
-2. Erwarteter Effekt:
-   - 4 Sprecher laufen nicht mehr komplett seriell
-   - bei Cap 2 sollten 23 Minuten grob Richtung 10-14 Minuten fallen
-   - bei späterem Cap 3/4 eventuell weiter Richtung 6-9 Minuten, aber erst nach stabilen Tests
+Resultat-Erwartung: `compose-dialog-segments` von ~5.700 auf ~2.000-2.500 Zeilen.
 
-3. Race-Safety bleibt erhalten:
-   - per-pass Updates weiter über atomare Slot-Updates/RPC
-   - Webhook chained nur noch ausstehende Passes
-   - keine mehrfachen Pass-Dispatches
+### B. NOOP ist niemals "done"
 
-### C. Timing-Forensik ergänzen
+Im sync-so-webhook:
+- Wenn `noopSuspect && !canEscalate` → **immer** hart failen + refunden, nicht still als done akzeptieren.
+- v134-Ladder bleibt, aber endet entweder bei klarem Erfolg oder klarem Fail. Nie bei "vielleicht ok".
 
-1. Pro Pass Zeitstempel speichern:
-   - preclip render start/end
-   - Sync.so dispatch time
-   - webhook completion time
-   - mux/stitch time
+### C. Plan-D-Fanout wirklich aktivieren und verifizieren
 
-2. Damit sehen wir künftig sofort, ob Wartezeit bei Preclip, Sync.so, Webhook oder Final-Mux liegt.
+- Code-Default in `compose-dialog-segments` umdrehen: `parallelFlagOn` defaultet auf `true`, `concurrencyCap=2`, env-Killswitch wird nur als Notfall-Abschalter genutzt.
+- Nach Deploy einmal mit einem 3-Sprecher-Run im Log verifizieren, dass `plan_d_parallel_dispatch_start` erscheint und `PLAN_D_FANOUT_BLOCKED_V128` nicht.
 
-### D. Dokumentation
+### Erwartete Wirkung
 
-Neue Memory-Doku:
-- `mem/architecture/lipsync/v137-speaker-face-mapping-and-parallel-fanout.md`
+- 4-Sprecher-Szene: **~6-10 Minuten** statt 17-23 (Fanout cap=2 + entfallene NOOP-Retries auf Pässen, die unter v136 sauber laufen).
+- Kein "alle done, aber 2 Sprecher bewegen die Lippen nicht" mehr — entweder alle sprechen oder die Szene failt sichtbar mit Refund.
+- Wartbarkeit drastisch besser: 1 Dispatch-Pfad, 1 ASD-Strategie, 1 NOOP-Endzustand.
 
-Updates:
-- `mem/index.md`
-- `.lovable/plan.md`
+### Was ich NICHT vorschlage
 
-## Erfolgskriterium
+- Provider-Wechsel
+- Hin- und Herwechsel zwischen sync-3 und lipsync-2-pro
+- Noch eine weitere v138/v139/v140-Schicht ÜBER dem aktuellen Code
+- Neue Gates oder neue ASD-Modi
 
-Nach sauberem Neustart der Szene muss im Forensik-Panel sichtbar sein:
+### Memory-Hygiene parallel dazu
 
-- alle 4 Sprecher haben plausible `coords`
-- `coord_source` ist `identity` oder `slot_filtered`, nicht `heuristic`
-- `preclip_face_centroid` liegt nahe `[360,360]`
-- Sprecher 1-4 zeigen sichtbaren Lip Sync
-- Laufzeit ist deutlich unter 23 Minuten, ideal zuerst ca. 10-14 Minuten mit Cap 2
+Die 80+ vXXX-Memory-Dateien werden auf eine kompakte Wahrheitsquelle zusammengeschnitten:
+- `mem/architecture/lipsync/CANONICAL.md` — eine Seite, was die Pipeline tut
+- `mem/architecture/lipsync/FROZEN-INVARIANTS.md` — bleibt
+- Alles dazwischen (v41-v137 außer aktiv referenzierten) wird als historisch markiert oder gelöscht, sobald v138 stabil läuft.
+
+### Risiko
+
+Konsolidierung ist invasiv. Konkretes Sicherheitsnetz:
+- Vorher Snapshot der aktuellen Edge-Functions
+- Eine 3-Sprecher- und eine 4-Sprecher-Szene als Smoke-Test direkt nach Deploy
+- Wenn ein Smoke-Test failt: sofort zurück zur Pre-v138-Version, nichts hängt am User-Run
+
+### Dateien, die ich im Build-Modus anfassen würde
+
+- `supabase/functions/compose-dialog-segments/index.ts` (massive Reduktion)
+- `supabase/functions/sync-so-webhook/index.ts` (NOOP-Endzustand + toten Retry-Code raus)
+- `supabase/functions/_shared/twoshot-face-map.ts` (nur noch `pickSpeakerCoordinates` als Fallback)
+- `mem/architecture/lipsync/CANONICAL.md` (neu) + `mem/index.md`
+
+Kein neuer Provider, keine neue Strategie, keine neue Gate-Schicht. Nur das, was wir schon haben, in **eine** Spur bringen und Plan-D wirklich an.
