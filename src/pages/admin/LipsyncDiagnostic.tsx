@@ -207,6 +207,52 @@ export default function LipsyncDiagnostic() {
         </Button>
       </Card>
 
+      <Card className="p-6 space-y-4 border-amber-500/40 bg-amber-500/5">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            🔬 v145 · Plate-Face-Forensik
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Extrahiert 3 Frames (early/mid/late) aus der Plate und lässt Gemini Vision
+            zählen, wie viele Gesichter mit erkennbarem Mund-Bereich tatsächlich
+            sichtbar sind. Beweist, ob der Sync.so face_gate-Fehler am
+            <strong> Plate-Inhalt</strong> liegt (Hailuo zeigt zu wenig Gesichter) oder an
+            der Sync.so-Detection. Kein Sync.so-Burn, ~€0.05 / Run.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <Label htmlFor="fp">Plate URL (mp4)</Label>
+            <Input id="fp" value={forensicPlateUrl} onChange={(e) => setForensicPlateUrl(e.target.value)}
+              placeholder="https://...lipsync-plates/.../p3-preclip-XXXX.mp4?token=..." />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label htmlFor="fs">Erwartete Sprecher</Label>
+              <Input id="fs" type="number" min="1" max="8" value={forensicSpeakers}
+                onChange={(e) => setForensicSpeakers(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="fd">Dauer (sek)</Label>
+              <Input id="fd" type="number" min="1" max="60" value={forensicDuration}
+                onChange={(e) => setForensicDuration(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="fsid">Scene ID (optional)</Label>
+              <Input id="fsid" value={forensicSceneId}
+                onChange={(e) => setForensicSceneId(e.target.value)}
+                placeholder="8bd0d568-..." />
+            </div>
+          </div>
+        </div>
+        <Button onClick={submitForensic} disabled={forensicSubmitting} variant="default">
+          {forensicSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          🔬 Forensik starten
+        </Button>
+      </Card>
+
+
+
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Recent Runs</h2>
         {runs.length === 0 && (
