@@ -3478,379 +3478,40 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate deterministic ASD (bbox-url-pro)`,
       );
     }
-    const wantPassPreclip =
+    // ── v153.5 — Per-Pass-Preclip-Render + v107/v126 Hard-Fail entfernt ──
+    // Der Single-Path bbox-url-pro Dispatch (v153) braucht keinen Preclip
+    // mehr. Der gesamte v69/v77/v114/v116/v126 Block wurde entfernt; das
+    // legacy v107_preclip_required_for_multispeaker Hard-Fail ist durch
+    // den v153-nativen "plate bbox required" Check ersetzt (greift weiter
+    // unten am v140 Safety-Net falls plateBox fehlt).
+    //
+    // `usePassPreclip` bleibt als Konstante `false` damit nachgelagerte
+    // Branches (Logs, dispatch_video_kind, face-gate Probe) ohne weitere
+    // Edits compilen. Phase B.3 entfernt diese Branches.
+    const passPreclipUrl: string | null = null;
+    const usePassPreclip = false as boolean;
+    void passPreclipUrl;
+    void usePassPreclip;
+
+    // v153.5 — Hard-Fail wenn Plate-Bbox fehlt (Ersatz für v107/v126).
+    // v153 setzt `_v153BboxPrimary` nur wenn `speakerPlateBboxes[idx]`
+    // valide ist. Fehlt der Plate-Bbox UND wir haben tightAudio + coords,
+    // muss die Szene neu gerendert werden — kein Silent-Fallback.
+    const v153BboxRequired =
       speakers.length >= 1 &&
       !!plateDims &&
-      Array.isArray(pass.coords) &&
-      Number.isFinite(pass.coords[0]) &&
-      Number.isFinite(pass.coords[1]) &&
-      !!tightAudioInfo &&
-      !skipPreclipForEdgeSpeaker;
-
-    // v114 — On retry the cached preclip_url may be a Supabase signed URL
-    // that has expired (24h TTL). If Sync.so can't fetch it we get
-    // `generation_input_video_download_error` and the pass silently dies.
-    // HEAD-probe the cached URL on retry; clear it so we re-render fresh.
-    if (isRetry && (pass as any).preclip_url) {
-      try {
-        const head = await fetch(String((pass as any).preclip_url), { method: "HEAD" });
-        if (!head.ok) {
-          console.log(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v114_preclip_url_stale status=${head.status} → re-render`);
-          (pass as any).preclip_url = null;
-          (pass as any).preclip_render_id = null;
-          (pass as any).preclip_crop = null;
-        }
-      } catch (_) {
-        (pass as any).preclip_url = null;
-        (pass as any).preclip_render_id = null;
-        (pass as any).preclip_crop = null;
-      }
-    }
-
-    if (
-      wantPassPreclip &&
-      !(pass as any).preclip_url &&
-      !(pass as any)._v152BboxPrimary &&
-      !(pass as any)._v153BboxPrimary
-    ) {
-      // v94: Window spans the UNION of all turns for this speaker, not just
-      // the first turn. Sync.so with sync_mode=cut_off caps output at
-      // min(video, audio); if the preclip only covers turn 1, turns 2..N of
-      // the same speaker freeze on the last preclip frame and lose lipsync.
-      const passSegsForPreclip = Array.isArray(pass.segments) ? pass.segments : [];
-      const psStarts = passSegsForPreclip.map((t: any) => Number(t.startTime)).filter((n) => Number.isFinite(n));
-      const psEnds = passSegsForPreclip.map((t: any) => Number(t.endTime)).filter((n) => Number.isFinite(n));
-      const winStartSec = psStarts.length > 0 ? Math.max(0, Math.min(...psStarts) - 0.08) : 0;
-      const winEndSec = psEnds.length > 0 ? Math.min(totalSec, Math.max(...psEnds) + 0.08) : totalSec;
-      // Extract bbox from faceMap if available so the crop wraps the face cleanly.
-      const fmFaces2: any[] = Array.isArray((faceMap as any)?.faces) ? (faceMap as any).faces : [];
-      const fmW2 = Number((faceMap as any)?.width) || plateDims!.width;
-      const fmH2 = Number((faceMap as any)?.height) || plateDims!.height;
-      const matchedFace2 =
-        fmFaces2.find((f) => f?.characterId && f.characterId === pass.character_id) ??
-        fmFaces2.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
-        null;
-      let bboxForCrop: [number, number, number, number] | null = null;
-      if (matchedFace2 && Array.isArray(matchedFace2.bbox) && matchedFace2.bbox.length === 4) {
-        const [bx1, by1, bx2, by2] = matchedFace2.bbox.map((n: any) => Number(n));
-        const sx = plateDims!.width / fmW2;
-        const sy = plateDims!.height / fmH2;
-        bboxForCrop = [
-          Math.round(bx1 * sx),
-          Math.round(by1 * sy),
-          Math.round(bx2 * sx),
-          Math.round(by2 * sy),
-        ];
-      }
-      // v77 — When plate-identity gave us a real plate-pixel bbox for this
-      // speaker, prefer it over the anchor-rescaled box (anchor often
-      // drifts 5–15 % vs the Hailuo plate).
-      const platePassBbox = speakerPlateBboxes[pass.speaker_idx] ?? null;
-      if (platePassBbox) {
-        bboxForCrop = platePassBbox;
-      }
-      // v76 — Collect coords of the OTHER passes (same plate) so the
-      // single-face preclip crop never includes a neighbor's face.
-      const siblingCoordsForPass: Array<[number, number]> = passes
-        .filter((other, idx) =>
-          idx !== currentPassIdx &&
-          Array.isArray(other?.coords) &&
-          other.coords.length === 2 &&
-          Number.isFinite(Number(other.coords[0])) &&
-          Number.isFinite(Number(other.coords[1])),
-        )
-        .map((other) => [Number(other.coords[0]), Number(other.coords[1])] as [number, number]);
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} siblings=${siblingCoordsForPass.length} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
-      );
-
-      // ── v135 — Pre-Crop Coord Snap ─────────────────────────────────────
-      // Forensik der v107_preclip_required_for_multispeaker Fails zeigte:
-      // ASD-Coord [301,171] lag daneben, Rekognition fand 1 Gesicht auf
-      // der Plate, aber der 228×228-Crop um die FALSCHE Coord schnitt das
-      // echte Gesicht weg → Face-Gate sah 0 Gesichter → Hard-Fail.
-      //
-      // Die Snap-Logik (v129.22.3 in syncso-face-gate.ts) griff erst beim
-      // Sync.so-Dispatch, also NACH dem kaputten Preclip-Render. Wir
-      // verschieben sie nach VORNE: Rekognition läuft auf der Plate vor
-      // dem Crop, korrigiert die Coord, der Crop landet auf dem Gesicht.
-      //
-      // Frame-URL Quelle: plate-face-identity hat die Plate bereits via
-      // `faceMap.frame_url` extrahiert (für Cast-Identifizierung). Wir
-      // re-usen genau diese URL — kein zusätzlicher Extraktion-Call.
-      try {
-        const plateFrameUrl: string | null =
-          (typeof (pass as any).probe_frame_url === "string" && (pass as any).probe_frame_url) ||
-          (typeof (faceMap as any)?.frame_url === "string" && (faceMap as any).frame_url) ||
-          null;
-        const haveCoords =
-          Array.isArray(pass.coords) &&
-          Number.isFinite(Number(pass.coords?.[0])) &&
-          Number.isFinite(Number(pass.coords?.[1]));
-        if (plateFrameUrl && haveCoords && plateDims?.width && plateDims?.height) {
-          const snapT0 = Date.now();
-          const W = plateDims.width;
-          const H = plateDims.height;
-          const cx = Number(pass.coords[0]);
-          const cy = Number(pass.coords[1]);
-          const probe = await detectFacesMediaPipe({
-            videoUrl: sourceClipUrl,
-            plateWidth: W,
-            plateHeight: H,
-            durationSec: 1,
-            prebuiltFrameUrls: [plateFrameUrl],
-          });
-          if (probe.ok && probe.faces.length > 0) {
-            // Nearest-neighbour: even on multi-face plates, pick the
-            // Rekognition face nearest to the original ASD coord — that
-            // is the speaker the ASD pipeline intended to target.
-            let bestFace = probe.faces[0];
-            let bestDist = Math.hypot(bestFace.center[0] - cx, bestFace.center[1] - cy);
-            for (let i = 1; i < probe.faces.length; i++) {
-              const f = probe.faces[i];
-              const d = Math.hypot(f.center[0] - cx, f.center[1] - cy);
-              if (d < bestDist) {
-                bestDist = d;
-                bestFace = f;
-              }
-            }
-            const dist = Math.round(bestDist);
-            const fx = bestFace.center[0];
-            const fy = bestFace.center[1];
-            // Safe-zone: face center must lie inside 5%-95% of the plate.
-            // Outside → likely background artefact; refuse to snap.
-            const inBounds =
-              fx >= W * 0.05 && fx <= W * 0.95 &&
-              fy >= H * 0.05 && fy <= H * 0.95;
-            // Distance bands:
-            //   ≤60px: no snap needed (within Rekognition jitter).
-            //   60..200px: snap (this rescues the v107 fail mode).
-            //   >200px: too far — likely wrong face / background hit.
-            if (!inBounds) {
-              (pass as any).coord_snap_skipped_reason = "out_of_safe_zone";
-              console.log(
-                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap SKIP face=[${Math.round(fx)},${Math.round(fy)}] outside safe-zone plate=${W}x${H} (${Date.now() - snapT0}ms)`,
-              );
-            } else if (dist <= 60) {
-              (pass as any).coord_snap_skipped_reason = `within_jitter:${dist}px`;
-              console.log(
-                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap NOOP dist=${dist}px ≤60px (${Date.now() - snapT0}ms)`,
-              );
-            } else if (dist > 200) {
-              (pass as any).coord_snap_skipped_reason = `distance_too_large:${dist}px`;
-              console.warn(
-                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap SKIP dist=${dist}px >200px — keeping original (${Date.now() - snapT0}ms)`,
-              );
-            } else {
-              const snapped: [number, number] = [Math.round(fx), Math.round(fy)];
-              const original: [number, number] = [Math.round(cx), Math.round(cy)];
-              (pass as any).coords_snap_origin = original;
-              (pass as any).coords_snapped_at = new Date().toISOString();
-              (pass as any).coord_snap_distance_px = dist;
-              (pass as any).coord_snap_source = "v135_pre_crop_rekognition";
-              (pass as any).coord_snap_face_count = probe.faces.length;
-              pass.coords = snapped as any;
-              console.log(
-                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap APPLIED intent=[${original[0]},${original[1]}] → rekognition=[${snapped[0]},${snapped[1]}] dist=${dist}px faces=${probe.faces.length} (${Date.now() - snapT0}ms)`,
-              );
-            }
-          } else {
-            (pass as any).coord_snap_skipped_reason = probe.ok
-              ? "rekognition_zero_faces"
-              : `rekognition_error:${probe.error ?? "unknown"}`;
-            console.warn(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap NO_FACE — expansion ladder will handle (${Date.now() - snapT0}ms) reason=${(pass as any).coord_snap_skipped_reason}`,
-            );
-          }
-        } else {
-          (pass as any).coord_snap_skipped_reason = !plateFrameUrl
-            ? "no_plate_frame_url"
-            : !haveCoords
-              ? "no_coords"
-              : "no_plate_dims";
-        }
-      } catch (e) {
-        (pass as any).coord_snap_skipped_reason = `threw:${(e as Error)?.message ?? "unknown"}`;
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v135_pre_snap threw: ${(e as Error)?.message ?? e}`,
-        );
-      }
-
-
-      // v116 (Fix B) — Face-Gate Self-Repair: render preclip; if the
-      // face-gate finds 0 faces (coords/bbox missed the actual face on
-      // the moving plate), re-render with an expanded crop (×1.4, then
-      // ×1.8) and re-validate. This rescues the multi-speaker failure
-      // mode where Sarah / late-pass speakers came back with faces=0
-      // and the chain hard-failed. We DO NOT retry on faces>1 (that's
-      // a real "two heads in crop" condition — bigger crop would only
-      // make it worse). Total worst-case = 3 Lambda renders / ~3 min.
-      const EXPANSION_LADDER = [1.0, 1.4, 1.8];
-      let preclip: Awaited<ReturnType<typeof renderPassFacePreclip>> | null = null;
-      let preclipDims: Awaited<ReturnType<typeof probeMp4Dims>> | null = null;
-      let preclipFaceOk = true;
-      let preclipFaceCount: number | null = null;
-      let repairAttempts = 0;
-      let resolutionBlocked = false;
-
-      for (let attempt = 0; attempt < EXPANSION_LADDER.length; attempt++) {
-        const factor = EXPANSION_LADDER[attempt];
-        if (attempt > 0) {
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v116_face_gate_repair attempt=${attempt + 1}/${EXPANSION_LADDER.length} factor=${factor.toFixed(2)} (prev faces=${preclipFaceCount})`,
-          );
-          repairAttempts = attempt;
-        }
-        preclip = await renderPassFacePreclip(
-          supabase,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-          Deno.env.get("SUPABASE_URL") ?? "",
-          {
-            sceneId,
-            projectId: (scene as any).project_id,
-            userId,
-            passIdx: currentPassIdx,
-            masterVideoUrl: sourceClipUrl,
-            srcWidth: plateDims!.width,
-            srcHeight: plateDims!.height,
-            coords: pass.coords as [number, number],
-            bbox: bboxForCrop,
-            siblingCoords: siblingCoordsForPass,
-            startSec: winStartSec,
-            endSec: winEndSec,
-            cropExpansionFactor: factor,
-          },
-          90_000,
-        );
-        if (!preclip.ok || !preclip.preclipUrl || !preclip.crop) {
-          // Render-level failure — no point expanding the crop; abort the loop.
-          break;
-        }
-        preclipDims = await probeMp4Dims(preclip.preclipUrl).catch(() => null);
-        const minPreclipAxis = Math.min(Number(preclipDims?.width ?? 0), Number(preclipDims?.height ?? 0));
-        if (!preclipDims || minPreclipAxis < 720) {
-          resolutionBlocked = true;
-          break;
-        }
-        // Face-gate (v77 / v129.21): require exactly 1 face — now also
-        // active for SINGLE-speaker preclips (v129.21 removed the
-        // `speakers.length >= 2` guard, since MediaPipe-backed detection
-        // is reliable enough for N=1 and catches subject-walk-off-frame).
-        // v129.18 — validate FIRST + MID + LAST frame, not just mid; a face
-        // entering/leaving the crop mid-turn was the actual root cause of
-        // the Sync.so `generation_unknown_error` (ASD frame N coords below
-        // the face → Sync.so sees pullover, not face).
-        preclipFaceOk = true;
-        preclipFaceCount = null;
-        if (speakers.length >= 1) {
-          try {
-            const totalFrames = Math.max(2, Math.round((preclip.durationSec ?? 1) * 30));
-            const frameSet: Array<{ tag: "first" | "mid" | "last"; n: number }> = [
-              { tag: "first", n: 1 },
-              { tag: "mid", n: Math.max(1, Math.round(totalFrames / 2)) },
-              { tag: "last", n: Math.max(1, totalFrames - 1) },
-            ];
-            for (const f of frameSet) {
-              const v = await validateFrameFace({
-                supabaseUrl, serviceKey,
-                videoUrl: preclip.preclipUrl,
-                frameNumber: f.n, fps: 30,
-                targetCoords: null,
-              });
-              if (!v.ok) continue;
-              const c = Number(v.faceCount ?? 0);
-              if (f.tag === "mid") preclipFaceCount = c;
-              if (c === 0 || c > 1) {
-                preclipFaceOk = false;
-                if (preclipFaceCount === null) preclipFaceCount = c;
-                (pass as any).preclip_face_gate_failed_frame = f.tag;
-                break;
-              }
-            }
-          } catch (e) {
-            console.warn(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} preclip_face_gate threw: ${(e as Error)?.message}`,
-            );
-          }
-        }
-        if (preclipFaceOk) break;
-        // Only retry-with-expansion when face was missed entirely (count 0).
-        // count>1 → bigger crop won't help, drop straight through.
-        if (preclipFaceCount !== 0) break;
-      }
-
-      if (resolutionBlocked) {
-        (pass as any).preclip_dims = preclipDims ?? null;
-        (pass as any).preclip_error = `preclip_resolution_too_small:${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"}`;
-        console.error(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v113_preclip_resolution_BLOCK actual=${preclipDims?.width ?? "?"}x${preclipDims?.height ?? "?"} expected>=720`,
-        );
-      } else if (preclip && preclip.ok && preclip.preclipUrl && preclip.crop) {
-        (pass as any).preclip_dims = preclipDims ?? null;
-        (pass as any).preclip_repair_attempts = repairAttempts;
-        if (preclipFaceOk) {
-          (pass as any).preclip_url = preclip.preclipUrl;
-          (pass as any).preclip_render_id = preclip.preclipRenderId ?? null;
-          (pass as any).preclip_crop = {
-            x: preclip.crop.x,
-            y: preclip.crop.y,
-            size: preclip.crop.size,
-            outputSize: preclip.crop.outputSize,
-          };
-          (pass as any).preclip_duration_sec = typeof preclip.durationSec === "number"
-            ? preclip.durationSec
-            : null;
-          (pass as any).preclip_error = null;
-          (pass as any).preclip_face_count = preclipFaceCount;
-          console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v77_preclip_ready faces=${preclipFaceCount ?? "skip"} repair_attempts=${repairAttempts} url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
-          );
-        } else {
-          (pass as any).preclip_error = `face_gate_failed:count=${preclipFaceCount} (after ${repairAttempts} v116 repair attempts)`;
-          (pass as any).preclip_face_count = preclipFaceCount;
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v116_preclip_face_gate_BLOCK faces=${preclipFaceCount} repair_attempts=${repairAttempts} — full-plate fallback`,
-          );
-        }
-      } else {
-        (pass as any).preclip_error = (preclip?.error ?? "unknown");
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified_failed ${preclip?.errorClass ?? "?"}: ${preclip?.error ?? "?"} — falling back to full-plate dispatch`,
-        );
-      }
-    }
-
-    // When preclip is available, swap the Sync.so video input + force
-    // auto_detect (the cropped 512x512 frame has exactly ONE face).
-    const passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
-    // v118 — mutable; the face-gate bypass below can disable the preclip
-    // dispatch path when the cropped frame validated 0 or >1 faces.
-    let usePassPreclip = !!passPreclipUrl;
-
-    // ── v126 — Hard-fail when preclip is required but missing ─────────────
-    // Unified pipeline: every pass (N=1..4) that has tight audio + coords
-    // MUST go through single-face preclip. Full-plate dispatch is removed.
-    // If preclip render or face-gate blocked, refund cleanly — never
-    // silently dispatch the full multi-face plate (that path is what
-    // produced the opaque `provider_unknown_error` loop).
-    const v126PreclipExpected =
       Array.isArray(pass.coords) &&
       Number.isFinite(Number(pass.coords?.[0])) &&
       Number.isFinite(Number(pass.coords?.[1])) &&
       !!tightAudioInfo;
-    if (
-      v126PreclipExpected &&
-      !usePassPreclip &&
-      !(pass as any)._v152BboxPrimary &&
-      !(pass as any)._v153BboxPrimary
-    ) {
-      const failReason = (pass as any).preclip_error ?? "preclip_prerequisites_missing";
+    if (v153BboxRequired && !(pass as any)._v153BboxPrimary) {
+      const failReason = "v153_plate_bbox_required";
       console.error(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v126_preclip_required_BLOCK speakers=${speakers.length} reason=${failReason} — refusing full-plate dispatch`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.5_plate_bbox_required_BLOCK speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0} — refusing dispatch`,
       );
       const existingDsLocal: any = (scene as any)?.dialog_shots ?? existing ?? {};
-      const alreadyRefunded107 = !!existingDsLocal?.refunded;
-      if (!alreadyRefunded107) {
+      const alreadyRefunded = !!existingDsLocal?.refunded;
+      if (!alreadyRefunded) {
         const { data: wV } = await supabase
           .from("wallets").select("balance").eq("user_id", userId).single();
         await supabase
@@ -3863,12 +3524,9 @@ serve(async (req) => {
       }
       const passesPatched = passes.map((p, i) =>
         i === currentPassIdx
-          ? { ...p, status: "failed" as const, last_error: failReason, last_error_class: "v107_preclip_required" }
+          ? { ...p, status: "failed" as const, last_error: failReason, last_error_class: "v153_plate_bbox_required" }
           : p,
       );
-      // v132 — Human-readable error: name the actual speaker + turn time,
-      // not just "preclip_required". Operators / customers can now see
-      // exactly which speaker needs to stay in frame on the re-render.
       const failedSpeakerName = String(
         (pass as any)?.speaker_name ?? `Sprecher ${currentPassIdx + 1}`,
       );
@@ -3882,7 +3540,7 @@ serve(async (req) => {
           ? ` (Dialog-Turn ${turnStartSec.toFixed(1)}s–${turnEndSec.toFixed(1)}s)`
           : "";
       const friendlyClipError =
-        `Lip-Sync abgebrochen: „${failedSpeakerName}"${turnLabel} ist im aktuellen Scene-Clip nicht erkennbar ` +
+        `Lip-Sync abgebrochen: „${failedSpeakerName}"${turnLabel} konnte im Scene-Clip nicht eindeutig zugeordnet werden ` +
         `(${failReason}). Bitte Szene neu rendern — alle Sprecher müssen während ihres Turns frontal und unverdeckt im Bild sein. ` +
         `Credits wurden zurückerstattet.`;
       await supabase
@@ -3895,16 +3553,15 @@ serve(async (req) => {
             passes: passesPatched,
             status: "failed",
             cost_credits: Number(existingDsLocal?.cost_credits ?? totalCost ?? 0),
-            refunded: !alreadyRefunded107,
-            error: `v107_preclip_required_pass_${currentPassIdx + 1}:${failReason}`,
-            v107_failed_speaker: {
+            refunded: !alreadyRefunded,
+            error: `v153_plate_bbox_required_pass_${currentPassIdx + 1}`,
+            v153_failed_speaker: {
               speaker: failedSpeakerName,
               character_id: (pass as any)?.character_id ?? null,
               pass_idx: currentPassIdx,
               turn_start_sec: turnStartSec,
               turn_end_sec: turnEndSec,
-              preclip_face_count: (pass as any).preclip_face_count ?? null,
-              preclip_error: (pass as any).preclip_error ?? null,
+              resolved_count: plateIdentityMap?.resolvedCount ?? 0,
             },
             finished_at: new Date().toISOString(),
           },
@@ -3921,14 +3578,13 @@ serve(async (req) => {
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "PREFLIGHT_BLOCKED",
-        error_class: "v107_preclip_required",
+        error_class: "v153_plate_bbox_required",
         error_message: failReason,
         meta: {
           pass_idx: currentPassIdx,
           speakers: speakers.length,
           plate_dims: plateDims ?? null,
-          preclip_error: (pass as any).preclip_error ?? null,
-          preclip_face_count: (pass as any).preclip_face_count ?? null,
+          resolved_count: plateIdentityMap?.resolvedCount ?? 0,
           have_tight_audio: !!tightAudioInfo,
           have_coords:
             Array.isArray(pass.coords) &&
@@ -3938,13 +3594,14 @@ serve(async (req) => {
       });
       return json(
         {
-          error: "v107_preclip_required_for_multispeaker",
+          error: "v153_plate_bbox_required",
           reason: failReason,
-          refunded: alreadyRefunded107 ? 0 : Number(totalCost ?? 0),
+          refunded: alreadyRefunded ? 0 : Number(totalCost ?? 0),
         },
         422,
       );
     }
+
 
 
 
