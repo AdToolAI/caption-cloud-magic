@@ -1477,6 +1477,8 @@ serve(async (req) => {
           error_message: reason,
           meta: {
             speakers: speakers.length,
+              plate_dims_missing: plateDimsMissing,
+              plate_hydration_source: plateHydrationSource,
             missing_box_idx: missingBoxIdx,
             duplicate_box_idx: dupeIdx,
             plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
