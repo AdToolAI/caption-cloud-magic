@@ -3078,6 +3078,11 @@ serve(async (req) => {
     // or faceMap, sibling coords, face-gate validation). On any failure for
     // a given pass, that pass falls back to the existing per-pass block on
     // its chain turn — full backward compatibility.
+    // v139 — Batch preclip prefetch is now the default. Without it the
+    // pipeline serializes N preclip renders behind N Sync.so webhooks,
+    // adding ~3–4 minutes for a 4-speaker scene. DB flag remains as a
+    // KILL-SWITCH: set composer.batch_preclip_render explicitly to false
+    // to revert to the legacy per-pass render path.
     const batchPreclipFlagOn = await (async () => {
       try {
         const { data } = await supabase
@@ -3085,8 +3090,9 @@ serve(async (req) => {
           .select("value")
           .eq("key", "composer.batch_preclip_render")
           .maybeSingle();
-        return data?.value === true || data?.value === "true";
-      } catch { return false; }
+        if (!data) return true;
+        return !(data.value === false || data.value === "false");
+      } catch { return true; }
     })();
     const canBatchPrefetch =
       batchPreclipFlagOn &&
