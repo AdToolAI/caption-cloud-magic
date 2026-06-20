@@ -1,10 +1,10 @@
 ---
-name: v136 Preclip-Centered Coords (Sync.so dispatch)
-description: Sync.so sync-3 silently no-ops on auto_detect over face-cropped preclips; v136 dispatches explicit preclip-centered coordinates so every speaker actually gets lipsynced
+name: v136 Preclip-Centered Coords (superseded by v140)
+description: Historical v136 preclip-centered coordinate override; superseded because it created competing ASD mutation paths, v140 final canonical wire builder is authoritative
 type: feature
 ---
 
-# v136 Preclip-Centered Coords
+# v136 Preclip-Centered Coords — superseded by v140
 
 ## Root cause (forensic, 2026-06-19, scene af3901da)
 
@@ -31,7 +31,7 @@ on the assumption that the cropped frame has exactly one face so Sync.so could
 locate it on its own. In practice sync-3's internal ASD has low confidence on a
 heavily cropped, upscaled face and silently passthrough-renders.
 
-## Fix
+## Historical fix
 
 Dispatch explicit in-preclip-output coordinates:
 
@@ -39,13 +39,21 @@ Dispatch explicit in-preclip-output coordinates:
 active_speaker_detection: {
   auto_detect: false,
   frame_number: 0,
-  coordinates: [[outputSize / 2, outputSize / 2]],
+  coordinates: [outputSize / 2, outputSize / 2],
 }
 ```
 
 The preclip builder centers the crop on the speaker's face and pads/upscales
 to `outputSize` (default 720). Geometric center = face center by construction,
 so explicit center coords are safe for both single- and multi-speaker passes.
+
+## v140 update
+
+The v136 inline override was removed from `compose-dialog-segments`. It fixed
+one symptom but created a second competing ASD mutation point. The only current
+authority is the v140 final canonical wire builder directly before the Sync.so
+fetch. If center coordinates are ever chosen again, they must pass through that
+builder as flat `[x, y]`.
 
 ## Safety nets retained
 
