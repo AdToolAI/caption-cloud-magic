@@ -932,6 +932,9 @@ export async function logSyncDispatch(
 export function classifySyncError(message?: string | null): string {
   if (!message) return "unknown";
   const m = message.toLowerCase();
+  // v143 — explicit Sync.so 422 for inaccessible inputs (the real root cause of
+  // weeks of phantom "NOOP" debugging). Map BEFORE the generic auth/4xx rules.
+  if (/generation_input_video_inaccessible|generation_input_audio_inaccessible|video url is inaccessible|url is inaccessible|publicly fetchable|not expired or auth-gated/.test(m)) return "input_inaccessible";
   if (/no_voiced_frames|preflight_audio_no_voice|silence|voiced|vad/.test(m)) return "audio_no_voice";
   if (/unsupported.*codec|codec.*not.*support|video_codec_unsupported/.test(m)) return "video_codec_unsupported";
   if (/segments?.*invalid|overlap|segment.*reject/.test(m)) return "segments_invalid";
@@ -1000,6 +1003,11 @@ export function classifySyncErrorCode(code?: string | null): SyncCodeBucket {
     "generation_video_missing",
     "generation_input_validation_failed",
     "generation_internal_auth",
+    // v143 — Sync.so could not fetch the input video URL (expired presigned S3
+    // is the most common cause). Retrying with the same URL never helps; the
+    // upstream caller must rehost into stable storage (see _shared/rehostPlate).
+    "generation_input_video_inaccessible",
+    "generation_input_audio_inaccessible",
   ].includes(c)) return "fail_fast";
   return "unknown";
 }
@@ -1024,6 +1032,8 @@ export function explainSyncErrorCode(code?: string | null): string | null {
     generation_video_missing: "Source video missing — regenerate the scene clip",
     generation_input_validation_failed: "Sync.so rejected the input — check audio/video format",
     generation_internal_auth: "Sync.so authentication failed — contact support",
+    generation_input_video_inaccessible: "Plate-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern",
+    generation_input_audio_inaccessible: "Audio-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern",
   };
   return map[String(code).toLowerCase()] ?? null;
 }

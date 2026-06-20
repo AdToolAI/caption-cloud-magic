@@ -3,6 +3,7 @@
 // polls all jobs, and writes results to `lipsync_diagnostic_runs.variants`.
 // Live pipeline (compose-dialog-segments, sync-so-webhook) is NOT touched.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +12,7 @@ const corsHeaders = {
 };
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
-const VERSION = "v142.0";
+const VERSION = "v143.0";
 
 console.log(`[lipsync-diagnostic] BOOT ${VERSION} deploy=${Date.now()}`);
 
@@ -261,9 +262,28 @@ Deno.serve(async (req) => {
 
   // Dispatch ALL variants in parallel, then poll all in parallel
   const work = async () => {
+    // v143 — Rehost plate + audio into our own buckets before dispatch so
+    // expired Replicate/S3 URLs don't poison the diagnostic.
+    let stablePlateUrl = plateUrl;
+    let rehostNote: string | null = null;
+    try {
+      const rh = await rehostPlate(admin, plateUrl, {
+        sceneId: body.source_scene_id ?? runRow.id,
+        passIdx: body.source_pass_idx ?? 0,
+        kind: "diagnostic",
+        ownerId: userData.user.id,
+      });
+      stablePlateUrl = rh.url;
+      rehostNote = `${rh.uploaded ? "uploaded" : "cached"} ${rh.bytes}B in ${rh.durationMs}ms`;
+      console.log(`[lipsync-diagnostic] v143_rehost ${rehostNote} → ${rh.path}`);
+    } catch (e) {
+      console.warn(`[lipsync-diagnostic] v143_rehost FAILED: ${(e as Error).message}`);
+      rehostNote = `failed: ${(e as Error).message}`;
+    }
+
     const dispatched = await Promise.all(
       variants.map(async (v) => {
-        const d = await dispatchVariant({ apiKey: SYNC_API_KEY, plateUrl, audioUrl, variant: v });
+        const d = await dispatchVariant({ apiKey: SYNC_API_KEY, plateUrl: stablePlateUrl, audioUrl, variant: v });
         return { variant: v, dispatch: d };
       }),
     );

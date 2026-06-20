@@ -1,61 +1,76 @@
-## Sync.so NOOP Diagnose-Modus (v142)
+# v143 — Plate-Rehost: Das wahre NOOP-Root-Cause
 
-Bevor wir noch eine Pipeline-Iteration bauen, klären wir **empirisch**, ob/wann sync-3 für unsere Plates überhaupt Lippen bewegt. Ohne dieses Signal raten wir bei jeder weiteren Änderung blind.
+## Was der Diagnostic-Run gezeigt hat
 
-### Ziel
-Eine kleine, isolierte Diagnose-Edge-Function, die **eine Pass-Eingabe** (Plate + VO + ASD) gleichzeitig in mehreren Varianten an Sync.so dispatcht und die Outputs nebeneinander sichtbar macht. Danach entscheiden wir die Pipeline-Strategie auf Basis echter Daten.
+Alle 5 Sync.so-Varianten (auto_detect, flat coords, bbox_url, bbox inline, lipsync-2-pro) sind mit **identischem Fehler** gestorben:
 
-### Was gebaut wird
+```
+HTTP 422
+errorCode: generation_input_video_inaccessible
+message: "The provided video URL is inaccessible."
+suggestion: "Make sure the video URL is publicly fetchable (not expired
+            or auth-gated), or upload the file via POST /v2/assets/upload
+            and pass the assetId instead."
+```
 
-**1. Edge Function `lipsync-diagnostic`**
-Input: `{ plate_url, audio_url, speaker_label, coords?, bounding_boxes_url? }`
-Dispatcht 5 parallele Sync.so Jobs (sync-3) mit identischer Plate/Audio aber verschiedenen ASD-Strategien:
+Die Plate war eine **presigned `s3.eu-central-1.amazonaws.com/...`-URL** von Hailuo (Replicate). Diese URLs leben nur ~1 Stunde. Zum Zeitpunkt des Diagnostic-Runs war sie tot.
 
-| Variante | ASD | Notes |
-|---|---|---|
-| A | `auto_detect: true` | Baseline (Sync.so picks face) |
-| B | flat `[x,y]` coords | aktueller v140 Default |
-| C | `bounding_boxes_url` (S3 JSON) | aktueller v134 Stufe 1 Eskalation |
-| D | `bounding_boxes` inline array | Doc-konforme Alternative |
-| E | Audio gepaddet auf 2.0s + auto_detect | testet Min-Audio-Hypothese |
+## Was das für die Live-Pipeline bedeutet
 
-Pollt alle Jobs, speichert Outputs in Bucket `lipsync-diag/<run_id>/<variant>.mp4` und schreibt Row in neue Tabelle `lipsync_diagnostic_runs` mit Output-URLs, sizeRatio pro Variante, Sync.so `status`/`error_message`.
+Wir haben seit Wochen ASD/Coords/Boxen-Hypothesen gejagt (v76, v122, v130, v134, v140, v141, v142), dabei war das eigentliche Problem schlicht: **Sync.so kann die Plate-URLs gar nicht laden, sobald sie älter als ~60 min sind.**
 
-**2. UI-Page `/admin/lipsync-diag`** (admin only)
-- Formular: Plate-URL, Audio-URL, optional Coords (mit Preset-Button "letzten Failed-Pass laden")
-- "Run Diagnostic" Button (~€0.45 Kosten, gated via has_role admin)
-- Ergebnis-Grid: 5 Video-Player nebeneinander, jeder mit Badge (sizeRatio, Sync.so status, "Lippen bewegen sich? J/N" Toggle für manuelle Annotation)
-- Quick-Load: Dropdown der letzten 10 NOOP-Suspect Passes aus `dialog_shots`/`syncso_dispatch_log` mit 1-Klick "diagnose"
+In Dialogszenen mit 4 Sprechern dauert die Generierung der Preclips + Audio-Synthese + Sync.so-Dispatch oft länger als 60 min (Replicate-Queues, Watchdog-Resets, Retries). Spätestens beim 3./4. Pass ist die ursprüngliche Plate-URL tot — Sync.so liefert `422` zurück, unser Code interpretiert das aktuell **nicht** als Fehler sondern fällt in die NOOP-Escalation-Ladder.
 
-**3. Min-Audio-Floor Memo**
-Sobald Run zeigt dass Variante E (gepaddet) Lippen bewegt aber A/B/C/D nicht → klares Signal für Audio-Min-Length-Guard in v143. Bis dahin **keine** Pipeline-Änderung.
+## Plan (3 Schritte)
 
-### Was NICHT geändert wird
-- `compose-dialog-segments` v140
-- `lipsync-watchdog` v141
-- `sync-so-webhook`
-- NOOP-Eskalations-Ladder v134
+### Schritt 1 — Hard-Evidence im Diagnostic bestätigen
+Diagnostic-Run mit einer **frischen** Plate wiederholen (z.B. gerade eben gerenderter Preclip, <5 min alt). Erwartung: alle 5 Varianten laufen durch, mindestens eine bewegt Lippen. Damit ist die URL-Lifetime-These bewiesen.
 
-Die laufende Pipeline bleibt unangetastet — Diagnose läuft komplett seitlich daran vorbei.
+### Schritt 2 — Plate immer in unseren Storage rehosten
+Bevor irgendein Sync.so-Dispatch (compose-dialog-segments, compose-dialog-scene, compose-lipsync-scene, lipsync-diagnostic) eine Plate sendet:
+- Plate von der Replicate/S3-URL nach `lipsync-plates/` Storage-Bucket kopieren (eigene Lovable Cloud, signed URL mit 7d TTL)
+- Diese stabile URL an Sync.so schicken
+- Alternativ: `POST /v2/assets/upload` direkt zu Sync.so (assetId) — robuster, aber zusätzliche Roundtrip-Latenz
 
-### Technische Details
+### Schritt 3 — 422 als Hard-Error in der State-Machine
+In `sync-so-webhook` und `lipsync-watchdog`:
+- HTTP 422 mit `generation_input_video_inaccessible` → **nicht** in NOOP-Ladder eskalieren, sondern sofort als `failed` markieren mit klarer Fehlermeldung
+- Refund triggern
+- UI zeigt: "Plate-URL war beim Dispatch nicht mehr abrufbar — bitte Szene neu rendern"
 
-**Files:**
-- `supabase/functions/lipsync-diagnostic/index.ts` (neu)
-- `supabase/migrations/<ts>_lipsync_diagnostic_runs.sql` (neu, mit GRANT + RLS auf admin role)
-- `supabase/storage` Bucket `lipsync-diag` (private, admin-only RLS)
-- `src/pages/admin/LipsyncDiagnostic.tsx` (neu)
-- Route in `src/App.tsx` + Nav-Eintrag im Admin-Bereich
-- `mem/architecture/lipsync/v142-diagnostic-mode.md` (neu)
+## Was NICHT angefasst wird
 
-**Sync.so Calls:** wiederverwenden die identische Helper-Logik aus `compose-dialog-segments` (sync-3 doc-strict options, Polling), aber in isolierter Datei dupliziert — kein Refactor der Live-Pipeline.
+- v140 Payload-Shape (war nie das Problem)
+- v141 State-Machine-Hardening (bleibt)
+- v134 NOOP-Escalation-Ladder (bleibt — greift nur noch bei echten NOOPs nach Schritt 2)
+- ASD-Coords-Logik (bleibt unverändert)
 
-**Kosten-Kontrolle:** Hard-Cap 5 Runs/Tag pro Admin via `lipsync_diagnostic_runs.created_at` Count; Button disabled wenn überschritten.
+## Technische Details
 
-**Auswertung:** sizeRatio + ein 3-Frame-Sample (mouth-region pixel-diff) als grobe automatische "moved?" Heuristik, manuelle Toggle hat Vorrang.
+**Neuer Storage-Bucket** `lipsync-plates`:
+- Private, RLS: nur Service-Role schreibt, Sync.so liest via signed URL (7d)
+- Pfad: `{user_id}/{scene_id}/{pass_id}.mp4`
 
-### Nächster Schritt nach Diagnose
-Mit den Ergebnissen entscheiden wir genau einen Patch:
-- Wenn E gewinnt → Min-Audio-Floor
-- Wenn A gewinnt aber B/C nicht → ASD-Strategie auf auto_detect zurückdrehen
-- Wenn alle 5 NOOP → Eskalation zu Sync.so Support, parallel Hedra/lipsync-2-pro Fallback
+**Neue Helper-Function** `_shared/rehostPlate.ts`:
+- Input: presigned S3-URL
+- Stream-Download → Storage-Upload → signed URL zurück
+- Idempotent über deterministisches Pfad-Hashing
+
+**Call-Sites die rehostPlate() bekommen:**
+- `compose-dialog-segments/index.ts` (Multi-Pass)
+- `compose-dialog-scene/index.ts` (Single-Speaker)
+- `compose-lipsync-scene/index.ts` (Legacy)
+- `lipsync-diagnostic/index.ts` (damit auch Diagnostic stabile URLs nutzt)
+
+**422-Handler** in `sync-so-webhook/index.ts`:
+```ts
+if (status === 422 && errorCode === 'generation_input_video_inaccessible') {
+  await markPassFailed(passId, 'plate_url_expired');
+  await refundCredits(userId, passId);
+  return; // KEINE NOOP-Escalation
+}
+```
+
+## Doku
+- Neue Memory: `mem/architecture/lipsync/v143-plate-rehost.md`
+- Update `mem/architecture/lipsync/v142-diagnostic-mode.md` — Outcome: "Diagnostic bewies URL-Lifetime, nicht ASD"

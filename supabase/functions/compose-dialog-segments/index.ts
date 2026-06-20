@@ -98,6 +98,8 @@ import {
   buildAsdStrategy,
   type PreflightFaceResult,
 } from "../_shared/asd-strategy.ts";
+import { rehostPlate } from "../_shared/rehostPlate.ts";
+
 
 
 
@@ -121,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v140.0";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v143.0";
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
@@ -4745,7 +4747,31 @@ serve(async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    const dispatchVideoUrl = usePassPreclip ? (passPreclipUrl as string) : passInputUrl;
+    const rawDispatchVideoUrl = usePassPreclip ? (passPreclipUrl as string) : passInputUrl;
+    // v143 — Rehost the plate into our own bucket before sending to Sync.so.
+    // Presigned Replicate/S3 URLs expire after ~60 min; multi-pass dialogs
+    // routinely exceed that window, causing Sync.so to silently return 422
+    // `generation_input_video_inaccessible` which our pipeline mis-read as
+    // a NOOP. The signed `lipsync-plates` URL is valid for 7 days.
+    let dispatchVideoUrl = rawDispatchVideoUrl;
+    let rehostInfo: { uploaded: boolean; ms: number; bytes: number } | null = null;
+    try {
+      const rh = await rehostPlate(supabase, rawDispatchVideoUrl, {
+        sceneId,
+        passIdx: currentPassIdx,
+        kind: usePassPreclip ? "preclip" : "fullplate",
+        ownerId: (scene as any)?.user_id ?? (scene as any)?.owner_id ?? null,
+      });
+      dispatchVideoUrl = rh.url;
+      rehostInfo = { uploaded: rh.uploaded, ms: rh.durationMs, bytes: rh.bytes };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v143_rehost ${rh.uploaded ? "uploaded" : "cached"} ${rh.bytes}B in ${rh.durationMs}ms`,
+      );
+    } catch (e) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v143_rehost FAILED — falling back to raw URL: ${(e as Error)?.message}`,
+      );
+    }
     const videoInput: Record<string, unknown> = { type: "video", url: dispatchVideoUrl };
     // v124 — Hard whitelist sanitizer + ASD mutex. Supersedes the partial
     // v106 blacklist scrub. For `model: "sync-3"` ONLY `sync_mode` and
@@ -4802,6 +4828,13 @@ serve(async (req) => {
       payload_audio_normalized: !!(pass as any).sync_audio_url,
       audio_normalization: (pass as any).audio_normalization ?? null,
       payload_video_url: dispatchVideoUrl,
+      // v143 — Rehost telemetry so dispatch logs prove whether Sync.so saw a
+      // stable lipsync-plates URL or the raw Replicate URL.
+      v143_rehost_url: rehostInfo ? dispatchVideoUrl : null,
+      v143_rehost_source_url: rehostInfo ? rawDispatchVideoUrl : null,
+      v143_rehost_uploaded: rehostInfo?.uploaded ?? null,
+      v143_rehost_bytes: rehostInfo?.bytes ?? null,
+      v143_rehost_ms: rehostInfo?.ms ?? null,
       // v106 — full options-key list so any future doc-drift (unsupported
       // field smuggled into sync-3) is visible in dispatch logs.
       options_keys: Object.keys(payloadOptions),
