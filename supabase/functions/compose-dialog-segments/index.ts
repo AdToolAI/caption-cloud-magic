@@ -2784,6 +2784,32 @@ serve(async (req) => {
       );
     }
 
+    // ── v150 — Fresh-Dispatch Preclip-Bypass für Multi-Speaker bbox-url-pro
+    // v147 hat bbox-url-pro als PRIMARY für N>=2 Speaker etabliert, aber der
+    // Single-Face-Preclip-Pfad (Rule 0 v131.2) gewinnt auf Fresh-Dispatch
+    // weiterhin und kollabiert die ASD wieder auf `auto_detect`. Das macht
+    // v147 auf Fresh-Dispatch wirkungslos und führt zur ersten NOOP-Welle,
+    // bevor die v134-Ladder überhaupt eingreift.
+    //
+    // Fix: Bei Fresh-Dispatch mit Multi-Speaker + Plate-Identity + Plate-Dims
+    // droppen wir den Preclip lokal, damit Full-Plate bbox-url-pro greift.
+    // Auf Single-Speaker Plates bleibt der Preclip-Pfad (= sicherer Default).
+    const v150FreshBboxEligible =
+      !isRetry &&
+      body?.noop_auto_escalation !== true &&
+      speakers.length >= 2 &&
+      !!plateDims &&
+      !!plateIdentityMap && plateIdentityMap.resolvedCount > 0 &&
+      !!(pass as any).preclip_url;
+    if (v150FreshBboxEligible) {
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_render_id = null;
+      (pass as any).preclip_crop = null;
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v150_fresh_bypass_preclip_for_bbox_url_pro speakers=${speakers.length} resolved=${plateIdentityMap.resolvedCount} speaker=${pass.speaker_name ?? "?"} — dropping preclip for full-plate bbox-url-pro PRIMARY`,
+      );
+    }
+
 
 
     // ── v118 — Pass-level Sync.so circuit breaker ────────────────────────
