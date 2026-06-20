@@ -4166,54 +4166,6 @@ serve(async (req) => {
         frame_clamped: !refFrameInPreclipRange,
       };
 
-      // v136 — Preclip-Centered Coords (supersedes v131.4 auto_detect override)
-      // Root cause discovered 2026-06-19 on scene af3901da: Sync.so sync-3
-      // with `{ auto_detect: true }` on a 720×720 face-cropped preclip
-      // silently returns the input video unchanged (no lip animation) for
-      // ~all passes. Forensic PSNR(preclip→output) measured 33–43 dB across
-      // all 4 speaker passes — no mouth movement.
-      //
-      // The preclip is by construction a one-face square centered on that
-      // speaker's face (see preclip builder, ~line 4047). We can dispatch
-      // explicit, in-preclip coordinates at the geometric center of the
-      // output frame, removing all guessing on Sync.so's side. This applies
-      // to BOTH single- and multi-speaker passes because the preclip is the
-      // same shape in both cases.
-      //
-      // Safety net: Sync.so's auto-snap (v129.22.3, ok_after_snap branch
-      // below at ~line 4950) still corrects any sub-frame drift, and the
-      // pre-snap (v135) still runs on plate-space ambiguous crops.
-      if (usePassPreclip && retryVariant === "coords-pro") {
-        const previousAsd = syncOptions.active_speaker_detection;
-        const outSizeForCenter = Number((pass as any).preclip_crop?.outputSize) || 720;
-        const centerXY = Math.round(outSizeForCenter / 2);
-        // v139.1 — Sync.so `coordinates` MUST be a flat [x, y] (2 numbers).
-        // v136 accidentally wrapped it as [[x, y]] (length 1) → Sync.so
-        // rejected every dispatch with 400 "coordinates must contain at
-        // least 2 elements". See mem/architecture/lipsync/v136-coords-shape-canonical.md
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          frame_number: 0,
-          coordinates: [centerXY, centerXY],
-        };
-        asdMode = "v136_preclip_centered_coords";
-        (pass as any).preclip_asd_source = "v136_preclip_center";
-        (pass as any).preclip_asd_coords = [centerXY, centerXY];
-        v1291Diag = {
-          ...v1291Diag,
-          rule: "v136_preclip_centered_coords",
-          mode: "preclip_center",
-          source: "preclip_geometric_center",
-          coord_space: "preclip_output",
-          frame_number: 0,
-          reason: "v136_supersedes_v131_4_auto_detect_silent_noop",
-          retry_variant: retryVariant,
-          original_strategy_mode: strategy.mode,
-          original_asd: previousAsd,
-          preclip_output_size: outSizeForCenter,
-          centered_coord: [centerXY, centerXY],
-        };
-      }
       (pass as any)._v1291 = v1291Diag;
       (pass as any)._v130_asd_strategy = {
         mode: v1291Diag?.mode ?? strategy.mode,
