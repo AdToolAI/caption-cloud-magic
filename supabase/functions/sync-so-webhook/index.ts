@@ -590,30 +590,47 @@ serve(async (req) => {
           (inputHead.bytes != null && outputHead.bytes != null && inputHead.bytes === outputHead.bytes))
       );
       const syncOutputResolutionRegression = expectedPreclipAxis >= 720 && minOutputAxis > 0 && minOutputAxis < 720;
-      // v128 — Re-encoded-but-passthrough sniff retained for diagnostics only.
-      // The auto-retry ladder (v127) has been removed per Alpha-Plan v3.1
-      // §1.2: terminal means terminal. A NOOP-suspect output is now marked
-      // `PASS_DONE_SUSPECT` (status=done + sync_noop_suspect=true) so the UI
-      // can render a yellow "degraded" badge and the user can explicitly
-      // trigger a retry (new attempt_id). No automatic re-dispatch.
+      // v150 — `reencodedPassthroughSuspect` (sizeRatio 0.65–1.35) lieferte
+      // strukturell False-Positives für korrekt lipgesynchte Passes mit
+      // wenig Mouth-Movement: Sync.so verändert nur ~10–25% der Frames,
+      // Output-Bytes liegen dadurch erwartet bei 70–90% der Input-Bytes.
+      // Die Heuristik flaggte das als NOOP, die v134-Ladder dispatch'te
+      // 2 weitere identisch-strukturierte Retries (die ebenfalls "0.84"
+      // produzierten), und HARD-FAIL'te schließlich einen erfolgreichen
+      // Pass (Beispiel: Szene 827ed500 / Matthew Dusatko, 2026-06-20).
+      //
+      // Wir behalten die Berechnung als reines Forensik-Log, aber sie
+      // entscheidet NICHT mehr über `noopSuspect`. Echte NOOPs werden
+      // weiterhin deterministisch erkannt:
+      //   - `syncOutputUnchanged`         → etag/bytes EXAKT identisch
+      //   - `syncOutputResolutionRegression` → min-axis <720 bei ≥720 erwartet
+      // Beide sind harte Signale ohne False-Positive-Risiko.
       const inBytes = Number(inputHead?.bytes ?? 0);
       const outBytes = Number(outputHead?.bytes ?? 0);
       const sizeRatio = inBytes > 0 && outBytes > 0 ? outBytes / inBytes : 0;
-      const reencodedPassthroughSuspect = !syncOutputUnchanged &&
+      const reencodedPassthroughSuspect_DEPRECATED = !syncOutputUnchanged &&
         sizeRatio >= 0.65 && sizeRatio <= 1.35;
-      const noopSuspect = syncOutputUnchanged || syncOutputResolutionRegression || reencodedPassthroughSuspect;
+      const reencodedPassthroughSuspect = false; // v150: disabled, see comment above
+      const noopSuspect = syncOutputUnchanged || syncOutputResolutionRegression;
+      // v150 — Diagnostik-Log auch wenn nur die alte (jetzt deaktivierte)
+      // bytes-Heuristik anschlagen würde. So sehen wir in den Logs, ob die
+      // alte v128 noch täglich False-Positives produziert hätte — ohne dass
+      // sie noch die Ladder triggert.
+      if (reencodedPassthroughSuspect_DEPRECATED && !noopSuspect) {
+        console.log(
+          `[sync-so-webhook] v150_bytes_heuristic_suppressed scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(2)} — alte v128-Heuristik hätte fälschlich NOOP markiert, jetzt unterdrückt.`,
+        );
+      }
       if (noopSuspect) {
         const noopReason = syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
-          : syncOutputUnchanged
-            ? "sync_output_unchanged"
-            : "sync_output_reencoded_passthrough_suspect";
+          : "sync_output_unchanged";
         await logSyncDispatch(supabase, {
           scene_id: sceneId, job_id: jobId, engine: "sync-segments",
           sync_status: "COMPLETED_NOOP_SUSPECT",
           error_class: "sync_completed_noop",
           meta: {
-            v128_terminal: true,
+            v150_terminal: true,
             pass_idx: currentPass,
             attempt_id: passBeforeDone?.attempt_id ?? null,
             model: passBeforeDone?.retry_variant ?? null,
@@ -627,7 +644,7 @@ serve(async (req) => {
           },
         });
         console.warn(
-          `[sync-so-webhook] v128 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → PASS_DONE_SUSPECT (no auto-retry, awaiting user retry)`,
+          `[sync-so-webhook] v150 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → PASS_DONE_SUSPECT (no auto-retry, awaiting user retry)`,
         );
         // Fall through to mark this pass `done` with `sync_noop_suspect: true`
         // (patched in the freshDonePasses update below).
@@ -656,9 +673,12 @@ serve(async (req) => {
       const passSpeakerName = String(passBeforeDone?.speaker_name ?? "Speaker");
       const passTurnIdx = Number(passBeforeDone?.idx ?? currentPass);
 
+      // v150 — Step 0 (bbox-url-pro) entfernt: ist nach v147+v150-B bereits
+      // PRIMARY auf Fresh-Dispatch für Multi-Speaker. Ein erneuter Retry mit
+      // derselben Variante produziert garantiert dasselbe Ergebnis. Nur noch
+      // 1 echte Eskalations-Stufe (coords-pro-box), danach Hard-Fail.
       const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [
-        { step: 0, variant: "bbox-url-pro",   label: "bounding_boxes_url (sync-3)" },
-        { step: 1, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)"   },
+        { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
       ];
       const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
       const canEscalate = noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
