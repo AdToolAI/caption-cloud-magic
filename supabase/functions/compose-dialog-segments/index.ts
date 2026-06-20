@@ -4828,6 +4828,13 @@ serve(async (req) => {
       payload_audio_normalized: !!(pass as any).sync_audio_url,
       audio_normalization: (pass as any).audio_normalization ?? null,
       payload_video_url: dispatchVideoUrl,
+      // v143 — Rehost telemetry so dispatch logs prove whether Sync.so saw a
+      // stable lipsync-plates URL or the raw Replicate URL.
+      v143_rehost_url: rehostInfo ? dispatchVideoUrl : null,
+      v143_rehost_source_url: rehostInfo ? rawDispatchVideoUrl : null,
+      v143_rehost_uploaded: rehostInfo?.uploaded ?? null,
+      v143_rehost_bytes: rehostInfo?.bytes ?? null,
+      v143_rehost_ms: rehostInfo?.ms ?? null,
       // v106 — full options-key list so any future doc-drift (unsupported
       // field smuggled into sync-3) is visible in dispatch logs.
       options_keys: Object.keys(payloadOptions),
