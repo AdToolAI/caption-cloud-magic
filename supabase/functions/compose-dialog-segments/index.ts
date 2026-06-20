@@ -121,7 +121,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v134.0";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.0";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // v37 — `sync3-coords` added as the Sync.so-recommended fallback for
