@@ -183,9 +183,19 @@ serve(async (req) => {
     .select(
       "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
     )
+    // v141 — Widen filter to include the zombie state observed on
+    // 2026-06-20: `pending + twoshot_stage=syncso_fanout_3_of_4`.
+    // After a watchdog auto-retry reset a `rendering` pass to `pending`
+    // but the original Sync.so job still completes via late webhook,
+    // the scene gets stuck because neither branch picked it up. We now
+    // also scan `pending + syncso_fanout_*` / `syncso_retry_*` /
+    // `syncso_fanout_recovering` / `audio_muxing` so the v5 fan-out
+    // poller + dispatcher branch handles them.
     .or(
       "lip_sync_status.in.(running,audio_muxing)," +
-      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred,master_clip))," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred,master_clip,syncso_fanout_recovering,audio_muxing))," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_fanout_%)," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_retry_%)," +
       "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)",
     )
     .is("lip_sync_applied_at", null)
