@@ -17,7 +17,8 @@ const corsHeaders = {
 };
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
-const VERSION = "v145.0";
+const VERSION = "v146.0";
+const REPLICATE_GATEWAY_BASE = "https://connector-gateway.lovable.dev/replicate/v1";
 
 console.log(`[lipsync-diagnostic] BOOT ${VERSION} deploy=${Date.now()}`);
 
@@ -227,8 +228,8 @@ Deno.serve(async (req) => {
     .select("id", { count: "exact", head: true })
     .eq("created_by", userData.user.id)
     .gte("created_at", since);
-  if ((count ?? 0) >= 5) {
-    return json({ error: "daily limit reached (5 runs / 24h)" }, 429);
+  if ((count ?? 0) >= 20) {
+    return json({ error: "daily limit reached (20 runs / 24h)" }, 429);
   }
 
   let body: any;
@@ -420,37 +421,85 @@ async function analyzeFrameWithGemini(params: {
   }
 }
 
-async function extractFrameAt(params: {
-  replicate: Replicate;
-  admin: any;
+// v146.2 — Video analysis via Replicate's Gemini 2.5 Flash wrapper.
+// Native `videos[]` input handles mp4 URLs directly; no frame extraction
+// needed and OpenRouter's "Unsupported image format" issue is bypassed.
+async function analyzeVideoWithGemini(params: {
+  replicateToken: string;
   videoUrl: string;
-  timestamp: number;
-  sceneId: string;
-  label: string;
-}): Promise<{ url?: string; error?: string }> {
+  durationSec: number;
+  expectedSpeakers: number;
+}): Promise<{
+  samples: Array<{ label: string; t_sec: number; count: number | null; faces?: any[] }>;
+  maxCount: number;
+  raw?: string;
+  error?: string;
+}> {
+  const tEarly = 0.1;
+  const tMid = Math.max(0.5, params.durationSec / 2);
+  const tLate = Math.max(1.0, params.durationSec - 0.3);
+  const empty = (err: string) => ({
+    samples: [
+      { label: "early", t_sec: tEarly, count: null, faces: [] },
+      { label: "mid",   t_sec: tMid,   count: null, faces: [] },
+      { label: "late",  t_sec: tLate,  count: null, faces: [] },
+    ],
+    maxCount: 0,
+    error: err,
+  });
   try {
-    const out: any = await params.replicate.run(
-      "lucataco/ffmpeg-extract-frame" as `${string}/${string}`,
-      { input: { video: params.videoUrl, timestamp: params.timestamp } },
+    const prompt =
+      `You receive a short video where ${params.expectedSpeakers} distinct speakers are expected. ` +
+      `Sample the video at THREE timestamps: t=${tEarly.toFixed(2)}s (early), t=${tMid.toFixed(2)}s (mid), t=${tLate.toFixed(2)}s (late). ` +
+      `For EACH timestamp, count DISTINCT human faces where the MOUTH AREA is clearly visible and large enough for lip-sync ` +
+      `(face takes at least 3% of frame area, mouth not occluded, face roughly frontal — profiles count only if the mouth is still discernible). ` +
+      `For each counted face, give its approximate center as percentage (x_pct, y_pct from 0 to 100) and area share (area_pct). ` +
+      `Return STRICT JSON only, no prose: ` +
+      `{"early":{"count":<int>,"faces":[{"x_pct":<int>,"y_pct":<int>,"area_pct":<number>,"mouth_visible":<bool>}]},` +
+      `"mid":{...},"late":{...}}`;
+
+    const replicate = new Replicate({ auth: params.replicateToken });
+    const out: any = await replicate.run(
+      "google/gemini-2.5-flash" as `${string}/${string}`,
+      {
+        input: {
+          prompt,
+          videos: [params.videoUrl],
+          temperature: 0.2,
+          max_output_tokens: 2048,
+          thinking_budget: 0,
+        },
+      },
     );
-    const frameUrl =
+
+    const txt =
       typeof out === "string" ? out
-      : Array.isArray(out) ? out[0]
-      : out?.url?.() ?? out?.url ?? "";
-    if (!frameUrl) return { error: "no frame url from replicate" };
-    // Rehost into composer-frames so Gemini can fetch it without CORS pain.
-    const pngRes = await fetch(frameUrl, { signal: AbortSignal.timeout(30_000) });
-    if (!pngRes.ok) return { error: `frame fetch HTTP ${pngRes.status}` };
-    const bytes = new Uint8Array(await pngRes.arrayBuffer());
-    const path = `system/forensic/${params.sceneId}-${params.label}-${Date.now()}.png`;
-    const up = await params.admin.storage.from("composer-frames").upload(path, bytes, {
-      contentType: "image/png", upsert: true, cacheControl: "86400",
-    });
-    if (up.error) return { error: `upload: ${up.error.message}` };
-    const { data: pub } = params.admin.storage.from("composer-frames").getPublicUrl(path);
-    return { url: pub.publicUrl };
+      : Array.isArray(out) ? out.join("")
+      : String(out ?? "");
+    // Strip markdown code fences if present
+    const cleaned = txt.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+    // Robust JSON extraction — find first { and matching last }
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace < 0 || lastBrace <= firstBrace) {
+      return { ...empty("no_json_in_response"), raw: txt.slice(0, 600) };
+    }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+    } catch (parseErr) {
+      return { ...empty(`json_parse_failed: ${(parseErr as Error).message}`), raw: txt.slice(0, 600) };
+    }
+    const pick = (key: "early" | "mid" | "late", t: number) => {
+      const obj: any = parsed?.[key] ?? {};
+      const c = Number.isFinite(Number(obj.count)) ? Math.round(Number(obj.count)) : null;
+      return { label: key, t_sec: t, count: c, faces: Array.isArray(obj.faces) ? obj.faces : [] };
+    };
+    const samples = [pick("early", tEarly), pick("mid", tMid), pick("late", tLate)];
+    const maxCount = Math.max(0, ...samples.map((s) => Number(s.count) || 0));
+    return { samples, maxCount, raw: txt.slice(0, 800) };
   } catch (e) {
-    return { error: `extract_exception: ${(e as Error).message}` };
+    return empty(`analyze_exception: ${(e as Error).message}`);
   }
 }
 
@@ -464,10 +513,11 @@ async function runForensic(args: {
   const expectedSpeakers: number = Math.max(1, Math.min(8, Number(body.expected_speakers ?? 2)));
   if (!plateUrl) return json({ error: "plate_url required for forensic mode" }, 400);
 
-  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!REPLICATE_API_TOKEN) return json({ error: "REPLICATE_API_TOKEN missing" }, 500);
+  const REPLICATE_API_TOKEN =
+    Deno.env.get("REPLICATE_API_KEY") ?? Deno.env.get("REPLICATE_API_TOKEN");
   if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY missing" }, 500);
+  if (!REPLICATE_API_TOKEN) return json({ error: "REPLICATE_API_KEY missing" }, 500);
 
   // Insert run row
   const { data: runRow, error: insErr } = await admin
@@ -483,14 +533,14 @@ async function runForensic(args: {
       source_scene_id: body.source_scene_id ?? null,
       source_pass_idx: body.source_pass_idx ?? null,
       variants: [],
-      notes: `forensic v145 · expected=${expectedSpeakers}`,
+      notes: `forensic v146 · expected=${expectedSpeakers}`,
     })
     .select()
     .single();
   if (insErr || !runRow) return json({ error: insErr?.message || "insert failed" }, 500);
 
   const work = async () => {
-    // 1) Rehost plate so Replicate can fetch it stable
+    // 1) Rehost plate so Gemini can fetch it from our public bucket
     let stableUrl = plateUrl;
     try {
       const rh = await rehostPlate(admin, plateUrl, {
@@ -500,59 +550,23 @@ async function runForensic(args: {
         ownerId: userId,
       });
       stableUrl = rh.url;
-      console.log(`[lipsync-diagnostic] v145_rehost ${rh.uploaded ? "uploaded" : "cached"} ${rh.bytes}B`);
+      console.log(`[lipsync-diagnostic] v146_rehost ${rh.uploaded ? "uploaded" : "cached"} ${rh.bytes}B`);
     } catch (e) {
-      console.warn(`[lipsync-diagnostic] v145_rehost failed: ${(e as Error).message}`);
+      console.warn(`[lipsync-diagnostic] v146_rehost failed: ${(e as Error).message}`);
     }
 
-    const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
-
-    // 2) Extract 3 frames at 0.1s, ~middle (assume 5s plate → 2.5s), and ~end (4.5s)
-    //    If actual duration is unknown, these timestamps still produce useful samples;
-    //    Replicate clamps to last frame if past EOF.
+    // 2) Single Gemini call analyzing the whole video at early/mid/late timestamps
     const dur = Number(body.duration_sec) > 0 ? Number(body.duration_sec) : 5;
-    const sceneId = (body.source_scene_id ?? runRow.id).toString().slice(0, 12);
-    const sampleSpecs = [
-      { label: "early", t: 0.1 },
-      { label: "mid",   t: Math.max(0.5, dur / 2) },
-      { label: "late",  t: Math.max(1.0, dur - 0.3) },
-    ];
+    const analysis = await analyzeVideoWithGemini({
+      replicateToken: REPLICATE_API_TOKEN,
+      videoUrl: stableUrl,
+      durationSec: dur,
+      expectedSpeakers,
+    });
 
-    const frames = await Promise.all(
-      sampleSpecs.map(async (s) => {
-        const r = await extractFrameAt({
-          replicate, admin, videoUrl: stableUrl, timestamp: s.t,
-          sceneId, label: s.label,
-        });
-        return { label: s.label, timestamp_sec: s.t, ...r };
-      }),
-    );
-
-    // 3) Analyze each frame with Gemini
-    const analyzed = await Promise.all(
-      frames.map(async (f) => {
-        if (!f.url) {
-          return { ...f, count: null, faces: [], analyze_error: f.error };
-        }
-        const a = await analyzeFrameWithGemini({
-          apiKey: LOVABLE_API_KEY, frameUrl: f.url, expectedSpeakers,
-        });
-        return {
-          label: f.label,
-          timestamp_sec: f.timestamp_sec,
-          frame_url: f.url,
-          count: a.count,
-          faces: a.faces ?? [],
-          analyze_error: a.error,
-          raw_snippet: a.raw,
-        };
-      }),
-    );
-
-    // 4) Verdict
-    const counts = analyzed.map((a) => Number.isFinite(Number(a.count)) ? Number(a.count) : 0);
-    const maxCount = Math.max(0, ...counts);
+    const maxCount = analysis.maxCount;
     const verdict =
+      analysis.error ? "analyze_failed" :
       maxCount === 0 ? "plate_face_count_zero" :
       maxCount < expectedSpeakers ? "plate_face_count_low" :
       "plate_face_count_ok";
@@ -560,19 +574,19 @@ async function runForensic(args: {
     await admin
       .from("lipsync_diagnostic_runs")
       .update({
-        variants: analyzed.map((a) => ({
-          id: `frame_${a.label}`,
-          label: `Frame ${a.label} @ ${a.timestamp_sec.toFixed(2)}s`,
-          model: "gemini-2.5-pro",
-          status: a.analyze_error ? "ANALYZE_FAILED" : (a.count === null ? "PARSE_FAILED" : "COMPLETED"),
-          output_url: a.frame_url ?? null,
-          error: a.analyze_error ?? null,
-          face_count: a.count,
-          faces: a.faces,
-          raw_snippet: a.raw_snippet,
+        variants: analysis.samples.map((s) => ({
+          id: `sample_${s.label}`,
+          label: `${s.label} @ ${s.t_sec.toFixed(2)}s`,
+          model: "gemini-2.5-pro (video direct)",
+          status: analysis.error ? "ANALYZE_FAILED" : (s.count === null ? "PARSE_FAILED" : "COMPLETED"),
+          output_url: stableUrl,
+          error: analysis.error ?? null,
+          face_count: s.count,
+          faces: s.faces ?? [],
+          raw_snippet: analysis.raw,
         })),
         status: "completed",
-        notes: `forensic v145 · expected=${expectedSpeakers} · max_detected=${maxCount} · verdict=${verdict}`,
+        notes: `forensic v146 · expected=${expectedSpeakers} · max_detected=${maxCount} · verdict=${verdict}`,
       })
       .eq("id", runRow.id);
   };
