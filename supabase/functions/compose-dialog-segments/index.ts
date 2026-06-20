@@ -5675,22 +5675,22 @@ serve(async (req) => {
           scene_id: sceneId,
           user_id: userId,
           engine: "sync-segments",
-          sync_status: "PLAN_D_FANOUT_BLOCKED_V128",
+          sync_status: "PLAN_D_FANOUT_BLOCKED_V139",
           meta: {
-            v128_terminal: true,
+            v139_blocked: true,
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             attempt_id: pass?.attempt_id ?? null,
             variant: pass?.retry_variant ?? null,
             model: pass?.retry_variant ?? null,
             dispatch_source: "compose-dialog-segments",
-            reason: "FEATURE_PLAN_D_FANOUT=false",
+            reason: "FEATURE_PLAN_D_FANOUT=false AND composer.plan_d_fanout_force_enable=false",
           },
         });
       } catch { /* ignore log errors */ }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} PLAN_D_FANOUT_BLOCKED_V128 ` +
-          `(env flag off, ${passes.length} passes) — webhook will chain serially`,
+        `[compose-dialog-segments] scene=${sceneId} PLAN_D_FANOUT_BLOCKED_V139 ` +
+          `(env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}, ${passes.length} passes) — webhook will chain serially`,
       );
     }
     if (!isAdvance && !isRetry && fanOutAllowed) {
@@ -5713,7 +5713,7 @@ serve(async (req) => {
         }, delayMs);
       }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} plan_d_parallel_dispatch_start N_passes=${passes.length} cap=${concurrencyCap} fanout_size=${fanOutEnd}`,
+        `[compose-dialog-segments] scene=${sceneId} v139_fanout_active cap=${concurrencyCap} fanout_size=${fanOutEnd} N_passes=${passes.length} env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}`,
       );
     } else if (!isAdvance && !isRetry && passes.length > 1) {
       console.log(
