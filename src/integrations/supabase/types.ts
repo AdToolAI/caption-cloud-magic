@@ -8134,6 +8134,60 @@ export type Database = {
         }
         Relationships: []
       }
+      lipsync_diagnostic_runs: {
+        Row: {
+          audio_url: string
+          bounding_boxes_url: string | null
+          coords: Json | null
+          created_at: string
+          created_by: string
+          error_message: string | null
+          id: string
+          notes: string | null
+          plate_url: string
+          source_pass_idx: number | null
+          source_scene_id: string | null
+          speaker_label: string | null
+          status: string
+          updated_at: string
+          variants: Json
+        }
+        Insert: {
+          audio_url: string
+          bounding_boxes_url?: string | null
+          coords?: Json | null
+          created_at?: string
+          created_by: string
+          error_message?: string | null
+          id?: string
+          notes?: string | null
+          plate_url: string
+          source_pass_idx?: number | null
+          source_scene_id?: string | null
+          speaker_label?: string | null
+          status?: string
+          updated_at?: string
+          variants?: Json
+        }
+        Update: {
+          audio_url?: string
+          bounding_boxes_url?: string | null
+          coords?: Json | null
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          id?: string
+          notes?: string | null
+          plate_url?: string
+          source_pass_idx?: number | null
+          source_scene_id?: string | null
+          speaker_label?: string | null
+          status?: string
+          updated_at?: string
+          variants?: Json
+        }
+        Relationships: []
+      }
       location_catalog_previews: {
         Row: {
           created_at: string
