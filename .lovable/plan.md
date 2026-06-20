@@ -1,62 +1,64 @@
-## v147 — bbox-url-pro als einzige ASD-Strategie
+# v148 — NOOP-Eskalation überstimmt Rule 0 (Preclip-Auto-Detect)
 
-### Ziel
-Komplett weg von `auto_detect: true` (Sync.so) — `bbox-url-pro` (deterministische `bounding_boxes_url`) wird der einzige Dispatch-Pfad für Multi-Speaker Dialog-Shots. Damit eliminieren wir die `face_gate_failed:count=0` Klasse von Fehlern komplett, weil Sync.so nicht mehr selbst nach Gesichtern suchen muss.
+## Problem (aus den Logs verifiziert)
 
-### Warum jetzt
-- v146 Forensik (Run `0b3dafc5`) hat bewiesen: Plates sind sauber, Sarah's Gesicht ist klar bei 32.6% Frame-Coverage sichtbar.
-- Der einzige verbleibende Verdächtige ist Sync.so's `auto_detect`, das auf unseren stilisierten Hailuo-Plates flaky ist.
-- v126 hatte `bbox-url-pro` schon mal als Primary, wurde aber wegen `provider_unknown_error` in Szene `cba18767` zurückgestellt. Wir lösen das diesmal mit korrektem Fallback + Pre-flight Validation der bbox-URL statt blind dispatchen.
+Scene `fcb2ee59` Pass 1:
+1. Fresh-Dispatch: Preclip vorhanden → Rule 0 (v131.2) erzwingt `auto_detect:true` auf der per-Speaker Crop (variant `coords-pro` als Label, aber ASD ist auto_detect).
+2. Sync.so liefert NOOP-suspect (`sync_output_reencoded_passthrough_suspect, sizeRatio=0.76`).
+3. `sync-so-webhook` eskaliert via v134-Ladder → ruft `compose-dialog-segments` mit `noop_auto_escalation:true` + `noop_escalation_variant:"bbox-url-pro"`.
+4. Aber `compose-dialog-segments` re-dispatcht **erneut mit Preclip + auto_detect**, weil:
+   - `hasPassPreclipForDispatch === true` → `v147BboxEligible = false`
+   - Rule 0 (v131.2) zwingt `auto_detect` unkonditional auf jeden Preclip-Pfad
+   - Die requested `bbox-url-pro`-Variante wird durch den Preclip-Pfad ignoriert
+5. NOOP wiederholt sich → Ladder erschöpft sich (2 Stufen) → Hard-Fail.
 
----
+Resultat: Der UI-Hinweis "NOOP-Retry läuft (Stufe 1/2)" rotiert, aber `bbox-url-pro` feuert nie wirklich, weil der Preclip-Pfad ihn aushebelt.
 
-### Scope
+## Fix (chirurgisch, in `compose-dialog-segments/index.ts`)
 
-**Part A — `supabase/functions/compose-dialog-segments/index.ts`**
-1. Ladder-Stage 1 für `speakers >= 2`: **`bbox-url-pro`** (bounding_boxes_url) statt `coords-pro` mit `auto_detect`.
-2. Single-Speaker (`speakers == 1`) bleibt unverändert — kein ASD nötig.
-3. Pre-Dispatch Validation:
-   - Prüfen dass `bounding_boxes_url` HTTP 200 liefert und valides JSON enthält.
-   - Mindestens 1 bbox pro Speaker-Turn, sonst Fallback Stage 2.
-4. Fallback-Ladder (deterministisch, keine `auto_detect`-Stage mehr):
-   - Stage 1: `bbox-url-pro` (primary)
-   - Stage 2: `coords-pro` mit ASD-Coords aus Preclip (v99-Style explizite bbox)
-   - Stage 3: Fail-fast + idempotenter Auto-Refund (kein 4× NOOP-Loop)
-5. Telemetry: `asd_mode_chosen`, `bbox_count_at_dispatch`, `bbox_validation_ms` in `syncso_dispatch_log`.
-6. Version bump `v147.0`.
+### A) NOOP-Eskalation droppt den Preclip-Pfad für den eskalierten Pass
 
-**Part B — `supabase/functions/poll-dialog-shots/index.ts`**
-- `auto_detect:true` Retry-Pfad entfernen — nur noch deterministische Modes.
-- Bei Stage-2 Failure direkt zu Refund-Pfad, kein weiterer Retry.
+Wenn `noop_auto_escalation === true` UND `noop_escalation_variant in ["bbox-url-pro", "coords-pro-box"]`:
+- Behandle den Pass so, als ob **kein Preclip vorhanden** wäre (`hasPassPreclipForDispatch := false` lokal für die Dispatch-Entscheidung).
+- Setze `retryVariant := noop_escalation_variant` (statt durch Rule 0 zu `coords-pro` mit auto_detect zu kollabieren).
+- Bypass Rule 0 (v131.2) für diesen Pass; gehe direkt in den Full-Plate Deterministic-ASD-Pfad (analog v88 edge_speaker_skip_preclip, aber als generischer NOOP-Bypass).
+- Strukturierter Log: `v148_noop_bypass_preclip step=<n> variant=<v> speaker=<name>`.
 
-**Part C — Memory & Docs**
-- Update `mem/architecture/lipsync/sync-3-only-dialog-pipeline.md` → bbox-url-pro als Single Source.
-- Update `mem/architecture/lipsync/v82-bbox-url-pro-primary.md` → reaktiviert, mit v126-Lessons-Learned Notiz.
-- Neuer Eintrag `mem/architecture/lipsync/v147-bbox-url-pro-only.md`.
+### B) v82-Gate erweitern
 
-**Part D — UI (`src/pages/admin/LipsyncDiagnostic.tsx`)**
-- `asd_mode_chosen` Spalte in der Dispatch-Log Tabelle anzeigen.
-- Verdict-Hint im Forensik-Card aktualisieren: erwähnt nicht mehr `auto_detect`.
+Das `v82-gate` Log emittiert auch im NOOP-Eskalations-Fall die Begründung (`gateReason = "v148-noop-bypass-bbox-url-pro"`), damit nachvollziehbar ist, warum jetzt Full-Plate gewählt wurde.
 
----
+### C) Pre-Dispatch-Validation bleibt (v147)
 
-### Was NICHT geändert wird
-- `rehostPlate` (v143)
-- Hailuo Prompt-Tuning für `speakers>=3`
-- Single-Speaker Pfad
-- Schema (keine Migration nötig — `syncso_dispatch_log` hat schon `asd_mode_chosen`)
-- Lipsync-Pro Model-Wahl (`sync/lipsync-2-pro` bleibt)
-- Pricing / Credit-Refund-Logik
+Falls bbox-URL Upload failed oder `nonNullFrames === 0`, downgrade auf `coords-pro-box` (Stufe 1 der Ladder) — nicht zurück auf preclip-auto_detect. Wenn auch coords-pro-box invalid, regulärer Hard-Fail.
 
-### Risiko & Mitigation
-- **Risiko:** v126-Regression (`provider_unknown_error` bei kaputter bbox-URL).
-- **Mitigation:** Pre-Dispatch Validation + Stage-2 Coords-Pro Fallback. v126 hatte keinen Fallback — v147 hat einen.
+### D) Hardening: NOOP-Eskalation ist idempotent
 
-### Validierungsplan
-1. `compose-dialog-segments` + `poll-dialog-shots` deployen.
-2. Eine 2-Sprecher Szene auf `/video-composer` triggern.
-3. `syncso_dispatch_log` checken: `asd_mode_chosen = 'bbox-url-pro'`, `bbox_count_at_dispatch >= 2`.
-4. Render-Result visuell verifizieren: beide Sprecher lippen synchron.
-5. Erst bei Erfolg: Forensik-Diagnostic-Lauf zur Bestätigung.
+`processed_attempt_ids` Check bleibt; doppelte Webhook-Lieferungen lösen die Eskalation nur einmal aus.
 
-OK so umsetzen?
+## Was NICHT geändert wird
+
+- Fresh-Dispatch-Pfad (Pass 1): Rule 0 (auto_detect auf Preclip) bleibt unverändert. Nur die NOOP-Eskalation umgeht ihn.
+- Single-Speaker-Pfad: unverändert (NOOP-Ladder wird dort eh nicht gezündet wie heute).
+- Wire-Payload-Schema, sync-3 doc-strict Optionen, Refund-Pfade.
+- v147 bleibt aktiv für Multi-Speaker-Szenen **ohne** Preclip-Path (Fresh-Dispatch).
+
+## Validierungsplan
+
+1. Multi-Speaker Szene mit Preclip auslösen, NOOP triggern (z.B. via lipsync-diagnostic Replay).
+2. Logs prüfen:
+   - `v148_noop_bypass_preclip step=1 variant=bbox-url-pro` muss erscheinen.
+   - `v147_BBOX_URL_PRIMARY` (oder `v147_BBOX_DOWNGRADE_TO_COORDS_PRO`) muss bei der Eskalations-Re-Dispatch feuern.
+   - `WIRE_PAYLOAD` muss `bounding_boxes_url` enthalten (kein `auto_detect`).
+3. UI: "NOOP-Retry läuft (Stufe 1/2)" muss bei Erfolg zu COMPLETED gehen, nicht zu Hard-Fail.
+
+## Doku
+
+- Neue Datei: `mem/architecture/lipsync/v148-noop-bypass-preclip.md`
+- Update: `mem/index.md` (verweis auf v148)
+- Update: `mem/architecture/lipsync/v147-bbox-url-pro-only.md` (Querverweis auf v148)
+
+## Risiken
+
+- Full-Plate Multi-Face Sync.so-Dispatch via bounding_boxes_url ist getestet (v82 Phase 2.1, jetzt v147). Risiko hauptsächlich: nicht-resolvable plateIdentityMap → Pre-Dispatch-Validation greift und downgraded sauber.
+- Kein Rollback der bestehenden Rule 0; sie wird nur in einem klar getaggten Fall (NOOP-Eskalation mit explizitem Variant) übergangen.

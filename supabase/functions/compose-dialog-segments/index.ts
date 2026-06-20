@@ -2759,6 +2759,33 @@ serve(async (req) => {
       );
     }
 
+    // ── v148 — NOOP-Eskalation bypassed Rule 0 (Preclip-Auto-Detect) ─────
+    // sync-so-webhook eskaliert NOOPs via v134-Ladder mit explizitem
+    // Variant (bbox-url-pro → coords-pro-box). Wenn ein Preclip existiert,
+    // greift jedoch Rule 0 (v131.2 auto_detect_unconditional_on_preclip) und
+    // kollabiert den Dispatch wieder auf `auto_detect` — die exakt selbe
+    // ASD-Shape, die gerade NOOP'd hat. Resultat: 2 identische Dispatches,
+    // Ladder erschöpft, Hard-Fail.
+    //
+    // Fix: Bei einer NOOP-Eskalation mit deterministischem Variant droppen
+    // wir den per-Pass Preclip lokal (analog v120), damit der Full-Plate
+    // bbox-url-pro / coords-pro-box Pfad greift. Rule 0 wird so für genau
+    // diesen eskalierten Pass übergangen, nicht generell.
+    const v148NoopBypassEligible =
+      body?.noop_auto_escalation === true &&
+      (requestedRetryVariant === "bbox-url-pro" || requestedRetryVariant === "coords-pro-box") &&
+      !!(pass as any).preclip_url;
+    if (v148NoopBypassEligible) {
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_render_id = null;
+      (pass as any).preclip_crop = null;
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v148_noop_bypass_preclip step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} — dropping preclip to allow full-plate deterministic ASD`,
+      );
+    }
+
+
+
     // ── v118 — Pass-level Sync.so circuit breaker ────────────────────────
     // Stop the silent dispatch→FAILED→dispatch loop that previously ran
     // until the user manually reset the scene. Cap each (scene, pass) at
@@ -2945,19 +2972,21 @@ serve(async (req) => {
     // ONLY on fresh dispatch (retries inherit the previous variant) and only
     // for multi-speaker scenes (N>=2 is the only place where the gate is
     // meaningful). Keep on one line for easy grep.
-    if (!isRetry && speakers.length >= 2) {
+    if ((!isRetry || (body?.noop_auto_escalation === true)) && speakers.length >= 2) {
       const gateReason =
-        freshDefaultVariant === "bbox-url-pro"
-          ? "picked-bbox-url-pro"
-          : !plateDims
-            ? "fallback-no-plateDims"
-            : !havePlateIdentityForDispatch
-              ? `fallback-identity-unresolved(resolved=${plateIdentityMap?.resolvedCount ?? 0})`
-              : hasPassPreclipForDispatch
-                ? "fallback-preclip-present"
-                : "fallback-unknown";
+        body?.noop_auto_escalation === true && (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box")
+          ? `v148-noop-bypass-${retryVariant}`
+          : freshDefaultVariant === "bbox-url-pro"
+            ? "picked-bbox-url-pro"
+            : !plateDims
+              ? "fallback-no-plateDims"
+              : !havePlateIdentityForDispatch
+                ? `fallback-identity-unresolved(resolved=${plateIdentityMap?.resolvedCount ?? 0})`
+                : hasPassPreclipForDispatch
+                  ? "fallback-preclip-present"
+                  : "fallback-unknown";
       console.log(
-        `[v82-gate] scene=${sceneId} pass=${currentPassIdx + 1} speakers=${speakers.length} plateDims=${!!plateDims} resolved=${plateIdentityMap?.resolvedCount ?? 0} preclip=${hasPassPreclipForDispatch} → variant=${freshDefaultVariant} (${gateReason})`,
+        `[v82-gate] scene=${sceneId} pass=${currentPassIdx + 1} speakers=${speakers.length} plateDims=${!!plateDims} resolved=${plateIdentityMap?.resolvedCount ?? 0} preclip=${hasPassPreclipForDispatch} noop_esc=${body?.noop_auto_escalation === true} → variant=${retryVariant} (${gateReason})`,
       );
     }
 
