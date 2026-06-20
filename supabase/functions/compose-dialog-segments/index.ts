@@ -4842,6 +4842,17 @@ serve(async (req) => {
       );
     }
 
+    if ((pass as any)._v153LegacyBranchHardFail) {
+      const hf = (pass as any)._v153LegacyBranchHardFail;
+      return await failBeforeProviderDispatch(
+        hf.reason,
+        hf.errorClass,
+        hf.message,
+        500,
+        hf.meta ?? {},
+      );
+    }
+
 
     if (speakerWindowsSecs.length > 0 && !tightAudioInfo) {
       return await failBeforeProviderDispatch(
