@@ -121,7 +121,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.0";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.1";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // v37 — `sync3-coords` added as the Sync.so-recommended fallback for
@@ -4150,10 +4150,14 @@ serve(async (req) => {
         const previousAsd = syncOptions.active_speaker_detection;
         const outSizeForCenter = Number((pass as any).preclip_crop?.outputSize) || 720;
         const centerXY = Math.round(outSizeForCenter / 2);
+        // v139.1 — Sync.so `coordinates` MUST be a flat [x, y] (2 numbers).
+        // v136 accidentally wrapped it as [[x, y]] (length 1) → Sync.so
+        // rejected every dispatch with 400 "coordinates must contain at
+        // least 2 elements". See mem/architecture/lipsync/v136-coords-shape-canonical.md
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           frame_number: 0,
-          coordinates: [[centerXY, centerXY]],
+          coordinates: [centerXY, centerXY],
         };
         asdMode = "v136_preclip_centered_coords";
         (pass as any).preclip_asd_source = "v136_preclip_center";
@@ -5205,6 +5209,38 @@ serve(async (req) => {
       }
     }
 
+    // v139.1 — Pre-dispatch coords-shape assertion. Sync.so sync-3 expects
+    // `coordinates: [x, y]` flat (2 finite numbers). Any other shape (nested,
+    // length≠2, non-number) is rejected with HTTP 400 "must contain at least
+    // 2 elements". Catch this client-side so we get a clear error code + log
+    // instead of a generic Sync.so 400 — and so a future regression like v136
+    // is impossible to ship unnoticed.
+    {
+      const coordsAsd: any = (payload.options as any)?.active_speaker_detection;
+      if (coordsAsd && coordsAsd.auto_detect === false) {
+        const c = coordsAsd.coordinates;
+        const hasBoxes = coordsAsd.bounding_boxes || coordsAsd.bounding_boxes_url;
+        const coordsOk =
+          Array.isArray(c) &&
+          c.length === 2 &&
+          c.every((n: unknown) => typeof n === "number" && Number.isFinite(n));
+        if (!hasBoxes && !coordsOk) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} BAD_COORDS_SHAPE coords=${JSON.stringify(c)} retry_variant=${retryVariant}`,
+          );
+          return await failBeforeProviderDispatch(
+            "BAD_COORDS_SHAPE",
+            "coords_shape_violation",
+            `v139.1 assert: active_speaker_detection.coordinates must be flat [x, y] (got ${JSON.stringify(c)})`,
+            500,
+            { final_asd: coordsAsd, retry_variant: retryVariant, compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION },
+          );
+        }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} coords_shape ok=[${c[0]},${c[1]}] frame_number=${coordsAsd.frame_number}`,
+        );
+      }
+    }
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
