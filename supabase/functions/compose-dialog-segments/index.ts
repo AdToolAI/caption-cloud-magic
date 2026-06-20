@@ -5209,6 +5209,38 @@ serve(async (req) => {
       }
     }
 
+    // v139.1 — Pre-dispatch coords-shape assertion. Sync.so sync-3 expects
+    // `coordinates: [x, y]` flat (2 finite numbers). Any other shape (nested,
+    // length≠2, non-number) is rejected with HTTP 400 "must contain at least
+    // 2 elements". Catch this client-side so we get a clear error code + log
+    // instead of a generic Sync.so 400 — and so a future regression like v136
+    // is impossible to ship unnoticed.
+    {
+      const coordsAsd: any = (payload.options as any)?.active_speaker_detection;
+      if (coordsAsd && coordsAsd.auto_detect === false) {
+        const c = coordsAsd.coordinates;
+        const hasBoxes = coordsAsd.bounding_boxes || coordsAsd.bounding_boxes_url;
+        const coordsOk =
+          Array.isArray(c) &&
+          c.length === 2 &&
+          c.every((n: unknown) => typeof n === "number" && Number.isFinite(n));
+        if (!hasBoxes && !coordsOk) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} BAD_COORDS_SHAPE coords=${JSON.stringify(c)} retry_variant=${retryVariant}`,
+          );
+          return await failBeforeProviderDispatch(
+            "BAD_COORDS_SHAPE",
+            "coords_shape_violation",
+            `v139.1 assert: active_speaker_detection.coordinates must be flat [x, y] (got ${JSON.stringify(c)})`,
+            500,
+            { final_asd: coordsAsd, retry_variant: retryVariant, compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION },
+          );
+        }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} coords_shape ok=[${c[0]},${c[1]}] frame_number=${coordsAsd.frame_number}`,
+        );
+      }
+    }
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
