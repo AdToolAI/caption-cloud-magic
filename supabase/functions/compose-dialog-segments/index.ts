@@ -5823,6 +5823,7 @@ serve(async (req) => {
       // pickSpeakerCoordinates produces plate-space coords.
       video_width: videoDims.width,
       video_height: videoDims.height,
+      plate_identity: v153PlateIdentitySnapshot,
       // v59 carry-over: keep multipass markers across retries.
       ...(carryForceMultipass ? { force_multipass: true } : {}),
       ...(carryMultipassAttempted ? { multipass_fallback_attempted: true } : {}),
