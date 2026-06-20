@@ -228,8 +228,8 @@ Deno.serve(async (req) => {
     .select("id", { count: "exact", head: true })
     .eq("created_by", userData.user.id)
     .gte("created_at", since);
-  if ((count ?? 0) >= 5) {
-    return json({ error: "daily limit reached (5 runs / 24h)" }, 429);
+  if ((count ?? 0) >= 20) {
+    return json({ error: "daily limit reached (20 runs / 24h)" }, 429);
   }
 
   let body: any;
