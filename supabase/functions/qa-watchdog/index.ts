@@ -225,6 +225,50 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       });
     }
 
+    // ─── 4b. Stale composer master-clip (>10min generating, no webhook) ───
+    // Replicate occasionally drops webhook callbacks for Hailuo/HappyHorse/Kling
+    // master plates. Without a watchdog the scene stays on
+    // `clip_status='generating'` forever and lipsync never starts.
+    // Dispatch the recovery worker which polls Replicate directly and either
+    // replays the webhook (success) or fails+refunds the scene.
+    const { data: stuckClips } = await sb
+      .from("composer_scenes")
+      .select(
+        "id, project_id, replicate_prediction_id, updated_at, engine_override, clip_source",
+      )
+      .eq("clip_status", "generating")
+      .is("clip_url", null)
+      .lt("updated_at", tenMinAgo)
+      .limit(50);
+
+    if (stuckClips && stuckClips.length > 0) {
+      const ids = stuckClips.map((s: any) => s.id);
+      try {
+        await sb.functions.invoke("recover-stuck-composer-clip", {
+          body: { scene_ids: ids },
+        });
+      } catch (recoverErr) {
+        console.error(
+          "[qa-watchdog] recover-stuck-composer-clip invoke failed:",
+          recoverErr,
+        );
+      }
+      anomalies.push({
+        kind: "workflow",
+        severity: "high",
+        title: `Watchdog: ${ids.length} composer master-clips stuck >10min`,
+        description: `Dispatched recover-stuck-composer-clip for:\n${stuckClips
+          .map(
+            (s: any) =>
+              `- ${s.id} engine=${s.engine_override ?? "none"} src=${s.clip_source} pred=${s.replicate_prediction_id ?? "null"} updated=${s.updated_at}`,
+          )
+          .join("\n")}`,
+        fingerprint: "composer-clip-stale",
+      });
+    }
+
+
+
     // ─── 5. Provider quota outage (>50% fail rate, ≥10 calls in last 10min) ───
     const { data: recentCalls } = await sb
       .from("provider_quota_log")
