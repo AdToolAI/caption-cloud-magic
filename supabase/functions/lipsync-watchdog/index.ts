@@ -183,9 +183,19 @@ serve(async (req) => {
     .select(
       "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
     )
+    // v141 — Widen filter to include the zombie state observed on
+    // 2026-06-20: `pending + twoshot_stage=syncso_fanout_3_of_4`.
+    // After a watchdog auto-retry reset a `rendering` pass to `pending`
+    // but the original Sync.so job still completes via late webhook,
+    // the scene gets stuck because neither branch picked it up. We now
+    // also scan `pending + syncso_fanout_*` / `syncso_retry_*` /
+    // `syncso_fanout_recovering` / `audio_muxing` so the v5 fan-out
+    // poller + dispatcher branch handles them.
     .or(
       "lip_sync_status.in.(running,audio_muxing)," +
-      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred,master_clip))," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred,master_clip,syncso_fanout_recovering,audio_muxing))," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_fanout_%)," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_retry_%)," +
       "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)",
     )
     .is("lip_sync_applied_at", null)
@@ -498,6 +508,34 @@ serve(async (req) => {
       const prevRetries = Number(ds?.watchdog_retries ?? 0);
       if (prevRetries < 1) {
         try {
+          // v141 — Pre-cancel probe. BEFORE we cancel and reset any pass,
+          // poll Sync.so for every rendering job. If it already COMPLETED,
+          // forward to our webhook so the real output is preserved instead
+          // of destroyed by a wrongful retry. This was the root cause of
+          // the 2026-06-20 "stuck at 95% for 24 min" hang: pass 2 was
+          // reset to pending while its provider job was already done.
+          const passesProbe: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+          let liveCompletedRecovered = false;
+          if (syncApiKey) {
+            for (const p of passesProbe) {
+              if (String(p?.status ?? "") !== "rendering" || !p?.job_id) continue;
+              const r = await pollAndForward({
+                syncApiKey, jobId: String(p.job_id), sceneId: d.id, supabaseUrl, serviceKey,
+              });
+              if (r.terminal && r.status === "COMPLETED") {
+                liveCompletedRecovered = true;
+                polled.push({ scene_id: d.id, job_id: String(p.job_id), status: "COMPLETED" });
+                await releaseInflightSyncJob(supabase, String(p.job_id)).catch(() => {});
+              }
+            }
+          }
+          if (liveCompletedRecovered) {
+            console.log(
+              `[lipsync-watchdog] v141 scene=${d.id} pre-cancel probe recovered completed job(s) — skip retry, let webhook drive`,
+            );
+            return; // webhook fan-out will progress the scene
+          }
+
           // Best-effort: bestehenden Sync.so-Job cancellen, damit kein
           // Geist-Webhook später noch den frischen Run überschreibt.
           const liveJobs: string[] = [];
@@ -521,9 +559,13 @@ serve(async (req) => {
           // Forensik mit `pass_not_found` kaputt gemacht. Neu: nur die
           // tatsächlich hängenden rendering-Passes auf pending zurücksetzen,
           // erfolgreich abgeschlossene `done`-Passes bleiben unverändert.
+          // v141 — Auch keine Passes mit bereits vorhandenem output_url
+          // anfassen (auch wenn sie noch fälschlich "rendering" stehen).
           const passesNow: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
           const passesPatched = passesNow.map((p: any, i: number) => {
             const st = String(p?.status ?? "");
+            if (st === "done" || st === "done_suspect" || st === "failed" || st === "canceled_by_scene_failure") return p;
+            if (typeof p?.output_url === "string" && p.output_url.length > 0) return p;
             if (st !== "rendering") return p;
             return {
               ...p,
