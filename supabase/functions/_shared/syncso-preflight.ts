@@ -1029,6 +1029,8 @@ export function explainSyncErrorCode(code?: string | null): string | null {
     generation_video_missing: "Source video missing — regenerate the scene clip",
     generation_input_validation_failed: "Sync.so rejected the input — check audio/video format",
     generation_internal_auth: "Sync.so authentication failed — contact support",
+    generation_input_video_inaccessible: "Plate-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern",
+    generation_input_audio_inaccessible: "Audio-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern",
   };
   return map[String(code).toLowerCase()] ?? null;
 }
