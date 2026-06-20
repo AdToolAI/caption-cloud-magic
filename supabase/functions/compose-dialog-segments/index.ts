@@ -5610,14 +5610,21 @@ serve(async (req) => {
     //    public.update_dialog_pass_slot() RPC (atomic per-slot jsonb_set).
     //    See mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.9) +
     //    mem/architecture/lipsync/v93-parallel-sync-so-passes.md
-    let parallelFlagOn = false;
+    // v138 — Defaults flipped ON. Plan-D parallel fan-out is now the
+    // standard path. DB flags act as KILL-SWITCHES only (set to false
+    // explicitly to force the legacy serial chain). Env var also
+    // defaults true. Previously all three defaulted false → 17-23 min
+    // serial runs even when ops set DB flags to true (deploy lag).
+    let parallelFlagOn = true;
     let concurrencyCap = 2;
-    let fanoutForceEnableDb = false;
+    let fanoutForceEnableDb = true;
     try {
       const { data: pFlag } = await supabase
         .from("system_config").select("value")
         .eq("key", "composer.parallel_sync_so_passes").maybeSingle();
-      parallelFlagOn = pFlag?.value === true || pFlag?.value === "true";
+      if (pFlag && (pFlag.value === false || pFlag.value === "false")) {
+        parallelFlagOn = false;
+      }
       const { data: cFlag } = await supabase
         .from("system_config").select("value")
         .eq("key", "composer.sync_so_concurrency_cap").maybeSingle();
@@ -5626,18 +5633,16 @@ serve(async (req) => {
       if (Number.isFinite(parsedCap) && parsedCap >= 1) {
         concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
       }
-      // v137 — DB-only force override for Plan-D fan-out. Lets us flip the
-      // kill-switch without redeploying edge functions to change env vars.
-      // Required because Stage 0.5 hard-coded `FEATURE_PLAN_D_FANOUT=false`
-      // and we observed scenes taking 20+ min serial. Set
-      // `composer.plan_d_fanout_force_enable=true` in system_config to
-      // bypass the env gate. Concurrency cap still applies.
       const { data: fFlag } = await supabase
         .from("system_config").select("value")
         .eq("key", "composer.plan_d_fanout_force_enable").maybeSingle();
-      fanoutForceEnableDb = fFlag?.value === true || fFlag?.value === "true";
+      if (fFlag && (fFlag.value === false || fFlag.value === "false")) {
+        fanoutForceEnableDb = false;
+      }
     } catch { /* defaults */ }
-    const planDFanoutEnvOn = (Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "false")
+    // v138 — Env killswitch defaults TRUE. Set FEATURE_PLAN_D_FANOUT=false
+    // explicitly to force serial mode for emergency rollback.
+    const planDFanoutEnvOn = (Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "true")
       .toLowerCase() === "true";
     const fanOutAllowed = (planDFanoutEnvOn || fanoutForceEnableDb) && parallelFlagOn && passes.length >= 2;
     if (parallelFlagOn && passes.length >= 2 && !planDFanoutEnvOn && !fanoutForceEnableDb && !isAdvance && !isRetry) {
