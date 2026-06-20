@@ -1395,11 +1395,10 @@ serve(async (req) => {
     // + refund + klare Meldung, statt 20 min später ein falsch gemixtes
     // Video zu liefern.
     if (
-      !isAdvance &&
-      !isRetry &&
       speakers.length >= 1
     ) {
       const missingBoxIdx: number[] = [];
+      const plateDimsMissing = !plateDims;
       for (let i = 0; i < speakers.length; i++) {
         const b = speakerPlateBboxes?.[i];
         if (!Array.isArray(b) || b.length !== 4) missingBoxIdx.push(i);
@@ -1421,12 +1420,14 @@ serve(async (req) => {
           }
         }
       }
-      if (missingBoxIdx.length > 0 || dupeIdx.length > 0) {
-        const reason = missingBoxIdx.length > 0
+      if (plateDimsMissing || missingBoxIdx.length > 0 || dupeIdx.length > 0) {
+        const reason = plateDimsMissing
+          ? "v153_plate_dims_missing"
+          : missingBoxIdx.length > 0
           ? `v153_plate_box_missing_for_speakers=[${missingBoxIdx.join(",")}]`
           : `v153_plate_box_duplicate_for_speakers=[${dupeIdx.join(",")}]`;
         console.error(
-          `[compose-dialog-segments] scene=${sceneId} v153_preflight_BLOCK ${reason} — refunding ${totalCost} credits, no dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} v153.2_preflight_BLOCK ${reason} hydration=${plateHydrationSource} — refunding ${totalCost} credits, no dispatch`,
         );
         const alreadyRefundedPF = !!(existing as any)?.refunded;
         if (!alreadyRefundedPF) {
