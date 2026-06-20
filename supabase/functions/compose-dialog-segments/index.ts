@@ -1256,7 +1256,29 @@ serve(async (req) => {
     const speakerPlateBboxes: Array<[number, number, number, number] | null> =
       new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
-    if (!isAdvance && speakers.length >= 1 && plateDims && sourceClipUrl) {
+    let plateHydrationSource: "persisted" | "live" | "missing" = "missing";
+    const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes)
+      ? persistedPlateIdentity.bboxes
+      : [];
+    if (persistedBboxes.length >= speakers.length) {
+      for (let i = 0; i < speakers.length; i++) {
+        const b = persistedBboxes[i];
+        if (Array.isArray(b) && b.length === 4 && b.every((n: unknown) => Number.isFinite(Number(n)))) {
+          speakerPlateBboxes[i] = [
+            Math.round(Number(b[0])),
+            Math.round(Number(b[1])),
+            Math.round(Number(b[2])),
+            Math.round(Number(b[3])),
+          ];
+          const cx = Math.round((speakerPlateBboxes[i]![0] + speakerPlateBboxes[i]![2]) / 2);
+          const cy = Math.round((speakerPlateBboxes[i]![1] + speakerPlateBboxes[i]![3]) / 2);
+          speakerCoords[i] = clampSyncCoords([cx, cy]);
+          coordSources[i] = "plate-persisted";
+        }
+      }
+      plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "persisted" : "missing";
+    }
+    if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
       try {
         plateIdentityMap = await resolvePlateFaceIdentities({
           supabase,
