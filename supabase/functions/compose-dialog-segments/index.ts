@@ -1207,6 +1207,23 @@ serve(async (req) => {
         422,
       );
     }
+    const persistedPlateIdentity = ((existing as any)?.plate_identity ?? null) as any;
+    const persistedPlateDims = persistedPlateIdentity?.dims;
+    if (
+      !plateDims &&
+      Number.isFinite(Number(persistedPlateDims?.width)) &&
+      Number.isFinite(Number(persistedPlateDims?.height))
+    ) {
+      plateDims = {
+        width: Math.round(Number(persistedPlateDims.width)),
+        height: Math.round(Number(persistedPlateDims.height)),
+      };
+      plateDimsSource = "anchor_facemap_fallback";
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v153.2_plate_hydration source=persisted-dims dims=${plateDims.width}x${plateDims.height}`,
+      );
+    }
+
     const videoDims = plateDims ?? {
       width: Number((existing as any)?.video_width) || 1280,
       height: Number((existing as any)?.video_height) || 720,
