@@ -234,6 +234,11 @@ Deno.serve(async (req) => {
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
 
+  // ─── v145: Plate-Face-Forensic mode ───────────────────────────────────
+  if (body.mode === "plate-face-forensic") {
+    return await runForensic({ admin, body, userId: userData.user.id });
+  }
+
   const plateUrl: string = body.plate_url;
   const audioUrl: string = body.audio_url;
   if (!plateUrl || !audioUrl) return json({ error: "plate_url and audio_url required" }, 400);
