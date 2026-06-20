@@ -98,6 +98,8 @@ import {
   buildAsdStrategy,
   type PreflightFaceResult,
 } from "../_shared/asd-strategy.ts";
+import { rehostPlate } from "../_shared/rehostPlate.ts";
+
 
 
 
