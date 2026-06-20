@@ -4988,72 +4988,16 @@ serve(async (req) => {
       // first-attempt dispatch where preflight had succeeded. Single
       // source of truth, no shape drift possible.
       if (gate.ok && gate.code === "ok_after_snap" && Array.isArray(gate.snapped_coord)) {
-        const snappedCoord: [number, number] = [
-          Number(gate.snapped_coord[0]),
-          Number(gate.snapped_coord[1]),
-        ];
-        const snapFrame: number = Number.isFinite(gateFrame as number)
-          ? Number(gateFrame)
-          : (Number.isFinite((syncOptions as any)?.active_speaker_detection?.frame_number)
-              ? Number((syncOptions as any).active_speaker_detection.frame_number)
-              : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : 0));
-
-        const snapStrategy = buildAsdStrategy({
-          preflight: {
-            faceFound: true,
-            coord: snappedCoord,
-            frame: snapFrame,
-            snapped: true,
-            originalCoord: (gate.original_coord ?? gateCoord ?? undefined) as
-              | [number, number]
-              | undefined,
-            snapDistancePx: gate.snap_distance_px ?? undefined,
-          },
-          geometry: {
-            preclipFaceCount: Number.isFinite(Number((pass as any).preclip_face_count))
-              ? Number((pass as any).preclip_face_count)
-              : null,
-            preclipAmbiguityRisk: null,
-            plateCoord: null,
-            preclipCrop: null,
-            asdFrameNumber: snapFrame,
-          },
-          retryVariant,
-          isMultiSpeaker: speakers.length >= 2,
-          usePreclip: usePassPreclip,
-        });
-
-        try {
-          syncOptions.active_speaker_detection = snapStrategy.asd;
-          if ((payload as any)?.options) {
-            (payload as any).options.active_speaker_detection = snapStrategy.asd;
-          }
-          if (!usePassPreclip) {
-            (pass as any).coords = snappedCoord;
-          } else {
-            (pass as any).dispatch_coords_snapped = snappedCoord;
-          }
-          (pass as any).coords_snapped_at = new Date().toISOString();
-          (pass as any).coords_snap_origin = gate.original_coord ?? null;
-          (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
-          (pass as any).snap_applied_to_dispatch = true;
-          (pass as any)._v130_asd_strategy = {
-            mode: snapStrategy.mode,
-            source: snapStrategy.source,
-            coord_space: snapStrategy.coordSpace,
-            frame_number: snapStrategy.frameNumber,
-            re_strategy: true,
-            re_strategy_trigger: "face_gate_snap",
-          };
-        } catch (mutErr) {
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v130 ASD re-strategy mutation failed: ${(mutErr as Error)?.message}`,
-          );
-        }
+        const snappedCoord: [number, number] = [Number(gate.snapped_coord[0]), Number(gate.snapped_coord[1])];
+        const snapFrame: number = Number.isFinite(gateFrame as number) ? Number(gateFrame) : 0;
+        if (!usePassPreclip) (pass as any).coords = snappedCoord;
+        else (pass as any).dispatch_coords_snapped = snappedCoord;
+        (pass as any).coords_snapped_at = new Date().toISOString();
+        (pass as any).coords_snap_origin = gate.original_coord ?? null;
+        (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
+        (pass as any).snap_applied_to_dispatch = true;
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v130_snap_via_strategy pass=${currentPassIdx + 1} ` +
-          `mode=${snapStrategy.mode} snapped=[${snappedCoord[0]},${snappedCoord[1]}] frame=${snapFrame} ` +
-          `space=${usePassPreclip ? "preclip" : "plate"} delta_px=${gate.snap_distance_px ?? "?"}`,
+          `[compose-dialog-segments] scene=${sceneId} v140_snap_recorded_no_payload_mutation pass=${currentPassIdx + 1} snapped=[${snappedCoord[0]},${snappedCoord[1]}] frame=${snapFrame} space=${usePassPreclip ? "preclip" : "plate"}`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -5079,10 +5023,10 @@ serve(async (req) => {
             },
             snap_applied_to_dispatch: true,
             asd_strategy: {
-              mode: snapStrategy.mode,
-              source: snapStrategy.source,
-              coord_space: snapStrategy.coordSpace,
-              diagnostics: snapStrategy.diagnostics,
+              mode: "snap_recorded_no_payload_mutation",
+              source: "face_gate",
+              coord_space: usePassPreclip ? "preclip" : "plate",
+              diagnostics: { reason: "v140_single_wire_builder_prevents_late_asd_mutation" },
             },
             source: "preflight-snap",
           },
