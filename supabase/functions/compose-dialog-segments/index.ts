@@ -2894,20 +2894,20 @@ serve(async (req) => {
       );
     }
 
-    // ── v153 — Single-Path bbox-url-pro Pipeline (N=1..4) ────────────────
+    // ── v153.1 — Single-Path bbox-url-pro Pipeline (N=1..4 einheitlich) ──
     // PRECLIP IS DEAD. Es gibt nur noch einen einzigen Dispatch-Pfad:
     // Full-Plate + `bounding_boxes_url` mit plate-nativer Box pro Sprecher.
     //
     // Aktivierung: jede frische (nicht-noop-escalation) Dispatch braucht
     //  - plateDims (sonst hat die Scene-Pre-Flight längst hart gefailt)
-    //  - eine plate-native Box für diesen Sprecher (N>=2) oder pass.coords (N=1)
+    //  - eine plate-native Box für DIESEN Sprecher — gilt einheitlich
+    //    für N=1, 2, 3, 4 (kein synthetic-coords-Fallback mehr für N=1).
     //
-    // Wenn das nicht erfüllt ist, hat die Scene-Pre-Flight (Z. ~1325)
+    // Wenn das nicht erfüllt ist, hat die Scene-Pre-Flight (Z. ~1326)
     // bereits hart gefailt + refunded. Hier ist es daher ein simples Flag.
     const v153HasPlateBox =
-      speakers.length === 1 ||
-      (Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
-        (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4);
+      Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
+      (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4;
     const v153UnifiedBboxEligible =
       body?.noop_auto_escalation !== true &&
       speakers.length >= 1 &&
@@ -2924,7 +2924,7 @@ serve(async (req) => {
       (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
       (pass as any)._v153BboxPrimary = true;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153_unified_bbox_primary speakers=${speakers.length} plate_box=${v153HasPlateBox ? "yes" : "synthetic"} resolved=${plateIdentityMap?.resolvedCount ?? "n=1"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.1_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
       );
     }
 
