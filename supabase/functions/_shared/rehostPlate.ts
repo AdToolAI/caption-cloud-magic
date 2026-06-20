@@ -97,7 +97,10 @@ export async function rehostPlate(
   const hash = (await sha1Hex(cleanedSource)).slice(0, 16);
   const path = `${owner}/${scene}/${pass}-${kind}-${hash}.mp4`;
 
-  // If object already exists in bucket, just return public URL (idempotent).
+  // 7-day signed URL — longer than any conceivable dispatch + retry window.
+  const SIGN_TTL_SEC = 7 * 24 * 60 * 60;
+
+  // If object already exists, just sign and return (idempotent).
   const { data: existing } = await supabase
     .storage
     .from(BUCKET)
@@ -106,9 +109,13 @@ export async function rehostPlate(
   const alreadyPresent = Array.isArray(existing) &&
     existing.some((e: any) => e?.name && path.endsWith(e.name));
   if (alreadyPresent) {
-    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    const { data: signed, error: signErr } = await supabase
+      .storage.from(BUCKET).createSignedUrl(path, SIGN_TTL_SEC);
+    if (signErr || !signed?.signedUrl) {
+      throw new Error(`rehostPlate: sign-existing failed: ${signErr?.message}`);
+    }
     return {
-      url: pub.publicUrl,
+      url: signed.signedUrl,
       bucket: BUCKET,
       path,
       uploaded: false,
@@ -137,16 +144,20 @@ export async function rehostPlate(
 
   const up = await supabase.storage.from(BUCKET).upload(path, buf, {
     contentType: "video/mp4",
-    cacheControl: "604800", // 7d edge cache; Sync.so fetches once
+    cacheControl: "604800",
     upsert: true,
   });
   if (up.error) {
     throw new Error(`rehostPlate: upload failed: ${up.error.message}`);
   }
-  const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const { data: signed, error: signErr } = await supabase
+    .storage.from(BUCKET).createSignedUrl(path, SIGN_TTL_SEC);
+  if (signErr || !signed?.signedUrl) {
+    throw new Error(`rehostPlate: sign-new failed: ${signErr?.message}`);
+  }
 
   return {
-    url: pub.publicUrl,
+    url: signed.signedUrl,
     bucket: BUCKET,
     path,
     uploaded: true,
