@@ -2562,15 +2562,25 @@ serve(async (req) => {
       for (const p of passes) {
         const idx = Number(p.speaker_idx);
         if (!Number.isFinite(idx) || idx < 0 || idx >= speakerCoords.length) continue;
+        // v139 (Fix C7) — Scope the refresh to ONLY the pass we are about
+        // to dispatch. Previously this loop touched every sibling pass and
+        // nulled their already-rendered preclips on every advance — see
+        // forensic report scene b1ee2ede… 09:08:50 where Matthew/Kailee/
+        // Sarah preclips were invalidated mid-flight although `source` was
+        // already `identity`. A sibling pass's coords are refreshed in its
+        // own dispatch turn; there is no need to mutate them here.
+        if (p.idx !== currentPassIdx) continue;
         const freshCoord = speakerCoords[idx];
         const freshSource = coordSources[idx] ?? "none";
         if (!freshCoord) continue;
         if (freshSource === "heuristic" || freshSource === "none") continue;
         const oldCoord = Array.isArray(p.coords) ? [p.coords[0], p.coords[1]] : null;
-        const changed =
-          !oldCoord ||
-          Math.round(Number(oldCoord[0])) !== Math.round(Number(freshCoord[0])) ||
-          Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
+        // v139 (Fix C7) — Raise the change threshold from sub-pixel (round)
+        // to 8 px Manhattan. Sub-pixel drift from a re-probed identity map
+        // was triggering full preclip re-renders for no visible gain.
+        const dx = oldCoord ? Math.abs(Number(oldCoord[0]) - Number(freshCoord[0])) : Infinity;
+        const dy = oldCoord ? Math.abs(Number(oldCoord[1]) - Number(freshCoord[1])) : Infinity;
+        const changed = !oldCoord || dx > 8 || dy > 8;
         if (changed) {
           // v128 — Alpha-Plan v3.1 §1.8: terminal coord-refresh guard.
           // v134 §2 — Exception: if THIS pass is currently in an active
