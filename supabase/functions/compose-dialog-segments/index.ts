@@ -1323,6 +1323,114 @@ serve(async (req) => {
       );
     }
 
+    // ── v153 — Multi-Speaker Pre-Flight Hard-Fail ───────────────────────
+    // SINGLE-PATH-POLICY: jeder Sprecher MUSS eine eigene plate-native Box
+    // bekommen (aus resolvePlateFaceIdentities oder Slot-Fallback). Wenn
+    // nicht, würde der bbox-url-pro Pfad mehrere Sprecher auf dieselbe
+    // Box mappen → genau der "Sprecher 1 spricht für 1+2"-Bug.
+    // Lieber sofort hart abbrechen + refund + klare Meldung, statt 20 min
+    // später ein falsch gemixtes Video zu liefern.
+    if (
+      !isAdvance &&
+      !isRetry &&
+      speakers.length >= 2 &&
+      !!plateDims
+    ) {
+      const missingBoxIdx: number[] = [];
+      for (let i = 0; i < speakers.length; i++) {
+        const b = speakerPlateBboxes?.[i];
+        if (!Array.isArray(b) || b.length !== 4) missingBoxIdx.push(i);
+      }
+      // Zusätzlich: distinkte Boxen verlangen (zwei Speaker dürfen nicht
+      // auf exakt dieselben Pixel mappen). Toleranz: center-Distanz <8px.
+      const boxes = speakerPlateBboxes
+        .map((b, i) => (Array.isArray(b) && b.length === 4 ? { i, b } : null))
+        .filter(Boolean) as Array<{ i: number; b: number[] }>;
+      const dupeIdx: number[] = [];
+      for (let a = 0; a < boxes.length; a++) {
+        for (let c = a + 1; c < boxes.length; c++) {
+          const ca = [(boxes[a].b[0] + boxes[a].b[2]) / 2, (boxes[a].b[1] + boxes[a].b[3]) / 2];
+          const cc = [(boxes[c].b[0] + boxes[c].b[2]) / 2, (boxes[c].b[1] + boxes[c].b[3]) / 2];
+          const dx = ca[0] - cc[0];
+          const dy = ca[1] - cc[1];
+          if (Math.hypot(dx, dy) < 8) {
+            dupeIdx.push(boxes[c].i);
+          }
+        }
+      }
+      if (missingBoxIdx.length > 0 || dupeIdx.length > 0) {
+        const reason = missingBoxIdx.length > 0
+          ? `v153_plate_box_missing_for_speakers=[${missingBoxIdx.join(",")}]`
+          : `v153_plate_box_duplicate_for_speakers=[${dupeIdx.join(",")}]`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v153_preflight_BLOCK ${reason} — refunding ${totalCost} credits, no dispatch`,
+        );
+        const alreadyRefundedPF = !!(existing as any)?.refunded;
+        if (!alreadyRefundedPF) {
+          try {
+            const { data: wPF } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wPF?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (e) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v153 preflight refund failed: ${(e as Error)?.message}`,
+            );
+          }
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+              refunded: true,
+              error: reason,
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error:
+              "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
+              "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
+              "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_status: "PREFLIGHT_BLOCKED", error_class: "v153_preflight_block",
+          error_message: reason,
+          meta: {
+            speakers: speakers.length,
+            missing_box_idx: missingBoxIdx,
+            duplicate_box_idx: dupeIdx,
+            plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
+            plate_identity_faces: plateIdentityMap?.faces?.length ?? 0,
+            refunded_credits: alreadyRefundedPF ? 0 : totalCost,
+          },
+        });
+        return json(
+          {
+            error: "v153_preflight_block",
+            reason,
+            refunded: alreadyRefundedPF ? 0 : totalCost,
+          },
+          422,
+        );
+      }
+    }
+
+
+
     // ── v133 — Identity-Ambiguity Hard-Fail (3+ speakers) ───────────────
     // Per-character probe + Hungarian assignment runs inside
     // resolvePlateFaceIdentities for N≥3. If the resulting mapping is
