@@ -12,7 +12,7 @@ const corsHeaders = {
 };
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
-const VERSION = "v142.0";
+const VERSION = "v143.0";
 
 console.log(`[lipsync-diagnostic] BOOT ${VERSION} deploy=${Date.now()}`);
 
