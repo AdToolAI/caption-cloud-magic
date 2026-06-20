@@ -5579,6 +5579,22 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v140_ASD_CANONICAL asd=${JSON.stringify(canonicalAsd)}`,
       );
+      if ((canonicalAsd as any)?.auto_detect === true) {
+        return await failBeforeProviderDispatch(
+          "v153_auto_detect_wire_blocked",
+          "v153_auto_detect_blocked",
+          "v153.2 assert: auto_detect:true is forbidden in dialog lip-sync; expected bbox-url-pro.",
+          500,
+          {
+            retry_variant: retryVariant,
+            plate_hydration_source: plateHydrationSource,
+            speaker_plate_boxes: speakerPlateBboxes,
+            plate_dims: plateDims,
+            is_advance: isAdvance,
+            is_retry: isRetry,
+          },
+        );
+      }
     } catch (canonErr) {
       return await failBeforeProviderDispatch(
         "DISPATCH_BLOCKED_V140_CANONICAL_ASD",
