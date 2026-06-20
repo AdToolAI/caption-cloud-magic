@@ -439,10 +439,15 @@ export async function resolvePlateFaceIdentities(params: {
       minConfidence = minConf;
       minMargin = minMar;
 
-      const isAmbiguous = minConf < 0.55 || minMar < 0.15;
+      // v151 — Swap-Hardening:
+      //  • N>=4: cross-check IMMER ausführen (Outer-Face-Swaps schleichen
+      //    sich bei ähnlicher Wardrobe/Geometrie durch Hungarian durch).
+      //  • N==3: schärferer Ambiguity-Gate (0.70/0.25 statt 0.55/0.15).
+      const forceCrossCheck = N >= 4;
+      const isAmbiguous = forceCrossCheck || minConf < 0.70 || minMar < 0.25;
       if (isAmbiguous) {
         console.warn(
-          `[plate-face-identity] scene=${params.sceneId} v133 ambiguous (minConf=${minConf.toFixed(2)}, minMargin=${minMar.toFixed(2)}) — running cross-check`,
+          `[plate-face-identity] scene=${params.sceneId} v151 cross-check engaged (N=${N}, minConf=${minConf.toFixed(2)}, minMargin=${minMar.toFixed(2)}, forced=${forceCrossCheck})`,
         );
         // Build assignment list in slot-sorted order for the cross-check.
         const assignments: Array<{ slot: number; characterId: string; portraitUrl: string }> = [];
@@ -463,7 +468,6 @@ export async function resolvePlateFaceIdentities(params: {
           identityMethod = "per-char-hungarian+crosscheck";
         } else if (typeof verdict === "object" && verdict.swap) {
           const [a, b] = verdict.swap;
-          // Find the two slots assigned to characters a and b, swap them.
           let slotA: number | null = null;
           let slotB: number | null = null;
           for (const [slot, v] of identityBySlot.entries()) {
@@ -478,13 +482,51 @@ export async function resolvePlateFaceIdentities(params: {
             crossCheck = "swapped";
             identityMethod = "per-char-hungarian+crosscheck";
             console.log(
-              `[plate-face-identity] scene=${params.sceneId} v133 cross-check applied swap ${a}↔${b}`,
+              `[plate-face-identity] scene=${params.sceneId} v151 cross-check applied swap ${a}↔${b}`,
             );
           } else {
             crossCheck = "rejected";
           }
         } else {
           crossCheck = "rejected";
+        }
+
+        // v151 — Tie-Breaker: bei rejected zweite Meinung via Legacy-
+        // Multi-Call holen. Wenn Legacy deutlich abweicht (>= 2
+        // Slots disagree), übernehmen wir Legacy als dominante Quelle.
+        if (crossCheck === "rejected" && N >= 3) {
+          console.warn(
+            `[plate-face-identity] scene=${params.sceneId} v151 cross-check rejected → legacy multi-call tie-breaker`,
+          );
+          const legacyMap = await askGeminiForPlateIdentity(
+            plateMap.frame_url,
+            params.characters,
+            plateMap.faces,
+            plateMap.width,
+            plateMap.height,
+          );
+          if (legacyMap.size >= N) {
+            let agree = 0;
+            for (const [slot, v] of legacyMap.entries()) {
+              const hung = identityBySlot.get(slot);
+              if (hung && hung.characterId.toLowerCase() === v.characterId.toLowerCase()) agree++;
+            }
+            if (agree < N - 1) {
+              identityBySlot = legacyMap;
+              identityMethod = "legacy-multi-tiebreak";
+              const confs = Array.from(legacyMap.values()).map((v) => v.confidence);
+              minConfidence = Math.min(...confs);
+              crossCheck = "tiebreak-legacy" as any;
+              console.log(
+                `[plate-face-identity] scene=${params.sceneId} v151 tiebreak adopted legacy (agree=${agree}/${N})`,
+              );
+            } else {
+              crossCheck = "tiebreak-agree" as any;
+              console.log(
+                `[plate-face-identity] scene=${params.sceneId} v151 tiebreak kept hungarian (agree=${agree}/${N})`,
+              );
+            }
+          }
         }
       }
     }
