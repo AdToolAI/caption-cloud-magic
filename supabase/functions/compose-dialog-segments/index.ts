@@ -339,6 +339,37 @@ const clampSyncCoords = (coords: [number, number] | null | undefined): [number, 
   return [Math.max(1, Math.round(x)), Math.max(1, Math.round(y))];
 };
 
+type CanonicalAsd =
+  | { auto_detect: true }
+  | { auto_detect: false; frame_number: number; coordinates: [number, number] }
+  | { auto_detect: false; bounding_boxes_url: string }
+  | { auto_detect: false; bounding_boxes: ([number, number, number, number] | null)[] };
+
+function normalizeCanonicalAsd(input: unknown): CanonicalAsd {
+  const asd = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  if (typeof asd.bounding_boxes_url === "string" && asd.bounding_boxes_url.trim()) {
+    return { auto_detect: false, bounding_boxes_url: asd.bounding_boxes_url };
+  }
+  if (Array.isArray(asd.bounding_boxes) && asd.bounding_boxes.length > 0) {
+    return { auto_detect: false, bounding_boxes: asd.bounding_boxes as ([number, number, number, number] | null)[] };
+  }
+  if (asd.auto_detect === false) {
+    const raw = Array.isArray(asd.coordinates) && Array.isArray(asd.coordinates[0])
+      ? (asd.coordinates[0] as unknown[])
+      : Array.isArray(asd.coordinates)
+        ? asd.coordinates
+        : [];
+    const x = Number(raw[0]);
+    const y = Number(raw[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error(`canonical_asd_missing_coordinates:${JSON.stringify(asd.coordinates ?? null)}`);
+    }
+    const frame = Number.isFinite(Number(asd.frame_number)) ? Math.max(0, Math.round(Number(asd.frame_number))) : 0;
+    return { auto_detect: false, frame_number: frame, coordinates: [Math.round(x), Math.round(y)] };
+  }
+  return { auto_detect: true };
+}
+
 /**
  * v71 — transient fetch errors (Supabase Storage hiccup, edge-runtime
  * AbortSignal timeout) used to be misclassified as "audio is invalid" and
