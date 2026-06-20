@@ -1328,6 +1328,7 @@ serve(async (req) => {
           coordSources[idx] = source;
         }
       });
+      plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "live" : "missing";
       console.log(
         `[compose-dialog-segments] scene=${sceneId} plate-identity faces=${plateIdentityMap.faces.length} ` +
         `resolved=${plateIdentityMap.resolvedCount}/${speakers.length} cached=${plateIdentityMap.cached}`,
@@ -1337,6 +1338,19 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
       );
     }
+    const v153PlateIdentitySnapshot = {
+      version: "v153.2" as const,
+      dims: plateDims,
+      bboxes: speakerPlateBboxes,
+      faces: plateIdentityMap?.faces ?? persistedPlateIdentity?.faces ?? [],
+      resolvedCount: plateIdentityMap?.resolvedCount ?? persistedPlateIdentity?.resolvedCount ?? 0,
+      cached: plateIdentityMap?.cached ?? persistedPlateIdentity?.cached ?? false,
+      sourceClipUrl,
+      hydratedAt: new Date().toISOString(),
+    };
+    console.warn(
+      `[compose-dialog-segments] scene=${sceneId} v153.2_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
+    );
 
     // ── v129.20 — Single-speaker no-face hard refund ─────────────────────
     // If Hailuo rendered a plate with zero detectable faces (e.g. subject
