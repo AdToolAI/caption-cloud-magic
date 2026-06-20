@@ -311,6 +311,17 @@ serve(async (req) => {
             st === "failed" ||
             st === "canceled_by_scene_failure"
           ) return -1;
+          // v144 — Do not advance a pass that is currently in an active
+          // NOOP-escalation cycle (status reset to pending by sync-so-webhook
+          // + fresh noop_retry_attempt_id). The webhook already fired a
+          // dedicated re-dispatch with the next ladder rung; a parallel
+          // `advance:true` call from the watchdog would race that and either
+          // double-dispatch or revert the variant back to coords-pro.
+          const inActiveNoopRetry =
+            !!p?.noop_retry_attempt_id &&
+            Number(p?.noop_escalation_step ?? 0) > 0 &&
+            st === "pending";
+          if (inActiveNoopRetry) return -1;
           if (st === "pending" || !p?.job_id) return i;
           if (st === "retrying" && !p?.job_id) return i;
           return -1;
