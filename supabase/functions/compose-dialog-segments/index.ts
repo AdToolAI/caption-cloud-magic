@@ -2759,6 +2759,33 @@ serve(async (req) => {
       );
     }
 
+    // ── v148 — NOOP-Eskalation bypassed Rule 0 (Preclip-Auto-Detect) ─────
+    // sync-so-webhook eskaliert NOOPs via v134-Ladder mit explizitem
+    // Variant (bbox-url-pro → coords-pro-box). Wenn ein Preclip existiert,
+    // greift jedoch Rule 0 (v131.2 auto_detect_unconditional_on_preclip) und
+    // kollabiert den Dispatch wieder auf `auto_detect` — die exakt selbe
+    // ASD-Shape, die gerade NOOP'd hat. Resultat: 2 identische Dispatches,
+    // Ladder erschöpft, Hard-Fail.
+    //
+    // Fix: Bei einer NOOP-Eskalation mit deterministischem Variant droppen
+    // wir den per-Pass Preclip lokal (analog v120), damit der Full-Plate
+    // bbox-url-pro / coords-pro-box Pfad greift. Rule 0 wird so für genau
+    // diesen eskalierten Pass übergangen, nicht generell.
+    const v148NoopBypassEligible =
+      body?.noop_auto_escalation === true &&
+      (requestedRetryVariant === "bbox-url-pro" || requestedRetryVariant === "coords-pro-box") &&
+      !!(pass as any).preclip_url;
+    if (v148NoopBypassEligible) {
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_render_id = null;
+      (pass as any).preclip_crop = null;
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v148_noop_bypass_preclip step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} — dropping preclip to allow full-plate deterministic ASD`,
+      );
+    }
+
+
+
     // ── v118 — Pass-level Sync.so circuit breaker ────────────────────────
     // Stop the silent dispatch→FAILED→dispatch loop that previously ran
     // until the user manually reset the scene. Cap each (scene, pass) at
