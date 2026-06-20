@@ -1,0 +1,1 @@
+INSERT INTO public.system_config (key, value) VALUES ('composer.plan_d_fanout_force_enable', 'true'::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value; INSERT INTO public.system_config (key, value) VALUES ('composer.sync_so_concurrency_cap', '2'::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;

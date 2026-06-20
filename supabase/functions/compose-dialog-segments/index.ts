@@ -2041,8 +2041,23 @@ serve(async (req) => {
         segments: passSegments,
         input_url: "", // filled per pass below
         status: "pending",
+        // v137 — per-pass mapping forensics. Surface what the
+        // speaker→face resolver decided so the cockpit can show why
+        // a given pass got those coordinates without joining
+        // syncso_dispatch_log.
+        v137_mapping: {
+          coord_source: coordSources[originalIdx] ?? "unknown",
+          plate_bbox: speakerPlateBboxes[originalIdx] ?? null,
+          plate_face_count: plateIdentityMap?.faces?.length ?? null,
+          plate_identity_resolved: plateIdentityMap?.resolvedCount ?? null,
+          plate_identity_method: (plateIdentityMap as any)?.identityMethod ?? null,
+          plate_identity_min_conf: (plateIdentityMap as any)?.minConfidence ?? null,
+          plate_identity_min_margin: (plateIdentityMap as any)?.minMargin ?? null,
+          plate_dims: plateDims ?? null,
+        },
       };
     });
+
 
     const builtPasses: PassState[] = splitMultiTurnFlagOn
       ? builtPassesRaw.flatMap((p) => {
@@ -5597,6 +5612,7 @@ serve(async (req) => {
     //    mem/architecture/lipsync/v93-parallel-sync-so-passes.md
     let parallelFlagOn = false;
     let concurrencyCap = 2;
+    let fanoutForceEnableDb = false;
     try {
       const { data: pFlag } = await supabase
         .from("system_config").select("value")
@@ -5610,20 +5626,22 @@ serve(async (req) => {
       if (Number.isFinite(parsedCap) && parsedCap >= 1) {
         concurrencyCap = Math.min(4, Math.max(1, Math.floor(parsedCap)));
       }
+      // v137 — DB-only force override for Plan-D fan-out. Lets us flip the
+      // kill-switch without redeploying edge functions to change env vars.
+      // Required because Stage 0.5 hard-coded `FEATURE_PLAN_D_FANOUT=false`
+      // and we observed scenes taking 20+ min serial. Set
+      // `composer.plan_d_fanout_force_enable=true` in system_config to
+      // bypass the env gate. Concurrency cap still applies.
+      const { data: fFlag } = await supabase
+        .from("system_config").select("value")
+        .eq("key", "composer.plan_d_fanout_force_enable").maybeSingle();
+      fanoutForceEnableDb = fFlag?.value === true || fFlag?.value === "true";
     } catch { /* defaults */ }
-    // v128 Phase B4 — Plan-D fan-out is HARD-DISABLED by default per
-    // Alpha-Plan v3.1 §1.2. The DB flag `composer.parallel_sync_so_passes`
-    // alone is insufficient because Stage 0.5 found it can be flipped from
-    // multiple admin paths without going through change review. The env
-    // flag `FEATURE_PLAN_D_FANOUT` is the explicit kill-switch and must
-    // also be `true` for fan-out to dispatch. When fan-out WOULD have run
-    // (parallelFlagOn + multi-pass) but the env flag is off, log the
-    // suppression so we can monitor the exit criterion (`0` Plan-D
-    // dispatches over 24h observation window).
     const planDFanoutEnvOn = (Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "false")
       .toLowerCase() === "true";
-    const fanOutAllowed = planDFanoutEnvOn && parallelFlagOn && passes.length >= 2;
-    if (parallelFlagOn && passes.length >= 2 && !planDFanoutEnvOn && !isAdvance && !isRetry) {
+    const fanOutAllowed = (planDFanoutEnvOn || fanoutForceEnableDb) && parallelFlagOn && passes.length >= 2;
+    if (parallelFlagOn && passes.length >= 2 && !planDFanoutEnvOn && !fanoutForceEnableDb && !isAdvance && !isRetry) {
+
       try {
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
