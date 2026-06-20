@@ -18,6 +18,10 @@ interface VariantResult {
   output_url?: string | null;
   dispatch_error?: string | null;
   error?: string | null;
+  // v145 forensic fields
+  face_count?: number | null;
+  faces?: Array<{ x_pct?: number; y_pct?: number; area_pct?: number; mouth_visible?: boolean }>;
+  raw_snippet?: string;
 }
 
 interface RunRow {
