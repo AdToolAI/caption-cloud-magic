@@ -4514,7 +4514,12 @@ serve(async (req) => {
       // Letzter Notanker: synthetisch aus coords (nur N=1 erlaubt).
       // Für N>=2 würde das pro Sprecher auf identische Boxen mappen
       // wenn coords nicht plate-native sind — daher Hard-Fail unten.
-      if (!box) {
+      // v153.1 — Synthetic-Coords-Fallback ist GLOBAL deaktiviert (N=1..4).
+      // Wenn weder plate-native noch facemap eine Box liefern, hat die
+      // Pre-Flight (Z. ~1326) bereits hart gefailt + refunded. Hier kein
+      // stiller Box-aus-coords-Mittelpunkt mehr — das hat in N=1 Szenen
+      // dazu geführt, dass Sync.so im Zweifel die falsche Person animiert.
+      if (!box && !(pass as any)._v153BboxPrimary) {
         const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
         const boxW = Math.round(dims.width * 0.18);
         const boxH = Math.round(dims.height * 0.28);
