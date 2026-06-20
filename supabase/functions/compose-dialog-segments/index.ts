@@ -121,7 +121,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v134.0";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.0";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // v37 — `sync3-coords` added as the Sync.so-recommended fallback for
@@ -2361,9 +2361,11 @@ serve(async (req) => {
           const reason = strictTargetCheck && hadFaces
             ? `plate_target_face_missing_pass_${pass.idx}_speaker_${pass.speaker_name}`
             : `face_validation_failed_pass_${pass.idx}_frame_${lastValidation?.frame ?? frames[0] ?? 0}`;
-          console.error(
-            `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} reason=${reason} frames=${frames.join(",")}`,
-          );
+          // v139 — Defer the log emission. v119 may demote this to SOFT_WARN
+          // below when plate-identity is authoritative. Logging "BLOCK" here
+          // first and then "SOFT_WARN proceed" later confused forensics on
+          // scene b1ee2ede… The single, truthful log is emitted after the
+          // v119 decision below.
           return {
             ok: false, pass, reason,
             strict: strictTargetCheck, hadFaces, frames,
@@ -2393,7 +2395,7 @@ serve(async (req) => {
           .filter((r) => !r.ok)
           .map((r) => (r as Extract<GateOutcome, { ok: false }>).pass.speaker_name);
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v119_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} v139_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
         );
         for (const r of gateResults) {
           if (!r.ok) {
@@ -2404,6 +2406,11 @@ serve(async (req) => {
           }
         }
       } else if (firstReject) {
+        // v139 — only NOW emit the hard BLOCK log; v119 did not demote.
+        const { reason: blockReason } = firstReject;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK (hard) pass=${firstReject.pass.idx} speaker=${firstReject.pass.speaker_name} reason=${blockReason}`,
+        );
         const { pass, reason, strict, hadFaces } = firstReject;
         const { data: w0 } = await supabase
           .from("wallets").select("balance").eq("user_id", userId).single();
@@ -2555,15 +2562,25 @@ serve(async (req) => {
       for (const p of passes) {
         const idx = Number(p.speaker_idx);
         if (!Number.isFinite(idx) || idx < 0 || idx >= speakerCoords.length) continue;
+        // v139 (Fix C7) — Scope the refresh to ONLY the pass we are about
+        // to dispatch. Previously this loop touched every sibling pass and
+        // nulled their already-rendered preclips on every advance — see
+        // forensic report scene b1ee2ede… 09:08:50 where Matthew/Kailee/
+        // Sarah preclips were invalidated mid-flight although `source` was
+        // already `identity`. A sibling pass's coords are refreshed in its
+        // own dispatch turn; there is no need to mutate them here.
+        if (p.idx !== currentPassIdx) continue;
         const freshCoord = speakerCoords[idx];
         const freshSource = coordSources[idx] ?? "none";
         if (!freshCoord) continue;
         if (freshSource === "heuristic" || freshSource === "none") continue;
         const oldCoord = Array.isArray(p.coords) ? [p.coords[0], p.coords[1]] : null;
-        const changed =
-          !oldCoord ||
-          Math.round(Number(oldCoord[0])) !== Math.round(Number(freshCoord[0])) ||
-          Math.round(Number(oldCoord[1])) !== Math.round(Number(freshCoord[1]));
+        // v139 (Fix C7) — Raise the change threshold from sub-pixel (round)
+        // to 8 px Manhattan. Sub-pixel drift from a re-probed identity map
+        // was triggering full preclip re-renders for no visible gain.
+        const dx = oldCoord ? Math.abs(Number(oldCoord[0]) - Number(freshCoord[0])) : Infinity;
+        const dy = oldCoord ? Math.abs(Number(oldCoord[1]) - Number(freshCoord[1])) : Infinity;
+        const changed = !oldCoord || dx > 8 || dy > 8;
         if (changed) {
           // v128 — Alpha-Plan v3.1 §1.8: terminal coord-refresh guard.
           // v134 §2 — Exception: if THIS pass is currently in an active
@@ -3061,6 +3078,11 @@ serve(async (req) => {
     // or faceMap, sibling coords, face-gate validation). On any failure for
     // a given pass, that pass falls back to the existing per-pass block on
     // its chain turn — full backward compatibility.
+    // v139 — Batch preclip prefetch is now the default. Without it the
+    // pipeline serializes N preclip renders behind N Sync.so webhooks,
+    // adding ~3–4 minutes for a 4-speaker scene. DB flag remains as a
+    // KILL-SWITCH: set composer.batch_preclip_render explicitly to false
+    // to revert to the legacy per-pass render path.
     const batchPreclipFlagOn = await (async () => {
       try {
         const { data } = await supabase
@@ -3068,8 +3090,9 @@ serve(async (req) => {
           .select("value")
           .eq("key", "composer.batch_preclip_render")
           .maybeSingle();
-        return data?.value === true || data?.value === "true";
-      } catch { return false; }
+        if (!data) return true;
+        return !(data.value === false || data.value === "false");
+      } catch { return true; }
     })();
     const canBatchPrefetch =
       batchPreclipFlagOn &&
@@ -5652,22 +5675,22 @@ serve(async (req) => {
           scene_id: sceneId,
           user_id: userId,
           engine: "sync-segments",
-          sync_status: "PLAN_D_FANOUT_BLOCKED_V128",
+          sync_status: "PLAN_D_FANOUT_BLOCKED_V139",
           meta: {
-            v128_terminal: true,
+            v139_blocked: true,
             pass_idx: currentPassIdx,
             total_passes: passes.length,
             attempt_id: pass?.attempt_id ?? null,
             variant: pass?.retry_variant ?? null,
             model: pass?.retry_variant ?? null,
             dispatch_source: "compose-dialog-segments",
-            reason: "FEATURE_PLAN_D_FANOUT=false",
+            reason: "FEATURE_PLAN_D_FANOUT=false AND composer.plan_d_fanout_force_enable=false",
           },
         });
       } catch { /* ignore log errors */ }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} PLAN_D_FANOUT_BLOCKED_V128 ` +
-          `(env flag off, ${passes.length} passes) — webhook will chain serially`,
+        `[compose-dialog-segments] scene=${sceneId} PLAN_D_FANOUT_BLOCKED_V139 ` +
+          `(env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}, ${passes.length} passes) — webhook will chain serially`,
       );
     }
     if (!isAdvance && !isRetry && fanOutAllowed) {
@@ -5690,7 +5713,7 @@ serve(async (req) => {
         }, delayMs);
       }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} plan_d_parallel_dispatch_start N_passes=${passes.length} cap=${concurrencyCap} fanout_size=${fanOutEnd}`,
+        `[compose-dialog-segments] scene=${sceneId} v139_fanout_active cap=${concurrencyCap} fanout_size=${fanOutEnd} N_passes=${passes.length} env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}`,
       );
     } else if (!isAdvance && !isRetry && passes.length > 1) {
       console.log(

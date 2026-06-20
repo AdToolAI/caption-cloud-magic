@@ -1,108 +1,158 @@
-## Ehrliche Antwort zu deiner Frage
+# v139 — Radical Pipeline Consolidation
 
-Deine Einschätzung (40-50% Sync.so / 50-60% Pipeline) ist auf Basis dessen, was im Code steht, **nicht mehr fair zu Sync.so**. Stand heute liegt das Verhältnis bei uns realistischer eher bei:
+Ziel: Aus den 5.771 Zeilen `compose-dialog-segments` + 1.652 Zeilen `sync-so-webhook` einen **einzigen, geradlinigen Pfad** machen. Eine Strategie, eine Variante, ein Modell, ein Recovery-Mechanismus. Erwartet: ~2.000 Zeilen, 6–8 min/Scene statt 17–23 min.
 
-- **~70-80% Pipeline-Komplexität**
-- **~20-30% echte Sync.so-Edge-Cases** (z.B. silent NOOP bei `auto_detect:true` auf kleinen Crops — das ist real)
+## Prinzip
+Aus der Forensik wissen wir: **v60 + v69 + v130 + v136** ist der einzige Pfad, der je dispatched. Alles andere ist Decke darüber. Wir entfernen die Decke, lassen den Pfad sichtbar.
 
-Der Hauptgrund: wir haben eine sehr saubere Idee (Single-Face-Crop + tight audio + sync-3 + cut_off) unter 80+ Versionsschichten (v41 bis v137) begraben. Die Pipeline ist nicht falsch — sie ist **überlagert**.
+---
 
-## Was die Audits zeigen
+## Stage 1 — Environment-Override neutralisieren (15 min, 0 Code-Zeilen)
 
-- `compose-dialog-segments/index.ts` hat **5.766 Zeilen** für eine konzeptionell kleine Aufgabe.
-- In `mem/architecture/lipsync/` liegen **80+ Memory-Dateien** zu derselben Pipeline (v41 bis v137).
-- Es gibt mindestens **5 parallel lebende ASD-Strategien** (auto_detect, bbox-url, bbox-inline, coords, coords-pro, v131.4 forced auto, v136 centered) — die meisten widersprechen sich teilweise.
-- Im `sync-so-webhook` liegen **~110 Zeilen toter Retry-Code** hinter `canRetry = false`.
-- Die NOOP-Eskalationsleiter (v134) kann ein NOOP-Ergebnis als `done` akzeptieren, wenn `canEscalate=false` getroffen wird — genau das, was bei Samuel & Matthew passiert ist.
+`FEATURE_PLAN_D_FANOUT` Edge-Secret aktuell `"false"` → wird auf `"true"` gesetzt. Sofort-Effekt: nächster Lauf parallel statt seriell.
 
-## Konkrete Ursache des aktuellen Runs (Szene `70555e30…`, 17 min)
+Verifikation: 1 Test-Scene, Log enthält **kein** `PLAN_D_FANOUT_BLOCKED_V128`, dafür neuen Marker `v139_fanout_active cap=2`.
 
-1. **Sprecher 3+4 sprechen, 1+2 nicht** → Pass 0 und 1 sind durch den `COMPLETED_NOOP_SUSPECT`-Pfad gelaufen und am Ende trotzdem als `done` geschrieben worden. Das ist nicht Sync.so, das ist unser eigener "soft accept".
-2. **17 statt 6-8 Minuten** → Plan-D-Fanout war im letzten Run weiterhin **nicht aktiv** (Logs zeigen `PLAN_D_FANOUT_BLOCKED_V128`), obwohl die DB-Flags `true` sind. Bedeutet: deployte Funktion las den neuen DB-Switch noch nicht. Plus 1-2 NOOP-Retry-Zyklen pro betroffenem Sprecher = `~3-5 min` extra pro Sprecher.
-3. **`audio_vs_video_delta_sec = 5-8s`** ist nicht das Problem — das ist nur ein Diagnose-Feld (Voll-WAV vs Preclip-Dauer) und unter `cut_off` normal.
+---
 
-## Antwort auf deine Kernfrage
+## Stage 2 — Tote Zeilen löschen (~1.200 Zeilen weg)
 
-> Haben wir die Pipeline sauber genug aufgesetzt?
+### `sync-so-webhook/index.ts`
+- `:1251–1366` — gesamter `if (canRetry) { … }` Block + die 4 `void variableX` Statements (~110 Zeilen)
+- `:1137–1224` — v30/v37/v61 Variant-Ladder (`v121StopLoss`, `treatAsTransient`, `forceCoordsRepair`, `nextVariant`) (~90 Zeilen)
 
-Konzept: **ja**. Implementierung: **nein, nicht mehr**. Wir haben jede Stufe sauber gebaut, aber nie zurückgeschnitten. Jeder neue Fix lebt parallel zu den alten Fixen. Das ist der eigentliche Grund, warum "alles, was schiefgehen kann, schiefgeht": es gibt zu viele Pfade, von denen mehrere veraltet sind.
+### `compose-dialog-segments/index.ts`
+- `:125–126` — `LIPSYNC_MODEL`, `LIPSYNC_FALLBACK_MODEL` Konstanten
+- `:515–544` — Body-Flag-Parsing für `isV41Retry`, `useV41Official`, `debugForceV56`, `retryNoAsd`, `forceMultipass`, `repairAudio` + alle Referenzen
+- `:2843–2845` — `void v120ForcePreclip`, `void havePlateIdentityForDispatch`, `void hasPassPreclipForDispatch` + die zugehörigen Berechnungen ab `:2679` und `:2833`
+- `:2860–2870` — v85-Log inkl. unerreichbarem `bbox-url-pro`-Branch
+- `:3885–3887` — `if (!usePassPreclip) { syncOptions.occlusion_detection_enabled = true }` (unerreichbar)
+- `:3083–3427` — gesamter Batch-Preclip-Block, **aber NUR um ihn umzubauen** (siehe Stage 4), nicht zu löschen
 
-## Plan v138 — Konsolidierung statt nochmal-Fix
+---
 
-Drei Sachen, keine vierte.
+## Stage 3 — Strategien konsolidieren (~800 Zeilen weg)
 
-### A. Konsolidieren (Code shrinken, kein neues Feature)
+### Eine Variante: `coords-pro`
+- `:2846–2854` Variant-Normalisierung wird zu `const retryVariant = "coords-pro"` (Konstante).
+- Alle `if (retryVariant === "…")` Branches im Dispatch-Builder (`:3986–4207`) auf den einen Pfad reduzieren.
+- v82 `bbox-url-pro` bleibt **nur** als NOOP-Escalation-Stufe im Webhook (`webhook:619`).
+- v130 `buildAsdStrategy` wird zu einer Funktion mit einer Code-Bahn: v136 preclip-centered für preclip-Pfad (der einzige).
 
-`compose-dialog-segments` auf einen einzigen Dispatch-Pfad reduzieren:
+### Eine Sprecher-Größe
+- N=1 Path und N≥2 Path unifizieren. v60 ist bereits unified, aber es gibt N=1-Sonderzweige (`:1258–1285` Single-Speaker-Refund, `:1666` Visibility-Skip). Diese bleiben als **frühe Guards**, aber kein separater Dispatch-Pfad.
 
-```text
-für jeden Sprecher-Turn:
-  1. plate-face-identity (Hungarian) lockt coords  [behalten]
-  2. Single-Face-Preclip rendern                   [behalten]
-  3. tight WAV slicen                              [behalten]
-  4. Sync.so payload:
-       model: sync-3
-       sync_mode: cut_off
-       active_speaker_detection:
-         auto_detect: false
-         frame_number: 0
-         coordinates: [[size/2, size/2]]           [v136, einziger Pfad]
-  5. dispatch
-```
+### Ein Recovery: NOOP-Escalation
+- v134-Ladder bleibt unverändert (Stufe 0→bbox-url-pro, 1→coords-pro-box, 2→HARD FAIL).
+- Webhook FAILED-Pfad macht **eine** Entscheidung: `noopSuspect` → Escalation. Sonst: terminal fail + refund. Keine Variant-Ladder, keine `canRetry`-Logik.
 
-Was rausfliegt:
-- `resolveSceneFaceMap` (Anchor-Faces) — wird seit v129.20 von `resolvePlateFaceIdentities` ersetzt
-- `bbox-url-pro`, `coords-pro-box`, `auto-pro`, `auto-standard` als First-Dispatch-Varianten
-- v131.4-`auto_detect:true`-Pfad auf Preclips
-- Full-Plate-Coords-Fallback ohne Preclip
-- Toter Retry-Ladder im sync-so-webhook (`canRetry = false`-Block)
-- `isV41Retry`, `forceMultipass`, `retryNoAsd` Body-Flags
+---
 
-Resultat-Erwartung: `compose-dialog-segments` von ~5.700 auf ~2.000-2.500 Zeilen.
+## Stage 4 — Bremsen lösen (~150 neue Zeilen, ~250 weg)
 
-### B. NOOP ist niemals "done"
+### Batch-Preclip Default AN
+- `composer.batch_preclip_render` Default-Wert in DB auf `true` setzen (Migration).
+- Code-Default in `:3064–3073` auf `true`, DB-Flag nur als Killswitch.
+- Effekt: 1 paralleler Render-Batch (70 s) statt 4× serial × 30 s = 120 s.
 
-Im sync-so-webhook:
-- Wenn `noopSuspect && !canEscalate` → **immer** hart failen + refunden, nicht still als done akzeptieren.
-- v134-Ladder bleibt, aber endet entweder bei klarem Erfolg oder klarem Fail. Nie bei "vielleicht ok".
+### COORD REFRESH scoped (Fix C7)
+- `:2554–2631` Loop wird auf den **aktuellen Pass** beschränkt (`if (p.idx !== currentPassIdx) continue`).
+- Pixel-Schwelle für `changed`: `Math.abs(oldCoord[0] - freshCoord[0]) > 8 || Math.abs(oldCoord[1] - freshCoord[1]) > 8`.
+- Sibling-Preclips bleiben unangetastet.
 
-### C. Plan-D-Fanout wirklich aktivieren und verifizieren
+### Face-Gate-Log Wahrheit (Fix C1)
+- `:2364` `console.error("FACE-GATE BLOCK …")` wird zu `gateOne`-Return-Wert, NICHT als Log emittiert.
+- Log wird einmal **nach** v119-Demote emittiert: entweder `FACE-GATE BLOCK (hard)` oder `FACE-GATE SOFT_WARN (v119)`.
 
-- Code-Default in `compose-dialog-segments` umdrehen: `parallelFlagOn` defaultet auf `true`, `concurrencyCap=2`, env-Killswitch wird nur als Notfall-Abschalter genutzt.
-- Nach Deploy einmal mit einem 3-Sprecher-Run im Log verifizieren, dass `plan_d_parallel_dispatch_start` erscheint und `PLAN_D_FANOUT_BLOCKED_V128` nicht.
+### Webhook-Recovery wenn Webhook nie kommt (Fix B11)
+- Bestehender lipsync-watchdog wird auf `4 min` Hard-Timeout pro Pass reduziert (war 7).
+- Bei Timeout: NOOP-Escalation-Pfad triggern statt nur Re-Probe.
 
-### Erwartete Wirkung
+---
 
-- 4-Sprecher-Szene: **~6-10 Minuten** statt 17-23 (Fanout cap=2 + entfallene NOOP-Retries auf Pässen, die unter v136 sauber laufen).
-- Kein "alle done, aber 2 Sprecher bewegen die Lippen nicht" mehr — entweder alle sprechen oder die Szene failt sichtbar mit Refund.
-- Wartbarkeit drastisch besser: 1 Dispatch-Pfad, 1 ASD-Strategie, 1 NOOP-Endzustand.
+## Stage 5 — Dokumentation & Versionierung (~80 Zeilen)
 
-### Was ich NICHT vorschlage
+- `COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.0"` im Code-Header.
+- `FROZEN-INVARIANTS.md` I.9 korrigieren: `parallel_sync_so_passes` defaults `true`.
+- 80+ `mem/architecture/lipsync/v*.md` Memory-Dateien → **eine** `CANONICAL.md` mit:
+  - Aktive Strategien (Tabelle)
+  - Happy-Path A→Z (aus Stage 0 Forensik)
+  - Killswitches & Env-Flags
+  - NOOP-Escalation-Ladder
+- Alle v41–v137 Einzeldateien als `_archive/` Subfolder verschoben (read-only Referenz).
+- `mem/index.md` bekommt einen Eintrag, ersetzt die 80 alten Lipsync-Einträge.
 
-- Provider-Wechsel
-- Hin- und Herwechsel zwischen sync-3 und lipsync-2-pro
-- Noch eine weitere v138/v139/v140-Schicht ÜBER dem aktuellen Code
-- Neue Gates oder neue ASD-Modi
+---
 
-### Memory-Hygiene parallel dazu
+## Geplante Code-Bewegungen (geschätzt)
 
-Die 80+ vXXX-Memory-Dateien werden auf eine kompakte Wahrheitsquelle zusammengeschnitten:
-- `mem/architecture/lipsync/CANONICAL.md` — eine Seite, was die Pipeline tut
-- `mem/architecture/lipsync/FROZEN-INVARIANTS.md` — bleibt
-- Alles dazwischen (v41-v137 außer aktiv referenzierten) wird als historisch markiert oder gelöscht, sobald v138 stabil läuft.
+| Bereich | Vorher | Nachher | Delta |
+|---------|--------|---------|-------|
+| `compose-dialog-segments/index.ts` | 5.771 | ~1.700 | −4.070 |
+| `sync-so-webhook/index.ts` | 1.652 | ~600 | −1.050 |
+| `_shared/*` (twoshot-face-map, plate-face-identity, asd-strategy, etc.) | unverändert | unverändert | 0 |
+| Neue: 1 Migration für DB-Defaults | — | ~40 | +40 |
+| `mem/architecture/lipsync/CANONICAL.md` | — | ~300 | +300 |
+| `mem/architecture/lipsync/_archive/*` | 80 Dateien | 80 Dateien (verschoben) | 0 |
 
-### Risiko
+**Netto:** ~5.000 Zeilen gelöscht, ~340 Zeilen neu.
 
-Konsolidierung ist invasiv. Konkretes Sicherheitsnetz:
-- Vorher Snapshot der aktuellen Edge-Functions
-- Eine 3-Sprecher- und eine 4-Sprecher-Szene als Smoke-Test direkt nach Deploy
-- Wenn ein Smoke-Test failt: sofort zurück zur Pre-v138-Version, nichts hängt am User-Run
+---
 
-### Dateien, die ich im Build-Modus anfassen würde
+## Verifikation (3-stufig)
 
-- `supabase/functions/compose-dialog-segments/index.ts` (massive Reduktion)
-- `supabase/functions/sync-so-webhook/index.ts` (NOOP-Endzustand + toten Retry-Code raus)
-- `supabase/functions/_shared/twoshot-face-map.ts` (nur noch `pickSpeakerCoordinates` als Fallback)
-- `mem/architecture/lipsync/CANONICAL.md` (neu) + `mem/index.md`
+### V1 — Build & Deploy
+- `compose-dialog-segments` + `sync-so-webhook` deployen.
+- Smoke-Test: `b1ee2ede`-ähnliche Scene mit 1 Sprecher → muss in <90 s durchlaufen.
 
-Kein neuer Provider, keine neue Strategie, keine neue Gate-Schicht. Nur das, was wir schon haben, in **eine** Spur bringen und Plan-D wirklich an.
+### V2 — 4-Sprecher End-to-End
+- Neue Scene mit 4 Sprechern starten.
+- Erwartete Logs in dieser Reihenfolge:
+  1. `v139_fanout_active cap=2`
+  2. genau **ein** `plan_b_B_batch_preclip_complete ok=4/4`
+  3. 4× `DISPATCH pass=N/4 model=sync-3` innerhalb von 80 s nach Start
+  4. **kein** `PLAN_D_FANOUT_BLOCKED_V128`
+  5. **kein** `FACE-GATE BLOCK` ohne folgendes `SOFT_WARN`
+  6. **kein** zweites `batch_preclip_complete` (Sibling-Reinvalidierung gefixt)
+- Erwartete Laufzeit: 6–8 min.
+- Alle 4 Sprecher mit echtem Lip-Sync (kein NOOP).
+
+### V3 — Failure-Mode-Test
+- Eine Scene mit absichtlich kaputtem Audio einer Pass → NOOP-Escalation-Ladder muss greifen, Refund muss erfolgen, andere 3 Passes laufen normal weiter.
+
+---
+
+## Risiken & Rollback
+
+| Risiko | Mitigation |
+|--------|----------|
+| Gelöschter Code wird doch noch gebraucht | Git-History bleibt; v138-Branch-Tag vor dem Cleanup setzen |
+| Plan-D Fan-out überlastet Sync.so | `concurrencyCap` ist DB-konfigurierbar (default 2, max 4) |
+| Batch-Preclip-Default AN bringt unerwartete Lambda-Last | DB-Flag bleibt als Killswitch erreichbar |
+| Memory-Konsolidierung verliert wichtige Details | `_archive/` bleibt vollständig, nur nicht mehr im Index |
+
+Rollback in 1 Schritt: `FEATURE_PLAN_D_FANOUT="false"` setzen → SERIAL-Modus wieder aktiv (alter Pfad bleibt im Code für Notfall, weil v60-Chain selbst nicht angetastet wird).
+
+---
+
+## Reihenfolge der Umsetzung
+
+1. **Migration** für `composer.batch_preclip_render = true` Default
+2. **Stage 1** Env-Secret setzen
+3. **Stage 4** Bremsen-Fixes (C1, C7, B11, Batch-Default Code)
+4. **Stage 2** Toter Code raus
+5. **Stage 3** Strategien konsolidieren
+6. **Stage 5** Docs + Memory
+7. Deploy, V1 → V2 → V3
+
+Nach jedem Stage ist die Pipeline funktional (kein Big-Bang). Wenn V2 oder V3 fehlschlägt, kann Stage 3 zurückgerollt werden ohne Stage 4 anzufassen.
+
+---
+
+## Was bewusst NICHT angefasst wird
+
+- `_shared/plate-face-identity.ts`, `plate-face-detect.ts`, `twoshot-face-map.ts` — funktionieren.
+- Audio-Mux-Lambda (`render-sync-segments-audio-mux`) — separate Function, nicht im Scope.
+- v138 NOOP Hard-Fail Logik — bleibt aktiv, ist korrekt.
+- Sync.so Modell `sync-3` + `cut_off` + `auto_detect` — funktioniert laut Pass-1-Log.
+- Frontend / UI / Wallet — komplett unangetastet.
