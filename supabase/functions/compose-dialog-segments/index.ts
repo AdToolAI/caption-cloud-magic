@@ -1323,18 +1323,18 @@ serve(async (req) => {
       );
     }
 
-    // ── v153 — Multi-Speaker Pre-Flight Hard-Fail ───────────────────────
+    // ── v153.1 — Unified Pre-Flight Hard-Fail (N=1..4) ──────────────────
     // SINGLE-PATH-POLICY: jeder Sprecher MUSS eine eigene plate-native Box
-    // bekommen (aus resolvePlateFaceIdentities oder Slot-Fallback). Wenn
-    // nicht, würde der bbox-url-pro Pfad mehrere Sprecher auf dieselbe
-    // Box mappen → genau der "Sprecher 1 spricht für 1+2"-Bug.
-    // Lieber sofort hart abbrechen + refund + klare Meldung, statt 20 min
-    // später ein falsch gemixtes Video zu liefern.
+    // bekommen — gilt einheitlich für 1, 2, 3 oder 4 Sprecher. Wenn nicht,
+    // würde der bbox-url-pro Pfad mehrere Sprecher auf dieselbe Box mappen
+    // (N>=2: "Sprecher 1 spricht für 1+2"-Bug) oder bei N=1 still auf eine
+    // synthetische Coords-Box zurückfallen. Lieber sofort hart abbrechen
+    // + refund + klare Meldung, statt 20 min später ein falsch gemixtes
+    // Video zu liefern.
     if (
       !isAdvance &&
       !isRetry &&
-      speakers.length >= 2 &&
-      !!plateDims
+      speakers.length >= 1
     ) {
       const missingBoxIdx: number[] = [];
       for (let i = 0; i < speakers.length; i++) {
