@@ -5248,6 +5248,19 @@ serve(async (req) => {
       }
     }
 
+    // v139.2 — WIRE_PAYLOAD forensik. Logs the EXACT options object that
+    // Sync.so will see, immediately before fetch. This is the only way to
+    // attribute a Sync.so 400 to a specific shape — every earlier mutation
+    // point becomes irrelevant once we have the wire bytes. Truncate to
+    // 1500 chars so multi-frame bounding_boxes don't flood the log.
+    try {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} WIRE_PAYLOAD version=${COMPOSE_DIALOG_SEGMENTS_VERSION} model=${(payload as any)?.model} options=${JSON.stringify((payload as any)?.options ?? null).slice(0, 1500)}`,
+      );
+    } catch (_logErr) {
+      // never let logging crash dispatch
+    }
+
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
       headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
@@ -5256,8 +5269,10 @@ serve(async (req) => {
 
     if (!resp.ok) {
       const errTxt = await resp.text().catch(() => "");
+      // v139.2 — Correlate failure with the wire shape that triggered it.
+      // Re-log options on failure so request+response sit in one query.
       console.error(
-        `[compose-dialog-segments] scene=${sceneId} dispatch FAILED pass=${currentPassIdx} status=${resp.status} body=${errTxt.slice(0, 600)}`,
+        `[compose-dialog-segments] scene=${sceneId} dispatch FAILED pass=${currentPassIdx} status=${resp.status} body=${errTxt.slice(0, 600)} wire_options=${JSON.stringify((payload as any)?.options ?? null).slice(0, 800)}`,
       );
       // Refund only if no previous pass succeeded (i.e. this is pass 0 fresh
       // dispatch) — if a later pass fails, we still refund the full cost since
