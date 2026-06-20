@@ -462,8 +462,49 @@ serve(async (req) => {
     // webhook except the most recently dispatched pass — causing scenes to
     // hang indefinitely with only the last pass marked done.
     const passesPre = Array.isArray((state as any).passes) ? [...(state as any).passes] : [];
-    const matchedIdx = passesPre.findIndex((p: any) => p?.job_id === jobId);
+    let matchedIdx = passesPre.findIndex((p: any) => p?.job_id === jobId);
     const isLegacySingle = matchedIdx < 0 && state.sync_job_id === jobId;
+    if (matchedIdx < 0 && !isLegacySingle) {
+      // v141 — Reattach late webhooks. Before treating this as an orphan,
+      // look the job up in `syncso_dispatch_log` to find the original
+      // pass_idx. After a watchdog auto-retry the pass's job_id is wiped
+      // from passes[], but the original Sync.so job can still complete
+      // and call back. If the corresponding pass is still pending and
+      // has no output_url, we adopt this webhook's result instead of
+      // throwing it away — which used to strand the scene at 95% forever.
+      try {
+        const { data: logRow } = await supabase
+          .from("syncso_dispatch_log")
+          .select("meta")
+          .eq("scene_id", sceneId)
+          .eq("job_id", jobId)
+          .eq("sync_status", "DISPATCHED")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const loggedPassIdx = Number((logRow as any)?.meta?.pass_idx);
+        if (
+          Number.isFinite(loggedPassIdx) &&
+          loggedPassIdx >= 0 &&
+          loggedPassIdx < passesPre.length
+        ) {
+          const target = passesPre[loggedPassIdx];
+          const targetStatus = String(target?.status ?? "");
+          const targetHasOutput =
+            typeof target?.output_url === "string" && target.output_url.length > 0;
+          if (!targetHasOutput && (targetStatus === "pending" || targetStatus === "rendering" || targetStatus === "retrying" || targetStatus === "failed")) {
+            console.log(
+              `[sync-so-webhook] v141 scene=${sceneId} job=${jobId} REATTACH late webhook → pass_idx=${loggedPassIdx} (prev status=${targetStatus})`,
+            );
+            passesPre[loggedPassIdx] = { ...target, job_id: jobId, status: targetStatus === "pending" ? "rendering" : targetStatus };
+            (state as any).passes = passesPre;
+            matchedIdx = loggedPassIdx;
+          }
+        }
+      } catch (e) {
+        console.warn(`[sync-so-webhook] v141 reattach lookup crash: ${(e as Error).message}`);
+      }
+    }
     if (matchedIdx < 0 && !isLegacySingle) {
       console.warn(`[sync-so-webhook] v5 scene=${sceneId} job=${jobId} ORPHAN (not in passes[] count=${passesPre.length}) — releasing inflight slot + best-effort provider cancel`);
       // v33: clean up the orphan so we don't leak a Sync.so concurrency slot
