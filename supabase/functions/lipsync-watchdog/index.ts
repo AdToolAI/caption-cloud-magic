@@ -508,6 +508,34 @@ serve(async (req) => {
       const prevRetries = Number(ds?.watchdog_retries ?? 0);
       if (prevRetries < 1) {
         try {
+          // v141 — Pre-cancel probe. BEFORE we cancel and reset any pass,
+          // poll Sync.so for every rendering job. If it already COMPLETED,
+          // forward to our webhook so the real output is preserved instead
+          // of destroyed by a wrongful retry. This was the root cause of
+          // the 2026-06-20 "stuck at 95% for 24 min" hang: pass 2 was
+          // reset to pending while its provider job was already done.
+          const passesProbe: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+          let liveCompletedRecovered = false;
+          if (syncApiKey) {
+            for (const p of passesProbe) {
+              if (String(p?.status ?? "") !== "rendering" || !p?.job_id) continue;
+              const r = await pollAndForward({
+                syncApiKey, jobId: String(p.job_id), sceneId: d.id, supabaseUrl, serviceKey,
+              });
+              if (r.terminal && r.status === "COMPLETED") {
+                liveCompletedRecovered = true;
+                polled.push({ scene_id: d.id, job_id: String(p.job_id), status: "COMPLETED" });
+                await releaseInflightSyncJob(supabase, String(p.job_id)).catch(() => {});
+              }
+            }
+          }
+          if (liveCompletedRecovered) {
+            console.log(
+              `[lipsync-watchdog] v141 scene=${d.id} pre-cancel probe recovered completed job(s) — skip retry, let webhook drive`,
+            );
+            return; // webhook fan-out will progress the scene
+          }
+
           // Best-effort: bestehenden Sync.so-Job cancellen, damit kein
           // Geist-Webhook später noch den frischen Run überschreibt.
           const liveJobs: string[] = [];
