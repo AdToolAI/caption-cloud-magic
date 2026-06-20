@@ -46,6 +46,13 @@ export default function LipsyncDiagnostic() {
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(false);
 
+  // v145 forensic state
+  const [forensicPlateUrl, setForensicPlateUrl] = useState("");
+  const [forensicSpeakers, setForensicSpeakers] = useState("4");
+  const [forensicDuration, setForensicDuration] = useState("5");
+  const [forensicSceneId, setForensicSceneId] = useState("");
+  const [forensicSubmitting, setForensicSubmitting] = useState(false);
+
   const loadRuns = async () => {
     setLoadingRuns(true);
     const { data, error } = await supabase
