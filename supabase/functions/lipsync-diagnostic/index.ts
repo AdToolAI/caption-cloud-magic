@@ -421,37 +421,81 @@ async function analyzeFrameWithGemini(params: {
   }
 }
 
-async function extractFrameAt(params: {
-  replicate: Replicate;
-  admin: any;
+// v146.1 — Direct video analysis via Gemini (no Replicate frame extraction).
+// Gemini 2.5 Pro accepts video input via OpenRouter chat-completions using
+// the `image_url` block with the mp4 URL. We send the whole rehosted plate
+// once and ask for a per-sample-time face count (early/mid/late).
+async function analyzeVideoWithGemini(params: {
+  apiKey: string;
   videoUrl: string;
-  timestamp: number;
-  sceneId: string;
-  label: string;
-}): Promise<{ url?: string; error?: string }> {
+  durationSec: number;
+  expectedSpeakers: number;
+}): Promise<{
+  samples: Array<{ label: string; t_sec: number; count: number | null; faces?: any[] }>;
+  maxCount: number;
+  raw?: string;
+  error?: string;
+}> {
+  const empty = (err: string) => ({
+    samples: [
+      { label: "early", t_sec: 0.1, count: null, faces: [] },
+      { label: "mid",   t_sec: Math.max(0.5, params.durationSec / 2), count: null, faces: [] },
+      { label: "late",  t_sec: Math.max(1.0, params.durationSec - 0.3), count: null, faces: [] },
+    ],
+    maxCount: 0,
+    error: err,
+  });
   try {
-    const out: any = await params.replicate.run(
-      "lucataco/ffmpeg-extract-frame" as `${string}/${string}`,
-      { input: { video: params.videoUrl, timestamp: params.timestamp } },
-    );
-    const frameUrl =
-      typeof out === "string" ? out
-      : Array.isArray(out) ? out[0]
-      : out?.url?.() ?? out?.url ?? "";
-    if (!frameUrl) return { error: "no frame url from replicate" };
-    // Rehost into composer-frames so Gemini can fetch it without CORS pain.
-    const pngRes = await fetch(frameUrl, { signal: AbortSignal.timeout(30_000) });
-    if (!pngRes.ok) return { error: `frame fetch HTTP ${pngRes.status}` };
-    const bytes = new Uint8Array(await pngRes.arrayBuffer());
-    const path = `system/forensic/${params.sceneId}-${params.label}-${Date.now()}.png`;
-    const up = await params.admin.storage.from("composer-frames").upload(path, bytes, {
-      contentType: "image/png", upsert: true, cacheControl: "86400",
+    const tEarly = 0.1;
+    const tMid = Math.max(0.5, params.durationSec / 2);
+    const tLate = Math.max(1.0, params.durationSec - 0.3);
+    const prompt =
+      `You receive a short video where ${params.expectedSpeakers} distinct speakers are expected. ` +
+      `Sample the video at THREE timestamps: t=${tEarly.toFixed(2)}s (early), t=${tMid.toFixed(2)}s (mid), t=${tLate.toFixed(2)}s (late). ` +
+      `For EACH timestamp, count DISTINCT human faces where the MOUTH AREA is clearly visible and large enough for lip-sync ` +
+      `(face takes at least 3% of frame area, mouth not occluded, face roughly frontal — profiles count only if the mouth is still discernible). ` +
+      `For each counted face, give its approximate center as percentage (x_pct, y_pct from 0 to 100) and area share (area_pct). ` +
+      `Return STRICT JSON only, no prose: ` +
+      `{"early":{"count":<int>,"faces":[{"x_pct":<int>,"y_pct":<int>,"area_pct":<number>,"mouth_visible":<bool>}]},` +
+      `"mid":{...},"late":{...}}`;
+    const resp = await fetch(LOVABLE_AI_GATEWAY, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-pro",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: params.videoUrl } },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(90_000),
     });
-    if (up.error) return { error: `upload: ${up.error.message}` };
-    const { data: pub } = params.admin.storage.from("composer-frames").getPublicUrl(path);
-    return { url: pub.publicUrl };
+    if (!resp.ok) {
+      return empty(`gemini HTTP ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+    }
+    const j = await resp.json();
+    const txt = String(j?.choices?.[0]?.message?.content ?? "");
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return { ...empty("no_json_in_response"), raw: txt.slice(0, 400) };
+    const parsed = JSON.parse(m[0]);
+    const pick = (key: "early" | "mid" | "late", t: number) => {
+      const obj: any = parsed?.[key] ?? {};
+      const c = Number.isFinite(Number(obj.count)) ? Math.round(Number(obj.count)) : null;
+      return { label: key, t_sec: t, count: c, faces: Array.isArray(obj.faces) ? obj.faces : [] };
+    };
+    const samples = [pick("early", tEarly), pick("mid", tMid), pick("late", tLate)];
+    const maxCount = Math.max(0, ...samples.map((s) => Number(s.count) || 0));
+    return { samples, maxCount, raw: txt.slice(0, 600) };
   } catch (e) {
-    return { error: `extract_exception: ${(e as Error).message}` };
+    return empty(`analyze_exception: ${(e as Error).message}`);
   }
 }
 
