@@ -2361,9 +2361,11 @@ serve(async (req) => {
           const reason = strictTargetCheck && hadFaces
             ? `plate_target_face_missing_pass_${pass.idx}_speaker_${pass.speaker_name}`
             : `face_validation_failed_pass_${pass.idx}_frame_${lastValidation?.frame ?? frames[0] ?? 0}`;
-          console.error(
-            `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} reason=${reason} frames=${frames.join(",")}`,
-          );
+          // v139 — Defer the log emission. v119 may demote this to SOFT_WARN
+          // below when plate-identity is authoritative. Logging "BLOCK" here
+          // first and then "SOFT_WARN proceed" later confused forensics on
+          // scene b1ee2ede… The single, truthful log is emitted after the
+          // v119 decision below.
           return {
             ok: false, pass, reason,
             strict: strictTargetCheck, hadFaces, frames,
@@ -2393,7 +2395,7 @@ serve(async (req) => {
           .filter((r) => !r.ok)
           .map((r) => (r as Extract<GateOutcome, { ok: false }>).pass.speaker_name);
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v119_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} v139_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
         );
         for (const r of gateResults) {
           if (!r.ok) {
@@ -2404,6 +2406,11 @@ serve(async (req) => {
           }
         }
       } else if (firstReject) {
+        // v139 — only NOW emit the hard BLOCK log; v119 did not demote.
+        const { reason: blockReason } = firstReject;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK (hard) pass=${firstReject.pass.idx} speaker=${firstReject.pass.speaker_name} reason=${blockReason}`,
+        );
         const { pass, reason, strict, hadFaces } = firstReject;
         const { data: w0 } = await supabase
           .from("wallets").select("balance").eq("user_id", userId).single();
