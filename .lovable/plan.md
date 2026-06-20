@@ -1,92 +1,48 @@
-## Analyse — was wirklich passiert (Szene 827ed500, Matthew Dusatko)
+## v151 — Plate-Identity Swap-Hardening für N≥4 Speaker
 
-Logs von 20:33–20:38:
+### Was passiert ist (Forensik)
+- Scene mit 4 Cast (Sarah, Mann, Frau, Matthew) wurde erfolgreich via `bbox-url-pro` lipgesynced — Pipeline + Sync.so funktionieren.
+- ABER: Speaker 1 ↔ Speaker 4 (die beiden Außenpositionen) sind im Output vertauscht. Audio von Sprecher 1 läuft auf das Gesicht von Sprecher 4 und umgekehrt.
+- Das ist **kein Sync.so-Bug** und **kein bbox-Bug** — der Fehler entsteht **vor dem Dispatch** in `_shared/plate-face-identity.ts`: die per-character Gemini-Probe + Hungarian-Assignment hat die Outer-Faces falsch zugeordnet. bbox-url-pro hat dann die (falsch gelabelten) Boxen perfekt befolgt.
 
-| Zeit | Step | Variante | Output | NOOP-Reason | sizeRatio |
-|---|---|---|---|---|---|
-| ~20:33 | 0 (fresh) | `auto_detect: true` (preclip-Pfad) | done | `reencoded_passthrough_suspect` | **0.82** |
-| 20:35 | 1 | `bbox-url-pro` | done | `reencoded_passthrough_suspect` | **0.84** |
-| 20:36 | 2 | `coords-pro-box` | done | `reencoded_passthrough_suspect` | **0.84** |
-| 20:37 | — | — | HARD FAIL | ladder exhausted | — |
-
-Matthews Pass: 9s Video, voiced-Window = **[2.446, 3.428]** → nur **0.98s gesprochen von 9s** (≈11% voiced).
-
-**Das ist kein NOOP. Das ist ein erfolgreicher Lipsync.** Sync.so verändert ~25–30 von 270 Frames (nur die voiced-Sekunde), Output-Bytes sind dadurch ~82–84% des Inputs. Das fällt genau in den v128-Verdachts-Korridor `0.65 ≤ sizeRatio ≤ 1.35` und wird fälschlich als `sync_output_reencoded_passthrough_suspect` markiert. Ladder eskaliert, jeder Retry produziert wieder denselben "verdächtigen" 0.84 Output, und nach Step 2 ist Matthews komplett verloren — obwohl alle drei Outputs vermutlich korrekt lipsynced waren.
-
-Beweise:
-- Samuel & Kailee (gleiche Szene, gleiche Plate, mehr voiced-Zeit) → `done` ohne Suspect.
-- `syncOutputUnchanged` (etag/bytes identisch) und `syncOutputResolutionRegression` (downscale <720) waren **nie** true für Matthew — nur die bytes-Heuristik.
-
-Zweitbefund: Fresh-Dispatch für Matthew lief mit `auto_detect: true` **trotz** v147. Grund: Pass hatte `preclip_url` → v131.2 Rule 0 erzwingt `auto_detect` auf dem Single-Face-Preclip. v148 bypasst das nur bei `noop_auto_escalation`, nicht auf Fresh-Dispatch.
-
-## Fix v150 (zwei Teile)
-
-### A) NOOP-Detector kalibrieren (sync-so-webhook, kritisch)
-
-In `supabase/functions/sync-so-webhook/index.ts` um Zeile 587–604:
-
-1. **Voiced-Ratio berechnen**: aus `passBeforeDone.windows` (oder `speakerWindowsSecs` falls vorhanden) `voicedSec = Σ(end-start)` und `voicedRatio = voicedSec / totalSec`.
-2. **`reencodedPassthroughSuspect` gaten**: nur noch true, wenn `voicedRatio >= 0.50`. Bei niedrigem voiced-Anteil ist sizeRatio ~0.7–0.9 **erwartetes Verhalten** für korrektes Lipsync und darf keinen Suspect auslösen.
-3. **`syncOutputUnchanged`** (etag/bytes identisch) bleibt als hartes Signal — das ist deterministisch kein Lipsync.
-4. **`syncOutputResolutionRegression`** (min-axis <720 bei erwarteten 720) bleibt unverändert.
-5. **Logging erweitern**: `voiced_sec`, `voiced_ratio`, `suspect_gated_by_voiced_ratio` ins `logSyncDispatch` meta + Konsolen-Log.
-
-Effekt: Matthews 11%-voiced-Pass wird beim ersten Output als `done` ohne Suspect markiert — kein Ladder-Run, kein Hard-Fail.
-
-### B) v147 bbox-url-pro auch auf Fresh-Dispatch durchsetzen (Multi-Speaker mit Preclip)
-
-In `supabase/functions/compose-dialog-segments/index.ts`:
-
-Aktuell (v148, Zeile ~2775): `noop_auto_escalation=true` + variant∈{bbox-url-pro, coords-pro-box} → Preclip wird gedroppt.
-
-Erweitern: **Auch auf Fresh-Dispatch** Preclip droppen, wenn:
-- `!isRetry` UND
-- `speakers.length >= 2` UND
-- `plateDims` vorhanden UND
-- `freshDefaultVariant === "bbox-url-pro"`
-
-→ Full-Plate-Dispatch mit `bounding_boxes_url`, kein Single-Face-Preclip-Detour.
-
-Logname: `v150_fresh_bypass_preclip_for_bbox_url_pro`.
-
-Effekt: Multi-Speaker-Pässe bekommen sofort die deterministische ASD statt `auto_detect`-auf-Crop. Bei korrekter A) ist das eigentlich nice-to-have, aber es macht v147 endlich konsistent (Memo `v147-bbox-url-pro-only.md` sagt genau das).
-
-### C) Ladder-Step 0 entfernen (Aufräumen)
-
-In `sync-so-webhook` `NOOP_LADDER` (Zeile 659–662): Step 0 `bbox-url-pro` raus. Nach v150-B ist Fresh-Dispatch bereits bbox-url-pro, ein Retry mit gleicher Variante bringt nichts. Neuer Ladder:
-
-```text
-Step 0 → coords-pro-box (bounding-box ASD)
-Step 1 → HARD FAIL + idempotent refund
+### Warum greift v133 cross-check hier nicht?
+Aktueller Gate (`plate-face-identity.ts` Z. 442):
+```ts
+const isAmbiguous = minConf < 0.55 || minMargin < 0.15;
 ```
+Bei 4 Speakern reicht eine grobe Ähnlichkeit (z. B. zwei Männer mit dunklem Pulli, zwei Frauen mit Kleid) damit Hungarian eine plausible, aber falsche Zuordnung mit `conf=0.7, margin=0.2` findet → cross-check wird übersprungen → Swap bleibt unentdeckt.
 
-UI-Label "max. 2 Stufen" → "max. 1 Stufe" in `dialog_shots` Status-Text (separat im Frontend, falls hardcoded).
+### Fix (nur `supabase/functions/_shared/plate-face-identity.ts`)
 
-### D) Recovery der bereits hart-failed'ten Matthew-Szene
+**A) Cross-check für N≥4 **immer** ausführen (unabhängig von conf/margin)**
+- Neuer Block in der `else`-Verzweigung nach Hungarian (Z. 421–490): wenn `N >= 4`, `isAmbiguous = true` erzwingen, damit der `crossCheckAssignment`-Pass garantiert läuft.
+- Begründung: 4 Faces × 4 Charaktere = 24 Permutationen, Gemini-Cross-Check ist 1 Call und billig im Vergleich zu einem fehlgeschlagenen Lipsync-Render.
 
-Einmalig per `supabase--read_query` / Migration: für Szene `827ed500` Pass 2 (Matthew) `status` von `failed` zurück auf `pending` + `noop_escalation_step=null`, damit User "Retry" drücken kann und neuer Lauf das v150-Verhalten bekommt. **Nicht** automatisch in Code — manueller One-Shot.
+**B) Cross-check verschärfen für N≥3**
+- Schwellen anheben: `minConf < 0.70 || minMargin < 0.25` (war 0.55 / 0.15).
+- Greift schon bei N=3 wenn das Hungarian-Ergebnis nicht eindeutig ist.
 
-## Files
+**C) Bei `crossCheck === "rejected"` → Legacy-Multi-Call als Tie-Breaker**
+- Aktuell wird bei `rejected` nichts mehr probiert; `ambiguousFinal=true` → Pipeline kippt auf Fallback-Pfade ohne Identity-Map.
+- Neu: bei `rejected` + `N >= 3` → `askGeminiForPlateIdentity(...)` (Z. 271) als zweiter Versuch; nur wenn beide widersprechen, bleibt es bei `ambiguous`.
 
-| Datei | Änderung |
-|---|---|
-| `supabase/functions/sync-so-webhook/index.ts` | A) voiced-ratio gate für reencoded_passthrough_suspect; C) NOOP_LADDER auf 1 Step kürzen |
-| `supabase/functions/compose-dialog-segments/index.ts` | B) Fresh-Dispatch Preclip-Bypass für bbox-url-pro |
-| `mem/architecture/lipsync/v150-voiced-ratio-noop-gate.md` | Neu — dokumentiert false-positive Analyse + Fix |
-| `mem/index.md` | Eintrag für v150 |
-| `.lovable/plan.md` | Plan-Eintrag |
+**D) Cache-Bust für diese Szene**
+- `plate_face_identity_cache` (oder analoger Cache-Key) hat das alte Ergebnis. Ich erweitere den Cache-Key um eine Versionskonstante `IDENTITY_CACHE_VERSION = "v151"` damit alle alten Einträge automatisch ignoriert werden.
 
-## Validierung
+### Was NICHT geändert wird
+- `bbox-url-pro` bleibt PRIMARY für N≥2 (v147).
+- v148 NOOP-Bypass, v150 Voiced-Ratio-Gate, v149 Master-Watchdog: unverändert.
+- Sync.so-Dispatch, ASD-Strategie, Refund-Logik: unverändert.
+- Single-Speaker- und N=2-Pfad: unverändert.
 
-1. Nach Deploy: User triggert Retry für Matthew (Pass 2) in Szene 827ed500.
-2. Erwartet im sync-so-webhook Log: `voiced_ratio=0.11 suspect_gated_by_voiced_ratio=true → PASS_DONE (no escalation)`.
-3. Erwartet im compose-dialog-segments Log: `v150_fresh_bypass_preclip_for_bbox_url_pro` + `v147_BBOX_URL_PRIMARY`.
-4. Pass-Status → `done`, scene fortschreitet auf `compose_lipsync_segments`.
+### Memory + Plan-Doku
+- Neu: `mem/architecture/lipsync/v151-identity-swap-hardening.md`
+- Update: `mem/index.md` (Verweis + Core-Regel "N≥4 = always cross-check")
+- Update: `.lovable/plan.md`
 
-## Was bewusst NICHT geändert wird
+### Recovery für die aktuelle Szene
+Da `passes` schon `done` sind und Sync.so-Kosten geflossen sind, kann ich die Szene nicht automatisch neu rendern. Du musst nach Deploy einmal **"Sauber neu starten"** auf der Szene drücken — der Cache-Bust sorgt dafür, dass v151 die Identity neu auflöst und cross-check zwingend läuft.
 
-- v147 bbox-url-pro selbst (bleibt PRIMARY für Multi-Speaker).
-- v148 NOOP-Bypass-Preclip (bleibt für echte NOOPs).
-- v134 Ladder-Mechanik (nur die Stufenanzahl).
-- `syncOutputUnchanged` (etag/bytes-identisch) als harter NOOP-Indikator.
-- Credit-Refund-Logik bei Hard-Fail.
+### Risiko
+- Kosten: +1 Gemini-Vision-Call pro N≥4-Szene (~$0.002). Vernachlässigbar.
+- Latenz: +1–2 s vor Dispatch. Akzeptabel.
