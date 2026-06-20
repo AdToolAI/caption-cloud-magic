@@ -2972,19 +2972,21 @@ serve(async (req) => {
     // ONLY on fresh dispatch (retries inherit the previous variant) and only
     // for multi-speaker scenes (N>=2 is the only place where the gate is
     // meaningful). Keep on one line for easy grep.
-    if (!isRetry && speakers.length >= 2) {
+    if ((!isRetry || (body?.noop_auto_escalation === true)) && speakers.length >= 2) {
       const gateReason =
-        freshDefaultVariant === "bbox-url-pro"
-          ? "picked-bbox-url-pro"
-          : !plateDims
-            ? "fallback-no-plateDims"
-            : !havePlateIdentityForDispatch
-              ? `fallback-identity-unresolved(resolved=${plateIdentityMap?.resolvedCount ?? 0})`
-              : hasPassPreclipForDispatch
-                ? "fallback-preclip-present"
-                : "fallback-unknown";
+        body?.noop_auto_escalation === true && (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box")
+          ? `v148-noop-bypass-${retryVariant}`
+          : freshDefaultVariant === "bbox-url-pro"
+            ? "picked-bbox-url-pro"
+            : !plateDims
+              ? "fallback-no-plateDims"
+              : !havePlateIdentityForDispatch
+                ? `fallback-identity-unresolved(resolved=${plateIdentityMap?.resolvedCount ?? 0})`
+                : hasPassPreclipForDispatch
+                  ? "fallback-preclip-present"
+                  : "fallback-unknown";
       console.log(
-        `[v82-gate] scene=${sceneId} pass=${currentPassIdx + 1} speakers=${speakers.length} plateDims=${!!plateDims} resolved=${plateIdentityMap?.resolvedCount ?? 0} preclip=${hasPassPreclipForDispatch} → variant=${freshDefaultVariant} (${gateReason})`,
+        `[v82-gate] scene=${sceneId} pass=${currentPassIdx + 1} speakers=${speakers.length} plateDims=${!!plateDims} resolved=${plateIdentityMap?.resolvedCount ?? 0} preclip=${hasPassPreclipForDispatch} noop_esc=${body?.noop_auto_escalation === true} → variant=${retryVariant} (${gateReason})`,
       );
     }
 
