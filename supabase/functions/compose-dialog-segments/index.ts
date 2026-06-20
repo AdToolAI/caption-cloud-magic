@@ -4588,6 +4588,23 @@ serve(async (req) => {
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
 
+    // ── v152 — Deferred Hard-Fail für bbox-url-pro Pre-Dispatch Errors ──
+    // Die bbox-Construction oben setzt `_v152HardFail` wenn upload/geometry
+    // versagt. Wir können dort noch nicht refunden weil failBeforeProviderDispatch
+    // erst hier deklariert ist. Hier triggern wir den Hard-Fail bevor Sync.so
+    // jemals einen Request sieht.
+    if ((pass as any)._v152HardFail) {
+      const hf = (pass as any)._v152HardFail;
+      return await failBeforeProviderDispatch(
+        hf.reason,
+        hf.errorClass,
+        hf.message,
+        422,
+        hf.meta ?? {},
+      );
+    }
+
+
     if (speakerWindowsSecs.length > 0 && !tightAudioInfo) {
       return await failBeforeProviderDispatch(
         "prepare_failed_no_tight_audio",
