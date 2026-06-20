@@ -4338,16 +4338,21 @@ serve(async (req) => {
         nonNullFrames = up.nonNullFrames;
       }
 
-      if (usedUrl) {
+      // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
+      // enthalten. Sonst: deterministischer Downgrade auf coords-pro (kein
+      // stiller inline-Fallback, der bei kaputter URL den v126-Provider-
+      // Unknown wieder triggern würde).
+      const v147BboxValid = !!usedUrl && nonNullFrames >= 1;
+      if (v147BboxValid) {
         syncOptions.active_speaker_detection = {
           auto_detect: false,
-          bounding_boxes_url: usedUrl,
+          bounding_boxes_url: usedUrl!,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_URL_PRIMARY speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
-      } else {
-        // graceful degrade — inline bounding_boxes (legacy coords-pro-box path)
+      } else if (retryVariant === "coords-pro-box") {
+        // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.
         const boundingBoxes: ([number, number, number, number] | null)[] =
           v124VoicedWindows.length > 0
             ? buildPerFrameBoxes({
@@ -4363,8 +4368,22 @@ serve(async (req) => {
           bounding_boxes: boundingBoxes,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-fallback)" : ""}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}`,
         );
+      } else {
+        // v147 — bbox-url-pro Upload failed oder 0 voiced frames → downgrade
+        // auf coords-pro statt blind inline-fallback. coords-pro nutzt
+        // pass.coords direkt und ist der nächst-sichere Stage.
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_DOWNGRADE_TO_COORDS_PRO reason=${!usedUrl ? "upload_failed" : "zero_voiced_frames"} non_null=${nonNullFrames}`,
+        );
+        retryVariant = "coords-pro";
+        pass.retry_variant = "coords-pro";
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          frame_number: referenceFrameNumber,
+          coordinates: clampSyncCoords(pass.coords),
+        };
       }
 
 
