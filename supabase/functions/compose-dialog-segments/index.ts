@@ -490,6 +490,16 @@ interface SegmentsState {
   finished_at?: string;
   final_url?: string | null;
   error?: string;
+  plate_identity?: {
+    version: "v153.2";
+    dims: { width: number; height: number } | null;
+    bboxes: Array<[number, number, number, number] | null>;
+    faces?: unknown[];
+    resolvedCount?: number;
+    cached?: boolean;
+    sourceClipUrl?: string;
+    hydratedAt?: string;
+  };
 }
 
 function uniqueSortedFrames(frames: number[]): number[] {
