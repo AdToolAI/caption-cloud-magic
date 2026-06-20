@@ -262,9 +262,28 @@ Deno.serve(async (req) => {
 
   // Dispatch ALL variants in parallel, then poll all in parallel
   const work = async () => {
+    // v143 — Rehost plate + audio into our own buckets before dispatch so
+    // expired Replicate/S3 URLs don't poison the diagnostic.
+    let stablePlateUrl = plateUrl;
+    let rehostNote: string | null = null;
+    try {
+      const rh = await rehostPlate(admin, plateUrl, {
+        sceneId: body.source_scene_id ?? runRow.id,
+        passIdx: body.source_pass_idx ?? 0,
+        kind: "diagnostic",
+        ownerId: userData.user.id,
+      });
+      stablePlateUrl = rh.url;
+      rehostNote = `${rh.uploaded ? "uploaded" : "cached"} ${rh.bytes}B in ${rh.durationMs}ms`;
+      console.log(`[lipsync-diagnostic] v143_rehost ${rehostNote} → ${rh.path}`);
+    } catch (e) {
+      console.warn(`[lipsync-diagnostic] v143_rehost FAILED: ${(e as Error).message}`);
+      rehostNote = `failed: ${(e as Error).message}`;
+    }
+
     const dispatched = await Promise.all(
       variants.map(async (v) => {
-        const d = await dispatchVariant({ apiKey: SYNC_API_KEY, plateUrl, audioUrl, variant: v });
+        const d = await dispatchVariant({ apiKey: SYNC_API_KEY, plateUrl: stablePlateUrl, audioUrl, variant: v });
         return { variant: v, dispatch: d };
       }),
     );
