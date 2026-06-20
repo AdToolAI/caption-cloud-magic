@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.2";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.3";
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
@@ -3408,6 +3408,12 @@ serve(async (req) => {
         return !(data.value === false || data.value === "false");
       } catch { return true; }
     })();
+    // v153.3 — Wenn der unified bbox-url-pro Pfad für den aktuellen Pass
+    // aktiv ist, sind die scene-level Voraussetzungen (plateDims + plate
+    // identity) für alle Passes erfüllt → kein Legacy-Batch-Preclip nötig.
+    // Spart die ~60s `plan_b_B_batch_preclip_complete` Wall-Time und
+    // verhindert, dass der Per-Pass-Preclip-Block die v153 ASD überschreibt.
+    const v153SkipLegacyPreclip = !!(pass as any)._v153BboxPrimary;
     const canBatchPrefetch =
       batchPreclipFlagOn &&
       !isAdvance &&
@@ -3416,7 +3422,13 @@ serve(async (req) => {
       speakers.length >= 2 &&
       !!plateDims &&
       passes.length > 1 &&
+      !v153SkipLegacyPreclip &&
       passes.every((p) => !(p as any).preclip_url);
+    if (v153SkipLegacyPreclip && currentPassIdx === 0) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v153.3_batch_preclip_skipped reason=v153_bbox_primary passes=${passes.length}`,
+      );
+    }
     if (canBatchPrefetch) {
       const tBatchStart = Date.now();
       console.log(
@@ -3752,7 +3764,12 @@ serve(async (req) => {
       }
     }
 
-    if (wantPassPreclip && !(pass as any).preclip_url && !(pass as any)._v152BboxPrimary) {
+    if (
+      wantPassPreclip &&
+      !(pass as any).preclip_url &&
+      !(pass as any)._v152BboxPrimary &&
+      !(pass as any)._v153BboxPrimary
+    ) {
       // v94: Window spans the UNION of all turns for this speaker, not just
       // the first turn. Sync.so with sync_mode=cut_off caps output at
       // min(video, audio); if the preclip only covers turn 1, turns 2..N of
@@ -4081,7 +4098,8 @@ serve(async (req) => {
     if (
       v126PreclipExpected &&
       !usePassPreclip &&
-      !(pass as any)._v152BboxPrimary
+      !(pass as any)._v152BboxPrimary &&
+      !(pass as any)._v153BboxPrimary
     ) {
       const failReason = (pass as any).preclip_error ?? "preclip_prerequisites_missing";
       console.error(
@@ -5580,10 +5598,18 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v140_ASD_CANONICAL asd=${JSON.stringify(canonicalAsd)}`,
       );
       if ((canonicalAsd as any)?.auto_detect === true) {
+        const v153WasPrimary = !!(pass as any)._v153BboxPrimary;
+        if (v153WasPrimary) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v153.3_preclip_overwrite_detected — v153 set bbox-url-pro but ASD was rewritten to auto_detect before wire. retry_variant=${retryVariant} use_pass_preclip=${usePassPreclip} preclip_url=${(pass as any).preclip_url ? "yes" : "no"}`,
+          );
+        }
         return await failBeforeProviderDispatch(
           "v153_auto_detect_wire_blocked",
           "v153_auto_detect_blocked",
-          "v153.2 assert: auto_detect:true is forbidden in dialog lip-sync; expected bbox-url-pro.",
+          v153WasPrimary
+            ? "v153.3 assert: auto_detect:true reached wire AFTER unified bbox path was active — legacy preclip overwrite still present."
+            : "v153.3 assert: auto_detect:true is forbidden in dialog lip-sync; expected bbox-url-pro.",
           500,
           {
             retry_variant: retryVariant,
@@ -5592,6 +5618,9 @@ serve(async (req) => {
             plate_dims: plateDims,
             is_advance: isAdvance,
             is_retry: isRetry,
+            v153_was_primary: v153WasPrimary,
+            use_pass_preclip: usePassPreclip,
+            had_preclip_url: !!(pass as any).preclip_url,
           },
         );
       }

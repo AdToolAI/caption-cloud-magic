@@ -1,51 +1,50 @@
-## v153.2 — Plate-Identity-Hydration für ALLE Passes (Advance + Retry)
 
-### Root-Cause-Analyse (aus den echten Edge-Logs)
+## Problem
 
-WIRE_PAYLOAD-Logs vom letzten Run zeigen für Pass 1, 2, 3:
-```
-WIRE_PAYLOAD version=v153.1 model=sync-3 options={"sync_mode":"cut_off","active_speaker_detection":{"auto_detect":true}}
-```
+`v153_auto_detect_wire_blocked` ist **nicht** der Fehler — es ist die v153.2 Safety-Net, die korrekt verhindert, dass ein `auto_detect:true` Payload an Sync.so rausgeht.
 
-Es fehlt komplett der erwartete `v153.1_unified_bbox_primary`-Log und auch der `v153_preflight_BLOCK`-Log. Heißt: die v153-Gates triggern für keinen einzigen Pass. Grund liegt in `compose-dialog-segments/index.ts`:
+Die eigentliche Ursache: nach dem v153-Bbox-Branch läuft im selben Request immer noch der **alte Preclip-Pfad** (`plan_b_B_batch_preclip` + per-pass `v1291_preclip_sync3`) und überschreibt `payload.options.active_speaker_detection` auf `{auto_detect:true}`. Genau dieser Pfad sollte laut deiner früheren Ansage komplett raus.
 
-- **Zeile 1232**: `resolvePlateFaceIdentities` läuft nur wenn `!isAdvance`. → für Pass 2/3/4 (Advance-Dispatches) wird `plateIdentityMap` nie geladen, `speakerPlateBboxes` bleibt komplett `null`.
-- **Zeile 1334**: Pre-Flight-Hard-Fail-Gate ist auf `!isAdvance && !isRetry` beschränkt — feuert für Advance-Passes nicht.
-- **Zeile 2911**: `v153UnifiedBboxEligible` verlangt `v153HasPlateBox` → false weil `speakerPlateBboxes` leer → Fallthrough in den Legacy-`else`-Branch bei Zeile 4651, der hart `{ auto_detect: true }` setzt.
+Logs Beweis (scene 9fa61b47, pass 1):
+1. `v153.2_unified_bbox_primary speakers=4 plate_box=yes` — v153 setzt korrekt bbox-url-pro
+2. `plan_b_B_batch_preclip_start passes=4` — Legacy-Batch startet trotzdem
+3. `v1291_preclip_sync3 … mode=single_face_auto` — Legacy überschreibt ASD
+4. `v140_ASD_CANONICAL asd={"auto_detect":true}` → Safety-Net blockt
 
-**Konsequenz heute**: nur Pass 1 (der erste, der mit der vollen Plate-Identity-Resolution startet) bekäme den Bbox-Pfad — aber selbst der nicht, weil Pass 1 ebenfalls bereits als Advance-Dispatch reinkommen kann sobald die Composer-UI den ersten Pass bereits aus einem früheren Lauf kennt. Resultat: ALLE Sprecher landen auf `auto_detect`, was Sync.so erneut die falschen Mouths animieren lässt und die Gesamtzeit identisch hält (kein Speedup, weil weiterhin auto_detect statt deterministischem Bbox-Path läuft).
+## Lösung — v153.3 in `supabase/functions/compose-dialog-segments/index.ts`
 
-### Fix-Plan
+**Phase A (sofort, sicher):** Preclip-Pfad gaten, nicht löschen — dann verifizieren.
 
-1. **`speakerPlateBboxes` in `dialog_shots` persistieren** (neue Felder im scene-state):
-   - Beim allerersten Dispatch nach erfolgreicher `resolvePlateFaceIdentities` schreiben wir `dialog_shots.plate_identity = { dims, bboxes: speakerPlateBboxes, faces: plateIdentityMap.faces, resolvedCount }` in die DB.
-   - Jeder nachfolgende Advance/Retry-Dispatch liest diesen Snapshot zuerst und füllt `speakerPlateBboxes` + `plateDims` daraus, **bevor** die v153-Gates greifen.
+1. **`canBatchPrefetch` (Zeile ~3411) deaktivieren wenn v153 aktiv**
+   Erweitern um `&& !v153UnifiedActive` — keine Legacy-Batch-Preclip-Renders mehr, wenn alle Speaker Plate-Bboxes haben. Spart die ~60s `plan_b_B_batch_preclip_complete ms_total=60476` direkt.
 
-2. **Fallback: Live-Hydration für Advance/Retry**:
-   - Wenn der persistierte Snapshot fehlt (Legacy-Scenes), entfernen wir die `!isAdvance`-Schranke bei Zeile 1232 und lassen `resolvePlateFaceIdentities` auch für Advance/Retry laufen (ist bereits per `(scene_id, plate_url)` gecached → günstig).
+2. **Per-pass Preclip-Block überspringen wenn `_v153BboxPrimary` gesetzt**
+   Vor dem Block, der `v129.23.2_face_gate` / `v1291_preclip_sync3` / `preclip-sync3-autodetect-v105` ausführt, ein hartes `if ((pass as any)._v153BboxPrimary) { /* skip entire preclip overwrite */ }` setzen. Damit bleibt der von v153 gebaute `bbox-url-pro` Payload unangetastet.
 
-3. **Pre-Flight-Hard-Fail-Gate generalisieren** (Zeile 1334):
-   - Bedingung von `!isAdvance && !isRetry` auf `speakers.length >= 1 && !!plateDims` ändern.
-   - Jeder Pass — egal Fresh, Advance oder Retry — muss seine eigene plate-native Box haben oder es feuert sofort der Hard-Fail + Credit-Refund.
+3. **Sicherheits-Assert verschärfen** (Zeile ~5582)
+   Wenn `_v153BboxPrimary && active_speaker_detection.auto_detect===true` → eigener Log `v153.3_preclip_overwrite_detected` mit Stack/Source, damit wir sofort sehen, falls noch eine 3. Stelle die ASD überschreibt.
 
-4. **v153 Eligibility-Gate vereinheitlichen** (Zeile 2911):
-   - `body?.noop_auto_escalation !== true` Bedingung bleibt.
-   - Nach Schritt 1+2 ist `v153HasPlateBox` jetzt für jeden Pass true → `_v153BboxPrimary = true` für ALLE Passes → Dispatch geht zwingend in `bbox-url-pro`.
+4. **Version bump** auf `v153.3`, Boot-Log + zusätzlicher Log `v153.3_preclip_skipped pass=X reason=v153_bbox_primary` pro übersprungenem Preclip.
 
-5. **Legacy-`else`-Branch bei Zeile 4650 endgültig dichtmachen**:
-   - Statt `syncOptions.active_speaker_detection = { auto_detect: true }` ein `failBeforeProviderDispatch("v153_unexpected_legacy_branch", …)` mit Credit-Refund — sodass kein einziger Pfad mehr stille `auto_detect:true`-Dispatches absetzen kann.
+**Phase B (Follow-up, sobald Phase A grün läuft):** echten Code löschen.
+- `plan_b_B_batch_preclip_*` Block (Zeilen ~3380–3700)
+- Per-pass Preclip-Render + `v129.23.2_face_gate` + `v1291_preclip_sync3` + `preclip-sync3-autodetect-v105` Branch
+- `usePassPreclip`, `preclipTrustedForGate`, `v143_rehost` Pfad
+- Tote `dispatch_video_kind: "preclip"` Zweige in payload-Builder
 
-6. **Versions-Bump auf `v153.2`** und neuer Diagnose-Log `v153.2_plate_hydration source=persisted|live|missing` pro Pass.
+Phase B wird in einer separaten Runde gemacht — nicht in derselben Datei-Änderung, damit Rollback einfach bleibt.
 
-### Erwartetes Verhalten
+## Erwartetes Verhalten nach Phase A
 
-- WIRE_PAYLOAD enthält für JEDEN Pass `{"auto_detect":false,"bounding_boxes_url":"…"}` — niemals mehr `auto_detect:true`.
-- Wenn Plate-Identity nicht eindeutig auflösbar ist, **bricht der erste betroffene Pass sofort hart ab + refundet alle Credits** statt 20-30 min weiterzulaufen → spürbarer Speedup.
-- Sprecher-Swap-Bug („Sprecher 1 spricht für Sprecher 1+2") ist ausgeschlossen, weil jeder Pass deterministisch seine eigene plate-native Box bekommt.
+- Logs zeigen pro Pass: `v153.2_unified_bbox_primary` → direkt `v140_ASD_CANONICAL asd={"auto_detect":false,"bounding_boxes_url":"…"}` → DISPATCH ohne dazwischenliegende `plan_b_B_batch_preclip_*` / `v1291_preclip_sync3` Zeilen.
+- Wall-Time pro Szene fällt drastisch (entfällt: 60s Batch-Preclip + N×~10s per-pass Preclip + N×Re-Render).
+- Sprecher 1–4 bekommen alle korrekten Lip-Sync (jeder eigene Plate-native Bbox), kein Sprecher mehr ohne Sync.
+- Wenn doch noch eine Code-Stelle ASD überschreibt: neues Log `v153.3_preclip_overwrite_detected` zeigt sofort, wo.
 
-### Files
+## Dateien
 
-- `supabase/functions/compose-dialog-segments/index.ts` (Hydration, Gate-Erweiterung, Legacy-else dichtmachen, Versions-Bump)
-- `mem/architecture/lipsync/v153-single-path-bbox-pipeline.md` (Update auf v153.2 inkl. Persist+Hydrate)
-- `mem/index.md` (Eintrag aktualisieren)
-- Deploy: `compose-dialog-segments`
+- `supabase/functions/compose-dialog-segments/index.ts` (Phase A)
+- `mem/architecture/lipsync/v153-single-path-bbox-pipeline.md` (auf v153.3 updaten)
+- `mem/index.md` (Eintrag updaten)
+
+Phase B (Löschen des Dead-Codes) wird in einem separaten Plan nach erfolgreicher Verifikation von Phase A vorgeschlagen.
