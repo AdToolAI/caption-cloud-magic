@@ -121,7 +121,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.0";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.1";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // v37 — `sync3-coords` added as the Sync.so-recommended fallback for
@@ -4150,10 +4150,14 @@ serve(async (req) => {
         const previousAsd = syncOptions.active_speaker_detection;
         const outSizeForCenter = Number((pass as any).preclip_crop?.outputSize) || 720;
         const centerXY = Math.round(outSizeForCenter / 2);
+        // v139.1 — Sync.so `coordinates` MUST be a flat [x, y] (2 numbers).
+        // v136 accidentally wrapped it as [[x, y]] (length 1) → Sync.so
+        // rejected every dispatch with 400 "coordinates must contain at
+        // least 2 elements". See mem/architecture/lipsync/v136-coords-shape-canonical.md
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           frame_number: 0,
-          coordinates: [[centerXY, centerXY]],
+          coordinates: [centerXY, centerXY],
         };
         asdMode = "v136_preclip_centered_coords";
         (pass as any).preclip_asd_source = "v136_preclip_center";
