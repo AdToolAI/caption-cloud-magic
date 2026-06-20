@@ -288,30 +288,48 @@ export default function LipsyncDiagnostic() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {(r.variants ?? []).map((v) => (
-                <Card key={v.id} className="p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">{v.label}</div>
-                    <Badge variant={
-                      v.status === "COMPLETED" ? "default" :
-                      v.status === "PENDING" ? "secondary" :
-                      "destructive"
-                    }>
-                      {v.status}
-                    </Badge>
-                  </div>
-                  {v.output_url ? (
-                    <video src={v.output_url} controls className="w-full rounded" />
-                  ) : (
-                    <div className="text-xs text-muted-foreground italic h-32 flex items-center justify-center bg-muted rounded">
-                      {v.dispatch_error || v.error || "waiting…"}
+              {(r.variants ?? []).map((v) => {
+                const isForensic = v.id?.startsWith("frame_");
+                return (
+                  <Card key={v.id} className="p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium">{v.label}</div>
+                      <Badge variant={
+                        v.status === "COMPLETED" ? "default" :
+                        v.status === "PENDING" ? "secondary" :
+                        "destructive"
+                      }>
+                        {isForensic && typeof v.face_count === "number"
+                          ? `${v.face_count} face${v.face_count === 1 ? "" : "s"}`
+                          : v.status}
+                      </Badge>
                     </div>
-                  )}
-                  {v.job_id && (
-                    <code className="text-[10px] text-muted-foreground block truncate">job {v.job_id}</code>
-                  )}
-                </Card>
-              ))}
+                    {v.output_url ? (
+                      isForensic ? (
+                        <img src={v.output_url} className="w-full rounded" alt="frame" />
+                      ) : (
+                        <video src={v.output_url} controls className="w-full rounded" />
+                      )
+                    ) : (
+                      <div className="text-xs text-muted-foreground italic h-32 flex items-center justify-center bg-muted rounded">
+                        {v.dispatch_error || v.error || "waiting…"}
+                      </div>
+                    )}
+                    {isForensic && v.faces && v.faces.length > 0 && (
+                      <div className="text-[10px] text-muted-foreground space-y-0.5">
+                        {v.faces.map((f, i) => (
+                          <div key={i}>
+                            face {i + 1}: x={f.x_pct}% y={f.y_pct}% area={f.area_pct}% mouth={f.mouth_visible ? "✓" : "✗"}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {v.job_id && (
+                      <code className="text-[10px] text-muted-foreground block truncate">job {v.job_id}</code>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           </Card>
         ))}
