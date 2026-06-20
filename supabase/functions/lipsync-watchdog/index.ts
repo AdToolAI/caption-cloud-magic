@@ -559,9 +559,13 @@ serve(async (req) => {
           // Forensik mit `pass_not_found` kaputt gemacht. Neu: nur die
           // tatsächlich hängenden rendering-Passes auf pending zurücksetzen,
           // erfolgreich abgeschlossene `done`-Passes bleiben unverändert.
+          // v141 — Auch keine Passes mit bereits vorhandenem output_url
+          // anfassen (auch wenn sie noch fälschlich "rendering" stehen).
           const passesNow: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
           const passesPatched = passesNow.map((p: any, i: number) => {
             const st = String(p?.status ?? "");
+            if (st === "done" || st === "done_suspect" || st === "failed" || st === "canceled_by_scene_failure") return p;
+            if (typeof p?.output_url === "string" && p.output_url.length > 0) return p;
             if (st !== "rendering") return p;
             return {
               ...p,
