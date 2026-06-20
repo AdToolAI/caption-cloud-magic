@@ -1,8 +1,13 @@
-// Lipsync Diagnostic (v142)
-// Dispatches the SAME plate+audio to Sync.so in 5 ASD variants in parallel,
-// polls all jobs, and writes results to `lipsync_diagnostic_runs.variants`.
+// Lipsync Diagnostic (v145)
+// Two modes:
+//  1. Default (Sync.so variant matrix) — 5 ASD variants in parallel.
+//  2. mode="plate-face-forensic" — extracts 3 frames from a plate,
+//     asks Gemini Vision to count clearly-visible faces with mouth area.
+//     Proves whether the plate IMAGE CONTENT (not Sync.so delivery) is
+//     the reason face_gate fails.
 // Live pipeline (compose-dialog-segments, sync-so-webhook) is NOT touched.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import Replicate from "npm:replicate@0.25.2";
 import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 const corsHeaders = {
@@ -12,7 +17,7 @@ const corsHeaders = {
 };
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
-const VERSION = "v143.0";
+const VERSION = "v145.0";
 
 console.log(`[lipsync-diagnostic] BOOT ${VERSION} deploy=${Date.now()}`);
 
