@@ -2903,10 +2903,24 @@ serve(async (req) => {
     let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
-    // v126 — Normalize legacy full-plate variants from older retries back to
-    // the unified preclip path. Webhook may still hand us "bbox-url-pro" etc.
-    if (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box" || retryVariant === "auto-pro" || retryVariant === "auto-standard") {
+    // v144 — Respect explicit NOOP-escalation variants. Previously v126
+    // collapsed every full-plate variant ("bbox-url-pro", "coords-pro-box",
+    // "auto-pro", "auto-standard") back to "coords-pro" — which silently
+    // re-dispatched the IDENTICAL input that already produced a NOOP. The
+    // v134 NOOP-ladder in sync-so-webhook calls us with `noop_auto_escalation=true`
+    // + the next rung's variant; honor it. Only collapse legacy retries
+    // that did NOT come from the NOOP-ladder.
+    const noopAutoEscalation = body?.noop_auto_escalation === true;
+    if (
+      !noopAutoEscalation &&
+      (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box" || retryVariant === "auto-pro" || retryVariant === "auto-standard")
+    ) {
       retryVariant = "coords-pro";
+    }
+    if (noopAutoEscalation) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v144_noop_escalation honoring variant=${retryVariant} step=${body?.noop_escalation_step ?? "?"}`,
+      );
     }
 
     // v85 (Mini-Phase 2.5) — Structured gate-decision log so we can answer
