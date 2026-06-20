@@ -932,6 +932,9 @@ export async function logSyncDispatch(
 export function classifySyncError(message?: string | null): string {
   if (!message) return "unknown";
   const m = message.toLowerCase();
+  // v143 — explicit Sync.so 422 for inaccessible inputs (the real root cause of
+  // weeks of phantom "NOOP" debugging). Map BEFORE the generic auth/4xx rules.
+  if (/generation_input_video_inaccessible|generation_input_audio_inaccessible|video url is inaccessible|url is inaccessible|publicly fetchable|not expired or auth-gated/.test(m)) return "input_inaccessible";
   if (/no_voiced_frames|preflight_audio_no_voice|silence|voiced|vad/.test(m)) return "audio_no_voice";
   if (/unsupported.*codec|codec.*not.*support|video_codec_unsupported/.test(m)) return "video_codec_unsupported";
   if (/segments?.*invalid|overlap|segment.*reject/.test(m)) return "segments_invalid";
