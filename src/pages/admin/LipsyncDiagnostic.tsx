@@ -285,6 +285,9 @@ export default function LipsyncDiagnostic() {
                 {r.error_message && (
                   <div className="text-xs text-destructive">err: {r.error_message}</div>
                 )}
+                {r.notes && (
+                  <div className="text-xs font-mono text-amber-500">{r.notes}</div>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
