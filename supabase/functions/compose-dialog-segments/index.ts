@@ -4808,6 +4808,7 @@ serve(async (req) => {
             segments: pass.segments,
             cost_credits: costCredits,
             refunded: !alreadyRefunded,
+            plate_identity: v153PlateIdentitySnapshot,
             error: reason,
             finished_at: new Date().toISOString(),
           },
