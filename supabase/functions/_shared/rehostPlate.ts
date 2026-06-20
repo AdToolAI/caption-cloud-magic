@@ -70,13 +70,14 @@ export async function rehostPlate(
     throw new Error("rehostPlate: sourceUrl is required");
   }
 
-  // If the URL is already inside our own storage, return it as-is.
-  // Match both `/storage/v1/object/public/<bucket>/` and signed URL paths.
-  if (/\/storage\/v1\/object\/(public|sign)\/lipsync-plates\//.test(sourceUrl)) {
+  // If the URL is already a fresh signed URL inside our bucket, return as-is.
+  // We only short-circuit `/sign/` URLs because plates must be Sync.so-fetchable
+  // (public URLs aren't issued from this bucket).
+  if (/\/storage\/v1\/object\/sign\/lipsync-plates\//.test(sourceUrl)) {
     return {
       url: sourceUrl,
       bucket: BUCKET,
-      path: sourceUrl.split(`/${BUCKET}/`)[1] ?? "",
+      path: sourceUrl.split(`/${BUCKET}/`)[1]?.split("?")[0] ?? "",
       uploaded: false,
       sourceUrl,
       bytes: 0,
