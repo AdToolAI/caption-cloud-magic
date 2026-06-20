@@ -3897,7 +3897,8 @@ serve(async (req) => {
       !!tightAudioInfo;
     if (
       v126PreclipExpected &&
-      !usePassPreclip
+      !usePassPreclip &&
+      !(pass as any)._v152BboxPrimary
     ) {
       const failReason = (pass as any).preclip_error ?? "preclip_prerequisites_missing";
       console.error(
