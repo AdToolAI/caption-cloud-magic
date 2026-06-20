@@ -355,3 +355,240 @@ Deno.serve(async (req) => {
 
   return json({ run_id: runRow.id, variants_count: variants.length, version: VERSION }, 202);
 });
+
+// ──────────────────────────────────────────────────────────────────────────
+// v145 — Plate-Face-Forensic
+//
+// Extracts 3 frames (early/mid/late) from the rehosted plate via Replicate
+// (lucataco/ffmpeg-extract-frame), then asks Gemini Vision per frame:
+//   "How many distinct human faces with visible mouth area do you see,
+//    and where are they (rough x%, y%)?"
+//
+// Result is stored in `lipsync_diagnostic_runs.variants` and `notes`,
+// status="completed" with a quick verdict ("plate_face_count_ok" /
+// "plate_face_count_low" / "plate_face_count_zero").
+// ──────────────────────────────────────────────────────────────────────────
+
+const LOVABLE_AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
+async function analyzeFrameWithGemini(params: {
+  apiKey: string;
+  frameUrl: string;
+  expectedSpeakers: number;
+}): Promise<{ count: number | null; faces?: any[]; raw?: string; error?: string }> {
+  try {
+    const prompt =
+      `You see one frame of a video where ${params.expectedSpeakers} distinct speakers are expected. ` +
+      `Count DISTINCT human faces where the MOUTH AREA is clearly visible and large enough for lip-sync ` +
+      `(face takes at least 3% of frame area, mouth not occluded, face roughly frontal — profiles count only ` +
+      `if the mouth is still discernible). For each counted face, return its approximate center as percentage ` +
+      `(x_pct, y_pct) from 0 to 100 and its approximate area share (area_pct). ` +
+      `Return STRICT JSON only, no prose: ` +
+      `{"count": <int>, "faces": [{"x_pct": <int>, "y_pct": <int>, "area_pct": <number>, "mouth_visible": <bool>}]}`;
+    const resp = await fetch(LOVABLE_AI_GATEWAY, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-pro",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: params.frameUrl } },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!resp.ok) {
+      return { count: null, error: `gemini HTTP ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
+    }
+    const j = await resp.json();
+    const txt = String(j?.choices?.[0]?.message?.content ?? "");
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return { count: null, raw: txt.slice(0, 300), error: "no_json_in_response" };
+    const parsed = JSON.parse(m[0]);
+    const count = Number.isFinite(Number(parsed?.count)) ? Math.round(Number(parsed.count)) : null;
+    return { count, faces: Array.isArray(parsed?.faces) ? parsed.faces : [], raw: txt.slice(0, 400) };
+  } catch (e) {
+    return { count: null, error: `analyze_exception: ${(e as Error).message}` };
+  }
+}
+
+async function extractFrameAt(params: {
+  replicate: Replicate;
+  admin: any;
+  videoUrl: string;
+  timestamp: number;
+  sceneId: string;
+  label: string;
+}): Promise<{ url?: string; error?: string }> {
+  try {
+    const out: any = await params.replicate.run(
+      "lucataco/ffmpeg-extract-frame" as `${string}/${string}`,
+      { input: { video: params.videoUrl, timestamp: params.timestamp } },
+    );
+    const frameUrl =
+      typeof out === "string" ? out
+      : Array.isArray(out) ? out[0]
+      : out?.url?.() ?? out?.url ?? "";
+    if (!frameUrl) return { error: "no frame url from replicate" };
+    // Rehost into composer-frames so Gemini can fetch it without CORS pain.
+    const pngRes = await fetch(frameUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!pngRes.ok) return { error: `frame fetch HTTP ${pngRes.status}` };
+    const bytes = new Uint8Array(await pngRes.arrayBuffer());
+    const path = `system/forensic/${params.sceneId}-${params.label}-${Date.now()}.png`;
+    const up = await params.admin.storage.from("composer-frames").upload(path, bytes, {
+      contentType: "image/png", upsert: true, cacheControl: "86400",
+    });
+    if (up.error) return { error: `upload: ${up.error.message}` };
+    const { data: pub } = params.admin.storage.from("composer-frames").getPublicUrl(path);
+    return { url: pub.publicUrl };
+  } catch (e) {
+    return { error: `extract_exception: ${(e as Error).message}` };
+  }
+}
+
+async function runForensic(args: {
+  admin: any;
+  body: any;
+  userId: string;
+}): Promise<Response> {
+  const { admin, body, userId } = args;
+  const plateUrl: string = body.plate_url;
+  const expectedSpeakers: number = Math.max(1, Math.min(8, Number(body.expected_speakers ?? 2)));
+  if (!plateUrl) return json({ error: "plate_url required for forensic mode" }, 400);
+
+  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!REPLICATE_API_TOKEN) return json({ error: "REPLICATE_API_TOKEN missing" }, 500);
+  if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY missing" }, 500);
+
+  // Insert run row
+  const { data: runRow, error: insErr } = await admin
+    .from("lipsync_diagnostic_runs")
+    .insert({
+      created_by: userId,
+      status: "running",
+      plate_url: plateUrl,
+      audio_url: "(forensic — no audio)",
+      speaker_label: body.speaker_label ?? `${expectedSpeakers} speakers expected`,
+      coords: null,
+      bounding_boxes_url: null,
+      source_scene_id: body.source_scene_id ?? null,
+      source_pass_idx: body.source_pass_idx ?? null,
+      variants: [],
+      notes: `forensic v145 · expected=${expectedSpeakers}`,
+    })
+    .select()
+    .single();
+  if (insErr || !runRow) return json({ error: insErr?.message || "insert failed" }, 500);
+
+  const work = async () => {
+    // 1) Rehost plate so Replicate can fetch it stable
+    let stableUrl = plateUrl;
+    try {
+      const rh = await rehostPlate(admin, plateUrl, {
+        sceneId: body.source_scene_id ?? runRow.id,
+        passIdx: body.source_pass_idx ?? 0,
+        kind: "forensic",
+        ownerId: userId,
+      });
+      stableUrl = rh.url;
+      console.log(`[lipsync-diagnostic] v145_rehost ${rh.uploaded ? "uploaded" : "cached"} ${rh.bytes}B`);
+    } catch (e) {
+      console.warn(`[lipsync-diagnostic] v145_rehost failed: ${(e as Error).message}`);
+    }
+
+    const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
+
+    // 2) Extract 3 frames at 0.1s, ~middle (assume 5s plate → 2.5s), and ~end (4.5s)
+    //    If actual duration is unknown, these timestamps still produce useful samples;
+    //    Replicate clamps to last frame if past EOF.
+    const dur = Number(body.duration_sec) > 0 ? Number(body.duration_sec) : 5;
+    const sceneId = (body.source_scene_id ?? runRow.id).toString().slice(0, 12);
+    const sampleSpecs = [
+      { label: "early", t: 0.1 },
+      { label: "mid",   t: Math.max(0.5, dur / 2) },
+      { label: "late",  t: Math.max(1.0, dur - 0.3) },
+    ];
+
+    const frames = await Promise.all(
+      sampleSpecs.map(async (s) => {
+        const r = await extractFrameAt({
+          replicate, admin, videoUrl: stableUrl, timestamp: s.t,
+          sceneId, label: s.label,
+        });
+        return { label: s.label, timestamp_sec: s.t, ...r };
+      }),
+    );
+
+    // 3) Analyze each frame with Gemini
+    const analyzed = await Promise.all(
+      frames.map(async (f) => {
+        if (!f.url) {
+          return { ...f, count: null, faces: [], analyze_error: f.error };
+        }
+        const a = await analyzeFrameWithGemini({
+          apiKey: LOVABLE_API_KEY, frameUrl: f.url, expectedSpeakers,
+        });
+        return {
+          label: f.label,
+          timestamp_sec: f.timestamp_sec,
+          frame_url: f.url,
+          count: a.count,
+          faces: a.faces ?? [],
+          analyze_error: a.error,
+          raw_snippet: a.raw,
+        };
+      }),
+    );
+
+    // 4) Verdict
+    const counts = analyzed.map((a) => Number.isFinite(Number(a.count)) ? Number(a.count) : 0);
+    const maxCount = Math.max(0, ...counts);
+    const verdict =
+      maxCount === 0 ? "plate_face_count_zero" :
+      maxCount < expectedSpeakers ? "plate_face_count_low" :
+      "plate_face_count_ok";
+
+    await admin
+      .from("lipsync_diagnostic_runs")
+      .update({
+        variants: analyzed.map((a) => ({
+          id: `frame_${a.label}`,
+          label: `Frame ${a.label} @ ${a.timestamp_sec.toFixed(2)}s`,
+          model: "gemini-2.5-pro",
+          status: a.analyze_error ? "ANALYZE_FAILED" : (a.count === null ? "PARSE_FAILED" : "COMPLETED"),
+          output_url: a.frame_url ?? null,
+          error: a.analyze_error ?? null,
+          face_count: a.count,
+          faces: a.faces,
+          raw_snippet: a.raw_snippet,
+        })),
+        status: "completed",
+        notes: `forensic v145 · expected=${expectedSpeakers} · max_detected=${maxCount} · verdict=${verdict}`,
+      })
+      .eq("id", runRow.id);
+  };
+
+  // @ts-ignore — EdgeRuntime.waitUntil
+  EdgeRuntime.waitUntil(work().catch(async (e) => {
+    await admin
+      .from("lipsync_diagnostic_runs")
+      .update({ status: "failed", error_message: (e as Error).message })
+      .eq("id", runRow.id);
+  }));
+
+  return json({
+    run_id: runRow.id,
+    mode: "plate-face-forensic",
+    expected_speakers: expectedSpeakers,
+    version: VERSION,
+  }, 202);
+}
