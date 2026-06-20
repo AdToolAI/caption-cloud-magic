@@ -4714,7 +4714,26 @@ serve(async (req) => {
 
 
     } else {
-      syncOptions.active_speaker_detection = { auto_detect: true };
+      (pass as any)._v153LegacyBranchHardFail = {
+        reason: "v153_unexpected_legacy_branch",
+        errorClass: "v153_auto_detect_blocked",
+        message:
+          "v153.2 blocked a legacy auto_detect dispatch before provider call. " +
+          "Every dialog pass must use bbox-url-pro with a plate-native speaker box.",
+        meta: {
+          retry_variant: retryVariant,
+          plate_hydration_source: plateHydrationSource,
+          speaker_plate_boxes: speakerPlateBboxes,
+          plate_dims: plateDims,
+          is_advance: isAdvance,
+          is_retry: isRetry,
+        },
+      };
+      syncOptions.active_speaker_detection = {
+        auto_detect: false,
+        frame_number: referenceFrameNumber,
+        coordinates: clampSyncCoords(pass.coords) ?? [Math.round(videoDims.width / 2), Math.round(videoDims.height / 2)],
+      };
     }
 
     const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
