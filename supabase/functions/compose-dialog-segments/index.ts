@@ -121,7 +121,13 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.1";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.2";
+// v139.2 — Module-load boot marker. Proves which build is actually running
+// inside Edge Runtime (vs a stale cached copy). Look for this exact string
+// in logs immediately after any deploy to confirm the new code is live.
+console.log(
+  `[compose-dialog-segments] BOOT version=${"v139.2"} deploy_marker=${Date.now()} pid=${(globalThis as any).Deno?.pid ?? "?"}`,
+);
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // v37 — `sync3-coords` added as the Sync.so-recommended fallback for
@@ -5242,6 +5248,19 @@ serve(async (req) => {
       }
     }
 
+    // v139.2 — WIRE_PAYLOAD forensik. Logs the EXACT options object that
+    // Sync.so will see, immediately before fetch. This is the only way to
+    // attribute a Sync.so 400 to a specific shape — every earlier mutation
+    // point becomes irrelevant once we have the wire bytes. Truncate to
+    // 1500 chars so multi-frame bounding_boxes don't flood the log.
+    try {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} WIRE_PAYLOAD version=${COMPOSE_DIALOG_SEGMENTS_VERSION} model=${(payload as any)?.model} options=${JSON.stringify((payload as any)?.options ?? null).slice(0, 1500)}`,
+      );
+    } catch (_logErr) {
+      // never let logging crash dispatch
+    }
+
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
       headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
@@ -5250,8 +5269,10 @@ serve(async (req) => {
 
     if (!resp.ok) {
       const errTxt = await resp.text().catch(() => "");
+      // v139.2 — Correlate failure with the wire shape that triggered it.
+      // Re-log options on failure so request+response sit in one query.
       console.error(
-        `[compose-dialog-segments] scene=${sceneId} dispatch FAILED pass=${currentPassIdx} status=${resp.status} body=${errTxt.slice(0, 600)}`,
+        `[compose-dialog-segments] scene=${sceneId} dispatch FAILED pass=${currentPassIdx} status=${resp.status} body=${errTxt.slice(0, 600)} wire_options=${JSON.stringify((payload as any)?.options ?? null).slice(0, 800)}`,
       );
       // Refund only if no previous pass succeeded (i.e. this is pass 0 fresh
       // dispatch) — if a later pass fails, we still refund the full cost since
