@@ -506,7 +506,18 @@ async function runForensic(args: {
       console.warn(`[lipsync-diagnostic] v145_rehost failed: ${(e as Error).message}`);
     }
 
-    const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
+    const replicate = new Replicate({
+      auth: LOVABLE_API_KEY,
+      baseUrl: REPLICATE_GATEWAY_BASE,
+      fetch: (input: any, init: any) =>
+        fetch(input, {
+          ...init,
+          headers: {
+            ...(init?.headers ?? {}),
+            "X-Connection-Api-Key": REPLICATE_CONNECTOR_KEY,
+          },
+        }),
+    } as any);
 
     // 2) Extract 3 frames at 0.1s, ~middle (assume 5s plate → 2.5s), and ~end (4.5s)
     //    If actual duration is unknown, these timestamps still produce useful samples;
