@@ -2990,7 +2990,7 @@ serve(async (req) => {
       (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
       (pass as any)._v153BboxPrimary = true;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.1_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.2_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
       );
     }
 
