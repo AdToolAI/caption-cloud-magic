@@ -467,6 +467,7 @@ async function analyzeVideoWithGemini(params: {
           videos: [params.videoUrl],
           temperature: 0.2,
           max_output_tokens: 2048,
+          thinking_budget: 0,
         },
       },
     );
@@ -475,9 +476,20 @@ async function analyzeVideoWithGemini(params: {
       typeof out === "string" ? out
       : Array.isArray(out) ? out.join("")
       : String(out ?? "");
-    const m = txt.match(/\{[\s\S]*\}/);
-    if (!m) return { ...empty("no_json_in_response"), raw: txt.slice(0, 400) };
-    const parsed = JSON.parse(m[0]);
+    // Strip markdown code fences if present
+    const cleaned = txt.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+    // Robust JSON extraction — find first { and matching last }
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace < 0 || lastBrace <= firstBrace) {
+      return { ...empty("no_json_in_response"), raw: txt.slice(0, 600) };
+    }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+    } catch (parseErr) {
+      return { ...empty(`json_parse_failed: ${(parseErr as Error).message}`), raw: txt.slice(0, 600) };
+    }
     const pick = (key: "early" | "mid" | "late", t: number) => {
       const obj: any = parsed?.[key] ?? {};
       const c = Number.isFinite(Number(obj.count)) ? Math.round(Number(obj.count)) : null;
@@ -485,7 +497,7 @@ async function analyzeVideoWithGemini(params: {
     };
     const samples = [pick("early", tEarly), pick("mid", tMid), pick("late", tLate)];
     const maxCount = Math.max(0, ...samples.map((s) => Number(s.count) || 0));
-    return { samples, maxCount, raw: txt.slice(0, 600) };
+    return { samples, maxCount, raw: txt.slice(0, 800) };
   } catch (e) {
     return empty(`analyze_exception: ${(e as Error).message}`);
   }
