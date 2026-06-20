@@ -1,48 +1,136 @@
-## v151 — Plate-Identity Swap-Hardening für N≥4 Speaker
+## v152 — Unified bbox-url-pro Pipeline (N=1..4)
 
-### Was passiert ist (Forensik)
-- Scene mit 4 Cast (Sarah, Mann, Frau, Matthew) wurde erfolgreich via `bbox-url-pro` lipgesynced — Pipeline + Sync.so funktionieren.
-- ABER: Speaker 1 ↔ Speaker 4 (die beiden Außenpositionen) sind im Output vertauscht. Audio von Sprecher 1 läuft auf das Gesicht von Sprecher 4 und umgekehrt.
-- Das ist **kein Sync.so-Bug** und **kein bbox-Bug** — der Fehler entsteht **vor dem Dispatch** in `_shared/plate-face-identity.ts`: die per-character Gemini-Probe + Hungarian-Assignment hat die Outer-Faces falsch zugeordnet. bbox-url-pro hat dann die (falsch gelabelten) Boxen perfekt befolgt.
+Einheitlicher Sync.so-Pfad für **alle** Dialog-Pässe: Full-Plate + `bounding_boxes_url`. Single-Speaker und Multi-Speaker laufen über genau denselben Code. Preclip-Render + Face-Gate verschwinden komplett aus dem Standardpfad.
 
-### Warum greift v133 cross-check hier nicht?
-Aktueller Gate (`plate-face-identity.ts` Z. 442):
+### Warum
+
+- Aktueller Multi-Speaker-Fehler (`face_gate_failed:count=0` für Matthew) ist ein Symptom der Pipeline-Spaltung: v116-Preclip-Render läuft als Pflicht, kollidiert mit v126-Guard, blockiert den eigentlich funktionierenden `bbox-url-pro`-Dispatch.
+- bbox-url-pro mit synthetischem Fallback (Zeile 4362: bbox aus `pass.coords` + plate dims) kann mathematisch *nicht fehlschlagen*, solange Coords + plate dims vorhanden sind — beides ist ab v126 schon Voraussetzung.
+- Spart 1–3 Lambda-Renders pro Pass (~60–180s Latenz pro Speaker).
+
+### Änderungen — `supabase/functions/compose-dialog-segments/index.ts`
+
+**A) `v150FreshBboxEligible` → `v152UnifiedBboxEligible` (Zeile ~2797)**
+
 ```ts
-const isAmbiguous = minConf < 0.55 || minMargin < 0.15;
+const v152UnifiedBboxEligible =
+  !isRetry &&
+  body?.noop_auto_escalation !== true &&
+  speakers.length >= 1 &&                              // ← war >=2
+  !!plateDims &&
+  Array.isArray(pass.coords) &&
+  Number.isFinite(Number(pass.coords?.[0])) &&
+  Number.isFinite(Number(pass.coords?.[1])) &&
+  // N=1: keine identity-disambiguation nötig (1 Gesicht, 1 Sprecher).
+  // N>=2: weiterhin Plate-Identity-Map erforderlich für deterministische Box-Zuordnung.
+  (speakers.length === 1 ||
+    (!!plateIdentityMap && plateIdentityMap.resolvedCount > 0));
+
+if (v152UnifiedBboxEligible) {
+  (pass as any).preclip_url = null;
+  (pass as any).preclip_render_id = null;
+  (pass as any).preclip_crop = null;
+  (pass as any).preclip_error = null;
+  (pass as any)._v152BboxPrimary = true;
+  console.warn(
+    `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_unified_bbox_primary speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? "n=1"} speaker=${pass.speaker_name ?? "?"}`,
+  );
+}
 ```
-Bei 4 Speakern reicht eine grobe Ähnlichkeit (z. B. zwei Männer mit dunklem Pulli, zwei Frauen mit Kleid) damit Hungarian eine plausible, aber falsche Zuordnung mit `conf=0.7, margin=0.2` findet → cross-check wird übersprungen → Swap bleibt unentdeckt.
 
-### Fix (nur `supabase/functions/_shared/plate-face-identity.ts`)
+**B) v116-Preclip-Render-Schleife gaten (Zeile ~3731)**
 
-**A) Cross-check für N≥4 **immer** ausführen (unabhängig von conf/margin)**
-- Neuer Block in der `else`-Verzweigung nach Hungarian (Z. 421–490): wenn `N >= 4`, `isAmbiguous = true` erzwingen, damit der `crossCheckAssignment`-Pass garantiert läuft.
-- Begründung: 4 Faces × 4 Charaktere = 24 Permutationen, Gemini-Cross-Check ist 1 Call und billig im Vergleich zu einem fehlgeschlagenen Lipsync-Render.
+Vor `const EXPANSION_LADDER = [1.0, 1.4, 1.8]`:
 
-**B) Cross-check verschärfen für N≥3**
-- Schwellen anheben: `minConf < 0.70 || minMargin < 0.25` (war 0.55 / 0.15).
-- Greift schon bei N=3 wenn das Hungarian-Ergebnis nicht eindeutig ist.
+```ts
+if ((pass as any)._v152BboxPrimary) {
+  console.log(
+    `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_skip_preclip_render bbox-url-pro PRIMARY`,
+  );
+} else {
+  // bestehende EXPANSION_LADDER-Loop + Face-Gate unverändert (Legacy/Retry-Pfad)
+}
+```
 
-**C) Bei `crossCheck === "rejected"` → Legacy-Multi-Call als Tie-Breaker**
-- Aktuell wird bei `rejected` nichts mehr probiert; `ambiguousFinal=true` → Pipeline kippt auf Fallback-Pfade ohne Identity-Map.
-- Neu: bei `rejected` + `N >= 3` → `askGeminiForPlateIdentity(...)` (Z. 271) als zweiter Versuch; nur wenn beide widersprechen, bleibt es bei `ambiguous`.
+Komplett-Entfernung des Codes machen wir in v153 nach 1–2 Wochen Telemetrie — solange bleibt die Schleife als sicherer Fallback für `noop_auto_escalation`-Retries und edge-cases im Legacy-Pfad.
 
-**D) Cache-Bust für diese Szene**
-- `plate_face_identity_cache` (oder analoger Cache-Key) hat das alte Ergebnis. Ich erweitere den Cache-Key um eine Versionskonstante `IDENTITY_CACHE_VERSION = "v151"` damit alle alten Einträge automatisch ignoriert werden.
+**C) v126-Hard-Fail-Guard für `_v152BboxPrimary` entschärfen (Zeile ~3892)**
 
-### Was NICHT geändert wird
-- `bbox-url-pro` bleibt PRIMARY für N≥2 (v147).
-- v148 NOOP-Bypass, v150 Voiced-Ratio-Gate, v149 Master-Watchdog: unverändert.
-- Sync.so-Dispatch, ASD-Strategie, Refund-Logik: unverändert.
-- Single-Speaker- und N=2-Pfad: unverändert.
+```ts
+if (
+  v126PreclipExpected &&
+  !usePassPreclip &&
+  !(pass as any)._v152BboxPrimary   // ← neu
+) {
+  // bestehender Refund-/Abort-Pfad
+}
+```
 
-### Memory + Plan-Doku
-- Neu: `mem/architecture/lipsync/v151-identity-swap-hardening.md`
-- Update: `mem/index.md` (Verweis + Core-Regel "N≥4 = always cross-check")
-- Update: `.lovable/plan.md`
+**D) bbox-url-pro Hard-Fail statt Silent-Downgrade (Zeile ~4396–4445)**
 
-### Recovery für die aktuelle Szene
-Da `passes` schon `done` sind und Sync.so-Kosten geflossen sind, kann ich die Szene nicht automatisch neu rendern. Du musst nach Deploy einmal **"Sauber neu starten"** auf der Szene drücken — der Cache-Bust sorgt dafür, dass v151 die Identity neu auflöst und cross-check zwingend läuft.
+Aktuell fällt der Pfad bei Upload-Fail oder 0 voiced frames auf `coords-pro` zurück. Ab v152: **harter Abbruch + Refund + klare User-Message**, gemäß User-Vorgabe.
 
-### Risiko
-- Kosten: +1 Gemini-Vision-Call pro N≥4-Szene (~$0.002). Vernachlässigbar.
-- Latenz: +1–2 s vor Dispatch. Akzeptabel.
+```ts
+const v147BboxValid = !!usedUrl && nonNullFrames >= 1;
+
+// v152 — Bbox sanity gates (vor v147BboxValid):
+const dimsArea = (plateDims?.width ?? 0) * (plateDims?.height ?? 0);
+const boxArea = box ? (box[2] - box[0]) * (box[3] - box[1]) : 0;
+const boxAreaPct = dimsArea > 0 ? boxArea / dimsArea : 0;
+const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= 0.45;  // 0.2% .. 45% der Plate
+
+if (v147BboxValid && v152BboxSane) {
+  // bestehender Dispatch unverändert
+} else if (retryVariant === "coords-pro-box") {
+  // Inline-Fallback für expliziten coords-pro-box Retry bleibt
+} else if ((pass as any)._v152BboxPrimary) {
+  // HARD-FAIL für v152 unified path — kein blinder Downgrade
+  const reason = !usedUrl
+    ? "bbox_url_upload_failed"
+    : nonNullFrames < 1
+      ? "bbox_zero_voiced_frames"
+      : `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`;
+  // → triggert dieselbe Refund-/User-Message-Routine wie v126 (extrahieren in
+  //   eine kleine Helper-Funktion `failPassWithRefund(reason, friendlyMsg)`,
+  //   die bereits aus dem v126-Block kopiert wird)
+  return await failPassWithRefund({ reason, friendlyMsg: `Lip-Sync für „${pass.speaker_name}" konnte nicht vorbereitet werden (${reason}). Bitte Szene neu rendern — Sprecher muss frontal und unverdeckt im Bild sein. Credits zurückerstattet.` });
+} else {
+  // Legacy-Pfad: bestehender silent downgrade auf coords-pro (für non-v152 Pässe)
+  retryVariant = "coords-pro";
+  // ...
+}
+```
+
+**E) bbox-Robustheit (innerhalb derselben Box-Construction, Zeile ~4330–4371)**
+
+Reihenfolge der bbox-Quellen härten:
+1. **faceMap matched face** (Gemini Vision, by characterId → slotIndex) — wie heute
+2. **NEU: Rekognition-Snap auf plate frame** wenn faceMap miss oder bbox-area `< 0.5%`: bereits vorhandener `v135_pre_snap` (Zeile ~3672) liefert Rekognition-Coords; bei Erfolg deren bbox nutzen (cx/cy ±50%w/80%h Heuristik)
+3. **Synthetic from pass.coords** (heutiger Fallback, Zeile 4362) — bleibt als letzte Stufe
+
+Die ersten zwei sind bereits Code, müssen nur in einer Kette stehen statt als sich gegenseitig ausschließende Branches.
+
+**F) Log-Klarheit (Zeile ~3005)**
+
+Im `v147_dispatch_reason`-Log zusätzlich `v152_unified_path: !!(pass as any)._v152BboxPrimary` und `bbox_area_pct` mitloggen für forensische Triage.
+
+### Was NICHT entfernt wird (noch nicht)
+
+- v116 EXPANSION_LADDER + Face-Gate-Code → bleibt als Legacy-Fallback für `noop_auto_escalation`-Retry-Variants (`coords-pro`, `sync3-coords`, `coords-pro-lp2pro`). Komplettentfernung folgt in v153 nach Telemetrie-Bestätigung.
+- v151 Identity-Swap-Hardening, v150 NOOP-Bytes-Heuristik, v149 Master-Watchdog, v148 NOOP-Bypass, Sync.so-Webhook, alle Refund-Logiken.
+- Retry-Pfad: `RETRY_VARIANTS = ["bbox-url-pro", "coords-pro", "coords-pro-box", "sync3-coords", "coords-pro-lp2pro", "auto-pro", "auto-standard"]` unverändert.
+
+### Recovery für laufende Szene
+
+Nach Deploy: User klickt **„Sauber neu starten"** → Fresh-Dispatch trifft `v152UnifiedBboxEligible=true` für alle 4 Sprecher → keine Preclip-Render mehr → bbox-url-pro PRIMARY direkt.
+
+### Files
+
+- **Edit**: `supabase/functions/compose-dialog-segments/index.ts` (~50 Zeilen netto Diff, davon ~25 neue helper-Funktion `failPassWithRefund` durch Extraktion aus v126-Block)
+- **Create**: `mem/architecture/lipsync/v152-unified-bbox-pipeline.md` (Architektur-Memo: einheitliche Pipeline + Hard-Fail-Policy + bbox-Robustheits-Kette)
+- **Edit**: `mem/index.md`, `.lovable/plan.md`
+- **Deploy**: `compose-dialog-segments`
+
+### Telemetrie-Plan (für spätere v153 Cleanup-Entscheidung)
+
+Nach Deploy für 7 Tage tracken: `count(v152_unified_bbox_primary)` vs `count(v152_skip_preclip_render)` vs `count(bbox_geometry_insane)` vs `count(bbox_url_upload_failed)`. Wenn Insane-Rate < 1% und Upload-Fail-Rate < 0.1% → v153 entfernt Preclip-Loop komplett.
