@@ -1,93 +1,81 @@
-## Root cause (forensisch bestätigt)
+## Beweislage (was wir nach v139.1 wissen)
 
-Aus den Edge-Function-Logs zum Zeitpunkt des Fehlers:
-
+**Sync.so OpenAPI (offizielle Quelle, gerade nachgeschlagen):**
+```yaml
+coordinates: { type: array, items: { type: integer } }
+# Description: "Reference point [x, y] on the speaker's face"
 ```
-ERROR [compose-dialog-segments] scene=d08783e6 dispatch FAILED pass=0 status=400
-body={"message":["options.active_speaker_detection.coordinates must contain at least 2 elements"],
-      "error":"Bad Request","statusCode":400}
-```
+→ **Flat `[x, y]` ist 100% korrekt.** Es gibt **kein `minItems`** im Schema. Die Fehlermeldung *"must contain at least 2 elements"* ist Sync.so-Laufzeit-Prosa und bedeutet schlicht: *die zwei Zahlen x und y müssen beide da sein*. v139.1 hat also die richtige Richtung — aber das 400 kommt trotzdem.
 
-Das ist **kein Sync.so Edge-Case und kein Audio/Plate-Problem** — es ist ein triviales Payload-Shape-Regression-Bug, eingeführt mit **v136 Preclip-Centered Coords**.
+**Was die Logs zum letzten Run (10:44 Uhr) zeigen:**
+- ❌ **Kein einziges `v139…`- oder `coords_shape…`-Log**. Unser v139.1-Pre-Dispatch-Assert hat nie gefeuert.
+- Nur `v1291_preclip_sync3` (alt) und `v130` taucht im Strategy-Log auf.
+- pass=1 dispatched mit `coords=[300,144]` (flat, sieht OK aus) — aber `centered_coord` im Strategy-Log war `[360,360]`. Zwei verschiedene Werte → **ein anderer Code-Pfad** als der v139.1-gepatchte hat die finalen Coords gesetzt.
+- pass=0 → Sync.so 400 "at least 2 elements". Unser Assert (der das 400 vorher abfangen würde) hat nicht geblockt → **entweder Deploy nicht aktiv ODER pass=0 läuft an dispatchToSyncSo komplett vorbei**.
 
-### Bug 1 (Blocker — `syncso_segments_dispatch_400`)
-
-Datei: `supabase/functions/compose-dialog-segments/index.ts`, **Zeile 4156**
-
-```ts
-coordinates: [[centerXY, centerXY]],   // ❌ nested array, length 1
-```
-
-Sync.so liest `coordinates` als flaches `[x, y]` (2 Elemente). Wir senden `[[360, 360]]` (1 Element, das wiederum ein Array ist) → Sync.so antwortet 400 "must contain at least 2 elements". Jeder einzelne Pass schlägt **bevor Sync.so überhaupt rechnet** fehl → `Lip-Sync abgebrochen` Banner in der UI.
-
-Beweis: Alle anderen v60–v130-Pfade nutzen das korrekte flache Schema:
-- Zeile 4242: `coordinates: clampSyncCoords(pass.coords)` → `[x, y]`
-- `clampSyncCoords` (Zeile 329) gibt `[number, number]` flach zurück.
-
-Nur v136 hat fälschlich eine zusätzliche Klammerebene.
-
-### Bug 2 (Sekundär — Qualität, nicht Blocker)
-
-```
-WARNING [plate-face-identity] probe kailee HTTP 400
-WARNING [plate-face-identity] gemini google/gemini-2.5-pro HTTP 400
-```
-
-Alle 4 v133-Per-Char-Probes + der Cross-Check (gemini-2.5-pro) bekommen 400 vom Lovable AI Gateway. Folge: Plate-Identity fällt auf Legacy-Pfad zurück, ASD-Strategy kann auf `last_resort_auto` / v119 SOFT_WARN demoten — was die Pipeline anfälliger macht. Erklärt das "alles geht schief"-Gefühl: selbst wenn Bug 1 nicht zugeschlagen hätte, wäre die Identity-Zuordnung degradiert.
-
-Wahrscheinliche Ursachen (zu verifizieren in Stage B):
-- Image-URLs in `content[].image_url.url` sind Supabase Signed URLs, die expired sind, oder
-- Gateway lehnt das Multi-Image-Payload-Shape für `gemini-2.5-flash`/`gemini-2.5-pro` ab (kürzlich geänderte Spec — siehe `mem/architecture/gemini-vision/mp4-payload-shapes.md`)
+**Root-Cause-Verdacht:** Es gibt **mindestens 7 Stellen** im File die `syncOptions.active_speaker_detection` setzen (Zeilen 4118, 4157, 4243, 4320, 4339, 4351, 5038) plus Forensik-Pfade (5467). v139.1 hat nur **eine** davon (4157) gefixt. Die anderen sind teilweise schon flat, aber **wir haben keinen Beweis welcher Pfad pass=0 nimmt**, weil zwischen Strategy-Override und Wire-Dispatch zu viele Mutations-Punkte liegen.
 
 ---
 
-## Plan
+## v139.2 — Plan (3 Etappen, jede einzeln verifizierbar)
 
-### Stage A — Hotfix (sofort, 1 Zeile)
+### Etappe A — Deployment-Wahrheit & Wire-Forensik (~30 Zeilen)
 
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
+Ziel: **Beweisen welche Version läuft und was Sync.so tatsächlich als JSON sieht.**
 
-- Zeile 4156: `coordinates: [[centerXY, centerXY]]` → `coordinates: [centerXY, centerXY]`
-- Zeile 4160 belassen (`preclip_asd_coords = [centerXY, centerXY]` ist bereits korrekt — war nur das Dispatch-Payload falsch)
-- Version-Bump: `COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.1"`
-- Diagnose-Log-Ergänzung: vor dem Sync.so `fetch` einmal pro Pass `console.log` mit `coords_shape=[len, isArrayOfNumber]` damit jede zukünftige Regression sofort sichtbar ist.
-- Pre-Dispatch Assertion: wenn `auto_detect === false`, prüfe `Array.isArray(coordinates) && coordinates.length === 2 && coordinates.every(n => Number.isFinite(n))` — sonst werfe **bevor** Sync.so-Aufruf, mit klarem Error-Code `BAD_COORDS_SHAPE` statt Sync.so 400.
+1. **Boot-Log** in `compose-dialog-segments/index.ts`: einmaliges `console.log` beim Modul-Load mit `COMPOSE_DIALOG_SEGMENTS_VERSION` + Datei-Hash (`Date.now()` reicht als "deploy marker"). So sehen wir sofort ob Edge-Runtime die alte Version cached.
+2. **Wire-Forensik-Log unmittelbar vor `fetch(${SYNC_API_BASE}/generate)`** (Zeile 5245): `console.log(... WIRE_PAYLOAD options=${JSON.stringify(payload.options)} pass=${currentPassIdx})`. Das zeigt uns die **exakte** Bytes, die Sync.so sieht — kein Raten mehr.
+3. **Wire-Forensik-Log bei der 400-Response**: zusätzlich das `payload.options` mitloggen damit Request+Response in einer Zeile korreliert sind.
+4. Re-Deploy, eine 4-Speaker-Szene laufen lassen, Logs ziehen.
 
-Erwartung: Dispatch geht durch, Pipeline läuft die 6–9 Minuten wie in v139 Stage 1 geplant.
+→ Aus diesen Logs wissen wir innerhalb von **einem Run** ob:
+   - (a) die Coords als `[[x,y]]` rausgehen (Regression an anderer Stelle),
+   - (b) die Coords komplett fehlen (`undefined`/leeres Array),
+   - (c) die Coords flat sind aber Sync.so wegen anderem Feld 400t (z. B. `frame_number` out-of-range, `auto_detect:false` mit leeren Boxes).
 
-### Stage B — Diagnose & Fix Gemini-Probe HTTP 400
+### Etappe B — Single-Setter-Refactor (~80 Zeilen netto, ~250 Zeilen gelöscht)
 
-Datei: `supabase/functions/_shared/plate-face-identity.ts`
+Ziel: **Aus 7 parallelen ASD-Mutation-Punkten wird genau einer.** Die Konsolidierung die du wolltest, aber chirurgisch nur für ASD.
 
-- Bei `!resp.ok` zusätzlich `await resp.text()` loggen (max 500 Zeichen), damit wir den Gateway-Fehler-Body sehen.
-- Prüfen ob `params.frameUrl` / `params.portraitUrl` öffentlich erreichbar sind (HEAD probe vor Gemini-Call, einmal pro Aufruf, mit 2s timeout) → bei 403/404 sofort `last_resort_auto` mit klarer Begründung statt blind Gemini zu callen.
-- Falls Image-URL ok ist, das Payload-Shape gegen `mem/architecture/gemini-vision/mp4-payload-shapes.md` abgleichen.
+1. Neue Helper-Funktion `buildAsdPayload(strategy, pass, preclipMeta) → { auto_detect, coordinates?, frame_number?, bounding_boxes_url? }`:
+   - Single Source of Truth — implementiert die volle Doc-Strict-Logik einmal.
+   - Returnt **immer** ein doc-konformes Objekt (entweder `{auto_detect:true}` oder `{auto_detect:false, frame_number:N, coordinates:[x,y]}` oder `{auto_detect:false, bounding_boxes_url:"..."}`).
+   - Eingebauter Self-Check: wirft synchron wenn Shape illegal — keine Möglichkeit dass ein illegaler Wert das File verlässt.
+2. **Alle 7 bestehenden Assignment-Stellen entfernen** und durch genau einen Call vor dem Dispatch ersetzen: `syncOptions.active_speaker_detection = buildAsdPayload(...)`.
+3. v131.5-Override / v136-Sanitizer / v139.1-Assert: alle drei in `buildAsdPayload` zusammenführen — kein Late-Mutation mehr.
+4. Re-Deploy.
 
-Stage B nur ausführen wenn Stage A nicht reicht (also wenn der erste 4-Sprecher-Run noch immer auf Identity-Fallback geht).
+### Etappe C — Verifikation & Memory-Update
 
-### Stage C — Memory & Docs
-
-- `mem/architecture/lipsync/v139-stage-1-brakes-released.md` ergänzen um v139.1 Regression-Fix-Entry.
-- Neue Memory `mem/architecture/lipsync/v136-coords-shape-canonical.md`: "Sync.so sync-3 `coordinates` MUSS flach `[x, y]` sein (2 Number-Elemente). Niemals nested. Pre-Dispatch Assertion vorhanden."
-
-### Was NICHT angefasst wird
-
-- v138 Plan-D Fan-out, v139 Stage 1 Brakes Released (Coord-Refresh Scoping, Batch-Preclip default ON, Plan-D default ON) — alles korrekt, läuft nur nie an, weil Bug 1 vorher abbricht.
-- Sync.so `sync-3`, `sync_mode: cut_off`, Webhook-Pfad, Stitch-Pipeline.
-- Audio/Plate/Preclip-Renderer, Frontend, Wallet, Refunds.
-
-### Verifikation
-
-1. Dieselbe 4-Sprecher-Szene neu generieren.
-2. Edge-Logs erwarten: kein `dispatch FAILED ... status=400`, stattdessen `v139_fanout_active cap=2`, 4× `DISPATCH`, 4× Sync.so Webhook, Stitch ok.
-3. Wenn weiterhin Gemini-Probe HTTP 400 erscheint → Stage B aktivieren.
+1. 4-Speaker-Szene laufen.
+2. Erwartetes Log-Pattern: `v139.2_boot version=v139.2`, dann pro Pass `WIRE_PAYLOAD options={...}` mit `"coordinates":[x,y]` flat, dann `v139_fanout_active cap=2`, dann 4× Sync.so 201 (kein 400 mehr).
+3. Memory: `mem/architecture/lipsync/v136-coords-shape-canonical.md` updaten mit der finalen Single-Setter-Regel; `mem/index.md` Eintrag erweitern.
 
 ---
 
-## Aufwand
+## Technische Details
 
-- Stage A: ~6 Zeilen Code-Änderung, ~10 Zeilen Assertion + Log, sofort deploybar.
-- Stage B: ~30 Zeilen, nur bei Bedarf.
-- Stage C: 2 Memory-Files.
+**Was NICHT angefasst wird (bleibt 1:1):**
+- v138 Plan-D Fan-out Logik, v139 Coord-Refresh-Scoping, Batch-Preclip-Defaults, Sync.so Webhook, Stitch, Audio-Normalisierung, Wallet/Refund-Pfad, Frontend.
+- Die Plate-Identity / v117 SOFT-WARN-Logik (orthogonal zum Shape-Problem).
 
-Stage A ist die alleinige Ursache des Banners auf dem Screenshot. Die anderen v138/v139 Konsolidierungen aus dem vorigen Plan bleiben relevant für Speed/Cleanup, sind aber unabhängig.
+**Was deployed wird:**
+- Nur `supabase/functions/compose-dialog-segments/index.ts`.
+- Keine DB-Migration, kein Frontend-Build, keine neuen Secrets.
+
+**Risiko:**
+- Niedrig. Etappe A ist nur Logging (read-only). Etappe B ist eine reine Refactoring-Konsolidierung — die *vorhandene* doc-strict Logik bleibt erhalten, nur die Duplikate verschwinden. Wenn Etappe A bereits einen unerwarteten Cause aufdeckt (z. B. `frame_number` zu groß), pivotieren wir bevor wir B machen.
+
+**Abbruch-Kriterium für Etappe B:**
+- Falls die Wire-Forensik aus Etappe A zeigt dass das Problem gar nicht die Coord-Shape ist sondern ein anderes Feld (z. B. `frame_number > preclip_frame_count`), wird Etappe B abgesagt und stattdessen der echte Cause gefixt.
+
+---
+
+## Reihenfolge der Ausführung
+
+1. Etappe A (Logging + Re-Deploy)
+2. Du startest eine Szene → wir lesen die `WIRE_PAYLOAD`-Logs
+3. Auf Basis des Beweises: Etappe B ODER Pivot
+4. Etappe C (Verifikation + Memory)
+
+Soll ich mit **Etappe A** beginnen?
