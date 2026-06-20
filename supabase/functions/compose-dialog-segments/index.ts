@@ -3153,15 +3153,15 @@ serve(async (req) => {
     const freshDefaultVariant: RetryVariant = (v153Active || v147BboxEligible)
       ? "bbox-url-pro"
       : "coords-pro";
+    const noopAutoEscalation = body?.noop_auto_escalation === true;
     let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
-    // v153 — Bei aktivem unified-Pfad auch Retries auf bbox-url-pro zwingen.
-    // Die NOOP-Ladder darf weiterhin bbox-url-pro / coords-pro-box wählen.
-    if (v153Active && !isRetry) {
+    // v153.2 — Bei aktivem unified-Pfad auch Advance/Retry auf bbox-url-pro zwingen.
+    // Die NOOP-Ladder darf weiterhin explizite Diagnose-Varianten wählen.
+    if (v153Active && !noopAutoEscalation) {
       retryVariant = "bbox-url-pro";
     }
-    const noopAutoEscalation = body?.noop_auto_escalation === true;
     const isFreshBboxPrimary = !isRetry && freshDefaultVariant === "bbox-url-pro";
     if (
       !noopAutoEscalation &&
