@@ -5110,6 +5110,33 @@ serve(async (req) => {
       }
     }
 
+    // ── v140 — Final single wire builder for ASD ────────────────────────
+    // From here to `fetch`, the outgoing payload is canonicalized exactly
+    // once. No branch may mutate `active_speaker_detection` after this point.
+    try {
+      const canonicalAsd = normalizeCanonicalAsd(
+        (payload.options as any)?.active_speaker_detection ??
+          (syncOptions as any)?.active_speaker_detection,
+      );
+      (syncOptions as any).active_speaker_detection = canonicalAsd;
+      (payload.options as any).active_speaker_detection = canonicalAsd;
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v140_ASD_CANONICAL asd=${JSON.stringify(canonicalAsd)}`,
+      );
+    } catch (canonErr) {
+      return await failBeforeProviderDispatch(
+        "DISPATCH_BLOCKED_V140_CANONICAL_ASD",
+        "canonical_asd_invalid",
+        `v140 canonical ASD builder rejected payload: ${(canonErr as Error)?.message ?? canonErr}`,
+        500,
+        {
+          final_asd: (payload.options as any)?.active_speaker_detection ?? null,
+          retry_variant: retryVariant,
+          compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+        },
+      );
+    }
+
     // ── v136 — Doc-strict ASD sanitizer (replaces v131.5 final override) ──
     // With v136 we dispatch explicit preclip-centered coordinates on preclip
     // passes, so the previous "force auto_detect:true at the wire" override
