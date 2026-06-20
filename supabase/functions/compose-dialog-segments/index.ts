@@ -121,7 +121,13 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.1";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.2";
+// v139.2 — Module-load boot marker. Proves which build is actually running
+// inside Edge Runtime (vs a stale cached copy). Look for this exact string
+// in logs immediately after any deploy to confirm the new code is live.
+console.log(
+  `[compose-dialog-segments] BOOT version=${"v139.2"} deploy_marker=${Date.now()} pid=${(globalThis as any).Deno?.pid ?? "?"}`,
+);
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // v37 — `sync3-coords` added as the Sync.so-recommended fallback for
