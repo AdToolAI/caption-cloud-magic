@@ -2889,30 +2889,42 @@ serve(async (req) => {
     const havePlateIdentityForDispatch =
       !!plateIdentityMap && plateIdentityMap.resolvedCount > 0;
     const hasPassPreclipForDispatch = !!(pass as any).preclip_url;
-    // v126 — Unified single-face preclip pipeline for ALL N (1..4).
-    // Variant is diagnostic-only now: dispatch payload is ALWAYS
-    // preclip + sync-3 + auto_detect + cut_off (see usePassPreclip block).
-    // Full-plate `bbox-url-pro` is removed as a first-dispatch option — it
-    // was the root cause of Samuel's `provider_unknown_error` on scene
-    // cba18767 (DB-verified June 15 2026). If a preclip cannot be produced
-    // we fail clean + refund, never silently fall back to full-plate.
+    // v147 — bbox-url-pro als PRIMARY für Multi-Speaker (revives v82 Phase 2.1).
+    // Empirie v146 Forensik Run 0b3dafc5: Hailuo-Plates sind sauber
+    // (Sarah 32.6% frame-coverage, Mund sichtbar), aber Sync.so `auto_detect`
+    // failt reproducibly mit `face_gate_failed:count=0` auf stilisierten
+    // Multi-Face Plates. Deterministische `bounding_boxes_url` umgeht den
+    // Sync.so-Detector komplett.
+    //
+    // v126 hatte bbox-url-pro deaktiviert wegen `provider_unknown_error`
+    // (Szene cba18767). v147 löst das mit Pre-Dispatch-Validation der bbox-
+    // URL (nonNullFrames >= 1) + sauberem Fallback auf `coords-pro` statt
+    // blind dispatchen.
+    //
+    // Preclip-Path bleibt unverändert (Rule 0 → auto_detect auf der per-
+    // Speaker single-face Crop ist sicher und well-understood). Nur der
+    // Full-Plate Multi-Speaker Pfad bekommt bbox-url-pro.
     void v120ForcePreclip;
-    void havePlateIdentityForDispatch;
-    void hasPassPreclipForDispatch;
-    const freshDefaultVariant: RetryVariant = "coords-pro";
+    const v147BboxEligible =
+      speakers.length >= 2 &&
+      havePlateIdentityForDispatch &&
+      !!plateDims &&
+      !hasPassPreclipForDispatch;
+    const freshDefaultVariant: RetryVariant = v147BboxEligible
+      ? "bbox-url-pro"
+      : "coords-pro";
     let retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
       : freshDefaultVariant;
-    // v144 — Respect explicit NOOP-escalation variants. Previously v126
-    // collapsed every full-plate variant ("bbox-url-pro", "coords-pro-box",
-    // "auto-pro", "auto-standard") back to "coords-pro" — which silently
-    // re-dispatched the IDENTICAL input that already produced a NOOP. The
-    // v134 NOOP-ladder in sync-so-webhook calls us with `noop_auto_escalation=true`
-    // + the next rung's variant; honor it. Only collapse legacy retries
-    // that did NOT come from the NOOP-ladder.
+    // v147 — Collapse-Gate Update: bbox-url-pro auf Fresh-Dispatch NICHT
+    // mehr nach coords-pro umleiten. Nur Legacy-Retries (die nicht aus
+    // dem NOOP-Ladder kommen UND nicht der frische v147-Default sind)
+    // werden gekappt, um den v126-Provider-Unknown-Loop zu vermeiden.
     const noopAutoEscalation = body?.noop_auto_escalation === true;
+    const isFreshBboxPrimary = !isRetry && freshDefaultVariant === "bbox-url-pro";
     if (
       !noopAutoEscalation &&
+      !isFreshBboxPrimary &&
       (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box" || retryVariant === "auto-pro" || retryVariant === "auto-standard")
     ) {
       retryVariant = "coords-pro";
@@ -2920,6 +2932,11 @@ serve(async (req) => {
     if (noopAutoEscalation) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v144_noop_escalation honoring variant=${retryVariant} step=${body?.noop_escalation_step ?? "?"}`,
+      );
+    }
+    if (isFreshBboxPrimary) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_bbox_url_pro_primary speakers=${speakers.length} resolved=${plateIdentityMap?.resolvedCount ?? 0}`,
       );
     }
 
@@ -4321,16 +4338,21 @@ serve(async (req) => {
         nonNullFrames = up.nonNullFrames;
       }
 
-      if (usedUrl) {
+      // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
+      // enthalten. Sonst: deterministischer Downgrade auf coords-pro (kein
+      // stiller inline-Fallback, der bei kaputter URL den v126-Provider-
+      // Unknown wieder triggern würde).
+      const v147BboxValid = !!usedUrl && nonNullFrames >= 1;
+      if (v147BboxValid) {
         syncOptions.active_speaker_detection = {
           auto_detect: false,
-          bounding_boxes_url: usedUrl,
+          bounding_boxes_url: usedUrl!,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_URL_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_URL_PRIMARY speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
-      } else {
-        // graceful degrade — inline bounding_boxes (legacy coords-pro-box path)
+      } else if (retryVariant === "coords-pro-box") {
+        // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.
         const boundingBoxes: ([number, number, number, number] | null)[] =
           v124VoicedWindows.length > 0
             ? buildPerFrameBoxes({
@@ -4346,8 +4368,22 @@ serve(async (req) => {
           bounding_boxes: boundingBoxes,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}${retryVariant === "bbox-url-pro" ? " (url-upload-failed → inline-fallback)" : ""}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}`,
         );
+      } else {
+        // v147 — bbox-url-pro Upload failed oder 0 voiced frames → downgrade
+        // auf coords-pro statt blind inline-fallback. coords-pro nutzt
+        // pass.coords direkt und ist der nächst-sichere Stage.
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_DOWNGRADE_TO_COORDS_PRO reason=${!usedUrl ? "upload_failed" : "zero_voiced_frames"} non_null=${nonNullFrames}`,
+        );
+        retryVariant = "coords-pro";
+        pass.retry_variant = "coords-pro";
+        syncOptions.active_speaker_detection = {
+          auto_detect: false,
+          frame_number: referenceFrameNumber,
+          coordinates: clampSyncCoords(pass.coords),
+        };
       }
 
 
