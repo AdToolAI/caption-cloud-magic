@@ -546,7 +546,7 @@ async function runForensic(args: {
     // 2) Single Gemini call analyzing the whole video at early/mid/late timestamps
     const dur = Number(body.duration_sec) > 0 ? Number(body.duration_sec) : 5;
     const analysis = await analyzeVideoWithGemini({
-      apiKey: LOVABLE_API_KEY,
+      replicateToken: REPLICATE_API_TOKEN,
       videoUrl: stableUrl,
       durationSec: dur,
       expectedSpeakers,
