@@ -1000,6 +1000,11 @@ export function classifySyncErrorCode(code?: string | null): SyncCodeBucket {
     "generation_video_missing",
     "generation_input_validation_failed",
     "generation_internal_auth",
+    // v143 — Sync.so could not fetch the input video URL (expired presigned S3
+    // is the most common cause). Retrying with the same URL never helps; the
+    // upstream caller must rehost into stable storage (see _shared/rehostPlate).
+    "generation_input_video_inaccessible",
+    "generation_input_audio_inaccessible",
   ].includes(c)) return "fail_fast";
   return "unknown";
 }
