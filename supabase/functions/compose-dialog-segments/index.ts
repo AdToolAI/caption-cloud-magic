@@ -2041,8 +2041,23 @@ serve(async (req) => {
         segments: passSegments,
         input_url: "", // filled per pass below
         status: "pending",
+        // v137 — per-pass mapping forensics. Surface what the
+        // speaker→face resolver decided so the cockpit can show why
+        // a given pass got those coordinates without joining
+        // syncso_dispatch_log.
+        v137_mapping: {
+          coord_source: coordSources[originalIdx] ?? "unknown",
+          plate_bbox: speakerPlateBboxes[originalIdx] ?? null,
+          plate_face_count: plateIdentityMap?.faces?.length ?? null,
+          plate_identity_resolved: plateIdentityMap?.resolvedCount ?? null,
+          plate_identity_method: (plateIdentityMap as any)?.identityMethod ?? null,
+          plate_identity_min_conf: (plateIdentityMap as any)?.minConfidence ?? null,
+          plate_identity_min_margin: (plateIdentityMap as any)?.minMargin ?? null,
+          plate_dims: plateDims ?? null,
+        },
       };
     });
+
 
     const builtPasses: PassState[] = splitMultiTurnFlagOn
       ? builtPassesRaw.flatMap((p) => {
