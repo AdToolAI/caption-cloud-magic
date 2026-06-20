@@ -112,6 +112,35 @@ export default function LipsyncDiagnostic() {
     }
   };
 
+  const submitForensic = async () => {
+    if (!forensicPlateUrl) {
+      toast({ title: "Plate-URL ist Pflicht", variant: "destructive" });
+      return;
+    }
+    setForensicSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("lipsync-diagnostic", {
+        body: {
+          mode: "plate-face-forensic",
+          plate_url: forensicPlateUrl,
+          expected_speakers: Number(forensicSpeakers) || 2,
+          duration_sec: Number(forensicDuration) || 5,
+          source_scene_id: forensicSceneId || undefined,
+        },
+      });
+      if (error) throw error;
+      toast({
+        title: "Forensik gestartet",
+        description: `Run ${data?.run_id?.slice(0, 8)} · 3 Frames werden extrahiert + analysiert (~30–60s)`,
+      });
+      loadRuns();
+    } catch (e: any) {
+      toast({ title: "Forensik fehlgeschlagen", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setForensicSubmitting(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-start justify-between">
