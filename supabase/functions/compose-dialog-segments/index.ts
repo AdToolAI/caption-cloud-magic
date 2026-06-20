@@ -497,7 +497,7 @@ interface SegmentsState {
     faces?: unknown[];
     resolvedCount?: number;
     cached?: boolean;
-    sourceClipUrl?: string;
+    sourceClipUrl?: string | null;
     hydratedAt?: string;
   };
 }
