@@ -502,7 +502,10 @@ async function runForensic(args: {
   if (!plateUrl) return json({ error: "plate_url required for forensic mode" }, 400);
 
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const REPLICATE_API_TOKEN =
+    Deno.env.get("REPLICATE_API_KEY") ?? Deno.env.get("REPLICATE_API_TOKEN");
   if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY missing" }, 500);
+  if (!REPLICATE_API_TOKEN) return json({ error: "REPLICATE_API_KEY missing" }, 500);
 
   // Insert run row
   const { data: runRow, error: insErr } = await admin
