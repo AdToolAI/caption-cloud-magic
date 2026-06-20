@@ -3569,7 +3569,7 @@ serve(async (req) => {
       }
     }
 
-    if (wantPassPreclip && !(pass as any).preclip_url) {
+    if (wantPassPreclip && !(pass as any).preclip_url && !(pass as any)._v152BboxPrimary) {
       // v94: Window spans the UNION of all turns for this speaker, not just
       // the first turn. Sync.so with sync_mode=cut_off caps output at
       // min(video, audio); if the preclip only covers turn 1, turns 2..N of
