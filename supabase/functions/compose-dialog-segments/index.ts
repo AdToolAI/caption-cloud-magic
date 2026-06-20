@@ -121,12 +121,12 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v139.2";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v140.0";
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
 console.log(
-  `[compose-dialog-segments] BOOT version=${"v139.2"} deploy_marker=${Date.now()} pid=${(globalThis as any).Deno?.pid ?? "?"}`,
+  `[compose-dialog-segments] BOOT version=${COMPOSE_DIALOG_SEGMENTS_VERSION} deploy_marker=${Date.now()} pid=${(globalThis as any).Deno?.pid ?? "?"}`,
 );
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
@@ -338,6 +338,37 @@ const clampSyncCoords = (coords: [number, number] | null | undefined): [number, 
   if (x <= 1 && y <= 1) return [Math.round(x * 1280), Math.round(y * 720)];
   return [Math.max(1, Math.round(x)), Math.max(1, Math.round(y))];
 };
+
+type CanonicalAsd =
+  | { auto_detect: true }
+  | { auto_detect: false; frame_number: number; coordinates: [number, number] }
+  | { auto_detect: false; bounding_boxes_url: string }
+  | { auto_detect: false; bounding_boxes: ([number, number, number, number] | null)[] };
+
+function normalizeCanonicalAsd(input: unknown): CanonicalAsd {
+  const asd = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  if (typeof asd.bounding_boxes_url === "string" && asd.bounding_boxes_url.trim()) {
+    return { auto_detect: false, bounding_boxes_url: asd.bounding_boxes_url };
+  }
+  if (Array.isArray(asd.bounding_boxes) && asd.bounding_boxes.length > 0) {
+    return { auto_detect: false, bounding_boxes: asd.bounding_boxes as ([number, number, number, number] | null)[] };
+  }
+  if (asd.auto_detect === false) {
+    const raw = Array.isArray(asd.coordinates) && Array.isArray(asd.coordinates[0])
+      ? (asd.coordinates[0] as unknown[])
+      : Array.isArray(asd.coordinates)
+        ? asd.coordinates
+        : [];
+    const x = Number(raw[0]);
+    const y = Number(raw[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error(`canonical_asd_missing_coordinates:${JSON.stringify(asd.coordinates ?? null)}`);
+    }
+    const frame = Number.isFinite(Number(asd.frame_number)) ? Math.max(0, Math.round(Number(asd.frame_number))) : 0;
+    return { auto_detect: false, frame_number: frame, coordinates: [Math.round(x), Math.round(y)] };
+  }
+  return { auto_detect: true };
+}
 
 /**
  * v71 — transient fetch errors (Supabase Storage hiccup, edge-runtime
@@ -4135,54 +4166,6 @@ serve(async (req) => {
         frame_clamped: !refFrameInPreclipRange,
       };
 
-      // v136 — Preclip-Centered Coords (supersedes v131.4 auto_detect override)
-      // Root cause discovered 2026-06-19 on scene af3901da: Sync.so sync-3
-      // with `{ auto_detect: true }` on a 720×720 face-cropped preclip
-      // silently returns the input video unchanged (no lip animation) for
-      // ~all passes. Forensic PSNR(preclip→output) measured 33–43 dB across
-      // all 4 speaker passes — no mouth movement.
-      //
-      // The preclip is by construction a one-face square centered on that
-      // speaker's face (see preclip builder, ~line 4047). We can dispatch
-      // explicit, in-preclip coordinates at the geometric center of the
-      // output frame, removing all guessing on Sync.so's side. This applies
-      // to BOTH single- and multi-speaker passes because the preclip is the
-      // same shape in both cases.
-      //
-      // Safety net: Sync.so's auto-snap (v129.22.3, ok_after_snap branch
-      // below at ~line 4950) still corrects any sub-frame drift, and the
-      // pre-snap (v135) still runs on plate-space ambiguous crops.
-      if (usePassPreclip && retryVariant === "coords-pro") {
-        const previousAsd = syncOptions.active_speaker_detection;
-        const outSizeForCenter = Number((pass as any).preclip_crop?.outputSize) || 720;
-        const centerXY = Math.round(outSizeForCenter / 2);
-        // v139.1 — Sync.so `coordinates` MUST be a flat [x, y] (2 numbers).
-        // v136 accidentally wrapped it as [[x, y]] (length 1) → Sync.so
-        // rejected every dispatch with 400 "coordinates must contain at
-        // least 2 elements". See mem/architecture/lipsync/v136-coords-shape-canonical.md
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          frame_number: 0,
-          coordinates: [centerXY, centerXY],
-        };
-        asdMode = "v136_preclip_centered_coords";
-        (pass as any).preclip_asd_source = "v136_preclip_center";
-        (pass as any).preclip_asd_coords = [centerXY, centerXY];
-        v1291Diag = {
-          ...v1291Diag,
-          rule: "v136_preclip_centered_coords",
-          mode: "preclip_center",
-          source: "preclip_geometric_center",
-          coord_space: "preclip_output",
-          frame_number: 0,
-          reason: "v136_supersedes_v131_4_auto_detect_silent_noop",
-          retry_variant: retryVariant,
-          original_strategy_mode: strategy.mode,
-          original_asd: previousAsd,
-          preclip_output_size: outSizeForCenter,
-          centered_coord: [centerXY, centerXY],
-        };
-      }
       (pass as any)._v1291 = v1291Diag;
       (pass as any)._v130_asd_strategy = {
         mode: v1291Diag?.mode ?? strategy.mode,
@@ -5005,72 +4988,16 @@ serve(async (req) => {
       // first-attempt dispatch where preflight had succeeded. Single
       // source of truth, no shape drift possible.
       if (gate.ok && gate.code === "ok_after_snap" && Array.isArray(gate.snapped_coord)) {
-        const snappedCoord: [number, number] = [
-          Number(gate.snapped_coord[0]),
-          Number(gate.snapped_coord[1]),
-        ];
-        const snapFrame: number = Number.isFinite(gateFrame as number)
-          ? Number(gateFrame)
-          : (Number.isFinite((syncOptions as any)?.active_speaker_detection?.frame_number)
-              ? Number((syncOptions as any).active_speaker_detection.frame_number)
-              : (Number.isFinite(referenceFrameNumber) ? Number(referenceFrameNumber) : 0));
-
-        const snapStrategy = buildAsdStrategy({
-          preflight: {
-            faceFound: true,
-            coord: snappedCoord,
-            frame: snapFrame,
-            snapped: true,
-            originalCoord: (gate.original_coord ?? gateCoord ?? undefined) as
-              | [number, number]
-              | undefined,
-            snapDistancePx: gate.snap_distance_px ?? undefined,
-          },
-          geometry: {
-            preclipFaceCount: Number.isFinite(Number((pass as any).preclip_face_count))
-              ? Number((pass as any).preclip_face_count)
-              : null,
-            preclipAmbiguityRisk: null,
-            plateCoord: null,
-            preclipCrop: null,
-            asdFrameNumber: snapFrame,
-          },
-          retryVariant,
-          isMultiSpeaker: speakers.length >= 2,
-          usePreclip: usePassPreclip,
-        });
-
-        try {
-          syncOptions.active_speaker_detection = snapStrategy.asd;
-          if ((payload as any)?.options) {
-            (payload as any).options.active_speaker_detection = snapStrategy.asd;
-          }
-          if (!usePassPreclip) {
-            (pass as any).coords = snappedCoord;
-          } else {
-            (pass as any).dispatch_coords_snapped = snappedCoord;
-          }
-          (pass as any).coords_snapped_at = new Date().toISOString();
-          (pass as any).coords_snap_origin = gate.original_coord ?? null;
-          (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
-          (pass as any).snap_applied_to_dispatch = true;
-          (pass as any)._v130_asd_strategy = {
-            mode: snapStrategy.mode,
-            source: snapStrategy.source,
-            coord_space: snapStrategy.coordSpace,
-            frame_number: snapStrategy.frameNumber,
-            re_strategy: true,
-            re_strategy_trigger: "face_gate_snap",
-          };
-        } catch (mutErr) {
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v130 ASD re-strategy mutation failed: ${(mutErr as Error)?.message}`,
-          );
-        }
+        const snappedCoord: [number, number] = [Number(gate.snapped_coord[0]), Number(gate.snapped_coord[1])];
+        const snapFrame: number = Number.isFinite(gateFrame as number) ? Number(gateFrame) : 0;
+        if (!usePassPreclip) (pass as any).coords = snappedCoord;
+        else (pass as any).dispatch_coords_snapped = snappedCoord;
+        (pass as any).coords_snapped_at = new Date().toISOString();
+        (pass as any).coords_snap_origin = gate.original_coord ?? null;
+        (pass as any).coords_snap_space = usePassPreclip ? "preclip" : "plate";
+        (pass as any).snap_applied_to_dispatch = true;
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v130_snap_via_strategy pass=${currentPassIdx + 1} ` +
-          `mode=${snapStrategy.mode} snapped=[${snappedCoord[0]},${snappedCoord[1]}] frame=${snapFrame} ` +
-          `space=${usePassPreclip ? "preclip" : "plate"} delta_px=${gate.snap_distance_px ?? "?"}`,
+          `[compose-dialog-segments] scene=${sceneId} v140_snap_recorded_no_payload_mutation pass=${currentPassIdx + 1} snapped=[${snappedCoord[0]},${snappedCoord[1]}] frame=${snapFrame} space=${usePassPreclip ? "preclip" : "plate"}`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -5096,10 +5023,10 @@ serve(async (req) => {
             },
             snap_applied_to_dispatch: true,
             asd_strategy: {
-              mode: snapStrategy.mode,
-              source: snapStrategy.source,
-              coord_space: snapStrategy.coordSpace,
-              diagnostics: snapStrategy.diagnostics,
+              mode: "snap_recorded_no_payload_mutation",
+              source: "face_gate",
+              coord_space: usePassPreclip ? "preclip" : "plate",
+              diagnostics: { reason: "v140_single_wire_builder_prevents_late_asd_mutation" },
             },
             source: "preflight-snap",
           },
@@ -5181,6 +5108,33 @@ serve(async (req) => {
           422,
         );
       }
+    }
+
+    // ── v140 — Final single wire builder for ASD ────────────────────────
+    // From here to `fetch`, the outgoing payload is canonicalized exactly
+    // once. No branch may mutate `active_speaker_detection` after this point.
+    try {
+      const canonicalAsd = normalizeCanonicalAsd(
+        (payload.options as any)?.active_speaker_detection ??
+          (syncOptions as any)?.active_speaker_detection,
+      );
+      (syncOptions as any).active_speaker_detection = canonicalAsd;
+      (payload.options as any).active_speaker_detection = canonicalAsd;
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v140_ASD_CANONICAL asd=${JSON.stringify(canonicalAsd)}`,
+      );
+    } catch (canonErr) {
+      return await failBeforeProviderDispatch(
+        "DISPATCH_BLOCKED_V140_CANONICAL_ASD",
+        "canonical_asd_invalid",
+        `v140 canonical ASD builder rejected payload: ${(canonErr as Error)?.message ?? canonErr}`,
+        500,
+        {
+          final_asd: (payload.options as any)?.active_speaker_detection ?? null,
+          retry_variant: retryVariant,
+          compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+        },
+      );
     }
 
     // ── v136 — Doc-strict ASD sanitizer (replaces v131.5 final override) ──
