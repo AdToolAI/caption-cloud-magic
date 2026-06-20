@@ -465,10 +465,10 @@ async function runForensic(args: {
   const expectedSpeakers: number = Math.max(1, Math.min(8, Number(body.expected_speakers ?? 2)));
   if (!plateUrl) return json({ error: "plate_url required for forensic mode" }, 400);
 
-  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!REPLICATE_API_TOKEN) return json({ error: "REPLICATE_API_TOKEN missing" }, 500);
+  const REPLICATE_CONNECTOR_KEY = Deno.env.get("LOVABLE_CONNECTOR_REPLICATE_API_KEY");
   if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY missing" }, 500);
+  if (!REPLICATE_CONNECTOR_KEY) return json({ error: "LOVABLE_CONNECTOR_REPLICATE_API_KEY missing — link Replicate connector first" }, 500);
 
   // Insert run row
   const { data: runRow, error: insErr } = await admin
