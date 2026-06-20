@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.0";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.1";
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
@@ -1323,18 +1323,18 @@ serve(async (req) => {
       );
     }
 
-    // ── v153 — Multi-Speaker Pre-Flight Hard-Fail ───────────────────────
+    // ── v153.1 — Unified Pre-Flight Hard-Fail (N=1..4) ──────────────────
     // SINGLE-PATH-POLICY: jeder Sprecher MUSS eine eigene plate-native Box
-    // bekommen (aus resolvePlateFaceIdentities oder Slot-Fallback). Wenn
-    // nicht, würde der bbox-url-pro Pfad mehrere Sprecher auf dieselbe
-    // Box mappen → genau der "Sprecher 1 spricht für 1+2"-Bug.
-    // Lieber sofort hart abbrechen + refund + klare Meldung, statt 20 min
-    // später ein falsch gemixtes Video zu liefern.
+    // bekommen — gilt einheitlich für 1, 2, 3 oder 4 Sprecher. Wenn nicht,
+    // würde der bbox-url-pro Pfad mehrere Sprecher auf dieselbe Box mappen
+    // (N>=2: "Sprecher 1 spricht für 1+2"-Bug) oder bei N=1 still auf eine
+    // synthetische Coords-Box zurückfallen. Lieber sofort hart abbrechen
+    // + refund + klare Meldung, statt 20 min später ein falsch gemixtes
+    // Video zu liefern.
     if (
       !isAdvance &&
       !isRetry &&
-      speakers.length >= 2 &&
-      !!plateDims
+      speakers.length >= 1
     ) {
       const missingBoxIdx: number[] = [];
       for (let i = 0; i < speakers.length; i++) {
@@ -1398,10 +1398,12 @@ serve(async (req) => {
             },
             lip_sync_status: "failed",
             twoshot_stage: "failed",
-            clip_error:
-              "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
-              "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
-              "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
+            clip_error: speakers.length === 1
+              ? "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
+                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist."
+              : "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
+                "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
+                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -2892,20 +2894,20 @@ serve(async (req) => {
       );
     }
 
-    // ── v153 — Single-Path bbox-url-pro Pipeline (N=1..4) ────────────────
+    // ── v153.1 — Single-Path bbox-url-pro Pipeline (N=1..4 einheitlich) ──
     // PRECLIP IS DEAD. Es gibt nur noch einen einzigen Dispatch-Pfad:
     // Full-Plate + `bounding_boxes_url` mit plate-nativer Box pro Sprecher.
     //
     // Aktivierung: jede frische (nicht-noop-escalation) Dispatch braucht
     //  - plateDims (sonst hat die Scene-Pre-Flight längst hart gefailt)
-    //  - eine plate-native Box für diesen Sprecher (N>=2) oder pass.coords (N=1)
+    //  - eine plate-native Box für DIESEN Sprecher — gilt einheitlich
+    //    für N=1, 2, 3, 4 (kein synthetic-coords-Fallback mehr für N=1).
     //
-    // Wenn das nicht erfüllt ist, hat die Scene-Pre-Flight (Z. ~1325)
+    // Wenn das nicht erfüllt ist, hat die Scene-Pre-Flight (Z. ~1326)
     // bereits hart gefailt + refunded. Hier ist es daher ein simples Flag.
     const v153HasPlateBox =
-      speakers.length === 1 ||
-      (Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
-        (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4);
+      Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
+      (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4;
     const v153UnifiedBboxEligible =
       body?.noop_auto_escalation !== true &&
       speakers.length >= 1 &&
@@ -2922,7 +2924,7 @@ serve(async (req) => {
       (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
       (pass as any)._v153BboxPrimary = true;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153_unified_bbox_primary speakers=${speakers.length} plate_box=${v153HasPlateBox ? "yes" : "synthetic"} resolved=${plateIdentityMap?.resolvedCount ?? "n=1"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.1_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
       );
     }
 
@@ -4512,7 +4514,12 @@ serve(async (req) => {
       // Letzter Notanker: synthetisch aus coords (nur N=1 erlaubt).
       // Für N>=2 würde das pro Sprecher auf identische Boxen mappen
       // wenn coords nicht plate-native sind — daher Hard-Fail unten.
-      if (!box) {
+      // v153.1 — Synthetic-Coords-Fallback ist GLOBAL deaktiviert (N=1..4).
+      // Wenn weder plate-native noch facemap eine Box liefern, hat die
+      // Pre-Flight (Z. ~1326) bereits hart gefailt + refunded. Hier kein
+      // stiller Box-aus-coords-Mittelpunkt mehr — das hat in N=1 Szenen
+      // dazu geführt, dass Sync.so im Zweifel die falsche Person animiert.
+      if (!box && !(pass as any)._v153BboxPrimary) {
         const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
         const boxW = Math.round(dims.width * 0.18);
         const boxH = Math.round(dims.height * 0.28);

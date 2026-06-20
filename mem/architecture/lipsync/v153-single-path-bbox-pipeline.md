@@ -1,6 +1,6 @@
 ---
-name: v153 Single-Path bbox-url-pro Pipeline
-description: Single-Path Dialog-Lipsync. Nur noch plate-native bbox-url-pro auf full plate. Kein Preclip, kein auto_detect, Pre-Flight Hard-Fail wenn Sprecher nicht eindeutig trennbar sind.
+name: v153.1 Single-Path bbox-url-pro Pipeline (N=1..4 einheitlich)
+description: Einheitliche Single-Path Dialog-Lipsync für 1–4 Sprecher. Nur noch plate-native bbox-url-pro auf full plate. Kein Preclip, kein auto_detect, kein synthetic-coords-Fallback. Pre-Flight Hard-Fail wenn auch nur ein Sprecher keine eigene Box hat — gilt auch für N=1.
 type: feature
 ---
 
