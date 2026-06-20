@@ -3,6 +3,7 @@
 // polls all jobs, and writes results to `lipsync_diagnostic_runs.variants`.
 // Live pipeline (compose-dialog-segments, sync-so-webhook) is NOT touched.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
