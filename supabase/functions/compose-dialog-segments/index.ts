@@ -1357,10 +1357,14 @@ serve(async (req) => {
       }
     }
     if (persistedGateOk && persistedBboxes.length >= speakers.length) {
-      // v158 — also rehydrate mouth landmarks from persisted faces[].
-      // Without this, advance passes (Pass 2..N) lose the mouth anchor and
-      // the dispatcher falls back to bbox-anchor → Sync.so faceMask misses
-      // the lips → morph/animorph on the wrong region.
+      // v158 — also rehydrate mouth landmarks from persisted faces[] or the
+      // canonical `mouths[]` array on the snapshot. Without this, advance
+      // passes (Pass 2..N) lose the mouth anchor and the dispatcher falls
+      // back to bbox-anchor → Sync.so faceMask misses the lips → morph on
+      // the wrong region.
+      const persistedMouths: any[] = Array.isArray(persistedPlateIdentity?.mouths)
+        ? persistedPlateIdentity.mouths
+        : [];
       const persistedFaces: any[] = Array.isArray(persistedPlateIdentity?.faces)
         ? persistedPlateIdentity.faces
         : [];
