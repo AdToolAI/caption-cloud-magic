@@ -4018,29 +4018,64 @@ serve(async (req) => {
       // v153.8 — Use ACTUAL plate frame count (probed from mp4 mvhd) instead
       // of the requested Hailuo duration. Sync.so rejects mismatched bbox
       // arrays with the opaque `generation_unknown_error`.
-      const __probedPlateDurSec = await getPlateDurationSecCached(passInputUrl);
+      // v161 — When a single-face preclip is in use, all bbox math runs in
+      // CLIP space (not plate space). We probe the preclip's actual frame
+      // count and shift voiced windows so they start at clip t=0.
+      const v161PreclipCrop = usePassPreclip ? (pass as any).preclip_crop as
+        | { x: number; y: number; size: number; outputSize: number }
+        | undefined : undefined;
+      const v161UsingPreclipForBbox = usePassPreclip && !!passPreclipUrl && !!v161PreclipCrop;
+      const probeUrlForBbox = v161UsingPreclipForBbox ? (passPreclipUrl as string) : passInputUrl;
+      const v161PreclipStartSec = v161UsingPreclipForBbox
+        ? Number((pass as any).preclip_start_sec ?? 0)
+        : 0;
+
+      const __probedPlateDurSec = await getPlateDurationSecCached(probeUrlForBbox);
       const __probedFrames = __probedPlateDurSec
         ? Math.max(1, Math.round(__probedPlateDurSec * ASSUMED_FPS))
         : null;
       const frameCount = __probedFrames ?? Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.8_bbox_framecount plate_duration=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s plate_fps=${ASSUMED_FPS} plate_frames=${__probedFrames ?? "?"} used=${frameCount} src=${__probedFrames ? "mp4probe" : "fallback_assumed_fps"}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s plate_fps=${ASSUMED_FPS} probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
 
-      // v124 — Per-frame array honoring this speaker's voiced windows.
-      // Frames outside the windows become `null` so sync-3 cannot animate
-      // a neighbour face during turns the speaker is silent.
-      const v124VoicedWindows = speakerWindowsSecs.slice();
+      // Voiced windows in the dispatched video's time base.
+      const v124VoicedWindows: Array<[number, number]> = v161UsingPreclipForBbox
+        ? speakerWindowsSecs.map(([s, e]) => [
+            Math.max(0, s - v161PreclipStartSec),
+            Math.max(0, e - v161PreclipStartSec),
+          ] as [number, number])
+        : speakerWindowsSecs.slice();
+
+      // Box in the dispatched video's pixel space.
+      let dispatchBox: [number, number, number, number] | null = box;
+      if (v161UsingPreclipForBbox && box && v161PreclipCrop) {
+        const scale = v161PreclipCrop.outputSize / Math.max(1, v161PreclipCrop.size);
+        const cx1 = Math.max(0, Math.round((box[0] - v161PreclipCrop.x) * scale));
+        const cy1 = Math.max(0, Math.round((box[1] - v161PreclipCrop.y) * scale));
+        const cx2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[2] - v161PreclipCrop.x) * scale));
+        const cy2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[3] - v161PreclipCrop.y) * scale));
+        if (cx2 > cx1 + 4 && cy2 > cy1 + 4) {
+          dispatchBox = [cx1, cy1, cx2, cy2];
+        } else {
+          // Fallback: most of the preclip IS the face.
+          const pad = Math.max(2, Math.round(v161PreclipCrop.outputSize * 0.08));
+          dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
+        }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
+        );
+      }
 
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
-      if (retryVariant === "bbox-url-pro") {
+      if (retryVariant === "bbox-url-pro" && dispatchBox) {
         const up = await uploadBoundingBoxesJson(supabase, {
           userId,
           projectId: String((scene as any).project_id ?? ""),
           sceneId,
           passIdx: currentPassIdx,
-          box,
+          box: dispatchBox,
           frameCount,
           voicedWindowsSec: v124VoicedWindows,
           fps: ASSUMED_FPS,
@@ -4054,14 +4089,16 @@ serve(async (req) => {
       // stiller inline-Fallback, der bei kaputter URL den v126-Provider-
       // Unknown wieder triggern würde).
       const v147BboxValid = !!usedUrl && nonNullFrames >= 1;
-      // v152 — Bbox-Geometrie Sanity-Gate: Box muss zwischen 0.2% und 45%
-      // der Plate-Fläche liegen. Außerhalb dieses Bandes ist sie entweder
-      // ein Detection-Artefakt (zu klein) oder ein Vollbild-False-Positive
-      // (zu groß). Beides würde Sync.so unzuverlässig machen.
-      const dimsArea = Math.max(1, (plateDims?.width ?? 0) * (plateDims?.height ?? 0));
-      const boxArea = box ? Math.max(0, (box[2] - box[0]) * (box[3] - box[1])) : 0;
-      const boxAreaPct = boxArea / dimsArea;
-      const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= 0.45;
+      // v152 — Bbox-Geometrie Sanity-Gate auf dem DISPATCHED video. Im
+      // Preclip-Modus ist die Box-Fläche praktisch das ganze Bild (≈ 60-95 %),
+      // also wird der upper-bound für Preclip auf 0.98 angehoben.
+      const dispatchDimsArea = v161UsingPreclipForBbox && v161PreclipCrop
+        ? Math.max(1, v161PreclipCrop.outputSize * v161PreclipCrop.outputSize)
+        : Math.max(1, (plateDims?.width ?? 0) * (plateDims?.height ?? 0));
+      const boxArea = dispatchBox ? Math.max(0, (dispatchBox[2] - dispatchBox[0]) * (dispatchBox[3] - dispatchBox[1])) : 0;
+      const boxAreaPct = boxArea / dispatchDimsArea;
+      const v152UpperBound = v161UsingPreclipForBbox ? 0.98 : 0.45;
+      const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= v152UpperBound;
       (pass as any)._v152BboxAreaPct = Number(boxAreaPct.toFixed(4));
 
       if (v147BboxValid && v152BboxSane) {
@@ -4070,7 +4107,7 @@ serve(async (req) => {
           bounding_boxes_url: usedUrl!,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_URL_PRIMARY speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (retryVariant === "coords-pro-box") {
         // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.
