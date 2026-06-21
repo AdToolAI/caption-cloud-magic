@@ -21,6 +21,7 @@ import React from 'react';
 import {
   AbsoluteFill,
   Audio,
+  Freeze,
   Img,
   Sequence,
   Video,
@@ -71,6 +72,10 @@ const ShotSchema = z.object({
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
   faceMask: FaceMaskSchema.optional().nullable(),
+  /** v164: bounding boxes of all OTHER speakers in this scene. Rendered as
+   *  frozen master-plate crops underneath the active overlay so non-speaking
+   *  faces do not "talk along" with the AI plate during this turn. */
+  silentSlots: z.array(CropSchema).optional().nullable(),
   /** Legacy compatibility only. Normal multi-speaker muxes keep overlays
    *  windowed to speaker turns and do not use hold-to-end. */
   holdToEnd: z.boolean().optional(),
@@ -249,6 +254,51 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
   );
 };
 
+/** v164: SilentFaceFreeze — renders the master plate video frozen at frame 0,
+ *  cropped to a non-speaking face bbox (source-master pixel space, already
+ *  mapped to composition space by caller). Soft circular mask matches the
+ *  CroppedOverlay seam so the frozen face blends with the live plate around
+ *  it. Used to suppress AI-plate mouth motion on non-active speakers during
+ *  the active speaker's turn window. */
+interface SilentFaceFreezeProps {
+  src: string;
+  left: number;
+  top: number;
+  size: number;
+}
+const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({ src, left, top, size }) => {
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,0) 95%)';
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          width: size,
+          height: size,
+          WebkitMaskImage: mask,
+          maskImage: mask,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          overflow: 'hidden',
+        }}
+      >
+        <Freeze frame={0}>
+          <Video
+            src={src}
+            muted
+            playbackRate={1}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </Freeze>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+
+
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
   masterImageUrl,
@@ -309,6 +359,26 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         const startFromForRelative =
           shot.sourceTiming === 'relative' ? relativeStartFrame : startFrame;
 
+        // v164: render silent-face freezes underneath the active overlay so
+        // non-speaking faces don't "talk along" with the AI plate. Only the
+        // active speaker's face stays animated; everyone else is paused.
+        const silentSlotEls = (shot.silentSlots ?? []).map((slot, slotIdx) => {
+          if (!slot || !(Number(slot.size) > 0) || !masterVideoUrl) return null;
+          const left = Number(slot.x) * scaleX;
+          const top = Number(slot.y) * scaleY;
+          const overlayScale = Math.max(scaleX, scaleY);
+          const size = Number(slot.size) * overlayScale;
+          return (
+            <SilentFaceFreeze
+              key={`silent-${idx}-${slotIdx}`}
+              src={masterVideoUrl}
+              left={left}
+              top={top}
+              size={size}
+            />
+          );
+        });
+
         // v25 fan-out face-mask path (highest priority): full Sync.so output
         // for this speaker, masked to a soft circle around their face. Spans
         // the full scene; multiple speakers stack as additive masked layers.
@@ -331,6 +401,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               durationInFrames={segDuration}
               layout="none"
             >
+              {silentSlotEls}
               <FaceMaskOverlay
                 src={shot.outputUrl}
                 cxPx={cxPx}
@@ -362,6 +433,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               durationInFrames={segDuration}
               layout="none"
             >
+              {silentSlotEls}
               <CroppedOverlay
                 src={shot.outputUrl}
                 segDuration={segDuration}
@@ -382,6 +454,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             durationInFrames={segDuration}
             layout="none"
           >
+            {silentSlotEls}
             <FullFrameOverlay
               src={shot.outputUrl}
               segDuration={segDuration}

@@ -221,6 +221,43 @@ serve(async (req) => {
     const SHOT_PAD_END_SHORT = 0.08;
     const SHORT_TURN_THRESHOLD_SEC = 0.6;
 
+    // v164 — Silent-faces overlay. For each speaker's voiced window, paint a
+    // FROZEN master-plate frame cropped to every OTHER speaker's preclip box
+    // underneath the active speaker overlay. Without this the original AI
+    // plate keeps animating the non-speaking mouths, which the user reads as
+    // "the wrong character spoke this line".
+    const v164SilentSlotsByExcludedIdx = new Map<number, Array<{ x: number; y: number; size: number }>>();
+    {
+      const allValidCrops: Array<{ speakerIdx: number; crop: { x: number; y: number; size: number } }> = [];
+      for (const p of donePasses) {
+        const c = (p as any)?.preclip_crop;
+        const sIdx = Number((p as any)?.speaker_idx);
+        if (
+          c &&
+          Number.isFinite(Number(c.x)) &&
+          Number.isFinite(Number(c.y)) &&
+          Number.isFinite(Number(c.size)) &&
+          Number.isFinite(sIdx)
+        ) {
+          allValidCrops.push({
+            speakerIdx: sIdx,
+            crop: { x: Number(c.x), y: Number(c.y), size: Number(c.size) },
+          });
+        }
+      }
+      for (const p of donePasses) {
+        const sIdx = Number((p as any)?.speaker_idx);
+        if (!Number.isFinite(sIdx)) continue;
+        const others = allValidCrops
+          .filter((e) => e.speakerIdx !== sIdx)
+          .map((e) => e.crop);
+        v164SilentSlotsByExcludedIdx.set(sIdx, others);
+      }
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v164_silent_slots speakers=${donePasses.length} crops_available=${allValidCrops.length}/${donePasses.length}`,
+      );
+    }
+
     const fanoutShots = useOverlay
       ? donePasses.flatMap((p: any) => {
           const passSegs = Array.isArray(p?.segments) ? p.segments : [];
@@ -260,6 +297,8 @@ serve(async (req) => {
               `coords=[${Number(p.coords?.[0])},${Number(p.coords?.[1])}] crop={x:${preclipCrop.x},y:${preclipCrop.y},size:${preclipCrop.size}} — using faceMask fallback`,
             );
           }
+          const silentSlots =
+            v164SilentSlotsByExcludedIdx.get(Number((p as any).speaker_idx)) ?? [];
           const overlayPayload: Record<string, unknown> = hasPreclipCrop
             ? {
                 crop: {
@@ -267,6 +306,7 @@ serve(async (req) => {
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
                 },
+                silentSlots,
               }
             : {
                 faceMask: {
@@ -274,6 +314,7 @@ serve(async (req) => {
                   cy: Number(p.coords[1]),
                   radius: radiusForCount,
                 },
+                silentSlots,
               };
 
 
@@ -336,11 +377,12 @@ serve(async (req) => {
       sourceStartSec: shot.sourceStartSec ?? 0,
       crop: shot.crop ?? null,
       faceMask: shot.faceMask ?? null,
+      silentSlots: Array.isArray(shot.silentSlots) ? shot.silentSlots.length : 0,
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
     }));
 
     console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length} summary=${JSON.stringify(shotSummary)}`,
+      `[render-sync-segments-audio-mux] scene=${sceneId} v164_mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length} summary=${JSON.stringify(shotSummary)}`,
     );
 
     const renderId = crypto.randomUUID();
