@@ -273,8 +273,9 @@ serve(async (req) => {
               `coords=[${Number(p.coords?.[0])},${Number(p.coords?.[1])}] crop={x:${preclipCrop.x},y:${preclipCrop.y},size:${preclipCrop.size}} — using faceMask fallback`,
             );
           }
-          const silentSlots =
-            v164SilentSlotsByExcludedIdx.get(Number((p as any).speaker_idx)) ?? [];
+          const silentSlots: Array<{ x: number; y: number; size: number }> = [];
+          void silentSlots;
+          void v164SilentSlotsByExcludedIdx;
           const overlayPayload: Record<string, unknown> = hasPreclipCrop
             ? {
                 crop: {
@@ -282,7 +283,6 @@ serve(async (req) => {
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
                 },
-                silentSlots,
               }
             : {
                 faceMask: {
@@ -290,8 +290,8 @@ serve(async (req) => {
                   cy: Number(p.coords[1]),
                   radius: radiusForCount,
                 },
-                silentSlots,
               };
+
 
 
           if (passSegs.length === 0) {
