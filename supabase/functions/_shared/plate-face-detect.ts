@@ -432,118 +432,144 @@ export async function detectPlateFaces(params: {
 
 
 
-  // 2. v155 — Extract a mid-duration JPEG frame and run AWS Rekognition on
-  //    it via `detectFacesMediaPipe`. Without `prebuiltFrameUrls`, that
-  //    helper short-circuits to `no_prebuilt_frame_url` (the v129.21 wiring
-  //    silently skipped Rekognition for the dialog pipeline — root cause of
-  //    the v153/v154 4-speaker torso-bbox bug). Rekognition is deterministic
-  //    and returns mouth landmarks; we propagate `landmarks.mouth` through
-  //    `PlateFaceBox.mouth` so the dispatcher can sit the Sync.so faceMask
-  //    exactly on the mouth.
-  let detectorUsed = "gemini-2.5-flash";
+  // 2. v156 — Anchor-First. Run AWS Rekognition directly on the anchor
+  //    frame (same composition as the plate, but artifact-free and already
+  //    in storage). Zero frame-extract latency, no Replicate dependency.
+  const anchorUrl = (params.anchorUrl ?? "").trim() || null;
+  const expectedN = Math.max(1, params.expectedCount);
+  let detectorUsed = "aws_rekognition_anchor";
   let mpFaces: PlateFaceBox[] | null = null;
-  const rekFrameUrl = await extractPlateFrameForRekognition({
-    supabase: params.supabase,
-    plateUrl: params.plateUrl,
-    midDurationSec: params.midDurationSec,
-    projectId: params.projectId,
-    sceneId: params.sceneId,
-    tag,
-  });
-  try {
-    const mp = await detectFacesMediaPipe({
-      videoUrl: params.plateUrl,
-      plateWidth: params.plateWidth,
-      plateHeight: params.plateHeight,
-      durationSec: Math.max(0.5, params.midDurationSec * 2),
-      prebuiltFrameUrls: rekFrameUrl ? [rekFrameUrl] : undefined,
-    });
-    if (mp.ok && mp.faces.length > 0) {
-      mpFaces = mp.faces
-        .map((f, idx) => ({
-          bbox: f.bbox,
-          center: f.center,
-          slot: idx,
-          confidence: f.confidence,
-          mouth: f.landmarks?.mouth,
-        }))
-        .sort((a, b) => a.center[0] - b.center[0])
-        .map((f, idx) => ({ ...f, slot: idx }));
-      detectorUsed = "aws_rekognition";
-      const mouthCount = mpFaces.filter((f) => Array.isArray(f.mouth)).length;
-      console.log(
-        `${tag} v155_rekognition_primary_hit faces=${mpFaces.length} ` +
-        `mouth_landmarks=${mouthCount}/${mpFaces.length} frames=${mp.framesScanned} ms=${mp.ms}`,
-      );
-    } else {
-      console.warn(
-        `${tag} v155_rekognition_fallback_to_gemini reason=${mp.error ?? "0_faces"} ` +
-        `frame_extracted=${rekFrameUrl ? "yes" : "no"}`,
-      );
+  let awsError: string | null = null;
+
+  if (anchorUrl) {
+    try {
+      const mp = await detectFacesMediaPipe({
+        videoUrl: params.plateUrl,
+        plateWidth: params.plateWidth,
+        plateHeight: params.plateHeight,
+        durationSec: Math.max(0.5, params.midDurationSec * 2),
+        prebuiltFrameUrls: [anchorUrl],
+      });
+      if (mp.ok && mp.faces.length > 0) {
+        mpFaces = mp.faces
+          .map((f, idx) => ({
+            bbox: f.bbox,
+            center: f.center,
+            slot: idx,
+            confidence: f.confidence,
+            mouth: f.landmarks?.mouth,
+          }))
+          .sort((a, b) => a.center[0] - b.center[0])
+          .map((f, idx) => ({ ...f, slot: idx }));
+        const mouthCount = mpFaces.filter((f) => Array.isArray(f.mouth)).length;
+        const confList = mpFaces.map((f) => (f.confidence ?? 0).toFixed(2)).join(",");
+        console.log(
+          `${tag} v156_anchor_detect_ok faces=${mpFaces.length} conf=[${confList}] ` +
+          `mouth=${mouthCount}/${mpFaces.length} anchor=${anchorUrl.slice(0, 100)} ms=${mp.ms}`,
+        );
+      } else {
+        awsError = mp.error ?? "zero_faces";
+        console.warn(`${tag} v156_anchor_detect_empty reason=${awsError}`);
+      }
+    } catch (e) {
+      awsError = `exception:${(e as Error)?.message}`;
+      console.warn(`${tag} v156_anchor_detect_threw ${awsError}`);
     }
-  } catch (e) {
-    console.warn(
-      `${tag} v155_rekognition_fallback_to_gemini reason=exception:${(e as Error)?.message}`,
-    );
+  } else {
+    console.warn(`${tag} v156_anchor_missing → aws_on_mp4_fallback (legacy scene)`);
+    try {
+      const mp = await detectFacesMediaPipe({
+        videoUrl: params.plateUrl,
+        plateWidth: params.plateWidth,
+        plateHeight: params.plateHeight,
+        durationSec: Math.max(0.5, params.midDurationSec * 2),
+        prebuiltFrameUrls: [params.plateUrl],
+      });
+      if (mp.ok && mp.faces.length > 0) {
+        mpFaces = mp.faces
+          .map((f, idx) => ({
+            bbox: f.bbox,
+            center: f.center,
+            slot: idx,
+            confidence: f.confidence,
+            mouth: f.landmarks?.mouth,
+          }))
+          .sort((a, b) => a.center[0] - b.center[0])
+          .map((f, idx) => ({ ...f, slot: idx }));
+        detectorUsed = "aws_rekognition_mp4_fallback";
+        console.log(`${tag} v156_mp4_fallback_ok faces=${mpFaces.length}`);
+      } else {
+        awsError = mp.error ?? "zero_faces_on_mp4";
+      }
+    } catch (e) {
+      awsError = `exception:${(e as Error)?.message}`;
+    }
   }
 
+  // 3. v156 Decision Tree.
+  //    - exact match + high confidence → ✅ use AWS result
+  //    - 0 < N < expected → HARD FAIL (no Gemini guess; was v153/v154 bug)
+  //    - 0 faces → Cartoon-Rescue via Gemini-Pro strict + geometry gate
+  let faces: PlateFaceBox[] | null = null;
 
-  // Gemini path — fallback OR when MediaPipe returned 0 faces.
-  let faces: PlateFaceBox[];
-  if (mpFaces && mpFaces.length > 0) {
+  if (mpFaces && mpFaces.length === expectedN) {
     faces = mpFaces;
+  } else if (mpFaces && mpFaces.length > 0 && mpFaces.length < expectedN) {
+    console.warn(
+      `${tag} v156_aws_partial faces=${mpFaces.length} expected=${expectedN} → HARD_FAIL ` +
+      `(no gemini rescue — would hallucinate missing speakers)`,
+    );
+    return null;
+  } else if (mpFaces && mpFaces.length > expectedN) {
+    // More faces detected than expected (e.g. background extra). Take the
+    // expectedN largest by bbox area, then re-slot left-to-right.
+    const ranked = [...mpFaces].sort((a, b) => {
+      const areaA = (a.bbox[2] - a.bbox[0]) * (a.bbox[3] - a.bbox[1]);
+      const areaB = (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1]);
+      return areaB - areaA;
+    }).slice(0, expectedN)
+      .sort((a, b) => a.center[0] - b.center[0])
+      .map((f, idx) => ({ ...f, slot: idx }));
+    faces = ranked;
+    console.log(`${tag} v156_aws_over_detect raw=${mpFaces.length} kept=${expectedN}`);
   } else {
-    const frameUrl = resolveFrameUrl(params.plateUrl);
-    const tsHint = Math.max(0.2, params.midDurationSec * 0.5);
-    console.log(`${tag} gemini-direct-mp4 ts≈${tsHint.toFixed(2)}s url=${frameUrl.slice(0, 100)}`);
-
-    const rawFaces = await askGeminiForPlateFaces(frameUrl, params.expectedCount, tsHint);
-    if (rawFaces.length === 0) {
-      console.warn(`${tag} gemini also returned 0 faces — caller should fall back`);
+    // 0 AWS faces → Cartoon-Rescue. Gemini-Pro strict on the anchor (or
+    // mp4 fallback) + hard geometry gate. Mismatch = hard fail, no flash.
+    const rescueUrl = anchorUrl ?? params.plateUrl;
+    const tsHint = anchorUrl ? 0 : Math.max(0.2, params.midDurationSec * 0.5);
+    console.warn(
+      `${tag} v156_aws_zero_faces (reason=${awsError ?? "unknown"}) → cartoon_rescue_attempt ` +
+      `via gemini-2.5-pro strict on ${anchorUrl ? "anchor" : "mp4"}`,
+    );
+    const rawPro = await askGeminiForPlateFaces(
+      rescueUrl,
+      expectedN,
+      tsHint,
+      { strict: true, model: "google/gemini-2.5-pro" },
+    );
+    if (rawPro.length === 0) {
+      console.warn(`${tag} v156_cartoon_rescue_fail reason=gemini_zero_faces`);
       return null;
     }
-    faces = normalizedFacesToPlateBoxes(rawFaces, params.plateWidth, params.plateHeight);
-
-    // v154 — Geometry sanity gate. Flash routinely returns torso/upper-body
-    // bboxes when the scene has multiple closely-spaced figures (the v153.x
-    // 4-speaker bug). If gate fails, retry with Gemini Pro + strict prompt.
-    const gate1 = validatePlateFacesGeometry(faces, params.plateWidth, params.plateHeight);
-    if (!gate1.ok) {
+    const proFaces = normalizedFacesToPlateBoxes(rawPro, params.plateWidth, params.plateHeight);
+    const gate = validatePlateFacesGeometry(proFaces, params.plateWidth, params.plateHeight);
+    if (!gate.ok) {
       console.warn(
-        `${tag} v154_sanity_gate FAIL detector=flash reason=${gate1.reason} detail=${gate1.detail ?? "-"} ` +
-        `— retrying with gemini-2.5-pro + strict prompt`,
+        `${tag} v156_cartoon_rescue_fail reason=geometry_gate:${gate.reason} detail=${gate.detail ?? "-"}`,
       );
-      const rawPro = await askGeminiForPlateFaces(
-        frameUrl,
-        params.expectedCount,
-        tsHint,
-        { strict: true, model: "google/gemini-2.5-pro" },
-      );
-      if (rawPro.length > 0) {
-        const proFaces = normalizedFacesToPlateBoxes(rawPro, params.plateWidth, params.plateHeight);
-        const gate2 = validatePlateFacesGeometry(proFaces, params.plateWidth, params.plateHeight);
-        if (gate2.ok) {
-          faces = proFaces;
-          detectorUsed = "gemini-2.5-pro-strict";
-          console.log(
-            `${tag} v154_sanity_gate PRO_RECOVERY ok faces=${faces.length} ` +
-            `boxes=${JSON.stringify(faces.map((f) => f.bbox))}`,
-          );
-        } else {
-          console.warn(
-            `${tag} v154_sanity_gate FAIL detector=pro reason=${gate2.reason} detail=${gate2.detail ?? "-"} ` +
-            `— refusing to cache; caller falls back / blocks`,
-          );
-          return null;
-        }
-      } else {
-        console.warn(`${tag} v154_sanity_gate Pro returned 0 faces — refusing to cache`);
-        return null;
-      }
-    } else {
-      detectorUsed = "gemini-2.5-flash";
+      return null;
     }
+    if (proFaces.length !== expectedN) {
+      console.warn(
+        `${tag} v156_cartoon_rescue_fail reason=count_mismatch got=${proFaces.length} expected=${expectedN}`,
+      );
+      return null;
+    }
+    faces = proFaces;
+    detectorUsed = "gemini-2.5-pro-cartoon";
+    console.log(`${tag} v156_cartoon_rescue_ok faces=${faces.length}`);
   }
+
 
 
   const W = Math.max(1, params.plateWidth);
