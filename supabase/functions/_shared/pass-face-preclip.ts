@@ -80,6 +80,8 @@ export interface PassPreclipResult {
    *  match the dispatched video's real frame count, NOT the legacy 24fps
    *  plate assumption. Mismatch → opaque `generation_unknown_error`. */
   fps?: number;
+  /** v163 — exact Remotion render frame count (`durationInFrames`). */
+  frameCount?: number;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
@@ -296,7 +298,8 @@ export async function renderPassFacePreclip(
       preclipRenderId: renderId,
       crop,
       durationSec: dur,
-        fps: FPS,
+      fps: FPS,
+      frameCount: durationInFrames,
     };
   }
 
@@ -319,6 +322,7 @@ export async function renderPassFacePreclip(
         crop,
         durationSec: dur,
         fps: FPS,
+        frameCount: durationInFrames,
       };
     }
     if (status === "failed") {
@@ -330,6 +334,7 @@ export async function renderPassFacePreclip(
         crop,
         durationSec: dur,
         fps: FPS,
+        frameCount: durationInFrames,
       };
     }
   }
@@ -341,6 +346,7 @@ export async function renderPassFacePreclip(
     preclipRenderId: renderId,
     crop,
     durationSec: dur,
-        fps: FPS,
+    fps: FPS,
+    frameCount: durationInFrames,
   };
 }
