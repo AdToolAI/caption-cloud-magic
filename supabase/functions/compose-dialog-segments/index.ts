@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v156";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v157";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -1314,6 +1314,11 @@ serve(async (req) => {
     // for every speaker count ≥ 1.
     const speakerPlateBboxes: Array<[number, number, number, number] | null> =
       new Array(speakers.length).fill(null);
+    // v157 — Pro-Sprecher Mund-Landmark (AWS Rekognition). Wenn vorhanden,
+    // baut der Dispatcher eine enge Mund-zentrierte Sync.so-Box statt der
+    // ganzen Gesichts-Bbox → eliminiert "Animorph"-Morphs auf Hals/Schulter.
+    const speakerPlateMouths: Array<[number, number] | null> =
+      new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
     let plateHydrationSource: "persisted" | "live" | "missing" = "missing";
     const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes)
@@ -1432,6 +1437,12 @@ serve(async (req) => {
             speakerCoords[idx] = [plateFace.center[0], plateFace.center[1]];
           }
           speakerPlateBboxes[idx] = plateFace.bbox;
+          if (Array.isArray((plateFace as any).mouth)) {
+            const mLm = (plateFace as any).mouth as [number, number];
+            if (Number.isFinite(mLm[0]) && Number.isFinite(mLm[1])) {
+              speakerPlateMouths[idx] = [mLm[0], mLm[1]];
+            }
+          }
           coordSources[idx] = source;
         }
       });
@@ -3769,21 +3780,46 @@ serve(async (req) => {
       // faceMap-Match-Loop für mehrere Speaker auf derselben Box landen
       // konnte wenn characterId nicht gesetzt war.
       const platePassBox = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
+      const platePassMouth = speakerPlateMouths?.[pass.speaker_idx] ?? null;
       if (Array.isArray(platePassBox) && platePassBox.length === 4) {
         const [bx1, by1, bx2, by2] = platePassBox.map((n: any) => Number(n));
         if (Number.isFinite(bx1) && Number.isFinite(by1) && Number.isFinite(bx2) && Number.isFinite(by2)) {
-          const padX = (bx2 - bx1) * 0.15;
-          const padY = (by2 - by1) * 0.15;
-          const x1 = Math.max(0, Math.round(bx1 - padX));
-          const y1 = Math.max(0, Math.round(by1 - padY));
-          const x2 = Math.min(dims.width, Math.round(bx2 + padX));
-          const y2 = Math.min(dims.height, Math.round(by2 + padY));
+          const w = Math.max(1, bx2 - bx1);
+          const h = Math.max(1, by2 - by1);
+          const aspectIn = h / w;
+          // v157 — Mund-zentrierte Tight-Box statt aufgeblähter Face/Torso-Bbox.
+          // Vorher: bbox ± 15 % Pad → auf bereits torso-lastigen AWS-Boxen
+          // landete der Sync.so-faceMask in Hals/Schultern und morphed dort.
+          // Jetzt: schmale Lippenregion (90 % der Face-Breite × 55 % davon
+          // in Höhe), zentriert auf das Rekognition-Mund-Landmark. Ohne Mund
+          // wird der obere ⅔-Mittelpunkt der Bbox (Augen/Nase) als Anker
+          // genommen — immer noch besser als alter Bbox-Center.
+          const useMouth = Array.isArray(platePassMouth)
+            && Number.isFinite(platePassMouth[0])
+            && Number.isFinite(platePassMouth[1]);
+          const anchorX = useMouth ? platePassMouth![0] : Math.round((bx1 + bx2) / 2);
+          const anchorY = useMouth
+            ? platePassMouth![1]
+            : Math.round(by1 + h * 0.66); // ohne Mund: unteres Drittel ≈ Mund
+          const boxW = Math.round(w * 0.90);
+          const boxH = Math.round(boxW * 0.55);
+          const x1 = Math.max(0, Math.round(anchorX - boxW / 2));
+          const y1 = Math.max(0, Math.round(anchorY - boxH / 2));
+          const x2 = Math.min(dims.width, Math.round(anchorX + boxW / 2));
+          const y2 = Math.min(dims.height, Math.round(anchorY + boxH / 2));
           if (x2 > x1 + 4 && y2 > y1 + 4) {
             box = [x1, y1, x2, y2];
-            bboxSource = "plate-native";
+            bboxSource = useMouth ? "plate-native:v157-mouth" : "plate-native:v157-bbox-anchor";
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v157_tight_mouth_box ` +
+              `speaker=${pass.speaker_name} mouth_used=${useMouth} aspect_in=${aspectIn.toFixed(2)} ` +
+              `aspect_out=${(boxH / boxW).toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
+              `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}]`,
+            );
           }
         }
       }
+
 
       // Sekundär: anchor faceMap (kann bei N=1 helfen oder wenn plate-native fehlt).
       if (!box) {

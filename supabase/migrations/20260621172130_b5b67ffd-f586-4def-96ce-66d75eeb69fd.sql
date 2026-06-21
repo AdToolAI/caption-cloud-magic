@@ -1,0 +1,1 @@
+UPDATE public.plate_face_cache SET expires_at = now() - interval '1 second' WHERE detector LIKE 'aws_rekognition%' AND expires_at > now();
