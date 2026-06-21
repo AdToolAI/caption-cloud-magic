@@ -9542,33 +9542,39 @@ export type Database = {
       plate_face_cache: {
         Row: {
           created_at: string
+          detection_provider: string | null
           detector: string
           expires_at: string
           faces: Json
           frame_url: string | null
           height: number
+          mouth_landmarks: Json | null
           plate_url: string
           plate_url_hash: string
           width: number
         }
         Insert: {
           created_at?: string
+          detection_provider?: string | null
           detector?: string
           expires_at?: string
           faces?: Json
           frame_url?: string | null
           height: number
+          mouth_landmarks?: Json | null
           plate_url: string
           plate_url_hash: string
           width: number
         }
         Update: {
           created_at?: string
+          detection_provider?: string | null
           detector?: string
           expires_at?: string
           faces?: Json
           frame_url?: string | null
           height?: number
+          mouth_landmarks?: Json | null
           plate_url?: string
           plate_url_hash?: string
           width?: number
