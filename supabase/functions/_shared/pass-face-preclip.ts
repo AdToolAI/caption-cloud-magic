@@ -296,6 +296,7 @@ export async function renderPassFacePreclip(
       preclipRenderId: renderId,
       crop,
       durationSec: dur,
+        fps: FPS,
     };
   }
 
@@ -317,6 +318,7 @@ export async function renderPassFacePreclip(
         preclipRenderId: renderId,
         crop,
         durationSec: dur,
+        fps: FPS,
       };
     }
     if (status === "failed") {
@@ -327,6 +329,7 @@ export async function renderPassFacePreclip(
         preclipRenderId: renderId,
         crop,
         durationSec: dur,
+        fps: FPS,
       };
     }
   }
@@ -338,5 +341,6 @@ export async function renderPassFacePreclip(
     preclipRenderId: renderId,
     crop,
     durationSec: dur,
+        fps: FPS,
   };
 }
