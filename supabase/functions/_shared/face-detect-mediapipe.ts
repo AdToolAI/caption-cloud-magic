@@ -369,8 +369,12 @@ export async function detectFacesMediaPipe(opts: {
     const uy1 = Math.min(...ys1);
     const ux2 = Math.max(...xs2);
     const uy2 = Math.max(...ys2);
-    const padX = Math.round((ux2 - ux1) * 0.10);
-    const padY = Math.round((uy2 - uy1) * 0.10);
+    // v157 — Cluster-Pad auf 0. Bei v156 Anchor-First wird genau 1 Frame an
+    // AWS gesendet; ein Cluster enthält damit max. 1 Detection → die +10 %
+    // brachten nur Pixel-Bleed in Hals/Schulter. Tight-Sizing übernimmt jetzt
+    // der Geometry-Gate in plate-face-detect.ts (v157).
+    const padX = 0;
+    const padY = 0;
     const x1 = Math.max(0, ux1 - padX);
     const y1 = Math.max(0, uy1 - padY);
     const x2 = Math.min(W, ux2 + padX);
