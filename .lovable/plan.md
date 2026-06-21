@@ -1,83 +1,58 @@
-## Befund
+## v164 — "Silent-Faces Overlay" (Plate-Mouth-Mute für Nicht-Sprecher)
 
-**Ja, ich weiß jetzt, was das Problem ist.** Sync.so dokumentiert klar: `bounding_boxes_url` muss eine JSON-Datei liefern, deren `bounding_boxes`-Array **genau einen Eintrag pro Videoframe** enthält. Unsere v162-FPS-Korrektur ging in die richtige Richtung, ist aber noch um 1 Frame daneben.
+### Was wirklich passiert
 
-Aktueller Fehler in der Pipeline:
+Pass 3 dispatcht korrekt:
+- Preclip-Crop x=676 ⇒ Kailee
+- BBox-JSON [264,247,454,452] ⇒ Kailees Mund im 720×720-Frame
+- Overlay im Final-Mux pastet Pass 3 wieder bei x=676 ⇒ Kailee
 
-```text
-Preclip-Render:
-  durationInFrames = ceil(durationSec * 30)
+Du siehst trotzdem Samuels Mund sich bewegen, weil `render-sync-segments-audio-mux` nur die **aktive** Sprecher-Region per Preclip überklebt. Unter dem Overlay läuft der originale AI-Plate weiter — und in dem Plate haben *alle vier* Gesichter eine natürliche Mund-Animation. Während Kailees Audio läuft, sieht man Samuel/Matthew/Sarah aus dem AI-Plate weiter "reden". Das interpretierst du (zurecht) als "falsche Person spricht Pass 3".
 
-Bounding-Boxes v162:
-  frameCount = round(durationSec * 30)
-```
+### Lösung: stumme Standbild-Patches für alle Nicht-Sprecher
 
-Konkrete Log-Beispiele der fehlgeschlagenen Szene:
+Während jedes Sprecher-Turn-Fensters legen wir auf jedes *andere* Gesicht ein eingefrorenes Standbild-Patch, sodass nur der aktive Sprecher (Preclip-Overlay) sich bewegt.
 
-```text
-Pass 1: dur=2.435s
-Renderframes: ceil(2.435 * 30) = 74
-BBox-JSON:    round(2.435 * 30) = 73  -> 1 Frame zu kurz
+### Technische Schritte
 
-Pass 2: dur=0.936s
-Renderframes: ceil(0.936 * 30) = 29
-BBox-JSON:    round(0.936 * 30) = 28  -> 1 Frame zu kurz
-```
+1. **Neues Shared-Modul `_shared/plate-silent-frames.ts`**
+   - `extractSilentFaceFrames(plateUrl, plateIdentity)`
+   - Liest 1 Frame ~0.2s aus `plate` (ffmpeg via Replicate oder `image-resizer`-EdgeFn — bevorzugt: Browser-Canvas-Extraktion wie `continuity-guardian-frame-extraction`, aber serverseitig via existing `face-frame-extract`).
+   - Pro Speaker-Slot croppt es eine quadratische Region um `bbox` (gleicher Algorithmus wie `pass-face-preclip.ts` für Crop-Geometrie, **kein Lambda-Render**, nur PNG-Crop) und lädt sie in den `lipsync-plates`-Bucket hoch: `shared/<sceneId>/silent-slot-<idx>.png`.
+   - Cache: in `dialog_shots.plate_identity.silentFrames[]` persistieren `{ slot, url, crop:{x,y,size} }`.
 
-Das passt exakt zu Sync.so `generation_unknown_error`: Die URL ist erreichbar, das Format stimmt, `auto_detect:false` stimmt, aber die Array-Länge passt nicht zum tatsächlichen MP4.
+2. **Aufruf in `compose-dialog-segments` direkt nach plate-identity-Hydration** (≈ Z. 1500–1525, hinter `v158_plate_hydration`-Log)
+   - Bei `speakers.length >= 2` UND fehlendem `silentFrames` → Extraktion einmal pro Szene, persistieren.
+   - Fail-open: schlägt es fehl, läuft v163 wie bisher (alter Look).
 
-## Plan v163
+3. **`render-sync-segments-audio-mux` — neuer Layer `silentFaceOverlays`** (Z. ~224 fanoutShots-Erzeugung)
+   - Für jede Pass-Window `[startSec..endSec]` zusätzlich pro **anderem** Slot einen Shot bauen:
+     ```
+     { startSec, endSec, imageUrl: silentFrames[otherSlot].url, crop: silentFrames[otherSlot].crop, layer: 'silent' }
+     ```
+   - Diese Layer rendern *unter* dem Preclip-Overlay, aber *über* dem Master-Plate.
+   - Wenn `silentFrames` fehlt → Layer überspringen (keine Regression).
 
-1. **Preclip-Ergebnis um echte Renderframes erweitern**
-   - `renderPassFacePreclip` gibt zusätzlich `frameCount` zurück.
-   - Dieser Wert ist exakt `durationInFrames`, also die Framezahl, die Remotion wirklich rendert.
+4. **Remotion-Composition `DialogStitchVideo` erweitern**
+   - Neuer Shot-Typ mit `imageUrl` statt `outputUrl`: rendert ein statisches `<Img>` mit `style={{ position:'absolute', left:crop.x, top:crop.y, width:crop.size, height:crop.size }}` für die Window-Dauer.
+   - Z-Reihenfolge: `plate < silentFaceOverlays < activeSpeakerOverlay`.
 
-2. **Bounding-Boxes für Preclips nicht mehr aus Dauer schätzen**
-   - In `compose-dialog-segments` wird für Preclip-Pfade `preclip_frame_count` gespeichert.
-   - `v163_bbox_framecount` nutzt dann exakt diese Framezahl.
-   - Keine `round(duration * fps)`-Schätzung mehr für Preclips.
+5. **Versions-Bump & Logs**
+   - `COMPOSE_DIALOG_SEGMENTS_VERSION = "v164"`.
+   - Neuer Log: `v164_silent_frames extracted=4/4 cached=true` und im Mux: `v164_silent_layer slots_painted=[0,1,3] active=2`.
 
-3. **Optionaler MP4-Probe nur noch als Diagnose/Fallback**
-   - Falls ein alter gecachter Preclip keinen gespeicherten `preclip_frame_count` hat, dann fallback:
-     - zuerst MP4-Duration probe,
-     - dann `ceil(duration * fps)`, nicht `round`.
+6. **Szene-Reset**: `becaa5ce-e4c3-47b7-933d-766e83807b9c` zurücksetzen (`lip_sync_status`, `dialog_shots`, `twoshot_stage`, `clip_error`) — KEINE Änderung an `plate_identity` Cache, damit die Mouth-/BBox-Hydration sofort verfügbar ist und nur die 4 silent-frames neu extrahiert werden müssen.
 
-4. **Fail-closed statt Provider-Fehler**
-   - Wenn für einen Preclip keine sichere Framezahl berechnet werden kann, wird vor Sync.so abgebrochen und refunded.
-   - Kein stiller Fallback auf Auto-Detect.
+7. **Deploy**: `compose-dialog-segments` + `render-sync-segments-audio-mux` + ggf. Remotion-Bundle neu deployen.
 
-5. **Logging verschärfen**
-   - Neue Marker:
-     - `version=v163`
-     - `v163_preclip_render OK frames=74 fps=30 dur_render=2.467`
-     - `v163_bbox_framecount source=preclip_frame_count frames=74`
-   - Damit sieht man sofort, ob Renderframes und JSON-Länge identisch sind.
+### Akzeptanzkriterien
 
-6. **Fehlgeschlagene Szene sauber zurücksetzen**
-   - Scene `becaa5ce-e4c3-47b7-933d-766e83807b9c` wird für Lip-Sync zurückgesetzt, damit keine alten 73/28-Frame-JSONs wiederverwendet werden.
+- Logs zeigen `v164_silent_frames extracted=4/4` und für jeden Pass `v164_silent_layer slots_painted=[…3 andere…]`.
+- Im finalen MP4 bewegt sich während Kailees Audio nur Kailees Mund; Samuel/Matthew/Sarah stehen still (frozen face crops).
+- Bei N=1-Szenen wird die Logik geskippt (kein "anderer" Slot).
 
-## Nicht ändern
+### Was wir explizit **nicht** ändern
 
-- Kein Auto-Detect.
-- Kein Rückfall auf `lipsync-2-pro`.
-- Kein Full-Plate-Morphing-Fallback.
-- Der Weg bleibt: **1 bis 4 Sprecher = Single-Face-Preclip + `sync-3` + `bounding_boxes_url` + Mux zurück in die Master-Plate**.
-
-## Erwartetes Ergebnis
-
-Nach Umsetzung muss Sync.so für die gleiche Szene Bounding-Box-JSONs mit exakt diesen Längen erhalten:
-
-```text
-Pass 1: 74 Einträge statt 73
-Pass 2: 29 Einträge statt 28
-```
-
-Damit ist der wahrscheinlichste verbliebene `generation_unknown_error`-Trigger entfernt.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+- Sync.so-Payload-Form (bleibt v163 bbox-url-pro mit `sync_mode:cut_off` und `auto_detect:false`).
+- Preclip-Render/-Frame-Count-Logik (v163 bleibt unverändert).
+- Plate-Identity-Resolver (Slot-Mapping bleibt korrekt — wurde durch DB verifiziert).
