@@ -575,8 +575,8 @@ export async function detectPlateFaces(params: {
   const W = Math.max(1, params.plateWidth);
   const H = Math.max(1, params.plateHeight);
 
-  if (faces.length === 0) {
-    console.warn(`${tag} all detector boxes degenerate — caller should fall back`);
+  if (!faces || faces.length === 0) {
+    console.warn(`${tag} v156_no_faces — caller hard-fails`);
     return null;
   }
 
