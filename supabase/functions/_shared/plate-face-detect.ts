@@ -353,7 +353,8 @@ export async function detectPlateFaces(params: {
   const tag = `[plate-face-detect] scene=${params.sceneId}`;
   const cacheKey = await hashUrl(params.plateUrl);
 
-  // 1. Cache hit?
+  // 1. Cache hit? v154 — validate against geometry sanity gate so stale
+  // torso-bbox rows from pre-v154 dispatches don't poison new dispatches.
   try {
     const { data: cached } = await params.supabase
       .from("plate_face_cache")
@@ -362,19 +363,39 @@ export async function detectPlateFaces(params: {
       .gte("expires_at", new Date().toISOString())
       .maybeSingle();
     if (cached && Array.isArray(cached.faces) && cached.faces.length > 0) {
-      console.log(`${tag} cache HIT faces=${cached.faces.length} detector=${cached.detector}`);
-      return {
-        faces: cached.faces as PlateFaceBox[],
-        width: cached.width,
-        height: cached.height,
-        detector: cached.detector,
-        frame_url: cached.frame_url ?? undefined,
-        cached: true,
-      };
+      const gate = validatePlateFacesGeometry(
+        cached.faces as PlateFaceBox[],
+        cached.width ?? params.plateWidth,
+        cached.height ?? params.plateHeight,
+      );
+      if (gate.ok) {
+        console.log(`${tag} cache HIT faces=${cached.faces.length} detector=${cached.detector}`);
+        return {
+          faces: cached.faces as PlateFaceBox[],
+          width: cached.width,
+          height: cached.height,
+          detector: cached.detector,
+          frame_url: cached.frame_url ?? undefined,
+          cached: true,
+        };
+      }
+      console.warn(
+        `${tag} v154_cache_evict stale detector=${cached.detector} reason=${gate.reason} detail=${gate.detail ?? "-"} — re-detecting`,
+      );
+      try {
+        await params.supabase
+          .from("plate_face_cache")
+          .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
+          .eq("plate_url_hash", cacheKey);
+      } catch (e) {
+        console.warn(`${tag} v154_cache_evict update failed: ${(e as Error)?.message}`);
+      }
     }
   } catch (e) {
     console.warn(`${tag} cache read failed: ${(e as Error)?.message}`);
   }
+
+
 
   // 2. v129.21 — Try MediaPipe FIRST (dedicated face detector, pixel-bbox,
   //    multi-frame union). Falls back to Gemini direct-mp4 on any failure.
