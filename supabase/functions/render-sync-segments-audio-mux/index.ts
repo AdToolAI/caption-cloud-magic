@@ -377,11 +377,12 @@ serve(async (req) => {
       sourceStartSec: shot.sourceStartSec ?? 0,
       crop: shot.crop ?? null,
       faceMask: shot.faceMask ?? null,
+      silentSlots: Array.isArray(shot.silentSlots) ? shot.silentSlots.length : 0,
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
     }));
 
     console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length} summary=${JSON.stringify(shotSummary)}`,
+      `[render-sync-segments-audio-mux] scene=${sceneId} v164_mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length} summary=${JSON.stringify(shotSummary)}`,
     );
 
     const renderId = crypto.randomUUID();
