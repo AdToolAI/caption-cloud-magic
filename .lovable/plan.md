@@ -1,59 +1,39 @@
-## Root cause
+## Diagnose: 4-Sprecher-Szene rendert ohne hörbares/sichtbares Lipsync
 
-Sync.so rejects every pass with `generation_unknown_error` because the `bounding_boxes_url` JSON has the **wrong frame count** for the actual plate.
+### Was wir aus den Logs/DB wissen
+- v153.8 lief sauber durch: 4 Passes (Samuel→Matthew→Kailee→Sarah), alle `status=done`, jeweils `bounding_boxes_url`, `sync_mode=cut_off`, `model=sync-3`.
+- Coords je Pass (Plate vermutlich 1280×720):
+  - p0 Samuel (618,421), p1 Matthew (793,377), p2 Kailee (974,379), p3 Sarah (1191,421)
+- Audio je Pass ist eine "tight WAV" mit nur den Worten dieses Sprechers (Segmente:
+  Samuel 0–2.37s, Matthew 2.62–3.64s, Kailee 3.89–6.72s, Sarah 6.97–8.83s).
+- `preclip_crop` ist überall `null` → Compositor fällt auf `faceMask` (radial circle, radius = `0.28 × min(w,h)` ≈ 202 px bei 720 px Achse) zurück.
+- Plate-Probe zeigt **10.125s** echte Länge vs. 9s requested.
 
-| Source | Duration | FPS | Frames |
-| --- | --- | --- | --- |
-| bbox JSON (uploaded) | 9.000 s (`totalSec` aus Hailuo-Request) | 24 | **216** |
-| Tatsächliches MP4 (ffprobe) | 10.125 s | 24 | **243** |
+### Symptom-Mapping
+- "Char 1+2 reden stumm die ganze Szene" → wir sehen die **Pristine-Plate** (Hailuo lässt alle Köpfe durchgehend mit-mimen). D.h. die Sync.so-Overlays für p0/p1 landen **nicht über deren Mund**.
+- "Char 3+4 öffnen den Mund gar nicht" → wir sehen das **Sync.so-Output** für p2/p3, aber Sync.so hat in dem Frame-Bereich **keinen Mund animiert** (entweder Bbox-Frame außerhalb der echten Plate-Länge, oder coords liegen daneben).
 
-Sync.so's spec ([Speaker Selection — API](https://sync.so/docs/developer-guides/speaker-selection)) ist explizit:
+Beide Symptome zeigen auf **falsche Bbox-/Coord-Geometrie** für die Sync.so-Eingabe und/oder für die Compositor-Mask.
 
-> The number of entries must match the total frame count.
+### Hypothesen (zu verifizieren, bevor wir patchen)
+1. **Plate-Auflösung ≠ Bbox-Koordinatensystem.** Die Bboxes kommen aus Gemini Vision auf einer 1280×720-Annahme, aber `coords`/`bounding_boxes_url` werden Sync.so im **echten** Pixelraum übergeben (z.B. 1280×720 vs. echtes 1248×704 oder ein anderes seitenverhältnis-bedingtes Padding). Selbst ein 16-px-Drift erklärt p0/p1 (Mund komplett außerhalb der 202-px-Mask).
+2. **Bbox-JSON-frame_count = 243, aber Sync.so behandelt Frames > requested.totalSec (216) als "no face"** → speziell für p2/p3 (deren Sprech-Fenster 3.89–8.83s liegt im Bereich Frame 93–212, eigentlich ok) aber die Pad-Frames 217–243 könnten den ASD-Konfidenz-Score so kippen, dass Sync.so aufgibt.
+3. **Per-Pass tight-WAV vs. absolute Zeitachse-Mismatch.** `audio_tight` setzt `sourceTiming=relative` mit `output_offsets_sec` — wenn das Array leer/falsch ist, spielt der Compositor für jeden Turn den Pass-Output von 0 ab und zeigt für die hintere Hälfte der Szene den unanimierten Tail.
 
-Hailuo liefert für eine 6 s/9 s Anfrage gerne 0.5–1.5 s mehr aus — unser `totalSec` ist die **angeforderte** Dauer, nicht die echte. Der v153.7-Dispatch ist sauber, aber die JSON-Datei wird vom Provider als „invalid" verworfen und in den Generic-Bucket geworfen → `[generation_unknown_error]`.
+### Diagnoseschritte (read-only, in build-mode)
+1. **ffprobe** auf Plate + alle 4 `output_url`s — Dauer, fps, w×h, ob audio im Pass-Output enthalten (Sync.so ersetzt Audio).
+2. **1 Frame extrahieren** aus Plate und aus jedem Pass-Output bei Mitten-Timestamp des jeweiligen Speaker-Turns (z.B. p0 @ 1.2s, p1 @ 3.1s, p2 @ 5.3s, p3 @ 7.9s) → vergleichen, ob der Mund des Zielsprechers im Pass-Output bewegt vs. Plate, und ob unsere `coords` über dem korrekten Gesicht liegen.
+3. **Bbox-JSON** für p0 & p3 herunterladen → Anzahl Einträge, Bbox-Bereich, schauen ob alle Frames dieselbe Bbox haben (statisch) oder gar leere Boxen.
+4. **Render-Inputs prüfen**: das letzte `audio_tight.output_offsets_sec` Array in `dialog_shots->passes[*]` lesen und mit Segments-Timing abgleichen.
+5. **Aktuelle Master-URL** in `composer_scenes` lesen und 1 Frame pro Sprecher-Turn rendern, um zu sehen welche Mask-Region greift.
 
-Vorher hat `bbox-inline` (gleicher Bug) auf kürzeren Plates trotzdem durchlaufen, weil Sync.so dort offenbar laxer geprüft hat. Bei `bbox-url-pro` ist das Length-Match strikt.
+### Was wir dann liefern
+- Ein **kurzer Befund-Report** ("Bbox-System X drift, mask-radius Y reicht nicht für 4-Speaker Layout, …").
+- Konkreter Fix-Vorschlag (z.B. dynamische Mask-Radien aus der Bbox-Größe, oder Bbox-Frames clampen auf `min(requested_total*fps, plate_frames)`, oder coords in echten Plate-Pixelraum reprojizieren) **mit `requires-approval=true`** — wir patchen erst nach deinem Go.
 
-## Fix (v153.8 — `actual-frame-count`)
+### Was wir **nicht** anfassen
+- v153.8 Frame-Count-Fix bleibt.
+- Auto-Detect bleibt aus.
+- Sync-3 Doc-Strict Options bleiben unverändert.
 
-Eine fokussierte Änderung in `supabase/functions/compose-dialog-segments/index.ts`:
-
-1. **Probe the rehosted plate once** — direkt nach `v143_rehost` (vor dem Dispatch der ersten Pass-JSON) wird per `HEAD`+`Range`-Lesefehler oder, einfacher, per `ffprobe`-Mini-Call der Plate-Header gelesen. Da Edge-Functions kein ffprobe haben, nutzen wir stattdessen den **mp4-Box-Parser, der bereits in `compose-dialog-segments` für die Audio-Normalisierung importiert wird** (`parseMp4DurationSec` / Helpers im selben File — siehe `audio_normalization` block). Falls keiner existiert, fügen wir einen kleinen `probePlateFrames(url)` Helper hinzu, der per `Range: bytes=0-65535` die `mvhd`-Box ausliest (Standard-Trick, ~30 Zeilen, keine neue Dependency).
-2. **Cache pro Scene** — Ergebnis (`actualDurationSec`, `nbFrames`, `fps`) im bestehenden `passDimsCache`/`plateMetaCache` ablegen, damit alle Passes (1..N) dasselbe `frameCount` benutzen.
-3. **`frameCount` ableiten** —
-   ```ts
-   const fps = probed.fps || ASSUMED_FPS;            // fallback 24
-   const frameCount = probed.nbFrames
-     ?? Math.max(1, Math.ceil(probed.actualDurationSec * fps));
-   ```
-   Dieser Wert ersetzt `Math.ceil(totalSec * ASSUMED_FPS)` in **beiden** Call-Sites (Zeile 3732 + 3789, also `bbox-url-pro` und der inline `bbox` Fallback).
-4. **Version-Bump** → `COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.8"`.
-5. **Neuer Diagnose-Log** vor dem Upload:
-   ```
-   v153.8_bbox_framecount plate_duration=10.125 plate_fps=24 plate_frames=243 used=243 src=mp4probe
-   ```
-   Wenn der Probe fehlschlägt, loggen wir `src=fallback_assumed_fps` und nutzen den alten `totalSec*ASSUMED_FPS` — kein Hard-Fail.
-
-## Nicht angefasst
-
-- ASD-Shape (`auto_detect:false` + `bounding_boxes_url`) bleibt unverändert (v140-Wire-Assert + v153.3 Overwrite-Sensor greifen weiter).
-- Sync-3 doc-strict Options (`sync_mode`, `active_speaker_detection`) bleiben unverändert.
-- Refund-Logik (v5/v129.4a) bleibt unverändert — der Pfad wird nach dem Fix gar nicht mehr getriggert.
-- Keine Änderung am v153.7 Coords-Shape-Log (Crash-Fix bleibt drin).
-
-## Verifikation
-
-1. Deploy `compose-dialog-segments` (v153.8).
-2. UI → „Sauber neu starten" auf derselben 4-Sprecher-Szene.
-3. Log-Check pro Pass:
-   - `v153.8_bbox_framecount plate_duration=10.x plate_fps=24 plate_frames=24x used=24x src=mp4probe`
-   - `v147_BBOX_URL_PRIMARY ... frames=24x voiced_frames=…`
-   - `WIRE_PAYLOAD … bounding_boxes_url=…`
-   - `DISPATCH pass=N/4`
-   - `sync-so-webhook ... terminal=COMPLETED` (kein `generation_unknown_error` mehr)
-4. Fallback-Probe: Wenn `mp4probe` fehlschlägt, soll alter `totalSec*24` Pfad greifen und gelogged werden — vorhandene Refund-Kette bleibt unverändert.
-
-## Erwartetes Ergebnis
-
-Alle 4 Sprecher-Passes laufen bei Sync.so durch, sceneweise Stitch via `poll-dialog-shots` produziert ein einzelnes `clip_url` für die Szene, UI zeigt grünes ✅ statt „Szene fehlgeschlagen".
+Sag "Diagnose starten" und ich gehe die Schritte 1-5 im Build-Mode der Reihe nach durch, ohne vorher Code zu ändern.
