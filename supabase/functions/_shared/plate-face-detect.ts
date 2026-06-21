@@ -185,6 +185,7 @@ async function callGeminiGateway(
   lovableKey: string,
   content: unknown[],
   tag: string,
+  model: string = "google/gemini-2.5-flash",
 ): Promise<{ ok: boolean; faces: GeminiFace[]; status: number | string }> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), GEMINI_TIMEOUT_MS);
@@ -196,7 +197,7 @@ async function callGeminiGateway(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [{ role: "user", content }],
       }),
       signal: ctrl.signal,
@@ -204,7 +205,7 @@ async function callGeminiGateway(
     clearTimeout(t);
     if (!resp.ok) {
       const errBody = await resp.text().catch(() => "");
-      console.warn(`${tag} gemini HTTP ${resp.status} body=${errBody.slice(0, 240)}`);
+      console.warn(`${tag} gemini(${model}) HTTP ${resp.status} body=${errBody.slice(0, 240)}`);
       return { ok: false, faces: [], status: resp.status };
     }
     const j = await resp.json();
@@ -212,7 +213,7 @@ async function callGeminiGateway(
     return { ok: true, faces: parseFaces(String(txt)), status: 200 };
   } catch (e) {
     clearTimeout(t);
-    console.warn(`${tag} gemini exception: ${(e as Error)?.message}`);
+    console.warn(`${tag} gemini(${model}) exception: ${(e as Error)?.message}`);
     return { ok: false, faces: [], status: "EXCEPTION" };
   }
 }
