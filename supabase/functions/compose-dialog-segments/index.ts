@@ -85,7 +85,7 @@ import {
   resolveCharacterPortraits,
   resolveSceneFaceMap,
 } from "../_shared/twoshot-face-map.ts";
-import { detectPlateFaces } from "../_shared/plate-face-detect.ts";
+import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.8";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v154";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -1319,7 +1319,39 @@ serve(async (req) => {
     const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes)
       ? persistedPlateIdentity.bboxes
       : [];
-    if (persistedBboxes.length >= speakers.length) {
+    // v154 — Geometry sanity gate against the persisted bboxes. The pre-v154
+    // detector path occasionally cached torso/upper-body boxes (center y >
+    // 0.55 of plate height). If those got persisted into dialog_shots, they
+    // would survive "Sauber neu starten" forever. Discard suspect persisted
+    // identities so the live re-detect path (with the new gate) runs.
+    let persistedGateOk = true;
+    if (persistedBboxes.length >= speakers.length && plateDims) {
+      const probeFaces = persistedBboxes
+        .slice(0, speakers.length)
+        .filter((b: unknown) => Array.isArray(b) && (b as unknown[]).length === 4)
+        .map((b: number[]) => ({
+          bbox: [
+            Math.round(Number(b[0])),
+            Math.round(Number(b[1])),
+            Math.round(Number(b[2])),
+            Math.round(Number(b[3])),
+          ] as [number, number, number, number],
+          center: [
+            Math.round((Number(b[0]) + Number(b[2])) / 2),
+            Math.round((Number(b[1]) + Number(b[3])) / 2),
+          ] as [number, number],
+          slot: 0,
+        }));
+      const gate = validatePlateFacesGeometry(probeFaces, plateDims.width, plateDims.height);
+      if (!gate.ok) {
+        persistedGateOk = false;
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v154_persisted_identity_evict reason=${gate.reason} ` +
+          `detail=${gate.detail ?? "-"} — forcing live plate re-detection`,
+        );
+      }
+    }
+    if (persistedGateOk && persistedBboxes.length >= speakers.length) {
       for (let i = 0; i < speakers.length; i++) {
         const b = persistedBboxes[i];
         if (Array.isArray(b) && b.length === 4 && b.every((n: unknown) => Number.isFinite(Number(n)))) {

@@ -109,6 +109,77 @@ const PLATE_PROMPT = (want: number, ts: number) =>
   "If a face is partially cropped, still return its visible portion's bbox. " +
   "If no faces, return empty faces array.";
 
+// v154 — Strict re-prompt for Gemini Pro after a geometry sanity-gate failure.
+const PLATE_PROMPT_STRICT = (want: number, ts: number) =>
+  `CRITICAL: Look at the frame at timestamp ${ts.toFixed(2)}s. ` +
+  `That frame contains ${want} human face(s). ` +
+  "Return ONLY the HEAD bounding box for each visible person. " +
+  "The bbox MUST start at the TOP of the HAIR/FOREHEAD and END at the CHIN. " +
+  "Width is ear-to-ear. " +
+  "DO NOT include shoulders, neck, chest, torso, arms, or any body parts below the chin. " +
+  "DO NOT include the background. " +
+  "The face bbox HEIGHT should be roughly 8–25 % of the image height for a typical wide group shot. " +
+  "If you would include anything below the chin, your answer is WRONG — clip it at the chin. " +
+  "Return STRICT JSON only — no prose, no markdown fences. " +
+  "Schema: {\"faces\":[{\"slot\":<int>,\"center\":[nx,ny],\"bbox\":[nx1,ny1,nx2,ny2],\"confidence\":<0..1>}]}. " +
+  "Coordinates MUST be NORMALIZED 0..1 (0,0 = top-left, 1,1 = bottom-right). " +
+  "'slot' = index after sorting visible faces by ascending normalized x (left-most = slot 0).";
+
+/**
+ * v154 — Geometry sanity gate. Returns ok=false when detected boxes
+ * smell like torso/body boxes instead of head/face boxes.
+ *   - any face center_y > 0.65 * plateHeight        → "center_far_below_midline"
+ *   - mean face center_y > 0.45 * plateHeight       → "cluster_below_upper_third"
+ *   - mean bbox height > 30 % of plateHeight        → "bbox_too_tall"
+ *   - any single bbox height > 40 % of plateHeight  → "bbox_oversized"
+ *   - any bbox h/w aspect > 1.8 (tall torso)        → "bbox_aspect_torso_like"
+ */
+export function validatePlateFacesGeometry(
+  faces: PlateFaceBox[],
+  _plateWidth: number,
+  plateHeight: number,
+): { ok: boolean; reason?: string; detail?: string } {
+  if (!faces.length) return { ok: false, reason: "empty" };
+  const H = Math.max(1, plateHeight);
+  const centers = faces.map((f) => f.center?.[1] ?? 0);
+  const farBelow = centers.filter((cy) => cy / H > 0.65);
+  if (farBelow.length > 0) {
+    return {
+      ok: false,
+      reason: "center_far_below_midline",
+      detail: farBelow.map((cy) => `cy=${cy}`).join(","),
+    };
+  }
+  const meanCy = centers.reduce((a, b) => a + b, 0) / centers.length;
+  if (meanCy / H > 0.45) {
+    return {
+      ok: false,
+      reason: "cluster_below_upper_third",
+      detail: `meanCy=${meanCy.toFixed(0)} H=${H} ratio=${(meanCy / H).toFixed(3)}`,
+    };
+  }
+  const heights = faces.map((f) => Math.max(0, f.bbox[3] - f.bbox[1]));
+  const widths = faces.map((f) => Math.max(0, f.bbox[2] - f.bbox[0]));
+  const meanHRatio = heights.reduce((a, b) => a + b, 0) / (heights.length * H);
+  if (meanHRatio > 0.30) {
+    return { ok: false, reason: "bbox_too_tall", detail: `meanHRatio=${meanHRatio.toFixed(3)}` };
+  }
+  const maxHRatio = Math.max(...heights) / H;
+  if (maxHRatio > 0.40) {
+    return { ok: false, reason: "bbox_oversized", detail: `maxHRatio=${maxHRatio.toFixed(3)}` };
+  }
+  const aspects = heights.map((h, i) => h / Math.max(1, widths[i]));
+  const tallTorsoCount = aspects.filter((a) => a > 1.8).length;
+  if (tallTorsoCount > 0) {
+    return {
+      ok: false,
+      reason: "bbox_aspect_torso_like",
+      detail: aspects.map((a) => a.toFixed(2)).join(","),
+    };
+  }
+  return { ok: true };
+}
+
 function parseFaces(content: string): GeminiFace[] {
   const m = String(content ?? "").match(/\{[\s\S]*\}/);
   if (!m) return [];
@@ -124,6 +195,7 @@ async function callGeminiGateway(
   lovableKey: string,
   content: unknown[],
   tag: string,
+  model: string = "google/gemini-2.5-flash",
 ): Promise<{ ok: boolean; faces: GeminiFace[]; status: number | string }> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), GEMINI_TIMEOUT_MS);
@@ -135,7 +207,7 @@ async function callGeminiGateway(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [{ role: "user", content }],
       }),
       signal: ctrl.signal,
@@ -143,7 +215,7 @@ async function callGeminiGateway(
     clearTimeout(t);
     if (!resp.ok) {
       const errBody = await resp.text().catch(() => "");
-      console.warn(`${tag} gemini HTTP ${resp.status} body=${errBody.slice(0, 240)}`);
+      console.warn(`${tag} gemini(${model}) HTTP ${resp.status} body=${errBody.slice(0, 240)}`);
       return { ok: false, faces: [], status: resp.status };
     }
     const j = await resp.json();
@@ -151,7 +223,7 @@ async function callGeminiGateway(
     return { ok: true, faces: parseFaces(String(txt)), status: 200 };
   } catch (e) {
     clearTimeout(t);
-    console.warn(`${tag} gemini exception: ${(e as Error)?.message}`);
+    console.warn(`${tag} gemini(${model}) exception: ${(e as Error)?.message}`);
     return { ok: false, faces: [], status: "EXCEPTION" };
   }
 }
@@ -187,6 +259,7 @@ async function askGeminiForPlateFaces(
   frameUrl: string,
   expectedCount: number,
   timestampSec: number,
+  opts?: { strict?: boolean; model?: string },
 ): Promise<GeminiFace[]> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) {
@@ -194,7 +267,11 @@ async function askGeminiForPlateFaces(
     return [];
   }
   const want = Math.max(1, Math.min(8, expectedCount || 2));
-  const prompt = PLATE_PROMPT(want, timestampSec);
+  const prompt = opts?.strict
+    ? PLATE_PROMPT_STRICT(want, timestampSec)
+    : PLATE_PROMPT(want, timestampSec);
+  const model = opts?.model ?? "google/gemini-2.5-flash";
+  const tagSuffix = opts?.strict ? "strict" : "default";
 
   // PRIMARY: type=input_video with the mp4 URL (verified 200 via probe).
   const primary = await callGeminiGateway(
@@ -203,18 +280,16 @@ async function askGeminiForPlateFaces(
       { type: "text", text: prompt },
       { type: "input_video", input_video: { url: frameUrl } } as unknown,
     ],
-    "[plate-face-detect:input_video]",
+    `[plate-face-detect:input_video:${tagSuffix}]`,
+    model,
   );
   if (primary.ok && primary.faces.length >= want) {
     return primary.faces;
   }
 
   // FALLBACK: data:video/mp4;base64,... via image_url (verified 200 via probe).
-  // Trigger when primary failed OR returned fewer faces than expected
-  // (probe showed input_video can miss 1 in 4-speaker shots; base64 hit 4/4).
   const dataUrl = await fetchMp4AsBase64DataUrl(frameUrl);
   if (!dataUrl) {
-    // Base64 fallback unavailable (too large / fetch failed) — return whatever primary gave.
     return primary.faces;
   }
   const fallback = await callGeminiGateway(
@@ -223,15 +298,44 @@ async function askGeminiForPlateFaces(
       { type: "text", text: prompt },
       { type: "image_url", image_url: { url: dataUrl } },
     ],
-    "[plate-face-detect:base64]",
+    `[plate-face-detect:base64:${tagSuffix}]`,
+    model,
   );
   if (fallback.ok && fallback.faces.length > primary.faces.length) {
     console.log(
-      `[plate-face-detect] base64 fallback wins: primary=${primary.faces.length} fallback=${fallback.faces.length}`,
+      `[plate-face-detect] base64 fallback wins (${tagSuffix}): primary=${primary.faces.length} fallback=${fallback.faces.length}`,
     );
     return fallback.faces;
   }
   return primary.faces.length >= fallback.faces.length ? primary.faces : fallback.faces;
+}
+
+/** v154 — Convert raw Gemini faces (normalized 0..1) → plate-pixel PlateFaceBox[]. */
+function normalizedFacesToPlateBoxes(
+  rawFaces: GeminiFace[],
+  plateWidth: number,
+  plateHeight: number,
+): PlateFaceBox[] {
+  const W = Math.max(1, plateWidth);
+  const H = Math.max(1, plateHeight);
+  return rawFaces
+    .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
+    .map((f) => {
+      const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
+      const x1 = Math.round(nx1 * W);
+      const y1 = Math.round(ny1 * H);
+      const x2 = Math.round(nx2 * W);
+      const y2 = Math.round(ny2 * H);
+      return {
+        bbox: [x1, y1, x2, y2] as [number, number, number, number],
+        center: [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)] as [number, number],
+        slot: 0,
+        confidence: typeof f.confidence === "number" ? f.confidence : undefined,
+      };
+    })
+    .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
+    .sort((a, b) => a.center[0] - b.center[0])
+    .map((f, idx) => ({ ...f, slot: idx }));
 }
 
 /**
@@ -259,7 +363,8 @@ export async function detectPlateFaces(params: {
   const tag = `[plate-face-detect] scene=${params.sceneId}`;
   const cacheKey = await hashUrl(params.plateUrl);
 
-  // 1. Cache hit?
+  // 1. Cache hit? v154 — validate against geometry sanity gate so stale
+  // torso-bbox rows from pre-v154 dispatches don't poison new dispatches.
   try {
     const { data: cached } = await params.supabase
       .from("plate_face_cache")
@@ -268,19 +373,39 @@ export async function detectPlateFaces(params: {
       .gte("expires_at", new Date().toISOString())
       .maybeSingle();
     if (cached && Array.isArray(cached.faces) && cached.faces.length > 0) {
-      console.log(`${tag} cache HIT faces=${cached.faces.length} detector=${cached.detector}`);
-      return {
-        faces: cached.faces as PlateFaceBox[],
-        width: cached.width,
-        height: cached.height,
-        detector: cached.detector,
-        frame_url: cached.frame_url ?? undefined,
-        cached: true,
-      };
+      const gate = validatePlateFacesGeometry(
+        cached.faces as PlateFaceBox[],
+        cached.width ?? params.plateWidth,
+        cached.height ?? params.plateHeight,
+      );
+      if (gate.ok) {
+        console.log(`${tag} cache HIT faces=${cached.faces.length} detector=${cached.detector}`);
+        return {
+          faces: cached.faces as PlateFaceBox[],
+          width: cached.width,
+          height: cached.height,
+          detector: cached.detector,
+          frame_url: cached.frame_url ?? undefined,
+          cached: true,
+        };
+      }
+      console.warn(
+        `${tag} v154_cache_evict stale detector=${cached.detector} reason=${gate.reason} detail=${gate.detail ?? "-"} — re-detecting`,
+      );
+      try {
+        await params.supabase
+          .from("plate_face_cache")
+          .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
+          .eq("plate_url_hash", cacheKey);
+      } catch (e) {
+        console.warn(`${tag} v154_cache_evict update failed: ${(e as Error)?.message}`);
+      }
     }
   } catch (e) {
     console.warn(`${tag} cache read failed: ${(e as Error)?.message}`);
   }
+
+
 
   // 2. v129.21 — Try MediaPipe FIRST (dedicated face detector, pixel-bbox,
   //    multi-frame union). Falls back to Gemini direct-mp4 on any failure.
@@ -330,28 +455,49 @@ export async function detectPlateFaces(params: {
       console.warn(`${tag} gemini also returned 0 faces — caller should fall back`);
       return null;
     }
+    faces = normalizedFacesToPlateBoxes(rawFaces, params.plateWidth, params.plateHeight);
 
-    const W = Math.max(1, params.plateWidth);
-    const H = Math.max(1, params.plateHeight);
-    faces = rawFaces
-      .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
-      .map((f) => {
-        const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
-        const x1 = Math.round(nx1 * W);
-        const y1 = Math.round(ny1 * H);
-        const x2 = Math.round(nx2 * W);
-        const y2 = Math.round(ny2 * H);
-        return {
-          bbox: [x1, y1, x2, y2] as [number, number, number, number],
-          center: [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)] as [number, number],
-          slot: 0,
-          confidence: typeof f.confidence === "number" ? f.confidence : undefined,
-        };
-      })
-      .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
-      .sort((a, b) => a.center[0] - b.center[0])
-      .map((f, idx) => ({ ...f, slot: idx }));
+    // v154 — Geometry sanity gate. Flash routinely returns torso/upper-body
+    // bboxes when the scene has multiple closely-spaced figures (the v153.x
+    // 4-speaker bug). If gate fails, retry with Gemini Pro + strict prompt.
+    const gate1 = validatePlateFacesGeometry(faces, params.plateWidth, params.plateHeight);
+    if (!gate1.ok) {
+      console.warn(
+        `${tag} v154_sanity_gate FAIL detector=flash reason=${gate1.reason} detail=${gate1.detail ?? "-"} ` +
+        `— retrying with gemini-2.5-pro + strict prompt`,
+      );
+      const rawPro = await askGeminiForPlateFaces(
+        frameUrl,
+        params.expectedCount,
+        tsHint,
+        { strict: true, model: "google/gemini-2.5-pro" },
+      );
+      if (rawPro.length > 0) {
+        const proFaces = normalizedFacesToPlateBoxes(rawPro, params.plateWidth, params.plateHeight);
+        const gate2 = validatePlateFacesGeometry(proFaces, params.plateWidth, params.plateHeight);
+        if (gate2.ok) {
+          faces = proFaces;
+          detectorUsed = "gemini-2.5-pro-strict";
+          console.log(
+            `${tag} v154_sanity_gate PRO_RECOVERY ok faces=${faces.length} ` +
+            `boxes=${JSON.stringify(faces.map((f) => f.bbox))}`,
+          );
+        } else {
+          console.warn(
+            `${tag} v154_sanity_gate FAIL detector=pro reason=${gate2.reason} detail=${gate2.detail ?? "-"} ` +
+            `— refusing to cache; caller falls back / blocks`,
+          );
+          return null;
+        }
+      } else {
+        console.warn(`${tag} v154_sanity_gate Pro returned 0 faces — refusing to cache`);
+        return null;
+      }
+    } else {
+      detectorUsed = "gemini-2.5-flash";
+    }
   }
+
 
   const W = Math.max(1, params.plateWidth);
   const H = Math.max(1, params.plateHeight);
