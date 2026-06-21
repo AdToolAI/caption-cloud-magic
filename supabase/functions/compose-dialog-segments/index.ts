@@ -90,7 +90,10 @@ import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
-// v153.5 — renderPassFacePreclip import removed; preclip path deleted.
+// v161 — renderPassFacePreclip re-enabled for the unified single-face
+// bbox-url-pro pipeline (1..N speakers). The full-plate dispatch path is
+// now strictly the fallback when preclip rendering fails.
+import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
