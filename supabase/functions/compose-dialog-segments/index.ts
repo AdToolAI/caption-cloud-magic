@@ -123,7 +123,66 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.7";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.8";
+
+// v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
+// requires the `bounding_boxes` array length to MATCH the actual video frame
+// count. We were sending `Math.ceil(totalSec * 24)` where `totalSec` was the
+// *requested* Hailuo duration (9s) — but Hailuo routinely returns 10.0–10.5s,
+// so the JSON had ~216 entries against a 243-frame plate → provider rejected
+// every pass with the opaque `generation_unknown_error`.
+//
+// Fix: probe the rehosted MP4 once per plate URL (cached by URL) by parsing
+// the `mvhd` box for `duration / timescale`, then derive frameCount from the
+// actual duration. Fallback to the legacy `totalSec * 24` if the probe fails.
+const __plateMetaCache = new Map<string, { durationSec: number | null }>();
+async function probePlateDurationSec(url: string): Promise<number | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    const findBox = (start: number, end: number, name: string): { start: number; end: number } | null => {
+      let p = start;
+      while (p + 8 <= end) {
+        const size = dv.getUint32(p);
+        const type = String.fromCharCode(buf[p + 4], buf[p + 5], buf[p + 6], buf[p + 7]);
+        const boxEnd = size === 0 ? end : p + size;
+        if (type === name) return { start: p + 8, end: boxEnd };
+        if (size < 8) break;
+        p = boxEnd;
+      }
+      return null;
+    };
+    const moov = findBox(0, buf.length, "moov");
+    if (!moov) return null;
+    const mvhd = findBox(moov.start, moov.end, "mvhd");
+    if (!mvhd) return null;
+    const version = buf[mvhd.start];
+    let timescale: number, duration: number;
+    if (version === 1) {
+      // version(1) + flags(3) + creation(8) + mod(8) + timescale(4) + duration(8)
+      timescale = dv.getUint32(mvhd.start + 4 + 8 + 8);
+      const high = dv.getUint32(mvhd.start + 4 + 8 + 8 + 4);
+      const low = dv.getUint32(mvhd.start + 4 + 8 + 8 + 8);
+      duration = high * 2 ** 32 + low;
+    } else {
+      // version(1) + flags(3) + creation(4) + mod(4) + timescale(4) + duration(4)
+      timescale = dv.getUint32(mvhd.start + 4 + 4 + 4);
+      duration = dv.getUint32(mvhd.start + 4 + 4 + 4 + 4);
+    }
+    if (!timescale) return null;
+    return duration / timescale;
+  } catch {
+    return null;
+  }
+}
+async function getPlateDurationSecCached(url: string): Promise<number | null> {
+  if (__plateMetaCache.has(url)) return __plateMetaCache.get(url)!.durationSec;
+  const durationSec = await probePlateDurationSec(url);
+  __plateMetaCache.set(url, { durationSec });
+  return durationSec;
+}
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
