@@ -42,6 +42,10 @@ timeout_sec = 180
 verify_jwt = true
 timeout_sec = 180
 
+[functions.compose-twoshot-audio]
+verify_jwt = true
+timeout_sec = 180
+
 
 [functions.compose-scene-anchor]
 verify_jwt = true
