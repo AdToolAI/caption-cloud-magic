@@ -51,10 +51,8 @@ export default function SceneInlinePlayer({
 }: Props) {
   const { t } = useTranslation();
   const { reset: resetLipSync, resettingId } = useResetLipSync();
-  const { isAdmin } = useUserRoles();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
-  const [forensicsOpen, setForensicsOpen] = useState(false);
 
   const clipUrl = scene.clipUrl;
   const posterUrl =
@@ -437,33 +435,12 @@ export default function SceneInlinePlayer({
                   <RefreshCw className="h-2.5 w-2.5" />
                   Neu rendern
                 </Button>
-                {isAdmin && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setForensicsOpen(true);
-                    }}
-                    title="Sync.so Forensik (Admin)"
-                    className="h-6 px-2 text-[10px] gap-1 bg-amber-500/10 border-amber-500/40 text-amber-200 hover:bg-amber-500/20"
-                  >
-                    <FlaskConical className="h-2.5 w-2.5" />
-                    Forensik
-                  </Button>
-                )}
               </div>
             </div>
           );
         })()}
 
-        {isAdmin && forensicsOpen && (
-          <SyncsoForensicsSheet
-            open={forensicsOpen}
-            onOpenChange={setForensicsOpen}
-            sceneId={scene.id}
-          />
-        )}
+
 
 
 
