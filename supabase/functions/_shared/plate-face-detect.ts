@@ -580,6 +580,61 @@ export async function detectPlateFaces(params: {
     return null;
   }
 
+  // ── v157 — AWS-Geometry-Gate + Auto-Tighten ──────────────────────────
+  // AWS Rekognition liefert bei eng gepackten Multi-Speaker-Plates oft
+  // Boxen die Hals + Schultern mit einschließen (aspect H/W > 1.4, oder
+  // bbox.h > 22 % der Plate-Höhe). Sync.so faceMask trifft dann Brust/
+  // Hintergrund-Pixel und morphed sie ("Animorph"-Artefakt bei Sprecher
+  // 2–4 in 4-Personen-Szenen).
+  //
+  // Fix: jede zu hohe/zu schulterlastige Box wird auf ein realistisches
+  // Stirn→Kinn-Verhältnis (h ≈ w * 1.15) zentriert auf das Mund-Landmark
+  // (bzw. obere ⅓ der alten Box) heruntergerechnet. Bleibt sie über 25 %
+  // Höhe, ist die Detection korrupt → hard fail.
+  const tightened: PlateFaceBox[] = [];
+  for (const f of faces) {
+    const [bx1, by1, bx2, by2] = f.bbox;
+    const w = Math.max(1, bx2 - bx1);
+    const h = Math.max(1, by2 - by1);
+    const aspectIn = h / w;
+    const hRatioIn = h / H;
+    if (aspectIn > 1.35 || hRatioIn > 0.22) {
+      const anchorY = Array.isArray(f.mouth) && Number.isFinite(f.mouth[1])
+        ? f.mouth[1]
+        : Math.round(by1 + h / 3); // obere ⅓ ≈ Augen/Nasenhöhe für Torso-Box
+      const cx = Math.round((bx1 + bx2) / 2);
+      const newW = w; // X bleibt — links/rechts ist verlässlich
+      const newH = Math.round(w * 1.15); // realistisches Face-Aspect
+      const nx1 = Math.max(0, Math.round(cx - newW / 2));
+      const nx2 = Math.min(W, Math.round(cx + newW / 2));
+      const ny1 = Math.max(0, Math.round(anchorY - newH / 2));
+      const ny2 = Math.min(H, Math.round(anchorY + newH / 2));
+      const tightH = ny2 - ny1;
+      const tightHRatio = tightH / H;
+      if (tightHRatio > 0.25) {
+        console.warn(
+          `${tag} v157_geometry_tighten_failed aspect_in=${aspectIn.toFixed(2)} ` +
+          `hRatio_in=${hRatioIn.toFixed(3)} tightHRatio=${tightHRatio.toFixed(3)} — HARD_FAIL`,
+        );
+        return null;
+      }
+      const newBbox: [number, number, number, number] = [nx1, ny1, nx2, ny2];
+      const newCenter: [number, number] = [
+        Math.round((nx1 + nx2) / 2),
+        Math.round((ny1 + ny2) / 2),
+      ];
+      console.log(
+        `${tag} v157_geometry_tighten slot=${f.slot} aspect_in=${aspectIn.toFixed(2)} ` +
+        `aspect_out=${(tightH / newW).toFixed(2)} hRatio_in=${hRatioIn.toFixed(3)} ` +
+        `hRatio_out=${tightHRatio.toFixed(3)} mouth_used=${!!f.mouth}`,
+      );
+      tightened.push({ ...f, bbox: newBbox, center: newCenter });
+    } else {
+      tightened.push(f);
+    }
+  }
+  faces = tightened;
+
   console.log(
     `${tag} detected ${faces.length} face(s) via ${detectorUsed} plate=${W}x${H} ` +
     `boxes=${JSON.stringify(faces.map((f) => f.bbox))}`,
