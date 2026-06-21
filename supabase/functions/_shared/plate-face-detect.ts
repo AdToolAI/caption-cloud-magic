@@ -109,6 +109,67 @@ const PLATE_PROMPT = (want: number, ts: number) =>
   "If a face is partially cropped, still return its visible portion's bbox. " +
   "If no faces, return empty faces array.";
 
+// v154 — Strict re-prompt for Gemini Pro after a geometry sanity-gate failure.
+const PLATE_PROMPT_STRICT = (want: number, ts: number) =>
+  `CRITICAL: Look at the frame at timestamp ${ts.toFixed(2)}s. ` +
+  `That frame contains ${want} human face(s). ` +
+  "Return ONLY the HEAD bounding box for each visible person. " +
+  "The bbox MUST start at the TOP of the HAIR/FOREHEAD and END at the CHIN. " +
+  "Width is ear-to-ear. " +
+  "DO NOT include shoulders, neck, chest, torso, arms, or any body parts below the chin. " +
+  "DO NOT include the background. " +
+  "The face bbox HEIGHT should be roughly 8–25 % of the image height for a typical wide group shot. " +
+  "If you would include anything below the chin, your answer is WRONG — clip it at the chin. " +
+  "Return STRICT JSON only — no prose, no markdown fences. " +
+  "Schema: {\"faces\":[{\"slot\":<int>,\"center\":[nx,ny],\"bbox\":[nx1,ny1,nx2,ny2],\"confidence\":<0..1>}]}. " +
+  "Coordinates MUST be NORMALIZED 0..1 (0,0 = top-left, 1,1 = bottom-right). " +
+  "'slot' = index after sorting visible faces by ascending normalized x (left-most = slot 0).";
+
+/**
+ * v154 — Geometry sanity gate. Returns ok=false when detected boxes
+ * smell like torso/body boxes instead of head/face boxes.
+ *   - any face center_y > 0.55 * plateHeight        → "center_below_midline"
+ *   - mean bbox height > 30 % of plateHeight        → "bbox_too_tall"
+ *   - any single bbox height > 40 % of plateHeight  → "bbox_oversized"
+ *   - any bbox h/w aspect > 1.8 (tall torso)        → "bbox_aspect_torso_like"
+ */
+export function validatePlateFacesGeometry(
+  faces: PlateFaceBox[],
+  _plateWidth: number,
+  plateHeight: number,
+): { ok: boolean; reason?: string; detail?: string } {
+  if (!faces.length) return { ok: false, reason: "empty" };
+  const H = Math.max(1, plateHeight);
+  const lowCenters = faces.filter((f) => (f.center?.[1] ?? 0) / H > 0.55);
+  if (lowCenters.length > 0) {
+    return {
+      ok: false,
+      reason: "center_below_midline",
+      detail: lowCenters.map((f) => `cy=${f.center?.[1]}`).join(","),
+    };
+  }
+  const heights = faces.map((f) => Math.max(0, f.bbox[3] - f.bbox[1]));
+  const widths = faces.map((f) => Math.max(0, f.bbox[2] - f.bbox[0]));
+  const meanHRatio = heights.reduce((a, b) => a + b, 0) / (heights.length * H);
+  if (meanHRatio > 0.30) {
+    return { ok: false, reason: "bbox_too_tall", detail: `meanHRatio=${meanHRatio.toFixed(3)}` };
+  }
+  const maxHRatio = Math.max(...heights) / H;
+  if (maxHRatio > 0.40) {
+    return { ok: false, reason: "bbox_oversized", detail: `maxHRatio=${maxHRatio.toFixed(3)}` };
+  }
+  const aspects = heights.map((h, i) => h / Math.max(1, widths[i]));
+  const tallTorsoCount = aspects.filter((a) => a > 1.8).length;
+  if (tallTorsoCount > 0) {
+    return {
+      ok: false,
+      reason: "bbox_aspect_torso_like",
+      detail: aspects.map((a) => a.toFixed(2)).join(","),
+    };
+  }
+  return { ok: true };
+}
+
 function parseFaces(content: string): GeminiFace[] {
   const m = String(content ?? "").match(/\{[\s\S]*\}/);
   if (!m) return [];
