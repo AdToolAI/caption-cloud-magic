@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.6";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v153.7";
 // v139.2 — Module-load boot marker. Proves which build is actually running
 // inside Edge Runtime (vs a stale cached copy). Look for this exact string
 // in logs immediately after any deploy to confirm the new code is live.
@@ -4813,9 +4813,16 @@ serve(async (req) => {
             { final_asd: coordsAsd, retry_variant: retryVariant, compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION },
           );
         }
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} coords_shape ok=[${c[0]},${c[1]}] frame_number=${coordsAsd.frame_number}`,
-        );
+        if (coordsOk) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} coords_shape ok=[${c[0]},${c[1]}] frame_number=${coordsAsd.frame_number}`,
+          );
+        } else if (hasBoxes) {
+          const boxesKind = coordsAsd.bounding_boxes_url ? "bounding_boxes_url" : "bounding_boxes";
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} coords_shape ok=${boxesKind} frame_number=${coordsAsd.frame_number ?? "n/a"}`,
+          );
+        }
       }
     }
 
