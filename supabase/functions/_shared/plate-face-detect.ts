@@ -382,6 +382,8 @@ export async function detectPlateFaces(params: {
   sceneId: string;
   projectId: string;
   midDurationSec: number;
+  /** v156 — Anchor frame (PNG/JPG) used as i2v input. AWS runs on this. */
+  anchorUrl?: string | null;
 }): Promise<PlateFaceMap | null> {
   const tag = `[plate-face-detect] scene=${params.sceneId}`;
   const cacheKey = await hashUrl(params.plateUrl);
