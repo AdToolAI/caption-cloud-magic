@@ -3726,10 +3726,18 @@ serve(async (req) => {
           };
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
+          // v162 — persist real preclip fps + duration so the bounding_boxes
+          // JSON array length below matches the actual dispatched video frame
+          // count (Sync.so rejects mismatches with `generation_unknown_error`).
+          (pass as any).preclip_fps = Number(preclipResult.fps ?? 30);
+          (pass as any).preclip_duration_sec = Number(
+            (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
+          );
           (pass as any).preclip_error = null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} dur=${preclipResult.durationSec?.toFixed(2)}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps}`,
           );
+
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           console.warn(
