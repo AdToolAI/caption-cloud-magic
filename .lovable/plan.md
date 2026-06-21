@@ -1,81 +1,83 @@
-# v162 — bbox-url-pro-only, kein Auto-Detect
+## Befund
 
-## Ziel
+**Ja, ich weiß jetzt, was das Problem ist.** Sync.so dokumentiert klar: `bounding_boxes_url` muss eine JSON-Datei liefern, deren `bounding_boxes`-Array **genau einen Eintrag pro Videoframe** enthält. Unsere v162-FPS-Korrektur ging in die richtige Richtung, ist aber noch um 1 Frame daneben.
 
-Nicht zurück zu `auto_detect`. Der Pfad bleibt für **alle Sprecher (1..N)** gleich:
-
-```text
-Single-face Preclip pro Pass → sync-3 → auto_detect:false + bounding_boxes_url → Crop-Mux zurück in die Szene
-```
-
-## Diagnose aus dem aktuellen Fehler
-
-Sync.so hat `generation_unknown_error` zurückgegeben, obwohl v161 korrekt einen Single-Face-Preclip erzeugt hat.
-
-Der konkrete v161-Fehler liegt sehr wahrscheinlich nicht an bbox-url-pro selbst, sondern an einem **Framecount/FPS-Mismatch im neuen Preclip-Pfad**:
-
-- `renderPassFacePreclip` rendert Preclips mit **30 fps**.
-- `compose-dialog-segments` baut die `bounding_boxes_url` aber mit globalem `ASSUMED_FPS` (24 fps).
-- Im aktuellen Log: Preclip-Dauer ca. `1.03s`, Bbox-JSON enthält `25` Frames (`1.03 × 24`).
-- Der echte Preclip bei 30fps hat aber ca. `31` Frames.
-- Sync.so-Doku verlangt: `bounding_boxes` Array-Länge muss exakt zur Video-Frameanzahl passen.
-- Genau solche Mismatches führen laut bestehendem Code-Kommentar bereits zu opakem `generation_unknown_error`.
-
-Das erklärt auch, warum die Anfrage sofort bei Sync.so fehlschlägt, obwohl die Box sichtbar plausibel ist.
-
-## Änderungen
-
-### 1. Preclip-FPS korrekt verwenden
-In `supabase/functions/compose-dialog-segments/index.ts`:
-
-- Wenn `usePassPreclip === true`, Bbox-Framecount mit **30 fps** berechnen.
-- Wenn Full-Plate-Fallback, weiter bestehenden Plate-FPS/`ASSUMED_FPS` verwenden.
-- Logmarker:
-  - `v162_bbox_framecount space=clip fps=30 ...`
-  - `v162_BBOX_URL_PRIMARY ... frames=<echte 30fps frame count>`
-
-### 2. Preclip-Duration direkt aus Render-Metadaten nutzen
-- Beim erfolgreichen Preclip-Render `preclip_duration_sec` speichern.
-- Für Preclip-Bbox-JSON bevorzugt `preclip_duration_sec × 30` verwenden.
-- MP4-Probe bleibt nur Fallback, falls Metadaten fehlen.
-
-### 3. Bounding-Boxes für Preclip weiterhin im Clip-Space
-- v161 Clip-Space Transform bleibt erhalten:
-  - Plate-Box → Crop-Offset abziehen → auf 720/OutputSize skalieren.
-- `bounding_boxes_url` bleibt public JSON mit:
-
-```json
-{ "bounding_boxes": [[x1,y1,x2,y2], ...] }
-```
-
-- Kein `auto_detect:true`.
-- Keine Coordinates.
-- Kein lipsync-2-pro.
-
-### 4. Fail-closed statt Silent-Fallback
-Wenn Preclip-Bbox-JSON nicht exakt gebaut werden kann:
-
-- Kein Auto-Detect-Fallback.
-- Kein Coordinates-Fallback.
-- Hard-Fail + Refund mit klarer Meldung.
-
-### 5. Scene-Reset für aktuellen Run
-Die aktuelle Szene `a0322789-3703-45c1-a82c-ec846379e177` wird zurückgesetzt, damit keine v161-Failed-Passes oder falsch gecachten 24fps-Bbox-JSONs wiederverwendet werden.
-
-## Verification
-
-Nach Umsetzung muss im Log stehen:
+Aktueller Fehler in der Pipeline:
 
 ```text
-version=v162
-v162_preclip_render OK ... fps=30
-v162_bbox_framecount space=clip fps=30 dur=... frames=31/69/...
-WIRE_PAYLOAD model=sync-3 options={ sync_mode: cut_off, active_speaker_detection: { auto_detect:false, bounding_boxes_url: ... } }
+Preclip-Render:
+  durationInFrames = ceil(durationSec * 30)
+
+Bounding-Boxes v162:
+  frameCount = round(durationSec * 30)
 ```
 
-Akzeptanz:
+Konkrete Log-Beispiele der fehlgeschlagenen Szene:
 
-- Kein `generation_unknown_error` wegen Framecount-Mismatch.
-- Kein `auto_detect` im Sync.so Payload.
-- Sprecher 2 bekommt eigenen Single-Face-Preclip + eigene Clip-Space-Bbox.
-- Finales Muxing bleibt per `preclip_crop`, damit Nachbargesichter nicht morphen können.
+```text
+Pass 1: dur=2.435s
+Renderframes: ceil(2.435 * 30) = 74
+BBox-JSON:    round(2.435 * 30) = 73  -> 1 Frame zu kurz
+
+Pass 2: dur=0.936s
+Renderframes: ceil(0.936 * 30) = 29
+BBox-JSON:    round(0.936 * 30) = 28  -> 1 Frame zu kurz
+```
+
+Das passt exakt zu Sync.so `generation_unknown_error`: Die URL ist erreichbar, das Format stimmt, `auto_detect:false` stimmt, aber die Array-Länge passt nicht zum tatsächlichen MP4.
+
+## Plan v163
+
+1. **Preclip-Ergebnis um echte Renderframes erweitern**
+   - `renderPassFacePreclip` gibt zusätzlich `frameCount` zurück.
+   - Dieser Wert ist exakt `durationInFrames`, also die Framezahl, die Remotion wirklich rendert.
+
+2. **Bounding-Boxes für Preclips nicht mehr aus Dauer schätzen**
+   - In `compose-dialog-segments` wird für Preclip-Pfade `preclip_frame_count` gespeichert.
+   - `v163_bbox_framecount` nutzt dann exakt diese Framezahl.
+   - Keine `round(duration * fps)`-Schätzung mehr für Preclips.
+
+3. **Optionaler MP4-Probe nur noch als Diagnose/Fallback**
+   - Falls ein alter gecachter Preclip keinen gespeicherten `preclip_frame_count` hat, dann fallback:
+     - zuerst MP4-Duration probe,
+     - dann `ceil(duration * fps)`, nicht `round`.
+
+4. **Fail-closed statt Provider-Fehler**
+   - Wenn für einen Preclip keine sichere Framezahl berechnet werden kann, wird vor Sync.so abgebrochen und refunded.
+   - Kein stiller Fallback auf Auto-Detect.
+
+5. **Logging verschärfen**
+   - Neue Marker:
+     - `version=v163`
+     - `v163_preclip_render OK frames=74 fps=30 dur_render=2.467`
+     - `v163_bbox_framecount source=preclip_frame_count frames=74`
+   - Damit sieht man sofort, ob Renderframes und JSON-Länge identisch sind.
+
+6. **Fehlgeschlagene Szene sauber zurücksetzen**
+   - Scene `becaa5ce-e4c3-47b7-933d-766e83807b9c` wird für Lip-Sync zurückgesetzt, damit keine alten 73/28-Frame-JSONs wiederverwendet werden.
+
+## Nicht ändern
+
+- Kein Auto-Detect.
+- Kein Rückfall auf `lipsync-2-pro`.
+- Kein Full-Plate-Morphing-Fallback.
+- Der Weg bleibt: **1 bis 4 Sprecher = Single-Face-Preclip + `sync-3` + `bounding_boxes_url` + Mux zurück in die Master-Plate**.
+
+## Erwartetes Ergebnis
+
+Nach Umsetzung muss Sync.so für die gleiche Szene Bounding-Box-JSONs mit exakt diesen Längen erhalten:
+
+```text
+Pass 1: 74 Einträge statt 73
+Pass 2: 29 Einträge statt 28
+```
+
+Damit ist der wahrscheinlichste verbliebene `generation_unknown_error`-Trigger entfernt.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
