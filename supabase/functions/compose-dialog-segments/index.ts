@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v159";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v160";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -1314,9 +1314,10 @@ serve(async (req) => {
     // for every speaker count ≥ 1.
     const speakerPlateBboxes: Array<[number, number, number, number] | null> =
       new Array(speakers.length).fill(null);
-    // v157 — Pro-Sprecher Mund-Landmark (AWS Rekognition). Wenn vorhanden,
-    // baut der Dispatcher eine enge Mund-zentrierte Sync.so-Box statt der
-    // ganzen Gesichts-Bbox → eliminiert "Animorph"-Morphs auf Hals/Schulter.
+    // v160 — Pro-Sprecher Mund-Landmark (AWS Rekognition). Der Landmark ist
+    // nur noch der deterministische Identitäts-/Qualitätsanker. Sync.so
+    // erwartet bei `bounding_boxes(_url)` eine echte Face-Detection-Box, keine
+    // Mini-Lippenregion; zu kleine Mouth-Boxes führten zu No-Lipsync/Morphs.
     const speakerPlateMouths: Array<[number, number] | null> =
       new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
@@ -1507,7 +1508,7 @@ serve(async (req) => {
     // diagnostic path, but the parallel `mouths[i]` array is the canonical
     // source on the persisted hydration branch above.
     const v153PlateIdentitySnapshot = {
-      version: "v153.2" as const,
+      version: "v160" as const,
       dims: plateDims,
       bboxes: speakerPlateBboxes,
       mouths: speakerPlateMouths,
