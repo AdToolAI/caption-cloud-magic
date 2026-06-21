@@ -336,6 +336,8 @@ export async function resolvePlateFaceIdentities(params: {
   plateHeight: number;
   midDurationSec: number;
   characters: Array<{ characterId: string; portraitUrl: string }>;
+  /** v156 — Anchor frame for AWS Rekognition (anchor-first detection). */
+  anchorUrl?: string | null;
 }): Promise<PlateIdentityMap | null> {
   const plateMap: PlateFaceMap | null = await detectPlateFaces({
     supabase: params.supabase,
@@ -346,6 +348,7 @@ export async function resolvePlateFaceIdentities(params: {
     sceneId: params.sceneId,
     projectId: params.projectId,
     midDurationSec: params.midDurationSec,
+    anchorUrl: params.anchorUrl ?? null,
   });
   if (!plateMap || plateMap.faces.length === 0) return null;
 
