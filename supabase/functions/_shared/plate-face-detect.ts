@@ -541,8 +541,13 @@ export async function detectPlateFaces(params: {
     `boxes=${JSON.stringify(faces.map((f) => f.bbox))}`,
   );
 
-  // 5. Persist cache (idempotent upsert).
+  // 5. Persist cache (idempotent upsert). v155: also persists mouth
+  //    landmarks when Rekognition produced them, so cache HITs preserve
+  //    the precise mouth coords without re-detecting.
   try {
+    const mouthLandmarks = faces
+      .filter((f) => Array.isArray(f.mouth))
+      .map((f) => ({ slot: f.slot, mouth: f.mouth }));
     await params.supabase
       .from("plate_face_cache")
       .upsert({
@@ -552,6 +557,8 @@ export async function detectPlateFaces(params: {
         height: H,
         faces,
         detector: detectorUsed,
+        detection_provider: detectorUsed,
+        mouth_landmarks: mouthLandmarks.length ? mouthLandmarks : null,
         frame_url: params.plateUrl,
         expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
       }, { onConflict: "plate_url_hash" });
