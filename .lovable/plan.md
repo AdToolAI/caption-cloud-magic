@@ -1,58 +1,88 @@
-## v164 — "Silent-Faces Overlay" (Plate-Mouth-Mute für Nicht-Sprecher)
+# v165 — Silent-Face Crop Math + Parallel Pass Dispatch
 
-### Was wirklich passiert
+## Root Causes (confirmed)
 
-Pass 3 dispatcht korrekt:
-- Preclip-Crop x=676 ⇒ Kailee
-- BBox-JSON [264,247,454,452] ⇒ Kailees Mund im 720×720-Frame
-- Overlay im Final-Mux pastet Pass 3 wieder bei x=676 ⇒ Kailee
+### Bug A — "Ganzes Video sieht aus als wäre alles lip-synced" (Geister-Gesichter)
 
-Du siehst trotzdem Samuels Mund sich bewegen, weil `render-sync-segments-audio-mux` nur die **aktive** Sprecher-Region per Preclip überklebt. Unter dem Overlay läuft der originale AI-Plate weiter — und in dem Plate haben *alle vier* Gesichter eine natürliche Mund-Animation. Während Kailees Audio läuft, sieht man Samuel/Matthew/Sarah aus dem AI-Plate weiter "reden". Das interpretierst du (zurecht) als "falsche Person spricht Pass 3".
+`SilentFaceFreeze` in `src/remotion/templates/DialogStitchVideo.tsx` (Zeile 269–298) rendert das **gesamte Master-Plate-Video** (1376×768, alle 4 Sprecher sichtbar) per `objectFit: cover` in eine `size × size` Box an Position `(left, top)`.
 
-### Lösung: stumme Standbild-Patches für alle Nicht-Sprecher
+Resultat pro Pass: 3 zusätzliche, vollständig gestauchte Kopien der **gesamten** Szene werden an den 3 anderen Sprecher-Slots gezeichnet → 4 Sprecher × 3 Ghost-Kopien = bis zu **12 überlappende Master-Plates** statt nur des einen Gesichts pro Slot.
 
-Während jedes Sprecher-Turn-Fensters legen wir auf jedes *andere* Gesicht ein eingefrorenes Standbild-Patch, sodass nur der aktive Sprecher (Preclip-Overlay) sich bewegt.
+Vergleich `CroppedOverlay` (Zeile 149–200): funktioniert, weil dort ein **bereits zugeschnittenes Preclip** (720×720, nur ein Gesicht) per `cover` skaliert wird. `SilentFaceFreeze` hat die identische Struktur, aber das Source-Video ist ungeschnitten — deshalb der Effekt.
 
-### Technische Schritte
+### Bug B — 12:30 Min Render-Dauer, Pass 3 + 4 besonders lang
 
-1. **Neues Shared-Modul `_shared/plate-silent-frames.ts`**
-   - `extractSilentFaceFrames(plateUrl, plateIdentity)`
-   - Liest 1 Frame ~0.2s aus `plate` (ffmpeg via Replicate oder `image-resizer`-EdgeFn — bevorzugt: Browser-Canvas-Extraktion wie `continuity-guardian-frame-extraction`, aber serverseitig via existing `face-frame-extract`).
-   - Pro Speaker-Slot croppt es eine quadratische Region um `bbox` (gleicher Algorithmus wie `pass-face-preclip.ts` für Crop-Geometrie, **kein Lambda-Render**, nur PNG-Crop) und lädt sie in den `lipsync-plates`-Bucket hoch: `shared/<sceneId>/silent-slot-<idx>.png`.
-   - Cache: in `dialog_shots.plate_identity.silentFrames[]` persistieren `{ slot, url, crop:{x,y,size} }`.
+`syncso_dispatch_log` für Szene `becaa5ce…` zeigt vier **sequentielle** Dispatches im Abstand von ~2:13, ~2:50, ~3:27 Minuten:
 
-2. **Aufruf in `compose-dialog-segments` direkt nach plate-identity-Hydration** (≈ Z. 1500–1525, hinter `v158_plate_hydration`-Log)
-   - Bei `speakers.length >= 2` UND fehlendem `silentFrames` → Extraktion einmal pro Szene, persistieren.
-   - Fail-open: schlägt es fehl, läuft v163 wie bisher (alter Look).
+```
+19:40:03  pass 0 DISPATCHED
+19:42:17  pass 1 DISPATCHED   (+2:13)
+19:45:06  pass 2 DISPATCHED   (+2:50)
+19:48:33  pass 3 DISPATCHED   (+3:27)
+```
 
-3. **`render-sync-segments-audio-mux` — neuer Layer `silentFaceOverlays`** (Z. ~224 fanoutShots-Erzeugung)
-   - Für jede Pass-Window `[startSec..endSec]` zusätzlich pro **anderem** Slot einen Shot bauen:
-     ```
-     { startSec, endSec, imageUrl: silentFrames[otherSlot].url, crop: silentFrames[otherSlot].crop, layer: 'silent' }
-     ```
-   - Diese Layer rendern *unter* dem Preclip-Overlay, aber *über* dem Master-Plate.
-   - Wenn `silentFrames` fehlt → Layer überspringen (keine Regression).
+Jede Iteration = Preclip-Lambda (~30–60 s) + Sync.so-Polling (~2 min) → 4× nacheinander = ~12 min total. Pass 3 und 4 sind „länger", weil sie alle vorigen Pass-Latenzen plus eigene tragen — sie laufen nicht wirklich langsamer.
 
-4. **Remotion-Composition `DialogStitchVideo` erweitern**
-   - Neuer Shot-Typ mit `imageUrl` statt `outputUrl`: rendert ein statisches `<Img>` mit `style={{ position:'absolute', left:crop.x, top:crop.y, width:crop.size, height:crop.size }}` für die Window-Dauer.
-   - Z-Reihenfolge: `plate < silentFaceOverlays < activeSpeakerOverlay`.
+---
 
-5. **Versions-Bump & Logs**
-   - `COMPOSE_DIALOG_SEGMENTS_VERSION = "v164"`.
-   - Neuer Log: `v164_silent_frames extracted=4/4 cached=true` und im Mux: `v164_silent_layer slots_painted=[0,1,3] active=2`.
+## Fix
 
-6. **Szene-Reset**: `becaa5ce-e4c3-47b7-933d-766e83807b9c` zurücksetzen (`lip_sync_status`, `dialog_shots`, `twoshot_stage`, `clip_error`) — KEINE Änderung an `plate_identity` Cache, damit die Mouth-/BBox-Hydration sofort verfügbar ist und nur die 4 silent-frames neu extrahiert werden müssen.
+### Fix A — Korrekte Crop-Math in `SilentFaceFreeze`
 
-7. **Deploy**: `compose-dialog-segments` + `render-sync-segments-audio-mux` + ggf. Remotion-Bundle neu deployen.
+Inneren Container nicht mehr als „squish-to-fit" verwenden, sondern als **Viewport** auf das skalierte Master-Plate:
+
+```text
+outer box (overflow:hidden)
+   left = x_src * scaleX
+   top  = y_src * scaleY
+   width  = size_src * scaleX
+   height = size_src * scaleY      ← getrennte X/Y-Skalierung,
+                                     identisch zu Active-Speaker-Pipeline
+inner <Video>
+   width  = srcW * scaleX          ← volle Plate-Größe in Comp-Pixeln
+   height = srcH * scaleY
+   transform = translate(-x_src*scaleX, -y_src*scaleY)
+   objectFit = fill                ← KEIN cover mehr
+```
+
+Damit zeigt jeder Silent-Slot exakt die Plate-Region `(x, y, size, size)` an, also nur das Gesicht des nicht-aktiven Sprechers — genau wie der aktive Preclip-Overlay daneben.
+
+Zusätzlich:
+- Soft-Circular-Mask beibehalten (sitzt auf der äusseren Box → fadeen die Plate-Region am Rand aus, kein sichtbarer Square-Seam).
+- `Freeze frame={0}` bleibt (wir wollen ja explizit den unbewegten Mund).
+- `srcWidth`/`srcHeight` werden bereits an die Composition durchgereicht (Zeile 318–321), keine neuen Props nötig.
+
+### Fix B — Parallele Pass-Dispatches
+
+In `supabase/functions/compose-dialog-segments/index.ts` die Pass-Schleife (around `for (const pass of passes)` / `currentPassIdx`) umstellen auf `Promise.allSettled(passes.map(dispatchOnePass))` — jeder Pass enthält bereits seinen eigenen `pass.idx`, `pass.coords`, `audio_url`, eigene Preclip-Render-ID und sein eigenes Sync.so-Polling.
+
+Konkrete Massnahmen:
+1. Pass-Body (Preclip-Render + Face-Gate + Sync.so-Dispatch + DB-Write) in eine async-Funktion `dispatchPass(pass, ctx)` extrahieren.
+2. Statt `for`-Loop: `await Promise.allSettled(passes.map((p) => dispatchPass(p, ctx)))`.
+3. **Concurrency-Cap = 4** (genau Anzahl Sprecher in Praxis): kein zusätzlicher Sync.so-Rate-Limit-Druck (4 parallele Jobs sind innerhalb Plan), kein Lambda-Worker-Druck (Preclip = 1 Worker pro Render, Sync.so läuft extern).
+4. Idempotenz ist bereits gegeben (`pass.preclip_url` wird vor erneutem Render geprüft, line 3576), also Re-Tries einzelner Passes brechen nichts.
+5. `logSyncDispatch`, `syncso_dispatch_log` und der ASD-Fingerprint bleiben pro Pass — die Logs werden weiterhin nach `pass_idx` indiziert und sind in der Cockpit-UI sortierbar.
+
+Erwartung: 4 Passes parallel → Wand-Zeit ≈ max(Pass-Latenz) ≈ **2:30–3:00 min statt 12:30**. Audio-Mux-Render läuft danach unverändert seriell.
 
 ### Akzeptanzkriterien
 
-- Logs zeigen `v164_silent_frames extracted=4/4` und für jeden Pass `v164_silent_layer slots_painted=[…3 andere…]`.
-- Im finalen MP4 bewegt sich während Kailees Audio nur Kailees Mund; Samuel/Matthew/Sarah stehen still (frozen face crops).
-- Bei N=1-Szenen wird die Logik geskippt (kein "anderer" Slot).
+- Final-MP4: nur der aktive Sprecher pro Audio-Fenster bewegt den Mund; die drei anderen Köpfe sind eingefroren auf Frame 0 ihrer eigenen Master-Plate-Region. Keine sichtbaren Mini-Plates / Ghost-Kopien mehr.
+- `syncso_dispatch_log` zeigt 4 `DISPATCHED`-Einträge innerhalb < 60 s Spanne (statt 8 min).
+- Gesamtrender (compose-dialog-segments → render-sync-segments-audio-mux) für 4-Sprecher / 9 s Szene < 5 min.
+- Bestehende 1- und 2-Sprecher-Szenen unverändert (1 Pass → trivial-parallel, 0 Silent-Slots → unverändert).
 
-### Was wir explizit **nicht** ändern
+### Dateien
 
-- Sync.so-Payload-Form (bleibt v163 bbox-url-pro mit `sync_mode:cut_off` und `auto_detect:false`).
-- Preclip-Render/-Frame-Count-Logik (v163 bleibt unverändert).
-- Plate-Identity-Resolver (Slot-Mapping bleibt korrekt — wurde durch DB verifiziert).
+- `src/remotion/templates/DialogStitchVideo.tsx` — `SilentFaceFreeze` Crop-Math
+- `supabase/functions/compose-dialog-segments/index.ts` — Pass-Schleife → `Promise.allSettled` mit `dispatchPass`-Wrapper
+- `supabase/migrations/<ts>_v165_reset_dialog_scene.sql` — Reset `becaa5ce-e4c3-47b7-933d-766e83807b9c` für Re-Run
+- `mem/architecture/lipsync/v165-silent-face-crop-and-parallel-dispatch.md` — Architektur-Notiz
+- `mem/index.md` — Pointer zu v165
+- Remotion-Bundle muss nach dem TSX-Fix neu deployed werden (`scripts/deploy-remotion-bundle.sh`)
+
+### Nicht im Scope
+
+- Sync.so-Pricing / Engine-Wechsel.
+- Master-Plate-Regenerierung.
+- Änderung am `bbox-url-pro` ASD-Format (v163 bleibt).
