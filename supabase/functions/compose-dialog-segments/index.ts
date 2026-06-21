@@ -3690,7 +3690,7 @@ serve(async (req) => {
       }
       const platePassBoxForPreclip = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
       );
       try {
         const preclipResult = await renderPassFacePreclip(
@@ -3743,18 +3743,18 @@ serve(async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
           );
         }
       } catch (preclipErr) {
         (pass as any).preclip_error = (preclipErr as Error)?.message ?? String(preclipErr);
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
         );
       }
     } else if (usePassPreclip) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_preclip_reuse cached url=…${(passPreclipUrl ?? "").slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_reuse cached url=…${(passPreclipUrl ?? "").slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} frames=${(pass as any).preclip_frame_count ?? "?"}`,
       );
     }
 
@@ -4094,7 +4094,7 @@ serve(async (req) => {
           dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
         }
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
         );
       }
 
@@ -4139,7 +4139,7 @@ serve(async (req) => {
           bounding_boxes_url: usedUrl!,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (retryVariant === "coords-pro-box") {
         // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.
