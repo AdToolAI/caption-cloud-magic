@@ -117,7 +117,7 @@ const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics
 const Admin = lazy(() => import("./pages/Admin"));
 const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
 const QACockpit = lazy(() => import("./pages/admin/QACockpit"));
-const LipsyncDiagnostic = lazy(() => import("./pages/admin/LipsyncDiagnostic"));
+
 
 const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
@@ -343,11 +343,6 @@ function AppLayout() {
           <Route path="/admin/qa-cockpit" element={
             <ProtectedRoute requireRole="admin">
               <QACockpit />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/lipsync-diag" element={
-            <ProtectedRoute requireRole="admin">
-              <LipsyncDiagnostic />
             </ProtectedRoute>
           } />
           
