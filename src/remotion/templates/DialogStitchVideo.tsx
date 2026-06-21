@@ -394,17 +394,17 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         // active speaker's face stays animated; everyone else is paused.
         const silentSlotEls = (shot.silentSlots ?? []).map((slot, slotIdx) => {
           if (!slot || !(Number(slot.size) > 0) || !masterVideoUrl) return null;
-          const left = Number(slot.x) * scaleX;
-          const top = Number(slot.y) * scaleY;
-          const overlayScale = Math.max(scaleX, scaleY);
-          const size = Number(slot.size) * overlayScale;
           return (
             <SilentFaceFreeze
               key={`silent-${idx}-${slotIdx}`}
               src={masterVideoUrl}
-              left={left}
-              top={top}
-              size={size}
+              srcX={Number(slot.x)}
+              srcY={Number(slot.y)}
+              srcSize={Number(slot.size)}
+              scaleX={scaleX}
+              scaleY={scaleY}
+              compW={compW}
+              compH={compH}
             />
           );
         });
