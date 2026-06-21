@@ -1,10 +1,10 @@
 ---
-name: v161 Single-Face Preclip + bbox-url-pro (1..N einheitlich)
-description: Einheitlicher Dispatch-Pfad für 1..N Sprecher — Per-Pass Remotion Preclip + Sync.so bbox-url-pro in CLIP-Koordinaten, Mux via preclip_crop. Eliminiert Animorph-Morphen auf Nachbargesichter.
+name: v163 Single-Face Preclip + bbox-url-pro exact framecount
+description: Einheitlicher 1..N Sprecherpfad mit Preclip + Sync.so bbox-url-pro; Bounding-Box-JSON nutzt exakte Remotion durationInFrames, nie gerundete Dauer.
 type: feature
 ---
 
-# v161 — Single-Face Preclip + bbox-url-pro für 1..N Sprecher
+# v163 — Single-Face Preclip + bbox-url-pro mit exakter Framezahl
 
 ## Pipeline (identisch für N=1 und N=4)
 
@@ -13,11 +13,13 @@ type: feature
    - Render via Remotion Lambda `DialogTurnFaceCropVideo`
    - Sibling-coords verhindern dass Nachbargesichter im Crop landen
    - Idempotent: gespeichert auf `pass.preclip_url` / `preclip_crop` / `preclip_render_id` / `preclip_start_sec` / `preclip_end_sec`
+   - `pass.preclip_frame_count` MUSS exakt `durationInFrames` aus Remotion sein
 2. **Sync.so Dispatch** — `model: "sync-3"`, `sync_mode: "cut_off"`,
    `active_speaker_detection: { auto_detect: false, bounding_boxes_url: <clip-space JSON> }`
    - `video.url = preclip_url`
    - Bounding-Box ist in **Clip-Koordinaten**: `(plate - crop.x) * (outputSize / size)`
-   - Frame count = probe(preclip mp4), Windows = `speakerWindowsSecs - preclip_start_sec`
+   - Frame count = `pass.preclip_frame_count`; legacy fallback nur `ceil(duration * fps)`, nie `round`
+   - Windows = `speakerWindowsSecs - preclip_start_sec`
    - Area-Gate Upper Bound 0.98 (statt 0.45) im Preclip-Modus, da Face ~70-90% einnimmt
 3. **Mux** (`render-sync-segments-audio-mux`)
    - `preclip_crop` triggert den `crop` overlay-Modus im Remotion Stitcher
@@ -27,6 +29,15 @@ type: feature
 
 - Wenn Preclip-Render scheitert → Fallback auf Full-Plate `bbox-url-pro` (alter v153-Pfad)
 - Wenn keine Plate-Box hydratisiert ist → v153.5 Hard-Fail + Refund (greift weiterhin)
+- Wenn keine sichere Preclip-Framezahl verfügbar ist → vor Sync.so failen/refunden; kein Auto-Detect-Fallback
+
+## Warum v163 nötig war
+
+Sync.so verlangt, dass `bounding_boxes_url.bounding_boxes.length` exakt der
+Framezahl des Input-Videos entspricht. v162 nutzte für Preclips noch
+`round(durationSec * 30)`; Remotion rendert aber `ceil(durationSec * 30)`.
+Bei kurzen Turns entstanden dadurch 73 statt 74 oder 28 statt 29 JSON-Einträge,
+was Sync.so als `generation_unknown_error` terminierte.
 
 ## Warum nicht mehr Full-Plate als Primärpfad
 
@@ -36,5 +47,5 @@ gesamte Frame-Region als Input nimmt. Single-Face-Preclip schließt das struktur
 
 ## Versionsmarker
 
-- `COMPOSE_DIALOG_SEGMENTS_VERSION = "v161"`
-- Log-Marker pro Pass: `v161_preclip_render START/OK/FAILED`, `v161_bbox_clip_space`, `v161_BBOX_URL_PRIMARY space=clip`
+- `COMPOSE_DIALOG_SEGMENTS_VERSION = "v163"`
+- Log-Marker pro Pass: `v163_preclip_render START/OK/FAILED`, `v163_bbox_framecount source=preclip_frame_count`, `v163_bbox_clip_space`, `v163_BBOX_URL_PRIMARY space=clip`
