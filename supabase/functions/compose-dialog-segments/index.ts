@@ -3860,12 +3860,16 @@ serve(async (req) => {
           const y2 = Math.min(dims.height, Math.round(anchorY + boxH / 2));
           if (x2 > x1 + 4 && y2 > y1 + 4) {
             box = [x1, y1, x2, y2];
-            bboxSource = useMouth ? "plate-native:v157-mouth" : "plate-native:v157-bbox-anchor";
+            bboxSource = useMouth ? "plate-native:v158-mouth" : "plate-native:v158-bbox-anchor";
+            const plateArea = Math.max(1, dims.width * dims.height);
+            const boxArea = Math.max(0, (x2 - x1) * (y2 - y1));
+            const areaPct = (boxArea / plateArea) * 100;
             console.log(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v157_tight_mouth_box ` +
-              `speaker=${pass.speaker_name} mouth_used=${useMouth} aspect_in=${aspectIn.toFixed(2)} ` +
-              `aspect_out=${(boxH / boxW).toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
-              `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}]`,
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v158_sync3_face_target_box ` +
+              `speaker=${pass.speaker_name} mouth_used=${useMouth} hydration=${plateHydrationSource} ` +
+              `aspect_in=${aspectIn.toFixed(2)} aspect_out=${(boxH / boxW).toFixed(2)} ` +
+              `area_pct=${areaPct.toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
+              `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}] source=${bboxSource}`,
             );
           }
         }
