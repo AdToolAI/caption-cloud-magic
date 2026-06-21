@@ -126,7 +126,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v162";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v163";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -3690,7 +3690,7 @@ serve(async (req) => {
       }
       const platePassBoxForPreclip = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
       );
       try {
         const preclipResult = await renderPassFacePreclip(
@@ -3726,33 +3726,37 @@ serve(async (req) => {
           };
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
-          // v162 — persist real preclip fps + duration so the bounding_boxes
-          // JSON array length below matches the actual dispatched video frame
-          // count (Sync.so rejects mismatches with `generation_unknown_error`).
+          // v163 — persist the exact Remotion render frame count. Sync.so
+          // requires `bounding_boxes_url.bounding_boxes.length` to match the
+          // dispatched video frames exactly; duration-derived `round(dur*fps)`
+          // was off by one for short preclips.
           (pass as any).preclip_fps = Number(preclipResult.fps ?? 30);
+          (pass as any).preclip_frame_count = Number.isFinite(Number(preclipResult.frameCount)) && Number(preclipResult.frameCount) > 0
+            ? Math.max(1, Math.round(Number(preclipResult.frameCount)))
+            : Math.max(1, Math.ceil((preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)) * Number(preclipResult.fps ?? 30)));
           (pass as any).preclip_duration_sec = Number(
             (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
           );
           (pass as any).preclip_error = null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps}`,
           );
 
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
           );
         }
       } catch (preclipErr) {
         (pass as any).preclip_error = (preclipErr as Error)?.message ?? String(preclipErr);
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
         );
       }
     } else if (usePassPreclip) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_preclip_reuse cached url=…${(passPreclipUrl ?? "").slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_reuse cached url=…${(passPreclipUrl ?? "").slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} frames=${(pass as any).preclip_frame_count ?? "?"}`,
       );
     }
 
@@ -4038,12 +4042,17 @@ serve(async (req) => {
         ? Number((pass as any).preclip_start_sec ?? 0)
         : 0;
 
-      // v162 — Frame count + fps MUST match the dispatched video exactly.
-      // For preclips: use the persisted preclip_fps (30) and preclip_duration_sec.
-      // For full-plate: probe mvhd as before and fall back to plate ASSUMED_FPS (24).
+      // v163 — Frame count + fps MUST match the dispatched video exactly.
+      // For preclips: use the exact Remotion `durationInFrames` captured by
+      // renderPassFacePreclip. Only legacy cached preclips fall back to
+      // ceil(duration*fps); never round, because it produced 73/28 bbox frames
+      // for 74/29-frame preclips and Sync.so failed with generation_unknown_error.
       const dispatchFps = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_fps ?? 30)
         : ASSUMED_FPS;
+      const preclipPersistedFrameCount = v161UsingPreclipForBbox
+        ? Math.round(Number((pass as any).preclip_frame_count ?? 0))
+        : 0;
       const preclipPersistedDurSec = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_duration_sec ?? 0)
         : 0;
@@ -4051,12 +4060,32 @@ serve(async (req) => {
         ? preclipPersistedDurSec
         : await getPlateDurationSecCached(probeUrlForBbox);
       const __probedFrames = __probedPlateDurSec
-        ? Math.max(1, Math.round(__probedPlateDurSec * dispatchFps))
+        ? Math.max(1, Math.ceil(__probedPlateDurSec * dispatchFps))
         : null;
-      const frameCount = __probedFrames ?? Math.max(1, Math.ceil(totalSec * dispatchFps));
+      const frameCount = v161UsingPreclipForBbox && preclipPersistedFrameCount > 0
+        ? preclipPersistedFrameCount
+        : (__probedFrames ?? Math.max(1, Math.ceil(totalSec * dispatchFps)));
+      const frameCountSource = v161UsingPreclipForBbox && preclipPersistedFrameCount > 0
+        ? "preclip_frame_count"
+        : (__probedFrames ? "ceil_probe_duration" : "ceil_total_duration");
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} fps=${dispatchFps} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} source=${frameCountSource} fps=${dispatchFps} preclip_frames=${preclipPersistedFrameCount || "?"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
+      if (v161UsingPreclipForBbox && frameCountSource === "ceil_total_duration") {
+        (pass as any)._v152HardFail = {
+          reason: "preclip_frame_count_unavailable",
+          errorClass: "v163_preclip_frame_count_unavailable",
+          message:
+            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+            "die exakte Preclip-Framezahl fehlt, daher kann keine sichere bounding_boxes_url erzeugt werden. Credits wurden zurückerstattet.",
+          meta: {
+            v163_exact_framecount_required: true,
+            preclip_duration_sec: preclipPersistedDurSec || null,
+            preclip_fps: dispatchFps,
+            preclip_url_present: !!passPreclipUrl,
+          },
+        };
+      }
 
       // Voiced windows in the dispatched video's time base.
       const v124VoicedWindows: Array<[number, number]> = v161UsingPreclipForBbox
@@ -4082,7 +4111,7 @@ serve(async (req) => {
           dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
         }
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
         );
       }
 
@@ -4127,7 +4156,7 @@ serve(async (req) => {
           bounding_boxes_url: usedUrl!,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (retryVariant === "coords-pro-box") {
         // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.
@@ -5544,6 +5573,8 @@ serve(async (req) => {
           null,
 
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
+        preclip_frame_count: (pass as any).preclip_frame_count ?? null,
+        preclip_fps: (pass as any).preclip_fps ?? null,
         preclip_dims: (pass as any).preclip_dims ?? null,
         preclip_crop: (pass as any).preclip_crop ?? null,
         dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
