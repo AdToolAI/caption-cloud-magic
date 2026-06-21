@@ -389,25 +389,13 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         const startFromForRelative =
           shot.sourceTiming === 'relative' ? relativeStartFrame : startFrame;
 
-        // v164: render silent-face freezes underneath the active overlay so
-        // non-speaking faces don't "talk along" with the AI plate. Only the
-        // active speaker's face stays animated; everyone else is paused.
-        const silentSlotEls = (shot.silentSlots ?? []).map((slot, slotIdx) => {
-          if (!slot || !(Number(slot.size) > 0) || !masterVideoUrl) return null;
-          return (
-            <SilentFaceFreeze
-              key={`silent-${idx}-${slotIdx}`}
-              src={masterVideoUrl}
-              srcX={Number(slot.x)}
-              srcY={Number(slot.y)}
-              srcSize={Number(slot.size)}
-              scaleX={scaleX}
-              scaleY={scaleY}
-              compW={compW}
-              compH={compH}
-            />
-          );
-        });
+        // v166 — Silent-face freeze tiles disabled. Sync.so already leaves
+        // non-speaking faces still via per-frame null bounding boxes; the
+        // freeze overlay produced visible ghost/morph artefacts and ballooned
+        // Lambda render time. Empty list keeps the Sequence layout unchanged.
+        const silentSlotEls: React.ReactNode[] = [];
+        void shot.silentSlots;
+        void SilentFaceFreeze;
 
         // v25 fan-out face-mask path (highest priority): full Sync.so output
         // for this speaker, masked to a soft circle around their face. Spans
