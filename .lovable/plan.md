@@ -1,90 +1,88 @@
-# Lipsync Pipeline – Cleanup nach v166 "Holy Grail"
+## Analyse: was heute kaputt gegangen ist
 
-Ziel: Toten Code, tote Admin-Tools und tote DB-Objekte aus den Failed-Eras (v41–v165) entfernen, ohne die v166-Pipeline anzufassen.
+**Do I know what the issue is? Yes.** Der aktuelle Fehler ist sehr wahrscheinlich **nicht primär das JSON-Format**, sondern die Kombination aus zwei Regressionen:
 
-## Was bleibt unangetastet (Frozen Core)
+1. **Sprecher→Gesicht-Mapping ist falsch geworden**
+   - In der aktuellen Szene `0b0b7f78...` ist die Script-Reihenfolge:
+     1. Samuel
+     2. Matthew
+     3. Kailee
+     4. Sarah
+   - Die visuelle Gesichtsreihenfolge im Plate ist aber nicht identisch mit der Script-Reihenfolge.
+   - Die vorhandene Anchor-FaceMap kennt die Identitäten, aber `plate_identity` wurde mit `resolvedCount: 0` und `characterId: null` gespeichert.
+   - Danach wurden die plate-native BBoxes blind per Index auf die Script-Reihenfolge gelegt. Ergebnis: Pass 1/3 können das falsche Gesicht croppen/animieren. Das passt exakt zu „Sprecher 3 wurde von Sprecher 1 gesprochen“ und jetzt zu „kein Lip Sync funktioniert sauber“.
 
-Diese Dateien/Tabellen sind v166-aktiv und werden NICHT angefasst:
+2. **v164/v165 `silentSlots` verschlimmern das sichtbare Ergebnis**
+   - Diese Freeze-Overlays frieren andere Gesichter aus dem Master-Plate ein.
+   - Das führt zu Morphs/Geisterflächen und kostet massiv Renderzeit, ohne den eigentlichen Mapping-Fehler zu lösen.
+   - Die Screenshot-Symptome passen: sichtbare Morphs, sehr langer finaler Stitch, als würde der Clip insgesamt „komisch“ überlagert.
 
-- Edge Functions: `compose-dialog-scene`, `compose-dialog-segments`, `sync-so-webhook`, `poll-dialog-shots`, `render-sync-segments-audio-mux`, `lipsync-watchdog`, `cancel-dialog-lipsync`, `reset-lipsync-scene`
-- `_shared/`: `pass-face-preclip.ts`, `plate-face-identity.ts`, `dialog-lock.ts`, `dialog-speakers.ts`, `rehostPlate.ts`, `lipsync-fail.ts`, `asd-strategy.ts`, `face-frame-extract.ts`
-- Templates: `src/remotion/templates/DialogStitchVideo.tsx`
-- Tabellen: `dialog_dispatch_locks`, `syncso_dispatch_log`, `syncso_inflight_jobs`, `frame_face_cache`, `scene_anchor_cache`
+**JSON-Befund:** Das Sync.so-Format selbst entspricht der Doku: `active_speaker_detection: { auto_detect:false, bounding_boxes_url }` und die JSON-Datei muss `{ "bounding_boxes": [...] }` enthalten. Der Fehler liegt eher darin, **welche Box** pro Sprecher in diese JSON geschrieben wird, nicht in der äußeren JSON-Struktur.
 
-## A) Edge Functions löschen
+## Plan v166
 
-Tote v124-Replay/Preflight/Diagnostik-Tools (v166 ist webhook-driven, kein Replay mehr nötig):
+### 1. Silent-Face Freeze vollständig deaktivieren
+- `render-sync-segments-audio-mux` soll keine `silentSlots` mehr erzeugen oder an Remotion geben.
+- `DialogStitchVideo.tsx` soll `SilentFaceFreeze` nicht mehr rendern.
+- Dadurch verschwinden die Morph-/Ghost-Overlays und die finale Lambda-Renderzeit sinkt deutlich.
 
-- `compose-twoshot-audio` – legacy 2-shot Vorgänger
-- `lip-sync-video` – standalone v1
-- `lipsync-diagnostic` – Diagnose-Tool aus v131
-- `syncso-preflight` – Preflight-Probe
-- `syncso-replay` + `syncso-replay-lab` + `syncso-replay-webhook` – Replay-Pipeline
-- `syncso-support-bundle` – Forensics-Exporter
-- `validate-frame-face` – Frame-Face-Probe
-- `normalize-master-clip` – alter Master-Normalizer
+### 2. Sprecher-Mapping reparieren: Anchor-Identität vor Slot-Index
+- In `compose-dialog-segments` wird die plate-native Face-Erkennung weiterhin genutzt, aber nicht mehr blind nach Script-Index zugeordnet, wenn `plate_identity.resolvedCount === 0`.
+- Wenn die Anchor-FaceMap vollständige `characterId`s enthält, wird gemappt als:
 
-→ inkl. `supabase--delete_edge_functions` und `config.toml`-Einträge entfernen.
-
-## B) `_shared/` Helpers löschen
-
-Nur löschen, wenn nach (A) keine aktive Function mehr importiert:
-
-- `face-count.ts`, `face-crop.ts`, `face-detect-mediapipe.ts` – pre-Rekognition Detektion
-- `plate-face-detect.ts` – ersetzt durch `plate-face-identity.ts`
-- `syncso-face-gate.ts` – legacy Gate
-- `syncso-preflight.ts` – Helper für gelöschte Function
-- `twoshot-face-map.ts` – legacy 2-shot Map
-- `dialogPassTransition.ts` – Transition-Helper, in v166 Pipeline unused
-
-Verifikation: nach Löschung `grep -rl <name> supabase/functions` muss leer sein.
-
-## C) Frontend aufräumen
-
-- Löschen:
-  - `src/pages/admin/LipsyncDiagnostic.tsx`
-  - `src/components/admin/SyncsoForensicsSheet.tsx`
-  - `src/lib/syncReplayClassify.ts`
-- Anpassen (Imports/Verwendungen entfernen, sonst unverändert):
-  - `src/App.tsx` – lazy-import + Route `LipsyncDiagnostic` entfernen
-  - `src/components/video-composer/SceneInlinePlayer.tsx` – `SyncsoForensicsSheet` Import + Render entfernen (Sheet ist nur Debug-UI)
-
-Bleibt erhalten (v166-aktiv): `useTwoShotAutoTrigger`, `useResetLipSync`, `usePipelineProgress`, `PipelineProgressBar`.
-
-## D) DB-Cleanup (separate Migration zur Genehmigung)
-
-Drop nur Tabellen ohne Live-Code-Referenz nach (A)+(B)+(C):
-
-```sql
-DROP TABLE IF EXISTS public.syncso_replay_log CASCADE;
-DROP TABLE IF EXISTS public.syncso_tuning_hints CASCADE;
-DROP TABLE IF EXISTS public.lipsync_diagnostic_runs CASCADE;
-DROP TABLE IF EXISTS public.plate_face_cache CASCADE;
-DROP TABLE IF EXISTS public.normalized_master_cache CASCADE;
+```text
+speaker.character_id
+  -> anchor faceMap slotIndex
+  -> plate-native face with same visual slot
+  -> speakerPlateBboxes[speaker_idx]
 ```
 
-Außerdem: tote Cron-Jobs aus `cron.job` prüfen und unschedulen (z. B. `syncso-replay-*`, `normalize-master-cron`, falls vorhanden). Liste wird vor der Migration via `supabase--read_query` auf `cron.job` ermittelt und in derselben Migration mit `cron.unschedule(...)` entfernt.
+- Nur wenn dieses Mapping eindeutig ist, wird dispatched.
+- Wenn nicht eindeutig: fail-fast + Credit-Refund statt falscher Lip-Sync.
 
-`types.ts` regeneriert sich nach der Migration automatisch.
+### 3. Bounding-Boxes-Pfad behalten, aber absichern
+- `bbox-url-pro` bleibt der richtige Weg.
+- Pro Pass wird validiert und geloggt:
+  - speaker name / character_id
+  - anchor slot
+  - plate bbox
+  - transformed clip bbox
+  - bbox JSON frame count
+  - non-null voiced frames
+- Keine Rückkehr zu `auto_detect:true` auf Multi-Speaker-Fullplate.
 
-## E) Verifikation
+### 4. Preclip-Crop nur aus korrekt gemappter Box
+- `renderPassFacePreclip` bekommt nur noch eine Box, die zu `speaker.character_id` passt.
+- Wenn die Box nicht zur Speaker-Koordinate passt, wird der Preclip verworfen und nicht still weiterverwendet.
 
-Nach jedem Schritt:
+### 5. Szene sauber zurücksetzen und neu laufen lassen
+- Nach Code-Änderung die aktuelle Szene `0b0b7f78-1b52-4210-9640-03124cf91fec` resetten:
+  - `lip_sync_status`
+  - `dialog_shots`
+  - `twoshot_stage`
+  - `clip_error`
+- Edge Functions deployen.
+- Remotion-Bundle neu deployen, weil `DialogStitchVideo.tsx` beteiligt ist.
 
-1. `grep -rl <gelöschter-Name> src supabase` → muss leer sein (außer Migrations-Historie).
-2. Build muss grün bleiben (läuft automatisch).
-3. v166-Smoke: `compose-dialog-scene` Pfad nicht angefasst → keine Funktionsänderung erwartet.
-4. Migrations-Historie (`supabase/migrations/2026052*…2026062*…`) bleibt unverändert – nur neue Migration für DROPs.
+### 6. Verifikation
+- Logs müssen zeigen:
 
-## Out of Scope
+```text
+v166_anchor_identity_slot_bridge speaker=Samuel ... character_id=samuel-dusatko anchor_slot=... plate_slot=...
+v166_bbox_json speaker=... frames=... voiced_frames=... box=...
+v166_no_silent_slots shots=4
+```
 
-- Keine Änderung an v166-Logik, sync-3-Optionen, Bbox-JSON, FaceMap, Refund-Pfad.
-- Keine Änderung an Remotion-Bundle / Lambda.
-- Keine Anpassung der `HOLY-GRAIL-v166`-Memory (Cleanup wird dort nur als Appendix-Notiz nachgetragen).
+- Erwartung im Ergebnis:
+  - keine Freeze-Morphs mehr
+  - nur die korrekte Speaker-Region wird pro Turn überlagert
+  - Sarah bleibt korrekt
+  - Pass 3 darf nicht mehr auf Sprecher 1/anderen Slot fallen
 
-## Reihenfolge der Ausführung
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
 
-1. Frontend-Imports entfernen (C – sonst Build bricht nach Function-Delete).
-2. `_shared/` Helpers + Edge Functions löschen (A + B) inkl. `supabase--delete_edge_functions`.
-3. DB-Migration einreichen (D) – du genehmigst sie separat.
-4. Memory-Index: Appendix-Bullet "v166 Cleanup – Datenmüll entfernt" in `mem/architecture/lipsync/HOLY-GRAIL-v166-complete-pipeline.md` ergänzen.
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
