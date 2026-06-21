@@ -3651,20 +3651,102 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v88_edge_speaker_skip_preclip coords=${JSON.stringify(pass.coords)} plate=${plateDims!.width}x${plateDims!.height} → full-plate deterministic ASD (bbox-url-pro)`,
       );
     }
-    // ── v153.5 — Per-Pass-Preclip-Render + v107/v126 Hard-Fail entfernt ──
-    // Der Single-Path bbox-url-pro Dispatch (v153) braucht keinen Preclip
-    // mehr. Der gesamte v69/v77/v114/v116/v126 Block wurde entfernt; das
-    // legacy v107_preclip_required_for_multispeaker Hard-Fail ist durch
-    // den v153-nativen "plate bbox required" Check ersetzt (greift weiter
-    // unten am v140 Safety-Net falls plateBox fehlt).
+    // ── v161 — Single-Face Preclip + bbox-url-pro (1..N einheitlich) ─────
+    // Für JEDEN Pass (1 Sprecher oder 4 Sprecher) wird ein Single-Face
+    // Square-Crop des aktiven Sprechers via Remotion Lambda gerendert und
+    // an Sync.so geschickt. Dispatch bleibt `bbox-url-pro` mit einer in
+    // den CLIP-Koordinatenraum transformierten plate-nativen Face-Box.
+    // Mux (render-sync-segments-audio-mux) überlagert den lipsynced Crop
+    // via `preclip_crop` zurück auf die Master-Plate. Damit gibt es kein
+    // Full-Frame Morphen mehr auf Nachbargesichter, weder bei N=1 noch N=4.
     //
-    // `usePassPreclip` bleibt als Konstante `false` damit nachgelagerte
-    // Branches (Logs, dispatch_video_kind, face-gate Probe) ohne weitere
-    // Edits compilen. Phase B.3 entfernt diese Branches.
-    const passPreclipUrl: string | null = null;
-    const usePassPreclip = false as boolean;
-    void passPreclipUrl;
-    void usePassPreclip;
+    // Idempotent: ein bereits gerenderter Preclip wird wiederverwendet.
+    // Fail-Closed: wenn der Preclip nicht rendert UND keine Plate-Box
+    // existiert, greift der v153.5 Hard-Fail unten (Refund + abort).
+    let passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
+    let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
+
+    const v161PreclipEligible =
+      !usePassPreclip &&
+      !!tightAudioInfo &&
+      !!plateDims &&
+      !!sourceClipUrl &&
+      Array.isArray(pass.coords) &&
+      Number.isFinite(Number(pass.coords?.[0])) &&
+      Number.isFinite(Number(pass.coords?.[1])) &&
+      Array.isArray(speakerWindowsSecs) && speakerWindowsSecs.length > 0 &&
+      body?.noop_auto_escalation !== true;
+
+    if (v161PreclipEligible) {
+      const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
+      const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)));
+      const siblingCoords: Array<[number, number]> = [];
+      for (let i = 0; i < speakers.length; i++) {
+        if (i === pass.speaker_idx) continue;
+        const c = (speakers as any[])[i]?.coords;
+        if (Array.isArray(c) && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1]))) {
+          siblingCoords.push([Number(c[0]), Number(c[1])]);
+        }
+      }
+      const platePassBoxForPreclip = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
+      );
+      try {
+        const preclipResult = await renderPassFacePreclip(
+          supabase,
+          serviceKey,
+          supabaseUrl,
+          {
+            sceneId,
+            projectId: String((scene as any).project_id ?? ""),
+            userId,
+            passIdx: currentPassIdx,
+            masterVideoUrl: sourceClipUrl,
+            srcWidth: plateDims.width,
+            srcHeight: plateDims.height,
+            coords: [Number(pass.coords[0]), Number(pass.coords[1])],
+            bbox: platePassBoxForPreclip,
+            siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
+            startSec: unionStart,
+            endSec: unionEnd,
+          },
+          120_000,
+        );
+        if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
+          passPreclipUrl = preclipResult.preclipUrl;
+          usePassPreclip = true;
+          (pass as any).preclip_url = preclipResult.preclipUrl;
+          (pass as any).preclip_render_id = preclipResult.preclipRenderId ?? null;
+          (pass as any).preclip_crop = {
+            x: preclipResult.crop.x,
+            y: preclipResult.crop.y,
+            size: preclipResult.crop.size,
+            outputSize: preclipResult.crop.outputSize,
+          };
+          (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
+          (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
+          (pass as any).preclip_error = null;
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} dur=${preclipResult.durationSec?.toFixed(2)}`,
+          );
+        } else {
+          (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
+          );
+        }
+      } catch (preclipErr) {
+        (pass as any).preclip_error = (preclipErr as Error)?.message ?? String(preclipErr);
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
+        );
+      }
+    } else if (usePassPreclip) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_reuse cached url=…${(passPreclipUrl ?? "").slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)}`,
+      );
+    }
 
     // v153.5 — Hard-Fail wenn Plate-Bbox fehlt (Ersatz für v107/v126).
     // v153 setzt `_v153BboxPrimary` nur wenn `speakerPlateBboxes[idx]`
