@@ -35,6 +35,79 @@
  * of "no face / wrong face" coordinate drift in production.
  */
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
+import Replicate from "npm:replicate@0.25.2";
+
+const REK_FRAME_MODEL = "lucataco/ffmpeg-extract-frame";
+
+/**
+ * v155 — Extract one mid-duration JPEG frame from the plate mp4 via
+ * Replicate's `lucataco/ffmpeg-extract-frame`, upload it to the
+ * `composer-frames` bucket, and return the public URL. This is what
+ * `detectFacesMediaPipe` (AWS Rekognition) needs as `prebuiltFrameUrls`.
+ *
+ * Returns null on any failure; the caller then falls back to Gemini
+ * directly on the mp4 URL.
+ */
+async function extractPlateFrameForRekognition(opts: {
+  supabase: any;
+  plateUrl: string;
+  midDurationSec: number;
+  projectId: string;
+  sceneId: string;
+  tag: string;
+}): Promise<string | null> {
+  const token = Deno.env.get("REPLICATE_API_TOKEN") ?? Deno.env.get("REPLICATE_API_KEY");
+  if (!token) {
+    console.warn(`${opts.tag} v155_frame_extract skip — REPLICATE_API_TOKEN/KEY missing`);
+    return null;
+  }
+  const ts = Math.max(0.1, Math.min(opts.midDurationSec * 0.5, opts.midDurationSec - 0.1));
+  const replicate = new Replicate({ auth: token });
+  let frameUrl: string | undefined;
+  try {
+    const out: any = await replicate.run(REK_FRAME_MODEL as `${string}/${string}`, {
+      input: { video: opts.plateUrl, timestamp: ts },
+    });
+    frameUrl =
+      typeof out === "string"
+        ? out
+        : Array.isArray(out)
+        ? out[0]
+        : typeof out?.url === "function"
+        ? out.url()
+        : out?.url ?? undefined;
+  } catch (e) {
+    console.warn(`${opts.tag} v155_frame_extract replicate threw: ${(e as Error)?.message}`);
+    return null;
+  }
+  if (!frameUrl || typeof frameUrl !== "string") {
+    console.warn(`${opts.tag} v155_frame_extract no url from replicate`);
+    return null;
+  }
+  // Mirror to composer-frames so Rekognition (and later forensics) have a
+  // stable, project-scoped URL. Replicate output URLs expire.
+  try {
+    const r = await fetch(frameUrl);
+    if (!r.ok) {
+      console.warn(`${opts.tag} v155_frame_extract fetch replicate ${r.status}`);
+      return null;
+    }
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    const path = `${opts.projectId || "shared"}/plate-rek/${opts.sceneId}-${Date.now()}.jpg`;
+    const { error: upErr } = await opts.supabase.storage
+      .from("composer-frames")
+      .upload(path, bytes, { contentType: "image/jpeg", upsert: true, cacheControl: "31536000" });
+    if (upErr) {
+      console.warn(`${opts.tag} v155_frame_extract upload failed: ${upErr.message}`);
+      return frameUrl; // Replicate URL is short-lived but Rekognition runs immediately.
+    }
+    const { data: pub } = opts.supabase.storage.from("composer-frames").getPublicUrl(path);
+    return pub?.publicUrl ?? frameUrl;
+  } catch (e) {
+    console.warn(`${opts.tag} v155_frame_extract mirror exception: ${(e as Error)?.message}`);
+    return frameUrl;
+  }
+}
 
 // v98 — Frame extraction via Gemini Vision directly on the video URL.
 // `validate-frame-face` proves Gemini 2.5 Flash accepts an mp4 URL as
