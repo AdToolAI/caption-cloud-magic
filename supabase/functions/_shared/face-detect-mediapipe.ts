@@ -222,6 +222,14 @@ async function callRekognition(
     if (x2 - x1 < 8 || y2 - y1 < 8) continue;
 
     const lm: MediaPipeFace["landmarks"] = {};
+    // v158 — Mouth-Landmark Auswahl deterministisch: bevorzuge `mouthDown`
+    // (Lippen-Mittelpunkt unten), sonst Centroid aus mouthLeft+mouthRight,
+    // sonst einzelnes Mouth-Landmark. AWS-API-Reihenfolge ist nicht garantiert,
+    // und "first-wins" landete in Produktion oft auf mouthLeft/Right → seitlich
+    // versetzter Sync.so-Anker → Animorph an der Lippenecke.
+    let mouthDown: [number, number] | null = null;
+    let mouthLeft: [number, number] | null = null;
+    let mouthRight: [number, number] | null = null;
     if (Array.isArray(d.Landmarks)) {
       for (const l of d.Landmarks) {
         const px: [number, number] = [
@@ -231,11 +239,20 @@ async function callRekognition(
         if (l.Type === "eyeLeft") lm.leftEye = px;
         else if (l.Type === "eyeRight") lm.rightEye = px;
         else if (l.Type === "nose") lm.nose = px;
-        else if (l.Type === "mouthLeft" || l.Type === "mouthDown" || l.Type === "mouthRight") {
-          // Use any mouth landmark as a coarse mouth anchor.
-          lm.mouth ||= px;
-        }
+        else if (l.Type === "mouthDown") mouthDown = px;
+        else if (l.Type === "mouthLeft") mouthLeft = px;
+        else if (l.Type === "mouthRight") mouthRight = px;
       }
+    }
+    if (mouthDown) {
+      lm.mouth = mouthDown;
+    } else if (mouthLeft && mouthRight) {
+      lm.mouth = [
+        Math.round((mouthLeft[0] + mouthRight[0]) / 2),
+        Math.round((mouthLeft[1] + mouthRight[1]) / 2),
+      ];
+    } else if (mouthLeft || mouthRight) {
+      lm.mouth = (mouthLeft ?? mouthRight)!;
     }
 
     out.push({
@@ -247,6 +264,58 @@ async function callRekognition(
     });
   }
   return out;
+}
+
+/**
+ * v158 — Decode actual pixel dimensions from PNG/JPEG bytes.
+ *
+ * Why: AWS Rekognition returns BoundingBox coords normalized to the SUBMITTED
+ * image's pixel space. The previous code multiplied them by `plateWidth /
+ * plateHeight`, silently assuming the anchor image and the rendered Hailuo
+ * plate share identical pixel dims. In production they often don't (anchor
+ * 1024×1024 portrait vs 1376×768 plate). The aspect-ratio mismatch placed
+ * every face and every mouth landmark at the wrong Y in plate space →
+ * animorph on every speaker. We now decode the real anchor dims, use them
+ * for the Rekognition coord-multiplication, then linearly re-scale into
+ * plate-space per-axis.
+ */
+function decodeImageDims(bytes: Uint8Array): { width: number; height: number } | null {
+  if (bytes.length < 24) return null;
+  // PNG: 89 50 4E 47 0D 0A 1A 0A, then IHDR with width/height as big-endian uint32.
+  if (
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+  ) {
+    const w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+    const h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+    if (w > 0 && h > 0) return { width: w, height: h };
+    return null;
+  }
+  // JPEG: FF D8, then scan markers for SOF0..SOF3 / SOF5..SOF7 / SOF9..SOF11 / SOF13..SOF15.
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let i = 2;
+    while (i < bytes.length - 8) {
+      if (bytes[i] !== 0xff) { i++; continue; }
+      while (i < bytes.length && bytes[i] === 0xff) i++;
+      const marker = bytes[i]; i++;
+      if (marker === 0xd8 || marker === 0xd9) continue;
+      if (
+        (marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf)
+      ) {
+        if (i + 7 > bytes.length) return null;
+        const h = (bytes[i + 3] << 8) | bytes[i + 4];
+        const w = (bytes[i + 5] << 8) | bytes[i + 6];
+        if (w > 0 && h > 0) return { width: w, height: h };
+        return null;
+      }
+      const segLen = (bytes[i] << 8) | bytes[i + 1];
+      if (segLen < 2) return null;
+      i += segLen;
+    }
+  }
+  return null;
 }
 
 /** Fetch a remote image (https URL) into bytes for Rekognition. */
