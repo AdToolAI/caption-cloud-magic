@@ -126,7 +126,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v162";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v163";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -3726,16 +3726,18 @@ serve(async (req) => {
           };
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
-          // v162 — persist real preclip fps + duration so the bounding_boxes
-          // JSON array length below matches the actual dispatched video frame
-          // count (Sync.so rejects mismatches with `generation_unknown_error`).
+          // v163 — persist the exact Remotion render frame count. Sync.so
+          // requires `bounding_boxes_url.bounding_boxes.length` to match the
+          // dispatched video frames exactly; duration-derived `round(dur*fps)`
+          // was off by one for short preclips.
           (pass as any).preclip_fps = Number(preclipResult.fps ?? 30);
+          (pass as any).preclip_frame_count = Math.max(1, Math.round(Number(preclipResult.frameCount ?? 0)));
           (pass as any).preclip_duration_sec = Number(
             (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
           );
           (pass as any).preclip_error = null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps}`,
           );
 
         } else {
@@ -4038,12 +4040,17 @@ serve(async (req) => {
         ? Number((pass as any).preclip_start_sec ?? 0)
         : 0;
 
-      // v162 — Frame count + fps MUST match the dispatched video exactly.
-      // For preclips: use the persisted preclip_fps (30) and preclip_duration_sec.
-      // For full-plate: probe mvhd as before and fall back to plate ASSUMED_FPS (24).
+      // v163 — Frame count + fps MUST match the dispatched video exactly.
+      // For preclips: use the exact Remotion `durationInFrames` captured by
+      // renderPassFacePreclip. Only legacy cached preclips fall back to
+      // ceil(duration*fps); never round, because it produced 73/28 bbox frames
+      // for 74/29-frame preclips and Sync.so failed with generation_unknown_error.
       const dispatchFps = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_fps ?? 30)
         : ASSUMED_FPS;
+      const preclipPersistedFrameCount = v161UsingPreclipForBbox
+        ? Math.round(Number((pass as any).preclip_frame_count ?? 0))
+        : 0;
       const preclipPersistedDurSec = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_duration_sec ?? 0)
         : 0;
@@ -4051,11 +4058,16 @@ serve(async (req) => {
         ? preclipPersistedDurSec
         : await getPlateDurationSecCached(probeUrlForBbox);
       const __probedFrames = __probedPlateDurSec
-        ? Math.max(1, Math.round(__probedPlateDurSec * dispatchFps))
+        ? Math.max(1, Math.ceil(__probedPlateDurSec * dispatchFps))
         : null;
-      const frameCount = __probedFrames ?? Math.max(1, Math.ceil(totalSec * dispatchFps));
+      const frameCount = v161UsingPreclipForBbox && preclipPersistedFrameCount > 0
+        ? preclipPersistedFrameCount
+        : (__probedFrames ?? Math.max(1, Math.ceil(totalSec * dispatchFps)));
+      const frameCountSource = v161UsingPreclipForBbox && preclipPersistedFrameCount > 0
+        ? "preclip_frame_count"
+        : (__probedFrames ? "ceil_probe_duration" : "ceil_total_duration");
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} fps=${dispatchFps} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} source=${frameCountSource} fps=${dispatchFps} preclip_frames=${preclipPersistedFrameCount || "?"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
 
       // Voiced windows in the dispatched video's time base.
