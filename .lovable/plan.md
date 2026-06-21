@@ -1,93 +1,107 @@
-# v157 — Tight-Mouth-Box (fix der „Animorphs" bei Sprecher 2–4)
+## Diagnose
 
-## Was die Logs verraten
+Du hast recht: Das ist kein Grund für einen Modellwechsel. Die saubere Lösung ist im `sync-3`-Targeting selbst.
 
-Alle 4 Pässe laufen sauber durch v156-AWS-Anchor-Detection, jede Box ist **distinkt und plate-nativ** (links → rechts: Samuel, Matthew, Kailee, Sarah):
+Die entscheidenden Findings:
 
-| Pass | Sprecher          | Box                    | W×H        | Aspect (H/W) | Area % |
-|------|-------------------|------------------------|-----------|---------------|--------|
-| 1    | **Samuel** (links, ✅) | [228, 59, 397, 318]    | 169 × 259 | **1.53**      | 3.5 %  |
-| 2    | Matthew (❌)       | [459, 94, 604, 292]    | 145 × 198 | 1.37          | 2.7 %  |
-| 3    | Kailee (❌)        | [818, 181, 947, 357]   | 129 × 176 | 1.36          | 2.2 %  |
-| 4    | Sarah (rechts, ❌) | [1006, 128, 1163, 372] | 157 × 244 | **1.55**      | 3.6 %  |
+1. **Produktiv läuft noch v156**
+   - Logs zeigen `WIRE_PAYLOAD version=v156`, nicht v157.
+   - Dadurch lief die v157-Tight-Mouth-Box im echten Test gar nicht zuverlässig/gar nicht produktiv.
 
-Eine echte Face-Bbox hat Aspect ≈ 1.1–1.3 (Stirn→Kinn). **Alles über 1.4 ist Kopf + Hals + Schultern.** Im Dispatch wird die Box dann zusätzlich um **+15 %** gepaddet (Z. 3775–3780), und vorher hat der Cluster-Code in `face-detect-mediapipe.ts` (Z. 372–377) bereits **+10 %** draufgelegt. Effekt: aus einer 1.5er-Torso-Box wird eine 1.7er Brust-Box.
+2. **Persisted/Advance-Pässe verlieren Mouth-Landmarks**
+   - Pass 2–4 laufen als `advance=true` mit `plate_hydration source=persisted`.
+   - Dabei werden aktuell nur gespeicherte `bboxes` rehydriert, aber nicht `mouth`.
+   - Ergebnis: `speakerPlateMouths` bleibt `null`, und der Dispatcher fällt auf eine schlechtere Bbox-Ankerung zurück.
 
-Was Sync.so jetzt sieht:
-- **Samuel (funktioniert):** er steht ganz außen links, redet aktiv, sein eigener Kopf füllt die obere Hälfte der Box gut — Sync.sos faceMask findet seine Lippen.
-- **Matthew / Kailee / Sarah (Animorphs):** die Boxen reichen weit ins Schulter-/Hals-/Hintergrund-Areal. Der Sync.so-FaceMask trifft Pixel, wo gar kein Mund ist → er „morphed" das nächstbeste Mund-ähnliche Muster (Schatten, Kinn des Nachbarn, Hemd-Falte) = der typische **„Animorph"-Artefakt**.
+3. **Sync.so-Dokumentation bestätigt den richtigen Weg**
+   - Für Multi-Person-Video ist `sync-3` mit `active_speaker_detection.bounding_boxes_url` korrekt.
+   - `bounding_boxes_url` muss eine JSON mit `bounding_boxes` pro Frame enthalten, `null` außerhalb sichtbarer/aktiver Frames.
+   - Wir bleiben also genau auf diesem Pfad.
 
-Die `validatePlateFacesGeometry` (die genau solche Torso-Boxen mit `bbox_aspect_torso_like` raussiebt) wird **nur auf Gemini-Ergebnisse angewendet**, nicht auf AWS — das ist die offene Flanke.
+4. **Wichtiger tiefer Bug: Anchor-First Koordinatenraum**
+   - AWS Rekognition liefert normalisierte Koordinaten relativ zum **Anchor-Bild**.
+   - Der Code skaliert sie aber direkt auf **Plate-Dimensionen**.
+   - Wenn Anchor und Plate unterschiedliche Aspect Ratios haben, landen Face- und Mouth-Koordinaten verschoben. Das erklärt Morphs bei allen Sprechern.
 
-Zusätzlich: AWS Rekognition liefert pro Gesicht ein präzises **`mouth`-Landmark** (`mouthLeft/Right/Down`). v155 hat das schon teilweise verdrahtet, aber Sync.so bekommt aktuell **die volle Bbox**, nicht den Mund.
+5. **Mouth-Landmark Auswahl ist zu unpräzise**
+   - AWS liefert `mouthLeft`, `mouthRight`, `mouthDown`.
+   - Aktuell wird das erste gefundene Mouth-Landmark genommen; API-Reihenfolge ist nicht garantiert.
+   - Für Sync-3 sollte bevorzugt `mouthDown` oder der Mittelpunkt aus left/right verwendet werden.
 
----
+6. **Per-frame JSON timing ist grundsätzlich korrekt, aber hard-coded FPS ist riskant**
+   - Die aktuelle JSON hat 243 Frames und `null` außerhalb der Sprecherfenster.
+   - Aber der Code nutzt intern 24fps, während Mux/Render auf 30fps läuft. Das kann bei manchen Sync.so-Auswertungen zu leichtem Timing-Drift führen.
 
-## Lösung v157 — drei chirurgische Eingriffe
+## Plan: v158 sync-3 sauber stabilisieren
 
-### 1. AWS-Geometry-Gate + Auto-Tighten (`_shared/plate-face-detect.ts`)
+### 1. Deployed Version eindeutig machen
+- `COMPOSE_DIALOG_SEGMENTS_VERSION` auf `v158` bumpen.
+- Boot-/Dispatch-Logs so setzen, dass wir sicher sehen:
+  - `BOOT version=v158`
+  - `WIRE_PAYLOAD version=v158`
+  - `v158_sync3_face_target_box` pro Pass.
+- Edge Function `compose-dialog-segments` nach der Änderung deployen.
 
-Nach dem AWS-Detect (Z. 515) und **bevor** das Ergebnis cached/zurückgegeben wird, prüfen:
+### 2. Mouth-Landmarks über Persistenz korrekt erhalten
+- `SegmentsState.plate_identity` um gespeicherte Mouth-Daten erweitern oder vorhandene `faces[].mouth` konsequent nutzen.
+- Im persisted hydration branch:
+  - `speakerPlateBboxes[i]` wie bisher setzen.
+  - zusätzlich `speakerPlateMouths[i]` aus `persistedPlateIdentity.faces[i].mouth` setzen.
+  - `speakerCoords[i]` bevorzugt auf Mouth setzen, nicht Bbox-Center.
+- Dadurch bekommen Pass 1–4 dieselben präzisen Mouth-Anker.
 
-- Wenn `bbox.h / bbox.w > 1.35` ODER `bbox.h / plateH > 0.22` → **Auto-Tighten**:
-  - Anker = `mouth`-Landmark falls vorhanden, sonst Bbox-Center
-  - Neue Box: Breite = bisheriges `w`, Höhe = `w * 1.15` (Stirn→Kinn-Verhältnis), zentriert auf Mund-y (bzw. obere ⅓ der alten Box)
-- Falls die getightete Box immer noch über 25 % Höhe ist → `hard fail` (sauberer Refund, kein Pseudo-Lipsync).
+### 3. AWS Mouth-Landmark Auswahl reparieren
+- In `_shared/face-detect-mediapipe.ts`:
+  - `mouthDown` bevorzugen.
+  - Falls kein `mouthDown`: Mittelpunkt aus `mouthLeft` + `mouthRight`.
+  - Erst danach Fallback auf einzelnes Mouth-Landmark.
+- Ziel: Sync-3 bekommt einen stabilen Mund-/Lower-face-Anker, keinen zufälligen Mundwinkel.
 
-Wir behalten damit den AWS-Vorteil (korrekte Links-rechts-Position, korrektes Mund-Landmark) und werfen nur den Torso-Anteil weg.
+### 4. Anchor-First Koordinatenraum korrigieren
+- In `_shared/plate-face-detect.ts` / AWS-Aufruf:
+  - Anchor-Bilddimensionen ermitteln oder die AWS-normalisierten Koordinaten bewusst als Anchor-Space behandeln.
+  - Dann korrekt auf Plate-Space mappen.
+- Wenn Anchor und Plate dieselbe komponierte Szene darstellen, aber unterschiedliche Pixelmaße haben:
+  - `x = normalizedX * plateWidth`
+  - `y = normalizedY * plateHeight`
+  bleibt nur dann korrekt, wenn Aspect/Framing identisch ist.
+- Wenn Aspect Ratio abweicht, Hard-Fail oder Live-Plate-Frame-Fallback statt still falsch skalieren.
 
-### 2. Dispatch-Padding entfernen, Mouth-zentrierte Box bauen (`compose-dialog-segments/index.ts`, Z. 3771–3786)
+### 5. Sync-3 bbox-url pro Pass fachlich korrekt bauen
+- Weiterhin `bounding_boxes_url`, kein Modellwechsel.
+- Box nicht als Schulter/Torso-Bbox und nicht ultraflach bauen, sondern als stabile Face-Target-Box:
+  - Zentrum: Mouth-Landmark.
+  - Breite: erkannte Face-Bbox-Breite mit kontrolliertem Faktor.
+  - Höhe: Lower-face/Face-Bereich, nicht Brust/Schulter.
+  - Clamp auf Plate-Dims.
+- Log pro Pass:
+  - Sprechername
+  - `mouth_used`
+  - `box`
+  - `area_pct`
+  - `bbox_source`
+  - `anchor_space_ok`
 
-Heute:
-```ts
-const padX = (bx2 - bx1) * 0.15;
-const padY = (by2 - by1) * 0.15;
-```
-→ vergrößert eine bereits zu hohe Box weiter.
+### 6. FPS/Framecount für `bounding_boxes_url` sync-3-konform machen
+- Nicht nur Dauer aus MP4 lesen, sondern FPS/Framecount nach Möglichkeit korrekt bestimmen.
+- Wenn FPS nicht sicher ist:
+  - konservativ und einheitlich mit Render-FPS arbeiten.
+  - Logs: `bbox_json_frames`, `video_duration`, `fps_used`.
+- Ziel: JSON-Länge passt zuverlässig zum Video-Frame-Raster.
 
-Neu, **wenn `plateFace.mouth` vorhanden** (AWS-Anchor-Pfad ≙ Default):
-- Box-Breite = `face.bbox.w * 0.90` (leicht tighter als Gesicht — Sync.so will den Mundbereich)
-- Box-Höhe = `Box-Breite * 0.55` (Lippen-Region, nicht ganzes Gesicht)
-- Zentriert auf `mouth = [mx, my]`
-- Geclampt an Plate-Dimensionen
+### 7. Cache und aktuelle defekte Scene sauber invalidieren
+- AWS/plate-face cache für die betroffene Szene ablaufen lassen.
+- `dialog_shots.plate_identity` der aktuellen fehlerhaften Scene entfernen/erneuern, damit v156/v157-Altdaten nicht weiterverwendet werden.
+- Keine stillen Partial-Ergebnisse: wenn Face-Targeting nicht eindeutig ist, Hard-Fail + Auto-Refund.
 
-Ohne `mouth` (Legacy / Cartoon-Rescue): Bbox-Center + Höhe-Anteil = nur obere 55 % der Bbox (Stirn–Kinn), `padX/padY` werden auf **0 %** reduziert.
-
-Loggen unter `v157_tight_mouth_box` mit `aspect_in`, `aspect_out`, `mouth_used`.
-
-### 3. Cluster-Pad reduzieren (`_shared/face-detect-mediapipe.ts`, Z. 372–373)
-
-Da wir bei v156-Anchor-First **genau einen Frame** an AWS schicken, gibt es nichts zu „clustern". Die +10 % bringen nur Pixel-Bleed:
-```ts
-const padX = Math.round((ux2 - ux1) * 0.10);  // wird 0
-const padY = Math.round((uy2 - uy1) * 0.10);  // wird 0
-```
-→ auf `0` setzen. Geometry-Gate und ggf. Tighten erledigen das saubere Sizing in Schritt 1.
-
----
-
-## Cache-Migration
-
-Bestehende `plate_face_cache`-Zeilen wurden mit den fetten Torso-Boxen gespeichert. Migration: alle Zeilen mit `detector LIKE 'aws_rekognition%'` evicten (`expires_at = now()-1s`), damit der nächste Render neu detektiert mit v157-Tighten.
-
----
-
-## Akzeptanzkriterien
-
-- Logs: `v157_tight_mouth_box mouth_used=true aspect_in=1.53 aspect_out=0.55` für alle 4 Pässe.
-- Box-Area % sinkt auf ~0.5–1.5 % (statt 2.2–3.6 %).
-- Visuelles Ergebnis: alle 4 Sprecher (Samuel, Matthew, Kailee, Sarah) bekommen saubere Lip-Sync ohne Morphs.
-- Anchor-Drift (Hailuo ±5–15 %) wird durch das engere Box-Profil rund um das Mund-Landmark toleriert.
-
----
-
-## NICHT angefasst
-
-- AWS-Anchor-First-Strategie selbst (v156 bleibt korrekt).
-- Cartoon-Fallback (Gemini-Pro auf Anchor).
-- Hard-Fail-Logik bei partial / 0 Faces.
-- Slot→Speaker Identity-Mapping (per-character-hungarian bleibt).
-
-## Token-/Kostenwirkung
-
-Keine — nur Geometrie-Anpassungen auf bereits berechneten Detection-Ergebnissen. Kein zusätzlicher AI-Call, kein zusätzliches Storage.
+### 8. Verifikation
+Nach Umsetzung prüfen:
+- Logs zeigen `version=v158`.
+- 4× `v158_sync3_face_target_box` für:
+  - Samuel Dusatko
+  - Matthew Dusatko
+  - Kailee
+  - Sarah Dusatko
+- Alle 4 haben `mouth_used=true` oder einen klar begründeten Hard-Fail.
+- `bounding_boxes_url` JSON enthält korrekte Frameanzahl und pro Pass nur die Sprecherfenster als non-null.
+- Kein Wechsel auf `lipsync-2-pro`, kein Auto-Detect-Fallback.
