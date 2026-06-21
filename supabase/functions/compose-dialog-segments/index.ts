@@ -2612,7 +2612,10 @@ serve(async (req) => {
         if (isAdvance) {
           try {
             EdgeRuntime.waitUntil((async () => {
-              await new Promise((r) => setTimeout(r, 8_000));
+              // v167 speedup #3 — was 8_000ms; 2s is enough for Storage propagation
+              // and saves 6s per transient audio-preflight self-retry. Single-shot,
+              // not a loop — Folge-Fail führt sauber in den Hard-Fail-Pfad mit Refund.
+              await new Promise((r) => setTimeout(r, 2_000));
               try {
                 await supabase.functions.invoke("compose-dialog-segments", {
                   body: { scene_id: sceneId, advance: true },
