@@ -75,7 +75,7 @@ export interface PassPreclipResult {
   crop?: FaceCropRegion;
   /** Window passed to Lambda (preclip plays t=0 → endSec-startSec). */
   durationSec?: number;
-  /** v162 — actual fps the preclip was rendered at. Required by callers
+  /** v163 — actual fps the preclip was rendered at. Required by callers
    *  building Sync.so `bounding_boxes_url` JSON: the array length MUST
    *  match the dispatched video's real frame count, NOT the legacy 24fps
    *  plate assumption. Mismatch → opaque `generation_unknown_error`. */
