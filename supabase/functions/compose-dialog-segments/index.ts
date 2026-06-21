@@ -1380,6 +1380,7 @@ serve(async (req) => {
           plateHeight: plateDims.height,
           midDurationSec: totalSec,
           characters,
+          anchorUrl, // v156 — Anchor-First: AWS Rekognition runs on this image
         });
       } catch (err) {
         console.warn(
