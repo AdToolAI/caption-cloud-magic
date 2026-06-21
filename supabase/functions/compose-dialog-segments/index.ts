@@ -1493,10 +1493,16 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
       );
     }
+    // v158 — Persist a per-speaker mouth array directly on the snapshot so
+    // advance/retry passes can rehydrate Sync.so face-target boxes without
+    // re-running plate-face detection. faces[].mouth still exists for the
+    // diagnostic path, but the parallel `mouths[i]` array is the canonical
+    // source on the persisted hydration branch above.
     const v153PlateIdentitySnapshot = {
       version: "v153.2" as const,
       dims: plateDims,
       bboxes: speakerPlateBboxes,
+      mouths: speakerPlateMouths,
       faces: plateIdentityMap?.faces ?? persistedPlateIdentity?.faces ?? [],
       resolvedCount: plateIdentityMap?.resolvedCount ?? persistedPlateIdentity?.resolvedCount ?? 0,
       cached: plateIdentityMap?.cached ?? persistedPlateIdentity?.cached ?? false,
@@ -1504,7 +1510,7 @@ serve(async (req) => {
       hydratedAt: new Date().toISOString(),
     };
     console.warn(
-      `[compose-dialog-segments] scene=${sceneId} v153.2_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
+      `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
     );
 
     // ── v129.20 — Single-speaker no-face hard refund ─────────────────────
