@@ -3731,7 +3731,9 @@ serve(async (req) => {
           // dispatched video frames exactly; duration-derived `round(dur*fps)`
           // was off by one for short preclips.
           (pass as any).preclip_fps = Number(preclipResult.fps ?? 30);
-          (pass as any).preclip_frame_count = Math.max(1, Math.round(Number(preclipResult.frameCount ?? 0)));
+          (pass as any).preclip_frame_count = Number.isFinite(Number(preclipResult.frameCount)) && Number(preclipResult.frameCount) > 0
+            ? Math.max(1, Math.round(Number(preclipResult.frameCount)))
+            : Math.max(1, Math.ceil((preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)) * Number(preclipResult.fps ?? 30)));
           (pass as any).preclip_duration_sec = Number(
             (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
           );
