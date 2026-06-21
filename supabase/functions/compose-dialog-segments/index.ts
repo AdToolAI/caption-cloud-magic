@@ -2612,7 +2612,10 @@ serve(async (req) => {
         if (isAdvance) {
           try {
             EdgeRuntime.waitUntil((async () => {
-              await new Promise((r) => setTimeout(r, 8_000));
+              // v167 speedup #3 — was 8_000ms; 2s is enough for Storage propagation
+              // and saves 6s per transient audio-preflight self-retry. Single-shot,
+              // not a loop — Folge-Fail führt sauber in den Hard-Fail-Pfad mit Refund.
+              await new Promise((r) => setTimeout(r, 2_000));
               try {
                 await supabase.functions.invoke("compose-dialog-segments", {
                   body: { scene_id: sceneId, advance: true },
@@ -5782,6 +5785,124 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v139_fanout_active cap=${concurrencyCap} fanout_size=${fanOutEnd} N_passes=${passes.length} env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}`,
       );
+
+      // ── v167 Speedup Schritt 2 — Preclip Pre-Fanout für Passes jenseits des Caps ──
+      // Wenn N > cap (z.B. N=4, cap=3), wartet Pass[cap..N-1] aktuell auf den
+      // Webhook eines früheren Passes UND rendert dann erst seinen ~90-120s
+      // Preclip. Dieser Block startet die Preclip-Renders für die "wartenden"
+      // Passes als Background-Task SOFORT (parallel zur sync-3-Verarbeitung
+      // der Fanout-Passes). Wenn der Webhook später `advance` für Pass N-1
+      // triggert, ist `preclip_url` bereits gesetzt → der Per-Pass-Lazy-Render
+      // (Z. 3727) wird übersprungen, Pass N-1 dispatched direkt.
+      //
+      // Hinter Env-Flag `FEATURE_PRECLIP_PREFANOUT` (default OFF). Aktivieren
+      // mit `FEATURE_PRECLIP_PREFANOUT=true` in den Edge-Secrets.
+      // Fallback: bei Failure greift der bestehende Per-Pass-Render in der
+      // späteren `advance`-Invocation → keine Regression möglich.
+      const preFanoutEnabled = (Deno.env.get("FEATURE_PRECLIP_PREFANOUT") ?? "false")
+        .toLowerCase() === "true";
+      if (preFanoutEnabled && passes.length > concurrencyCap && plateDims && sourceClipUrl) {
+        const waitingIdxs: number[] = [];
+        for (let i = concurrencyCap; i < passes.length; i++) {
+          const wp = passes[i];
+          if ((wp as any)?.preclip_url && (wp as any)?.preclip_crop) continue; // already cached
+          if (!Array.isArray(wp?.coords) || wp.coords.length !== 2) continue;
+          if (!Number.isFinite(Number(wp.coords[0])) || !Number.isFinite(Number(wp.coords[1]))) continue;
+          waitingIdxs.push(i);
+        }
+        if (waitingIdxs.length > 0) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v167_preclip_prefanout START waiting_passes=${waitingIdxs.join(",")} cap=${concurrencyCap} N=${passes.length}`,
+          );
+          try {
+            EdgeRuntime.waitUntil((async () => {
+              await Promise.allSettled(waitingIdxs.map(async (waitIdx) => {
+                const wp = passes[waitIdx];
+                try {
+                  const wpSegments = Array.isArray(wp.segments) ? wp.segments : [];
+                  const wpWindows: Array<[number, number]> = wpSegments
+                    .map((s: any) => [Number(s.startTime), Number(s.endTime)] as [number, number])
+                    .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && e > s);
+                  if (wpWindows.length === 0) {
+                    console.warn(`[compose-dialog-segments] scene=${sceneId} v167_preclip_prefanout pass=${waitIdx + 1} skip: no audio windows`);
+                    return;
+                  }
+                  const wpUnionStart = Math.max(0, Math.min(...wpWindows.map(([s]) => s)));
+                  const wpUnionEnd = Math.min(totalSec, Math.max(...wpWindows.map(([, e]) => e)));
+                  const wpSiblings: Array<[number, number]> = [];
+                  for (let k = 0; k < speakers.length; k++) {
+                    if (k === wp.speaker_idx) continue;
+                    const c = (speakers as any[])[k]?.coords;
+                    if (Array.isArray(c) && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1]))) {
+                      wpSiblings.push([Number(c[0]), Number(c[1])]);
+                    }
+                  }
+                  const wpPlateBox = speakerPlateBboxes?.[wp.speaker_idx] ?? null;
+                  const wpPreclip = await renderPassFacePreclip(
+                    supabase,
+                    serviceKey,
+                    supabaseUrl,
+                    {
+                      sceneId,
+                      projectId: String((scene as any).project_id ?? ""),
+                      userId,
+                      passIdx: waitIdx,
+                      masterVideoUrl: sourceClipUrl,
+                      srcWidth: plateDims.width,
+                      srcHeight: plateDims.height,
+                      coords: [Number(wp.coords[0]), Number(wp.coords[1])],
+                      bbox: wpPlateBox,
+                      siblingCoords: wpSiblings.length > 0 ? wpSiblings : null,
+                      startSec: wpUnionStart,
+                      endSec: wpUnionEnd,
+                    },
+                    120_000,
+                  );
+                  if (wpPreclip.ok && wpPreclip.preclipUrl && wpPreclip.crop) {
+                    const patch = {
+                      preclip_url: wpPreclip.preclipUrl,
+                      preclip_render_id: wpPreclip.preclipRenderId ?? null,
+                      preclip_crop: {
+                        x: wpPreclip.crop.x,
+                        y: wpPreclip.crop.y,
+                        size: wpPreclip.crop.size,
+                        outputSize: wpPreclip.crop.outputSize,
+                      },
+                      preclip_start_sec: Number(wpUnionStart.toFixed(3)),
+                      preclip_end_sec: Number(wpUnionEnd.toFixed(3)),
+                      preclip_fps: Number(wpPreclip.fps ?? 30),
+                      preclip_frame_count: Number.isFinite(Number(wpPreclip.frameCount)) && Number(wpPreclip.frameCount) > 0
+                        ? Math.max(1, Math.round(Number(wpPreclip.frameCount)))
+                        : Math.max(1, Math.ceil((wpPreclip.durationSec ?? Math.max(0.2, wpUnionEnd - wpUnionStart)) * Number(wpPreclip.fps ?? 30))),
+                      preclip_duration_sec: Number((wpPreclip.durationSec ?? Math.max(0.2, wpUnionEnd - wpUnionStart)).toFixed(3)),
+                      preclip_error: null,
+                    };
+                    await supabase.rpc("update_dialog_pass_slot", {
+                      _scene_id: sceneId,
+                      _pass_idx: waitIdx,
+                      _patch: patch,
+                    });
+                    console.log(
+                      `[compose-dialog-segments] scene=${sceneId} v167_preclip_prefanout pass=${waitIdx + 1} OK persisted url=…${wpPreclip.preclipUrl.slice(-60)}`,
+                    );
+                  } else {
+                    console.warn(
+                      `[compose-dialog-segments] scene=${sceneId} v167_preclip_prefanout pass=${waitIdx + 1} render failed err=${wpPreclip.error} — per-pass lazy-render will retry on advance`,
+                    );
+                  }
+                } catch (e) {
+                  console.warn(
+                    `[compose-dialog-segments] scene=${sceneId} v167_preclip_prefanout pass=${waitIdx + 1} threw: ${(e as Error)?.message ?? e} — per-pass lazy-render will retry on advance`,
+                  );
+                }
+              }));
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} v167_preclip_prefanout DONE waiting_passes=${waitingIdxs.join(",")}`,
+              );
+            })());
+          } catch { /* EdgeRuntime not available in some test contexts */ }
+        }
+      }
     } else if (!isAdvance && !isRetry && passes.length > 1) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} SERIAL mode (${passes.length} speakers, v60 unified, parallel_flag=${parallelFlagOn}) — webhook will chain pass 2..N as pass 1..N-1 complete`,
