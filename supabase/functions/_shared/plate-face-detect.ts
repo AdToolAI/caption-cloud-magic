@@ -52,6 +52,13 @@ export interface PlateFaceBox {
   slot: number;
   /** Optional confidence 0..1. */
   confidence?: number;
+  /**
+   * v155 — Plate-pixel mouth landmark. Populated only when the detector
+   * is AWS Rekognition (which returns MouthLeft/Right/Down landmarks).
+   * The dialog dispatch path uses this instead of bbox-center so Sync.so's
+   * faceMask sits exactly on the mouth instead of the nose/forehead.
+   */
+  mouth?: [number, number];
 }
 
 export interface PlateFaceMap {
