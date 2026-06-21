@@ -249,6 +249,7 @@ async function askGeminiForPlateFaces(
   frameUrl: string,
   expectedCount: number,
   timestampSec: number,
+  opts?: { strict?: boolean; model?: string },
 ): Promise<GeminiFace[]> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) {
@@ -256,7 +257,11 @@ async function askGeminiForPlateFaces(
     return [];
   }
   const want = Math.max(1, Math.min(8, expectedCount || 2));
-  const prompt = PLATE_PROMPT(want, timestampSec);
+  const prompt = opts?.strict
+    ? PLATE_PROMPT_STRICT(want, timestampSec)
+    : PLATE_PROMPT(want, timestampSec);
+  const model = opts?.model ?? "google/gemini-2.5-flash";
+  const tagSuffix = opts?.strict ? "strict" : "default";
 
   // PRIMARY: type=input_video with the mp4 URL (verified 200 via probe).
   const primary = await callGeminiGateway(
@@ -265,18 +270,16 @@ async function askGeminiForPlateFaces(
       { type: "text", text: prompt },
       { type: "input_video", input_video: { url: frameUrl } } as unknown,
     ],
-    "[plate-face-detect:input_video]",
+    `[plate-face-detect:input_video:${tagSuffix}]`,
+    model,
   );
   if (primary.ok && primary.faces.length >= want) {
     return primary.faces;
   }
 
   // FALLBACK: data:video/mp4;base64,... via image_url (verified 200 via probe).
-  // Trigger when primary failed OR returned fewer faces than expected
-  // (probe showed input_video can miss 1 in 4-speaker shots; base64 hit 4/4).
   const dataUrl = await fetchMp4AsBase64DataUrl(frameUrl);
   if (!dataUrl) {
-    // Base64 fallback unavailable (too large / fetch failed) — return whatever primary gave.
     return primary.faces;
   }
   const fallback = await callGeminiGateway(
@@ -285,15 +288,44 @@ async function askGeminiForPlateFaces(
       { type: "text", text: prompt },
       { type: "image_url", image_url: { url: dataUrl } },
     ],
-    "[plate-face-detect:base64]",
+    `[plate-face-detect:base64:${tagSuffix}]`,
+    model,
   );
   if (fallback.ok && fallback.faces.length > primary.faces.length) {
     console.log(
-      `[plate-face-detect] base64 fallback wins: primary=${primary.faces.length} fallback=${fallback.faces.length}`,
+      `[plate-face-detect] base64 fallback wins (${tagSuffix}): primary=${primary.faces.length} fallback=${fallback.faces.length}`,
     );
     return fallback.faces;
   }
   return primary.faces.length >= fallback.faces.length ? primary.faces : fallback.faces;
+}
+
+/** v154 — Convert raw Gemini faces (normalized 0..1) → plate-pixel PlateFaceBox[]. */
+function normalizedFacesToPlateBoxes(
+  rawFaces: GeminiFace[],
+  plateWidth: number,
+  plateHeight: number,
+): PlateFaceBox[] {
+  const W = Math.max(1, plateWidth);
+  const H = Math.max(1, plateHeight);
+  return rawFaces
+    .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
+    .map((f) => {
+      const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
+      const x1 = Math.round(nx1 * W);
+      const y1 = Math.round(ny1 * H);
+      const x2 = Math.round(nx2 * W);
+      const y2 = Math.round(ny2 * H);
+      return {
+        bbox: [x1, y1, x2, y2] as [number, number, number, number],
+        center: [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)] as [number, number],
+        slot: 0,
+        confidence: typeof f.confidence === "number" ? f.confidence : undefined,
+      };
+    })
+    .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
+    .sort((a, b) => a.center[0] - b.center[0])
+    .map((f, idx) => ({ ...f, slot: idx }));
 }
 
 /**
