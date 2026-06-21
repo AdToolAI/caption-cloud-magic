@@ -1,41 +1,32 @@
-## Befund
-
-- Die aktuell fehlgeschlagene Szene läuft nicht mit dem letzten Fix: Live-Logs zeigen `BOOT version=v156` und `WIRE_PAYLOAD version=v156`, keine `v158_sync3_face_target_box` Logs.
-- Die Szene `5f4005fa-5fe1-429f-b47c-e6478310429a` wurde mit alten großen Face-Boxes dispatched (`area_pct` ca. 2.4–2.6%). Das entspricht genau den Morph-Artefakten.
-- Sync-3 bleibt gesetzt. Kein Wechsel auf `lipsync-2-pro`.
+## Problem
+Der Screenshot bestätigt den nächsten Engpass: v159 erkennt zwar einen Mundanker (`mouth_used=true`), erzeugt aber eine zu kleine Box (`area_pct=0.14`). Der aktuelle Sanity-Guard blockt korrekt, weil Sync.so laut Doku `bounding_boxes` als Face-Detection-Box erwartet, nicht als reine Lippen-/Mund-Mini-Region. Genau diese Mini-Region kann Morphs/No-Lipsync auslösen.
 
 ## Plan
+1. **Sync-3 Box-Strategie korrigieren**
+   - Für `sync-3` wieder eine echte, enge Gesicht-Box senden: Stirn/Haar bis Kinn, Ohr-zu-Ohr.
+   - Den Mund-Landmark nur noch als Qualitäts-/Zuordnungsanker verwenden, nicht als Mittelpunkt einer winzigen Lippenbox.
+   - Zielgröße: realistische Head/Face-Box um ca. `0.4%–3%` der Plate-Fläche statt `0.14%`.
 
-1. **Version sauber auf v159 bumpen**
-   - `COMPOSE_DIALOG_SEGMENTS_VERSION` auf `v159` setzen.
-   - Neue eindeutige Logs: `BOOT version=v159`, `WIRE_PAYLOAD version=v159`, `v159_sync3_mouth_box`.
+2. **Mouth-Gating beibehalten**
+   - Multi-Speaker bleibt fail-closed, wenn kein Mouth-Landmark vorhanden ist.
+   - Damit senden wir nur Boxen, deren Sprecher eindeutig per Mouth-Landmark zugeordnet wurde.
 
-2. **Sync-3 Targeting fail-closed machen**
-   - Für Multi-Speaker `bbox-url-pro` darf nur noch mit Mund-zentrierter Box dispatchen.
-   - Wenn `mouth_used=false` oder Box-Fläche zu groß ist, wird vor Sync.so abgebrochen und refunded statt ein Morph-Video zu erzeugen.
-   - Zielbereich: kompakte Mund-/Untergesichtsbox statt Full-Face/Schulterbox.
+3. **Doc-strict Sync-3 Payload bereinigen**
+   - `sync-3` bleibt aktiv, kein Wechsel auf `lipsync-2-pro`.
+   - `active_speaker_detection.bounding_boxes_url` bleibt der Primärpfad.
+   - Keine `auto_detect:true`-Fallbacks.
+   - Falls noch nicht effektiv durch Sanitizer entfernt, sicherstellen, dass verbotene `sync-3` Optionen nicht im finalen Payload landen.
 
-3. **Current Scene + Cache invalidieren**
-   - Nicht nur die alte Testszene, sondern die aktuelle Szene `5f4005fa-5fe1-429f-b47c-e6478310429a` zurücksetzen:
-     - `dialog_shots.plate_identity` entfernen
-     - alte `plate_face_cache` AWS-Rekognition-Zeilen auslaufen lassen
-   - Dadurch wird beim nächsten Start wirklich neu erkannt.
+4. **Geometry Gate an echte Face-Boxes anpassen**
+   - Den Sanity-Bereich so lassen/leicht präzisieren, dass echte Gesichtsboxen passieren und Mini-Mouth-Boxes weiterhin blockiert werden.
+   - Der Fehler `bbox_geometry_insane:area_pct=0.14` soll danach nicht mehr bei korrekt erkannter Face-Box auftreten.
 
-4. **Edge Function aktiv deployen**
-   - `compose-dialog-segments` deployen, damit nicht erneut v156 in Produktion läuft.
-   - Danach Logs prüfen, bevor du neu renderst.
+5. **Cache/Scene resetten**
+   - Stale `plate_face_cache` und `dialog_shots.plate_identity` für die aktuell fehlgeschlagene Scene `8a0baf67-2261-4ba3-8dc7-e511dcee9e59` invalidieren, damit v160 nicht alte Mouth-Box-Daten wiederverwendet.
 
-5. **Verifikation vor Provider-Kosten**
-   - Erwartete Logs vor dem Sync.so-Call:
-     - `BOOT version=v159`
-     - `WIRE_PAYLOAD version=v159`
-     - 4× `v159_sync3_mouth_box`
-     - `mouth_used=true`
-     - `area_pct` deutlich unter den alten 2.4–2.6%
-     - `active_speaker_detection.bounding_boxes_url`, kein `auto_detect:true`
+6. **Deploy + Verifikation**
+   - `compose-dialog-segments` deployen.
+   - In Logs prüfen: `version=v160`, pro Pass `v160_sync3_face_box`, `mouth_used=true`, `area_pct >= 0.20` und `v147_BBOX_URL_PRIMARY` statt Hard-Fail.
 
-## Technische Details
-
-- Sync.so-Doku bestätigt: `bounding_boxes_url` muss `{ "bounding_boxes": [...] }` enthalten, ein Eintrag pro Frame, `null` außerhalb der sichtbaren/gewollten Frames.
-- Der bestehende v156-Live-Lauf erfüllt zwar formal das DTO, targetet aber zu große Boxen. v159 erzwingt Mund-zentrierte Boxen und blockt alte Full-Face-Dispatches.
-- Keine Modelländerung: `model: "sync-3"` bleibt unverändert.
+## Erwartetes Ergebnis
+Die Pipeline nutzt weiterhin `sync-3`, aber mit Sync.so-konformen Face-Bounding-Boxes. Dadurch sollte der direkte Fehler verschwinden und die Morphs sollten deutlich reduziert werden, weil Sync.so wieder ein vollständiges Gesicht statt einer winzigen Lippenregion targetet.
