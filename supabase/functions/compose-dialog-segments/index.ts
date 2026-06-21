@@ -1437,6 +1437,12 @@ serve(async (req) => {
             speakerCoords[idx] = [plateFace.center[0], plateFace.center[1]];
           }
           speakerPlateBboxes[idx] = plateFace.bbox;
+          if (Array.isArray((plateFace as any).mouth)) {
+            const mLm = (plateFace as any).mouth as [number, number];
+            if (Number.isFinite(mLm[0]) && Number.isFinite(mLm[1])) {
+              speakerPlateMouths[idx] = [mLm[0], mLm[1]];
+            }
+          }
           coordSources[idx] = source;
         }
       });
