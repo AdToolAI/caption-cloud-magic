@@ -42,9 +42,6 @@ timeout_sec = 180
 verify_jwt = true
 timeout_sec = 180
 
-[functions.compose-twoshot-audio]
-verify_jwt = true
-timeout_sec = 180
 
 [functions.compose-scene-anchor]
 verify_jwt = true
@@ -817,13 +814,3 @@ timeout_sec = 120
 [functions.auth-email-hook]
 verify_jwt = false
 
-[functions.syncso-support-bundle]
-verify_jwt = false
-timeout_sec = 60
-
-[functions.syncso-replay]
-verify_jwt = false
-timeout_sec = 90
-
-[functions.syncso-replay-webhook]
-verify_jwt = false
