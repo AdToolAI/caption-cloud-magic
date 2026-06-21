@@ -1,88 +1,72 @@
-## Analyse: was heute kaputt gegangen ist
+# Lipsync Pipeline – Complete Post-Mortem & Final Architecture
 
-**Do I know what the issue is? Yes.** Der aktuelle Fehler ist sehr wahrscheinlich **nicht primär das JSON-Format**, sondern die Kombination aus zwei Regressionen:
+Goal: Document, in one place, the full journey from the first broken lipsync attempts to the now-working v166 "Holy Grail" pipeline, so future agents (and you) never re-attempt dead ends.
 
-1. **Sprecher→Gesicht-Mapping ist falsch geworden**
-   - In der aktuellen Szene `0b0b7f78...` ist die Script-Reihenfolge:
-     1. Samuel
-     2. Matthew
-     3. Kailee
-     4. Sarah
-   - Die visuelle Gesichtsreihenfolge im Plate ist aber nicht identisch mit der Script-Reihenfolge.
-   - Die vorhandene Anchor-FaceMap kennt die Identitäten, aber `plate_identity` wurde mit `resolvedCount: 0` und `characterId: null` gespeichert.
-   - Danach wurden die plate-native BBoxes blind per Index auf die Script-Reihenfolge gelegt. Ergebnis: Pass 1/3 können das falsche Gesicht croppen/animieren. Das passt exakt zu „Sprecher 3 wurde von Sprecher 1 gesprochen“ und jetzt zu „kein Lip Sync funktioniert sauber“.
+## Deliverable
+A single new memory doc:
 
-2. **v164/v165 `silentSlots` verschlimmern das sichtbare Ergebnis**
-   - Diese Freeze-Overlays frieren andere Gesichter aus dem Master-Plate ein.
-   - Das führt zu Morphs/Geisterflächen und kostet massiv Renderzeit, ohne den eigentlichen Mapping-Fehler zu lösen.
-   - Die Screenshot-Symptome passen: sichtbare Morphs, sehr langer finaler Stitch, als würde der Clip insgesamt „komisch“ überlagert.
+- `mem/architecture/lipsync/HOLY-GRAIL-v166-complete-pipeline.md`
 
-**JSON-Befund:** Das Sync.so-Format selbst entspricht der Doku: `active_speaker_detection: { auto_detect:false, bounding_boxes_url }` und die JSON-Datei muss `{ "bounding_boxes": [...] }` enthalten. Der Fehler liegt eher darin, **welche Box** pro Sprecher in diese JSON geschrieben wird, nicht in der äußeren JSON-Struktur.
+Plus index entry in `mem/index.md` under the lipsync section, replacing the now-superseded v161–v165 bullet points with one canonical pointer.
 
-## Plan v166
+No code changes. Documentation only.
 
-### 1. Silent-Face Freeze vollständig deaktivieren
-- `render-sync-segments-audio-mux` soll keine `silentSlots` mehr erzeugen oder an Remotion geben.
-- `DialogStitchVideo.tsx` soll `SilentFaceFreeze` nicht mehr rendern.
-- Dadurch verschwinden die Morph-/Ghost-Overlays und die finale Lambda-Renderzeit sinkt deutlich.
+## Document structure
 
-### 2. Sprecher-Mapping reparieren: Anchor-Identität vor Slot-Index
-- In `compose-dialog-segments` wird die plate-native Face-Erkennung weiterhin genutzt, aber nicht mehr blind nach Script-Index zugeordnet, wenn `plate_identity.resolvedCount === 0`.
-- Wenn die Anchor-FaceMap vollständige `characterId`s enthält, wird gemappt als:
+### 1. Executive Summary
+- One paragraph: what works now (v166), why it works, key invariants.
 
-```text
-speaker.character_id
-  -> anchor faceMap slotIndex
-  -> plate-native face with same visual slot
-  -> speakerPlateBboxes[speaker_idx]
-```
+### 2. Timeline of Failed Approaches (grouped, not version-by-version)
+Five eras, each with: *what we tried → why it failed → lesson*.
 
-- Nur wenn dieses Mapping eindeutig ist, wird dispatched.
-- Wenn nicht eindeutig: fail-fast + Credit-Refund statt falscher Lip-Sync.
+1. **Segments-era (v41–v70)** – official Sync.so `segments` payload, multi-speaker ASD experiments, dead-segment blocks, neighbor-aware preclips. Failed because Sync.so segments are not frame-accurate for >2 speakers and we kept hitting `provider_unknown_error`.
+2. **Preclip / single-face era (v68–v123)** – per-speaker single-face preclips with bounding-box coords. Failed due to identity drift, stale payloads, plate-gate collisions, and circular fallback loops.
+3. **Doc-strict / sync-3 era (v124–v131)** – locked the payload to documented options only. Stabilised provider errors but still had wrong-mouth animations on multi-character scenes.
+4. **Parallel passes & tight-window era (v93–v95, v38–v40, v149)** – tried parallelising and trimming audio windows. Cut latency but exposed speaker-to-face mapping bugs.
+5. **Today's iterations (v161–v165)** – bbox-url-pro JSON, silent-face overlays, viewport-translate crop. Caused ghosting/morphs and 12:30 render times. Two root causes finally surfaced:
+   - speaker index ≠ visual slot (script order was blindly used)
+   - silent-face overlays double-rendered the master plate
 
-### 3. Bounding-Boxes-Pfad behalten, aber absichern
-- `bbox-url-pro` bleibt der richtige Weg.
-- Pro Pass wird validiert und geloggt:
-  - speaker name / character_id
-  - anchor slot
-  - plate bbox
-  - transformed clip bbox
-  - bbox JSON frame count
-  - non-null voiced frames
-- Keine Rückkehr zu `auto_detect:true` auf Multi-Speaker-Fullplate.
+### 3. The Breakthrough (v166)
+Three decisive fixes:
 
-### 4. Preclip-Crop nur aus korrekt gemappter Box
-- `renderPassFacePreclip` bekommt nur noch eine Box, die zu `speaker.character_id` passt.
-- Wenn die Box nicht zur Speaker-Koordinate passt, wird der Preclip verworfen und nicht still weiterverwendet.
+a. **Anchor-Identity Slot Bridge** in `compose-dialog-segments`: when `plate_identity.faces[]` has no `characterId`, copy it in from `faceMap` by `slot`/`slotIndex` so script order maps to the correct visual face.
+b. **Hard-fail instead of guess**: removed the `unlabeled.find(f => f.slot === idx)` fallback. If a speaker can't be resolved to a visual face, the pass aborts and refunds.
+c. **Removed silent-face overlays** in both `render-sync-segments-audio-mux` and `DialogStitchVideo.tsx`. Sync.so already handles non-speaking faces via `null` bbox entries; the Remotion overlay was a redundant source of ghosting.
 
-### 5. Szene sauber zurücksetzen und neu laufen lassen
-- Nach Code-Änderung die aktuelle Szene `0b0b7f78-1b52-4210-9640-03124cf91fec` resetten:
-  - `lip_sync_status`
-  - `dialog_shots`
-  - `twoshot_stage`
-  - `clip_error`
-- Edge Functions deployen.
-- Remotion-Bundle neu deployen, weil `DialogStitchVideo.tsx` beteiligt ist.
+### 4. Final End-to-End Pipeline (v166)
+Step-by-step with file references:
 
-### 6. Verifikation
-- Logs müssen zeigen:
+1. User triggers cinematic-sync → `compose-dialog-scene`
+2. Scene-level lock via `try_acquire_dialog_lock`
+3. Plate generation (Hailuo i2v) + anchor portrait extraction
+4. Per-turn dispatch loop in `compose-dialog-segments`:
+   - resolve speaker → `character_id` via faceMap (Anchor-Identity Slot Bridge)
+   - call `_shared/pass-face-preclip.ts` to produce frame-exact bbox JSON
+   - POST to Sync.so `sync-3` with `active_speaker_detection: { bounding_boxes_url, auto_detect: false }`
+5. Sync.so webhook (`sync-so-webhook`) patches `dialog_shots`, triggers `poll-dialog-shots`
+6. `render-sync-segments-audio-mux` ffmpeg-muxes the per-turn lipsync clips with original audio (no silent overlays anymore)
+7. `DialogStitchVideo.tsx` (Remotion/Lambda) stitches turns into the final clip
+8. Idempotent refund path on any failure (per FROZEN-INVARIANTS)
 
-```text
-v166_anchor_identity_slot_bridge speaker=Samuel ... character_id=samuel-dusatko anchor_slot=... plate_slot=...
-v166_bbox_json speaker=... frames=... voiced_frames=... box=...
-v166_no_silent_slots shots=4
-```
+Include a Mermaid diagram of the flow under `/mnt/documents/lipsync-v166-pipeline.mmd`.
 
-- Erwartung im Ergebnis:
-  - keine Freeze-Morphs mehr
-  - nur die korrekte Speaker-Region wird pro Turn überlagert
-  - Sarah bleibt korrekt
-  - Pass 3 darf nicht mehr auf Sprecher 1/anderen Slot fallen
+### 5. Frozen Invariants (do not regress)
+- sync-3 only, doc-strict options
+- bbox-url-pro is the single source of truth (no `auto_detect: true`)
+- Speaker→face mapping MUST go through `character_id`, never raw script index
+- No silent-face overlays in Remotion
+- Hard-fail + refund > silent wrong animation
+- Per-scene lock; webhook-driven, not polling-driven dispatch
 
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
+### 6. Index Cleanup
+In `mem/index.md`:
+- Add `[Holy Grail Lipsync v166](mem://architecture/lipsync/HOLY-GRAIL-v166-complete-pipeline)` to the lipsync section
+- Mark v161–v165 docs as "superseded by v166" in this new doc's appendix (do not delete them — historical record)
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+## Out of scope
+- No code changes
+- No new migrations
+- No edge function redeploys
+
+After you approve, I'll switch to build mode and write only those two files (doc + index update) plus the Mermaid artifact.
