@@ -402,7 +402,55 @@ export async function detectFacesMediaPipe(opts: {
   }
 
   const perFrameResults = await Promise.all(
-    validFrames.map((f) => callRekognition(f.bytes, f.i, W, H)),
+    validFrames.map(async (f) => {
+      // v158 — Decode the SUBMITTED image's own pixel dims; use those for the
+      // AWS-coord-multiplication, then linearly re-scale into plate space.
+      // Eliminates the aspect-ratio-mismatch animorph (anchor 1:1 vs plate 16:9).
+      const dims = decodeImageDims(f.bytes);
+      const iw = dims?.width && dims.width > 0 ? dims.width : W;
+      const ih = dims?.height && dims.height > 0 ? dims.height : H;
+      const detected = await callRekognition(f.bytes, f.i, iw, ih);
+      if (dims && (iw !== W || ih !== H)) {
+        const sx = W / iw;
+        const sy = H / ih;
+        const aspectAnchor = iw / ih;
+        const aspectPlate = W / H;
+        const aspectMismatch = Math.abs(aspectAnchor - aspectPlate) / aspectPlate;
+        if (aspectMismatch > 0.02) {
+          console.warn(
+            `[face-detect/aws] v158_anchor_plate_aspect_mismatch anchor=${iw}x${ih} ` +
+            `plate=${W}x${H} mismatch=${(aspectMismatch * 100).toFixed(1)}% — per-axis scale ` +
+            `sx=${sx.toFixed(3)} sy=${sy.toFixed(3)} (mouth/face Y may drift; consider re-anchoring at plate aspect)`,
+          );
+        } else {
+          console.log(
+            `[face-detect/aws] v158_anchor_dim_scale anchor=${iw}x${ih} plate=${W}x${H} sx=${sx.toFixed(3)} sy=${sy.toFixed(3)}`,
+          );
+        }
+        return detected.map((face) => {
+          const lm = face.landmarks ? { ...face.landmarks } : undefined;
+          const scalePt = (p?: [number, number]): [number, number] | undefined =>
+            p ? [Math.round(p[0] * sx), Math.round(p[1] * sy)] : undefined;
+          if (lm) {
+            lm.leftEye = scalePt(lm.leftEye);
+            lm.rightEye = scalePt(lm.rightEye);
+            lm.nose = scalePt(lm.nose);
+            lm.mouth = scalePt(lm.mouth);
+          }
+          const sx1 = Math.max(0, Math.min(W, Math.round(face.bbox[0] * sx)));
+          const sy1 = Math.max(0, Math.min(H, Math.round(face.bbox[1] * sy)));
+          const sx2 = Math.max(0, Math.min(W, Math.round(face.bbox[2] * sx)));
+          const sy2 = Math.max(0, Math.min(H, Math.round(face.bbox[3] * sy)));
+          return {
+            ...face,
+            bbox: [sx1, sy1, sx2, sy2] as [number, number, number, number],
+            center: [Math.round((sx1 + sx2) / 2), Math.round((sy1 + sy2) / 2)] as [number, number],
+            landmarks: lm,
+          };
+        });
+      }
+      return detected;
+    }),
   );
   const allFaces = perFrameResults.flat();
 
