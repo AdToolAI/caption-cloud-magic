@@ -3788,7 +3788,17 @@ serve(async (req) => {
         const y2 = Math.min(dims.height, Math.round(cy + boxH / 2));
         box = [x1, y1, x2, y2];
       }
-      const frameCount = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
+      // v153.8 — Use ACTUAL plate frame count (probed from mp4 mvhd) instead
+      // of the requested Hailuo duration. Sync.so rejects mismatched bbox
+      // arrays with the opaque `generation_unknown_error`.
+      const __probedPlateDurSec = await getPlateDurationSecCached(passInputUrl);
+      const __probedFrames = __probedPlateDurSec
+        ? Math.max(1, Math.round(__probedPlateDurSec * ASSUMED_FPS))
+        : null;
+      const frameCount = __probedFrames ?? Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.8_bbox_framecount plate_duration=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s plate_fps=${ASSUMED_FPS} plate_frames=${__probedFrames ?? "?"} used=${frameCount} src=${__probedFrames ? "mp4probe" : "fallback_assumed_fps"}`,
+      );
 
       // v124 — Per-frame array honoring this speaker's voiced windows.
       // Frames outside the windows become `null` so sync-3 cannot animate
