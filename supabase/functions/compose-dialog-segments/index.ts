@@ -1394,7 +1394,11 @@ serve(async (req) => {
               const cy = (Number(pf.bbox[1]) + Number(pf.bbox[3])) / 2;
               return Math.hypot(cx - targetCx, cy - targetCy) < 50;
             });
-          const m = f && Array.isArray((f as any).mouth) ? (f as any).mouth : null;
+          // Canonical source: snapshot.mouths[i]. Fallback to faces[].mouth.
+          const snapM = persistedMouths[i];
+          const m =
+            (Array.isArray(snapM) && snapM.length === 2 ? snapM : null) ??
+            (f && Array.isArray((f as any).mouth) ? (f as any).mouth : null);
           if (m && Number.isFinite(Number(m[0])) && Number.isFinite(Number(m[1]))) {
             speakerPlateMouths[i] = [Math.round(Number(m[0])), Math.round(Number(m[1]))];
             speakerCoords[i] = clampSyncCoords([
