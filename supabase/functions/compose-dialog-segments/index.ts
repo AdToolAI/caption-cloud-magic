@@ -4071,6 +4071,21 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} source=${frameCountSource} fps=${dispatchFps} preclip_frames=${preclipPersistedFrameCount || "?"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
+      if (v161UsingPreclipForBbox && frameCountSource === "ceil_total_duration") {
+        (pass as any)._v152HardFail = {
+          reason: "preclip_frame_count_unavailable",
+          errorClass: "v163_preclip_frame_count_unavailable",
+          message:
+            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+            "die exakte Preclip-Framezahl fehlt, daher kann keine sichere bounding_boxes_url erzeugt werden. Credits wurden zurückerstattet.",
+          meta: {
+            v163_exact_framecount_required: true,
+            preclip_duration_sec: preclipPersistedDurSec || null,
+            preclip_fps: dispatchFps,
+            preclip_url_present: !!passPreclipUrl,
+          },
+        };
+      }
 
       // Voiced windows in the dispatched video's time base.
       const v124VoicedWindows: Array<[number, number]> = v161UsingPreclipForBbox
@@ -5558,6 +5573,8 @@ serve(async (req) => {
           null,
 
         preclip_duration_sec: (pass as any).preclip_duration_sec ?? null,
+        preclip_frame_count: (pass as any).preclip_frame_count ?? null,
+        preclip_fps: (pass as any).preclip_fps ?? null,
         preclip_dims: (pass as any).preclip_dims ?? null,
         preclip_crop: (pass as any).preclip_crop ?? null,
         dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
