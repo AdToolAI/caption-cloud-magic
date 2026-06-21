@@ -128,7 +128,8 @@ const PLATE_PROMPT_STRICT = (want: number, ts: number) =>
 /**
  * v154 — Geometry sanity gate. Returns ok=false when detected boxes
  * smell like torso/body boxes instead of head/face boxes.
- *   - any face center_y > 0.55 * plateHeight        → "center_below_midline"
+ *   - any face center_y > 0.65 * plateHeight        → "center_far_below_midline"
+ *   - mean face center_y > 0.45 * plateHeight       → "cluster_below_upper_third"
  *   - mean bbox height > 30 % of plateHeight        → "bbox_too_tall"
  *   - any single bbox height > 40 % of plateHeight  → "bbox_oversized"
  *   - any bbox h/w aspect > 1.8 (tall torso)        → "bbox_aspect_torso_like"
@@ -140,12 +141,21 @@ export function validatePlateFacesGeometry(
 ): { ok: boolean; reason?: string; detail?: string } {
   if (!faces.length) return { ok: false, reason: "empty" };
   const H = Math.max(1, plateHeight);
-  const lowCenters = faces.filter((f) => (f.center?.[1] ?? 0) / H > 0.55);
-  if (lowCenters.length > 0) {
+  const centers = faces.map((f) => f.center?.[1] ?? 0);
+  const farBelow = centers.filter((cy) => cy / H > 0.65);
+  if (farBelow.length > 0) {
     return {
       ok: false,
-      reason: "center_below_midline",
-      detail: lowCenters.map((f) => `cy=${f.center?.[1]}`).join(","),
+      reason: "center_far_below_midline",
+      detail: farBelow.map((cy) => `cy=${cy}`).join(","),
+    };
+  }
+  const meanCy = centers.reduce((a, b) => a + b, 0) / centers.length;
+  if (meanCy / H > 0.45) {
+    return {
+      ok: false,
+      reason: "cluster_below_upper_third",
+      detail: `meanCy=${meanCy.toFixed(0)} H=${H} ratio=${(meanCy / H).toFixed(3)}`,
     };
   }
   const heights = faces.map((f) => Math.max(0, f.bbox[3] - f.bbox[1]));
