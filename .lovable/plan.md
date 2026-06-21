@@ -1,39 +1,66 @@
-## Diagnose: 4-Sprecher-Szene rendert ohne hörbares/sichtbares Lipsync
+## v155 — Rekognition als Primary in der Dialog-Plate-Detection
 
-### Was wir aus den Logs/DB wissen
-- v153.8 lief sauber durch: 4 Passes (Samuel→Matthew→Kailee→Sarah), alle `status=done`, jeweils `bounding_boxes_url`, `sync_mode=cut_off`, `model=sync-3`.
-- Coords je Pass (Plate vermutlich 1280×720):
-  - p0 Samuel (618,421), p1 Matthew (793,377), p2 Kailee (974,379), p3 Sarah (1191,421)
-- Audio je Pass ist eine "tight WAV" mit nur den Worten dieses Sprechers (Segmente:
-  Samuel 0–2.37s, Matthew 2.62–3.64s, Kailee 3.89–6.72s, Sarah 6.97–8.83s).
-- `preclip_crop` ist überall `null` → Compositor fällt auf `faceMask` (radial circle, radius = `0.28 × min(w,h)` ≈ 202 px bei 720 px Achse) zurück.
-- Plate-Probe zeigt **10.125s** echte Länge vs. 9s requested.
+**Korrektur zur vorherigen Annahme:** AWS Rekognition ist bereits voll integriert (`_shared/face-detect-mediapipe.ts`, Secrets `AWS_ACCESS_KEY_ID/SECRET/REGION` vorhanden, SigV4-Signer fertig, im `syncso-preflight` als Snap-Layer aktiv). Es wird nur **in der Dialog-Pipeline noch nicht genutzt** — `compose-dialog-segments` → `plate-face-detect.ts` ruft heute nur Gemini auf. Genau der Pfad, der den 4-Speaker-Bug ausgelöst hat.
 
-### Symptom-Mapping
-- "Char 1+2 reden stumm die ganze Szene" → wir sehen die **Pristine-Plate** (Hailuo lässt alle Köpfe durchgehend mit-mimen). D.h. die Sync.so-Overlays für p0/p1 landen **nicht über deren Mund**.
-- "Char 3+4 öffnen den Mund gar nicht" → wir sehen das **Sync.so-Output** für p2/p3, aber Sync.so hat in dem Frame-Bereich **keinen Mund animiert** (entweder Bbox-Frame außerhalb der echten Plate-Länge, oder coords liegen daneben).
+### Was wirklich zu tun ist
 
-Beide Symptome zeigen auf **falsche Bbox-/Coord-Geometrie** für die Sync.so-Eingabe und/oder für die Compositor-Mask.
+Klein, chirurgisch, kein neuer Secret, keine neue Lib.
 
-### Hypothesen (zu verifizieren, bevor wir patchen)
-1. **Plate-Auflösung ≠ Bbox-Koordinatensystem.** Die Bboxes kommen aus Gemini Vision auf einer 1280×720-Annahme, aber `coords`/`bounding_boxes_url` werden Sync.so im **echten** Pixelraum übergeben (z.B. 1280×720 vs. echtes 1248×704 oder ein anderes seitenverhältnis-bedingtes Padding). Selbst ein 16-px-Drift erklärt p0/p1 (Mund komplett außerhalb der 202-px-Mask).
-2. **Bbox-JSON-frame_count = 243, aber Sync.so behandelt Frames > requested.totalSec (216) als "no face"** → speziell für p2/p3 (deren Sprech-Fenster 3.89–8.83s liegt im Bereich Frame 93–212, eigentlich ok) aber die Pad-Frames 217–243 könnten den ASD-Konfidenz-Score so kippen, dass Sync.so aufgibt.
-3. **Per-Pass tight-WAV vs. absolute Zeitachse-Mismatch.** `audio_tight` setzt `sourceTiming=relative` mit `output_offsets_sec` — wenn das Array leer/falsch ist, spielt der Compositor für jeden Turn den Pass-Output von 0 ab und zeigt für die hintere Hälfte der Szene den unanimierten Tail.
+**1. `_shared/plate-face-detect.ts` — neuer Primary Path**
 
-### Diagnoseschritte (read-only, in build-mode)
-1. **ffprobe** auf Plate + alle 4 `output_url`s — Dauer, fps, w×h, ob audio im Pass-Output enthalten (Sync.so ersetzt Audio).
-2. **1 Frame extrahieren** aus Plate und aus jedem Pass-Output bei Mitten-Timestamp des jeweiligen Speaker-Turns (z.B. p0 @ 1.2s, p1 @ 3.1s, p2 @ 5.3s, p3 @ 7.9s) → vergleichen, ob der Mund des Zielsprechers im Pass-Output bewegt vs. Plate, und ob unsere `coords` über dem korrekten Gesicht liegen.
-3. **Bbox-JSON** für p0 & p3 herunterladen → Anzahl Einträge, Bbox-Bereich, schauen ob alle Frames dieselbe Bbox haben (statisch) oder gar leere Boxen.
-4. **Render-Inputs prüfen**: das letzte `audio_tight.output_offsets_sec` Array in `dialog_shots->passes[*]` lesen und mit Segments-Timing abgleichen.
-5. **Aktuelle Master-URL** in `composer_scenes` lesen und 1 Frame pro Sprecher-Turn rendern, um zu sehen welche Mask-Region greift.
+Vor dem Gemini-Aufruf:
+```ts
+import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
 
-### Was wir dann liefern
-- Ein **kurzer Befund-Report** ("Bbox-System X drift, mask-radius Y reicht nicht für 4-Speaker Layout, …").
-- Konkreter Fix-Vorschlag (z.B. dynamische Mask-Radien aus der Bbox-Größe, oder Bbox-Frames clampen auf `min(requested_total*fps, plate_frames)`, oder coords in echten Plate-Pixelraum reprojizieren) **mit `requires-approval=true`** — wir patchen erst nach deinem Go.
+const rek = await detectFacesMediaPipe({
+  videoUrl: "", durationSec: 0,           // unused
+  plateWidth: W, plateHeight: H,
+  prebuiltFrameUrls: [plateFrameUrl],     // bereits extrahierter Plate-Frame
+});
 
-### Was wir **nicht** anfassen
-- v153.8 Frame-Count-Fix bleibt.
-- Auto-Detect bleibt aus.
-- Sync-3 Doc-Strict Options bleiben unverändert.
+if (rek.ok && rek.faces.length >= expectedCount) {
+  // Map MediaPipeFace → PlateIdentityFace
+  // Wichtig: center = landmarks.mouth (wenn vorhanden) statt bbox-center
+  return { faces: mapped, provider: "aws_rekognition" };
+}
+// sonst → bestehende Gemini-Logik (Flash → Pro + Geometry-Gate)
+```
 
-Sag "Diagnose starten" und ich gehe die Schritte 1-5 im Build-Mode der Reihe nach durch, ohne vorher Code zu ändern.
+**2. Mund-Landmark-Verwendung**
+
+`MediaPipeFace.landmarks.mouth` ist heute schon befüllt aus Rekognition (`Landmarks: MouthLeft/Right/Up/Down`). In `compose-dialog-segments` → wo `speakerCoords[idx] = plateFace.center` gesetzt wird: wenn `provider === "aws_rekognition"` und `landmarks.mouth` vorhanden, nutze den Mund-Punkt statt bbox-center. Dadurch sitzt die Sync.so-faceMask exakt auf dem Mund statt 80–120px darüber.
+
+**3. `plate_face_cache` Spalten**
+```sql
+ALTER TABLE plate_face_cache
+  ADD COLUMN IF NOT EXISTS detection_provider TEXT,
+  ADD COLUMN IF NOT EXISTS mouth_landmarks JSONB;
+```
+Bestehender v154-Cache bleibt valid (provider NULL = gemini-legacy).
+
+**4. Validation**
+- Rekognition-Konfidenz < 90 → Fallback Gemini
+- v154 Geometry-Gate bleibt aktiv (Schutz für den Gemini-Fallback-Pfad)
+- Logs: `v155_rekognition_primary_hit` / `v155_rekognition_fallback_to_gemini` (mit reason)
+- Pro Pass log `v155_mouth_landmark_delta` (Abstand bbox-center ↔ mouth-landmark) — Erfolgs-Telemetrie
+
+**5. Version-Bump** `compose-dialog-segments` → `v155`
+
+### Was NICHT geändert wird
+
+- Keine neuen Secrets (AWS_* sind schon da)
+- Kein neuer SigV4-Code (face-detect-mediapipe.ts ist fertig)
+- ASD `bounding_boxes_url`-Format bleibt
+- sync-3 Doc-Strict, Refund-Logik bleiben
+- v154 Flash→Pro + Geometry-Gate bleibt als Fallback
+
+### Verifikation nach Implementierung
+
+Re-Run Szene `cea5be34-…`:
+- Logs zeigen `v155_rekognition_primary_hit count=4 conf=[95..99]`
+- Frame-Extraction pro Sprecher-Turn zeigt Mask exakt am Mund
+- `v155_mouth_landmark_delta` sollte 60–120px y-shift gegenüber bbox-center zeigen (= Beweis dass es geholfen hat)
+
+### Aufwand
+
+~150 Zeilen Diff in `plate-face-detect.ts` + ~20 Zeilen in `compose-dialog-segments` + Migration. Ein Edge-Function-Deploy. Keine User-Action nötig.
