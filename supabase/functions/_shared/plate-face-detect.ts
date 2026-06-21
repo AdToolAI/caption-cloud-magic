@@ -424,28 +424,49 @@ export async function detectPlateFaces(params: {
       console.warn(`${tag} gemini also returned 0 faces — caller should fall back`);
       return null;
     }
+    faces = normalizedFacesToPlateBoxes(rawFaces, params.plateWidth, params.plateHeight);
 
-    const W = Math.max(1, params.plateWidth);
-    const H = Math.max(1, params.plateHeight);
-    faces = rawFaces
-      .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
-      .map((f) => {
-        const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
-        const x1 = Math.round(nx1 * W);
-        const y1 = Math.round(ny1 * H);
-        const x2 = Math.round(nx2 * W);
-        const y2 = Math.round(ny2 * H);
-        return {
-          bbox: [x1, y1, x2, y2] as [number, number, number, number],
-          center: [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)] as [number, number],
-          slot: 0,
-          confidence: typeof f.confidence === "number" ? f.confidence : undefined,
-        };
-      })
-      .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
-      .sort((a, b) => a.center[0] - b.center[0])
-      .map((f, idx) => ({ ...f, slot: idx }));
+    // v154 — Geometry sanity gate. Flash routinely returns torso/upper-body
+    // bboxes when the scene has multiple closely-spaced figures (the v153.x
+    // 4-speaker bug). If gate fails, retry with Gemini Pro + strict prompt.
+    const gate1 = validatePlateFacesGeometry(faces, params.plateWidth, params.plateHeight);
+    if (!gate1.ok) {
+      console.warn(
+        `${tag} v154_sanity_gate FAIL detector=flash reason=${gate1.reason} detail=${gate1.detail ?? "-"} ` +
+        `— retrying with gemini-2.5-pro + strict prompt`,
+      );
+      const rawPro = await askGeminiForPlateFaces(
+        frameUrl,
+        params.expectedCount,
+        tsHint,
+        { strict: true, model: "google/gemini-2.5-pro" },
+      );
+      if (rawPro.length > 0) {
+        const proFaces = normalizedFacesToPlateBoxes(rawPro, params.plateWidth, params.plateHeight);
+        const gate2 = validatePlateFacesGeometry(proFaces, params.plateWidth, params.plateHeight);
+        if (gate2.ok) {
+          faces = proFaces;
+          detectorUsed = "gemini-2.5-pro-strict";
+          console.log(
+            `${tag} v154_sanity_gate PRO_RECOVERY ok faces=${faces.length} ` +
+            `boxes=${JSON.stringify(faces.map((f) => f.bbox))}`,
+          );
+        } else {
+          console.warn(
+            `${tag} v154_sanity_gate FAIL detector=pro reason=${gate2.reason} detail=${gate2.detail ?? "-"} ` +
+            `— refusing to cache; caller falls back / blocks`,
+          );
+          return null;
+        }
+      } else {
+        console.warn(`${tag} v154_sanity_gate Pro returned 0 faces — refusing to cache`);
+        return null;
+      }
+    } else {
+      detectorUsed = "gemini-2.5-flash";
+    }
   }
+
 
   const W = Math.max(1, params.plateWidth);
   const H = Math.max(1, params.plateHeight);
