@@ -1414,7 +1414,22 @@ serve(async (req) => {
           if (plateFace) unlabeled.splice(unlabeled.indexOf(plateFace), 1);
         }
         if (plateFace) {
-          speakerCoords[idx] = [plateFace.center[0], plateFace.center[1]];
+          // v155 — Prefer the Rekognition-derived mouth landmark over the
+          // bbox center. For tight-crop faces the bbox center sits on the
+          // nose/forehead, ~60–120px above the actual lips, which makes
+          // Sync.so's faceMask miss the mouth entirely (root cause of
+          // "char talks silently" in the 4-speaker repro).
+          const mouth = (plateFace as any).mouth as [number, number] | undefined;
+          if (Array.isArray(mouth) && Number.isFinite(mouth[0]) && Number.isFinite(mouth[1])) {
+            speakerCoords[idx] = [mouth[0], mouth[1]];
+            const dy = mouth[1] - plateFace.center[1];
+            console.log(
+              `[compose-dialog-segments] v155_mouth_landmark_used speaker=${idx} ` +
+              `mouth=[${mouth[0]},${mouth[1]}] bbox_center=[${plateFace.center[0]},${plateFace.center[1]}] dy=${dy}`,
+            );
+          } else {
+            speakerCoords[idx] = [plateFace.center[0], plateFace.center[1]];
+          }
           speakerPlateBboxes[idx] = plateFace.bbox;
           coordSources[idx] = source;
         }
