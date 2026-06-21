@@ -126,7 +126,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v161";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v162";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -3726,10 +3726,18 @@ serve(async (req) => {
           };
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
+          // v162 — persist real preclip fps + duration so the bounding_boxes
+          // JSON array length below matches the actual dispatched video frame
+          // count (Sync.so rejects mismatches with `generation_unknown_error`).
+          (pass as any).preclip_fps = Number(preclipResult.fps ?? 30);
+          (pass as any).preclip_duration_sec = Number(
+            (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
+          );
           (pass as any).preclip_error = null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} dur=${preclipResult.durationSec?.toFixed(2)}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps}`,
           );
+
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           console.warn(
@@ -3744,7 +3752,7 @@ serve(async (req) => {
       }
     } else if (usePassPreclip) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_preclip_reuse cached url=…${(passPreclipUrl ?? "").slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_preclip_reuse cached url=…${(passPreclipUrl ?? "").slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)}`,
       );
     }
 
@@ -4030,13 +4038,24 @@ serve(async (req) => {
         ? Number((pass as any).preclip_start_sec ?? 0)
         : 0;
 
-      const __probedPlateDurSec = await getPlateDurationSecCached(probeUrlForBbox);
+      // v162 — Frame count + fps MUST match the dispatched video exactly.
+      // For preclips: use the persisted preclip_fps (30) and preclip_duration_sec.
+      // For full-plate: probe mvhd as before and fall back to plate ASSUMED_FPS (24).
+      const dispatchFps = v161UsingPreclipForBbox
+        ? Number((pass as any).preclip_fps ?? 30)
+        : ASSUMED_FPS;
+      const preclipPersistedDurSec = v161UsingPreclipForBbox
+        ? Number((pass as any).preclip_duration_sec ?? 0)
+        : 0;
+      const __probedPlateDurSec = v161UsingPreclipForBbox && preclipPersistedDurSec > 0
+        ? preclipPersistedDurSec
+        : await getPlateDurationSecCached(probeUrlForBbox);
       const __probedFrames = __probedPlateDurSec
-        ? Math.max(1, Math.round(__probedPlateDurSec * ASSUMED_FPS))
+        ? Math.max(1, Math.round(__probedPlateDurSec * dispatchFps))
         : null;
-      const frameCount = __probedFrames ?? Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
+      const frameCount = __probedFrames ?? Math.max(1, Math.ceil(totalSec * dispatchFps));
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s plate_fps=${ASSUMED_FPS} probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_bbox_framecount space=${v161UsingPreclipForBbox ? "clip" : "plate"} fps=${dispatchFps} probe_dur=${__probedPlateDurSec ? __probedPlateDurSec.toFixed(3) : "?"} requested_total=${totalSec}s probed_frames=${__probedFrames ?? "?"} used=${frameCount}`,
       );
 
       // Voiced windows in the dispatched video's time base.
@@ -4063,7 +4082,7 @@ serve(async (req) => {
           dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
         }
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
         );
       }
 
@@ -4078,11 +4097,12 @@ serve(async (req) => {
           box: dispatchBox,
           frameCount,
           voicedWindowsSec: v124VoicedWindows,
-          fps: ASSUMED_FPS,
+          fps: dispatchFps,
         });
         usedUrl = up.url;
         nonNullFrames = up.nonNullFrames;
       }
+
 
       // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
       // enthalten. Sonst: deterministischer Downgrade auf coords-pro (kein
@@ -4107,7 +4127,7 @@ serve(async (req) => {
           bounding_boxes_url: usedUrl!,
         };
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v161_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v162_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (retryVariant === "coords-pro-box") {
         // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.

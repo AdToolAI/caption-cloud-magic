@@ -75,9 +75,15 @@ export interface PassPreclipResult {
   crop?: FaceCropRegion;
   /** Window passed to Lambda (preclip plays t=0 → endSec-startSec). */
   durationSec?: number;
+  /** v162 — actual fps the preclip was rendered at. Required by callers
+   *  building Sync.so `bounding_boxes_url` JSON: the array length MUST
+   *  match the dispatched video's real frame count, NOT the legacy 24fps
+   *  plate assumption. Mismatch → opaque `generation_unknown_error`. */
+  fps?: number;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
+
 
 const FPS = 30;
 const POLL_INTERVAL_MS = 2_000;
@@ -290,6 +296,7 @@ export async function renderPassFacePreclip(
       preclipRenderId: renderId,
       crop,
       durationSec: dur,
+        fps: FPS,
     };
   }
 
@@ -311,6 +318,7 @@ export async function renderPassFacePreclip(
         preclipRenderId: renderId,
         crop,
         durationSec: dur,
+        fps: FPS,
       };
     }
     if (status === "failed") {
@@ -321,6 +329,7 @@ export async function renderPassFacePreclip(
         preclipRenderId: renderId,
         crop,
         durationSec: dur,
+        fps: FPS,
       };
     }
   }
@@ -332,5 +341,6 @@ export async function renderPassFacePreclip(
     preclipRenderId: renderId,
     crop,
     durationSec: dur,
+        fps: FPS,
   };
 }
