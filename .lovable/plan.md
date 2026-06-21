@@ -1,72 +1,90 @@
-# Lipsync Pipeline – Complete Post-Mortem & Final Architecture
+# Lipsync Pipeline – Cleanup nach v166 "Holy Grail"
 
-Goal: Document, in one place, the full journey from the first broken lipsync attempts to the now-working v166 "Holy Grail" pipeline, so future agents (and you) never re-attempt dead ends.
+Ziel: Toten Code, tote Admin-Tools und tote DB-Objekte aus den Failed-Eras (v41–v165) entfernen, ohne die v166-Pipeline anzufassen.
 
-## Deliverable
-A single new memory doc:
+## Was bleibt unangetastet (Frozen Core)
 
-- `mem/architecture/lipsync/HOLY-GRAIL-v166-complete-pipeline.md`
+Diese Dateien/Tabellen sind v166-aktiv und werden NICHT angefasst:
 
-Plus index entry in `mem/index.md` under the lipsync section, replacing the now-superseded v161–v165 bullet points with one canonical pointer.
+- Edge Functions: `compose-dialog-scene`, `compose-dialog-segments`, `sync-so-webhook`, `poll-dialog-shots`, `render-sync-segments-audio-mux`, `lipsync-watchdog`, `cancel-dialog-lipsync`, `reset-lipsync-scene`
+- `_shared/`: `pass-face-preclip.ts`, `plate-face-identity.ts`, `dialog-lock.ts`, `dialog-speakers.ts`, `rehostPlate.ts`, `lipsync-fail.ts`, `asd-strategy.ts`, `face-frame-extract.ts`
+- Templates: `src/remotion/templates/DialogStitchVideo.tsx`
+- Tabellen: `dialog_dispatch_locks`, `syncso_dispatch_log`, `syncso_inflight_jobs`, `frame_face_cache`, `scene_anchor_cache`
 
-No code changes. Documentation only.
+## A) Edge Functions löschen
 
-## Document structure
+Tote v124-Replay/Preflight/Diagnostik-Tools (v166 ist webhook-driven, kein Replay mehr nötig):
 
-### 1. Executive Summary
-- One paragraph: what works now (v166), why it works, key invariants.
+- `compose-twoshot-audio` – legacy 2-shot Vorgänger
+- `lip-sync-video` – standalone v1
+- `lipsync-diagnostic` – Diagnose-Tool aus v131
+- `syncso-preflight` – Preflight-Probe
+- `syncso-replay` + `syncso-replay-lab` + `syncso-replay-webhook` – Replay-Pipeline
+- `syncso-support-bundle` – Forensics-Exporter
+- `validate-frame-face` – Frame-Face-Probe
+- `normalize-master-clip` – alter Master-Normalizer
 
-### 2. Timeline of Failed Approaches (grouped, not version-by-version)
-Five eras, each with: *what we tried → why it failed → lesson*.
+→ inkl. `supabase--delete_edge_functions` und `config.toml`-Einträge entfernen.
 
-1. **Segments-era (v41–v70)** – official Sync.so `segments` payload, multi-speaker ASD experiments, dead-segment blocks, neighbor-aware preclips. Failed because Sync.so segments are not frame-accurate for >2 speakers and we kept hitting `provider_unknown_error`.
-2. **Preclip / single-face era (v68–v123)** – per-speaker single-face preclips with bounding-box coords. Failed due to identity drift, stale payloads, plate-gate collisions, and circular fallback loops.
-3. **Doc-strict / sync-3 era (v124–v131)** – locked the payload to documented options only. Stabilised provider errors but still had wrong-mouth animations on multi-character scenes.
-4. **Parallel passes & tight-window era (v93–v95, v38–v40, v149)** – tried parallelising and trimming audio windows. Cut latency but exposed speaker-to-face mapping bugs.
-5. **Today's iterations (v161–v165)** – bbox-url-pro JSON, silent-face overlays, viewport-translate crop. Caused ghosting/morphs and 12:30 render times. Two root causes finally surfaced:
-   - speaker index ≠ visual slot (script order was blindly used)
-   - silent-face overlays double-rendered the master plate
+## B) `_shared/` Helpers löschen
 
-### 3. The Breakthrough (v166)
-Three decisive fixes:
+Nur löschen, wenn nach (A) keine aktive Function mehr importiert:
 
-a. **Anchor-Identity Slot Bridge** in `compose-dialog-segments`: when `plate_identity.faces[]` has no `characterId`, copy it in from `faceMap` by `slot`/`slotIndex` so script order maps to the correct visual face.
-b. **Hard-fail instead of guess**: removed the `unlabeled.find(f => f.slot === idx)` fallback. If a speaker can't be resolved to a visual face, the pass aborts and refunds.
-c. **Removed silent-face overlays** in both `render-sync-segments-audio-mux` and `DialogStitchVideo.tsx`. Sync.so already handles non-speaking faces via `null` bbox entries; the Remotion overlay was a redundant source of ghosting.
+- `face-count.ts`, `face-crop.ts`, `face-detect-mediapipe.ts` – pre-Rekognition Detektion
+- `plate-face-detect.ts` – ersetzt durch `plate-face-identity.ts`
+- `syncso-face-gate.ts` – legacy Gate
+- `syncso-preflight.ts` – Helper für gelöschte Function
+- `twoshot-face-map.ts` – legacy 2-shot Map
+- `dialogPassTransition.ts` – Transition-Helper, in v166 Pipeline unused
 
-### 4. Final End-to-End Pipeline (v166)
-Step-by-step with file references:
+Verifikation: nach Löschung `grep -rl <name> supabase/functions` muss leer sein.
 
-1. User triggers cinematic-sync → `compose-dialog-scene`
-2. Scene-level lock via `try_acquire_dialog_lock`
-3. Plate generation (Hailuo i2v) + anchor portrait extraction
-4. Per-turn dispatch loop in `compose-dialog-segments`:
-   - resolve speaker → `character_id` via faceMap (Anchor-Identity Slot Bridge)
-   - call `_shared/pass-face-preclip.ts` to produce frame-exact bbox JSON
-   - POST to Sync.so `sync-3` with `active_speaker_detection: { bounding_boxes_url, auto_detect: false }`
-5. Sync.so webhook (`sync-so-webhook`) patches `dialog_shots`, triggers `poll-dialog-shots`
-6. `render-sync-segments-audio-mux` ffmpeg-muxes the per-turn lipsync clips with original audio (no silent overlays anymore)
-7. `DialogStitchVideo.tsx` (Remotion/Lambda) stitches turns into the final clip
-8. Idempotent refund path on any failure (per FROZEN-INVARIANTS)
+## C) Frontend aufräumen
 
-Include a Mermaid diagram of the flow under `/mnt/documents/lipsync-v166-pipeline.mmd`.
+- Löschen:
+  - `src/pages/admin/LipsyncDiagnostic.tsx`
+  - `src/components/admin/SyncsoForensicsSheet.tsx`
+  - `src/lib/syncReplayClassify.ts`
+- Anpassen (Imports/Verwendungen entfernen, sonst unverändert):
+  - `src/App.tsx` – lazy-import + Route `LipsyncDiagnostic` entfernen
+  - `src/components/video-composer/SceneInlinePlayer.tsx` – `SyncsoForensicsSheet` Import + Render entfernen (Sheet ist nur Debug-UI)
 
-### 5. Frozen Invariants (do not regress)
-- sync-3 only, doc-strict options
-- bbox-url-pro is the single source of truth (no `auto_detect: true`)
-- Speaker→face mapping MUST go through `character_id`, never raw script index
-- No silent-face overlays in Remotion
-- Hard-fail + refund > silent wrong animation
-- Per-scene lock; webhook-driven, not polling-driven dispatch
+Bleibt erhalten (v166-aktiv): `useTwoShotAutoTrigger`, `useResetLipSync`, `usePipelineProgress`, `PipelineProgressBar`.
 
-### 6. Index Cleanup
-In `mem/index.md`:
-- Add `[Holy Grail Lipsync v166](mem://architecture/lipsync/HOLY-GRAIL-v166-complete-pipeline)` to the lipsync section
-- Mark v161–v165 docs as "superseded by v166" in this new doc's appendix (do not delete them — historical record)
+## D) DB-Cleanup (separate Migration zur Genehmigung)
 
-## Out of scope
-- No code changes
-- No new migrations
-- No edge function redeploys
+Drop nur Tabellen ohne Live-Code-Referenz nach (A)+(B)+(C):
 
-After you approve, I'll switch to build mode and write only those two files (doc + index update) plus the Mermaid artifact.
+```sql
+DROP TABLE IF EXISTS public.syncso_replay_log CASCADE;
+DROP TABLE IF EXISTS public.syncso_tuning_hints CASCADE;
+DROP TABLE IF EXISTS public.lipsync_diagnostic_runs CASCADE;
+DROP TABLE IF EXISTS public.plate_face_cache CASCADE;
+DROP TABLE IF EXISTS public.normalized_master_cache CASCADE;
+```
+
+Außerdem: tote Cron-Jobs aus `cron.job` prüfen und unschedulen (z. B. `syncso-replay-*`, `normalize-master-cron`, falls vorhanden). Liste wird vor der Migration via `supabase--read_query` auf `cron.job` ermittelt und in derselben Migration mit `cron.unschedule(...)` entfernt.
+
+`types.ts` regeneriert sich nach der Migration automatisch.
+
+## E) Verifikation
+
+Nach jedem Schritt:
+
+1. `grep -rl <gelöschter-Name> src supabase` → muss leer sein (außer Migrations-Historie).
+2. Build muss grün bleiben (läuft automatisch).
+3. v166-Smoke: `compose-dialog-scene` Pfad nicht angefasst → keine Funktionsänderung erwartet.
+4. Migrations-Historie (`supabase/migrations/2026052*…2026062*…`) bleibt unverändert – nur neue Migration für DROPs.
+
+## Out of Scope
+
+- Keine Änderung an v166-Logik, sync-3-Optionen, Bbox-JSON, FaceMap, Refund-Pfad.
+- Keine Änderung an Remotion-Bundle / Lambda.
+- Keine Anpassung der `HOLY-GRAIL-v166`-Memory (Cleanup wird dort nur als Appendix-Notiz nachgetragen).
+
+## Reihenfolge der Ausführung
+
+1. Frontend-Imports entfernen (C – sonst Build bricht nach Function-Delete).
+2. `_shared/` Helpers + Edge Functions löschen (A + B) inkl. `supabase--delete_edge_functions`.
+3. DB-Migration einreichen (D) – du genehmigst sie separat.
+4. Memory-Index: Appendix-Bullet "v166 Cleanup – Datenmüll entfernt" in `mem/architecture/lipsync/HOLY-GRAIL-v166-complete-pipeline.md` ergänzen.
