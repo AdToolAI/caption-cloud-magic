@@ -1443,6 +1443,46 @@ serve(async (req) => {
       }
     }
     if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
+      // v166 — Anchor-Identity Slot Bridge.
+      // If the plate-identity step could not label faces (Gemini probe failed
+      // or resolvedCount=0), but the anchor faceMap KNOWS the characterId of
+      // every visual slot (sorted L→R), bridge anchor_slot → plate_slot by
+      // position. Both detectors sort faces left→right; for N detected faces
+      // matching N anchor slots, slot i on plate IS slot i on anchor.
+      // Without this bridge, the legacy code falls back to
+      // `unlabeled.find(f => f.slot === idx)` where `idx` is the SCRIPT order,
+      // which has no relation to visual position → wrong speaker → wrong face
+      // animated. (DB-confirmed root cause of "Sprecher 3 wurde von Sprecher 1
+      // gesprochen" in scene 0b0b7f78… on 2026-06-21.)
+      const anchorFaces = Array.isArray((faceMap as any)?.faces)
+        ? ((faceMap as any).faces as Array<{ slotIndex?: number; characterId?: string | null }>)
+        : [];
+      const anchorHasIdentities =
+        anchorFaces.length > 0 &&
+        anchorFaces.every((f) => typeof f?.characterId === "string" && (f.characterId as string).length > 0);
+      if (
+        anchorHasIdentities &&
+        anchorFaces.length === plateIdentityMap.faces.length &&
+        plateIdentityMap.faces.some((f) => !f.characterId)
+      ) {
+        const platesByVisual = [...plateIdentityMap.faces].sort((a, b) => a.slot - b.slot);
+        const anchorByVisual = [...anchorFaces].sort(
+          (a, b) => Number(a.slotIndex ?? 0) - Number(b.slotIndex ?? 0),
+        );
+        platesByVisual.forEach((pf, visualIdx) => {
+          if (!pf.characterId) {
+            const cid = anchorByVisual[visualIdx]?.characterId ?? null;
+            if (cid) {
+              pf.characterId = String(cid);
+              (pf as any).matchConfidence = 0.85;
+            }
+          }
+        });
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v166_anchor_identity_slot_bridge bridged=${plateIdentityMap.faces.filter((f) => f.characterId).length}/${plateIdentityMap.faces.length} anchor_ids=${anchorByVisual.map((f) => f.characterId).join(",")}`,
+        );
+      }
+
       const byId = new Map<string, PlateIdentityFace>();
       for (const f of plateIdentityMap.faces) {
         if (f.characterId) byId.set(String(f.characterId).toLowerCase(), f);
@@ -1462,11 +1502,18 @@ serve(async (req) => {
       speakers.forEach((sp, idx) => {
         const cid = sp.character_id ? String(sp.character_id).toLowerCase() : "";
         let plateFace: PlateIdentityFace | undefined = cid ? byId.get(cid) : undefined;
-        let source = "plate-identity";
+        let source = cid && plateFace ? "plate-identity+v166-anchor-bridge" : "plate-identity";
         if (!plateFace && unlabeled.length > 0) {
-          plateFace = unlabeled.find((f) => f.slot === idx) ?? unlabeled[0];
-          source = "plate-slot-fallback";
-          if (plateFace) unlabeled.splice(unlabeled.indexOf(plateFace), 1);
+          // v166 — DO NOT fall back to `unlabeled.find(f => f.slot === idx)`.
+          // `idx` is the script order; `slot` is the L→R visual position; they
+          // do not correlate. If we reach here, identity could not be resolved
+          // for this speaker — leave plateFace undefined so the v153.5 hard-
+          // fail refunds instead of silently animating the wrong face.
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v166_no_identity_for_speaker ` +
+            `speaker=${sp.speaker ?? `idx${idx}`} character_id=${cid || "?"} ` +
+            `unlabeled_plate_faces=${unlabeled.length} — refusing slot-index fallback`,
+          );
         }
         if (plateFace) {
           // v155 — Prefer the Rekognition-derived mouth landmark over the
