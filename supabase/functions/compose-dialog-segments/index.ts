@@ -1314,6 +1314,11 @@ serve(async (req) => {
     // for every speaker count ≥ 1.
     const speakerPlateBboxes: Array<[number, number, number, number] | null> =
       new Array(speakers.length).fill(null);
+    // v157 — Pro-Sprecher Mund-Landmark (AWS Rekognition). Wenn vorhanden,
+    // baut der Dispatcher eine enge Mund-zentrierte Sync.so-Box statt der
+    // ganzen Gesichts-Bbox → eliminiert "Animorph"-Morphs auf Hals/Schulter.
+    const speakerPlateMouths: Array<[number, number] | null> =
+      new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
     let plateHydrationSource: "persisted" | "live" | "missing" = "missing";
     const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes)
