@@ -254,6 +254,51 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
   );
 };
 
+/** v164: SilentFaceFreeze — renders the master plate video frozen at frame 0,
+ *  cropped to a non-speaking face bbox (source-master pixel space, already
+ *  mapped to composition space by caller). Soft circular mask matches the
+ *  CroppedOverlay seam so the frozen face blends with the live plate around
+ *  it. Used to suppress AI-plate mouth motion on non-active speakers during
+ *  the active speaker's turn window. */
+interface SilentFaceFreezeProps {
+  src: string;
+  left: number;
+  top: number;
+  size: number;
+}
+const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({ src, left, top, size }) => {
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,0) 95%)';
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          width: size,
+          height: size,
+          WebkitMaskImage: mask,
+          maskImage: mask,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          overflow: 'hidden',
+        }}
+      >
+        <Freeze frame={0}>
+          <Video
+            src={src}
+            muted
+            playbackRate={1}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </Freeze>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+
+
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
   masterImageUrl,
