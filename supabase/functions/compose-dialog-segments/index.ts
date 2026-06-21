@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v157";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v158";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -1357,6 +1357,18 @@ serve(async (req) => {
       }
     }
     if (persistedGateOk && persistedBboxes.length >= speakers.length) {
+      // v158 — also rehydrate mouth landmarks from persisted faces[] or the
+      // canonical `mouths[]` array on the snapshot. Without this, advance
+      // passes (Pass 2..N) lose the mouth anchor and the dispatcher falls
+      // back to bbox-anchor → Sync.so faceMask misses the lips → morph on
+      // the wrong region.
+      const persistedMouths: any[] = Array.isArray(persistedPlateIdentity?.mouths)
+        ? persistedPlateIdentity.mouths
+        : [];
+      const persistedFaces: any[] = Array.isArray(persistedPlateIdentity?.faces)
+        ? persistedPlateIdentity.faces
+        : [];
+      let mouthHydrated = 0;
       for (let i = 0; i < speakers.length; i++) {
         const b = persistedBboxes[i];
         if (Array.isArray(b) && b.length === 4 && b.every((n: unknown) => Number.isFinite(Number(n)))) {
@@ -1366,13 +1378,46 @@ serve(async (req) => {
             Math.round(Number(b[2])),
             Math.round(Number(b[3])),
           ];
-          const cx = Math.round((speakerPlateBboxes[i]![0] + speakerPlateBboxes[i]![2]) / 2);
-          const cy = Math.round((speakerPlateBboxes[i]![1] + speakerPlateBboxes[i]![3]) / 2);
-          speakerCoords[i] = clampSyncCoords([cx, cy]);
-          coordSources[i] = "plate-persisted";
+          // Try to find a persisted face whose bbox matches this speaker
+          // (by slot index first, then by bbox center proximity).
+          const bx1 = speakerPlateBboxes[i]![0];
+          const by1 = speakerPlateBboxes[i]![1];
+          const bx2 = speakerPlateBboxes[i]![2];
+          const by2 = speakerPlateBboxes[i]![3];
+          const targetCx = Math.round((bx1 + bx2) / 2);
+          const targetCy = Math.round((by1 + by2) / 2);
+          let f =
+            persistedFaces.find((pf: any) => Number(pf?.slot) === i) ??
+            persistedFaces.find((pf: any) => {
+              if (!Array.isArray(pf?.bbox) || pf.bbox.length !== 4) return false;
+              const cx = (Number(pf.bbox[0]) + Number(pf.bbox[2])) / 2;
+              const cy = (Number(pf.bbox[1]) + Number(pf.bbox[3])) / 2;
+              return Math.hypot(cx - targetCx, cy - targetCy) < 50;
+            });
+          // Canonical source: snapshot.mouths[i]. Fallback to faces[].mouth.
+          const snapM = persistedMouths[i];
+          const m =
+            (Array.isArray(snapM) && snapM.length === 2 ? snapM : null) ??
+            (f && Array.isArray((f as any).mouth) ? (f as any).mouth : null);
+          if (m && Number.isFinite(Number(m[0])) && Number.isFinite(Number(m[1]))) {
+            speakerPlateMouths[i] = [Math.round(Number(m[0])), Math.round(Number(m[1]))];
+            speakerCoords[i] = clampSyncCoords([
+              Math.round(Number(m[0])),
+              Math.round(Number(m[1])),
+            ]);
+            coordSources[i] = "plate-persisted-mouth";
+            mouthHydrated++;
+          } else {
+            speakerCoords[i] = clampSyncCoords([targetCx, targetCy]);
+            coordSources[i] = "plate-persisted";
+          }
         }
       }
       plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "persisted" : "missing";
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v158_persisted_mouth_hydration ` +
+        `mouths=${mouthHydrated}/${speakers.length} bboxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length}`,
+      );
     }
     if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
       try {
@@ -1456,10 +1501,16 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
       );
     }
+    // v158 — Persist a per-speaker mouth array directly on the snapshot so
+    // advance/retry passes can rehydrate Sync.so face-target boxes without
+    // re-running plate-face detection. faces[].mouth still exists for the
+    // diagnostic path, but the parallel `mouths[i]` array is the canonical
+    // source on the persisted hydration branch above.
     const v153PlateIdentitySnapshot = {
       version: "v153.2" as const,
       dims: plateDims,
       bboxes: speakerPlateBboxes,
+      mouths: speakerPlateMouths,
       faces: plateIdentityMap?.faces ?? persistedPlateIdentity?.faces ?? [],
       resolvedCount: plateIdentityMap?.resolvedCount ?? persistedPlateIdentity?.resolvedCount ?? 0,
       cached: plateIdentityMap?.cached ?? persistedPlateIdentity?.cached ?? false,
@@ -1467,7 +1518,7 @@ serve(async (req) => {
       hydratedAt: new Date().toISOString(),
     };
     console.warn(
-      `[compose-dialog-segments] scene=${sceneId} v153.2_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
+      `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
     );
 
     // ── v129.20 — Single-speaker no-face hard refund ─────────────────────
@@ -3809,12 +3860,16 @@ serve(async (req) => {
           const y2 = Math.min(dims.height, Math.round(anchorY + boxH / 2));
           if (x2 > x1 + 4 && y2 > y1 + 4) {
             box = [x1, y1, x2, y2];
-            bboxSource = useMouth ? "plate-native:v157-mouth" : "plate-native:v157-bbox-anchor";
+            bboxSource = useMouth ? "plate-native:v158-mouth" : "plate-native:v158-bbox-anchor";
+            const plateArea = Math.max(1, dims.width * dims.height);
+            const boxArea = Math.max(0, (x2 - x1) * (y2 - y1));
+            const areaPct = (boxArea / plateArea) * 100;
             console.log(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v157_tight_mouth_box ` +
-              `speaker=${pass.speaker_name} mouth_used=${useMouth} aspect_in=${aspectIn.toFixed(2)} ` +
-              `aspect_out=${(boxH / boxW).toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
-              `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}]`,
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v158_sync3_face_target_box ` +
+              `speaker=${pass.speaker_name} mouth_used=${useMouth} hydration=${plateHydrationSource} ` +
+              `aspect_in=${aspectIn.toFixed(2)} aspect_out=${(boxH / boxW).toFixed(2)} ` +
+              `area_pct=${areaPct.toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
+              `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}] source=${bboxSource}`,
             );
           }
         }
