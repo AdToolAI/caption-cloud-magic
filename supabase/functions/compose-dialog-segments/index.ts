@@ -3788,20 +3788,13 @@ serve(async (req) => {
     //     (v63). The master VO may outrun the plate; loop keeps the locked
     //     plate playing for the full audio duration so no freeze.
     const payloadSyncMode = tightAudioInfo ? "cut_off" : "loop";
+    // v160 — sync-3 doc-strict from construction: only send public-schema
+    // options Sync.so accepts. The sanitizer remains as a safety net, but we
+    // no longer create `temperature` / `occlusion_detection_enabled` and rely
+    // on stripping them later.
     const syncOptions: Record<string, unknown> = {
       sync_mode: payloadSyncMode,
-      // v100 — back to Sync.so doc default (0.5, range 0–1). v99's hard-coded
-      // 1.0 combined with static per-frame bounding_boxes on a single-face
-      // preclip reproducibly triggered `provider_unknown_error` on every
-      // pass of multi-speaker scenes (DB-verified for scene 720fd0b1…).
-      temperature: 0.5,
     };
-    // ── v153.6 — Preclip-Branch entfernt ────────────────────────────────
-    // Der gesamte `if (usePassPreclip)` Block (v129.1 payload-contract +
-    // v130 ASD-Strategy + v1291_preclip_sync3 Logs) ist tot, weil v153 nur
-    // noch über bbox-url-pro dispatcht. occlusion_detection wird global
-    // aktiviert, da kein 512×512 Crop-Pfad mehr existiert.
-    syncOptions.occlusion_detection_enabled = true;
 
     if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
 
@@ -3839,15 +3832,11 @@ serve(async (req) => {
           const w = Math.max(1, bx2 - bx1);
           const h = Math.max(1, by2 - by1);
           const aspectIn = h / w;
-          // v159 — Mund-zentrierte Tight-Box. Multi-Speaker (N>=2) ist
-          // fail-closed: ohne Rekognition-Mund-Landmark wird NICHT mehr
-          // mit einem Bbox-Pseudo-Anker dispatcht (das hat in v156–v158
-          // alle 4 Sprecher morphen lassen). Stattdessen meldet der Block
-          // die fehlende Mund-Anker-Quelle und wird unten (v152-Pfad)
-          // hart abgebrochen + refunded.
-          // Box-Geometrie v159: 70 % Face-Breite × 45 % davon in Höhe
-          // (vorher 90 % × 55 %). Kompakte Lippenregion verhindert, dass
-          // Sync.so benachbarte Gesichter berührt.
+          // v160 — Sync.so `bounding_boxes(_url)` wants a real face detection
+          // box. v159's mouth-centered mini box (0.14% area in production)
+          // was below our own sanity floor and is not the API contract. Keep
+          // the mouth landmark as the fail-closed identity anchor, but dispatch
+          // the tight face/head bbox itself so sync-3 has enough facial context.
           const useMouth = Array.isArray(platePassMouth)
             && Number.isFinite(platePassMouth[0])
             && Number.isFinite(platePassMouth[1]);
@@ -3862,25 +3851,24 @@ serve(async (req) => {
             // pre-dispatch gate refunds instead of sending a bad target.
           } else {
             const anchorX = useMouth ? platePassMouth![0] : Math.round((bx1 + bx2) / 2);
-            const anchorY = useMouth
-              ? platePassMouth![1]
-              : Math.round(by1 + h * 0.66);
-            const boxW = Math.round(w * 0.70);
-            const boxH = Math.round(boxW * 0.45);
-            const x1 = Math.max(0, Math.round(anchorX - boxW / 2));
-            const y1 = Math.max(0, Math.round(anchorY - boxH / 2));
-            const x2 = Math.min(dims.width, Math.round(anchorX + boxW / 2));
-            const y2 = Math.min(dims.height, Math.round(anchorY + boxH / 2));
+            const anchorY = useMouth ? platePassMouth![1] : Math.round(by1 + h * 0.66);
+            const padX = Math.max(2, Math.round(w * 0.08));
+            const padTop = Math.max(2, Math.round(h * 0.06));
+            const padBottom = Math.max(2, Math.round(h * 0.04));
+            const x1 = Math.max(0, Math.round(bx1 - padX));
+            const y1 = Math.max(0, Math.round(by1 - padTop));
+            const x2 = Math.min(dims.width, Math.round(bx2 + padX));
+            const y2 = Math.min(dims.height, Math.round(by2 + padBottom));
             if (x2 > x1 + 4 && y2 > y1 + 4) {
               box = [x1, y1, x2, y2];
-              bboxSource = useMouth ? "plate-native:v159-mouth" : "plate-native:v159-bbox-anchor-single";
+              bboxSource = useMouth ? "plate-native:v160-face-mouth-verified" : "plate-native:v160-face-single";
               const plateArea = Math.max(1, dims.width * dims.height);
               const boxArea = Math.max(0, (x2 - x1) * (y2 - y1));
               const areaPct = (boxArea / plateArea) * 100;
               console.log(
-                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v159_sync3_mouth_box ` +
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v160_sync3_face_box ` +
                 `speaker=${pass.speaker_name} mouth_used=${useMouth} hydration=${plateHydrationSource} ` +
-                `aspect_in=${aspectIn.toFixed(2)} aspect_out=${(boxH / boxW).toFixed(2)} ` +
+                `aspect_in=${aspectIn.toFixed(2)} aspect_out=${((y2 - y1) / Math.max(1, x2 - x1)).toFixed(2)} ` +
                 `area_pct=${areaPct.toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
                 `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}] source=${bboxSource} ` +
                 `speakers=${speakers.length}`,
