@@ -123,7 +123,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v158";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v159";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -3838,39 +3838,53 @@ serve(async (req) => {
           const w = Math.max(1, bx2 - bx1);
           const h = Math.max(1, by2 - by1);
           const aspectIn = h / w;
-          // v157 — Mund-zentrierte Tight-Box statt aufgeblähter Face/Torso-Bbox.
-          // Vorher: bbox ± 15 % Pad → auf bereits torso-lastigen AWS-Boxen
-          // landete der Sync.so-faceMask in Hals/Schultern und morphed dort.
-          // Jetzt: schmale Lippenregion (90 % der Face-Breite × 55 % davon
-          // in Höhe), zentriert auf das Rekognition-Mund-Landmark. Ohne Mund
-          // wird der obere ⅔-Mittelpunkt der Bbox (Augen/Nase) als Anker
-          // genommen — immer noch besser als alter Bbox-Center.
+          // v159 — Mund-zentrierte Tight-Box. Multi-Speaker (N>=2) ist
+          // fail-closed: ohne Rekognition-Mund-Landmark wird NICHT mehr
+          // mit einem Bbox-Pseudo-Anker dispatcht (das hat in v156–v158
+          // alle 4 Sprecher morphen lassen). Stattdessen meldet der Block
+          // die fehlende Mund-Anker-Quelle und wird unten (v152-Pfad)
+          // hart abgebrochen + refunded.
+          // Box-Geometrie v159: 70 % Face-Breite × 45 % davon in Höhe
+          // (vorher 90 % × 55 %). Kompakte Lippenregion verhindert, dass
+          // Sync.so benachbarte Gesichter berührt.
           const useMouth = Array.isArray(platePassMouth)
             && Number.isFinite(platePassMouth[0])
             && Number.isFinite(platePassMouth[1]);
-          const anchorX = useMouth ? platePassMouth![0] : Math.round((bx1 + bx2) / 2);
-          const anchorY = useMouth
-            ? platePassMouth![1]
-            : Math.round(by1 + h * 0.66); // ohne Mund: unteres Drittel ≈ Mund
-          const boxW = Math.round(w * 0.90);
-          const boxH = Math.round(boxW * 0.55);
-          const x1 = Math.max(0, Math.round(anchorX - boxW / 2));
-          const y1 = Math.max(0, Math.round(anchorY - boxH / 2));
-          const x2 = Math.min(dims.width, Math.round(anchorX + boxW / 2));
-          const y2 = Math.min(dims.height, Math.round(anchorY + boxH / 2));
-          if (x2 > x1 + 4 && y2 > y1 + 4) {
-            box = [x1, y1, x2, y2];
-            bboxSource = useMouth ? "plate-native:v158-mouth" : "plate-native:v158-bbox-anchor";
-            const plateArea = Math.max(1, dims.width * dims.height);
-            const boxArea = Math.max(0, (x2 - x1) * (y2 - y1));
-            const areaPct = (boxArea / plateArea) * 100;
-            console.log(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v158_sync3_face_target_box ` +
-              `speaker=${pass.speaker_name} mouth_used=${useMouth} hydration=${plateHydrationSource} ` +
-              `aspect_in=${aspectIn.toFixed(2)} aspect_out=${(boxH / boxW).toFixed(2)} ` +
-              `area_pct=${areaPct.toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
-              `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}] source=${bboxSource}`,
+          const multiSpeakerNoMouth = speakers.length >= 2 && !useMouth;
+          if (multiSpeakerNoMouth) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v159_mouth_missing_multi_speaker ` +
+              `speaker=${pass.speaker_name} hydration=${plateHydrationSource} bbox=${JSON.stringify(platePassBox)} — ` +
+              `refusing to dispatch without mouth landmark (would morph)`,
             );
+            // Hand off to v152 hard-fail path below: leave box=null so the
+            // pre-dispatch gate refunds instead of sending a bad target.
+          } else {
+            const anchorX = useMouth ? platePassMouth![0] : Math.round((bx1 + bx2) / 2);
+            const anchorY = useMouth
+              ? platePassMouth![1]
+              : Math.round(by1 + h * 0.66);
+            const boxW = Math.round(w * 0.70);
+            const boxH = Math.round(boxW * 0.45);
+            const x1 = Math.max(0, Math.round(anchorX - boxW / 2));
+            const y1 = Math.max(0, Math.round(anchorY - boxH / 2));
+            const x2 = Math.min(dims.width, Math.round(anchorX + boxW / 2));
+            const y2 = Math.min(dims.height, Math.round(anchorY + boxH / 2));
+            if (x2 > x1 + 4 && y2 > y1 + 4) {
+              box = [x1, y1, x2, y2];
+              bboxSource = useMouth ? "plate-native:v159-mouth" : "plate-native:v159-bbox-anchor-single";
+              const plateArea = Math.max(1, dims.width * dims.height);
+              const boxArea = Math.max(0, (x2 - x1) * (y2 - y1));
+              const areaPct = (boxArea / plateArea) * 100;
+              console.log(
+                `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v159_sync3_mouth_box ` +
+                `speaker=${pass.speaker_name} mouth_used=${useMouth} hydration=${plateHydrationSource} ` +
+                `aspect_in=${aspectIn.toFixed(2)} aspect_out=${(boxH / boxW).toFixed(2)} ` +
+                `area_pct=${areaPct.toFixed(2)} in=${JSON.stringify(platePassBox)} ` +
+                `out=${JSON.stringify(box)} anchor=[${anchorX},${anchorY}] source=${bboxSource} ` +
+                `speakers=${speakers.length}`,
+              );
+            }
           }
         }
       }
