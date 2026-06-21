@@ -1,66 +1,95 @@
-## v155 — Rekognition als Primary in der Dialog-Plate-Detection
+# v156 — Anchor-First Detection: AWS Rekognition direkt, kein Frame-Extract
 
-**Korrektur zur vorherigen Annahme:** AWS Rekognition ist bereits voll integriert (`_shared/face-detect-mediapipe.ts`, Secrets `AWS_ACCESS_KEY_ID/SECRET/REGION` vorhanden, SigV4-Signer fertig, im `syncso-preflight` als Snap-Layer aktiv). Es wird nur **in der Dialog-Pipeline noch nicht genutzt** — `compose-dialog-segments` → `plate-face-detect.ts` ruft heute nur Gemini auf. Genau der Pfad, der den 4-Speaker-Bug ausgelöst hat.
+## Diagnose
 
-### Was wirklich zu tun ist
-
-Klein, chirurgisch, kein neuer Secret, keine neue Lib.
-
-**1. `_shared/plate-face-detect.ts` — neuer Primary Path**
-
-Vor dem Gemini-Aufruf:
-```ts
-import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
-
-const rek = await detectFacesMediaPipe({
-  videoUrl: "", durationSec: 0,           // unused
-  plateWidth: W, plateHeight: H,
-  prebuiltFrameUrls: [plateFrameUrl],     // bereits extrahierter Plate-Frame
-});
-
-if (rek.ok && rek.faces.length >= expectedCount) {
-  // Map MediaPipeFace → PlateIdentityFace
-  // Wichtig: center = landmarks.mouth (wenn vorhanden) statt bbox-center
-  return { faces: mapped, provider: "aws_rekognition" };
-}
-// sonst → bestehende Gemini-Logik (Flash → Pro + Geometry-Gate)
+Live-Logs (Scene `3c1e8270…`):
+```
+v155_frame_extract replicate threw: POST .../lucataco/ffmpeg-extract-frame/predictions → 404
+v155_rekognition_fallback_to_gemini reason=no_prebuilt_frame_url
 ```
 
-**2. Mund-Landmark-Verwendung**
+→ Rekognition wird nie erreicht → Gemini halluziniert bei 4 Sprechern → v154-Gate killt → „Lip-Sync abgebrochen".
 
-`MediaPipeFace.landmarks.mouth` ist heute schon befüllt aus Rekognition (`Landmarks: MouthLeft/Right/Up/Down`). In `compose-dialog-segments` → wo `speakerCoords[idx] = plateFace.center` gesetzt wird: wenn `provider === "aws_rekognition"` und `landmarks.mouth` vorhanden, nutze den Mund-Punkt statt bbox-center. Dadurch sitzt die Sync.so-faceMask exakt auf dem Mund statt 80–120px darüber.
+Root Cause auf Code-Ebene: `replicate.run("lucataco/...")` trifft den Official-Endpoint, lucataco ist Community → 404. Reparieren würde funktionieren — aber Replicate als Frame-Extractor ist ein Workaround, kein Design.
 
-**3. `plate_face_cache` Spalten**
+## Strategie: Anchor-First
+
+Jede Plate entsteht aus einem **i2v-Call mit Anchor-Frame** (PNG/JPG). Der Anchor liegt bereits in `composer_scenes.lock_reference_url` / `reference_image_url` und ist im Scope von `compose-dialog-segments` schon verfügbar (Zeile 1163). AWS Rekognition läuft direkt auf dem Anchor → **0 ms Extract, kein Vendor, kein Polling, kein 404-Risiko, bessere Detection-Qualität** (kein Motion-Blur, keine i2v-Kompressionsartefakte).
+
+```
+Heute:   plate.mp4 → Replicate-Extract → JPEG → AWS Rekognition
+v156:    anchor.jpg (schon da) → AWS Rekognition direkt
+```
+
+Geometrisch identisch: Anchor und Plate haben dieselbe Komposition. Kopfdrift im i2v <50 px, Sync.so-Maske ~200 px → Mouth-Landmark passt exakt.
+
+## Konkrete Änderungen
+
+### 1. `_shared/plate-face-detect.ts`
+- **Neuer Parameter** `anchorUrl?: string` in `detectPlateFaces`.
+- `extractPlateFrameForRekognition` → **gelöscht**. Komplett. Inklusive `REK_FRAME_MODEL`, `Replicate`-Import wenn unbenutzt.
+- Neue Detection-Reihenfolge:
+
+  ```
+  1. Cache (key bleibt plate_url_hash)
+  2. if (anchorUrl) → AWS Rekognition auf anchorUrl
+  3. else (Legacy-Szenen ohne Anchor) → AWS auf erstes Plate-Frame via
+     simpler Range-Request + mp4box (nur Notfall, deutliches Warn-Log)
+  4. Decision Tree:
+     - AWS faces.length === expectedCount + allConf ≥ 90 → ✅ use, detector="aws_rekognition_anchor"
+     - AWS faces.length === 0 → Cartoon-Rescue: Gemini-Pro strict + Geometry-Gate
+       - ok + count match → use, detector="gemini-2.5-pro-cartoon"
+       - sonst → HARD FAIL
+     - AWS 0 < faces.length < expectedCount → HARD FAIL "aws_partial_detection"
+       (kein Gemini-Rescue — das war der v153/v154-Bug)
+  ```
+
+- **Gestrichen:** Gemini-Flash-Direct-on-MP4 (Zeilen 551–600). Gemini-Pro nur noch im Cartoon-Branch.
+- **Behalten:** `validatePlateFacesGeometry` (auch für Cartoon-Pro).
+- Cache-Key wird `anchor_url_hash` wenn Anchor genutzt, sonst weiter `plate_url_hash`. Persist `detection_provider`, `mouth_landmarks` wie heute.
+
+### 2. `compose-dialog-segments/index.ts`
+- `COMPOSE_DIALOG_SEGMENTS_VERSION = "v156"`.
+- Beim Call von `resolveSceneFaceMap` → `anchorUrl` durchreichen (ist schon da, Zeile 1163–1166).
+- Beim Call von `detectPlateFaces` (irgendwo in der Dispatch-Kette) → `anchorUrl` reinreichen.
+- Fehler-Mapping in der UI-Toast-Message:
+  - `aws_partial_detection` → „Nicht alle Sprecher klar im Bild — bitte Szene neu generieren mit klarer Trennung der Gesichter."
+  - `aws_zero_faces + cartoon_rescue_failed` → „Gesichter konnten nicht erkannt werden."
+
+### 3. Migration: Legacy-Cache evicten
 ```sql
-ALTER TABLE plate_face_cache
-  ADD COLUMN IF NOT EXISTS detection_provider TEXT,
-  ADD COLUMN IF NOT EXISTS mouth_landmarks JSONB;
+UPDATE plate_face_cache
+SET expires_at = now() - interval '1 second'
+WHERE detection_provider IS NULL
+   OR detection_provider LIKE 'gemini-2.5-flash%'
+   OR detection_provider = 'gemini-2.5-pro-strict';
 ```
-Bestehender v154-Cache bleibt valid (provider NULL = gemini-legacy).
+Behalten: `aws_rekognition`, neu `aws_rekognition_anchor`, neu `gemini-2.5-pro-cartoon`.
 
-**4. Validation**
-- Rekognition-Konfidenz < 90 → Fallback Gemini
-- v154 Geometry-Gate bleibt aktiv (Schutz für den Gemini-Fallback-Pfad)
-- Logs: `v155_rekognition_primary_hit` / `v155_rekognition_fallback_to_gemini` (mit reason)
-- Pro Pass log `v155_mouth_landmark_delta` (Abstand bbox-center ↔ mouth-landmark) — Erfolgs-Telemetrie
+### 4. Logs (für Monitoring)
+- `v156_anchor_detect_ok faces=N conf=[…] mouth=N/N anchor_url=…`
+- `v156_anchor_missing → mp4_fallback` (sollte selten sein, Legacy)
+- `v156_aws_partial faces=N expected=M → HARD_FAIL` (kein Gemini-Versuch)
+- `v156_aws_zero_faces → cartoon_rescue_attempt`
+- `v156_cartoon_rescue_ok faces=N` / `v156_cartoon_rescue_fail reason=…`
 
-**5. Version-Bump** `compose-dialog-segments` → `v155`
+### 5. NICHT angefasst
+- `face-detect-mediapipe.ts` (AWS-SigV4-Pfad ist korrekt).
+- `extract-video-frames` / `extract-video-last-frame` (Hybrid-Extend / Continuity, separate Cleanup).
+- AWS-Secrets, Region-Resolver, DB-Schema von `plate_face_cache`.
 
-### Was NICHT geändert wird
+## Akzeptanzkriterien
+- **Realszene (4 echte Sprecher):** `v156_anchor_detect_ok faces=4`, kein Replicate-, kein Gemini-Call. Sync läuft.
+- **Cartoon (4 animiert):** `v156_aws_zero_faces → cartoon_rescue_ok faces=4`. Sync läuft.
+- **Partial (2 von 4 sichtbar):** `v156_aws_partial → HARD_FAIL`, Auto-Refund, klare UI-Message. **Kein** Gemini-Rateversuch.
+- **Legacy-Szene ohne Anchor:** `v156_anchor_missing → mp4_fallback` Warn-Log, dann ein-shot mp4-Decode (mp4box.js + min JPEG). Falls Decode fehlschlägt → HARD FAIL mit Hinweis „Szene neu generieren".
 
-- Keine neuen Secrets (AWS_* sind schon da)
-- Kein neuer SigV4-Code (face-detect-mediapipe.ts ist fertig)
-- ASD `bounding_boxes_url`-Format bleibt
-- sync-3 Doc-Strict, Refund-Logik bleiben
-- v154 Flash→Pro + Geometry-Gate bleibt als Fallback
+## Warum das der schnellste & sauberste Weg ist
+- **Latenz:** spart 2–5 s pro Szene (kein Replicate-Roundtrip + Poll).
+- **Reliability:** Anchor liegt im eigenen Storage, kein externer Single-Point-of-Failure.
+- **Cost:** spart ~$0.001/Szene Replicate-Spend.
+- **Code-Surface:** entfernt ~80 Zeilen Helper + Replicate-Dependency aus dem Hot-Path.
+- **Quality:** Anchor ist artefaktfrei → höhere Rekognition-Confidence → präzisere Mouth-Landmarks → Sync.so-Maske sitzt exakter.
 
-### Verifikation nach Implementierung
-
-Re-Run Szene `cea5be34-…`:
-- Logs zeigen `v155_rekognition_primary_hit count=4 conf=[95..99]`
-- Frame-Extraction pro Sprecher-Turn zeigt Mask exakt am Mund
-- `v155_mouth_landmark_delta` sollte 60–120px y-shift gegenüber bbox-center zeigen (= Beweis dass es geholfen hat)
-
-### Aufwand
-
-~150 Zeilen Diff in `plate-face-detect.ts` + ~20 Zeilen in `compose-dialog-segments` + Migration. Ein Edge-Function-Deploy. Keine User-Action nötig.
+## Risiko: Niedrig
+2 Files (`plate-face-detect.ts`, `compose-dialog-segments/index.ts`), 1 kleine Daten-Migration, kein neuer Vendor, kein neuer Secret, kein UI-Refactor.
