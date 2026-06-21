@@ -414,16 +414,31 @@ export async function detectPlateFaces(params: {
 
 
 
-  // 2. v129.21 — Try MediaPipe FIRST (dedicated face detector, pixel-bbox,
-  //    multi-frame union). Falls back to Gemini direct-mp4 on any failure.
+  // 2. v155 — Extract a mid-duration JPEG frame and run AWS Rekognition on
+  //    it via `detectFacesMediaPipe`. Without `prebuiltFrameUrls`, that
+  //    helper short-circuits to `no_prebuilt_frame_url` (the v129.21 wiring
+  //    silently skipped Rekognition for the dialog pipeline — root cause of
+  //    the v153/v154 4-speaker torso-bbox bug). Rekognition is deterministic
+  //    and returns mouth landmarks; we propagate `landmarks.mouth` through
+  //    `PlateFaceBox.mouth` so the dispatcher can sit the Sync.so faceMask
+  //    exactly on the mouth.
   let detectorUsed = "gemini-2.5-flash";
   let mpFaces: PlateFaceBox[] | null = null;
+  const rekFrameUrl = await extractPlateFrameForRekognition({
+    supabase: params.supabase,
+    plateUrl: params.plateUrl,
+    midDurationSec: params.midDurationSec,
+    projectId: params.projectId,
+    sceneId: params.sceneId,
+    tag,
+  });
   try {
     const mp = await detectFacesMediaPipe({
       videoUrl: params.plateUrl,
       plateWidth: params.plateWidth,
       plateHeight: params.plateHeight,
       durationSec: Math.max(0.5, params.midDurationSec * 2),
+      prebuiltFrameUrls: rekFrameUrl ? [rekFrameUrl] : undefined,
     });
     if (mp.ok && mp.faces.length > 0) {
       mpFaces = mp.faces
@@ -432,21 +447,28 @@ export async function detectPlateFaces(params: {
           center: f.center,
           slot: idx,
           confidence: f.confidence,
+          mouth: f.landmarks?.mouth,
         }))
         .sort((a, b) => a.center[0] - b.center[0])
         .map((f, idx) => ({ ...f, slot: idx }));
-      detectorUsed = `mediapipe-${mp.framesScanned}f`;
+      detectorUsed = "aws_rekognition";
+      const mouthCount = mpFaces.filter((f) => Array.isArray(f.mouth)).length;
       console.log(
-        `${tag} mediapipe PRIMARY ok faces=${mpFaces.length} frames=${mp.framesScanned} ms=${mp.ms}`,
+        `${tag} v155_rekognition_primary_hit faces=${mpFaces.length} ` +
+        `mouth_landmarks=${mouthCount}/${mpFaces.length} frames=${mp.framesScanned} ms=${mp.ms}`,
       );
     } else {
       console.warn(
-        `${tag} mediapipe PRIMARY miss (${mp.error ?? "0 faces"}) — falling back to gemini`,
+        `${tag} v155_rekognition_fallback_to_gemini reason=${mp.error ?? "0_faces"} ` +
+        `frame_extracted=${rekFrameUrl ? "yes" : "no"}`,
       );
     }
   } catch (e) {
-    console.warn(`${tag} mediapipe PRIMARY threw: ${(e as Error)?.message} — falling back to gemini`);
+    console.warn(
+      `${tag} v155_rekognition_fallback_to_gemini reason=exception:${(e as Error)?.message}`,
+    );
   }
+
 
   // Gemini path — fallback OR when MediaPipe returned 0 faces.
   let faces: PlateFaceBox[];
