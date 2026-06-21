@@ -359,6 +359,26 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         const startFromForRelative =
           shot.sourceTiming === 'relative' ? relativeStartFrame : startFrame;
 
+        // v164: render silent-face freezes underneath the active overlay so
+        // non-speaking faces don't "talk along" with the AI plate. Only the
+        // active speaker's face stays animated; everyone else is paused.
+        const silentSlotEls = (shot.silentSlots ?? []).map((slot, slotIdx) => {
+          if (!slot || !(Number(slot.size) > 0) || !masterVideoUrl) return null;
+          const left = Number(slot.x) * scaleX;
+          const top = Number(slot.y) * scaleY;
+          const overlayScale = Math.max(scaleX, scaleY);
+          const size = Number(slot.size) * overlayScale;
+          return (
+            <SilentFaceFreeze
+              key={`silent-${idx}-${slotIdx}`}
+              src={masterVideoUrl}
+              left={left}
+              top={top}
+              size={size}
+            />
+          );
+        });
+
         // v25 fan-out face-mask path (highest priority): full Sync.so output
         // for this speaker, masked to a soft circle around their face. Spans
         // the full scene; multiple speakers stack as additive masked layers.
@@ -381,6 +401,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               durationInFrames={segDuration}
               layout="none"
             >
+              {silentSlotEls}
               <FaceMaskOverlay
                 src={shot.outputUrl}
                 cxPx={cxPx}
@@ -412,6 +433,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               durationInFrames={segDuration}
               layout="none"
             >
+              {silentSlotEls}
               <CroppedOverlay
                 src={shot.outputUrl}
                 segDuration={segDuration}
@@ -432,6 +454,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             durationInFrames={segDuration}
             layout="none"
           >
+            {silentSlotEls}
             <FullFrameOverlay
               src={shot.outputUrl}
               segDuration={segDuration}
