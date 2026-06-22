@@ -38,6 +38,7 @@ import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
+import { SceneRenderConfirmProvider } from '@/lib/composer/sceneRenderConfirm';
 import MotionStudioTopStepper, { type TopStepperStep } from './MotionStudioTopStepper';
 import PipelineProgressBar from './PipelineProgressBar';
 import AutoDirectorWizard from './AutoDirectorWizard';
@@ -1402,6 +1403,7 @@ export default function VideoComposerDashboard() {
 
   return (
     <ComposerHistoryContext.Provider value={{ pushEntry: pushHistoryEntry }}>
+    <SceneRenderConfirmProvider>
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border/40 bg-card/50 backdrop-blur-sm">
@@ -1814,6 +1816,7 @@ export default function VideoComposerDashboard() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </SceneRenderConfirmProvider>
     </ComposerHistoryContext.Provider>
   );
 }

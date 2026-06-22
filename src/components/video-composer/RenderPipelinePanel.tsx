@@ -124,21 +124,27 @@ export default function RenderPipelinePanel({
                 </Badge>
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Generieren · Stitchen · Direkt in Director&apos;s Cut öffnen — alles in einem Klick.
+                Szenen einzeln rendern · Final stitchen · Direkt in Director&apos;s Cut öffnen.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {status === 'idle' && (
+            {status === 'idle' && !isAllReady && (
+              <div className="text-[11px] text-muted-foreground italic max-w-[280px] text-right">
+                Rendere Szenen einzeln, um Kosten und Qualität zu kontrollieren.
+                Stitch wird verfügbar, sobald alle Szenen fertig sind.
+              </div>
+            )}
+            {status === 'idle' && isAllReady && (
               <Button
                 size="sm"
                 onClick={() => setPreflightOpen(true)}
                 disabled={!projectId || scenes.length === 0}
                 className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
               >
-                <Rocket className="h-3.5 w-3.5 mr-1.5" />
-                Render All & Stitch
+                <Film className="h-3.5 w-3.5 mr-1.5" />
+                Final stitchen
               </Button>
             )}
             {status === 'partial' && !videoUrl && (

@@ -28,6 +28,7 @@ import StoryboardScenePlayerList from './StoryboardScenePlayerList';
 import SceneStyleMode from './SceneStyleMode';
 import SceneAvatarMode from './SceneAvatarMode';
 import { useSceneGenerate } from '@/hooks/useSceneGenerate';
+import { useSceneRenderConfirm } from '@/lib/composer/sceneRenderConfirm';
 import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
 import PipelineProgressBar from './PipelineProgressBar';
 import StageStoryboardLoader from './stage/StageStoryboardLoader';
@@ -443,11 +444,19 @@ export default function StoryboardTab({
   const [leftMode, setLeftMode] = useState<LeftPaneMode>('editor');
 
   // Stage 18 — inline scene generation directly from the player tile
+  const confirmRender = useSceneRenderConfirm();
   const { generate: generateScene, generating: generatingMap } = useSceneGenerate({
     projectId,
     characters: safeCharacters,
     onOptimisticPatch: (id, patch) => updateScene(id, patch),
     ensureProject: onEnsurePersisted,
+    confirmRender: (s) =>
+      confirmRender({
+        scenes: [s],
+        title: `Szene ${(s.orderIndex ?? 0) + 1} rendern?`,
+        description:
+          'Sobald du bestätigst, startet die Render-Pipeline (Video-Provider, ggf. Voiceover & Lip-Sync). Credits werden verbraucht.',
+      }),
   });
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
