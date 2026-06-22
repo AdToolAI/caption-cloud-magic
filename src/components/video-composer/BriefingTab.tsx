@@ -457,7 +457,16 @@ export default function BriefingTab({
     }
   };
 
-
+  // Programmatic retry trigger from the Storyboard-tab error panel.
+  // The dashboard increments `retryStoryboardNonce` when the user clicks
+  // "Try again"; we re-run the same generation pipeline with the current
+  // briefing. Initial value (0) is a no-op to avoid auto-firing on mount.
+  useEffect(() => {
+    if (!retryStoryboardNonce) return;
+    if (isGenerating) return;
+    void handleGenerateStoryboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryStoryboardNonce]);
 
   const canProceed = briefing.productName.trim().length > 0;
 
