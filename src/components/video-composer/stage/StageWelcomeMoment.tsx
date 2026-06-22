@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { emitStageEvent } from "@/lib/stage/stageEvents";
+import StageCountdown from "./StageCountdown";
 
 const SESSION_KEY = "motion-studio:welcomed-this-session";
 
@@ -19,7 +20,7 @@ const SESSION_KEY = "motion-studio:welcomed-this-session";
  * - prefers-reduced-motion collapses to a 400ms fade.
  */
 export default function StageWelcomeMoment() {
-  const [phase, setPhase] = useState<"hidden" | "playing" | "iris" | "done">("hidden");
+  const [phase, setPhase] = useState<"hidden" | "playing" | "countdown" | "iris" | "done">("hidden");
   const [skipped, setSkipped] = useState(false);
 
   const reducedMotion = useMemo(
@@ -44,13 +45,13 @@ export default function StageWelcomeMoment() {
 
     const timers: number[] = [];
     timers.push(window.setTimeout(() => emitStageEvent("action"), 1000));
-    timers.push(window.setTimeout(() => setPhase("iris"), 3200));
-    timers.push(window.setTimeout(() => setPhase("done"), 3800));
+    // Welcome beats finish ~3.2s; let tagline settle, then roll into countdown.
+    timers.push(window.setTimeout(() => setPhase("countdown"), 3400));
     return () => timers.forEach((id) => window.clearTimeout(id));
   }, [reducedMotion]);
 
   useEffect(() => {
-    if (phase !== "playing" && phase !== "iris") return;
+    if (phase === "hidden" || phase === "done") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleSkip();
     };
@@ -66,6 +67,12 @@ export default function StageWelcomeMoment() {
     window.setTimeout(() => setPhase("done"), 500);
   };
 
+  const handleCountdownComplete = useCallback(() => {
+    setPhase("iris");
+    window.setTimeout(() => setPhase("done"), 600);
+  }, []);
+
+
   if (phase === "done" || phase === "hidden") return null;
 
   // Stable particle field
@@ -79,6 +86,7 @@ export default function StageWelcomeMoment() {
   });
 
   const irisActive = phase === "iris";
+  const isCountdown = phase === "countdown";
 
   return (
     <div
@@ -154,8 +162,16 @@ export default function StageWelcomeMoment() {
         }}
       />
 
-      {/* Center stage content */}
-      <div className="relative h-full w-full flex flex-col items-center justify-center px-6">
+      {/* Center stage content (welcome beats) */}
+      <div
+        className="relative h-full w-full flex flex-col items-center justify-center px-6"
+        style={{
+          opacity: isCountdown ? 0 : 1,
+          transform: isCountdown ? "scale(0.96)" : "scale(1)",
+          transition: "opacity 420ms ease-out, transform 420ms ease-out",
+          pointerEvents: isCountdown ? "none" : undefined,
+        }}
+      >
         {/* Clapper */}
         <div
           className="mb-10"
@@ -262,6 +278,17 @@ export default function StageWelcomeMoment() {
           }}
         />
       </div>
+
+      {/* Academy Leader countdown — plays after welcome beats, opens the briefing */}
+      {isCountdown && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ animation: "stageWelcomeFade 320ms ease-out forwards" }}
+        >
+          <StageCountdown onComplete={handleCountdownComplete} reducedMotion={reducedMotion} />
+        </div>
+      )}
+
 
       {/* Skip button */}
       {!reducedMotion && (
