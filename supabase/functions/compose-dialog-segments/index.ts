@@ -72,6 +72,7 @@ import {
   readPreferredSyncSourceKind,
   recordCircuitFailure,
   recordCircuitSuccess,
+  reconcileStaleSyncJobs,
   registerInflightSyncJob,
   SYNCSO_DEFAULT_MAX_PARALLEL,
   // trimWavLeadIn intentionally NOT imported (v33: lead-in trim disabled).
@@ -679,7 +680,7 @@ serve(async (req) => {
       const holder = `compose-dialog-segments-${crypto.randomUUID()}`;
       const { data: acquired, error: lockErr } = await supabase.rpc(
         "try_acquire_dialog_lock",
-        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 90, _pass_idx: earlyPassIdx },
+        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 120, _pass_idx: earlyPassIdx },
       );
       if (lockErr) {
         console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${earlyPassIdx} lock rpc error: ${lockErr.message} — proceeding without lock`);
@@ -5289,11 +5290,44 @@ serve(async (req) => {
       // never let logging crash dispatch
     }
 
-    const resp = await fetch(`${SYNC_API_BASE}/generate`, {
-      method: "POST",
-      headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    // v169 Stage A — Stale-Job Reconcile (best-effort, ≤500ms). Frees Sync.so
+    // concurrency slots held by zombie jobs from earlier failed runs so this
+    // dispatch doesn't hit a spurious 429.
+    try {
+      await reconcileStaleSyncJobs(supabase, {
+        userId,
+        syncApiKey,
+        apiBase: SYNC_API_BASE,
+      });
+    } catch (_e) {
+      // never block dispatch on reconcile
+    }
+
+    // v169 Stage B — 429-Backoff. Sync.so concurrency_limit_reached is
+    // transient (other passes in this scene or a parallel scene). Retry
+    // identical payload up to 3× with exponential backoff + jitter before
+    // falling through to the existing dispatch-failure path.
+    const BACKOFFS_MS = [4_000, 10_000, 22_000];
+    let resp: Response;
+    let attempt = 0;
+    while (true) {
+      resp = await fetch(`${SYNC_API_BASE}/generate`, {
+        method: "POST",
+        headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (resp.status !== 429 || attempt >= BACKOFFS_MS.length) break;
+      const base = BACKOFFS_MS[attempt];
+      const jitter = Math.floor(Math.random() * (base * 0.2));
+      const waitMs = base + jitter;
+      attempt++;
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} 429_RETRY attempt=${attempt}/${BACKOFFS_MS.length} backoff_ms=${waitMs}`,
+      );
+      try { await resp.body?.cancel(); } catch (_e) { /* ignore */ }
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+
 
     if (!resp.ok) {
       const errTxt = await resp.text().catch(() => "");
