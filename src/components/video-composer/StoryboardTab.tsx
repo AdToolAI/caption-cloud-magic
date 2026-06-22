@@ -726,6 +726,7 @@ export default function StoryboardTab({
                         (s) => s.id !== selectedScene.id && s.clipStatus === 'ready' && !!s.clipUrl,
                       )}
                       onAddScene={onAddScene}
+                      siblingsDurationSec={sumOtherScenesDuration(scenes, selectedScene.id)}
                       onInsertScenesAfter={onInsertScenesAfter}
                       onAddCharacter={onAddCharacter}
                       language={language}
