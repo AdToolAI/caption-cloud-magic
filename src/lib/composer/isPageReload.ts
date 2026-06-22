@@ -1,24 +1,26 @@
 /**
- * Returns true if the *current page mount* is the result of a real browser
- * reload (F5 / Cmd-R / refresh button / programmatic `location.reload()`).
+ * Returns true if the *current tab session started with* a real browser
+ * reload (F5 / Cmd-R / refresh button / programmatic `location.reload()`),
+ * but ONLY for mount-time effects that happen close to the document load.
  *
- * Important: `performance.getEntriesByType("navigation")[0].type` reflects
- * the original document load and never changes during the tab's lifetime.
- * That means once a user reloaded the page once, every subsequent SPA
- * navigation would also look like a "reload" — which would permanently
- * suppress mount-time effects like the Motion Studio welcome intro.
- *
- * To avoid that we only honour the reload signal for the *first* call after
- * the document loaded. Every later call (i.e. SPA navigations within the
- * same tab) returns false so the consuming effect runs normally.
+ * Implementation notes:
+ * - `performance.getEntriesByType("navigation")[0].type` reflects the
+ *   original document load and never changes during the tab's lifetime.
+ *   Naively returning it would treat *every* later SPA navigation as a
+ *   reload, permanently suppressing intros and similar one-shot effects.
+ * - We therefore cache the answer once at module load, and after a short
+ *   grace window (~1.5s after the document finished loading) the helper
+ *   always returns false. SPA navigations triggered later in the session
+ *   are correctly treated as fresh navigations.
  */
-let consumed = false;
+const NAV_GRACE_MS = 1500;
 
-export function isPageReload(): boolean {
+let cachedWasReload: boolean | null = null;
+let loadTimestamp = 0;
+
+function readNavType(): boolean {
   try {
     if (typeof performance === "undefined") return false;
-    if (consumed) return false;
-    consumed = true;
     const nav = performance.getEntriesByType?.("navigation")?.[0] as
       | PerformanceNavigationTiming
       | undefined;
@@ -26,4 +28,16 @@ export function isPageReload(): boolean {
   } catch {
     return false;
   }
+}
+
+if (typeof window !== "undefined") {
+  cachedWasReload = readNavType();
+  loadTimestamp = (typeof performance !== "undefined" ? performance.now() : 0);
+}
+
+export function isPageReload(): boolean {
+  if (typeof window === "undefined") return false;
+  if (cachedWasReload !== true) return false;
+  const now = typeof performance !== "undefined" ? performance.now() : 0;
+  return now - loadTimestamp <= NAV_GRACE_MS;
 }
