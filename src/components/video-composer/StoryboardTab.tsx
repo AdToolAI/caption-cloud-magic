@@ -529,70 +529,71 @@ export default function StoryboardTab({
 
 
 
-      {/* AI Generation Tips (gold) */}
-      <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-gold/20 shadow-soft">
-        <div
-          className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-gold via-gold/60 to-transparent"
-          style={{ boxShadow: '0 0 12px hsl(var(--primary) / 0.4)' }}
-        />
-        <div className="p-4 pl-5">
+      {/* AI Generation Tips — promoted to Bond StagePanel for Briefing-parity */}
+      <StagePanel
+        slateIndex="00"
+        eyebrow="REEL · NOTES"
+        title={t('videoComposer.aiTipsTitle')}
+        accessory={
           <button
             type="button"
             onClick={() => setTipsCollapsed((v) => !v)}
-            className="flex w-full items-center justify-between gap-3 text-left group"
+            className="text-[10px] uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1"
             aria-expanded={!tipsCollapsed}
           >
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gold/10 border border-gold/20">
-                <Sparkles className="h-3.5 w-3.5 text-gold" />
-              </div>
-              <h3 className="font-display text-sm font-semibold tracking-wide text-foreground">
-                {t('videoComposer.aiTipsTitle')}
-              </h3>
-            </div>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1 group-hover:text-foreground transition-colors">
-              {tipsCollapsed ? t('videoComposer.aiTipsExpand') : t('videoComposer.aiTipsCollapse')}
-              {tipsCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-            </span>
+            {tipsCollapsed ? t('videoComposer.aiTipsExpand') : t('videoComposer.aiTipsCollapse')}
+            {tipsCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
           </button>
+        }
+      >
+        {!tipsCollapsed && (
+          <ul className="space-y-2.5 text-xs leading-relaxed text-muted-foreground">
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
+              <span>{t('videoComposer.aiTipPrompt')}</span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
+              <span>{t('videoComposer.aiTipPersons')}</span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
+              <span className="text-foreground/90">{t('videoComposer.aiTipCredits')}</span>
+            </li>
+          </ul>
+        )}
+      </StagePanel>
 
-          {!tipsCollapsed && (
-            <ul className="mt-4 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                <span>{t('videoComposer.aiTipPrompt')}</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                <span>{t('videoComposer.aiTipPersons')}</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/70" />
-                <span className="text-foreground/90">{t('videoComposer.aiTipCredits')}</span>
-              </li>
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* Cast Consistency Map — shows which character appears in which scene
-          and the active continuity anchor (reference image / frame chain / prompt). */}
-      <CastConsistencyMap scenes={scenes} characters={safeCharacters} />
+      {/* Cast Consistency Map — Bond glass wrapper for Briefing-parity */}
+      {scenes.length > 0 && safeCharacters.length > 0 && (
+        <StagePanel
+          slateIndex="00"
+          eyebrow="CAST · CONTINUITY"
+          title="Cast Consistency Map"
+        >
+          <CastConsistencyMap scenes={scenes} characters={safeCharacters} embedded />
+        </StagePanel>
+      )}
 
       {/* Scene Cards — v2 Layout: Cinematic Filmstrip (left) + persistent Studio editor (right) */}
       {scenes.length === 0 ? (
         isGeneratingStoryboard ? (
           <StageStoryboardLoader />
         ) : (
-          <Card className="border-border/40 bg-card/50">
-            <CardContent className="py-12 text-center">
+          <StagePanel
+            slateIndex="01"
+            eyebrow="REEL · EMPTY"
+            title="Noch keine Szenen"
+          >
+            <div className="py-8 text-center">
               <p className="text-muted-foreground text-sm mb-3">Noch keine Szenen vorhanden</p>
               <Button onClick={addScene} variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" /> Erste Szene hinzufügen
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </StagePanel>
         )
+
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
           {/* Left: 3-mode editor pane (Editor / Stil / Avatar) */}
