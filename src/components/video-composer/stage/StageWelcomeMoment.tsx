@@ -279,6 +279,17 @@ export default function StageWelcomeMoment() {
         />
       </div>
 
+      {/* Academy Leader countdown — plays after welcome beats, opens the briefing */}
+      {isCountdown && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ animation: "stageWelcomeFade 320ms ease-out forwards" }}
+        >
+          <StageCountdown onComplete={handleCountdownComplete} reducedMotion={reducedMotion} />
+        </div>
+      )}
+
+
       {/* Skip button */}
       {!reducedMotion && (
         <button
