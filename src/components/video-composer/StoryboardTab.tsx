@@ -594,6 +594,12 @@ export default function StoryboardTab({
       {scenes.length === 0 ? (
         isGeneratingStoryboard ? (
           <StageStoryboardLoader />
+        ) : storyboardError ? (
+          <StageStoryboardError
+            error={storyboardError}
+            onRetry={onRetryStoryboard}
+            onBackToBriefing={onBackToBriefing}
+          />
         ) : (
           <StagePanel
             slateIndex="01"
