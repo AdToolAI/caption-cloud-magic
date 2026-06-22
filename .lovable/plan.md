@@ -1,69 +1,91 @@
-# Phase 4 — Cinematic Welcome & Briefing Soundstage
+## Was wirklich los ist (Befund nach Code-Check)
 
-Du hast Recht: Der bisherige `StageWelcomeMoment` ist nur ein ~700ms Clapper-Snap — viel zu kurz und nicht "krass" genug. Und das Briefing selbst sieht noch aus wie ein normales Formular auf dunklem Background. Wir bringen beides auf Bond-meets-Apple-Niveau.
+1. **Welcome-Sequenz spielt nur 1× pro Browser-Tab.**
+   `StageWelcomeMoment.tsx` setzt `sessionStorage["motion-studio:welcomed-this-session"] = "1"` und blockt jeden weiteren Mount. → Beim erneuten Aufruf siehst du sie nicht.
 
-## 1. Cinematic Welcome Sequence (`StageWelcomeMoment` v2)
+2. **Quick / Direct / Studio sind tote Buttons.**
+   `DirectorBar` schreibt `editorMode` zwar in `useStudioPreferences`, aber **nirgendwo** im Briefing (`BriefingTab.tsx`) oder Dashboard (`VideoComposerDashboard.tsx`) wird der Wert gelesen. → Klick ändert nur die Pille-Optik, sonst nichts.
 
-Ersetzt den aktuellen 700ms-Clap durch eine ~3.8s Sequenz in 5 Beats, skippable per Klick/ESC, einmal pro Session (`sessionStorage`).
+3. **Briefing-Karten sind optisch unverändert.**
+   `BriefingTab.tsx` rendert weiterhin Standard-`<Card className="border-border/40 bg-card/80">` für **Modus / Kategorie / Produkt / Stil / Visueller Stil / Charaktere / Pro-Tipp**. Die Soundstage-Layer (Spotlight, Grain, Scanlines) liegen nur **hinter** den Karten — die Karten selbst tragen kein Gold, kein Glas, kein Slate-Header. Deshalb wirkt es identisch zur alten Version.
 
-```text
-0.0s ─ Deep black, faint gold particles drifting
-0.6s ─ Letterbox bars slide in (2.39:1, gold hairline)
-1.0s ─ Clapper SVG snaps shut (existing) + Action-Cue
-1.4s ─ "ADTOOL AI" wordmark fades up, gold gradient sweep L→R
-2.0s ─ "MOTION STUDIO" sub-line types in (mono, letterspaced)
-2.6s ─ Tagline "Where stories become cinema." fade-in
-3.2s ─ Spotlight iris-open reveals the briefing underneath
-3.8s ─ Overlay removed, ambient hush loop starts
-```
+## Plan — 3 zielgerichtete Fixes
 
-Neue Komponente: `src/components/video-composer/stage/StageWelcomeMoment.tsx` (refactor, gleicher Export).
-- Reine CSS/Framer-Motion-Animation, keine neuen Assets nötig.
-- Partikel via 24 absolut positionierte `motion.span` mit `animate` (drift + opacity).
-- Letterbox-Bars wiederverwenden das `CinemascopeOverlay`-Styling.
-- Wordmark nutzt `Playfair Display` (bereits geladen), gold gradient via `bg-clip-text`.
-- Iris-Reveal via `clip-path: circle()` 0% → 150%.
-- "Skip Intro"-Pill unten rechts (erscheint ab 0.8s).
-- Audio: ruft `playCue('action')` bei 1.0s und `startAmbient()` bei 3.6s via bestehenden `useStageAudio` Hook.
+### Fix 1 — Welcome-Sequenz bei jedem Studio-Besuch neu
+`StageWelcomeMoment.tsx`:
+- `sessionStorage`-Gate komplett entfernen.
+- Sequenz startet bei jedem Mount von `MotionStudioStage` (= jedes Mal, wenn die Route `/video-composer` betreten wird).
+- Skip per Klick / ESC / "Skip Intro"-Pill bleibt.
+- `prefers-reduced-motion` bleibt respektiert (400ms-Fade).
+- Optional in `DirectorBar`: kleines `Intro`-Icon (Replay-Pfeil) zum manuellen Re-Trigger via Custom-Event — nicht zwingend, aber sauber.
 
-## 2. Briefing Soundstage Skin
+### Fix 2 — Quick / Direct / Studio funktional machen
+Der Switch soll **sichtbar** das Briefing umformen, sonst ist er Deko.
 
-Aktuell ist die Briefing-Seite generisch. Wir geben ihr eine eigene cinematic Identität, ohne Felder/Logik anzufassen.
+Wir definieren pro Mode, welche Sektionen sichtbar sind:
 
-### 2a. Stage Backdrop Layer (global im `MotionStudioStage`)
-- Animated radial gold spotlight (oben mitte), langsam atmend (8s ease-in-out loop).
-- Zweiter, schwächerer Spot unten rechts (counterbalance).
-- Existierende Film-Grain-Layer behalten, leicht verstärken.
-- Subtile horizontale "scanlines" (1px every 4px, opacity 0.015) als CSS-Repeat.
+| Sektion                  | Quick | Direct | Studio |
+|--------------------------|:----:|:------:|:------:|
+| Modus (KI/Manuell)       |  –   |   ✓    |   ✓    |
+| Kategorie                |  ✓   |   ✓    |   ✓    |
+| Produkt/Service (Basis)  |  ✓   |   ✓    |   ✓    |
+| Produkt — erweitert (USPs, Zielgruppe, Tonalität)    |  –   | ✓ | ✓ |
+| Stil & Format            |  Kompakt (nur AR + Dauer) | ✓ | ✓ |
+| Visueller Stil           |  –   |   ✓    |   ✓    |
+| Charaktere               |  –   |   –    |   ✓    |
+| Pro-Tipp / Director's Note |  –   |   ✓    |   ✓    |
+| Pricing-Banner           |  ✓   |   ✓    |   ✓    |
 
-### 2b. Briefing Section Cards
-Datei: `src/components/video-composer/briefing/BriefingSection.tsx` (oder äquivalent — vor Edit per `code--view` finden).
-- Cards bekommen `backdrop-blur-xl`, glas-effekt mit `bg-white/[0.02]`, gold hairline border (`border-primary/20`), inner shadow.
-- Section-Header mit Take-Slate-Stil: kleine Slate-Nummer ("SC 01", "SC 02", …) links neben dem Titel, Mono-Font, gold.
-- Hover: border glow auf `border-primary/40` + leichter lift (`translate-y -1px`).
+Umsetzung in `BriefingTab.tsx`:
+- `const { prefs } = useStudioPreferences();` einmal oben einbinden.
+- Pro Section: `{prefs.editorMode !== "quick" && (…)}` etc.
+- Innerhalb der "Produkt"-Card per Mode-Check die erweiterten Felder (USPs / Zielgruppe / Tonalität) ein-/ausblenden.
+- "Stil & Format" bekommt im Quick-Mode eine reduzierte Variante (nur Aspect-Ratio + Dauer-Slider).
+- Mode-Wechsel animiert per Tailwind `transition-all` + `data-state`-Fade (200ms).
 
-### 2c. Step-Indicator (Briefing / Storyboard / Voiceover / Musik / Export)
-- Statt Standard-Progressbar: 5 Slate-Marker mit Verbindungslinie, aktiver Step pulsiert gold.
-- Fortschritt-% rechts in Mono-Font, vor der Zahl ein winziges Reel-Icon.
+Damit ist der Unterschied **sofort sichtbar**: Quick = 2-3 Karten, Direct = ~6 Karten, Studio = alles inkl. Charaktere.
 
-### 2d. "Pro-Tipp Sherlock-Holmes-Effekt"-Banner
-- Aus dem aktuellen Listing-Look in ein "Director's Note"-Banner umwandeln: linke gold-Linie 2px, leicht kursive Serif für den Titel, kleines Filmrollen-Icon.
+### Fix 3 — Briefing tatsächlich auf Soundstage-Optik skinnen
+Wir ersetzen das `<Card>`-Default-Styling der **9 Briefing-Sektionen** in `BriefingTab.tsx` durch eine eigene Glass-Wrapper-Komponente.
 
-## 3. Files
+**Neu:** `src/components/video-composer/stage/StagePanel.tsx` (~40 LOC) — Drop-in für `<Card>`:
+- `bg-[#0b1120]/55 backdrop-blur-xl`
+- 1px Gold-Hairline: `border border-amber-200/15`
+- Inner-Top-Highlight + Drop-Shadow: `shadow-[inset_0_1px_0_hsla(43,90%,68%,0.12),0_30px_80px_-30px_hsla(43,90%,68%,0.18)]`
+- `rounded-2xl`
+- Slot für `slateIndex` (z.B. `01`) und `eyebrow` ("SCENE · BRIEFING") → rendert links einen kleinen Schwarz-Gold-Slate, rechts daneben die `Playfair`-Headline + Gold-Hairline darunter.
 
-**Edit:**
-- `src/components/video-composer/stage/StageWelcomeMoment.tsx` — komplette Neuimplementierung der Sequenz
-- `src/components/video-composer/stage/MotionStudioStage.tsx` — Backdrop-Layer (spotlights, scanlines) erweitern
-- `src/index.css` — neue Keyframes: `stageSpotlightBreath`, `stageWordmarkSweep`, `stageIrisOpen`, `stageScanlines`
-- Briefing-Container (genauer Pfad nach `code--view` von `src/pages/VideoComposer/index.tsx` und dem Briefing-Tab) — Card-/Header-/Tip-Styling
+**Neu:** `src/components/video-composer/stage/DirectorsNote.tsx` (~25 LOC)
+- Ersetzt den gelben "Pro-Tipp"-Block:
+  - Linke vertikale Goldlinie (`border-l-2 border-amber-300/70`)
+  - Mono-Caps-Label "DIRECTOR'S NOTE"
+  - Body in `Playfair Display italic`, `text-amber-100/85`.
 
-**Keine neuen Dependencies, keine neuen Assets, keine Backend-Änderungen.** Lipsync/Render/Edge-Functions bleiben unberührt.
+**Edit:** `BriefingTab.tsx`
+- Alle 9 `<Card>`-Wrapper → `<StagePanel slateIndex="0X" eyebrow="…">` mit korrektem Section-Titel in Playfair.
+- "Pro-Tipp"-Block → `<DirectorsNote>`.
+- Primary-CTA ("Auto-Director" / "Storyboard generieren") bekommt Gold-Gradient-Variante: `linear-gradient(180deg,#F5C76A,#b78934)` + dunkler Text + Hover-Glow.
+- 5-Schritt-Stepper (Briefing / Storyboard / VO / Musik / Export) bekommt Mini-Slate-Look statt Pills — verbunden durch dünne Goldlinie, aktiver Slate glüht.
 
-## 4. Persistence & Accessibility
-- Welcome läuft 1× pro Browser-Session (`sessionStorage['motion-studio:welcome-seen']`).
-- "Skip Intro" + ESC-Key skippt sofort, setzt Flag.
-- `prefers-reduced-motion`: Sequenz kollabiert zu 400ms Fade ohne Bewegung.
-- Mute-Toggle in der DirectorBar respektiert (kein Action-Cue wenn muted).
+Damit ist die Soundstage-Optik **in der Briefing-Fläche selbst** spürbar, nicht nur am Hintergrund.
 
-## 5. Estimate
-~1 Tag. Phase 5 (Storyboard-Strip Polaroids, AI-Co-Pilot pro Szene) wie geplant danach.
+## Files
+
+**Edit**
+- `src/components/video-composer/stage/StageWelcomeMoment.tsx` — sessionStorage raus.
+- `src/components/video-composer/BriefingTab.tsx` — Cards → `StagePanel`, Mode-Gating, Pro-Tipp → `DirectorsNote`, CTA-Gold-Variante, Stepper-Slate.
+
+**Create**
+- `src/components/video-composer/stage/StagePanel.tsx` — Glass-Panel mit Take-Slate-Header.
+- `src/components/video-composer/stage/DirectorsNote.tsx` — Director's-Note-Banner.
+
+**Optional Touch**
+- `src/index.css` — eine `stageCtaGlow` Keyframe für den CTA-Hover.
+
+## Out of Scope
+- Storyboard-Tab Re-Skin (kommt im nächsten Pass nach Briefing-Validierung).
+- Audio-Engine, Render-Pipeline, Edge-Functions — bleiben unangetastet.
+- Storyboard-Polaroids / AI-Co-Pilot (Phase 5).
+
+## Aufwand
+~0.5 Tag. Reine Frontend-/Presentation-Arbeit; keine Backend-, Render- oder Type-Schema-Änderung.

@@ -31,15 +31,10 @@ export default function StageWelcomeMoment() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      if (window.sessionStorage.getItem(SESSION_KEY)) {
-        setPhase("done");
-        return;
-      }
-      window.sessionStorage.setItem(SESSION_KEY, "1");
-    } catch {
-      /* no-op */
-    }
+    // Note: intentionally NO sessionStorage gate — the cinematic welcome
+    // should replay every time the user enters the Motion Studio so it
+    // feels like stepping onto a sound stage anew.
+    void SESSION_KEY;
     setPhase("playing");
 
     if (reducedMotion) {

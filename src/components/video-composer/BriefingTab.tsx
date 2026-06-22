@@ -37,6 +37,9 @@ import { suggestShotDirectorForStyle, getStyleLabel } from '@/config/styleToShot
 import CharacterManager from './CharacterManager';
 import VideoModeSelector from './VideoModeSelector';
 import BrandKitApplyPanel from './BrandKitApplyPanel';
+import StagePanel from './stage/StagePanel';
+import DirectorsNote from './stage/DirectorsNote';
+import { useStudioPreferences } from '@/hooks/useStudioPreferences';
 import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
@@ -224,6 +227,10 @@ export default function BriefingTab({
   onUpdateScenes,
 }: BriefingTabProps) {
   const { t } = useTranslation();
+  const { prefs } = useStudioPreferences();
+  const editorMode = prefs.editorMode; // 'quick' | 'direct' | 'studio'
+  const showDirect = editorMode !== 'quick';
+  const showStudio = editorMode === 'studio';
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -462,58 +469,58 @@ export default function BriefingTab({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Mode Indicator Strip — confirms which editor mode is active */}
+      <div className="flex items-center justify-between px-1">
+        <p className="font-mono text-[9px] uppercase tracking-[0.4em] text-amber-200/60">
+          {editorMode === 'quick'
+            ? 'Quick Mode · Essential briefing only'
+            : editorMode === 'direct'
+              ? 'Direct Mode · Full creative control'
+              : 'Studio Mode · Every dial on the console'}
+        </p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.4em] text-amber-200/40">
+          Switch via Director's Bar above
+        </p>
+      </div>
+
       {/* Legal Usage Notice */}
-      <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-destructive/20 shadow-soft">
-        <div
-          className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-destructive via-destructive/60 to-transparent"
-          style={{ boxShadow: '0 0 12px hsl(var(--destructive) / 0.4)' }}
-        />
-        <div className="p-4 pl-5">
+      <StagePanel
+        tone="destructive"
+        slateIndex="00"
+        eyebrow="Compliance · Legal"
+        title={t('videoComposer.aiLegalTitle')}
+        accessory={
           <button
             type="button"
             onClick={() => setTipsCollapsed((v) => !v)}
-            className="flex w-full items-center justify-between gap-3 text-left group"
-            aria-expanded={!tipsCollapsed}
+            className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80 hover:text-foreground transition-colors"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-destructive/10 border border-destructive/30">
-                <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
-              </div>
-              <h3 className="font-display text-sm font-semibold tracking-wide text-destructive">
-                {t('videoComposer.aiLegalTitle')}
-              </h3>
-            </div>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1 group-hover:text-foreground transition-colors">
-              {tipsCollapsed ? t('videoComposer.aiTipsExpand') : t('videoComposer.aiTipsCollapse')}
-              {tipsCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-            </span>
+            {tipsCollapsed ? t('videoComposer.aiTipsExpand') : t('videoComposer.aiTipsCollapse')}
+            {tipsCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
           </button>
+        }
+      >
+        {!tipsCollapsed && (
+          <ul className="space-y-2.5 text-xs leading-relaxed text-muted-foreground">
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+              <span className="text-foreground/90">{t('videoComposer.aiLegalProhibited')}</span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+              <span>{t('videoComposer.aiLegalConsequences')}</span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+              <span>{t('videoComposer.aiLegalResponsibility')}</span>
+            </li>
+          </ul>
+        )}
+      </StagePanel>
 
-          {!tipsCollapsed && (
-            <ul className="mt-4 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                <span className="text-foreground/90">{t('videoComposer.aiLegalProhibited')}</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                <span>{t('videoComposer.aiLegalConsequences')}</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                <span>{t('videoComposer.aiLegalResponsibility')}</span>
-              </li>
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* Mode Selection */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t('videoComposer.mode')}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Mode Selection — Direct & Studio only (Quick auto-uses AI mode) */}
+      {showDirect && (
+        <StagePanel slateIndex="01" eyebrow="Scene · Production Mode" title={t('videoComposer.mode')}>
           <div className="grid grid-cols-2 gap-3">
             {([
               { mode: 'ai' as ComposerMode, icon: Wand2, label: t('videoComposer.aiAssisted'), desc: t('videoComposer.aiAssistedDesc') },
@@ -524,51 +531,43 @@ export default function BriefingTab({
                 onClick={() => onUpdateBriefing({ mode })}
                 className={`p-4 rounded-lg border text-left transition-all ${
                   briefing.mode === mode
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                    : 'border-border/40 hover:border-border'
+                    ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
+                    : 'border-border/40 hover:border-amber-200/30'
                 }`}
               >
-                <Icon className={`h-5 w-5 mb-2 ${briefing.mode === mode ? 'text-primary' : 'text-muted-foreground'}`} />
+                <Icon className={`h-5 w-5 mb-2 ${briefing.mode === mode ? 'text-amber-300' : 'text-muted-foreground'}`} />
                 <p className="font-medium text-sm">{label}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
               </button>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </StagePanel>
+      )}
 
       {/* Category Selection */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t('videoComposer.category')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {CATEGORIES.map(({ id, label, icon: Icon, desc }) => (
-              <button
-                key={id}
-                onClick={() => onUpdateProject({ category: id })}
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  category === id
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                    : 'border-border/40 hover:border-border'
-                }`}
-              >
-                <Icon className={`h-4 w-4 mb-1.5 ${category === id ? 'text-primary' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-xs">{label}</p>
-                <p className="text-[10px] text-muted-foreground">{desc}</p>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <StagePanel slateIndex="02" eyebrow="Scene · Format" title={t('videoComposer.category')}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {CATEGORIES.map(({ id, label, icon: Icon, desc }) => (
+            <button
+              key={id}
+              onClick={() => onUpdateProject({ category: id })}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                category === id
+                  ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
+                  : 'border-border/40 hover:border-amber-200/30'
+              }`}
+            >
+              <Icon className={`h-4 w-4 mb-1.5 ${category === id ? 'text-amber-300' : 'text-muted-foreground'}`} />
+              <p className="font-medium text-xs">{label}</p>
+              <p className="text-[10px] text-muted-foreground">{desc}</p>
+            </button>
+          ))}
+        </div>
+      </StagePanel>
 
       {/* Category-Specific Briefing */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{cfg.cardTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <StagePanel slateIndex="03" eyebrow="Scene · Subject" title={cfg.cardTitle}>
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{t('videoComposer.projectName')}</Label>
@@ -666,55 +665,54 @@ export default function BriefingTab({
               />
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </StagePanel>
 
-      {/* Style & Format */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t('videoComposer.styleFormat')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t('videoComposer.emotionalTone')}</Label>
-              <Select
-                value={briefing.tone}
-                onValueChange={(v) => onUpdateBriefing({ tone: v as EmotionalTone })}
-              >
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TONES.map((tone) => (
-                    <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Style & Format — Quick = compact (AR + Duration only). Direct/Studio = full. */}
+      <StagePanel slateIndex="04" eyebrow="Scene · Style & Format" title={t('videoComposer.styleFormat')}>
+        <div className="space-y-4">
+          {showDirect && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t('videoComposer.emotionalTone')}</Label>
+                <Select
+                  value={briefing.tone}
+                  onValueChange={(v) => onUpdateBriefing({ tone: v as EmotionalTone })}
+                >
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TONES.map((tone) => (
+                      <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t('videoComposer.language')}</Label>
+                <Select
+                  value={language}
+                  onValueChange={(v) => onUpdateProject({ language: v })}
+                >
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="de">Deutsch</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t('videoComposer.language')}</Label>
-              <Select
-                value={language}
-                onValueChange={(v) => onUpdateProject({ language: v })}
-              >
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="de">Deutsch</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Español</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
 
           {/* Duration Slider */}
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs">{t('videoComposer.videoDuration')}</Label>
-              <span className="text-xs font-medium text-primary">{briefing.duration}s</span>
+              <span className="text-xs font-medium text-amber-300">{briefing.duration}s</span>
             </div>
             <Slider
               value={[briefing.duration]}
@@ -740,8 +738,8 @@ export default function BriefingTab({
                   onClick={() => onUpdateBriefing({ aspectRatio: value })}
                   className={`p-2 rounded-lg border text-center transition-all ${
                     briefing.aspectRatio === value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border/40 hover:border-border'
+                      ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30'
+                      : 'border-border/40 hover:border-amber-200/30'
                   }`}
                 >
                   <p className="font-medium text-xs">{label}</p>
@@ -751,75 +749,97 @@ export default function BriefingTab({
             </div>
           </div>
 
-          {/* Default Quality Tier */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">KI-Qualität (Standard für alle Szenen)</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {([
-                { q: 'standard' as ClipQuality, title: 'Standard', desc: '768p / 720p — günstiger', rate: '€0.15/s' },
-                { q: 'pro' as ClipQuality, title: 'Pro', desc: '1080p — höhere Auflösung', rate: 'ab €0.20/s' },
-              ]).map(({ q, title, desc, rate }) => {
-                const isActive = (briefing.defaultQuality || 'standard') === q;
-                return (
-                  <button
-                    key={q}
-                    onClick={() => onUpdateBriefing({ defaultQuality: q })}
-                    className={`p-3 rounded-lg border text-left transition-all ${
-                      isActive
-                        ? q === 'pro'
-                          ? 'border-amber-500/60 bg-amber-500/5 ring-1 ring-amber-500/30'
-                          : 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                        : 'border-border/40 hover:border-border'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className={`font-medium text-xs ${isActive && q === 'pro' ? 'text-amber-400' : isActive ? 'text-primary' : ''}`}>
-                        {title}
-                      </p>
-                      <span className="text-[10px] text-muted-foreground">{rate}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
-                  </button>
-                );
-              })}
+          {/* Default Quality Tier — Direct & Studio only */}
+          {showDirect && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">KI-Qualität (Standard für alle Szenen)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { q: 'standard' as ClipQuality, title: 'Standard', desc: '768p / 720p — günstiger', rate: '€0.15/s' },
+                  { q: 'pro' as ClipQuality, title: 'Pro', desc: '1080p — höhere Auflösung', rate: 'ab €0.20/s' },
+                ]).map(({ q, title, desc, rate }) => {
+                  const isActive = (briefing.defaultQuality || 'standard') === q;
+                  return (
+                    <button
+                      key={q}
+                      onClick={() => onUpdateBriefing({ defaultQuality: q })}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        isActive
+                          ? q === 'pro'
+                            ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30'
+                            : 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                          : 'border-border/40 hover:border-amber-200/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className={`font-medium text-xs ${isActive && q === 'pro' ? 'text-amber-300' : isActive ? 'text-primary' : ''}`}>
+                          {title}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">{rate}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-muted-foreground/70">
+                Pro-Szene überschreibbar im Storyboard.
+              </p>
             </div>
-            <p className="text-[10px] text-muted-foreground/70">
-              Pro-Szene überschreibbar im Storyboard.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </StagePanel>
 
-      {/* Video Mode — choose between AI video, AI image, or mixed scenes */}
-      <VideoModeSelector
-        value={briefing.videoMode || 'video'}
-        language={language}
-        onChange={(mode: VideoMode) => onUpdateBriefing({ videoMode: mode })}
-      />
+      {/* Video Mode — Direct & Studio only */}
+      {showDirect && (
+        <VideoModeSelector
+          value={briefing.videoMode || 'video'}
+          language={language}
+          onChange={(mode: VideoMode) => onUpdateBriefing({ videoMode: mode })}
+        />
+      )}
 
-      {/* Recurring Characters — drives consistency across scenes */}
-      <CharacterManager
-        characters={briefing.characters || []}
-        language={language}
-        onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
-      />
+      {/* Recurring Characters — Studio only (advanced) */}
+      {showStudio && (
+        <CharacterManager
+          characters={briefing.characters || []}
+          language={language}
+          onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
+        />
+      )}
 
-      {/* Visual Style — drives consistent look across all AI-generated scenes */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Palette className="h-4 w-4 text-primary" />
-            {language === 'de' ? 'Visueller Stil' : language === 'es' ? 'Estilo Visual' : 'Visual Style'}
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
+      {/* Director's Note — Direct & Studio only */}
+      {showDirect && (
+        <DirectorsNote>
+          {language === 'de'
+            ? 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek.'
+            : language === 'es'
+              ? 'Describe ropa y objetos distintivos en detalle (abrigo, corona, arma). La IA los repite con mucha más fiabilidad que las caras — el espectador reconoce al personaje por ellos. Para consistencia facial real, usa un avatar de la biblioteca.'
+              : 'Describe distinctive clothing & props in detail (coat, crown, weapon). The AI repeats those far more reliably than faces — your audience recognises the character by them. For true face consistency, use an avatar from the library.'}
+        </DirectorsNote>
+      )}
+
+
+
+      {/* Visual Style — Direct & Studio only */}
+      {showDirect && (
+        <StagePanel
+          slateIndex="05"
+          eyebrow="Scene · Visual Language"
+          title={
+            <span className="flex items-center gap-2">
+              <Palette className="h-4 w-4 text-amber-300" />
+              {language === 'de' ? 'Visueller Stil' : language === 'es' ? 'Estilo Visual' : 'Visual Style'}
+            </span>
+          }
+        >
+          <p className="text-xs text-muted-foreground mb-3">
             {language === 'de'
               ? 'Wird auf alle KI-generierten Szenen angewendet — sorgt für einheitlichen Look.'
               : language === 'es'
                 ? 'Se aplica a todas las escenas generadas por IA — garantiza un aspecto uniforme.'
                 : 'Applied to every AI-generated scene — ensures a consistent look.'}
           </p>
-        </CardHeader>
-        <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {VISUAL_STYLES.map((style) => {
               const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
@@ -832,9 +852,6 @@ export default function BriefingTab({
                     const styleId = style.id as ComposerVisualStyle;
                     onUpdateBriefing({ visualStyle: styleId });
 
-                    // Soft-suggest Shot Director defaults to scenes whose
-                    // shotDirector is currently empty. Manual selections are
-                    // never overwritten.
                     if (scenes && onUpdateScenes && scenes.length > 0) {
                       const emptyScenes = scenes.filter(
                         (s) => !s.shotDirector || Object.values(s.shotDirector).filter(Boolean).length === 0,
@@ -869,14 +886,14 @@ export default function BriefingTab({
                   }}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     isActive
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                      : 'border-border/40 hover:border-border'
+                      ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
+                      : 'border-border/40 hover:border-amber-200/30'
                   }`}
                 >
                   <div className="flex items-start gap-2">
                     <span className="text-lg leading-none">{style.glyph}</span>
                     <div className="min-w-0">
-                      <p className={`font-medium text-xs ${isActive ? 'text-primary' : ''}`}>
+                      <p className={`font-medium text-xs ${isActive ? 'text-amber-300' : ''}`}>
                         {style.label[lang]}
                       </p>
                       <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
@@ -888,8 +905,8 @@ export default function BriefingTab({
               );
             })}
           </div>
-        </CardContent>
-      </Card>
+        </StagePanel>
+      )}
 
       {/* Brand Kit Auto-Apply */}
       {assemblyConfig && onChangeBrandKit && onChangeBrandKitAutoSync && onApplyAssembly && (
@@ -947,13 +964,18 @@ export default function BriefingTab({
         </Card>
       )}
 
-      {/* Action */}
-      <div className="flex justify-end">
-        <Button
+      {/* Action — gold-gradient cinematic CTA */}
+      <div className="flex justify-end pt-2">
+        <button
+          type="button"
           onClick={handleGenerateStoryboard}
           disabled={!canProceed || isGenerating}
-          className="gap-2"
-          size="lg"
+          className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px]"
+          style={{
+            background: 'linear-gradient(180deg, #FFE9A8 0%, #F5C76A 50%, #b78934 100%)',
+            boxShadow:
+              '0 0 24px -8px hsla(43,90%,68%,0.5), inset 0 1px 0 hsla(0,0%,100%,0.45), inset 0 -1px 0 hsla(0,0%,0%,0.25)',
+          }}
         >
           {isGenerating ? (
             <>
@@ -971,7 +993,7 @@ export default function BriefingTab({
               {t('videoComposer.continueToStoryboard')}
             </>
           )}
-        </Button>
+        </button>
       </div>
     </div>
   );
