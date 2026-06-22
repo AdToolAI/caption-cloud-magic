@@ -775,8 +775,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
         audioPlan: targetScene.audioPlan,
+        performanceEntries: derivePerformanceEntries(targetScene, characters),
         language: directorLanguage,
       });
+
 
       const preparedSingle = targetScene.clipSource.startsWith('ai-') && targetScene.engineOverride !== 'cinematic-sync'
         ? await prepareSceneAnchor(targetScene, characters, activeBrandChar, composedSingle.finalPrompt, '16:9', {}, libLocations)
