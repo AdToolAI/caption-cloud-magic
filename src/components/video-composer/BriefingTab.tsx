@@ -112,9 +112,14 @@ interface BriefingTabProps {
   /** Fired when AI generation ends (success OR failure) so the loading
    *  panel can be hidden. */
   onGenerationEnd?: () => void;
-  /** Fired when AI generation fails or returns 0 scenes — dashboard
-   *  should bring the user back to Briefing so they can retry. */
-  onGenerationFailed?: () => void;
+  /** Fired when AI generation fails or returns 0 scenes. Receives the
+   *  user-facing error message + retryable flag so the dashboard can show
+   *  a persistent error panel with a retry button. */
+  onGenerationFailed?: (err: { message: string; retryable: boolean }) => void;
+  /** Counter the dashboard increments to trigger a programmatic re-run of
+   *  `handleGenerateStoryboard` (used by the storyboard-error retry button).
+   *  Initial value 0 is a no-op. */
+  retryStoryboardNonce?: number;
   brandKitId?: string | null;
   brandKitAutoSync?: boolean;
   assemblyConfig?: AssemblyConfig;
