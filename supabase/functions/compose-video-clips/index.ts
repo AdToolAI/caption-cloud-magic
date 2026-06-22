@@ -337,6 +337,15 @@ serve(async (req) => {
       //  *exaggerated*-talking guard so plates don't drift into clearly-
       //  worded speech that fights the audio.
       ", exaggerated facial talking, dialogue performance, singing, yelling, words clearly visible on lips" +
+      // v171 (Jun 22 2026) — Ghost-Speaker Guard. With all 4 passes finally
+      // running in parallel, non-active speakers were visibly mouthing along
+      // because the plate prompt asked for "subtle idle mouth and jaw motion"
+      // on every face. We keep the *lip-ready geometry* on the active speaker
+      // (Sync.so still needs an animatable mouth region — do NOT re-add the
+      // v112-killer tokens "talking mouth / lip movement / open mouth speech")
+      // but explicitly forbid idle mouth/jaw motion + listener mouth movement
+      // so the plate itself shows only the speaker-driven mouths in post.
+      ", idle mouth motion, idle jaw motion, mouths softly moving, mouth twitching, jaw twitching, multiple mouths flapping, group chatter, background mouth motion, listeners moving their lips, listeners' mouths moving, secondary characters speaking, non-speaker mouth movement, everyone talking at once, all characters speaking simultaneously" +
       // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
       // mid-clip camera cut or push-in when given a 3-shot start-frame plus
       // a long dialog-style prompt. The downstream Sync.so dispatch then
