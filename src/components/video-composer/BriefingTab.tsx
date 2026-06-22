@@ -39,6 +39,7 @@ import VideoModeSelector from './VideoModeSelector';
 import BrandKitApplyPanel from './BrandKitApplyPanel';
 import StagePanel from './stage/StagePanel';
 import DirectorsNote from './stage/DirectorsNote';
+import FilmStripModeSelector from './stage/FilmStripModeSelector';
 import { useStudioPreferences } from '@/hooks/useStudioPreferences';
 import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
