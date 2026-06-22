@@ -10,6 +10,15 @@ import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
 import type { SceneSnippet } from '@/types/motion-studio';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
 import { DEFAULT_TEXT_OVERLAY, DEFAULT_ASSEMBLY_CONFIG, getClipCost, getClipRate } from '@/types/video-composer';
+import {
+  MAX_PROJECT_SECONDS,
+  MIN_SCENE_SECONDS,
+  canAddScene,
+  formatDuration,
+  sumAllScenesDuration,
+  sumOtherScenesDuration,
+  budgetTone,
+} from '@/lib/composer/budget';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useComposerHistoryContext } from './ComposerHistoryContext';
 import { sceneToSnakeSnapshot } from '@/lib/video-composer/sceneSnapshot';
