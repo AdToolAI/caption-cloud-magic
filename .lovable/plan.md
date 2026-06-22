@@ -1,42 +1,48 @@
+## Problem
+
+1. **Briefing-Intro spielt bei jedem Reload.** `StageWelcomeMoment` (`src/components/video-composer/stage/StageWelcomeMoment.tsx:33-39`) hat einen ausdrücklichen Kommentar *"intentionally NO sessionStorage gate — the cinematic welcome should replay every time"* — die ~3,8 s Cinematic-Sequenz läuft bei jedem Mount. Auch der Template-Picker (`VideoComposerDashboard.tsx:219`) öffnet sich, sobald weder ein `?projectId=` in der URL steht noch ein Draft im localStorage existiert.
+
+2. **Seite lädt sich gelegentlich von selbst neu.** In unserem Code gibt es keinen automatischen Reload-Trigger im Motion-Studio-Pfad. Auto-Reloads kommen praktisch immer aus einer dieser Quellen:
+   - Lovable Live-Preview HMR (passiert bei jedem File-Edit – nur in der Editor-Vorschau, nicht auf der Live-Domain).
+   - Service-Worker-Umschaltungen (wir entregistrieren bereits alle SWs in `main.tsx:114`, also unwahrscheinlich).
+   - `ChunkLoadError` nach Neudeploy → Browser muss ein altes Bundle nachladen und scheitert → ErrorBoundary zeigt manuellen Reload-Button.
+
 ## Ziel
 
-Im Motion Studio gilt ab sofort ein **hartes Gesamt-Budget von 10 Minuten (600 s)** pro Projekt. Szenen werden weiterhin **einzeln** erzeugt (kein Massen-Render), aber die Summe aller Szenen-Dauern darf 600 s **niemals** überschreiten – weder beim Anlegen neuer Szenen noch beim Verlängern bestehender.
+- Intro & Template-Picker **erscheinen nur bei einer "echten" Navigation** auf das Motion Studio (Sidebar-Klick, Direkt-URL), **nicht bei Page-Reload (F5 / Cmd-R / Browser-Refresh)**.
+- Auto-Reload-Quelle identifizieren bzw. eindämmen.
 
-Lipsync-, Render- und Stitch-Pipeline werden **nicht** angefasst.
+## Lösung Issue #1 — Intro & Template-Picker
 
-## Verhalten
+**Verlässliche Reload-Erkennung** über die Navigation Timing API:
 
-- **Briefing-Slider** (Ziel-Gesamtdauer): 15 s – 600 s (Step 15 s).
-- **Per-Szene-Slider** (`SceneCard`): bleibt technisch 3–15 s, wird aber **dynamisch geclamped** auf `min(15, 600 − sumOfOtherScenes)`. Beispiel: 595 s schon verplant → Slider geht nur bis 8 s.
-- **"Szene hinzufügen"-Button**: deaktiviert, sobald `sumOfScenes ≥ 597 s` (kein Platz mehr für minimale 3-s-Szene). Tooltip: *"Budget voll – kürze oder lösche eine Szene, um Platz zu schaffen."*
-- **Auto-Director / Ad-Director / Scene-Director**: wenn die KI mehr Sekunden plant als verfügbar, wird die Szenen-Liste server­seitig auf das Restbudget gekürzt (letzte Szenen abgeschnitten) – Logging + UI-Hinweis.
-- **Budget-Anzeige**: oben im Composer-Dashboard sichtbare Leiste `mm:ss / 10:00` mit Farb-Stufen (grün < 8 min, amber 8–10 min, rot = voll).
-- **Freigewordene Zeit** nach Kürzen/Löschen wird automatisch verfügbar – nichts Manuelles, einfach: jeder Slider liest live `remaining = 600 − sumOfOthers`.
+```ts
+const isReload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
+```
 
-## Was sich technisch ändert
+`'reload'` deckt F5, Cmd-R, Browser-Refresh-Button und programmatic `location.reload()` ab. SPA-Navigation (Sidebar-Klick auf "Motion Studio") liefert `'navigate'` oder `'back_forward'` – Intro spielt also normal weiter.
+
+**Änderungen:**
 
 | Datei | Änderung |
 |---|---|
-| `src/components/video-composer/BriefingTab.tsx` | Slider `max=600 step=15`, Label-Formatter (s ↔ `m:ss`) |
-| `src/components/video-composer/SceneCard.tsx` | Duration-Slider `max = Math.min(15, 600 − sumOfOtherScenes)`; dabei mind. `min=3`; bei `remaining<3` Slider disabled mit Tooltip |
-| `src/components/video-composer/VideoComposerDashboard.tsx` | Neue Budget-Leiste `mm:ss / 10:00` + Farblogik; "Add Scene"-Button disabled-State |
-| `src/components/video-composer/AutoDirectorWizard.tsx` + `AdDirectorWizard.tsx` | Target-Sec auf max 600 begrenzen; vor Submit prüfen ob `600 − sumExistingScenes` verbleibt |
-| `supabase/functions/auto-director-compose/index.ts` | Server-Cap: kumulierte `n_seconds` der Szenen ≤ `min(targetSec, 600)`; überschüssige Szenen werden gedroppt und im Response gemeldet |
-| `supabase/functions/ad-director-*` (sofern Szenen erzeugt) | gleiche 600-s-Hard-Cap |
-| `src/locales/{en,de,es}/translation.json` | Neue Keys: `videoComposer.budgetLabel`, `budgetFull`, `budgetExceededTooltip` |
+| `src/components/video-composer/stage/StageWelcomeMoment.tsx` | Reload-Check: bei `isReload` direkt `setPhase('done')`, kein Intro |
+| `src/components/video-composer/VideoComposerDashboard.tsx` | `showTemplatePicker`-Init: zusätzlich `&& !isReload` – nach F5 nicht erneut auto-öffnen (der "Vorlage öffnen"-Button in der Toolbar bleibt jederzeit verfügbar) |
 
-Helfer:
-- Neue Util `src/lib/composer/budget.ts` mit `MAX_PROJECT_SECONDS = 600`, `getRemainingBudget(scenes, currentSceneId?)`, `formatDuration(s)`. Wird von allen oben genannten Komponenten genutzt → eine Wahrheit.
+Beide Stellen nutzen denselben kleinen Helper `src/lib/composer/isPageReload.ts` mit defensivem `try/catch` (Safari < 15 hat die API nicht).
 
-## Was explizit unberührt bleibt
+## Lösung Issue #2 — Auto-Reload
 
-- **Pro-Szene-Render** (`generate-scene-visual`, Hailuo/Kling/Pika/Vidu/Runway/Sora/HappyHorse/Seedance/Luma/Wan/Hedra) – jede Szene rendert einzeln wie bisher, keine Pipeline-Änderung.
-- **Lipsync** komplett: `generate-scene-dialog`, `compose-dialog-scene`, `poll-dialog-shots`, `sync-so-webhook`, HeyGen Talking-Head, Cinematic-Sync – nichts angefasst (arbeiten pro Szene, kennen Projekt-Gesamtdauer nicht).
-- **Stitch & Director's Cut**: `compose-stitch-and-handoff`, Lambda-Render – unverändert.
-- **Per-Provider-Limits** (3–15 s pro Clip) – bleiben hartes Provider-Cap.
+Da der Code keinen unkontrollierten Reload triggert, ist die wahrscheinlichste reale Ursache ein **`ChunkLoadError`** nach Neudeployment, bei dem der Browser ein veraltetes Bundle nicht mehr findet und das ErrorBoundary den Nutzer mit *"Seite neu laden"* abfängt. Maßnahmen:
 
-## Edge-Cases
+1. **Globaler Vite-Listener** in `src/main.tsx`: bei `event.error?.name === 'ChunkLoadError'` oder Message-Match `"Failed to fetch dynamically imported module"` einmalig `location.reload()` mit Guard (`sessionStorage` flag, damit kein Reload-Loop entsteht) — das ist die saubere, branchenübliche Behebung.
+2. **Tracking-Log:** `console.warn('[chunk-reload]', …)` plus Sentry-Breadcrumb, damit wir reproduzierbare Vorfälle nachvollziehen können.
+3. **Sidebar-Klick auf "Motion Studio" während man bereits dort ist** → soll keinen Re-Mount/Reload mehr triggern (heutiges Verhalten beibehalten, kein Eingriff nötig — React Router rendert dieselbe Route ohnehin nicht neu).
 
-- Beim **Initialisieren eines neuen Projekts** mit z.B. 8 Default-Szenen × 5 s = 40 s → reichlich Budget, keine Sichtveränderung.
-- **Bestehende Projekte > 600 s** (sollte praktisch keine geben): kein Auto-Cut; Budget-Leiste wird rot, Slider auf 0 zusätzlicher Sekunden geclamped, User muss manuell kürzen/löschen.
-- **Frame-Picker / Hybrid-Extend**: prüft vor Verlängerung Restbudget; sonst Toast *"Kein Budget mehr – kürze eine andere Szene."*
+Falls der User berichtet, dass der Reload **ohne neue Deployments** passiert, gehen wir in einer Folge-Iteration mit einem Repro-Schritt nach (Browser-Tab, Aktion, Zeitpunkt) – dafür wäre die Konsole zum Zeitpunkt des Reloads aufschlussreich.
+
+## Was NICHT angefasst wird
+
+- Komplette Tab-Persistenz, Draft-Restore-Logik, Realtime-Subscriptions, Polling-Intervalle.
+- Der manuelle Reload-Button im `ErrorBoundary` (nur Auto-Loop wird verhindert).
+- Lipsync/Render/Stitch-Pipeline.

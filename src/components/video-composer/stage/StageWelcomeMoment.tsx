@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { emitStageEvent } from "@/lib/stage/stageEvents";
+import { isPageReload } from "@/lib/composer/isPageReload";
 import StageCountdown from "./StageCountdown";
 
 const SESSION_KEY = "motion-studio:welcomed-this-session";
@@ -32,9 +33,14 @@ export default function StageWelcomeMoment() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Note: intentionally NO sessionStorage gate — the cinematic welcome
-    // should replay every time the user enters the Motion Studio so it
-    // feels like stepping onto a sound stage anew.
+    // Skip the cinematic welcome on browser reloads (F5 / Cmd-R / refresh
+    // button). The intro should only play on a fresh navigation to the
+    // Motion Studio (sidebar click, direct URL) — reloading mid-work
+    // shouldn't replay the 3.8s sequence every time.
+    if (isPageReload()) {
+      setPhase("done");
+      return;
+    }
     void SESSION_KEY;
     setPhase("playing");
 
