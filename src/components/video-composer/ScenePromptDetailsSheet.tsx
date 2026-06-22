@@ -50,8 +50,11 @@ interface Props {
   brandCharacterInput?: BrandCharacterInput;
   libCharacters: any[];
   libLocations: any[];
+  /** Project cast — forwarded to DirectorConsolePreview for the [4 PERFORMANCE] block. */
+  characters?: Array<{ id: string; name: string }>;
   onOpenCompareLab: () => void;
 }
+
 
 const t = {
   de: {
