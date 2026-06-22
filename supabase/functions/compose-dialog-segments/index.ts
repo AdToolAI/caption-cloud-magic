@@ -590,6 +590,7 @@ serve(async (req) => {
   let lockSupabase: any = null;
   let lockSceneId: string | null = null;
   let lockHolder: string | null = null;
+  let lockPassIdx: number = 0; // v168 Phase 2 — per-pass-lock partition key (0 when flag OFF)
   // v100 — crash-safe envelope: keep sceneId/userId/syncApiKey reachable from
   // the outer catch so an uncaught throw before/after dispatch can immediately
   // mark the scene `failed` (with refund) instead of leaving it `pending` until
