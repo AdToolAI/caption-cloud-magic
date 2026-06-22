@@ -1,79 +1,70 @@
-## Academy Leader Countdown — Nach der Welcome Sequence
+## Vintage Pass — "1920s Hand-Cranked Camera" Countdown
 
-Verstanden! Macht auch mehr Sinn: Welcome-Sequenz baut die Stimmung auf (Clapperboard + Bars), dann der klassische 3-2-1 Academy Leader als finaler Übergang ins Briefing — wie im echten Kino.
+Geile Idee! Lass uns die Uhr von "moderner Stoppuhr mit Gold-Akzent" zu echtem **Stummfilm-Look** umbauen — wie mit einer hand-gekurbelten 1920er Bell & Howell Kamera gedreht. Das ändert weniger die Struktur als die Textur, die Bewegung und die Farbpalette.
 
-### Reihenfolge
+### Was sich ändert
 
-```text
-[Welcome Moment ~2.6s]
-   Black → Clapperboard → "MOTION STUDIO" Type-in → Bars open
-            │
-            ▼
-[Academy Countdown ~3.6s]   ← NEU
-   ┌─────────────┐
-   │   ╱──╲      │
-   │  │ 3  │     │  ← Sweep rotiert 1s
-   │   ╲──╱      │     dann 3 → 2 → 1
-   └─────────────┘     dann kurzer Weiß-Flash
-            │
-            ▼
-[Briefing fadet ein]
-```
+**1. Sepia statt Gold** — Stummfilme waren entweder Schwarz-Weiß mit Sepia-Tonung oder hatten ganze Szenen in einer Farbe eingefärbt (tinting). Die Scheibe wird:
+- Warmes **Sepia-Beige** (`#d4b483`, `#a67c52`) statt Bond-Gold
+- Hintergrund **gealtertes Cremeweiß** (`#e8dcc4`) statt tiefes Schwarz — also **Negativ umgekehrt**: helle Scheibe, dunkle Zahl, wie ein echter Filmleader vor 1930
+- Zahl in **schwerer Antik-Serife** (Playfair bleibt, aber bold + outline) in tiefem Anthrazit `#1a1410`
 
-Kein Cut zwischen Welcome und Countdown — Welcome endet, Bars öffnen, dahinter erscheint **nahtlos** die Countdown-Scheibe (kein erneuter Black-Cut). Nach der "1" gibt's einen kurzen Weiß-Flash (klassisches Academy-Leader-Ende), dann fadet das Briefing rein.
+**2. Hand-Crank Stutter** — 1920er Kameras liefen mit ~16-18 fps statt 24, und der Bediener kurbelte ungleichmäßig. Statt smoother Animationen:
+- Sweep-Linie ruckelt in **6 Steps pro Sekunde** statt smooth zu rotieren (`steps(6, end)`)
+- Zahlen-Wechsel mit kurzem **Doppel-Bild-Flicker** (3 zoomt aus, kurz beide sichtbar, 2 zoomt rein)
+- Die ganze Scheibe macht **alle 0.4s einen 1-2px Mikro-Jitter** (Kamera-Wackeln durch Handkurbel)
 
-### Visual Design (Old-Film Clock)
+**3. Heftiges Film-Flicker** — alte Stummfilme flackern stark wegen ungleichmäßiger Belichtung:
+- Helligkeit der Scheibe variiert in 8-12 fps zwischen 85% und 110% (`filter: brightness()` keyframe mit steps)
+- Vignette pulsiert mit
+- Gelegentliche **Belichtungs-Spitzen** (alle 1.5s ein heller Frame, wie ein verbranntes Einzelbild)
 
-- **Scheibe**: Kreis Ø ~280px, tief-schwarz `#050505`, konzentrische Ringe in `rgba(245,199,106,0.15)`
-- **Ziffer**: Große Playfair-Display-Zahl mittig (Bone-White), mit subtilem Film-Korn-Overlay
-- **Sweep-Linie**: Gold-glühende Linie rotiert in **genau 1s** um den Kreis (wie Stoppuhr-Sekundenzeiger)
-- **12 Tick-Marker** am Rand wie Uhrenzifferblatt, aktiver pulsiert in Gold
-- **Diagonales ✕** im Hintergrund (8% Opazität) — das ikonische Academy-Leader-Kreuz
-- **Film-Korn**: SVG-noise overlay, 25% Opazität, leicht flackernd (echter 16mm-Look)
-- **Vignette** außen für Fokus
+**4. Echte Film-Defekte** statt nur Korn:
+- **Vertikale Kratzer** die ein paar Frames lang sichtbar sind und dann woandershin springen (CSS keyframe der die Position steppt)
+- **Staub/Haare** — 2-3 kleine schwarze Sprenkel an zufälligen Positionen, die alle paar Frames neu erscheinen
+- **Cigarette burns** / Markierungen — die runden braunen Brandflecken oben rechts (klassisches Reel-Change-Zeichen) blitzen 2 Frames bei jedem Zahl-Wechsel auf
+- **Splice-Lines** — horizontale weiße Linie die einmal von oben nach unten durchläuft pro Zahl (Klebestelle im Film)
 
-### Choreografie
+**5. Akademie-Leader 1920er-Style statt moderner Look**:
+- Statt 12 Uhren-Ticks → **konzentrische Sektor-Linien** wie auf einem alten SMPTE Universal Leader (1930), aber bewusst noch unregelmäßiger
+- Das diagonale ✕ wird **handgezeichnet wirkend** (leicht wackelige Linie, dicker, mit Tinte-Look)
+- **Typografische Ornamente** außen herum: kleine Sterne, Punkte, "REEL 1", "PART 1", "PICTURE START" in monospace Caps
 
-| Zeit (nach Welcome) | Beat                                                  |
-| ------------------- | ----------------------------------------------------- |
-| 0 – 200ms           | Clock-Scheibe fadet ein (scale 0.9 → 1.0)             |
-| 200ms               | "3" pop-in, Sweep startet 1s-Rotation                 |
-| 1200ms              | "3" zoom-out + blur, "2" pop-in, neuer Sweep          |
-| 2200ms              | "2" zoom-out, "1" pop-in, neuer Sweep                 |
-| 3200ms              | "1" zoom-out, **Weiß-Flash** (200ms)                  |
-| 3400ms              | Clock kollabiert, Briefing erscheint                  |
+**6. Vignette + Linsen-Charakter**:
+- Starke **runde Vignette** außen (alte Objektive vignettieren stark)
+- Leichte **Linsen-Verzeichnung** an den Rändern (CSS `border-radius` kreisförmig schon da, plus subtiler `filter: blur(0.5px)` an den Außenrändern via Mask)
+- **Chromatic Aberration** Andeutung — die Zahl bekommt 0.5px roten Schein links + cyanen rechts (Linsenfehler alter Optiken)
 
-Skip-Button rechts unten überspringt Welcome + Countdown sofort. Reduced-motion: Countdown wird auf 400ms statischen Fade reduziert (zeigt nur "3·2·1" nebeneinander, kein Spin).
+**7. Geschwindigkeit & Sound-Hint**:
+- Countdown läuft **leicht ungleichmäßig** — "3" bleibt 1100ms, "2" bleibt 950ms, "1" bleibt 1050ms (wie schlecht gekurbelt)
+- Am Ende statt Weiß-Flash → klassischer **Schwarz-Cut mit 2 Frames Weiß-Flicker** dazwischen (Film läuft aus der Schleife)
+- Optional: kleine **"PICTURE START"** Lauftext-Markierung die rotiert (out of scope für Audio, aber visuell)
 
-### Integration
+### Choreografie (~3.1s)
 
-- Neue Komponente: `src/components/video-composer/stage/StageCountdown.tsx`
-- `StageWelcomeMoment.tsx` wird erweitert: nach dem letzten Welcome-Beat rendert es `<StageCountdown onComplete={onDone} />` statt direkt `onDone()` aufzurufen
-- Skip-Button verschoben in den Welcome-Wrapper, deckt beide Phasen ab
-- Keine Änderung am Briefing oder den Mode-Cards
+| Zeit         | Beat                                                                 |
+| ------------ | -------------------------------------------------------------------- |
+| 0 – 200ms    | Scheibe blendet ein mit Belichtungs-Flicker (3 schnelle Helligkeits-Pulses) |
+| 200 – 1300ms | "3" sichtbar, gestepptes Sweep, Jitter, Flicker durchgehend          |
+| 1300ms       | Splice-Linie zuckt durch, "3"→"2" mit Doppel-Frame-Flicker           |
+| 1300 – 2250ms| "2" sichtbar (950ms — schneller weil "Kamera überdreht")            |
+| 2250ms       | Cigarette burn flackert oben rechts, "2"→"1"                         |
+| 2250 – 3300ms| "1" sichtbar mit zunehmendem Flicker (Film läuft aus)                |
+| 3300 – 3500ms| Schwarz-Cut mit 2 Frames Weiß-Flicker, Briefing erscheint            |
 
-### Neue Keyframes (`index.css`)
+### Files
 
-```text
-countdownSweep    → rotate(0deg → 360deg), 1s linear infinite (3 Loops)
-countdownDigitIn  → scale(0.4) blur(20px) → scale(1) blur(0), 200ms
-countdownDigitOut → scale(1) → scale(1.8) blur(12px) opacity:0, 300ms
-countdownGrain    → translate noise pattern, 0.15s steps infinite
-countdownFlash    → opacity 0 → 1 → 0 weiß, 200ms
-countdownTick     → tick-marker gold pulse, 1s linear
-```
+- Edit: `src/components/video-composer/stage/StageCountdown.tsx` — komplette Re-Implementation der visuellen Schicht (Struktur bleibt: Scheibe, Zahl, Sweep, Defekte, Flash). Logik (Timer, onComplete) bleibt.
+- Edit: `src/components/video-composer/stage/StageWelcomeMoment.tsx` — Hintergrund-Farbe hinter dem Countdown von `#050816` zu tiefem `#0a0805` (warmes Schwarz statt blau-schwarz), damit die Sepia-Scheibe nicht kalt wirkt. Minimal.
+- Keine neuen Komponenten, keine Backend-Änderungen.
 
 ### Scope
 
-**In scope:**
-- Neue `StageCountdown.tsx` Komponente
-- Integration nach Welcome in `StageWelcomeMoment.tsx`
-- 6 neue Keyframes in `index.css`
-- Skip + reduced-motion Pfad
+**In scope:** Sepia-Palette, Hand-Crank Stutter (steps), Film-Flicker, Kratzer/Staub/Cigarette burns/Splice lines, ungleichmäßiges Timing, Chromatic Aberration auf der Zahl, runde Vignette, typografische Ornamente.
 
 **Out of scope:**
-- Audio / Tick-Sounds (Web Audio Setup — auf Wunsch separat)
-- Briefing-, Mode-Card-, oder Layout-Änderungen
-- Backend / edge / schema
+- Audio (Projektor-Surren, Tick-Geräusche) — separater Pass auf Wunsch
+- Komplette Welcome-Sequenz vintage-isieren (du hast den Clapperboard-Look gerade erst freigegeben)
+- Frame-Rate-Drop für die ganze Seite
 
-Reiner Frontend-Polish, ~0.3 Tag. Soll ich's so bauen?
+Reiner Frontend-Polish auf einer Komponente. ~0.3 Tag. Soll ich's so umsetzen?
