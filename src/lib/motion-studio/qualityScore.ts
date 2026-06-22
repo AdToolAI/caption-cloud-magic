@@ -108,8 +108,10 @@ const T = {
       consistencyWarn: 'Gemischte Style-Cues entdeckt (z. B. "noir" + "cinematic colorful") — entscheide dich für eine Richtung.',
       redundancyWarn: 'Cast-Aktionen wiederholen die Scene-Action — präzisiere oder lösche Dubletten, damit jede Zeile etwas Eigenes lenkt.',
       boilerplateWarn: 'Auto-Platzhalter in Cast-Aktionen erkannt ("gestikuliert natürlich, sichtbar zur Kamera") — wird aus dem finalen Prompt gefiltert; ersetze sie für mehr Kontrolle.',
+      performanceConflictWarn: 'Eine Cast-Aktion beschreibt bereits eine Geste/Mimik, die auch im Performance-Tab gesetzt ist — wähle eine Quelle, damit das Modell eine eindeutige Anweisung erhält.',
 
     },
+
   },
   es: {
     subject: { pass: 'Reparto fijo', warn: 'Reparto vago', fail: 'Sin reparto' },
