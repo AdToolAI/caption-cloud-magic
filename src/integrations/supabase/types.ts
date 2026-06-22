@@ -2210,6 +2210,7 @@ export type Database = {
           created_at: string
           default_aspect_ratio: string | null
           default_language: string | null
+          default_performance: Json | null
           default_voice_id: string | null
           default_voice_name: string | null
           default_voice_provider: string | null
@@ -2254,6 +2255,7 @@ export type Database = {
           created_at?: string
           default_aspect_ratio?: string | null
           default_language?: string | null
+          default_performance?: Json | null
           default_voice_id?: string | null
           default_voice_name?: string | null
           default_voice_provider?: string | null
@@ -2298,6 +2300,7 @@ export type Database = {
           created_at?: string
           default_aspect_ratio?: string | null
           default_language?: string | null
+          default_performance?: Json | null
           default_voice_id?: string | null
           default_voice_name?: string | null
           default_voice_provider?: string | null

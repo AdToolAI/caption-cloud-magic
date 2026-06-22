@@ -23,6 +23,14 @@ export interface BrandCharacter {
   portrait_mode: 'original' | 'auto_generated' | 'auto_default_outfit' | 'manual_upload' | null;
   default_language: string | null;
   default_aspect_ratio: string | null;
+  /** Phase 3.3 — default Performance Layer applied to every Composer scene unless overridden. */
+  default_performance?: {
+    expression?: string;
+    gesture?: string;
+    gaze?: string;
+    energy?: 1 | 2 | 3 | 4 | 5;
+  } | null;
+
   // Marketplace
   marketplace_status?: 'private' | 'pending_review' | 'published' | 'under_investigation' | 'rejected' | null;
   pricing_type?: 'free' | 'premium' | null;

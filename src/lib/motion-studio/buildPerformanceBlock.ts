@@ -115,9 +115,16 @@ export function derivePerformanceEntries(
     characterShots?: Array<{ characterId?: string; shotType?: string }>;
     characterShot?: { characterId?: string; shotType?: string };
   },
-  characters: Array<{ id: string; name: string }> | undefined,
+  characters:
+    | Array<{
+        id: string;
+        name: string;
+        /** Phase 3.3 — character-level fallback merged under scene overrides. */
+        default_performance?: import('@/types/video-composer').ScenePerformance | null;
+      }>
+    | undefined,
 ): PerformanceEntry[] {
-  if (!scene.performance || !characters?.length) return [];
+  if (!characters?.length) return [];
   const shots = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
   const activeIds = new Set(
     shots
@@ -125,7 +132,26 @@ export function derivePerformanceEntries(
       .map((s) => s.characterId)
       .filter(Boolean) as string[],
   );
+  const scenePerf = scene.performance ?? {};
   return characters
     .filter((c) => activeIds.has(c.id))
-    .map((c) => ({ name: c.name, performance: scene.performance![c.id] }));
+    .map((c) => {
+      // Scene-level wins, character-level fills the gaps. Empty fields on
+      // either side never overwrite the other side's value.
+      const fromChar = (c.default_performance ?? undefined) as
+        | import('@/types/video-composer').ScenePerformance
+        | undefined;
+      const fromScene = scenePerf[c.id];
+      const merged: import('@/types/video-composer').ScenePerformance | undefined =
+        fromChar || fromScene
+          ? {
+              expression: fromScene?.expression ?? fromChar?.expression,
+              gesture: fromScene?.gesture ?? fromChar?.gesture,
+              gaze: fromScene?.gaze ?? fromChar?.gaze,
+              energy: fromScene?.energy ?? fromChar?.energy,
+            }
+          : undefined;
+      return { name: c.name, performance: merged };
+    });
 }
+

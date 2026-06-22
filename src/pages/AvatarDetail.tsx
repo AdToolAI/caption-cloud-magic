@@ -14,6 +14,8 @@ import { WardrobePerspectiveCard } from '@/components/brand-characters/WardrobeP
 import { SavedOutfitsSection } from '@/components/brand-characters/SavedOutfitsSection';
 import { SavedOutfitViewerCard } from '@/components/brand-characters/SavedOutfitViewerCard';
 import { VoiceProfileCard } from '@/components/avatars/VoiceProfileCard';
+import { AvatarDefaultPerformanceCard } from '@/components/avatars/AvatarDefaultPerformanceCard';
+
 import type { OutfitLook } from '@/hooks/useSavedOutfits';
 
 interface SelectedOutfit {
@@ -163,7 +165,12 @@ const AvatarDetail = () => {
                     }}
                   />
                   <VoiceProfileCard avatarId={avatar.id} avatar={avatar} />
+                  <AvatarDefaultPerformanceCard
+                    avatarId={avatar.id}
+                    initial={avatar.default_performance ?? null}
+                  />
                 </div>
+
               </div>
 
               <SavedOutfitsSection
