@@ -1564,15 +1564,24 @@ export default function VideoComposerDashboard() {
               onUpdateProject={updateProject}
               onGoToStoryboard={() => setActiveTab('storyboard')}
               onScenesGenerated={(scenes) => {
+                setStoryboardError(null);
                 setScenes(scenes);
                 setActiveTab('storyboard');
               }}
-              onGenerationStart={() => setIsGeneratingStoryboard(true)}
-              onGenerationEnd={() => setIsGeneratingStoryboard(false)}
-              onGenerationFailed={() => {
-                setIsGeneratingStoryboard(false);
-                setActiveTab('briefing');
+              onGenerationStart={() => {
+                setStoryboardError(null);
+                setIsGeneratingStoryboard(true);
               }}
+              onGenerationEnd={() => setIsGeneratingStoryboard(false)}
+              onGenerationFailed={(err) => {
+                // Keep the user on the Storyboard tab and surface the error
+                // there via a persistent panel with a retry button — no
+                // silent tab bounce back to Briefing.
+                setIsGeneratingStoryboard(false);
+                setStoryboardError(err);
+                setActiveTab('storyboard');
+              }}
+              retryStoryboardNonce={retryStoryboardNonce}
               brandKitId={project.brandKitId ?? null}
               brandKitAutoSync={project.brandKitAutoSync ?? false}
               assemblyConfig={project.assemblyConfig}
