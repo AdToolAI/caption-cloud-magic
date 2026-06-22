@@ -78,7 +78,9 @@ const T = {
       consistencyWarn: 'Detected mixed style cues (e.g. "noir" + "cinematic colorful") — pick one direction.',
       redundancyWarn: 'Cast actions repeat the scene action — tighten or delete duplicates so each line directs something specific.',
       boilerplateWarn: 'Auto-placeholder cast actions detected ("gesturing naturally, visible to camera") — they will be filtered from the final prompt; consider replacing them with concrete direction.',
+      performanceConflictWarn: 'A cast action already describes a gesture/expression that is also set in the Performance tab — pick one source so the model gets a single, unambiguous direction.',
     },
+
   },
 
   de: {
