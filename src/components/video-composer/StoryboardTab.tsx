@@ -470,10 +470,10 @@ export default function StoryboardTab({
 
   const handleAddSceneClick = () => {
     if (!addSceneAllowed) {
-      toast({
-        title: 'Projekt-Budget voll',
-        description: `Maximal ${formatDuration(MAX_PROJECT_SECONDS)} pro Projekt. Kürze oder lösche eine andere Szene, um Platz zu schaffen.`,
-        variant: 'destructive',
+      void import('sonner').then(({ toast }) => {
+        toast.error('Projekt-Budget voll', {
+          description: `Maximal ${formatDuration(MAX_PROJECT_SECONDS)} pro Projekt. Kürze oder lösche eine andere Szene, um Platz zu schaffen.`,
+        });
       });
       return;
     }
