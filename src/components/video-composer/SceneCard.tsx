@@ -771,7 +771,13 @@ export default function SceneCard({
             <SceneStudioTabBar
               cardId={`scene-card-${scene.id || index}`}
               language={lang}
+              badges={{
+                performance: countDirectedPerformances(
+                  derivePerformanceEntries(scene, characters ?? []),
+                ),
+              }}
             />
+
             {/* Content */}
             <div className="flex-1 min-w-0 space-y-4">
               <SceneStudioSectionHeader tab="story" language={lang} />
