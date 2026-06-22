@@ -134,6 +134,8 @@ export function useGenerateAllClips({
     // very next frame. Also flip every pending AI scene to 'generating'
     // locally so the per-scene shimmer appears instantly.
     emitPipelineEvent({ type: 'clips:start' });
+    // 🎬 Action — cinematic clapper cue for the Sound Stage layer.
+    emitStageEvent('action', { source: 'generate-all' });
     const pendingNow = scenes.filter(
       (s) =>
         s.clipStatus !== 'ready' &&
