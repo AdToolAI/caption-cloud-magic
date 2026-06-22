@@ -164,6 +164,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useSceneRenderConfirm } from "@/lib/composer/sceneRenderConfirm";
 
 interface SceneCardProps {
   scene: ComposerScene;
