@@ -138,8 +138,10 @@ const T = {
       consistencyWarn: 'Cues de estilo mezclados detectados (p. ej. "noir" + "cinematic colorful") — elige una dirección.',
       redundancyWarn: 'Las acciones del reparto repiten la acción de la escena — afina o elimina duplicados para que cada línea aporte algo propio.',
       boilerplateWarn: 'Detectados placeholders automáticos en acciones del reparto ("gesticula con naturalidad, visible a cámara") — se filtrarán del prompt final; sustitúyelos por dirección concreta.',
+      performanceConflictWarn: 'Una acción del reparto ya describe un gesto/expresión que también está fijado en la pestaña Performance — elige una sola fuente para dar al modelo una dirección inequívoca.',
 
     },
+
   },
 } as const;
 
