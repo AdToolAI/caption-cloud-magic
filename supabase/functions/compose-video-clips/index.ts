@@ -337,6 +337,15 @@ serve(async (req) => {
       //  *exaggerated*-talking guard so plates don't drift into clearly-
       //  worded speech that fights the audio.
       ", exaggerated facial talking, dialogue performance, singing, yelling, words clearly visible on lips" +
+      // v171 (Jun 22 2026) — Ghost-Speaker Guard. With all 4 passes finally
+      // running in parallel, non-active speakers were visibly mouthing along
+      // because the plate prompt asked for "subtle idle mouth and jaw motion"
+      // on every face. We keep the *lip-ready geometry* on the active speaker
+      // (Sync.so still needs an animatable mouth region — do NOT re-add the
+      // v112-killer tokens "talking mouth / lip movement / open mouth speech")
+      // but explicitly forbid idle mouth/jaw motion + listener mouth movement
+      // so the plate itself shows only the speaker-driven mouths in post.
+      ", idle mouth motion, idle jaw motion, mouths softly moving, mouth twitching, jaw twitching, multiple mouths flapping, group chatter, background mouth motion, listeners moving their lips, listeners' mouths moving, secondary characters speaking, non-speaker mouth movement, everyone talking at once, all characters speaking simultaneously" +
       // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
       // mid-clip camera cut or push-in when given a 3-shot start-frame plus
       // a long dialog-style prompt. The downstream Sync.so dispatch then
@@ -649,7 +658,7 @@ serve(async (req) => {
       // natural, lip-ready neutral expression with the mouth area clearly
       // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
       // constraints live exclusively in the negative_prompt.
-      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral position with a soft visible teeth gap and a softly mobile jaw — small, subtle, natural idle mouth and jaw motion (the character should be speaking naturally, no specific words, no exaggerated speech). EVERY visible person independently and continuously shows subtle idle motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), small natural head bobs and weight shifts, occasional blinks and gentle eye movement, no person ever fully static or statue-like. Each face must move at least slightly every second. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), small natural head bobs and weight shifts, occasional blinks and gentle eye movement, no person ever fully static or statue-like. BUT mouths and jaws stay still and softly closed — no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap, no listener mouth movement. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
@@ -683,7 +692,15 @@ serve(async (req) => {
       // small idle mouth/jaw motion that sync-3 requires to drive
       // lipsync on AI-generated plates. Without it, plates render with a
       // statically closed mouth and sync-3 returns the input unchanged.
-      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft and clearly visible. Every visible character should be speaking naturally with subtle, natural idle mouth and jaw movements throughout the entire clip (no specific words, no exaggerated speech — just lightweight, lifelike mouth motion).`;
+      // v171 (Jun 22 2026) — Ghost-Speaker fix. The closing clause used to ask
+      // every character to "speak naturally with subtle idle mouth/jaw motion"
+      // throughout the clip. With all N passes now running in parallel, that
+      // makes non-active speakers visibly mouth along ("ghost speaking") on
+      // top of their pass-overlay. We keep the lip-ready *geometry* (soft,
+      // visible, unobstructed lip-line) — which is what sync-3 actually needs
+      // to drive lipsync — but remove the *motion* instruction. Plate mouths
+      // stay still; only the per-pass lipsync model opens the active mouth.
+      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
