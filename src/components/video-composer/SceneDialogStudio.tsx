@@ -48,6 +48,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
 import { DialogTakeStrip } from './DialogTakeStrip';
 import PerTurnShotChip from './PerTurnShotChip';
+import { useSceneRenderConfirm } from '@/lib/composer/sceneRenderConfirm';
 import {
   buildCoveragePartials,
   coverageMarkerFor,
