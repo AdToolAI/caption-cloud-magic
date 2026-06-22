@@ -452,9 +452,59 @@ export default function StoryboardTab({
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
   const totalCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
+  const budgetRemaining = Math.max(0, MAX_PROJECT_SECONDS - totalDuration);
+  const addSceneAllowed = canAddScene(scenes);
+  const tone = budgetTone(totalDuration);
+  const budgetBarColor =
+    tone === 'red'
+      ? 'bg-red-500'
+      : tone === 'amber'
+        ? 'bg-amber-400'
+        : 'bg-emerald-400';
+  const budgetTextColor =
+    tone === 'red'
+      ? 'text-red-300'
+      : tone === 'amber'
+        ? 'text-amber-300'
+        : 'text-emerald-300';
+
+  const handleAddSceneClick = () => {
+    if (!addSceneAllowed) {
+      toast({
+        title: 'Projekt-Budget voll',
+        description: `Maximal ${formatDuration(MAX_PROJECT_SECONDS)} pro Projekt. Kürze oder lösche eine andere Szene, um Platz zu schaffen.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    addScene();
+  };
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto min-w-0">
+      {/* Budget Bar — hartes 10-Minuten-Projekt-Limit */}
+      <div className="rounded-lg bg-card/60 border border-border/40 px-3 py-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Projekt-Budget
+          </span>
+          <span className={`text-xs font-medium tabular-nums ${budgetTextColor}`}>
+            {formatDuration(totalDuration)} / {formatDuration(MAX_PROJECT_SECONDS)}
+            {budgetRemaining > 0 && budgetRemaining < MAX_PROJECT_SECONDS && (
+              <span className="text-muted-foreground/70 ml-1.5">
+                · {formatDuration(budgetRemaining)} frei
+              </span>
+            )}
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-300 ${budgetBarColor}`}
+            style={{ width: `${Math.min(100, (totalDuration / MAX_PROJECT_SECONDS) * 100)}%` }}
+          />
+        </div>
+      </div>
+
       {/* Summary Bar */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-card/60 border border-border/40">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -465,7 +515,18 @@ export default function StoryboardTab({
           <span className="text-primary font-medium">~€{totalCost.toFixed(2)}</span>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={addScene} className="gap-1 text-xs">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAddSceneClick}
+            disabled={!addSceneAllowed}
+            className="gap-1 text-xs"
+            title={
+              addSceneAllowed
+                ? 'Neue Szene hinzufügen'
+                : `Budget voll (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — kürze oder lösche eine Szene.`
+            }
+          >
             <Plus className="h-3.5 w-3.5" /> Szene
           </Button>
           {scenes.length > 1 && scenes[0]?.clipSource?.startsWith('ai-') && (
