@@ -1959,10 +1959,12 @@ export default function SceneCard({
               {scene.clipSource.startsWith("ai-") && (
                 <DirectorQualityCoach
                   scene={scene}
+                  characters={characters}
                   language={lang}
                   className="mt-2"
                 />
               )}
+
 
               {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
               <AlertDialog
