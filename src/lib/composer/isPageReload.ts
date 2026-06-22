@@ -1,18 +1,24 @@
 /**
- * Returns true if the current page was loaded via a browser reload
- * (F5, Cmd-R, refresh button, programmatic `location.reload()`).
+ * Returns true if the *current page mount* is the result of a real browser
+ * reload (F5 / Cmd-R / refresh button / programmatic `location.reload()`).
  *
- * Returns false for fresh SPA navigations (sidebar clicks, direct URL
- * entry, back/forward) — these get navigation.type === 'navigate' or
- * 'back_forward'.
+ * Important: `performance.getEntriesByType("navigation")[0].type` reflects
+ * the original document load and never changes during the tab's lifetime.
+ * That means once a user reloaded the page once, every subsequent SPA
+ * navigation would also look like a "reload" — which would permanently
+ * suppress mount-time effects like the Motion Studio welcome intro.
  *
- * Defensive: older Safari and some embedded webviews don't expose the
- * Navigation Timing API; in that case we assume "not a reload" so the
- * cinematic intro still plays at least once.
+ * To avoid that we only honour the reload signal for the *first* call after
+ * the document loaded. Every later call (i.e. SPA navigations within the
+ * same tab) returns false so the consuming effect runs normally.
  */
+let consumed = false;
+
 export function isPageReload(): boolean {
   try {
     if (typeof performance === "undefined") return false;
+    if (consumed) return false;
+    consumed = true;
     const nav = performance.getEntriesByType?.("navigation")?.[0] as
       | PerformanceNavigationTiming
       | undefined;
