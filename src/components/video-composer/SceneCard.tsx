@@ -276,6 +276,7 @@ export default function SceneCard({
     | "de"
     | "en"
     | "es";
+  const confirmRender = useSceneRenderConfirm();
   const isStock =
     scene.clipSource === "stock" || scene.clipSource === "stock-image";
   const clipSourceIcon = scene.clipSource.startsWith("ai-")
