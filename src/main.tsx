@@ -120,6 +120,48 @@ if ('caches' in window) {
   caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
 }
 
+// ChunkLoadError auto-recovery — after a new deployment the browser may
+// hold a stale entry bundle that references chunk hashes that no longer
+// exist. Instead of leaving the user on a broken page (which feels like
+// the platform "reloaded by itself"), we reload exactly ONCE per session
+// to pick up the fresh bundle. The sessionStorage guard prevents an
+// infinite reload loop if the error persists for a different reason.
+const CHUNK_RELOAD_FLAG = "chunk-reload-attempted";
+function isChunkLoadError(reason: unknown): boolean {
+  const msg = String(
+    (reason as any)?.message ?? (reason as any)?.toString?.() ?? reason ?? "",
+  );
+  const name = String((reason as any)?.name ?? "");
+  return (
+    name === "ChunkLoadError" ||
+    msg.includes("ChunkLoadError") ||
+    msg.includes("Failed to fetch dynamically imported module") ||
+    msg.includes("Importing a module script failed") ||
+    msg.includes("error loading dynamically imported module")
+  );
+}
+function maybeRecoverFromChunkError(reason: unknown) {
+  if (!isChunkLoadError(reason)) return;
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_FLAG) === "1") {
+      console.warn("[chunk-reload] already attempted in this session, skipping");
+      return;
+    }
+    sessionStorage.setItem(CHUNK_RELOAD_FLAG, "1");
+  } catch { /* sessionStorage blocked */ }
+  console.warn("[chunk-reload] stale bundle detected, reloading once", reason);
+  Sentry.addBreadcrumb({
+    category: "chunk-reload",
+    level: "warning",
+    message: String((reason as any)?.message ?? reason),
+  });
+  window.location.reload();
+}
+window.addEventListener("error", (ev) => maybeRecoverFromChunkError(ev.error ?? ev.message));
+window.addEventListener("unhandledrejection", (ev) => maybeRecoverFromChunkError(ev.reason));
+
+
+
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={({ error }) => <ErrorFallback error={error} />}>
     <HelmetProvider>
