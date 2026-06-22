@@ -93,17 +93,20 @@ export default function StageWelcomeMoment() {
       role="dialog"
       aria-label="Welcome to AdTool AI Motion Studio"
       onClick={handleSkip}
-      className="fixed inset-0 z-[80] overflow-hidden bg-[#050816] cursor-pointer select-none"
+      className="fixed inset-0 z-[80] overflow-hidden cursor-pointer select-none"
 
       style={{
+        backgroundColor: isCountdown ? "#0a0805" : "#050816",
+        transition: "background-color 400ms ease-out",
         clipPath: irisActive ? "circle(160% at 50% 50%)" : "circle(150% at 50% 50%)",
-        transition: irisActive
-          ? "clip-path 600ms cubic-bezier(0.76, 0, 0.24, 1), opacity 600ms ease-out"
-          : undefined,
         opacity: irisActive ? 0 : 1,
         animation: reducedMotion ? "stageWelcomeFade 400ms ease-out forwards" : undefined,
+        ...(irisActive
+          ? { transitionProperty: "clip-path, opacity, background-color", transitionDuration: "600ms", transitionTimingFunction: "cubic-bezier(0.76, 0, 0.24, 1)" }
+          : {}),
       }}
     >
+
       {/* Vignette + spotlight */}
       <div
         aria-hidden
