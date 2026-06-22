@@ -1,0 +1,1 @@
+ALTER TABLE public.brand_characters ADD COLUMN IF NOT EXISTS default_performance jsonb;
