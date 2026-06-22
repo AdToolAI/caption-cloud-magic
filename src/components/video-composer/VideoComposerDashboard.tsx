@@ -59,6 +59,7 @@ import { useComposerHistory } from '@/hooks/useComposerHistory';
 import { ComposerHistoryContext } from './ComposerHistoryContext';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
+import { isPageReload } from '@/lib/composer/isPageReload';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 
@@ -216,7 +217,11 @@ export default function VideoComposerDashboard() {
   // re-run `handleGenerateStoryboard` with the current briefing.
   const [retryStoryboardNonce, setRetryStoryboardNonce] = useState(0);
   // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
-  const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
+  // Auto-open template picker on a fresh navigation only — never on F5/reload.
+  // The "Vorlage öffnen" button in the toolbar remains available at any time.
+  const [showTemplatePicker, setShowTemplatePicker] = useState(
+    () => !hasUrlProject && !loadDraft() && !isPageReload(),
+  );
   const [showAutoDirector, setShowAutoDirector] = useState(false);
   const [showAdDirector, setShowAdDirector] = useState(() => {
     try { return sessionStorage.getItem('ad-director-wizard:open') === '1'; } catch { return false; }
