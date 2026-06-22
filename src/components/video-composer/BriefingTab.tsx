@@ -469,58 +469,58 @@ export default function BriefingTab({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Mode Indicator Strip — confirms which editor mode is active */}
+      <div className="flex items-center justify-between px-1">
+        <p className="font-mono text-[9px] uppercase tracking-[0.4em] text-amber-200/60">
+          {editorMode === 'quick'
+            ? 'Quick Mode · Essential briefing only'
+            : editorMode === 'direct'
+              ? 'Direct Mode · Full creative control'
+              : 'Studio Mode · Every dial on the console'}
+        </p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.4em] text-amber-200/40">
+          Switch via Director's Bar above
+        </p>
+      </div>
+
       {/* Legal Usage Notice */}
-      <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-destructive/20 shadow-soft">
-        <div
-          className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-destructive via-destructive/60 to-transparent"
-          style={{ boxShadow: '0 0 12px hsl(var(--destructive) / 0.4)' }}
-        />
-        <div className="p-4 pl-5">
+      <StagePanel
+        tone="destructive"
+        slateIndex="00"
+        eyebrow="Compliance · Legal"
+        title={t('videoComposer.aiLegalTitle')}
+        accessory={
           <button
             type="button"
             onClick={() => setTipsCollapsed((v) => !v)}
-            className="flex w-full items-center justify-between gap-3 text-left group"
-            aria-expanded={!tipsCollapsed}
+            className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80 hover:text-foreground transition-colors"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-destructive/10 border border-destructive/30">
-                <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
-              </div>
-              <h3 className="font-display text-sm font-semibold tracking-wide text-destructive">
-                {t('videoComposer.aiLegalTitle')}
-              </h3>
-            </div>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1 group-hover:text-foreground transition-colors">
-              {tipsCollapsed ? t('videoComposer.aiTipsExpand') : t('videoComposer.aiTipsCollapse')}
-              {tipsCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-            </span>
+            {tipsCollapsed ? t('videoComposer.aiTipsExpand') : t('videoComposer.aiTipsCollapse')}
+            {tipsCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
           </button>
+        }
+      >
+        {!tipsCollapsed && (
+          <ul className="space-y-2.5 text-xs leading-relaxed text-muted-foreground">
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+              <span className="text-foreground/90">{t('videoComposer.aiLegalProhibited')}</span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+              <span>{t('videoComposer.aiLegalConsequences')}</span>
+            </li>
+            <li className="flex gap-2.5">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
+              <span>{t('videoComposer.aiLegalResponsibility')}</span>
+            </li>
+          </ul>
+        )}
+      </StagePanel>
 
-          {!tipsCollapsed && (
-            <ul className="mt-4 space-y-2.5 text-xs leading-relaxed text-muted-foreground">
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                <span className="text-foreground/90">{t('videoComposer.aiLegalProhibited')}</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                <span>{t('videoComposer.aiLegalConsequences')}</span>
-              </li>
-              <li className="flex gap-2.5">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-destructive/70" />
-                <span>{t('videoComposer.aiLegalResponsibility')}</span>
-              </li>
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* Mode Selection */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t('videoComposer.mode')}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Mode Selection — Direct & Studio only (Quick auto-uses AI mode) */}
+      {showDirect && (
+        <StagePanel slateIndex="01" eyebrow="Scene · Production Mode" title={t('videoComposer.mode')}>
           <div className="grid grid-cols-2 gap-3">
             {([
               { mode: 'ai' as ComposerMode, icon: Wand2, label: t('videoComposer.aiAssisted'), desc: t('videoComposer.aiAssistedDesc') },
@@ -531,51 +531,43 @@ export default function BriefingTab({
                 onClick={() => onUpdateBriefing({ mode })}
                 className={`p-4 rounded-lg border text-left transition-all ${
                   briefing.mode === mode
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                    : 'border-border/40 hover:border-border'
+                    ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
+                    : 'border-border/40 hover:border-amber-200/30'
                 }`}
               >
-                <Icon className={`h-5 w-5 mb-2 ${briefing.mode === mode ? 'text-primary' : 'text-muted-foreground'}`} />
+                <Icon className={`h-5 w-5 mb-2 ${briefing.mode === mode ? 'text-amber-300' : 'text-muted-foreground'}`} />
                 <p className="font-medium text-sm">{label}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
               </button>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </StagePanel>
+      )}
 
       {/* Category Selection */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t('videoComposer.category')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {CATEGORIES.map(({ id, label, icon: Icon, desc }) => (
-              <button
-                key={id}
-                onClick={() => onUpdateProject({ category: id })}
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  category === id
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                    : 'border-border/40 hover:border-border'
-                }`}
-              >
-                <Icon className={`h-4 w-4 mb-1.5 ${category === id ? 'text-primary' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-xs">{label}</p>
-                <p className="text-[10px] text-muted-foreground">{desc}</p>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <StagePanel slateIndex="02" eyebrow="Scene · Format" title={t('videoComposer.category')}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {CATEGORIES.map(({ id, label, icon: Icon, desc }) => (
+            <button
+              key={id}
+              onClick={() => onUpdateProject({ category: id })}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                category === id
+                  ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
+                  : 'border-border/40 hover:border-amber-200/30'
+              }`}
+            >
+              <Icon className={`h-4 w-4 mb-1.5 ${category === id ? 'text-amber-300' : 'text-muted-foreground'}`} />
+              <p className="font-medium text-xs">{label}</p>
+              <p className="text-[10px] text-muted-foreground">{desc}</p>
+            </button>
+          ))}
+        </div>
+      </StagePanel>
 
       {/* Category-Specific Briefing */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{cfg.cardTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <StagePanel slateIndex="03" eyebrow="Scene · Subject" title={cfg.cardTitle}>
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{t('videoComposer.projectName')}</Label>
