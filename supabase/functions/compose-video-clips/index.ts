@@ -692,7 +692,15 @@ serve(async (req) => {
       // small idle mouth/jaw motion that sync-3 requires to drive
       // lipsync on AI-generated plates. Without it, plates render with a
       // statically closed mouth and sync-3 returns the input unchanged.
-      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft and clearly visible. Every visible character should be speaking naturally with subtle, natural idle mouth and jaw movements throughout the entire clip (no specific words, no exaggerated speech — just lightweight, lifelike mouth motion).`;
+      // v171 (Jun 22 2026) — Ghost-Speaker fix. The closing clause used to ask
+      // every character to "speak naturally with subtle idle mouth/jaw motion"
+      // throughout the clip. With all N passes now running in parallel, that
+      // makes non-active speakers visibly mouth along ("ghost speaking") on
+      // top of their pass-overlay. We keep the lip-ready *geometry* (soft,
+      // visible, unobstructed lip-line) — which is what sync-3 actually needs
+      // to drive lipsync — but remove the *motion* instruction. Plate mouths
+      // stay still; only the per-pass lipsync model opens the active mouth.
+      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
