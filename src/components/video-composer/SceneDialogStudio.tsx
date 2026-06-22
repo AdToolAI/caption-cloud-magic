@@ -862,6 +862,32 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         seen.set(vid, sp.name);
       }
     }
+    // ── Schritt 1: Cost-Confirm-Gate (Dialog) ───────────────────────────
+    // N speakers × ceil(dur) × 9 Cr/s for Sync.so lipsync passes, plus
+    // Hailuo plate + VO per turn. Show aggregated cost before firing.
+    {
+      const turnCount = Math.max(1, blocks.length);
+      const ok = await confirmRender({
+        scenes: [
+          {
+            ...scene,
+            dialogScript: script,
+            dialogVoices: voicePerSpeaker,
+            withAudio: true,
+          } as typeof scene,
+        ],
+        passes: turnCount,
+        title:
+          turnCount > 1
+            ? `Dialog rendern (${turnCount} Turns)?`
+            : 'Dialog-Szene rendern?',
+        description:
+          turnCount > 1
+            ? `Pro Sprecher-Turn läuft ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. Gesamtkosten siehe unten.`
+            : 'Voiceover + Lip-Sync werden mitberechnet.',
+      });
+      if (!ok) return;
+    }
     // Pin dialog into the parent scene's AI prompt immediately — visible to
     // the user and persisted alongside the script + voice map.
     try {
