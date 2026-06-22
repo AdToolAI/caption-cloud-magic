@@ -89,9 +89,9 @@ export default function StageWelcomeMoment() {
     <div
       role="dialog"
       aria-label="Welcome to AdTool AI Motion Studio"
-      aria-hidden={phase === "done"}
       onClick={handleSkip}
       className="fixed inset-0 z-[80] overflow-hidden bg-[#050816] cursor-pointer select-none"
+
       style={{
         clipPath: irisActive ? "circle(160% at 50% 50%)" : "circle(150% at 50% 50%)",
         transition: irisActive
