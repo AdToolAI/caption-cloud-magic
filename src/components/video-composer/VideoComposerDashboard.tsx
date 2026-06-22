@@ -1610,6 +1610,14 @@ export default function VideoComposerDashboard() {
                 preferredAspect={project.briefing?.aspectRatio}
                 onRefetchScenes={refetchScenesFromDb}
                 isGeneratingStoryboard={isGeneratingStoryboard}
+                storyboardError={storyboardError}
+                onRetryStoryboard={() => {
+                  // Re-run BriefingTab's pipeline with the current briefing.
+                  // Clear the error first so the loader takes over the panel.
+                  setStoryboardError(null);
+                  setRetryStoryboardNonce((n) => n + 1);
+                }}
+                onBackToBriefing={() => setActiveTab('briefing')}
                 onEnsurePersisted={async () => {
                   const result = await ensureProjectPersisted(project);
                   // Sync ref BEFORE setState so any callback that fires inside
