@@ -123,6 +123,7 @@ function AudioTimeline({ plan }: { plan: AudioPlan }) {
 
 export default function DirectorConsolePreview({
   scene,
+  characters,
   language = 'en',
   className,
 }: DirectorConsolePreviewProps) {
@@ -134,6 +135,7 @@ export default function DirectorConsolePreview({
         shotDirector: scene.shotDirector,
         cinematicStylePresetId: scene.cinematicPresetSlug,
         audioPlan: scene.audioPlan,
+        performanceEntries: derivePerformanceEntries(scene, characters),
         language,
       }),
     [
@@ -142,9 +144,12 @@ export default function DirectorConsolePreview({
       scene.shotDirector,
       scene.cinematicPresetSlug,
       scene.audioPlan,
+      scene.performance,
+      characters,
       language,
     ],
   );
+
 
   const locked = !!scene.dialogLockedAt && !!scene.audioPlan?.speakers?.length;
   const audioPlanText = scene.audioPlan
