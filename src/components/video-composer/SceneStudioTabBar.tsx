@@ -163,22 +163,57 @@ export function SceneStudioSectionHeader({ tab, language, subtitle, className }:
     <div
       data-studio-section={tab}
       className={cn(
-        'flex items-center gap-2 mt-3 mb-1 pt-2 border-t border-border/30',
-        'first:mt-0 first:pt-0 first:border-t-0',
+        'relative flex items-stretch gap-0 mt-4 mb-2 overflow-hidden rounded-lg',
+        'first:mt-0',
         className,
       )}
+      style={{
+        background:
+          'linear-gradient(180deg, hsla(225,32%,12%,0.55) 0%, hsla(228,38%,6%,0.35) 100%)',
+        boxShadow:
+          'inset 0 1px 0 hsla(43,90%,82%,0.16), inset 0 0 0 1px hsla(43,90%,68%,0.18), 0 0 0 1px hsla(43,90%,68%,0.10)',
+      }}
     >
-      <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10 text-primary">
-        <Icon className="h-3 w-3" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-primary leading-tight">
-          {meta.title}
+      {/* Hazard-stripe slate edge */}
+      <div
+        aria-hidden
+        className="shrink-0 self-stretch w-1.5"
+        style={{
+          background:
+            'repeating-linear-gradient(135deg, #0b0b0b 0 4px, hsl(43,90%,58%) 4px 8px)',
+        }}
+      />
+      {/* Top filament */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          background:
+            'linear-gradient(90deg, transparent, hsla(43,90%,68%,0.55), transparent)',
+        }}
+      />
+      <div className="flex flex-1 items-center gap-2.5 px-3 py-2 min-w-0">
+        <div
+          className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"
+          style={{ boxShadow: 'inset 0 0 0 1px hsla(43,90%,68%,0.25)' }}
+        >
+          <Icon className="h-3 w-3" />
         </div>
-        <div className="text-[9.5px] text-muted-foreground/70 leading-tight truncate">
-          {subtitle ?? meta.sub}
+        <div className="flex-1 min-w-0">
+          <div
+            className="font-mono text-[9px] uppercase tracking-[0.32em] text-primary/85 leading-tight"
+          >
+            {meta.title}
+          </div>
+          <div
+            className="text-[10px] text-muted-foreground/80 leading-tight truncate"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic' }}
+          >
+            {subtitle ?? meta.sub}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
