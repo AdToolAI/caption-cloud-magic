@@ -65,7 +65,18 @@ function SortablePlayer({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative group">
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        background:
+          'linear-gradient(180deg, hsla(225,32%,12%,0.55) 0%, hsla(228,38%,6%,0.35) 100%)',
+        boxShadow: isActive
+          ? 'inset 0 1px 0 hsla(43,90%,82%,0.28), inset 0 0 0 1px hsla(43,90%,68%,0.32), 0 0 0 1px hsla(43,90%,68%,0.42), 0 16px 40px -18px hsla(43,90%,68%,0.45)'
+          : 'inset 0 1px 0 hsla(43,90%,82%,0.16), inset 0 0 0 1px hsla(43,90%,68%,0.16), 0 0 0 1px hsla(43,90%,68%,0.18)',
+      }}
+      className="relative group rounded-xl overflow-hidden transition-shadow"
+    >
       <button
         type="button"
         aria-label="Szene verschieben"
@@ -86,6 +97,7 @@ function SortablePlayer({
     </div>
   );
 }
+
 
 export default function StoryboardScenePlayerList({
   scenes,

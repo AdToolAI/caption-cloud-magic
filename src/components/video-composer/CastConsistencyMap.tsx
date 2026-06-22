@@ -22,7 +22,10 @@ import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
 interface Props {
   scenes: ComposerScene[];
   characters: ComposerCharacter[];
+  /** When true, skip the outer Card chrome + duplicate title (parent provides StagePanel). */
+  embedded?: boolean;
 }
+
 
 type Anchor = 'reference' | 'chain' | 'prompt' | 'absent';
 
@@ -76,7 +79,7 @@ const ANCHOR_META: Record<Anchor, { label: string; icon: React.ReactNode; classN
   },
 };
 
-export function CastConsistencyMap({ scenes, characters }: Props) {
+export function CastConsistencyMap({ scenes, characters, embedded = false }: Props) {
   // Defensive: filter out any cast entries without a usable name. A single
   // library asset that lost its name (e.g. legacy import, mid-edit draft)
   // would otherwise crash the whole Storyboard tab via `.name.toLowerCase()`.
@@ -88,22 +91,42 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
     return null;
   }
 
+  const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
+    embedded ? (
+      <div className="space-y-3">{children}</div>
+    ) : (
+      <Card className="p-4 bg-card/60 backdrop-blur-xl border-border/60 space-y-3">{children}</Card>
+    );
+
   return (
-    <Card className="p-4 bg-card/60 backdrop-blur-xl border-border/60 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-medium">Cast Consistency Map</h3>
+    <Wrapper>
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-medium">Cast Consistency Map</h3>
+            <Badge variant="outline" className="text-[10px]">
+              {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} · {safeCharacters.length} cast
+            </Badge>
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1"><ImageIcon className="h-2.5 w-2.5 text-primary" /> Reference</span>
+            <span className="flex items-center gap-1"><Link2 className="h-2.5 w-2.5" /> Chain</span>
+            <span className="flex items-center gap-1"><Circle className="h-2.5 w-2.5" /> Prompt</span>
+          </div>
+        </div>
+      )}
+      {embedded && (
+        <div className="flex items-center justify-end gap-3 text-[10px] text-muted-foreground -mt-1">
           <Badge variant="outline" className="text-[10px]">
             {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} · {safeCharacters.length} cast
           </Badge>
-        </div>
-        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1"><ImageIcon className="h-2.5 w-2.5 text-primary" /> Reference</span>
           <span className="flex items-center gap-1"><Link2 className="h-2.5 w-2.5" /> Chain</span>
           <span className="flex items-center gap-1"><Circle className="h-2.5 w-2.5" /> Prompt</span>
         </div>
-      </div>
+      )}
+
 
       <TooltipProvider delayDuration={200}>
         <div className="overflow-x-auto">
@@ -183,6 +206,7 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
         Wenn ein Charakter ohne Anker erscheint, wird automatisch der letzte Frame der vorherigen Szene
         als Continuity-Brücke genutzt (Frame-Chain 🔗).
       </p>
-    </Card>
+    </Wrapper>
+
   );
 }
