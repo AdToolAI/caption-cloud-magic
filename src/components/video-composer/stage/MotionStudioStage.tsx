@@ -17,6 +17,21 @@ import { emitStageEvent } from "@/lib/stage/stageEvents";
 export default function MotionStudioStage({ children }: { children: ReactNode }) {
   useStageAudio();
 
+  // Bridge: Pipeline "end" events emit a soft "Cut" cue on the Sound Stage.
+  useEffect(() => {
+    return subscribePipelineEvents((e) => {
+      if (
+        e.type === "clips:end" ||
+        e.type === "lipsync:end" ||
+        e.type === "export:end"
+      ) {
+        emitStageEvent("cut", { source: e.type });
+      }
+    });
+  }, []);
+
+
+
   return (
     <div className="relative min-h-screen text-foreground">
       {/* Stage Floor — deep black with radial gold spotlight from top-left */}
