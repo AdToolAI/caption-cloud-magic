@@ -1771,9 +1771,53 @@ serve(async (req) => {
             if (remapped.length >= 1) castShots = remapped;
           }
           if (castShots.length >= 1 && !looksComposed) {
+            // Outfit lookup — mirrors cinematic-sync (line 1232–1266).
+            // Without this, a user-picked saved outfit (e.g. Roman armor)
+            // is invisible to the universal anchor and the i2v provider
+            // sees only the default portrait.
+            const outfitLookIdsUni = castShots
+              .map((cs) => (cs as any).outfitLookId)
+              .filter((id): id is string => typeof id === "string" && id.length > 0);
+            const outfitUrlByIdUni = new Map<string, string>();
+            if (outfitLookIdsUni.length > 0) {
+              try {
+                const { data: outfitRows } = await supabaseAdmin
+                  .from("avatar_outfit_looks")
+                  .select("id, cover_url, front_url")
+                  .in("id", outfitLookIdsUni);
+                for (const row of outfitRows ?? []) {
+                  const url = (row as any).cover_url || (row as any).front_url;
+                  if (typeof url === "string" && url.length > 0) {
+                    outfitUrlByIdUni.set(String((row as any).id), url);
+                  }
+                }
+              } catch (e) {
+                console.warn(
+                  `[compose-video-clips] universal anchor scene ${scene.id}: outfit lookup failed`,
+                  e,
+                );
+              }
+            }
             const portraitsFromCast = castShots
+              .map((cs) => {
+                const outfitId = (cs as any).outfitLookId as string | undefined;
+                const outfitUrl = outfitId ? outfitUrlByIdUni.get(outfitId) : undefined;
+                return outfitUrl || charById.get(cs.characterId)?.referenceImageUrl;
+              })
+              .filter((u): u is string => typeof u === "string" && u.length > 0);
+            // Identity refs — always the bare portrait (face-only ground truth)
+            // so face-lock continues to work when the primary slot is an
+            // outfit cover.
+            const identityFromCast = castShots
               .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
               .filter((u): u is string => typeof u === "string" && u.length > 0);
+            const wardrobeLockNamesUni = castShots
+              .filter((cs) => {
+                const id = (cs as any).outfitLookId as string | undefined;
+                return id && outfitUrlByIdUni.has(id);
+              })
+              .map((cs) => charById.get(cs.characterId)?.name)
+              .filter((n): n is string => typeof n === "string" && n.length > 0);
             // Phase C.1 — Continuity Auto-Lock: prepend the dialog-mode
             // continuity-lock frame (composed anchor of a previous same-cast
             // dialog scene) so Nano Banana 2 anchors the new composition to
@@ -1803,7 +1847,7 @@ serve(async (req) => {
                   : stripDialogForAnchor(scene.aiPrompt || "") ||
                     neutralFallback;
               console.log(
-                `[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length})`,
+                `[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length}, outfits=${outfitUrlByIdUni.size}/${outfitLookIdsUni.length}${wardrobeLockNamesUni.length > 0 ? `, wardrobeLock=[${wardrobeLockNamesUni.join("/")}]` : ""})`,
               );
               try {
                 const anchorResp = await fetch(
@@ -1818,10 +1862,13 @@ serve(async (req) => {
                       sceneId: scene.id,
                       portraitUrl: portraitUrls[0],
                       portraitUrls,
+                      identityPortraitUrls: identityFromCast.slice(0, portraitUrls.length),
                       characterNames,
                       scenePrompt: anchorPrompt,
                       aspectRatio: "16:9",
                       shotType: castShots[0]?.shotType,
+                      wardrobeLock: wardrobeLockNamesUni.length > 0,
+                      wardrobeLockNames: wardrobeLockNamesUni,
                     }),
                   },
                 );
