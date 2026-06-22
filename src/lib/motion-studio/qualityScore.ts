@@ -19,6 +19,8 @@ import type { AudioPlan, ComposerScene } from '@/types/video-composer';
 import type { DirectorLanguage } from './composeFinalPrompt';
 import { isBoilerplateAction } from './isBoilerplateAction';
 import { jaccardOverlap } from './composePromptLayers';
+import type { PerformanceEntry } from './buildPerformanceBlock';
+
 
 
 export type QualityAxis =
