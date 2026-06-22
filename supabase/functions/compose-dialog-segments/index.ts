@@ -385,10 +385,12 @@ async function uploadBoundingBoxesJson(
   }
 }
 
-// Pricing: Sync.so lipsync-2-pro = 9 credits/s.  ONE pass over the full clip
-// (regardless of speaker count), so cost = ceil(totalSec) * 9 (min 9).
-const LIPSYNC_CREDITS_PER_SEC = 9;
-const LIPSYNC_MIN_CREDITS = 9;
+// Pricing: Sync.so lipsync-2-pro = 16 credits/s (raised from 9, 3.5× margin cap
+// on ~€0.046/s raw cost). ONE pass over the full clip (regardless of speaker
+// count), so cost = ceil(totalSec) * 16 (min 16). Mirrors frontend estimate
+// in src/lib/composer/estimateSceneRenderCost.ts.
+const LIPSYNC_CREDITS_PER_SEC = 16;
+const LIPSYNC_MIN_CREDITS = 16;
 const MIN_TURN_DUR_SEC = 0.4;
 
 const computeCost = (durSec: number) =>

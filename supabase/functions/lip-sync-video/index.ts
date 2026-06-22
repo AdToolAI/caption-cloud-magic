@@ -9,9 +9,11 @@ const corsHeaders = {
 };
 
 // Artlist-grade lip-sync via Sync.so lipsync-2-pro
-// Duration-based pricing (Sync.so Creator $0.08/s → 9 credits/s ≈ €0.09/s, ~22% margin).
-const CREDITS_PER_SECOND = 9;
-const MIN_COST = 9;
+// Duration-based pricing: 16 credits/s ≈ €0.16/s (raised from 9, 3.5× margin
+// cap on ~€0.046/s Sync.so Creator raw cost). Mirrors frontend estimate in
+// src/lib/composer/estimateSceneRenderCost.ts and compose-dialog-segments.
+const CREDITS_PER_SECOND = 16;
+const MIN_COST = 16;
 const FALLBACK_DURATION_SEC = 10; // conservative cap when caller omits duration
 const computeCost = (durationSec: number): number =>
   Math.max(MIN_COST, Math.ceil(Math.max(0, durationSec)) * CREDITS_PER_SECOND);

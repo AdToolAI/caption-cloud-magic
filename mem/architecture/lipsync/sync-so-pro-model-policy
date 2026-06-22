@@ -28,7 +28,7 @@ type: feature
 
 **No-Silent-Fallback:** Wenn 2+ Sprecher, aber im fertigen Clip <2 Gesichter → `clip_error='source_clip_missing_speakers'` + Refund, kein single-pass merged-VO Fallback. User triggert „🎥 Clip + Lip-Sync neu rendern" in `SceneCard`.
 
-**Pricing:** Sync.so Creator $19/mo plan; `ceil(durationSec) × 9 × 2 passes` credits (€0.18/s, ~22% margin); MIN_VO_DURATION 0.4s; idempotent refunds via deterministic UUID.
+**Pricing (raised June 2026):** Sync.so Creator $19/mo plan; **16 credits/s per pass** (raised from 9, 3.5× margin cap on ~€0.046/s raw cost); two-shot = `ceil(durationSec) × 16 × 2` credits (€0.32/s); MIN_VO_DURATION 0.4s; idempotent refunds via deterministic UUID. Mirrored in `src/lib/composer/estimateSceneRenderCost.ts`, `supabase/functions/compose-dialog-segments` (`LIPSYNC_CREDITS_PER_SEC=16`), `supabase/functions/lip-sync-video` (`CREDITS_PER_SECOND=16`). Render-Confirm-Dialog zeigt Breakdown pro Komponente mit Cr + EUR + Detail-Subtext.
 
 **Sample-Accurate Audio Pipeline:** `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching. ElevenLabs `output_format=pcm_24000` (Starter-Tier). Hume liefert WAV → decode + resample. Merged track hart auf `totalSamples = round(sceneDur * 44100)` getrimmt. Upload als WAV. `voicedRange.turns[i].startSec/endSec` ist sample-exakt am tatsächlichen TTS-Onset jeder Einzeläußerung.
 
