@@ -678,7 +678,7 @@ export default function StoryboardTab({
           >
             <div className="py-8 text-center">
               <p className="text-muted-foreground text-sm mb-3">Noch keine Szenen vorhanden</p>
-              <Button onClick={addScene} variant="outline" className="gap-2">
+              <Button onClick={handleAddSceneClick} disabled={!addSceneAllowed} variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" /> Erste Szene hinzufügen
               </Button>
             </div>
