@@ -346,6 +346,11 @@ serve(async (req) => {
       // but explicitly forbid idle mouth/jaw motion + listener mouth movement
       // so the plate itself shows only the speaker-driven mouths in post.
       ", idle mouth motion, idle jaw motion, mouths softly moving, mouth twitching, jaw twitching, multiple mouths flapping, group chatter, background mouth motion, listeners moving their lips, listeners' mouths moving, secondary characters speaking, non-speaker mouth movement, everyone talking at once, all characters speaking simultaneously" +
+      // v172 (Jun 22 2026) — Closed-Eyes + Dauer-Nicken Guard. The v171 idle-
+      // body clause ("small head bobs", "occasional blinks") was being
+      // over-interpreted by Hailuo/Kling as continuous nodding and frequently
+      // held-shut eyes. Hard-block both failure modes.
+      ", closed eyes, eyes closed, squinting, sleepy eyes, drowsy expression, prolonged blink, eyes held shut, head nodding, nodding head, continuous nodding, rhythmic head bobbing, head bobbing up and down, agreeing nod loop, everyone nodding" +
       // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
       // mid-clip camera cut or push-in when given a 3-shot start-frame plus
       // a long dialog-style prompt. The downstream Sync.so dispatch then
