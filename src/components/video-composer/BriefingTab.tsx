@@ -821,22 +821,25 @@ export default function BriefingTab({
 
 
 
-      {/* Visual Style — drives consistent look across all AI-generated scenes */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Palette className="h-4 w-4 text-primary" />
-            {language === 'de' ? 'Visueller Stil' : language === 'es' ? 'Estilo Visual' : 'Visual Style'}
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
+      {/* Visual Style — Direct & Studio only */}
+      {showDirect && (
+        <StagePanel
+          slateIndex="05"
+          eyebrow="Scene · Visual Language"
+          title={
+            <span className="flex items-center gap-2">
+              <Palette className="h-4 w-4 text-amber-300" />
+              {language === 'de' ? 'Visueller Stil' : language === 'es' ? 'Estilo Visual' : 'Visual Style'}
+            </span>
+          }
+        >
+          <p className="text-xs text-muted-foreground mb-3">
             {language === 'de'
               ? 'Wird auf alle KI-generierten Szenen angewendet — sorgt für einheitlichen Look.'
               : language === 'es'
                 ? 'Se aplica a todas las escenas generadas por IA — garantiza un aspecto uniforme.'
                 : 'Applied to every AI-generated scene — ensures a consistent look.'}
           </p>
-        </CardHeader>
-        <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {VISUAL_STYLES.map((style) => {
               const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
@@ -849,9 +852,6 @@ export default function BriefingTab({
                     const styleId = style.id as ComposerVisualStyle;
                     onUpdateBriefing({ visualStyle: styleId });
 
-                    // Soft-suggest Shot Director defaults to scenes whose
-                    // shotDirector is currently empty. Manual selections are
-                    // never overwritten.
                     if (scenes && onUpdateScenes && scenes.length > 0) {
                       const emptyScenes = scenes.filter(
                         (s) => !s.shotDirector || Object.values(s.shotDirector).filter(Boolean).length === 0,
@@ -886,14 +886,14 @@ export default function BriefingTab({
                   }}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     isActive
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                      : 'border-border/40 hover:border-border'
+                      ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30 shadow-[0_0_24px_-12px_hsla(43,90%,68%,0.6)]'
+                      : 'border-border/40 hover:border-amber-200/30'
                   }`}
                 >
                   <div className="flex items-start gap-2">
                     <span className="text-lg leading-none">{style.glyph}</span>
                     <div className="min-w-0">
-                      <p className={`font-medium text-xs ${isActive ? 'text-primary' : ''}`}>
+                      <p className={`font-medium text-xs ${isActive ? 'text-amber-300' : ''}`}>
                         {style.label[lang]}
                       </p>
                       <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
@@ -905,8 +905,8 @@ export default function BriefingTab({
               );
             })}
           </div>
-        </CardContent>
-      </Card>
+        </StagePanel>
+      )}
 
       {/* Brand Kit Auto-Apply */}
       {assemblyConfig && onChangeBrandKit && onChangeBrandKitAutoSync && onApplyAssembly && (
