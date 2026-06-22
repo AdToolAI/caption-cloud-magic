@@ -1,50 +1,49 @@
-# Kompatibilitäts-Check & Aktivierung Per-Pass-Lock
+## Kontext
 
-## Ergebnis der Pfad-Prüfung — alle 5 anderen Lock-Callsites sind kompatibel ✅
+Du bist auf **Growth-Plan ($49) = 6 parallele Jobs**. 4 Sprecher-Passes sollten locker reinpassen. Trotzdem 429 um 12:28:42.
 
-| Callsite | Hält Lock auf | Wann | Risiko bei `FEATURE_PER_PASS_LOCK=true` |
-|---|---|---|---|
-| `compose-dialog-segments` (initial Pass 0 vom Client) | `(scene, 0)` | bei Dispatch | ✅ unverändert |
-| `compose-dialog-segments` (Self-Invoke Pass 1..N) | `(scene, N)` | bei Fanout | ✅ **das ist der Fix** — kein scene_lock_busy mehr |
-| `sync-so-webhook` (v5 RMW-Block) | `(scene, 0)` über `withDialogLock` | wenn ein Sync.so-Job fertig wird | ✅ safe — Hot-Path nutzt schon `update_dialog_pass_slot` RPC (Z. 708/800/974); Full-Row-Writes nur in Terminal-/Error-Pfaden |
-| `lipsync-watchdog` | `(scene, 0)` über `withDialogLock` | alle 60 s als Aufsicht | ✅ supervisory, kein Dispatch-Race |
-| `cancel-dialog-lipsync` | `(scene, 0)` | bei User-Cancel | ✅ exklusive Operation |
-| `remotion-webhook` (preclip/stitch) | `(scene, 0)` | bei Lambda-Done | ✅ anderes Konzept (Render), kein Dispatch-Race |
+**Wahrscheinliche Ursache:** Aus früheren fehlgeschlagenen Runs (z. B. der 9-Sprecher-Test um 11:40) hängen noch Sync.so-Jobs als „in-flight" und blockieren Concurrency-Slots, bis Sync.so sie nach ~5–10 min selbst timeoutet. Beim neuen Run war damit das Budget faktisch < 4.
 
-## Warum keine Sibling-Race-Risiken
+## Fix — zweistufig, beide klein
 
-1. **Hot-Path bereits RPC-atomic**: `sync-so-webhook` schreibt Pass-Ergebnisse über `update_dialog_pass_slot(scene, pass_idx, patch)` — atomic per Slot, kein Lost-Update auch wenn `compose-dialog-segments` parallel Pass N+1 dispatched.
-2. **Full-Row-Writes nur in Terminal-States**: Die 11 Full-Row-`UPDATE`s im Webhook (Recovery, all-done, failed) laufen erst, wenn die Szene komplett ist oder definitiv failed → kein aktiver Dispatcher mehr.
-3. **Timing-Window passt**: Pass 0 hält `(scene,0)` ~70 s, Sync.so-Webhook für Pass 0 kommt nach ~110–120 s → Lock ist längst frei, kein Block.
-4. **Webhook-vs-Dispatcher**: `sync-so-webhook` für Pass-Fertigstellung will `(scene,0)`. `compose-dialog-segments` Pass 2 hält `(scene,2)`. **Verschiedene Partitionen → keine Kollision.**
+### Stufe A — Stale-Job-Cleanup beim Dispatch-Start (proaktiv)
 
-## Aktivierungs-Plan
+Vor dem ersten Sync.so-`/generate`-Call in `compose-dialog-segments`:
 
-### Schritt 1 — Secret anlegen (1 Klick deinerseits)
-Ich rufe `add_secret` mit Name `FEATURE_PER_PASS_LOCK` auf. Du trägst Wert `true` ein.
+1. Aus `inflight_sync_jobs`-Tabelle alle Jobs des aktuellen Users laden, die älter als 6 min und nicht terminal sind.
+2. Für jeden: `GET https://api.sync.so/v2/generate/{job_id}` → wenn Sync.so `completed/failed/canceled` meldet, lokal als terminal markieren (kein Slot mehr belegt).
+3. Wenn Sync.so noch `pending/processing` zeigt **und** lokaler Pass bereits `failed/done_suspect`: `POST .../cancel` → echter Slot-Free.
+4. Best-effort, max 500 ms total, niemals Dispatch blockieren.
 
-### Schritt 2 — N=2 Testlauf (Soll: ~3:30 statt ~6:00)
-- 2-Sprecher-Szene rendern
-- Edge-Function-Logs prüfen: erwartet `v168_per_pass_lock ACQUIRED pass=0` und `pass=1` mit <2 s Abstand
-- Kein `scene_lock_busy` mehr für Pass 1
-- Wallclock-Vergleich
+### Stufe B — 429-Backoff als Safety-Net (reaktiv)
 
-### Schritt 3 — N=3 Test (Soll: ~5:00 statt ~8:30)
-Nur wenn N=2 grün.
+In `compose-dialog-segments/index.ts` Z. 5292–5360, nur bei `resp.status === 429`:
 
-### Schritt 4 — N=4 Test (Soll: ~7:30–8:00 statt 11:40)
-Nur wenn N=3 grün.
+1. Sleep mit Backoff 4s → 10s → 22s (~20% Jitter), max 3 Versuche, identischer Payload.
+2. Log: `429_RETRY attempt=N/3 backoff_ms=...`.
+3. Bei Erfolg → normaler Flow. Bei 3× 429 → bestehender Fehlerpfad mit `clip_error: "syncso_concurrency_exhausted"`.
+4. Lock-TTL Z. 682 von 90s → **120s** (Retry kann bis ~36s dauern).
+5. Keine Änderung an Webhook/Watchdog/Cancel/Per-Pass-Lock.
 
-### Sofort-Rollback
-Du setzt `FEATURE_PER_PASS_LOCK=false` → alle Locks fallen zurück auf `(scene, 0)`-Partition = exaktes Legacy-Verhalten in <30 s.
+## Erwartete Wirkung
 
-## Was NICHT angefasst wird
+- **Stufe A** räumt das eigentliche Problem auf: keine Zombie-Slots mehr → 4 Passes laufen sauber parallel.
+- **Stufe B** ist Versicherung, falls Sync.so trotzdem mal kurzzeitig throttelt (z. B. Burst-Schutz oder paralleles Talking-Head-Render aus anderem Modul).
 
-- ✅ Webhook-/Watchdog-/Cancel-Pfade bleiben auf `(scene, 0)` (keine API-Änderung an `withDialogLock`)
-- ✅ `try_claim_mux_dispatch` unverändert
-- ✅ Sync.so Plan-Limit headroom: cap auf 4 belassen, Creator-Plan erlaubt 6
-- ✅ Keine Code-Änderung in den 5 anderen Callsites → null Regressionsrisiko
+## Verifikation
 
-## Bestätigung gewünscht
+1. `inflight_sync_jobs` vor Test prüfen → alte non-terminal Rows zählen.
+2. 4-Sprecher-Szene starten.
+3. Logs: `STALE_JOB_RECONCILED` (Stufe A) + `v168_per_pass_lock ACQUIRED pass=0..3` mit <2s Abstand.
+4. Idealfall: **kein** `429_RETRY` Log.
+5. UI: grün, ~3:30 Renderzeit.
 
-Sage **„Secret anlegen"** und ich rufe `add_secret` auf. Dann trägst du `true` ein und wir machen den N=2 Test.
+## Rollback
+
+- Stufe A per Env `FEATURE_STALE_JOB_RECONCILE=false` deaktivierbar.
+- Stufe B: Retry-Code no-op, wenn Sync.so kein 429 schickt.
+- Per-Pass-Lock weiter über `FEATURE_PER_PASS_LOCK=false` instant abschaltbar.
+
+## Sollen wir loslegen?
+
+Ich kann Stufe A + B in einem Commit umsetzen (~80 Zeilen Code, 0 DB-Migration nötig, da `inflight_sync_jobs` existiert).

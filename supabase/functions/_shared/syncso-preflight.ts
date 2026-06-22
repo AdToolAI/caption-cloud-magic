@@ -717,6 +717,85 @@ export async function releaseInflightSyncJob(
   }
 }
 
+/**
+ * v169 Stage A — Stale-Job Reconcile.
+ * Sync.so concurrency slots are blocked by jobs that locally already failed
+ * but are still "processing" on the provider side. Before a fresh dispatch
+ * we GET each old inflight job and clear it from the local table when
+ * Sync.so reports a terminal state. Best-effort, time-bounded.
+ *
+ * Returns the number of inflight rows freed (for logging).
+ */
+export async function reconcileStaleSyncJobs(
+  supabase: { from: (t: string) => any },
+  opts: {
+    userId: string;
+    syncApiKey: string;
+    minAgeMs?: number;     // default 6 min — only touch jobs older than this
+    maxJobs?: number;      // default 10
+    budgetMs?: number;     // default 500
+    apiBase?: string;      // default https://api.sync.so/v2
+  },
+): Promise<number> {
+  const enabled = (Deno.env.get("FEATURE_STALE_JOB_RECONCILE") ?? "true")
+    .toLowerCase() !== "false";
+  if (!enabled) return 0;
+  const minAgeMs = opts.minAgeMs ?? 6 * 60 * 1000;
+  const maxJobs = opts.maxJobs ?? 10;
+  const budgetMs = opts.budgetMs ?? 500;
+  const apiBase = opts.apiBase ?? "https://api.sync.so/v2";
+  const cutoff = new Date(Date.now() - minAgeMs).toISOString();
+  const t0 = Date.now();
+  let freed = 0;
+  try {
+    const { data: rows, error } = await supabase
+      .from("syncso_inflight_jobs")
+      .select("job_id, started_at")
+      .eq("user_id", opts.userId)
+      .lt("started_at", cutoff)
+      .order("started_at", { ascending: true })
+      .limit(maxJobs);
+    if (error || !rows || rows.length === 0) return 0;
+    for (const r of rows) {
+      if (Date.now() - t0 > budgetMs) break;
+      const jobId = String((r as any).job_id ?? "");
+      if (!jobId) continue;
+      try {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 1200);
+        const resp = await fetch(`${apiBase}/generate/${jobId}`, {
+          method: "GET",
+          headers: { "x-api-key": opts.syncApiKey },
+          signal: ctrl.signal,
+        });
+        clearTimeout(to);
+        if (resp.status === 404) {
+          // Sync.so doesn't know it anymore → free local slot.
+          await supabase.from("syncso_inflight_jobs").delete().eq("job_id", jobId);
+          freed++;
+          continue;
+        }
+        if (!resp.ok) continue;
+        const body = await resp.json().catch(() => null) as any;
+        const status = String(body?.status ?? "").toUpperCase();
+        if (status === "COMPLETED" || status === "FAILED" || status === "CANCELED" || status === "REJECTED") {
+          await supabase.from("syncso_inflight_jobs").delete().eq("job_id", jobId);
+          freed++;
+        }
+      } catch (_e) {
+        // ignore per-job — best-effort
+      }
+    }
+  } catch (e) {
+    console.warn(`[syncso-preflight] reconcile crash: ${(e as Error).message}`);
+  }
+  if (freed > 0) {
+    console.log(`[syncso-preflight] STALE_JOB_RECONCILED user=${opts.userId} freed=${freed} budget_ms=${Date.now() - t0}`);
+  }
+  return freed;
+}
+
+
 /** Exponential backoff with jitter, capped at 60s. attempt is 1-based. */
 export function computeBackoffMs(attempt: number): number {
   const base = Math.min(60_000, (2 ** Math.max(0, attempt - 1)) * 2_000);
