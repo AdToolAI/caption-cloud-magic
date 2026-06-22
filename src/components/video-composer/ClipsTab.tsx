@@ -950,8 +950,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
         audioPlan: dbScene.audioPlan,
+        performanceEntries: derivePerformanceEntries(dbScene, characters),
         language: directorLanguage,
       });
+
 
       // 4. Scene-Aware Character Anchor — composes ALL selected characters into
       //    the requested scene composition via Nano Banana 2 (compose-scene-anchor).
