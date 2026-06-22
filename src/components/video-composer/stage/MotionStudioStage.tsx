@@ -34,13 +34,32 @@ export default function MotionStudioStage({ children }: { children: ReactNode })
 
   return (
     <div className="relative min-h-screen text-foreground">
-      {/* Stage Floor — deep black with radial gold spotlight from top-left */}
+      {/* Stage Floor — deep black with breathing gold spotlight */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
           background:
             "radial-gradient(ellipse 80% 60% at 15% 0%, hsla(43, 90%, 68%, 0.08) 0%, transparent 55%), radial-gradient(ellipse 60% 50% at 85% 100%, hsla(187, 84%, 55%, 0.05) 0%, transparent 60%), #050816",
+        }}
+      />
+      {/* Breathing top spotlight */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[60vh]"
+        style={{
+          background:
+            "radial-gradient(ellipse 50% 100% at 50% 0%, hsla(43, 90%, 68%, 0.10) 0%, transparent 70%)",
+          animation: "stageSpotlightBreath 9s ease-in-out infinite",
+        }}
+      />
+      {/* Subtle scanlines for cinematic depth */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 opacity-[0.04]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(0deg, hsla(43,90%,68%,0.6) 0px, hsla(43,90%,68%,0.6) 1px, transparent 1px, transparent 4px)",
         }}
       />
       {/* Film grain layer — barely-there texture for cinematic depth */}
@@ -62,3 +81,4 @@ export default function MotionStudioStage({ children }: { children: ReactNode })
     </div>
   );
 }
+
