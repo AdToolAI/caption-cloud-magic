@@ -21,6 +21,7 @@ import SceneAvatarMode from './SceneAvatarMode';
 import { useSceneGenerate } from '@/hooks/useSceneGenerate';
 import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
 import PipelineProgressBar from './PipelineProgressBar';
+import StageStoryboardLoader from './stage/StageStoryboardLoader';
 import { Play, CheckCircle2 } from 'lucide-react';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
@@ -581,22 +582,7 @@ export default function StoryboardTab({
       {/* Scene Cards — v2 Layout: Cinematic Filmstrip (left) + persistent Studio editor (right) */}
       {scenes.length === 0 ? (
         isGeneratingStoryboard ? (
-          <Card className="border-primary/40 bg-gradient-to-br from-primary/5 to-card/60 shadow-[0_0_32px_-12px_hsl(var(--primary)/0.5)]">
-            <CardContent className="py-14 text-center flex flex-col items-center gap-4">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
-                <Loader2 className="relative h-10 w-10 text-primary animate-spin" />
-              </div>
-              <div className="space-y-1.5">
-                <p className="font-display text-base font-semibold text-foreground">
-                  Storyboard wird generiert…
-                </p>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                  Die KI baut dein Storyboard basierend auf dem Briefing. Das dauert in der Regel 10–20 Sekunden.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <StageStoryboardLoader />
         ) : (
           <Card className="border-border/40 bg-card/50">
             <CardContent className="py-12 text-center">
