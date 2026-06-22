@@ -22,7 +22,10 @@ import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
 interface Props {
   scenes: ComposerScene[];
   characters: ComposerCharacter[];
+  /** When true, skip the outer Card chrome + duplicate title (parent provides StagePanel). */
+  embedded?: boolean;
 }
+
 
 type Anchor = 'reference' | 'chain' | 'prompt' | 'absent';
 
