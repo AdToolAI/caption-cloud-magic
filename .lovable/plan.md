@@ -1,81 +1,85 @@
-# Storyboarding-Optimierung — Status & nächste Schritte
+# Outfit-Override Fix — manuell gewähltes Outfit muss IMMER gewinnen
 
-## Phase 1 + 2 Review (verifiziert im Code)
+## Was passiert aktuell (Root-Cause-Analyse, im Code verifiziert)
 
-Stichprobenartig gegen die tatsächlichen Files geprüft — alles aus dem letzten Plan ist sauber gelandet:
+Drei zusammenwirkende Bugs sorgen dafür, dass ein manuell gepicktes Outfit (z. B. Römerrüstung im Business-Briefing) ignoriert oder verwässert wird:
 
-| Bereich | Datei | Status |
-|---|---|---|
-| Boilerplate-Filter (EN/DE/ES) | `src/lib/motion-studio/isBoilerplateAction.ts` | ✅ inkl. 4 EN, 2 DE, 2 ES Patterns |
-| Dedup im Action-Layer | `applyActionsToPrompt.ts` | ✅ `specific`-Filter + Scene-vs-Cast-Logik |
-| Kein Double-Wrap mehr | `composeFinalPrompt.ts:197` | ✅ Marker werden raw emittiert, kein `[2 ACTION] [SceneAction] …` mehr |
-| `[4 PERFORMANCE]`-Block | `buildPerformanceBlock.ts` | ✅ 12-Wort-Cap, korrekt zwischen SHOT und DIALOG (`composeFinalPrompt.ts:209`) |
-| Quality-Coach Warnungen | `qualityScore.ts` (3 Sprachen) | ✅ `redundancyWarn` + `boilerplateWarn` |
-| UI Performance-Tab | `SceneStudioTabBar.tsx` + `ScenePerformancePanel.tsx` | ✅ Tab vorhanden, EN/DE Labels |
-| Hook-Integration | `useGenerateAllClips.ts:216` | ✅ `derivePerformanceEntries` wird durchgereicht |
-| Lip-Sync-Pipeline | `compose-dialog-segments/*`, `audioPlan` | ✅ unangetastet |
+### Bug 1 — Universal-Anchor-Pfad sucht Outfit-Bilder gar nicht erst nach
+`supabase/functions/compose-video-clips/index.ts:1773–1789` (Universal-Anchor für Hailuo / Kling / Pika / Seedance / Luma / Wan / HappyHorse) baut `portraitsFromCast` **direkt aus `charById.get(...).referenceImageUrl`** — die `outfitLookId` des Cast-Slots wird nie gelesen, kein Outfit-Cover wird geladen.
 
-**Bewertung:** Phase 1+2 sind production-ready. Was bisher fehlt, sind die *Wirkungstests* (sieht der User die Verbesserungen?) und die nächste Ausbaustufe.
+Die identische Outfit-Auflösung existiert nur im **cinematic-sync**-Zweig (Zeile 1232–1266). Heißt: nur in der Sprach-Pipeline kommt das gewählte Outfit überhaupt im Anchor an — alle anderen Engines sehen das blanke Default-Porträt.
 
----
+### Bug 2 — Client-Resolver liest `__outfitImageUrl`, aber niemand setzt es
+`src/lib/motion-studio/resolveSceneCharacterAnchor.ts:175` macht `(slot as any).__outfitImageUrl` — eine Property, die in der gesamten Codebase nirgends geschrieben wird. Das war ein altes Stub, das nie zu Ende geführt wurde. `prepareSceneAnchor` (Client-Pfad in `useGenerateAllClips` / `ClipsTab`) sendet dadurch auch im besten Fall nur das Basis-Porträt an `compose-scene-anchor`.
 
-## Beobachtungen seit Phase 2
+### Bug 3 — `compose-scene-anchor` hat keine Wardrobe-Lock-Klausel
+Selbst wenn das Outfit-Cover als Image #1 ankommt, sagt der Prompt in `supabase/functions/compose-scene-anchor/index.ts:358` nur: *„Use the body/wardrobe from Image #1 for Sarah, but the FACE from this image"*. Diese Formulierung gewichtet Wardrobe vs. Scene-Description nicht. Wenn der Scene-Text *„professional business meeting"* sagt, hedget Nano Banana 2 und rendert oft Business-Kleidung in Römer-Stil oder umgekehrt.
 
-1. **Performance-Tab ist „leise"** — User wissen nicht, dass er existiert. Kein Indikator auf der SceneCard, kein Auto-Suggest pro Cast-Member.
-2. **Performance-Block landet im Prompt, aber nicht in `applyActionsToPrompt`-Markern.** Heißt: wenn ein User später noch Cast-Actions tippt, kann es zu *latenter* Doppelung (Gestik in CastAction *und* in Performance) kommen. Aktuell ungewarnt.
-3. **Keine Presets.** Jede Szene wird from-scratch direktiert — bei Mehr-Szenen-Storyboards ist das viel Klickarbeit, und die Tonality über Szenen hinweg driftet.
-4. **Storyboard-LLM (`compose-video-storyboard`) kennt das Performance-Feld nicht.** Wenn die AI initial Szenen baut, könnte sie für jeden Sprecher gleich sinnvolle Defaults vorschlagen statt leerer Felder.
+Es gibt keine Anweisung wie *„Wardrobe IS LOCKED. If the scene says 'office' but the wardrobe shows Roman armor, render Roman armor inside the office."*
 
 ---
 
-## Phase 3 — Performance Discoverability & Smart Defaults
+## Lösung
 
-Ziel: Performance-Layer wird *gesehen, genutzt, intelligent gefüllt* — ohne den Prompt aufzublähen.
+Drei chirurgische Eingriffe, alle additiv, kein Schema, keine UI-Änderung, Lip-Sync-Pipeline bleibt unangetastet (es geht ausschließlich um die Bild-Komposition vor dem i2v-Render).
 
-### 3.1 Sichtbarkeit auf der SceneCard
-- Performance-Tab bekommt ein Count-Badge (`countDirectedPerformances`), analog zum Audio-Tab.
-- Neue Mini-Zeile unter dem Prompt-Editor: „🎭 0/3 cast directed" mit Klick → öffnet den Tab.
-- Hover-Tooltip erklärt einmalig, was die 4 Felder bewirken (LocalStorage-Flag, kein Modal-Spam).
+### 1. Universal-Anchor: Outfit-Cover-Auflösung mirror'n
+**Datei:** `supabase/functions/compose-video-clips/index.ts`
+**Stelle:** ab Zeile 1773, direkt vor dem Aufbau von `portraitsFromCast`.
 
-### 3.2 Konflikt-Warnung Cast-Action ↔ Performance
-- Erweitert `qualityScore.ts` um einen dritten Tipp `performanceConflictWarn`:
-  detektiert, wenn `CastActions[char]` Wörter wie *smile / nod / lean / point / gesture* enthält und gleichzeitig `performance[char].gesture` oder `.expression` gesetzt ist.
-- Tipp-Text in EN/DE/ES, schlägt vor, das doppelte Wort aus der Cast-Action zu entfernen.
+Spiegelt die bewährte cinematic-sync-Logik (Zeile 1232–1266):
+- Sammle alle `outfitLookId` aus `castShots`.
+- Eine Query auf `avatar_outfit_looks` (id, cover_url, front_url).
+- Beim Bauen von `portraitsFromCast`: wenn der Slot ein `outfitLookId` mit aufgelöster URL hat → die Outfit-URL nehmen, sonst Fallback auf `referenceImageUrl`.
+- Zusätzlich: `wardrobeLock: outfitUrlById.size > 0` und `wardrobeLockNames: [Namen der Char-Slots mit Outfit]` an `compose-scene-anchor` mitgeben (siehe #3).
+- `identityPortraitUrls` (canonical face-only) wird **immer** aus `referenceImageUrl` befüllt — bleibt unverändert, damit Face-Lock weiter funktioniert.
 
-### 3.3 Performance-Presets pro Charakter (Brand-Char-scoped)
-- Im Avatar-Profil (`/avatars/:id`) optionales Feld „Default performance" (gleiche 4 Slots).
-- `derivePerformanceEntries` mergt: `scene.performance[charId]` > `character.defaultPerformance` > leer.
-- Vorteil: tonalitäts-konsistente Charaktere über alle Szenen ohne pro-Szenen-Klicks.
+### 2. Client-Resolver `__outfitImageUrl` echt befüllen
+**Datei:** `src/lib/motion-studio/prepareSceneAnchor.ts`
+**Stelle:** ab Zeile 153 in `prepareSceneAnchor`, vor dem `supabase.functions.invoke('compose-scene-anchor', …)` (Zeile 197).
 
-### 3.4 LLM-seitige Vorbefüllung (best-effort, optional)
-- `compose-video-storyboard` Edge Function bekommt im JSON-Schema ein optionales `performance[]`-Feld pro Charakter (gleiche 4 Enums).
-- Strikt validiert; bei unbekannten Enums fallback auf leer.
-- Pipeline-Vertrag bleibt rückwärtskompatibel: Feld ist optional, alte Storyboards funktionieren unverändert.
-- Lip-Sync bleibt unberührt (audioPlan wird hier nicht angefasst).
+- Sammle `outfitLookId` über alle aktiven `characterShots`/`characterShot`.
+- Eine `supabase.from('avatar_outfit_looks').select('id, cover_url, front_url').in('id', ids)` Query (cached pro Render-Run reicht — wird einmal pro Szene gefeuert, das ist akzeptabel).
+- Map id → URL.
+- Beim Bauen von `portraitUrls` (Zeile 187): wenn der Anchor zu einem Charakter mit gesetztem Outfit gehört, statt `a.referenceImageUrl` die Outfit-URL nehmen; `identityPortraitUrls` parallel mit dem echten Porträt befüllen und an `compose-scene-anchor` mitgeben.
+- `wardrobeLock` + `wardrobeLockNames` an den Body anhängen.
+- Resolver darf so bleiben — die alte `__outfitImageUrl`-Stelle wird obsolet, kann aber als Fallback drin bleiben.
+
+### 3. `compose-scene-anchor`: Wardrobe-Lock-Klausel
+**Datei:** `supabase/functions/compose-scene-anchor/index.ts`
+**Stellen:** `Body`-Interface (Zeile 23–61), Klausel-Bereich (~ Zeile 350–365) und `editInstruction` (Zeile 366–370).
+
+- `Body` um `wardrobeLock?: boolean` und `wardrobeLockNames?: string[]` erweitern.
+- Neue Klausel `WARDROBE_LOCK_SUFFIX`:
+
+  > „**WARDROBE LOCK** — the wardrobe shown in the reference image for {NAMES} is MANDATORY and OVERRIDES any clothing implied by the scene description. If the scene description says 'modern office' or 'business meeting' but the wardrobe reference shows {e.g. Roman armor / fantasy robe / costume X}, the character wears EXACTLY that wardrobe inside the described environment. Do NOT translate the outfit into a 'scene-appropriate' equivalent. Do NOT swap fabrics, colors, or silhouettes to match the setting. The wardrobe in the reference IS the ground truth — the scene only provides location, lighting and pose."
+
+- Klausel ans `editInstruction` anhängen, hinter `STRICT_SWAP_SUFFIX` / `FACE_LOCK_SUFFIX`, vor `worldClause`.
+- Wenn `wardrobeLock` nicht gesetzt ist → Klausel leer (kein Verhaltenwechsel für Calls ohne explizites Outfit). Keine bestehenden Aufrufer brechen.
+
+### 4. Logging
+Beide Edge Functions geben bereits Outfit-Stats aus (cinematic-sync Zeile 1335). Spiegeln für Universal-Anchor und einmal in `compose-scene-anchor` (`wardrobeLock=true count=N`). Damit lässt sich im Edge-Function-Log binnen 5 Sekunden verifizieren, ob ein Render mit oder ohne Wardrobe-Lock lief.
 
 ---
 
-## Phase 4 — Storyboard-weite Direction (Optional, nach 3)
+## Was sich NICHT ändert (Schutzzone)
 
-Ziel: Über alle Szenen hinweg konsistente Tonalität — Artlist/Runway haben das nicht, wäre echter Differenziator.
-
-- **Story-Bible-Box** im Composer-Header: 3 Felder *Tone* (Casual/Corporate/Cinematic), *Pacing* (Slow/Medium/Punchy), *Color story* (Warm/Cool/Neutral).
-- Wird in jeder Szene als `[0 STORY]`-Layer (1 Zeile, ≤ 20 Wörter) vor `[1 SUBJECT]` injiziert.
-- Quality-Coach kann Abweichungen einer Szene vom globalen Tone flaggen.
-- Hat null Berührung mit dem Lip-Sync-Pfad — pure Prompt-Komposition.
-
----
-
-## Was diese Runde NICHT angefasst wird (Lip-Sync-Schutzzone)
-
-`compose-dialog-segments/*`, `compose-dialog-scene`, `sync-so-webhook`, `poll-dialog-shots`, `LIPSYNC_MODEL`, `MIN_VO_DURATION`, `update_dialog_shot_pass`, `syncso_inflight_jobs`, `lipsync-watchdog`, `formatAudioPlan`, `audioPlan`-Schema, `MAX_SHOT_RETRIES`. Alle Phase-3/4-Änderungen sind reine Client-seitige Prompt-Composition + ein optionales Feld in `compose-video-storyboard`.
+- **Schema** — `avatar_outfit_looks`, `composer_scenes`, `brand_characters` werden nicht angefasst.
+- **UI** — Outfit-Picker (`CharacterCastPicker`, `SavedOutfitsSection`) bleibt wie er ist; die Auswahl-Spec (`outfitLookId`) stimmt bereits.
+- **Lip-Sync-Pipeline** — `compose-dialog-segments/*`, `sync-so-webhook`, `audioPlan`, `LIPSYNC_MODEL`, `poll-dialog-shots`, `syncso_inflight_jobs`, `MIN_VO_DURATION`, `update_dialog_shot_pass`, `formatAudioPlan` — null Berührung.
+- **Talking-Head (HeyGen)** — nutzt eigene Portrait-Pipeline, ist in beiden Anchor-Pfaden schon `skip`.
+- **Vidu Q2** — `subject-reference` Pfad bleibt unverändert (er bekommt das Outfit-Bild bereits direkt als Subject-Ref, weil die Anchor-URL = `referenceImageUrl` ist; Vidu liest Wardrobe direkter aus dem Bild und braucht keine separate Lock-Klausel).
 
 ---
 
-## Empfehlung
+## Erwartetes Verhalten danach
 
-Phase 3.1 + 3.2 zuerst (Discoverability + Konflikt-Warnung) — ca. 1–2 h, sofort sichtbarer Nutzen, null Risiko.
-Danach 3.3 (Char-Presets) als eigener Schritt, weil es ein Avatar-Profil-Schema-Update braucht.
-3.4 und Phase 4 sind opt-in für später.
+- Briefing „AdTool AI Werbekampagne, Business" + manuell ausgewähltes Outfit „Römerrüstung" für Sarah → Nano Banana 2 rendert Sarah in **echter Römerrüstung** im modernen Büro/Boardroom, Identity bleibt durch die separate Face-Only-Identity-Referenz exakt gelockt, alle anderen Cast-Member ohne explizites Outfit tragen weiter Business.
+- Kein Outfit gepickt → 100 % identisches Verhalten zu heute (Lock-Klausel wird nicht emittiert).
+- Funktioniert für alle i2v-Engines (Hailuo, Kling, Pika, Seedance, Luma, Wan, HappyHorse) und cinematic-sync; Vidu Q2 funktioniert weiter wie heute.
 
-**Frage:** Starten wir mit Phase 3.1 + 3.2 oder soll 3.3 (Char-Presets) gleich mit?
+---
+
+## Aufwand
+
+~1 h Arbeit, 3 Files geändert (`compose-video-clips/index.ts`, `prepareSceneAnchor.ts`, `compose-scene-anchor/index.ts`), keine Migration.

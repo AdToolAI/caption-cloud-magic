@@ -58,6 +58,14 @@ interface Body {
   locationNames?: string[];
   buildingNames?: string[];
   propNames?: string[];
+  /** Wardrobe-Lock — when true, the wardrobe shown in `portraitUrls` is a
+   *  user-picked saved outfit (e.g. Roman armor) that MUST be rendered
+   *  literally even when it contradicts the scene description (e.g.
+   *  "modern office"). Without this flag, Nano Banana 2 silently translates
+   *  the outfit into something "scene-appropriate". Names listed in
+   *  `wardrobeLockNames` are the cast members whose wardrobe is locked. */
+  wardrobeLock?: boolean;
+  wardrobeLockNames?: string[];
 }
 
 async function sha1(s: string): Promise<string> {
@@ -363,8 +371,17 @@ serve(async (req) => {
         identityLines.join("\n");
     }
 
+    // Wardrobe-Lock — when the caller picked a saved outfit for one or more
+    // cast members, the wardrobe shown in the reference image MUST override
+    // anything implied by the scene description. Without this clause the
+    // image model hedges (e.g. Business-Briefing + Roman-armor outfit →
+    // generic suit with armor-ish trim instead of full Roman armor).
+    const WARDROBE_LOCK_SUFFIX = body.wardrobeLock === true
+      ? ` WARDROBE LOCK — the wardrobe / clothing / armor visible in the reference image${portraits.length > 1 ? "s" : ""} for ${(body.wardrobeLockNames && body.wardrobeLockNames.length > 0 ? body.wardrobeLockNames.join(", ") : "the character(s)")} is MANDATORY and OVERRIDES any clothing implied by the scene description. The wardrobe in the reference IS the ground truth — the scene only provides location, lighting, pose and props. If the scene description says "modern office", "business meeting", "wedding", "beach" etc. but the wardrobe reference shows Roman armor, a fantasy robe, a costume, period dress or any unusual garment, the character wears EXACTLY that wardrobe inside the described environment (e.g. full Roman armor inside the modern boardroom). Do NOT translate the outfit into a "scene-appropriate" equivalent. Do NOT swap fabrics, colors, materials, silhouettes, accessories, headwear or footwear to match the setting. Preserve every wardrobe detail visible in the reference: garment type, layers, color palette, patterns, metals, leather, belts, capes, helmets, jewelry, footwear.`
+      : "";
+
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${WARDROBE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
@@ -433,7 +450,7 @@ serve(async (req) => {
       );
     }
     console.log(
-      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} elapsedMs=${Date.now() - t0}`,
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} wardrobeLock=${body.wardrobeLock ? 1 : 0}${body.wardrobeLock && body.wardrobeLockNames?.length ? `(${body.wardrobeLockNames.join("/")})` : ""} elapsedMs=${Date.now() - t0}`,
     );
 
     const aiJson = await aiResp.json();
