@@ -5642,45 +5642,62 @@ serve(async (req) => {
       },
     });
 
-    // v29: For retry/advance dispatches, re-read the DB and merge ONLY our
-    // pass into the freshest passes[] so a concurrent webhook for a sibling
-    // pass can't be overwritten by our stale `passes` snapshot.
-    if (isRetry || isAdvance) {
-      const { data: freshRow } = await supabase
-        .from("composer_scenes")
-        .select("dialog_shots")
-        .eq("id", sceneId)
-        .maybeSingle();
-      const freshState: any = (freshRow as any)?.dialog_shots ?? state;
-      const freshPasses: any[] = Array.isArray(freshState?.passes)
-        ? freshState.passes.map((p: any) => ({ ...p }))
-        : passes;
-      freshPasses[currentPassIdx] = pass;
-      const mergedState: any = {
-        ...freshState,
-        ...state,
-        passes: freshPasses,
-        // Preserve fields that may have been advanced by other passes:
-        cost_credits: Number(freshState?.cost_credits ?? state.cost_credits ?? totalCost),
-        fallback_history: freshState?.fallback_history ?? state.fallback_history ?? [],
-      };
+    // v168 — Phase 1 of Per-Pass-Lock rollout: replace full-row dialog_shots
+    // UPDATE with atomic per-slot RPC writes. With Plan-D fan-out, up to N
+    // parallel dispatchers race here; a full-row UPDATE causes Lost-Update
+    // (the last writer overwrites sibling-pass job_ids). The RPCs use
+    // jsonb_set/||-merge at the row-lock level, so each pass writes only
+    // its own slot atomically.
+    //
+    //   1) update_dialog_pass_slot(scene, pass_idx, patch)
+    //      → writes `dialog_shots.passes[pass_idx] = passes[pass_idx] || patch`
+    //   2) update_dialog_shots_root_merge(scene, patch)
+    //      → merges root-level fields (cost_credits, fallback_history)
+    //        WITHOUT touching `passes[]`. `passes` is stripped defensively.
+    //   3) plain UPDATE for top-level scene columns (lip_sync_status,
+    //      twoshot_stage, …) — these are idempotent across passes (latest
+    //      writer's value is fine for status/diagnostic fields).
+    {
+      const { error: slotErr } = await supabase.rpc("update_dialog_pass_slot", {
+        _scene_id: sceneId,
+        _pass_idx: currentPassIdx,
+        _patch: pass,
+      });
+      if (slotErr) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v168_per_slot_write pass=${currentPassIdx + 1} rpc_error=${slotErr.message} — falling back to full-row UPDATE`,
+        );
+        // Fallback: read-modify-write merge (legacy behavior for safety).
+        const { data: freshRow } = await supabase
+          .from("composer_scenes")
+          .select("dialog_shots")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const freshState: any = (freshRow as any)?.dialog_shots ?? state;
+        const freshPasses: any[] = Array.isArray(freshState?.passes)
+          ? freshState.passes.map((p: any) => ({ ...p }))
+          : passes;
+        freshPasses[currentPassIdx] = pass;
+        await supabase
+          .from("composer_scenes")
+          .update({ dialog_shots: { ...freshState, ...state, passes: freshPasses } })
+          .eq("id", sceneId);
+      } else {
+        // Root merge for cost_credits / fallback_history (PRESERVES passes[]).
+        const rootPatch: Record<string, unknown> = {
+          cost_credits: Number(state?.cost_credits ?? totalCost),
+          fallback_history: state?.fallback_history ?? [],
+        };
+        await supabase.rpc("update_dialog_shots_root_merge", {
+          _scene_id: sceneId,
+          _patch: rootPatch,
+        });
+      }
+
+      // Top-level scene columns (idempotent across parallel passes).
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: mergedState,
-          lip_sync_status: "running",
-          twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
-          lip_sync_source_clip_url: sourceClipUrl,
-          replicate_prediction_id: `sync:${jobId}`,
-          clip_error: null,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
-    } else {
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: state,
           lip_sync_status: "running",
           twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
           lip_sync_source_clip_url: sourceClipUrl,
