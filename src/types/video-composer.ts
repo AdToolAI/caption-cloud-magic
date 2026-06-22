@@ -44,6 +44,46 @@ export type ClipQuality = 'standard' | 'pro';
 
 export type ClipStatus = 'pending' | 'generating' | 'ready' | 'failed';
 
+// =============================================================================
+// Phase 2 — Performance Layer
+// =============================================================================
+// Compact per-character direction for facial expression, gesture, gaze, and
+// energy. Each axis is a small enum (Shot-Director-style); they all default
+// to "unset" so empty performance never injects boilerplate into the prompt.
+
+export type PerformanceExpression =
+  | 'neutral'
+  | 'warm-smile'
+  | 'curious'
+  | 'concerned'
+  | 'confident'
+  | 'surprised';
+
+export type PerformanceGesture =
+  | 'still'
+  | 'hand-on-chin'
+  | 'open-palms'
+  | 'point'
+  | 'cross-arms'
+  | 'lean-in';
+
+export type PerformanceGaze =
+  | 'to-camera'
+  | 'to-speaker'
+  | 'away'
+  | 'down-thinking';
+
+/** 1 (subtle) … 5 (big). Stored as integer; emitted only when set. */
+export type PerformanceEnergy = 1 | 2 | 3 | 4 | 5;
+
+export interface ScenePerformance {
+  expression?: PerformanceExpression;
+  gesture?: PerformanceGesture;
+  gaze?: PerformanceGaze;
+  energy?: PerformanceEnergy;
+}
+
+
 export type TransitionStyle = 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
 
 /**
@@ -348,6 +388,16 @@ export interface ComposerScene {
   sceneActionUser?: string;
   /** Auto-translated English mirror of `sceneActionUser`. Cached server-side. */
   sceneActionEn?: string;
+
+  /**
+   * Phase 2 — per-character Performance Layer (Mimik / Gestik / Blick / Energy).
+   * Optional; emitted as a compact `[4 PERFORMANCE]` block between SHOT and
+   * DIALOG only when at least one field is set. Never read by the lip-sync
+   * pipeline (Sync.so / HeyGen / compose-dialog-segments work off `audioPlan`).
+   * Keyed by `characterId` so reordering cast does not lose direction.
+   */
+  performance?: Record<string, ScenePerformance>;
+
 
 
   /** Stock media metadata when clipSource === 'stock' or 'stock-image'. */

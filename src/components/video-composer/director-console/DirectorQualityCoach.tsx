@@ -14,6 +14,7 @@ import {
   type DirectorLanguage,
 } from '@/lib/motion-studio/composeFinalPrompt';
 import { evaluateSceneQuality, type Severity } from '@/lib/motion-studio/qualityScore';
+import { derivePerformanceEntries } from '@/lib/motion-studio/buildPerformanceBlock';
 import type { ComposerScene } from '@/types/video-composer';
 
 interface Props {
@@ -28,10 +29,14 @@ interface Props {
     | 'dialogScript'
     | 'characterShot'
     | 'characterShots'
+    | 'performance'
   >;
+  /** Project cast — used to derive the [4 PERFORMANCE] block for preview/score. */
+  characters?: Array<{ id: string; name: string }>;
   language?: DirectorLanguage;
   className?: string;
 }
+
 
 const TONE: Record<Severity, { ring: string; chip: string; icon: string }> = {
   pass: {
@@ -63,7 +68,7 @@ const HEADINGS = {
   es: { title: 'Director Score', good: 'Lista para rodar', mid: 'Requiere pulido', bad: 'Habría que volver a rodar', fix: 'Consejos del coach' },
 } as const;
 
-export default function DirectorQualityCoach({ scene, language = 'en', className }: Props) {
+export default function DirectorQualityCoach({ scene, characters, language = 'en', className }: Props) {
   const [open, setOpen] = useState(false);
 
   const composed = useMemo(
@@ -74,10 +79,12 @@ export default function DirectorQualityCoach({ scene, language = 'en', className
         shotDirector: scene.shotDirector,
         cinematicStylePresetId: scene.cinematicPresetSlug,
         audioPlan: scene.audioPlan,
+        performanceEntries: derivePerformanceEntries(scene, characters),
         language,
       }),
-    [scene.aiPrompt, scene.directorModifiers, scene.shotDirector, scene.cinematicPresetSlug, scene.audioPlan, language],
+    [scene.aiPrompt, scene.directorModifiers, scene.shotDirector, scene.cinematicPresetSlug, scene.audioPlan, scene.performance, characters, language],
   );
+
 
   const result = useMemo(
     () =>

@@ -50,8 +50,11 @@ interface Props {
   brandCharacterInput?: BrandCharacterInput;
   libCharacters: any[];
   libLocations: any[];
+  /** Project cast — forwarded to DirectorConsolePreview for the [4 PERFORMANCE] block. */
+  characters?: Array<{ id: string; name: string }>;
   onOpenCompareLab: () => void;
 }
+
 
 const t = {
   de: {
@@ -109,8 +112,10 @@ export default function ScenePromptDetailsSheet({
   brandCharacterInput,
   libCharacters,
   libLocations,
+  characters,
   onOpenCompareLab,
 }: Props) {
+
   const [layersOpen, setLayersOpen] = useState(false);
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
   const L = t[language];
@@ -150,7 +155,7 @@ export default function ScenePromptDetailsSheet({
               <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
                 {L.livePrompt}
               </Label>
-              <DirectorConsolePreview scene={scene} language={language} className="mt-1" />
+              <DirectorConsolePreview scene={scene} characters={characters} language={language} className="mt-1" />
             </div>
 
             {/* 2) Composed final prompt + layer breakdown */}

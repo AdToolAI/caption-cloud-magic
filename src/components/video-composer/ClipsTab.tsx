@@ -25,7 +25,8 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } fr
 import { recommendEngineForScene, countSpeakers } from '@/lib/video-composer/sceneEngineRouter';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
-import { composeFinalPrompt, type DirectorLanguage } from '@/lib/motion-studio/composeFinalPrompt';
+import { composeFinalPrompt, type DirectorLanguage } from "@/lib/motion-studio/composeFinalPrompt";
+import { derivePerformanceEntries } from "@/lib/motion-studio/buildPerformanceBlock";
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
@@ -597,8 +598,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           libraryCharacters: libCharacters,
           libraryLocations: libLocations,
           audioPlan: s.audioPlan,
+          performanceEntries: derivePerformanceEntries(s, characters),
           language: directorLanguage,
         }));
+
       }
 
       // Second pass (parallel): scene-aware character anchor.
@@ -772,8 +775,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
         audioPlan: targetScene.audioPlan,
+        performanceEntries: derivePerformanceEntries(targetScene, characters),
         language: directorLanguage,
       });
+
 
       const preparedSingle = targetScene.clipSource.startsWith('ai-') && targetScene.engineOverride !== 'cinematic-sync'
         ? await prepareSceneAnchor(targetScene, characters, activeBrandChar, composedSingle.finalPrompt, '16:9', {}, libLocations)
@@ -945,8 +950,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
         audioPlan: dbScene.audioPlan,
+        performanceEntries: derivePerformanceEntries(dbScene, characters),
         language: directorLanguage,
       });
+
 
       // 4. Scene-Aware Character Anchor — composes ALL selected characters into
       //    the requested scene composition via Nano Banana 2 (compose-scene-anchor).

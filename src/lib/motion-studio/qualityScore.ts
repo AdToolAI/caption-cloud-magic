@@ -17,6 +17,9 @@
 
 import type { AudioPlan, ComposerScene } from '@/types/video-composer';
 import type { DirectorLanguage } from './composeFinalPrompt';
+import { isBoilerplateAction } from './isBoilerplateAction';
+import { jaccardOverlap } from './composePromptLayers';
+
 
 export type QualityAxis =
   | 'subject'
@@ -71,8 +74,11 @@ const T = {
       lengthFailLong: 'Prompt too long (>1200 chars) — trim to one outcome per line.',
       lengthWarn: 'Prompt borderline — Artlist recommends 80–600 chars per scene.',
       consistencyWarn: 'Detected mixed style cues (e.g. "noir" + "cinematic colorful") — pick one direction.',
+      redundancyWarn: 'Cast actions repeat the scene action — tighten or delete duplicates so each line directs something specific.',
+      boilerplateWarn: 'Auto-placeholder cast actions detected ("gesturing naturally, visible to camera") — they will be filtered from the final prompt; consider replacing them with concrete direction.',
     },
   },
+
   de: {
     subject: { pass: 'Cast gesetzt', warn: 'Cast unklar', fail: 'Kein Cast' },
     action: { pass: 'Aktion konkret', warn: 'Aktion vage', fail: 'Keine Aktion' },
@@ -96,6 +102,9 @@ const T = {
       lengthFailLong: 'Prompt zu lang (>1200 Zeichen) — kürze auf "ein Outcome pro Zeile".',
       lengthWarn: 'Prompt grenzwertig — Artlist empfiehlt 80–600 Zeichen pro Szene.',
       consistencyWarn: 'Gemischte Style-Cues entdeckt (z. B. "noir" + "cinematic colorful") — entscheide dich für eine Richtung.',
+      redundancyWarn: 'Cast-Aktionen wiederholen die Scene-Action — präzisiere oder lösche Dubletten, damit jede Zeile etwas Eigenes lenkt.',
+      boilerplateWarn: 'Auto-Platzhalter in Cast-Aktionen erkannt ("gestikuliert natürlich, sichtbar zur Kamera") — wird aus dem finalen Prompt gefiltert; ersetze sie für mehr Kontrolle.',
+
     },
   },
   es: {
@@ -121,6 +130,9 @@ const T = {
       lengthFailLong: 'Prompt demasiado largo (>1200 caracteres) — recorta a "un resultado por línea".',
       lengthWarn: 'Prompt en el límite — Artlist recomienda 80–600 caracteres por escena.',
       consistencyWarn: 'Cues de estilo mezclados detectados (p. ej. "noir" + "cinematic colorful") — elige una dirección.',
+      redundancyWarn: 'Las acciones del reparto repiten la acción de la escena — afina o elimina duplicados para que cada línea aporte algo propio.',
+      boilerplateWarn: 'Detectados placeholders automáticos en acciones del reparto ("gesticula con naturalidad, visible a cámara") — se filtrarán del prompt final; sustitúyelos por dirección concreta.',
+
     },
   },
 } as const;
@@ -250,7 +262,7 @@ export function evaluateSceneQuality({
     tips.push({ axis: 'length', severity: 'warn', label: L.length.warn, hint: L.hints.lengthWarn });
   }
 
-  // 7. CONSISTENCY
+  // 7. CONSISTENCY — style clashes + Phase 1 hygiene (boilerplate + redundancy)
   for (const [a, b] of STYLE_CONFLICTS) {
     if (a.test(prompt) && b.test(prompt)) {
       axes.consistency = 'warn';
@@ -258,6 +270,30 @@ export function evaluateSceneQuality({
       break;
     }
   }
+
+  // 7a. BOILERPLATE — system auto-placeholder cast actions still in scene
+  const castMatch = raw.match(/\[CastActions\]\s*([\s\S]*?)\s*\[\/CastActions\]/i);
+  const sceneMatch = raw.match(/\[SceneAction\]\s*([\s\S]*?)\s*\[\/SceneAction\]/i);
+  const castLines = castMatch
+    ? castMatch[1].split('\n').map((l) => l.replace(/^\s*-\s*[^:]+:\s*/, '').trim()).filter(Boolean)
+    : [];
+  const boilerCount = castLines.filter((l) => isBoilerplateAction(l)).length;
+  if (boilerCount > 0) {
+    if (axes.consistency === 'pass') axes.consistency = 'warn';
+    tips.push({ axis: 'consistency', severity: 'warn', label: L.consistency.warn, hint: L.hints.boilerplateWarn });
+  }
+
+  // 7b. REDUNDANCY — cast line overlaps scene action ≥ 0.5 Jaccard
+  const sceneText = sceneMatch?.[1]?.trim() ?? '';
+  if (sceneText && castLines.length > 0) {
+    const overlap = castLines.some((l) => !isBoilerplateAction(l) && jaccardOverlap(l, sceneText) >= 0.5);
+    if (overlap) {
+      if (axes.consistency === 'pass') axes.consistency = 'warn';
+      tips.push({ axis: 'consistency', severity: 'warn', label: L.consistency.warn, hint: L.hints.redundancyWarn });
+    }
+  }
+
+
 
   // Aggregate score
   const values = Object.values(axes);

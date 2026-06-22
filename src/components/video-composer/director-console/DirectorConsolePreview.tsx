@@ -23,6 +23,7 @@ import {
   formatAudioPlan,
   type DirectorLanguage,
 } from '@/lib/motion-studio/composeFinalPrompt';
+import { derivePerformanceEntries } from '@/lib/motion-studio/buildPerformanceBlock';
 import type { ComposerScene, AudioPlan } from '@/types/video-composer';
 
 interface DirectorConsolePreviewProps {
@@ -34,15 +35,23 @@ interface DirectorConsolePreviewProps {
     | 'cinematicPresetSlug'
     | 'audioPlan'
     | 'dialogLockedAt'
+    | 'characterShot'
+    | 'characterShots'
+    | 'performance'
   >;
+  /** Optional — used to render the [4 PERFORMANCE] block in the preview. */
+  characters?: Array<{ id: string; name: string }>;
   language?: DirectorLanguage;
   className?: string;
 }
+
 
 const LAYER_COLORS: Record<string, string> = {
   '[1 SUBJECT]': 'text-amber-300',
   '[2 ACTION]': 'text-cyan-300',
   '[3 SHOT]': 'text-violet-300',
+  '[4 PERFORMANCE]': 'text-fuchsia-300',
+
   '[5 DIALOG]': 'text-emerald-300',
   '[6 SFX]': 'text-pink-300',
   '[6 AMBIENT]': 'text-pink-300',
@@ -114,6 +123,7 @@ function AudioTimeline({ plan }: { plan: AudioPlan }) {
 
 export default function DirectorConsolePreview({
   scene,
+  characters,
   language = 'en',
   className,
 }: DirectorConsolePreviewProps) {
@@ -125,6 +135,7 @@ export default function DirectorConsolePreview({
         shotDirector: scene.shotDirector,
         cinematicStylePresetId: scene.cinematicPresetSlug,
         audioPlan: scene.audioPlan,
+        performanceEntries: derivePerformanceEntries(scene, characters),
         language,
       }),
     [
@@ -133,9 +144,12 @@ export default function DirectorConsolePreview({
       scene.shotDirector,
       scene.cinematicPresetSlug,
       scene.audioPlan,
+      scene.performance,
+      characters,
       language,
     ],
   );
+
 
   const locked = !!scene.dialogLockedAt && !!scene.audioPlan?.speakers?.length;
   const audioPlanText = scene.audioPlan

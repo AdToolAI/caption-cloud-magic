@@ -20,6 +20,8 @@ import { extractFunctionsError } from '@/lib/functionsError';
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
 import { composeFinalPrompt, type DirectorLanguage } from '@/lib/motion-studio/composeFinalPrompt';
+import { derivePerformanceEntries } from '@/lib/motion-studio/buildPerformanceBlock';
+
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
@@ -211,10 +213,12 @@ export function useGenerateAllClips({
             libraryCharacters: libCharacters,
             libraryLocations: libLocations,
             audioPlan: s.audioPlan,
+            performanceEntries: derivePerformanceEntries(s, characters),
             language: directorLanguage,
           }),
         );
       }
+
 
       // 4. scene-aware character anchor (parallel)
       const anchorByScene = new Map<string, Awaited<ReturnType<typeof prepareSceneAnchor>>>();

@@ -143,6 +143,8 @@ import SceneCardSummaryHeader from "./SceneCardSummaryHeader";
 import SceneStudioTabBar, {
   SceneStudioSectionHeader,
 } from "./SceneStudioTabBar";
+import ScenePerformancePanel from "./ScenePerformancePanel";
+
 import {
   recommendEngineForScene,
   estimateHeygenCostEur,
@@ -1723,7 +1725,24 @@ export default function SceneCard({
                   </>
                 )}
 
+
+              {/* Phase 2 — Performance Layer (Mimik/Gestik/Blick/Energy).
+                  Sits between Cast and Audio. Lip-sync safe — never touches
+                  audioPlan or compose-dialog-segments. */}
+              {scene.clipSource.startsWith("ai-") && characters && characters.length > 0 && (
+                <>
+                  <SceneStudioSectionHeader tab="performance" language={lang} />
+                  <ScenePerformancePanel
+                    scene={scene}
+                    characters={characters}
+                    language={lang}
+                    onUpdate={onUpdate}
+                  />
+                </>
+              )}
+
               <SceneStudioSectionHeader tab="audio" language={lang} />
+
               {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
               {scene.clipSource.startsWith("ai-") && characters && scene.dialogMode === true && (
                 <SceneDialogStudio
@@ -1940,10 +1959,12 @@ export default function SceneCard({
               {scene.clipSource.startsWith("ai-") && (
                 <DirectorQualityCoach
                   scene={scene}
+                  characters={characters}
                   language={lang}
                   className="mt-2"
                 />
               )}
+
 
               {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
               <AlertDialog
@@ -2465,13 +2486,53 @@ export default function SceneCard({
                           }
                           rows={6}
                         />
-                        <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
-                          {lang === "de"
-                            ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
-                            : lang === "es"
-                              ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
-                              : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
-                        </p>
+                        <div className="flex items-center justify-between gap-2 pl-1">
+                          <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic flex-1">
+                            {lang === "de"
+                              ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
+                              : lang === "es"
+                                ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
+                                : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
+                          </p>
+                          {(() => {
+                            const chars = (scene.aiPrompt || '').length;
+                            const tone =
+                              chars === 0
+                                ? 'text-muted-foreground/50'
+                                : chars < 35
+                                  ? 'text-rose-300/80'
+                                  : chars <= 900
+                                    ? 'text-emerald-300/80'
+                                    : chars <= 1400
+                                      ? 'text-amber-300/80'
+                                      : 'text-rose-300/80';
+                            const label =
+                              chars === 0
+                                ? lang === 'de' ? 'leer' : lang === 'es' ? 'vacío' : 'empty'
+                                : chars < 35
+                                  ? lang === 'de' ? 'zu kurz' : lang === 'es' ? 'muy corto' : 'too short'
+                                  : chars <= 900
+                                    ? lang === 'de' ? 'safe' : lang === 'es' ? 'seguro' : 'safe'
+                                    : chars <= 1400
+                                      ? lang === 'de' ? 'grenzwertig' : lang === 'es' ? 'al límite' : 'borderline'
+                                      : lang === 'de' ? 'Provider kürzt evtl.' : lang === 'es' ? 'puede recortarse' : 'may be trimmed';
+                            return (
+                              <span
+                                className={`shrink-0 font-mono text-[10px] tabular-nums ${tone}`}
+                                title={
+                                  lang === 'de'
+                                    ? `Hailuo/Kling ~512 Token sweet-spot; ab 1200+ ignorieren i2v-Modelle hintere Layer`
+                                    : lang === 'es'
+                                      ? `Hailuo/Kling ~512 tokens sweet-spot; >1200 los modelos ignoran capas finales`
+                                      : `Hailuo/Kling sweet-spot ~512 tokens; >1200 chars and i2v models drop trailing layers`
+                                }
+                              >
+                                ~{chars} · {label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+
                       </>
                     ) : (
                       <StructuredPromptBuilder
@@ -2939,7 +3000,9 @@ export default function SceneCard({
         brandCharacterInput={brandCharacterInput}
         libCharacters={libCharacters}
         libLocations={libLocations}
+        characters={characters}
         onOpenCompareLab={() => setCompareLabOpen(true)}
+
       />
 
       {/* Block L — Inline Compare Lab Dialog */}
