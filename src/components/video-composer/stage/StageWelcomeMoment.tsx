@@ -86,6 +86,7 @@ export default function StageWelcomeMoment() {
   });
 
   const irisActive = phase === "iris";
+  const isCountdown = phase === "countdown";
 
   return (
     <div
