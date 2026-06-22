@@ -28,6 +28,7 @@ import StoryboardScenePlayerList from './StoryboardScenePlayerList';
 import SceneStyleMode from './SceneStyleMode';
 import SceneAvatarMode from './SceneAvatarMode';
 import { useSceneGenerate } from '@/hooks/useSceneGenerate';
+import { useSceneRenderConfirm } from '@/lib/composer/sceneRenderConfirm';
 import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
 import PipelineProgressBar from './PipelineProgressBar';
 import StageStoryboardLoader from './stage/StageStoryboardLoader';
