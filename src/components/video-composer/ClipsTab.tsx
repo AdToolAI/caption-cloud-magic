@@ -598,8 +598,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           libraryCharacters: libCharacters,
           libraryLocations: libLocations,
           audioPlan: s.audioPlan,
+          performanceEntries: derivePerformanceEntries(s, characters),
           language: directorLanguage,
         }));
+
       }
 
       // Second pass (parallel): scene-aware character anchor.
