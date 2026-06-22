@@ -22,6 +22,7 @@ import { useSceneGenerate } from '@/hooks/useSceneGenerate';
 import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
 import PipelineProgressBar from './PipelineProgressBar';
 import StageStoryboardLoader from './stage/StageStoryboardLoader';
+import StageStoryboardError from './stage/StageStoryboardError';
 import StagePanel from './stage/StagePanel';
 
 import { Play, CheckCircle2 } from 'lucide-react';
