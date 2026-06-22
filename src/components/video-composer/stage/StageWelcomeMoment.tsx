@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { emitStageEvent } from "@/lib/stage/stageEvents";
+import StageCountdown from "./StageCountdown";
 
 const SESSION_KEY = "motion-studio:welcomed-this-session";
 
