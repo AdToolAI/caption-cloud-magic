@@ -5835,6 +5835,91 @@ serve(async (req) => {
           `(env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}, ${passes.length} passes) — webhook will chain serially`,
       );
     }
+    // ── v170 — Seed sibling pass skeletons BEFORE fan-out ────────────────
+    // Regression fix (June 2026): on fresh multi-speaker dispatch the v168
+    // per-slot RPC above only writes `passes[0]`, and the root merge strips
+    // `passes` defensively. The parallel `{ advance: true, pass_idx: i }`
+    // self-invokes therefore loaded `prevState.passes.length === 1`, hit the
+    // "no pass at cursor" guard, and silently returned. Result in DB:
+    // `total_passes: 4` but `passes` length 1 → UI shows 1/1 and only the
+    // first speaker is ever lip-synced.
+    //
+    // Fix: BEFORE fanning out, persist a pending skeleton for every sibling
+    // pass (slots 1..N-1) via the same atomic RPC. Each skeleton carries the
+    // full pass metadata (idx, speaker_idx, character_id, audio_url, coords,
+    // segments, retry_variant, audio_url_full, v137_mapping). The fan-out
+    // self-invokes then find their slot and dispatch normally.
+    if (!isAdvance && !isRetry && passes.length > 1) {
+      try {
+        const seedResults = await Promise.allSettled(
+          passes.slice(1).map(async (sibling, offset) => {
+            const slotIdx = offset + 1;
+            // Defensive deep-copy so we never persist `rendering`/`job_id`
+            // state inherited from a shared reference.
+            const skeleton: Record<string, unknown> = {
+              ...(sibling as any),
+              status: "pending",
+              job_id: null,
+              output_url: null,
+              started_at: null,
+              finished_at: null,
+              error: null,
+            };
+            const { error } = await supabase.rpc("update_dialog_pass_slot", {
+              _scene_id: sceneId,
+              _pass_idx: slotIdx,
+              _patch: skeleton,
+            });
+            if (error) throw new Error(error.message);
+            return slotIdx;
+          }),
+        );
+        const seededIdxs = seedResults
+          .map((r, i) => (r.status === "fulfilled" ? i + 1 : null))
+          .filter((v): v is number => v !== null);
+        const failedSeeds = seedResults
+          .map((r, i) => (r.status === "rejected" ? { idx: i + 1, reason: (r as PromiseRejectedResult).reason?.message ?? String((r as PromiseRejectedResult).reason) } : null))
+          .filter((v): v is { idx: number; reason: string } => v !== null);
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v170_pass_skeleton_seed ok=${seededIdxs.join(",") || "none"} total_passes=${passes.length}${failedSeeds.length ? ` failed=${JSON.stringify(failedSeeds)}` : ""}`,
+        );
+        if (failedSeeds.length > 0) {
+          // Fallback: write the full array via the legacy UPDATE so siblings
+          // are at least present (last-writer-wins is acceptable here because
+          // pass 0 was already persisted via the per-slot RPC above).
+          try {
+            const { data: freshRow2 } = await supabase
+              .from("composer_scenes")
+              .select("dialog_shots")
+              .eq("id", sceneId)
+              .maybeSingle();
+            const freshDs: any = (freshRow2 as any)?.dialog_shots ?? {};
+            const freshPasses: any[] = Array.isArray(freshDs?.passes)
+              ? freshDs.passes.slice()
+              : [];
+            for (let i = 0; i < passes.length; i++) {
+              if (!freshPasses[i]) freshPasses[i] = passes[i];
+            }
+            await supabase
+              .from("composer_scenes")
+              .update({
+                dialog_shots: { ...freshDs, passes: freshPasses, total_passes: passes.length, multi_pass: passes.length > 1 },
+                updated_at: nowIso,
+              })
+              .eq("id", sceneId);
+          } catch (fallbackErr) {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v170_pass_skeleton_seed_fallback_failed: ${(fallbackErr as Error)?.message ?? fallbackErr}`,
+            );
+          }
+        }
+      } catch (seedErr) {
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v170_pass_skeleton_seed_threw: ${(seedErr as Error)?.message ?? seedErr}`,
+        );
+      }
+    }
+
     if (!isAdvance && !isRetry && fanOutAllowed) {
       // Pass 0 was just dispatched above. Fan out passes [1 .. cap-1] now;
       // any beyond cap remain `pending` and get kicked by the webhook.
