@@ -208,6 +208,13 @@ export default function VideoComposerDashboard() {
   // True while the BriefingTab's AI mode is running compose-video-storyboard.
   // Used to show a loading panel on the (already-active) Storyboard tab.
   const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
+  // Last storyboard-generation failure surfaced from BriefingTab. When set,
+  // the Storyboard tab renders a Bond-style error panel with retry instead
+  // of bouncing the user silently back to Briefing.
+  const [storyboardError, setStoryboardError] = useState<{ message: string; retryable: boolean } | null>(null);
+  // Counter the storyboard-error panel increments to ask BriefingTab to
+  // re-run `handleGenerateStoryboard` with the current briefing.
+  const [retryStoryboardNonce, setRetryStoryboardNonce] = useState(0);
   // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
