@@ -21,7 +21,9 @@ import {
 
 const CREDIT_PER_EUR = 100;     // 1 credit = €0.01
 const VO_CREDITS_PER_SCENE = 5; // ~€0.05 ElevenLabs avg
-const LIPSYNC_CREDITS_PER_SEC_PER_PASS = 9; // sync.so lipsync-2-pro
+// sync.so lipsync-2-pro: raised 9 → 16 Cr/s (3.5× margin cap on ~€0.046/s raw cost).
+// Backend mirrors: compose-dialog-segments, lip-sync-video.
+const LIPSYNC_CREDITS_PER_SEC_PER_PASS = 16;
 
 export interface SceneCostLine {
   label: string;
@@ -95,10 +97,12 @@ export function estimateSceneRenderCost(
   const lines: SceneCostLine[] = [];
 
   if (providerCredits > 0) {
+    const ratePerSec = durationSec > 0 ? providerCredits / durationSec : 0;
     lines.push({
       label: `Video (${scene.clipSource}, ${quality}, ${durationSec}s)`,
       credits: providerCredits,
       eur: providerEur,
+      detail: `${durationSec}s × ${ratePerSec.toFixed(1)} Cr/s · Provider-Rohkost + Marge`,
     });
   }
 
@@ -110,6 +114,7 @@ export function estimateSceneRenderCost(
       label: 'Voiceover (ElevenLabs)',
       credits: voCredits,
       eur: voCredits / CREDIT_PER_EUR,
+      detail: 'Flat-Rate pro Szene (TTS-Synthese)',
     });
   }
 
@@ -124,8 +129,8 @@ export function estimateSceneRenderCost(
       eur: lipsyncCredits / CREDIT_PER_EUR,
       detail:
         passes > 1
-          ? `${passes} Sprecher · ${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s × ${passes}`
-          : undefined,
+          ? `${passes} Sprecher · ${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s × ${passes} Passes`
+          : `${durationSec}s × ${LIPSYNC_CREDITS_PER_SEC_PER_PASS} Cr/s · 1 Pass`,
     });
   }
 

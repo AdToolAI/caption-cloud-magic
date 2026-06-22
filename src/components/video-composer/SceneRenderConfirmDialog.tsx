@@ -62,34 +62,38 @@ export default function SceneRenderConfirmDialog({
           </AlertDialogTitle>
           <AlertDialogDescription>
             {description ||
-              'Sobald du bestätigst, startet die Render-Pipeline und Credits werden verbraucht.'}
+              'Genaue Aufschlüsselung pro Komponente — sobald du bestätigst, startet die Render-Pipeline und Credits werden verbraucht.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="space-y-3 my-2">
+        <div className="space-y-3 my-2 max-h-[55vh] overflow-y-auto pr-1">
           {cost.scenes.map((scn) => (
             <div
               key={scn.sceneId}
               className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2"
             >
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground">
                   Szene {scn.sceneIndex}
                 </span>
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[10px] tabular-nums">
                   {formatCredits(scn.totalCredits)} · {formatEur(scn.totalEur)}
                 </Badge>
               </div>
-              <ul className="space-y-0.5">
+              <ul className="space-y-1.5">
                 {scn.lines.map((line, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center justify-between text-[11px] text-muted-foreground"
-                  >
-                    <span className="truncate pr-2">{line.label}</span>
-                    <span className="tabular-nums shrink-0">
-                      {formatCredits(line.credits)}
-                    </span>
+                  <li key={i} className="text-[11px]">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-foreground/90 leading-tight">{line.label}</span>
+                      <span className="tabular-nums shrink-0 text-foreground/90 font-medium">
+                        {formatCredits(line.credits)} · {formatEur(line.eur)}
+                      </span>
+                    </div>
+                    {line.detail && (
+                      <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                        {line.detail}
+                      </div>
+                    )}
                   </li>
                 ))}
                 {scn.lines.length === 0 && (
