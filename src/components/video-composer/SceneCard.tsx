@@ -143,6 +143,8 @@ import SceneCardSummaryHeader from "./SceneCardSummaryHeader";
 import SceneStudioTabBar, {
   SceneStudioSectionHeader,
 } from "./SceneStudioTabBar";
+import ScenePerformancePanel from "./ScenePerformancePanel";
+
 import {
   recommendEngineForScene,
   estimateHeygenCostEur,
