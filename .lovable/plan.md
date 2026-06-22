@@ -1,50 +1,79 @@
-# Motion Studio Briefing — Cinematic Polish Pass
+## Academy Leader Countdown — Nach der Welcome Sequence
 
-Close the three gaps from the last review so the Briefing actually looks and behaves like a film-director console.
+Verstanden! Macht auch mehr Sinn: Welcome-Sequenz baut die Stimmung auf (Clapperboard + Bars), dann der klassische 3-2-1 Academy Leader als finaler Übergang ins Briefing — wie im echten Kino.
 
-## 1. Stronger Glass + Visible Gold (StagePanel)
+### Reihenfolge
 
-Make panels read as lit glass on a dark stage instead of dark grey rectangles.
+```text
+[Welcome Moment ~2.6s]
+   Black → Clapperboard → "MOTION STUDIO" Type-in → Bars open
+            │
+            ▼
+[Academy Countdown ~3.6s]   ← NEU
+   ┌─────────────┐
+   │   ╱──╲      │
+   │  │ 3  │     │  ← Sweep rotiert 1s
+   │   ╲──╱      │     dann 3 → 2 → 1
+   └─────────────┘     dann kurzer Weiß-Flash
+            │
+            ▼
+[Briefing fadet ein]
+```
 
-- Background: layered gradient `linear-gradient(180deg, rgba(20,26,42,0.72) 0%, rgba(11,17,32,0.55) 100%)` + `backdrop-blur-2xl` + `saturate(140%)`.
-- Inner top highlight: `box-shadow: inset 0 1px 0 rgba(255,233,168,0.18), inset 0 0 0 1px rgba(245,199,106,0.12)`.
-- Outer gold glow: `0 0 0 1px rgba(245,199,106,0.25), 0 20px 60px -20px rgba(245,199,106,0.18), 0 8px 24px -12px rgba(0,0,0,0.6)`.
-- Take-Slate header: real slate look — black bar with diagonal yellow/black hazard stripe edge, `SC 01 · TAKE 1` in mono, gold `●` REC dot with soft pulse.
-- Hover: glow intensifies (`rgba(245,199,106,0.4)`), 200ms ease.
+Kein Cut zwischen Welcome und Countdown — Welcome endet, Bars öffnen, dahinter erscheint **nahtlos** die Countdown-Scheibe (kein erneuter Black-Cut). Nach der "1" gibt's einen kurzen Weiß-Flash (klassisches Academy-Leader-Ende), dann fadet das Briefing rein.
 
-## 2. Mode Switch Actually Changes the Stage
+### Visual Design (Old-Film Clock)
 
-Quick / Direct / Studio must produce visibly different briefings, not just hide cards silently.
+- **Scheibe**: Kreis Ø ~280px, tief-schwarz `#050505`, konzentrische Ringe in `rgba(245,199,106,0.15)`
+- **Ziffer**: Große Playfair-Display-Zahl mittig (Bone-White), mit subtilem Film-Korn-Overlay
+- **Sweep-Linie**: Gold-glühende Linie rotiert in **genau 1s** um den Kreis (wie Stoppuhr-Sekundenzeiger)
+- **12 Tick-Marker** am Rand wie Uhrenzifferblatt, aktiver pulsiert in Gold
+- **Diagonales ✕** im Hintergrund (8% Opazität) — das ikonische Academy-Leader-Kreuz
+- **Film-Korn**: SVG-noise overlay, 25% Opazität, leicht flackernd (echter 16mm-Look)
+- **Vignette** außen für Fokus
 
-- **Quick** (2 panels): Category + single combined "Briefing & Format" panel (prompt + aspect + duration inline). Big gold CTA. Stepper hidden, replaced by single "ONE-TAKE" slate.
-- **Direct** (5 panels): adds Production Mode, Style & Format, Video Mode. 3-step stepper.
-- **Studio** (all panels): full 5-step stepper, Character Manager, Director's Notes between sections.
-- Mode indicator strip becomes a real film-strip selector (3 perforated tiles, active tile lit gold, inactive tiles dim with sprocket holes on top/bottom edge).
-- Switching mode triggers a 250ms cross-fade on the panel grid so the change is felt.
+### Choreografie
 
-## 3. Welcome Sequence — Re-triggerable + Upgrade
+| Zeit (nach Welcome) | Beat                                                  |
+| ------------------- | ----------------------------------------------------- |
+| 0 – 200ms           | Clock-Scheibe fadet ein (scale 0.9 → 1.0)             |
+| 200ms               | "3" pop-in, Sweep startet 1s-Rotation                 |
+| 1200ms              | "3" zoom-out + blur, "2" pop-in, neuer Sweep          |
+| 2200ms              | "2" zoom-out, "1" pop-in, neuer Sweep                 |
+| 3200ms              | "1" zoom-out, **Weiß-Flash** (200ms)                  |
+| 3400ms              | Clock kollabiert, Briefing erscheint                  |
 
-- Remove any remaining gates; `StageWelcomeMoment` mounts on every entry to `/video-composer` Motion Studio tab.
-- Extend from ~1.2s to ~2.6s with 4 beats:
-  1. Black screen, gold `●` REC blinks (0 → 0.4s)
-  2. Clapperboard slate slams down with `SC 01 · TAKE 1 · MOTION STUDIO` (0.4 → 1.2s, subtle shake)
-  3. Cinemascope bars retract, "WELCOME TO ADTOOL AI MOTION STUDIO" types in Playfair (1.2 → 2.2s)
-  4. Bars fully open, panel grid fades up (2.2 → 2.6s)
-- Skippable via click anywhere or Esc.
-- Reduced-motion: collapse to a 400ms fade + static slate.
+Skip-Button rechts unten überspringt Welcome + Countdown sofort. Reduced-motion: Countdown wird auf 400ms statischen Fade reduziert (zeigt nur "3·2·1" nebeneinander, kein Spin).
 
-## 4. CTA + Stepper Polish
+### Integration
 
-- CTA: keep gold gradient, add inner highlight + animated sheen sweep every 4s when ready, lock-icon → arrow morph on hover.
-- Stepper: each step becomes a mini film-slate (number in mono, label below, active = gold fill + soft glow, completed = gold outline + check, pending = bone-white 40% opacity).
+- Neue Komponente: `src/components/video-composer/stage/StageCountdown.tsx`
+- `StageWelcomeMoment.tsx` wird erweitert: nach dem letzten Welcome-Beat rendert es `<StageCountdown onComplete={onDone} />` statt direkt `onDone()` aufzurufen
+- Skip-Button verschoben in den Welcome-Wrapper, deckt beide Phasen ab
+- Keine Änderung am Briefing oder den Mode-Cards
 
-## Technical Notes
+### Neue Keyframes (`index.css`)
 
-- **Files edited:** `BriefingTab.tsx` (mode-aware grid + film-strip selector + stepper slate), `StagePanel.tsx` (stronger glass + slate header), `StageWelcomeMoment.tsx` (4-beat sequence, no gate), `index.css` (`@keyframes stageRecPulse`, `stageSheen`, `slateSlam`).
-- **Files created:** `FilmStripModeSelector.tsx`, `StageStepperSlate.tsx`.
-- **No backend, no edge function, no schema changes.** Pure frontend / presentation.
-- **Out of scope:** Storyboard tab, audio engine, render pipeline, AI co-pilot.
+```text
+countdownSweep    → rotate(0deg → 360deg), 1s linear infinite (3 Loops)
+countdownDigitIn  → scale(0.4) blur(20px) → scale(1) blur(0), 200ms
+countdownDigitOut → scale(1) → scale(1.8) blur(12px) opacity:0, 300ms
+countdownGrain    → translate noise pattern, 0.15s steps infinite
+countdownFlash    → opacity 0 → 1 → 0 weiß, 200ms
+countdownTick     → tick-marker gold pulse, 1s linear
+```
 
-## Effort
+### Scope
 
-~0.5 day. Frontend only.
+**In scope:**
+- Neue `StageCountdown.tsx` Komponente
+- Integration nach Welcome in `StageWelcomeMoment.tsx`
+- 6 neue Keyframes in `index.css`
+- Skip + reduced-motion Pfad
+
+**Out of scope:**
+- Audio / Tick-Sounds (Web Audio Setup — auf Wunsch separat)
+- Briefing-, Mode-Card-, oder Layout-Änderungen
+- Backend / edge / schema
+
+Reiner Frontend-Polish, ~0.3 Tag. Soll ich's so bauen?
