@@ -1363,7 +1363,7 @@ serve(async (req) => {
                         Authorization: authHeader,
                       },
                       body: JSON.stringify({
-                        sceneId: scene.id,
+                      sceneId: scene.id,
                         portraitUrl: portraitUrls[0],
                         portraitUrls,
                         identityPortraitUrls,
@@ -1375,6 +1375,8 @@ serve(async (req) => {
                         strictSwapMode: swap || faceLock,
                         swapMismatches,
                         faceLockMode: faceLock,
+                        wardrobeLock: wardrobeLockNamesCS.length > 0,
+                        wardrobeLockNames: wardrobeLockNamesCS,
                       }),
                     },
                   );
