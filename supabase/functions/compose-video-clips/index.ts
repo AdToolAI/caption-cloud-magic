@@ -1277,6 +1277,16 @@ serve(async (req) => {
                 .filter(
                   (n): n is string => typeof n === "string" && n.length > 0,
                 );
+              // Wardrobe-Lock: which cast members have a user-picked outfit?
+              // Their wardrobe must override the scene description (e.g. Roman
+              // armor inside a "business meeting").
+              const wardrobeLockNamesCS = effectiveShots
+                .filter((cs) => {
+                  const id = (cs as any).outfitLookId as string | undefined;
+                  return id && outfitUrlById.has(id);
+                })
+                .map((cs) => charById.get(cs.characterId)?.name)
+                .filter((n): n is string => typeof n === "string" && n.length > 0);
               // Cinematic-Sync REQUIRES a portrait. If we got speakers from
               // the script but couldn't resolve any portrait (no cast picker
               // used + no matching brand_character), fail loud BEFORE Hailuo
