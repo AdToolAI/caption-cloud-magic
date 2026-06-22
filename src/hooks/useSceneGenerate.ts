@@ -29,6 +29,11 @@ interface UseSceneGenerateOpts {
   onOptimisticPatch?: (sceneId: string, patch: Partial<ComposerScene>) => void;
   /** Persist the project (assign DB UUIDs) before generating. */
   ensureProject?: () => Promise<{ projectId: string; scenes: ComposerScene[] } | undefined>;
+  /**
+   * Schritt 1 — cost-confirm gate. When provided, render is blocked
+   * until the user approves the cost breakdown. Returning false cancels.
+   */
+  confirmRender?: (scene: ComposerScene) => Promise<boolean>;
 }
 
 export function useSceneGenerate(opts: UseSceneGenerateOpts) {
@@ -37,6 +42,13 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
   const generate = useCallback(
     async (scene: ComposerScene) => {
       if (!scene) return;
+      // ── Schritt 1: Cost-Confirm-Gate ──────────────────────────────────
+      // Block BEFORE optimistic feedback so the UI doesn't show a fake
+      // "Baut…" state if the user cancels.
+      if (opts.confirmRender) {
+        const ok = await opts.confirmRender(scene);
+        if (!ok) return;
+      }
       // ── INSTANT FEEDBACK (0s) ───────────────────────────────────────
       // Fire BEFORE any slow async (ensureProject, anchor compose, edge
       // function). The user must see the loading state on the very next
