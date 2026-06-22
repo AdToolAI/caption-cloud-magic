@@ -8,11 +8,11 @@
  * see where they are at any moment.
  */
 import { useCallback } from 'react';
-import { Film, Palette, Users, Volume2, Settings2 } from 'lucide-react';
+import { Film, Palette, Users, Volume2, Settings2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DirectorLanguage } from '@/lib/motion-studio/composeFinalPrompt';
 
-export type SceneStudioTab = 'story' | 'look' | 'cast' | 'audio' | 'advanced';
+export type SceneStudioTab = 'story' | 'look' | 'cast' | 'performance' | 'audio' | 'advanced';
 
 interface BarProps {
   /** id of the SceneCard root (used to scope the querySelector). */
@@ -26,6 +26,7 @@ const LABELS = {
     story: 'Story',
     look: 'Look',
     cast: 'Cast',
+    performance: 'Performance',
     audio: 'Audio',
     advanced: 'Advanced',
   },
@@ -33,6 +34,7 @@ const LABELS = {
     story: 'Story',
     look: 'Look',
     cast: 'Cast',
+    performance: 'Performance',
     audio: 'Audio',
     advanced: 'Erweitert',
   },
@@ -40,6 +42,7 @@ const LABELS = {
     story: 'Historia',
     look: 'Estilo',
     cast: 'Reparto',
+    performance: 'Actuación',
     audio: 'Audio',
     advanced: 'Avanzado',
   },
@@ -49,11 +52,13 @@ const ICONS: Record<SceneStudioTab, typeof Film> = {
   story: Film,
   look: Palette,
   cast: Users,
+  performance: Sparkles,
   audio: Volume2,
   advanced: Settings2,
 };
 
-const TABS: SceneStudioTab[] = ['story', 'cast', 'audio', 'look', 'advanced'];
+const TABS: SceneStudioTab[] = ['story', 'cast', 'performance', 'audio', 'look', 'advanced'];
+
 
 export default function SceneStudioTabBar({ cardId, language, className }: BarProps) {
   const handleScroll = useCallback(
@@ -112,6 +117,7 @@ const SECTION_TITLES = {
   en: {
     story: { title: 'Story & Engine', sub: 'Script, duration and which AI model renders the clip' },
     cast: { title: 'Cast', sub: 'Characters appearing in this scene + face-lock anchor' },
+    performance: { title: 'Performance', sub: 'Per-character expression, gesture, gaze and energy' },
     audio: { title: 'Audio & Voiceover', sub: 'Dialog studio, lip-sync and Director Score' },
     look: { title: 'Look & Cinematography', sub: 'One-click cinematic styles + reference frame' },
     advanced: { title: 'Advanced', sub: 'Final prompt, negative prompt and engine compare' },
@@ -119,6 +125,7 @@ const SECTION_TITLES = {
   de: {
     story: { title: 'Story & Engine', sub: 'Skript, Dauer und welches KI-Modell den Clip rendert' },
     cast: { title: 'Cast', sub: 'Charaktere in dieser Szene + Face-Lock-Anker' },
+    performance: { title: 'Performance', sub: 'Mimik, Gestik, Blick und Energy pro Charakter' },
     audio: { title: 'Audio & Voiceover', sub: 'Skript-Studio, Lip-Sync und Director Score' },
     look: { title: 'Look & Bildsprache', sub: 'One-Click Cinematic Styles + Referenzbild' },
     advanced: { title: 'Erweitert', sub: 'Final-Prompt, Negative-Prompt und Engine-Vergleich' },
@@ -126,11 +133,13 @@ const SECTION_TITLES = {
   es: {
     story: { title: 'Historia y Motor', sub: 'Guion, duración y qué modelo IA renderiza el clip' },
     cast: { title: 'Reparto', sub: 'Personajes en esta escena + ancla de face-lock' },
+    performance: { title: 'Actuación', sub: 'Expresión, gesto, mirada y energía por personaje' },
     audio: { title: 'Audio y Voz', sub: 'Estudio de guion, lip-sync y Director Score' },
     look: { title: 'Estilo y Cinematografía', sub: 'Estilos cinematográficos en un clic + frame de referencia' },
     advanced: { title: 'Avanzado', sub: 'Prompt final, prompt negativo y comparación de motores' },
   },
 } as const;
+
 
 /**
  * Visual divider that marks the start of a section inside an expanded

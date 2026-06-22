@@ -38,6 +38,10 @@ import {
   buildPerTurnShotBlock,
   hasPerTurnOverrides,
 } from '@/lib/shotDirector/buildPerTurnShotBlock';
+import {
+  buildPerformanceBlock,
+  type PerformanceEntry,
+} from './buildPerformanceBlock';
 
 export type DirectorLanguage = 'de' | 'en' | 'es';
 
@@ -53,7 +57,15 @@ export interface ComposeFinalPromptInputs extends ComposerInputs {
    * `shotDirector`. Ignored once the speaker entry carries the override.
    */
   dialogShotOverrides?: Record<string, Partial<ShotSelection>>;
+  /**
+   * Phase 2 — per-character Performance Layer (Mimik / Gestik / Blick / Energy).
+   * Emitted as `[4 PERFORMANCE]` between SHOT and DIALOG only when at least
+   * one entry has a non-empty performance. Lip-sync pipeline ignores it
+   * (works off `audioPlan`, not `aiPrompt`).
+   */
+  performanceEntries?: PerformanceEntry[];
 }
+
 
 export interface ComposeFinalPromptResult extends ComposerResult {
   /** The labelled, multi-line "screenplay" prompt as shipped to providers. */
@@ -175,12 +187,34 @@ export function composeFinalPrompt(
       .replace(/\.\s*$/, '')
       .trim();
   }
-  if (actionBody) lines.push(`[2 ACTION] ${actionBody}.`);
+  if (actionBody) {
+    // Phase 1 hygiene: when `applyActionsToPrompt` has already prepended
+    // `[SceneAction]` / `[CastActions]` marker blocks, those markers are
+    // themselves prompt-grade structural tags. Wrapping them inside another
+    // `[2 ACTION] …` clause makes the prompt noisier and produces nested
+    // bracket clutter like `[2 ACTION] [SceneAction] …`. Emit raw in that
+    // case and only wrap when the body is plain prose.
+    const startsWithMarker = /^\s*\[(SceneAction|CastActions)\]/i.test(actionBody);
+    if (startsWithMarker) {
+      lines.push(actionBody.replace(/\.\s*$/, '') + '.');
+    } else {
+      lines.push(`[2 ACTION] ${actionBody}.`);
+    }
+  }
   if (shotBody) lines.push(`[3 SHOT] ${shotBody}.`);
+
+  // [4 PERFORMANCE] — Phase 2 per-character Mimik/Gestik/Blick/Energy.
+  // Always sits between SHOT and DIALOG so Sync.so / HeyGen never see it
+  // (the lip-sync pipeline reads `audioPlan`, not `aiPrompt`).
+  const performanceBlock = buildPerformanceBlock(inputs.performanceEntries ?? []);
+  if (performanceBlock) {
+    lines.push(performanceBlock);
+  }
 
   if (audioPlanText) {
     lines.push(`[5 DIALOG]\n${audioPlanText}`);
   }
+
 
   // [6 DIALOG SHOTS] — Phase 3.1 per-turn Shot Director overrides. Only
   // emitted when at least one speaker carries an override; pure additive.
