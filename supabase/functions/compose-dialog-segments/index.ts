@@ -6008,9 +6008,10 @@ serve(async (req) => {
         await lockSupabase.rpc("release_dialog_lock", {
           _scene_id: lockSceneId,
           _holder: lockHolder,
+          _pass_idx: lockPassIdx,
         });
       } catch (e) {
-        console.warn(`[compose-dialog-segments] lock release failed: ${(e as Error)?.message ?? e}`);
+        console.warn(`[compose-dialog-segments] lock release failed (scene=${lockSceneId} pass=${lockPassIdx}): ${(e as Error)?.message ?? e}`);
       }
     }
   }
