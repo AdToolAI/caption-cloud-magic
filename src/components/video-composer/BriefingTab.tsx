@@ -439,8 +439,13 @@ export default function BriefingTab({
           : (err?.message || t('videoComposer.tryAgain')),
         variant: 'destructive',
       });
-      // Bring the user back to Briefing so they can fix inputs and retry.
-      onGenerationFailed?.();
+      // Surface the failure to the dashboard so it can render a persistent
+      // error panel on the Storyboard tab (with a one-click retry) instead
+      // of silently bouncing the user back to Briefing.
+      onGenerationFailed?.({
+        message: String(err?.message || t('videoComposer.tryAgain')),
+        retryable: isRetryable,
+      });
 
     } finally {
       setIsGenerating(false);
