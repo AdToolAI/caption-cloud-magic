@@ -1,85 +1,157 @@
-# Outfit-Override Fix — manuell gewähltes Outfit muss IMMER gewinnen
 
-## Was passiert aktuell (Root-Cause-Analyse, im Code verifiziert)
+# Motion Studio Relaunch – "Sound Stage"
 
-Drei zusammenwirkende Bugs sorgen dafür, dass ein manuell gepicktes Outfit (z. B. Römerrüstung im Business-Briefing) ignoriert oder verwässert wird:
+Ein dreiphasiger Umbau, der das Motion Studio von einer Werkbank in ein **Filmset** verwandelt – ohne eine einzige Funktion zu verlieren. Lipsync-Pipeline, Edge Functions, Render-Engine und Datenmodell bleiben **vollständig unangetastet**. Alle Änderungen sind UI/UX, plus eine schlanke Audio-Atmosphäre-Schicht.
 
-### Bug 1 — Universal-Anchor-Pfad sucht Outfit-Bilder gar nicht erst nach
-`supabase/functions/compose-video-clips/index.ts:1773–1789` (Universal-Anchor für Hailuo / Kling / Pika / Seedance / Luma / Wan / HappyHorse) baut `portraitsFromCast` **direkt aus `charById.get(...).referenceImageUrl`** — die `outfitLookId` des Cast-Slots wird nie gelesen, kein Outfit-Cover wird geladen.
+## Leitidee
 
-Die identische Outfit-Auflösung existiert nur im **cinematic-sync**-Zweig (Zeile 1232–1266). Heißt: nur in der Sprach-Pipeline kommt das gewählte Outfit überhaupt im Anchor an — alle anderen Engines sehen das blanke Default-Porträt.
+**"Wenn der Creator das Motion Studio öffnet, soll sich das anfühlen, als würde im Briefing-Raum von MI6 das Licht ausgehen – aber alle Werkzeuge sind so klar erreichbar wie auf einem Apple-Gerät."**
 
-### Bug 2 — Client-Resolver liest `__outfitImageUrl`, aber niemand setzt es
-`src/lib/motion-studio/resolveSceneCharacterAnchor.ts:175` macht `(slot as any).__outfitImageUrl` — eine Property, die in der gesamten Codebase nirgends geschrieben wird. Das war ein altes Stub, das nie zu Ende geführt wurde. `prepareSceneAnchor` (Client-Pfad in `useGenerateAllClips` / `ClipsTab`) sendet dadurch auch im besten Fall nur das Basis-Porträt an `compose-scene-anchor`.
-
-### Bug 3 — `compose-scene-anchor` hat keine Wardrobe-Lock-Klausel
-Selbst wenn das Outfit-Cover als Image #1 ankommt, sagt der Prompt in `supabase/functions/compose-scene-anchor/index.ts:358` nur: *„Use the body/wardrobe from Image #1 for Sarah, but the FACE from this image"*. Diese Formulierung gewichtet Wardrobe vs. Scene-Description nicht. Wenn der Scene-Text *„professional business meeting"* sagt, hedget Nano Banana 2 und rendert oft Business-Kleidung in Römer-Stil oder umgekehrt.
-
-Es gibt keine Anweisung wie *„Wardrobe IS LOCKED. If the scene says 'office' but the wardrobe shows Roman armor, render Roman armor inside the office."*
+- **Visuell:** Deep Black, Gold, präzise Glasflächen, Spotlights – Bond-DNA verstärkt, aber ruhiger und edler.
+- **Funktional:** Ein klarer Hauptpfad mit allen Tiefen einklappbar – für Solo-Creator und KMU, die nicht jeden Tag drehen.
+- **Audio:** Ambient + Cinematic Events (Klappe, Action, Cut) als Standard, mit globalem Mute-Toggle.
 
 ---
 
-## Lösung
+## Phase 1 – Sound Stage Shell (Atmosphäre & Identität)
 
-Drei chirurgische Eingriffe, alle additiv, kein Schema, keine UI-Änderung, Lip-Sync-Pipeline bleibt unangetastet (es geht ausschließlich um die Bild-Komposition vor dem i2v-Render).
+Die globale Hülle des Studios. Wenn der User eine Szene öffnet, kippt die UI in den "Set-Modus".
 
-### 1. Universal-Anchor: Outfit-Cover-Auflösung mirror'n
-**Datei:** `supabase/functions/compose-video-clips/index.ts`
-**Stelle:** ab Zeile 1773, direkt vor dem Aufbau von `portraitsFromCast`.
+### 1.1 Studio Shell Layout
+- Neuer Wrapper `MotionStudioStage` ersetzt den aktuellen Page-Container von `/video-composer`.
+- Sidebar collapsed-by-default sobald eine Szene aktiv ist, mit Floating-Reveal-Pill links.
+- Topbar wird zu einer **Director's Bar**: Projektname links, Stage-Status (Take-Counter, gerenderte Sekunden, Budget), Studio-Mode-Toggle, Mute-Toggle, Vollbild rechts.
+- Hintergrund: Tiefes `#050816` mit subtilem radialem Gold-Glow von oben links, dezenter Film-Korn-Layer (1–2 % opacity, GPU-billig via SVG-Filter).
 
-Spiegelt die bewährte cinematic-sync-Logik (Zeile 1232–1266):
-- Sammle alle `outfitLookId` aus `castShots`.
-- Eine Query auf `avatar_outfit_looks` (id, cover_url, front_url).
-- Beim Bauen von `portraitsFromCast`: wenn der Slot ein `outfitLookId` mit aufgelöster URL hat → die Outfit-URL nehmen, sonst Fallback auf `referenceImageUrl`.
-- Zusätzlich: `wardrobeLock: outfitUrlById.size > 0` und `wardrobeLockNames: [Namen der Char-Slots mit Outfit]` an `compose-scene-anchor` mitgeben (siehe #3).
-- `identityPortraitUrls` (canonical face-only) wird **immer** aus `referenceImageUrl` befüllt — bleibt unverändert, damit Face-Lock weiter funktioniert.
+### 1.2 Cinematic Welcome Moment
+- Beim ersten Öffnen pro Session: 700ms Klappen-Animation (SVG Filmklappe schließt, "Take 01" Caption), dann Fade in den Studio Floor.
+- Nur einmal pro Tab-Session – nicht aufdringlich.
 
-### 2. Client-Resolver `__outfitImageUrl` echt befüllen
-**Datei:** `src/lib/motion-studio/prepareSceneAnchor.ts`
-**Stelle:** ab Zeile 153 in `prepareSceneAnchor`, vor dem `supabase.functions.invoke('compose-scene-anchor', …)` (Zeile 197).
+### 1.3 Storyboard Strip (Hauptnavigation)
+- Horizontaler Filmstreifen direkt unter der Director's Bar.
+- Jede Szene = Polaroid-Karte mit Frame-First-Thumbnail (nutzt bestehende `scene_still_frames`), Take-Nummer, Dauer-Pill, Status-Glow (idle/generating/ready/failed).
+- Drag-to-reorder, "+ Add Scene" als geprägte Klappen-Karte am Ende.
+- Klick = lädt Scene in den Editor darunter.
+- Ersetzt visuell die heutige Scene-Tab-Bar; bestehende `SceneCard`-Logik bleibt, wird nur in den neuen Container gehängt.
 
-- Sammle `outfitLookId` über alle aktiven `characterShots`/`characterShot`.
-- Eine `supabase.from('avatar_outfit_looks').select('id, cover_url, front_url').in('id', ids)` Query (cached pro Render-Run reicht — wird einmal pro Szene gefeuert, das ist akzeptabel).
-- Map id → URL.
-- Beim Bauen von `portraitUrls` (Zeile 187): wenn der Anchor zu einem Charakter mit gesetztem Outfit gehört, statt `a.referenceImageUrl` die Outfit-URL nehmen; `identityPortraitUrls` parallel mit dem echten Porträt befüllen und an `compose-scene-anchor` mitgeben.
-- `wardrobeLock` + `wardrobeLockNames` an den Body anhängen.
-- Resolver darf so bleiben — die alte `__outfitImageUrl`-Stelle wird obsolet, kann aber als Fallback drin bleiben.
+### 1.4 Three-Mode Editor (Komplexitäts-Schalter)
+Innerhalb jeder Szene drei klar getrennte Modi, oben rechts in der Scene Card:
 
-### 3. `compose-scene-anchor`: Wardrobe-Lock-Klausel
-**Datei:** `supabase/functions/compose-scene-anchor/index.ts`
-**Stellen:** `Body`-Interface (Zeile 23–61), Klausel-Bereich (~ Zeile 350–365) und `editInstruction` (Zeile 366–370).
+| Modus | Sichtbar | Default für |
+|---|---|---|
+| **Quick** | 1 NL-Prompt + Generate. Scene Director übernimmt Rest. | Neue / KMU |
+| **Direct** | Prompt + Cast + Style Preset + Duration | Wiederkehrende Creator |
+| **Studio** | Vollständige Tab-Leiste (Shot Director, Performance, Continuity, etc.) | Profis |
 
-- `Body` um `wardrobeLock?: boolean` und `wardrobeLockNames?: string[]` erweitern.
-- Neue Klausel `WARDROBE_LOCK_SUFFIX`:
+- Default bei neuen Projekten: **Quick**.
+- Modus pro Projekt persistiert (localStorage + Spalte in `composer_projects.preferred_editor_mode`).
+- Kein Funktionsverlust – alle Tabs bleiben im Studio-Modus exakt wie heute.
 
-  > „**WARDROBE LOCK** — the wardrobe shown in the reference image for {NAMES} is MANDATORY and OVERRIDES any clothing implied by the scene description. If the scene description says 'modern office' or 'business meeting' but the wardrobe reference shows {e.g. Roman armor / fantasy robe / costume X}, the character wears EXACTLY that wardrobe inside the described environment. Do NOT translate the outfit into a 'scene-appropriate' equivalent. Do NOT swap fabrics, colors, or silhouettes to match the setting. The wardrobe in the reference IS the ground truth — the scene only provides location, lighting and pose."
-
-- Klausel ans `editInstruction` anhängen, hinter `STRICT_SWAP_SUFFIX` / `FACE_LOCK_SUFFIX`, vor `worldClause`.
-- Wenn `wardrobeLock` nicht gesetzt ist → Klausel leer (kein Verhaltenwechsel für Calls ohne explizites Outfit). Keine bestehenden Aufrufer brechen.
-
-### 4. Logging
-Beide Edge Functions geben bereits Outfit-Stats aus (cinematic-sync Zeile 1335). Spiegeln für Universal-Anchor und einmal in `compose-scene-anchor` (`wardrobeLock=true count=N`). Damit lässt sich im Edge-Function-Log binnen 5 Sekunden verifizieren, ob ein Render mit oder ohne Wardrobe-Lock lief.
+### 1.5 Ready-for-Take Indikator
+- Ersetzt die heutige Sammlung an grünen/gelben Badges durch **einen** zentralen Status-Chip pro Szene: *"Bereit für Take"* / *"Fehlt: Charakter"* / *"Fehlt: Voiceover"*.
+- Klick öffnet eine schlanke Checkliste (Sheet), aus der Detail-Badges weiterhin erreichbar bleiben.
 
 ---
 
-## Was sich NICHT ändert (Schutzzone)
+## Phase 2 – Director's Workflow (Flow & Sprache)
 
-- **Schema** — `avatar_outfit_looks`, `composer_scenes`, `brand_characters` werden nicht angefasst.
-- **UI** — Outfit-Picker (`CharacterCastPicker`, `SavedOutfitsSection`) bleibt wie er ist; die Auswahl-Spec (`outfitLookId`) stimmt bereits.
-- **Lip-Sync-Pipeline** — `compose-dialog-segments/*`, `sync-so-webhook`, `audioPlan`, `LIPSYNC_MODEL`, `poll-dialog-shots`, `syncso_inflight_jobs`, `MIN_VO_DURATION`, `update_dialog_shot_pass`, `formatAudioPlan` — null Berührung.
-- **Talking-Head (HeyGen)** — nutzt eigene Portrait-Pipeline, ist in beiden Anchor-Pfaden schon `skip`.
-- **Vidu Q2** — `subject-reference` Pfad bleibt unverändert (er bekommt das Outfit-Bild bereits direkt als Subject-Ref, weil die Anchor-URL = `referenceImageUrl` ist; Vidu liest Wardrobe direkter aus dem Bild und braucht keine separate Lock-Klausel).
+Den Weg von Idee zu fertiger Szene um die Hälfte verkürzen.
+
+### 2.1 Inline AI-Co-Pilot
+- Goldenes Mikrofon-Icon in jeder Scene Card.
+- Eingabe in natürlicher Sprache: *"Mach diese Szene dramatischer"*, *"Setze die Szene bei Sonnenuntergang"*, *"Wechsle Outfit zu Römerrüstung"*.
+- Lovable AI Tool-Call mappt auf bestehende Felder (Shot Director, Style Preset, Performance, Cast, Wardrobe-Lock).
+- Diff-Vorschau vor Anwendung – User akzeptiert oder verwirft.
+- Nutzt bestehende `scene-director` Edge Function – nur erweitert um neue Tools (`updateStyle`, `updatePerformance`, `swapOutfit`).
+
+### 2.2 Render-Moment als Cinematic Event
+- "Generate" Button heißt jetzt **"Action"** mit Klappen-Icon.
+- Klick: Klappen-Snap-Animation auf der Scene Card (300ms), Card pulsiert in Gold während Polling, Border wandert wie ein Scheinwerfer-Sweep.
+- Bei Fertigstellung: Reveal-Animation (Card kippt kurz, neuer Thumbnail erscheint), dezenter "Cut"-Soundcue.
+- Bei Fehler: roter Blitz statt rotem Toast, plus Refund-Hinweis bleibt sichtbar.
+
+### 2.3 Director's Voice (Sprach-Layer)
+- Quality Coach formuliert in Regisseur-Sprache statt Prozenten:
+  - *"Die Kamera atmet, aber das Licht erzählt noch nichts."*
+  - *"Charakter ist gesetzt – fehlt ein Ankerblick zur Linse."*
+- Lokalisiert (DE/EN/ES) über bestehenden i18n-Layer.
+- Score (0–100) bleibt intern, wird nur als kleiner Ring rechts visualisiert.
+- Begriffs-Refactor in der UI: *Generate → Take*, *Project → Production*, *Output → Final Cut*, *Asset Library → Cast & Set*. (Nur Labels, keine Routen/IDs.)
+
+### 2.4 Cinemascope Preview
+- Player erhält neuen "Cinema"-Toggle (Letterbox 2.39:1, schwarze Balken, goldener Glow-Rand, Tastatur-F).
+- Funktioniert in der Scene Card *und* in der "Render All & Stitch"-Vorschau.
 
 ---
 
-## Erwartetes Verhalten danach
+## Phase 3 – Atmosphäre (Audio & Mikro-Inszenierung)
 
-- Briefing „AdTool AI Werbekampagne, Business" + manuell ausgewähltes Outfit „Römerrüstung" für Sarah → Nano Banana 2 rendert Sarah in **echter Römerrüstung** im modernen Büro/Boardroom, Identity bleibt durch die separate Face-Only-Identity-Referenz exakt gelockt, alle anderen Cast-Member ohne explizites Outfit tragen weiter Business.
-- Kein Outfit gepickt → 100 % identisches Verhalten zu heute (Lock-Klausel wird nicht emittiert).
-- Funktioniert für alle i2v-Engines (Hailuo, Kling, Pika, Seedance, Luma, Wan, HappyHorse) und cinematic-sync; Vidu Q2 funktioniert weiter wie heute.
+Optional aktivierbar, Default **an** mit sofort sichtbarem Mute-Toggle in der Director's Bar.
+
+### 3.1 Set Ambient
+- Beim Öffnen einer Production: leiser Soundstage-Ambient-Loop (~25 s, -32 dB), generiert einmalig via ElevenLabs SFX und auf CDN gecached.
+- Beim Schließen / Mute / Tab-Hidden: sanftes Fade-out.
+
+### 3.2 Cinematic Event Cues
+- **Action** (Klick auf Take): kurzer Klappen-Snap (~400ms, -20dB).
+- **Cut** (Render-Done): weicher Filmrollen-Stop.
+- **Take Failed**: gedämpfter, tiefer Thud.
+- Alle Cues lokal als kleine MP3s in `src/assets/sounds/` über Lovable Assets, ein einziger `useStageAudio()` Hook mit Web Audio Gain Node und respektiert `prefers-reduced-motion` + globalen Mute.
+
+### 3.3 Scene-Mood Underscore (opt-in pro Szene)
+- Erweiterte Stufe: Wenn eine Szene Stil "Action" / "Dialog" / "Atmosphere" hat, läuft beim aktiven Editieren ein dezentes Score-Snippet aus der Music Library im Hintergrund.
+- Standardmäßig **aus**, aktivierbar über ein zweites Pill im Mute-Toggle (3-Stufen: Off / Ambient / Full Score).
+
+### 3.4 Mute Persistenz & Accessibility
+- Globaler Audio-State in `useStudioPreferences` (localStorage).
+- WCAG: Sound nie als einziger Feedback-Kanal (visuelle Cues immer parallel).
+- Komplettes Auto-Mute wenn `prefers-reduced-motion: reduce`.
 
 ---
 
-## Aufwand
+## Was sich **nicht** ändert (Sicherheits-Zone)
 
-~1 h Arbeit, 3 Files geändert (`compose-video-clips/index.ts`, `prepareSceneAnchor.ts`, `compose-scene-anchor/index.ts`), keine Migration.
+- Lipsync-Pipeline (Sync.so v3, Dialog-Shot, ASD-Strategy, Webhook).
+- Alle Edge Functions außer evtl. Erweiterung von `scene-director` um neue Tool-Definitionen.
+- Datenbank-Schema außer **einer** neuen optionalen Spalte `preferred_editor_mode text` auf `composer_projects`.
+- Render-Engine, Continuity Guardian, Frame-First, Multi-Character Composition, Wardrobe Lock, alle Provider-Integrationen.
+- Bestehende `SceneCard`, `ScenePromptDetailsSheet`, `ScenePerformancePanel`, `DirectorConsolePreview` – werden nur in neuen Wrapper gehängt und visuell justiert.
+
+## Technischer Anhang
+
+**Neue Komponenten**
+- `src/components/video-composer/stage/MotionStudioStage.tsx` (Shell)
+- `src/components/video-composer/stage/DirectorBar.tsx`
+- `src/components/video-composer/stage/StoryboardStrip.tsx`
+- `src/components/video-composer/stage/EditorModeToggle.tsx`
+- `src/components/video-composer/stage/ReadyForTakeChip.tsx`
+- `src/components/video-composer/stage/AiCopilotButton.tsx`
+- `src/components/video-composer/stage/CinemascopeOverlay.tsx`
+- `src/components/video-composer/stage/StageWelcomeMoment.tsx`
+
+**Neue Hooks**
+- `src/hooks/useStageAudio.ts` (Web Audio + ElevenLabs SFX cache)
+- `src/hooks/useStudioPreferences.ts` (Mode + Mute + Cinema persistiert)
+
+**Assets**
+- `src/assets/sounds/clapper-action.mp3.asset.json` (via lovable-assets)
+- `src/assets/sounds/cut-soft.mp3.asset.json`
+- `src/assets/sounds/take-failed.mp3.asset.json`
+- `src/assets/sounds/stage-ambient.mp3.asset.json` (einmalig ElevenLabs-generiert, dann auf CDN)
+
+**Edge Function (Erweiterung, nicht Neubau)**
+- `scene-director` bekommt zusätzliche Tools: `updateStylePreset`, `updatePerformance`, `swapWardrobe`, `restage` – wirken auf den bestehenden Scene-State.
+
+**Migration**
+- `composer_projects.preferred_editor_mode text default 'quick'`
+
+**Tokens (in `src/index.css`)**
+- `--stage-floor`, `--stage-spotlight`, `--clapper-snap`, `--cinemascope-bar`, `--mode-quick`, `--mode-direct`, `--mode-studio` – alle als HSL, integriert in Tailwind.
+
+**Geschätzter Umfang**
+- Phase 1: ~2 Tage (Shell, Strip, Mode-Toggle, Ready-Chip)
+- Phase 2: ~2 Tage (Co-Pilot, Action-Moment, Director's Voice, Cinemascope)
+- Phase 3: ~1 Tag (Audio-Layer, Assets, Mute-Persistenz)
+
+Ergebnis: Ein Solo-Creator öffnet das Studio, hört leise das Set, sieht seinen Filmstreifen, tippt *"Sonnenuntergang am Strand, ruhige Stimmung"*, drückt **Action**, hört die Klappe, sieht den Spotlight-Sweep – und 90 Sekunden später schaltet das Cinemascope-Reveal seinen ersten Take frei. **Das ist die andere Welt.**
+
