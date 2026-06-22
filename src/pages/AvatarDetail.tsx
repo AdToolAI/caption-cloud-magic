@@ -165,7 +165,12 @@ const AvatarDetail = () => {
                     }}
                   />
                   <VoiceProfileCard avatarId={avatar.id} avatar={avatar} />
+                  <AvatarDefaultPerformanceCard
+                    avatarId={avatar.id}
+                    initial={avatar.default_performance ?? null}
+                  />
                 </div>
+
               </div>
 
               <SavedOutfitsSection
