@@ -27,6 +27,7 @@ import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import { emitStageEvent } from '@/lib/stage/stageEvents';
 
 interface UseGenerateAllClipsArgs {
   scenes: ComposerScene[];
