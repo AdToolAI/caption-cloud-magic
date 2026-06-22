@@ -17587,6 +17587,10 @@ export type Database = {
         Args: { _pass_idx: number; _patch: Json; _scene_id: string }
         Returns: Json
       }
+      update_dialog_shots_root_merge: {
+        Args: { _patch: Json; _scene_id: string }
+        Returns: Json
+      }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
       verify_license_certificate: {
         Args: { _token: string }
