@@ -722,24 +722,35 @@ export default function BriefingTab({
             </div>
           )}
 
-          {/* Duration Slider */}
+          {/* Duration Slider — bis 10 Minuten (hartes Projekt-Budget) */}
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs">{t('videoComposer.videoDuration')}</Label>
-              <span className="text-xs font-medium text-amber-300">{briefing.duration}s</span>
+              <span className="text-xs font-medium text-amber-300">
+                {briefing.duration < 60
+                  ? `${briefing.duration}s`
+                  : `${Math.floor(briefing.duration / 60)}:${(briefing.duration % 60).toString().padStart(2, '0')} min`}
+              </span>
             </div>
             <Slider
               value={[briefing.duration]}
               onValueChange={([v]) => onUpdateBriefing({ duration: v })}
               min={15}
-              max={90}
-              step={5}
+              max={600}
+              step={15}
               className="w-full"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground">
               <span>15s</span>
-              <span>90s</span>
+              <span>10:00 min</span>
             </div>
+            {briefing.duration > 180 && (
+              <p className="text-[11px] text-amber-300/80 leading-snug">
+                Längere Filme bedeuten mehr Szenen, höhere Kosten und längere Renderzeit.
+                Du erstellst weiterhin jede Szene einzeln — das Projekt ist auf 10 Minuten
+                Gesamtdauer begrenzt.
+              </p>
+            )}
           </div>
 
           {/* Aspect Ratio */}

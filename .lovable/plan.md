@@ -1,43 +1,42 @@
-# Fix: Geschlossene Augen + Dauer-Nicken im Plate
+## Ziel
 
-## Ursache
+Im Motion Studio gilt ab sofort ein **hartes Gesamt-Budget von 10 Minuten (600 s)** pro Projekt. Szenen werden weiterhin **einzeln** erzeugt (kein Massen-Render), aber die Summe aller Szenen-Dauern darf 600 s **niemals** überschreiten – weder beim Anlegen neuer Szenen noch beim Verlängern bestehender.
 
-In `supabase/functions/compose-video-clips/index.ts` enthält das `neutralTwoShotPrompt` (Zeile ~661) seit dem Ghost-Speaker-Fix die Idle-Body-Motion-Klausel:
+Lipsync-, Render- und Stitch-Pipeline werden **nicht** angefasst.
 
-> "small natural head bobs and weight shifts, occasional blinks and gentle eye movement"
+## Verhalten
 
-Damit dies Hailuo/Kling tatsächlich umsetzt, übertreiben die Modelle die beiden offensichtlichsten Cues:
-- **"head bobs"** → jede Person nickt durchgehend
-- **"occasional blinks"** → Augen werden oft mitten im Take geschlossen festgehalten
+- **Briefing-Slider** (Ziel-Gesamtdauer): 15 s – 600 s (Step 15 s).
+- **Per-Szene-Slider** (`SceneCard`): bleibt technisch 3–15 s, wird aber **dynamisch geclamped** auf `min(15, 600 − sumOfOtherScenes)`. Beispiel: 595 s schon verplant → Slider geht nur bis 8 s.
+- **"Szene hinzufügen"-Button**: deaktiviert, sobald `sumOfScenes ≥ 597 s` (kein Platz mehr für minimale 3-s-Szene). Tooltip: *"Budget voll – kürze oder lösche eine Szene, um Platz zu schaffen."*
+- **Auto-Director / Ad-Director / Scene-Director**: wenn die KI mehr Sekunden plant als verfügbar, wird die Szenen-Liste server­seitig auf das Restbudget gekürzt (letzte Szenen abgeschnitten) – Logging + UI-Hinweis.
+- **Budget-Anzeige**: oben im Composer-Dashboard sichtbare Leiste `mm:ss / 10:00` mit Farb-Stufen (grün < 8 min, amber 8–10 min, rot = voll).
+- **Freigewordene Zeit** nach Kürzen/Löschen wird automatisch verfügbar – nichts Manuelles, einfach: jeder Slider liest live `remaining = 600 − sumOfOthers`.
 
-Das `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` (Zeile ~339) hat momentan keine Negative gegen Closed-Eyes oder Head-Nodding.
+## Was sich technisch ändert
 
-## Fix (Stufe A, ~15 LOC, nur Prompts — kein Logik-Change)
+| Datei | Änderung |
+|---|---|
+| `src/components/video-composer/BriefingTab.tsx` | Slider `max=600 step=15`, Label-Formatter (s ↔ `m:ss`) |
+| `src/components/video-composer/SceneCard.tsx` | Duration-Slider `max = Math.min(15, 600 − sumOfOtherScenes)`; dabei mind. `min=3`; bei `remaining<3` Slider disabled mit Tooltip |
+| `src/components/video-composer/VideoComposerDashboard.tsx` | Neue Budget-Leiste `mm:ss / 10:00` + Farblogik; "Add Scene"-Button disabled-State |
+| `src/components/video-composer/AutoDirectorWizard.tsx` + `AdDirectorWizard.tsx` | Target-Sec auf max 600 begrenzen; vor Submit prüfen ob `600 − sumExistingScenes` verbleibt |
+| `supabase/functions/auto-director-compose/index.ts` | Server-Cap: kumulierte `n_seconds` der Szenen ≤ `min(targetSec, 600)`; überschüssige Szenen werden gedroppt und im Response gemeldet |
+| `supabase/functions/ad-director-*` (sofern Szenen erzeugt) | gleiche 600-s-Hard-Cap |
+| `src/locales/{en,de,es}/translation.json` | Neue Keys: `videoComposer.budgetLabel`, `budgetFull`, `budgetExceededTooltip` |
 
-### 1. `neutralTwoShotPrompt` (Zeile ~661)
-Idle-Body-Klausel umschreiben:
-- "small natural head bobs" → **"subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing)"**
-- "occasional blinks and gentle eye movement" → **"eyes stay open, alert and clearly visible throughout the entire clip — gaze softly engaged with the scene, only very rare natural blinks (eyes never held closed, never squinting, never sleepy)"**
+Helfer:
+- Neue Util `src/lib/composer/budget.ts` mit `MAX_PROJECT_SECONDS = 600`, `getRemainingBudget(scenes, currentSceneId?)`, `formatDuration(s)`. Wird von allen oben genannten Komponenten genutzt → eine Wahrheit.
 
-Rest (breathing, locked camera, closed mouths, lip-ready geometry) bleibt 1:1.
+## Was explizit unberührt bleibt
 
-### 2. `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` (Zeile ~339)
-Neue Negative-Tokens an die bestehende Ghost-Speaker-Liste anhängen:
-`, closed eyes, eyes closed, squinting, sleepy eyes, drowsy expression, prolonged blink, eyes held shut, head nodding, nodding head, continuous nodding, rhythmic head bobbing, head bobbing up and down, agreeing nod loop, everyone nodding`
+- **Pro-Szene-Render** (`generate-scene-visual`, Hailuo/Kling/Pika/Vidu/Runway/Sora/HappyHorse/Seedance/Luma/Wan/Hedra) – jede Szene rendert einzeln wie bisher, keine Pipeline-Änderung.
+- **Lipsync** komplett: `generate-scene-dialog`, `compose-dialog-scene`, `poll-dialog-shots`, `sync-so-webhook`, HeyGen Talking-Head, Cinematic-Sync – nichts angefasst (arbeiten pro Szene, kennen Projekt-Gesamtdauer nicht).
+- **Stitch & Director's Cut**: `compose-stitch-and-handoff`, Lambda-Render – unverändert.
+- **Per-Provider-Limits** (3–15 s pro Clip) – bleiben hartes Provider-Cap.
 
-(Kein Eingriff auf die v112-Killer-Tokens "talking mouth / lip movement / open mouth speech" — bleiben weiterhin draussen.)
+## Edge-Cases
 
-### 3. `buildCinematicSyncMasterPrompt` (Zeile ~703)
-Schlussklausel um einen Halbsatz ergänzen, damit der Master-Plate-Prompt selbst auch Augen + Kopf adressiert:
-> "…no character produces idle mouth, jaw or lip motion in the plate itself. **Eyes stay open and alert, heads stay steady — no nodding, no head bobbing.**"
-
-## Unverändert
-- `LOCKED static camera` + Anti-Split-Screen-Negative
-- Sync.so Payload / Pass-Skeleton / v170 Seeding
-- Ghost-Speaker-Fix (Mund-Negative) bleibt komplett bestehen
-
-## Verifikation
-Neue 3–4-Sprecher-Szene rendern: Während Speaker 1 spricht, dürfen Speaker 2/3/4 atmen + leichte Schulter-Gewichtsverlagerung zeigen, aber **keine** wiederholten Kopfnicker und **keine** geschlossenen Augen über mehrere Frames.
-
-## Rollback
-Falls Hailuo dadurch wieder steife "Statuen" rendert (v112-ähnliche Regression): die "weight shifts + shoulder adjustments"-Klausel verstärken, statt zur alten "head bobs"-Formulierung zurückzukehren.
+- Beim **Initialisieren eines neuen Projekts** mit z.B. 8 Default-Szenen × 5 s = 40 s → reichlich Budget, keine Sichtveränderung.
+- **Bestehende Projekte > 600 s** (sollte praktisch keine geben): kein Auto-Cut; Budget-Leiste wird rot, Slider auf 0 zusätzlicher Sekunden geclamped, User muss manuell kürzen/löschen.
+- **Frame-Picker / Hybrid-Extend**: prüft vor Verlängerung Restbudget; sonst Toast *"Kein Budget mehr – kürze eine andere Szene."*
