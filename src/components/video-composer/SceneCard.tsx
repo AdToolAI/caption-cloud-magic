@@ -3000,7 +3000,9 @@ export default function SceneCard({
         brandCharacterInput={brandCharacterInput}
         libCharacters={libCharacters}
         libLocations={libLocations}
+        characters={characters}
         onOpenCompareLab={() => setCompareLabOpen(true)}
+
       />
 
       {/* Block L — Inline Compare Lab Dialog */}
