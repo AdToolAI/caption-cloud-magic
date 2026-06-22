@@ -206,6 +206,7 @@ export function CastConsistencyMap({ scenes, characters, embedded = false }: Pro
         Wenn ein Charakter ohne Anker erscheint, wird automatisch der letzte Frame der vorherigen Szene
         als Continuity-Brücke genutzt (Frame-Chain 🔗).
       </p>
-    </Card>
+    </Wrapper>
+
   );
 }
