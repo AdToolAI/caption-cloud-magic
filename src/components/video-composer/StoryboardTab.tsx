@@ -22,6 +22,7 @@ import { useSceneGenerate } from '@/hooks/useSceneGenerate';
 import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
 import PipelineProgressBar from './PipelineProgressBar';
 import StageStoryboardLoader from './stage/StageStoryboardLoader';
+import StageStoryboardError from './stage/StageStoryboardError';
 import StagePanel from './stage/StagePanel';
 
 import { Play, CheckCircle2 } from 'lucide-react';
@@ -69,6 +70,15 @@ interface StoryboardTabProps {
   /** True while the AI is generating the initial storyboard from the
    *  briefing. Shows a loading panel instead of the empty-state. */
   isGeneratingStoryboard?: boolean;
+  /** Last storyboard-generation failure (from BriefingTab). When set and
+   *  scenes are empty, the Storyboard tab renders an error panel with a
+   *  retry button instead of the "no scenes" empty state. */
+  storyboardError?: { message: string; retryable?: boolean } | null;
+  /** Re-invokes the storyboard generation pipeline with the current briefing. */
+  onRetryStoryboard?: () => void;
+  /** Switches the parent dashboard back to the Briefing tab so the user
+   *  can adjust their inputs. */
+  onBackToBriefing?: () => void;
 }
 
 export default function StoryboardTab({
@@ -85,6 +95,9 @@ export default function StoryboardTab({
   onRefetchScenes,
   onEnsurePersisted,
   isGeneratingStoryboard = false,
+  storyboardError = null,
+  onRetryStoryboard,
+  onBackToBriefing,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
 
@@ -581,6 +594,12 @@ export default function StoryboardTab({
       {scenes.length === 0 ? (
         isGeneratingStoryboard ? (
           <StageStoryboardLoader />
+        ) : storyboardError ? (
+          <StageStoryboardError
+            error={storyboardError}
+            onRetry={onRetryStoryboard}
+            onBackToBriefing={onBackToBriefing}
+          />
         ) : (
           <StagePanel
             slateIndex="01"

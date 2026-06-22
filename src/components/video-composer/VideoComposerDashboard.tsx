@@ -208,6 +208,13 @@ export default function VideoComposerDashboard() {
   // True while the BriefingTab's AI mode is running compose-video-storyboard.
   // Used to show a loading panel on the (already-active) Storyboard tab.
   const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
+  // Last storyboard-generation failure surfaced from BriefingTab. When set,
+  // the Storyboard tab renders a Bond-style error panel with retry instead
+  // of bouncing the user silently back to Briefing.
+  const [storyboardError, setStoryboardError] = useState<{ message: string; retryable: boolean } | null>(null);
+  // Counter the storyboard-error panel increments to ask BriefingTab to
+  // re-run `handleGenerateStoryboard` with the current briefing.
+  const [retryStoryboardNonce, setRetryStoryboardNonce] = useState(0);
   // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
@@ -1557,15 +1564,24 @@ export default function VideoComposerDashboard() {
               onUpdateProject={updateProject}
               onGoToStoryboard={() => setActiveTab('storyboard')}
               onScenesGenerated={(scenes) => {
+                setStoryboardError(null);
                 setScenes(scenes);
                 setActiveTab('storyboard');
               }}
-              onGenerationStart={() => setIsGeneratingStoryboard(true)}
-              onGenerationEnd={() => setIsGeneratingStoryboard(false)}
-              onGenerationFailed={() => {
-                setIsGeneratingStoryboard(false);
-                setActiveTab('briefing');
+              onGenerationStart={() => {
+                setStoryboardError(null);
+                setIsGeneratingStoryboard(true);
               }}
+              onGenerationEnd={() => setIsGeneratingStoryboard(false)}
+              onGenerationFailed={(err) => {
+                // Keep the user on the Storyboard tab and surface the error
+                // there via a persistent panel with a retry button — no
+                // silent tab bounce back to Briefing.
+                setIsGeneratingStoryboard(false);
+                setStoryboardError(err);
+                setActiveTab('storyboard');
+              }}
+              retryStoryboardNonce={retryStoryboardNonce}
               brandKitId={project.brandKitId ?? null}
               brandKitAutoSync={project.brandKitAutoSync ?? false}
               assemblyConfig={project.assemblyConfig}
@@ -1594,6 +1610,14 @@ export default function VideoComposerDashboard() {
                 preferredAspect={project.briefing?.aspectRatio}
                 onRefetchScenes={refetchScenesFromDb}
                 isGeneratingStoryboard={isGeneratingStoryboard}
+                storyboardError={storyboardError}
+                onRetryStoryboard={() => {
+                  // Re-run BriefingTab's pipeline with the current briefing.
+                  // Clear the error first so the loader takes over the panel.
+                  setStoryboardError(null);
+                  setRetryStoryboardNonce((n) => n + 1);
+                }}
+                onBackToBriefing={() => setActiveTab('briefing')}
                 onEnsurePersisted={async () => {
                   const result = await ensureProjectPersisted(project);
                   // Sync ref BEFORE setState so any callback that fires inside
