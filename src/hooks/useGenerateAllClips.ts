@@ -27,6 +27,7 @@ import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import { emitStageEvent } from '@/lib/stage/stageEvents';
 
 interface UseGenerateAllClipsArgs {
   scenes: ComposerScene[];
@@ -133,6 +134,8 @@ export function useGenerateAllClips({
     // very next frame. Also flip every pending AI scene to 'generating'
     // locally so the per-scene shimmer appears instantly.
     emitPipelineEvent({ type: 'clips:start' });
+    // 🎬 Action — cinematic clapper cue for the Sound Stage layer.
+    emitStageEvent('action', { source: 'generate-all' });
     const pendingNow = scenes.filter(
       (s) =>
         s.clipStatus !== 'ready' &&
@@ -344,6 +347,7 @@ export function useGenerateAllClips({
         variant: 'destructive',
       });
       emitPipelineEvent({ type: 'clips:end' });
+      emitStageEvent('take-failed', { source: 'generate-all' });
     } finally {
       // Do NOT emit clips:end on success — the server only STARTED rendering.
       // The pipeline bar stays alive via real `clipStatus === 'generating'`
