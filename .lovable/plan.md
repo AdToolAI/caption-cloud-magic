@@ -1,118 +1,90 @@
+# Phase 1 + 2: Echte 4-Way-Fanout für Sync.so Dialog-Passes
 
-# Tiefenanalyse abgeschlossen — kritische Funde
+## Was die Logs zeigen (Run cf344a0d, 11:40 wallclock, cap=4)
 
-Der Subagent hat zwei **fundamentale Probleme** identifiziert, die meinen letzten Plan invalidieren. Bevor wir irgendetwas anfassen, hier die Wahrheit:
-
-## ❌ Pfad C ist heute funktional TOT
-
-**Code-Beleg:** `compose-dialog-segments/index.ts` Z. 3200–3218 (v153-Block) **nullifiziert `preclip_url` / `preclip_crop` / `preclip_render_id` bei jedem Advance-Call bedingungslos**, sobald eine plate box existiert (= Normalzustand).
-
-Konsequenz: Der v167-Pre-Fanout würde 3× Lambda (~90-120s pro Render) im Hintergrund rendern, der v153-Block würfe die Ergebnisse 300ms später weg, und v161-Lazy-Render würde alles neu rendern.
-
-**Netto-Speedup: 0. Netto-Kosten: 3 verschwendete Lambda-Renders pro N=4-Run.**
-
-→ `FEATURE_PRECLIP_PREFANOUT=true` jetzt zu setzen wäre **schädlich**. Wir lassen es AUS.
-
-## ✅ Pfad B ist der richtige Hebel — aber tiefer als gedacht
-
-Die Wurzel der Serialisierung ist **bestätigt**: `dialog_dispatch_locks` hat `scene_id UUID PRIMARY KEY`. Pass 0 hält 90s-Lock → Fanout-Self-Invokes für Pass 1/2 (250ms/500ms delayed) treffen auf BUSY → return 202 → fallen still auf serielle Webhook-Chain zurück. Genau das erklärt das beobachtete Pattern "nur 2 von 4 wirklich parallel".
-
-**ABER:** Es gibt einen **zweiten Lost-Update-Vektor**, den ich vorher nicht gesehen hatte:
-
-`compose-dialog-segments/index.ts` Z. 5667–5691 macht nach jedem Sync.so-Submit einen **Full-Row-UPDATE** auf `composer_scenes` mit kompletter `dialog_shots: mergedState` JSONB. Bei 4 parallelen Passes: jeder liest fresh state, merged seinen Slot, schreibt zurück. **Letzter Schreiber überschreibt Job-IDs der anderen.**
-
-Per-Pass-Lock alleine reicht also **nicht** — wir müssen gleichzeitig diesen Full-JSONB-Write auf die atomare RPC `update_dialog_pass_slot` migrieren (was Frozen-Invariant I.9 ohnehin verlangt).
-
-# Sauberster Implementierungspfad — 4 Phasen mit Validation-Gates
-
-Reihenfolge ist nicht verhandelbar. Jede Phase wird einzeln deployed + an einer N=2 Test-Szene validiert bevor die nächste kommt. Bei jedem unerwarteten Log → Stop & Diagnose.
-
-## Phase 0 — Diagnostik-Probe (1 Action, KEIN Code-Change)
-
-Setze testweise `composer.sync_so_concurrency_cap = 4` (statt 3) in DB. Lasse N=4-Run.
-
-**Ziel:** Bestätigen dass die Serialisierung wirklich am Scene-Lock liegt (und nicht z.B. an Edge-Runtime `setTimeout`-Verhalten). Erwartung: Logs zeigen 3 Fanout-Self-Invokes, davon werden 2-3 mit `scene_lock_busy` 202 abgewiesen.
-
-**Risiko:** Null. cap=4 ändert nichts wenn der Lock blockt — Verhalten identisch zu cap=3 heute.
-
-**Rollback:** DB-Update auf 3 zurück.
-
-## Phase 1 — Full-JSONB-Write → atomare RPC (Code-Hygiene, KEIN Locking-Change)
-
-`compose-dialog-segments/index.ts` Z. 5667-5691 umbauen:
-- `dialog_shots: mergedState` → `update_dialog_pass_slot` RPC pro Slot
-- Top-Level-Felder (`lip_sync_status`, `twoshot_stage`, `replicate_prediction_id`, `clip_error`, `lip_sync_source_clip_url`) bleiben als separates UPDATE — diese werden noch von cap-1 Pass exklusiv geschrieben weil Scene-Lock noch da ist
-
-**Validation:** N=2-Run, Logs zeigen `update_dialog_pass_slot pass_idx=0` und `pass_idx=1` als separate Writes. End-to-end-Zeit identisch zu heute (keine Speedup-Erwartung).
-
-**Risiko:** mittel-niedrig. Wenn das RPC die nötigen Felder nicht alle setzen kann → fail-fast vor dem ersten Sync.so-Submit. Vorher: RPC-Definition prüfen + ggf. erweitern.
-
-**Rollback:** Code-Revert (1 Block, ~25 Zeilen).
-
-## Phase 2 — Schema-Migration: `dialog_dispatch_locks` per-pass
-
-```sql
-ALTER TABLE dialog_dispatch_locks ADD COLUMN pass_idx INT NOT NULL DEFAULT -1;
-ALTER TABLE dialog_dispatch_locks DROP CONSTRAINT dialog_dispatch_locks_pkey;
-ALTER TABLE dialog_dispatch_locks ADD PRIMARY KEY (scene_id, pass_idx);
+```text
+t=0s     Pass 0  STARTED
+t=50s    Pass 0  DISPATCHED  (face-probe 45s + dispatch 5s)
+t=51s    Pass 1  STARTED        ← fanout aktiv (1s gap)
+t=70s    Pass 1  DISPATCHED
+                                ← 60s LÜCKE: warten auf Pass 0 webhook
+t=131s   Pass 2  STARTED
+t=194s   Pass 2  DISPATCHED  (face-probe 60s)
+                                ← 68s LÜCKE: warten auf Pass 2 webhook
+t=263s   Pass 3  STARTED
+t=312s   Pass 3  DISPATCHED
+         + sync.so render & mux → 11:40 total
 ```
 
-Plus RPCs `try_acquire_dialog_lock` und `release_dialog_lock` um `_pass_idx INT DEFAULT -1` Parameter erweitern. Backward-compat: `pass_idx=-1` = scene-level (für Watchdog).
+## Diagnose — der eigentliche Bottleneck ist **nicht** mehr der Scene-Lock
 
-**Code-Stellen:** 5 (alle in Bericht §B-7 dokumentiert):
-- `compose-dialog-segments/index.ts:667` → `pass_idx=currentPassIdx`, TTL 90s→30s
-- `compose-dialog-segments/index.ts:5972` → release mit pass_idx
-- `_shared/dialog-lock.ts` Z. 24-87 → `withDialogLock(sceneId, passIdx, ...)` Signatur
-- `lipsync-watchdog/index.ts:224` → `withDialogLock(sceneId, -1, ...)` (scene-level Convention)
-- DB-Migration siehe oben
+`composer.sync_so_concurrency_cap = 4` hat **bereits funktioniert** — Pass 0+1 dispatchen jetzt 1s auseinander (gestern: 0+2 parallel, Pass 1 erst nach 110s). Aber:
 
-**Validation:** N=2-Run zuerst — Logs zeigen Pass 0 und Pass 1 acquiren **getrennte Locks**, beide Dispatchen parallel. Erwartung: N=2 fällt von ~7 min auf ~5 min. Dann N=4-Run.
+1. **Nur 2-Way-Fanout, nicht 4-Way.** Pass 2 und Pass 3 starten erst nach `webhook-from-previous-pass` (~60–80 s pro Hop). Der `preclip-prefanout`-Code rendert offenbar nur N=2 Preclips parallel und chained den Rest.
+2. **Face-Gate-Probe ist seriell.** Jeder Pass macht eine eigene 40–60 s `FACE_GATE_PROBE_UNAVAILABLE`-Probe vor dispatch. 4 × 50 s = **200 s rein für Face-Probes**, die mit echter Parallelität auf ~50 s kollabieren.
+3. **Scene-Lock-Block** (`try_acquire_dialog_lock(scene_id)`) ist immer noch da, aber durch die 60–80 s Webhook-Lücken wird er nie wirklich getroffen — Pass N+1 startet erst nachdem Pass N-Lock längst frei ist. Lock ist **nicht der Top-Bottleneck**, aber blockiert die Lösung.
 
-**Risiko:** hoch-mittel. Wenn die RPC-Signatur-Änderung nicht atomar mit dem Code-Deploy ankommt → fail-open (Z. 670-671: "proceeding without lock") → mögliche kurze Race-Window. Mitigation: Migration ZUERST deployen, dann Code-Deploy in dem die neue Signatur aufgerufen wird.
+## Realistische Zielzeiten
 
-**Frozen-Invariant I.9 wird geändert** — laut Doku-Bericht ist das legitim solange Lock-RPC atomic + per-slot writes via `update_dialog_pass_slot` (Phase 1) + `try_claim_mux_dispatch` für Mux (unverändert).
+| Szenario | Wallclock | Δ |
+|---|---:|---:|
+| Heute (cap=4, 2-way fanout) | **11:40** | Baseline |
+| + Echte 4-Way-Fanout (alle Passes STARTED in <10 s) | **~8:00** | −3:40 |
+| + Per-Pass-Lock + Per-Slot-Write RPC (sicher gegen Lost-Update) | **~7:30** | −4:10 |
 
-**Rollback:** Schema-Migration zurück (PK auf scene_id, Column droppen), Code-Revert. Sauber wenn Phase 1 sauber war.
+Multi-Speaker-Single-Job (Path A) bleibt explizit **ausgeschlossen** (Qualität).
 
-## Phase 3 — Re-Test C nur falls nötig
+## Implementierungs-Plan (4 Phasen, jede einzeln rollback-bar)
 
-**Bedingung:** Nach Phase 2 mit cap=4 sollten **alle 4 Passes wirklich parallel** dispatchen. Wenn das den N=4-Wallclock auf ~5-6 min bringt, brauchen wir Pfad C nicht mehr (er wäre dann eine Mikro-Optimierung an der falschen Stelle).
+### Phase 1 — Per-Slot-Write RPC (Code-Hygiene, kein Speedup, low risk)
+**Ziel:** Vor Per-Pass-Lock muss der Full-Row-`UPDATE composer_scenes SET dialog_shots = …` weg, sonst überschreibt der letzte paralleles Pass-Webhook die Job-IDs der anderen.
 
-Wenn doch nötig: v153-Block (Z. 3200-3218) so patchen dass er pre-gecachte preclips respektiert:
-```ts
-const alreadyCached = !!(pass as any).preclip_url && !!(pass as any).preclip_crop
-  && !!(pass as any).preclip_frame_count;
-if (v153UnifiedBboxEligible && !alreadyCached) {
-  (pass as any).preclip_url = null;
-  // ...
-}
-(pass as any)._v153BboxPrimary = true;
-```
+- Neue RPC `update_dialog_pass_slot(p_scene_id uuid, p_pass_idx int, p_patch jsonb)` — macht `jsonb_set` auf `dialog_shots[pass_idx]` atomar mit `FOR UPDATE`-Row-Lock.
+- `compose-dialog-segments/index.ts` Zeilen 5667–5691 → ersetzen mit RPC-Call pro Slot.
+- Top-Level-Scene-Felder (`dialog_status`, `dialog_completed_at`) bleiben als separater UPDATE.
+- **Validierung:** N=2 Run muss identische Wallclock zeigen (~6 min). Schreib-Logs zeigen separate `UPDATE` statt eines Merge.
 
-Erst **dann** `FEATURE_PRECLIP_PREFANOUT=true`.
+### Phase 2 — Per-Pass-Lock (Schema + RPC, Kernfix für Fanout)
+- Migration:
+  - `ALTER TABLE dialog_dispatch_locks DROP CONSTRAINT pkey, ADD COLUMN pass_idx INT NOT NULL DEFAULT 0, ADD PRIMARY KEY (scene_id, pass_idx)`
+  - `try_acquire_dialog_lock(scene_id, pass_idx)` + `release_dialog_lock(scene_id, pass_idx)` erweitert.
+- `compose-dialog-segments` & `propagateDialogLock.ts`: alle Lock-Aufrufe nehmen `pass_idx`-Argument.
+- **Hinter Feature-Flag** `FEATURE_PER_PASS_LOCK` (Edge-Function-Env). Default OFF.
+- **Rollback:** Flag OFF + Reverse-Migration; alte Lock-Aufrufe bleiben backward-kompatibel via `pass_idx DEFAULT 0`.
 
-# Erwartete Wall-Clock für N=4
+### Phase 3 — Echter 4-Way Preclip + Dispatch Fanout
+- Im `composer-self-invoke` Code-Pfad: statt N=2 vorab zu dispatchen, **alle N Passes** als parallele Self-Invokes feuern (mit `pass_idx` an Lock-RPC).
+- `FEATURE_PRECLIP_PREFANOUT` bleibt der Schalter; intern wird `MAX_PREFANOUT` von hardcoded 2 → `Math.min(N, 4)` (Sync.so Plan-Limit).
+- Face-Gate-Probe läuft dadurch automatisch parallel (jeder Self-Invoke macht eigene Probe).
+- **Validierung im Log:** Alle 4 `DISPATCH_ATTEMPT_STARTED` innerhalb <10 s (heute: 263 s).
 
-| Phase | Erwartung | Risiko |
-|---|---|---|
-| Heute | 13:30 | — |
-| Nach Phase 0 (cap=4, kein Code) | 13:30 (Bestätigung dass Lock blockt) | 0 |
-| Nach Phase 1 (RPC-Migration) | 13:30 (keine Speedup, nur Race-fix) | low-med |
-| Nach Phase 2 (Per-Pass-Lock) | **~5:00–6:00** | **med-high** |
-| Phase 3 optional | −1 bis −2 min weiter | low |
+### Phase 4 — Rollout
+- N=2 Test mit Flag ON → erwartete Wallclock ~3:30 (heute ~6 min).
+- N=3 Test → ~5:00 (heute ~8:30).
+- N=4 Test → ~7:30–8:00 (heute 11:40).
+- Bei jeder Stufe: 0 % Failure-Rate als Gate, sonst Flag OFF und Phase debuggen.
 
-# Was diese Analyse von meinem letzten Plan ändert
+## Was NICHT angefasst wird (Frozen-Invariants)
 
-1. **Pfad C wird NICHT als "1-Klick-Win" aktiviert** — er ist heute schädlich (3 wasted Lambda) und braucht erst einen v153-Patch.
-2. **Pfad B braucht eine vorgeschaltete RPC-Migration (Phase 1)** — sonst Lost-Update-Race auf `dialog_shots[]`.
-3. **Phase 0 (Diagnostik mit cap=4) ist neu** — bestätigt die Hypothese ohne Risiko bevor wir am Lock anfassen.
-4. **Watchdog-Compat ist geklärt** — er nutzt `pass_idx=-1` Convention, kollidiert nicht mit per-pass Locks.
+- ✅ `try_claim_mux_dispatch(scene_id)` — bleibt scene-weit, single-flight beim finalen Mux.
+- ✅ Sync.so-3-Optionen (nur `sync_mode` + `active_speaker_detection`, kein temperature) — unverändert.
+- ✅ v153-Block (Preclip-Nullify) — wird in Phase 3 patched, **nur wenn nötig** (erst Logs nach Phase 3 zeigen, ob Preclips überschrieben werden).
+- ✅ ASD-Strategie (frame_number+coords pro Pass) — unverändert.
+- ✅ 8-min Sync.so Watchdog — unverändert.
 
-# Frage an dich
+## Risiken & Mitigationen
 
-Soll ich mit **Phase 0** starten (DB cap=4 setzen, 1× Testrun beobachten, dann Logs interpretieren)?
-Das ist null-Risiko und gibt uns harte Daten ob die Lock-Hypothese stimmt, bevor wir Migration + Code-Refactor planen.
+| Risiko | Mitigation |
+|---|---|
+| Lost-Update auf `composer_scenes.dialog_shots` bei 4 parallelen Webhooks | Phase 1 (Per-Slot-RPC) ist Prerequisite vor Phase 2 |
+| Sync.so Plan-Limit (Creator: 6 concurrent jobs) überschritten | `MAX_PREFANOUT = Math.min(N, 4)` lässt Headroom |
+| Face-Gate-Probe-Storm (4× parallel auf gleicher Source) | Probes laufen schon idempotent gegen Preclip-URL; kein Server-Stress |
+| Edge-Function CPU-Limit bei 4 parallel Self-Invokes | Self-Invokes sind separate Function-Instanzen, kein gemeinsames Limit |
+| Webhook-Race auf finalen Mux-Trigger | `try_claim_mux_dispatch` bleibt unverändert, behält single-flight |
 
-Oder soll ich direkt Phase 1 (RPC-Migration als Code-Hygiene) als ersten echten Schritt vorbereiten?
+## Reihenfolge der Lieferung
 
-Drittens: Ich kann auch zuerst die exakte Definition von `update_dialog_pass_slot` aus der DB ziehen und prüfen ob sie alle nötigen Felder schreibt — das wäre eine Vor-Phase-1-Sicherheit. Sag mir, wo wir anfangen.
+1. Phase 1 Migration + Code in einem Schub → User testet N=2 (Soll: gleiche Zeit, keine Regression)
+2. Phase 2 Migration + Code mit Flag OFF → kein Verhaltens-Change
+3. Phase 3 Code-Change + Flag ON für User-Account → N=2 Test
+4. N=3 + N=4 Tests, dann Flag global ON
