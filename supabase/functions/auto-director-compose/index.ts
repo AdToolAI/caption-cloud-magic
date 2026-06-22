@@ -125,10 +125,34 @@ serve(async (req) => {
     }
 
     // ============== STAGE 2: EXECUTE ==============
-    const scenes = body.approvedScenes;
-    if (!scenes || scenes.length === 0) {
+    const rawScenes = body.approvedScenes;
+    if (!rawScenes || rawScenes.length === 0) {
       return jsonResponse({ error: "MISSING_SCENES", message: "approvedScenes is required for execute stage" }, 400);
     }
+
+    // Hard project budget: 10 minutes (600 s). Trim trailing scenes that
+    // would push the total beyond the cap so the client cannot bypass the
+    // budget by crafting a payload directly.
+    const MAX_PROJECT_SECONDS = 600;
+    let cumulative = 0;
+    const scenes: typeof rawScenes = [];
+    let droppedScenes = 0;
+    for (const s of rawScenes) {
+      const dur = Math.max(3, Math.min(15, Number(s.durationSeconds) || 0));
+      if (cumulative + dur > MAX_PROJECT_SECONDS) {
+        droppedScenes = rawScenes.length - scenes.length;
+        break;
+      }
+      cumulative += dur;
+      scenes.push({ ...s, durationSeconds: dur });
+    }
+    if (scenes.length === 0) {
+      return jsonResponse({ error: "BUDGET_EXCEEDED", message: `Each scene must fit within the 10-minute project budget.` }, 400);
+    }
+    if (droppedScenes > 0) {
+      console.warn(`[auto-director] budget cap: dropped ${droppedScenes} trailing scene(s) to stay within ${MAX_PROJECT_SECONDS}s`);
+    }
+
 
     // Create new composer project
     const config = {
