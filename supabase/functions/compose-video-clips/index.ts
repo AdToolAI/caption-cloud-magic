@@ -705,7 +705,7 @@ serve(async (req) => {
       // visible, unobstructed lip-line) — which is what sync-3 actually needs
       // to drive lipsync — but remove the *motion* instruction. Plate mouths
       // stay still; only the per-pass lipsync model opens the active mouth.
-      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself.`;
+      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself. Eyes stay open and alert throughout the entire plate; heads stay steady — no nodding, no head bobbing.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
