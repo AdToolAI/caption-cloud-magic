@@ -1,85 +1,82 @@
-## Symptom (verifiziert auf Szene `70558eb9…9707a3`)
+## Symptom
 
-- Start 18:27:11. 11+ min später: `lip_sync_status='running'`, `twoshot_stage='syncso_fanout_0_of_4'`, `current_pass=0`, kein Audio-Mux.
-- 4 Sync.so-Jobs erfolgreich dispatched (HTTP 201, job-IDs `2f42…`, `07bc…`, `272d…`, `9ea2…`).
-- `sync-so-webhook`-Logs: jeder Job wird mit `ORPHAN (not in passes[] count=0) — releasing inflight slot + best-effort provider cancel` verworfen.
-- DB-Check: `dialog_shots->'passes'` ist **`NULL`**.
-- **Neue User-Beobachtung:** Alle 4 sichtbaren Single-Clips zeigen immer denselben Charakter (Samuel). Passt zur DB: `segments` enthält nur 1 Turn (Samuel, 0–2.32 s, `speakerIdx=0`), aber `total_passes=4` (force_multipass). Mit leerem `passes[]` kann der Dispatcher die Face-Box-Rotation nicht persistieren — alle 4 Passes laufen gegen Slot 0 statt 0/1/2/3 zu rotieren. **Symptom desselben Root-Cause-Bugs**, kein zweiter Defekt.
+Bei 4 Sprechern wird **nur 1 Lip-Sync-Pass** erstellt. UI zeigt `1/1 Clips`, Szene endet nach ~6 min mit `lip_sync_status=done`, obwohl `total_passes=4`.
+
+DB-Beleg (latest scene `37685723…`):
+```
+n_passes=1, current_pass=0, total_passes=4, lip_sync_status=done
+```
 
 ## Root Cause
 
-Die Postgres-RPC `public.update_dialog_pass_slot(scene_id, pass_idx, patch)` (v168 per-slot-write) ist ein **stilles No-Op**, wenn `dialog_shots.passes` noch nicht existiert:
+Die gestrige Migration `update_dialog_pass_slot` initialisiert `passes` zwar als leeres Array, aber `jsonb_set(arr, '{N}', x, true)` mit out-of-bounds positivem Index **hängt am Ende an statt zu padden** (PostgreSQL-Doku: "the new value is added at the end of the array if the index is positive").
 
-```sql
-SELECT jsonb_set('{}'::jsonb, ARRAY['passes','0'], '{"a":1}'::jsonb, true);
--- → '{}'   (kein Effekt!)
-```
+Plan-D Fanout dispatched Pass 0..3 parallel:
+1. Pass 0 schreibt zuerst → `passes = [p0]` ✓
+2. Pass 2 läuft als nächstes → `jsonb_set([p0], '{2}', p2, true)` → `[p0, p2]` (p2 landet auf Index 1, nicht 2!)
+3. Pass 1/3 überschreiben sich gegenseitig, Endzustand chaotisch.
 
-Postgres-Verhalten: `jsonb_set` mit Pfad `[array_key, numeric_index]` legt das fehlende Zwischenelement nicht als Array an und gibt das Original unverändert zurück — ohne Fehler. Konsequenz:
+Wenn der Webhook dann `passes[1].sync_job_id` mit dem zurückkommenden Job vergleicht, matched nichts → alle weiteren Passes werden als ORPHAN klassifiziert. Sichtbar bleibt nur Pass 0.
 
-1. Dispatcher startet 4 parallele Fan-Out-Passes (lock-protected).
-2. Jeder ruft `update_dialog_pass_slot(scene, pass_idx, slot_patch)` → **No-Op**.
-3. Direkt danach läuft `update_dialog_shots_root_merge(scene, rootOnly)` (strippt `passes` defensiv) → Root bekommt `sync_job_id`, `total_passes`, etc., aber `passes` bleibt `NULL`.
-4. Sync.so liefert ~90 s später per Webhook ab; Webhook prüft `Array.isArray(dialog_shots.passes)` → `false` → klassifiziert den Job als `ORPHAN`, gibt den `syncso_inflight_jobs`-Slot frei, cancelt provider-seitig.
-5. `current_pass` bleibt bei 0 → `render-sync-segments-audio-mux` triggert nie (wartet auf `passes.every(done)`).
-6. Pro Pass fehlt der persistierte Face-Slot-Index → alle 4 Passes targeten die identische Bbox (`slot 0` = Samuel) statt 0/1/2/3 zu rotieren.
-7. UI bleibt auf "Startzustand" weil `passes[]` leer ist (siehe `SceneInlinePlayer.tsx`).
+Zusätzlich: ohne `FOR UPDATE` Row-Lock kann zwischen Read und Write von parallelen Calls ein Lost-Update entstehen.
 
-**Warum es früher lief:** vor dem v168-Refactor schrieb der Dispatcher in einem Full-Row-Update `passes: [pass0, pass1, …]` als komplettes Array. Mit dem Switch auf den atomaren Per-Slot-Pfad fehlt jetzt die Initial-Seed-Logik.
+## Fix
 
-## Fix — eine Migration, ~12 Zeilen SQL
+Eine zweite, finale Migration auf `update_dialog_pass_slot`:
 
-`update_dialog_pass_slot` so anpassen, dass sie `passes` **deterministisch als Array initialisiert**, bevor sie den Slot setzt:
+1. Explizites `SELECT … FOR UPDATE` zum serialisieren paralleler Writer.
+2. **Padding-Loop**: Array mit `{}` auffüllen bis `length > _pass_idx`, BEVOR der Slot geschrieben wird.
+3. Anschließend Slot-Merge via `jsonb_set(arr, [idx], (arr->idx) || _patch, true)`.
+
+### SQL (vereinfacht)
 
 ```sql
 CREATE OR REPLACE FUNCTION public.update_dialog_pass_slot(
   _scene_id uuid, _pass_idx integer, _patch jsonb
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
-DECLARE _new_shots jsonb;
+DECLARE
+  _ds jsonb;
+  _arr jsonb;
+  _new_shots jsonb;
 BEGIN
+  -- Row-lock serialisiert parallele Pass-Dispatcher
+  SELECT COALESCE(dialog_shots, '{}'::jsonb) INTO _ds
+  FROM public.composer_scenes WHERE id = _scene_id FOR UPDATE;
+
+  _arr := CASE WHEN jsonb_typeof(_ds->'passes') = 'array'
+               THEN _ds->'passes' ELSE '[]'::jsonb END;
+
+  -- Pad mit {} bis Index existiert (verhindert append-to-end Bug)
+  WHILE jsonb_array_length(_arr) <= _pass_idx LOOP
+    _arr := _arr || '[{}]'::jsonb;
+  END LOOP;
+
+  _arr := jsonb_set(_arr, ARRAY[_pass_idx::text],
+                    (_arr->_pass_idx) || _patch, true);
+  _ds  := jsonb_set(_ds, ARRAY['passes'], _arr, true);
+
   UPDATE public.composer_scenes
-  SET dialog_shots = jsonb_set(
-        -- Stage 1: ensure dialog_shots.passes is a JSON array
-        jsonb_set(
-          COALESCE(dialog_shots, '{}'::jsonb),
-          ARRAY['passes'],
-          CASE
-            WHEN jsonb_typeof(dialog_shots->'passes') = 'array'
-              THEN dialog_shots->'passes'
-            ELSE '[]'::jsonb
-          END,
-          true
-        ),
-        -- Stage 2: write/merge the slot atomically
-        ARRAY['passes', _pass_idx::text],
-        COALESCE(dialog_shots->'passes'->_pass_idx, '{}'::jsonb) || _patch,
-        true
-      ),
-      updated_at = now()
+  SET dialog_shots = _ds, updated_at = now()
   WHERE id = _scene_id
   RETURNING dialog_shots INTO _new_shots;
+
   RETURN _new_shots;
 END;
 $$;
 ```
 
-Verifikation nach Approval:
+## Verification
 
-```sql
-SELECT jsonb_set(jsonb_set('{}'::jsonb,'{passes}','[]'::jsonb,true),
-                 ARRAY['passes','0'],'{"a":1}'::jsonb,true);
--- → {"passes": [{"a": 1}]}   ✓ Array
-```
+Nach Migration:
+1. Neue 4-Sprecher-Szene in Composer starten.
+2. Erwartung: nach ~30s zeigt UI `1/4 → 2/4 → 3/4 → 4/4 Clips`, DB `n_passes=4` aufgebaut über Zeit (parallel).
+3. Alle 4 Sync.so-Jobs landen in passes[0..3] mit unterschiedlichen `speaker_idx`.
+4. Webhook ORPHAN-Quote = 0.
 
-## Recovery der hängenden Szene (einmalig nach Migration)
-
-Szene `70558eb9…9707a3` über die vorhandene Composer-UI sauber neu starten (`useResetLipSync.reset(sceneId)`). Die 4 alten Sync.so-Jobs sind bereits orphaned/cancelled; Credits unverändert reserviert; kein zusätzlicher Code nötig.
+Kein Frontend-, Edge-Function- oder Memory-Change nötig — nur eine SQL-Migration auf die bestehende RPC.
 
 ## Out of Scope
 
-- Edge Functions (`compose-dialog-segments`, `sync-so-webhook`, watchdogs) bleiben unverändert.
-- `update_dialog_shots_root_merge` ist korrekt — wird nicht angefasst.
-- Kein UI-/Frontend-Diff.
-- Kein Memory-Update.
-
-Aufwand: ~5 Minuten, 1 Migration, 0 Code-Edits.
+- `compose-dialog-segments` (unverändert, ruft RPC korrekt mit `_pass_idx`).
+- `sync-so-webhook`, `lipsync-watchdog`, `render-sync-segments-audio-mux`.
+- Hängende Szene `70558eb9…` → bleibt failed, User muss "Sauber neu starten" auf einer neuen Szene drücken zum Verifizieren.
