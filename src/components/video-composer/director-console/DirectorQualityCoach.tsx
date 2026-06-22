@@ -68,7 +68,7 @@ const HEADINGS = {
   es: { title: 'Director Score', good: 'Lista para rodar', mid: 'Requiere pulido', bad: 'Habría que volver a rodar', fix: 'Consejos del coach' },
 } as const;
 
-export default function DirectorQualityCoach({ scene, language = 'en', className }: Props) {
+export default function DirectorQualityCoach({ scene, characters, language = 'en', className }: Props) {
   const [open, setOpen] = useState(false);
 
   const composed = useMemo(
@@ -79,10 +79,12 @@ export default function DirectorQualityCoach({ scene, language = 'en', className
         shotDirector: scene.shotDirector,
         cinematicStylePresetId: scene.cinematicPresetSlug,
         audioPlan: scene.audioPlan,
+        performanceEntries: derivePerformanceEntries(scene, characters),
         language,
       }),
-    [scene.aiPrompt, scene.directorModifiers, scene.shotDirector, scene.cinematicPresetSlug, scene.audioPlan, language],
+    [scene.aiPrompt, scene.directorModifiers, scene.shotDirector, scene.cinematicPresetSlug, scene.audioPlan, scene.performance, characters, language],
   );
+
 
   const result = useMemo(
     () =>
