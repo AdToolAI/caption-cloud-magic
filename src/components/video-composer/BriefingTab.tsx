@@ -39,6 +39,7 @@ import VideoModeSelector from './VideoModeSelector';
 import BrandKitApplyPanel from './BrandKitApplyPanel';
 import StagePanel from './stage/StagePanel';
 import DirectorsNote from './stage/DirectorsNote';
+import FilmStripModeSelector from './stage/FilmStripModeSelector';
 import { useStudioPreferences } from '@/hooks/useStudioPreferences';
 import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
@@ -469,19 +470,12 @@ export default function BriefingTab({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Mode Indicator Strip — confirms which editor mode is active */}
-      <div className="flex items-center justify-between px-1">
-        <p className="font-mono text-[9px] uppercase tracking-[0.4em] text-amber-200/60">
-          {editorMode === 'quick'
-            ? 'Quick Mode · Essential briefing only'
-            : editorMode === 'direct'
-              ? 'Direct Mode · Full creative control'
-              : 'Studio Mode · Every dial on the console'}
-        </p>
-        <p className="font-mono text-[9px] uppercase tracking-[0.4em] text-amber-200/40">
-          Switch via Director's Bar above
-        </p>
-      </div>
+      {/* Film-strip Mode Selector — visible Quick / Direct / Studio reels */}
+      <FilmStripModeSelector />
+
+      {/* Crossfade wrapper — re-keyed on editorMode so panel changes "feel" */}
+      <div key={editorMode} className="stage-mode-fade space-y-6">
+
 
       {/* Legal Usage Notice */}
       <StagePanel
@@ -970,7 +964,7 @@ export default function BriefingTab({
           type="button"
           onClick={handleGenerateStoryboard}
           disabled={!canProceed || isGenerating}
-          className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px]"
+          className={`group relative inline-flex items-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px] ${canProceed && !isGenerating ? 'stage-cta-sheen' : ''}`}
           style={{
             background: 'linear-gradient(180deg, #FFE9A8 0%, #F5C76A 50%, #b78934 100%)',
             boxShadow:
@@ -995,6 +989,8 @@ export default function BriefingTab({
           )}
         </button>
       </div>
+      </div>
     </div>
   );
 }
+
