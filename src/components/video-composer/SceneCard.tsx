@@ -1910,6 +1910,18 @@ export default function SceneCard({
                       }
                       title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
                       onClick={async () => {
+                        // ── Schritt 1: Cost-Confirm-Gate (re-roll) ──────
+                        const passes = scene.dialogVoices
+                          ? Object.keys(scene.dialogVoices).length
+                          : 1;
+                        const ok = await confirmRender({
+                          scenes: [scene],
+                          passes,
+                          title: 'Clip + Lip-Sync neu rendern?',
+                          description:
+                            'Anchor und Clip werden zurückgesetzt und beides neu generiert. Credits werden erneut verbraucht.',
+                        });
+                        if (!ok) return;
                         try {
                           const prevPlan = ((scene as any).audioPlan ??
                             {}) as Record<string, any>;
