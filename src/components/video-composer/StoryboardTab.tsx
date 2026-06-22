@@ -95,6 +95,9 @@ export default function StoryboardTab({
   onRefetchScenes,
   onEnsurePersisted,
   isGeneratingStoryboard = false,
+  storyboardError = null,
+  onRetryStoryboard,
+  onBackToBriefing,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
 
