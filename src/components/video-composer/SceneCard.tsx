@@ -1723,7 +1723,24 @@ export default function SceneCard({
                   </>
                 )}
 
+
+              {/* Phase 2 — Performance Layer (Mimik/Gestik/Blick/Energy).
+                  Sits between Cast and Audio. Lip-sync safe — never touches
+                  audioPlan or compose-dialog-segments. */}
+              {scene.clipSource.startsWith("ai-") && characters && characters.length > 0 && (
+                <>
+                  <SceneStudioSectionHeader tab="performance" language={lang} />
+                  <ScenePerformancePanel
+                    scene={scene}
+                    characters={characters}
+                    language={lang}
+                    onUpdate={onUpdate}
+                  />
+                </>
+              )}
+
               <SceneStudioSectionHeader tab="audio" language={lang} />
+
               {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
               {scene.clipSource.startsWith("ai-") && characters && scene.dialogMode === true && (
                 <SceneDialogStudio
