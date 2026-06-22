@@ -155,7 +155,7 @@ export default function ScenePromptDetailsSheet({
               <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
                 {L.livePrompt}
               </Label>
-              <DirectorConsolePreview scene={scene} language={language} className="mt-1" />
+              <DirectorConsolePreview scene={scene} characters={characters} language={language} className="mt-1" />
             </div>
 
             {/* 2) Composed final prompt + layer breakdown */}
