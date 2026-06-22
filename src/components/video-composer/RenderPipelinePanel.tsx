@@ -124,7 +124,7 @@ export default function RenderPipelinePanel({
                 </Badge>
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Generieren · Stitchen · Direkt in Director&apos;s Cut öffnen — alles in einem Klick.
+                Szenen einzeln rendern · Final stitchen · Direkt in Director&apos;s Cut öffnen.
               </p>
             </div>
           </div>
