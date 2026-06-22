@@ -162,6 +162,49 @@
   border: 1px solid var(--glass-border);
 }
 
+/* ── Motion Studio Sound Stage ──────────────────────────────────────────
+   Spotlight-sweep border used by Scene Cards while a take is rendering,
+   and the "take ready" gold reveal pulse. Both gated by data attributes
+   so SceneCard can opt in without restructuring. */
+@keyframes stageSpotlightSweep {
+  0%   { background-position: -150% 0; }
+  100% { background-position: 250% 0; }
+}
+@keyframes stageTakeReadyPulse {
+  0%   { box-shadow: 0 0 0 0 hsla(43, 90%, 68%, 0.55); }
+  60%  { box-shadow: 0 0 0 14px hsla(43, 90%, 68%, 0); }
+  100% { box-shadow: 0 0 0 0 hsla(43, 90%, 68%, 0); }
+}
+[data-stage-take="rendering"] {
+  position: relative;
+}
+[data-stage-take="rendering"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsla(43, 90%, 68%, 0) 35%,
+    hsla(43, 90%, 68%, 0.65) 50%,
+    hsla(43, 90%, 68%, 0) 65%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: stageSpotlightSweep 2.4s linear infinite;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  padding: 1px;
+  opacity: 0.85;
+}
+[data-stage-take="ready"] {
+  animation: stageTakeReadyPulse 700ms ease-out 1;
+}
+
+
 /* Add checkerboard pattern for transparent backgrounds */
 .bg-checkerboard {
   background-image: 
