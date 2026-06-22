@@ -50,6 +50,8 @@ const LAYER_COLORS: Record<string, string> = {
   '[1 SUBJECT]': 'text-amber-300',
   '[2 ACTION]': 'text-cyan-300',
   '[3 SHOT]': 'text-violet-300',
+  '[4 PERFORMANCE]': 'text-fuchsia-300',
+
   '[5 DIALOG]': 'text-emerald-300',
   '[6 SFX]': 'text-pink-300',
   '[6 AMBIENT]': 'text-pink-300',
