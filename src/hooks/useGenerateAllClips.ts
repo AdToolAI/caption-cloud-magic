@@ -211,10 +211,12 @@ export function useGenerateAllClips({
             libraryCharacters: libCharacters,
             libraryLocations: libLocations,
             audioPlan: s.audioPlan,
+            performanceEntries: derivePerformanceEntries(s, characters),
             language: directorLanguage,
           }),
         );
       }
+
 
       // 4. scene-aware character anchor (parallel)
       const anchorByScene = new Map<string, Awaited<ReturnType<typeof prepareSceneAnchor>>>();
