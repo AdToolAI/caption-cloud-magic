@@ -665,55 +665,54 @@ export default function BriefingTab({
               />
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </StagePanel>
 
-      {/* Style & Format */}
-      <Card className="border-border/40 bg-card/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t('videoComposer.styleFormat')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t('videoComposer.emotionalTone')}</Label>
-              <Select
-                value={briefing.tone}
-                onValueChange={(v) => onUpdateBriefing({ tone: v as EmotionalTone })}
-              >
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TONES.map((tone) => (
-                    <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Style & Format — Quick = compact (AR + Duration only). Direct/Studio = full. */}
+      <StagePanel slateIndex="04" eyebrow="Scene · Style & Format" title={t('videoComposer.styleFormat')}>
+        <div className="space-y-4">
+          {showDirect && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t('videoComposer.emotionalTone')}</Label>
+                <Select
+                  value={briefing.tone}
+                  onValueChange={(v) => onUpdateBriefing({ tone: v as EmotionalTone })}
+                >
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TONES.map((tone) => (
+                      <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t('videoComposer.language')}</Label>
+                <Select
+                  value={language}
+                  onValueChange={(v) => onUpdateProject({ language: v })}
+                >
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="de">Deutsch</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t('videoComposer.language')}</Label>
-              <Select
-                value={language}
-                onValueChange={(v) => onUpdateProject({ language: v })}
-              >
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="de">Deutsch</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Español</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
 
           {/* Duration Slider */}
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label className="text-xs">{t('videoComposer.videoDuration')}</Label>
-              <span className="text-xs font-medium text-primary">{briefing.duration}s</span>
+              <span className="text-xs font-medium text-amber-300">{briefing.duration}s</span>
             </div>
             <Slider
               value={[briefing.duration]}
@@ -739,8 +738,8 @@ export default function BriefingTab({
                   onClick={() => onUpdateBriefing({ aspectRatio: value })}
                   className={`p-2 rounded-lg border text-center transition-all ${
                     briefing.aspectRatio === value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border/40 hover:border-border'
+                      ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30'
+                      : 'border-border/40 hover:border-amber-200/30'
                   }`}
                 >
                   <p className="font-medium text-xs">{label}</p>
@@ -750,58 +749,77 @@ export default function BriefingTab({
             </div>
           </div>
 
-          {/* Default Quality Tier */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">KI-Qualität (Standard für alle Szenen)</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {([
-                { q: 'standard' as ClipQuality, title: 'Standard', desc: '768p / 720p — günstiger', rate: '€0.15/s' },
-                { q: 'pro' as ClipQuality, title: 'Pro', desc: '1080p — höhere Auflösung', rate: 'ab €0.20/s' },
-              ]).map(({ q, title, desc, rate }) => {
-                const isActive = (briefing.defaultQuality || 'standard') === q;
-                return (
-                  <button
-                    key={q}
-                    onClick={() => onUpdateBriefing({ defaultQuality: q })}
-                    className={`p-3 rounded-lg border text-left transition-all ${
-                      isActive
-                        ? q === 'pro'
-                          ? 'border-amber-500/60 bg-amber-500/5 ring-1 ring-amber-500/30'
-                          : 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                        : 'border-border/40 hover:border-border'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className={`font-medium text-xs ${isActive && q === 'pro' ? 'text-amber-400' : isActive ? 'text-primary' : ''}`}>
-                        {title}
-                      </p>
-                      <span className="text-[10px] text-muted-foreground">{rate}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
-                  </button>
-                );
-              })}
+          {/* Default Quality Tier — Direct & Studio only */}
+          {showDirect && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">KI-Qualität (Standard für alle Szenen)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { q: 'standard' as ClipQuality, title: 'Standard', desc: '768p / 720p — günstiger', rate: '€0.15/s' },
+                  { q: 'pro' as ClipQuality, title: 'Pro', desc: '1080p — höhere Auflösung', rate: 'ab €0.20/s' },
+                ]).map(({ q, title, desc, rate }) => {
+                  const isActive = (briefing.defaultQuality || 'standard') === q;
+                  return (
+                    <button
+                      key={q}
+                      onClick={() => onUpdateBriefing({ defaultQuality: q })}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        isActive
+                          ? q === 'pro'
+                            ? 'border-amber-300/70 bg-amber-300/5 ring-1 ring-amber-300/30'
+                            : 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                          : 'border-border/40 hover:border-amber-200/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className={`font-medium text-xs ${isActive && q === 'pro' ? 'text-amber-300' : isActive ? 'text-primary' : ''}`}>
+                          {title}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground">{rate}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-muted-foreground/70">
+                Pro-Szene überschreibbar im Storyboard.
+              </p>
             </div>
-            <p className="text-[10px] text-muted-foreground/70">
-              Pro-Szene überschreibbar im Storyboard.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </StagePanel>
 
-      {/* Video Mode — choose between AI video, AI image, or mixed scenes */}
-      <VideoModeSelector
-        value={briefing.videoMode || 'video'}
-        language={language}
-        onChange={(mode: VideoMode) => onUpdateBriefing({ videoMode: mode })}
-      />
+      {/* Video Mode — Direct & Studio only */}
+      {showDirect && (
+        <VideoModeSelector
+          value={briefing.videoMode || 'video'}
+          language={language}
+          onChange={(mode: VideoMode) => onUpdateBriefing({ videoMode: mode })}
+        />
+      )}
 
-      {/* Recurring Characters — drives consistency across scenes */}
-      <CharacterManager
-        characters={briefing.characters || []}
-        language={language}
-        onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
-      />
+      {/* Recurring Characters — Studio only (advanced) */}
+      {showStudio && (
+        <CharacterManager
+          characters={briefing.characters || []}
+          language={language}
+          onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
+        />
+      )}
+
+      {/* Director's Note — Direct & Studio only */}
+      {showDirect && (
+        <DirectorsNote>
+          {language === 'de'
+            ? 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek.'
+            : language === 'es'
+              ? 'Describe ropa y objetos distintivos en detalle (abrigo, corona, arma). La IA los repite con mucha más fiabilidad que las caras — el espectador reconoce al personaje por ellos. Para consistencia facial real, usa un avatar de la biblioteca.'
+              : 'Describe distinctive clothing & props in detail (coat, crown, weapon). The AI repeats those far more reliably than faces — your audience recognises the character by them. For true face consistency, use an avatar from the library.'}
+        </DirectorsNote>
+      )}
+
+
 
       {/* Visual Style — drives consistent look across all AI-generated scenes */}
       <Card className="border-border/40 bg-card/80">
