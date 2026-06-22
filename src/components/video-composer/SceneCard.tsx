@@ -269,6 +269,7 @@ export default function SceneCard({
   previousSceneIndex,
   frameFirstMode,
   embedded,
+  siblingsDurationSec = 0,
 }: SceneCardProps) {
   const lang = (language === "es" ? "es" : language === "en" ? "en" : "de") as
     | "de"
