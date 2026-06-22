@@ -964,13 +964,18 @@ export default function BriefingTab({
         </Card>
       )}
 
-      {/* Action */}
-      <div className="flex justify-end">
-        <Button
+      {/* Action — gold-gradient cinematic CTA */}
+      <div className="flex justify-end pt-2">
+        <button
+          type="button"
           onClick={handleGenerateStoryboard}
           disabled={!canProceed || isGenerating}
-          className="gap-2"
-          size="lg"
+          className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-full font-mono text-[11px] uppercase tracking-[0.25em] text-[hsl(230_30%_4%)] disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-[0_0_40px_-8px_hsla(43,90%,68%,0.7)] hover:-translate-y-[1px]"
+          style={{
+            background: 'linear-gradient(180deg, #FFE9A8 0%, #F5C76A 50%, #b78934 100%)',
+            boxShadow:
+              '0 0 24px -8px hsla(43,90%,68%,0.5), inset 0 1px 0 hsla(0,0%,100%,0.45), inset 0 -1px 0 hsla(0,0%,0%,0.25)',
+          }}
         >
           {isGenerating ? (
             <>
@@ -988,7 +993,7 @@ export default function BriefingTab({
               {t('videoComposer.continueToStoryboard')}
             </>
           )}
-        </Button>
+        </button>
       </div>
     </div>
   );
