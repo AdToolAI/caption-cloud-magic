@@ -58,6 +58,14 @@ interface Body {
   locationNames?: string[];
   buildingNames?: string[];
   propNames?: string[];
+  /** Wardrobe-Lock — when true, the wardrobe shown in `portraitUrls` is a
+   *  user-picked saved outfit (e.g. Roman armor) that MUST be rendered
+   *  literally even when it contradicts the scene description (e.g.
+   *  "modern office"). Without this flag, Nano Banana 2 silently translates
+   *  the outfit into something "scene-appropriate". Names listed in
+   *  `wardrobeLockNames` are the cast members whose wardrobe is locked. */
+  wardrobeLock?: boolean;
+  wardrobeLockNames?: string[];
 }
 
 async function sha1(s: string): Promise<string> {
