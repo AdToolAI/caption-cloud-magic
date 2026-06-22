@@ -144,6 +144,11 @@ import SceneStudioTabBar, {
   SceneStudioSectionHeader,
 } from "./SceneStudioTabBar";
 import ScenePerformancePanel from "./ScenePerformancePanel";
+import {
+  derivePerformanceEntries,
+  countDirectedPerformances,
+} from "@/lib/motion-studio/buildPerformanceBlock";
+
 
 import {
   recommendEngineForScene,
