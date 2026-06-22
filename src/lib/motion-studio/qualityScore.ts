@@ -181,7 +181,9 @@ export function evaluateSceneQuality({
   finalPrompt,
   negativePrompt,
   language = 'en',
+  performanceEntries,
 }: ScoreInputs): QualityResult {
+
   const L = T[language] ?? T.en;
   const tips: Tip[] = [];
   const axes: Record<QualityAxis, Severity> = {
