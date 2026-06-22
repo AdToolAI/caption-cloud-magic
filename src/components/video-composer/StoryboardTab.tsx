@@ -768,7 +768,7 @@ export default function StoryboardTab({
               generatingMap={generatingMap}
               onSelect={setSelectedSceneId}
               onReorder={onUpdateScenes}
-              onAddScene={addScene}
+              onAddScene={handleAddSceneClick}
               onGenerate={generateScene}
             />
           </div>
