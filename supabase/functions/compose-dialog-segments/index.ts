@@ -5375,7 +5375,9 @@ serve(async (req) => {
           },
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: `syncso_segments_dispatch_${resp.status}`,
+          clip_error: resp.status === 429
+            ? "syncso_concurrency_exhausted"
+            : `syncso_segments_dispatch_${resp.status}`,
         })
         .eq("id", sceneId);
       await logSyncDispatch(supabase, {
