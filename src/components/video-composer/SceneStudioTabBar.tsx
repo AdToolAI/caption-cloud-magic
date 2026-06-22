@@ -19,7 +19,10 @@ interface BarProps {
   cardId: string;
   language: DirectorLanguage;
   className?: string;
+  /** Phase 3.1 — optional count chip per tab (only rendered when > 0). */
+  badges?: Partial<Record<SceneStudioTab, number>>;
 }
+
 
 const LABELS = {
   en: {
