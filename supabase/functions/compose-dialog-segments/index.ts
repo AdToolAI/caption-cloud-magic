@@ -5683,14 +5683,15 @@ serve(async (req) => {
           .update({ dialog_shots: { ...freshState, ...state, passes: freshPasses } })
           .eq("id", sceneId);
       } else {
-        // Root merge for cost_credits / fallback_history (PRESERVES passes[]).
-        const rootPatch: Record<string, unknown> = {
-          cost_credits: Number(state?.cost_credits ?? totalCost),
-          fallback_history: state?.fallback_history ?? [],
-        };
+        // Root merge: write ALL root-level state fields (sync_job_id, status,
+        // total_sec, video_width, etc.) WITHOUT touching `passes[]`. The RPC
+        // strips `passes` defensively. Last-writer-wins on root scalars is
+        // the legacy behavior and is tolerable because authoritative per-pass
+        // job IDs live in `passes[i].sync_job_id`.
+        const { passes: _drop, ...rootOnly } = state as any;
         await supabase.rpc("update_dialog_shots_root_merge", {
           _scene_id: sceneId,
-          _patch: rootPatch,
+          _patch: rootOnly,
         });
       }
 
