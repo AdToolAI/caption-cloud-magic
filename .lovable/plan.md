@@ -1,50 +1,56 @@
-# Storyboard-Loading: Cinematic Stage Panel statt kurzem Spinner
+# Storyboard-Tab: Audit + Look-Lift
 
-## Ziel
-Wenn das Storyboard nach dem Briefing generiert wird (10–20s, manchmal länger), erscheint ab sofort ein **vollflächiges Bond-2028 Panel** im selben Stil wie das Welcome-Moment / Countdown — statt der jetzigen kleinen Card mit Spinner. Das Panel bleibt sichtbar, **solange `isGeneratingStoryboard === true`**, zeigt News aus dem News-Radar und genug Lesefutter gegen das Warten.
+## 1) Was ich am Storyboard inhaltlich sehe (Screenshots)
 
-## Was der User sieht
+**Verdrahtet & live (geprüft im Code):**
+- Toolbar oben: `Szene hinzufügen`, `Engine für alle`, `Frame-First`, `Scene Library`, `Talking-Head`, `Alle generieren (n · €x)` → alle in `StoryboardTab.tsx` aktiv.
+- **Cast Consistency Map** mit Reference/Chain/Prompt-Status → `CastConsistencyMap` rendert pro Szene den richtigen Anker-Typ.
+- **Director Score** Badge mit Hinweisen ("Länge daneben — Prompt zu lang") → `useDirectorScore` läuft, Auto-Fix-Button vorhanden.
+- **Scene aus Beschreibung** + **Auto-EN**-Übersetzung + Lock-Icon → `SceneDirectorBox` + `useAutoTranslateEn`.
+- **Cast / Location / Bauwerk / Props** Picker mit @-Mentions → `useUnifiedMentionLibrary` injiziert in den Prompt.
+- **Performance pro Charakter** (Mimik/Gestik/Blick/Energie 1-5) → wird in den Prompt komponiert, sichtbar im strukturierten KI-Prompt.
+- **Story & Engine**: Modell-Dropdown, Dialog & Lip-Sync Toggle, Stock/KI/Eigenes Tabs, Slider für Dauer → alle in `SceneCard` verdrahtet.
+- Rechte Spalte: pro-Szene `Generieren`-Button mit Status (WARTET/READY) + Kosten → `StoryboardScenePlayerList` ruft `generateScene` korrekt auf.
 
-1. User klickt "Storyboard generieren" im Briefing.
-2. Die Storyboard-Tab wird aktiv und **statt der Empty-State-Card** öffnet sich ein vollflächiges Panel (gleicher Look wie `StagePanel` / `StageWelcomeMoment`):
-   - Dunkler Bond-Black Background mit goldenem Cinemascope-Frame
-   - Gold-Wordmark oben: "BUILDING YOUR STORYBOARD"
-   - Untertitel: "Der Director arbeitet — Skript, Cast & Szenen werden komponiert."
-   - **Mittig**: animierte Status-Zeile, die alle ~2.5s durch die Phasen rotiert
-     (`Analysiere Briefing` → `Wähle Cast` → `Plane Szenen-Bögen` → `Schreibe Skripte` → `Setze Kamera & Look` → `Finalisiere Storyboard`)
-   - **Darunter rotierender "Director's Notes"-Karussell** mit Lesefutter: 6–8 kuratierte Tipps zum Composer-Workflow (Frame-Chain, Cast Consistency, Engine pro Szene, Talking Head etc.), jeweils 1 Absatz, alle ~6s wechselnd, mit smoothem fade
-   - **Unten**: News-Ticker im Bond-Stil mit Live-Items aus `useNewsRadar()`:
-     - Horizontal scrollende goldene Marquee-Zeile "AdTool News Radar · LIVE"
-     - Max. 8 Items, Format `[Kategorie] Headline — Source`
-     - Endlos-Loop bis Panel sich schließt
-   - Dezenter Progress-Hinweis "~10–20 Sekunden — du musst nicht warten, wir benachrichtigen dich" + dezenter indeterminater Gold-Bar
-3. Sobald `isGeneratingStoryboard` auf `false` flippt → Panel fade/iris-out (200ms), Storyboard erscheint normal.
+**Was *noch nicht* sichtbar zündet (ehrlich):**
+- **Director Score "Auto-Fix"** kürzt Prompt heuristisch — funktioniert, aber wenn der Prompt von einem Mention-Block erzeugt wurde, regeneriert er sich beim nächsten Render wieder lang. → Bekanntes Verhalten, kein Bug, aber ich würde im Audit-Schritt einen "Prompt-Layer auto-trim" Hinweis vorschlagen (nicht jetzt umsetzen, nur dokumentieren).
+- **Performance-Slots (Mimik/Gestik/Blick) "—"** im Screenshot: optional, leer = Fallback "natural". Funktioniert, aber Label sagt nicht klar "optional → auto". Reines Wording, kein Bug.
+- **Frame-First Pipeline** Button öffnet das Still-Frame-Studio nur für die *aktuell selektierte* Szene — global "Frame-First für alle" gibt es noch nicht. Heute aber bewusst so dokumentiert.
 
-## Technische Umsetzung
+→ Kurz: **alles Versprochene ist verdrahtet**, die zwei Punkte oben sind UX-Klarheit, kein Funktionsschaden.
 
-**Neue Datei:** `src/components/video-composer/stage/StageStoryboardLoader.tsx`
-- Props: `language: string` (für News-Radar Sprache, optional)
-- Nutzt `useNewsRadar()` für Live-News (Fallback bereits eingebaut)
-- Interne State-Machine für Phase-Rotation (`setInterval` 2500ms) und Notes-Karussell (`setInterval` 6000ms)
-- Wiederverwendet visuelle Patterns aus `StagePanel.tsx` (Cinemascope-Frame, Gold-Akzente, Playfair Display Headings, Inter Body) — gleicher Bond-2028 Look wie Welcome-Moment, aber **ohne** Countdown (das ist eine eigene Sequence)
-- Reduced-motion-Safe: deaktiviert Marquee + Phase-Rotation bei `prefers-reduced-motion`
-- Pure Frontend, keine neuen Edge-Functions / Backend-Calls (News kommt aus existierendem `useNewsRadar`)
+## 2) Look-Lift auf Briefing-Niveau (nur Optik, keine Funktion anfassen)
 
-**Edit:** `src/components/video-composer/StoryboardTab.tsx` (Zeilen 583–599)
-- Ersetzt den aktuellen Loader-Card-Branch durch `<StageStoryboardLoader />`
-- Empty-State (keine Generierung läuft) bleibt unverändert
+Im `BriefingTab` sitzen die Sektionen in `StagePanel` (Bond-Glas, Gold-Halo, Slate-Header, Filament-Top). Im `StoryboardTab` und `SceneCard` sind die gleichen Inhalte heute in flachen `Card`-Containern. Wir heben sie auf das gleiche Niveau, ohne Props/Logik zu ändern.
 
-**Content (DE / EN / ES Lokalisierung):**
-- 6 Phase-Strings: "Briefing analysieren", "Cast wählen", "Szenen-Bögen planen", "Skripte schreiben", "Kamera & Look setzen", "Finalisieren"
-- 8 Director's-Notes als Lesefutter (je ~2–3 Sätze)
-- Header / Subheader / Footer-Hinweis
-- Alle Strings via `useTranslation()` mit Keys unter `videoComposer.storyboardLoader.*`
+### Änderungen (rein presentational)
 
-## Out of scope
-- Kein Skip-Button (Generierung läuft serverseitig sowieso weiter)
-- Keine echte Progress-Anzeige aus dem Backend (kein neuer Endpoint) — Phase-Rotation ist visuell, kein Live-Status
-- Welcome-Moment / Countdown bleibt unverändert
-- Kein Audio
+**`src/components/video-composer/StoryboardTab.tsx`**
+- "Wichtige Hinweise zur KI-Generierung" → in `StagePanel` mit `eyebrow="REEL · NOTES"`, `title="Wichtige Hinweise"` wrappen. Inhalt 1:1.
+- "Cast Consistency Map" Wrapper → `StagePanel` mit `slateIndex="00"`, `eyebrow="CAST · CONTINUITY"`, `title="Cast Consistency Map"`, Accessory = Reference/Chain/Prompt-Legende (heute schon im Header).
+- Empty-State Card (vor erster Szene) → ebenfalls `StagePanel`.
 
-## Geschätzter Aufwand
-~0.4 Tage. 1 neue Komponente (~250 Zeilen), 1 Edit, 3 Sprach-Pakete erweitert.
+**`src/components/video-composer/SceneCard.tsx`** (nur die 5 Sub-Header, die schon existieren: Story & Engine, Cast, Aktion, Performance, Audio & Voiceover, Szene aus Beschreibung)
+- Jede dieser Sektionen bekommt einen `StagePanel`-Wrapper mit passendem `slateIndex` (= Szenen-Nummer) und `eyebrow` (z.B. `STORY · ENGINE`, `CAST · LOCK`, `ACTION · BEAT`, `PERFORMANCE · CAST`, `AUDIO · VO`).
+- Die internen Felder (Inputs, Dropdowns, Slider, Buttons, @-Mentions, Auto-EN, Lock, Strukturiert-Badge) bleiben *exakt* wie sie sind — kein Re-Wire, keine Prop-Änderung, kein State-Refactor.
+
+**`src/components/video-composer/CastConsistencyMap.tsx`**
+- Den äußeren `div` durch `StagePanel`-Inhalt-Slot ersetzen (oder Outer-Wrapping in StoryboardTab — ich entscheide nach Lesbarkeit beim Implementieren). Grid + Reference/Chain/Prompt-Icons bleiben.
+
+**`src/components/video-composer/StoryboardScenePlayerList.tsx`** (rechte Spalte)
+- Pro Szenen-Tile leichtes Bond-Glas (gleicher Gradient + Gold-Inset wie `StagePanel`, aber kompakter, ohne Slate-Header — sonst wird die rechte Spalte zu schwer). Status-Pille "WARTET" bleibt, Generieren-Button bleibt, Kosten bleiben.
+
+### Was bewusst NICHT angefasst wird
+
+- Keine Änderungen an `useDirectorScore`, `useAutoTranslateEn`, `useUnifiedMentionLibrary`, `generateScene`, `useSceneManager`, `compose-*` Edge Functions.
+- Keine Änderung der Reihenfolge oder IDs der Felder (sonst brechen `data-tour`-Selektoren der Product-Tour).
+- Keine Änderung an `StagePanel` selbst (wird vom Welcome/Briefing geteilt).
+- Storyboard-Loader (`StageStoryboardLoader`) bleibt wie gerade gebaut.
+
+## 3) Aufwand & Risiko
+
+- ~3 Dateien anfassen, ~150-200 Zeilen rein Wrapper-JSX.
+- Risiko: niedrig — nur visuelles Wrapping, alle bestehenden Children bleiben gleich.
+- Verifizierung: Build muss durchlaufen, anschließend per Playwright-Screenshot Briefing vs. Storyboard vergleichen.
+
+Soll ich es so umsetzen?
