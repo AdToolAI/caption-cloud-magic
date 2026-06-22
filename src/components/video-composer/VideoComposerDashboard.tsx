@@ -1816,6 +1816,7 @@ export default function VideoComposerDashboard() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </SceneRenderConfirmProvider>
     </ComposerHistoryContext.Provider>
   );
 }
