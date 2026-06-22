@@ -346,6 +346,11 @@ serve(async (req) => {
       // but explicitly forbid idle mouth/jaw motion + listener mouth movement
       // so the plate itself shows only the speaker-driven mouths in post.
       ", idle mouth motion, idle jaw motion, mouths softly moving, mouth twitching, jaw twitching, multiple mouths flapping, group chatter, background mouth motion, listeners moving their lips, listeners' mouths moving, secondary characters speaking, non-speaker mouth movement, everyone talking at once, all characters speaking simultaneously" +
+      // v172 (Jun 22 2026) — Closed-Eyes + Dauer-Nicken Guard. The v171 idle-
+      // body clause ("small head bobs", "occasional blinks") was being
+      // over-interpreted by Hailuo/Kling as continuous nodding and frequently
+      // held-shut eyes. Hard-block both failure modes.
+      ", closed eyes, eyes closed, squinting, sleepy eyes, drowsy expression, prolonged blink, eyes held shut, head nodding, nodding head, continuous nodding, rhythmic head bobbing, head bobbing up and down, agreeing nod loop, everyone nodding" +
       // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
       // mid-clip camera cut or push-in when given a 3-shot start-frame plus
       // a long dialog-style prompt. The downstream Sync.so dispatch then
@@ -658,7 +663,7 @@ serve(async (req) => {
       // natural, lip-ready neutral expression with the mouth area clearly
       // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
       // constraints live exclusively in the negative_prompt.
-      return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), small natural head bobs and weight shifts, occasional blinks and gentle eye movement, no person ever fully static or statue-like. BUT mouths and jaws stay still and softly closed — no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap, no listener mouth movement. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. BUT mouths and jaws stay still and softly closed — no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap, no listener mouth movement. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
@@ -700,7 +705,7 @@ serve(async (req) => {
       // visible, unobstructed lip-line) — which is what sync-3 actually needs
       // to drive lipsync — but remove the *motion* instruction. Plate mouths
       // stay still; only the per-pass lipsync model opens the active mouth.
-      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself.`;
+      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself. Eyes stay open and alert throughout the entire plate; heads stay steady — no nodding, no head bobbing.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
