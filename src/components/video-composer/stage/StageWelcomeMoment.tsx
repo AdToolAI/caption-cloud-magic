@@ -162,8 +162,16 @@ export default function StageWelcomeMoment() {
         }}
       />
 
-      {/* Center stage content */}
-      <div className="relative h-full w-full flex flex-col items-center justify-center px-6">
+      {/* Center stage content (welcome beats) */}
+      <div
+        className="relative h-full w-full flex flex-col items-center justify-center px-6"
+        style={{
+          opacity: isCountdown ? 0 : 1,
+          transform: isCountdown ? "scale(0.96)" : "scale(1)",
+          transition: "opacity 420ms ease-out, transform 420ms ease-out",
+          pointerEvents: isCountdown ? "none" : undefined,
+        }}
+      >
         {/* Clapper */}
         <div
           className="mb-10"
