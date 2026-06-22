@@ -6731,18 +6731,21 @@ export type Database = {
           acquired_at: string
           expires_at: string
           holder: string
+          pass_idx: number
           scene_id: string
         }
         Insert: {
           acquired_at?: string
           expires_at: string
           holder: string
+          pass_idx?: number
           scene_id: string
         }
         Update: {
           acquired_at?: string
           expires_at?: string
           holder?: string
+          pass_idx?: number
           scene_id?: string
         }
         Relationships: []
@@ -17555,10 +17558,12 @@ export type Database = {
         Args: { p_amount: number; p_conversation_id: string; p_user_id: string }
         Returns: number
       }
-      release_dialog_lock: {
-        Args: { _holder: string; _scene_id: string }
-        Returns: undefined
-      }
+      release_dialog_lock:
+        | { Args: { _holder: string; _scene_id: string }; Returns: undefined }
+        | {
+            Args: { _holder: string; _pass_idx?: number; _scene_id: string }
+            Returns: undefined
+          }
       replace_composer_scene_with_children: {
         Args: {
           p_children: Json
@@ -17578,13 +17583,27 @@ export type Database = {
         Args: { _window_min?: number }
         Returns: number
       }
-      try_acquire_dialog_lock: {
-        Args: { _holder: string; _scene_id: string; _ttl_seconds?: number }
-        Returns: boolean
-      }
+      try_acquire_dialog_lock:
+        | {
+            Args: { _holder: string; _scene_id: string; _ttl_seconds?: number }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _holder: string
+              _pass_idx?: number
+              _scene_id: string
+              _ttl_seconds?: number
+            }
+            Returns: boolean
+          }
       try_claim_mux_dispatch: { Args: { _scene_id: string }; Returns: boolean }
       update_dialog_pass_slot: {
         Args: { _pass_idx: number; _patch: Json; _scene_id: string }
+        Returns: Json
+      }
+      update_dialog_shots_root_merge: {
+        Args: { _patch: Json; _scene_id: string }
         Returns: Json
       }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }

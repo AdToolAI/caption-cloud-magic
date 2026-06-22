@@ -590,6 +590,7 @@ serve(async (req) => {
   let lockSupabase: any = null;
   let lockSceneId: string | null = null;
   let lockHolder: string | null = null;
+  let lockPassIdx: number = 0; // v168 Phase 2 — per-pass-lock partition key (0 when flag OFF)
   // v100 — crash-safe envelope: keep sceneId/userId/syncApiKey reachable from
   // the outer catch so an uncaught throw before/after dispatch can immediately
   // mark the scene `failed` (with refund) instead of leaving it `pending` until
@@ -661,21 +662,38 @@ serve(async (req) => {
     // duplicate Sync.so jobs that never match the latest passes[] state and
     // burn provider credits. `withDialogLock` falls back to "no lock" on
     // contention which is exactly what we must avoid here.
+    //
+    // v168 Phase 2 — Per-Pass-Lock. When FEATURE_PER_PASS_LOCK=true, the lock
+    // is partitioned by (scene_id, pass_idx) so up to N parallel passes for
+    // the same scene can each dispatch concurrently. When OFF, pass_idx
+    // defaults to 0 → exact legacy single-flight-per-scene semantics.
+    // Initial dispatch from the client has no body.pass_idx → 0.
+    // Self-invoke / webhook advance calls carry pass_idx in body.
     {
+      const perPassLockEnabled = (Deno.env.get("FEATURE_PER_PASS_LOCK") ?? "false")
+        .toLowerCase() === "true";
+      const bodyPassIdx = Number(body?.pass_idx);
+      const earlyPassIdx = perPassLockEnabled && Number.isFinite(bodyPassIdx) && bodyPassIdx >= 0
+        ? Math.floor(bodyPassIdx)
+        : 0;
       const holder = `compose-dialog-segments-${crypto.randomUUID()}`;
       const { data: acquired, error: lockErr } = await supabase.rpc(
         "try_acquire_dialog_lock",
-        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 90 },
+        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 90, _pass_idx: earlyPassIdx },
       );
       if (lockErr) {
-        console.warn(`[compose-dialog-segments] scene=${sceneId} lock rpc error: ${lockErr.message} — proceeding without lock`);
+        console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${earlyPassIdx} lock rpc error: ${lockErr.message} — proceeding without lock`);
       } else if (acquired !== true) {
-        console.warn(`[compose-dialog-segments] scene=${sceneId} BUSY — another dispatcher holds the lock; skipping`);
-        return json({ ok: true, status: "scene_lock_busy", scene_id: sceneId }, 202);
+        console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${earlyPassIdx} BUSY — another dispatcher holds the (scene,pass) lock; skipping`);
+        return json({ ok: true, status: "scene_lock_busy", scene_id: sceneId, pass_idx: earlyPassIdx }, 202);
       } else {
         lockSupabase = supabase;
         lockSceneId = sceneId;
         lockHolder = holder;
+        lockPassIdx = earlyPassIdx;
+        if (perPassLockEnabled) {
+          console.log(`[compose-dialog-segments] scene=${sceneId} v168_per_pass_lock ACQUIRED pass=${earlyPassIdx}`);
+        }
       }
     }
 
@@ -5642,45 +5660,63 @@ serve(async (req) => {
       },
     });
 
-    // v29: For retry/advance dispatches, re-read the DB and merge ONLY our
-    // pass into the freshest passes[] so a concurrent webhook for a sibling
-    // pass can't be overwritten by our stale `passes` snapshot.
-    if (isRetry || isAdvance) {
-      const { data: freshRow } = await supabase
-        .from("composer_scenes")
-        .select("dialog_shots")
-        .eq("id", sceneId)
-        .maybeSingle();
-      const freshState: any = (freshRow as any)?.dialog_shots ?? state;
-      const freshPasses: any[] = Array.isArray(freshState?.passes)
-        ? freshState.passes.map((p: any) => ({ ...p }))
-        : passes;
-      freshPasses[currentPassIdx] = pass;
-      const mergedState: any = {
-        ...freshState,
-        ...state,
-        passes: freshPasses,
-        // Preserve fields that may have been advanced by other passes:
-        cost_credits: Number(freshState?.cost_credits ?? state.cost_credits ?? totalCost),
-        fallback_history: freshState?.fallback_history ?? state.fallback_history ?? [],
-      };
+    // v168 — Phase 1 of Per-Pass-Lock rollout: replace full-row dialog_shots
+    // UPDATE with atomic per-slot RPC writes. With Plan-D fan-out, up to N
+    // parallel dispatchers race here; a full-row UPDATE causes Lost-Update
+    // (the last writer overwrites sibling-pass job_ids). The RPCs use
+    // jsonb_set/||-merge at the row-lock level, so each pass writes only
+    // its own slot atomically.
+    //
+    //   1) update_dialog_pass_slot(scene, pass_idx, patch)
+    //      → writes `dialog_shots.passes[pass_idx] = passes[pass_idx] || patch`
+    //   2) update_dialog_shots_root_merge(scene, patch)
+    //      → merges root-level fields (cost_credits, fallback_history)
+    //        WITHOUT touching `passes[]`. `passes` is stripped defensively.
+    //   3) plain UPDATE for top-level scene columns (lip_sync_status,
+    //      twoshot_stage, …) — these are idempotent across passes (latest
+    //      writer's value is fine for status/diagnostic fields).
+    {
+      const { error: slotErr } = await supabase.rpc("update_dialog_pass_slot", {
+        _scene_id: sceneId,
+        _pass_idx: currentPassIdx,
+        _patch: pass,
+      });
+      if (slotErr) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v168_per_slot_write pass=${currentPassIdx + 1} rpc_error=${slotErr.message} — falling back to full-row UPDATE`,
+        );
+        // Fallback: read-modify-write merge (legacy behavior for safety).
+        const { data: freshRow } = await supabase
+          .from("composer_scenes")
+          .select("dialog_shots")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const freshState: any = (freshRow as any)?.dialog_shots ?? state;
+        const freshPasses: any[] = Array.isArray(freshState?.passes)
+          ? freshState.passes.map((p: any) => ({ ...p }))
+          : passes;
+        freshPasses[currentPassIdx] = pass;
+        await supabase
+          .from("composer_scenes")
+          .update({ dialog_shots: { ...freshState, ...state, passes: freshPasses } })
+          .eq("id", sceneId);
+      } else {
+        // Root merge: write ALL root-level state fields (sync_job_id, status,
+        // total_sec, video_width, etc.) WITHOUT touching `passes[]`. The RPC
+        // strips `passes` defensively. Last-writer-wins on root scalars is
+        // the legacy behavior and is tolerable because authoritative per-pass
+        // job IDs live in `passes[i].sync_job_id`.
+        const { passes: _drop, ...rootOnly } = state as any;
+        await supabase.rpc("update_dialog_shots_root_merge", {
+          _scene_id: sceneId,
+          _patch: rootOnly,
+        });
+      }
+
+      // Top-level scene columns (idempotent across parallel passes).
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: mergedState,
-          lip_sync_status: "running",
-          twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
-          lip_sync_source_clip_url: sourceClipUrl,
-          replicate_prediction_id: `sync:${jobId}`,
-          clip_error: null,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
-    } else {
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: state,
           lip_sync_status: "running",
           twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
           lip_sync_source_clip_url: sourceClipUrl,
@@ -5972,9 +6008,10 @@ serve(async (req) => {
         await lockSupabase.rpc("release_dialog_lock", {
           _scene_id: lockSceneId,
           _holder: lockHolder,
+          _pass_idx: lockPassIdx,
         });
       } catch (e) {
-        console.warn(`[compose-dialog-segments] lock release failed: ${(e as Error)?.message ?? e}`);
+        console.warn(`[compose-dialog-segments] lock release failed (scene=${lockSceneId} pass=${lockPassIdx}): ${(e as Error)?.message ?? e}`);
       }
     }
   }
