@@ -93,9 +93,11 @@ export default function DirectorQualityCoach({ scene, characters, language = 'en
         finalPrompt: composed.finalPrompt,
         negativePrompt: composed.negativePrompt || '',
         language,
+        performanceEntries: derivePerformanceEntries(scene, characters),
       }),
-    [scene, composed.finalPrompt, composed.negativePrompt, language],
+    [scene, composed.finalPrompt, composed.negativePrompt, language, characters],
   );
+
 
   const L = HEADINGS[language] ?? HEADINGS.en;
   const verdict = result.score >= 85 ? L.good : result.score >= 65 ? L.mid : L.bad;

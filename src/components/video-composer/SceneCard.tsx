@@ -144,6 +144,11 @@ import SceneStudioTabBar, {
   SceneStudioSectionHeader,
 } from "./SceneStudioTabBar";
 import ScenePerformancePanel from "./ScenePerformancePanel";
+import {
+  derivePerformanceEntries,
+  countDirectedPerformances,
+} from "@/lib/motion-studio/buildPerformanceBlock";
+
 
 import {
   recommendEngineForScene,
@@ -766,7 +771,13 @@ export default function SceneCard({
             <SceneStudioTabBar
               cardId={`scene-card-${scene.id || index}`}
               language={lang}
+              badges={{
+                performance: countDirectedPerformances(
+                  derivePerformanceEntries(scene, characters ?? []),
+                ),
+              }}
             />
+
             {/* Content */}
             <div className="flex-1 min-w-0 space-y-4">
               <SceneStudioSectionHeader tab="story" language={lang} />
@@ -2494,6 +2505,38 @@ export default function SceneCard({
                                 ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
                                 : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
                           </p>
+                          {(() => {
+                            const perfEntries = derivePerformanceEntries(scene, characters ?? []);
+                            const total = perfEntries.length;
+                            const directed = countDirectedPerformances(perfEntries);
+                            if (total === 0) return null;
+                            const label =
+                              lang === 'de' ? 'Cast direktiert'
+                              : lang === 'es' ? 'reparto dirigido'
+                              : 'cast directed';
+                            const tone = directed === 0 ? 'text-muted-foreground/60 hover:text-primary' : 'text-primary/80 hover:text-primary';
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const root = document.getElementById(`scene-card-${scene.id || index}`);
+                                  root?.querySelector('[data-studio-section="performance"]')
+                                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }}
+                                className={`shrink-0 inline-flex items-center gap-1 text-[10px] tabular-nums ${tone} transition-colors`}
+                                title={
+                                  lang === 'de'
+                                    ? 'Mimik, Gestik, Blick und Energy pro Charakter setzen'
+                                    : lang === 'es'
+                                      ? 'Define expresión, gesto, mirada y energía por personaje'
+                                      : 'Set expression, gesture, gaze and energy per character'
+                                }
+                              >
+                                🎭 {directed}/{total} {label}
+                              </button>
+                            );
+                          })()}
+
                           {(() => {
                             const chars = (scene.aiPrompt || '').length;
                             const tone =

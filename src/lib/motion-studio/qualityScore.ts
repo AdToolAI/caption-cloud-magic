@@ -19,6 +19,8 @@ import type { AudioPlan, ComposerScene } from '@/types/video-composer';
 import type { DirectorLanguage } from './composeFinalPrompt';
 import { isBoilerplateAction } from './isBoilerplateAction';
 import { jaccardOverlap } from './composePromptLayers';
+import type { PerformanceEntry } from './buildPerformanceBlock';
+
 
 
 export type QualityAxis =
@@ -76,7 +78,9 @@ const T = {
       consistencyWarn: 'Detected mixed style cues (e.g. "noir" + "cinematic colorful") — pick one direction.',
       redundancyWarn: 'Cast actions repeat the scene action — tighten or delete duplicates so each line directs something specific.',
       boilerplateWarn: 'Auto-placeholder cast actions detected ("gesturing naturally, visible to camera") — they will be filtered from the final prompt; consider replacing them with concrete direction.',
+      performanceConflictWarn: 'A cast action already describes a gesture/expression that is also set in the Performance tab — pick one source so the model gets a single, unambiguous direction.',
     },
+
   },
 
   de: {
@@ -104,8 +108,10 @@ const T = {
       consistencyWarn: 'Gemischte Style-Cues entdeckt (z. B. "noir" + "cinematic colorful") — entscheide dich für eine Richtung.',
       redundancyWarn: 'Cast-Aktionen wiederholen die Scene-Action — präzisiere oder lösche Dubletten, damit jede Zeile etwas Eigenes lenkt.',
       boilerplateWarn: 'Auto-Platzhalter in Cast-Aktionen erkannt ("gestikuliert natürlich, sichtbar zur Kamera") — wird aus dem finalen Prompt gefiltert; ersetze sie für mehr Kontrolle.',
+      performanceConflictWarn: 'Eine Cast-Aktion beschreibt bereits eine Geste/Mimik, die auch im Performance-Tab gesetzt ist — wähle eine Quelle, damit das Modell eine eindeutige Anweisung erhält.',
 
     },
+
   },
   es: {
     subject: { pass: 'Reparto fijo', warn: 'Reparto vago', fail: 'Sin reparto' },
@@ -132,8 +138,10 @@ const T = {
       consistencyWarn: 'Cues de estilo mezclados detectados (p. ej. "noir" + "cinematic colorful") — elige una dirección.',
       redundancyWarn: 'Las acciones del reparto repiten la acción de la escena — afina o elimina duplicados para que cada línea aporte algo propio.',
       boilerplateWarn: 'Detectados placeholders automáticos en acciones del reparto ("gesticula con naturalidad, visible a cámara") — se filtrarán del prompt final; sustitúyelos por dirección concreta.',
+      performanceConflictWarn: 'Una acción del reparto ya describe un gesto/expresión que también está fijado en la pestaña Performance — elige una sola fuente para dar al modelo una dirección inequívoca.',
 
     },
+
   },
 } as const;
 
@@ -159,7 +167,10 @@ interface ScoreInputs {
   finalPrompt: string;
   negativePrompt: string;
   language?: DirectorLanguage;
+  /** Phase 3.2 — used to detect conflicts between CastActions and Performance layer. */
+  performanceEntries?: PerformanceEntry[];
 }
+
 
 function severityScore(s: Severity): number {
   return s === 'pass' ? 100 : s === 'warn' ? 60 : 0;
@@ -170,7 +181,9 @@ export function evaluateSceneQuality({
   finalPrompt,
   negativePrompt,
   language = 'en',
+  performanceEntries,
 }: ScoreInputs): QualityResult {
+
   const L = T[language] ?? T.en;
   const tips: Tip[] = [];
   const axes: Record<QualityAxis, Severity> = {
@@ -293,6 +306,48 @@ export function evaluateSceneQuality({
     }
   }
 
+  // 7c. PERFORMANCE CONFLICT — same gesture/expression set in both
+  // CastActions and the Performance tab. Single warning per scene.
+  if (performanceEntries && performanceEntries.length > 0 && castMatch) {
+    const namedCastLines = castMatch[1]
+      .split('\n')
+      .map((l) => {
+        const m = l.match(/^\s*-\s*([^:]+):\s*(.+)$/);
+        return m ? { name: m[1].trim().toLowerCase(), text: m[2].trim() } : null;
+      })
+      .filter(Boolean) as Array<{ name: string; text: string }>;
+
+    const GESTURE_RE: Record<string, RegExp> = {
+      'hand-on-chin': /\b(hand[- ]on[- ]chin|chin)\b/i,
+      'open-palms': /\bopen\s+palms|palms\s+(?:up|out|open)\b/i,
+      'point': /\bpoint(?:s|ing)?\b/i,
+      'cross-arms': /\b(?:cross(?:ed)?\s+arms|arms?\s+cross)/i,
+      'lean-in': /\blean(?:s|ing)?\s+in\b/i,
+    };
+    const EXPRESSION_RE: Record<string, RegExp> = {
+      'warm-smile': /\bsmil(?:e|es|ing)\b/i,
+      'concerned': /\b(?:concerned|worried)\b/i,
+      'curious': /\bcurious\b/i,
+      'confident': /\bconfident\b/i,
+      'surprised': /\bsurprised\b/i,
+    };
+
+    const hasConflict = performanceEntries.some((e) => {
+      if (!e?.name || !e.performance) return false;
+      const line = namedCastLines.find((c) => c.name === e.name.trim().toLowerCase());
+      if (!line) return false;
+      const g = e.performance.gesture;
+      if (g && GESTURE_RE[g]?.test(line.text)) return true;
+      const x = e.performance.expression;
+      if (x && EXPRESSION_RE[x]?.test(line.text)) return true;
+      return false;
+    });
+
+    if (hasConflict) {
+      if (axes.consistency === 'pass') axes.consistency = 'warn';
+      tips.push({ axis: 'consistency', severity: 'warn', label: L.consistency.warn, hint: L.hints.performanceConflictWarn });
+    }
+  }
 
 
   // Aggregate score
