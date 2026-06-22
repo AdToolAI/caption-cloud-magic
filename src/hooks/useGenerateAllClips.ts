@@ -347,6 +347,7 @@ export function useGenerateAllClips({
         variant: 'destructive',
       });
       emitPipelineEvent({ type: 'clips:end' });
+      emitStageEvent('take-failed', { source: 'generate-all' });
     } finally {
       // Do NOT emit clips:end on success — the server only STARTED rendering.
       // The pipeline bar stays alive via real `clipStatus === 'generating'`
