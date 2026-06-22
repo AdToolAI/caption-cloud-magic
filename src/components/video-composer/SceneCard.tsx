@@ -988,15 +988,39 @@ export default function SceneCard({
                 </div>
               </div>
 
-              {/* Duration slider */}
-              <Slider
-                value={[scene.durationSeconds]}
-                onValueChange={([v]) => onUpdate({ durationSeconds: v })}
-                min={3}
-                max={15}
-                step={1}
-                className="w-full"
-              />
+              {/* Duration slider — clamped by 10-min project budget */}
+              {(() => {
+                const MAX_PROJECT_SEC = 600;
+                const MIN_SCENE = 3;
+                const PROVIDER_MAX = 15;
+                const remaining = Math.max(0, MAX_PROJECT_SEC - siblingsDurationSec);
+                const sliderMax = Math.max(MIN_SCENE, Math.min(PROVIDER_MAX, remaining));
+                const budgetCapped = sliderMax < PROVIDER_MAX;
+                // Defensive: if persisted scene already exceeds the new cap, allow current
+                // value (so the slider can render) but show a warning.
+                const effectiveMax = Math.max(sliderMax, scene.durationSeconds);
+                return (
+                  <div className="space-y-1">
+                    <Slider
+                      value={[scene.durationSeconds]}
+                      onValueChange={([v]) =>
+                        onUpdate({ durationSeconds: Math.min(v, sliderMax) })
+                      }
+                      min={MIN_SCENE}
+                      max={effectiveMax}
+                      step={1}
+                      className="w-full"
+                    />
+                    {budgetCapped && (
+                      <p className="text-[10px] text-amber-300/80 leading-snug">
+                        Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
+                        Kürze oder lösche eine andere Szene, um mehr Zeit freizugeben.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
 
               {/* 🎬 Director Mode — Hybrid Production actions (only when source clip is ready) */}
               {onHybridExtend &&
