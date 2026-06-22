@@ -63,7 +63,7 @@ const ICONS: Record<SceneStudioTab, typeof Film> = {
 const TABS: SceneStudioTab[] = ['story', 'cast', 'performance', 'audio', 'look', 'advanced'];
 
 
-export default function SceneStudioTabBar({ cardId, language, className }: BarProps) {
+export default function SceneStudioTabBar({ cardId, language, className, badges }: BarProps) {
   const handleScroll = useCallback(
     (tab: SceneStudioTab) => {
       const root = document.getElementById(cardId);
@@ -87,6 +87,7 @@ export default function SceneStudioTabBar({ cardId, language, className }: BarPr
     >
       {TABS.map((tab) => {
         const Icon = ICONS[tab];
+        const count = badges?.[tab] ?? 0;
         return (
           <button
             key={tab}
@@ -101,12 +102,18 @@ export default function SceneStudioTabBar({ cardId, language, className }: BarPr
           >
             <Icon className="h-3 w-3" />
             {LABELS[language][tab]}
+            {count > 0 && (
+              <span className="ml-0.5 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-primary/20 text-primary text-[9px] font-semibold tabular-nums">
+                {count}
+              </span>
+            )}
           </button>
         );
       })}
     </div>
   );
 }
+
 
 interface SectionProps {
   tab: SceneStudioTab;
