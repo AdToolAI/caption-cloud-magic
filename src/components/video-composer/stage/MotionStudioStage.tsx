@@ -1,8 +1,10 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import DirectorBar from "./DirectorBar";
 import StageWelcomeMoment from "./StageWelcomeMoment";
 import CinemascopeOverlay from "./CinemascopeOverlay";
 import { useStageAudio } from "@/hooks/useStageAudio";
+import { subscribePipelineEvents } from "@/lib/pipelineEvents";
+import { emitStageEvent } from "@/lib/stage/stageEvents";
 
 /**
  * MotionStudioStage — the Sound Stage shell that wraps the entire Motion
