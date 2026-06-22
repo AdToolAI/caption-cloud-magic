@@ -217,6 +217,12 @@ interface SceneCardProps {
    * drops its own card chrome to avoid double borders.
    */
   embedded?: boolean;
+  /**
+   * Sum of `durationSeconds` of all OTHER scenes in the project. Used to
+   * clamp this scene's duration slider so the total project never exceeds
+   * the 10-minute hard budget (see `src/lib/composer/budget.ts`).
+   */
+  siblingsDurationSec?: number;
 }
 
 const SCENE_TYPES: SceneType[] = [
