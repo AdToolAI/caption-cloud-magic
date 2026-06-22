@@ -167,7 +167,10 @@ interface ScoreInputs {
   finalPrompt: string;
   negativePrompt: string;
   language?: DirectorLanguage;
+  /** Phase 3.2 — used to detect conflicts between CastActions and Performance layer. */
+  performanceEntries?: PerformanceEntry[];
 }
+
 
 function severityScore(s: Severity): number {
   return s === 'pass' ? 100 : s === 'warn' ? 60 : 0;
