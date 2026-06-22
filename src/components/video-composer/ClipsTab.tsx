@@ -25,7 +25,8 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } fr
 import { recommendEngineForScene, countSpeakers } from '@/lib/video-composer/sceneEngineRouter';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
-import { composeFinalPrompt, type DirectorLanguage } from '@/lib/motion-studio/composeFinalPrompt';
+import { composeFinalPrompt, type DirectorLanguage } from "@/lib/motion-studio/composeFinalPrompt";
+import { derivePerformanceEntries } from "@/lib/motion-studio/buildPerformanceBlock";
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
