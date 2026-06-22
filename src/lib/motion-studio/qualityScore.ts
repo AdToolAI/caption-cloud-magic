@@ -306,6 +306,48 @@ export function evaluateSceneQuality({
     }
   }
 
+  // 7c. PERFORMANCE CONFLICT — same gesture/expression set in both
+  // CastActions and the Performance tab. Single warning per scene.
+  if (performanceEntries && performanceEntries.length > 0 && castMatch) {
+    const namedCastLines = castMatch[1]
+      .split('\n')
+      .map((l) => {
+        const m = l.match(/^\s*-\s*([^:]+):\s*(.+)$/);
+        return m ? { name: m[1].trim().toLowerCase(), text: m[2].trim() } : null;
+      })
+      .filter(Boolean) as Array<{ name: string; text: string }>;
+
+    const GESTURE_RE: Record<string, RegExp> = {
+      'hand-on-chin': /\b(hand[- ]on[- ]chin|chin)\b/i,
+      'open-palms': /\bopen\s+palms|palms\s+(?:up|out|open)\b/i,
+      'point': /\bpoint(?:s|ing)?\b/i,
+      'cross-arms': /\b(?:cross(?:ed)?\s+arms|arms?\s+cross)/i,
+      'lean-in': /\blean(?:s|ing)?\s+in\b/i,
+    };
+    const EXPRESSION_RE: Record<string, RegExp> = {
+      'warm-smile': /\bsmil(?:e|es|ing)\b/i,
+      'concerned': /\b(?:concerned|worried)\b/i,
+      'curious': /\bcurious\b/i,
+      'confident': /\bconfident\b/i,
+      'surprised': /\bsurprised\b/i,
+    };
+
+    const hasConflict = performanceEntries.some((e) => {
+      if (!e?.name || !e.performance) return false;
+      const line = namedCastLines.find((c) => c.name === e.name.trim().toLowerCase());
+      if (!line) return false;
+      const g = e.performance.gesture;
+      if (g && GESTURE_RE[g]?.test(line.text)) return true;
+      const x = e.performance.expression;
+      if (x && EXPRESSION_RE[x]?.test(line.text)) return true;
+      return false;
+    });
+
+    if (hasConflict) {
+      if (axes.consistency === 'pass') axes.consistency = 'warn';
+      tips.push({ axis: 'consistency', severity: 'warn', label: L.consistency.warn, hint: L.hints.performanceConflictWarn });
+    }
+  }
 
 
   // Aggregate score
