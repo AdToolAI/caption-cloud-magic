@@ -662,21 +662,38 @@ serve(async (req) => {
     // duplicate Sync.so jobs that never match the latest passes[] state and
     // burn provider credits. `withDialogLock` falls back to "no lock" on
     // contention which is exactly what we must avoid here.
+    //
+    // v168 Phase 2 — Per-Pass-Lock. When FEATURE_PER_PASS_LOCK=true, the lock
+    // is partitioned by (scene_id, pass_idx) so up to N parallel passes for
+    // the same scene can each dispatch concurrently. When OFF, pass_idx
+    // defaults to 0 → exact legacy single-flight-per-scene semantics.
+    // Initial dispatch from the client has no body.pass_idx → 0.
+    // Self-invoke / webhook advance calls carry pass_idx in body.
     {
+      const perPassLockEnabled = (Deno.env.get("FEATURE_PER_PASS_LOCK") ?? "false")
+        .toLowerCase() === "true";
+      const bodyPassIdx = Number(body?.pass_idx);
+      const earlyPassIdx = perPassLockEnabled && Number.isFinite(bodyPassIdx) && bodyPassIdx >= 0
+        ? Math.floor(bodyPassIdx)
+        : 0;
       const holder = `compose-dialog-segments-${crypto.randomUUID()}`;
       const { data: acquired, error: lockErr } = await supabase.rpc(
         "try_acquire_dialog_lock",
-        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 90 },
+        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 90, _pass_idx: earlyPassIdx },
       );
       if (lockErr) {
-        console.warn(`[compose-dialog-segments] scene=${sceneId} lock rpc error: ${lockErr.message} — proceeding without lock`);
+        console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${earlyPassIdx} lock rpc error: ${lockErr.message} — proceeding without lock`);
       } else if (acquired !== true) {
-        console.warn(`[compose-dialog-segments] scene=${sceneId} BUSY — another dispatcher holds the lock; skipping`);
-        return json({ ok: true, status: "scene_lock_busy", scene_id: sceneId }, 202);
+        console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${earlyPassIdx} BUSY — another dispatcher holds the (scene,pass) lock; skipping`);
+        return json({ ok: true, status: "scene_lock_busy", scene_id: sceneId, pass_idx: earlyPassIdx }, 202);
       } else {
         lockSupabase = supabase;
         lockSceneId = sceneId;
         lockHolder = holder;
+        lockPassIdx = earlyPassIdx;
+        if (perPassLockEnabled) {
+          console.log(`[compose-dialog-segments] scene=${sceneId} v168_per_pass_lock ACQUIRED pass=${earlyPassIdx}`);
+        }
       }
     }
 
