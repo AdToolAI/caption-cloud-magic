@@ -70,6 +70,15 @@ interface StoryboardTabProps {
   /** True while the AI is generating the initial storyboard from the
    *  briefing. Shows a loading panel instead of the empty-state. */
   isGeneratingStoryboard?: boolean;
+  /** Last storyboard-generation failure (from BriefingTab). When set and
+   *  scenes are empty, the Storyboard tab renders an error panel with a
+   *  retry button instead of the "no scenes" empty state. */
+  storyboardError?: { message: string; retryable?: boolean } | null;
+  /** Re-invokes the storyboard generation pipeline with the current briefing. */
+  onRetryStoryboard?: () => void;
+  /** Switches the parent dashboard back to the Briefing tab so the user
+   *  can adjust their inputs. */
+  onBackToBriefing?: () => void;
 }
 
 export default function StoryboardTab({
