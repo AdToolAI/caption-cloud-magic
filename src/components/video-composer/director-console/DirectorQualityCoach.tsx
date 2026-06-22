@@ -14,6 +14,7 @@ import {
   type DirectorLanguage,
 } from '@/lib/motion-studio/composeFinalPrompt';
 import { evaluateSceneQuality, type Severity } from '@/lib/motion-studio/qualityScore';
+import { derivePerformanceEntries } from '@/lib/motion-studio/buildPerformanceBlock';
 import type { ComposerScene } from '@/types/video-composer';
 
 interface Props {
@@ -28,10 +29,14 @@ interface Props {
     | 'dialogScript'
     | 'characterShot'
     | 'characterShots'
+    | 'performance'
   >;
+  /** Project cast — used to derive the [4 PERFORMANCE] block for preview/score. */
+  characters?: Array<{ id: string; name: string }>;
   language?: DirectorLanguage;
   className?: string;
 }
+
 
 const TONE: Record<Severity, { ring: string; chip: string; icon: string }> = {
   pass: {
