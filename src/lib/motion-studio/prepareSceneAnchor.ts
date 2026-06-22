@@ -184,7 +184,47 @@ export async function prepareSceneAnchor(
   // first-frame-composed (single OR multi). Multi always lands here because
   // the resolver upgrades the strategy when >1 anchor is present.
   try {
-    const portraitUrls = anchors.map((a) => a.referenceImageUrl);
+    // Outfit lookup — when a cast slot has `outfitLookId`, replace the
+    // bare portrait with the saved outfit cover (e.g. Roman armor) so the
+    // composed first frame shows the user-picked wardrobe. The bare
+    // portrait is kept as `identityPortraitUrls` so face-lock still works.
+    const rawSlots = (scene.characterShots && scene.characterShots.length > 0)
+      ? scene.characterShots
+      : (scene.characterShot ? [scene.characterShot] : []);
+    const outfitIds = rawSlots
+      .map((s) => (s as any)?.outfitLookId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const outfitUrlById = new Map<string, string>();
+    const characterIdToOutfitUrl = new Map<string, string>();
+    if (outfitIds.length > 0) {
+      try {
+        const { data: rows } = await supabase
+          .from('avatar_outfit_looks')
+          .select('id, cover_url, front_url')
+          .in('id', outfitIds);
+        for (const row of rows ?? []) {
+          const url = (row as any).cover_url || (row as any).front_url;
+          if (typeof url === 'string' && url.length > 0) {
+            outfitUrlById.set(String((row as any).id), url);
+          }
+        }
+        for (const s of rawSlots) {
+          const oid = (s as any)?.outfitLookId as string | undefined;
+          const url = oid ? outfitUrlById.get(oid) : undefined;
+          if (s?.characterId && url) characterIdToOutfitUrl.set(s.characterId, url);
+        }
+      } catch (e) {
+        console.warn('[prepareSceneAnchor] outfit lookup failed', e);
+      }
+    }
+    const portraitUrls = anchors.map((a) =>
+      characterIdToOutfitUrl.get(a.characterId) || a.referenceImageUrl,
+    );
+    const identityPortraitUrls = anchors.map((a) => a.referenceImageUrl);
+    const wardrobeLockNames = anchors
+      .filter((a) => characterIdToOutfitUrl.has(a.characterId))
+      .map((a) => a.name)
+      .filter((n): n is string => typeof n === 'string' && n.length > 0);
     const locationUrls = worldRefs.filter((w) => w.kind === 'location').map((w) => w.url);
     const locationNames = worldRefs.filter((w) => w.kind === 'location').map((w) => w.name);
     const buildingUrls = worldRefs.filter((w) => w.kind === 'building').map((w) => w.url);
@@ -199,6 +239,7 @@ export async function prepareSceneAnchor(
         sceneId: scene.id,
         portraitUrl: portraitUrls[0],
         portraitUrls,
+        identityPortraitUrls,
         characterNames: anchors.map((a) => a.name),
         scenePrompt: scenePromptForCompose,
         aspectRatio,
@@ -209,6 +250,8 @@ export async function prepareSceneAnchor(
         buildingNames,
         propUrls,
         propNames,
+        wardrobeLock: wardrobeLockNames.length > 0,
+        wardrobeLockNames,
       },
     });
     const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
