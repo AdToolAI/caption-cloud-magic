@@ -102,3 +102,30 @@ export function buildPerformanceBlock(entries: PerformanceEntry[]): string {
 export function countDirectedPerformances(entries: PerformanceEntry[]): number {
   return (entries ?? []).filter((e) => !isEmpty(e.performance)).length;
 }
+
+/**
+ * Derive `PerformanceEntry[]` from a ComposerScene + the project's characters
+ * array. Filters to characters who are actually cast in the scene (so an
+ * abandoned performance entry for a dropped cast member doesn't leak into
+ * the prompt).
+ */
+export function derivePerformanceEntries(
+  scene: {
+    performance?: Record<string, import('@/types/video-composer').ScenePerformance>;
+    characterShots?: Array<{ characterId?: string; shotType?: string }>;
+    characterShot?: { characterId?: string; shotType?: string };
+  },
+  characters: Array<{ id: string; name: string }> | undefined,
+): PerformanceEntry[] {
+  if (!scene.performance || !characters?.length) return [];
+  const shots = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+  const activeIds = new Set(
+    shots
+      .filter((s) => s && s.shotType && s.shotType !== 'absent')
+      .map((s) => s.characterId)
+      .filter(Boolean) as string[],
+  );
+  return characters
+    .filter((c) => activeIds.has(c.id))
+    .map((c) => ({ name: c.name, performance: scene.performance![c.id] }));
+}
