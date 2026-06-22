@@ -450,7 +450,7 @@ serve(async (req) => {
       );
     }
     console.log(
-      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} elapsedMs=${Date.now() - t0}`,
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} wardrobeLock=${body.wardrobeLock ? 1 : 0}${body.wardrobeLock && body.wardrobeLockNames?.length ? `(${body.wardrobeLockNames.join("/")})` : ""} elapsedMs=${Date.now() - t0}`,
     );
 
     const aiJson = await aiResp.json();
