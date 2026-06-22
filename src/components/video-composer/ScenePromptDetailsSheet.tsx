@@ -112,8 +112,10 @@ export default function ScenePromptDetailsSheet({
   brandCharacterInput,
   libCharacters,
   libLocations,
+  characters,
   onOpenCompareLab,
 }: Props) {
+
   const [layersOpen, setLayersOpen] = useState(false);
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
   const L = t[language];
