@@ -2986,8 +2986,17 @@ serve(async (req) => {
         currentPassIdx = pendingIdx >= 0 ? pendingIdx : prevState.current_pass;
       }
       if (!passes[currentPassIdx]) {
-        console.warn(`[compose-dialog-segments] scene=${sceneId} advance but no pass at idx=${currentPassIdx}`);
-        return json({ ok: true, skipped: "no_pass_at_cursor" }, 200);
+        console.warn(`[compose-dialog-segments] scene=${sceneId} v170_advance_missing_slot idx=${currentPassIdx} have=${passes.length} total_passes=${(prevState as any)?.total_passes ?? "?"} — sibling skeleton was never seeded`);
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-segments",
+            sync_status: "ADVANCE_MISSING_SLOT",
+            error_class: "pass_skeleton_missing",
+            error_message: `advance pass_idx=${currentPassIdx} but passes.length=${passes.length}`,
+            meta: { pass_idx: currentPassIdx, have: passes.length, total_passes: (prevState as any)?.total_passes ?? null },
+          });
+        } catch { /* best-effort */ }
+        return json({ ok: true, skipped: "no_pass_at_cursor", pass_idx: currentPassIdx, have: passes.length }, 200);
       }
       if (passes[currentPassIdx].status === "done" || passes[currentPassIdx].status === "rendering") {
         return json({ ok: true, skipped: `pass_${currentPassIdx}_already_${passes[currentPassIdx].status}` }, 200);
