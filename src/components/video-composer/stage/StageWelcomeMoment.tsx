@@ -20,7 +20,7 @@ const SESSION_KEY = "motion-studio:welcomed-this-session";
  * - prefers-reduced-motion collapses to a 400ms fade.
  */
 export default function StageWelcomeMoment() {
-  const [phase, setPhase] = useState<"hidden" | "playing" | "iris" | "done">("hidden");
+  const [phase, setPhase] = useState<"hidden" | "playing" | "countdown" | "iris" | "done">("hidden");
   const [skipped, setSkipped] = useState(false);
 
   const reducedMotion = useMemo(
@@ -45,13 +45,13 @@ export default function StageWelcomeMoment() {
 
     const timers: number[] = [];
     timers.push(window.setTimeout(() => emitStageEvent("action"), 1000));
-    timers.push(window.setTimeout(() => setPhase("iris"), 3200));
-    timers.push(window.setTimeout(() => setPhase("done"), 3800));
+    // Welcome beats finish ~3.2s; let tagline settle, then roll into countdown.
+    timers.push(window.setTimeout(() => setPhase("countdown"), 3400));
     return () => timers.forEach((id) => window.clearTimeout(id));
   }, [reducedMotion]);
 
   useEffect(() => {
-    if (phase !== "playing" && phase !== "iris") return;
+    if (phase === "hidden" || phase === "done") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleSkip();
     };
@@ -66,6 +66,12 @@ export default function StageWelcomeMoment() {
     setPhase("iris");
     window.setTimeout(() => setPhase("done"), 500);
   };
+
+  const handleCountdownComplete = useCallback(() => {
+    setPhase("iris");
+    window.setTimeout(() => setPhase("done"), 600);
+  }, []);
+
 
   if (phase === "done" || phase === "hidden") return null;
 
