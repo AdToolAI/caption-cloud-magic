@@ -227,6 +227,10 @@ export default function BriefingTab({
   onUpdateScenes,
 }: BriefingTabProps) {
   const { t } = useTranslation();
+  const { prefs } = useStudioPreferences();
+  const editorMode = prefs.editorMode; // 'quick' | 'direct' | 'studio'
+  const showDirect = editorMode !== 'quick';
+  const showStudio = editorMode === 'studio';
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
