@@ -989,6 +989,8 @@ export default function BriefingTab({
           )}
         </button>
       </div>
+      </div>
     </div>
   );
 }
+
