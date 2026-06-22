@@ -387,3 +387,9 @@
   }
 
 }
+
+/* Motion Studio Sound Stage — global keyframes */
+@keyframes stageSpotlightBreath {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.06); }
+}
