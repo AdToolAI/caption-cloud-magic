@@ -231,6 +231,7 @@ export default function BriefingTab({
   onApplyAssembly,
   scenes,
   onUpdateScenes,
+  retryStoryboardNonce = 0,
 }: BriefingTabProps) {
   const { t } = useTranslation();
   const { prefs } = useStudioPreferences();
