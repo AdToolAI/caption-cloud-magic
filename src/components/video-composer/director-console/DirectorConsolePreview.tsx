@@ -23,6 +23,7 @@ import {
   formatAudioPlan,
   type DirectorLanguage,
 } from '@/lib/motion-studio/composeFinalPrompt';
+import { derivePerformanceEntries } from '@/lib/motion-studio/buildPerformanceBlock';
 import type { ComposerScene, AudioPlan } from '@/types/video-composer';
 
 interface DirectorConsolePreviewProps {
@@ -34,10 +35,16 @@ interface DirectorConsolePreviewProps {
     | 'cinematicPresetSlug'
     | 'audioPlan'
     | 'dialogLockedAt'
+    | 'characterShot'
+    | 'characterShots'
+    | 'performance'
   >;
+  /** Optional — used to render the [4 PERFORMANCE] block in the preview. */
+  characters?: Array<{ id: string; name: string }>;
   language?: DirectorLanguage;
   className?: string;
 }
+
 
 const LAYER_COLORS: Record<string, string> = {
   '[1 SUBJECT]': 'text-amber-300',
