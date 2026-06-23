@@ -154,6 +154,7 @@ import {
   recommendEngineForScene,
   estimateHeygenCostEur,
 } from "@/lib/video-composer/sceneEngineRouter";
+import { validateSceneForCinematicSync } from "@/lib/video-composer/validateSceneForCinematicSync";
 import {
   AlertDialog,
   AlertDialogAction,
