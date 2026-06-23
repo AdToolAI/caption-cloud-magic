@@ -309,6 +309,21 @@ export default function ProductionPlanSheet({
 
               {/* Szenen */}
               <SectionCard title={`Szenen (${plan.scenes.length})`}>
+                {plan.scenes.length === 0 ? (
+                  <div className="rounded border border-amber-300/40 bg-amber-300/[0.05] p-4 text-xs space-y-2">
+                    <div className="font-medium text-amber-300 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> Briefing zu dünn — keine Szenen geplant
+                    </div>
+                    <div className="text-muted-foreground">
+                      Bitte zurück zum Briefing gehen und mindestens Produktname + 1–2 USPs oder
+                      eine Szenenbeschreibung ergänzen. Optional ein oder mehrere Charaktere im
+                      Briefing auswählen — die KI plant dann automatisch ein vollständiges Drehbuch.
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
+                      Zurück zu Briefing
+                    </Button>
+                  </div>
+                ) : (
                 <div className="space-y-3">
                   {plan.scenes.map((s) => (
                     <div key={s.index} className="rounded border border-border/40 p-3 space-y-2 text-xs">
@@ -327,6 +342,29 @@ export default function ProductionPlanSheet({
                       {s.voiceover?.text && (
                         <div className="italic text-muted-foreground">
                           "{s.voiceover.text.slice(0, 200)}{s.voiceover.text.length > 200 ? '…' : ''}"
+                        </div>
+                      )}
+
+                      {/* Director's vision — anchor prompt (the scene itself) */}
+                      {s.anchorPromptEN && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Szene (Director's Vision)</Label>
+                          <div className="rounded border border-amber-300/20 bg-amber-300/[0.03] p-2 text-[11px] text-foreground/90">
+                            {s.anchorPromptEN}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Performance: Mimik / Gestik / Blick / Energy */}
+                      {s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick || s.performance.energy) && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Performance</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {s.performance.mimik && <Badge variant="outline" className="text-[10px]">Mimik: {s.performance.mimik}</Badge>}
+                            {s.performance.gestik && <Badge variant="outline" className="text-[10px]">Gestik: {s.performance.gestik}</Badge>}
+                            {s.performance.blick && <Badge variant="outline" className="text-[10px]">Blick: {s.performance.blick}</Badge>}
+                            {s.performance.energy != null && <Badge variant="outline" className="text-[10px]">Energy: {s.performance.energy}/5</Badge>}
+                          </div>
                         </div>
                       )}
 
