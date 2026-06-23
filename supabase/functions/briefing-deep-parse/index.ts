@@ -378,7 +378,7 @@ function clamp(n: any, min: number, max: number, fallback: number): number {
 }
 function stripUndef<T extends Record<string, any>>(o: T): T {
   for (const k of Object.keys(o)) {
-    if (o[k] === undefined || o[k] === null || o[k] === '') delete o[k];
+    if (o[k] === undefined) delete o[k];
   }
   return o;
 }
@@ -395,9 +395,9 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       return stripUndef({
         mentionKey: c.mentionKey,
         outfit: c.outfit ?? rCast?.outfit,
-        characterId: rCast?.characterId ?? null,
+        characterId: typeof rCast?.characterId === 'string' ? rCast.characterId : null,
         characterName: rCast?.characterName ?? String(c.mentionKey ?? '').replace(/^@/, ''),
-        voiceId: rCast?.voiceId ?? null,
+        voiceId: typeof rCast?.voiceId === 'string' ? rCast.voiceId : null,
         voiceName: rCast?.voiceName,
         referenceImageUrl: null,
       });
@@ -406,10 +406,11 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       const r2 = r?.location;
       return stripUndef({
         mentionKey: s.location.mentionKey,
-        locationId: r2?.locationId ?? null,
+        locationId: typeof r2?.locationId === 'string' ? r2.locationId : null,
         locationName: r2?.locationName ?? String(s.location.mentionKey ?? '').replace(/^@/, ''),
       });
     })() : undefined;
+
 
     const engine = normalizeEngine(s.engine);
     const durationSec = clamp(s.durationSec, 1, 60, 5);
