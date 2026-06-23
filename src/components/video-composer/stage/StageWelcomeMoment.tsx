@@ -3,7 +3,42 @@ import { emitStageEvent } from "@/lib/stage/stageEvents";
 import { isPageReload } from "@/lib/composer/isPageReload";
 import StageCountdown from "./StageCountdown";
 
-const SESSION_KEY = "motion-studio:welcomed-this-session";
+const TRIGGER_KEY = "motion-studio:intro-trigger";
+const LAST_DATE_KEY = "motion-studio:intro-last-date";
+
+function todayKey() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function shouldPlayIntro(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const trigger = window.sessionStorage.getItem(TRIGGER_KEY);
+    if (trigger !== "1") return false;
+    const last = window.localStorage.getItem(LAST_DATE_KEY);
+    if (last === todayKey()) {
+      // Already played today — consume trigger and skip.
+      window.sessionStorage.removeItem(TRIGGER_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function markIntroPlayed() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_DATE_KEY, todayKey());
+    window.sessionStorage.removeItem(TRIGGER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
  * Cinematic welcome sequence (~3.8s). 5 beats:
