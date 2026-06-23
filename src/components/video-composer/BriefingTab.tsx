@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ShoppingBag, Building2, BookOpen, Palette,
-  Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp, FileText,
+  Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp,
 } from 'lucide-react';
 // ProductionPlanSheet is now mounted at dashboard level (see VideoComposerDashboard).
 import { toast } from '@/hooks/use-toast';
