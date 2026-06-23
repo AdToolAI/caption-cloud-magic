@@ -46,6 +46,7 @@ function resolveCastMention(
   return {
     characterId: hit.id,
     characterName: hit.name,
+    shotType: 'full',
     referenceImageUrl: hit.reference_image_url ?? undefined,
   } as CharacterShot;
 }
