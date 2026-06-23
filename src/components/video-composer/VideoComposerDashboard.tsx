@@ -61,6 +61,9 @@ import { ComposerHistoryContext } from './ComposerHistoryContext';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 import { isPageReload } from '@/lib/composer/isPageReload';
+import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
+import ProductionWarRoom from './storyboard/ProductionWarRoom';
+import ProductionPlanSheet from './briefing/ProductionPlanSheet';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 
