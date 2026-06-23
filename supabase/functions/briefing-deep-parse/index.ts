@@ -105,6 +105,52 @@ const TOOL_PASS_A = {
                   energy: { type: 'integer' },
                 },
               },
+              brollHints: {
+                type: 'array',
+                description: 'Stock-footage keywords for B-Roll search (max 12, English).',
+                items: { type: 'string' },
+              },
+              brandAnchor: {
+                type: 'object',
+                description: 'Brand-Kit anchors: logo endcard, color/font override, note.',
+                properties: {
+                  logoEndcard: { type: 'boolean' },
+                  primaryColorOverride: { type: 'string' },
+                  accentColorOverride: { type: 'string' },
+                  fontOverride: { type: 'string' },
+                  note: { type: 'string' },
+                },
+              },
+              negativePromptScene: {
+                type: 'string',
+                description: 'Per-scene negative prompt, IN ADDITION to the global one.',
+              },
+              continuityHint: {
+                type: 'string',
+                description: 'Continuity hint, e.g. "same position as S01", "match wardrobe S02".',
+              },
+              musicCue: {
+                type: 'object',
+                properties: {
+                  energy: { type: 'string', enum: ['low','mid','high','drop','silent'] },
+                  marker: { type: 'string' },
+                  note: { type: 'string' },
+                },
+              },
+              dialogTurns: {
+                type: 'array',
+                description: 'Explicit dialog turns for cinematic-sync / native-dialogue scenes. Speaker mention keys keep the leading "@".',
+                items: {
+                  type: 'object',
+                  properties: {
+                    speakerMentionKey: { type: 'string' },
+                    text: { type: 'string' },
+                    mood: { type: 'string' },
+                    delivery: { type: 'string' },
+                  },
+                  required: ['speakerMentionKey', 'text'],
+                },
+              },
             },
             required: ['index', 'durationSec'],
           },
@@ -162,6 +208,12 @@ Rules:
 - Voice IDs like "JBFqnCBsd6RMkjVDRZzb" go into voice.voiceId; names like "George" into voice.voiceName.
 - Mentions keep the leading "@" verbatim (e.g. "@founder-avatar", "@home-office") — the resolver maps them to DB IDs later.
 - For VO timecodes prefer timecodeStartSec / timecodeEndSec in seconds.
+- brollHints: only when the briefing names stock-footage cues (e.g. "Pexels: city skyline", "B-Roll: laptop close-up"). 1–6 short English keywords per scene.
+- brandAnchor: extract logo-endcard mentions, scene-specific brand color/font overrides. Leave undefined when the briefing doesn't mention it.
+- negativePromptScene: only when the briefing names a negative prompt specifically for ONE scene; otherwise leave undefined and rely on the global negativePrompt.
+- continuityHint: capture phrases like "gleiche Position wie S01", "match wardrobe Szene 2", "selber Hintergrund".
+- musicCue: capture music energy markers ("drop here", "silence", "low-energy bed", "high-energy push").
+- dialogTurns: for cinematic-sync / native-dialogue / sync-* / heygen scenes with multiple lines, emit one turn per speaker line. Detect speakers from "NAME:", "[NAME]:", "NAME — MOOD:" or labelled bullets. Use the @mention key when one was declared earlier in the briefing (e.g. "@founder-avatar"), otherwise the bare uppercased name.
 - DO NOT invent fields the briefing does not state. Leave optional fields undefined.`;
 
 // ── Pass B — Resolution & validation ─────────────────────────────────────────

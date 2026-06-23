@@ -89,6 +89,35 @@ export const PlanScene = z.object({
     blick: z.string().max(120).optional(),
     energy: z.number().int().min(1).max(5).optional(),
   }).optional(),
+
+  // ── Stage-2 schema extensions ────────────────────────────────────────────
+  /** Stock-footage keywords for B-Roll search (Pexels/Pixabay). */
+  brollHints: z.array(z.string().max(80)).max(12).optional(),
+  /** Brand-Kit anchors for this scene (logo endcard, color override, etc.). */
+  brandAnchor: z.object({
+    logoEndcard: z.boolean().optional(),
+    primaryColorOverride: z.string().max(16).optional(),
+    accentColorOverride: z.string().max(16).optional(),
+    fontOverride: z.string().max(80).optional(),
+    note: z.string().max(240).optional(),
+  }).optional(),
+  /** Negative prompt scoped to this scene (in addition to the global one). */
+  negativePromptScene: z.string().max(1000).optional(),
+  /** Continuity hint, e.g. "same position as S01", "match wardrobe S02". */
+  continuityHint: z.string().max(240).optional(),
+  /** Music cue marker for this scene. */
+  musicCue: z.object({
+    energy: z.enum(['low', 'mid', 'high', 'drop', 'silent']).optional(),
+    marker: z.string().max(80).optional(),
+    note: z.string().max(240).optional(),
+  }).optional(),
+  /** Explicit per-turn dialog (used by cinematic-sync / native-dialogue). */
+  dialogTurns: z.array(z.object({
+    speakerMentionKey: z.string().max(80),
+    text: z.string().max(1000),
+    mood: z.string().max(80).optional(),
+    delivery: z.string().max(240).optional(),
+  })).max(20).optional(),
 });
 
 export const PlanVoice = z.object({
