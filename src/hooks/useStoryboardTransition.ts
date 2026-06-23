@@ -17,7 +17,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
+import { ProductionPlan, PlanScene, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 import { toast } from '@/hooks/use-toast';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
 
