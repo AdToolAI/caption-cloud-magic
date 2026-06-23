@@ -241,6 +241,7 @@ export default function BriefingTab({
   const showStudio = editorMode === 'studio';
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [briefingImportOpen, setBriefingImportOpen] = useState(false);
 
   const TIPS_KEY = 'video-composer-briefing-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
