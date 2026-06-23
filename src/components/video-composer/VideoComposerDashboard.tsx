@@ -1595,7 +1595,7 @@ export default function VideoComposerDashboard() {
               language={project.language}
               onUpdateBriefing={updateBriefing}
               onUpdateProject={updateProject}
-              onGoToStoryboard={() => setActiveTab('storyboard')}
+              onGoToStoryboard={() => handleTabChange('storyboard')}
               onScenesGenerated={(scenes) => {
                 setStoryboardError(null);
                 setScenes(scenes);
