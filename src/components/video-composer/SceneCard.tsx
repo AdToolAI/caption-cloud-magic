@@ -154,6 +154,7 @@ import {
   recommendEngineForScene,
   estimateHeygenCostEur,
 } from "@/lib/video-composer/sceneEngineRouter";
+import { validateSceneForCinematicSync } from "@/lib/video-composer/validateSceneForCinematicSync";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -914,6 +915,27 @@ export default function SceneCard({
                           </SelectContent>
                         </Select>
                         {/* Cinematic-Sync quick-switch lives in ClipsTab as a prominent action button — kept out of here to avoid duplication. */}
+                        {(() => {
+                          const warns = validateSceneForCinematicSync(scene);
+                          if (warns.length === 0) return null;
+                          return (
+                            <div className="basis-full mt-1 flex flex-col gap-0.5">
+                              {warns.map((w) => (
+                                <span
+                                  key={w.code}
+                                  className={`text-[9px] leading-tight px-1.5 py-0.5 rounded ${
+                                    w.level === "warning"
+                                      ? "bg-amber-500/10 text-amber-200 border border-amber-500/30"
+                                      : "bg-sky-500/10 text-sky-200 border border-sky-500/30"
+                                  }`}
+                                  title="Hinweis vor dem Render — der Server fängt diese Fälle automatisch ab."
+                                >
+                                  {w.level === "warning" ? "⚠️" : "ℹ️"} {w.message}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </>
                     );
                   })()}

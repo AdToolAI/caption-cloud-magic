@@ -997,27 +997,48 @@ serve(async (req) => {
       // for cinematic-sync two-shot dialog. Force-migrate any cinematic-sync
       // scene with ≥2 distinct speakers to ai-hailuo (Tier-B fallback). The UI
       // shows a warning badge separately; this guard makes the block defensive.
+      //
+      // June 2026 hardening: also cover engineOverride === 'sync-segments'
+      // (the new Fast Dialog default) and use a robust speaker/dialog detector
+      // that survives the Production-Plan `NAME — MOOD:` format. The old
+      // regex only matched `NAME:` / `[NAME]:` and silently returned 0
+      // speakers for "SAMUEL DUSATKO — CASUAL: …", which let HappyHorse run
+      // into the missing-anchor hard-fail. Triggering on any of
+      // {speakers>=1, dialogScript present, cast present} is safe because
+      // the migration target (Hailuo) handles all three cases cleanly.
+      const __engineForHHGuard = scene.engineOverride ?? "auto";
       if (
         (scene.clipSource as string) === "ai-happyhorse" &&
-        (scene.engineOverride ?? "auto") === "cinematic-sync"
+        (__engineForHHGuard === "cinematic-sync" ||
+          __engineForHHGuard === "sync-segments")
       ) {
-        const dlg = String((scene as any).dialogScript ?? "");
+        const dlg = String((scene as any).dialogScript ?? "").trim();
+        // Robust speaker matcher: tolerate optional `[NAME]`, optional
+        // `— MOOD` / `- mood` / `(beat)` trailing tag, and require a
+        // colon (ASCII or full-width).
+        const SPEAKER_LINE_RE =
+          /^\s*\[?\s*([A-Za-zÀ-ÿ][\w\s.'-]{0,60}?)\s*\]?\s*(?:[—\-–]\s*[^:：]{0,40})?\s*[:：]/;
         const speakerNames = new Set(
           dlg
             .split(/\r?\n/)
-            .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{0,40}?)\]?\s*[:：]/))
+            .map((l) => l.match(SPEAKER_LINE_RE))
             .filter((m): m is RegExpMatchArray => !!m)
             .map((m) => m[1].trim().toLowerCase()),
         );
-        // Stage 7 (May 31 2026): also migrate the SINGLE-speaker path. The
-        // happyhorse_cinematic_sync_missing_anchor failure mode and the
-        // recurring `auto-reset: talking_head_master_invalid_for_cinematic_sync`
-        // loop both manifest only when HappyHorse is the master plate for a
-        // 1-speaker cinematic-sync scene. Hailuo i2v is the stable default
-        // here. The 2+ speaker pipeline keeps its existing migration.
-        if (speakerNames.size >= 1) {
+        const castCount = Array.isArray((scene as any).characterShots)
+          ? (scene as any).characterShots.filter(
+              (cs: any) => cs && cs.shotType !== "absent" && (cs.characterId || cs.name),
+            ).length
+          : ((scene as any).characterShot && (scene as any).characterShot.shotType !== "absent")
+            ? 1
+            : 0;
+        // Stage 7 (May 31 2026) + June 2026: migrate whenever there is *any*
+        // dialog or cast signal — not just a parseable [NAME]: line.
+        const shouldMigrate =
+          speakerNames.size >= 1 || dlg.length > 0 || castCount >= 1;
+        if (shouldMigrate) {
           console.warn(
-            `[compose-video-clips] Scene ${scene.id}: HappyHorse + cinematic-sync + ${speakerNames.size} speaker(s) — migrating to ai-hailuo for stable master-plate generation.`,
+            `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} (speakers=${speakerNames.size}, dialogLen=${dlg.length}, cast=${castCount}) — migrating to ai-hailuo for stable master-plate generation.`,
           );
           scene.clipSource = "ai-hailuo";
           await supabaseAdmin
@@ -2893,27 +2914,35 @@ serve(async (req) => {
           const isCinematicSyncHH =
             (scene.engineOverride ?? "auto") === "cinematic-sync";
 
-          // STAGE 4 (May 30 2026): Cinematic-Sync + HappyHorse must NEVER
-          // start without a freshly composed scene-anchor as I2V reference —
-          // otherwise HappyHorse invents the scene from text and v5 lip-sync
-          // ends up on a raw avatar bust. The cinematic-sync prep block above
-          // already composes an anchor for any scene with >=1 resolvable
-          // speaker portrait. If we still land here without isI2V it means
-          // Nano Banana 2 returned no URL — fail the scene with a clear
-          // user-facing error instead of silently dispatching a stranger.
+          // STAGE 4 (May 30 2026) + June 2026 soft-fallback:
+          // Cinematic-Sync + HappyHorse must NEVER start without a freshly
+          // composed scene-anchor as I2V reference — otherwise HappyHorse
+          // invents the scene from text and v5 lip-sync ends up on a raw
+          // avatar bust. The Stage 2 guard above already migrates virtually
+          // all such scenes to Hailuo. If we still land here (rare edge:
+          // cast had a portrait that failed to render, or no dialog/cast at
+          // all but engineOverride is cinematic-sync), do NOT hard-fail.
+          // Auto-migrate to ai-hailuo and re-queue as pending so the next
+          // dispatch picks it up. The Lip-Sync pipeline itself is NOT
+          // touched — only clip_source + clip_status.
           if (isCinematicSyncHH && !isI2V) {
             const msg =
-              "happyhorse_cinematic_sync_missing_anchor: Scene-Anchor konnte nicht erzeugt werden (Nano Banana 2 lieferte keine URL). Bitte Charakter-Portrait im Cast prüfen und Szene neu rendern.";
-            console.error(
-              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} aborted — no composed reference_image_url`,
+              "happyhorse_cinematic_sync_missing_anchor → automatisch auf Hailuo migriert. Bitte Render erneut starten oder das Cast-Portrait prüfen.";
+            console.warn(
+              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} — no composed reference_image_url, auto-migrating to ai-hailuo and re-queueing as pending.`,
             );
             await supabaseAdmin
               .from("composer_scenes")
-              .update(failedClipUpdate(isCinematicSyncHH, msg))
+              .update({
+                clip_source: "ai-hailuo",
+                clip_status: "pending",
+                clip_error: msg,
+                updated_at: new Date().toISOString(),
+              })
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
-              status: "failed",
+              status: "migrated_pending",
               error: msg,
             });
             continue;
