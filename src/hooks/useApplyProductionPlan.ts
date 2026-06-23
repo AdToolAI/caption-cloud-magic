@@ -160,13 +160,15 @@ function planSceneToComposerScene(
   orderIndex: number,
   projectId: string,
   negativePrompt: string | undefined,
+  briefingTone: string | undefined,
 ): ComposerScene {
-  // Build characterShots from resolved cast.
+  // Build characterShots from resolved cast — shotType derived from framing.
+  const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
   const characterShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
     .map((c, i) => ({
       characterId: c.characterId as string,
-      shotType: i === 0 ? 'full' : 'profile',
+      shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
     } as CharacterShot));
 
   // Build the i2v prompt: English anchor hint + continuity + brand note +
@@ -193,9 +195,7 @@ function planSceneToComposerScene(
   const hasDialogTurns = Array.isArray(ps.dialogTurns) && ps.dialogTurns.length > 0;
   const dialogMode = ps.lipSync || LIPSYNC_ENGINES.has(engine) || !!ps.voiceover?.text || hasDialogTurns;
 
-  // Build dialogScript:
-  //  1. Prefer explicit dialogTurns (multi-speaker, with optional MOOD tag).
-  //  2. Fallback: single-speaker VO mapped to first cast / NARRATOR.
+  // Build dialogScript.
   let dialogScript: string | undefined;
   if (hasDialogTurns) {
     dialogScript = (ps.dialogTurns ?? [])
@@ -226,6 +226,38 @@ function planSceneToComposerScene(
     return 'custom';
   })();
 
+  // ── Performance Layer (Mimik/Gestik/Blick/Energy) ─────────────────────
+  // Plan emits ONE performance block per scene → applied to every cast
+  // member that resolved to a library character. Free-form German/English
+  // hints are mapped to the strict ScenePerformance enums.
+  let performance: Record<string, ScenePerformance> | undefined;
+  if (ps.performance && characterShots.length > 0) {
+    const sp: ScenePerformance = {
+      expression: mapExpression(ps.performance.mimik),
+      gesture: mapGesture(ps.performance.gestik),
+      gaze: mapGaze(ps.performance.blick),
+      energy: clampEnergy(ps.performance.energy),
+    };
+    // Keep only when at least one axis resolved.
+    if (sp.expression || sp.gesture || sp.gaze || sp.energy) {
+      performance = {};
+      for (const cs of characterShots) {
+        performance[cs.characterId] = { ...sp };
+      }
+    }
+  }
+
+  // ── ActionBeat (CharacterAction / EnvironmentMotion / MotionIntensity) ─
+  const split = splitAction(ps.anchorPromptEN);
+  const motionIntensity = motionIntensityFromMusic(ps.musicCue?.energy);
+  const actionBeat = (split.characterAction || split.environmentMotion)
+    ? {
+        characterAction: split.characterAction,
+        environmentMotion: split.environmentMotion,
+        motionIntensity,
+      }
+    : undefined;
+
   return {
     id: newSceneId(),
     projectId,
@@ -252,6 +284,9 @@ function planSceneToComposerScene(
       : undefined,
     sceneActionUser: ps.anchorPromptEN ?? ps.voiceover?.text,
     sceneActionEn: ps.anchorPromptEN,
+    performance,
+    actionBeat,
+    realismPreset: realismFromTone(briefingTone),
     textOverlay: { ...DEFAULT_TEXT_OVERLAY } as any,
     transitionType: 'crossfade',
     transitionDuration: 0.4,
