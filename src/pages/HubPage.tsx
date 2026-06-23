@@ -252,7 +252,22 @@ export default function HubPage() {
                     ? "opacity-50 cursor-not-allowed bg-card/40 backdrop-blur-sm"
                     : "bg-card/60 backdrop-blur-md hover:-translate-y-2 hover:shadow-[0_0_40px_hsla(43,90%,68%,0.2),0_0_80px_hsla(187,84%,55%,0.1)]"
                   }`}
-                onClick={(e) => locked && e.preventDefault()}
+                onClick={(e) => {
+                  if (locked) {
+                    e.preventDefault();
+                    return;
+                  }
+                  // Arm the Motion Studio cinematic intro only when the user
+                  // enters via the "Erstellen" hub. Daily-throttled inside
+                  // StageWelcomeMoment.
+                  if (hub.key === "erstellen" && item.route === "/video-composer") {
+                    try {
+                      window.sessionStorage.setItem("motion-studio:intro-trigger", "1");
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                }}
               >
                 {/* Hover glow overlay */}
                 {!locked && (
