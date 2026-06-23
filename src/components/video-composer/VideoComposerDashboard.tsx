@@ -1841,7 +1841,34 @@ export default function VideoComposerDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Briefing → Storyboard auto-analyse: 2028-style overlay + plan review. */}
+      <ProductionWarRoom
+        open={storyboardTransition.state.warRoomOpen}
+        progress={storyboardTransition.state.progress}
+        phaseLabel={storyboardTransition.state.phaseLabel}
+        phase={storyboardTransition.state.phase === 'idle' ? 'A' : storyboardTransition.state.phase}
+        onCancel={() => storyboardTransition.close()}
+      />
+      <ProductionPlanSheet
+        open={storyboardTransition.state.planSheetOpen}
+        onOpenChange={(v) => storyboardTransition.setPlanSheetOpen(v)}
+        projectId={project.id}
+        language={project.language}
+        currentScenes={project.scenes}
+        currentAssembly={project.assemblyConfig}
+        currentBriefing={project.briefing}
+        onUpdateBriefing={updateBriefing}
+        onUpdateScenes={setScenes}
+        onApplyAssembly={(next) => setProject((p) => ({ ...p, assemblyConfig: next }))}
+        onApplied={() => {
+          storyboardTransition.setPlanSheetOpen(false);
+          setActiveTab('storyboard');
+        }}
+        initialPlan={storyboardTransition.state.initialPlan}
+      />
     </div>
+
     </SceneRenderConfirmProvider>
     </ComposerHistoryContext.Provider>
   );
