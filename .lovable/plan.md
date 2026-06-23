@@ -1,58 +1,50 @@
-## Problem
+# Bugfix: Plan-Validierung schlägt nach Pass B fehl (88 %)
 
-Beim Wechsel ins Storyboard läuft die Briefing-Analyse, aber statt des Plan-Feldes erscheint nur der rote Toast **„Briefing-Analyse fehlgeschlagen / Plan-Validierung fehlgeschlagen"**. Ursache: `briefing-deep-parse` liefert einen Plan, den die strenge Zod-Schema (`ProductionPlan`) ablehnt – z. B. weil das AI-Modell ein `engine` außerhalb der Enum-Liste setzt (`"ai-hailuo"`, `"runway"` …), `durationSec` ausserhalb `1–60` liefert, `musicCue.energy` einen freien Text statt Enum hat, oder einzelne Scene-Felder schlicht fehlen. Da wir hart `throw` werfen, wird kein Plan-Sheet geöffnet und der Nutzer sieht keine Details. Zusätzlich gibt es keine Edge-Logs zum Debuggen.
+## Root Cause
 
-## Ziel
+In `supabase/functions/briefing-deep-parse/index.ts` löscht der Helper `stripUndef` jeden Key, dessen Wert `undefined`, `null` oder `''` ist:
 
-1. Der Nutzer kommt **immer** ins Plan-Sheet, auch wenn einzelne Felder „schief" zurück­kommen.
-2. Konkrete Fehlerursache wird sichtbar (statt generischem Toast).
-3. Lipsync-Pipeline bleibt unangetastet.
+```ts
+if (o[k] === undefined || o[k] === null || o[k] === '') delete o[k];
+```
 
-## Lösung (4 Schichten)
+Die `ResolvedCast`- und `ResolvedLocation`-Objekte setzen aber bewusst `characterId: null` bzw. `locationId: null`, wenn Pass B nichts in der Library findet. Im Zod-Schema sind beide Felder **required nullable** (`z.string().nullable()`), nicht optional. Sobald `stripUndef` die `null`-Keys entfernt, fehlen die Pflichtfelder → Client wirft genau die Fehler aus dem Screenshot:
 
-### 1. Server-seitige Normalisierung in `mergeManifestAndResolution`
-- `engine`: auf zulässige Werte mappen (`heygen`, `cinematic-sync`, …); alles andere → `'auto'`. Aliasse: `ai-heygen→heygen`, `b-roll→broll`, `sync→sync-polish`.
-- `durationSec`: `clamp(1, 60)`; fehlende → `5`.
-- `musicCue.energy`: in Enum-Whitelist filtern, sonst entfernen.
-- `dialogTurns`: leere Texte / fehlende Speaker rauswerfen; max 20.
-- `brollHints`: Strings trimmen, leere raus, max 12.
-- `cast`/`location`: undefined-Felder strippen (verhindert spätere Zod-Probleme).
-- `performance.energy`: clamp 1–5.
+- `scenes.0.cast.0.characterId: Invalid input`
+- `scenes.0.location.locationId: Invalid input`
 
-Damit landet im Client ein Objekt, das die Zod-Schema in 99 % der Fälle akzeptiert.
+Per-Scene-Recovery rettet hier nichts, weil **jede** Szene betroffen ist, sobald Pass B mindestens ein Cast/Location nicht auflöst — und genau das passiert bei jedem Test-Briefing ohne perfekt passende Library-Einträge.
 
-### 2. Client-seitige Recovery in `useStoryboardTransition`
-- Statt `safeParse → throw`: erst `ProductionPlan.safeParse(data.plan)`. Bei Fail:
-  - Detaillierte `console.error` mit `parsed.error.flatten()`.
-  - **Per-Szene-Recovery**: `data.plan.scenes` einzeln durch `PlanScene.safeParse()` schicken, kaputte Szenen verwerfen (mit Warnung), Rest weiterverwenden.
-  - Wrapper-Objekt mit den überlebenden Szenen erneut durch `ProductionPlan.safeParse`. 
-  - Wenn ≥ 1 Szene überlebt → Plan-Sheet öffnet (mit Warn-Toast „X Szenen konnten nicht übernommen werden").
-  - Nur wenn 0 Szenen überleben → roter Toast + Fallback-Navigation.
+## Fix (1 Datei, minimal)
 
-### 3. Bessere Fehler-Sichtbarkeit
-- Toast-Description: erste 1–2 Zod-Issue-Pfade (`scenes[0].engine: invalid_enum_value`).
-- Edge-Function: `console.log('[briefing-deep-parse] manifest scenes:', n, 'plan scenes:', n, 'unresolved:', m)` direkt vor dem `Response`, damit zukünftige Fehler in den Function-Logs sichtbar sind.
+`supabase/functions/briefing-deep-parse/index.ts`
 
-### 4. Schema-Lockerung an einem Punkt
-- `PlanScene.engine` bekommt zusätzlich `.catch('auto')` (statt nur `.default`), damit ein Fremdwert nicht das ganze Scene-Parsing kippt.
-- `PlanScene.durationSec`: `.catch(5)` analog.
-- Keine weiteren Schema-Aufweichungen – die anderen Felder sind bereits optional.
+1. `stripUndef` so anpassen, dass **nur `undefined`** entfernt wird (nicht `null`, nicht `''`). `null` ist im Plan-Schema ein gültiger Wert (nullable Felder), `''` ist für `voiceover.text` o.Ä. legitim.
 
-## Lipsync-Schutz
+```ts
+function stripUndef<T extends Record<string, any>>(o: T): T {
+  for (const k of Object.keys(o)) {
+    if (o[k] === undefined) delete o[k];
+  }
+  return o;
+}
+```
 
-Reine UI-/Validation-Reparatur. Es werden weder `dialog_shots`, `syncso_*` noch `compose-video-clips` angefasst. Die Guards in `useApplyProductionPlan` (`isProtected`) bleiben aktiv: Plan-Apply überschreibt nie eine bereits gerenderte/lipsynced Szene.
+2. Sicherheits-Defaults beim Cast-Mapping, damit `characterId`/`locationId` garantiert `string | null` sind (nie `undefined`):
 
-## Geänderte Dateien
+```ts
+characterId: typeof rCast?.characterId === 'string' ? rCast.characterId : null,
+locationId:  typeof r2?.locationId    === 'string' ? r2.locationId    : null,
+```
 
-- `supabase/functions/briefing-deep-parse/index.ts` — Normalisierung in `mergeManifestAndResolution` + Telemetrie-Log.
-- `src/hooks/useStoryboardTransition.ts` — Per-Szene-Recovery + bessere Fehlermeldung.
-- `src/lib/video-composer/briefing/productionPlan.ts` — `engine`/`durationSec` mit `.catch(...)` härten.
+3. Logging vor dem Response erweitern: pro Szene `cast.length`, `hasLocation`, `unresolvedCount` loggen, damit künftige 88 %-Hänger sofort sichtbar sind.
 
-## Was bewusst NICHT passiert
+## Nicht angefasst
 
-- Kein Refactor der 2-Pass-Pipeline.
-- Keine Änderung am Prompt (das funktioniert sonst korrekt).
-- Kein Eingriff in Composer-Storyboard-Rendering.
-- Keine neuen Felder im Schema.
+- Zod-Schema (`productionPlan.ts`) — bleibt strikt.
+- Client-Recovery (`useStoryboardTransition`) — bleibt als zweite Verteidigungslinie.
+- Lipsync-/Composer-Pipeline.
 
-Soll ich es so umsetzen?
+## Verifikation
+
+Nach Deploy von `briefing-deep-parse` denselben Briefing-Flow auslösen → Production War Room sollte Pass B auf 100 % bringen und das Plan-Sheet öffnen.
