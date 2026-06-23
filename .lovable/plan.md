@@ -1,30 +1,98 @@
-Ja, das lässt sich genau so umsetzen. Aktuell spielt die Sequenz (`StageWelcomeMoment`) bei jedem Aufruf von `/video-composer`, der kein Browser-Reload ist – der `SESSION_KEY` ist im Code zwar definiert, wird aber gar nicht geprüft.
+## Problem
 
-## Was geändert wird
+Aktuell akzeptiert der Composer-Briefing-Flow nur einen kurzen Textprompt → Ad/Auto-Director erzeugt daraus ein generisches Default-Storyboard (Hailuo, 4 Szenen, kein VO, kein Shot-Director, kein Cast-Override). Lange strukturierte Briefings (6–7 Seiten mit Skript-Tabelle, ElevenLabs-Settings, Caption-Style, Negative-Prompt) werden **inhaltlich nicht ausgewertet** — der Director sieht nur „erzeuge ein Werbevideo" und füllt die Felder selbst.
 
-1. **Trigger nur beim Klick im „Erstellen“-Hub**  
-   Auf der `/hub/erstellen`-Seite wird beim Klick auf die Motion-Studio-Kachel (Route `/video-composer`) ein kurzlebiges Flag in `sessionStorage` gesetzt:  
-   `motion-studio:intro-trigger = "1"`.  
-   Andere Wege nach `/video-composer` (Direktlink, Reload, Rücksprung aus Sub-Seiten, Navigationswechsel zwischen Plattform und Lovable) setzen dieses Flag nicht.
+Ziel: Ein Briefing in Briefing-Tiefe (mehrere tausend Tokens, Markdown/Tabellen) soll **deterministisch** in Projekt-Settings + alle Szenen-Felder übersetzt werden, inkl. VO, Cast/Location-Mentions, Shot-Director, Captions, Negative Prompt.
 
-2. **Max. 1×/Tag**  
-   `StageWelcomeMoment` prüft beim Mount:
-   - Existiert das Trigger-Flag aus Schritt 1? Falls nein → Intro wird sofort übersprungen.
-   - Wurde heute bereits abgespielt? Vergleich mit `localStorage["motion-studio:intro-last-date"]` (YYYY-MM-DD). Falls heute → übersprungen.
-   - Sonst: Intro abspielen, danach **Datum von heute** in `localStorage` schreiben und Trigger-Flag konsumieren (löschen).
+---
 
-3. **Skip/ESC/Klick** verhalten sich wie bisher, markieren das Intro aber ebenfalls als „heute gesehen“, damit es bei einem weiteren Wechsel am gleichen Tag nicht erneut kommt.
+## Smarteste Lösung: 3-stufige Briefing-Pipeline
 
-4. **Browser-Reload-Schutz** (bereits vorhanden via `isPageReload()`) bleibt erhalten.
+Statt einen Mega-LLM-Call zu hoffen, wird das Briefing in **strukturierte Layer** zerlegt — jeder Layer schreibt deterministisch in genau die UI-Felder, die er befüllen darf. Das ist robust, debugbar, und skaliert auf 7+ Seiten ohne Halluzination.
 
-## Akzeptanztests (manuell)
+### Stufe 1 — Briefing-Parser (Edge Function `parse-briefing`)
 
-- Klick in der Sidebar auf „Erstellen“ → Kachel „Motion Studio“ → Intro spielt 1× ab.  
-- Direkt danach von Motion Studio z. B. zu `/home` und wieder über Sidebar → Erstellen → Motion Studio → **kein** Intro.  
-- Direkter Aufruf `/video-composer` (Bookmark, F5, Lovable-Preview-Wechsel) → **kein** Intro.  
-- Am nächsten Tag erneut über Sidebar → Erstellen → Motion Studio → Intro spielt wieder einmal.
+**Input:** Rohtext (Markdown, Tabellen, beliebige Länge bis ~30k Tokens) + optional Datei-Upload (PDF/DOCX → via `document--parse_document`-Äquivalent serverseitig).
 
-## Betroffene Dateien
+**Verarbeitung:**
+- Lovable AI Gateway, Modell `google/gemini-2.5-flash` (lang-Kontext, billig)
+- **Tool-Calling mit striktem Zod-Schema** statt freiem JSON — Gemini *muss* die Felder ausfüllen, kann nichts erfinden
+- Bei sehr langen Briefings: chunked-summarize-then-extract (erst Sektionen erkennen, dann pro Sektion extrahieren)
 
-- `src/components/video-composer/stage/StageWelcomeMoment.tsx` (Daily-Gate + Trigger-Flag-Konsum)
-- `src/pages/HubPage.tsx` (Set Trigger-Flag im `onClick` der Motion-Studio-Kachel des „Erstellen“-Hubs)
+**Output:** Ein normalisiertes `BriefingManifest`:
+
+```ts
+{
+  project: { name, aspectRatio, fps, totalDurationSec, platforms[] },
+  scenes: [{
+    index, label, durationSec, engine,
+    vo: { text, timecodeStart, timecodeEnd, delivery, speedMultiplier },
+    cast: [{ mentionKey, outfit? }],
+    location: { mentionKey },
+    shotDirector: { framing, angle, movement, lighting, stylePreset },
+    anchorPromptHintEN: string,
+    performance: { mimik?, gestik?, blick?, energy? },
+  }],
+  voice: { provider:'elevenlabs', voiceId, model, stability, similarityBoost, style, speakerBoost, requestStitching },
+  captions: { source, font, sizePx, color, strokeColor, strokePx, highlightColor, maxWordsPerCue, position, safeZonePct, burnIn, highlightWords[] },
+  negativePrompt: string,
+  unresolved: [{ field, reason, suggestion }] // alles was der Parser nicht 1:1 mappen konnte
+}
+```
+
+### Stufe 2 — Resolver (clientseitig + Edge `resolve-briefing-mentions`)
+
+Übersetzt **Briefing-Aliase → echte DB-IDs**:
+
+- `@founder-avatar` → sucht in `brand_characters` (own + purchased via `useAccessibleCharacters`); wenn nicht gefunden → schlägt vor, einen anzulegen oder einen ähnlichen zu mappen
+- `@home-office` → analog `brand_locations`
+- `JBFqnCBsd6RMkjVDRZzb` (ElevenLabs Voice-ID) → validiert gegen `elevenlabs-voices.ts`
+- Style-Presets („Founder Authentic") → mappt auf `cinematicRealismPresets` / `composerVisualStyles`
+- Shot-Director-Werte → validiert gegen `shotDirector/` Enums (Framing/Angle/Movement/Lighting)
+
+Unresolved Items → werden im UI als **Briefing-Diff** angezeigt (siehe Stufe 3).
+
+### Stufe 3 — Briefing Apply Sheet (UI)
+
+Nach Parse + Resolve öffnet sich ein **Review-Sheet** mit:
+
+- Linke Spalte: extrahierte Werte aus Briefing
+- Rechte Spalte: aktuelle Projekt-Werte
+- Pro Feld: Checkbox „übernehmen" (default ON)
+- Unresolved-Section mit Inline-Action („Avatar anlegen", „Voice mappen", …)
+- Footer: „Alles übernehmen" → schreibt deterministisch in Composer-State (Zustand-Store / DB)
+
+→ Damit ist die **Übernahme nachvollziehbar**, nicht magisch, und der User sieht sofort was wirklich gemappt wurde.
+
+---
+
+## Wo das im Code andockt
+
+| Komponente | Verantwortlich |
+|---|---|
+| `supabase/functions/parse-briefing/index.ts` (neu) | Stufe 1, Tool-Calling, Zod-Schema |
+| `supabase/functions/resolve-briefing-mentions/index.ts` (neu) | Stufe 2, DB-Lookup |
+| `src/lib/video-composer/briefing/manifestSchema.ts` (neu) | Shared Zod-Schema (client + edge) |
+| `src/components/video-composer/briefing/BriefingApplySheet.tsx` (neu) | Stufe 3, Review-UI |
+| `src/components/video-composer/briefing/BriefingInput.tsx` (neu/erweitert) | Textarea + File-Upload (PDF/MD/TXT) → ruft `parse-briefing` |
+| `src/pages/VideoComposer/index.tsx` | Integriert „📋 Briefing importieren"-Button neben „Ad Director" / „Auto-Director" |
+| `src/hooks/useApplyBriefingManifest.ts` (neu) | Schreibt akzeptierte Felder in Composer-State (Szenen-CRUD, VO-Track, Captions-Config) |
+
+---
+
+## Warum diese Lösung „smart" ist
+
+1. **Deterministisch statt magisch** — Tool-Calling mit Zod erzwingt Struktur; Gemini kann keine Felder erfinden oder vergessen.
+2. **Skaliert auf 7+ Seiten** — Gemini 2.5 Flash hat 1M-Token-Context; chunked-extract als Fallback.
+3. **Robust gegen Halluzination** — Resolver-Stufe validiert gegen echte DB/Enums; Unresolved bleibt sichtbar statt still-falsch.
+4. **Wiederverwendbar** — gleicher `BriefingManifest` kann später auch im Ad Director / Email Director / Universal Creator angewendet werden.
+5. **User-Transparenz** — Review-Sheet zeigt was übernommen wird, bevor irgendwas geschrieben wird → kein „warum hat er das nicht gemacht?"-Moment mehr.
+6. **Refund-safe** — kein Credit-Verbrauch beim Parsen (nur Lovable-AI-Token, billig); Render läuft erst nach User-Bestätigung.
+
+---
+
+## Offene Frage vor Build
+
+Soll der Briefing-Importer (a) **nur in Motion Studio / Video Composer** verfügbar sein, oder (b) als **globales Tool** (Ad Director, Email Director, Universal Creator auch)? 
+
+Empfehlung: (a) zuerst, weil dort der höchste Mehrwert ist und das Manifest-Schema sich am Composer-Feldset orientiert. Andere Studios in einer späteren Iteration anbinden, sobald das Schema stabil ist.
