@@ -186,7 +186,7 @@ export function useStoryboardTransition({
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
-      const msg = extractFunctionsError(e) || e?.message || 'Deep-Parse fehlgeschlagen';
+      const msg = e?.message || (typeof e === 'string' ? e : 'Deep-Parse fehlgeschlagen');
       toast({
         title: 'Briefing-Analyse fehlgeschlagen',
         description: msg.includes('402')
