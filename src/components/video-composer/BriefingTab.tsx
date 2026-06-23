@@ -492,11 +492,37 @@ export default function BriefingTab({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Briefing Import — paste a long-form briefing → AI parses → review → apply */}
+      <div className="flex items-center justify-between rounded-lg border border-amber-300/30 bg-amber-300/[0.04] p-3">
+        <div className="flex items-center gap-2.5 text-sm">
+          <FileText className="h-4 w-4 text-amber-300" />
+          <div>
+            <div className="font-medium">Vollständiges Briefing einfügen</div>
+            <div className="text-xs text-muted-foreground">Skript-Tabelle · Voice-Settings · Captions · Negative Prompt — 1:1 in Szenen übernehmen.</div>
+          </div>
+        </div>
+        <Button size="sm" variant="outline" className="border-amber-300/40 hover:bg-amber-300/10" onClick={() => setBriefingImportOpen(true)}>
+          Briefing importieren
+        </Button>
+      </div>
+
+      <BriefingImportDialog
+        open={briefingImportOpen}
+        onOpenChange={setBriefingImportOpen}
+        currentScenes={scenes ?? []}
+        currentAssembly={assemblyConfig}
+        currentBriefing={briefing}
+        onUpdateBriefing={onUpdateBriefing}
+        onUpdateScenes={(next) => onUpdateScenes?.(next)}
+        onApplyAssembly={(next) => onApplyAssembly?.(next)}
+      />
+
       {/* Film-strip Mode Selector — visible Quick / Direct / Studio reels */}
       <FilmStripModeSelector />
 
       {/* Crossfade wrapper — re-keyed on editorMode so panel changes "feel" */}
       <div key={editorMode} className="stage-mode-fade space-y-6">
+
 
 
       {/* Legal Usage Notice */}
