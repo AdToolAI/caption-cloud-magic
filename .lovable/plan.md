@@ -1,50 +1,66 @@
-# Bugfix: Plan-Validierung schlägt nach Pass B fehl (88 %)
 
-## Root Cause
+## Ziel
 
-In `supabase/functions/briefing-deep-parse/index.ts` löscht der Helper `stripUndef` jeden Key, dessen Wert `undefined`, `null` oder `''` ist:
+Ein Klick auf "Storyboard erstellen" reicht: KI plant Strategie, Drehbuch, Szenen, Mimik/Gestik, Aktion, Hintergrund, Kamera, Engine, Voice — alles automatisch aus Briefing + im Briefing ausgewählten Charakteren. Jedes Feld bleibt im Storyboard manuell editierbar.
 
-```ts
-if (o[k] === undefined || o[k] === null || o[k] === '') delete o[k];
-```
+## Problemanalyse heute
 
-Die `ResolvedCast`- und `ResolvedLocation`-Objekte setzen aber bewusst `characterId: null` bzw. `locationId: null`, wenn Pass B nichts in der Library findet. Im Zod-Schema sind beide Felder **required nullable** (`z.string().nullable()`), nicht optional. Sobald `stripUndef` die `null`-Keys entfernt, fehlen die Pflichtfelder → Client wirft genau die Fehler aus dem Screenshot:
+1. `briefing-deep-parse` extrahiert nur, was wörtlich im Briefing-Text steht (Pass-A-Regel "DO NOT invent"). Ohne explizite Szenenliste kommt `scenes: []` zurück → Plan-Sheet zeigt "Szenen (0)".
+2. Briefing-Text wird in `useStoryboardTransition.buildBriefingText` aus dem strukturierten `ComposerBriefing` zusammengebaut — die im Briefing ausgewählten `characters[]`, `tone`, `duration`, `aspectRatio`, `visualStyle`, `videoMode` werden dabei nicht (oder nur teilweise) übergeben, und die Charakter-IDs/Library-Daten gar nicht.
+3. `useApplyProductionPlan.planSceneToComposerScene` befüllt zwar `aiPrompt`, `dialogScript`, `dialogVoices`, `shotDirector`, `engineOverride`. Aber `actionBeat` (CharacterAction / EnvironmentMotion / MotionIntensity) und `performance` (Mimik/Gestik/Blick/Energy) — beides bereits im ComposerScene-Schema vorhanden — werden nicht geschrieben, obwohl genau das der Kern eines "professionellen Drehbuchs" ist.
 
-- `scenes.0.cast.0.characterId: Invalid input`
-- `scenes.0.location.locationId: Invalid input`
+## Lösung — "Studio Director"-Pipeline
 
-Per-Scene-Recovery rettet hier nichts, weil **jede** Szene betroffen ist, sobald Pass B mindestens ein Cast/Location nicht auflöst — und genau das passiert bei jedem Test-Briefing ohne perfekt passende Library-Einträge.
+### A. Briefing → vollständiger Director-Brief (Client)
 
-## Fix (1 Datei, minimal)
+`src/hooks/useStoryboardTransition.ts` · `buildBriefingText`:
+- Erweitern auf strukturierten Markdown-Brief mit allen Briefing-Feldern: `tone`, `duration`, `aspectRatio`, `videoMode`, `visualStyle`, `brandColors`, `defaultQuality`, `preferStock`.
+- Neuer Abschnitt **`## Cast (selected in briefing)`**: pro `briefing.characters[]` Name, Appearance, SignatureItems, AppearanceFrequency, `mentionKey` (`@<slug>`) und — wenn `brandCharacterId` gesetzt — der Hinweis "library:<id>".
+- Neuer Top-Level-Hinweis `Mode: AUTO-DIRECTOR (synthesize full screenplay)` damit Pass A weiß, dass es planen darf.
 
-`supabase/functions/briefing-deep-parse/index.ts`
+### B. Pass A — Director-Modus (Edge Function)
 
-1. `stripUndef` so anpassen, dass **nur `undefined`** entfernt wird (nicht `null`, nicht `''`). `null` ist im Plan-Schema ein gültiger Wert (nullable Felder), `''` ist für `voiceover.text` o.Ä. legitim.
+`supabase/functions/briefing-deep-parse/index.ts` · `SYSTEM_PASS_A`:
+- Neue Regel über der "DO NOT invent"-Regel:
+  > **AUTO-DIRECTOR mode**: wenn der Brief KEINE expliziten Szenen enthält, MUSST du als professioneller Werbe-Regisseur eine vollständige Strategie entwerfen — 3–7 Szenen entlang Hook → Pain → Reveal → Proof → CTA (oder einer für den `Mode/tone` passenden Dramaturgie). Verteile `totalDurationSec` gleichmäßig (Fallback 5s pro Szene). 
+  > Für **jede** Szene fülle, was der Brief nicht vorgibt: `voiceover.text` (Sprache aus Brief, knapp, sprechbar), `cast` (aus `## Cast`-Mentions, max 2 pro Szene), `engine` (`cinematic-sync` wenn Dialog + Cast, sonst `broll`), `lipSync`, `shotDirector.{framing,angle,movement,lighting}` (enums), `anchorPromptEN` (Setting/Geschehnis/Stimmung auf English, 1–3 Sätze — Auto/Flugzeug/Office/etc., je nach Brief), `performance.{mimik,gestik,blick,energy}` pro Cast-Member, `dialogTurns` bei mehreren Sprechern, `musicCue.energy`, `brollHints` (3–6 EN-Keywords) für Cutaways.
+- "DO NOT invent IDs" bleibt — nur Mentions aus `## Cast` benutzen.
+- Existierende Regel "If briefing says 3 scenes × 5s emit EXACTLY that many" bleibt vorrangig.
 
-```ts
-function stripUndef<T extends Record<string, any>>(o: T): T {
-  for (const k of Object.keys(o)) {
-    if (o[k] === undefined) delete o[k];
-  }
-  return o;
-}
-```
+### C. Server-Safety-Net
 
-2. Sicherheits-Defaults beim Cast-Mapping, damit `characterId`/`locationId` garantiert `string | null` sind (nie `undefined`):
+Nach Pass A in `Deno.serve`: wenn `manifest.scenes.length === 0` → deterministischen 3-Szenen-Fallback (Hook/Reveal/CTA) generieren mit Default-Cast = erste `library:`-Mention, Engine `cinematic-sync` falls Cast vorhanden, sonst `broll`. Verhindert Hänger bei Modell-Aussetzern.
 
-```ts
-characterId: typeof rCast?.characterId === 'string' ? rCast.characterId : null,
-locationId:  typeof r2?.locationId    === 'string' ? r2.locationId    : null,
-```
+### D. Apply: Performance + ActionBeat schreiben
 
-3. Logging vor dem Response erweitern: pro Szene `cast.length`, `hasLocation`, `unresolvedCount` loggen, damit künftige 88 %-Hänger sofort sichtbar sind.
+`src/hooks/useApplyProductionPlan.ts` · `planSceneToComposerScene`:
+- Aus `ps.performance` pro Cast-Member ein `performance: Record<characterId, ScenePerformance>` bauen (Enum-Mapping: free-form → nächste `PerformanceExpression/Gesture/Gaze`, `energy` 1–5 unverändert).
+- Aus `ps.anchorPromptEN` + `ps.dialogTurns?.length` ein `actionBeat` ableiten:
+  - `characterAction` = erste 12 Wörter aus anchorPromptEN, die das Subjekt beschreiben.
+  - `environmentMotion` = Rest (Setting/Wetter/Geschehnis).
+  - `motionIntensity`: aus `musicCue.energy` (drop/high → `high`, mid → `moderate`, low → `subtle`, silent/undefined → `static`).
+- `characterShots` aus `ps.cast` mit `shotType` aus `shotDirector.framing` ableiten (close-up → `detail`, wide → `full`, profile → `profile`, sonst `full`/`profile`-Alternierung wie bisher).
+- `realismPreset` aus Brief-`tone`: `dramatic/luxury` → `cinematic-spot`, `friendly/professional` → `lifestyle-hero`, sonst `documentary`.
 
-## Nicht angefasst
+### E. UI-Feedback im Plan-Sheet
 
-- Zod-Schema (`productionPlan.ts`) — bleibt strikt.
-- Client-Recovery (`useStoryboardTransition`) — bleibt als zweite Verteidigungslinie.
-- Lipsync-/Composer-Pipeline.
+`ProductionPlanSheet.tsx`:
+- Empty-State wenn `plan.scenes.length === 0` mit Hinweis "Briefing zu dünn — füge USPs oder eine Szenenbeschreibung hinzu" + Button "Zurück zu Briefing".
+- Pro Szene zusätzlich (falls gesetzt) Performance-Badges (Mimik/Gestik/Energy) und ActionBeat-Zeile anzeigen, damit sichtbar ist was die KI geplant hat.
 
-## Verifikation
+## Was bewusst NICHT geändert wird
 
-Nach Deploy von `briefing-deep-parse` denselben Briefing-Flow auslösen → Production War Room sollte Pass B auf 100 % bringen und das Plan-Sheet öffnen.
+- Zod-Schema (`productionPlan.ts`) — alle neuen Felder existieren bereits.
+- Lip-Sync-Pipeline, `dialog_shots`, `syncso_*`, Apply-Guards für geschützte Szenen.
+- Storyboard-Tab und manuelle Editor-Pfade bleiben unverändert; alle KI-Vorschläge sind dort 1:1 überschreibbar.
+
+## Files
+
+- `src/hooks/useStoryboardTransition.ts` — erweiterter Director-Brief inkl. Cast-Liste.
+- `supabase/functions/briefing-deep-parse/index.ts` — AUTO-DIRECTOR Regeln in Pass A, Empty-Scene-Fallback.
+- `src/hooks/useApplyProductionPlan.ts` — `performance`, `actionBeat`, `realismPreset`, framing-basierter `shotType`.
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Empty-State + Performance/Action-Badges.
+
+## Deployment
+
+Edge Function `briefing-deep-parse` neu deployen.
