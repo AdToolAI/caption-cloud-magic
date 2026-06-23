@@ -46,9 +46,25 @@ function isProtected(s: ComposerScene): boolean {
   return false;
 }
 
-/** Builds the freeform briefing blob the deep-parser expects. */
+/** Slugify a character name into a stable @-mention key. */
+function toMentionSlug(name: string): string {
+  return String(name ?? '')
+    .toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'cast';
+}
+
+/**
+ * Builds the freeform briefing blob the deep-parser expects.
+ * In AUTO-DIRECTOR mode (default), the parser is allowed to synthesize a
+ * full screenplay from the structured briefing + selected cast.
+ */
 function buildBriefingText(b: ComposerBriefing): string {
   const lines: string[] = [];
+  lines.push('Mode: AUTO-DIRECTOR (synthesize full screenplay from briefing + cast)');
+  lines.push('');
   if (b.productName) lines.push(`# ${b.productName}`);
   if (b.productDescription) lines.push('', b.productDescription);
   if (b.usps?.length) {
@@ -56,10 +72,31 @@ function buildBriefingText(b: ComposerBriefing): string {
     for (const u of b.usps) lines.push(`- ${u}`);
   }
   if (b.targetAudience) lines.push('', `## Target Audience`, b.targetAudience);
-  if ((b as any).tone) lines.push('', `Tone: ${(b as any).tone}`);
-  if ((b as any).duration) lines.push(`Duration: ${(b as any).duration}s`);
-  if ((b as any).aspectRatio) lines.push(`Aspect: ${(b as any).aspectRatio}`);
-  if ((b as any).visualStyle) lines.push(`Visual style: ${(b as any).visualStyle}`);
+
+  // Cast — the heart of AUTO-DIRECTOR. Each entry becomes an addressable
+  // mention key the parser can place into scenes.
+  if (b.characters && b.characters.length) {
+    lines.push('', '## Cast (selected in briefing)');
+    for (const c of b.characters) {
+      const slug = toMentionSlug(c.name);
+      const libSuffix = c.brandCharacterId ? `  (library:${c.brandCharacterId})` : '';
+      lines.push(`- @${slug} — **${c.name}**${libSuffix}`);
+      if (c.appearance) lines.push(`  · Appearance: ${c.appearance}`);
+      if (c.signatureItems) lines.push(`  · Signature items: ${c.signatureItems}`);
+      if (c.appearanceFrequency) lines.push(`  · Frequency: ${c.appearanceFrequency}`);
+    }
+  }
+
+  lines.push('', '## Project');
+  if (b.tone) lines.push(`- Tone: ${b.tone}`);
+  if (b.duration) lines.push(`- Total duration: ${b.duration}s`);
+  if (b.aspectRatio) lines.push(`- Aspect: ${b.aspectRatio}`);
+  if (b.videoMode) lines.push(`- Video mode: ${b.videoMode}`);
+  if (b.visualStyle) lines.push(`- Visual style: ${b.visualStyle}`);
+  if (b.brandColors?.length) lines.push(`- Brand colors: ${b.brandColors.join(', ')}`);
+  if (b.defaultQuality) lines.push(`- Default quality: ${b.defaultQuality}`);
+  if (b.preferStock) lines.push(`- Prefer stock footage when appropriate`);
+
   return lines.join('\n').trim();
 }
 
