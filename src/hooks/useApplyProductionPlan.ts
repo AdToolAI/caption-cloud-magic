@@ -72,11 +72,17 @@ function planSceneToComposerScene(
       shotType: i === 0 ? 'full' : 'profile',
     } as CharacterShot));
 
-  // Build the i2v prompt: English anchor hint + negative-prompt suffix.
+  // Build the i2v prompt: English anchor hint + continuity + brand note +
+  // scene-level + global negative-prompt suffix.
   const promptParts: string[] = [];
   if (ps.anchorPromptEN?.trim()) promptParts.push(ps.anchorPromptEN.trim());
-  if (negativePrompt?.trim()) {
-    promptParts.push(`--no ${negativePrompt.replace(/\s+/g, ' ').trim()}`);
+  if (ps.continuityHint?.trim()) promptParts.push(`Continuity: ${ps.continuityHint.trim()}`);
+  if (ps.brandAnchor?.note?.trim()) promptParts.push(`Brand: ${ps.brandAnchor.note.trim()}`);
+  const negParts: string[] = [];
+  if (ps.negativePromptScene?.trim()) negParts.push(ps.negativePromptScene.trim());
+  if (negativePrompt?.trim()) negParts.push(negativePrompt.trim());
+  if (negParts.length) {
+    promptParts.push(`--no ${negParts.join(', ').replace(/\s+/g, ' ').trim()}`);
   }
   const aiPrompt = promptParts.join(' ') || undefined;
 
@@ -87,7 +93,30 @@ function planSceneToComposerScene(
   }
 
   const engine = ps.engine ?? 'auto';
-  const dialogMode = ps.lipSync || LIPSYNC_ENGINES.has(engine) || !!ps.voiceover?.text;
+  const hasDialogTurns = Array.isArray(ps.dialogTurns) && ps.dialogTurns.length > 0;
+  const dialogMode = ps.lipSync || LIPSYNC_ENGINES.has(engine) || !!ps.voiceover?.text || hasDialogTurns;
+
+  // Build dialogScript:
+  //  1. Prefer explicit dialogTurns (multi-speaker, with optional MOOD tag).
+  //  2. Fallback: single-speaker VO mapped to first cast / NARRATOR.
+  let dialogScript: string | undefined;
+  if (hasDialogTurns) {
+    dialogScript = (ps.dialogTurns ?? [])
+      .map((t) => {
+        const rawKey = (t.speakerMentionKey ?? '').replace(/^@/, '').trim();
+        const match = (ps.cast ?? []).find(
+          (c) => (c.mentionKey ?? '').replace(/^@/, '').toLowerCase() === rawKey.toLowerCase(),
+        );
+        const name = (match?.characterName ?? rawKey ?? 'NARRATOR').toUpperCase();
+        const moodSuffix = t.mood?.trim() ? ` — ${t.mood.trim().toUpperCase()}` : '';
+        return `${name}${moodSuffix}: ${t.text.trim()}`;
+      })
+      .join('\n');
+  } else if (ps.voiceover?.text) {
+    dialogScript = characterShots[0]
+      ? `${(ps.cast ?? [])[0]?.characterName?.toUpperCase() ?? 'NARRATOR'}: ${ps.voiceover.text}`
+      : `NARRATOR: ${ps.voiceover.text}`;
+  }
 
   const sceneType: ComposerScene['sceneType'] = (() => {
     const beat = (ps.beat ?? '').toLowerCase();
@@ -114,11 +143,7 @@ function planSceneToComposerScene(
     characterShots: characterShots.length ? characterShots : undefined,
     engineOverride: engine !== 'auto' ? (engine as any) : undefined,
     dialogMode,
-    dialogScript: ps.voiceover?.text
-      ? (characterShots[0]
-          ? `${(ps.cast ?? [])[0]?.characterName?.toUpperCase() ?? 'NARRATOR'}: ${ps.voiceover.text}`
-          : `NARRATOR: ${ps.voiceover.text}`)
-      : undefined,
+    dialogScript,
     dialogVoices: Object.keys(dialogVoices).length ? dialogVoices : undefined,
     shotDirector: ps.shotDirector
       ? {
@@ -135,6 +160,12 @@ function planSceneToComposerScene(
     transitionDuration: 0.4,
     retryCount: 0,
     costEuros: 0,
+    // Stage-2 plan fields stored on the scene for downstream readers.
+    brollKeywords: ps.brollHints,
+    brandAnchor: ps.brandAnchor,
+    musicCue: ps.musicCue,
+    continuityHint: ps.continuityHint,
+    negativePromptScene: ps.negativePromptScene,
   } as ComposerScene;
 }
 
