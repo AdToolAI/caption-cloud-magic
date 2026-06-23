@@ -43,6 +43,12 @@ interface Props {
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onApplyAssembly: (next: AssemblyConfig) => void;
   onApplied?: () => void;
+  /**
+   * Pre-loaded plan from the War Room flow. When set, the sheet opens
+   * directly on the review step — the legacy paste-and-parse UI is
+   * skipped. Used by the Briefing → Storyboard auto-analyse handoff.
+   */
+  initialPlan?: TProductionPlan | null;
 }
 
 export default function ProductionPlanSheet({
@@ -51,15 +57,24 @@ export default function ProductionPlanSheet({
   currentScenes, currentAssembly, currentBriefing,
   onUpdateBriefing, onUpdateScenes, onApplyAssembly,
   onApplied,
+  initialPlan,
 }: Props) {
-  const [step, setStep] = useState<Step>('paste');
+  const [step, setStep] = useState<Step>(initialPlan ? 'review' : 'paste');
   const [text, setText] = useState('');
-  const [plan, setPlan] = useState<TProductionPlan | null>(null);
+  const [plan, setPlan] = useState<TProductionPlan | null>(initialPlan ?? null);
   const [progress, setProgress] = useState<'A' | 'B' | null>(null);
   const [progressLabel, setProgressLabel] = useState('');
   const { characters, locations } = useUnifiedMentionLibrary();
   const applyPlan = useApplyProductionPlan();
   const [applying, setApplying] = useState(false);
+
+  // When a new initialPlan arrives (subsequent re-opens), refresh local state.
+  useEffect(() => {
+    if (initialPlan) {
+      setPlan(initialPlan);
+      setStep('review');
+    }
+  }, [initialPlan]);
 
   const charOptions = useMemo(
     () => (characters ?? []).map((c: any) => ({ id: c.id, name: c.name })),
