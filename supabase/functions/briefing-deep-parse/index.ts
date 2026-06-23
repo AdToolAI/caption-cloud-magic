@@ -633,6 +633,20 @@ Deno.serve(async (req) => {
 
     const plan = mergeManifestAndResolution(manifest, resolution);
 
+    try {
+      console.log('[briefing-deep-parse] plan summary', {
+        scenes: plan.scenes?.length ?? 0,
+        unresolved: plan.unresolved?.length ?? 0,
+        perScene: (plan.scenes ?? []).map((sc: any) => ({
+          index: sc.index,
+          cast: sc.cast?.length ?? 0,
+          hasLocation: !!sc.location,
+          engine: sc.engine,
+          durationSec: sc.durationSec,
+        })),
+      });
+    } catch (_) { /* noop */ }
+
     // ── Persist (versioned) ───────────────────────────────────────────────
     let version = 1;
     try {
