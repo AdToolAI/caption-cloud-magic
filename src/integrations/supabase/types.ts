@@ -5327,6 +5327,45 @@ export type Database = {
           },
         ]
       }
+      composer_production_plans: {
+        Row: {
+          created_at: string
+          id: string
+          manifest: Json
+          parser_meta: Json
+          project_id: string | null
+          source_text: string
+          unresolved: Json
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manifest: Json
+          parser_meta?: Json
+          project_id?: string | null
+          source_text: string
+          unresolved?: Json
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manifest?: Json
+          parser_meta?: Json
+          project_id?: string | null
+          source_text?: string
+          unresolved?: Json
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: []
+      }
       composer_projects: {
         Row: {
           ad_compliance_acknowledged: boolean
