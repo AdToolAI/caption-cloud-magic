@@ -1,98 +1,130 @@
-## Problem
+Verstanden — die Lip-Sync-Pipeline ist sakrosankt. Der Plan baut einen **kompletten Seitenpfad**, der die bestehende Pipeline nirgends anfasst.
 
-Aktuell akzeptiert der Composer-Briefing-Flow nur einen kurzen Textprompt → Ad/Auto-Director erzeugt daraus ein generisches Default-Storyboard (Hailuo, 4 Szenen, kein VO, kein Shot-Director, kein Cast-Override). Lange strukturierte Briefings (6–7 Seiten mit Skript-Tabelle, ElevenLabs-Settings, Caption-Style, Negative-Prompt) werden **inhaltlich nicht ausgewertet** — der Director sieht nur „erzeuge ein Werbevideo" und füllt die Felder selbst.
+## Konzept: 3 Phasen, 1 Source of Truth
 
-Ziel: Ein Briefing in Briefing-Tiefe (mehrere tausend Tokens, Markdown/Tabellen) soll **deterministisch** in Projekt-Settings + alle Szenen-Felder übersetzt werden, inkl. VO, Cast/Location-Mentions, Shot-Director, Captions, Negative Prompt.
-
----
-
-## Smarteste Lösung: 3-stufige Briefing-Pipeline
-
-Statt einen Mega-LLM-Call zu hoffen, wird das Briefing in **strukturierte Layer** zerlegt — jeder Layer schreibt deterministisch in genau die UI-Felder, die er befüllen darf. Das ist robust, debugbar, und skaliert auf 7+ Seiten ohne Halluzination.
-
-### Stufe 1 — Briefing-Parser (Edge Function `parse-briefing`)
-
-**Input:** Rohtext (Markdown, Tabellen, beliebige Länge bis ~30k Tokens) + optional Datei-Upload (PDF/DOCX → via `document--parse_document`-Äquivalent serverseitig).
-
-**Verarbeitung:**
-- Lovable AI Gateway, Modell `google/gemini-2.5-flash` (lang-Kontext, billig)
-- **Tool-Calling mit striktem Zod-Schema** statt freiem JSON — Gemini *muss* die Felder ausfüllen, kann nichts erfinden
-- Bei sehr langen Briefings: chunked-summarize-then-extract (erst Sektionen erkennen, dann pro Sektion extrahieren)
-
-**Output:** Ein normalisiertes `BriefingManifest`:
-
-```ts
-{
-  project: { name, aspectRatio, fps, totalDurationSec, platforms[] },
-  scenes: [{
-    index, label, durationSec, engine,
-    vo: { text, timecodeStart, timecodeEnd, delivery, speedMultiplier },
-    cast: [{ mentionKey, outfit? }],
-    location: { mentionKey },
-    shotDirector: { framing, angle, movement, lighting, stylePreset },
-    anchorPromptHintEN: string,
-    performance: { mimik?, gestik?, blick?, energy? },
-  }],
-  voice: { provider:'elevenlabs', voiceId, model, stability, similarityBoost, style, speakerBoost, requestStitching },
-  captions: { source, font, sizePx, color, strokeColor, strokePx, highlightColor, maxWordsPerCue, position, safeZonePct, burnIn, highlightWords[] },
-  negativePrompt: string,
-  unresolved: [{ field, reason, suggestion }] // alles was der Parser nicht 1:1 mappen konnte
-}
+```text
+[Briefing-Text]  ──►  [Deep-Parse]  ──►  [Production Plan]  ──►  [Storyboard]
+   roh oder Form        2-Pass AI         editierbares Formular     1:1 angelegt
+                        ~30-120s          = Single Source of Truth  
 ```
 
-### Stufe 2 — Resolver (clientseitig + Edge `resolve-briefing-mentions`)
+Der Plan ist das neue Herzstück. Storyboard wird nur noch aus dem Plan abgeleitet.
 
-Übersetzt **Briefing-Aliase → echte DB-IDs**:
+## Lip-Sync-Sicherheitsgarantien (nicht verhandelbar)
 
-- `@founder-avatar` → sucht in `brand_characters` (own + purchased via `useAccessibleCharacters`); wenn nicht gefunden → schlägt vor, einen anzulegen oder einen ähnlichen zu mappen
-- `@home-office` → analog `brand_locations`
-- `JBFqnCBsd6RMkjVDRZzb` (ElevenLabs Voice-ID) → validiert gegen `elevenlabs-voices.ts`
-- Style-Presets („Founder Authentic") → mappt auf `cinematicRealismPresets` / `composerVisualStyles`
-- Shot-Director-Werte → validiert gegen `shotDirector/` Enums (Framing/Angle/Movement/Lighting)
+Diese Regeln sind in jedem Stage des Plans verankert:
 
-Unresolved Items → werden im UI als **Briefing-Diff** angezeigt (siehe Stufe 3).
+1. **Keine Edits an Lip-Sync-Code.** Folgende Dateien/Functions werden NICHT angefasst:
+   - `compose-dialog-scene`, `poll-dialog-shots`, `sync-so-webhook`
+   - `compose-twoshot-lipsync`, `compose-lipsync-scene`
+   - `compose-video-clips`, `auto-director`
+   - `_shared/lipsync/*`, `useTwoShotAutoTrigger`, `propagateDialogLock`
+   - `dialog_shots`, `syncso_dispatch_log`, `syncso_inflight_jobs`, `dialog_dispatch_locks`
+   - Alle `mem://architecture/lipsync/*`-Regeln (sync-3 doc-strict, 8min Watchdog, ASD-Strategy, etc.) bleiben unverändert
 
-### Stufe 3 — Briefing Apply Sheet (UI)
+2. **Apply schreibt nur die gleichen Felder, die der Composer-UI heute auch schreibt.** Es benutzt `useComposerPersistence.ensureProjectPersisted` (existierender Pfad). Keine neuen DB-Writes auf Lip-Sync-Tabellen, keine direkten Updates auf `dialog_shots`, `dialog_locked_at`, `lock_reference_url`, `continuity_locked`, `lockSource`, `lipSyncStatus`, `lipSyncAppliedAt`, `lipSyncSourceClipUrl`.
 
-Nach Parse + Resolve öffnet sich ein **Review-Sheet** mit:
+3. **Dialog-Mode wird nur beim INITIALEN Erstellen einer Szene gesetzt.** Wenn der User später den Plan re-applied auf eine Szene mit `lipSyncStatus != null`, `clipUrl` gesetzt, oder `dialog_locked_at != null` → diese Szene wird übersprungen und im UI als "geschützt — bereits Lip-Synced" markiert. Kein Replace, kein Clear, kein Reset.
 
-- Linke Spalte: extrahierte Werte aus Briefing
-- Rechte Spalte: aktuelle Projekt-Werte
-- Pro Feld: Checkbox „übernehmen" (default ON)
-- Unresolved-Section mit Inline-Action („Avatar anlegen", „Voice mappen", …)
-- Footer: „Alles übernehmen" → schreibt deterministisch in Composer-State (Zustand-Store / DB)
+4. **DB-Replace ist scoped.** Der "alte Szenen löschen"-Schritt löscht ausschließlich Szenen, die alle folgenden Kriterien erfüllen:
+   - `clip_status = 'pending'` (nie generiert)
+   - `clip_url IS NULL`
+   - `lip_sync_status IS NULL`
+   - `dialog_locked_at IS NULL`
+   - keine Zeile in `dialog_shots` mit dieser `scene_id`
+   
+   Trifft auch nur eines nicht zu → Szene bleibt, Plan-Apply legt neue Szenen daneben an und warnt im UI ("3 alte Szenen geschützt, 3 neue angelegt").
 
-→ Damit ist die **Übernahme nachvollziehbar**, nicht magisch, und der User sieht sofort was wirklich gemappt wurde.
+5. **engineOverride/dialogMode wird respektvoll gemerged.** Der Apply setzt diese Felder nur, wenn die Zielszene neu erstellt wird. Bestehende Werte werden über die existierenden Pending-Resolver (`resolveLipSyncValue`, `resolveDialogModeValue`, `resolveEngineOverrideValue`) gelesen — wir umgehen sie nicht.
 
----
+6. **Kein Bypass von `propagateDialogLock`.** Nach jedem `setScenes` läuft die existierende Lock-Propagation. Der Apply ruft `setScenes` (nicht `setScenesLocalOnly`) auf, damit der normale Persistenz- und Lock-Pfad greift.
 
-## Wo das im Code andockt
+7. **Voice-Settings im AssemblyConfig — read-only für Lip-Sync.** Die `assemblyConfig.voiceover`-Felder (Voice-ID, Stability, Style, etc.) werden überschrieben, aber die Lip-Sync-Pipeline liest aus `dialogVoices`/`dialog_takes` pro Szene, nicht aus `assemblyConfig`. Trennung ist bereits da; wir bestätigen sie per Type-Cast-Tests.
 
-| Komponente | Verantwortlich |
-|---|---|
-| `supabase/functions/parse-briefing/index.ts` (neu) | Stufe 1, Tool-Calling, Zod-Schema |
-| `supabase/functions/resolve-briefing-mentions/index.ts` (neu) | Stufe 2, DB-Lookup |
-| `src/lib/video-composer/briefing/manifestSchema.ts` (neu) | Shared Zod-Schema (client + edge) |
-| `src/components/video-composer/briefing/BriefingApplySheet.tsx` (neu) | Stufe 3, Review-UI |
-| `src/components/video-composer/briefing/BriefingInput.tsx` (neu/erweitert) | Textarea + File-Upload (PDF/MD/TXT) → ruft `parse-briefing` |
-| `src/pages/VideoComposer/index.tsx` | Integriert „📋 Briefing importieren"-Button neben „Ad Director" / „Auto-Director" |
-| `src/hooks/useApplyBriefingManifest.ts` (neu) | Schreibt akzeptierte Felder in Composer-State (Szenen-CRUD, VO-Track, Captions-Config) |
+8. **Negative Prompt nur in `aiPrompt`-Suffix.** Wird als Klartext-Anhang gespeichert, nicht als neues DB-Feld. Lip-Sync-Renderer (`render-directors-cut`, Sync.so) ignorieren `aiPrompt` ohnehin.
 
----
+9. **Plan-Tabelle ist isoliert.** `composer_production_plans` ist eine neue Read-/Write-Insel. Keine Foreign Keys zu `dialog_shots`, `syncso_*`, `composer_scenes.dialog_*`. Lip-Sync-Edge-Functions referenzieren sie nicht.
 
-## Warum diese Lösung „smart" ist
+10. **Smoke-Test vor Merge.** Bevor der Plan-Pfad live geht, lokaler Durchlauf:
+    - Briefing mit Cinematic-Sync importieren → 3 neue Szenen
+    - Eine davon rendern lassen (echter Hailuo + Sync.so Pass)
+    - Re-Apply des gleichen Plans → die gerendete Szene bleibt unangetastet (Schutz Regel 3+4)
+    - `dialog_shots`/`syncso_dispatch_log` zeigen keine Drift
 
-1. **Deterministisch statt magisch** — Tool-Calling mit Zod erzwingt Struktur; Gemini kann keine Felder erfinden oder vergessen.
-2. **Skaliert auf 7+ Seiten** — Gemini 2.5 Flash hat 1M-Token-Context; chunked-extract als Fallback.
-3. **Robust gegen Halluzination** — Resolver-Stufe validiert gegen echte DB/Enums; Unresolved bleibt sichtbar statt still-falsch.
-4. **Wiederverwendbar** — gleicher `BriefingManifest` kann später auch im Ad Director / Email Director / Universal Creator angewendet werden.
-5. **User-Transparenz** — Review-Sheet zeigt was übernommen wird, bevor irgendwas geschrieben wird → kein „warum hat er das nicht gemacht?"-Moment mehr.
-6. **Refund-safe** — kein Credit-Verbrauch beim Parsen (nur Lovable-AI-Token, billig); Render läuft erst nach User-Bestätigung.
+## Phase 1 — Deep Parse (Backend)
 
----
+Neue Edge Function `briefing-deep-parse` (300s Timeout, separater Codepfad).
 
-## Offene Frage vor Build
+Zwei aufeinanderfolgende AI-Calls (Gemini 2.5 Pro, beide):
 
-Soll der Briefing-Importer (a) **nur in Motion Studio / Video Composer** verfügbar sein, oder (b) als **globales Tool** (Ad Director, Email Director, Universal Creator auch)? 
+1. **Pass A — Strukturextraktion** — Tool-Calling auf Roh-Text, deterministisches Mapping auf existierende Enums (Framing/Angle/Movement/Lighting). "Nichts erfinden"-Regel strikt.
 
-Empfehlung: (a) zuerst, weil dort der höchste Mehrwert ist und das Manifest-Schema sich am Composer-Feldset orientiert. Andere Studios in einer späteren Iteration anbinden, sobald das Schema stabil ist.
+2. **Pass B — Validierung & Anreicherung** — bekommt Manifest aus A + Library-Snapshot des Users (`brand_characters`, `brand_locations`, ElevenLabs-Voices). Resolviert `@founder-avatar`, prüft Dauer-Konsistenz, markiert offene Punkte mit konkretem Vorschlag.
+
+Ergebnis wird in neue Tabelle `composer_production_plans` versioniert gespeichert.
+
+## Phase 2 — Production Plan als Formular (UI)
+
+`ProductionPlanSheet` ersetzt den dünnen Review-Dialog:
+
+```text
+┌─ Projekt: Name · Plattform · 9:16 · 30fps · 15s ──────┐
+├─ Cast & Stimmen ──────────────────────────────────────┤
+│ @founder-avatar → [Founder Default ▼] Voice: George   │
+│   Lip-Sync: ON   Outfit: Casual                       │
+├─ Locations ───────────────────────────────────────────┤
+│ @home-office → [Home Office ▼]                        │
+├─ Szenen ──────────────────────────────────────────────┤
+│ S01 Pain · 5s · Cinematic-Sync · Lip-Sync ON          │
+│   VO · Shot · Cast · Performance                      │
+│   [🔒 Geschützt — bereits gerendert]  ← Regel 3       │
+├─ Voice/Captions/Negative Prompt ──────────────────────┤
+└────────────────────────────────────────────────────────┘
+  [⚠ 2 ungelöste Punkte]  [Plan anwenden →]
+```
+
+Alle Felder inline editierbar, live-validiert, "ungelöste Punkte" mit One-Click-Fix. Geschützte Szenen klar markiert.
+
+## Phase 3 — Apply (read-mostly, write-light)
+
+`useApplyProductionPlan` Hook:
+
+1. Lädt `composer_scenes` für das Projekt → filtert nach Schutz-Kriterien (Regel 4)
+2. Löscht nur ungeschützte alte Szenen via existierender Composer-Delete-Logik
+3. Legt neue Szenen via `ensureProjectPersisted` an — gleicher Pfad wie heute, gleiche Feld-Map
+4. Setzt `assemblyConfig` via `persistAssemblyConfig` — existierender Pfad
+5. Toast mit Diff: "3 neu · 0 ersetzt · 2 geschützt"
+6. Tab-Wechsel ins Storyboard
+
+## Phase 4 — Strukturierter Briefing-Input
+
+Im Import-Dialog Mode-Switch:
+- **Freitext**: wie bisher, KI parst
+- **Strukturiert**: aufklappbares Formular mit gleichen Feldern → wandelt direkt in Plan um
+
+Beide Modi enden im `ProductionPlanSheet`.
+
+## Was sich konkret ändert (Whitelist)
+
+**Neu (touchless für Lip-Sync):**
+- `supabase/functions/briefing-deep-parse/index.ts`
+- DB-Tabelle `composer_production_plans` (Versionierung, isoliert)
+- `src/lib/video-composer/briefing/productionPlan.ts`
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
+- `src/components/video-composer/briefing/StructuredBriefingForm.tsx`
+- `src/hooks/useApplyProductionPlan.ts` (mit Schutz-Filter)
+
+**Angepasst:**
+- `BriefingImportDialog` → Mode-Switch + Übergabe an Plan-Sheet
+- `VideoComposerDashboard` → neuer Handler `replaceStoryboardFromPlan` der die Schutz-Filter respektiert
+
+**Garantiert nicht angefasst:**
+- Alle Lip-Sync-Functions, -Tables, -Hooks, -Memory-Rules (siehe Garantie 1)
+
+## Realistisch?
+
+Ja. Der Plan-Pfad ist additiv und sandboxed. Die Schutz-Regeln 3+4 sind das einzige nicht-triviale Stück Logik — und sie sind in genau einem Hook (`useApplyProductionPlan`) konzentriert, mit Unit-Tests gegen alle 5 Schutz-Kriterien. 2 Minuten Verarbeitung sind ok; wir zeigen während Pass A/B eine Progress-Card.
+
+Reihenfolge — welche bevorzugst du?
+- **Variante A**: Komplettpaket in einem Rutsch (Deep-Parse + Plan-Sheet + Apply + DB-Schutz + strukturierter Input)
+- **Variante B**: Erst Deep-Parse + Plan-Sheet + Apply mit Schutz-Filter (löst dein 4-Szenen-Problem); strukturierter Input später

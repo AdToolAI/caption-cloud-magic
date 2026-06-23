@@ -1,0 +1,514 @@
+// supabase/functions/briefing-deep-parse/index.ts
+//
+// 2-pass deep parser. Pass A extracts a structured manifest from the raw
+// briefing text. Pass B resolves @-mentions against the user's library,
+// validates consistency, and produces a final ProductionPlan.
+//
+// No credits are deducted. NO writes to lipsync tables — only inserts into
+// `composer_production_plans` for versioning.
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
+};
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
+
+// ── Enums (mirror src/lib/.../manifestSchema.ts) ─────────────────────────────
+
+const FRAMING = ['extreme-wide','wide','medium-wide','medium','medium-close-up','close-up','extreme-close-up'];
+const ANGLE = ['eye-level','low-angle','high-angle','dutch-angle','over-the-shoulder','three-quarter','profile','frontal'];
+const MOVEMENT = ['static','slow-push-in','push-in','pull-out','pan-left','pan-right','tilt-up','tilt-down','tracking','handheld','orbital','crane-up','crane-down','lean-in'];
+const LIGHTING = ['natural','soft-window','hard-window','golden-hour','blue-hour','low-key','high-key','rim','backlit','practical','studio-softbox','neon','overcast'];
+const ENGINE = ['auto','broll','heygen','sync-polish','cinematic-sync','sync-segments','native-dialogue'];
+
+// ── Pass A — Structural extraction ───────────────────────────────────────────
+
+const TOOL_PASS_A = {
+  type: 'function',
+  function: {
+    name: 'emitBriefingManifest',
+    description:
+      'Extract a strict structured manifest from the briefing. Capture EVERY concrete value the briefing names: scene durations, voiceover lines with timecodes, ElevenLabs voice id/model/stability/similarity/style/speed/speaker_boost, caption style, highlight words, negative prompt, cast/location mentions (@…), shot framing/angle/movement/lighting per scene, anchor prompt hints (English). DO NOT invent. Leave optional fields undefined when not stated. If the briefing says "3 scenes × 5s = 15s" then emit exactly 3 scenes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        project: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            aspectRatio: { type: 'string', enum: ['16:9','9:16','1:1','4:5'] },
+            fps: { type: 'integer', enum: [24,25,30,60] },
+            totalDurationSec: { type: 'number' },
+            platforms: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        scenes: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              index: { type: 'integer' },
+              label: { type: 'string' },
+              beat: { type: 'string', description: 'Pain | Reveal | Solution | CTA | Hook | …' },
+              durationSec: { type: 'number' },
+              engine: { type: 'string', enum: ENGINE },
+              lipSync: { type: 'boolean' },
+              voiceover: {
+                type: 'object',
+                properties: {
+                  text: { type: 'string' },
+                  timecodeStartSec: { type: 'number' },
+                  timecodeEndSec: { type: 'number' },
+                  delivery: { type: 'string' },
+                  speedMultiplier: { type: 'number' },
+                },
+              },
+              cast: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    mentionKey: { type: 'string' },
+                    outfit: { type: 'string' },
+                  },
+                  required: ['mentionKey'],
+                },
+              },
+              location: {
+                type: 'object',
+                properties: { mentionKey: { type: 'string' } },
+                required: ['mentionKey'],
+              },
+              shotDirector: {
+                type: 'object',
+                properties: {
+                  framing: { type: 'string', enum: FRAMING },
+                  angle: { type: 'string', enum: ANGLE },
+                  movement: { type: 'string', enum: MOVEMENT },
+                  lighting: { type: 'string', enum: LIGHTING },
+                  stylePreset: { type: 'string' },
+                },
+              },
+              anchorPromptEN: { type: 'string' },
+              performance: {
+                type: 'object',
+                properties: {
+                  mimik: { type: 'string' },
+                  gestik: { type: 'string' },
+                  blick: { type: 'string' },
+                  energy: { type: 'integer' },
+                },
+              },
+            },
+            required: ['index', 'durationSec'],
+          },
+        },
+        voice: {
+          type: 'object',
+          properties: {
+            provider: { type: 'string', enum: ['elevenlabs'] },
+            voiceId: { type: 'string' },
+            voiceName: { type: 'string' },
+            model: { type: 'string' },
+            stability: { type: 'number' },
+            similarityBoost: { type: 'number' },
+            style: { type: 'number' },
+            speakerBoost: { type: 'boolean' },
+            speed: { type: 'number' },
+            requestStitching: { type: 'boolean' },
+          },
+        },
+        captions: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean' },
+            source: { type: 'string', enum: ['auto-from-vo','manual'] },
+            font: { type: 'string' },
+            sizePx: { type: 'integer' },
+            color: { type: 'string' },
+            strokeColor: { type: 'string' },
+            strokePx: { type: 'integer' },
+            highlightColor: { type: 'string' },
+            maxWordsPerCue: { type: 'integer' },
+            position: { type: 'string', enum: ['top','bottom','center'] },
+            safeZonePct: { type: 'integer' },
+            burnIn: { type: 'boolean' },
+            highlightWords: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        negativePrompt: { type: 'string' },
+      },
+      required: ['scenes'],
+    },
+  },
+};
+
+const SYSTEM_PASS_A = `You are a precision parser for video production briefings.
+
+Your job: read the ENTIRE briefing and emit a strict manifest via the emitBriefingManifest tool.
+
+Rules:
+- Read tables, bullet lists, and prose as equally valid sources.
+- If the briefing says "3 scenes × 5s = 15s" or lists "Szene 1 … Szene 3", emit EXACTLY that many scenes — never more, never fewer.
+- Map shot framing/angle/movement/lighting to the provided enum values (closest match). Omit when no match.
+- "Cinematic-Sync", "Sync-Polish", "HeyGen", "B-Roll", "Native Dialogue" engine names map to the engine enum verbatim (lowercased + hyphenated).
+- Set lipSync=true when the scene explicitly uses an engine with lip-sync (cinematic-sync, sync-polish, sync-segments, native-dialogue, heygen) or names a speaking on-camera character with VO.
+- Voice IDs like "JBFqnCBsd6RMkjVDRZzb" go into voice.voiceId; names like "George" into voice.voiceName.
+- Mentions keep the leading "@" verbatim (e.g. "@founder-avatar", "@home-office") — the resolver maps them to DB IDs later.
+- For VO timecodes prefer timecodeStartSec / timecodeEndSec in seconds.
+- DO NOT invent fields the briefing does not state. Leave optional fields undefined.`;
+
+// ── Pass B — Resolution & validation ─────────────────────────────────────────
+
+const TOOL_PASS_B = {
+  type: 'function',
+  function: {
+    name: 'emitProductionPlan',
+    description:
+      'Take a parsed manifest plus the user library and emit a final ProductionPlan with resolved cast/location IDs, voice IDs per character, and a list of unresolved issues with concrete suggestions.',
+    parameters: {
+      type: 'object',
+      properties: {
+        scenes: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              index: { type: 'integer' },
+              cast: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    mentionKey: { type: 'string' },
+                    characterId: { type: 'string', nullable: true },
+                    characterName: { type: 'string' },
+                    voiceId: { type: 'string', nullable: true },
+                    voiceName: { type: 'string' },
+                    outfit: { type: 'string' },
+                  },
+                  required: ['mentionKey', 'characterName'],
+                },
+              },
+              location: {
+                type: 'object',
+                properties: {
+                  mentionKey: { type: 'string' },
+                  locationId: { type: 'string', nullable: true },
+                  locationName: { type: 'string' },
+                },
+                required: ['mentionKey', 'locationName'],
+              },
+            },
+            required: ['index'],
+          },
+        },
+        voice: {
+          type: 'object',
+          properties: {
+            voiceId: { type: 'string' },
+            voiceName: { type: 'string' },
+          },
+        },
+        unresolved: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              field: { type: 'string' },
+              reason: { type: 'string' },
+              suggestion: { type: 'string' },
+              severity: { type: 'string', enum: ['info','warn','error'] },
+            },
+            required: ['field', 'reason'],
+          },
+        },
+      },
+      required: ['scenes', 'unresolved'],
+    },
+  },
+};
+
+const SYSTEM_PASS_B = `You validate and resolve a parsed briefing manifest against the user's actual asset library.
+
+You receive:
+- MANIFEST: the structural extraction from pass A
+- LIBRARY.characters: brand_characters available to the user (id, name, default_voice_id)
+- LIBRARY.locations: brand_locations available to the user (id, name)
+- LIBRARY.voices: ElevenLabs voices known to the system (id, name, language)
+
+Resolve every cast mention (@founder-avatar etc.) and every location mention (@home-office etc.) to a library entry. Normalize: strip "@", lowercase, remove separators (- _ space), allow substring match in either direction. When unresolved, set characterId/locationId = null and add an unresolved item with severity=warn and a clear suggestion like "Avatar 'Founder Default' im Library nicht gefunden — manuell zuordnen".
+
+For voice resolution:
+- If the briefing names a voice (id OR name), resolve to LIBRARY.voices and copy voiceId/voiceName to the project-level voice settings.
+- For each cast member, copy default_voice_id from the matched brand_character into ResolvedCast.voiceId, or null if missing.
+
+Consistency checks (each becomes an unresolved entry when violated):
+- Sum of scene durationSec must equal project.totalDurationSec (severity=warn).
+- Every cinematic-sync / heygen / sync-* / native-dialogue scene MUST have at least one cast member (severity=error if none).
+- VO timecodes within a scene must fit inside its durationSec (severity=warn).
+
+DO NOT invent IDs. Only emit characterId / locationId that exist in LIBRARY. If you are unsure, set null and add an unresolved entry.`;
+
+interface CallOpts { model: string; system: string; tool: any; user: string; }
+
+async function callGateway(opts: CallOpts) {
+  const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: opts.model,
+      messages: [
+        { role: 'system', content: opts.system },
+        { role: 'user', content: opts.user },
+      ],
+      tools: [opts.tool],
+      tool_choice: { type: 'function', function: { name: opts.tool.function.name } },
+      max_tokens: 12000,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    const err: any = new Error(`gateway ${res.status}: ${text.slice(0, 400)}`);
+    err.status = res.status;
+    throw err;
+  }
+  const json = await res.json();
+  const call = json?.choices?.[0]?.message?.tool_calls?.[0];
+  if (!call?.function?.arguments) throw new Error('no tool call returned');
+  return JSON.parse(call.function.arguments);
+}
+
+function normalizeMention(s: string): string {
+  return String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
+}
+
+function mergeManifestAndResolution(manifest: any, resolution: any) {
+  const scenesById = new Map<number, any>();
+  for (const s of resolution?.scenes ?? []) {
+    if (typeof s?.index === 'number') scenesById.set(s.index, s);
+  }
+  const scenes = (manifest?.scenes ?? []).map((s: any) => {
+    const r = scenesById.get(s.index);
+    const cast = (s.cast ?? []).map((c: any) => {
+      const rCast = (r?.cast ?? []).find((x: any) => x.mentionKey === c.mentionKey);
+      return {
+        mentionKey: c.mentionKey,
+        outfit: c.outfit ?? rCast?.outfit,
+        characterId: rCast?.characterId ?? null,
+        characterName: rCast?.characterName ?? c.mentionKey.replace(/^@/, ''),
+        voiceId: rCast?.voiceId ?? null,
+        voiceName: rCast?.voiceName,
+        referenceImageUrl: null,
+      };
+    });
+    const location = s.location ? (() => {
+      const r2 = r?.location;
+      return {
+        mentionKey: s.location.mentionKey,
+        locationId: r2?.locationId ?? null,
+        locationName: r2?.locationName ?? s.location.mentionKey.replace(/^@/, ''),
+      };
+    })() : undefined;
+    return {
+      ...s,
+      lipSync: s.lipSync === true
+        || ['cinematic-sync','sync-polish','sync-segments','native-dialogue','heygen'].includes(s.engine),
+      cast,
+      location,
+    };
+  });
+
+  return {
+    project: manifest?.project,
+    scenes,
+    voice: {
+      ...(manifest?.voice ?? {}),
+      voiceId: resolution?.voice?.voiceId ?? manifest?.voice?.voiceId,
+      voiceName: resolution?.voice?.voiceName ?? manifest?.voice?.voiceName,
+      provider: 'elevenlabs',
+      requestStitching: manifest?.voice?.requestStitching ?? true,
+    },
+    captions: manifest?.captions,
+    negativePrompt: manifest?.negativePrompt,
+    unresolved: resolution?.unresolved ?? [],
+  };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const userId = userRes.user.id;
+
+    const body = await req.json().catch(() => ({}));
+    const briefing: string = String(body?.briefing ?? '').trim();
+    const projectId: string | null = body?.projectId ?? null;
+    if (!briefing) {
+      return new Response(JSON.stringify({ error: 'briefing text required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (briefing.length > 120_000) {
+      return new Response(JSON.stringify({ error: 'briefing too long (max ~120k chars)' }), {
+        status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const t0 = Date.now();
+
+    // ── Pass A — structural extraction (Gemini 2.5 Pro for quality) ───────
+    const manifest = await callGateway({
+      model: 'google/gemini-2.5-pro',
+      system: SYSTEM_PASS_A,
+      tool: TOOL_PASS_A,
+      user: `BRIEFING:\n\n${briefing}`,
+    });
+    const tA = Date.now();
+
+    // ── Library snapshot (small, no PII) ──────────────────────────────────
+    const [charRes, locRes] = await Promise.all([
+      supabase
+        .from('brand_characters')
+        .select('id,name,default_voice_id')
+        .eq('user_id', userId)
+        .limit(200),
+      supabase
+        .from('brand_locations')
+        .select('id,name')
+        .eq('user_id', userId)
+        .limit(200),
+    ]);
+    const characters = charRes.data ?? [];
+    const locations = locRes.data ?? [];
+
+    // Curated voice list (mirror of src/lib/elevenlabs-voices catalog).
+    const voices = [
+      { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', language: 'multilingual' },
+      { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice', language: 'multilingual' },
+      { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', language: 'multilingual' },
+      { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger', language: 'multilingual' },
+      { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', language: 'multilingual' },
+      { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', language: 'multilingual' },
+      { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', language: 'multilingual' },
+      { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', language: 'multilingual' },
+      { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric', language: 'multilingual' },
+      { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris', language: 'multilingual' },
+      { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', language: 'multilingual' },
+      { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', language: 'multilingual' },
+      { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', language: 'multilingual' },
+      { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill', language: 'multilingual' },
+    ];
+
+    // ── Pass B — resolution + validation ──────────────────────────────────
+    let resolution: any = { scenes: [], unresolved: [] };
+    try {
+      resolution = await callGateway({
+        model: 'google/gemini-2.5-pro',
+        system: SYSTEM_PASS_B,
+        tool: TOOL_PASS_B,
+        user: JSON.stringify({
+          MANIFEST: manifest,
+          LIBRARY: { characters, locations, voices },
+        }),
+      });
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] Pass B failed, falling back to local resolution:', e?.message);
+      // Local fallback resolution
+      const resolvedScenes = (manifest?.scenes ?? []).map((s: any) => {
+        const cast = (s.cast ?? []).map((c: any) => {
+          const needle = normalizeMention(c.mentionKey);
+          const hit = characters.find((ch: any) => {
+            const n = normalizeMention(ch.name);
+            return n.includes(needle) || needle.includes(n);
+          });
+          return {
+            mentionKey: c.mentionKey,
+            characterId: hit?.id ?? null,
+            characterName: hit?.name ?? c.mentionKey.replace(/^@/, ''),
+            voiceId: hit?.default_voice_id ?? null,
+            outfit: c.outfit,
+          };
+        });
+        let location;
+        if (s.location?.mentionKey) {
+          const needle = normalizeMention(s.location.mentionKey);
+          const hit = locations.find((l: any) => {
+            const n = normalizeMention(l.name);
+            return n.includes(needle) || needle.includes(n);
+          });
+          location = {
+            mentionKey: s.location.mentionKey,
+            locationId: hit?.id ?? null,
+            locationName: hit?.name ?? s.location.mentionKey.replace(/^@/, ''),
+          };
+        }
+        return { index: s.index, cast, location };
+      });
+      resolution = { scenes: resolvedScenes, unresolved: [] };
+    }
+    const tB = Date.now();
+
+    const plan = mergeManifestAndResolution(manifest, resolution);
+
+    // ── Persist (versioned) ───────────────────────────────────────────────
+    let version = 1;
+    try {
+      if (projectId) {
+        const { data: prev } = await supabase
+          .from('composer_production_plans')
+          .select('version')
+          .eq('project_id', projectId)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (prev?.version) version = (prev.version as number) + 1;
+      }
+      await supabase.from('composer_production_plans').insert({
+        user_id: userId,
+        project_id: projectId,
+        version,
+        source_text: briefing,
+        manifest: plan,
+        unresolved: plan.unresolved,
+        parser_meta: {
+          passA_ms: tA - t0,
+          passB_ms: tB - tA,
+          total_ms: Date.now() - t0,
+          model: 'gemini-2.5-pro',
+        },
+      });
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] persist failed (non-fatal):', e?.message);
+    }
+
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA } }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (e: any) {
+    const status = e?.status === 429 ? 429 : e?.status === 402 ? 402 : 500;
+    console.error('[briefing-deep-parse] error:', e?.message);
+    return new Response(JSON.stringify({ error: e?.message ?? 'deep parse failed' }), {
+      status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
