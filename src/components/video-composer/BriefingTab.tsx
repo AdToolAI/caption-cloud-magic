@@ -18,6 +18,7 @@ import {
   Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp, FileText,
 } from 'lucide-react';
 import BriefingImportDialog from './briefing/BriefingImportDialog';
+import ProductionPlanSheet from './briefing/ProductionPlanSheet';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { extractFunctionsError } from '@/lib/functionsError';
@@ -492,29 +493,32 @@ export default function BriefingTab({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Briefing Import — paste a long-form briefing → AI parses → review → apply */}
+      {/* Production Plan — deep-parse a full briefing into an editable, lipsync-safe Drehbuch */}
       <div className="flex items-center justify-between rounded-lg border border-amber-300/30 bg-amber-300/[0.04] p-3">
         <div className="flex items-center gap-2.5 text-sm">
           <FileText className="h-4 w-4 text-amber-300" />
           <div>
-            <div className="font-medium">Vollständiges Briefing einfügen</div>
-            <div className="text-xs text-muted-foreground">Skript-Tabelle · Voice-Settings · Captions · Negative Prompt — 1:1 in Szenen übernehmen.</div>
+            <div className="font-medium">Production Plan aus Briefing</div>
+            <div className="text-xs text-muted-foreground">2-Pass-KI · Tabellen, VO-Skript, Cast, Captions, Negative Prompt — Lip-Sync-Pipeline bleibt geschützt.</div>
           </div>
         </div>
         <Button size="sm" variant="outline" className="border-amber-300/40 hover:bg-amber-300/10" onClick={() => setBriefingImportOpen(true)}>
-          Briefing importieren
+          Briefing analysieren
         </Button>
       </div>
 
-      <BriefingImportDialog
+      <ProductionPlanSheet
         open={briefingImportOpen}
         onOpenChange={setBriefingImportOpen}
+        projectId={scenes?.[0]?.projectId}
+        language={language}
         currentScenes={scenes ?? []}
         currentAssembly={assemblyConfig}
         currentBriefing={briefing}
         onUpdateBriefing={onUpdateBriefing}
         onUpdateScenes={(next) => onUpdateScenes?.(next)}
         onApplyAssembly={(next) => onApplyAssembly?.(next)}
+        onApplied={() => onGoToStoryboard()}
       />
 
       {/* Film-strip Mode Selector — visible Quick / Direct / Studio reels */}
