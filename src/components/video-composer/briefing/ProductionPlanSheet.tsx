@@ -516,6 +516,7 @@ export default function ProductionPlanSheet({
                     </div>
                   ))}
                 </div>
+                )}
               </SectionCard>
 
               {/* Voice */}
