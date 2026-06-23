@@ -17,7 +17,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
+import { ProductionPlan, PlanScene, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 import { toast } from '@/hooks/use-toast';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
 
@@ -163,10 +163,42 @@ export function useStoryboardTransition({
       if (cancelledRef.current) return { handled: true };
       if (error) throw error;
 
+      let plan: TProductionPlan | null = null;
+      let droppedScenes = 0;
+
       const parsed = ProductionPlan.safeParse(data?.plan);
-      if (!parsed.success) {
-        console.warn('[useStoryboardTransition] plan validation failed', parsed.error);
-        throw new Error('Plan-Validierung fehlgeschlagen');
+      if (parsed.success) {
+        plan = parsed.data;
+      } else {
+        // Per-scene recovery: keep what we can.
+        console.error('[useStoryboardTransition] plan validation failed', parsed.error.flatten());
+        const rawScenes: any[] = Array.isArray(data?.plan?.scenes) ? data.plan.scenes : [];
+        const survivors: any[] = [];
+        for (const s of rawScenes) {
+          const sp = PlanScene.safeParse(s);
+          if (sp.success) survivors.push(sp.data);
+          else droppedScenes += 1;
+        }
+        if (survivors.length > 0) {
+          const retry = ProductionPlan.safeParse({ ...(data?.plan ?? {}), scenes: survivors });
+          if (retry.success) {
+            plan = retry.data;
+          } else {
+            console.error('[useStoryboardTransition] retry failed', retry.error.flatten());
+          }
+        }
+        if (!plan) {
+          const issues = parsed.error.issues.slice(0, 2)
+            .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
+            .join(' · ');
+          throw new Error(`Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}`);
+        }
+        if (droppedScenes > 0) {
+          toast({
+            title: 'Plan teilweise übernommen',
+            description: `${droppedScenes} Szene(n) konnten nicht validiert werden und wurden übersprungen.`,
+          });
+        }
       }
 
       // Smoothly drive the bar to 100% before swapping to the plan sheet.
@@ -179,7 +211,7 @@ export function useStoryboardTransition({
         progress: 0,
         phaseLabel: '',
         planSheetOpen: true,
-        initialPlan: parsed.data,
+        initialPlan: plan,
       });
       return { handled: true };
     } catch (e: any) {

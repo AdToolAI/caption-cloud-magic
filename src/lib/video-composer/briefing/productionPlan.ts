@@ -51,12 +51,12 @@ export const PlanScene = z.object({
   /** Pain / Reveal / CTA / etc. */
   beat: z.string().max(80).optional(),
 
-  durationSec: z.number().min(1).max(60),
+  durationSec: z.number().min(1).max(60).catch(5),
 
-  /** Composer engineOverride — kept narrow to existing union. */
+  /** Composer engineOverride — kept narrow to existing union. Fremdwerte fallen auf 'auto' zurück. */
   engine: z.enum([
     'auto', 'broll', 'heygen', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue',
-  ]).default('auto'),
+  ]).default('auto').catch('auto'),
 
   /** Whether this scene needs lip-sync. Only sets `dialogMode` on NEW scenes; existing rows untouched. */
   lipSync: z.boolean().default(false),
