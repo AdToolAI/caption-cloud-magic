@@ -209,7 +209,7 @@ export function useApplyBriefingManifest() {
         ...assembly,
         subtitles: {
           enabled: c.enabled ?? true,
-          language: currentBriefing?.language ?? 'de',
+          language: (currentBriefing as any)?.language ?? 'de',
           style: {
             font: c.font ?? 'Inter',
             size: c.sizePx ?? 64,
