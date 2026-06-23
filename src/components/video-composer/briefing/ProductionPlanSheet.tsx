@@ -330,6 +330,63 @@ export default function ProductionPlanSheet({
                         </div>
                       )}
 
+                      {/* Dialog turns (multi-speaker, lipsync-ready) */}
+                      {(s.dialogTurns ?? []).length > 0 && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Dialog ({s.dialogTurns!.length} Turn{s.dialogTurns!.length === 1 ? '' : 's'})
+                          </Label>
+                          <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 space-y-1 font-mono text-[11px]">
+                            {s.dialogTurns!.map((t, i) => (
+                              <div key={i}>
+                                <span className="text-amber-300">
+                                  {t.speakerMentionKey.replace(/^@/, '').toUpperCase()}
+                                  {t.mood ? ` — ${t.mood.toUpperCase()}` : ''}:
+                                </span>{' '}
+                                <span className="text-muted-foreground">{t.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stage-2 plan extras: brollHints / brandAnchor / continuity / music / per-scene negative */}
+                      {(s.brollHints?.length || s.brandAnchor || s.musicCue || s.continuityHint || s.negativePromptScene) && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Plan-Extras</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {(s.brollHints ?? []).map((h, i) => (
+                              <Badge key={`br-${i}`} variant="outline" className="text-[10px]">B-Roll: {h}</Badge>
+                            ))}
+                            {s.brandAnchor?.logoEndcard && (
+                              <Badge variant="outline" className="text-[10px] border-amber-300/40 text-amber-300">Logo-Endcard</Badge>
+                            )}
+                            {s.brandAnchor?.primaryColorOverride && (
+                              <Badge variant="outline" className="text-[10px]">Brand-Color: {s.brandAnchor.primaryColorOverride}</Badge>
+                            )}
+                            {s.brandAnchor?.fontOverride && (
+                              <Badge variant="outline" className="text-[10px]">Font: {s.brandAnchor.fontOverride}</Badge>
+                            )}
+                            {s.musicCue?.energy && (
+                              <Badge variant="outline" className="text-[10px]">♪ {s.musicCue.energy}{s.musicCue.marker ? ` · ${s.musicCue.marker}` : ''}</Badge>
+                            )}
+                            {s.continuityHint && (
+                              <Badge variant="outline" className="text-[10px]">Continuity: {s.continuityHint}</Badge>
+                            )}
+                            {s.negativePromptScene && (
+                              <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">--no {s.negativePromptScene.slice(0, 60)}{s.negativePromptScene.length > 60 ? '…' : ''}</Badge>
+                            )}
+                          </div>
+                          {s.brandAnchor?.note && (
+                            <div className="text-[11px] italic text-muted-foreground">Brand-Note: {s.brandAnchor.note}</div>
+                          )}
+                          {s.musicCue?.note && (
+                            <div className="text-[11px] italic text-muted-foreground">Music: {s.musicCue.note}</div>
+                          )}
+                        </div>
+                      )}
+
+
                       {s.shotDirector && (
                         <div className="flex flex-wrap gap-1">
                           {s.shotDirector.framing && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.framing}</Badge>}
