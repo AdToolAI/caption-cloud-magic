@@ -4,6 +4,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 const LS_AUTOSTART_DONE = "adtool-tour-autostart-done";
+const LS_TOUR_COMPLETED = "adtool-tour-completed-v1";
+
+const readLocalCompleted = (): boolean => {
+  try {
+    return localStorage.getItem(LS_TOUR_COMPLETED) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const writeLocalCompleted = () => {
+  try {
+    localStorage.setItem(LS_TOUR_COMPLETED, "1");
+    sessionStorage.setItem(LS_AUTOSTART_DONE, "1");
+  } catch {
+    /* ignore */
+  }
+};
 
 export const useProductTour = () => {
   const { user } = useAuth();
@@ -11,6 +29,7 @@ export const useProductTour = () => {
   const [run, setRun] = useState(false);
   const [tourCompletedAt, setTourCompletedAt] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [locallyCompleted, setLocallyCompleted] = useState<boolean>(() => readLocalCompleted());
 
   // Load tour state from DB
   useEffect(() => {
@@ -26,7 +45,13 @@ export const useProductTour = () => {
         .eq("id", user.id)
         .maybeSingle();
       if (!cancelled) {
-        setTourCompletedAt((data as any)?.tour_completed_at ?? null);
+        const serverCompleted = (data as any)?.tour_completed_at ?? null;
+        setTourCompletedAt(serverCompleted);
+        // Mirror server state to localStorage so future loads are instant & robust
+        if (serverCompleted) {
+          writeLocalCompleted();
+          setLocallyCompleted(true);
+        }
         setLoaded(true);
       }
     })();
@@ -39,26 +64,38 @@ export const useProductTour = () => {
   useEffect(() => {
     if (!loaded || !user) return;
     if (tourCompletedAt) return;
+    if (locallyCompleted) return;
     if (location.pathname !== "/home") return;
     if (sessionStorage.getItem(LS_AUTOSTART_DONE) === "1") return;
 
     // Tiny delay to let DOM settle (lazy routes / animations)
     const t = setTimeout(() => {
       setRun(true);
-      sessionStorage.setItem(LS_AUTOSTART_DONE, "1");
+      try {
+        sessionStorage.setItem(LS_AUTOSTART_DONE, "1");
+      } catch {
+        /* ignore */
+      }
     }, 1200);
     return () => clearTimeout(t);
-  }, [loaded, user, tourCompletedAt, location.pathname]);
+  }, [loaded, user, tourCompletedAt, locallyCompleted, location.pathname]);
 
   const markCompleted = useCallback(async () => {
     setRun(false);
+    // Persist locally FIRST so UI is stable even if backend write is slow/fails
+    writeLocalCompleted();
+    setLocallyCompleted(true);
     if (!user) return;
     const now = new Date().toISOString();
     setTourCompletedAt(now);
-    await supabase
-      .from("profiles")
-      .update({ tour_completed_at: now } as any)
-      .eq("id", user.id);
+    try {
+      await supabase
+        .from("profiles")
+        .update({ tour_completed_at: now } as any)
+        .eq("id", user.id);
+    } catch {
+      /* local marker already prevents re-show */
+    }
   }, [user]);
 
   const startTour = useCallback(() => {
@@ -76,6 +113,6 @@ export const useProductTour = () => {
     markCompleted,
     skipTour,
     startTour,
-    isCompleted: !!tourCompletedAt,
+    isCompleted: !!tourCompletedAt || locallyCompleted,
   };
 };
