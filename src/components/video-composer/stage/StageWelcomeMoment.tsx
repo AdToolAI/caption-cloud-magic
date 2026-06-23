@@ -68,15 +68,18 @@ export default function StageWelcomeMoment() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Skip the cinematic welcome on browser reloads (F5 / Cmd-R / refresh
-    // button). The intro should only play on a fresh navigation to the
-    // Motion Studio (sidebar click, direct URL) — reloading mid-work
-    // shouldn't replay the 3.8s sequence every time.
+    // Skip on browser reloads (F5 / Cmd-R).
     if (isPageReload()) {
       setPhase("done");
       return;
     }
-    void SESSION_KEY;
+    // Gate: only play when triggered via Sidebar "Erstellen" → Motion Studio,
+    // and at most once per calendar day.
+    if (!shouldPlayIntro()) {
+      setPhase("done");
+      return;
+    }
+    markIntroPlayed();
     setPhase("playing");
 
     if (reducedMotion) {
