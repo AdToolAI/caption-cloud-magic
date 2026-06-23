@@ -436,7 +436,7 @@ export function useApplyProductionPlan() {
       .slice()
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
-        planSceneToComposerScene(s, protectedScenes.length + i, projectId ?? '', plan.negativePrompt),
+        planSceneToComposerScene(s, protectedScenes.length + i, projectId ?? '', plan.negativePrompt, currentBriefing?.tone),
       );
 
     // 4) Hard-delete deletableScenes from DB (so realtime doesn't bring them back).
