@@ -1,130 +1,118 @@
-Verstanden — die Lip-Sync-Pipeline ist sakrosankt. Der Plan baut einen **kompletten Seitenpfad**, der die bestehende Pipeline nirgends anfasst.
 
-## Konzept: 3 Phasen, 1 Source of Truth
+## Ziel
 
-```text
-[Briefing-Text]  ──►  [Deep-Parse]  ──►  [Production Plan]  ──►  [Storyboard]
-   roh oder Form        2-Pass AI         editierbares Formular     1:1 angelegt
-                        ~30-120s          = Single Source of Truth  
-```
+Die "Briefing analysieren"-Karte verschwindet als separater Button. Stattdessen wird die 2-Pass-Analyse **automatisch** beim Wechsel von Briefing → Storyboard ausgelöst. Während der 1–2 Minuten erscheint ein vollflächiger **"Production War Room"** im James-Bond-2028-Look mit lebendigem News-Ticker und TrendRadar — danach öffnet sich der Plan-Review (bisheriges `ProductionPlanSheet`) wie heute. Zusätzlich wird der Plan-Schema-Umfang geprüft und gezielt erweitert, damit Plan + Storyboard wirklich alles aus dem Briefing tragen.
 
-Der Plan ist das neue Herzstück. Storyboard wird nur noch aus dem Plan abgeleitet.
+## Was sich für den Nutzer ändert
 
-## Lip-Sync-Sicherheitsgarantien (nicht verhandelbar)
+1. **Briefing-Tab**: Karte "Production Plan aus Briefing → Briefing analysieren" wird entfernt.
+2. **Storyboard-Übergang**: Beim Klick auf "Storyboard" (Stepper) oder "Weiter zu Storyboard" läuft:
+   - **Guard**: Wenn das Storyboard bereits Szenen enthält ODER eine Szene `rendered`/`lip-sync-aktiv` ist → **kein Re-Analyse**, direkter Wechsel (Lip-Sync-Schutz bleibt).
+   - **Sonst**: Production-War-Room-Overlay öffnet sich, Edge-Function `briefing-deep-parse` läuft im Hintergrund (Pass A + B, ~60–120s).
+   - Nach Erfolg: Overlay schließt → bestehendes `ProductionPlanSheet` öffnet sich → User reviewed → "Plan anwenden" generiert Szenen → Stepper springt auf Storyboard.
+   - Bei Fehler: Toast, User bleibt im Briefing, kann manuell weiter.
+3. **Manueller Re-Trigger**: kleiner Secondary-Button "Plan neu erstellen" oben rechts in Briefing/Storyboard (für Edge-Cases), gated mit Lip-Sync-Warnung.
 
-Diese Regeln sind in jedem Stage des Plans verankert:
+## Production War Room (2028-Style Loading)
 
-1. **Keine Edits an Lip-Sync-Code.** Folgende Dateien/Functions werden NICHT angefasst:
-   - `compose-dialog-scene`, `poll-dialog-shots`, `sync-so-webhook`
-   - `compose-twoshot-lipsync`, `compose-lipsync-scene`
-   - `compose-video-clips`, `auto-director`
-   - `_shared/lipsync/*`, `useTwoShotAutoTrigger`, `propagateDialogLock`
-   - `dialog_shots`, `syncso_dispatch_log`, `syncso_inflight_jobs`, `dialog_dispatch_locks`
-   - Alle `mem://architecture/lipsync/*`-Regeln (sync-3 doc-strict, 8min Watchdog, ASD-Strategy, etc.) bleiben unverändert
-
-2. **Apply schreibt nur die gleichen Felder, die der Composer-UI heute auch schreibt.** Es benutzt `useComposerPersistence.ensureProjectPersisted` (existierender Pfad). Keine neuen DB-Writes auf Lip-Sync-Tabellen, keine direkten Updates auf `dialog_shots`, `dialog_locked_at`, `lock_reference_url`, `continuity_locked`, `lockSource`, `lipSyncStatus`, `lipSyncAppliedAt`, `lipSyncSourceClipUrl`.
-
-3. **Dialog-Mode wird nur beim INITIALEN Erstellen einer Szene gesetzt.** Wenn der User später den Plan re-applied auf eine Szene mit `lipSyncStatus != null`, `clipUrl` gesetzt, oder `dialog_locked_at != null` → diese Szene wird übersprungen und im UI als "geschützt — bereits Lip-Synced" markiert. Kein Replace, kein Clear, kein Reset.
-
-4. **DB-Replace ist scoped.** Der "alte Szenen löschen"-Schritt löscht ausschließlich Szenen, die alle folgenden Kriterien erfüllen:
-   - `clip_status = 'pending'` (nie generiert)
-   - `clip_url IS NULL`
-   - `lip_sync_status IS NULL`
-   - `dialog_locked_at IS NULL`
-   - keine Zeile in `dialog_shots` mit dieser `scene_id`
-   
-   Trifft auch nur eines nicht zu → Szene bleibt, Plan-Apply legt neue Szenen daneben an und warnt im UI ("3 alte Szenen geschützt, 3 neue angelegt").
-
-5. **engineOverride/dialogMode wird respektvoll gemerged.** Der Apply setzt diese Felder nur, wenn die Zielszene neu erstellt wird. Bestehende Werte werden über die existierenden Pending-Resolver (`resolveLipSyncValue`, `resolveDialogModeValue`, `resolveEngineOverrideValue`) gelesen — wir umgehen sie nicht.
-
-6. **Kein Bypass von `propagateDialogLock`.** Nach jedem `setScenes` läuft die existierende Lock-Propagation. Der Apply ruft `setScenes` (nicht `setScenesLocalOnly`) auf, damit der normale Persistenz- und Lock-Pfad greift.
-
-7. **Voice-Settings im AssemblyConfig — read-only für Lip-Sync.** Die `assemblyConfig.voiceover`-Felder (Voice-ID, Stability, Style, etc.) werden überschrieben, aber die Lip-Sync-Pipeline liest aus `dialogVoices`/`dialog_takes` pro Szene, nicht aus `assemblyConfig`. Trennung ist bereits da; wir bestätigen sie per Type-Cast-Tests.
-
-8. **Negative Prompt nur in `aiPrompt`-Suffix.** Wird als Klartext-Anhang gespeichert, nicht als neues DB-Feld. Lip-Sync-Renderer (`render-directors-cut`, Sync.so) ignorieren `aiPrompt` ohnehin.
-
-9. **Plan-Tabelle ist isoliert.** `composer_production_plans` ist eine neue Read-/Write-Insel. Keine Foreign Keys zu `dialog_shots`, `syncso_*`, `composer_scenes.dialog_*`. Lip-Sync-Edge-Functions referenzieren sie nicht.
-
-10. **Smoke-Test vor Merge.** Bevor der Plan-Pfad live geht, lokaler Durchlauf:
-    - Briefing mit Cinematic-Sync importieren → 3 neue Szenen
-    - Eine davon rendern lassen (echter Hailuo + Sync.so Pass)
-    - Re-Apply des gleichen Plans → die gerendete Szene bleibt unangetastet (Schutz Regel 3+4)
-    - `dialog_shots`/`syncso_dispatch_log` zeigen keine Drift
-
-## Phase 1 — Deep Parse (Backend)
-
-Neue Edge Function `briefing-deep-parse` (300s Timeout, separater Codepfad).
-
-Zwei aufeinanderfolgende AI-Calls (Gemini 2.5 Pro, beide):
-
-1. **Pass A — Strukturextraktion** — Tool-Calling auf Roh-Text, deterministisches Mapping auf existierende Enums (Framing/Angle/Movement/Lighting). "Nichts erfinden"-Regel strikt.
-
-2. **Pass B — Validierung & Anreicherung** — bekommt Manifest aus A + Library-Snapshot des Users (`brand_characters`, `brand_locations`, ElevenLabs-Voices). Resolviert `@founder-avatar`, prüft Dauer-Konsistenz, markiert offene Punkte mit konkretem Vorschlag.
-
-Ergebnis wird in neue Tabelle `composer_production_plans` versioniert gespeichert.
-
-## Phase 2 — Production Plan als Formular (UI)
-
-`ProductionPlanSheet` ersetzt den dünnen Review-Dialog:
+Fullscreen-Modal mit Glass + Gold/Cyan, während `briefing-deep-parse` läuft:
 
 ```text
-┌─ Projekt: Name · Plattform · 9:16 · 30fps · 15s ──────┐
-├─ Cast & Stimmen ──────────────────────────────────────┤
-│ @founder-avatar → [Founder Default ▼] Voice: George   │
-│   Lip-Sync: ON   Outfit: Casual                       │
-├─ Locations ───────────────────────────────────────────┤
-│ @home-office → [Home Office ▼]                        │
-├─ Szenen ──────────────────────────────────────────────┤
-│ S01 Pain · 5s · Cinematic-Sync · Lip-Sync ON          │
-│   VO · Shot · Cast · Performance                      │
-│   [🔒 Geschützt — bereits gerendert]  ← Regel 3       │
-├─ Voice/Captions/Negative Prompt ──────────────────────┤
-└────────────────────────────────────────────────────────┘
-  [⚠ 2 ungelöste Punkte]  [Plan anwenden →]
+┌─ PRODUCTION WAR ROOM ─────────────────── 01:14 / ~02:00 ──┐
+│ ▸ Pass A · Briefing → Manifest        [████████░░] 80%   │
+│ ▸ Pass B · Resolve Cast & Locations   [██░░░░░░░░] 20%   │
+│                                                            │
+│ ┌─ NEWS RADAR ────────────┐ ┌─ TREND RADAR ─────────────┐ │
+│ │ Instagram testet Creat… │ │ #ShortFormStorytelling ↑ │ │
+│ │ TikTok Shop expandiert… │ │ #LipSyncReels      ↑↑    │ │
+│ │ LinkedIn priorisiert K… │ │ AI-Avatar-Ads     ↑↑↑    │ │
+│ └─────────────────────────┘ └───────────────────────────┘ │
+│                                                            │
+│   "While we build your plan — here's what's moving         │
+│    in your industry right now."                            │
+└────────────────────────────────────────────────────────────┘
 ```
 
-Alle Felder inline editierbar, live-validiert, "ungelöste Punkte" mit One-Click-Fix. Geschützte Szenen klar markiert.
+Inhalte werden aus bestehenden Hooks/Endpunkten gezogen — **keine neuen Edge Functions, kein neuer API-Spend**:
+- News: gleicher Feed wie `NewsRadar`-Ticker oben (max 6 Items, autoplay alle 4s).
+- Trends: gleicher Cache wie TrendRadar-Hub (Top 6 Tags der User-Sprache).
+- Progress: zwei Phasen-Bars (Pass A / Pass B) mit deterministischer Pseudo-Progress-Animation (60s/60s), `100%` wird erst gesetzt wenn die Edge-Function tatsächlich resolved.
 
-## Phase 3 — Apply (read-mostly, write-light)
+## Antwort: Ist das Plan-Feld aussagekräftig genug?
 
-`useApplyProductionPlan` Hook:
+**Teils.** Das aktuelle `PlanScene`-Schema deckt das Wesentliche ab (Beat, Dauer, Engine, Lip-Sync-Flag, Cast/Location, ShotDirector 4-Achsen, VO mit Timecode + Delivery, Performance, Anchor-Prompt EN). Aber für *"alles exakt aus dem Briefing übernehmen"* fehlen 6 Felder, die der Storyboard-Generator heute schon kann/braucht:
 
-1. Lädt `composer_scenes` für das Projekt → filtert nach Schutz-Kriterien (Regel 4)
-2. Löscht nur ungeschützte alte Szenen via existierender Composer-Delete-Logik
-3. Legt neue Szenen via `ensureProjectPersisted` an — gleicher Pfad wie heute, gleiche Feld-Map
-4. Setzt `assemblyConfig` via `persistAssemblyConfig` — existierender Pfad
-5. Toast mit Diff: "3 neu · 0 ersetzt · 2 geschützt"
-6. Tab-Wechsel ins Storyboard
+| Lücke | Heute im Plan? | Konsequenz |
+|---|---|---|
+| **B-Roll-Hints** (Stockschlagworte pro Szene) | ❌ | B-Roll-Szenen werden generisch, statt Briefing-spezifisch |
+| **Brand-Kit-Anker** (Logo-Endcard, Brand-Color-Override) | ❌ | Brand-CI muss separat manuell gesetzt werden |
+| **Negative-Prompt pro Szene** (nicht nur global) | ❌ | Risiko ungewollter Elemente in einzelnen Szenen |
+| **Continuity-Hints** (z.B. "selbe Position wie S01") | ❌ | Anchor-Identity-Swap bekommt keinen Kontext |
+| **Music-Cue** (Energie/Drop-Marker pro Szene) | ❌ | Musik-Stage muss raten |
+| **Dialog-Turns explizit** (statt VO-Text mit Em-Dash) | ❌ | Erfordert Regex-Parsing in `compose-video-clips` (genau das, was wir gerade fixen mussten) |
 
-## Phase 4 — Strukturierter Briefing-Input
+→ **Vorschlag:** Schema-Erweiterung in `productionPlan.ts` um diese 6 optionalen Felder, Pass A/B-Prompts in `briefing-deep-parse` entsprechend nachschärfen, Plan-Sheet bekommt 2 neue collapsible Sections ("Dialog-Turns" und "B-Roll / Music / Continuity"). Bestehende Felder bleiben **unverändert** — reine additive Erweiterung, **null Lip-Sync-Pipeline-Risk**.
 
-Im Import-Dialog Mode-Switch:
-- **Freitext**: wie bisher, KI parst
-- **Strukturiert**: aufklappbares Formular mit gleichen Feldern → wandelt direkt in Plan um
+## Technischer Umsetzungsplan
 
-Beide Modi enden im `ProductionPlanSheet`.
+### Frontend
 
-## Was sich konkret ändert (Whitelist)
+1. **`src/components/video-composer/BriefingTab.tsx`**
+   - Entfernen: `ProductionPlanCard` (Zeile mit "Briefing analysieren"-Button + States `analyzing`, `planOpen`).
+   - Behalten: `ProductionPlanSheet`-Import — wird vom neuen Hook geöffnet.
+2. **`src/components/video-composer/storyboard/ProductionWarRoom.tsx` (NEU)**
+   - Fullscreen-Overlay (`Dialog` mit `max-w-5xl`), Glass + Gold/Cyan.
+   - Props: `open`, `progressA`, `progressB`, `onCancel`.
+   - Innen: 2 Progress-Bars + 2 Bento-Karten (News, Trends) + rotierendes Pro-Tip.
+3. **`src/hooks/useStoryboardTransition.ts` (NEU)**
+   - Single entry point für "Briefing → Storyboard"-Wechsel.
+   - Guard: `scenes.length > 0` ODER `scenes.some(s => s.dialogMode || s.status === 'completed')` → skip analyze, direct switch.
+   - Sonst: setzt War-Room-State, ruft `supabase.functions.invoke('briefing-deep-parse', { ... })`, simuliert Progress (60s/60s linear, bei Response 100%), öffnet danach `ProductionPlanSheet` mit dem zurückgegebenen Plan.
+4. **`src/pages/VideoComposer/index.tsx`**
+   - Stepper-onClick auf "Storyboard" und Button "Weiter" → `useStoryboardTransition.trigger()` statt direktem Tab-Wechsel.
+   - Mount `<ProductionWarRoom />` und `<ProductionPlanSheet />` auf Page-Ebene (statt im Briefing-Tab), damit Overlay tab-übergreifend funktioniert.
+5. **`ProductionPlanSheet.tsx`**
+   - 2 neue collapsible Sections für die unten gelisteten Plan-Felder.
+   - Read-only Anzeige für `brollHints`, `musicCue`, `continuityHint` — `dialogTurns` editierbar.
 
-**Neu (touchless für Lip-Sync):**
-- `supabase/functions/briefing-deep-parse/index.ts`
-- DB-Tabelle `composer_production_plans` (Versionierung, isoliert)
-- `src/lib/video-composer/briefing/productionPlan.ts`
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
-- `src/components/video-composer/briefing/StructuredBriefingForm.tsx`
-- `src/hooks/useApplyProductionPlan.ts` (mit Schutz-Filter)
+### Schema-Erweiterung (additiv, optional)
 
-**Angepasst:**
-- `BriefingImportDialog` → Mode-Switch + Übergabe an Plan-Sheet
-- `VideoComposerDashboard` → neuer Handler `replaceStoryboardFromPlan` der die Schutz-Filter respektiert
+`src/lib/video-composer/briefing/productionPlan.ts` — neue **optional**e Felder in `PlanScene`:
+```ts
+brollHints: z.array(z.string().max(80)).max(8).optional(),
+brandAnchor: z.object({
+  showLogo: z.boolean().optional(),
+  colorOverride: z.string().optional(),
+}).optional(),
+negativePromptScene: z.string().max(600).optional(),
+continuityHint: z.string().max(200).optional(),
+musicCue: z.object({
+  energy: z.enum(['ambient','build','drop','climax','outro']).optional(),
+  notes: z.string().max(120).optional(),
+}).optional(),
+dialogTurns: z.array(z.object({
+  speakerMentionKey: z.string(),
+  text: z.string().max(800),
+  mood: z.string().max(40).optional(),
+})).optional(),
+```
 
-**Garantiert nicht angefasst:**
-- Alle Lip-Sync-Functions, -Tables, -Hooks, -Memory-Rules (siehe Garantie 1)
+### Edge-Function
 
-## Realistisch?
+`supabase/functions/briefing-deep-parse/index.ts` — Pass A System-Prompt um die 6 neuen Felder erweitern (Pass B unverändert: nur Cast/Location-Resolve). Output bleibt zod-validiert, Funktion bleibt idempotent.
 
-Ja. Der Plan-Pfad ist additiv und sandboxed. Die Schutz-Regeln 3+4 sind das einzige nicht-triviale Stück Logik — und sie sind in genau einem Hook (`useApplyProductionPlan`) konzentriert, mit Unit-Tests gegen alle 5 Schutz-Kriterien. 2 Minuten Verarbeitung sind ok; wir zeigen während Pass A/B eine Progress-Card.
+### Lip-Sync-Schutz (unangetastet)
 
-Reihenfolge — welche bevorzugst du?
-- **Variante A**: Komplettpaket in einem Rutsch (Deep-Parse + Plan-Sheet + Apply + DB-Schutz + strukturierter Input)
-- **Variante B**: Erst Deep-Parse + Plan-Sheet + Apply mit Schutz-Filter (löst dein 4-Szenen-Problem); strukturierter Input später
+- Keine Änderung an `compose-video-clips`, `compose-dialog-segments`, `compose-dialog-scene`, `dialog_shots`, `syncso_*`, `cinematicSyncTwoShotAnchorPipeline`, `lipsyncSyncSoPro`, Sync-3-Doc-Strict-Options.
+- `useApplyProductionPlan` schreibt weiterhin **nur** in die Composer-UI-Felder, die der manuelle Editor auch beschreibt — neue Plan-Felder werden in dieselben bestehenden Scene-Felder gemappt (`dialogTurns` → bestehendes `dialogScript`-Format mit `[NAME]:`-Markern, das die robuste Regex aus dem letzten Fix bereits versteht).
+- War-Room-Overlay ist rein visuell — kein Pipeline-Touch.
+- Guard verhindert harte Re-Analyse, sobald irgendeine Szene Lip-Sync nutzt.
+
+## Files (Δ)
+
+- **NEU**: `src/components/video-composer/storyboard/ProductionWarRoom.tsx`, `src/hooks/useStoryboardTransition.ts`
+- **EDIT**: `src/components/video-composer/BriefingTab.tsx` (Card raus), `src/pages/VideoComposer/index.tsx` (Stepper-Trigger + Overlay-Mount), `src/components/video-composer/briefing/ProductionPlanSheet.tsx` (2 Sections), `src/lib/video-composer/briefing/productionPlan.ts` (6 optionale Felder), `supabase/functions/briefing-deep-parse/index.ts` (Prompt-Update), `src/hooks/useApplyProductionPlan.ts` (Mapping der neuen Felder), `mem/features/video-composer/production-plan-pipeline.md` (Update)
+
+## Offene Frage
+
+Möchtest du die Schema-Erweiterung (6 neue Felder + Prompt-Update + 2 Sheet-Sections) **gleich mitgemacht** haben, oder erstmal **nur** den UX-Move (Briefing-Analyse → Storyboard-Übergang + War-Room) ohne Schema-Änderungen? Letzteres ist deutlich kleiner und risikoärmer.
