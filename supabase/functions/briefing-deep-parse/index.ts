@@ -610,6 +610,51 @@ Deno.serve(async (req) => {
     });
     const tA = Date.now();
 
+    // ── Safety net: if Pass A returned 0 scenes (modelblip / extreme thin
+    //    briefing), synthesize a deterministic 3-scene arc so the user is
+    //    never stuck on an empty Production Plan.
+    if (!Array.isArray(manifest?.scenes) || manifest.scenes.length === 0) {
+      console.warn('[briefing-deep-parse] Pass A returned 0 scenes — synthesizing fallback arc');
+      const total = Number(manifest?.project?.totalDurationSec) || 15;
+      const per = Math.max(3, Math.min(12, Math.round(total / 3)));
+      // First @-mention in the briefing text, if any.
+      const mentionMatch = briefing.match(/@[a-z0-9][a-z0-9-_]{1,47}/i);
+      const firstMention = mentionMatch ? mentionMatch[0] : null;
+      const castOne = firstMention ? [{ mentionKey: firstMention }] : [];
+      const engine = firstMention ? 'cinematic-sync' : 'broll';
+      const beats = [
+        { beat: 'Hook',   framing: 'medium-close-up', movement: 'slow-push-in', energy: 'high' },
+        { beat: 'Reveal', framing: 'wide',            movement: 'tracking',     energy: 'mid'  },
+        { beat: 'CTA',    framing: 'medium',          movement: 'static',       energy: 'high' },
+      ];
+      manifest.scenes = beats.map((b, i) => ({
+        index: i + 1,
+        label: b.beat,
+        beat: b.beat,
+        durationSec: per,
+        engine,
+        lipSync: !!firstMention,
+        cast: castOne,
+        shotDirector: {
+          framing: b.framing,
+          angle: 'eye-level',
+          movement: b.movement,
+          lighting: 'soft-window',
+        },
+        anchorPromptEN: `${b.beat} beat for ${manifest?.project?.name ?? 'the brand'}: cinematic establishing shot in a relevant setting.`,
+        performance: {
+          mimik: b.beat === 'Hook' ? 'confident' : b.beat === 'CTA' ? 'warm-smile' : 'curious',
+          gestik: b.beat === 'CTA' ? 'open-palms' : 'still',
+          blick: b.beat === 'CTA' ? 'to-camera' : 'away',
+          energy: b.energy === 'high' ? 4 : 3,
+        },
+        musicCue: { energy: b.energy },
+      }));
+      if (!manifest.project) manifest.project = {};
+      if (!manifest.project.totalDurationSec) manifest.project.totalDurationSec = per * 3;
+    }
+
+
     // ── Library snapshot (small, no PII) ──────────────────────────────────
     const [charRes, locRes] = await Promise.all([
       supabase

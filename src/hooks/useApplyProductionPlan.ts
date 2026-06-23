@@ -20,6 +20,12 @@ import type {
   AssemblyConfig,
   ComposerBriefing,
   CharacterShot,
+  CharacterShotType,
+  ScenePerformance,
+  PerformanceExpression,
+  PerformanceGesture,
+  PerformanceGaze,
+  PerformanceEnergy,
 } from '@/types/video-composer';
 import type { TProductionPlan, TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 
@@ -38,6 +44,97 @@ function newSceneId() {
 const LIPSYNC_ENGINES = new Set([
   'cinematic-sync', 'sync-polish', 'sync-segments', 'native-dialogue', 'heygen',
 ]);
+
+// ── Free-form → enum mappers for Performance Layer ────────────────────────
+
+function mapExpression(raw?: string): PerformanceExpression | undefined {
+  if (!raw) return undefined;
+  const s = raw.toLowerCase();
+  if (/(smile|warm|happy|lächel|freundlich|friendly)/.test(s)) return 'warm-smile';
+  if (/(curious|neugierig|interest)/.test(s)) return 'curious';
+  if (/(concern|worried|sorge|besorgt|sad|trauer)/.test(s)) return 'concerned';
+  if (/(confident|selbstbewusst|stark|determined)/.test(s)) return 'confident';
+  if (/(surprised|überrascht|shock|staun)/.test(s)) return 'surprised';
+  if (/(neutral|ruhig|calm|still|stoisch)/.test(s)) return 'neutral';
+  return undefined;
+}
+function mapGesture(raw?: string): PerformanceGesture | undefined {
+  if (!raw) return undefined;
+  const s = raw.toLowerCase();
+  if (/(point|zeig|finger)/.test(s)) return 'point';
+  if (/(open[-\s]?palm|offene hände|gesticulate|gestikulier)/.test(s)) return 'open-palms';
+  if (/(chin|kinn|nachdenklich)/.test(s)) return 'hand-on-chin';
+  if (/(cross[-\s]?arm|verschränkt)/.test(s)) return 'cross-arms';
+  if (/(lean[-\s]?in|lehnt sich|forward)/.test(s)) return 'lean-in';
+  if (/(still|ruhig|motionless|reglos)/.test(s)) return 'still';
+  return undefined;
+}
+function mapGaze(raw?: string): PerformanceGaze | undefined {
+  if (!raw) return undefined;
+  const s = raw.toLowerCase();
+  if (/(camera|kamera|to[-\s]?cam|in die kamera)/.test(s)) return 'to-camera';
+  if (/(speaker|gegenüber|partner|anderen)/.test(s)) return 'to-speaker';
+  if (/(down|boden|denk|thinking|nachdenk)/.test(s)) return 'down-thinking';
+  if (/(away|abgewandt|weg|side)/.test(s)) return 'away';
+  return undefined;
+}
+function clampEnergy(n: any): PerformanceEnergy | undefined {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return undefined;
+  const r = Math.max(1, Math.min(5, Math.round(v)));
+  return r as PerformanceEnergy;
+}
+
+function framingToShotType(framing?: string, fallback: CharacterShotType = 'full'): CharacterShotType {
+  if (!framing) return fallback;
+  const s = framing.toLowerCase();
+  if (/(extreme[-\s]?close|extreme-close-up|ecu)/.test(s)) return 'detail';
+  if (/(close[-\s]?up|cu)/.test(s)) return 'detail';
+  if (/(profile)/.test(s)) return 'profile';
+  if (/(over[-\s]?the[-\s]?shoulder|ots|pov)/.test(s)) return 'pov';
+  if (/(back|rücken)/.test(s)) return 'back';
+  if (/(silhouette)/.test(s)) return 'silhouette';
+  if (/(wide|establish|extreme[-\s]?wide)/.test(s)) return 'full';
+  return fallback;
+}
+
+function realismFromTone(tone?: string): ComposerScene['realismPreset'] | undefined {
+  if (!tone) return undefined;
+  const t = tone.toLowerCase();
+  if (/(dramatic|luxury|cinematic|epic)/.test(t)) return 'cinematic-spot';
+  if (/(friendly|professional|corporate|warm)/.test(t)) return 'lifestyle-hero';
+  if (/(documentary|doku|realistic|natural)/.test(t)) return 'documentary';
+  return undefined;
+}
+
+function motionIntensityFromMusic(energy?: string): NonNullable<ComposerScene['actionBeat']>['motionIntensity'] {
+  switch ((energy ?? '').toLowerCase()) {
+    case 'drop':
+    case 'high':   return 'high';
+    case 'mid':    return 'moderate';
+    case 'low':    return 'subtle';
+    case 'silent': return 'static';
+    default:       return 'static';
+  }
+}
+
+function splitAction(anchorEN?: string): { characterAction?: string; environmentMotion?: string } {
+  if (!anchorEN) return {};
+  const parts = anchorEN.split(/(?<=[.!?])\s+/);
+  if (parts.length <= 1) {
+    const words = anchorEN.trim().split(/\s+/);
+    if (words.length <= 12) return { characterAction: anchorEN.trim() };
+    return {
+      characterAction: words.slice(0, 12).join(' '),
+      environmentMotion: words.slice(12).join(' '),
+    };
+  }
+  return {
+    characterAction: parts[0].trim(),
+    environmentMotion: parts.slice(1).join(' ').trim() || undefined,
+  };
+}
+
 
 /**
  * A scene is PROTECTED from being deleted/replaced when ANY of these is true:
