@@ -344,41 +344,151 @@ function normalizeMention(s: string): string {
   return String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
 }
 
+const ENGINE_ALIASES: Record<string, string> = {
+  'ai-heygen': 'heygen',
+  'heygen-avatar': 'heygen',
+  'b-roll': 'broll',
+  'b_roll': 'broll',
+  'broll-stock': 'broll',
+  'sync': 'sync-polish',
+  'syncso': 'sync-polish',
+  'sync-so': 'sync-polish',
+  'sync.so': 'sync-polish',
+  'lipsync': 'sync-polish',
+  'lip-sync': 'sync-polish',
+  'cinematic': 'cinematic-sync',
+  'native': 'native-dialogue',
+  'dialogue': 'native-dialogue',
+  'segments': 'sync-segments',
+};
+const ENGINE_WHITELIST = new Set(['auto','broll','heygen','sync-polish','cinematic-sync','sync-segments','native-dialogue']);
+const MUSIC_ENERGY_WHITELIST = new Set(['low','mid','high','drop','silent']);
+
+function normalizeEngine(raw: any): string {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (!s) return 'auto';
+  if (ENGINE_WHITELIST.has(s)) return s;
+  if (ENGINE_ALIASES[s]) return ENGINE_ALIASES[s];
+  return 'auto';
+}
+function clamp(n: any, min: number, max: number, fallback: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(max, Math.max(min, v));
+}
+function stripUndef<T extends Record<string, any>>(o: T): T {
+  for (const k of Object.keys(o)) {
+    if (o[k] === undefined || o[k] === null || o[k] === '') delete o[k];
+  }
+  return o;
+}
+
 function mergeManifestAndResolution(manifest: any, resolution: any) {
   const scenesById = new Map<number, any>();
   for (const s of resolution?.scenes ?? []) {
     if (typeof s?.index === 'number') scenesById.set(s.index, s);
   }
-  const scenes = (manifest?.scenes ?? []).map((s: any) => {
+  const scenes = (manifest?.scenes ?? []).map((s: any, i: number) => {
     const r = scenesById.get(s.index);
     const cast = (s.cast ?? []).map((c: any) => {
       const rCast = (r?.cast ?? []).find((x: any) => x.mentionKey === c.mentionKey);
-      return {
+      return stripUndef({
         mentionKey: c.mentionKey,
         outfit: c.outfit ?? rCast?.outfit,
         characterId: rCast?.characterId ?? null,
-        characterName: rCast?.characterName ?? c.mentionKey.replace(/^@/, ''),
+        characterName: rCast?.characterName ?? String(c.mentionKey ?? '').replace(/^@/, ''),
         voiceId: rCast?.voiceId ?? null,
         voiceName: rCast?.voiceName,
         referenceImageUrl: null,
-      };
+      });
     });
     const location = s.location ? (() => {
       const r2 = r?.location;
-      return {
+      return stripUndef({
         mentionKey: s.location.mentionKey,
         locationId: r2?.locationId ?? null,
-        locationName: r2?.locationName ?? s.location.mentionKey.replace(/^@/, ''),
-      };
+        locationName: r2?.locationName ?? String(s.location.mentionKey ?? '').replace(/^@/, ''),
+      });
     })() : undefined;
-    return {
-      ...s,
+
+    const engine = normalizeEngine(s.engine);
+    const durationSec = clamp(s.durationSec, 1, 60, 5);
+
+    // musicCue normalization
+    let musicCue: any = undefined;
+    if (s.musicCue && typeof s.musicCue === 'object') {
+      const energyRaw = String(s.musicCue.energy ?? '').toLowerCase();
+      const mc = stripUndef({
+        energy: MUSIC_ENERGY_WHITELIST.has(energyRaw) ? energyRaw : undefined,
+        marker: s.musicCue.marker ? String(s.musicCue.marker).slice(0, 80) : undefined,
+        note: s.musicCue.note ? String(s.musicCue.note).slice(0, 240) : undefined,
+      });
+      if (Object.keys(mc).length) musicCue = mc;
+    }
+
+    // dialogTurns sanitize
+    let dialogTurns: any = undefined;
+    if (Array.isArray(s.dialogTurns)) {
+      const turns = s.dialogTurns
+        .map((t: any) => stripUndef({
+          speakerMentionKey: String(t?.speakerMentionKey ?? '').slice(0, 80).trim(),
+          text: String(t?.text ?? '').slice(0, 1000).trim(),
+          mood: t?.mood ? String(t.mood).slice(0, 80) : undefined,
+          delivery: t?.delivery ? String(t.delivery).slice(0, 240) : undefined,
+        }))
+        .filter((t: any) => t.speakerMentionKey && t.text)
+        .slice(0, 20);
+      if (turns.length) dialogTurns = turns;
+    }
+
+    // brollHints sanitize
+    let brollHints: any = undefined;
+    if (Array.isArray(s.brollHints)) {
+      const hints = s.brollHints
+        .map((h: any) => String(h ?? '').trim().slice(0, 80))
+        .filter(Boolean)
+        .slice(0, 12);
+      if (hints.length) brollHints = hints;
+    }
+
+    // performance.energy clamp
+    let performance: any = undefined;
+    if (s.performance && typeof s.performance === 'object') {
+      const p = stripUndef({
+        mimik: s.performance.mimik,
+        gestik: s.performance.gestik,
+        blick: s.performance.blick,
+        energy: s.performance.energy != null
+          ? clamp(s.performance.energy, 1, 5, 3)
+          : undefined,
+      });
+      if (Object.keys(p).length) performance = p;
+    }
+
+    return stripUndef({
+      index: Number.isFinite(Number(s.index)) ? Math.max(1, Math.floor(Number(s.index))) : i + 1,
+      label: s.label,
+      beat: s.beat,
+      durationSec,
+      engine,
       lipSync: s.lipSync === true
-        || ['cinematic-sync','sync-polish','sync-segments','native-dialogue','heygen'].includes(s.engine),
+        || ['cinematic-sync','sync-polish','sync-segments','native-dialogue','heygen'].includes(engine),
+      voiceover: s.voiceover,
       cast,
       location,
-    };
+      shotDirector: s.shotDirector,
+      anchorPromptEN: s.anchorPromptEN,
+      performance,
+      brollHints,
+      brandAnchor: s.brandAnchor,
+      negativePromptScene: s.negativePromptScene,
+      continuityHint: s.continuityHint,
+      musicCue,
+      dialogTurns,
+    });
   });
+
+  console.log('[briefing-deep-parse] merge done — scenes:', scenes.length, 'unresolved:', (resolution?.unresolved ?? []).length);
 
   return {
     project: manifest?.project,
