@@ -17,7 +17,7 @@ import {
   ShoppingBag, Building2, BookOpen, Palette,
   Wand2, Hand, Plus, X, ArrowRight, Loader2, Sparkles, ShieldAlert, ChevronDown, ChevronUp, FileText,
 } from 'lucide-react';
-import ProductionPlanSheet from './briefing/ProductionPlanSheet';
+// ProductionPlanSheet is now mounted at dashboard level (see VideoComposerDashboard).
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { extractFunctionsError } from '@/lib/functionsError';
@@ -241,7 +241,7 @@ export default function BriefingTab({
   const showStudio = editorMode === 'studio';
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [briefingImportOpen, setBriefingImportOpen] = useState(false);
+  // briefingImportOpen state removed — auto-analyse handled by dashboard hook.
 
   const TIPS_KEY = 'video-composer-briefing-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
