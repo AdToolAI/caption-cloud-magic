@@ -443,8 +443,21 @@ export function useApplyProductionPlan() {
       .slice()
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
-        planSceneToComposerScene(s, protectedScenes.length + i, projectId ?? '', plan.negativePrompt, currentBriefing?.tone),
+        planSceneToComposerScene(s, protectedScenes.length + i, projectId ?? '', plan.negativePrompt, currentBriefing?.tone, plan.voice?.voiceId),
       );
+
+    // Diagnostic: warn when a lipSync-engine scene resolved to 0 characterShots.
+    for (const ns of newScenes) {
+      const engine = (ns as any).engineOverride ?? ns.clipSource;
+      const isLipsync = LIPSYNC_ENGINES.has(String(engine));
+      const castCount = (ns.characterShots?.length ?? 0) || (ns.characterShot ? 1 : 0);
+      if (isLipsync && castCount === 0) {
+        console.warn('[useApplyProductionPlan] lipsync scene has no cast — check mention resolution', {
+          orderIndex: ns.orderIndex,
+          engine,
+        });
+      }
+    }
 
     // 4) Hard-delete deletableScenes from DB (so realtime doesn't bring them back).
     if (projectId && deletableScenes.length > 0) {
