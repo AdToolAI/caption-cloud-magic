@@ -583,10 +583,17 @@ serve(async (req) => {
       if (!s) return [];
       const out: string[] = [];
       const seen = new Set<string>();
-      for (const line of s.split("\n")) {
-        const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+      // Accept: "NAME:", "[NAME]:", "NAME — MOOD:", "NAME – mood:", "NAME [mood]:"
+      // Em-dash (\u2014), en-dash (\u2013) and hyphen, plus optional mood word(s).
+      const RE = /^\s*\[?([\p{L}][\p{L}\p{N}\s.'\-]{0,60}?)\]?\s*(?:[\u2014\u2013\-]\s*[\p{L}\s]{1,32})?\s*(?:\[[^\]]{1,32}\])?\s*[:：]/u;
+      for (const line of s.split(/\r?\n/)) {
+        const m = line.match(RE);
         if (!m) continue;
-        const slug = m[1].trim().toLowerCase().replace(/\s+/g, "-");
+        const slug = m[1]
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^\p{L}\p{N}\-]/gu, "");
         if (slug && !seen.has(slug)) {
           seen.add(slug);
           out.push(slug);
@@ -594,6 +601,7 @@ serve(async (req) => {
       }
       return out;
     };
+
 
     /**
      * Resolve a speaker slug ("matthew-dusatko" or "matthew") to the matching
@@ -1187,9 +1195,63 @@ serve(async (req) => {
           // an extra/cloned person from an older pipeline version. We only
           // reuse an existing anchor when audit_version matches and ok===true.
           try {
-            const castShots = (scene.characterShots ?? []).filter(
+            const castShotsRaw = (scene.characterShots ?? []).filter(
               (s) => s && s.shotType !== "absent" && s.characterId,
             );
+
+            // STAGE 6 (Jun 24 2026): unified mention library exposes saved
+            // outfit looks as virtual mention IDs `outfit:<look_id>`. When
+            // such an ID lands in characterShots[].characterId it cannot be
+            // resolved against brand_characters and the cinematic-sync anchor
+            // step fails with `missing_single_speaker` even though the user
+            // clearly picked an avatar+outfit. Resolve the prefix here once
+            // (lazy migration) so the rest of the pipeline sees the real
+            // brand_character UUID and gets a portrait.
+            const castShots: typeof castShotsRaw = [];
+            for (const shot of castShotsRaw) {
+              const id = String(shot.characterId ?? "");
+              if (id.startsWith("outfit:")) {
+                const lookId = id.slice("outfit:".length);
+                try {
+                  const { data: look } = await supabaseAdmin
+                    .from("avatar_outfit_looks")
+                    .select("id, avatar_id, front_url, cover_url")
+                    .eq("id", lookId)
+                    .maybeSingle();
+                  if (look?.avatar_id) {
+                    const avatarId = String(look.avatar_id);
+                    if (!charById.has(avatarId)) {
+                      const { data: brand } = await supabaseAdmin
+                        .from("brand_characters")
+                        .select("id, name, reference_image_url")
+                        .eq("id", avatarId)
+                        .maybeSingle();
+                      if (brand) {
+                        charById.set(avatarId, {
+                          id: avatarId,
+                          name: String((brand as any).name ?? ""),
+                          // Prefer the outfit's front_url so the look is
+                          // actually carried into the anchor / i2v.
+                          referenceImageUrl:
+                            (look as any).front_url ??
+                            (look as any).cover_url ??
+                            (brand as any).reference_image_url,
+                        } as ComposerCharacter);
+                      }
+                    }
+                    castShots.push({ characterId: avatarId, shotType: shot.shotType });
+                    continue;
+                  }
+                } catch (outfitErr) {
+                  console.warn(
+                    `[compose-video-clips] outfit-prefix resolve failed for ${id}`,
+                    outfitErr,
+                  );
+                }
+              }
+              castShots.push(shot);
+            }
+
             // Speaker-list override: when a dialog script is present, the
             // visual cast MUST equal the deduplicated set of actual speakers,
             // in script order. This prevents the "Samuel speaks twice → 3
@@ -1199,6 +1261,7 @@ serve(async (req) => {
               scene.dialogScript,
             );
             let effectiveShots = castShots;
+
             if (scriptSpeakers.length > 0) {
               const remapped = scriptSpeakers
                 .map((slug) => resolveSpeakerToShot(slug, castShots))
@@ -1220,7 +1283,21 @@ serve(async (req) => {
             // Without this fallback the single-speaker cinematic-sync path
             // silently skips composition → Hailuo invents a stranger OR a
             // stale talking-head URL leaks into v5 lipsync.
-            if (effectiveShots.length === 0 && scriptSpeakers.length > 0) {
+            // Also trigger this fallback when castShots exist but NONE of
+            // them resolves to a portrait (e.g. legacy `outfit:`/`catalog:`
+            // prefixed IDs that survived the resolver above with a broken
+            // look reference). Without this, the anchor step throws
+            // `missing_single_speaker` even though brand_characters contains
+            // a perfectly usable portrait under the speaker's name.
+            const effectiveHasPortrait = effectiveShots.some((s) => {
+              const c = charById.get(String(s.characterId));
+              return !!(c && (c as any).referenceImageUrl);
+            });
+            if (
+              scriptSpeakers.length > 0 &&
+              (effectiveShots.length === 0 || !effectiveHasPortrait)
+            ) {
+
               try {
                 const { data: brandRows } = await supabaseAdmin
                   .from("brand_characters")
