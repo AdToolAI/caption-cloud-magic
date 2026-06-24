@@ -1931,7 +1931,7 @@ export default function SceneCard({
                         scene.clipStatus === "generating" ||
                         scene.lipSyncStatus === "running"
                       }
-                      title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
+                      title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers', 'anchor_missing_speakers' oder 'v153_preflight_block' (Face-Detect fehlgeschlagen)."
                       onClick={async () => {
                         // ── Schritt 1: Cost-Confirm-Gate (re-roll) ──────
                         const passes = scene.dialogVoices
