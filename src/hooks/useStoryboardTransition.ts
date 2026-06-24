@@ -338,9 +338,12 @@ export function useStoryboardTransition({
       // so the user is never stuck. Open the plan sheet for review.
       try {
         const fallback = buildLocalFallbackPlan(briefing, text);
+        const reason = status
+          ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
+          : (msg.toLowerCase().includes('timeout') ? 'Timeout' : 'Netzwerkfehler');
         toast({
           title: 'Auto-Analyse offline',
-          description: 'Basis-Plan (3 Szenen) erstellt — bitte prüfen und anpassen.',
+          description: `${reason} — Basis-Plan (3 Szenen) erstellt, bitte prüfen & anpassen.`,
         });
         setState({
           warRoomOpen: false,
