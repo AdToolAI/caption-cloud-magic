@@ -834,6 +834,7 @@ Deno.serve(async (req) => {
           passB_ms: tB - tA,
           total_ms: Date.now() - t0,
           model: 'gemini-2.5-pro',
+          passA_error: passAError,
         },
       });
     } catch (e: any) {
