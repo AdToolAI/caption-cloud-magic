@@ -161,15 +161,18 @@ function planSceneToComposerScene(
   projectId: string,
   negativePrompt: string | undefined,
   briefingTone: string | undefined,
+  projectVoiceId: string | undefined,
 ): ComposerScene {
   // Build characterShots from resolved cast — shotType derived from framing.
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
   const characterShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
-    .map((c, i) => ({
-      characterId: c.characterId as string,
-      shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
-    } as CharacterShot));
+    .map((c, i) =>
+      ({
+        characterId: c.characterId as string,
+        shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
+      }) as CharacterShot,
+    );
 
   // Build the i2v prompt: English anchor hint + continuity + brand note +
   // scene-level + global negative-prompt suffix.
@@ -186,9 +189,13 @@ function planSceneToComposerScene(
   const aiPrompt = promptParts.join(' ') || undefined;
 
   // Per-character dialog voices (cinematic-sync / heygen use these).
+  // Fallback to project-level voice if the resolved cast member has no voiceId,
+  // so compose-dialog-segments never errors with `missing_voice`.
   const dialogVoices: Record<string, string> = {};
   for (const c of ps.cast ?? []) {
-    if (c.characterId && c.voiceId) dialogVoices[c.characterId] = c.voiceId;
+    if (!c.characterId) continue;
+    const vid = c.voiceId || projectVoiceId;
+    if (vid) dialogVoices[c.characterId] = vid;
   }
 
   const engine = ps.engine ?? 'auto';
@@ -436,8 +443,21 @@ export function useApplyProductionPlan() {
       .slice()
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
-        planSceneToComposerScene(s, protectedScenes.length + i, projectId ?? '', plan.negativePrompt, currentBriefing?.tone),
+        planSceneToComposerScene(s, protectedScenes.length + i, projectId ?? '', plan.negativePrompt, currentBriefing?.tone, plan.voice?.voiceId),
       );
+
+    // Diagnostic: warn when a lipSync-engine scene resolved to 0 characterShots.
+    for (const ns of newScenes) {
+      const engine = (ns as any).engineOverride ?? ns.clipSource;
+      const isLipsync = LIPSYNC_ENGINES.has(String(engine));
+      const castCount = (ns.characterShots?.length ?? 0) || (ns.characterShot ? 1 : 0);
+      if (isLipsync && castCount === 0) {
+        console.warn('[useApplyProductionPlan] lipsync scene has no cast — check mention resolution', {
+          orderIndex: ns.orderIndex,
+          engine,
+        });
+      }
+    }
 
     // 4) Hard-delete deletableScenes from DB (so realtime doesn't bring them back).
     if (projectId && deletableScenes.length > 0) {
