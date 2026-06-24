@@ -616,12 +616,23 @@ Deno.serve(async (req) => {
     const t0 = Date.now();
 
     // ── Pass A — structural extraction (Gemini 2.5 Pro for quality) ───────
-    const manifest = await callGateway({
-      model: 'google/gemini-2.5-pro',
-      system: SYSTEM_PASS_A,
-      tool: TOOL_PASS_A,
-      user: `BRIEFING:\n\n${briefing}`,
-    });
+    // Defensive: if the gateway fails (5xx / timeout / no tool call), we
+    // continue with an empty manifest so the safety arc below still gives
+    // the user a usable plan instead of a hard 500.
+    let manifest: any;
+    let passAError: string | null = null;
+    try {
+      manifest = await callGateway({
+        model: 'google/gemini-2.5-pro',
+        system: SYSTEM_PASS_A,
+        tool: TOOL_PASS_A,
+        user: `BRIEFING:\n\n${briefing}`,
+      });
+    } catch (e: any) {
+      passAError = e?.message ?? 'pass A failed';
+      console.error('[briefing-deep-parse] Pass A failed — using fallback arc:', passAError);
+      manifest = { project: {}, scenes: [] };
+    }
     const tA = Date.now();
 
     // ── Safety net: if Pass A returned 0 scenes (modelblip / extreme thin
