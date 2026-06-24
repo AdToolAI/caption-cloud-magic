@@ -190,7 +190,7 @@ export function CastConsistencyMap({ scenes, characters, embedded = false, onUpd
                     </div>
                   </td>
                   {scenes.map((s, i) => {
-                    const anchor = getAnchor(s, c, i);
+                    const anchor = getAnchor(s, c, i, resolve);
                     const meta = ANCHOR_META[anchor];
                     return (
                       <td key={s.id} className="p-0.5 text-center">
@@ -220,13 +220,63 @@ export function CastConsistencyMap({ scenes, characters, embedded = false, onUpd
         // Use the same sanitized list as the table so a nameless cast entry
         // can never crash this render via `.name`-access in the join below.
         const orphans = safeCharacters.filter((c) =>
-          scenes.every((s, i) => getAnchor(s, c, i) === 'absent')
+          scenes.every((s, i) => getAnchor(s, c, i, resolve) === 'absent')
         );
         if (orphans.length === 0) return null;
+
+        // One-click repair: normalize any prefixed characterShot/characterShots
+        // IDs on every scene so the orphan resolves against the base UUID.
+        const handleRepair = () => {
+          if (!onUpdateScene) return;
+          for (const s of scenes) {
+            const patch: Partial<ComposerScene> = {};
+            let dirty = false;
+
+            if (s.characterShot?.characterId) {
+              const norm = resolve(s.characterShot.characterId);
+              if (norm && norm !== s.characterShot.characterId) {
+                patch.characterShot = { ...s.characterShot, characterId: norm };
+                dirty = true;
+              }
+            }
+            if (Array.isArray(s.characterShots) && s.characterShots.length) {
+              const next: CharacterShot[] = s.characterShots.map((cs) => {
+                const norm = resolve(cs.characterId);
+                return norm && norm !== cs.characterId ? { ...cs, characterId: norm } : cs;
+              });
+              if (next.some((cs, idx) => cs.characterId !== s.characterShots![idx].characterId)) {
+                patch.characterShots = next;
+                dirty = true;
+              }
+            }
+            if (dirty) onUpdateScene(s.id, patch);
+          }
+        };
+
+        const canRepair = !!onUpdateScene && scenes.some((s) => {
+          if (s.characterShot?.characterId && /^(outfit|catalog|lib):/.test(s.characterShot.characterId)) return true;
+          return (s.characterShots ?? []).some((cs) => /^(outfit|catalog|lib):/.test(cs.characterId ?? ''));
+        });
+
         return (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-            ⚠️ {orphans.map((o) => o.name).join(', ')} {orphans.length === 1 ? 'kommt' : 'kommen'} in keiner Szene vor.
-            Klicke in einer Szene auf den Charakter-Button, um {orphans.length === 1 ? 'ihn' : 'sie'} als Anker hinzuzufügen — oder generiere das Storyboard neu.
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 flex items-start justify-between gap-3">
+            <div className="flex-1">
+              ⚠️ {orphans.map((o) => o.name).join(', ')} {orphans.length === 1 ? 'kommt' : 'kommen'} in keiner Szene vor.
+              {canRepair
+                ? ' Die IDs tragen einen Outfit-/Katalog-Präfix — ein Klick repariert den Anker auf die Basis-UUID.'
+                : ' Klicke in einer Szene auf den Charakter-Button, um sie als Anker hinzuzufügen — oder generiere das Storyboard neu.'}
+            </div>
+            {canRepair && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-[10px] border-amber-500/50 text-amber-100 hover:bg-amber-500/20 shrink-0"
+                onClick={handleRepair}
+              >
+                <Wrench className="h-3 w-3 mr-1" />
+                Anker automatisch reparieren
+              </Button>
+            )}
           </div>
         );
       })()}
