@@ -164,12 +164,17 @@ function planSceneToComposerScene(
   projectVoiceId: string | undefined,
 ): ComposerScene {
   // Build characterShots from resolved cast — shotType derived from framing.
+  // Strip Mention-Library prefixes (`outfit:`, `catalog:`, `lib:`) so the
+  // Cinematic-Sync anchor and Cast Consistency Map compare against the base
+  // brand_characters.id UUID. Server-side has a lazy resolver as backstop.
+  const stripPrefix = (id: string) =>
+    id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
   const characterShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
     .map((c, i) =>
       ({
-        characterId: c.characterId as string,
+        characterId: stripPrefix(c.characterId as string),
         shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
       }) as CharacterShot,
     );

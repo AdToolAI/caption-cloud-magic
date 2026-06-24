@@ -665,7 +665,7 @@ export default function StoryboardTab({
           eyebrow="CAST · CONTINUITY"
           title="Cast Consistency Map"
         >
-          <CastConsistencyMap scenes={scenes} characters={safeCharacters} embedded />
+          <CastConsistencyMap scenes={scenes} characters={safeCharacters} embedded onUpdateScene={updateScene} />
         </StagePanel>
       )}
 
