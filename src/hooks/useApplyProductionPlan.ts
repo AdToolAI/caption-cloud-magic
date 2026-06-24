@@ -200,7 +200,7 @@ function planSceneToComposerScene(
   for (const c of ps.cast ?? []) {
     if (!c.characterId) continue;
     const vid = c.voiceId || projectVoiceId;
-    if (vid) dialogVoices[c.characterId] = vid;
+    if (vid) dialogVoices[stripPrefix(c.characterId)] = vid;
   }
 
   const engine = ps.engine ?? 'auto';
