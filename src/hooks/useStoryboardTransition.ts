@@ -197,7 +197,7 @@ export function useStoryboardTransition({
     progressTimerRef.current = window.setInterval(() => {
       setState((s) => {
         // Cap at 95% until the real response lands.
-        const next = Math.min(s.progress + (s.progress < 60 ? 1.1 : 0.5), 95);
+        const next = Math.min(s.progress + (s.progress < 50 ? 1.1 : 0.35), 70);
         const phase: Phase = next < 60 ? 'A' : 'B';
         const phaseLabel =
           phase === 'A'
