@@ -161,15 +161,18 @@ function planSceneToComposerScene(
   projectId: string,
   negativePrompt: string | undefined,
   briefingTone: string | undefined,
+  projectVoiceId: string | undefined,
 ): ComposerScene {
   // Build characterShots from resolved cast — shotType derived from framing.
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
   const characterShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
-    .map((c, i) => ({
-      characterId: c.characterId as string,
-      shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
-    } as CharacterShot));
+    .map((c, i) =>
+      ({
+        characterId: c.characterId as string,
+        shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
+      }) as CharacterShot,
+    );
 
   // Build the i2v prompt: English anchor hint + continuity + brand note +
   // scene-level + global negative-prompt suffix.
@@ -186,9 +189,13 @@ function planSceneToComposerScene(
   const aiPrompt = promptParts.join(' ') || undefined;
 
   // Per-character dialog voices (cinematic-sync / heygen use these).
+  // Fallback to project-level voice if the resolved cast member has no voiceId,
+  // so compose-dialog-segments never errors with `missing_voice`.
   const dialogVoices: Record<string, string> = {};
   for (const c of ps.cast ?? []) {
-    if (c.characterId && c.voiceId) dialogVoices[c.characterId] = c.voiceId;
+    if (!c.characterId) continue;
+    const vid = c.voiceId || projectVoiceId;
+    if (vid) dialogVoices[c.characterId] = vid;
   }
 
   const engine = ps.engine ?? 'auto';
