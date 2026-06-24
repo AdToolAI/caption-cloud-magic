@@ -14,40 +14,68 @@
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Users, Image as ImageIcon, Link2, Circle } from 'lucide-react';
-import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
+import { Users, Image as ImageIcon, Link2, Circle, Wrench } from 'lucide-react';
+import type { ComposerCharacter, ComposerScene, CharacterShot } from '@/types/video-composer';
+import { useCharacterIdResolver } from '@/hooks/useCharacterIdResolver';
 
 interface Props {
   scenes: ComposerScene[];
   characters: ComposerCharacter[];
   /** When true, skip the outer Card chrome + duplicate title (parent provides StagePanel). */
   embedded?: boolean;
+  /** Optional: enables the "Anker reparieren" one-click fix on orphan cast members. */
+  onUpdateScene?: (sceneId: string, updates: Partial<ComposerScene>) => void;
 }
 
 
 type Anchor = 'reference' | 'chain' | 'prompt' | 'absent';
 
-function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: number): Anchor {
-  const shot = scene.characterShot;
-  const hasShot = !!shot && !!shot.shotType && shot.shotType !== 'absent';
-  // Match by exact id OR by name (covers `lib:…` ids and LLM id-drift).
-  const idMatch = hasShot && shot!.characterId === character.id;
+/**
+ * Collect every characterId reference on a scene, normalized through the
+ * outfit/catalog/lib resolver so prefixed IDs compare against base UUIDs.
+ */
+function collectSceneCharacterIds(
+  scene: ComposerScene,
+  resolve: (raw: string | null | undefined) => string | null,
+): string[] {
+  const raw: Array<string | undefined> = [];
+  if (scene.characterShot?.characterId) raw.push(scene.characterShot.characterId);
+  for (const cs of scene.characterShots ?? []) {
+    if (cs?.characterId) raw.push(cs.characterId);
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const r of raw) {
+    const norm = resolve(r);
+    if (norm && !seen.has(norm)) {
+      seen.add(norm);
+      out.push(norm);
+    }
+  }
+  return out;
+}
+
+function getAnchor(
+  scene: ComposerScene,
+  character: ComposerCharacter,
+  idx: number,
+  resolve: (raw: string | null | undefined) => string | null,
+): Anchor {
+  const sceneIds = collectSceneCharacterIds(scene, resolve);
+  const idMatch = sceneIds.includes(character.id);
+
   const fullName = (character?.name ?? '').trim().toLowerCase();
   const firstName = fullName.split(/\s+/)[0] || '';
-  const nameMatchInId =
-    hasShot &&
-    !!shot!.characterId &&
-    !!firstName &&
-    shot!.characterId.toLowerCase().includes(firstName);
-  // Fallback: character's name appears verbatim in the scene prompt.
-  const promptText = (scene.aiPrompt || '').toLowerCase();
+  // Fallback: character's name appears verbatim in the scene prompt or script.
+  const promptText = ((scene.aiPrompt || '') + ' ' + (scene.dialogScript || '')).toLowerCase();
   const nameMatchInPrompt =
     !!firstName &&
     ((!!fullName && promptText.includes(fullName)) || promptText.includes(firstName));
 
-  if (!idMatch && !nameMatchInId && !nameMatchInPrompt) return 'absent';
+  if (!idMatch && !nameMatchInPrompt) return 'absent';
   // Strong signature_items + AI scene → reference-style anchor (Sherlock-Holmes effect)
   if ((character.signatureItems?.trim() || character.referenceImageUrl) && scene.clipSource?.startsWith('ai-')) return 'reference';
   // First scene with the character → no chain possible, prompt-only
@@ -79,7 +107,9 @@ const ANCHOR_META: Record<Anchor, { label: string; icon: React.ReactNode; classN
   },
 };
 
-export function CastConsistencyMap({ scenes, characters, embedded = false }: Props) {
+export function CastConsistencyMap({ scenes, characters, embedded = false, onUpdateScene }: Props) {
+  const { resolve } = useCharacterIdResolver();
+
   // Defensive: filter out any cast entries without a usable name. A single
   // library asset that lost its name (e.g. legacy import, mid-edit draft)
   // would otherwise crash the whole Storyboard tab via `.name.toLowerCase()`.
@@ -160,7 +190,7 @@ export function CastConsistencyMap({ scenes, characters, embedded = false }: Pro
                     </div>
                   </td>
                   {scenes.map((s, i) => {
-                    const anchor = getAnchor(s, c, i);
+                    const anchor = getAnchor(s, c, i, resolve);
                     const meta = ANCHOR_META[anchor];
                     return (
                       <td key={s.id} className="p-0.5 text-center">
@@ -190,13 +220,63 @@ export function CastConsistencyMap({ scenes, characters, embedded = false }: Pro
         // Use the same sanitized list as the table so a nameless cast entry
         // can never crash this render via `.name`-access in the join below.
         const orphans = safeCharacters.filter((c) =>
-          scenes.every((s, i) => getAnchor(s, c, i) === 'absent')
+          scenes.every((s, i) => getAnchor(s, c, i, resolve) === 'absent')
         );
         if (orphans.length === 0) return null;
+
+        // One-click repair: normalize any prefixed characterShot/characterShots
+        // IDs on every scene so the orphan resolves against the base UUID.
+        const handleRepair = () => {
+          if (!onUpdateScene) return;
+          for (const s of scenes) {
+            const patch: Partial<ComposerScene> = {};
+            let dirty = false;
+
+            if (s.characterShot?.characterId) {
+              const norm = resolve(s.characterShot.characterId);
+              if (norm && norm !== s.characterShot.characterId) {
+                patch.characterShot = { ...s.characterShot, characterId: norm };
+                dirty = true;
+              }
+            }
+            if (Array.isArray(s.characterShots) && s.characterShots.length) {
+              const next: CharacterShot[] = s.characterShots.map((cs) => {
+                const norm = resolve(cs.characterId);
+                return norm && norm !== cs.characterId ? { ...cs, characterId: norm } : cs;
+              });
+              if (next.some((cs, idx) => cs.characterId !== s.characterShots![idx].characterId)) {
+                patch.characterShots = next;
+                dirty = true;
+              }
+            }
+            if (dirty) onUpdateScene(s.id, patch);
+          }
+        };
+
+        const canRepair = !!onUpdateScene && scenes.some((s) => {
+          if (s.characterShot?.characterId && /^(outfit|catalog|lib):/.test(s.characterShot.characterId)) return true;
+          return (s.characterShots ?? []).some((cs) => /^(outfit|catalog|lib):/.test(cs.characterId ?? ''));
+        });
+
         return (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-            ⚠️ {orphans.map((o) => o.name).join(', ')} {orphans.length === 1 ? 'kommt' : 'kommen'} in keiner Szene vor.
-            Klicke in einer Szene auf den Charakter-Button, um {orphans.length === 1 ? 'ihn' : 'sie'} als Anker hinzuzufügen — oder generiere das Storyboard neu.
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 flex items-start justify-between gap-3">
+            <div className="flex-1">
+              ⚠️ {orphans.map((o) => o.name).join(', ')} {orphans.length === 1 ? 'kommt' : 'kommen'} in keiner Szene vor.
+              {canRepair
+                ? ' Die IDs tragen einen Outfit-/Katalog-Präfix — ein Klick repariert den Anker auf die Basis-UUID.'
+                : ' Klicke in einer Szene auf den Charakter-Button, um sie als Anker hinzuzufügen — oder generiere das Storyboard neu.'}
+            </div>
+            {canRepair && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-[10px] border-amber-500/50 text-amber-100 hover:bg-amber-500/20 shrink-0"
+                onClick={handleRepair}
+              >
+                <Wrench className="h-3 w-3 mr-1" />
+                Anker automatisch reparieren
+              </Button>
+            )}
           </div>
         );
       })()}

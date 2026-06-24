@@ -1,72 +1,45 @@
-## Problem
+## Was wirklich passiert ist
 
-Scene `4c17be43…` failed with `cinematic_sync_anchor_missing_single_speaker`, even though Samuel Dusatko (Avatar + Skript + Stimme) was clearly selected.
+Die Sync.so Multi-Speaker-Pipeline (v169) ist **nicht** angefasst worden. Verifiziert:
 
-DB-Inspektion zeigt die echte Ursache:
+- `compose-dialog-segments` steht weiterhin auf `COMPOSE_DIALOG_SEGMENTS_VERSION = "v169"`, mit `FEATURE_PER_PASS_LOCK`, `FEATURE_PLAN_D_FANOUT`, Concurrency-Cap 4, MAX_SHOT_RETRIES 4, Pre-Fanout, Stale-Reconcile — exakt wie im Guide.
+- `_shared/` enthält weiterhin `asd-strategy.ts`, `pass-face-preclip.ts`, `plate-face-detect.ts`, `plate-face-identity.ts`, `dialog-lock.ts`, `lipsync-fail.ts`, `webhook-auth.ts`.
+- Die letzten Edits saßen ausschließlich in `compose-video-clips` (Cinematic-Sync-Anchor-Resolver) — also vor der Dialog-Pipeline, nicht in ihr.
 
-```
-character_shots = [{ characterId: "outfit:18fdfdf2-…", shotType: "detail" }]
-```
+Der eigentliche Fehler im Screenshot ist **kein Pipeline-Bug**, sondern ein Resolver-Bug:
 
-Der ausgewählte Eintrag ist eine **Saved Outfit-Look** (`useUnifiedMentionLibrary` setzt `id = outfit:<look_id>`). Beim Einfügen in eine Szene landet diese ID 1:1 in `characterShots[].characterId` — statt das echte Avatar zu referenzieren und die Outfit-ID separat in `outfitLookId` zu speichern.
+1. Studio Director schreibt `character_shots[]` mit IDs wie `outfit:18fdfdf2…`.
+2. `CastConsistencyMap` liest nur `scene.characterShot` (singular, legacy) und vergleicht stumpf gegen `brand_character.id` → matcht nie → orange Warnung "Samuel Dusatko kommt in keiner Szene vor".
+3. Cinematic-Sync findet aus demselben Grund kein Portrait → `lip_sync_aborted`.
 
-Folge im Edge Function `compose-video-clips`:
-1. `charById.get("outfit:…")` → nichts → `portraitUrls = []`
-2. Brand-Character-Speaker-Fallback springt nicht an, weil `effectiveShots.length > 0` (der Outfit-Shot zählt mit)
-3. Guard wirft `cinematic_sync_anchor_missing_single_speaker`
+## Plan — nur Resolver/Normalisierung, keine Pipeline-Änderung
 
-Zusätzlich loggt der Function `twoshot-audio prep failed: empty_dialog_script` — der Server-Parser bricht am Em-Dash (`SAMUEL DUSATKO — CASUAL:`), weil das Regex-Char-Class `[\w\s.'-]` U+2014 nicht enthält.
+### 1) `src/lib/video-composer/resolveCharacterId.ts` (neu, ~25 Zeilen)
+Pure Helper: nimmt einen rohen `characterId` (`uuid` | `outfit:<lookId>` | `catalog:<lookId>` | `lib:<id>`) plus die Avatar-Library und gibt die Basis-`brand_character.id` zurück. Konsumiert `avatar_outfit_looks` aus dem bereits geladenen `useAccessibleCharacters`-Cache (kein neuer DB-Call).
 
-## Plan
+### 2) `src/components/video-composer/CastConsistencyMap.tsx`
+- `getAnchor()` zusätzlich gegen `scene.character_shots?.[]` matchen (nicht nur `characterShot`).
+- IDs vor dem Vergleich durch `resolveCharacterId()` schicken — damit `outfit:…` / `catalog:…` als Treffer zählen.
+- Restliche UI/Logik unverändert.
 
-### 1. `outfit:`-Prefix beim Einfügen in eine Szene auflösen (Client)
+### 3) `src/hooks/useApplyProductionPlan.ts`
+Beim Anwenden des Plans pro Szene:
+- Jede `characterShots[].characterId` durch `resolveCharacterId()` normalisieren (Basis-UUID statt `outfit:` Präfix).
+- Zusätzlich zur `character_shots[]`-Liste auch das Legacy-Feld `characterShot` (singular, erster Eintrag) setzen, damit alte UI-Pfade weiter funktionieren.
+- Verhalten für `clipSource: 'ai-happyhorse'` bei Dialog bleibt wie zuvor.
 
-In allen Stellen, die `MotionStudioCharacter`-Mentions in `scene.characterShots` schreiben (vor allem `applySceneAssetsToPrompt` / SceneCard Mention-Drop / Scene-Director Resolver):
+### 4) Warnbanner in `CastConsistencyMap.tsx`
+Wenn nach dem Resolver immer noch `absent` für einen Cast-Member herauskommt: neuer Button **"Anker automatisch reparieren"** der pro betroffener Szene `characterShot = { characterId: <base>, shotType: 'medium' }` setzt und `character_shots[]` ergänzt. Reine State-Mutation über den bestehenden `useSceneManager`-Updater, kein Backend.
 
-- Wenn `mention.id.startsWith('outfit:')`:
-  - `outfitLookId = mention.id.slice('outfit:'.length)`
-  - `characterId = <avatar_id>` (aus `outfitLooks` Map, parent Brand-Character)
-  - `shotType` bleibt wie gewählt
-- Für `catalog:character:` analog auf die echte Catalog-UUID mappen.
+### 5) Was **nicht** angefasst wird
+- `supabase/functions/compose-dialog-segments/**` — v169 bleibt bitweise wie deployed.
+- `supabase/functions/sync-so-webhook/**`, `lipsync-watchdog/**`, `finalize-dialog-scene/**`.
+- `_shared/asd-strategy.ts`, `pass-face-preclip.ts`, `dialog-lock.ts`, `lipsync-fail.ts`.
+- `compose-video-clips` Edge Function — die em-dash + outfit-Fixes von letzter Runde bleiben, dort fehlte nur der Resolver, die Pipeline selbst war/ist korrekt.
 
-### 2. Server-seitige Auto-Recovery in `compose-video-clips`
+### Verifikation nach Build
+1. Screenshot-Szene neu öffnen → Cast Consistency Map zeigt für Samuel Dusatko in mind. 1 Szene 🟢/🔗 statt leerem Kreis.
+2. "Neu rendern" auf S01 → Cinematic-Sync findet Portrait, Pass 1 dispatcht. (Pipeline-Verhalten ab da identisch zu v169.)
+3. Edge-Function-Log `compose-dialog-segments`: weiterhin `BOOT version=v169`, kein neuer Deploy.
 
-Direkt nach dem Bau von `castShots` (Zeile ~1190), bevor `effectiveShots` ermittelt wird:
-
-- Für jede Shot mit `characterId.startsWith('outfit:')`:
-  - `avatar_outfit_looks` per `id` laden → `avatar_id`, `cover_url`, `front_url`
-  - Shot umschreiben: `characterId = avatar_id`, `outfitLookId = <look>` (falls leer)
-  - Parent `brand_characters` in `charById` einlesen, damit `referenceImageUrl` und Name vorhanden sind
-- Wenn nach dem Umschreiben **immer noch** kein `portraitUrl` resolvable ist (z. B. defekte Outfit-Referenz), fällt der bestehende Brand-Character-by-Name-Fallback (Zeilen 1223–1260) ohnehin durch — wir lassen ihn dann auch laufen, wenn alle Shots „leer" sind (heißt: keinen aufflösbaren `referenceImageUrl` haben), nicht nur wenn `effectiveShots.length === 0`.
-
-### 3. Em-Dash-tolerantes Speaker-Regex (Server)
-
-In `compose-video-clips/index.ts` `uniqueSpeakerSlugsFromScript` (Zeile 587) und in `prepare-twoshot-audio` (gleicher Bug, daher `empty_dialog_script`):
-
-- Char-Class von `[\w\s.'-]` auf `[\p{L}\p{N}\s.'\-—–]` umstellen (mit `u`-Flag), und nur die führende Speaker-Phrase **vor dem ersten `:`** matchen.
-- Mood-Suffix (`— CASUAL`, `– hopeful`) wird beim Slug-Bau abgeschnitten: ersten Em/En/Hyphen-Block + Mood-Wort vor dem Doppelpunkt entfernen, dann `replace(/\s+/g,'-')`.
-
-Damit wird aus `SAMUEL DUSATKO — CASUAL: …` zuverlässig der Slug `samuel-dusatko` (statt aktuell zufällig korrekt oder gar leer).
-
-### 4. UI: Preflight zeigt jetzt den echten Defekt
-
-`validateSceneForCinematicSync.ts` zusätzlich prüfen: wenn ein `characterShots[].characterId` mit `outfit:` oder `catalog:` startet **und** kein `portraitUrl` ableitbar ist → Warnung *„Outfit-Look ohne Avatar-Bindung — bitte Avatar erneut zuweisen"* statt erst nach Hailuo-Render zu failen.
-
-## Technische Details
-
-- Tabellen: `avatar_outfit_looks(id, avatar_id, cover_url, front_url)`, `brand_characters(id, name, reference_image_url, default_voice_id)`
-- Betroffene Files:
-  - `src/lib/video-composer/mentions/applySceneAssetsToPrompt.ts` (oder äquivalente Stelle, die Mentions in `characterShots` mappt)
-  - `src/components/video-composer/SceneCard.tsx` (Mention-Drop-Handler)
-  - `src/lib/video-composer/cinematic-sync/validateSceneForCinematicSync.ts`
-  - `supabase/functions/compose-video-clips/index.ts` (Speaker-Regex + Outfit-Resolver)
-  - `supabase/functions/prepare-twoshot-audio/index.ts` (Speaker-Regex)
-- Migration einmalig: SQL-Patch für bestehende Scene-Rows, die `outfit:`-IDs in `character_shots` halten — entweder im selben Edge-Call lazy migrieren (beim ersten Auflösen direkt zurückschreiben) oder per Backfill-Script. Empfehlung: lazy in (2), kein DB-Migration nötig.
-
-## Reihenfolge
-
-1. (2) + (3) im Edge Function → behebt die laufende Szene sofort ohne dass der User etwas neu anlegen muss.
-2. (1) Client-Mapping → verhindert das Entstehen neuer kaputter `outfit:`-IDs.
-3. (4) Preflight-Warnung → User sieht Probleme bereits vor dem Generate-Klick.
-
-Lipsync-Pipeline (Sync.so / Hailuo / HappyHorse) bleibt vollständig unangetastet — wir korrigieren nur die **Eingabe** (Portrait-Auflösung) vor dem Anchor-Step.
+Soll ich so umsetzen?
