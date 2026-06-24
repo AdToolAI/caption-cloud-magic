@@ -735,13 +735,18 @@ Deno.serve(async (req) => {
     let resolution: any = { scenes: [], unresolved: [] };
     try {
       resolution = await callGateway({
-        model: 'google/gemini-2.5-pro',
+        model: 'google/gemini-2.5-flash',
         system: SYSTEM_PASS_B,
         tool: TOOL_PASS_B,
         user: JSON.stringify({
           MANIFEST: manifest,
-          LIBRARY: { characters, locations, voices },
+          LIBRARY: {
+            characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id })),
+            locations: locations.map((l: any) => ({ id: l.id, name: l.name })),
+            voices,
+          },
         }),
+        timeoutMs: 45_000,
       });
     } catch (e: any) {
       console.warn('[briefing-deep-parse] Pass B failed, falling back to local resolution:', e?.message);
