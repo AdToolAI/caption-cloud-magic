@@ -149,11 +149,15 @@ export default function ProductionPlanSheet({
       setStep('review');
     } catch (e: any) {
       clearTimeout(phaseTimer);
-      const msg = e?.message ?? 'Deep-Parse fehlgeschlagen';
+      const details = await extractFunctionsErrorDetails(e);
+      const msg = details.message || 'Deep-Parse fehlgeschlagen';
+      const status = details.status;
+      console.error('[ProductionPlanSheet] deep-parse failed', { status, msg, body: details.body });
       toast({
         title: 'Briefing konnte nicht verarbeitet werden',
-        description: msg.includes('402') ? 'Keine AI-Credits mehr.'
-          : msg.includes('429') ? 'Zu viele Anfragen — bitte kurz warten.' : msg,
+        description: status === 402 || /402/.test(msg) ? 'Keine AI-Credits mehr.'
+          : status === 429 || /429/.test(msg) ? 'Zu viele Anfragen — bitte kurz warten.'
+          : status ? `${status}: ${msg}` : msg,
         variant: 'destructive',
       });
       setStep('paste');
