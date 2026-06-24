@@ -583,10 +583,17 @@ serve(async (req) => {
       if (!s) return [];
       const out: string[] = [];
       const seen = new Set<string>();
-      for (const line of s.split("\n")) {
-        const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+      // Accept: "NAME:", "[NAME]:", "NAME — MOOD:", "NAME – mood:", "NAME [mood]:"
+      // Em-dash (\u2014), en-dash (\u2013) and hyphen, plus optional mood word(s).
+      const RE = /^\s*\[?([\p{L}][\p{L}\p{N}\s.'\-]{0,60}?)\]?\s*(?:[\u2014\u2013\-]\s*[\p{L}\s]{1,32})?\s*(?:\[[^\]]{1,32}\])?\s*[:：]/u;
+      for (const line of s.split(/\r?\n/)) {
+        const m = line.match(RE);
         if (!m) continue;
-        const slug = m[1].trim().toLowerCase().replace(/\s+/g, "-");
+        const slug = m[1]
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^\p{L}\p{N}\-]/gu, "");
         if (slug && !seen.has(slug)) {
           seen.add(slug);
           out.push(slug);
@@ -594,6 +601,7 @@ serve(async (req) => {
       }
       return out;
     };
+
 
     /**
      * Resolve a speaker slug ("matthew-dusatko" or "matthew") to the matching
