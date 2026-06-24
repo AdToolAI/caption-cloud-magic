@@ -14,40 +14,68 @@
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Users, Image as ImageIcon, Link2, Circle } from 'lucide-react';
-import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
+import { Users, Image as ImageIcon, Link2, Circle, Wrench } from 'lucide-react';
+import type { ComposerCharacter, ComposerScene, CharacterShot } from '@/types/video-composer';
+import { useCharacterIdResolver } from '@/hooks/useCharacterIdResolver';
 
 interface Props {
   scenes: ComposerScene[];
   characters: ComposerCharacter[];
   /** When true, skip the outer Card chrome + duplicate title (parent provides StagePanel). */
   embedded?: boolean;
+  /** Optional: enables the "Anker reparieren" one-click fix on orphan cast members. */
+  onUpdateScene?: (sceneId: string, updates: Partial<ComposerScene>) => void;
 }
 
 
 type Anchor = 'reference' | 'chain' | 'prompt' | 'absent';
 
-function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: number): Anchor {
-  const shot = scene.characterShot;
-  const hasShot = !!shot && !!shot.shotType && shot.shotType !== 'absent';
-  // Match by exact id OR by name (covers `lib:…` ids and LLM id-drift).
-  const idMatch = hasShot && shot!.characterId === character.id;
+/**
+ * Collect every characterId reference on a scene, normalized through the
+ * outfit/catalog/lib resolver so prefixed IDs compare against base UUIDs.
+ */
+function collectSceneCharacterIds(
+  scene: ComposerScene,
+  resolve: (raw: string | null | undefined) => string | null,
+): string[] {
+  const raw: Array<string | undefined> = [];
+  if (scene.characterShot?.characterId) raw.push(scene.characterShot.characterId);
+  for (const cs of scene.characterShots ?? []) {
+    if (cs?.characterId) raw.push(cs.characterId);
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const r of raw) {
+    const norm = resolve(r);
+    if (norm && !seen.has(norm)) {
+      seen.add(norm);
+      out.push(norm);
+    }
+  }
+  return out;
+}
+
+function getAnchor(
+  scene: ComposerScene,
+  character: ComposerCharacter,
+  idx: number,
+  resolve: (raw: string | null | undefined) => string | null,
+): Anchor {
+  const sceneIds = collectSceneCharacterIds(scene, resolve);
+  const idMatch = sceneIds.includes(character.id);
+
   const fullName = (character?.name ?? '').trim().toLowerCase();
   const firstName = fullName.split(/\s+/)[0] || '';
-  const nameMatchInId =
-    hasShot &&
-    !!shot!.characterId &&
-    !!firstName &&
-    shot!.characterId.toLowerCase().includes(firstName);
-  // Fallback: character's name appears verbatim in the scene prompt.
-  const promptText = (scene.aiPrompt || '').toLowerCase();
+  // Fallback: character's name appears verbatim in the scene prompt or script.
+  const promptText = ((scene.aiPrompt || '') + ' ' + (scene.dialogScript || '')).toLowerCase();
   const nameMatchInPrompt =
     !!firstName &&
     ((!!fullName && promptText.includes(fullName)) || promptText.includes(firstName));
 
-  if (!idMatch && !nameMatchInId && !nameMatchInPrompt) return 'absent';
+  if (!idMatch && !nameMatchInPrompt) return 'absent';
   // Strong signature_items + AI scene → reference-style anchor (Sherlock-Holmes effect)
   if ((character.signatureItems?.trim() || character.referenceImageUrl) && scene.clipSource?.startsWith('ai-')) return 'reference';
   // First scene with the character → no chain possible, prompt-only
