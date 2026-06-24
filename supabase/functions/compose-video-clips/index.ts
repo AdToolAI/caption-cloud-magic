@@ -1283,7 +1283,21 @@ serve(async (req) => {
             // Without this fallback the single-speaker cinematic-sync path
             // silently skips composition → Hailuo invents a stranger OR a
             // stale talking-head URL leaks into v5 lipsync.
-            if (effectiveShots.length === 0 && scriptSpeakers.length > 0) {
+            // Also trigger this fallback when castShots exist but NONE of
+            // them resolves to a portrait (e.g. legacy `outfit:`/`catalog:`
+            // prefixed IDs that survived the resolver above with a broken
+            // look reference). Without this, the anchor step throws
+            // `missing_single_speaker` even though brand_characters contains
+            // a perfectly usable portrait under the speaker's name.
+            const effectiveHasPortrait = effectiveShots.some((s) => {
+              const c = charById.get(String(s.characterId));
+              return !!(c && (c as any).referenceImageUrl);
+            });
+            if (
+              scriptSpeakers.length > 0 &&
+              (effectiveShots.length === 0 || !effectiveHasPortrait)
+            ) {
+
               try {
                 const { data: brandRows } = await supabaseAdmin
                   .from("brand_characters")
