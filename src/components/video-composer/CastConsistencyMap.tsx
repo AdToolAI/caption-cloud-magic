@@ -107,7 +107,9 @@ const ANCHOR_META: Record<Anchor, { label: string; icon: React.ReactNode; classN
   },
 };
 
-export function CastConsistencyMap({ scenes, characters, embedded = false }: Props) {
+export function CastConsistencyMap({ scenes, characters, embedded = false, onUpdateScene }: Props) {
+  const { resolve } = useCharacterIdResolver();
+
   // Defensive: filter out any cast entries without a usable name. A single
   // library asset that lost its name (e.g. legacy import, mid-edit draft)
   // would otherwise crash the whole Storyboard tab via `.name.toLowerCase()`.
