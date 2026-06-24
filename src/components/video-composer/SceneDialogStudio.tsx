@@ -297,7 +297,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       return inLib ? buildSyntheticFromLibrary(inLib) : undefined;
     };
 
-    return cast
+    const resolved = cast
       .map((cs) => {
         if (cs.characterId) {
           const direct = characters.find((c) => c.id === cs.characterId);
@@ -317,7 +317,30 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return findByName(String(nameGuess));
       })
       .filter((c): c is ComposerCharacter => !!c);
-  }, [cast, characters, accessibleChars]);
+
+    // Script-name Fallback: wenn der Cast-Resolver leer ist, das Skript aber
+    // "NAME: ..."-Zeilen enthält, lösen wir die Namen direkt gegen die
+    // Briefing-Liste + Avatar-Library auf, damit Sprecher- und Stimm-Auswahl
+    // wieder erscheinen (statt 0 Sprecher).
+    if (resolved.length === 0 && script) {
+      const re =
+        /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.'-]{0,60}?)\s*(?:[—–-]\s*[A-Za-zÀ-ÿ ]{1,32})?\s*(?:\[[^\]]{1,32}\])?\s*:\s*\S/;
+      const found: ComposerCharacter[] = [];
+      const seen = new Set<string>();
+      for (const raw of script.split(/\r?\n/)) {
+        const m = re.exec(raw.trim());
+        if (!m) continue;
+        const hit = findByName(m[1].trim());
+        if (hit && !seen.has(hit.id)) {
+          seen.add(hit.id);
+          found.push(hit);
+        }
+      }
+      if (found.length > 0) return found;
+    }
+
+    return resolved;
+  }, [cast, characters, accessibleChars, script]);
 
 
 
