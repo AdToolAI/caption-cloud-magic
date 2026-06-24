@@ -19,7 +19,67 @@ import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductionPlan, PlanScene, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 import { toast } from '@/hooks/use-toast';
+import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
+
+/**
+ * Build a deterministic 3-scene Hook/Reveal/CTA arc so the user is never
+ * blocked when the AI gateway is unreachable. Mirrors the server-side
+ * safety arc in briefing-deep-parse (lines 627-669).
+ */
+function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
+  const total = Number(briefing.duration) || 15;
+  const per = Math.max(3, Math.min(12, Math.round(total / 3)));
+  const mentionMatch = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i);
+  const firstMention = mentionMatch ? mentionMatch[0] : null;
+  const firstChar = briefing.characters?.[0];
+  const cast = firstMention
+    ? [{
+        mentionKey: firstMention,
+        characterId: firstChar?.brandCharacterId ?? null,
+        characterName: firstChar?.name ?? firstMention.replace(/^@/, ''),
+        voiceId: null,
+      }]
+    : [];
+  const engine = firstMention ? 'cinematic-sync' as const : 'broll' as const;
+  const beats: Array<{ beat: string; framing: string; movement: string; energy: 'low' | 'mid' | 'high' }> = [
+    { beat: 'Hook',   framing: 'medium-close-up', movement: 'slow-push-in', energy: 'high' },
+    { beat: 'Reveal', framing: 'wide',            movement: 'tracking',     energy: 'mid'  },
+    { beat: 'CTA',    framing: 'medium',          movement: 'static',       energy: 'high' },
+  ];
+  return ProductionPlan.parse({
+    project: {
+      name: briefing.productName,
+      aspectRatio: briefing.aspectRatio as any,
+      totalDurationSec: per * 3,
+    },
+    scenes: beats.map((b, i) => ({
+      index: i + 1,
+      label: b.beat,
+      beat: b.beat,
+      durationSec: per,
+      engine,
+      lipSync: !!firstMention,
+      cast,
+      shotDirector: {
+        framing: b.framing, angle: 'eye-level', movement: b.movement, lighting: 'soft-window',
+      },
+      anchorPromptEN: `${b.beat} beat for ${briefing.productName ?? 'the brand'}: cinematic establishing shot in a relevant setting.`,
+      performance: {
+        mimik: b.beat === 'Hook' ? 'confident' : b.beat === 'CTA' ? 'warm-smile' : 'curious',
+        gestik: b.beat === 'CTA' ? 'open-palms' : 'still',
+        blick: b.beat === 'CTA' ? 'to-camera' : 'away',
+        energy: b.energy === 'high' ? 4 : 3,
+      },
+      musicCue: { energy: b.energy },
+    })),
+    unresolved: [{
+      field: 'auto-director',
+      reason: 'AI-Director offline — deterministischer 3-Szenen-Plan erstellt. Bitte vor dem Rendern prüfen.',
+      severity: 'warn',
+    }],
+  });
+}
 
 type Phase = 'idle' | 'A' | 'B' | 'done';
 
