@@ -1195,9 +1195,63 @@ serve(async (req) => {
           // an extra/cloned person from an older pipeline version. We only
           // reuse an existing anchor when audit_version matches and ok===true.
           try {
-            const castShots = (scene.characterShots ?? []).filter(
+            const castShotsRaw = (scene.characterShots ?? []).filter(
               (s) => s && s.shotType !== "absent" && s.characterId,
             );
+
+            // STAGE 6 (Jun 24 2026): unified mention library exposes saved
+            // outfit looks as virtual mention IDs `outfit:<look_id>`. When
+            // such an ID lands in characterShots[].characterId it cannot be
+            // resolved against brand_characters and the cinematic-sync anchor
+            // step fails with `missing_single_speaker` even though the user
+            // clearly picked an avatar+outfit. Resolve the prefix here once
+            // (lazy migration) so the rest of the pipeline sees the real
+            // brand_character UUID and gets a portrait.
+            const castShots: typeof castShotsRaw = [];
+            for (const shot of castShotsRaw) {
+              const id = String(shot.characterId ?? "");
+              if (id.startsWith("outfit:")) {
+                const lookId = id.slice("outfit:".length);
+                try {
+                  const { data: look } = await supabaseAdmin
+                    .from("avatar_outfit_looks")
+                    .select("id, avatar_id, front_url, cover_url")
+                    .eq("id", lookId)
+                    .maybeSingle();
+                  if (look?.avatar_id) {
+                    const avatarId = String(look.avatar_id);
+                    if (!charById.has(avatarId)) {
+                      const { data: brand } = await supabaseAdmin
+                        .from("brand_characters")
+                        .select("id, name, reference_image_url")
+                        .eq("id", avatarId)
+                        .maybeSingle();
+                      if (brand) {
+                        charById.set(avatarId, {
+                          id: avatarId,
+                          name: String((brand as any).name ?? ""),
+                          // Prefer the outfit's front_url so the look is
+                          // actually carried into the anchor / i2v.
+                          referenceImageUrl:
+                            (look as any).front_url ??
+                            (look as any).cover_url ??
+                            (brand as any).reference_image_url,
+                        } as ComposerCharacter);
+                      }
+                    }
+                    castShots.push({ characterId: avatarId, shotType: shot.shotType });
+                    continue;
+                  }
+                } catch (outfitErr) {
+                  console.warn(
+                    `[compose-video-clips] outfit-prefix resolve failed for ${id}`,
+                    outfitErr,
+                  );
+                }
+              }
+              castShots.push(shot);
+            }
+
             // Speaker-list override: when a dialog script is present, the
             // visual cast MUST equal the deduplicated set of actual speakers,
             // in script order. This prevents the "Samuel speaks twice → 3
@@ -1207,6 +1261,7 @@ serve(async (req) => {
               scene.dialogScript,
             );
             let effectiveShots = castShots;
+
             if (scriptSpeakers.length > 0) {
               const remapped = scriptSpeakers
                 .map((slug) => resolveSpeakerToShot(slug, castShots))
