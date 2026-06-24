@@ -321,13 +321,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Script-name Fallback: wenn der Cast-Resolver leer ist, das Skript aber
     // "NAME: ..."-Zeilen enthält, lösen wir die Namen direkt gegen die
     // Briefing-Liste + Avatar-Library auf, damit Sprecher- und Stimm-Auswahl
-    // wieder erscheinen (statt 0 Sprecher).
-    if (resolved.length === 0 && script) {
+    // wieder erscheinen (statt 0 Sprecher). Wir lesen aus scene.dialogScript
+    // (persistente Quelle) — das lokale `script`-State ist hier noch nicht
+    // deklariert.
+    const persistedScript = scene.dialogScript ?? '';
+    if (resolved.length === 0 && persistedScript) {
       const re =
         /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.'-]{0,60}?)\s*(?:[—–-]\s*[A-Za-zÀ-ÿ ]{1,32})?\s*(?:\[[^\]]{1,32}\])?\s*:\s*\S/;
       const found: ComposerCharacter[] = [];
       const seen = new Set<string>();
-      for (const raw of script.split(/\r?\n/)) {
+      for (const raw of persistedScript.split(/\r?\n/)) {
         const m = re.exec(raw.trim());
         if (!m) continue;
         const hit = findByName(m[1].trim());
@@ -340,7 +343,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
 
     return resolved;
-  }, [cast, characters, accessibleChars, script]);
+  }, [cast, characters, accessibleChars, scene.dialogScript]);
 
 
 
