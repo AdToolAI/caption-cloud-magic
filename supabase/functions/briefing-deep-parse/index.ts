@@ -841,7 +841,7 @@ Deno.serve(async (req) => {
       console.warn('[briefing-deep-parse] persist failed (non-fatal):', e?.message);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA } }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA }, passA_error: passAError }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
