@@ -315,19 +315,51 @@ export function useStoryboardTransition({
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
-      const msg = e?.message || (typeof e === 'string' ? e : 'Deep-Parse fehlgeschlagen');
-      toast({
-        title: 'Briefing-Analyse fehlgeschlagen',
-        description: msg.includes('402')
-          ? 'Keine AI-Credits mehr — bitte aufladen.'
-          : msg.includes('429')
-            ? 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.'
-            : msg,
-        variant: 'destructive',
-      });
-      setState((s) => ({ ...s, warRoomOpen: false, phase: 'idle', progress: 0 }));
-      // Fall back to normal navigation so the user is never blocked.
-      navigateToStoryboard();
+      const details = await extractFunctionsErrorDetails(e);
+      const status = details.status;
+      const msg = details.message || 'Deep-Parse fehlgeschlagen';
+      console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: details.body });
+
+      // Hard blocks (credits / rate-limit / payload): keep classic toast + navigate.
+      if (status === 402 || status === 429 || status === 413 || /402|429/.test(msg)) {
+        toast({
+          title: 'Briefing-Analyse fehlgeschlagen',
+          description: status === 402 || /402/.test(msg) ? 'Keine AI-Credits mehr — bitte aufladen.'
+            : status === 429 || /429/.test(msg) ? 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.'
+            : 'Briefing zu lang — bitte kürzen.',
+          variant: 'destructive',
+        });
+        setState((s) => ({ ...s, warRoomOpen: false, phase: 'idle', progress: 0 }));
+        navigateToStoryboard();
+        return { handled: true };
+      }
+
+      // Soft fail (500 / network / validation): build a local fallback plan
+      // so the user is never stuck. Open the plan sheet for review.
+      try {
+        const fallback = buildLocalFallbackPlan(briefing, text);
+        toast({
+          title: 'Auto-Analyse offline',
+          description: 'Basis-Plan (3 Szenen) erstellt — bitte prüfen und anpassen.',
+        });
+        setState({
+          warRoomOpen: false,
+          phase: 'idle',
+          progress: 0,
+          phaseLabel: '',
+          planSheetOpen: true,
+          initialPlan: fallback,
+        });
+      } catch (fallbackErr: any) {
+        console.error('[useStoryboardTransition] local fallback failed', fallbackErr);
+        toast({
+          title: 'Briefing-Analyse fehlgeschlagen',
+          description: status ? `${status}: ${msg}` : msg,
+          variant: 'destructive',
+        });
+        setState((s) => ({ ...s, warRoomOpen: false, phase: 'idle', progress: 0 }));
+        navigateToStoryboard();
+      }
       return { handled: true };
     }
   }, [briefing, projectId, scenes, navigateToStoryboard]);
