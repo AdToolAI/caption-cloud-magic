@@ -197,7 +197,7 @@ export function useStoryboardTransition({
     progressTimerRef.current = window.setInterval(() => {
       setState((s) => {
         // Cap at 95% until the real response lands.
-        const next = Math.min(s.progress + (s.progress < 60 ? 1.1 : 0.5), 95);
+        const next = Math.min(s.progress + (s.progress < 50 ? 1.1 : 0.35), 70);
         const phase: Phase = next < 60 ? 'A' : 'B';
         const phaseLabel =
           phase === 'A'
@@ -338,9 +338,12 @@ export function useStoryboardTransition({
       // so the user is never stuck. Open the plan sheet for review.
       try {
         const fallback = buildLocalFallbackPlan(briefing, text);
+        const reason = status
+          ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
+          : (msg.toLowerCase().includes('timeout') ? 'Timeout' : 'Netzwerkfehler');
         toast({
           title: 'Auto-Analyse offline',
-          description: 'Basis-Plan (3 Szenen) erstellt — bitte prüfen und anpassen.',
+          description: `${reason} — Basis-Plan (3 Szenen) erstellt, bitte prüfen & anpassen.`,
         });
         setState({
           warRoomOpen: false,

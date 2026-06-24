@@ -1,67 +1,49 @@
-# Root Cause: v166 Anchor-Bridge blockt Single-Speaker Fallback
+## Root cause
 
-Du hast Recht — die Pipeline selbst (compose-dialog-segments v169, Sync.so, ASD, Webhook, Watchdog) ist intakt. Der Fehler kommt aus dem **Hydrations-Schritt vor** dem Dispatch, genauer aus der v166-Änderung in `compose-dialog-segments/index.ts:1523-1565`.
+`briefing-deep-parse` runs **two Gemini 2.5 Pro calls in series** (Pass A extraction + Pass B resolution). There is **no `[functions.briefing-deep-parse]` block** in `supabase/config.toml`, so it inherits the default **30 s edge-function timeout**.
 
-## Was passiert (Single-Speaker-Szene aus dem Screenshot)
+A 15 s briefing with full director details produces ~6–8k input tokens → Pass A alone with Gemini 2.5 Pro regularly needs 20–40 s. Combined the two passes blow past 30 s. The Edge runtime kills the function before it can respond, the client gets a non-2xx → `useStoryboardTransition` correctly falls back to `buildLocalFallbackPlan` (the generic "Hook beat for AdTool AI : cinematic establishing shot in a relevant setting" you see).
 
-1. Hailuo rendert die Plate → 1 Gesicht wird von Gemini Vision detektiert.
-2. `plate-face-identity` versucht das Gesicht einem `brand_character` zuzuordnen, aber:
-   - Der Speaker-Record trägt eine **präfixierte ID** wie `outfit:<uuid>` oder `pose:<uuid>` (Saved-Outfit-Look, den wir letzte Woche eingebaut haben).
-   - `byId.get(cid)` schlägt fehl, weil die Plate-Face mit der reinen `brand_character.id` gelabelt ist (ohne Präfix).
-3. Vorher (vor v166) gab es einen `unlabeled.find(f => f.slot === idx)` Fallback → bei N=1 hat das immer das einzige Gesicht zurückgegeben → es funktionierte.
-4. v166 hat diesen Fallback **komplett entfernt**, um den Multi-Speaker-Bug zu fixen (Sprecher 3 von Sprecher 1 animiert). Das ist für N≥2 korrekt, aber für **N=1 zu hart**: bei einer Single-Speaker-Szene ist "das einzige Gesicht" unzweideutig das richtige.
-5. Folge: `speakerPlateBboxes[0]` bleibt `null` → der `v153.2_preflight_BLOCK` (Zeile 1638-1735) feuert mit `v153_plate_box_missing_for_speakers=[0]` → Refund + die Meldung "für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden".
+The progress bar stalling exactly at "Pass B 88 %" matches the fake client-side ticker reaching its cap while the server is being torn down.
 
-Das passt 1:1 zum Screenshot (Single-Speaker, "Lipsync abgebrochen", Credits refunded, hailuo-Master ist schon gerendert).
+The lip-sync pipeline (`compose-dialog-segments` v169) is **not affected** — only the briefing parser.
 
-## Fix (3 chirurgische Änderungen, KEINE Pipeline-Änderung)
+## Fix (3 small, isolated changes)
 
-### 1. `supabase/functions/compose-dialog-segments/index.ts` — `resolveBaseCharacterId` Helper + Normalisierung
+### 1. Raise the function timeout
 
-Vor der `speakers.forEach`-Schleife (≈1523):
+Add an explicit block to `supabase/config.toml`:
 
-```ts
-const stripIdPrefix = (id?: string | null) =>
-  String(id ?? "").toLowerCase().replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+```toml
+[functions.briefing-deep-parse]
+verify_jwt = true
+timeout_sec = 300
 ```
 
-Dann an **zwei** Stellen anwenden:
-- `byId.set(stripIdPrefix(f.characterId), f)` (Zeile 1509)
-- `const cid = stripIdPrefix(sp.character_id);` (Zeile 1524)
+### 2. Make Pass B fast & resilient
 
-Damit matcht `outfit:abc-uuid` (Speaker) wieder auf `abc-uuid` (Plate-Face) — die ursprüngliche Identitätsauflösung funktioniert wieder, ohne den v166-Multi-Speaker-Schutz aufzuweichen.
+In `supabase/functions/briefing-deep-parse/index.ts`:
 
-### 2. Single-Speaker-Safety-Net wiederherstellen
+- Switch Pass B model from `google/gemini-2.5-pro` → `google/gemini-2.5-flash`. Resolution is mechanical mention-matching; Flash handles it in ~3-6 s.
+- Wrap **each** gateway call in an internal `AbortController` budget (Pass A: 90 s, Pass B: 45 s) so a single hung call can never starve the whole function. On abort → log + fall through to existing local resolution / safety arc (already implemented).
+- Trim the Pass B payload: send only `{id, name}` for characters/locations (no extras) — already mostly the case, just enforce.
 
-Innerhalb von `if (!plateFace && unlabeled.length > 0)` (Zeile 1527-1538) einen N=1-Pfad hinzufügen, **bevor** der `console.warn`:
+### 3. Honest client progress + better error surfacing
 
-```ts
-if (speakers.length === 1) {
-  plateFace = unlabeled[0]; // schon nach Bbox-Fläche absteigend sortiert (Z. 1516-1522)
-  source = "single-speaker-largest-face";
-}
-```
+In `src/hooks/useStoryboardTransition.ts`:
 
-Begründung: Bei N=1 gibt es per Definition keinen "falschen Sprecher". Der v166-Bug betraf nur N≥2 (script-order ≠ visual-order). Bei N=1 ist das größte Gesicht ohne Identität immer die richtige Wahl — genau wie es vor v166 lief.
+- Cap the fake progress at 70 % until the real response arrives (so the "stuck at 88 %" illusion goes away).
+- When the fallback fires, include the actual HTTP status / error message in the toast description (e.g. "Auto-Analyse offline · timeout 30 s — Basis-Plan erstellt") so we can diagnose future regressions without guessing.
 
-### 3. Auch `characters` Liste vor `plate-face-identity` normalisieren
+## Explicitly NOT touched
 
-`plate-face-identity` bekommt `characters` als Eingabe (≈1457). Wir prüfen kurz, ob dort dieselbe Präfix-ID landet, und strippen sie bei Aufbau. Falls die Liste bereits aus `useAccessibleCharacters` mit base-IDs kommt, ist hier nichts zu tun — wir verifizieren das beim Implementieren mit einem `grep`.
+- `compose-dialog-segments` (v169 lip-sync pipeline)
+- `compose-video-clips`
+- Single-speaker safety net / identity bridge
+- Prompt sanitizer & "Hard Rule" face-occlusion guard
+- `briefing-deep-parse` Pass A model (stays Gemini 2.5 Pro for director quality)
+- Plan schema / `ProductionPlanSheet` UI
 
-## Was NICHT geändert wird (Pipeline bleibt unangetastet)
+## Expected result
 
-- `compose-dialog-segments` v169-Architektur (parallel fan-out, per-pass lock, RPC writes)
-- `sync-so-webhook`, `lipsync-watchdog`, `finalize-dialog-scene`
-- `asd-strategy` (frame_number/bounding_boxes_url, kein auto_detect für N≥2)
-- Retry-Ladder, Sync.so Payload-Rules, 429-Backoff
-- v166-Bridge für N≥2 (bleibt strikt, kein slot-index-Fallback)
-- v153.5 Hard-Fail für N≥2 (bleibt, korrekter Schutz)
-
-## Verifikation nach dem Fix
-
-1. Logs prüfen: für die fehlgeschlagene Szene sollte `v166_anchor_identity_slot_bridge` ODER `single-speaker-largest-face` erscheinen statt `v166_no_identity_for_speaker`.
-2. Re-Render in der gleichen Szene → `speakerPlateBboxes[0]` ist gesetzt → Preflight passiert → Dispatch zu Sync.so läuft.
-3. Multi-Speaker-Test (2-Sprecher-Szene mit korrekten brand_characters) muss weiterhin sauber laufen — der v166-Schutz greift dort nach wie vor.
-
-## Aufwand
-~25 Zeilen in einer Datei. Keine Migration, keine neuen Edge Functions, kein Schema-Change.
+After redeploy: full briefing (15 s, 3 scenes, named cast, voice IDs, shot director) ends up in the Production Plan instead of the generic safety arc, in well under 60 s. Storyboard auto-applies the real plan. Lip-sync path is untouched.

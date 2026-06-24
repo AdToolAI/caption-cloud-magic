@@ -380,26 +380,42 @@ Consistency checks (each becomes an unresolved entry when violated):
 
 DO NOT invent IDs. Only emit characterId / locationId that exist in LIBRARY. If you are unsure, set null and add an unresolved entry.`;
 
-interface CallOpts { model: string; system: string; tool: any; user: string; }
+interface CallOpts { model: string; system: string; tool: any; user: string; timeoutMs?: number; }
 
 async function callGateway(opts: CallOpts) {
-  const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: opts.model,
-      messages: [
-        { role: 'system', content: opts.system },
-        { role: 'user', content: opts.user },
-      ],
-      tools: [opts.tool],
-      tool_choice: { type: 'function', function: { name: opts.tool.function.name } },
-      max_tokens: 12000,
-    }),
-  });
+  const timeoutMs = opts.timeoutMs ?? 90_000;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        messages: [
+          { role: 'system', content: opts.system },
+          { role: 'user', content: opts.user },
+        ],
+        tools: [opts.tool],
+        tool_choice: { type: 'function', function: { name: opts.tool.function.name } },
+        max_tokens: 12000,
+      }),
+    });
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      const err: any = new Error(`gateway timeout after ${timeoutMs}ms (model=${opts.model})`);
+      err.status = 504;
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
   if (!res.ok) {
     const text = await res.text();
     const err: any = new Error(`gateway ${res.status}: ${text.slice(0, 400)}`);
@@ -627,6 +643,7 @@ Deno.serve(async (req) => {
         system: SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
         user: `BRIEFING:\n\n${briefing}`,
+        timeoutMs: 90_000,
       });
     } catch (e: any) {
       passAError = e?.message ?? 'pass A failed';
@@ -718,13 +735,18 @@ Deno.serve(async (req) => {
     let resolution: any = { scenes: [], unresolved: [] };
     try {
       resolution = await callGateway({
-        model: 'google/gemini-2.5-pro',
+        model: 'google/gemini-2.5-flash',
         system: SYSTEM_PASS_B,
         tool: TOOL_PASS_B,
         user: JSON.stringify({
           MANIFEST: manifest,
-          LIBRARY: { characters, locations, voices },
+          LIBRARY: {
+            characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id })),
+            locations: locations.map((l: any) => ({ id: l.id, name: l.name })),
+            voices,
+          },
         }),
+        timeoutMs: 45_000,
       });
     } catch (e: any) {
       console.warn('[briefing-deep-parse] Pass B failed, falling back to local resolution:', e?.message);

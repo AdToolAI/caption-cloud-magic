@@ -1,5 +1,10 @@
 project_id = "lbunafpxuskwmsrraqxl"
 
+[functions.briefing-deep-parse]
+verify_jwt = true
+timeout_sec = 300
+
+
 [functions.process-email-queue]
 verify_jwt = true
 
