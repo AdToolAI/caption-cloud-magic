@@ -258,36 +258,67 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const confirmRender = useSceneRenderConfirm();
 
   // Build the cast subset of ComposerCharacters that are actually in this scene.
-  // Library-Fallback: Wenn der Cast über brand_characters.id verlinkt ist (Plan-
-  // Apply hängt direkt die Library-ID rein), aber NICHT in der Project-Cast-Liste
-  // steht, ziehen wir den Eintrag aus useAccessibleCharacters und bauen einen
-  // synthetischen ComposerCharacter. Sonst würde Studio leer rendern.
-  const sceneCast = useMemo<ComposerCharacter[]>(
-    () =>
-      cast
-        .map((cs) => {
+  // Library-Fallback in 3 Stufen, damit der Studio nicht leer rendert wenn der
+  // Plan/Briefing-Apply die IDs nicht 1:1 in die Project-Cast-Liste schreibt:
+  //   1) direkter Match in `characters` (project-local)
+  //   2) Match in `characters` via brandCharacterId
+  //   3) Match in `accessibleChars` (Avatar-Library) via id / brandCharacterId
+  //   4) Fuzzy Name-Match (first-name, substring) gegen beide Pools
+  const buildSyntheticFromLibrary = (lib: any): ComposerCharacter => ({
+    id: lib.id,
+    name: lib.name ?? 'Charakter',
+    appearance: (lib as any).appearance ?? (lib as any).description ?? '',
+    signatureItems: (lib as any).signature_items ?? '',
+    brandCharacterId: lib.id,
+    referenceImageUrl:
+      (lib as any).portrait_url ??
+      (lib as any).reference_image_url ??
+      (lib as any).hedra_portrait_url ??
+      undefined,
+    identityCardPrompt: (lib as any).identity_card_prompt ?? undefined,
+  });
+
+  const sceneCast = useMemo<ComposerCharacter[]>(() => {
+    const lowered = (s: string) => (s || '').toLowerCase();
+    const firstOf = (s: string) => lowered(s).split(/\s+/)[0] ?? '';
+    const findByName = (needle: string): ComposerCharacter | undefined => {
+      const n = lowered(needle);
+      const nFirst = firstOf(needle);
+      if (!n) return undefined;
+      const inProject = characters.find((c) => {
+        const cn = lowered(c.name);
+        return cn === n || firstOf(c.name) === nFirst || cn.includes(nFirst);
+      });
+      if (inProject) return inProject;
+      const inLib = accessibleChars.find((b: any) => {
+        const bn = lowered(b.name ?? '');
+        return bn === n || firstOf(b.name ?? '') === nFirst || bn.includes(nFirst);
+      });
+      return inLib ? buildSyntheticFromLibrary(inLib) : undefined;
+    };
+
+    return cast
+      .map((cs) => {
+        if (cs.characterId) {
           const direct = characters.find((c) => c.id === cs.characterId);
           if (direct) return direct;
-          if (!cs.characterId) return undefined;
-          const lib = accessibleChars.find((b) => b.id === cs.characterId);
-          if (!lib) return undefined;
-          return {
-            id: lib.id,
-            name: lib.name ?? 'Charakter',
-            appearance: (lib as any).appearance ?? '',
-            signatureItems: (lib as any).signature_items ?? '',
-            brandCharacterId: lib.id,
-            referenceImageUrl:
-              (lib as any).portrait_url ??
-              (lib as any).reference_image_url ??
-              (lib as any).hedra_portrait_url ??
-              undefined,
-            identityCardPrompt: (lib as any).identity_card_prompt ?? undefined,
-          } as ComposerCharacter;
-        })
-        .filter((c): c is ComposerCharacter => !!c),
-    [cast, characters, accessibleChars],
-  );
+          const viaBrand = characters.find((c) => c.brandCharacterId === cs.characterId);
+          if (viaBrand) return viaBrand;
+          const libHit = accessibleChars.find(
+            (b: any) => b.id === cs.characterId,
+          );
+          if (libHit) return buildSyntheticFromLibrary(libHit);
+        }
+        // Last resort: try by any name attached to the cast slot.
+        const nameGuess =
+          (cs as any).characterName ||
+          (cs as any).name ||
+          (cs.characterId ?? '');
+        return findByName(String(nameGuess));
+      })
+      .filter((c): c is ComposerCharacter => !!c);
+  }, [cast, characters, accessibleChars]);
+
 
 
   // Brand-default voice per ComposerCharacter.id — pulled from the Avatar Library.
