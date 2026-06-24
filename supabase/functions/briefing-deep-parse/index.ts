@@ -744,6 +744,36 @@ Deno.serve(async (req) => {
 
     const plan = mergeManifestAndResolution(manifest, resolution);
 
+    // Local fill-pass: for any cast member with characterId === null, run a
+    // last-resort fuzzy match against the loaded `characters` library and
+    // back-fill characterId + characterName + voiceId (default_voice_id).
+    // Voice fallback: if still null, inherit project-level voice.
+    try {
+      const projectVoiceId: string | null =
+        (plan?.voice?.voiceId as string | undefined) ?? null;
+      for (const sc of plan.scenes ?? []) {
+        for (const c of sc.cast ?? []) {
+          if (!c.characterId) {
+            const needle = normalizeMention(c.mentionKey ?? c.characterName ?? '');
+            const hit = characters.find((ch: any) => {
+              const n = normalizeMention(ch.name);
+              return n && needle && (n.includes(needle) || needle.includes(n));
+            });
+            if (hit) {
+              c.characterId = hit.id;
+              c.characterName = hit.name;
+              if (!c.voiceId && typeof hit.default_voice_id === 'string') {
+                c.voiceId = hit.default_voice_id;
+              }
+            }
+          }
+          if (!c.voiceId && projectVoiceId) c.voiceId = projectVoiceId;
+        }
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
+    }
+
     try {
       console.log('[briefing-deep-parse] plan summary', {
         scenes: plan.scenes?.length ?? 0,
