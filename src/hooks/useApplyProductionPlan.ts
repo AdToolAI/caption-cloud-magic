@@ -271,7 +271,10 @@ function planSceneToComposerScene(
     orderIndex,
     sceneType,
     durationSeconds: Math.round(ps.durationSec),
-    clipSource: 'ai-hailuo' as any,
+    // Lip-Sync-Szenen defaulten auf HappyHorse (dialog-fähig). Die Cinematic-Sync-
+    // Pipeline migriert bei Bedarf intern auf Hailuo-Plate — die UI bleibt
+    // konsistent auf einem dialog-fähigen Modell.
+    clipSource: (dialogMode ? 'ai-happyhorse' : 'ai-hailuo') as any,
     clipQuality: 'standard',
     clipStatus: 'pending',
     aiPrompt,
