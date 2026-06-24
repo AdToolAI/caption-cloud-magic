@@ -1380,8 +1380,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSplitOnMount, blocks.length, generating]);
 
-  if (sceneCast.length < 1) return null;
   if (open === false) return null;
+  const castEmpty = sceneCast.length < 1;
+
 
   const isMonologue = sceneCast.length === 1;
 
