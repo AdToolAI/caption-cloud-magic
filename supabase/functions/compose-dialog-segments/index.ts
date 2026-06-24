@@ -1504,9 +1504,20 @@ serve(async (req) => {
         );
       }
 
+      // v170 — Strip variant-id prefixes (outfit:/pose:/wardrobe:/vibe:/prop:/look:)
+      // before matching. The Saved-Outfit-Look feature stores speakers with a
+      // composite mention-key like `outfit:<base-uuid>`, but plate-face-identity
+      // labels faces with the raw `brand_character.id`. Without normalization
+      // every single-speaker scene with a saved outfit fell into the v166 hard-
+      // fail and showed "kein eindeutiges Gesicht in der Szene".
+      const stripIdPrefix = (id?: string | null) =>
+        String(id ?? "")
+          .toLowerCase()
+          .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+
       const byId = new Map<string, PlateIdentityFace>();
       for (const f of plateIdentityMap.faces) {
-        if (f.characterId) byId.set(String(f.characterId).toLowerCase(), f);
+        if (f.characterId) byId.set(stripIdPrefix(f.characterId), f);
       }
       // Slot-fallback for any face the identity step couldn't label.
       // v129.20: for single-speaker scenes sort unlabeled faces by bbox
@@ -1521,21 +1532,33 @@ serve(async (req) => {
         });
       }
       speakers.forEach((sp, idx) => {
-        const cid = sp.character_id ? String(sp.character_id).toLowerCase() : "";
+        const cid = stripIdPrefix(sp.character_id);
         let plateFace: PlateIdentityFace | undefined = cid ? byId.get(cid) : undefined;
         let source = cid && plateFace ? "plate-identity+v166-anchor-bridge" : "plate-identity";
         if (!plateFace && unlabeled.length > 0) {
-          // v166 — DO NOT fall back to `unlabeled.find(f => f.slot === idx)`.
-          // `idx` is the script order; `slot` is the L→R visual position; they
-          // do not correlate. If we reach here, identity could not be resolved
-          // for this speaker — leave plateFace undefined so the v153.5 hard-
-          // fail refunds instead of silently animating the wrong face.
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v166_no_identity_for_speaker ` +
-            `speaker=${sp.speaker ?? `idx${idx}`} character_id=${cid || "?"} ` +
-            `unlabeled_plate_faces=${unlabeled.length} — refusing slot-index fallback`,
-          );
+          // v170 — Single-speaker safety net (restored from pre-v166 behaviour).
+          // For N=1 there is no "wrong speaker" risk — the v166 multi-speaker
+          // bug (script-order ≠ visual-order) cannot occur. Pick the largest
+          // unlabeled face (already sorted by area above) so a saved-outfit
+          // mismatch or a Gemini identity miss doesn't refund a valid plate.
+          if (speakers.length === 1) {
+            plateFace = unlabeled[0];
+            source = "single-speaker-largest-face";
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} v170_single_speaker_largest_face ` +
+              `character_id=${cid || "?"} unlabeled_plate_faces=${unlabeled.length}`,
+            );
+          } else {
+            // v166 — DO NOT fall back to `unlabeled.find(f => f.slot === idx)`
+            // for N≥2: script order and visual position don't correlate.
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v166_no_identity_for_speaker ` +
+              `speaker=${sp.speaker ?? `idx${idx}`} character_id=${cid || "?"} ` +
+              `unlabeled_plate_faces=${unlabeled.length} — refusing slot-index fallback`,
+            );
+          }
         }
+
         if (plateFace) {
           // v155 — Prefer the Rekognition-derived mouth landmark over the
           // bbox center. For tight-crop faces the bbox center sits on the
