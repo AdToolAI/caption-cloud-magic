@@ -544,8 +544,55 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
   };
 
-  const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
-  const speakers = useMemo(() => uniqueSpeakers(blocks, sceneCast), [blocks, sceneCast]);
+  // First-pass parse against the cast resolved from `characterShots`.
+  // Then: if the cast came up empty but the script contains "NAME:" lines,
+  // resolve those names against the project briefing + accessible library and
+  // build a merged cast. This is what makes the voice picker reappear even
+  // when the plan-apply did not write characterShots[].characterId.
+  const scriptSpeakerNames = useMemo(() => {
+    const lines = (script || '').split(/\r?\n/);
+    const names = new Set<string>();
+    const re =
+      /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.'-]{0,60}?)\s*(?:[—–-]\s*[A-Za-zÀ-ÿ ]{1,32})?\s*(?:\[[^\]]{1,32}\])?\s*:\s*\S/;
+    for (const raw of lines) {
+      const m = re.exec(raw.trim());
+      if (m) names.add(m[1].trim());
+    }
+    return Array.from(names);
+  }, [script]);
+
+  const enrichedSceneCast = useMemo<ComposerCharacter[]>(() => {
+    if (sceneCast.length > 0) return sceneCast;
+    const lowered = (s: string) => (s || '').toLowerCase();
+    const firstOf = (s: string) => lowered(s).split(/\s+/)[0] ?? '';
+    const found: ComposerCharacter[] = [];
+    const seen = new Set<string>();
+    for (const needle of scriptSpeakerNames) {
+      const n = lowered(needle);
+      const nFirst = firstOf(needle);
+      const inProject = characters.find((c) => {
+        const cn = lowered(c.name);
+        return cn === n || firstOf(c.name) === nFirst || cn.includes(nFirst);
+      });
+      if (inProject && !seen.has(inProject.id)) {
+        seen.add(inProject.id);
+        found.push(inProject);
+        continue;
+      }
+      const inLib = accessibleChars.find((b: any) => {
+        const bn = lowered(b.name ?? '');
+        return bn === n || firstOf(b.name ?? '') === nFirst || bn.includes(nFirst);
+      });
+      if (inLib && !seen.has(inLib.id)) {
+        seen.add(inLib.id);
+        found.push(buildSyntheticFromLibrary(inLib));
+      }
+    }
+    return found;
+  }, [sceneCast, scriptSpeakerNames, characters, accessibleChars]);
+
+  const blocks = useMemo(() => parseDialogScript(script, enrichedSceneCast), [script, enrichedSceneCast]);
+  const speakers = useMemo(() => uniqueSpeakers(blocks, enrichedSceneCast), [blocks, enrichedSceneCast]);
 
   // ── Voice Auto-Bind (Phase A) ─────────────────────────────────────────
   // When a speaker appears for the first time and has no voice yet, inherit
