@@ -87,7 +87,7 @@ const T = {
     subject: { pass: 'Cast gesetzt', warn: 'Cast unklar', fail: 'Kein Cast' },
     action: { pass: 'Aktion konkret', warn: 'Aktion vage', fail: 'Keine Aktion' },
     shot: { pass: 'Shot definiert', warn: 'Shot generisch', fail: 'Kein Shot' },
-    dialog: { pass: 'Dialog gelockt', warn: 'Dialog Entwurf', fail: 'Dialog Mismatch' },
+    dialog: { pass: 'Dialog gelockt', warn: 'Dialog Entwurf', fail: 'Voiceover-Timing fehlt' },
     negative: { pass: 'Negative gesetzt', warn: 'Negative schwach', fail: 'Kein Negative' },
     length: { pass: 'Länge passt', warn: 'Länge knapp', fail: 'Länge daneben' },
     consistency: { pass: 'Kohärent', warn: 'Gemischte Cues', fail: 'Konflikt' },
