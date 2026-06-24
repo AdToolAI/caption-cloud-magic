@@ -453,7 +453,11 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
   const scenes = (manifest?.scenes ?? []).map((s: any, i: number) => {
     const r = scenesById.get(s.index);
     const cast = (s.cast ?? []).map((c: any) => {
-      const rCast = (r?.cast ?? []).find((x: any) => x.mentionKey === c.mentionKey);
+      // Fuzzy match by normalized mentionKey (Pass B may return slightly different formatting).
+      const needle = normalizeMention(c.mentionKey);
+      const rCast =
+        (r?.cast ?? []).find((x: any) => x.mentionKey === c.mentionKey) ||
+        (r?.cast ?? []).find((x: any) => normalizeMention(x.mentionKey) === needle);
       return stripUndef({
         mentionKey: c.mentionKey,
         outfit: c.outfit ?? rCast?.outfit,
