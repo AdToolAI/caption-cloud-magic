@@ -235,6 +235,16 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
   airliner cockpit at dusk, hands on yoke, instrument panels glowing amber." —
   "Two soldiers crouched behind sandbags in a smoke-choked trench, debris
   falling, distant artillery flashes."
+  HARD RULE — DIALOG SCENES: For any scene that contains spoken dialog or
+  voiceover with on-camera cast (engine="cinematic-sync" or lipSync=true),
+  the visible speaker MUST stay frontal or three-quarter with mouth and
+  jaw unobstructed throughout the shot. NEVER write "hand on forehead",
+  "hands over face", "looking down at laptop/phone/desk/screen", "head in
+  hands", "head down", "eyes closed", "facing away", "back to camera",
+  "from behind" or any similar face-occluding pose into a dialog scene's
+  anchorPromptEN. Save those gestures for B-Roll / non-dialog scenes
+  (engine="broll"). The lip-sync pipeline rejects plates where the
+  speaker's face is not clearly visible.
 - "performance.{mimik,gestik,blick,energy}": short free-form German/English
   hints for facial expression, gesture, gaze direction, energy level 1–5.
   Tailor to the beat (Hook = high energy, confident; Pain = concerned, low;

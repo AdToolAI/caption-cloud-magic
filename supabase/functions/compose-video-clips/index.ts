@@ -674,10 +674,46 @@ serve(async (req) => {
       return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. BUT mouths and jaws stay still and softly closed — no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap, no listener mouth movement. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
+    /**
+     * v172 (Jun 24 2026) — Face-Occlusion-Sanitizer for cinematic-sync plates.
+     * Studio-Director scene prompts often contain face-blocking pose
+     * descriptors ("hand on forehead", "looking down at laptop", "eyes
+     * closed", …). For dialog plates those guarantee a v153_preflight_block
+     * because `plate-face-detect` can't find a frontal face at the
+     * mid-frame sample. The DB scene text stays untouched; only the prompt
+     * sent to Hailuo is sanitized.
+     */
+    const stripFaceOcclusionForPlate = (text: string): string => {
+      if (!text) return text;
+      let out = text;
+      const replacements: Array<[RegExp, string]> = [
+        [/\bhands?\s+on\s+forehead\b/gi, ""],
+        [/\bhands?\s+(?:over|covering)\s+(?:the\s+)?face\b/gi, ""],
+        [/\bface\s+in\s+(?:the\s+)?hands?\b/gi, ""],
+        [/\bhead\s+in\s+(?:the\s+)?hands?\b/gi, ""],
+        [/\b(?:looking|gazing|staring)\s+down\s+at\s+(?:a\s+|the\s+)?(?:laptop|phone|smartphone|mobile|desk|screen|keyboard|notebook|tablet|monitor)\b/gi, "at a cluttered desk"],
+        [/\bhead\s+down\b/gi, ""],
+        [/\blooking\s+away\b/gi, ""],
+        [/\bback\s+to\s+camera\b/gi, ""],
+        [/\bfacing\s+away\b/gi, ""],
+        [/\bfrom\s+behind\b/gi, ""],
+        [/\beyes\s+closed\b/gi, "eyes open, looking at the camera"],
+        [/\bcovering\s+(?:their|his|her)\s+face\b/gi, ""],
+        [/\brubbing\s+(?:their|his|her)\s+(?:eyes|forehead|temples)\b/gi, ""],
+      ];
+      for (const [re, rep] of replacements) out = out.replace(re, rep);
+      // Tidy up dangling commas/whitespace left behind.
+      out = out.replace(/\s*,\s*,/g, ",").replace(/\s{2,}/g, " ").replace(/\s+,/g, ",").trim();
+      return out;
+    };
+
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
       const speakerSlugs = uniqueSpeakerSlugsFromScript(scene.dialogScript);
-      const cleanedVisualPrompt = stripDialogForAnchor(scene.aiPrompt || "");
-      if (speakerSlugs.length < 2)
+      const cleanedVisualPromptRaw = stripDialogForAnchor(scene.aiPrompt || "");
+      const cleanedVisualPrompt = stripFaceOcclusionForPlate(cleanedVisualPromptRaw);
+      // v172 — N=0 (no speakers): nothing to lip-sync, fall through unchanged
+      // so non-dialog cinematic-sync plates are not over-constrained.
+      if (speakerSlugs.length === 0)
         return cleanedVisualPrompt || scene.aiPrompt || "cinematic footage";
       const castShots = (scene.characterShots ?? []).filter(
         (s) => s && s.shotType !== "absent" && s.characterId,
@@ -688,12 +724,17 @@ serve(async (req) => {
         .filter(
           (name): name is string => typeof name === "string" && name.length > 0,
         );
+      // v172 — N=1 now also gets the frontal/lip-ready wrapper (was only
+      // applied for N≥2 before). `neutralTwoShotPrompt` has a built-in n===1
+      // branch that forces "front, three-quarter or natural profile angle …
+      // mouth and jaw remain clearly visible and unobstructed".
       const neutralPlate = neutralTwoShotPrompt(
         speakerNames,
         speakerSlugs.length,
       );
       const sceneDescription =
         cleanedVisualPrompt || "modern cinematic interior scene";
+
       // "Lip-ready" plate: natural, animatable face — NOT a frozen one. The
       // negative prompt forbids talking/mouth-flap, but the positive prompt
       // must not over-constrain the mouth or Sync.so produces ventriloquist

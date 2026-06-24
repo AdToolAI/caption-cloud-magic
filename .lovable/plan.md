@@ -1,45 +1,49 @@
-## Was wirklich passiert ist
+## Warum sieht das Gesicht trotzdem nicht ok aus für die Pipeline
 
-Die Sync.so Multi-Speaker-Pipeline (v169) ist **nicht** angefasst worden. Verifiziert:
+Du hast Recht — im Vorschau-Thumbnail ist ein Gesicht erkennbar. Trotzdem schlägt der Preflight korrekt fehl. Drei Gründe, die hier zusammenkommen:
 
-- `compose-dialog-segments` steht weiterhin auf `COMPOSE_DIALOG_SEGMENTS_VERSION = "v169"`, mit `FEATURE_PER_PASS_LOCK`, `FEATURE_PLAN_D_FANOUT`, Concurrency-Cap 4, MAX_SHOT_RETRIES 4, Pre-Fanout, Stale-Reconcile — exakt wie im Guide.
-- `_shared/` enthält weiterhin `asd-strategy.ts`, `pass-face-preclip.ts`, `plate-face-detect.ts`, `plate-face-identity.ts`, `dialog-lock.ts`, `lipsync-fail.ts`, `webhook-auth.ts`.
-- Die letzten Edits saßen ausschließlich in `compose-video-clips` (Cinematic-Sync-Anchor-Resolver) — also vor der Dialog-Pipeline, nicht in ihr.
+1. **`plate-face-detect` sampelt nicht den Thumbnail-Frame**, sondern den **Mittel-Frame** (`midDurationSec * 0.5`, also ~5s in einer 10s-Szene — `plate-face-detect.ts:539`). Das Thumbnail das du siehst ist meist Frame 0 oder ein Cover-Frame. In der Szene "tired founder, **hand on forehead, looking down at laptop**" hat der Sprecher genau in der Mitte der Bewegung die Hand am Kopf → Gesicht teilweise verdeckt.
+2. **Geometry-Gate** (`plate-face-detect.ts:160-200`) lehnt Gesichts-Boxen ab, deren Mittelpunkt unterhalb von 45 % der Plate-Höhe liegt (`cluster_below_upper_third`). "Looking down at laptop" kippt den Kopf so weit, dass das Gesicht **unter** dieser Linie landet → Box wird als torso-artig verworfen.
+3. **N=1-Pfad ist nicht abgesichert**: `buildCinematicSyncMasterPrompt` in `compose-video-clips/index.ts:680-681` returned bei Single-Speaker-Szenen den **rohen Briefing-Prompt ungefiltert** an Hailuo. Der "Lip-ready, frontal, mouth/jaw unobstructed"-Wrapper, den N≥2-Szenen kriegen, wird für N=1 übersprungen.
 
-Der eigentliche Fehler im Screenshot ist **kein Pipeline-Bug**, sondern ein Resolver-Bug:
+Die Pipeline (v169 / v153 Preflight) ist also **richtig** und tut genau ihren Job — nur der Plate-Render davor produziert für Single-Speaker-Szenen genau das was die User-Beschreibung sagt: ein nach unten schauender Founder mit Hand am Kopf.
 
-1. Studio Director schreibt `character_shots[]` mit IDs wie `outfit:18fdfdf2…`.
-2. `CastConsistencyMap` liest nur `scene.characterShot` (singular, legacy) und vergleicht stumpf gegen `brand_character.id` → matcht nie → orange Warnung "Samuel Dusatko kommt in keiner Szene vor".
-3. Cinematic-Sync findet aus demselben Grund kein Portrait → `lip_sync_aborted`.
+## Fix (3 chirurgische Stellen, Pipeline bleibt unangetastet)
 
-## Plan — nur Resolver/Normalisierung, keine Pipeline-Änderung
+### 1. Server: Single-Speaker-Plate frontal erzwingen (Kernfix)
 
-### 1) `src/lib/video-composer/resolveCharacterId.ts` (neu, ~25 Zeilen)
-Pure Helper: nimmt einen rohen `characterId` (`uuid` | `outfit:<lookId>` | `catalog:<lookId>` | `lib:<id>`) plus die Avatar-Library und gibt die Basis-`brand_character.id` zurück. Konsumiert `avatar_outfit_looks` aus dem bereits geladenen `useAccessibleCharacters`-Cache (kein neuer DB-Call).
+`supabase/functions/compose-video-clips/index.ts` → `buildCinematicSyncMasterPrompt`
+- Den `speakerSlugs.length < 2`-Early-Return **nur** noch bei `length === 0` greifen lassen.
+- Für `length === 1` denselben Weg wie für N≥2 nehmen: `neutralTwoShotPrompt(speakerNames, 1)` hat bereits einen N=1-Pfad ("Exactly 1 person … framed in a clean front, three-quarter or natural profile angle … mouth and jaw remain clearly visible and unobstructed by hands, microphones or props").
+- Setting/Lighting aus dem Briefing geht **nicht verloren** — landet im `Visual setting: …`-Teil; nur face-blockierende Pose-Anweisungen werden vom Frontal-Wrapper überschrieben.
 
-### 2) `src/components/video-composer/CastConsistencyMap.tsx`
-- `getAnchor()` zusätzlich gegen `scene.character_shots?.[]` matchen (nicht nur `characterShot`).
-- IDs vor dem Vergleich durch `resolveCharacterId()` schicken — damit `outfit:…` / `catalog:…` als Treffer zählen.
-- Restliche UI/Logik unverändert.
+### 2. Server: Face-Occlusion-Sanitizer für Dialog-Plates
 
-### 3) `src/hooks/useApplyProductionPlan.ts`
-Beim Anwenden des Plans pro Szene:
-- Jede `characterShots[].characterId` durch `resolveCharacterId()` normalisieren (Basis-UUID statt `outfit:` Präfix).
-- Zusätzlich zur `character_shots[]`-Liste auch das Legacy-Feld `characterShot` (singular, erster Eintrag) setzen, damit alte UI-Pfade weiter funktionieren.
-- Verhalten für `clipSource: 'ai-happyhorse'` bei Dialog bleibt wie zuvor.
+Neue Helferfunktion `stripFaceOcclusionForPlate(text)` in derselben Datei. Läuft **nur** für Cinematic-Sync-Plates und ersetzt harte Occlusion-Trigger lautlos durch neutrale Equivalente:
+- `hand on forehead` / `hands over face` / `face in hands` → entfernt
+- `looking down at laptop/phone/desk/screen/keyboard` → `at a cluttered desk`
+- `head down` / `looking away` / `back to camera` / `facing away` / `from behind` → entfernt
+- `eyes closed` → `eyes open, looking at the camera`
 
-### 4) Warnbanner in `CastConsistencyMap.tsx`
-Wenn nach dem Resolver immer noch `absent` für einen Cast-Member herauskommt: neuer Button **"Anker automatisch reparieren"** der pro betroffener Szene `characterShot = { characterId: <base>, shotType: 'medium' }` setzt und `character_shots[]` ergänzt. Reine State-Mutation über den bestehenden `useSceneManager`-Updater, kein Backend.
+Der originale `scene.aiPrompt` in der DB bleibt unangetastet — die UI zeigt weiterhin den Briefing-Text. Nur was an Hailuo geschickt wird, ist gesäubert.
 
-### 5) Was **nicht** angefasst wird
-- `supabase/functions/compose-dialog-segments/**` — v169 bleibt bitweise wie deployed.
-- `supabase/functions/sync-so-webhook/**`, `lipsync-watchdog/**`, `finalize-dialog-scene/**`.
-- `_shared/asd-strategy.ts`, `pass-face-preclip.ts`, `dialog-lock.ts`, `lipsync-fail.ts`.
-- `compose-video-clips` Edge Function — die em-dash + outfit-Fixes von letzter Runde bleiben, dort fehlte nur der Resolver, die Pipeline selbst war/ist korrekt.
+### 3. Studio Director: Anti-Occlusion-Regel im Pass A
 
-### Verifikation nach Build
-1. Screenshot-Szene neu öffnen → Cast Consistency Map zeigt für Samuel Dusatko in mind. 1 Szene 🟢/🔗 statt leerem Kreis.
-2. "Neu rendern" auf S01 → Cinematic-Sync findet Portrait, Pass 1 dispatcht. (Pipeline-Verhalten ab da identisch zu v169.)
-3. Edge-Function-Log `compose-dialog-segments`: weiterhin `BOOT version=v169`, kein neuer Deploy.
+`supabase/functions/briefing-deep-parse/index.ts` → `SYSTEM_PASS_A`
+- Harte Regel ergänzen: *"For any scene that contains spoken dialog, the visible speaker MUST stay frontal or three-quarter with mouth and jaw unobstructed. Never write 'hand on forehead', 'looking down at laptop/phone', 'head in hands', 'eyes closed', 'facing away' or similar face-occluding actions into dialog scenes. Save those gestures for B-Roll / non-dialog scenes."*
 
-Soll ich so umsetzen?
+Damit zukünftige Plan-Generierungen das Problem gar nicht erst erzeugen.
+
+## Was NICHT angefasst wird
+
+- `compose-dialog-segments` (v169 / v153.x Preflight) — bleibt 1:1.
+- `_shared/plate-face-detect.ts` (Geometry-Gate, Gemini-Prompts) — bleibt 1:1.
+- Sync.so-Call, ASD, Bbox-Pipeline, Refund-Logik — bleibt 1:1.
+- Bestehender N≥2-Pfad in `buildCinematicSyncMasterPrompt` — bleibt 1:1.
+
+## Verifikation
+
+1. S01 → **"Neu rendern"** klicken.
+2. Edge-Log zeigt für S01 jetzt `Lip-ready neutral master plate: Exactly 1 person … framed in a clean front, three-quarter or natural profile angle …` als gesendeten Hailuo-Prompt.
+3. Mid-Frame-Sample zeigt Gesicht frontal/three-quarter, oberhalb der 45-%-Linie.
+4. `plate-face-detect` findet exakt 1 Box → v153.1-Preflight passiert → Sync.so dispatcht → kein "Sauber neu starten"-Banner mehr.
