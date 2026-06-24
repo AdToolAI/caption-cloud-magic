@@ -1,34 +1,67 @@
-## Diagnose
+## Problem
 
-- Button „Skript schreiben · 1 Zeile" ist sichtbar und togglt `dialogStudioOpen` korrekt — `dialogMode` ist an, `dialogScript` existiert.
-- `SceneDialogStudio` rendert aber `null`, weil intern `sceneCast.length < 1` ist.
-- Ursache: `sceneCast` wird gebaut, indem `cast[].characterId` in der Project-`characters`-Liste gesucht wird. Der Briefing-Plan setzt `characterShots[].characterId` jedoch auf die `brand_characters.id` (Avatar-Library). Die Project-Cast-Liste enthält den Avatar erst, wenn er explizit über die Briefing-Cast-Sektion hinzugefügt wurde — das ist beim Auto-Apply nicht garantiert.
-- Zweites Symptom: Modell-Dropdown ist leer, obwohl Lip-Sync aktiv ist. Beim Plan-Apply landen Szenen als `ai-hailuo`, nicht als HappyHorse. Der Provider wird erst gesetzt, wenn der User den Toggle manuell aus- und wieder einschaltet.
+Das aktuelle Verhalten ist ein Rückschritt: Das Dialog-Studio zeigt zwar das Skript, aber keine Sprecher-/Voice-Zeile. Dadurch bleibt `0 Sprecher`, `dialogVoices` wird nicht gesetzt und Lip-Sync scheitert später mit fehlender Stimme.
 
-## Plan
+Ursache ist sehr wahrscheinlich nicht die Lip-Sync-Pipeline selbst, sondern die Cast-Auflösung im Dialog-Studio:
+- Der Plan schreibt Cast-IDs aus der Avatar-Library/Briefing-Analyse.
+- `SceneDialogStudio` kann daraus keinen lokalen `sceneCast` bauen.
+- `parseDialogScript()` findet deshalb keinen Sprecher im Skript.
+- Ohne `speakers.length > 0` rendert die Voice-Auswahl nicht.
 
-1. **`SceneDialogStudio` mit Library-Fallback**
-   - Wenn `characters.find(c => c.id === cs.characterId)` leer ist, in `useAccessibleCharacters()` / `useUnifiedMentionLibrary()` nach derselben `brand_characters.id` suchen und einen synthetischen `ComposerCharacter` ableiten (`name`, `referenceImageUrl`, `brandCharacterId`).
-   - `sceneCast` wird damit nie leer, solange der Cast eine gültige Library-ID hat.
-   - `defaultVoiceByCharId` greift dann wieder, die `default_voice_id` wird automatisch geladen.
+## Zielzustand
 
-2. **Harten Null-Return entfernen**
-   - `if (sceneCast.length < 1) return null;` durch einen Recovery-Header ersetzen: Hinweistext + Skript-Textarea bleibt nutzbar, Generate-Buttons werden disabled mit Tooltip „Cast-Charakter im Briefing zuweisen".
-   - So öffnet das Studio auch dann sichtbar, falls der Library-Fallback einmal nichts findet.
+Wenn im Briefing/Plan ein Cast-Member ausgewählt wurde und im Skript steht z.B. `SAMUEL DUSATKO — CASUAL: ...`, muss das Dialog-Studio wieder wie vorher funktionieren:
+- Sprecher sichtbar mit Avatar/Name.
+- Stimme rechts auswählbar.
+- Default-Stimme wird automatisch gesetzt, falls im Avatar vorhanden.
+- Wenn keine Default-Stimme existiert, bleibt die Voice-Auswahl trotzdem sichtbar und manuell nutzbar.
+- Lip-Sync-Generierung wird erst erlaubt, wenn mindestens eine gültige Stimme pro Sprecher gesetzt ist.
+- Dialog-/Lip-Sync-Szenen verwenden HappyHorse als Provider-Default.
 
-3. **HappyHorse-Default beim Plan-Apply**
-   - In `useApplyProductionPlan.ts` (`planSceneToComposerScene`): wenn `dialogMode === true`, `clipSource = 'ai-happyhorse'` und `clipQuality = 'standard'` (statt aktuell hardcodiertem `'ai-hailuo'`).
-   - Pipeline-sicher: `cinematic-sync` migriert HappyHorse automatisch zu Hailuo für die Plate (siehe `validateSceneForCinematicSync` Hinweis `happyhorse_will_auto_migrate`), die UI zeigt aber konsistent HappyHorse als gewähltes Modell.
+## Umsetzung
 
-4. **Auto-HappyHorse beim Toggle bestätigen**
-   - In `SceneCard.tsx` greift die existierende Auto-Migration via `DIALOG_FALLBACK_CLIP_SOURCE = 'ai-happyhorse'` bereits richtig. Hier nichts ändern.
+### 1. Cast-Fallback im Dialog-Studio robuster machen
+In `SceneDialogStudio.tsx`:
+- Library-Fallback erweitert prüfen:
+  - `id`
+  - `brandCharacterId`
+  - Name/First-name fuzzy match
+  - Script-Speaker-Name gegen Avatar-Name
+- Library-Felder korrekt mappen:
+  - `referenceImageUrl = portrait_url || reference_image_url`
+  - `brandCharacterId = brand_character.id`
+  - `default_voice_id` als Default-Voice-Quelle
 
-## Betroffene Dateien
+### 2. Skriptparser für Regie-/Mood-Suffix reparieren
+`parseDialogScript()` aktuell erkennt `NAME: Text`, aber dein Skript ist eher:
 
-- `src/components/video-composer/SceneDialogStudio.tsx` — `sceneCast`-Fallback über `useAccessibleCharacters`, harten Null-Return durch Recovery-UI ersetzen.
-- `src/hooks/useApplyProductionPlan.ts` — Default-`clipSource` für Lip-Sync-Szenen auf `ai-happyhorse`.
+```text
+SAMUEL DUSATKO — CASUAL: Du sitzt sechs Stunden ...
+```
 
-## Nicht verändert
+Ich passe die Erkennung so an, dass solche Formate sauber als Sprecher `SAMUEL DUSATKO` erkannt werden, während `CASUAL` als Tonalität/Mood ignoriert oder separat behandelt wird. Dadurch wird aus `0 Sprecher` wieder `1 Sprecher`.
 
-- Lip-Sync-Pipeline (`compose-dialog-segments`, `sync-so-webhook`, `poll-dialog-shots`, `dialog_shots`, `dialogVoices`-Schema) bleibt komplett unangetastet.
-- Keine Backend- oder Edge-Function-Änderungen, keine Migrationen.
+### 3. Voice-Auswahl immer aus erkannten Skriptsprechern + Cast ableiten
+In `SceneDialogStudio.tsx`:
+- Voice-Zeilen nicht nur von `speakers` aus `parseDialogScript()` abhängig machen, sondern fallbackweise aus `sceneCast`, wenn ein Dialog-Skript vorhanden ist.
+- Für jeden sichtbaren Sprecher direkt `dialogVoices` initialisieren:
+  - Avatar-Default-Stimme, falls vorhanden.
+  - sonst erste verfügbare ElevenLabs-Stimme als sicherer Fallback.
+- Dadurch bleibt die Stimme rechts auswählbar und der Generate-Button wird nicht blind freigegeben.
+
+### 4. Plan-Anwendung Cast/Voice stabilisieren
+In `useApplyProductionPlan.ts`:
+- Bei Dialog-Szenen sicherstellen, dass `characterShots`, `characterShot`, `dialogMode`, `dialogScript`, `dialogVoices`, `engineOverride: 'cinematic-sync'`, `lipSyncWithVoiceover: true`, `clipSource: 'ai-happyhorse'` konsistent gesetzt werden.
+- Keine bestehenden gerenderten/gelockten Lip-Sync-Szenen anfassen.
+
+### 5. UI-Recovery-Banner entschärfen
+Der aktuelle gelbe Banner sagt „Kein Cast-Charakter aufgelöst“, obwohl du im Plan einen Cast gewählt hast. Nach dem Fix soll er nur erscheinen, wenn wirklich weder Cast noch Skriptsprecher auflösbar sind. Sonst erscheinen wieder Sprecher + Voice-Auswahl.
+
+## Validierung
+
+Ich prüfe danach per Code/Preview-Signal:
+- `SAMUEL DUSATKO — CASUAL: ...` wird als 1 Sprecher erkannt.
+- Voice-Auswahl erscheint wieder unter dem Skript.
+- `dialogVoices` wird beim Öffnen/Auto-Bind gesetzt.
+- Dialog-Szene steht auf HappyHorse und Cinematic-Sync.
+- Generate bleibt blockiert, falls wirklich keine Stimme existiert, statt später in der Lip-Sync-Pipeline zu scheitern.
