@@ -1388,6 +1388,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
   return (
     <Card ref={ref} className="p-3 space-y-3 border-primary/30 bg-primary/5">
+      {castEmpty && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-400/40 bg-amber-500/[0.06] px-2.5 py-2 text-[11px] text-amber-200">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-300" />
+          <div className="leading-snug">
+            {language === 'de'
+              ? 'Kein Cast-Charakter aufgelöst. Skript ist editierbar, aber für Voiceover/Lip-Sync bitte oben unter „Cast" einen Charakter aus der Avatar-Library zuweisen.'
+              : language === 'es'
+              ? 'Sin reparto resuelto. Puedes editar el guion, pero asigna un personaje arriba en "Cast" para generar voz/lip-sync.'
+              : 'No cast character resolved. Script is editable, but assign a character above under "Cast" to generate voiceover/lip-sync.'}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Mic className="h-3.5 w-3.5 text-primary" />
@@ -1880,8 +1893,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           type="button"
           size="sm"
           onClick={handleGenerate}
-          disabled={generating || blocks.length === 0}
+          disabled={generating || blocks.length === 0 || castEmpty}
+          title={castEmpty ? (language === 'de' ? 'Cast-Charakter im Briefing zuweisen' : language === 'es' ? 'Asigna un personaje del reparto en el briefing' : 'Assign a cast character in the briefing') : undefined}
           className="h-7 text-xs gap-1 ml-auto"
+
         >
           {(() => {
             if (generating) {
