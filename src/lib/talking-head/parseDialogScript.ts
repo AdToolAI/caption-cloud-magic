@@ -38,9 +38,19 @@ export interface DialogBlock {
   tonality?: DialogTonalityId;
 }
 
-/** Matches `Name [tonality]?: text`. Tonality bracket is optional. */
-const LINE_RE =
-  /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.-]{0,40})\s*(?:\[([^\]]{1,32})\])?\s*[:—-]\s*(.+)$/;
+/**
+ * Primary form: `Name [— Mood]? [tonality]?: text` — requires a colon.
+ * Captures: 1=name, 2=mood (after em/en/hyphen dash), 3=bracket tonality, 4=text.
+ */
+const LINE_RE_PRIMARY =
+  /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.'-]{0,60}?)\s*(?:[—–-]\s*([A-Za-zÀ-ÿ ]{1,32}?))?\s*(?:\[([^\]]{1,32})\])?\s*:\s*(.+)$/;
+
+/**
+ * Fallback form: `Name [tonality]? — text` — em-dash / en-dash / hyphen as
+ * the only separator (legacy screenplays without a trailing colon).
+ */
+const LINE_RE_FALLBACK =
+  /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.'-]{0,60})\s*(?:\[([^\]]{1,32})\])?\s*[—–-]\s*(.+)$/;
 
 export function parseDialogScript(
   script: string,
@@ -58,25 +68,44 @@ export function parseDialogScript(
       current = null;
       continue;
     }
-    const m = LINE_RE.exec(line);
-    if (m) {
-      const speakerName = m[1].trim();
-      const tonalityRaw = m[2]?.trim();
-      const text = m[3].trim();
+    let speakerName: string | undefined;
+    let moodRaw: string | undefined;
+    let tonalityRaw: string | undefined;
+    let text: string | undefined;
+    const mP = LINE_RE_PRIMARY.exec(line);
+    if (mP) {
+      speakerName = mP[1].trim();
+      moodRaw = mP[2]?.trim();
+      tonalityRaw = mP[3]?.trim();
+      text = mP[4].trim();
+    } else {
+      const mF = LINE_RE_FALLBACK.exec(line);
+      if (mF) {
+        speakerName = mF[1].trim();
+        tonalityRaw = mF[2]?.trim();
+        text = mF[3].trim();
+      }
+    }
+    if (speakerName && text) {
       const spk = speakerName.toLowerCase();
       const spkFirst = spk.split(/\s+/)[0];
       const c = cast.find((x) => {
-        const xn = x.name.toLowerCase();
+        const xn = (x.name || '').toLowerCase();
+        if (!xn) return false;
         const xnFirst = xn.split(/\s+/)[0];
         return (
           xn === spk ||
           xnFirst === spk ||           // cast "Sarah Dusatko" ↔ script "Sarah"
           xn === spkFirst ||           // cast "Sarah" ↔ script "Sarah Dusatko"
-          xnFirst === spkFirst         // both share a first name
+          xnFirst === spkFirst ||      // both share a first name
+          xn.includes(spkFirst) ||     // tolerant substring
+          spk.includes(xnFirst)
         );
       });
       if (c) {
-        const tonality = normalizeTonalityMarker(tonalityRaw);
+        const tonality =
+          normalizeTonalityMarker(tonalityRaw) ??
+          normalizeTonalityMarker(moodRaw);
         current = { speakerId: c.id, speakerName: c.name, text, tonality };
         blocks.push(current);
         continue;
