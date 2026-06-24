@@ -643,6 +643,7 @@ Deno.serve(async (req) => {
         system: SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
         user: `BRIEFING:\n\n${briefing}`,
+        timeoutMs: 90_000,
       });
     } catch (e: any) {
       passAError = e?.message ?? 'pass A failed';
