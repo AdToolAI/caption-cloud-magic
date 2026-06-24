@@ -1,39 +1,34 @@
-# Fix: "Skript schreiben" nicht öffnenbar & keine Stimme auto-zugewiesen
-
 ## Diagnose
 
-Der Plan im Sheet sieht gut aus (Director's Vision, framing, cast resolved zu `Samuel Dusatko`) — aber nach **„Plan anwenden"** landet der Cast **nicht** in der Szene:
-- Cast-Row: Warnung „Samuel Dusatko kommt in keiner Szene vor"
-- Szene 4 hat 0 Anker → `twoshot_audio_prep_failed: missing_voice`
-- „Skript schreiben"-Button bleibt ausgeblendet, weil `sceneCastCount < 1`
+- Button „Skript schreiben · 1 Zeile" ist sichtbar und togglt `dialogStudioOpen` korrekt — `dialogMode` ist an, `dialogScript` existiert.
+- `SceneDialogStudio` rendert aber `null`, weil intern `sceneCast.length < 1` ist.
+- Ursache: `sceneCast` wird gebaut, indem `cast[].characterId` in der Project-`characters`-Liste gesucht wird. Der Briefing-Plan setzt `characterShots[].characterId` jedoch auf die `brand_characters.id` (Avatar-Library). Die Project-Cast-Liste enthält den Avatar erst, wenn er explizit über die Briefing-Cast-Sektion hinzugefügt wurde — das ist beim Auto-Apply nicht garantiert.
+- Zweites Symptom: Modell-Dropdown ist leer, obwohl Lip-Sync aktiv ist. Beim Plan-Apply landen Szenen als `ai-hailuo`, nicht als HappyHorse. Der Provider wird erst gesetzt, wenn der User den Toggle manuell aus- und wieder einschaltet.
 
-### Ursache
-1. **Pass-B-Resolver** liefert Cast mit leicht anderem `mentionKey`-Format (z. B. `samueldusatko` statt `@samuel-dusatko`) → strikter `===`-Match in `mergeManifestAndResolution` schlägt fehl → `characterId = null` → `planSceneToComposerScene` filtert ihn raus (Filter `c.characterId`).
-2. Selbst wenn Character matched: wenn `default_voice_id` am `brand_character` leer ist, fällt `dialogVoices` weg → `compose-dialog-segments` erkennt „missing_voice".
-3. UI versteckt den „Skript schreiben"-Button bei 0 Cast → User kann nicht manuell nachziehen.
+## Plan
 
-## Fixes (3 Dateien)
+1. **`SceneDialogStudio` mit Library-Fallback**
+   - Wenn `characters.find(c => c.id === cs.characterId)` leer ist, in `useAccessibleCharacters()` / `useUnifiedMentionLibrary()` nach derselben `brand_characters.id` suchen und einen synthetischen `ComposerCharacter` ableiten (`name`, `referenceImageUrl`, `brandCharacterId`).
+   - `sceneCast` wird damit nie leer, solange der Cast eine gültige Library-ID hat.
+   - `defaultVoiceByCharId` greift dann wieder, die `default_voice_id` wird automatisch geladen.
 
-### 1) `supabase/functions/briefing-deep-parse/index.ts`
-- In `mergeManifestAndResolution`: fuzzy Cast-Match per `normalizeMention` (Fallback zu strict `===`).
-- Direkt nach `mergeManifestAndResolution` im Handler: **Local-Fill-Pass**, der für jede Cast-Position mit `characterId === null` lokal über die geladene `characters`-Library fuzzy-sucht und bei Treffer `characterId`, `characterName` und `voiceId` (default_voice_id) nachträgt. Voice-Fallback: wenn weiterhin null, nimmt project-level `plan.voice.voiceId`.
+2. **Harten Null-Return entfernen**
+   - `if (sceneCast.length < 1) return null;` durch einen Recovery-Header ersetzen: Hinweistext + Skript-Textarea bleibt nutzbar, Generate-Buttons werden disabled mit Tooltip „Cast-Charakter im Briefing zuweisen".
+   - So öffnet das Studio auch dann sichtbar, falls der Library-Fallback einmal nichts findet.
 
-### 2) `src/hooks/useApplyProductionPlan.ts`
-- In `planSceneToComposerScene`: wenn ein resolved Cast-Member **keine** `voiceId` hat, mit `plan.voice.voiceId` (Project-Default) auffüllen, sodass `dialogVoices[characterId]` immer gesetzt ist und `compose-dialog-segments` keine „missing_voice" wirft.
-- Signatur erweitern um `projectVoiceId` Argument (aus `plan.voice?.voiceId`).
-- Console-Warning loggen, wenn eine `lipSync`-Szene 0 `characterShots` nach Apply hat (damit wir Resolver-Issues künftig sehen).
+3. **HappyHorse-Default beim Plan-Apply**
+   - In `useApplyProductionPlan.ts` (`planSceneToComposerScene`): wenn `dialogMode === true`, `clipSource = 'ai-happyhorse'` und `clipQuality = 'standard'` (statt aktuell hardcodiertem `'ai-hailuo'`).
+   - Pipeline-sicher: `cinematic-sync` migriert HappyHorse automatisch zu Hailuo für die Plate (siehe `validateSceneForCinematicSync` Hinweis `happyhorse_will_auto_migrate`), die UI zeigt aber konsistent HappyHorse als gewähltes Modell.
 
-### 3) `src/components/video-composer/SceneCard.tsx` (Zeile ~1731–1790)
-- „Skript schreiben"-Button-Bedingung lockern:
-  ```ts
-  if (sceneCastCount < 1 && scene.dialogMode !== true) return null;
-  ```
-  → Button erscheint auch bei 0 Cast, sobald `dialogMode === true` (Lipsync-Engine), damit User das Studio öffnen, Cast zuweisen und Stimme picken kann.
-- `SceneDialogStudio` (Zeile ~1813) Render-Bedingung gleich lassen (verlangt schon `dialogMode === true`), aber Studio rendert auch ohne Cast — User kann dort den Cast-Picker nutzen.
+4. **Auto-HappyHorse beim Toggle bestätigen**
+   - In `SceneCard.tsx` greift die existierende Auto-Migration via `DIALOG_FALLBACK_CLIP_SOURCE = 'ai-happyhorse'` bereits richtig. Hier nichts ändern.
 
-## Antwort auf „Passt der Briefing-Plan so?"
-**Ja, inhaltlich top:** 3 Szenen mit klarer Pain→Reveal→CTA-Architektur, Director's Vision mit Framing/Lens/DOF, korrekt resolved auf `@samuel-dusatko` und `@home-office`, Engine `cinematic-sync`. Einziger Schwachpunkt war die **Übergabe in die Szenen** (siehe Fix 1+2) — der Plan selbst ist sauber.
+## Betroffene Dateien
 
----
+- `src/components/video-composer/SceneDialogStudio.tsx` — `sceneCast`-Fallback über `useAccessibleCharacters`, harten Null-Return durch Recovery-UI ersetzen.
+- `src/hooks/useApplyProductionPlan.ts` — Default-`clipSource` für Lip-Sync-Szenen auf `ai-happyhorse`.
 
-**Bitte in den Build-Mode wechseln, dann setze ich die 3 Fixes parallel um und re-deploye die Edge Function.**
+## Nicht verändert
+
+- Lip-Sync-Pipeline (`compose-dialog-segments`, `sync-so-webhook`, `poll-dialog-shots`, `dialog_shots`, `dialogVoices`-Schema) bleibt komplett unangetastet.
+- Keine Backend- oder Edge-Function-Änderungen, keine Migrationen.
