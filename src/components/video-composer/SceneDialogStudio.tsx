@@ -257,14 +257,38 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { data: accessibleChars = [] } = useAccessibleCharacters();
   const confirmRender = useSceneRenderConfirm();
 
-  // Build the cast subset of ComposerCharacters that are actually in this scene
+  // Build the cast subset of ComposerCharacters that are actually in this scene.
+  // Library-Fallback: Wenn der Cast über brand_characters.id verlinkt ist (Plan-
+  // Apply hängt direkt die Library-ID rein), aber NICHT in der Project-Cast-Liste
+  // steht, ziehen wir den Eintrag aus useAccessibleCharacters und bauen einen
+  // synthetischen ComposerCharacter. Sonst würde Studio leer rendern.
   const sceneCast = useMemo<ComposerCharacter[]>(
     () =>
       cast
-        .map((cs) => characters.find((c) => c.id === cs.characterId))
+        .map((cs) => {
+          const direct = characters.find((c) => c.id === cs.characterId);
+          if (direct) return direct;
+          if (!cs.characterId) return undefined;
+          const lib = accessibleChars.find((b) => b.id === cs.characterId);
+          if (!lib) return undefined;
+          return {
+            id: lib.id,
+            name: lib.name ?? 'Charakter',
+            appearance: (lib as any).appearance ?? '',
+            signatureItems: (lib as any).signature_items ?? '',
+            brandCharacterId: lib.id,
+            referenceImageUrl:
+              (lib as any).portrait_url ??
+              (lib as any).reference_image_url ??
+              (lib as any).hedra_portrait_url ??
+              undefined,
+            identityCardPrompt: (lib as any).identity_card_prompt ?? undefined,
+          } as ComposerCharacter;
+        })
         .filter((c): c is ComposerCharacter => !!c),
-    [cast, characters],
+    [cast, characters, accessibleChars],
   );
+
 
   // Brand-default voice per ComposerCharacter.id — pulled from the Avatar Library.
   // Used for one-tap auto-binding when a speaker first enters the scene.
