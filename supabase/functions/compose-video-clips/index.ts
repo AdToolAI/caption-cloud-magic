@@ -1081,13 +1081,17 @@ serve(async (req) => {
           : ((scene as any).characterShot && (scene as any).characterShot.shotType !== "absent")
             ? 1
             : 0;
-        // Stage 7 (May 31 2026) + June 2026: migrate whenever there is *any*
-        // dialog or cast signal — not just a parseable [NAME]: line.
-        const shouldMigrate =
-          speakerNames.size >= 1 || dlg.length > 0 || castCount >= 1;
+        // June 26 2026 — DURATION-FIX: only migrate HappyHorse → Hailuo for
+        // TRUE multi-speaker dialog (≥2 distinct speakers). Single-speaker
+        // scenes stay on HappyHorse because it natively renders 3–15s and
+        // Sync.so lipsyncs the resulting clip cleanly — preserving the user's
+        // picked duration (7s/8s/9s/15s) instead of snapping to Hailuo's
+        // 6/10s buckets. Multi-speaker still flows through the dialog-shot
+        // pipeline which stitches multiple Hailuo plates per turn.
+        const shouldMigrate = speakerNames.size >= 2;
         if (shouldMigrate) {
           console.warn(
-            `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} (speakers=${speakerNames.size}, dialogLen=${dlg.length}, cast=${castCount}) — migrating to ai-hailuo for stable master-plate generation.`,
+            `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} multi-speaker (${speakerNames.size}) — migrating to ai-hailuo for dialog-shot pipeline.`,
           );
           scene.clipSource = "ai-hailuo";
           await supabaseAdmin
@@ -1097,6 +1101,10 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+        } else if (dlg.length > 0 || castCount >= 1) {
+          console.log(
+            `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} single-speaker (dialogLen=${dlg.length}, cast=${castCount}) — keeping HappyHorse to honour picked duration ${scene.durationSeconds}s.`,
+          );
         }
       }
 
@@ -1206,33 +1214,17 @@ serve(async (req) => {
           if (voDur > 0) {
             const required = voDur + 0.4;
             const currentDur = Number(scene.durationSeconds || 0);
-            // RESPECT USER PICK: only extend when the VO truly does not fit
-            // into the configured scene duration. Previously `Math.max(5, 6)`
-            // silently bumped a user's 5s pick to 6s even when the VO was
-            // shorter than 5s — the slider value was effectively ignored.
+            // June 26 2026 — DURATION-FIX: never silently overwrite the user's
+            // picked duration. If the VO is longer than the picked scene
+            // length, Sync.so handles it via `cut_off` (or the user can extend
+            // the slider). Previously this block would bump 7s → 10s on Hailuo
+            // and even DB-persist that change, which broke the slider for
+            // every subsequent render. We now only log diagnostics.
             if (required > currentDur) {
-              // Provider-specific quantization:
-              //   - Hailuo: only 6 or 10s allowed → snap up to next bucket.
-              //   - HappyHorse / others: freely choose ceil(required), clamped
-              //     to the provider's 3–15s range. Honour the user's pick.
               const isHailuo = (scene.clipSource as string) === "ai-hailuo";
-              const fitDur = isHailuo
-                ? (required <= 6 ? 6 : 10)
-                : Math.min(15, Math.max(3, Math.ceil(required)));
-              const targetDur = Math.max(currentDur, fitDur);
-              if (targetDur > currentDur) {
-                console.log(
-                  `[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO ${voDur.toFixed(2)}s > scene ${currentDur}s → extending to ${targetDur}s (provider=${scene.clipSource})`,
-                );
-                scene.durationSeconds = targetDur;
-                await supabaseAdmin
-                  .from("composer_scenes")
-                  .update({
-                    duration_seconds: targetDur,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq("id", scene.id);
-              }
+              console.log(
+                `[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO ${voDur.toFixed(2)}s > picked ${currentDur}s — honouring user pick (provider=${scene.clipSource}). Sync.so cut_off will trim.`,
+              );
               if (isHailuo && required > 10) {
                 console.warn(
                   `[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO (${voDur.toFixed(2)}s) exceeds Hailuo 10s limit — Sync.so will cut_off.`,

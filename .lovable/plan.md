@@ -1,37 +1,50 @@
-## Beobachtete Probleme
+## Ursache (verifiziert in `compose-video-clips/index.ts`)
 
-### 1) Szene 1 wird im Voiceover-Step schwarz, sobald Szene 2 dazukommt
-- In `ComposerSequencePreview.tsx` resettet ein Effekt (`useEffect([playable])`) bei jeder Änderung der Szenen-Liste die Slot-Map (`slotMapRef = {A:-1,B:-1,C:-1}`), behält aber `slotASrcRef`/`slotBSrcRef`.
-- `setSrcForSlot('A', sameUrl)` macht dadurch einen Early-Return (`src` unverändert), ruft also weder `el.load()` noch setzt `el.src` neu. Gleichzeitig wird Slot B mit Szene 2 geladen, was die Decoder-Pipeline kurz blockiert. Ergebnis: Slot A behält zwar Opacity 1, hat aber je nach Browser-State keinen dekodierten Frame mehr → schwarz.
-- Außerdem wird beim Reset nicht erzwungen, dass Slot A wirklich Szene 0 zeigt (kein `el.currentTime = 0` + `el.load()` bei gleichem URL, kein Re-Sync mit `activeSlotRef = 'A'` falls vorher 'B' aktiv war).
+Hailuo ist nicht das Problem. Bei mehreren Sprechern funktionieren 7/8/9/15s, weil dort die **Dialog-Shot-Pipeline** (`compose-dialog-scene`) je Turn ein eigenes Hailuo-Plate rendert und sie via ffmpeg zu beliebiger Gesamtlänge zusammenklebt. Bei Single-Speaker greift dieser Pfad nicht — stattdessen schlagen drei stille Overrides zu:
 
-### 2) Szenen sind immer 10 s, egal welche Länge eingestellt ist
-- In `compose-video-clips/index.ts` (Zeile ~1124–1231) snappt die „Cinematic-Sync auto-extend"-Logik die Szenendauer immer auf **6 oder 10 s** (Hailuo-Grid), basierend auf der VO-Länge — die Slider-Auswahl des Users (z. B. 5 s) wird dabei überschrieben, sobald die VO länger als 6 s ist.
-- Für HappyHorse (3–15 s frei wählbar) und i2v-Plates ohne VO darf das nicht passieren — dort sollte die User-Wahl gelten.
-- Zusätzlich liefert `briefing-deep-parse` für AUTO-DIRECTOR-Pläne oft `durationSec` Defaults, die später (HappyHorse-Pfad) ebenfalls nicht respektiert werden, weil die Slider-Werte beim Re-Render durch den Auto-Extend wieder hochgezogen werden.
+1. **HappyHorse → Hailuo Silent-Migration** (`index.ts:1058–1100`)
+   Sobald `clipSource = ai-happyhorse` + `cinematic-sync/sync-segments` + irgendein Cast/Dialog vorliegt, wird der Provider serverseitig auf `ai-hailuo` umgeschrieben. HappyHorse selbst respektiert 3–15s sauber (`index.ts:3106`), wird hier aber gar nicht mehr aufgerufen.
+2. **Hailuo Hard-Snap** (`index.ts:2461`): `scene.durationSeconds >= 8 ? 10 : 6` — 7s → 6s, 8s/9s → 10s.
+3. **Cinematic-Sync Auto-Extend** (`index.ts:1206–1234`)
+   Liest VO-Länge aus `scene_audio_clips`, überschreibt `scene.durationSeconds` und schreibt den neuen Wert in die DB zurück. Eine VO mit 9.2s macht aus deinen 7s also 10s — auch wenn HappyHorse 9s könnte.
 
----
+Zusätzlich: `siblingsDurationSec` wird nur im StoryboardTab an die SceneCard übergeben, nicht im ClipsTab — Budget-Clamp dort inaktiv (nicht ursächlich für 10s, aber unsauber).
 
 ## Plan
 
-### Fix A — Preview „Szene 1 schwarz" (`src/components/video-composer/ComposerSequencePreview.tsx`)
-1. Im Reset-Effekt (`useEffect([playable])`) zusätzlich:
-   - `slotASrcRef.current = undefined; slotBSrcRef.current = undefined; slotCSrcRef.current = undefined;`
-   - `setOpacityForSlot('A', 1); setOpacityForSlot('B', 0);`
-   - nach `preloadSlot('A', 0)` direkt `videoARef.current?.load()` + `currentTime = 0` erzwingen.
-2. `preloadSlot` so ändern, dass es bei „same URL aber neuer Map-Slot" trotzdem `el.load()` triggert, damit der Decoder einen sichtbaren Frame hat (statt nur Early-Return).
-3. `playable` als Dependency nur auf eine **stabile Signatur** (z. B. `playable.map(s => s.id + ':' + s.clipUrl).join('|')`) hashen, damit Re-Renders ohne tatsächliche Änderungen den Slot-Reset nicht unnötig auslösen.
+### 1. Single-Speaker an die Dialog-Shot-Pipeline andocken (Hailuo bleibt!)
+In `compose-video-clips/index.ts` den Cinematic-Sync-Pfad so erweitern, dass auch Single-Speaker-Szenen über `compose-dialog-scene` laufen, sobald `durationSeconds` ∉ {6, 10}. So entstehen 7/8/9/15s als gestitchte Hailuo-Plates (z.B. 7s = ein 6s-Plate + 1s-Tail-Plate, 15s = 10+6 trimmed), exakt wie bei Multi-Speaker. Lipsync-Pipeline (Sync.so) bleibt unberührt — sie läuft pro Turn wie heute. Kein neuer Provider, keine neue API.
 
-### Fix B — Slider-Dauer respektieren (`supabase/functions/compose-video-clips/index.ts`)
-1. Im Cinematic-Sync-Auto-Extend-Block (~Z. 1198–1231) nur noch dann auf 6/10 snappen, wenn `clipSource === 'ai-hailuo'`. Für `ai-happyhorse` stattdessen `targetDur = Math.min(15, Math.max(currentDur, Math.ceil(required)))`.
-2. Wenn `voDur <= currentDur`, **gar nichts** verändern (User-Wahl ist King). Aktuell wird `fitDur = required <=6 ? 6 : 10` ohne diese Bedingung berechnet — also schon mit `currentDur >= voDur` werden 5 s auf 6 s gehoben, weil `Math.max(5, 6) = 6`. Fix: erst prüfen `if (required <= currentDur) return;`.
-3. HappyHorse-Pfad (~Z. 3094): `const hhDuration = Math.min(15, Math.max(3, Math.round(scene.durationSeconds)))` bleibt — aber wir loggen explizit, wenn auto-extend vorher den Wert verändert hat, damit das nicht versteckt passiert.
-4. UI-Hinweis in `SceneCard.tsx` ergänzen: Wenn `clipSource === 'ai-hailuo'` und Slider auf 5 s → kleiner Hinweis „Hailuo unterstützt nur 6 oder 10 s — wird auf 6 s gerundet".
+### 2. HappyHorse-Migration entschärfen
+Migration nur noch auslösen, wenn echtes Multi-Speaker-Dialog vorliegt (`turns.length >= 2 && distinctSpeakers >= 2`). Bei Single-Speaker-HappyHorse Provider beibehalten — HappyHorse rendert 3–15s nativ + Sync.so lipsynced den fertigen Clip wie heute.
 
-### Verifikation
-- Build + Edge Function Deploy.
-- Manuell: 2 Szenen á 5 s anlegen (HappyHorse), beide rendern, dann Voiceover-Tab öffnen → Szene 1 muss sichtbar sein, Gesamtdauer = 10 s nicht 20 s.
-- Hailuo + langer VO (8 s) → Szene wird auf 10 s erweitert, Log-Eintrag zeigt Begründung.
+### 3. Stille Duration-Overrides abschaffen
+- `index.ts:1206–1234`: Auto-Extend darf `scene.durationSeconds` nicht mehr ohne Userwissen überschreiben. Stattdessen:
+  - Wenn VO länger als gewählte Dauer → Cut-Off-Flag an Sync.so (existiert bereits via `cut_off`-Mode), Userwert bleibt.
+  - DB-Writeback der neuen Dauer entfernen.
+- `index.ts:2461`: Hailuo-Snap nur noch im Plate-Renderer der Dialog-Shot-Pipeline anwenden, nicht im Single-Clip-Pfad — dort wird gestitcht.
 
-### Nicht angefasst
-- Lipsync-Pipeline (`compose-dialog-segments` v169, Sync.so-Webhook, `compose-twoshot-audio`) bleibt unberührt — wir ändern nur die Auto-Extend-Vorstufe und den Preview-Renderer.
+### 4. UI-Transparenz
+- SceneCard-Hinweisbadge umformulieren: nicht mehr „Hailuo rundet auf 6/10s", sondern „Längen ≠ 6/10s werden aus mehreren Hailuo-Plates gestitcht (gleicher Preis pro Sekunde)".
+- `siblingsDurationSec` im ClipsTab korrekt an SceneCard durchreichen.
+
+### 5. Sequenz-Preview-Freeze (Szene 1 schwarz)
+Parallel mitnehmen, ohne die Lip-Sync-Pipeline anzufassen:
+- Slot A erst sichtbar markieren nach `loadeddata`/`canplay`.
+- `currentTime` erst nach Metadata setzen.
+- Watchdog erst aktivieren, wenn aktiver Slot wirklich gestartet.
+- `playableSignature` um `durationSeconds`, `clipStatus`, `clipLeadInTrimSeconds` erweitern.
+
+### Kosten
+- 7s = 6s-Plate + ~1s-Tail-Plate (gestitcht). Pro Sekunde gleicher Hailuo-Preis wie bisher, keine Doppelberechnung des Users.
+- 15s = 10+6 minus 1s Trim. Internes Stitching ist transparent — UI zeigt weiterhin „N Sekunden × Hailuo-Tarif".
+
+### Was nicht angefasst wird
+- `compose-dialog-segments`, Sync.so-Joblogik, Webhook, Stitcher, Lipsync-Kernpipeline.
+- HeyGen, Replicate-Keys, Provider-Liste.
+
+### Validierung
+Drei-Szenen-Projekt 5s/8s/7s mit Single-Speaker + Hailuo:
+- Payload sendet 5/8/7.
+- Szenen 2 und 3 werden gestitcht (nicht auf 10s gerundet).
+- Preview spielt Szene 1 sichtbar ab, kein Sprung zu Szene 2.
