@@ -136,7 +136,7 @@ export default function ProductionPlanSheet({
 
     try {
       const { data, error } = await supabase.functions.invoke('briefing-deep-parse', {
-        body: { briefing, projectId },
+        body: { briefing, projectId, language },
       });
       clearTimeout(phaseTimer);
       if (error) throw error;
@@ -245,16 +245,14 @@ export default function ProductionPlanSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-amber-300" />
+      <DialogContent className="max-w-4xl max-h-[88vh] overflow-hidden flex flex-col p-4 gap-3">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <FileText className="h-4 w-4 text-amber-300" />
             Production Plan — Briefing analysieren & übernehmen
           </DialogTitle>
-          <DialogDescription>
-            Die KI liest dein vollständiges Briefing, extrahiert Szenen, Cast, Voice und Captions
-            und legt einen editierbaren Drehplan an. Bereits gerenderte oder Lip-Sync-aktive Szenen
-            werden niemals überschrieben.
+          <DialogDescription className="text-xs">
+            Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.
           </DialogDescription>
         </DialogHeader>
 
@@ -296,8 +294,8 @@ export default function ProductionPlanSheet({
         )}
 
         {step === 'review' && plan && (
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4">
+          <ScrollArea className="flex-1 min-h-0 pr-3">
+            <div className="space-y-3">
               {/* Projekt */}
               <SectionCard title="Projekt">
                 <Row label="Name" value={plan.project?.name} />
