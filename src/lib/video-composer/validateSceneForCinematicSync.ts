@@ -93,14 +93,15 @@ export function validateSceneForCinematicSync(
     });
   }
 
-  // Provider lip-sync capability
-  if (!providerSupportsLipsync(provider)) {
+  // Provider lip-sync allowlist (June 2026 policy: HappyHorse + Hailuo only)
+  if (provider !== 'ai-happyhorse' && provider !== 'ai-hailuo') {
     out.push({
       code: 'provider_no_lipsync_support',
       level: 'warning',
-      message: `Provider ${PROVIDER_CAPS[provider]?.label ?? provider} unterstützt kein Lip-Sync. Bitte Hailuo (6/10s) oder HappyHorse (3–15s) wählen.`,
+      message: `Lip-Sync läuft nur über HappyHorse (empfohlen · 3–15s) oder Hailuo (Fallback · 6/10s). Aktuell: ${PROVIDER_CAPS[provider]?.label ?? provider}.`,
     });
   }
+
 
   // Provider-specific duration validation
   const allowedDurations = getProviderDurations(provider);
