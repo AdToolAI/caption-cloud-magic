@@ -114,10 +114,33 @@ export default function ProductionPlanSheet({
       seen.add(dedupeKey);
       const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
-      const lookName = fromMeta || fromName || m.name?.trim() || 'Unbenannter Look';
+      const lookName = fromMeta || fromName || m.name?.trim() || 'Standard-Look';
       const arr = map.get(base) ?? [];
       arr.push({ lookId, name: lookName });
       map.set(base, arr);
+    }
+    return map;
+  }, [outfitMentions]);
+
+  /**
+   * Global outfit lookup by lookId. Used so the UI can render a stable
+   * label for ANY outfitLookId in the plan, even when the avatar library
+   * hasn't loaded yet or when the resolver only stored `outfitLookId`
+   * without a matching base character.
+   */
+  const outfitById = useMemo(() => {
+    const map = new Map<string, { lookId: string; name: string; baseId: string | null }>();
+    for (const m of outfitMentions) {
+      const lookId = m.meta?.outfitLookId;
+      if (!lookId || map.has(lookId)) continue;
+      const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
+      const fromName = (m.name?.split(' — ')[1] ?? '').trim();
+      const lookName = fromMeta || fromName || m.name?.trim() || 'Standard-Look';
+      map.set(lookId, {
+        lookId,
+        name: lookName,
+        baseId: m.meta?.baseCharacterId ?? null,
+      });
     }
     return map;
   }, [outfitMentions]);
@@ -127,9 +150,9 @@ export default function ProductionPlanSheet({
     if (!rawId) return { baseId: null, outfitLookId: null };
     if (rawId.startsWith('outfit:')) {
       const lookId = rawId.slice('outfit:'.length);
-      const mention = outfitMentions.find((m) => m.meta?.outfitLookId === lookId);
+      const hit = outfitById.get(lookId);
       return {
-        baseId: mention?.meta?.baseCharacterId ?? null,
+        baseId: hit?.baseId ?? null,
         outfitLookId: lookId,
       };
     }
