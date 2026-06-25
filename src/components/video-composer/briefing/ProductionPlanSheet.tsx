@@ -17,18 +17,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, CheckCircle2, FileText, Loader2, Shield, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Loader2, Shield, Sparkles, Wand2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
+import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
+import type { MotionStudioCharacter } from '@/types/motion-studio';
 import type {
   ComposerScene,
   AssemblyConfig,
   ComposerBriefing,
 } from '@/types/video-composer';
+
 
 type Step = 'paste' | 'parsing' | 'review';
 
