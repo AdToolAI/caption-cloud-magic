@@ -380,6 +380,23 @@ export default function SceneCard({
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
 
+  // June 2026 Lip-Sync Policy — when the scene is routed through the
+  // Cinematic-Sync / Sync.so pipeline, only HappyHorse (primary) and
+  // Hailuo (fallback) are certified as master plates. Auto-migrate any
+  // legacy scene whose clipSource is still set to a non-certified provider
+  // (e.g. ai-kling, ai-veo from the previous 3-provider policy) onto the
+  // primary lipsync provider so the user never lands on an unrenderable
+  // combination after re-opening an older project.
+  useEffect(() => {
+    if (!isLipsyncEngine(scene.engineOverride ?? null)) return;
+    if (isLipsyncClipSource(scene.clipSource)) return;
+    onUpdate({
+      clipSource: LIPSYNC_PRIMARY_CLIP_SOURCE,
+      clipQuality: 'standard',
+    });
+  }, [scene.engineOverride, scene.clipSource, onUpdate]);
+
+
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
   // dialog from 2+). Hidden by default; opened via the "Skript schreiben" button
   // in the cast row. Initial open if a script already exists.
