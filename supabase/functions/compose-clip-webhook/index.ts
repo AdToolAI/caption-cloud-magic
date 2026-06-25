@@ -429,7 +429,7 @@ serve(async (req) => {
       // content/policy errors fall through to the normal failed+refund path.
       const canAutoRetry =
         currentRetry < MAX_AUTO_RETRY &&
-        isRetryableTransientError(predError) &&
+        isRetryableTransientError(enrichedError) &&
         (payload.model || payload.version) &&
         payload.input &&
         typeof payload.input === 'object';
