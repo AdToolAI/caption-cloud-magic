@@ -251,6 +251,11 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => (s.index === index ? { ...s, ...patch } : s)),
     });
   };
+  /**
+   * Sets the BASE character on a cast slot (CastRef.characterId).
+   * Resets `outfitLookId` so we never end up with an outfit that
+   * belongs to a different avatar.
+   */
   const updateSceneCastChar = (sceneIndex: number, castIdx: number, characterId: string | null) => {
     setPlan((p) => p && {
       ...p,
@@ -264,11 +269,29 @@ export default function ProductionPlanSheet({
           ...c,
           characterId,
           characterName: matched?.name ?? c.characterName,
+          // Outfit is a separate axis — reset it when the base avatar changes.
+          outfitLookId: null,
         };
         return { ...s, cast };
       }),
     });
   };
+
+  /** Sets the optional outfit look (CastRef.outfitLookId) on a cast slot. */
+  const updateSceneCastOutfit = (sceneIndex: number, castIdx: number, outfitLookId: string | null) => {
+    setPlan((p) => p && {
+      ...p,
+      scenes: p.scenes.map((s) => {
+        if (s.index !== sceneIndex) return s;
+        const cast = [...(s.cast ?? [])];
+        const c = cast[castIdx];
+        if (!c) return s;
+        cast[castIdx] = { ...c, outfitLookId };
+        return { ...s, cast };
+      }),
+    });
+  };
+
   const updateSceneLocation = (sceneIndex: number, locationId: string | null) => {
     setPlan((p) => p && {
       ...p,
@@ -289,6 +312,77 @@ export default function ProductionPlanSheet({
     () => (plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0),
     [plan],
   );
+
+  // ── Live-recompute unresolved ───────────────────────────────────────────
+  // The Edge Function emits `plan.unresolved` once. As the user edits the
+  // cast/location dropdowns, items that point at now-resolved fields are
+  // filtered out so the "offene Punkte"-Counter shrinks live.
+  const liveUnresolved = useMemo(() => {
+    if (!plan) return [] as TProductionPlan['unresolved'];
+    return (plan.unresolved ?? []).filter((u) => {
+      const m = /^scenes\[(\d+)\]\.cast\[(\d+)\]\.characterId$/.exec(u.field);
+      if (m) {
+        const sIdx = Number(m[1]);
+        const cIdx = Number(m[2]);
+        const scene = plan.scenes[sIdx];
+        const slot = scene?.cast?.[cIdx];
+        if (slot?.characterId) return false;
+      }
+      const ml = /^scenes\[(\d+)\]\.location\.locationId$/.exec(u.field);
+      if (ml) {
+        const sIdx = Number(ml[1]);
+        if (plan.scenes[sIdx]?.location?.locationId) return false;
+      }
+      if (u.field === 'project.totalDurationSec') {
+        const proj = plan.project?.totalDurationSec;
+        if (!proj || proj === totalPlanSec) return false;
+      }
+      return true;
+    });
+  }, [plan, totalPlanSec]);
+
+  /**
+   * Auto-Resolve: for every cast slot that has `characterId === null`,
+   * run a fuzzy match (normalize → lowercase, strip @ / separators →
+   * substring both directions) against the base avatars library. The
+   * first hit wins. Same algorithm as the server-side resolver — runs
+   * locally so the user gets instant feedback.
+   */
+  const handleAutoResolve = () => {
+    if (!plan) return;
+    const norm = (s: string) =>
+      s.toLowerCase().replace(/^@/, '').replace(/[\s_\-]+/g, '');
+    let fixed = 0;
+    setPlan((p) => {
+      if (!p) return p;
+      const scenes = p.scenes.map((s) => {
+        const cast = (s.cast ?? []).map((c) => {
+          if (c.characterId) return c;
+          const needle = norm(c.mentionKey || c.characterName || '');
+          if (!needle) return c;
+          const hit = charOptions.find((o) => {
+            const n = norm(o.name);
+            return n.includes(needle) || needle.includes(n);
+          });
+          if (!hit) return c;
+          fixed += 1;
+          return {
+            ...c,
+            characterId: hit.id,
+            characterName: hit.name,
+            outfitLookId: null,
+          };
+        });
+        return { ...s, cast };
+      });
+      return { ...p, scenes };
+    });
+    toast({
+      title: fixed > 0 ? `${fixed} Cast-Slots automatisch zugewiesen` : 'Keine weiteren Auto-Matches',
+      description: fixed > 0 ? 'Du kannst die Zuordnung im Dropdown noch anpassen.' : undefined,
+    });
+  };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
