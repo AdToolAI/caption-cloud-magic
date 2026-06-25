@@ -1,36 +1,30 @@
-## Plan: Wiederkehrenden Lip-Sync-Fehler sauber beheben
+## Problem
+Die Outfit-Auswahl im Production-Plan hängt aktuell an der geladenen Mention-Library. Wenn der Plan ein `outfitLookId` enthält, aber die Outfit-Library beim Öffnen/Neu-Generieren noch nicht vollständig geladen ist oder das Look-Objekt nicht sauber gemappt wird, fällt die UI auf einen falschen/unklaren Label-Zustand zurück. Deshalb wirkt es inkonsistent: einmal korrekt, beim nächsten Generieren wieder „Unbekannt“/falsch.
 
-### Befund
-- Der Fehler kommt diesmal nicht aus Sync.so selbst und auch nicht aus der Audio-/Voice-Auswahl.
-- In den Logs zur Szene `6d3fd7fb...` wurde ein Gesicht korrekt erkannt: `faces=1`, `mouth=1/1`.
-- Danach bricht aber unsere eigene Vorprüfung ab: `v157_geometry_tighten_failed ... HARD_FAIL`.
-- Ursache: Die neue Sicherheitsregel für „zu große Face-Boxen“ ist bei Single-Speaker-Closeups zu streng. Sie war gegen Mehrsprecher-/Torso-Fehlmasken gedacht, blockiert jetzt aber gültige Nahaufnahmen.
+## Ziel
+Outfits müssen im Plan-Dialog stabil angezeigt werden, auch wenn Daten asynchron laden oder der Plan aus einer älteren/anderen Resolver-Version kommt. Charakter-ID und Outfit-ID bleiben getrennt, damit die Lip-Sync-Pipeline nicht beeinflusst wird.
 
-### Umsetzung
-1. **Face-Geometry-Gate entschärfen, aber nur gezielt**
-   - In `supabase/functions/_shared/plate-face-detect.ts` wird die v157-Regel angepasst.
-   - Für Single-Speaker-Szenen mit genau einem erkannten Gesicht und vorhandenem Mund-Landmark darf eine größere Face-Box akzeptiert bzw. enger zugeschnitten werden.
-   - Für Multi-Speaker bleibt die harte Sicherheitslogik bestehen, damit Sprecher nicht vertauscht oder falsch gemorpht werden.
+## Umsetzung
+1. **Outfit-Library robuster laden**
+   - In `useUnifiedMentionLibrary` die gespeicherten Outfit-Looks inklusive Avatar-Namen stabil abfragen/mappen.
+   - Defensives Labeling: niemals `undefined`, `null` oder „Unbekannt“, sondern klare Fallbacks wie `Standard-Look` oder der gespeicherte Look-Name.
 
-2. **Box-Tightening robuster machen**
-   - Wenn ein Mund-Landmark vorhanden ist, wird die neue Box stärker um den Mund/Face-Bereich kalibriert.
-   - Die `tightHRatio > 0.25` Hard-Fail-Grenze wird nicht mehr blind auf gültige Single-Speaker-Closeups angewendet.
-   - Ergebnis: klare Nahaufnahmen wie im Screenshot laufen weiter, problematische Mehrsprecher-Kompositionen werden weiterhin blockiert.
+2. **Plan-Dialog resilient machen**
+   - In `ProductionPlanSheet` einen globalen `outfitById`-Index ergänzen.
+   - Wenn `c.outfitLookId` gesetzt ist, aber nicht in `outfitsByCharacter.get(baseId)` auftaucht, wird der Look trotzdem als auswählbare Option angezeigt statt falsch/leer zu wirken.
+   - Wenn `characterId` fehlt, aber `outfitLookId` vorhanden ist, wird die Base-Character-ID aus dem Outfit-Meta automatisch rekonstruiert.
 
-3. **Fehlermeldung präziser machen**
-   - Falls die Vorprüfung wirklich blockiert, soll die UI/DB nicht mehr pauschal sagen „kein eindeutiges Gesicht“, wenn tatsächlich „Face-Box zu groß/Geometrie-Regel“ der Grund war.
-   - Dadurch ist künftig sofort sichtbar, ob der Clip neu gerendert werden muss oder ob nur die interne Vorprüfung zu streng war.
+3. **Auto-Resolve erweitern**
+   - Beim Auto-Resolve nicht nur Charaktere, sondern auch Outfit-Hinweise (`c.outfit`, Look-Name, Mention-Name) gegen gespeicherte Looks matchen.
+   - Treffer setzen `characterId` und `outfitLookId` getrennt.
 
-4. **Bestehende Szene reparierbar machen**
-   - Die Szene bleibt nicht dauerhaft durch gecachte/alte Fehldaten blockiert.
-   - Beim nächsten „Lip-Sync neu rendern“ soll die aktualisierte Detection greifen und die vorhandene Szene nicht unnötig neu als Video-Plate erzeugt werden müssen.
+4. **Server-Resolver ergänzen**
+   - `briefing-deep-parse` bekommt die gespeicherten Outfit-Looks in die Library-Snapshot-Daten.
+   - Nach Pass B wird lokal sichergestellt: wenn ein Cast ein Outfit beschreibt oder ein Look eindeutig matcht, wird `outfitLookId` gesetzt, ohne `characterId` mit `outfit:` zu vermischen.
 
-5. **Deployment & Validierung**
-   - Betroffene Backend-Funktion deployen.
-   - Logs prüfen, ob die Szene danach nicht mehr bei `v157_geometry_tighten_failed` abbricht.
-   - Die eigentliche Sync.so v169/v166 Pipeline bleibt unangetastet: keine Änderung am Dispatch-Modell, kein Wechsel von `sync-3`, keine Änderung an Audio-Segmenten oder Bounding-Box-URL-Strategie.
+5. **Sicherheitsgrenze für Lip-Sync beibehalten**
+   - Keine Änderungen an Sync-/Lip-Sync-Core-Funktionen.
+   - `characterId` bleibt immer Base-Avatar-ID; `outfitLookId` bleibt optionales Zusatzfeld für Anchor/Prompt.
 
-### Nicht enthalten
-- Kein Umbau der Lip-Sync-Pipeline.
-- Kein Provider-Wechsel.
-- Kein erneutes Ändern der Briefing-/Storyboard-Logik.
+## Ergebnis
+Der Production-Plan zeigt Outfits stabil und nachvollziehbar an, auch nach erneutem Generieren oder verzögertem Laden. Die Storyboard-Anwendung übernimmt dann Charakter + Outfit sauber getrennt.
