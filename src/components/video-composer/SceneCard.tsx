@@ -1085,7 +1085,7 @@ export default function SceneCard({
                       )}
                       {current !== 6 && current !== 10 && (
                         <p className="text-[10px] text-amber-300/80 leading-snug">
-                          ⚠ Aktuell {current}s — Hailuo wird auf 6s oder 10s anpassen.
+                          ⚠ Aktuell {current}s — Hailuo rendert nur 6s oder 10s. Beim Render wird auf 6s gerundet (10s nur, wenn explizit gewählt).
                           Für freie Längen (3–15s) Provider auf HappyHorse wechseln.
                         </p>
                       )}
@@ -1558,10 +1558,19 @@ export default function SceneCard({
                               value={currentModelId}
                               onChange={(modelId) => {
                                 const next = modelIdToSource(modelId);
-                                onUpdate({
+                                const updates: Partial<ComposerScene> = {
                                   clipSource: next.clipSource,
                                   clipQuality: next.clipQuality,
-                                });
+                                };
+                                // Hailuo only supports 6s or 10s. When switching TO Hailuo
+                                // from a free-duration provider (HappyHorse 3-15s), default
+                                // to 6s unless the user already had exactly 10s picked.
+                                // Never silently bump 7/8/9/15s → 10s.
+                                if (next.clipSource === 'ai-hailuo') {
+                                  const cur = Number(scene.durationSeconds || 0);
+                                  if (cur !== 10) updates.durationSeconds = 6;
+                                }
+                                onUpdate(updates);
                               }}
                               currency="EUR"
                               models={modelsForPicker}

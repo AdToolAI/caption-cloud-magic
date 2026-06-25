@@ -2464,7 +2464,11 @@ serve(async (req) => {
           }
         } else if (scene.clipSource === "ai-hailuo") {
           // Hailuo via Replicate (Standard 768p / Pro 1080p)
-          const duration = scene.durationSeconds >= 8 ? 10 : 6;
+          // STRICT: Hailuo only supports 6s or 10s buckets. Honour the user's
+          // exact pick — only treat the scene as 10s when explicitly set to 10,
+          // otherwise render 6s. Previously `>= 8 ? 10 : 6` silently rounded
+          // 8s/9s scenes up to 10s and triggered Pro+10s API rejections.
+          const duration = Number(scene.durationSeconds) === 10 ? 10 : 6;
           // Hailuo API constraint: 1080p is only accepted for 6s. 10s requires 768p.
           const resolution =
             duration === 10 ? "768p" : quality === "pro" ? "1080p" : "768p";
