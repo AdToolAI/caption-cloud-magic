@@ -1276,9 +1276,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const target = Math.max(userPick, audioRequired);
 
         // Honour the user's chosen provider — never silent-switch to Hailuo.
-        const userPickedProvider = (scene.clipSource as string) || 'ai-hailuo';
+        // June 2026 Lip-Sync policy: HappyHorse is the primary master plate
+        // (3–15s native, honours user-picked durations), Hailuo only kicks in
+        // when the user explicitly switched to it as the 6/10s fallback.
+        const userPickedProvider = (scene.clipSource as string) || 'ai-happyhorse';
         const masterProvider: 'ai-hailuo' | 'ai-happyhorse' =
-          userPickedProvider === 'ai-happyhorse' ? 'ai-happyhorse' : 'ai-hailuo';
+          userPickedProvider === 'ai-hailuo' ? 'ai-hailuo' : 'ai-happyhorse';
+
 
         const masterDuration =
           masterProvider === 'ai-happyhorse'
