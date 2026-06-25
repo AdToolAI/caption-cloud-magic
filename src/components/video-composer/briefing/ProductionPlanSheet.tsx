@@ -80,14 +80,58 @@ export default function ProductionPlanSheet({
     }
   }, [initialPlan]);
 
-  const charOptions = useMemo(
-    () => (characters ?? []).map((c: any) => ({ id: c.id, name: c.name })),
+  // Char options: split into Base avatars (no `outfit:` prefix) vs Outfit
+  // looks. The cast picker shows base avatars in the Charakter dropdown
+  // and a filtered outfit dropdown next to it (CastRef invariant: ID
+  // separation is enforced at the picker boundary).
+  const baseChars = useMemo(
+    () => (characters ?? []).filter((c: MotionStudioCharacter) => c.meta?.kind !== 'outfit'),
     [characters],
+  );
+  const outfitMentions = useMemo(
+    () => (characters ?? []).filter((c: MotionStudioCharacter) => c.meta?.kind === 'outfit'),
+    [characters],
+  );
+  const charOptions = useMemo(
+    () => baseChars.map((c) => ({ id: c.id, name: c.name, mention: c })),
+    [baseChars],
   );
   const locOptions = useMemo(
     () => (locations ?? []).map((l: any) => ({ id: l.id, name: l.name })),
     [locations],
   );
+
+  /** Outfit looks belonging to a given base character id. */
+  const outfitsByCharacter = useMemo(() => {
+    const map = new Map<string, Array<{ lookId: string; name: string }>>();
+    for (const m of outfitMentions) {
+      const base = m.meta?.baseCharacterId;
+      const lookId = m.meta?.outfitLookId;
+      const lookName = m.meta?.outfitName ?? m.name;
+      if (!base || !lookId) continue;
+      const arr = map.get(base) ?? [];
+      arr.push({ lookId, name: lookName });
+      map.set(base, arr);
+    }
+    return map;
+  }, [outfitMentions]);
+
+  /** Resolve any raw cast id (legacy `outfit:` or base UUID) to base + look. */
+  const splitCastId = (rawId: string | null | undefined): { baseId: string | null; outfitLookId: string | null } => {
+    if (!rawId) return { baseId: null, outfitLookId: null };
+    if (rawId.startsWith('outfit:')) {
+      const lookId = rawId.slice('outfit:'.length);
+      const mention = outfitMentions.find((m) => m.meta?.outfitLookId === lookId);
+      return {
+        baseId: mention?.meta?.baseCharacterId ?? null,
+        outfitLookId: lookId,
+      };
+    }
+    if (rawId.startsWith('catalog:')) return { baseId: rawId.split(':', 2)[1] ?? null, outfitLookId: null };
+    if (rawId.startsWith('lib:')) return { baseId: rawId.slice(4), outfitLookId: null };
+    return { baseId: rawId, outfitLookId: null };
+  };
+
 
   // Identify which existing scenes are lipsync-protected (display only).
   const protectedSceneIds = useMemo(() => {
