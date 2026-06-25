@@ -1206,29 +1206,41 @@ serve(async (req) => {
           if (voDur > 0) {
             const required = voDur + 0.4;
             const currentDur = Number(scene.durationSeconds || 0);
-            // Hailuo allowed durations: 6 or 10. Respect user's pick — only
-            // extend if VO actually needs MORE than what they chose.
-            const fitDur = required <= 6 ? 6 : 10;
-            const targetDur = Math.max(currentDur, fitDur);
-            if (targetDur > currentDur) {
-              console.log(
-                `[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO ${voDur.toFixed(2)}s > scene ${currentDur}s → extending to ${targetDur}s`,
-              );
-              scene.durationSeconds = targetDur;
-              await supabaseAdmin
-                .from("composer_scenes")
-                .update({
-                  duration_seconds: targetDur,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", scene.id);
-            }
-            if (required > 10) {
-              console.warn(
-                `[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO (${voDur.toFixed(2)}s) exceeds Hailuo 10s limit — Sync.so will cut_off.`,
-              );
+            // RESPECT USER PICK: only extend when the VO truly does not fit
+            // into the configured scene duration. Previously `Math.max(5, 6)`
+            // silently bumped a user's 5s pick to 6s even when the VO was
+            // shorter than 5s — the slider value was effectively ignored.
+            if (required > currentDur) {
+              // Provider-specific quantization:
+              //   - Hailuo: only 6 or 10s allowed → snap up to next bucket.
+              //   - HappyHorse / others: freely choose ceil(required), clamped
+              //     to the provider's 3–15s range. Honour the user's pick.
+              const isHailuo = (scene.clipSource as string) === "ai-hailuo";
+              const fitDur = isHailuo
+                ? (required <= 6 ? 6 : 10)
+                : Math.min(15, Math.max(3, Math.ceil(required)));
+              const targetDur = Math.max(currentDur, fitDur);
+              if (targetDur > currentDur) {
+                console.log(
+                  `[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO ${voDur.toFixed(2)}s > scene ${currentDur}s → extending to ${targetDur}s (provider=${scene.clipSource})`,
+                );
+                scene.durationSeconds = targetDur;
+                await supabaseAdmin
+                  .from("composer_scenes")
+                  .update({
+                    duration_seconds: targetDur,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", scene.id);
+              }
+              if (isHailuo && required > 10) {
+                console.warn(
+                  `[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO (${voDur.toFixed(2)}s) exceeds Hailuo 10s limit — Sync.so will cut_off.`,
+                );
+              }
             }
           }
+
 
           // ── Server-side multi-cast anchor safety net ────────────────────
           // ALWAYS audit when 2+ cast members, even if a /scene-anchors/ image

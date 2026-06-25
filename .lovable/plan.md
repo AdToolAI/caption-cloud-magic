@@ -1,30 +1,37 @@
-## Problem
-Die Outfit-Auswahl im Production-Plan hängt aktuell an der geladenen Mention-Library. Wenn der Plan ein `outfitLookId` enthält, aber die Outfit-Library beim Öffnen/Neu-Generieren noch nicht vollständig geladen ist oder das Look-Objekt nicht sauber gemappt wird, fällt die UI auf einen falschen/unklaren Label-Zustand zurück. Deshalb wirkt es inkonsistent: einmal korrekt, beim nächsten Generieren wieder „Unbekannt“/falsch.
+## Beobachtete Probleme
 
-## Ziel
-Outfits müssen im Plan-Dialog stabil angezeigt werden, auch wenn Daten asynchron laden oder der Plan aus einer älteren/anderen Resolver-Version kommt. Charakter-ID und Outfit-ID bleiben getrennt, damit die Lip-Sync-Pipeline nicht beeinflusst wird.
+### 1) Szene 1 wird im Voiceover-Step schwarz, sobald Szene 2 dazukommt
+- In `ComposerSequencePreview.tsx` resettet ein Effekt (`useEffect([playable])`) bei jeder Änderung der Szenen-Liste die Slot-Map (`slotMapRef = {A:-1,B:-1,C:-1}`), behält aber `slotASrcRef`/`slotBSrcRef`.
+- `setSrcForSlot('A', sameUrl)` macht dadurch einen Early-Return (`src` unverändert), ruft also weder `el.load()` noch setzt `el.src` neu. Gleichzeitig wird Slot B mit Szene 2 geladen, was die Decoder-Pipeline kurz blockiert. Ergebnis: Slot A behält zwar Opacity 1, hat aber je nach Browser-State keinen dekodierten Frame mehr → schwarz.
+- Außerdem wird beim Reset nicht erzwungen, dass Slot A wirklich Szene 0 zeigt (kein `el.currentTime = 0` + `el.load()` bei gleichem URL, kein Re-Sync mit `activeSlotRef = 'A'` falls vorher 'B' aktiv war).
 
-## Umsetzung
-1. **Outfit-Library robuster laden**
-   - In `useUnifiedMentionLibrary` die gespeicherten Outfit-Looks inklusive Avatar-Namen stabil abfragen/mappen.
-   - Defensives Labeling: niemals `undefined`, `null` oder „Unbekannt“, sondern klare Fallbacks wie `Standard-Look` oder der gespeicherte Look-Name.
+### 2) Szenen sind immer 10 s, egal welche Länge eingestellt ist
+- In `compose-video-clips/index.ts` (Zeile ~1124–1231) snappt die „Cinematic-Sync auto-extend"-Logik die Szenendauer immer auf **6 oder 10 s** (Hailuo-Grid), basierend auf der VO-Länge — die Slider-Auswahl des Users (z. B. 5 s) wird dabei überschrieben, sobald die VO länger als 6 s ist.
+- Für HappyHorse (3–15 s frei wählbar) und i2v-Plates ohne VO darf das nicht passieren — dort sollte die User-Wahl gelten.
+- Zusätzlich liefert `briefing-deep-parse` für AUTO-DIRECTOR-Pläne oft `durationSec` Defaults, die später (HappyHorse-Pfad) ebenfalls nicht respektiert werden, weil die Slider-Werte beim Re-Render durch den Auto-Extend wieder hochgezogen werden.
 
-2. **Plan-Dialog resilient machen**
-   - In `ProductionPlanSheet` einen globalen `outfitById`-Index ergänzen.
-   - Wenn `c.outfitLookId` gesetzt ist, aber nicht in `outfitsByCharacter.get(baseId)` auftaucht, wird der Look trotzdem als auswählbare Option angezeigt statt falsch/leer zu wirken.
-   - Wenn `characterId` fehlt, aber `outfitLookId` vorhanden ist, wird die Base-Character-ID aus dem Outfit-Meta automatisch rekonstruiert.
+---
 
-3. **Auto-Resolve erweitern**
-   - Beim Auto-Resolve nicht nur Charaktere, sondern auch Outfit-Hinweise (`c.outfit`, Look-Name, Mention-Name) gegen gespeicherte Looks matchen.
-   - Treffer setzen `characterId` und `outfitLookId` getrennt.
+## Plan
 
-4. **Server-Resolver ergänzen**
-   - `briefing-deep-parse` bekommt die gespeicherten Outfit-Looks in die Library-Snapshot-Daten.
-   - Nach Pass B wird lokal sichergestellt: wenn ein Cast ein Outfit beschreibt oder ein Look eindeutig matcht, wird `outfitLookId` gesetzt, ohne `characterId` mit `outfit:` zu vermischen.
+### Fix A — Preview „Szene 1 schwarz" (`src/components/video-composer/ComposerSequencePreview.tsx`)
+1. Im Reset-Effekt (`useEffect([playable])`) zusätzlich:
+   - `slotASrcRef.current = undefined; slotBSrcRef.current = undefined; slotCSrcRef.current = undefined;`
+   - `setOpacityForSlot('A', 1); setOpacityForSlot('B', 0);`
+   - nach `preloadSlot('A', 0)` direkt `videoARef.current?.load()` + `currentTime = 0` erzwingen.
+2. `preloadSlot` so ändern, dass es bei „same URL aber neuer Map-Slot" trotzdem `el.load()` triggert, damit der Decoder einen sichtbaren Frame hat (statt nur Early-Return).
+3. `playable` als Dependency nur auf eine **stabile Signatur** (z. B. `playable.map(s => s.id + ':' + s.clipUrl).join('|')`) hashen, damit Re-Renders ohne tatsächliche Änderungen den Slot-Reset nicht unnötig auslösen.
 
-5. **Sicherheitsgrenze für Lip-Sync beibehalten**
-   - Keine Änderungen an Sync-/Lip-Sync-Core-Funktionen.
-   - `characterId` bleibt immer Base-Avatar-ID; `outfitLookId` bleibt optionales Zusatzfeld für Anchor/Prompt.
+### Fix B — Slider-Dauer respektieren (`supabase/functions/compose-video-clips/index.ts`)
+1. Im Cinematic-Sync-Auto-Extend-Block (~Z. 1198–1231) nur noch dann auf 6/10 snappen, wenn `clipSource === 'ai-hailuo'`. Für `ai-happyhorse` stattdessen `targetDur = Math.min(15, Math.max(currentDur, Math.ceil(required)))`.
+2. Wenn `voDur <= currentDur`, **gar nichts** verändern (User-Wahl ist King). Aktuell wird `fitDur = required <=6 ? 6 : 10` ohne diese Bedingung berechnet — also schon mit `currentDur >= voDur` werden 5 s auf 6 s gehoben, weil `Math.max(5, 6) = 6`. Fix: erst prüfen `if (required <= currentDur) return;`.
+3. HappyHorse-Pfad (~Z. 3094): `const hhDuration = Math.min(15, Math.max(3, Math.round(scene.durationSeconds)))` bleibt — aber wir loggen explizit, wenn auto-extend vorher den Wert verändert hat, damit das nicht versteckt passiert.
+4. UI-Hinweis in `SceneCard.tsx` ergänzen: Wenn `clipSource === 'ai-hailuo'` und Slider auf 5 s → kleiner Hinweis „Hailuo unterstützt nur 6 oder 10 s — wird auf 6 s gerundet".
 
-## Ergebnis
-Der Production-Plan zeigt Outfits stabil und nachvollziehbar an, auch nach erneutem Generieren oder verzögertem Laden. Die Storyboard-Anwendung übernimmt dann Charakter + Outfit sauber getrennt.
+### Verifikation
+- Build + Edge Function Deploy.
+- Manuell: 2 Szenen á 5 s anlegen (HappyHorse), beide rendern, dann Voiceover-Tab öffnen → Szene 1 muss sichtbar sein, Gesamtdauer = 10 s nicht 20 s.
+- Hailuo + langer VO (8 s) → Szene wird auf 10 s erweitert, Log-Eintrag zeigt Begründung.
+
+### Nicht angefasst
+- Lipsync-Pipeline (`compose-dialog-segments` v169, Sync.so-Webhook, `compose-twoshot-audio`) bleibt unberührt — wir ändern nur die Auto-Extend-Vorstufe und den Preview-Renderer.
