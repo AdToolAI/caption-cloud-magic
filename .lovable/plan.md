@@ -1,37 +1,36 @@
-## Fix: Outfit-Dropdown listet 2 vorhandene Looks als "undefined"
+## Plan: Wiederkehrenden Lip-Sync-Fehler sauber beheben
 
-### Diagnose
-Im Outfit-Picker (`ProductionPlanSheet.tsx`, Z. 105-117) wird das Label so gebaut:
-```ts
-const lookName = m.meta?.outfitName ?? m.name;
-```
-Wenn `m.meta` aus irgendeinem Grund nicht durchgereicht wird (z. B. weil ein zukünftiger `dedupe`-Schritt das Objekt flach kopiert oder ein anderer Aggregator die outfit-mention ohne `meta` erzeugt), bleibt nur `m.name`. Dieses `name` wird in `useUnifiedMentionLibrary` (Z. 116) als Template-String gebaut:
-```ts
-name: `${byAvatar.get(l.avatar_id) ?? 'Avatar'} — ${l.name}`
-```
-Wenn `l.name` an irgendeiner Stelle undefined ist, entsteht der String `"Samuel Dusatko — undefined"` — exakt das beobachtete Verhalten. In der DB sind die Namen für Samuel ("Casual", "Greek Hoplite") gesetzt, also liegt der Fehler im JS-Pfad, nicht in den Daten.
+### Befund
+- Der Fehler kommt diesmal nicht aus Sync.so selbst und auch nicht aus der Audio-/Voice-Auswahl.
+- In den Logs zur Szene `6d3fd7fb...` wurde ein Gesicht korrekt erkannt: `faces=1`, `mouth=1/1`.
+- Danach bricht aber unsere eigene Vorprüfung ab: `v157_geometry_tighten_failed ... HARD_FAIL`.
+- Ursache: Die neue Sicherheitsregel für „zu große Face-Boxen“ ist bei Single-Speaker-Closeups zu streng. Sie war gegen Mehrsprecher-/Torso-Fehlmasken gedacht, blockiert jetzt aber gültige Nahaufnahmen.
 
-### Fix (rein UI/Label, kein Pipeline-Touch)
+### Umsetzung
+1. **Face-Geometry-Gate entschärfen, aber nur gezielt**
+   - In `supabase/functions/_shared/plate-face-detect.ts` wird die v157-Regel angepasst.
+   - Für Single-Speaker-Szenen mit genau einem erkannten Gesicht und vorhandenem Mund-Landmark darf eine größere Face-Box akzeptiert bzw. enger zugeschnitten werden.
+   - Für Multi-Speaker bleibt die harte Sicherheitslogik bestehen, damit Sprecher nicht vertauscht oder falsch gemorpht werden.
 
-**1. `src/hooks/useUnifiedMentionLibrary.ts`** (Z. 107-137, outfit mapping)
-- Defensiv: `const lookLabel = (typeof l.name === 'string' && l.name.trim()) ? l.name.trim() : 'Unbenannter Look';`
-- Verwende `lookLabel` sowohl in `name` als auch in `meta.outfitName`, sodass nie ein undefined/null in Template-Strings rutscht.
+2. **Box-Tightening robuster machen**
+   - Wenn ein Mund-Landmark vorhanden ist, wird die neue Box stärker um den Mund/Face-Bereich kalibriert.
+   - Die `tightHRatio > 0.25` Hard-Fail-Grenze wird nicht mehr blind auf gültige Single-Speaker-Closeups angewendet.
+   - Ergebnis: klare Nahaufnahmen wie im Screenshot laufen weiter, problematische Mehrsprecher-Kompositionen werden weiterhin blockiert.
 
-**2. `src/components/video-composer/briefing/ProductionPlanSheet.tsx`** (Z. 105-117, `outfitsByCharacter`)
-- Robusteres Label-Resolving:
-  ```ts
-  const lookName =
-    (m.meta?.outfitName && String(m.meta.outfitName).trim()) ||
-    (m.name?.split(' — ')[1] ?? '').trim() ||
-    m.name?.trim() ||
-    'Unbenannter Look';
-  ```
-- Zusätzlich Dedupe auf `lookId`, damit derselbe Look bei doppelten Mention-Quellen nicht zweimal auftaucht.
+3. **Fehlermeldung präziser machen**
+   - Falls die Vorprüfung wirklich blockiert, soll die UI/DB nicht mehr pauschal sagen „kein eindeutiges Gesicht“, wenn tatsächlich „Face-Box zu groß/Geometrie-Regel“ der Grund war.
+   - Dadurch ist künftig sofort sichtbar, ob der Clip neu gerendert werden muss oder ob nur die interne Vorprüfung zu streng war.
 
-**3. SelectItem-Rendering** (Z. 630-632)
-- Hard-Guard: `{o.name || 'Unbenannter Look'}` — letzte Verteidigungslinie, falls oben doch etwas durchrutscht.
+4. **Bestehende Szene reparierbar machen**
+   - Die Szene bleibt nicht dauerhaft durch gecachte/alte Fehldaten blockiert.
+   - Beim nächsten „Lip-Sync neu rendern“ soll die aktualisierte Detection greifen und die vorhandene Szene nicht unnötig neu als Video-Plate erzeugt werden müssen.
 
-### Validierung
-- ProductionPlan-Sheet öffnen → Outfit-Dropdown bei Samuel zeigt "Casual" und "Greek Hoplite".
-- Smoke-Test: outfit-Row in DB temporär ohne Name → Dropdown zeigt "Unbenannter Look", nicht "undefined".
-- Keine Änderungen an Lip-Sync-, Anchor- oder Compose-Pipeline.
+5. **Deployment & Validierung**
+   - Betroffene Backend-Funktion deployen.
+   - Logs prüfen, ob die Szene danach nicht mehr bei `v157_geometry_tighten_failed` abbricht.
+   - Die eigentliche Sync.so v169/v166 Pipeline bleibt unangetastet: keine Änderung am Dispatch-Modell, kein Wechsel von `sync-3`, keine Änderung an Audio-Segmenten oder Bounding-Box-URL-Strategie.
+
+### Nicht enthalten
+- Kein Umbau der Lip-Sync-Pipeline.
+- Kein Provider-Wechsel.
+- Kein erneutes Ändern der Briefing-/Storyboard-Logik.
