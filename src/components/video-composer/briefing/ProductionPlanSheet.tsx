@@ -634,7 +634,7 @@ export default function ProductionPlanSheet({
                                     <SelectContent>
                                       <SelectItem value="__default__">Standard-Look</SelectItem>
                                       {availableOutfits.map((o) => (
-                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name}</SelectItem>
+                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || 'Unbenannter Look'}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
