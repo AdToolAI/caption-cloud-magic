@@ -1041,72 +1041,62 @@ serve(async (req) => {
           .eq("id", scene.id);
       }
 
-      // STAGE 2 (Lip-Sync Strategy May 2026): HappyHorse 1.0 exhibits high
-      // identity-drift on multi-cast frames and is not viable as a Master-Plate
-      // for cinematic-sync two-shot dialog. Force-migrate any cinematic-sync
-      // scene with ≥2 distinct speakers to ai-hailuo (Tier-B fallback). The UI
-      // shows a warning badge separately; this guard makes the block defensive.
-      //
-      // June 2026 hardening: also cover engineOverride === 'sync-segments'
-      // (the new Fast Dialog default) and use a robust speaker/dialog detector
-      // that survives the Production-Plan `NAME — MOOD:` format. The old
-      // regex only matched `NAME:` / `[NAME]:` and silently returned 0
-      // speakers for "SAMUEL DUSATKO — CASUAL: …", which let HappyHorse run
-      // into the missing-anchor hard-fail. Triggering on any of
-      // {speakers>=1, dialogScript present, cast present} is safe because
-      // the migration target (Hailuo) handles all three cases cleanly.
+      // June 26 2026 — SILENT MIGRATION REMOVED.
+      // Previously HappyHorse + cinematic-sync / sync-segments was silently
+      // rewritten to ai-hailuo whenever ≥2 speakers were detected. That
+      // change collapsed user-picked durations (7s/8s/9s/15s) to Hailuo's
+      // 6/10s buckets and made the UI show "10s hailuo" even though the
+      // user picked "7s happyhorse". The dialog-segments pipeline is
+      // provider-agnostic (see compose-dialog-segments comment line 897:
+      // "Hailuo/HappyHorse i2v"), so the migration is not technically
+      // required. If HappyHorse multi-cast plates fail face-detection in
+      // Sync.so the user now sees the real error and credits are refunded
+      // idempotently — no silent provider switch.
       const __engineForHHGuard = scene.engineOverride ?? "auto";
       if (
         (scene.clipSource as string) === "ai-happyhorse" &&
         (__engineForHHGuard === "cinematic-sync" ||
           __engineForHHGuard === "sync-segments")
       ) {
-        const dlg = String((scene as any).dialogScript ?? "").trim();
-        // Robust speaker matcher: tolerate optional `[NAME]`, optional
-        // `— MOOD` / `- mood` / `(beat)` trailing tag, and require a
-        // colon (ASCII or full-width).
-        const SPEAKER_LINE_RE =
-          /^\s*\[?\s*([A-Za-zÀ-ÿ][\w\s.'-]{0,60}?)\s*\]?\s*(?:[—\-–]\s*[^:：]{0,40})?\s*[:：]/;
-        const speakerNames = new Set(
-          dlg
-            .split(/\r?\n/)
-            .map((l) => l.match(SPEAKER_LINE_RE))
-            .filter((m): m is RegExpMatchArray => !!m)
-            .map((m) => m[1].trim().toLowerCase()),
+        console.log(
+          `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} — keeping HappyHorse as master plate (silent Hailuo migration removed June 2026). Duration ${scene.durationSeconds}s preserved.`,
         );
-        const castCount = Array.isArray((scene as any).characterShots)
-          ? (scene as any).characterShots.filter(
-              (cs: any) => cs && cs.shotType !== "absent" && (cs.characterId || cs.name),
-            ).length
-          : ((scene as any).characterShot && (scene as any).characterShot.shotType !== "absent")
-            ? 1
-            : 0;
-        // June 26 2026 — DURATION-FIX: only migrate HappyHorse → Hailuo for
-        // TRUE multi-speaker dialog (≥2 distinct speakers). Single-speaker
-        // scenes stay on HappyHorse because it natively renders 3–15s and
-        // Sync.so lipsyncs the resulting clip cleanly — preserving the user's
-        // picked duration (7s/8s/9s/15s) instead of snapping to Hailuo's
-        // 6/10s buckets. Multi-speaker still flows through the dialog-shot
-        // pipeline which stitches multiple Hailuo plates per turn.
-        const shouldMigrate = speakerNames.size >= 2;
-        if (shouldMigrate) {
-          console.warn(
-            `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} multi-speaker (${speakerNames.size}) — migrating to ai-hailuo for dialog-shot pipeline.`,
+      }
+
+      // Duration guard — surface mismatches instead of silently snapping.
+      // Hailuo: only 6s or 10s. HappyHorse: 3–15s.
+      if (scene.clipSource === "ai-hailuo") {
+        const d = Number(scene.durationSeconds);
+        if (d !== 6 && d !== 10) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: `Hailuo unterstützt nur 6s oder 10s. Gewählt: ${d}s. Bitte Szenenlänge auf 6 oder 10 setzen oder Provider auf HappyHorse (3–15s) wechseln.`,
+              scene_id: scene.id,
+              provider: "ai-hailuo",
+              picked: d,
+              allowed: [6, 10],
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
-          scene.clipSource = "ai-hailuo";
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              clip_source: "ai-hailuo",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", scene.id);
-        } else if (dlg.length > 0 || castCount >= 1) {
-          console.log(
-            `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} single-speaker (dialogLen=${dlg.length}, cast=${castCount}) — keeping HappyHorse to honour picked duration ${scene.durationSeconds}s.`,
+        }
+      } else if (scene.clipSource === "ai-happyhorse") {
+        const d = Number(scene.durationSeconds);
+        if (!Number.isFinite(d) || d < 3 || d > 15) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: `HappyHorse unterstützt 3–15 Sekunden. Gewählt: ${d}s.`,
+              scene_id: scene.id,
+              provider: "ai-happyhorse",
+              picked: d,
+              allowed: { min: 3, max: 15 },
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
       }
+
 
       // Defensive: rewrite unsupported AI engines to a working default.
       if (
