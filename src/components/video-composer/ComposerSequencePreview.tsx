@@ -242,6 +242,9 @@ export default function ComposerSequencePreview({
       return;
     }
     if (slotMapRef.current[slot] === idx) return; // already preloaded
+    const prevSrcRef =
+      slot === 'A' ? slotASrcRef : slot === 'B' ? slotBSrcRef : slotCSrcRef;
+    const srcUnchanged = prevSrcRef.current === target.clipUrl;
     setSrcForSlot(slot, target.clipUrl);
     slotMapRef.current[slot] = idx;
     const el = getVideoForSlot(slot);
@@ -262,11 +265,26 @@ export default function ComposerSequencePreview({
       } else {
         el.muted = true;
       }
+      // When the URL is unchanged but the slot was just remapped (e.g. after a
+      // playable-list reset), the early-return inside setSrcForSlot skipped
+      // `el.load()`. Force a reload so the decoder definitely has a visible
+      // first frame — otherwise the slot can stay black after a re-init.
+      if (srcUnchanged) {
+        try { el.load(); } catch { /* noop */ }
+      }
       try { el.currentTime = 0; } catch { /* noop */ }
     }
   }, [setSrcForSlot]);
 
   // ── Reset when scene set fundamentally changes ─────────────────
+  // Use a stable signature (id + clipUrl per playable scene) instead of the
+  // playable array reference. Otherwise every parent re-render that produces a
+  // new array (but same content) triggers a destructive slot reset, which has
+  // been observed to leave Slot A black for scene 1 after scene 2 is added.
+  const playableSignature = useMemo(
+    () => playable.map((s) => `${s.id}:${s.clipUrl ?? ''}`).join('|'),
+    [playable],
+  );
   useEffect(() => {
     clearAllTimers();
     transitioningRef.current = false;
@@ -277,8 +295,13 @@ export default function ComposerSequencePreview({
     imageStartRef.current = null;
     activeSlotRef.current = 'A';
     slotMapRef.current = { A: -1, B: -1, C: -1 };
+    // Forget which URLs the slots currently hold, so preloadSlot will always
+    // re-arm them with a fresh `el.load()` even if the URL happens to match.
+    slotASrcRef.current = undefined;
+    slotBSrcRef.current = undefined;
+    slotCSrcRef.current = undefined;
 
-    if (playable.length > 0) {
+    if (playableRef.current.length > 0) {
       // Init: load scene 0 → A, scene 1 → B, scene 2 → hidden prefetch C.
       preloadSlot('A', 0);
       preloadSlot('B', 1);
@@ -287,7 +310,8 @@ export default function ComposerSequencePreview({
       setOpacityForSlot('B', 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playable]);
+  }, [playableSignature]);
+
 
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => () => clearAllTimers(), [clearAllTimers]);
