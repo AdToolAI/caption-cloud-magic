@@ -1352,10 +1352,11 @@ export default function SceneCard({
                             : "Dialog & Lip-Sync";
                       const toggleHint =
                         lang === "de"
-                          ? "Nur Modelle mit professionellem nativem Dialog & Lippensync (Kling 3, Veo 3.1, HappyHorse 1.0)."
+                          ? "Nur HappyHorse 1.0 (empfohlen · 3–15s) und Hailuo 2.3 (Fallback · 6/10s) sind für Sync.so Lip-Sync zertifiziert."
                           : lang === "es"
-                            ? "Solo modelos con diálogo nativo y lip-sync profesional (Kling 3, Veo 3.1, HappyHorse 1.0)."
-                            : "Only models with professional native dialog & lip-sync (Kling 3, Veo 3.1, HappyHorse 1.0).";
+                            ? "Solo HappyHorse 1.0 (recomendado · 3–15s) y Hailuo 2.3 (alternativa · 6/10s) están certificados para Sync.so lip-sync."
+                            : "Only HappyHorse 1.0 (recommended · 3–15s) and Hailuo 2.3 (fallback · 6/10s) are certified for Sync.so lip-sync.";
+
                       return (
                         <div className="space-y-2">
                           {/* Dialog & Lip-Sync toggle — James-Bond-2028 gold accent */}
