@@ -245,8 +245,8 @@ export default function ProductionPlanSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[88vh] overflow-hidden flex flex-col p-4 gap-3">
-        <DialogHeader className="space-y-1">
+      <DialogContent className="max-w-4xl w-[95vw] h-[90dvh] max-h-[90dvh] overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto] p-4 gap-3">
+        <DialogHeader className="space-y-1 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileText className="h-4 w-4 text-amber-300" />
             Production Plan — Briefing analysieren & übernehmen
@@ -294,7 +294,7 @@ export default function ProductionPlanSheet({
         )}
 
         {step === 'review' && plan && (
-          <ScrollArea className="flex-1 min-h-0 pr-3">
+          <ScrollArea className="h-full min-h-0 pr-3 -mr-1">
             <div className="space-y-3">
               {/* Projekt */}
               <SectionCard title="Projekt">
@@ -585,11 +585,12 @@ export default function ProductionPlanSheet({
                   </ul>
                 </div>
               )}
+              <div className="h-4" />
             </div>
           </ScrollArea>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 shrink-0 border-t border-border/40 pt-3">
           {step === 'paste' && (
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
