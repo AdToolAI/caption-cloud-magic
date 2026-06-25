@@ -1286,7 +1286,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const masterDuration =
           masterProvider === 'ai-happyhorse'
             ? Math.min(15, Math.max(3, Math.ceil(userPick)))
-            : userPick >= 10
+            // Hailuo: STRICT — only honour exactly 10s as 10s, otherwise 6s.
+            // Never bump 6s/7s/8s/9s up to 10s based on audio length.
+            : userPick === 10
               ? 10
               : 6;
 
