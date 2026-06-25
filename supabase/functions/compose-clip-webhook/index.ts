@@ -407,7 +407,9 @@ serve(async (req) => {
 
 
     } else if (status === 'failed') {
-      console.error(`[compose-clip-webhook] Clip failed:`, predError);
+      // Enrich silent Hailuo / generic model fails by re-fetching the prediction.
+      const enrichedError = await enrichEmptyPredError(predictionId, predError);
+      console.error(`[compose-clip-webhook] Clip failed:`, enrichedError);
 
       // Get current retry count
       const { data: scene } = await supabase
