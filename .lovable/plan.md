@@ -1,50 +1,78 @@
-## Ursache (verifiziert in `compose-video-clips/index.ts`)
+## Diagnose (bestätigt durch Screenshot)
 
-Hailuo ist nicht das Problem. Bei mehreren Sprechern funktionieren 7/8/9/15s, weil dort die **Dialog-Shot-Pipeline** (`compose-dialog-scene`) je Turn ein eigenes Hailuo-Plate rendert und sie via ffmpeg zu beliebiger Gesamtlänge zusammenklebt. Bei Single-Speaker greift dieser Pfad nicht — stattdessen schlagen drei stille Overrides zu:
+Im Storyboard rechts: Szene 1 = `10s hailuo` (€1.68), Szene 2+3 = `5s happyhorse`.
+Du wolltest HappyHorse mit 7s. Was wirklich passiert:
 
-1. **HappyHorse → Hailuo Silent-Migration** (`index.ts:1058–1100`)
-   Sobald `clipSource = ai-happyhorse` + `cinematic-sync/sync-segments` + irgendein Cast/Dialog vorliegt, wird der Provider serverseitig auf `ai-hailuo` umgeschrieben. HappyHorse selbst respektiert 3–15s sauber (`index.ts:3106`), wird hier aber gar nicht mehr aufgerufen.
-2. **Hailuo Hard-Snap** (`index.ts:2461`): `scene.durationSeconds >= 8 ? 10 : 6` — 7s → 6s, 8s/9s → 10s.
-3. **Cinematic-Sync Auto-Extend** (`index.ts:1206–1234`)
-   Liest VO-Länge aus `scene_audio_clips`, überschreibt `scene.durationSeconds` und schreibt den neuen Wert in die DB zurück. Eine VO mit 9.2s macht aus deinen 7s also 10s — auch wenn HappyHorse 9s könnte.
+```text
+UI: HappyHorse + 7s + Dialog
+     │
+     ▼
+compose-video-clips Zeile 1094:
+"if (clipSource === 'ai-happyhorse' && cast >= 2 || dialog_mode)
+   → migrate to ai-hailuo"   ← SILENT SWITCH (der Bug)
+     │
+     ▼
+Hailuo akzeptiert nur 6s | 10s
+     │
+     ▼
+Duration wird auf 10s gesnappt
+     │
+     ▼
+DB & UI zeigen jetzt: "10s hailuo" statt "7s happyhorse"
+```
 
-Zusätzlich: `siblingsDurationSec` wird nur im StoryboardTab an die SceneCard übergeben, nicht im ClipsTab — Budget-Clamp dort inaktiv (nicht ursächlich für 10s, aber unsauber).
+Der Code-Kommentar von damals: *„HappyHorse zeigt Identity-Drift in Multi-Cast"*. Aber: du nutzt **1 Sprecher**, und HappyHorse hat in deinen aktuellen Szenen (5s) sauber funktioniert. Die Migration ist also überprotektiv.
 
-## Plan
+## Fix
 
-### 1. Single-Speaker an die Dialog-Shot-Pipeline andocken (Hailuo bleibt!)
-In `compose-video-clips/index.ts` den Cinematic-Sync-Pfad so erweitern, dass auch Single-Speaker-Szenen über `compose-dialog-scene` laufen, sobald `durationSeconds` ∉ {6, 10}. So entstehen 7/8/9/15s als gestitchte Hailuo-Plates (z.B. 7s = ein 6s-Plate + 1s-Tail-Plate, 15s = 10+6 trimmed), exakt wie bei Multi-Speaker. Lipsync-Pipeline (Sync.so) bleibt unberührt — sie läuft pro Turn wie heute. Kein neuer Provider, keine neue API.
+### 1. Silent-Migration entfernen — `compose-video-clips/index.ts` Zeile 1060–1108
+- HappyHorse bleibt HappyHorse, egal wie viele Sprecher
+- Pipeline (`compose-dialog-segments`) ist bereits provider-agnostisch — frisst jede MP4 (Code-Kommentar Z.897 sagt wörtlich „Hailuo/HappyHorse i2v")
+- Logging bleibt, aber kein `update clip_source` mehr
 
-### 2. HappyHorse-Migration entschärfen
-Migration nur noch auslösen, wenn echtes Multi-Speaker-Dialog vorliegt (`turns.length >= 2 && distinctSpeakers >= 2`). Bei Single-Speaker-HappyHorse Provider beibehalten — HappyHorse rendert 3–15s nativ + Sync.so lipsynced den fertigen Clip wie heute.
+### 2. Provider-Capability-Map — `src/lib/video-composer/providerCapabilities.ts` (neu)
+```ts
+export const PROVIDER_CAPS = {
+  "ai-hailuo":     { durations: [6, 10],                       lipsync: true  },
+  "ai-happyhorse": { durations: [3,4,5,6,7,8,9,10,11,12,13,14,15], lipsync: true },
+  // alle anderen: lipsync: false
+};
+```
+Single source of truth für UI + Backend-Guard.
 
-### 3. Stille Duration-Overrides abschaffen
-- `index.ts:1206–1234`: Auto-Extend darf `scene.durationSeconds` nicht mehr ohne Userwissen überschreiben. Stattdessen:
-  - Wenn VO länger als gewählte Dauer → Cut-Off-Flag an Sync.so (existiert bereits via `cut_off`-Mode), Userwert bleibt.
-  - DB-Writeback der neuen Dauer entfernen.
-- `index.ts:2461`: Hailuo-Snap nur noch im Plate-Renderer der Dialog-Shot-Pipeline anwenden, nicht im Single-Clip-Pfad — dort wird gestitcht.
+### 3. SceneDialogStudio.tsx — Duration-Picker provider-aware
+- Hailuo-Mode: **2 Buttons** „6s" | „10s" (kein Slider, ehrlich)
+- HappyHorse-Mode: Slider 3–15s in 1s-Schritten
+- Provider-Wechsel mit ungültiger Duration → auto-snap auf nächstgültigen Wert + Toast „Duration auf 10s angepasst (Hailuo unterstützt nur 6s oder 10s)"
+- Entfernt: den blinden Snap-Code auf 6/10 sobald Dialog aktiv
 
-### 4. UI-Transparenz
-- SceneCard-Hinweisbadge umformulieren: nicht mehr „Hailuo rundet auf 6/10s", sondern „Längen ≠ 6/10s werden aus mehreren Hailuo-Plates gestitcht (gleicher Preis pro Sekunde)".
-- `siblingsDurationSec` im ClipsTab korrekt an SceneCard durchreichen.
+### 4. Backend-Duration-Guard — `compose-video-clips/index.ts`
+- Hailuo + Dauer ≠ 6/10 → **400** mit klarer Message statt Silent-Snap
+- HappyHorse + Dauer < 3 oder > 15 → **400**
+- Verhindert künftige UI/Backend-Drift
 
-### 5. Sequenz-Preview-Freeze (Szene 1 schwarz)
-Parallel mitnehmen, ohne die Lip-Sync-Pipeline anzufassen:
-- Slot A erst sichtbar markieren nach `loadeddata`/`canplay`.
-- `currentTime` erst nach Metadata setzen.
-- Watchdog erst aktivieren, wenn aktiver Slot wirklich gestartet.
-- `playableSignature` um `durationSeconds`, `clipStatus`, `clipLeadInTrimSeconds` erweitern.
+### 5. SceneCard.tsx — Provider-Picker mit Lipsync-Badge
+- Hailuo + HappyHorse: Badge „Lipsync ✓"
+- Andere 8 Provider bei `dialog_mode === true`: ausgegraut + Tooltip „Kein Lipsync"
 
-### Kosten
-- 7s = 6s-Plate + ~1s-Tail-Plate (gestitcht). Pro Sekunde gleicher Hailuo-Preis wie bisher, keine Doppelberechnung des Users.
-- 15s = 10+6 minus 1s Trim. Internes Stitching ist transparent — UI zeigt weiterhin „N Sekunden × Hailuo-Tarif".
+## Was bewusst NICHT angefasst wird
 
-### Was nicht angefasst wird
-- `compose-dialog-segments`, Sync.so-Joblogik, Webhook, Stitcher, Lipsync-Kernpipeline.
-- HeyGen, Replicate-Keys, Provider-Liste.
+- `compose-dialog-segments` — battle-tested v24 Pipeline, akzeptiert beide Plates bereits
+- Sync.so-Payload — unverändert
+- Multi-Speaker-Logik — HappyHorse darf jetzt mehrere Sprecher, wenn das in deiner Praxis fehlschlägt sehen wir's klar im Log (kein Silent-Switch mehr, der den Fehler maskiert)
 
-### Validierung
-Drei-Szenen-Projekt 5s/8s/7s mit Single-Speaker + Hailuo:
-- Payload sendet 5/8/7.
-- Szenen 2 und 3 werden gestitcht (nicht auf 10s gerundet).
-- Preview spielt Szene 1 sichtbar ab, kein Sprung zu Szene 2.
+## Risiko
+
+Falls HappyHorse + 4-Sprecher-Plates tatsächlich Identity-Drift haben (wie das Memory dokumentiert) → Sync.so wirft `face_probe_unavailable` und Credits werden idempotent refundiert (bestehender Mechanismus). Du siehst dann den **echten** Fehler statt einer kosmetischen Hailuo-Conversion. Falls das in deinen Tests passiert: einfach Single-Speaker-Constraint für HappyHorse ergänzen (kleiner Follow-up).
+
+## Dateien
+
+- **Edit:** `supabase/functions/compose-video-clips/index.ts` (Z.1060–1108 + neuer Duration-Guard)
+- **Edit:** `src/components/composer/SceneDialogStudio.tsx` (Duration-Picker)
+- **Edit:** `src/components/composer/SceneCard.tsx` (Lipsync-Badge)
+- **Edit:** `src/lib/video-composer/validateSceneForCinematicSync.ts` (provider-aware)
+- **Neu:**  `src/lib/video-composer/providerCapabilities.ts`
+
+## Aufwand
+
+~1.5–2h. Danach: 1 Test-Szene HappyHorse + 7s + 1 Sprecher → muss als `7s happyhorse` durchlaufen.
