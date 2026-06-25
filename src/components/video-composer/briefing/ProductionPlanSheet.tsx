@@ -733,14 +733,19 @@ export default function ProductionPlanSheet({
                 </div>
               )}
 
-              {/* Unresolved */}
-              {plan.unresolved.length > 0 && (
-                <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3 space-y-1 text-xs">
-                  <div className="font-medium text-amber-300 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> {plan.unresolved.length} offene{plan.unresolved.length === 1 ? 'r' : ''} Punkt{plan.unresolved.length === 1 ? '' : 'e'}
+              {/* Unresolved (live) */}
+              {liveUnresolved.length > 0 && (
+                <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-amber-300 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> {liveUnresolved.length} offene{liveUnresolved.length === 1 ? 'r' : ''} Punkt{liveUnresolved.length === 1 ? '' : 'e'}
+                    </div>
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={handleAutoResolve}>
+                      Auto-Resolve
+                    </Button>
                   </div>
                   <ul className="space-y-1">
-                    {plan.unresolved.map((u, i) => (
+                    {liveUnresolved.map((u, i) => (
                       <li key={i} className="text-muted-foreground">
                         <span className="text-amber-300">{u.field}:</span> {u.reason}
                         {u.suggestion && <span className="ml-1 italic">— {u.suggestion}</span>}
@@ -749,6 +754,7 @@ export default function ProductionPlanSheet({
                   </ul>
                 </div>
               )}
+
               <div className="h-4" />
             </div>
           </ScrollArea>
