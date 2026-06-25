@@ -36,8 +36,51 @@ function isRetryableTransientError(predError: unknown): boolean {
     s.includes('upstream connect error') ||
     s.includes('504 gateway') ||
     s.includes('502 bad gateway') ||
-    s.includes('temporarily unavailable')
+    s.includes('temporarily unavailable') ||
+    // Hailuo / generic upstream model blip — one silent retry before refunding.
+    s.includes('internal model error') ||
+    s.includes('generation failed') ||
+    s.includes('prediction failed') ||
+    s.includes('unknown error') ||
+    s === 'failed' ||
+    s === 'null'
   );
+}
+
+/**
+ * Some Replicate model failures arrive at the webhook with an EMPTY error
+ * property (status:"failed", error:null). To give the user actionable text
+ * and to let the retry classifier see a real string, re-fetch the prediction
+ * detail from Replicate and pull `error` or the tail of `logs`.
+ */
+async function enrichEmptyPredError(
+  predictionId: string | undefined,
+  current: unknown,
+): Promise<string> {
+  const initial = String(current ?? '').trim();
+  if (initial && initial !== 'null') return initial;
+  if (!predictionId) return initial;
+  try {
+    const key = Deno.env.get('REPLICATE_API_KEY');
+    if (!key) return initial;
+    const r = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) return initial;
+    const detail = await r.json();
+    const fromErr = String(detail?.error ?? '').trim();
+    if (fromErr) return fromErr.slice(0, 500);
+    const logs = String(detail?.logs ?? '');
+    if (logs) {
+      // Last non-empty line of logs is usually the actual model exception.
+      const lines = logs.split('\n').map((l) => l.trim()).filter(Boolean);
+      const tail = lines.slice(-3).join(' | ');
+      if (tail) return `model_failed: ${tail}`.slice(0, 500);
+    }
+    return 'model_failed_silently';
+  } catch (_e) {
+    return initial || 'model_failed_silently';
+  }
 }
 
 // v81: detectSpeakerCount is now the shared countDialogSpeakers (aliased on import
