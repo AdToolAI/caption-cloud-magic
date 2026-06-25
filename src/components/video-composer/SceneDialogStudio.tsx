@@ -1336,7 +1336,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             id: sceneIdFinal,
             projectId: pidFinal,
             sceneType: scene.sceneType,
-            clipSource: 'ai-hailuo' as const,
+            clipSource: masterProvider,
             clipQuality: scene.clipQuality || 'standard',
             aiPrompt: scene.aiPrompt || '',
             negativePrompt: (scene as any).negativePrompt || undefined,
