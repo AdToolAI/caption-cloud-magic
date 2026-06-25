@@ -410,9 +410,22 @@ export default function SceneInlinePlayer({
           const rawErr = String(
             (scene as any).clipError ?? (scene as any).clip_error ?? '',
           ).trim();
-          const friendly = rawErr
-            ? rawErr.length > 220 ? rawErr.slice(0, 220) + '…' : rawErr
-            : 'Render fehlgeschlagen.';
+          const lower = rawErr.toLowerCase();
+          // Map silent/opaque model fails to actionable text.
+          let friendly: string;
+          if (!rawErr) {
+            friendly = 'Render fehlgeschlagen.';
+          } else if (
+            lower === 'model_failed_silently' ||
+            lower.startsWith('model_failed') ||
+            lower === 'failed' ||
+            lower === 'null'
+          ) {
+            friendly =
+              'Das Video-Modell hat die Generierung intern abgebrochen (kein Grund vom Provider geliefert). Bitte Anchor neu generieren oder Prompt leicht anpassen und erneut starten.';
+          } else {
+            friendly = rawErr.length > 220 ? rawErr.slice(0, 220) + '…' : rawErr;
+          }
           return (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-destructive/30 via-black/70 to-destructive/30 backdrop-blur-[2px] px-3 text-center">
               <AlertTriangle className="h-7 w-7 text-destructive mb-1.5" />

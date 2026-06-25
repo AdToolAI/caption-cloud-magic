@@ -36,8 +36,51 @@ function isRetryableTransientError(predError: unknown): boolean {
     s.includes('upstream connect error') ||
     s.includes('504 gateway') ||
     s.includes('502 bad gateway') ||
-    s.includes('temporarily unavailable')
+    s.includes('temporarily unavailable') ||
+    // Hailuo / generic upstream model blip — one silent retry before refunding.
+    s.includes('internal model error') ||
+    s.includes('generation failed') ||
+    s.includes('prediction failed') ||
+    s.includes('unknown error') ||
+    s === 'failed' ||
+    s === 'null'
   );
+}
+
+/**
+ * Some Replicate model failures arrive at the webhook with an EMPTY error
+ * property (status:"failed", error:null). To give the user actionable text
+ * and to let the retry classifier see a real string, re-fetch the prediction
+ * detail from Replicate and pull `error` or the tail of `logs`.
+ */
+async function enrichEmptyPredError(
+  predictionId: string | undefined,
+  current: unknown,
+): Promise<string> {
+  const initial = String(current ?? '').trim();
+  if (initial && initial !== 'null') return initial;
+  if (!predictionId) return initial;
+  try {
+    const key = Deno.env.get('REPLICATE_API_KEY');
+    if (!key) return initial;
+    const r = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) return initial;
+    const detail = await r.json();
+    const fromErr = String(detail?.error ?? '').trim();
+    if (fromErr) return fromErr.slice(0, 500);
+    const logs = String(detail?.logs ?? '');
+    if (logs) {
+      // Last non-empty line of logs is usually the actual model exception.
+      const lines = logs.split('\n').map((l) => l.trim()).filter(Boolean);
+      const tail = lines.slice(-3).join(' | ');
+      if (tail) return `model_failed: ${tail}`.slice(0, 500);
+    }
+    return 'model_failed_silently';
+  } catch (_e) {
+    return initial || 'model_failed_silently';
+  }
 }
 
 // v81: detectSpeakerCount is now the shared countDialogSpeakers (aliased on import
@@ -364,7 +407,9 @@ serve(async (req) => {
 
 
     } else if (status === 'failed') {
-      console.error(`[compose-clip-webhook] Clip failed:`, predError);
+      // Enrich silent Hailuo / generic model fails by re-fetching the prediction.
+      const enrichedError = await enrichEmptyPredError(predictionId, predError);
+      console.error(`[compose-clip-webhook] Clip failed:`, enrichedError);
 
       // Get current retry count
       const { data: scene } = await supabase
@@ -384,7 +429,7 @@ serve(async (req) => {
       // content/policy errors fall through to the normal failed+refund path.
       const canAutoRetry =
         currentRetry < MAX_AUTO_RETRY &&
-        isRetryableTransientError(predError) &&
+        isRetryableTransientError(enrichedError) &&
         (payload.model || payload.version) &&
         payload.input &&
         typeof payload.input === 'object';
@@ -424,7 +469,7 @@ serve(async (req) => {
             .eq('id', sceneId);
 
           console.log(
-            `[compose-clip-webhook] auto-retry ${currentRetry + 1}/${MAX_AUTO_RETRY} for scene ${sceneId} → new pred ${retried.id} (transient: "${String(predError).slice(0, 80)}")`,
+            `[compose-clip-webhook] auto-retry ${currentRetry + 1}/${MAX_AUTO_RETRY} for scene ${sceneId} → new pred ${retried.id} (transient: "${String(enrichedError).slice(0, 80)}")`,
           );
 
           return new Response(JSON.stringify({ ok: true, retried: true }), {
@@ -445,7 +490,7 @@ serve(async (req) => {
         .update({
           clip_status: 'failed',
           retry_count: currentRetry + 1,
-          clip_error: String(predError ?? '').slice(0, 500) || null,
+          clip_error: String(enrichedError ?? '').slice(0, 500) || null,
           ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
             ? {
                 lip_sync_status: null,
