@@ -109,9 +109,14 @@ import {
   NATIVE_DIALOGUE_CLIP_SOURCES,
   DIALOG_FALLBACK_CLIP_SOURCE,
   DIALOG_FALLBACK_CLIP_QUALITY,
+  LIPSYNC_CLIP_SOURCES,
+  LIPSYNC_PRIMARY_CLIP_SOURCE,
+  isLipsyncEngine,
+  isLipsyncClipSource,
   modelIdToSource,
   sourceToModelId,
 } from "@/lib/video-composer/modelMapping";
+
 import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
 import { useUnifiedMentionLibrary } from "@/hooks/useUnifiedMentionLibrary";
 import { useStylePresets } from "@/hooks/useStylePresets";
