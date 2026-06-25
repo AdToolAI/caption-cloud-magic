@@ -87,6 +87,8 @@ interface Args {
   briefing: ComposerBriefing;
   projectId: string | undefined;
   scenes: ComposerScene[];
+  /** Project language (de/en/es/…) — forwarded to deep-parse for LANGUAGE LOCK. */
+  language: string;
   /** Navigation hook: switches the dashboard tab to 'storyboard'. */
   navigateToStoryboard: () => void;
 }
@@ -170,7 +172,7 @@ export interface StoryboardTransitionState {
 }
 
 export function useStoryboardTransition({
-  briefing, projectId, scenes, navigateToStoryboard,
+  briefing, projectId, scenes, language, navigateToStoryboard,
 }: Args) {
   const [state, setState] = useState<StoryboardTransitionState>({
     warRoomOpen: false,
@@ -254,7 +256,7 @@ export function useStoryboardTransition({
 
     try {
       const { data, error } = await supabase.functions.invoke('briefing-deep-parse', {
-        body: { briefing: text, projectId },
+        body: { briefing: text, projectId, language },
       });
       stopProgress();
       if (cancelledRef.current) return { handled: true };

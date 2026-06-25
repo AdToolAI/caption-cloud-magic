@@ -618,6 +618,32 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const briefing: string = String(body?.briefing ?? '').trim();
     const projectId: string | null = body?.projectId ?? null;
+    const rawLang: string = String(body?.language ?? 'de').toLowerCase().slice(0, 5);
+    const LANG_NAME: Record<string, string> = {
+      de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
+      fr: 'French', it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+    };
+    const langKey = rawLang.split('-')[0];
+    const languageDisplay = LANG_NAME[langKey] ?? rawLang.toUpperCase();
+    const LANGUAGE_LOCK = `
+═══════════════════════════════════════════════════════════════════════════
+LANGUAGE LOCK — output language: ${languageDisplay} [${langKey}]
+═══════════════════════════════════════════════════════════════════════════
+ALL human-readable text fields MUST be written in ${languageDisplay}:
+  - scenes[*].voiceover.text
+  - scenes[*].dialogTurns[*].text  (and .mood, .delivery)
+  - scenes[*].label, scenes[*].beat
+  - scenes[*].performance.{mimik, gestik, blick}
+  - captions.highlightWords
+ENGLISH-ONLY fields (visual prompts consumed by AI models — DO NOT translate):
+  - scenes[*].anchorPromptEN
+  - scenes[*].brollHints
+  - scenes[*].shotDirector.* enums
+  - negativePrompt / negativePromptScene
+This overrides any English wording in the briefing's scaffolding
+(## Cast, ## Project headers, mention keys, etc.).
+═══════════════════════════════════════════════════════════════════════════
+`;
     if (!briefing) {
       return new Response(JSON.stringify({ error: 'briefing text required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -640,9 +666,9 @@ Deno.serve(async (req) => {
     try {
       manifest = await callGateway({
         model: 'google/gemini-2.5-pro',
-        system: SYSTEM_PASS_A,
+        system: LANGUAGE_LOCK + '\n' + SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
-        user: `BRIEFING:\n\n${briefing}`,
+        user: `BRIEFING (source language: ${languageDisplay}):\n\n${briefing}`,
         timeoutMs: 90_000,
       });
     } catch (e: any) {
@@ -736,9 +762,10 @@ Deno.serve(async (req) => {
     try {
       resolution = await callGateway({
         model: 'google/gemini-2.5-flash',
-        system: SYSTEM_PASS_B,
+        system: LANGUAGE_LOCK + '\n' + SYSTEM_PASS_B,
         tool: TOOL_PASS_B,
         user: JSON.stringify({
+          OUTPUT_LANGUAGE: langKey,
           MANIFEST: manifest,
           LIBRARY: {
             characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id })),
