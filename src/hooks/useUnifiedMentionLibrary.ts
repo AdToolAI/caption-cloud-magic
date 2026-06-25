@@ -107,6 +107,10 @@ export function useUnifiedMentionLibrary(): {
   const outfitChars: MotionStudioCharacter[] = useMemo(() => {
     const byAvatar = new Map(brandChars.map((c: any) => [c.id, c.name]));
     return outfitLooks.map((l: any) => ({
+      // ID stays `outfit:<lookId>` so the @-mention dropdown can list
+      // multiple looks per avatar as separate picks. Consumers that
+      // need the base brand_characters.id read `meta.baseCharacterId`.
+      // This is the *one* boundary the CastRef contract is enforced at.
       id: `outfit:${l.id}`,
       user_id: l.user_id,
       name: `${byAvatar.get(l.avatar_id) ?? 'Avatar'} — ${l.name}`,
@@ -120,8 +124,18 @@ export function useUnifiedMentionLibrary(): {
       workspace_id: null,
       created_at: l.created_at,
       updated_at: l.created_at,
-    }));
+      // CastRef metadata — read by `mentionToCastRef` and the
+      // ProductionPlanSheet outfit picker. Plain strings, no PII.
+      meta: {
+        kind: 'outfit' as const,
+        baseCharacterId: l.avatar_id as string,
+        outfitLookId: l.id as string,
+        outfitName: l.name as string,
+        avatarName: (byAvatar.get(l.avatar_id) ?? null) as string | null,
+      },
+    } as MotionStudioCharacter));
   }, [outfitLooks, brandChars]);
+
 
   // Cast Catalog rows surfaced as virtual mentionable characters with reference
   // image — picked items inject the portrait into Vidu/Hailuo i2v / Nano Banana
