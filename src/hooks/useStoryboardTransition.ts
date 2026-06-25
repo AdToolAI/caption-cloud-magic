@@ -87,6 +87,8 @@ interface Args {
   briefing: ComposerBriefing;
   projectId: string | undefined;
   scenes: ComposerScene[];
+  /** Project language (de/en/es/…) — forwarded to deep-parse for LANGUAGE LOCK. */
+  language: string;
   /** Navigation hook: switches the dashboard tab to 'storyboard'. */
   navigateToStoryboard: () => void;
 }
