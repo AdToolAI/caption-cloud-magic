@@ -329,10 +329,10 @@ export default function ProductionPlanSheet({
                 ) : (
                 <div className="space-y-3">
                   {plan.scenes.map((s) => (
-                    <div key={s.index} className="rounded border border-border/40 p-3 space-y-2 text-xs">
+                    <div key={s.index} className="rounded border border-border/40 p-2 space-y-1.5 text-xs">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px]">S{String(s.index).padStart(2, '0')}</Badge>
-                        <span className="font-medium">{s.label ?? s.beat ?? '—'}</span>
+                        <span className="font-medium truncate">{s.label ?? s.beat ?? '—'}</span>
                         <Badge variant="secondary" className="text-[10px] ml-auto">{s.engine ?? 'auto'}</Badge>
                         {s.lipSync && (
                           <Badge variant="outline" className="text-[10px] border-amber-300/40 text-amber-300">
@@ -343,18 +343,15 @@ export default function ProductionPlanSheet({
                       </div>
 
                       {s.voiceover?.text && (
-                        <div className="italic text-muted-foreground">
-                          "{s.voiceover.text.slice(0, 200)}{s.voiceover.text.length > 200 ? '…' : ''}"
+                        <div className="italic text-muted-foreground line-clamp-2">
+                          "{s.voiceover.text}"
                         </div>
                       )}
 
-                      {/* Director's vision — anchor prompt (the scene itself) */}
+                      {/* Director's vision — anchor prompt (clamped) */}
                       {s.anchorPromptEN && (
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Szene (Director's Vision)</Label>
-                          <div className="rounded border border-amber-300/20 bg-amber-300/[0.03] p-2 text-[11px] text-foreground/90">
-                            {s.anchorPromptEN}
-                          </div>
+                        <div className="rounded border border-amber-300/20 bg-amber-300/[0.03] p-1.5 text-[11px] text-foreground/90 line-clamp-3">
+                          {s.anchorPromptEN}
                         </div>
                       )}
 
@@ -618,8 +615,8 @@ export default function ProductionPlanSheet({
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-border/40 p-3">
-      <div className="font-medium text-sm mb-2">{title}</div>
+    <div className="rounded-lg border border-border/40 p-2.5">
+      <div className="font-medium text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">{title}</div>
       <div className="space-y-1">{children}</div>
     </div>
   );
