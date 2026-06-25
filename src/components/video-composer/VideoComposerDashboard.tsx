@@ -777,6 +777,7 @@ export default function VideoComposerDashboard() {
     briefing: project.briefing,
     projectId: project.id,
     scenes: project.scenes,
+    language: project.language,
     navigateToStoryboard: () => setActiveTab('storyboard'),
   });
 
