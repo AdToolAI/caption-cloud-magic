@@ -1,20 +1,37 @@
-## Problem
+## Fix: Outfit-Dropdown listet 2 vorhandene Looks als "undefined"
 
-Im Production Plan steht "3 Szenen", aber im UI sind nur 2 sichtbar. Ursache: doppelte `scene.index`-Werte aus Pass A (Gemini kann z. B. 1, 2, 2 oder 0, 1, 2 zurückgeben → nach `Math.max(1, ...)` werden 0 und 1 beide zu 1). Im UI wird die Liste mit `key={s.index}` gerendert — React dedupliziert daher die Kollision und zeigt nur die letzte Szene mit gleichem Key. Die Szene existiert weiterhin im Datenmodell, ist aber unsichtbar.
+### Diagnose
+Im Outfit-Picker (`ProductionPlanSheet.tsx`, Z. 105-117) wird das Label so gebaut:
+```ts
+const lookName = m.meta?.outfitName ?? m.name;
+```
+Wenn `m.meta` aus irgendeinem Grund nicht durchgereicht wird (z. B. weil ein zukünftiger `dedupe`-Schritt das Objekt flach kopiert oder ein anderer Aggregator die outfit-mention ohne `meta` erzeugt), bleibt nur `m.name`. Dieses `name` wird in `useUnifiedMentionLibrary` (Z. 116) als Template-String gebaut:
+```ts
+name: `${byAvatar.get(l.avatar_id) ?? 'Avatar'} — ${l.name}`
+```
+Wenn `l.name` an irgendeiner Stelle undefined ist, entsteht der String `"Samuel Dusatko — undefined"` — exakt das beobachtete Verhalten. In der DB sind die Namen für Samuel ("Casual", "Greek Hoplite") gesetzt, also liegt der Fehler im JS-Pfad, nicht in den Daten.
 
-## Fix (minimal, nur UI/Parser-Normalisierung — keine Pipeline-Änderung)
+### Fix (rein UI/Label, kein Pipeline-Touch)
 
-### 1. `supabase/functions/briefing-deep-parse/index.ts`
-- Nach `mergeManifestAndResolution`: Szenen nach ursprünglicher Reihenfolge stabil sortieren und sequentiell neu indizieren (`index = i + 1`), damit nie Duplikate persistiert werden.
-- Gleiche Re-Index-Logik im Safety-Arc-Fallback (Zeile ~699) anwenden (dort ist es bereits ok, nur konsistent halten).
+**1. `src/hooks/useUnifiedMentionLibrary.ts`** (Z. 107-137, outfit mapping)
+- Defensiv: `const lookLabel = (typeof l.name === 'string' && l.name.trim()) ? l.name.trim() : 'Unbenannter Look';`
+- Verwende `lookLabel` sowohl in `name` als auch in `meta.outfitName`, sodass nie ein undefined/null in Template-Strings rutscht.
 
-### 2. `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
-- React-Key auf stabilen Kompositschlüssel umstellen: `key={\`${s.index}-${i}\`}` (Map-Iteration mit Position), damit Kollisionen niemals mehr eine Szene verschlucken — Defense-in-Depth gegenüber Altplänen in der DB.
-- Header-Badge ergänzen: `S{i+1}` (Anzeigeposition) zusätzlich zu `s.index`, falls Werte voneinander abweichen.
-- Optionaler Live-Selfheal beim Laden: wenn doppelte `index`-Werte erkannt werden → einmalig client-seitig re-indizieren und in `onUpdateScenes`/State spiegeln (verhindert Wiederholung bei bereits gespeicherten Plänen).
+**2. `src/components/video-composer/briefing/ProductionPlanSheet.tsx`** (Z. 105-117, `outfitsByCharacter`)
+- Robusteres Label-Resolving:
+  ```ts
+  const lookName =
+    (m.meta?.outfitName && String(m.meta.outfitName).trim()) ||
+    (m.name?.split(' — ')[1] ?? '').trim() ||
+    m.name?.trim() ||
+    'Unbenannter Look';
+  ```
+- Zusätzlich Dedupe auf `lookId`, damit derselbe Look bei doppelten Mention-Quellen nicht zweimal auftaucht.
 
-### 3. Keine Änderungen an
-- `compose-dialog-segments`, `compose-video-clips`, Lip-Sync-Pipeline, CastRef, Anchor — alle bleiben unangetastet.
+**3. SelectItem-Rendering** (Z. 630-632)
+- Hard-Guard: `{o.name || 'Unbenannter Look'}` — letzte Verteidigungslinie, falls oben doch etwas durchrutscht.
 
-## Resultat
-"3 Szenen" zeigt verlässlich 3 Karten an, auch bei Altplänen mit kollidierenden Indizes. Reihenfolge bleibt erhalten, Lip-Sync-geschützte Szenen weiterhin nie überschrieben.
+### Validierung
+- ProductionPlan-Sheet öffnen → Outfit-Dropdown bei Samuel zeigt "Casual" und "Greek Hoplite".
+- Smoke-Test: outfit-Row in DB temporär ohne Name → Dropdown zeigt "Unbenannter Look", nicht "undefined".
+- Keine Änderungen an Lip-Sync-, Anchor- oder Compose-Pipeline.

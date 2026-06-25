@@ -106,34 +106,40 @@ export function useUnifiedMentionLibrary(): {
 
   const outfitChars: MotionStudioCharacter[] = useMemo(() => {
     const byAvatar = new Map(brandChars.map((c: any) => [c.id, c.name]));
-    return outfitLooks.map((l: any) => ({
-      // ID stays `outfit:<lookId>` so the @-mention dropdown can list
-      // multiple looks per avatar as separate picks. Consumers that
-      // need the base brand_characters.id read `meta.baseCharacterId`.
-      // This is the *one* boundary the CastRef contract is enforced at.
-      id: `outfit:${l.id}`,
-      user_id: l.user_id,
-      name: `${byAvatar.get(l.avatar_id) ?? 'Avatar'} — ${l.name}`,
-      description: `Saved outfit: ${l.name}`,
-      signature_items: '',
-      reference_image_url: l.front_url ?? l.cover_url,
-      reference_image_seed: null,
-      voice_id: null,
-      tags: ['outfit'],
-      usage_count: 0,
-      workspace_id: null,
-      created_at: l.created_at,
-      updated_at: l.created_at,
-      // CastRef metadata — read by `mentionToCastRef` and the
-      // ProductionPlanSheet outfit picker. Plain strings, no PII.
-      meta: {
-        kind: 'outfit' as const,
-        baseCharacterId: l.avatar_id as string,
-        outfitLookId: l.id as string,
-        outfitName: l.name as string,
-        avatarName: (byAvatar.get(l.avatar_id) ?? null) as string | null,
-      },
-    } as MotionStudioCharacter));
+    return outfitLooks.map((l: any) => {
+      // Defensive label: never let `undefined`/`null` rutschen in Template-Strings.
+      const lookLabel =
+        (typeof l.name === 'string' && l.name.trim()) ? l.name.trim() : 'Unbenannter Look';
+      const avatarName = (byAvatar.get(l.avatar_id) as string | undefined) ?? 'Avatar';
+      return {
+        // ID stays `outfit:<lookId>` so the @-mention dropdown can list
+        // multiple looks per avatar as separate picks. Consumers that
+        // need the base brand_characters.id read `meta.baseCharacterId`.
+        // This is the *one* boundary the CastRef contract is enforced at.
+        id: `outfit:${l.id}`,
+        user_id: l.user_id,
+        name: `${avatarName} — ${lookLabel}`,
+        description: `Saved outfit: ${lookLabel}`,
+        signature_items: '',
+        reference_image_url: l.front_url ?? l.cover_url,
+        reference_image_seed: null,
+        voice_id: null,
+        tags: ['outfit'],
+        usage_count: 0,
+        workspace_id: null,
+        created_at: l.created_at,
+        updated_at: l.created_at,
+        // CastRef metadata — read by `mentionToCastRef` and the
+        // ProductionPlanSheet outfit picker. Plain strings, no PII.
+        meta: {
+          kind: 'outfit' as const,
+          baseCharacterId: l.avatar_id as string,
+          outfitLookId: l.id as string,
+          outfitName: lookLabel,
+          avatarName: (byAvatar.get(l.avatar_id) ?? null) as string | null,
+        },
+      } as MotionStudioCharacter;
+    });
   }, [outfitLooks, brandChars]);
 
 
