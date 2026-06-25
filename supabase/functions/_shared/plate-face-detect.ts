@@ -591,6 +591,10 @@ export async function detectPlateFaces(params: {
   // Stirn→Kinn-Verhältnis (h ≈ w * 1.15) zentriert auf das Mund-Landmark
   // (bzw. obere ⅓ der alten Box) heruntergerechnet. Bleibt sie über 25 %
   // Höhe, ist die Detection korrupt → hard fail.
+  // v170 — Single-speaker closeups (MCU/CU) sind legitime Komposition und
+  // dürfen ein großes Face-Bbox haben. Nur Multi-Speaker-Plates oder
+  // eindeutige Torso-Fehlmasken werden hart abgelehnt.
+  const isSingleSpeaker = faces.length === 1 && expectedN === 1;
   const tightened: PlateFaceBox[] = [];
   for (const f of faces) {
     const [bx1, by1, bx2, by2] = f.bbox;
@@ -598,23 +602,55 @@ export async function detectPlateFaces(params: {
     const h = Math.max(1, by2 - by1);
     const aspectIn = h / w;
     const hRatioIn = h / H;
-    if (aspectIn > 1.35 || hRatioIn > 0.22) {
+    // Trigger nur bei wirklich verdächtiger Geometrie. Für Single-Speaker
+    // Closeups (mit Mund-Landmark) tolerieren wir große Boxen bis 60%.
+    const triggerAspect = isSingleSpeaker ? 1.6 : 1.35;
+    const triggerHRatio = isSingleSpeaker ? 0.45 : 0.22;
+    if (aspectIn > triggerAspect || hRatioIn > triggerHRatio) {
       const anchorY = Array.isArray(f.mouth) && Number.isFinite(f.mouth[1])
         ? f.mouth[1]
-        : Math.round(by1 + h / 3); // obere ⅓ ≈ Augen/Nasenhöhe für Torso-Box
+        : Math.round(by1 + h / 3);
       const cx = Math.round((bx1 + bx2) / 2);
-      const newW = w; // X bleibt — links/rechts ist verlässlich
-      const newH = Math.round(w * 1.15); // realistisches Face-Aspect
+      const newW = w;
+      const newH = Math.round(w * 1.15);
       const nx1 = Math.max(0, Math.round(cx - newW / 2));
       const nx2 = Math.min(W, Math.round(cx + newW / 2));
       const ny1 = Math.max(0, Math.round(anchorY - newH / 2));
       const ny2 = Math.min(H, Math.round(anchorY + newH / 2));
       const tightH = ny2 - ny1;
       const tightHRatio = tightH / H;
-      if (tightHRatio > 0.25) {
+      // Hard-Fail-Schwelle: Single-Speaker = 0.60, Multi = 0.25 (alt).
+      const hardFailRatio = isSingleSpeaker ? 0.60 : 0.25;
+      if (tightHRatio > hardFailRatio) {
+        // Letzter Rettungsversuch: wenn ein Mund-Landmark vorhanden ist,
+        // bauen wir die Box direkt um den Mund mit konservativer Größe.
+        if (Array.isArray(f.mouth) && Number.isFinite(f.mouth[0]) && Number.isFinite(f.mouth[1])) {
+          const mx = f.mouth[0];
+          const my = f.mouth[1];
+          const faceH = Math.min(H, Math.round(Math.min(w, H * 0.55)));
+          const faceW = Math.round(faceH / 1.15);
+          const rx1 = Math.max(0, Math.round(mx - faceW / 2));
+          const rx2 = Math.min(W, Math.round(mx + faceW / 2));
+          // Mund liegt typischerweise im unteren Drittel des Gesichts
+          const ry1 = Math.max(0, Math.round(my - faceH * 0.66));
+          const ry2 = Math.min(H, Math.round(my + faceH * 0.34));
+          const rebuiltBbox: [number, number, number, number] = [rx1, ry1, rx2, ry2];
+          const rebuiltCenter: [number, number] = [
+            Math.round((rx1 + rx2) / 2),
+            Math.round((ry1 + ry2) / 2),
+          ];
+          console.log(
+            `${tag} v170_geometry_mouth_rebuild slot=${f.slot} ` +
+            `hRatio_in=${hRatioIn.toFixed(3)} hRatio_out=${((ry2 - ry1) / H).toFixed(3)} ` +
+            `single=${isSingleSpeaker}`,
+          );
+          tightened.push({ ...f, bbox: rebuiltBbox, center: rebuiltCenter });
+          continue;
+        }
         console.warn(
-          `${tag} v157_geometry_tighten_failed aspect_in=${aspectIn.toFixed(2)} ` +
-          `hRatio_in=${hRatioIn.toFixed(3)} tightHRatio=${tightHRatio.toFixed(3)} — HARD_FAIL`,
+          `${tag} v170_geometry_tighten_failed aspect_in=${aspectIn.toFixed(2)} ` +
+          `hRatio_in=${hRatioIn.toFixed(3)} tightHRatio=${tightHRatio.toFixed(3)} ` +
+          `single=${isSingleSpeaker} mouth=false — HARD_FAIL`,
         );
         return null;
       }
@@ -624,9 +660,9 @@ export async function detectPlateFaces(params: {
         Math.round((ny1 + ny2) / 2),
       ];
       console.log(
-        `${tag} v157_geometry_tighten slot=${f.slot} aspect_in=${aspectIn.toFixed(2)} ` +
+        `${tag} v170_geometry_tighten slot=${f.slot} aspect_in=${aspectIn.toFixed(2)} ` +
         `aspect_out=${(tightH / newW).toFixed(2)} hRatio_in=${hRatioIn.toFixed(3)} ` +
-        `hRatio_out=${tightHRatio.toFixed(3)} mouth_used=${!!f.mouth}`,
+        `hRatio_out=${tightHRatio.toFixed(3)} mouth_used=${!!f.mouth} single=${isSingleSpeaker}`,
       );
       tightened.push({ ...f, bbox: newBbox, center: newCenter });
     } else {
