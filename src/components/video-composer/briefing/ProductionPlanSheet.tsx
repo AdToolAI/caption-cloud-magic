@@ -626,9 +626,24 @@ export default function ProductionPlanSheet({
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cast</Label>
                           {s.cast.map((c, i) => {
                             const split = splitCastId(c.characterId);
-                            const baseId = split.baseId;
-                            const outfitId = c.outfitLookId ?? split.outfitLookId ?? null;
-                            const availableOutfits = baseId ? (outfitsByCharacter.get(baseId) ?? []) : [];
+                            const explicitLookId = c.outfitLookId ?? split.outfitLookId ?? null;
+                            const lookHit = explicitLookId ? outfitById.get(explicitLookId) ?? null : null;
+                            // Recover base character from outfit when the
+                            // resolver only stored an outfitLookId.
+                            const baseId = split.baseId ?? lookHit?.baseId ?? null;
+                            const outfitId = explicitLookId;
+                            const fromCharacter = baseId ? (outfitsByCharacter.get(baseId) ?? []) : [];
+                            // Ensure the selected look is always a valid
+                            // option in the dropdown — even if the library
+                            // hasn't loaded it under this avatar yet.
+                            const merged = [...fromCharacter];
+                            if (outfitId && !merged.some((o) => o.lookId === outfitId)) {
+                              merged.push({
+                                lookId: outfitId,
+                                name: lookHit?.name ?? 'Gespeicherter Look',
+                              });
+                            }
+                            const showOutfitPicker = !!baseId && merged.length > 0;
                             return (
                               <div key={`${c.mentionKey}-${i}`} className="flex items-center gap-2 flex-wrap">
                                 <Badge variant="outline" className="text-[10px] shrink-0">{c.mentionKey}</Badge>
@@ -646,7 +661,7 @@ export default function ProductionPlanSheet({
                                     ))}
                                   </SelectContent>
                                 </Select>
-                                {baseId && availableOutfits.length > 0 && (
+                                {showOutfitPicker && (
                                   <Select
                                     value={outfitId ?? '__default__'}
                                     onValueChange={(v) => updateSceneCastOutfit(s.index, i, v === '__default__' ? null : v)}
@@ -656,8 +671,8 @@ export default function ProductionPlanSheet({
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__default__">Standard-Look</SelectItem>
-                                      {availableOutfits.map((o) => (
-                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || 'Unbenannter Look'}</SelectItem>
+                                      {merged.map((o) => (
+                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || 'Standard-Look'}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
