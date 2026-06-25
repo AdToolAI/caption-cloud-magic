@@ -23,18 +23,31 @@ import {
 export const ResolvedCast = z.object({
   /** Original mention key from the briefing, e.g. "@founder-avatar". */
   mentionKey: z.string(),
-  /** Library brand_character.id, null when no match was found. */
+  /**
+   * Library brand_character.id (base avatar UUID), null when no match.
+   * MUST be a base brand_characters.id — never `outfit:` / `catalog:` /
+   * `lib:` prefixed. The dedicated `outfitLookId` field below carries
+   * outfit selection. This is the `CastRef` invariant enforced by the
+   * apply/UI layers.
+   */
   characterId: z.string().nullable(),
   /** Resolved display name (library or fallback to mentionKey). */
   characterName: z.string(),
   /** Library portrait if known. */
   referenceImageUrl: z.string().nullable().optional(),
-  /** Optional outfit hint from the briefing. */
+  /**
+   * Optional saved-outfit (`avatar_outfit_looks.id`) — fully decoupled
+   * from `characterId`. UI shows two dropdowns; the anchor compositor
+   * uses the outfit cover image when set.
+   */
+  outfitLookId: z.string().nullable().optional(),
+  /** Free-text outfit hint from the briefing (creative description, NOT a library ID). */
   outfit: z.string().optional(),
   /** ElevenLabs voice id this character should speak with, when known. */
   voiceId: z.string().nullable().optional(),
   voiceName: z.string().optional(),
 });
+
 
 export const ResolvedLocation = z.object({
   mentionKey: z.string(),

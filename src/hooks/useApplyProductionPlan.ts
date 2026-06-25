@@ -163,10 +163,10 @@ function planSceneToComposerScene(
   briefingTone: string | undefined,
   projectVoiceId: string | undefined,
 ): ComposerScene {
-  // Build characterShots from resolved cast — shotType derived from framing.
-  // Strip Mention-Library prefixes (`outfit:`, `catalog:`, `lib:`) so the
-  // Cinematic-Sync anchor and Cast Consistency Map compare against the base
-  // brand_characters.id UUID. Server-side has a lazy resolver as backstop.
+  // Build characterShots from resolved cast. The plan stores `characterId`
+  // as the BASE brand_characters.id (CastRef invariant) plus an optional
+  // separate `outfitLookId`. We still defensively strip any legacy mention
+  // prefix in case an older plan flows through.
   const stripPrefix = (id: string) =>
     id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
@@ -176,6 +176,10 @@ function planSceneToComposerScene(
       ({
         characterId: stripPrefix(c.characterId as string),
         shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
+        // Propagate outfit selection — `prepareSceneAnchor` reads this
+        // and swaps the avatar's default portrait for the outfit cover
+        // image during anchor composition.
+        outfitLookId: c.outfitLookId ?? undefined,
       }) as CharacterShot,
     );
 
@@ -202,6 +206,7 @@ function planSceneToComposerScene(
     const vid = c.voiceId || projectVoiceId;
     if (vid) dialogVoices[stripPrefix(c.characterId)] = vid;
   }
+
 
   const engine = ps.engine ?? 'auto';
   const hasDialogTurns = Array.isArray(ps.dialogTurns) && ps.dialogTurns.length > 0;

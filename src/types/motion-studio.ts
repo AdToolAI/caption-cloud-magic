@@ -14,7 +14,21 @@ export interface MotionStudioCharacter {
   workspace_id: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Optional CastRef metadata. Set by `useUnifiedMentionLibrary` for
+   * synthetic outfit / catalog mention entries so consumers can recover
+   * the base `brand_characters.id` and the chosen outfit/catalog look
+   * without parsing the prefix off `id`.
+   */
+  meta?: {
+    kind: 'outfit' | 'catalog' | 'brand' | 'motion-studio';
+    baseCharacterId?: string;
+    outfitLookId?: string | null;
+    outfitName?: string | null;
+    avatarName?: string | null;
+  };
 }
+
 
 export interface MotionStudioLocation {
   id: string;

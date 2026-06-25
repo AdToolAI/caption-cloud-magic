@@ -17,18 +17,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, CheckCircle2, FileText, Loader2, Shield, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Loader2, Shield, Sparkles, Wand2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
+import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
+import type { MotionStudioCharacter } from '@/types/motion-studio';
 import type {
   ComposerScene,
   AssemblyConfig,
   ComposerBriefing,
 } from '@/types/video-composer';
+
 
 type Step = 'paste' | 'parsing' | 'review';
 
@@ -77,14 +80,58 @@ export default function ProductionPlanSheet({
     }
   }, [initialPlan]);
 
-  const charOptions = useMemo(
-    () => (characters ?? []).map((c: any) => ({ id: c.id, name: c.name })),
+  // Char options: split into Base avatars (no `outfit:` prefix) vs Outfit
+  // looks. The cast picker shows base avatars in the Charakter dropdown
+  // and a filtered outfit dropdown next to it (CastRef invariant: ID
+  // separation is enforced at the picker boundary).
+  const baseChars = useMemo(
+    () => (characters ?? []).filter((c: MotionStudioCharacter) => c.meta?.kind !== 'outfit'),
     [characters],
+  );
+  const outfitMentions = useMemo(
+    () => (characters ?? []).filter((c: MotionStudioCharacter) => c.meta?.kind === 'outfit'),
+    [characters],
+  );
+  const charOptions = useMemo(
+    () => baseChars.map((c) => ({ id: c.id, name: c.name, mention: c })),
+    [baseChars],
   );
   const locOptions = useMemo(
     () => (locations ?? []).map((l: any) => ({ id: l.id, name: l.name })),
     [locations],
   );
+
+  /** Outfit looks belonging to a given base character id. */
+  const outfitsByCharacter = useMemo(() => {
+    const map = new Map<string, Array<{ lookId: string; name: string }>>();
+    for (const m of outfitMentions) {
+      const base = m.meta?.baseCharacterId;
+      const lookId = m.meta?.outfitLookId;
+      const lookName = m.meta?.outfitName ?? m.name;
+      if (!base || !lookId) continue;
+      const arr = map.get(base) ?? [];
+      arr.push({ lookId, name: lookName });
+      map.set(base, arr);
+    }
+    return map;
+  }, [outfitMentions]);
+
+  /** Resolve any raw cast id (legacy `outfit:` or base UUID) to base + look. */
+  const splitCastId = (rawId: string | null | undefined): { baseId: string | null; outfitLookId: string | null } => {
+    if (!rawId) return { baseId: null, outfitLookId: null };
+    if (rawId.startsWith('outfit:')) {
+      const lookId = rawId.slice('outfit:'.length);
+      const mention = outfitMentions.find((m) => m.meta?.outfitLookId === lookId);
+      return {
+        baseId: mention?.meta?.baseCharacterId ?? null,
+        outfitLookId: lookId,
+      };
+    }
+    if (rawId.startsWith('catalog:')) return { baseId: rawId.split(':', 2)[1] ?? null, outfitLookId: null };
+    if (rawId.startsWith('lib:')) return { baseId: rawId.slice(4), outfitLookId: null };
+    return { baseId: rawId, outfitLookId: null };
+  };
+
 
   // Identify which existing scenes are lipsync-protected (display only).
   const protectedSceneIds = useMemo(() => {
@@ -204,6 +251,11 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => (s.index === index ? { ...s, ...patch } : s)),
     });
   };
+  /**
+   * Sets the BASE character on a cast slot (CastRef.characterId).
+   * Resets `outfitLookId` so we never end up with an outfit that
+   * belongs to a different avatar.
+   */
   const updateSceneCastChar = (sceneIndex: number, castIdx: number, characterId: string | null) => {
     setPlan((p) => p && {
       ...p,
@@ -217,11 +269,29 @@ export default function ProductionPlanSheet({
           ...c,
           characterId,
           characterName: matched?.name ?? c.characterName,
+          // Outfit is a separate axis — reset it when the base avatar changes.
+          outfitLookId: null,
         };
         return { ...s, cast };
       }),
     });
   };
+
+  /** Sets the optional outfit look (CastRef.outfitLookId) on a cast slot. */
+  const updateSceneCastOutfit = (sceneIndex: number, castIdx: number, outfitLookId: string | null) => {
+    setPlan((p) => p && {
+      ...p,
+      scenes: p.scenes.map((s) => {
+        if (s.index !== sceneIndex) return s;
+        const cast = [...(s.cast ?? [])];
+        const c = cast[castIdx];
+        if (!c) return s;
+        cast[castIdx] = { ...c, outfitLookId };
+        return { ...s, cast };
+      }),
+    });
+  };
+
   const updateSceneLocation = (sceneIndex: number, locationId: string | null) => {
     setPlan((p) => p && {
       ...p,
@@ -242,6 +312,77 @@ export default function ProductionPlanSheet({
     () => (plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0),
     [plan],
   );
+
+  // ── Live-recompute unresolved ───────────────────────────────────────────
+  // The Edge Function emits `plan.unresolved` once. As the user edits the
+  // cast/location dropdowns, items that point at now-resolved fields are
+  // filtered out so the "offene Punkte"-Counter shrinks live.
+  const liveUnresolved = useMemo(() => {
+    if (!plan) return [] as TProductionPlan['unresolved'];
+    return (plan.unresolved ?? []).filter((u) => {
+      const m = /^scenes\[(\d+)\]\.cast\[(\d+)\]\.characterId$/.exec(u.field);
+      if (m) {
+        const sIdx = Number(m[1]);
+        const cIdx = Number(m[2]);
+        const scene = plan.scenes[sIdx];
+        const slot = scene?.cast?.[cIdx];
+        if (slot?.characterId) return false;
+      }
+      const ml = /^scenes\[(\d+)\]\.location\.locationId$/.exec(u.field);
+      if (ml) {
+        const sIdx = Number(ml[1]);
+        if (plan.scenes[sIdx]?.location?.locationId) return false;
+      }
+      if (u.field === 'project.totalDurationSec') {
+        const proj = plan.project?.totalDurationSec;
+        if (!proj || proj === totalPlanSec) return false;
+      }
+      return true;
+    });
+  }, [plan, totalPlanSec]);
+
+  /**
+   * Auto-Resolve: for every cast slot that has `characterId === null`,
+   * run a fuzzy match (normalize → lowercase, strip @ / separators →
+   * substring both directions) against the base avatars library. The
+   * first hit wins. Same algorithm as the server-side resolver — runs
+   * locally so the user gets instant feedback.
+   */
+  const handleAutoResolve = () => {
+    if (!plan) return;
+    const norm = (s: string) =>
+      s.toLowerCase().replace(/^@/, '').replace(/[\s_\-]+/g, '');
+    let fixed = 0;
+    setPlan((p) => {
+      if (!p) return p;
+      const scenes = p.scenes.map((s) => {
+        const cast = (s.cast ?? []).map((c) => {
+          if (c.characterId) return c;
+          const needle = norm(c.mentionKey || c.characterName || '');
+          if (!needle) return c;
+          const hit = charOptions.find((o) => {
+            const n = norm(o.name);
+            return n.includes(needle) || needle.includes(n);
+          });
+          if (!hit) return c;
+          fixed += 1;
+          return {
+            ...c,
+            characterId: hit.id,
+            characterName: hit.name,
+            outfitLookId: null,
+          };
+        });
+        return { ...s, cast };
+      });
+      return { ...p, scenes };
+    });
+    toast({
+      title: fixed > 0 ? `${fixed} Cast-Slots automatisch zugewiesen` : 'Keine weiteren Auto-Matches',
+      description: fixed > 0 ? 'Du kannst die Zuordnung im Dropdown noch anpassen.' : undefined,
+    });
+  };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -434,32 +575,55 @@ export default function ProductionPlanSheet({
                         </div>
                       )}
 
-                      {/* Cast resolver */}
+                      {/* Cast resolver — CastRef: base character + optional outfit (separate dropdowns) */}
                       {(s.cast ?? []).length > 0 && (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cast</Label>
-                          {s.cast.map((c, i) => (
-                            <div key={`${c.mentionKey}-${i}`} className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px]">{c.mentionKey}</Badge>
-                              <Select
-                                value={c.characterId ?? '__none__'}
-                                onValueChange={(v) => updateSceneCastChar(s.index, i, v === '__none__' ? null : v)}
-                              >
-                                <SelectTrigger className="h-7 text-xs">
-                                  <SelectValue placeholder="Library-Avatar wählen…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__none__">— nicht zugeordnet —</SelectItem>
-                                  {charOptions.map((o) => (
-                                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {c.voiceName && <Badge variant="secondary" className="text-[10px]">🎙 {c.voiceName}</Badge>}
-                            </div>
-                          ))}
+                          {s.cast.map((c, i) => {
+                            const split = splitCastId(c.characterId);
+                            const baseId = split.baseId;
+                            const outfitId = c.outfitLookId ?? split.outfitLookId ?? null;
+                            const availableOutfits = baseId ? (outfitsByCharacter.get(baseId) ?? []) : [];
+                            return (
+                              <div key={`${c.mentionKey}-${i}`} className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-[10px] shrink-0">{c.mentionKey}</Badge>
+                                <Select
+                                  value={baseId ?? '__none__'}
+                                  onValueChange={(v) => updateSceneCastChar(s.index, i, v === '__none__' ? null : v)}
+                                >
+                                  <SelectTrigger className="h-7 text-xs flex-1 min-w-[140px]">
+                                    <SelectValue placeholder="Charakter wählen…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">— nicht zugeordnet —</SelectItem>
+                                    {charOptions.map((o) => (
+                                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {baseId && availableOutfits.length > 0 && (
+                                  <Select
+                                    value={outfitId ?? '__default__'}
+                                    onValueChange={(v) => updateSceneCastOutfit(s.index, i, v === '__default__' ? null : v)}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs min-w-[120px]">
+                                      <SelectValue placeholder="Outfit…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__default__">Standard-Look</SelectItem>
+                                      {availableOutfits.map((o) => (
+                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                                {c.voiceName && <Badge variant="secondary" className="text-[10px]">🎙 {c.voiceName}</Badge>}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
+
 
                       {/* Location resolver */}
                       {s.location && (
@@ -569,14 +733,19 @@ export default function ProductionPlanSheet({
                 </div>
               )}
 
-              {/* Unresolved */}
-              {plan.unresolved.length > 0 && (
-                <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3 space-y-1 text-xs">
-                  <div className="font-medium text-amber-300 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> {plan.unresolved.length} offene{plan.unresolved.length === 1 ? 'r' : ''} Punkt{plan.unresolved.length === 1 ? '' : 'e'}
+              {/* Unresolved (live) */}
+              {liveUnresolved.length > 0 && (
+                <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-amber-300 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> {liveUnresolved.length} offene{liveUnresolved.length === 1 ? 'r' : ''} Punkt{liveUnresolved.length === 1 ? '' : 'e'}
+                    </div>
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={handleAutoResolve}>
+                      Auto-Resolve
+                    </Button>
                   </div>
                   <ul className="space-y-1">
-                    {plan.unresolved.map((u, i) => (
+                    {liveUnresolved.map((u, i) => (
                       <li key={i} className="text-muted-foreground">
                         <span className="text-amber-300">{u.field}:</span> {u.reason}
                         {u.suggestion && <span className="ml-1 italic">— {u.suggestion}</span>}
@@ -585,6 +754,7 @@ export default function ProductionPlanSheet({
                   </ul>
                 </div>
               )}
+
               <div className="h-4" />
             </div>
           </ScrollArea>
