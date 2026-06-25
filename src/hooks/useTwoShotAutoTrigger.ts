@@ -195,9 +195,16 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // sie hier deterministisch nach, BEVOR der eigentliche v5-Dispatch
         // läuft.
         const AUDIO_PREP_STALE_MS = 3 * 60 * 1000; // 3min: TTS+Mux dauert ~10–30s
+        // v172: erlaube Em-Dash / En-Dash / Klammern / Mood-Suffixe im
+        // Sprecher-Label (z.B. "SAMUEL DUSATKO — CASUAL:" oder
+        // "ANNA (verzweifelt):"). Vorher fielen solche Skripte aus dem
+        // Audio-Prep raus und die Szene blieb für immer in
+        // `twoshot_stage='master_clip'` ohne `audio_plan.twoshot.url` stecken.
         const hasDialogScript = (d: any) =>
           typeof d.dialog_script === 'string' &&
-          /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/m.test(d.dialog_script);
+          /^\s*\[?[A-Za-zÀ-ÿ][\p{L}\p{N}\s.,'’\-–—()[\]/&]{0,80}?\]?\s*[:：]/mu.test(
+            d.dialog_script,
+          );
 
         // Re-Run Self-Heal: Szene ist auf pending zurückgesetzt, aber
         // lip_sync_applied_at vom vorigen Erfolgs-Lauf steht noch — der

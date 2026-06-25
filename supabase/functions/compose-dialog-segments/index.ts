@@ -817,12 +817,31 @@ serve(async (req) => {
     const totalSec = Number(twoshot.totalSec ?? 0);
 
     if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {
+      // v172 self-heal: NICHT als hartes failed markieren — der Audio-Prep
+      // (compose-twoshot-audio) ist hier einfach noch nicht durchgelaufen
+      // oder hat keinen master geschrieben. twoshot_stage auf null setzen,
+      // damit der Client-Trigger (useTwoShotAutoTrigger) im nächsten Tick
+      // den Audio-Prep nachholt. Vorher blieb die Szene ewig auf
+      // "Lip-Sync wird gestartet…" weil der Status pending blieb und
+      // gleichzeitig twoshot_stage='master_clip' den Re-Try blockierte.
+      await supabase
+        .from("composer_scenes")
+        .update({
+          twoshot_stage: null,
+          lip_sync_status: "pending",
+          clip_error: "audio_plan_not_ready_self_heal",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
       return json(
         {
+          ok: false,
+          self_heal: true,
           error: "missing_audio_plan",
-          message: "Sync-Segments requires compose-twoshot-audio output (master WAV + speakers[].voicedRange.turns[]).",
+          message:
+            "Audio-Plan ist noch nicht fertig — Stage wurde zurückgesetzt, Trigger holt compose-twoshot-audio im nächsten Tick nach.",
         },
-        422,
+        202,
       );
     }
 
