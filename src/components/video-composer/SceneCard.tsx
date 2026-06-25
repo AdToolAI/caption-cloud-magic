@@ -1516,16 +1516,17 @@ export default function SceneCard({
                             <Label className="text-[10px] text-muted-foreground">
                               {lang === "de"
                                 ? dialogMode
-                                  ? "KI-Modell · Dialog-fähig (3)"
+                                  ? "KI-Modell · Lip-Sync (HappyHorse · Hailuo Fallback)"
                                   : "KI-Modell · Qualität & Preis im Dropdown"
                                 : lang === "es"
                                   ? dialogMode
-                                    ? "Modelo IA · con diálogo (3)"
+                                    ? "Modelo IA · Lip-Sync (HappyHorse · Hailuo)"
                                     : "Modelo IA"
                                   : dialogMode
-                                    ? "AI Model · dialog-capable (3)"
+                                    ? "AI Model · Lip-Sync (HappyHorse · Hailuo)"
                                     : "AI Model"}
                             </Label>
+
                             <ModelSelector
                               value={currentModelId}
                               onChange={(modelId) => {
