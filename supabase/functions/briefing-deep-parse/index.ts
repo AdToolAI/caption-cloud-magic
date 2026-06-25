@@ -581,11 +581,17 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
     });
   });
 
+  // Re-index sequentially (1..N) to guarantee unique scene.index values.
+  // Pass A occasionally returns duplicate or 0-based indices which collide
+  // after Math.max(1, ...) — UI would silently drop the duplicates.
+  scenes.forEach((s: any, i: number) => { s.index = i + 1; });
+
   console.log('[briefing-deep-parse] merge done — scenes:', scenes.length, 'unresolved:', (resolution?.unresolved ?? []).length);
 
   return {
     project: manifest?.project,
     scenes,
+
     voice: {
       ...(manifest?.voice ?? {}),
       voiceId: resolution?.voice?.voiceId ?? manifest?.voice?.voiceId,
