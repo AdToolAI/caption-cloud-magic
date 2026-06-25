@@ -8,12 +8,19 @@
  * called from here — this is UI sugar only.
  */
 import type { ComposerScene } from '@/types/video-composer';
+import {
+  PROVIDER_CAPS,
+  getProviderDurations,
+  providerSupportsLipsync,
+} from './providerCapabilities';
 
 export type SceneCinematicSyncWarning = {
   code:
     | 'cast_missing_portrait'
-    | 'happyhorse_will_auto_migrate'
-    | 'no_cast_no_dialog_lipsync_pointless';
+    | 'happyhorse_multispeaker_beta'
+    | 'no_cast_no_dialog_lipsync_pointless'
+    | 'duration_not_supported_by_provider'
+    | 'provider_no_lipsync_support';
   level: 'info' | 'warning';
   message: string;
 };
@@ -40,6 +47,20 @@ function sceneHasAnyCastSlot(scene: ComposerScene): boolean {
   return !!(single && single.shotType !== 'absent');
 }
 
+function countSpeakers(scene: ComposerScene): number {
+  const dlg = String((scene as any).dialogScript ?? '').trim();
+  if (!dlg) return 0;
+  const re = /^\s*\[?\s*([A-Za-zÀ-ÿ][\w\s.'-]{0,60}?)\s*\]?\s*(?:[—\-–]\s*[^:：]{0,40})?\s*[:：]/;
+  const names = new Set(
+    dlg
+      .split(/\r?\n/)
+      .map((l) => l.match(re))
+      .filter((m): m is RegExpMatchArray => !!m)
+      .map((m) => m[1].trim().toLowerCase()),
+  );
+  return names.size;
+}
+
 export function validateSceneForCinematicSync(
   scene: ComposerScene,
 ): SceneCinematicSyncWarning[] {
@@ -51,6 +72,8 @@ export function validateSceneForCinematicSync(
   const hasDialog = ((scene.dialogScript ?? '').trim().length) > 0;
   const hasCast = sceneHasAnyCastSlot(scene);
   const hasPortrait = hasResolvableCastPortrait(scene);
+  const provider = (scene.clipSource as string) || 'ai-hailuo';
+  const duration = Number(scene.durationSeconds ?? 0);
 
   if (!hasCast && !hasDialog) {
     out.push({
@@ -70,12 +93,32 @@ export function validateSceneForCinematicSync(
     });
   }
 
-  if ((scene.clipSource as string) === 'ai-happyhorse') {
+  // Provider lip-sync capability
+  if (!providerSupportsLipsync(provider)) {
     out.push({
-      code: 'happyhorse_will_auto_migrate',
+      code: 'provider_no_lipsync_support',
+      level: 'warning',
+      message: `Provider ${PROVIDER_CAPS[provider]?.label ?? provider} unterstützt kein Lip-Sync. Bitte Hailuo (6/10s) oder HappyHorse (3–15s) wählen.`,
+    });
+  }
+
+  // Provider-specific duration validation
+  const allowedDurations = getProviderDurations(provider);
+  if (duration > 0 && !allowedDurations.includes(Math.round(duration))) {
+    out.push({
+      code: 'duration_not_supported_by_provider',
+      level: 'warning',
+      message: `${PROVIDER_CAPS[provider]?.label ?? provider} unterstützt nur ${allowedDurations.join('s, ')}s. Gewählt: ${duration}s — wird beim Render auf den nächstmöglichen Wert angepasst.`,
+    });
+  }
+
+  // HappyHorse multi-speaker is allowed but flagged as Beta
+  if (provider === 'ai-happyhorse' && countSpeakers(scene) >= 2) {
+    out.push({
+      code: 'happyhorse_multispeaker_beta',
       level: 'info',
       message:
-        'HappyHorse + Lip-Sync wird vor dem Render automatisch auf Hailuo migriert — HappyHorse ist als Master-Plate für Sync.so nicht stabil.',
+        'HappyHorse mit mehreren Sprechern (Beta) — falls die Plate Sync.so-Face-Detection nicht besteht, werden die Credits automatisch refundiert.',
     });
   }
 

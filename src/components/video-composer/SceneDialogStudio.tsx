@@ -1263,8 +1263,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           return;
         }
 
-        // Duration: respect user's chosen scene length unless audio needs more.
-        // Hailuo only allows 6s or 10s. User pick = scene.durationSeconds.
+        // Duration: respect the user's chosen provider + duration.
+        // - HappyHorse natively renders 3–15s → honour user pick directly
+        // - Hailuo only supports 6s | 10s → snap to nearest with toast on change
+        // - Audio length always wins if it exceeds the user pick.
         const audioRequired = Math.ceil(
           synthed.reduce((acc, s) => acc + s.durationSec, 0) +
           INTER_SPEAKER_GAP_SEC * Math.max(0, synthed.length - 1) +
@@ -1272,7 +1274,18 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         );
         const userPick = Number(scene.durationSeconds || 6);
         const target = Math.max(userPick, audioRequired);
-        const masterDuration = target <= 6 ? 6 : 10;
+
+        // Honour the user's chosen provider — never silent-switch to Hailuo.
+        const userPickedProvider = (scene.clipSource as string) || 'ai-hailuo';
+        const masterProvider: 'ai-hailuo' | 'ai-happyhorse' =
+          userPickedProvider === 'ai-happyhorse' ? 'ai-happyhorse' : 'ai-hailuo';
+
+        const masterDuration =
+          masterProvider === 'ai-happyhorse'
+            ? Math.min(15, Math.max(3, Math.ceil(target)))
+            : target <= 6
+              ? 6
+              : 10;
 
         const dialogScriptText = synthed.map((s) => `${s.character.name}: ${s.block.text}`).join('\n');
         const dialogVoicesMap: Record<string, DialogVoiceCfg> = {};
@@ -1290,12 +1303,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           dialogScript: dialogScriptText,
           dialogVoices: dialogVoicesMap,
           durationSeconds: masterDuration,
-          clipSource: 'ai-hailuo',
+          clipSource: masterProvider,
           engineOverride: 'cinematic-sync',
           clipStatus: 'generating',
           twoshotStage: 'audio',
           lipSyncWithVoiceover: true,
         });
+
 
         // Actually trigger compose-video-clips so the master Hailuo i2v
         // render starts. Without this the card stays "generating" forever.
@@ -1322,7 +1336,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             id: sceneIdFinal,
             projectId: pidFinal,
             sceneType: scene.sceneType,
-            clipSource: 'ai-hailuo' as const,
+            clipSource: masterProvider,
             clipQuality: scene.clipQuality || 'standard',
             aiPrompt: scene.aiPrompt || '',
             negativePrompt: (scene as any).negativePrompt || undefined,

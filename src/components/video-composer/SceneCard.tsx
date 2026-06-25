@@ -1012,7 +1012,7 @@ export default function SceneCard({
                 </div>
               </div>
 
-              {/* Duration slider — clamped by 10-min project budget */}
+              {/* Duration picker — provider-aware (Hailuo: 6/10 buttons, HappyHorse: 3-15 slider) */}
               {(() => {
                 const MAX_PROJECT_SEC = 600;
                 const MIN_SCENE = 3;
@@ -1020,9 +1020,58 @@ export default function SceneCard({
                 const remaining = Math.max(0, MAX_PROJECT_SEC - siblingsDurationSec);
                 const sliderMax = Math.max(MIN_SCENE, Math.min(PROVIDER_MAX, remaining));
                 const budgetCapped = sliderMax < PROVIDER_MAX;
-                // Defensive: if persisted scene already exceeds the new cap, allow current
-                // value (so the slider can render) but show a warning.
                 const effectiveMax = Math.max(sliderMax, scene.durationSeconds);
+                const isHailuo = scene.clipSource === 'ai-hailuo';
+
+                if (isHailuo) {
+                  // Hailuo only supports 6s or 10s — show explicit buttons.
+                  const can10 = 10 <= effectiveMax;
+                  const current = scene.durationSeconds;
+                  return (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Dauer
+                        </span>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant={current === 6 ? 'default' : 'outline'}
+                            className="h-6 px-3 text-[10px]"
+                            onClick={() => onUpdate({ durationSeconds: 6 })}
+                          >
+                            6s
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={current === 10 ? 'default' : 'outline'}
+                            className="h-6 px-3 text-[10px]"
+                            disabled={!can10}
+                            onClick={() => onUpdate({ durationSeconds: 10 })}
+                          >
+                            10s
+                          </Button>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                          · Hailuo nativ
+                        </span>
+                      </div>
+                      {budgetCapped && (
+                        <p className="text-[10px] text-amber-300/80 leading-snug">
+                          Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
+                        </p>
+                      )}
+                      {current !== 6 && current !== 10 && (
+                        <p className="text-[10px] text-amber-300/80 leading-snug">
+                          ⚠ Aktuell {current}s — Hailuo wird auf 6s oder 10s anpassen.
+                          Für freie Längen (3–15s) Provider auf HappyHorse wechseln.
+                        </p>
+                      )}
+                    </div>
+                  );
+                }
+
+                // HappyHorse (or default) — free 3–15s slider
                 return (
                   <div className="space-y-1">
                     <Slider
@@ -1038,22 +1087,17 @@ export default function SceneCard({
                     {budgetCapped && (
                       <p className="text-[10px] text-amber-300/80 leading-snug">
                         Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
-                        Kürze oder lösche eine andere Szene, um mehr Zeit freizugeben.
                       </p>
                     )}
-                    {scene.clipSource === 'ai-hailuo' &&
-                      scene.durationSeconds !== 6 &&
-                      scene.durationSeconds !== 10 && (
-                        <p className="text-[10px] text-amber-300/80 leading-snug">
-                          Hailuo rendert nur 6s oder 10s — wird beim Rendern auf{' '}
-                          {scene.durationSeconds < 8 ? '6s' : '10s'} gerundet.
-                          Für exakte {scene.durationSeconds}s wechsle auf HappyHorse (3–15s nativ).
-                        </p>
-                      )}
-
+                    {scene.clipSource === 'ai-happyhorse' && (
+                      <p className="text-[10px] text-emerald-300/70 leading-snug">
+                        HappyHorse · {scene.durationSeconds}s (nativ 3–15s, jede Sekunde wählbar)
+                      </p>
+                    )}
                   </div>
                 );
               })()}
+
 
 
               {/* 🎬 Director Mode — Hybrid Production actions (only when source clip is ready) */}
