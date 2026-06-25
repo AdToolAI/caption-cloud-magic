@@ -192,8 +192,23 @@ export default function ProductionPlanSheet({
         console.warn('[ProductionPlanSheet] plan validation failed', parsed.error);
         throw new Error('Plan-Validierung fehlgeschlagen');
       }
-      setPlan(parsed.data);
+      // Selfheal: re-index duplicates so the UI never silently drops a scene.
+      const seen = new Set<number>();
+      const healed = {
+        ...parsed.data,
+        scenes: parsed.data.scenes.map((s, i) => {
+          if (seen.has(s.index)) {
+            return { ...s, index: i + 1 };
+          }
+          seen.add(s.index);
+          return s;
+        }),
+      };
+      // Second pass if first pass produced new collisions.
+      healed.scenes = healed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
+      setPlan(healed);
       setStep('review');
+
     } catch (e: any) {
       clearTimeout(phaseTimer);
       const details = await extractFunctionsErrorDetails(e);
