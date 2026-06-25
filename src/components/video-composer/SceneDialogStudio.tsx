@@ -1265,15 +1265,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
         // Duration: respect the user's chosen provider + duration.
         // - HappyHorse natively renders 3–15s → honour user pick directly
-        // - Hailuo only supports 6s | 10s → snap to nearest with toast on change
-        // - Audio length always wins if it exceeds the user pick.
+        // - Hailuo only supports 6s | 10s → honour the user's picked bucket
+        // - Audio length must NOT silently extend Hailuo scenes; Sync.so cut_off handles overflow.
         const audioRequired = Math.ceil(
           synthed.reduce((acc, s) => acc + s.durationSec, 0) +
           INTER_SPEAKER_GAP_SEC * Math.max(0, synthed.length - 1) +
           0.4,
         );
         const userPick = Number(scene.durationSeconds || 6);
-        const target = Math.max(userPick, audioRequired);
 
         // Honour the user's chosen provider — never silent-switch to Hailuo.
         // June 2026 Lip-Sync policy: HappyHorse is the primary master plate
@@ -1286,10 +1285,17 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
         const masterDuration =
           masterProvider === 'ai-happyhorse'
-            ? Math.min(15, Math.max(3, Math.ceil(target)))
-            : target <= 6
-              ? 6
-              : 10;
+            ? Math.min(15, Math.max(3, Math.ceil(userPick)))
+            : userPick >= 10
+              ? 10
+              : 6;
+
+        if (masterProvider === 'ai-hailuo' && audioRequired > masterDuration) {
+          toast({
+            title: 'Dialog länger als Szene',
+            description: `Audio braucht ~${audioRequired}s, Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Hailuo auf 10s setzen oder HappyHorse nutzen.`,
+          });
+        }
 
         const dialogScriptText = synthed.map((s) => `${s.character.name}: ${s.block.text}`).join('\n');
         const dialogVoicesMap: Record<string, DialogVoiceCfg> = {};

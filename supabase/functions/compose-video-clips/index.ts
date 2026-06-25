@@ -2465,7 +2465,14 @@ serve(async (req) => {
         } else if (scene.clipSource === "ai-hailuo") {
           // Hailuo via Replicate (Standard 768p / Pro 1080p)
           const duration = scene.durationSeconds >= 8 ? 10 : 6;
-          const resolution = quality === "pro" ? "1080p" : "768p";
+          // Hailuo API constraint: 1080p is only accepted for 6s. 10s requires 768p.
+          const resolution =
+            duration === 10 ? "768p" : quality === "pro" ? "1080p" : "768p";
+          if (quality === "pro" && duration === 10) {
+            console.warn(
+              `[compose-video-clips] Hailuo Pro+10s API-incompatible — downgrading resolution to 768p (Scene ${scene.id}).`,
+            );
+          }
           const isI2V = !!scene.referenceImageUrl;
           const isCinematicSyncScene =
             (scene.engineOverride ?? "auto") === "cinematic-sync";

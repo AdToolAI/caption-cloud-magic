@@ -1089,6 +1089,11 @@ export default function SceneCard({
                           Für freie Längen (3–15s) Provider auf HappyHorse wechseln.
                         </p>
                       )}
+                      {scene.clipQuality === 'pro' && current === 10 && (
+                        <p className="text-[10px] text-amber-300/80 leading-snug">
+                          10s bei Hailuo nur in 768p verfügbar — Pro wird auf Standard-Auflösung reduziert.
+                        </p>
+                      )}
                     </div>
                   );
                 }
