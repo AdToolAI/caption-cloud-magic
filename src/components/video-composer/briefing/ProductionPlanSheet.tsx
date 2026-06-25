@@ -575,32 +575,55 @@ export default function ProductionPlanSheet({
                         </div>
                       )}
 
-                      {/* Cast resolver */}
+                      {/* Cast resolver — CastRef: base character + optional outfit (separate dropdowns) */}
                       {(s.cast ?? []).length > 0 && (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cast</Label>
-                          {s.cast.map((c, i) => (
-                            <div key={`${c.mentionKey}-${i}`} className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px]">{c.mentionKey}</Badge>
-                              <Select
-                                value={c.characterId ?? '__none__'}
-                                onValueChange={(v) => updateSceneCastChar(s.index, i, v === '__none__' ? null : v)}
-                              >
-                                <SelectTrigger className="h-7 text-xs">
-                                  <SelectValue placeholder="Library-Avatar wählen…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="__none__">— nicht zugeordnet —</SelectItem>
-                                  {charOptions.map((o) => (
-                                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {c.voiceName && <Badge variant="secondary" className="text-[10px]">🎙 {c.voiceName}</Badge>}
-                            </div>
-                          ))}
+                          {s.cast.map((c, i) => {
+                            const split = splitCastId(c.characterId);
+                            const baseId = split.baseId;
+                            const outfitId = c.outfitLookId ?? split.outfitLookId ?? null;
+                            const availableOutfits = baseId ? (outfitsByCharacter.get(baseId) ?? []) : [];
+                            return (
+                              <div key={`${c.mentionKey}-${i}`} className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-[10px] shrink-0">{c.mentionKey}</Badge>
+                                <Select
+                                  value={baseId ?? '__none__'}
+                                  onValueChange={(v) => updateSceneCastChar(s.index, i, v === '__none__' ? null : v)}
+                                >
+                                  <SelectTrigger className="h-7 text-xs flex-1 min-w-[140px]">
+                                    <SelectValue placeholder="Charakter wählen…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">— nicht zugeordnet —</SelectItem>
+                                    {charOptions.map((o) => (
+                                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {baseId && availableOutfits.length > 0 && (
+                                  <Select
+                                    value={outfitId ?? '__default__'}
+                                    onValueChange={(v) => updateSceneCastOutfit(s.index, i, v === '__default__' ? null : v)}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs min-w-[120px]">
+                                      <SelectValue placeholder="Outfit…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__default__">Standard-Look</SelectItem>
+                                      {availableOutfits.map((o) => (
+                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                                {c.voiceName && <Badge variant="secondary" className="text-[10px]">🎙 {c.voiceName}</Badge>}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
+
 
                       {/* Location resolver */}
                       {s.location && (
