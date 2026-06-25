@@ -1,78 +1,88 @@
-## Diagnose (bestätigt durch Screenshot)
+## Ziel
 
-Im Storyboard rechts: Szene 1 = `10s hailuo` (€1.68), Szene 2+3 = `5s happyhorse`.
-Du wolltest HappyHorse mit 7s. Was wirklich passiert:
+Sobald **Lip-Sync** aktiviert ist (Engine `cinematic-sync` oder `sync-segments`), wird der Provider-Picker auf zwei Optionen reduziert:
 
-```text
-UI: HappyHorse + 7s + Dialog
-     │
-     ▼
-compose-video-clips Zeile 1094:
-"if (clipSource === 'ai-happyhorse' && cast >= 2 || dialog_mode)
-   → migrate to ai-hailuo"   ← SILENT SWITCH (der Bug)
-     │
-     ▼
-Hailuo akzeptiert nur 6s | 10s
-     │
-     ▼
-Duration wird auf 10s gesnappt
-     │
-     ▼
-DB & UI zeigen jetzt: "10s hailuo" statt "7s happyhorse"
-```
+- **HappyHorse** — Standard / Default-Auswahl (3–15s freie Länge)
+- **Hailuo** — Nur als Fallback wählbar (6s / 10s)
 
-Der Code-Kommentar von damals: *„HappyHorse zeigt Identity-Drift in Multi-Cast"*. Aber: du nutzt **1 Sprecher**, und HappyHorse hat in deinen aktuellen Szenen (5s) sauber funktioniert. Die Migration ist also überprotektiv.
+Alle anderen 9 Provider (Kling, Veo, Wan, Seedance, Luma, Sora, Pika, Runway, Vidu, Kling-Omni) sind im Lip-Sync-Modus **nicht selektierbar** (ausgegraut oder ausgeblendet).
 
-## Fix
+Sobald Lip-Sync deaktiviert wird → alle Provider wieder frei wählbar.
 
-### 1. Silent-Migration entfernen — `compose-video-clips/index.ts` Zeile 1060–1108
-- HappyHorse bleibt HappyHorse, egal wie viele Sprecher
-- Pipeline (`compose-dialog-segments`) ist bereits provider-agnostisch — frisst jede MP4 (Code-Kommentar Z.897 sagt wörtlich „Hailuo/HappyHorse i2v")
-- Logging bleibt, aber kein `update clip_source` mehr
+---
 
-### 2. Provider-Capability-Map — `src/lib/video-composer/providerCapabilities.ts` (neu)
-```ts
-export const PROVIDER_CAPS = {
-  "ai-hailuo":     { durations: [6, 10],                       lipsync: true  },
-  "ai-happyhorse": { durations: [3,4,5,6,7,8,9,10,11,12,13,14,15], lipsync: true },
-  // alle anderen: lipsync: false
-};
-```
-Single source of truth für UI + Backend-Guard.
+## Verhalten im Detail
 
-### 3. SceneDialogStudio.tsx — Duration-Picker provider-aware
-- Hailuo-Mode: **2 Buttons** „6s" | „10s" (kein Slider, ehrlich)
-- HappyHorse-Mode: Slider 3–15s in 1s-Schritten
-- Provider-Wechsel mit ungültiger Duration → auto-snap auf nächstgültigen Wert + Toast „Duration auf 10s angepasst (Hailuo unterstützt nur 6s oder 10s)"
-- Entfernt: den blinden Snap-Code auf 6/10 sobald Dialog aktiv
+1. **Auto-Default beim Aktivieren von Lip-Sync**
+   Wenn der User Lip-Sync einschaltet und der aktuelle `clipSource` ein nicht-lipsync-fähiger Provider ist (z.B. Kling, Veo, Sora), wird automatisch auf **`ai-happyhorse`** umgestellt. Die Dauer wird dabei in den HappyHorse-Range (3–15s) geklemmt — bisheriger Wert bleibt erhalten, wenn er passt.
 
-### 4. Backend-Duration-Guard — `compose-video-clips/index.ts`
-- Hailuo + Dauer ≠ 6/10 → **400** mit klarer Message statt Silent-Snap
-- HappyHorse + Dauer < 3 oder > 15 → **400**
-- Verhindert künftige UI/Backend-Drift
+2. **Provider-Picker UI (Lip-Sync ON)**
+   Nur zwei Buttons/Optionen sichtbar:
+   - HappyHorse (Standard, Badge: "Empfohlen · 3–15s")
+   - Hailuo (Badge: "Fallback · nur 6s/10s")
+   Alle anderen Provider werden im Dropdown **gefiltert oder als disabled mit Tooltip** angezeigt: *"Nicht verfügbar mit Lip-Sync — nur HappyHorse oder Hailuo unterstützen Sync.so."*
 
-### 5. SceneCard.tsx — Provider-Picker mit Lipsync-Badge
-- Hailuo + HappyHorse: Badge „Lipsync ✓"
-- Andere 8 Provider bei `dialog_mode === true`: ausgegraut + Tooltip „Kein Lipsync"
+3. **Wechsel HappyHorse ↔ Hailuo im Lip-Sync-Modus**
+   Beim Wechsel zu Hailuo wird die Dauer auf den nächsten erlaubten Wert (6s oder 10s) gesnapped, mit Toast-Hinweis. Beim Wechsel zurück auf HappyHorse bleibt die Dauer wie sie ist (im 3–15s Range).
 
-## Was bewusst NICHT angefasst wird
+4. **Lip-Sync deaktivieren**
+   Alle Provider werden wieder freigegeben, der zuletzt gewählte Provider bleibt aktiv.
 
-- `compose-dialog-segments` — battle-tested v24 Pipeline, akzeptiert beide Plates bereits
-- Sync.so-Payload — unverändert
-- Multi-Speaker-Logik — HappyHorse darf jetzt mehrere Sprecher, wenn das in deiner Praxis fehlschlägt sehen wir's klar im Log (kein Silent-Switch mehr, der den Fehler maskiert)
+5. **Backend-Schutz**
+   `compose-video-clips/index.ts` blockt zusätzlich serverseitig: Wenn `engineOverride ∈ {cinematic-sync, sync-segments}` und `clipSource` weder `ai-happyhorse` noch `ai-hailuo` ist → 400 mit klarem Fehler. (Doppelte Absicherung gegen UI-Bypass.)
 
-## Risiko
+---
 
-Falls HappyHorse + 4-Sprecher-Plates tatsächlich Identity-Drift haben (wie das Memory dokumentiert) → Sync.so wirft `face_probe_unavailable` und Credits werden idempotent refundiert (bestehender Mechanismus). Du siehst dann den **echten** Fehler statt einer kosmetischen Hailuo-Conversion. Falls das in deinen Tests passiert: einfach Single-Speaker-Constraint für HappyHorse ergänzen (kleiner Follow-up).
+## Technische Umsetzung
 
-## Dateien
+**`src/lib/video-composer/providerCapabilities.ts`** (existiert bereits)
+- Neue Helper: `getLipsyncPrimaryProvider()` → `'ai-happyhorse'`
+- Neue Helper: `getLipsyncFallbackProvider()` → `'ai-hailuo'`
+- Neue Helper: `isLipsyncEngine(engine)` → boolean
+- `getLipsyncProviders()` Reihenfolge sicherstellen: HappyHorse zuerst, Hailuo danach
 
-- **Edit:** `supabase/functions/compose-video-clips/index.ts` (Z.1060–1108 + neuer Duration-Guard)
-- **Edit:** `src/components/composer/SceneDialogStudio.tsx` (Duration-Picker)
-- **Edit:** `src/components/composer/SceneCard.tsx` (Lipsync-Badge)
-- **Edit:** `src/lib/video-composer/validateSceneForCinematicSync.ts` (provider-aware)
-- **Neu:**  `src/lib/video-composer/providerCapabilities.ts`
+**`src/components/video-composer/SceneCard.tsx`** (Provider-Dropdown)
+- `useEffect`: Wenn Lip-Sync-Engine aktiv und `clipSource` nicht lipsync-fähig → `onUpdate({ clipSource: 'ai-happyhorse' })` + Dauer clampen
+- Provider-Dropdown im Lip-Sync-Mode auf `getLipsyncProviders()` reduzieren, andere als `disabled` mit Tooltip rendern
+- Badges: HappyHorse "Empfohlen", Hailuo "Fallback · 6s/10s"
 
-## Aufwand
+**`src/components/video-composer/SceneDialogStudio.tsx`**
+- Default-Provider beim ersten Öffnen des Dialog-Studios: `ai-happyhorse` statt `ai-hailuo` (für `masterProvider` Logik aus letztem Turn)
+- `userPickedProvider` fallback auf `'ai-happyhorse'` statt `'ai-hailuo'` setzen
 
-~1.5–2h. Danach: 1 Test-Szene HappyHorse + 7s + 1 Sprecher → muss als `7s happyhorse` durchlaufen.
+**`src/lib/video-composer/validateSceneForCinematicSync.ts`**
+- Bestehende Warnung `provider_no_lipsync_support` greift bereits; Message aktualisieren: *"Nur HappyHorse (empfohlen) oder Hailuo (Fallback) unterstützen Lip-Sync."*
+
+**`supabase/functions/compose-video-clips/index.ts`** (Backend-Guard)
+- Nach den bereits eingebauten Duration-Guards: zusätzlicher Check
+  ```
+  if (engine ∈ {cinematic-sync, sync-segments}
+      && clipSource ∉ {ai-happyhorse, ai-hailuo})
+    → 400 invalid_provider_for_lipsync
+  ```
+
+---
+
+## Was unverändert bleibt
+
+- Die gesamte Lip-Sync-Pipeline (`compose-dialog-segments`, `sync-so-webhook`, `poll-dialog-shots`, `dialog_shots`-Tabelle, Sync.so Pro Policy)
+- Die Provider-Liste und Capabilities für **alle Nicht-Lipsync-Szenen** (B-Roll, normales Compose) — Kling, Veo, Sora etc. bleiben dort voll wählbar
+- Refund-Automatik, Credit-Logik, Audio-/Voice-Pipeline
+- Die in der letzten Runde gefixte Provider-aware Duration-Auswahl (Hailuo 6/10 Buttons, HappyHorse 3–15 Slider)
+
+---
+
+## Risiken / Edge Cases
+
+- **Bestehende Szenen** mit z.B. `clipSource: 'ai-kling' + engineOverride: 'cinematic-sync'` (theoretisch in DB möglich): Beim nächsten Öffnen wird automatisch auf HappyHorse migriert — kein Daten-Verlust, nur Provider-Korrektur.
+- **HappyHorse Multi-Speaker** ist laut Memory in `cinematic-sync` historisch 0/274 erfolgreich gewesen (silent Hailuo-Migration); jetzt ohne Migration könnte die Erfolgsrate für Multi-Speaker auf HappyHorse niedriger sein. Der User hat aber explizit gesagt, er weiß dass HappyHorse mit 4 Sprechern funktioniert hat — die Beta-Warnung im Validator macht das transparent, und Hailuo bleibt 1-Klick-Fallback.
+
+---
+
+## Akzeptanzkriterien
+
+- Lip-Sync ON → Provider-Picker zeigt nur HappyHorse + Hailuo, alle anderen disabled mit Tooltip
+- Neuer Szene mit Lip-Sync → HappyHorse ist vorausgewählt
+- Wechsel auf Hailuo im Lip-Sync-Modus → Dauer snapped auf 6s/10s mit Toast
+- Lip-Sync OFF → alle 11 Provider wieder frei wählbar
+- Backend rejected explizit jeden Lip-Sync-Render mit Nicht-{HappyHorse,Hailuo}-Provider

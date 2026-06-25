@@ -109,9 +109,14 @@ import {
   NATIVE_DIALOGUE_CLIP_SOURCES,
   DIALOG_FALLBACK_CLIP_SOURCE,
   DIALOG_FALLBACK_CLIP_QUALITY,
+  LIPSYNC_CLIP_SOURCES,
+  LIPSYNC_PRIMARY_CLIP_SOURCE,
+  isLipsyncEngine,
+  isLipsyncClipSource,
   modelIdToSource,
   sourceToModelId,
 } from "@/lib/video-composer/modelMapping";
+
 import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
 import { useUnifiedMentionLibrary } from "@/hooks/useUnifiedMentionLibrary";
 import { useStylePresets } from "@/hooks/useStylePresets";
@@ -374,6 +379,23 @@ export default function SceneCard({
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
+
+  // June 2026 Lip-Sync Policy — when the scene is routed through the
+  // Cinematic-Sync / Sync.so pipeline, only HappyHorse (primary) and
+  // Hailuo (fallback) are certified as master plates. Auto-migrate any
+  // legacy scene whose clipSource is still set to a non-certified provider
+  // (e.g. ai-kling, ai-veo from the previous 3-provider policy) onto the
+  // primary lipsync provider so the user never lands on an unrenderable
+  // combination after re-opening an older project.
+  useEffect(() => {
+    if (!isLipsyncEngine(scene.engineOverride ?? null)) return;
+    if (isLipsyncClipSource(scene.clipSource)) return;
+    onUpdate({
+      clipSource: LIPSYNC_PRIMARY_CLIP_SOURCE,
+      clipQuality: 'standard',
+    });
+  }, [scene.engineOverride, scene.clipSource, onUpdate]);
+
 
   // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
   // dialog from 2+). Hidden by default; opened via the "Skript schreiben" button
@@ -1352,10 +1374,11 @@ export default function SceneCard({
                             : "Dialog & Lip-Sync";
                       const toggleHint =
                         lang === "de"
-                          ? "Nur Modelle mit professionellem nativem Dialog & Lippensync (Kling 3, Veo 3.1, HappyHorse 1.0)."
+                          ? "Nur HappyHorse 1.0 (empfohlen · 3–15s) und Hailuo 2.3 (Fallback · 6/10s) sind für Sync.so Lip-Sync zertifiziert."
                           : lang === "es"
-                            ? "Solo modelos con diálogo nativo y lip-sync profesional (Kling 3, Veo 3.1, HappyHorse 1.0)."
-                            : "Only models with professional native dialog & lip-sync (Kling 3, Veo 3.1, HappyHorse 1.0).";
+                            ? "Solo HappyHorse 1.0 (recomendado · 3–15s) y Hailuo 2.3 (alternativa · 6/10s) están certificados para Sync.so lip-sync."
+                            : "Only HappyHorse 1.0 (recommended · 3–15s) and Hailuo 2.3 (fallback · 6/10s) are certified for Sync.so lip-sync.";
+
                       return (
                         <div className="space-y-2">
                           {/* Dialog & Lip-Sync toggle — James-Bond-2028 gold accent */}
@@ -1387,15 +1410,16 @@ export default function SceneCard({
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
                                   {dialogMode
                                     ? lang === "de"
-                                      ? "3 Modelle · Skript & Lip-Sync aktiv"
+                                      ? "2 Modelle · HappyHorse + Hailuo (Sync.so Lip-Sync)"
                                       : lang === "es"
-                                        ? "3 modelos · Guion y lip-sync activos"
-                                        : "3 models · Script & lip-sync active"
+                                        ? "2 modelos · HappyHorse + Hailuo (Sync.so)"
+                                        : "2 models · HappyHorse + Hailuo (Sync.so)"
                                     : lang === "de"
                                       ? "B-Roll-Modus · 11 Modelle verfügbar"
                                       : lang === "es"
                                         ? "Modo B-roll · 11 modelos disponibles"
                                         : "B-roll mode · 11 models available"}
+
                                 </span>
                               </div>
                             </div>
@@ -1446,11 +1470,12 @@ export default function SceneCard({
                                             : "Switched to HappyHorse 1.0",
                                       description:
                                         lang === "de"
-                                          ? "Für Dialog & Lip-Sync sind nur Kling 3, Veo 3.1 und HappyHorse 1.0 verfügbar. Günstigste Option vorausgewählt."
+                                          ? "Lip-Sync läuft nur über HappyHorse (3–15s) oder Hailuo (6/10s Fallback). HappyHorse vorausgewählt."
                                           : lang === "es"
-                                            ? "Para diálogo y lip-sync solo están disponibles Kling 3, Veo 3.1 y HappyHorse 1.0. Se eligió la más económica."
-                                            : "Dialog & lip-sync supports only Kling 3, Veo 3.1 and HappyHorse 1.0. Cheapest option preselected.",
+                                            ? "Lip-Sync solo con HappyHorse (3–15s) o Hailuo (6/10s alternativa). HappyHorse preseleccionado."
+                                            : "Lip-Sync runs only on HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse preselected.",
                                     });
+
                                   }
                                 }
                                 // Optimistic local update.
@@ -1513,16 +1538,17 @@ export default function SceneCard({
                             <Label className="text-[10px] text-muted-foreground">
                               {lang === "de"
                                 ? dialogMode
-                                  ? "KI-Modell · Dialog-fähig (3)"
+                                  ? "KI-Modell · Lip-Sync (HappyHorse · Hailuo Fallback)"
                                   : "KI-Modell · Qualität & Preis im Dropdown"
                                 : lang === "es"
                                   ? dialogMode
-                                    ? "Modelo IA · con diálogo (3)"
+                                    ? "Modelo IA · Lip-Sync (HappyHorse · Hailuo)"
                                     : "Modelo IA"
                                   : dialogMode
-                                    ? "AI Model · dialog-capable (3)"
+                                    ? "AI Model · Lip-Sync (HappyHorse · Hailuo)"
                                     : "AI Model"}
                             </Label>
+
                             <ModelSelector
                               value={currentModelId}
                               onChange={(modelId) => {

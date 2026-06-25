@@ -46,26 +46,58 @@ export const COMPOSER_AVAILABLE_MODELS: ToolkitModel[] = [
 ];
 
 /**
- * Clip sources whose underlying provider family supports professional native
- * dialogue + lip-sync end-to-end. Used by the SceneCard "Dialog & Lip-Sync"
- * toggle to gate the model picker and auto-fall back when the user switches
- * dialogue on while a non-dialogue model (e.g. Hailuo, Seedance, Pika) is
- * selected.
+ * Clip sources whose underlying provider family is certified for the
+ * Cinematic-Sync / Lip-Sync pipeline (Sync.so lipsync-2-pro overlay on top
+ * of an i2v master plate). Per June 2026 policy this list is intentionally
+ * minimal — only HappyHorse (primary, 3–15s native) and Hailuo (fallback,
+ * 6/10s native) have proven stable as Sync.so master plates. All other
+ * providers (Kling, Veo, Wan, Seedance, Luma, Sora, Pika, Runway, Vidu)
+ * remain fully usable for B-roll / non-lipsync scenes but are hidden from
+ * the picker the moment the user enables Dialog & Lip-Sync.
  */
-export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
-  'ai-kling',
-  'ai-veo',
-  'ai-happyhorse',
+export const LIPSYNC_PRIMARY_CLIP_SOURCE: ClipSource = 'ai-happyhorse';
+export const LIPSYNC_FALLBACK_CLIP_SOURCE: ClipSource = 'ai-hailuo';
+export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
+  LIPSYNC_PRIMARY_CLIP_SOURCE,
+  LIPSYNC_FALLBACK_CLIP_SOURCE,
 ];
 
-/** Composer dropdown models filtered to the dialog-capable subset. */
-export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS.filter(
-  (m) => m.capabilities?.nativeDialogue === true,
-);
+/**
+ * Legacy alias — kept so existing imports (RenderPreFlightDialog, etc.)
+ * keep working. Now mirrors LIPSYNC_CLIP_SOURCES.
+ */
+export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = LIPSYNC_CLIP_SOURCES;
 
-/** Cheapest dialog-capable fallback when the user toggles dialogue on. */
-export const DIALOG_FALLBACK_CLIP_SOURCE: ClipSource = 'ai-happyhorse';
+const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo']);
+
+/**
+ * Composer dropdown models filtered to the Lip-Sync-certified subset
+ * (HappyHorse standard/pro + Hailuo standard/pro). Order matters — primary
+ * provider first so the ModelSelector pre-selects HappyHorse.
+ */
+export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS
+  .filter((m) => LIPSYNC_FAMILIES.has(m.family))
+  .sort((a, b) => {
+    // HappyHorse (primary) before Hailuo (fallback); standard before pro.
+    const fam = (x: ToolkitModel) => (x.family === 'happyhorse' ? 0 : 1);
+    if (fam(a) !== fam(b)) return fam(a) - fam(b);
+    return /pro/i.test(a.id) ? 1 : -1;
+  });
+
+/** Default (cheapest, most flexible) lip-sync provider preselected when the toggle flips ON. */
+export const DIALOG_FALLBACK_CLIP_SOURCE: ClipSource = LIPSYNC_PRIMARY_CLIP_SOURCE;
 export const DIALOG_FALLBACK_CLIP_QUALITY: ClipQuality = 'standard';
+
+/** True iff the engine override puts the scene through the Sync.so pipeline. */
+export function isLipsyncEngine(engine: string | null | undefined): boolean {
+  return engine === 'cinematic-sync' || engine === 'sync-segments';
+}
+
+/** True iff the given clip source is allowed when Lip-Sync is active. */
+export function isLipsyncClipSource(src: string | null | undefined): boolean {
+  return !!src && (LIPSYNC_CLIP_SOURCES as ReadonlyArray<string>).includes(src);
+}
+
 
 /** Map a toolkit modelId → composer (clipSource, clipQuality). */
 export function modelIdToSource(modelId: string): { clipSource: ClipSource; clipQuality: ClipQuality } {

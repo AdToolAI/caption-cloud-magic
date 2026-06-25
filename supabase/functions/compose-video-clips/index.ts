@@ -1063,6 +1063,30 @@ serve(async (req) => {
         );
       }
 
+      // June 26 2026 — LIP-SYNC PROVIDER ALLOWLIST.
+      // Only ai-happyhorse (primary) and ai-hailuo (fallback) are certified
+      // as Sync.so master plates. Reject any other clip source in the
+      // cinematic-sync / sync-segments pipeline with a clear 400 so the
+      // frontend can route the user back to the picker. Defense-in-depth
+      // against UI bypass / legacy scenes / stale optimistic state.
+      if (
+        (__engineForHHGuard === "cinematic-sync" ||
+          __engineForHHGuard === "sync-segments") &&
+        (scene.clipSource as string) !== "ai-happyhorse" &&
+        (scene.clipSource as string) !== "ai-hailuo"
+      ) {
+        return new Response(
+          JSON.stringify({
+            error: "invalid_provider_for_lipsync",
+            message: `Lip-Sync ist nur mit HappyHorse (empfohlen · 3–15s) oder Hailuo (Fallback · 6/10s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`,
+            scene_id: scene.id,
+            picked: scene.clipSource,
+            allowed: ["ai-happyhorse", "ai-hailuo"],
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       // Duration guard — surface mismatches instead of silently snapping.
       // Hailuo: only 6s or 10s. HappyHorse: 3–15s.
       if (scene.clipSource === "ai-hailuo") {
