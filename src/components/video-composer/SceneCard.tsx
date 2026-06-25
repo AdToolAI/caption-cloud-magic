@@ -1448,11 +1448,12 @@ export default function SceneCard({
                                             : "Switched to HappyHorse 1.0",
                                       description:
                                         lang === "de"
-                                          ? "Für Dialog & Lip-Sync sind nur Kling 3, Veo 3.1 und HappyHorse 1.0 verfügbar. Günstigste Option vorausgewählt."
+                                          ? "Lip-Sync läuft nur über HappyHorse (3–15s) oder Hailuo (6/10s Fallback). HappyHorse vorausgewählt."
                                           : lang === "es"
-                                            ? "Para diálogo y lip-sync solo están disponibles Kling 3, Veo 3.1 y HappyHorse 1.0. Se eligió la más económica."
-                                            : "Dialog & lip-sync supports only Kling 3, Veo 3.1 and HappyHorse 1.0. Cheapest option preselected.",
+                                            ? "Lip-Sync solo con HappyHorse (3–15s) o Hailuo (6/10s alternativa). HappyHorse preseleccionado."
+                                            : "Lip-Sync runs only on HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse preselected.",
                                     });
+
                                   }
                                 }
                                 // Optimistic local update.
