@@ -1388,15 +1388,16 @@ export default function SceneCard({
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
                                   {dialogMode
                                     ? lang === "de"
-                                      ? "3 Modelle · Skript & Lip-Sync aktiv"
+                                      ? "2 Modelle · HappyHorse + Hailuo (Sync.so Lip-Sync)"
                                       : lang === "es"
-                                        ? "3 modelos · Guion y lip-sync activos"
-                                        : "3 models · Script & lip-sync active"
+                                        ? "2 modelos · HappyHorse + Hailuo (Sync.so)"
+                                        : "2 models · HappyHorse + Hailuo (Sync.so)"
                                     : lang === "de"
                                       ? "B-Roll-Modus · 11 Modelle verfügbar"
                                       : lang === "es"
                                         ? "Modo B-roll · 11 modelos disponibles"
                                         : "B-roll mode · 11 models available"}
+
                                 </span>
                               </div>
                             </div>
