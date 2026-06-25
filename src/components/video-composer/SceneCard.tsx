@@ -1041,6 +1041,15 @@ export default function SceneCard({
                         Kürze oder lösche eine andere Szene, um mehr Zeit freizugeben.
                       </p>
                     )}
+                    {scene.clipSource === 'ai-hailuo' &&
+                      scene.durationSeconds !== 6 &&
+                      scene.durationSeconds !== 10 && (
+                        <p className="text-[10px] text-amber-300/80 leading-snug">
+                          Hailuo unterstützt nur 6s oder 10s — wird beim Rendern auf{' '}
+                          {scene.durationSeconds < 8 ? '6s' : '10s'} gerundet.
+                        </p>
+                      )}
+
                   </div>
                 );
               })()}
