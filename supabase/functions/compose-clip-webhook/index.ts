@@ -490,7 +490,7 @@ serve(async (req) => {
         .update({
           clip_status: 'failed',
           retry_count: currentRetry + 1,
-          clip_error: String(predError ?? '').slice(0, 500) || null,
+          clip_error: String(enrichedError ?? '').slice(0, 500) || null,
           ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
             ? {
                 lip_sync_status: null,
