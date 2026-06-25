@@ -469,7 +469,7 @@ serve(async (req) => {
             .eq('id', sceneId);
 
           console.log(
-            `[compose-clip-webhook] auto-retry ${currentRetry + 1}/${MAX_AUTO_RETRY} for scene ${sceneId} → new pred ${retried.id} (transient: "${String(predError).slice(0, 80)}")`,
+            `[compose-clip-webhook] auto-retry ${currentRetry + 1}/${MAX_AUTO_RETRY} for scene ${sceneId} → new pred ${retried.id} (transient: "${String(enrichedError).slice(0, 80)}")`,
           );
 
           return new Response(JSON.stringify({ ok: true, retried: true }), {
