@@ -104,11 +104,17 @@ export default function ProductionPlanSheet({
   /** Outfit looks belonging to a given base character id. */
   const outfitsByCharacter = useMemo(() => {
     const map = new Map<string, Array<{ lookId: string; name: string }>>();
+    const seen = new Set<string>();
     for (const m of outfitMentions) {
       const base = m.meta?.baseCharacterId;
       const lookId = m.meta?.outfitLookId;
-      const lookName = m.meta?.outfitName ?? m.name;
       if (!base || !lookId) continue;
+      const dedupeKey = `${base}::${lookId}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
+      const fromName = (m.name?.split(' — ')[1] ?? '').trim();
+      const lookName = fromMeta || fromName || m.name?.trim() || 'Unbenannter Look';
       const arr = map.get(base) ?? [];
       arr.push({ lookId, name: lookName });
       map.set(base, arr);
