@@ -192,8 +192,23 @@ export default function ProductionPlanSheet({
         console.warn('[ProductionPlanSheet] plan validation failed', parsed.error);
         throw new Error('Plan-Validierung fehlgeschlagen');
       }
-      setPlan(parsed.data);
+      // Selfheal: re-index duplicates so the UI never silently drops a scene.
+      const seen = new Set<number>();
+      const healed = {
+        ...parsed.data,
+        scenes: parsed.data.scenes.map((s, i) => {
+          if (seen.has(s.index)) {
+            return { ...s, index: i + 1 };
+          }
+          seen.add(s.index);
+          return s;
+        }),
+      };
+      // Second pass if first pass produced new collisions.
+      healed.scenes = healed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
+      setPlan(healed);
       setStep('review');
+
     } catch (e: any) {
       clearTimeout(phaseTimer);
       const details = await extractFunctionsErrorDetails(e);
@@ -469,11 +484,12 @@ export default function ProductionPlanSheet({
                   </div>
                 ) : (
                 <div className="space-y-3">
-                  {plan.scenes.map((s) => (
-                    <div key={s.index} className="rounded border border-border/40 p-2 space-y-1.5 text-xs">
+                  {plan.scenes.map((s, sIdx) => (
+                    <div key={`scene-${sIdx}-${s.index}`} className="rounded border border-border/40 p-2 space-y-1.5 text-xs">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px]">S{String(s.index).padStart(2, '0')}</Badge>
                         <span className="font-medium truncate">{s.label ?? s.beat ?? '—'}</span>
+
                         <Badge variant="secondary" className="text-[10px] ml-auto">{s.engine ?? 'auto'}</Badge>
                         {s.lipSync && (
                           <Badge variant="outline" className="text-[10px] border-amber-300/40 text-amber-300">
