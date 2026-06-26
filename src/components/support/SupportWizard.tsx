@@ -555,12 +555,33 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
             <p className="text-sm text-muted-foreground mt-1">{t.s3Sub}</p>
           </div>
 
+          <EvidenceBoostBanner variant="hero" />
+          {shouldNudgeMedia && severity === "blocking" && (
+            <EvidenceBoostBanner urgent />
+          )}
+
           <AttachmentUploader
+            ref={uploaderRef}
             userId={userId}
             draftId={draftId}
             attachments={attachments}
             onChange={setAttachments}
           />
+
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Camera className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">{t.mediaHelperTitle}</span>
+            </div>
+            <ul className="space-y-1.5 text-xs text-muted-foreground">
+              {t.mediaHelperItems.map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <details className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
             <summary className="cursor-pointer text-sm text-foreground/80 font-medium">
@@ -573,6 +594,7 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
           </details>
         </div>
       )}
+
 
       {/* Footer nav */}
       <div className="flex items-center justify-between pt-4 border-t border-white/10">
