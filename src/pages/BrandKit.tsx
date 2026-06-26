@@ -25,6 +25,8 @@ import { ActiveBrandSelector } from "@/components/brand/ActiveBrandSelector";
 import { BrandKitHeroHeader } from "@/components/brand/BrandKitHeroHeader";
 import { BrandVault } from "@/components/brand/BrandVault";
 import { BrandDnaExtractor } from "@/components/brand/BrandDnaExtractor";
+import { BrandVoiceLibrary } from "@/components/brand/BrandVoiceLibrary";
+import { BrandAssetFactory } from "@/components/brand/BrandAssetFactory";
 import type { BrandDnaResult } from "@/hooks/useBrandDnaExtractor";
 
 const BrandKit = () => {
@@ -711,6 +713,10 @@ const BrandKit = () => {
                         <p className="text-sm leading-relaxed text-muted-foreground">{activeBrandKit.ai_comment}</p>
                       </div>
                     </motion.div>
+
+                    {/* Sprint 2 — Brand Voice + Asset Factory */}
+                    <BrandVoiceLibrary brandKitId={activeBrandKit.id} />
+                    <BrandAssetFactory brandKitId={activeBrandKit.id} />
                   </div>
                 ) : (
                   <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
