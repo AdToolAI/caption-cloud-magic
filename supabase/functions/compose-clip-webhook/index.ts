@@ -5,6 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
+import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
@@ -489,13 +490,24 @@ serve(async (req) => {
         }
       }
 
-      // ── Final failure → mark failed + refund ───────────────────────────────
+      // ── Green-Net (Alibaba HappyHorse content filter) → auto-fallback ──────
+      // Switch this scene's clip_source to ai-hailuo so the next "Neu rendern"
+      // click bypasses HappyHorse entirely. Prepend a tagged marker so the UI
+      // can render a friendly explainer banner instead of the cryptic
+      // DataInspectionFailed string.
+      const isGreenNet =
+        isGreenNetRejection(enrichedError) &&
+        String((scene as any)?.clip_source ?? '') === 'ai-happyhorse';
+      const taggedError = (isGreenNet ? '[green_net_rejected] ' : '') +
+        (String(enrichedError ?? '').slice(0, 480) || 'unknown_error');
+
       await supabase
         .from('composer_scenes')
         .update({
           clip_status: 'failed',
           retry_count: currentRetry + 1,
-          clip_error: String(enrichedError ?? '').slice(0, 500) || null,
+          clip_error: taggedError,
+          ...(isGreenNet ? { clip_source: 'ai-hailuo' } : {}),
           ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
             ? {
                 lip_sync_status: null,
@@ -507,6 +519,12 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', sceneId);
+
+      if (isGreenNet) {
+        console.warn(
+          `[compose-clip-webhook] green-net rejection on scene ${sceneId} → auto-switched clip_source to ai-hailuo`,
+        );
+      }
 
       // Refund credits for failed clip
       const { data: sceneData } = await supabase
