@@ -223,6 +223,15 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
         energy: fallback.energy === 'high' ? 4 : 3,
       },
       musicCue: { energy: fallback.energy },
+      // Stage-3: surface extracted plan→storyboard fields when present.
+      transition: h?.transition
+        ? { type: h.transition, durationSec: h.transitionDurationSec ?? 0.4 }
+        : undefined,
+      textOverlay: h?.overlayText
+        ? { text: h.overlayText, position: h.overlayPosition ?? 'bottom', animation: 'fade-in' }
+        : undefined,
+      tone: h?.tone,
+      seed: typeof h?.seed === 'number' ? h.seed : undefined,
     };
   });
 
