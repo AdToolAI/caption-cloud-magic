@@ -1,8 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload, X, Paperclip, Image as ImageIcon, FileText, Film } from "lucide-react";
+import { Loader2, Upload, X, Paperclip, Image as ImageIcon, FileText, Film, Video, Square, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useScreenRecorder } from "@/hooks/useScreenRecorder";
+
 
 export interface UploadedAttachment {
   path: string;
@@ -36,17 +38,22 @@ function iconFor(type: string) {
   return <FileText className="h-4 w-4" />;
 }
 
-export function AttachmentUploader({
+export interface AttachmentUploaderHandle {
+  addFiles: (files: File[]) => Promise<void>;
+}
+
+export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, AttachmentUploaderProps>(function AttachmentUploader({
   userId,
   draftId,
   attachments,
   onChange,
   maxFiles = DEFAULT_MAX_FILES,
   maxBytes = DEFAULT_MAX_BYTES,
-}: AttachmentUploaderProps) {
+}, ref) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const arr = Array.from(files);
@@ -111,6 +118,19 @@ export function AttachmentUploader({
     if (inputRef.current) inputRef.current.value = "";
   }, [attachments, draftId, maxBytes, maxFiles, onChange, userId]);
 
+  useImperativeHandle(ref, () => ({
+    addFiles: (files: File[]) => handleFiles(files),
+  }), [handleFiles]);
+
+  // Screen recorder
+  const recorder = useScreenRecorder({
+    maxSeconds: 60,
+    onComplete: (file) => {
+      handleFiles([file]);
+      toast({ title: "Recording added", description: `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)` });
+    },
+  });
+
   const removeAt = useCallback(async (idx: number) => {
     const att = attachments[idx];
     if (!att) return;
@@ -122,8 +142,47 @@ export function AttachmentUploader({
     onChange(attachments.filter((_, i) => i !== idx));
   }, [attachments, onChange]);
 
+
   return (
     <div className="space-y-3">
+      {/* 60% badge bar */}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-foreground/85">
+          <Zap className="h-3.5 w-3.5 text-primary" />
+          <span>Tickets with media are resolved <strong className="text-primary">60% faster</strong>.</span>
+        </div>
+        {recorder.supported && (
+          recorder.recording ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={recorder.stop}
+              className="gap-1.5 animate-pulse"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+              Stop · {recorder.elapsed}s / {recorder.maxSeconds}s
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={recorder.start}
+              disabled={uploading || attachments.length >= maxFiles}
+              className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+            >
+              <Video className="h-3.5 w-3.5" />
+              Record screen
+            </Button>
+          )
+        )}
+      </div>
+
+      {recorder.error && (
+        <p className="text-xs text-red-400">{recorder.error}</p>
+      )}
+
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
@@ -151,10 +210,10 @@ export function AttachmentUploader({
             ? <Loader2 className="h-8 w-8 animate-spin text-primary" />
             : <Upload className="h-8 w-8 text-primary" />}
           <p className="text-sm text-foreground/80">
-            <span className="font-medium">Drop files here</span> or click to browse
+            <span className="font-medium">Drop files here</span>, paste with ⌘V or click to browse
           </p>
           <p className="text-xs text-muted-foreground">
-            Images, videos (MP4/MOV), PDF · max {maxFiles} files · up to {(maxBytes / 1024 / 1024).toFixed(0)} MB each
+            Images, videos (MP4/MOV/WebM), PDF · max {maxFiles} files · up to {(maxBytes / 1024 / 1024).toFixed(0)} MB each
           </p>
           <Button
             type="button"
@@ -183,6 +242,10 @@ export function AttachmentUploader({
                   alt={att.name}
                   className="w-full h-24 object-cover"
                 />
+              ) : att.type.startsWith("video/") ? (
+                <div className="w-full h-24 flex items-center justify-center bg-black/60 text-primary">
+                  <Film className="h-6 w-6" />
+                </div>
               ) : (
                 <div className="w-full h-24 flex items-center justify-center bg-black/30 text-primary">
                   {iconFor(att.type)}
@@ -208,4 +271,5 @@ export function AttachmentUploader({
       )}
     </div>
   );
-}
+});
+

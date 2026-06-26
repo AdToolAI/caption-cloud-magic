@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Loader2, Send, Bug, Film, Share2, CreditCard, User as UserIcon, Sparkles, HelpCircle, Wrench } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ChevronLeft, ChevronRight, Loader2, Send, Bug, Film, Share2, CreditCard, User as UserIcon, Sparkles, HelpCircle, Wrench, Camera, Video, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { AttachmentUploader, type UploadedAttachment } from "./AttachmentUploader";
+import { AttachmentUploader, type AttachmentUploaderHandle, type UploadedAttachment } from "./AttachmentUploader";
+import { EvidenceBoostBanner } from "./EvidenceBoostBanner";
 import { collectBrowserInfo, detectAffectedModule, type BrowserInfo } from "@/lib/support/contextCollector";
 import { useTranslation } from "@/hooks/useTranslation";
+
 
 type Severity = "low" | "normal" | "high" | "blocking";
 
@@ -87,6 +93,15 @@ const TEXT = {
       other: "Other",
     },
     promptBanner: "The clearer you are, the faster we'll respond — usually under 2h for blocking issues.",
+    pastedTitle: "Screenshot attached",
+    pastedDesc: "Pasted from clipboard ✓",
+    coachTitle: "Send without a screenshot?",
+    coachDesc: "Tickets with a screenshot or short recording are resolved 60% faster on average. Want to add one before sending?",
+    coachAddMedia: "Add screenshot / recording",
+    coachSendAnyway: "Send without",
+    coachBlockingNote: "For blocking issues we strongly recommend a recording — it usually saves a full day of back-and-forth.",
+    mediaHelperTitle: "Why media speeds things up",
+    mediaHelperItems: ["A screenshot shows the exact UI state","A recording shows the exact click path","Console errors are auto-attached"],
     requiredHint: "Please fill in subject and category.",
   },
   de: {
@@ -143,6 +158,15 @@ const TEXT = {
       other: "Sonstiges",
     },
     promptBanner: "Je präziser du bist, desto schneller antworten wir — bei blockierenden Fällen meist unter 2 Std.",
+    pastedTitle: "Screenshot angehängt",
+    pastedDesc: "Aus Zwischenablage übernommen ✓",
+    coachTitle: "Ohne Screenshot senden?",
+    coachDesc: "Tickets mit Screenshot oder kurzem Recording werden im Schnitt 60 % schneller gelöst. Möchtest du noch eins anhängen?",
+    coachAddMedia: "Screenshot / Recording hinzufügen",
+    coachSendAnyway: "Trotzdem senden",
+    coachBlockingNote: "Für blockierende Fälle empfehlen wir dringend ein Recording — das spart meist einen ganzen Tag Hin und Her.",
+    mediaHelperTitle: "Warum Medien helfen",
+    mediaHelperItems: ["Screenshot zeigt den exakten UI-Zustand","Recording zeigt den exakten Klickpfad","Konsolen-Errors werden automatisch mitgeschickt"],
     requiredHint: "Bitte Betreff und Kategorie ausfüllen.",
   },
   es: {
@@ -199,6 +223,15 @@ const TEXT = {
       other: "Otro",
     },
     promptBanner: "Cuanto más claro seas, más rápido respondemos — en casos bloqueantes, normalmente <2h.",
+    pastedTitle: "Captura adjuntada",
+    pastedDesc: "Pegada desde el portapapeles ✓",
+    coachTitle: "¿Enviar sin captura?",
+    coachDesc: "Los tickets con captura o una breve grabación se resuelven un 60 % más rápido de media. ¿Quieres añadir una antes de enviar?",
+    coachAddMedia: "Añadir captura / grabación",
+    coachSendAnyway: "Enviar sin",
+    coachBlockingNote: "Para casos bloqueantes recomendamos encarecidamente una grabación — suele ahorrar un día entero de ida y vuelta.",
+    mediaHelperTitle: "Por qué ayuda adjuntar medios",
+    mediaHelperItems: ["Una captura muestra el estado exacto de la UI","Una grabación muestra la ruta exacta de clics","Los errores de consola se adjuntan automáticamente"],
     requiredHint: "Rellena el asunto y la categoría.",
   },
 } as const;
@@ -215,6 +248,8 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
   const t = TEXT[(language as keyof typeof TEXT)] || TEXT.en;
 
   const draftId = useMemo(() => crypto.randomUUID(), []);
+  const uploaderRef = useRef<AttachmentUploaderHandle>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<string>("bug");
@@ -228,12 +263,43 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [browserInfo, setBrowserInfo] = useState<BrowserInfo | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
 
   useEffect(() => {
     collectBrowserInfo().then(setBrowserInfo);
   }, []);
 
+  // Smart paste: capture screenshots from clipboard anywhere in the wizard
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) {
+            // Rename so it has a sensible name
+            files.push(new File([f], `pasted-${Date.now()}.${(f.type.split("/")[1] || "png")}`, { type: f.type }));
+          }
+        }
+      }
+      if (files.length && uploaderRef.current) {
+        e.preventDefault();
+        uploaderRef.current.addFiles(files);
+        toast({ title: t.pastedTitle, description: t.pastedDesc });
+      }
+    };
+    el.addEventListener("paste", onPaste as EventListener);
+    return () => el.removeEventListener("paste", onPaste as EventListener);
+  }, [t]);
+
   const canAdvanceFrom1 = subject.trim().length >= 3 && !!category;
+  const mediaRecommendedCategories = new Set(["bug", "rendering", "publishing", "technical"]);
+  const shouldNudgeMedia = mediaRecommendedCategories.has(category) && attachments.length === 0;
+
 
   const submit = async () => {
     if (!canAdvanceFrom1) {
@@ -308,7 +374,7 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
   };
 
   return (
-    <div className="space-y-6">
+    <div ref={rootRef} className="space-y-6">
       {/* Step indicator */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-mono tracking-wider uppercase">
@@ -325,6 +391,10 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
           ))}
         </div>
       </div>
+
+      {/* Persistent Evidence Boost banner */}
+      <EvidenceBoostBanner variant="compact" />
+
 
       {step === 1 && (
         <div className="space-y-5">
@@ -485,12 +555,33 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
             <p className="text-sm text-muted-foreground mt-1">{t.s3Sub}</p>
           </div>
 
+          <EvidenceBoostBanner variant="hero" />
+          {shouldNudgeMedia && severity === "blocking" && (
+            <EvidenceBoostBanner urgent />
+          )}
+
           <AttachmentUploader
+            ref={uploaderRef}
             userId={userId}
             draftId={draftId}
             attachments={attachments}
             onChange={setAttachments}
           />
+
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Camera className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">{t.mediaHelperTitle}</span>
+            </div>
+            <ul className="space-y-1.5 text-xs text-muted-foreground">
+              {t.mediaHelperItems.map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <details className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
             <summary className="cursor-pointer text-sm text-foreground/80 font-medium">
@@ -503,6 +594,7 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
           </details>
         </div>
       )}
+
 
       {/* Footer nav */}
       <div className="flex items-center justify-between pt-4 border-t border-white/10">
@@ -529,7 +621,13 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
         ) : (
           <Button
             type="button"
-            onClick={submit}
+            onClick={() => {
+              if (shouldNudgeMedia) {
+                setCoachOpen(true);
+              } else {
+                submit();
+              }
+            }}
             disabled={submitting || !canAdvanceFrom1}
             className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 shadow-[0_0_20px_hsl(var(--primary)/0.4)]"
           >
@@ -538,6 +636,44 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
           </Button>
         )}
       </div>
+
+      {/* AI Media Coach */}
+      <AlertDialog open={coachOpen} onOpenChange={setCoachOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" />
+              {t.coachTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t.coachDesc}
+              {severity === "blocking" && (
+                <span className="block mt-2 text-red-300/90">{t.coachBlockingNote}</span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setCoachOpen(false);
+                submit();
+              }}
+            >
+              {t.coachSendAnyway}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setCoachOpen(false);
+                setStep(3);
+              }}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {t.coachAddMedia}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+

@@ -1,104 +1,59 @@
-# Launch-Readiness & AI-Support-Pipeline
+# Support Center — Level Up zu "Evidence-First"
 
-## Teil A — Launch-Readiness Status (Kurz-Audit)
+Ziel: Kunden sollen Bilder/Videos hochladen wollen. Wir verkaufen aktiv den Nutzen (60% schnellere Fixes) und machen das Hochladen so einfach wie möglich — inkl. One-Click Screen-Recording.
 
-**Bereits live & grün:**
-- 467/473 Edge Functions Smoke-tested
-- Stripe-Payments + TRIAL20-Coupon
-- Status-Page `/status` + Watchdog + Synthetic Probes
-- Auth-Emails + Email-Queue (pgmq + cron) + Suppression-Liste
-- `support_tickets` Tabelle + `send-support-ticket` Funktion (sendet bereits an `info@useadtool.ai`)
-- SupportWizard + MyTicketsList UI
+## 1. "Evidence Boost" Hero-Banner (Schritt 1 + Schritt 3)
+- Goldener Glow-Banner direkt unter dem Schritt-Indikator:
+  > ⚡ **Tickets mit Screenshot oder Screen-Recording werden im Schnitt 60% schneller gelöst.**
+- In Schritt 3 als großer "Pro-Tipp"-Card mit Icon (Sparkles + Camera), nicht nur als Pflichtfeld.
+- Lokalisiert DE / EN / ES.
 
-**Lücken vor Paid-Launch:**
-1. **Kein AI-Triage** auf eingehenden Tickets → Antwort dauert manuell
-2. **Keine Auto-Bestätigung** an Kunden mit ETA
-3. **Keine Auto-Notify** beim Statuswechsel `resolved`
-4. **Keine Verknüpfung** Ticket ↔ Status-Page-Incident (wenn Bug bereits bekannt)
+## 2. Media Upload Promotion in Schritt 1
+- Neue Sektion "Screenshot oder Recording hinzufügen (empfohlen)" direkt unter dem Subject-Feld — User kann schon in Step 1 droppen, nicht erst in Step 3.
+- Dezenter "+60% Speed"-Badge auf dem Upload-Bereich.
+- Bei Kategorie **Bug** oder **Render-Problem** und Severity **High/Blocking**: Banner wird rot/dringend mit Text "Ohne Visual können wir diesen Fall meist nicht reproduzieren — bitte Screenshot anhängen."
 
-## Teil B — AI-Support-Pipeline (deine Idee, ja sehr sinnvoll)
+## 3. One-Click Screen Recording (NEU)
+- Neuer Button im AttachmentUploader: **"📹 Bildschirm aufnehmen"** (max 60s).
+- Nutzt `navigator.mediaDevices.getDisplayMedia` + `MediaRecorder` (WebM, Browser-nativ, keine externe Lib).
+- Mini-Toolbar während Aufnahme: Timer + Stop-Button.
+- Nach Stop: Auto-Upload in `support-attachments` Bucket, erscheint sofort als Thumbnail.
+- Fallback-Hinweis bei nicht-unterstützten Browsern (Safari iOS).
 
-### Flow
+## 4. Smart Paste (Screenshot aus Clipboard)
+- `paste`-Event-Listener auf Wizard-Root: Wenn User Cmd/Ctrl+V drückt und Clipboard ein Bild enthält → direkt zu Attachments hinzufügen, Toast "Screenshot aus Zwischenablage angehängt ✓".
 
-```text
-Kunde sendet Ticket (Wizard / Email-Reply)
-       │
-       ▼
-[send-support-ticket]  ──►  support_tickets INSERT
-       │
-       ├─► Auto-Confirm Email an Kunde (sofort)
-       │   "Ticket #1234 erhalten, AI analysiert gerade…"
-       │
-       └─► triage-support-ticket (async via pg_notify)
-              │
-              ▼
-        Gemini 2.5 Flash:
-        - Kategorie (bug/billing/howto/feature)
-        - Severity (low/normal/high/blocking)
-        - Root-Cause-Hypothese
-        - Match gegen offene status_incidents
-        - ETA-Vorschlag (1h / 24h / 3d / 1w)
-        - Vorgeschlagene Antwort (DE/EN/ES)
-              │
-              ├─► UPDATE support_tickets SET ai_analysis, eta, suggested_reply
-              ├─► Email an info@useadtool.ai (mit User-Kontext + Plan + letzte Renders)
-              └─► Email an Kunden: "Wir haben deine Anfrage analysiert.
-                                    Voraussichtliche Lösung in ~{ETA}.
-                                    {kontextuelle Erstantwort}"
+## 5. AI Media Coach (Pre-Submit Check)
+- Beim Klick auf "Ticket senden" (wenn 0 Attachments und Kategorie ∈ {bug, rendering, publishing, technical}):
+  - Modal: "⚠️ Ohne Visual dauert die Lösung im Schnitt 60% länger. Möchtest du trotzdem ohne senden?"
+  - Buttons: "Bild/Video hinzufügen" (primary, gold) ↔ "Ohne senden" (secondary, ghost).
+- Bei Severity = blocking ohne Media: zusätzlich Text "Wir empfehlen für blockierende Fälle dringend ein Recording."
 
-Admin im Cockpit: 1-Klick "Approve & Send" oder "Mark Resolved"
-       │
-       ▼
-Status = resolved  ──►  Trigger notify-ticket-resolved
-                              └─► Email an Kunde: "Fixed ✓ — bitte teste"
-```
+## 6. Triage-Boost im Backend
+- `send-support-ticket` / `triage-support-ticket`: Wenn `attachments.length > 0` und mind. 1 Bild/Video dabei → `ai_priority_boost = true` und ETA-Estimate × 0.6 (Gemini-Prompt erweitert um "Ticket has visual evidence — assume 60% faster reproduction time").
+- Admin-Inbox zeigt grünen **📎 Evidence**-Badge bei Tickets mit Media-Anhang, damit Bearbeiter diese priorisieren.
 
-### Was gebaut wird
+## 7. Persistent "Why Media Helps"-Helper (Schritt 3)
+- Kleine Karte neben dem Uploader:
+  - "✅ Screenshot zeigt UI-Zustand"
+  - "✅ Recording zeigt den exakten Klickpfad"
+  - "✅ Konsolen-Errors werden automatisch mitgeschickt"
+- Plus: Live-Counter wie viele Tickets diese Woche durch Media schneller gelöst wurden (statisch fake nicht — read aus `support_tickets where attachments_count > 0 and resolved_at < expected_at` der letzten 7 Tage, sonst Text "Pro-Tipp: Recording = schnellste Lösung").
 
-**1. DB-Migration** — `support_tickets` erweitern:
-- `ai_category`, `ai_severity`, `ai_root_cause`, `ai_eta_hours`, `ai_suggested_reply`, `ai_analyzed_at`
-- `linked_incident_id` (FK auf `status_incidents`)
-- `resolved_notification_sent_at`
-- Trigger: bei `status → resolved` queue Email
+## Technische Details
 
-**2. Edge Function `triage-support-ticket`**
-- Input: `ticket_id`
-- Lädt Ticket + User-Profile + letzte 5 Errors aus `runtime_errors`/`bug_reports`
-- Gemini 2.5 Flash Tool-Call → strukturiertes Triage-JSON
-- Matched gegen offene `status_incidents` (Vector-Similarity auf description)
-- Schreibt zurück + verschickt 2 Emails (Kunde + Inbox)
+**Files to edit:**
+- `src/components/support/SupportWizard.tsx` — Evidence-Banner, Upload in Step 1, AI Media Coach Modal, Smart Paste Listener.
+- `src/components/support/AttachmentUploader.tsx` — Screen-Recording Button + MediaRecorder Hook + 60%-Badge.
+- `src/components/support/EvidenceBoostBanner.tsx` *(neu)* — wiederverwendbar für Step 1 + 3, lokalisiert.
+- `src/hooks/useScreenRecorder.ts` *(neu)* — kapselt `getDisplayMedia` + `MediaRecorder` (start/stop/blob).
+- `supabase/functions/triage-support-ticket/index.ts` — `has_visual_evidence` flag im Prompt, ETA × 0.6.
+- `src/components/admin/qa-cockpit/SupportInboxTab.tsx` — 📎 Evidence-Badge auf Ticket-Cards.
 
-**3. Edge Function `notify-ticket-resolved`**
-- Triggered durch DB-Trigger (pg_net) bei `status → resolved`
-- Sendet React-Email "Fixed" Template
+**Keine DB-Migration nötig** — `attachments` ist bereits ein jsonb-Array auf `support_tickets`.
 
-**4. React-Email Templates** in `_shared/transactional-email-templates/`:
-- `support-ticket-received.tsx` (sofortige Eingangsbestätigung)
-- `support-ticket-triaged.tsx` (AI-Analyse + ETA + Antwort)
-- `support-ticket-resolved.tsx` (Fix-Notification)
-- Registry-Eintrag + deploy
+**Browser-Kompatibilität:** `getDisplayMedia` läuft auf Chrome/Edge/Firefox Desktop; Safari iOS bekommt Fallback-Hinweis "Screen-Recording nicht verfügbar — bitte Screenshot hochladen".
 
-**5. Admin-Cockpit-Tab "Support Inbox"** unter `/admin/qa-cockpit`:
-- Liste aller Tickets mit AI-Analyse-Spalte
-- 1-Klick "Send Suggested Reply" / "Approve ETA" / "Mark Resolved"
-- Link zu verknüpftem Incident
-- Filter: Offen / In Progress / Resolved heute
-
-**6. Auto-Suggest auf Status-Page**
-- Wenn Ticket mit `linked_incident_id` → User sieht Banner "Wir arbeiten dran: {incident.title}"
-
-### Kosten
-- Gemini 2.5 Flash Triage: ~0.001€/Ticket (negierbar)
-- Email-Sends laufen über bestehende Lovable-Emails-Queue (kein Extra-Provider)
-
-### Sicherheit
-- AI-Antwort wird **NICHT** automatisch versendet ohne Admin-Approve (Default OFF), nur als Vorschlag
-- Toggle `system_config.support.auto_send_ai_reply = false` per Default
-- User können später auf "Auto" wechseln wenn Confidence hoch genug
-
-## Teil C — Out of Scope (für später)
-- Inbound-Email-Parsing (Kunden antworten direkt per Email → Ticket-Update). Braucht Mailgun/Postmark Inbound-Webhook. Vorschlag: Phase 2.
-- Multi-Agent-Inbox (mehrere Support-Mitarbeiter). Aktuell genügt 1 Inbox.
-
-## Empfehlung
-Vor Paid-Launch: **Teil B komplett bauen** (geschätzt 1 Iteration). Danach grün für Marketing-Spend.
+## Out-of-Scope (bewusst nicht jetzt)
+- Server-side Video-Transcoding (Browser liefert WebM, das reicht für Support).
+- Annotation-Tools (Pfeile/Kringel auf Screenshots) — späterer Polish.
