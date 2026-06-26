@@ -2,6 +2,7 @@
 // Runs once per day (e.g. 08:00 UTC) and emits one summary notification per user.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -9,6 +10,10 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-daily-digest" });
+  }
   try {
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,

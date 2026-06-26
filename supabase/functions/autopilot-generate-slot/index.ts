@@ -2,6 +2,7 @@
 // Pipeline: brief → prompt-shield → caption + visual prompt via AI → image generation → qa-gate → ready
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -11,6 +12,10 @@ interface Body { slot_id: string }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-generate-slot" });
+  }
   try {
     const { slot_id } = (await req.json()) as Body;
     if (!slot_id) return json({ ok: false, error: "missing slot_id" }, 400);

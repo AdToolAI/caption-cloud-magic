@@ -2,6 +2,7 @@
 // Returns { allowed, severity, category, reason }
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -39,6 +40,10 @@ Antworte NUR via Tool-Call.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-prompt-shield" });
+  }
   try {
     // Service-role only (called from autopilot-generate-slot edge function).
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";

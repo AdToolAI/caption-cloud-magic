@@ -5,6 +5,7 @@
 // and aligns slot scheduling with `posting_slots` (high-score windows per platform).
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -39,6 +40,10 @@ interface PostingSlot {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-plan-week" });
+  }
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -10,6 +11,10 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-weekly-review" });
+  }
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

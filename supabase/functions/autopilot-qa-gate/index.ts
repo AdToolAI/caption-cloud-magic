@@ -1,6 +1,7 @@
 // Vision-Gate — analyzes generated asset + caption for brand safety, deepfake/copyright risks.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -33,6 +34,10 @@ Antworte NUR via Tool-Call.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-qa-gate" });
+  }
   try {
     const body = (await req.json()) as Body;
     const apiKey = Deno.env.get("LOVABLE_API_KEY");

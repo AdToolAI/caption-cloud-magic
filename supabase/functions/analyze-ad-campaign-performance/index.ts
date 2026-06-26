@@ -5,6 +5,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
@@ -39,6 +40,10 @@ function variantLabel(c: { cutdown_type: string | null; ad_variant_strategy: str
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "analyze-ad-campaign-performance" });
+  }
 
   try {
     const authHeader = req.headers.get('Authorization');
