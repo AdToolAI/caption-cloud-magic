@@ -398,6 +398,11 @@ export default function QACockpit() {
             <IncidentManager />
           </TabsContent>
 
+          <TabsContent value="support-inbox">
+            <SupportInboxTab />
+          </TabsContent>
+
+
           {/* META TOKEN HEALTH */}
           <TabsContent value="meta-token">
             <MetaTokenHealthTab />
