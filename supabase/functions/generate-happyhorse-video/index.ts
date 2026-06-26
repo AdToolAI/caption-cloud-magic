@@ -132,13 +132,15 @@ async function rehostAndPersist(params: {
     }
     throw new Error(`HappyHorse prediction timed out after ${Math.round(MAX_POLL_MS / 1000)}s`);
   } catch (err: any) {
-    console.error(`[generate-happyhorse-video] ❌ Failure:`, err?.message ?? err);
+    const greenNetReject = isGreenNetRejection(err);
+    const tag = greenNetReject ? "green_net_rejected" : "happyhorse_failed";
+    console.error(`[generate-happyhorse-video] ❌ Failure (${tag}):`, err?.message ?? err);
     await supabaseAdmin
       .from("ai_video_generations")
       .update({
         status: "failed",
         failed_at: new Date().toISOString(),
-        error_message: err?.message ?? "HappyHorse generation failed",
+        error_message: `[${tag}] ${err?.message ?? "HappyHorse generation failed"}`,
       })
       .eq("id", generationId);
 
