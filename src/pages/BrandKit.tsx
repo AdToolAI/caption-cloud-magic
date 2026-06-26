@@ -421,6 +421,8 @@ const BrandKit = () => {
           <AnimatePresence mode="wait">
             {/* Create Tab */}
             <TabsContent value="create" className="space-y-6">
+              {/* Brand DNA Extractor — fills the form via URL/screenshot */}
+              <BrandDnaExtractor onApply={handleApplyDna} />
               <motion.div
                 key="create"
                 variants={tabVariants}
