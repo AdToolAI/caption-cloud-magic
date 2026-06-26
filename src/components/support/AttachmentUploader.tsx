@@ -118,6 +118,19 @@ export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, Attachmen
     if (inputRef.current) inputRef.current.value = "";
   }, [attachments, draftId, maxBytes, maxFiles, onChange, userId]);
 
+  useImperativeHandle(ref, () => ({
+    addFiles: (files: File[]) => handleFiles(files),
+  }), [handleFiles]);
+
+  // Screen recorder
+  const recorder = useScreenRecorder({
+    maxSeconds: 60,
+    onComplete: (file) => {
+      handleFiles([file]);
+      toast({ title: "Recording added", description: `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)` });
+    },
+  });
+
   const removeAt = useCallback(async (idx: number) => {
     const att = attachments[idx];
     if (!att) return;
@@ -128,6 +141,7 @@ export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, Attachmen
     }
     onChange(attachments.filter((_, i) => i !== idx));
   }, [attachments, onChange]);
+
 
   return (
     <div className="space-y-3">
