@@ -46,6 +46,13 @@ export const ResolvedCast = z.object({
   /** ElevenLabs voice id this character should speak with, when known. */
   voiceId: z.string().nullable().optional(),
   voiceName: z.string().optional(),
+  /**
+   * Explicit shot framing for THIS cast member in this scene. Overrides
+   * the scene-default derived from `shotDirector.framing`. Useful for
+   * 2-shot scenes where each character needs a different framing
+   * (e.g. one in close-up, one in profile).
+   */
+  shotType: z.enum(['full', 'profile', 'back', 'detail', 'pov', 'silhouette']).optional(),
 });
 
 
