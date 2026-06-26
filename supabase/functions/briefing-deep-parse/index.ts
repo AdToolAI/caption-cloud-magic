@@ -313,6 +313,32 @@ LITERAL-PARSE MODE (applies when the briefing DOES list scenes explicitly)
   with multiple lines, emit one turn per speaker line. Detect speakers from
   "NAME:", "[NAME]:", "NAME — MOOD:" or labelled bullets.
 
+═══════════════════════════════════════════════════════════════════════════
+BRIEFING INTELLIGENCE v2 — mode detection + AI-fill trail
+═══════════════════════════════════════════════════════════════════════════
+
+ALWAYS set the top-level _meta object:
+- _meta.mode: classify the briefing. One of:
+    "storytelling" (narrative arc, characters, plot),
+    "brand" (brand awareness, identity, lifestyle),
+    "product" (concrete product/SaaS/feature pitch),
+    "educational" (how-to, explainer, tutorial),
+    "other".
+- _meta.modeConfidence: 0..1.
+- _meta.research: up to 8 short factual bullets you used to enrich the plan
+  from general knowledge (era context, brand archetypes, audience norms,
+  cinematic references). Keep facts concise. DO NOT fabricate URLs.
+- _meta.aiFilled: list dotted paths of PLAN-LEVEL fields you invented because
+  the briefing didn't state them, e.g. "captions.font", "voice.voiceName",
+  "negativePrompt".
+
+PER SCENE: set scenes[i]._meta.aiFilled with the dotted paths you filled
+in for that scene WITHOUT explicit briefing input — examples:
+  "anchorPromptEN", "shotDirector.framing", "shotDirector.lighting",
+  "performance.gestik", "musicCue.energy", "brollHints", "voiceover.text".
+Omit fields the briefing explicitly stated. The creator uses this list
+to know what is AI-generated and what is theirs.
+
 In LITERAL mode, DO NOT invent fields the briefing does not state.`;
 
 // ── Pass B — Resolution & validation ─────────────────────────────────────────
