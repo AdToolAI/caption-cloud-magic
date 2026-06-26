@@ -169,8 +169,27 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
               <SelectItem value="fade">{t('uc.fadeInOut')}</SelectItem>
               <SelectItem value="slide">{t('uc.slideInOut')}</SelectItem>
               <SelectItem value="bounce">{t('uc.bounce')}</SelectItem>
+              <SelectItem value="hormozi">✨ Hormozi (Word-by-Word + Highlights)</SelectItem>
             </SelectContent>
           </Select>
+          {style.animation === 'hormozi' && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+              <p className="text-[11px] text-muted-foreground">
+                Word-by-Word Pop-In im Hormozi/MrBeast-Stil. Power-Wörter werden in einer farbigen Pill hervorgehoben. Keywords werden beim Export automatisch per AI extrahiert (oder manuell pro Segment überschrieben).
+              </p>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="hormozi-color" className="text-xs">Highlight-Farbe</Label>
+                <Input
+                  id="hormozi-color"
+                  type="color"
+                  value={style.highlightColor || '#F5C76A'}
+                  onChange={(e) => updateStyle({ highlightColor: e.target.value })}
+                  className="h-7 w-14 p-0.5"
+                />
+                <code className="text-[10px] text-muted-foreground">{(style.highlightColor || '#F5C76A').toUpperCase()}</code>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
