@@ -436,9 +436,16 @@ export default function ProductionPlanSheet({
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileText className="h-4 w-4 text-amber-300" />
             Production Plan — Briefing analysieren & übernehmen
+            {plan?._meta?.source === 'local-fallback' && (
+              <Badge variant="outline" className="ml-auto text-[10px] border-amber-400/40 text-amber-300 bg-amber-400/[0.06]">
+                Lokaler Fallback-Plan
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.
+            {plan?._meta?.source === 'local-fallback'
+              ? 'Die AI-Analyse war offline — dieser Plan wurde lokal aus deinem Briefing-Text extrahiert. Bitte vor dem Übernehmen prüfen.'
+              : 'Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.'}
           </DialogDescription>
         </DialogHeader>
 
