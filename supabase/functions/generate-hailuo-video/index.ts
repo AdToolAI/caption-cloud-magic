@@ -58,8 +58,10 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration: rawDuration, resolution, startImageUrl, promptOptimizer, visualStyle } = body;
 
-    // Hailuo 2.3 only supports 6 or 10 seconds
-    const duration = rawDuration >= 8 ? 10 : 6;
+    // Hailuo 2.3 only supports 6 or 10 seconds.
+    // STRICT (June 26 2026): only an EXACT 10 stays 10; everything else → 6.
+    // Prevents silent 7/8/9s → 10s upgrades that crash Pro/1080p renders.
+    const duration = Number(rawDuration) === 10 ? 10 : 6;
     // 1080p only available for 6s
     const finalResolution = (duration === 10 && resolution === '1080p') ? '768p' : resolution;
 

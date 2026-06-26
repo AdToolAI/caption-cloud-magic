@@ -876,9 +876,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         onUpdate(updates);
       } catch (e) { console.warn('[SceneDialogStudio] audioPlan emit failed', e); }
 
-      // Bump scene duration so all VO blocks fit (cap at 60s sanity)
+      // Bump scene duration so all VO blocks fit (cap at 60s sanity).
+      // June 26 2026 — Hailuo guard: Hailuo only supports 6s | 10s. NEVER
+      // auto-bump Hailuo scenes wegen Audio-Länge — das würde die bewusste
+      // Nutzer-Wahl (6s) zu einer Zwischenlänge überschreiben, die später
+      // als 10s gerundet wird. Sync.so `cut_off` kürzt stattdessen das Audio.
       const totalNeeded = Math.min(60, Math.ceil(cumulativeOffset));
-      if (totalNeeded > (scene.durationSeconds ?? 0)) {
+      const isHailuoScene = (scene.clipSource as string) === 'ai-hailuo';
+      if (!isHailuoScene && totalNeeded > (scene.durationSeconds ?? 0)) {
         onUpdate({ durationSeconds: totalNeeded });
       }
       // Notify other panels (SoundDesign / preview) to refresh — use the
