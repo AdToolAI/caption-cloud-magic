@@ -38,17 +38,22 @@ function iconFor(type: string) {
   return <FileText className="h-4 w-4" />;
 }
 
-export function AttachmentUploader({
+export interface AttachmentUploaderHandle {
+  addFiles: (files: File[]) => Promise<void>;
+}
+
+export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, AttachmentUploaderProps>(function AttachmentUploader({
   userId,
   draftId,
   attachments,
   onChange,
   maxFiles = DEFAULT_MAX_FILES,
   maxBytes = DEFAULT_MAX_BYTES,
-}: AttachmentUploaderProps) {
+}, ref) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const arr = Array.from(files);
