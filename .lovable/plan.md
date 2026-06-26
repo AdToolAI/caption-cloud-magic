@@ -1,45 +1,104 @@
-## Problem
+# Launch-Readiness & AI-Support-Pipeline
 
-Im QA-Cockpit zeigen 5 Functions Fehler — alle sind Smoke-Test-Artefakte, keine echten Produktionsbugs:
+## Teil A — Launch-Readiness Status (Kurz-Audit)
 
-| Function | Status | Ursache |
-|---|---|---|
-| `facebook-list-pages` | 500 Internal | `qaMockJson(corsHeaders, …)` referenziert `corsHeaders` — die Variable heißt aber `CORS` → ReferenceError |
-| `facebook-select-page` | 500 Internal | Gleicher ReferenceError (`corsHeaders` statt `CORS`) |
-| `auth-email-hook` | 401 Invalid signature | `isQaMockRequest`-Guard steht in einer Helper-Funktion (Zeile 94), aber NICHT im echten `Deno.serve`-Handler (Zeile 298) → Smoke-Call läuft direkt in `verifyWebhookRequest` und scheitert |
-| `qa-weekly-deep-sweep` | 401 Invalid token | Kein `isQaMockRequest`-Guard im Handler — Admin-Token-Check schlägt im Mock-Modus zu |
-| `smoke-matrix-run` | 401 unauthorized | Kein `isQaMockRequest`-Guard — Self-Call beim Sweep läuft in eigenen Admin-Check |
+**Bereits live & grün:**
+- 467/473 Edge Functions Smoke-tested
+- Stripe-Payments + TRIAL20-Coupon
+- Status-Page `/status` + Watchdog + Synthetic Probes
+- Auth-Emails + Email-Queue (pgmq + cron) + Suppression-Liste
+- `support_tickets` Tabelle + `send-support-ticket` Funktion (sendet bereits an `info@useadtool.ai`)
+- SupportWizard + MyTicketsList UI
 
-## Lösung
+**Lücken vor Paid-Launch:**
+1. **Kein AI-Triage** auf eingehenden Tickets → Antwort dauert manuell
+2. **Keine Auto-Bestätigung** an Kunden mit ETA
+3. **Keine Auto-Notify** beim Statuswechsel `resolved`
+4. **Keine Verknüpfung** Ticket ↔ Status-Page-Incident (wenn Bug bereits bekannt)
 
-**Reine Mock-Guard-Korrekturen, keine Geschäftslogik-Änderungen.**
+## Teil B — AI-Support-Pipeline (deine Idee, ja sehr sinnvoll)
 
-1. **`facebook-list-pages` & `facebook-select-page`**: `qaMockJson(corsHeaders, …)` → `qaMockJson(CORS, …)` (Variablenname korrigieren).
+### Flow
 
-2. **`auth-email-hook`**: Im Handler (`Deno.serve` bei Zeile 298) direkt nach dem OPTIONS-Preflight ein `if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "auth-email-hook" });` einfügen — vor der Signature-Verifikation. Die existierende Zeile 94 (im Helper) unangetastet lassen.
+```text
+Kunde sendet Ticket (Wizard / Email-Reply)
+       │
+       ▼
+[send-support-ticket]  ──►  support_tickets INSERT
+       │
+       ├─► Auto-Confirm Email an Kunde (sofort)
+       │   "Ticket #1234 erhalten, AI analysiert gerade…"
+       │
+       └─► triage-support-ticket (async via pg_notify)
+              │
+              ▼
+        Gemini 2.5 Flash:
+        - Kategorie (bug/billing/howto/feature)
+        - Severity (low/normal/high/blocking)
+        - Root-Cause-Hypothese
+        - Match gegen offene status_incidents
+        - ETA-Vorschlag (1h / 24h / 3d / 1w)
+        - Vorgeschlagene Antwort (DE/EN/ES)
+              │
+              ├─► UPDATE support_tickets SET ai_analysis, eta, suggested_reply
+              ├─► Email an info@useadtool.ai (mit User-Kontext + Plan + letzte Renders)
+              └─► Email an Kunden: "Wir haben deine Anfrage analysiert.
+                                    Voraussichtliche Lösung in ~{ETA}.
+                                    {kontextuelle Erstantwort}"
 
-3. **`qa-weekly-deep-sweep`**: Im Handler (Zeile 727) nach OPTIONS-Preflight Mock-Guard einfügen — vor dem Admin-Token-Check (Zeile 744). Import von `isQaMockRequest, qaMockJson` aus `../_shared/qaMock.ts` ergänzen.
+Admin im Cockpit: 1-Klick "Approve & Send" oder "Mark Resolved"
+       │
+       ▼
+Status = resolved  ──►  Trigger notify-ticket-resolved
+                              └─► Email an Kunde: "Fixed ✓ — bitte teste"
+```
 
-4. **`smoke-matrix-run`**: Im Handler (Zeile 162) nach OPTIONS-Preflight Mock-Guard einfügen — vor dem Admin-Check (Zeile 175). Wichtig: damit kann sich der Sweep nicht mehr selbst aufrufen — der Registry-Eintrag für `smoke-matrix-run` selbst sollte als Self-Reference ausgeschlossen werden (in `smokeRegistry.ts` entfernen oder als `skip` markieren), sonst läuft der Sweep rekursiv.
+### Was gebaut wird
 
-## Verifikation
+**1. DB-Migration** — `support_tickets` erweitern:
+- `ai_category`, `ai_severity`, `ai_root_cause`, `ai_eta_hours`, `ai_suggested_reply`, `ai_analyzed_at`
+- `linked_incident_id` (FK auf `status_incidents`)
+- `resolved_notification_sent_at`
+- Trigger: bei `status → resolved` queue Email
 
-Nach Deploy:
-- Kategorie **Social — Meta** erneut sweepen → `facebook-list-pages` + `facebook-select-page` grün.
-- Kategorie **Notifications & Email** sweepen → `auth-email-hook` grün.
-- Kategorie **QA & Testing** sweepen → `qa-weekly-deep-sweep` + `smoke-matrix-run` grün (bzw. `smoke-matrix-run` aus Registry entfernt → 16/16 statt 17).
+**2. Edge Function `triage-support-ticket`**
+- Input: `ticket_id`
+- Lädt Ticket + User-Profile + letzte 5 Errors aus `runtime_errors`/`bug_reports`
+- Gemini 2.5 Flash Tool-Call → strukturiertes Triage-JSON
+- Matched gegen offene `status_incidents` (Vector-Similarity auf description)
+- Schreibt zurück + verschickt 2 Emails (Kunde + Inbox)
 
-## Out-of-Scope
+**3. Edge Function `notify-ticket-resolved`**
+- Triggered durch DB-Trigger (pg_net) bei `status → resolved`
+- Sendet React-Email "Fixed" Template
 
-- Keine Änderungen am Auth-Flow, an Meta-Discovery oder am Deep-Sweep-Orchestrator.
-- Keine Änderungen an `_shared/qaMock.ts`.
-- Keine UI-Änderungen im Cockpit.
+**4. React-Email Templates** in `_shared/transactional-email-templates/`:
+- `support-ticket-received.tsx` (sofortige Eingangsbestätigung)
+- `support-ticket-triaged.tsx` (AI-Analyse + ETA + Antwort)
+- `support-ticket-resolved.tsx` (Fix-Notification)
+- Registry-Eintrag + deploy
 
-## Files
+**5. Admin-Cockpit-Tab "Support Inbox"** unter `/admin/qa-cockpit`:
+- Liste aller Tickets mit AI-Analyse-Spalte
+- 1-Klick "Send Suggested Reply" / "Approve ETA" / "Mark Resolved"
+- Link zu verknüpftem Incident
+- Filter: Offen / In Progress / Resolved heute
 
-- `supabase/functions/facebook-list-pages/index.ts` — 1-Zeilen-Fix (`corsHeaders` → `CORS`).
-- `supabase/functions/facebook-select-page/index.ts` — 1-Zeilen-Fix.
-- `supabase/functions/auth-email-hook/index.ts` — Mock-Guard im Deno.serve-Handler.
-- `supabase/functions/qa-weekly-deep-sweep/index.ts` — Import + Mock-Guard im Handler.
-- `supabase/functions/smoke-matrix-run/index.ts` — Import + Mock-Guard im Handler.
-- `supabase/functions/_shared/smokeRegistry.ts` — `smoke-matrix-run` aus Registry entfernen (Self-Reference).
+**6. Auto-Suggest auf Status-Page**
+- Wenn Ticket mit `linked_incident_id` → User sieht Banner "Wir arbeiten dran: {incident.title}"
+
+### Kosten
+- Gemini 2.5 Flash Triage: ~0.001€/Ticket (negierbar)
+- Email-Sends laufen über bestehende Lovable-Emails-Queue (kein Extra-Provider)
+
+### Sicherheit
+- AI-Antwort wird **NICHT** automatisch versendet ohne Admin-Approve (Default OFF), nur als Vorschlag
+- Toggle `system_config.support.auto_send_ai_reply = false` per Default
+- User können später auf "Auto" wechseln wenn Confidence hoch genug
+
+## Teil C — Out of Scope (für später)
+- Inbound-Email-Parsing (Kunden antworten direkt per Email → Ticket-Update). Braucht Mailgun/Postmark Inbound-Webhook. Vorschlag: Phase 2.
+- Multi-Agent-Inbox (mehrere Support-Mitarbeiter). Aktuell genügt 1 Inbox.
+
+## Empfehlung
+Vor Paid-Launch: **Teil B komplett bauen** (geschätzt 1 Iteration). Danach grün für Marketing-Spend.
