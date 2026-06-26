@@ -648,7 +648,7 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
             type="button"
             onClick={() => setStep((s) => (s + 1) as 2 | 3)}
             disabled={step === 1 && !canAdvanceFrom1}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="bg-gradient-to-r from-primary to-amber-300 text-primary-foreground hover:opacity-90 shadow-[0_0_18px_hsl(var(--primary)/0.45)]"
           >
             {t.next}
             <ChevronRight className="h-4 w-4 ml-1" />
