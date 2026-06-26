@@ -19,6 +19,7 @@ import { WatchdogTab } from "@/pages/admin/WatchdogTab";
 import { ProbesTab } from "@/pages/admin/ProbesTab";
 import { MetaTokenHealthTab } from "@/pages/admin/MetaTokenHealthTab";
 import { IncidentManager } from "@/components/admin/qa-cockpit/IncidentManager";
+import { FunctionMatrixTab } from "@/components/admin/qa-cockpit/FunctionMatrixTab";
 
 
 const TIER_COLORS: Record<string, string> = {
@@ -325,6 +326,10 @@ export default function QACockpit() {
               <Sparkles className="h-3.5 w-3.5 mr-1.5" />
               Live Sweep
             </TabsTrigger>
+            <TabsTrigger value="smoke-matrix" className="text-[#F5C76A]">
+              <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
+              Smoke Matrix
+            </TabsTrigger>
             <TabsTrigger value="deep-sweep" className="text-[#F5C76A]">
               <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
               Deep Sweep
@@ -364,6 +369,11 @@ export default function QACockpit() {
           {/* WEEKLY DEEP SWEEP */}
           <TabsContent value="deep-sweep">
             <DeepSweepTab />
+          </TabsContent>
+
+          {/* FUNCTION SMOKE MATRIX (Block 1) */}
+          <TabsContent value="smoke-matrix">
+            <FunctionMatrixTab />
           </TabsContent>
 
           {/* WATCHDOG */}
