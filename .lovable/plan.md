@@ -1,41 +1,54 @@
+## Realer Coverage-Stand (frisch gemessen)
+- **473 Edge Functions** insgesamt.
+- **22** haben einen `isQaMockRequest`-Guard im Handler.
+- **30** sind in `_shared/smokeRegistry.ts` registriert (Block 1 = 29 grün).
+- **~450 Functions** noch ohne Smoke-Pfad.
 
-## Ziel
-26/29 → 29/29 grün. Die drei Fails sind **keine echten Bugs**, sondern reine Smoke-Mock-Lücken — die Functions wurden noch nicht in den `x-qa-mock`-Pfad eingebunden.
+Die frühere „424/473"-Aussage war ein Rechenfehler — Realität ist deutlich kleiner. Wave B ist also Pflicht, wenn wir echte Full-Coverage wollen.
 
-## Root-Cause pro Fail
+## Wave B — Sub-Wellen Rollout
 
-| Function | Fehler | Ursache |
-|---|---|---|
-| `analyze-image-v2` | 401 Unauthorized | Ruft `supabase.auth.getUser()` mit dem Anon-Header des Sweep-Callers → kein echter User → 401. Hat zwar `x-qa-mock` in CORS, aber **kein Short-Circuit** im Handler. |
-| `search-stock-videos` | 401 Unauthorized | Gleiche Mechanik (User-Check vor Mock-Pfad), und `x-qa-mock` fehlt sogar in CORS. |
-| `extract-subtitle-keywords` | 500 `extraction_failed` „No ob[ject generated]" | Geht direkt zum Lovable-AI-Gateway (Gemini structured output) — kein `qaMock`-Pfad. Wenn das Gateway im Sweep-Kontext kein valides Object liefert, schlägt es hart fehl. |
+| Welle | Scope | ca. Anzahl | Aufwand pro Function |
+|---|---|---|---|
+| **B1** | Trivial-Mocks: `check-*`, `health-*`, `get-*`, `fetch-*`, `search-*`, `list-*`, `analytics-*`, `calendar-*`, `planner-*` (Read-only Lookups) | ~80 | Guard + `{ok:true,mock:true,...}` |
+| **B2** | Provider-Wrapper: restliche `generate-*` (Video/Image/Audio/TTS) | ~70 | Guard + Sample-Asset-URL aus `qaMock.ts` |
+| **B3** | Composer / Director / Render / Compose / Process Pipelines | ~80 | Guard + strukturierter Mock-Body (Scene/Plan/Job) |
+| **B4** | Social-Publishing (`twitch-*`, `tiktok-*`, `instagram-*`, `linkedin-*`, `x-*`, `publish-*`, `send-*`) | ~55 | Guard + `{external_id, permalink, mock:true}` |
+| **B5** | Admin / Cron / Watchdog / QA-intern + Skip-Liste | ~115 | meist **Skip mit Grund** (cron-only, webhook, service_role-only) |
+| **B6** | AI-Gateway / Gemini-strukturierte Outputs (`extract-*`, `briefing-*`, `analyze-*` mit Schema) | ~50 | Guard + schemakonformer JSON-Mock |
 
-## Fix (3 kleine, gleichartige Patches)
+**Reihenfolge:** B1 → B2 → B5 (Skip-Liste, damit Cockpit „Coverage" realistisch wird) → B4 → B3 → B6.
 
-In jeder der drei Edge-Functions ganz am Anfang des Handlers (direkt nach dem OPTIONS-Return) den standardisierten Mock-Guard einbauen:
+## Pro Sub-Welle (gleicher Loop)
+1. Inventar-Skript listet alle Functions im Scope, die noch keinen Guard haben.
+2. Patch in 2 Teilen pro Function:
+   - **Handler:** `import { isQaMockRequest, qaMockResponse } from '../_shared/qaMock.ts'` + Guard direkt nach OPTIONS.
+   - **Registry:** Eintrag in `_shared/smokeRegistry.ts` mit `category`, `body`, optional `expect: 'structured'` + `requiredKeys`.
+3. `smoke-matrix-run` deployen, im Cockpit Sweep starten, rote Kacheln gezielt nachpatchen.
+4. Done-Kriterium pro Welle: **100 % grün oder explizit `skip` mit Grund**.
 
-```ts
-import { isQaMockRequest, qaMockResponse } from '../_shared/qaMock.ts';
-…
-if (isQaMockRequest(req)) {
-  return qaMockResponse({ /* function-spezifischer Sample-Body */ });
-}
-```
+## Registry-Erweiterungen (einmalig, mit B1)
+- `SmokeEntry.expect = 'structured'` zusätzlich mit `requiredKeys?: string[]` → Validator prüft Top-Level-Keys, damit ein leeres `{}` nicht fälschlich grün ist.
+- Neue Kategorien: `social-publishing`, `analytics-reports`, `admin-cron` (im Cockpit-Filter ergänzen).
+- Skip-Einträge bekommen im Cockpit eine **graue „SKIP"-Kachel** statt rot, mit Tooltip = `skip`-Begründung.
 
-Function-spezifische Mock-Payloads:
+## Konkret jetzt: **Sub-Welle B1 (~80 Trivial-Mocks)**
+Scope-Liste wird beim Start automatisch aus den Präfixen `check-*`, `health-*`, `get-*`, `fetch-*`, `list-*`, `search-*` (außer den 2 bereits gepatchten), `analytics-*`, `calendar-*`, `planner-*` gezogen. Lieferung in **3 Batches à ~25 Functions** in einer einzigen Build-Runde:
+- Batch 1: `check-*` + `health-*` + `get-*` + `fetch-*`
+- Batch 2: `analytics-*` + `calendar-*` + `planner-*`
+- Batch 3: restliche `search-*` + `list-*`
 
-- **extract-subtitle-keywords** → `{ results: [{ id: '1', keywords: ['test'] }] }`
-- **search-stock-videos** → `{ ok: true, videos: [], total: 0, source: 'mock' }`
-- **analyze-image-v2** → `{ ok: true, quality: { resolution:{width:1920,height:1080}, aspectRatio:'16:9', fileSize:0, qualityScore:90, issues:[] }, crops:{square:'',portrait:'',story:''} }`
+Nach jedem Batch deployen, damit ein eventueller Tippfehler nicht 80 Functions auf einmal rot färbt.
 
-Zusätzlich bei `search-stock-videos` `x-qa-mock` in den CORS-Allow-Headers ergänzen (analog zu `analyze-image-v2`).
-
-## Verifikation
-1. Functions deployen.
-2. Im QA-Cockpit erneut „Sweep starten".
-3. Erwartung: **29/29 Pass**, keine 401/500 mehr in Briefing, Misc und Picture/Image.
+## Done-Definition Wave B (komplett)
+- Cockpit „Smoke Matrix" zeigt **Coverage X/473** mit grün / rot / skip.
+- 0 € Provider-Kosten für einen Full-Sweep.
+- Skip-Liste sichtbar mit Grund.
+- Voller Sweep < 3 min Laufzeit.
 
 ## Nicht im Scope
-- Keine Änderungen an Produktions-Logik der drei Functions.
-- Keine Registry-Body-Anpassungen nötig (Bodies sind valide).
-- Wave B (weitere ~250 Functions) bleibt separates Paket.
+- Keine Änderung an Produktionslogik der Functions.
+- Keine echten Spends (bleibt Deep-Sweep).
+- Keine UI-Redesigns am Cockpit außer Kategorien-Filter + Skip-Kachel.
+
+**Start mit Sub-Welle B1, Batch 1 (`check-*`/`health-*`/`get-*`/`fetch-*`)?**
