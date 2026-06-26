@@ -25,6 +25,7 @@ import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
+import BriefingPlanSummary from './BriefingPlanSummary';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
 import type {
   ComposerScene,
