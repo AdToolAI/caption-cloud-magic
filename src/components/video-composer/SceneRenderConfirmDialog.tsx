@@ -9,7 +9,7 @@
  *
  * Controlled by SceneRenderConfirmProvider via a Promise-based API.
  */
-import { Loader2, Wallet, Sparkles, AlertTriangle } from 'lucide-react';
+import { Loader2, Wallet, Sparkles, AlertTriangle, Clock, Info } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +24,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { formatCredits, formatEur, type AggregatedCost } from '@/lib/composer/estimateSceneRenderCost';
+import { formatEtaRange } from '@/hooks/useProviderEta';
+import RefundGuaranteeBadge from './RefundGuaranteeBadge';
 
 export interface SceneRenderConfirmPayload {
   title?: string;
@@ -102,18 +104,62 @@ export default function SceneRenderConfirmDialog({
                   </li>
                 )}
               </ul>
+              {scn.etaSeconds > 0 && (
+                <div className="mt-2 pt-2 border-t border-border/30 flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Renderzeit
+                  </span>
+                  <span className="tabular-nums">{formatEtaRange(scn.etaSeconds)}</span>
+                </div>
+              )}
             </div>
           ))}
 
-          <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 flex items-center justify-between">
-            <span className="text-sm flex items-center gap-1.5">
-              <Wallet className="h-4 w-4 text-primary" />
-              Gesamt
-            </span>
-            <span className="font-semibold tabular-nums">
-              {formatCredits(cost.totalCredits)} · {formatEur(cost.totalEur)}
-            </span>
+          <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm flex items-center gap-1.5">
+                <Wallet className="h-4 w-4 text-primary" />
+                Gesamt
+              </span>
+              <span className="font-semibold tabular-nums">
+                {formatCredits(cost.totalCredits)} · {formatEur(cost.totalEur)}
+              </span>
+            </div>
+            {cost.etaSeconds > 0 && (
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  Geschätzte Renderzeit
+                </span>
+                <span className="tabular-nums">{formatEtaRange(cost.etaSeconds)}</span>
+              </div>
+            )}
           </div>
+
+          {cost.warnings.length > 0 && (
+            <div className="space-y-1.5">
+              {cost.warnings.map((w, i) => (
+                <div
+                  key={i}
+                  className={`rounded-md border px-3 py-2 text-[11px] flex items-start gap-1.5 ${
+                    w.level === 'warning'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                      : 'bg-sky-500/10 border-sky-500/30 text-sky-200'
+                  }`}
+                >
+                  {w.level === 'warning' ? (
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  ) : (
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  )}
+                  <span className="leading-tight">{w.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {cost.totalCredits > 0 && <RefundGuaranteeBadge />}
 
           {cost.totalCredits === 0 && (
             <div className="rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-[11px] text-amber-300 flex items-start gap-1.5">

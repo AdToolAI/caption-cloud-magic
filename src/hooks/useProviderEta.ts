@@ -55,7 +55,11 @@ export interface ProviderEtaResult {
   label: string;
 }
 
-export function useProviderEta(
+/**
+ * Pure ETA calculator — no React hook semantics. Safe to call from
+ * helpers, cost aggregators, and edge function payload prep.
+ */
+export function computeProviderEta(
   clipSource: ClipSource | string | undefined,
   durationSeconds: number = 5,
   quality: ClipQuality = 'standard',
@@ -68,4 +72,25 @@ export function useProviderEta(
     tint: config.tint,
     label: config.label,
   };
+}
+
+export function useProviderEta(
+  clipSource: ClipSource | string | undefined,
+  durationSeconds: number = 5,
+  quality: ClipQuality = 'standard',
+): ProviderEtaResult {
+  return computeProviderEta(clipSource, durationSeconds, quality);
+}
+
+/** Format seconds → human range like "~2-3 min" or "~45s". */
+export function formatEtaRange(etaSeconds: number): string {
+  if (etaSeconds <= 0) return '~sofort';
+  if (etaSeconds < 90) {
+    const lo = Math.max(15, Math.round(etaSeconds * 0.8));
+    const hi = Math.round(etaSeconds * 1.3);
+    return `~${lo}-${hi}s`;
+  }
+  const minLo = Math.max(1, Math.floor((etaSeconds * 0.8) / 60));
+  const minHi = Math.ceil((etaSeconds * 1.3) / 60);
+  return minLo === minHi ? `~${minLo} min` : `~${minLo}-${minHi} min`;
 }

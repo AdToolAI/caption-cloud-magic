@@ -18,12 +18,20 @@ import {
   type ComposerScene,
   type ClipQuality,
 } from '@/types/video-composer';
+import { computeProviderEta } from '@/hooks/useProviderEta';
+import { getRenderWarnings, aggregateWarnings, type RenderWarning } from '@/lib/video-composer/renderWarnings';
 
 const CREDIT_PER_EUR = 100;     // 1 credit = €0.01
 const VO_CREDITS_PER_SCENE = 5; // ~€0.05 ElevenLabs avg
 // sync.so lipsync-2-pro: raised 9 → 16 Cr/s (3.5× margin cap on ~€0.046/s raw cost).
 // Backend mirrors: compose-dialog-segments, lip-sync-video.
 const LIPSYNC_CREDITS_PER_SEC_PER_PASS = 16;
+// Wall-clock add-ons (seconds) on top of base provider ETA when audio/lipsync are involved.
+const VO_ETA_SECONDS = 8;
+const LIPSYNC_ETA_BASE_SECONDS = 45;
+const LIPSYNC_ETA_PER_PASS_SECONDS = 35;
+// Lambda stitch median for a 4-scene master, conservative.
+const STITCH_ETA_SECONDS = 70;
 
 export interface SceneCostLine {
   label: string;
@@ -41,12 +49,20 @@ export interface SceneCostBreakdown {
   totalCredits: number;
   totalEur: number;
   lines: SceneCostLine[];
+  /** Estimated wall-clock seconds until clip ready (provider + VO + lipsync). */
+  etaSeconds: number;
+  /** Provider/config warnings for this scene. */
+  warnings: RenderWarning[];
 }
 
 export interface AggregatedCost {
   scenes: SceneCostBreakdown[];
   totalCredits: number;
   totalEur: number;
+  /** Estimated wall-clock seconds. Parallel scenes assumed → max + 20% overhead. */
+  etaSeconds: number;
+  /** Deduplicated warnings across all scenes. */
+  warnings: RenderWarning[];
 }
 
 interface EstimateOpts {
@@ -135,6 +151,16 @@ export function estimateSceneRenderCost(
   }
 
   const totalCredits = providerCredits + voCredits + lipsyncCredits;
+
+  // ETA: base provider time + VO synth + lipsync passes (sequential after clip).
+  const providerEta = computeProviderEta(scene.clipSource, durationSec, quality).etaSeconds;
+  let etaSeconds = providerEta;
+  if (voCredits > 0) etaSeconds += VO_ETA_SECONDS;
+  if (lipsyncCredits > 0) {
+    const passes = opts.passes ?? passesForScene(scene);
+    etaSeconds += LIPSYNC_ETA_BASE_SECONDS + passes * LIPSYNC_ETA_PER_PASS_SECONDS;
+  }
+
   return {
     sceneId: scene.id,
     sceneIndex: (scene.orderIndex ?? 0) + 1,
@@ -144,6 +170,8 @@ export function estimateSceneRenderCost(
     totalCredits,
     totalEur: totalCredits / CREDIT_PER_EUR,
     lines,
+    etaSeconds,
+    warnings: getRenderWarnings(scene),
   };
 }
 
@@ -152,10 +180,16 @@ export function aggregateCost(
   opts: EstimateOpts = {},
 ): AggregatedCost {
   const breakdowns = scenes.map((s) => estimateSceneRenderCost(s, opts));
+  // Scenes render in parallel (Promise.all in handleGenerateAll) → wall-clock
+  // is roughly the slowest scene plus a small overhead for orchestration.
+  const slowest = breakdowns.reduce((mx, b) => Math.max(mx, b.etaSeconds), 0);
+  const etaSeconds = Math.round(slowest * 1.2) + (breakdowns.length > 1 ? STITCH_ETA_SECONDS : 0);
   return {
     scenes: breakdowns,
     totalCredits: breakdowns.reduce((sum, b) => sum + b.totalCredits, 0),
     totalEur: breakdowns.reduce((sum, b) => sum + b.totalEur, 0),
+    etaSeconds,
+    warnings: aggregateWarnings(scenes),
   };
 }
 
