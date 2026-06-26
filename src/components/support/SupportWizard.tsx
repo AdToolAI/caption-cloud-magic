@@ -221,6 +221,8 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
   const t = TEXT[(language as keyof typeof TEXT)] || TEXT.en;
 
   const draftId = useMemo(() => crypto.randomUUID(), []);
+  const uploaderRef = useRef<AttachmentUploaderHandle>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<string>("bug");
@@ -234,12 +236,43 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [browserInfo, setBrowserInfo] = useState<BrowserInfo | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
 
   useEffect(() => {
     collectBrowserInfo().then(setBrowserInfo);
   }, []);
 
+  // Smart paste: capture screenshots from clipboard anywhere in the wizard
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) {
+            // Rename so it has a sensible name
+            files.push(new File([f], `pasted-${Date.now()}.${(f.type.split("/")[1] || "png")}`, { type: f.type }));
+          }
+        }
+      }
+      if (files.length && uploaderRef.current) {
+        e.preventDefault();
+        uploaderRef.current.addFiles(files);
+        toast({ title: t.pastedTitle, description: t.pastedDesc });
+      }
+    };
+    el.addEventListener("paste", onPaste as EventListener);
+    return () => el.removeEventListener("paste", onPaste as EventListener);
+  }, [t]);
+
   const canAdvanceFrom1 = subject.trim().length >= 3 && !!category;
+  const mediaRecommendedCategories = new Set(["bug", "rendering", "publishing", "technical"]);
+  const shouldNudgeMedia = mediaRecommendedCategories.has(category) && attachments.length === 0;
+
 
   const submit = async () => {
     if (!canAdvanceFrom1) {
