@@ -4,6 +4,7 @@ import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInter
 import { ZoomIn } from '../components/animations/ZoomIn';
 import { PanEffect } from '../components/animations/PanEffect';
 import { LottieIcons } from '../components/LottieIcons';
+import { HormoziCaption, type HormoziSegment } from '../components/HormoziCaption';
 
 // Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
 const AudioLayer = memo(function AudioLayer({
@@ -100,6 +101,8 @@ export const UniversalVideoSchema = z.object({
       startTime: z.number(),
       endTime: z.number(),
     })),
+    /** Hormozi mode: power-words to visually highlight in this segment. */
+    highlightKeywords: z.array(z.string()).optional(),
   })).optional(),
   subtitleStyle: z.object({
     position: z.enum(['top', 'center', 'bottom']),
@@ -108,11 +111,13 @@ export const UniversalVideoSchema = z.object({
     color: z.string(),
     backgroundColor: z.string(),
     backgroundOpacity: z.number(),
-    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch']),
+    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'hormozi']),
     animationSpeed: z.number(),
     outlineStyle: z.enum(['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow']),
     outlineColor: z.string(),
     outlineWidth: z.number(),
+    /** Hormozi mode: pill color for highlighted power-words (default gold). */
+    highlightColor: z.string().optional(),
   }).optional(),
   background: z.object({
     type: z.enum(['color', 'gradient', 'video', 'image']),
@@ -766,7 +771,21 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           backgroundMusicVolume={backgroundMusicVolume}
         />
         {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
-        {currentSubtitleSegment && subtitleStyle && (
+        {subtitleStyle?.animation === 'hormozi' && subtitles && subtitles.length > 0 && (
+          <HormoziCaption
+            segments={subtitles as HormoziSegment[]}
+            style={{
+              position: subtitleStyle.position,
+              font: subtitleStyle.font,
+              fontSize: subtitleStyle.fontSize,
+              color: subtitleStyle.color,
+              outlineColor: subtitleStyle.outlineColor,
+              outlineWidth: subtitleStyle.outlineWidth,
+              highlightColor: subtitleStyle.highlightColor || '#F5C76A',
+            }}
+          />
+        )}
+        {currentSubtitleSegment && subtitleStyle && subtitleStyle.animation !== 'hormozi' && (
           <AbsoluteFill style={{
             display: 'flex',
             flexDirection: 'column',
@@ -859,7 +878,21 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       />
       
       {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
-      {currentSubtitleSegment && subtitleStyle && (
+      {subtitleStyle?.animation === 'hormozi' && subtitles && subtitles.length > 0 && (
+        <HormoziCaption
+          segments={subtitles as HormoziSegment[]}
+          style={{
+            position: subtitleStyle.position,
+            font: subtitleStyle.font,
+            fontSize: subtitleStyle.fontSize,
+            color: subtitleStyle.color,
+            outlineColor: subtitleStyle.outlineColor,
+            outlineWidth: subtitleStyle.outlineWidth,
+            highlightColor: subtitleStyle.highlightColor || '#F5C76A',
+          }}
+        />
+      )}
+      {currentSubtitleSegment && subtitleStyle && subtitleStyle.animation !== 'hormozi' && (
         <AbsoluteFill style={{
           display: 'flex',
           flexDirection: 'column',
