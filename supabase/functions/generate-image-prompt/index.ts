@@ -6,10 +6,11 @@
 // a recommended model/mode/strength.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -193,6 +194,8 @@ const TOOL_DEF = {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { text: "QA mock content", script: "QA mock script", caption: "QA mock caption", variants: ["v1","v2"], status: "succeeded" });
+
 
   try {
     const supabase = createClient(

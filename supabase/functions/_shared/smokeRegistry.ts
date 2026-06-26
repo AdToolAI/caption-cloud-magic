@@ -257,6 +257,29 @@ export const SMOKE_REGISTRY: SmokeEntry[] = [
   { name: "fetch-news-hub",               category: "misc", body: { language: "en" }, expect: "any-2xx" },
   { name: "fetch-news-radar",             category: "misc", body: { language: "en" }, expect: "any-2xx" },
   { name: "fetch-trends",                 category: "misc", body: { language: "en" }, expect: "any-2xx" },
+
+  // ────────────── Wave B2.1 — Video / Image Providers (mock-guarded) ──────────────
+  { name: "generate-ai-video",                category: "ai-video-providers", body: { prompt: "qa", duration: 5 }, expect: "any-2xx" },
+  { name: "generate-fast-preview",            category: "ai-video-providers", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-video-variants",          category: "ai-video-providers", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-composer-image-scene",    category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-scene-visual",            category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-scene-still",             category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-background-scenes",       category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-video-thumbnail",         category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-thumbnail",               category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-premium-visual",          category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-studio-image",            category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-brand-asset",             category: "picture-image", body: { prompt: "qa", kind: "logo" }, expect: "any-2xx" },
+  { name: "generate-character-sheet",         category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-avatar-portrait",         category: "picture-image", body: { prompt: "qa" }, expect: "any-2xx" },
+  { name: "generate-avatar-poses",            category: "picture-image", body: { avatarId: "qa-mock" }, expect: "any-2xx" },
+  { name: "generate-avatar-wardrobe",         category: "picture-image", body: { avatarId: "qa-mock" }, expect: "any-2xx" },
+  { name: "generate-wardrobe-perspectives",   category: "picture-image", body: { avatarId: "qa-mock" }, expect: "any-2xx" },
+  { name: "generate-location-vibes",          category: "picture-image", body: { locationId: "qa-mock" }, expect: "any-2xx" },
+  { name: "generate-location-props",          category: "picture-image", body: { locationId: "qa-mock" }, expect: "any-2xx" },
+  { name: "generate-world-asset",             category: "picture-image", body: { prompt: "qa", kind: "prop" }, expect: "any-2xx" },
+  { name: "generate-image-prompt",            category: "briefing-composer", body: { userText: "qa" }, expect: "any-2xx" },
 ];
 
 /** Categories in display order for the Cockpit UI. */
