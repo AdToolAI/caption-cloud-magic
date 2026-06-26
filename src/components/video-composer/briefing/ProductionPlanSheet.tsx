@@ -25,6 +25,7 @@ import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
+import BriefingPlanSummary from './BriefingPlanSummary';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
 import type {
   ComposerScene,
@@ -430,7 +431,7 @@ export default function ProductionPlanSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[90dvh] max-h-[90dvh] overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto] p-4 gap-3">
+      <DialogContent className="max-w-4xl w-[95vw] h-[90dvh] max-h-[90dvh] overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto_auto] p-4 gap-3">
         <DialogHeader className="space-y-1 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileText className="h-4 w-4 text-amber-300" />
@@ -818,6 +819,13 @@ export default function ProductionPlanSheet({
               <div className="h-4" />
             </div>
           </ScrollArea>
+        )}
+
+        {/* Pre-Apply Summary (Briefing Intelligence v2) — sticky above footer */}
+        {step === 'review' && plan && (
+          <div className="shrink-0">
+            <BriefingPlanSummary plan={plan} />
+          </div>
         )}
 
         <DialogFooter className="gap-2 shrink-0 border-t border-border/40 pt-3">

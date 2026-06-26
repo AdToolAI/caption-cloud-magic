@@ -151,6 +151,13 @@ const TOOL_PASS_A = {
                   required: ['speakerMentionKey', 'text'],
                 },
               },
+              _meta: {
+                type: 'object',
+                description: 'AI-enrichment trail for this scene. List the dotted field paths you filled in because the briefing did NOT explicitly state them (e.g. "shotDirector.lighting", "performance.gestik", "anchorPromptEN"). The UI shows a ✨ badge next to these so the creator sees what is theirs vs. AI-added.',
+                properties: {
+                  aiFilled: { type: 'array', items: { type: 'string' } },
+                },
+              },
             },
             required: ['index', 'durationSec'],
           },
@@ -189,6 +196,26 @@ const TOOL_PASS_A = {
           },
         },
         negativePrompt: { type: 'string' },
+        _meta: {
+          type: 'object',
+          description: 'Briefing-Intelligence v2 telemetry. Set `mode` to one of storytelling | brand | product | educational | other (best guess based on the briefing). Set `modeConfidence` 0..1. Use `research` as a short array of factual bullets you leaned on to enrich the plan (general knowledge; do NOT fabricate sources). Use `aiFilled` to list plan-level dotted paths you invented (e.g. "captions.font", "voice.voiceName") because the briefing did not state them.',
+          properties: {
+            mode: { type: 'string' },
+            modeConfidence: { type: 'number' },
+            research: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  fact: { type: 'string' },
+                  source: { type: 'string' },
+                },
+                required: ['fact'],
+              },
+            },
+            aiFilled: { type: 'array', items: { type: 'string' } },
+          },
+        },
       },
       required: ['scenes'],
     },
@@ -285,6 +312,32 @@ LITERAL-PARSE MODE (applies when the briefing DOES list scenes explicitly)
 - dialogTurns: for cinematic-sync / native-dialogue / sync-* / heygen scenes
   with multiple lines, emit one turn per speaker line. Detect speakers from
   "NAME:", "[NAME]:", "NAME — MOOD:" or labelled bullets.
+
+═══════════════════════════════════════════════════════════════════════════
+BRIEFING INTELLIGENCE v2 — mode detection + AI-fill trail
+═══════════════════════════════════════════════════════════════════════════
+
+ALWAYS set the top-level _meta object:
+- _meta.mode: classify the briefing. One of:
+    "storytelling" (narrative arc, characters, plot),
+    "brand" (brand awareness, identity, lifestyle),
+    "product" (concrete product/SaaS/feature pitch),
+    "educational" (how-to, explainer, tutorial),
+    "other".
+- _meta.modeConfidence: 0..1.
+- _meta.research: up to 8 short factual bullets you used to enrich the plan
+  from general knowledge (era context, brand archetypes, audience norms,
+  cinematic references). Keep facts concise. DO NOT fabricate URLs.
+- _meta.aiFilled: list dotted paths of PLAN-LEVEL fields you invented because
+  the briefing didn't state them, e.g. "captions.font", "voice.voiceName",
+  "negativePrompt".
+
+PER SCENE: set scenes[i]._meta.aiFilled with the dotted paths you filled
+in for that scene WITHOUT explicit briefing input — examples:
+  "anchorPromptEN", "shotDirector.framing", "shotDirector.lighting",
+  "performance.gestik", "musicCue.energy", "brollHints", "voiceover.text".
+Omit fields the briefing explicitly stated. The creator uses this list
+to know what is AI-generated and what is theirs.
 
 In LITERAL mode, DO NOT invent fields the briefing does not state.`;
 
@@ -558,6 +611,16 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       if (Object.keys(p).length) performance = p;
     }
 
+    // Per-scene aiFilled trail (BriefingIntel v2). Sanitized: stringify,
+    // de-dupe, max 30 entries. UI shows a ✨ badge next to these fields.
+    let sceneMeta: any = undefined;
+    if (s._meta && Array.isArray(s._meta.aiFilled)) {
+      const af = Array.from(new Set(
+        s._meta.aiFilled.map((p: any) => String(p ?? '').trim()).filter(Boolean),
+      )).slice(0, 30);
+      if (af.length) sceneMeta = { aiFilled: af };
+    }
+
     return stripUndef({
       index: Number.isFinite(Number(s.index)) ? Math.max(1, Math.floor(Number(s.index))) : i + 1,
       label: s.label,
@@ -578,6 +641,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       continuityHint: s.continuityHint,
       musicCue,
       dialogTurns,
+      _meta: sceneMeta,
     });
   });
 
@@ -587,6 +651,35 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
   scenes.forEach((s: any, i: number) => { s.index = i + 1; });
 
   console.log('[briefing-deep-parse] merge done — scenes:', scenes.length, 'unresolved:', (resolution?.unresolved ?? []).length);
+
+  // Plan-level _meta (mode, research, aiFilled) sanitized.
+  let planMeta: any = undefined;
+  if (manifest?._meta && typeof manifest._meta === 'object') {
+    const m = manifest._meta;
+    const modeRaw = String(m.mode ?? '').toLowerCase();
+    const ALLOWED_MODE = new Set(['storytelling','brand','product','educational','other']);
+    const research = Array.isArray(m.research)
+      ? m.research
+          .map((r: any) => stripUndef({
+            fact: String(r?.fact ?? '').trim().slice(0, 400),
+            source: r?.source ? String(r.source).slice(0, 120) : undefined,
+          }))
+          .filter((r: any) => r.fact)
+          .slice(0, 20)
+      : undefined;
+    const aiFilled = Array.isArray(m.aiFilled)
+      ? Array.from(new Set(m.aiFilled.map((p: any) => String(p ?? '').trim()).filter(Boolean))).slice(0, 40)
+      : undefined;
+    planMeta = stripUndef({
+      mode: ALLOWED_MODE.has(modeRaw) ? modeRaw : (modeRaw ? 'other' : undefined),
+      modeConfidence: typeof m.modeConfidence === 'number'
+        ? clamp(m.modeConfidence, 0, 1, 0.5)
+        : undefined,
+      research: research?.length ? research : undefined,
+      aiFilled: aiFilled?.length ? aiFilled : undefined,
+    });
+    if (!Object.keys(planMeta).length) planMeta = undefined;
+  }
 
   return {
     project: manifest?.project,
@@ -602,6 +695,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
     captions: manifest?.captions,
     negativePrompt: manifest?.negativePrompt,
     unresolved: resolution?.unresolved ?? [],
+    _meta: planMeta,
   };
 }
 
