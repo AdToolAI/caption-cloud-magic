@@ -175,7 +175,13 @@ function planSceneToComposerScene(
     .map((c, i) =>
       ({
         characterId: stripPrefix(c.characterId as string),
-        shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
+        // Per-cast override (Stage-3 mapping completion) wins over the
+        // scene default. Falls back to primary/profile split for 2-shots.
+        shotType: c.shotType
+          ? c.shotType
+          : i === 0
+            ? primaryShot
+            : (primaryShot === 'detail' ? 'profile' : 'profile'),
         // Propagate outfit selection — `prepareSceneAnchor` reads this
         // and swaps the avatar's default portrait for the outfit cover
         // image during anchor composition.
@@ -306,10 +312,23 @@ function planSceneToComposerScene(
     sceneActionEn: ps.anchorPromptEN,
     performance,
     actionBeat,
-    realismPreset: realismFromTone(briefingTone),
-    textOverlay: { ...DEFAULT_TEXT_OVERLAY } as any,
-    transitionType: 'crossfade',
-    transitionDuration: 0.4,
+    // Stage-3: scene-level tone wins over briefing-level tone for preset.
+    realismPreset: realismFromTone(ps.tone) ?? realismFromTone(briefingTone),
+    // Stage-3: per-scene burnt-in overlay (defaults preserved when plan empty).
+    textOverlay: (ps.textOverlay && ps.textOverlay.text)
+      ? {
+          text: ps.textOverlay.text,
+          position: ps.textOverlay.position ?? 'bottom',
+          animation: ps.textOverlay.animation ?? 'fade-in',
+          fontSize: ps.textOverlay.fontSizePx ?? DEFAULT_TEXT_OVERLAY.fontSize,
+          color: ps.textOverlay.color ?? DEFAULT_TEXT_OVERLAY.color,
+        } as any
+      : ({ ...DEFAULT_TEXT_OVERLAY } as any),
+    // Stage-3: transition into this scene (plan-driven). Falls back to crossfade.
+    transitionType: (ps.transition?.type ?? 'crossfade') as any,
+    transitionDuration: ps.transition?.durationSec ?? 0.4,
+    // Stage-3: deterministic seed (mapped to composer_scenes.seed).
+    seed: typeof ps.seed === 'number' ? ps.seed : undefined,
     retryCount: 0,
     costEuros: 0,
     // Stage-2 plan fields stored on the scene for downstream readers.

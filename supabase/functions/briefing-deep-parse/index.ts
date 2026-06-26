@@ -77,6 +77,7 @@ const TOOL_PASS_A = {
                   properties: {
                     mentionKey: { type: 'string' },
                     outfit: { type: 'string' },
+                    shotType: { type: 'string', enum: ['full','profile','back','detail','pov','silhouette'], description: 'Per-cast framing override for two-shot scenes. Omit when the scene-level framing applies to every speaker.' },
                   },
                   required: ['mentionKey'],
                 },
@@ -152,6 +153,28 @@ const TOOL_PASS_A = {
                   required: ['speakerMentionKey', 'text'],
                 },
               },
+              transition: {
+                type: 'object',
+                description: 'Transition INTO this scene. Only set when the briefing explicitly names one (e.g. "Übergang: crossfade", "hard cut"). Defaults are applied client-side.',
+                properties: {
+                  type: { type: 'string', enum: ['none','fade','crossfade','wipe','slide','zoom'] },
+                  durationSec: { type: 'number' },
+                },
+              },
+              textOverlay: {
+                type: 'object',
+                description: 'Burnt-in scene caption (kinetic text). Set only when the briefing requests on-screen text for this scene.',
+                properties: {
+                  text: { type: 'string' },
+                  position: { type: 'string', enum: ['top','center','bottom'] },
+                  animation: { type: 'string', enum: ['none','fade-in','scale-bounce','slide-left','slide-right','word-by-word','glow-pulse'] },
+                  fontSizePx: { type: 'integer' },
+                  color: { type: 'string' },
+                },
+                required: ['text'],
+              },
+              tone: { type: 'string', description: 'Scene-level tone keyword (e.g. "cinematic", "luxury", "documentary"). Optional override of the project tone.' },
+              seed: { type: 'integer', description: 'Master seed for reproducible renders. Only set when the briefing names a number ("Seed: 12345").' },
               _meta: {
                 type: 'object',
                 description: 'AI-enrichment trail for this scene. List the dotted field paths you filled in because the briefing did NOT explicitly state them (e.g. "shotDirector.lighting", "performance.gestik", "anchorPromptEN"). The UI shows a ✨ badge next to these so the creator sees what is theirs vs. AI-added.',
