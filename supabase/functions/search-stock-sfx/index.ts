@@ -1,3 +1,4 @@
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 // Search royalty-free SFX via Pixabay Audio API.
 // Pixabay also serves SFX on its audio endpoint — keyword-driven.
 // Falls back to a small built-in catalog if no API key is set.
@@ -91,6 +92,10 @@ function filterFallback(query: string, category: string): SfxResult[] {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "search-stock-sfx" });
   }
 
   try {

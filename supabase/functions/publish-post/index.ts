@@ -3,6 +3,7 @@ import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { getRedisCache } from "../_shared/redis-cache.ts";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import {
   getMetaConnection,
   ensureFreshToken,
@@ -31,6 +32,10 @@ const PLATFORM_LIMITS = {
 Deno.serve(withTelemetry('publish-post', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "publish-post" });
   }
 
   let capturedPostId: string | null = null;

@@ -4,6 +4,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -29,6 +30,10 @@ function extractPathFromSignedUrl(url: string | null, bucket: string): string | 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "repair-brand-character-urls" });
   }
 
   try {

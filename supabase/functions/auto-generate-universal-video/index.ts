@@ -8,6 +8,7 @@ import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 // r39: Use shared getLambdaFunctionName
 function _getLambdaFunctionName(): string {
   return getLambdaFunctionName();
@@ -114,6 +115,10 @@ function isInfraError(msg: string): boolean {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "auto-generate-universal-video" });
   }
 
   console.log(`[auto-generate-universal-video] BUILD_TAG=${AUTO_GEN_BUILD_TAG}`);

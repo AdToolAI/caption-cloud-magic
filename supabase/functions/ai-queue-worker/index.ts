@@ -8,6 +8,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { trackAIJobEvent } from '../_shared/telemetry.ts';
 import { getSupabaseClient } from '../_shared/db-client.ts';
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const BATCH_SIZE = 10; // Process 10 jobs in parallel (Continuous mode optimization)
 const POLL_INTERVAL_MS = 10000; // Poll every 10 seconds
 const JOB_TIMEOUT_MS = 300000; // 5 minutes max per job
@@ -34,6 +35,10 @@ serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "ai-queue-worker" });
   }
 
   const supabase = getSupabaseClient();

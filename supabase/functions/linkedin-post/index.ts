@@ -4,6 +4,7 @@ import { withTelemetry } from '../_shared/telemetry.ts';
 import { linkedinCircuitBreaker } from '../_shared/circuit-breaker.ts';
 import { withTimeout } from '../_shared/timeout.ts';
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
@@ -12,6 +13,10 @@ const corsHeaders = {
 Deno.serve(withTelemetry('linkedin-post', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "linkedin-post" });
   }
 
   return await linkedinCircuitBreaker.execute(async () => {
