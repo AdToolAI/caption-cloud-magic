@@ -23,6 +23,9 @@ import { BrandBoard } from "@/components/brand/BrandBoard";
 import { ConsistencyScore } from "@/components/brand/ConsistencyScore";
 import { ActiveBrandSelector } from "@/components/brand/ActiveBrandSelector";
 import { BrandKitHeroHeader } from "@/components/brand/BrandKitHeroHeader";
+import { BrandVault } from "@/components/brand/BrandVault";
+import { BrandDnaExtractor } from "@/components/brand/BrandDnaExtractor";
+import type { BrandDnaResult } from "@/hooks/useBrandDnaExtractor";
 
 const BrandKit = () => {
   const { t } = useTranslation();
