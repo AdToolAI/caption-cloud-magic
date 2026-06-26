@@ -337,8 +337,7 @@ serve(async (req) => {
         .update({
           status: "failed",
           failed_at: new Date().toISOString(),
-          error_message: err?.message ?? "HappyHorse submit failed",
-          error_class: errorClass,
+          error_message: `[${errorClass}] ${err?.message ?? "HappyHorse submit failed"}`,
         })
         .eq("id", generation.id);
       await supabaseAdmin.rpc("refund_ai_video_credits", {
