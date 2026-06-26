@@ -23,6 +23,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useComposerHistoryContext } from './ComposerHistoryContext';
 import { sceneToSnakeSnapshot } from '@/lib/video-composer/sceneSnapshot';
 import { CastConsistencyMap } from './CastConsistencyMap';
+import DriftReportPanel from './briefing/DriftReportPanel';
 import StoryboardLeftPane, { type LeftPaneMode } from './StoryboardLeftPane';
 import StoryboardScenePlayerList from './StoryboardScenePlayerList';
 import SceneStyleMode from './SceneStyleMode';
@@ -657,6 +658,11 @@ export default function StoryboardTab({
           </ul>
         )}
       </StagePanel>
+
+      {/* Plan ↔ Storyboard Drift-Check — Briefing-Intelligence v2 */}
+      {scenes.length > 0 && (
+        <DriftReportPanel projectId={projectId} scenes={scenes} />
+      )}
 
       {/* Cast Consistency Map — Bond glass wrapper for Briefing-parity */}
       {scenes.length > 0 && safeCharacters.length > 0 && (
