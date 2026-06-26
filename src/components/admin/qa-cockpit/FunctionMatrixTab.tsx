@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Loader2, Play, CheckCircle2, XCircle, MinusCircle, Clock, RotateCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { SMOKE_CATEGORIES, SMOKE_CATEGORY_LABELS } from "@/lib/qa/smokeCategories";
 
 type SmokeStatus = "pass" | "fail" | "skip" | "timeout";
 
@@ -44,18 +45,7 @@ interface SmokeSweep {
   duration_ms: number | null;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  "ai-video-providers": "AI Video Providers",
-  "lipsync-dialog": "Lipsync & Dialog",
-  "briefing-composer": "Briefing & Composer",
-  "picture-image": "Picture / Image",
-  "audio-music-sfx": "Audio / Music / SFX",
-  "social-publishing": "Social Publishing",
-  "billing-credits": "Billing / Credits",
-  "admin-cron": "Admin / Cron / Health",
-  "analytics-reports": "Analytics / Reports",
-  "misc": "Misc",
-};
+const CATEGORY_LABELS = SMOKE_CATEGORY_LABELS;
 
 const STATUS_STYLES: Record<SmokeStatus, { bg: string; icon: typeof CheckCircle2; label: string }> = {
   pass: { bg: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40", icon: CheckCircle2, label: "Pass" },
