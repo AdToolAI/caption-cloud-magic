@@ -94,7 +94,9 @@ export function CostMonitor() {
             <ProviderCostBreakdown providers={data.providers} />
             <TopExpensiveFunctionsCard endpoints={data.top_endpoints} />
           </div>
+          <VideoProviderMarginCard />
           <CostTrendChart trend={data.trend} />
+
           <p className="text-xs text-muted-foreground text-center pt-2">
             Letzte Aktualisierung: {new Date(data.timestamp).toLocaleString('de-DE')} · Schätzungen basieren auf dokumentierten Stückpreisen × gezähltem Call-Volumen
           </p>
