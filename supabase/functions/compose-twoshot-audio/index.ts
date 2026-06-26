@@ -609,15 +609,29 @@ serve(async (req) => {
         // regenerate as WAV.
         const isCurrentPipeline = url.includes("/twoshot-vo/") && url.endsWith(".wav");
         if (isCurrentPipeline) {
-          return json({
-            success: true,
-            already: true,
-            url,
-            duration: existing[0].duration,
-            speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
-              ? (existing[0] as any).metadata.speakers
-              : blocks.length,
-          });
+          const existingSceneDur = Number((existing[0] as any)?.metadata?.scene_duration_seconds ?? 0);
+          const requestedSceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
+          const sceneClipSource = String((scene as any).clip_source ?? "");
+          const hailuoDurationMismatch =
+            sceneClipSource === "ai-hailuo" &&
+            requestedSceneDur > 0 &&
+            existingSceneDur > 0 &&
+            Math.abs(existingSceneDur - requestedSceneDur) > 0.05;
+          if (hailuoDurationMismatch) {
+            console.warn(
+              `[compose-twoshot-audio] existing Hailuo twoshot WAV duration ${existingSceneDur}s != scene ${requestedSceneDur}s — regenerating instead of reusing stale 10s audio_plan.`,
+            );
+          } else {
+            return json({
+              success: true,
+              already: true,
+              url,
+              duration: existing[0].duration,
+              speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
+                ? (existing[0] as any).metadata.speakers
+                : blocks.length,
+            });
+          }
         }
       }
     }
@@ -1179,7 +1193,7 @@ serve(async (req) => {
     };
     // If we extended the scene to fit the dialog, propagate the new duration
     // so downstream renderers (compose-dialog-segments / Remotion mux) align.
-    if (dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
+    if (!isHailuoScene && dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
       sceneUpdate.duration_seconds = Math.round(totalSec * 1000) / 1000;
     }
     await supabase
