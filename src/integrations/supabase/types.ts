@@ -2116,6 +2116,44 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_assets: {
+        Row: {
+          brand_kit_id: string
+          created_at: string
+          id: string
+          kind: string
+          meta: Json
+          url: string
+          user_id: string
+        }
+        Insert: {
+          brand_kit_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          meta?: Json
+          url: string
+          user_id: string
+        }
+        Update: {
+          brand_kit_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_assets_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_buildings: {
         Row: {
           archived_at: string | null
@@ -2206,6 +2244,7 @@ export type Database = {
         Row: {
           archived_at: string | null
           average_rating: number
+          brand_kit_id: string | null
           cloned_from_preset: string | null
           created_at: string
           default_aspect_ratio: string | null
@@ -2251,6 +2290,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           average_rating?: number
+          brand_kit_id?: string | null
           cloned_from_preset?: string | null
           created_at?: string
           default_aspect_ratio?: string | null
@@ -2296,6 +2336,7 @@ export type Database = {
         Update: {
           archived_at?: string | null
           average_rating?: number
+          brand_kit_id?: string | null
           cloned_from_preset?: string | null
           created_at?: string
           default_aspect_ratio?: string | null
@@ -2339,6 +2380,13 @@ export type Database = {
           voice_settings?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "brand_characters_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "brand_characters_cloned_from_preset_fkey"
             columns: ["cloned_from_preset"]
@@ -2426,6 +2474,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "brand_content_analysis_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_drift_reports: {
+        Row: {
+          brand_kit_id: string
+          created_at: string
+          id: string
+          preview_url: string | null
+          resolved_at: string | null
+          score: number | null
+          severity: string
+          source_id: string | null
+          source_table: string
+          suggested_fix: Json
+          user_id: string
+        }
+        Insert: {
+          brand_kit_id: string
+          created_at?: string
+          id?: string
+          preview_url?: string | null
+          resolved_at?: string | null
+          score?: number | null
+          severity?: string
+          source_id?: string | null
+          source_table: string
+          suggested_fix?: Json
+          user_id: string
+        }
+        Update: {
+          brand_kit_id?: string
+          created_at?: string
+          id?: string
+          preview_url?: string | null
+          resolved_at?: string | null
+          score?: number | null
+          severity?: string
+          source_id?: string | null
+          source_table?: string
+          suggested_fix?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_drift_reports_brand_kit_id_fkey"
             columns: ["brand_kit_id"]
             isOneToOne: false
             referencedRelation: "brand_kits"
@@ -2535,6 +2633,7 @@ export type Database = {
       brand_locations: {
         Row: {
           archived_at: string | null
+          brand_kit_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -2550,6 +2649,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          brand_kit_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -2565,6 +2665,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          brand_kit_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -2578,7 +2679,15 @@ export type Database = {
           user_id?: string
           visual_identity_json?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "brand_locations_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       brand_props: {
         Row: {
