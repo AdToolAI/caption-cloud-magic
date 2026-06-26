@@ -55,9 +55,9 @@ export const ESTIMATED_COSTS: Record<string, number> = {
   video_render_remotion: 5,
   video_render_shotstack: 10,
   comment_analyze: 1,
-  // Sora 2 Long-Form costs per second
-  sora_longform_standard: 25, // €0.25/sec = 25 credits
-  sora_longform_pro: 53,      // €0.53/sec = 53 credits
+  // Sora 2 Long-Form costs per second (Premium-Engine tier, ~65% margin)
+  sora_longform_standard: 55, // €0.55/sec = 55 credits
+  sora_longform_pro: 130,     // €1.30/sec = 130 credits
   // Explainer Video Animation (Hailuo 2.3 ~$0.30/scene = 30 credits)
   explainer_scene_animate: 30,
   explainer_character_animate: 35,
@@ -78,7 +78,7 @@ export function calculateSoraLongformCost(
     ? ESTIMATED_COSTS.sora_longform_pro 
     : ESTIMATED_COSTS.sora_longform_standard;
   
-  const eurosPerSecond = model === 'sora-2-pro' ? 0.53 : 0.25;
+  const eurosPerSecond = model === 'sora-2-pro' ? 1.30 : 0.55;
   
   return {
     credits: totalDurationSeconds * creditsPerSecond,
