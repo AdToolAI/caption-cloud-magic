@@ -103,6 +103,11 @@ function extractSceneHints(briefingText: string): SceneHint[] {
   const camRe = /(?:KAMERA|CAMERA)\s*:\s*([^\n]+)/i;
   const emoRe = /(?:EMOTION|MOOD)\s*:\s*([^\n]+)/i;
   const beatRe = /(?:^|\n)\s*(?:—\s*)?(HOOK|REVEAL|PUNCHLINE|CTA|PROBLEM|PAIN|SOLUTION|LÖSUNG|DEMO|PROOF)\b/i;
+  // Stage-3 extractors
+  const transitionRe = /(?:TRANSITION|ÜBERGANG|UEBERGANG)\s*:\s*(none|cut|hard\s*cut|fade|crossfade|wipe|slide|zoom)(?:\s*[,·\-]\s*([0-9.]+)\s*s?)?/i;
+  const overlayRe = /(?:OVERLAY|TEXT[-\s]?OVERLAY|ON[-\s]?SCREEN[-\s]?TEXT|EINBLENDUNG)\s*:\s*["„“]?([^"\n„“”]+)["“”]?(?:\s*[\(\[]\s*(top|center|middle|bottom)\s*[\)\]])?/i;
+  const toneRe = /(?:TONE|TON|STIMMUNG)\s*:\s*([^\n]+)/i;
+  const seedRe = /SEED\s*[:=]\s*(\d{1,10})/i;
 
   return blocks
     .sort((a, b) => a.idx - b.idx)
@@ -113,6 +118,32 @@ function extractSceneHints(briefingText: string): SceneHint[] {
       const emotion = body.match(emoRe)?.[1]?.trim();
       const beat = body.match(beatRe)?.[1]?.trim();
       const blob = `${shot ?? ''} ${camera ?? ''}`;
+
+      // Transition
+      const tMatch = body.match(transitionRe);
+      let transition: SceneHint['transition'];
+      let transitionDurationSec: number | undefined;
+      if (tMatch) {
+        const raw = tMatch[1].toLowerCase().replace(/\s+/g, '');
+        transition = raw === 'cut' || raw === 'hardcut' ? 'none'
+          : (['none','fade','crossfade','wipe','slide','zoom'].includes(raw) ? (raw as SceneHint['transition']) : undefined);
+        const d = Number(tMatch[2]);
+        if (Number.isFinite(d) && d >= 0 && d <= 3) transitionDurationSec = d;
+      }
+      // Overlay
+      const oMatch = body.match(overlayRe);
+      const overlayText = oMatch?.[1]?.trim();
+      const overlayPosRaw = oMatch?.[2]?.toLowerCase();
+      const overlayPosition: SceneHint['overlayPosition'] =
+        overlayPosRaw === 'top' ? 'top'
+        : overlayPosRaw === 'center' || overlayPosRaw === 'middle' ? 'center'
+        : overlayPosRaw === 'bottom' ? 'bottom'
+        : undefined;
+      // Tone & seed
+      const tone = body.match(toneRe)?.[1]?.trim().slice(0, 80);
+      const seedRaw = body.match(seedRe)?.[1];
+      const seed = seedRaw ? Number(seedRaw) : undefined;
+
       return {
         beat,
         dialog,
@@ -122,6 +153,12 @@ function extractSceneHints(briefingText: string): SceneHint[] {
         framing: classify(blob, FRAMING_TOKENS),
         movement: classify(blob, MOVEMENT_TOKENS),
         lighting: classify(`${shot ?? ''} ${body}`, LIGHTING_TOKENS),
+        transition,
+        transitionDurationSec,
+        overlayText,
+        overlayPosition,
+        tone,
+        seed: Number.isFinite(seed) ? seed : undefined,
       } as SceneHint;
     });
 }
