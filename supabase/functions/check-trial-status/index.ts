@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
 
 type Lang = "de" | "en" | "es";
 
@@ -96,11 +97,69 @@ serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const startedAt = Date.now();
-  let processed = 0, paused = 0, graceWarned = 0, emailsSent = 0;
+  let processed = 0, paused = 0, graceWarned = 0, emailsSent = 0, countdownSent = 0, prePauseSent = 0;
 
   try {
-    const nowIso = new Date().toISOString();
-    const graceCutoffIso = new Date(Date.now() - GRACE_PERIOD_DAYS * 86400_000).toISOString();
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const graceCutoffIso = new Date(now - GRACE_PERIOD_DAYS * 86400_000).toISOString();
+
+    // --- Phase 0: Trial-countdown reminders (Day 3 / 6 / 9 / 13) ---
+    // Day 3/6/9 = soft (cap-aware). Day 13 = final-day warning (bypass cap).
+    const { data: activeUsers } = await supabase
+      .from("profiles")
+      .select("id, email, language, trial_ends_at, activation_emails_sent")
+      .eq("trial_status", "active")
+      .gt("trial_ends_at", nowIso)
+      .limit(2000);
+
+    const COUNTDOWN_STEPS: Array<{ key: string; daysRemaining: number; bypass: boolean }> = [
+      { key: "countdown_d11", daysRemaining: 11, bypass: false }, // ~ day 3
+      { key: "countdown_d8",  daysRemaining: 8,  bypass: false }, // ~ day 6
+      { key: "countdown_d5",  daysRemaining: 5,  bypass: false }, // ~ day 9
+      { key: "trial_final_day", daysRemaining: 1, bypass: true }, // day 13
+    ];
+
+    for (const u of activeUsers ?? []) {
+      if (!u.trial_ends_at) continue;
+      const daysLeft = Math.ceil((new Date(u.trial_ends_at).getTime() - now) / 86_400_000);
+      const step = COUNTDOWN_STEPS.find((s) => s.daysRemaining === daysLeft);
+      if (!step) continue;
+
+      const sentMap = (u.activation_emails_sent as Record<string, string> | null) || {};
+      if (sentMap[step.key]) continue;
+
+      const templateName = step.key === "trial_final_day" ? "trial_final_day" : `trial_${step.key}`;
+
+      if (!step.bypass && !(await canSendMarketingEmail(supabase, u.id, templateName))) {
+        continue; // global cap → wait for next run
+      }
+
+      try {
+        const lang = normalizeLang(u.language);
+        const copy = step.bypass
+          ? finalDayCopy[lang]
+          : countdownCopy[lang](daysLeft);
+        const { subject, html } = renderEmail(copy, APP_URL, u.email);
+        await sendEmail({
+          to: u.email,
+          subject,
+          html,
+          template: templateName,
+          category: "marketing",
+        });
+        await supabase
+          .from("profiles")
+          .update({ activation_emails_sent: { ...sentMap, [step.key]: new Date().toISOString() } })
+          .eq("id", u.id);
+        if (!step.bypass) await markMarketingEmailSent(supabase, u.id);
+        countdownSent++;
+        emailsSent++;
+        processed++;
+      } catch (e) {
+        console.error(`[check-trial-status] countdown ${step.key} error:`, e);
+      }
+    }
 
     // --- Phase 1: Trial just expired → enter grace period + send warning email ---
     const { data: graceUsers } = await supabase
@@ -140,6 +199,42 @@ serve(async (req) => {
         emailsSent++;
       } catch (e) {
         console.error("[check-trial-status] grace email error:", e);
+      }
+    }
+
+    // --- Phase 1.5: Grace pre-pause warning (1 day before pause, bypass cap) ---
+    const prePauseLowerIso = new Date(now - (GRACE_PERIOD_DAYS - 1) * 86_400_000).toISOString();
+    const prePauseUpperIso = new Date(now - (GRACE_PERIOD_DAYS - 2) * 86_400_000).toISOString();
+    const { data: prePauseUsers } = await supabase
+      .from("profiles")
+      .select("id, email, language, trial_ends_at, activation_emails_sent")
+      .eq("trial_status", "grace")
+      .gte("trial_ends_at", prePauseLowerIso)
+      .lt("trial_ends_at", prePauseUpperIso)
+      .limit(500);
+
+    for (const u of prePauseUsers ?? []) {
+      const sentMap = (u.activation_emails_sent as Record<string, string> | null) || {};
+      if (sentMap.pre_pause) continue;
+      try {
+        const lang = normalizeLang(u.language);
+        const { subject, html } = renderEmail(prePauseCopy[lang], APP_URL, u.email);
+        await sendEmail({
+          to: u.email,
+          subject,
+          html,
+          template: "trial_pre_pause",
+          category: "marketing",
+        });
+        await supabase
+          .from("profiles")
+          .update({ activation_emails_sent: { ...sentMap, pre_pause: new Date().toISOString() } })
+          .eq("id", u.id);
+        prePauseSent++;
+        emailsSent++;
+        processed++;
+      } catch (e) {
+        console.error("[check-trial-status] pre-pause email error:", e);
       }
     }
 
@@ -210,6 +305,8 @@ serve(async (req) => {
         processed,
         graceWarned,
         paused,
+        countdownSent,
+        prePauseSent,
         emailsSent,
         durationMs: Date.now() - startedAt,
       }),
