@@ -100,6 +100,8 @@ export const UniversalVideoSchema = z.object({
       startTime: z.number(),
       endTime: z.number(),
     })),
+    /** Hormozi mode: power-words to visually highlight in this segment. */
+    highlightKeywords: z.array(z.string()).optional(),
   })).optional(),
   subtitleStyle: z.object({
     position: z.enum(['top', 'center', 'bottom']),
@@ -108,11 +110,13 @@ export const UniversalVideoSchema = z.object({
     color: z.string(),
     backgroundColor: z.string(),
     backgroundOpacity: z.number(),
-    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch']),
+    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'hormozi']),
     animationSpeed: z.number(),
     outlineStyle: z.enum(['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow']),
     outlineColor: z.string(),
     outlineWidth: z.number(),
+    /** Hormozi mode: pill color for highlighted power-words (default gold). */
+    highlightColor: z.string().optional(),
   }).optional(),
   background: z.object({
     type: z.enum(['color', 'gradient', 'video', 'image']),
