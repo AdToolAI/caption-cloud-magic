@@ -106,17 +106,19 @@ export default function MusicBrowser() {
     const { error } = await supabase.from('user_audio_library').insert({
       user_id: user.id,
       type: 'music',
-      external_id: track.id,
       source: 'jamendo',
+      external_id: track.id,
       title: track.title,
       artist: track.artist,
-      duration_sec: track.duration,
-      thumbnail_url: track.thumbnail,
+      url: track.url,
       preview_url: track.preview_url,
-      download_url: track.url,
+      thumbnail_url: track.thumbnail,
+      duration_sec: track.duration,
+      bpm: track.bpm,
+      genre: track.genre,
+      mood: track.mood,
       tags: track.tags,
-      metadata: { genre: track.genre, mood: track.mood, bpm: track.bpm },
-    } as any);
+    });
     if (error) {
       toast({ title: 'Speichern fehlgeschlagen', description: error.message, variant: 'destructive' });
       return;
