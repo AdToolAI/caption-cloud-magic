@@ -1060,7 +1060,7 @@ export default function SceneCard({
                             size="sm"
                             variant={current === 6 ? 'default' : 'outline'}
                             className="h-6 px-3 text-[10px]"
-                            onClick={() => onUpdate({ durationSeconds: 6, clipError: null as any })}
+                            onClick={() => onUpdate({ durationSeconds: 6 })}
                           >
                             6s
                           </Button>
@@ -1069,7 +1069,7 @@ export default function SceneCard({
                             variant={current === 10 ? 'default' : 'outline'}
                             className="h-6 px-3 text-[10px]"
                             disabled={!can10}
-                            onClick={() => onUpdate({ durationSeconds: 10, clipError: null as any })}
+                            onClick={() => onUpdate({ durationSeconds: 10 })}
                           >
                             10s
                           </Button>
