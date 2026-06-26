@@ -263,50 +263,66 @@ export function useStoryboardTransition({
     });
     startProgressLoop();
 
+    // Direct fetch with 180s AbortController — `supabase.functions.invoke`
+    // imposes a ~30s timeout that kicks in before deep-parse (research +
+    // gemini pass) can finish (~40–90s typical, up to 150s with research).
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 180_000);
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse`;
+    const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token ?? anon;
+
+    const parsePlan = (data: any): { plan: TProductionPlan | null; dropped: number; error?: string } => {
+      let dropped = 0;
+      const parsed = ProductionPlan.safeParse(data?.plan);
+      if (parsed.success) return { plan: parsed.data, dropped };
+      console.error('[useStoryboardTransition] plan validation failed', parsed.error.flatten());
+      const rawScenes: any[] = Array.isArray(data?.plan?.scenes) ? data.plan.scenes : [];
+      const survivors: any[] = [];
+      for (const s of rawScenes) {
+        const sp = PlanScene.safeParse(s);
+        if (sp.success) survivors.push(sp.data); else dropped += 1;
+      }
+      if (survivors.length > 0) {
+        const retry = ProductionPlan.safeParse({ ...(data?.plan ?? {}), scenes: survivors });
+        if (retry.success) return { plan: retry.data, dropped };
+      }
+      const issues = parsed.error.issues.slice(0, 2)
+        .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join(' · ');
+      return { plan: null, dropped, error: `Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}` };
+    };
+
     try {
-      const { data, error } = await supabase.functions.invoke('briefing-deep-parse', {
-        body: { briefing: text, projectId, language },
+      const res = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anon,
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ briefing: text, projectId, language }),
       });
+      window.clearTimeout(timeoutId);
       stopProgress();
       if (cancelledRef.current) return { handled: true };
-      if (error) throw error;
 
-      let plan: TProductionPlan | null = null;
-      let droppedScenes = 0;
-
-      const parsed = ProductionPlan.safeParse(data?.plan);
-      if (parsed.success) {
-        plan = parsed.data;
-      } else {
-        // Per-scene recovery: keep what we can.
-        console.error('[useStoryboardTransition] plan validation failed', parsed.error.flatten());
-        const rawScenes: any[] = Array.isArray(data?.plan?.scenes) ? data.plan.scenes : [];
-        const survivors: any[] = [];
-        for (const s of rawScenes) {
-          const sp = PlanScene.safeParse(s);
-          if (sp.success) survivors.push(sp.data);
-          else droppedScenes += 1;
-        }
-        if (survivors.length > 0) {
-          const retry = ProductionPlan.safeParse({ ...(data?.plan ?? {}), scenes: survivors });
-          if (retry.success) {
-            plan = retry.data;
-          } else {
-            console.error('[useStoryboardTransition] retry failed', retry.error.flatten());
-          }
-        }
-        if (!plan) {
-          const issues = parsed.error.issues.slice(0, 2)
-            .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
-            .join(' · ');
-          throw new Error(`Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}`);
-        }
-        if (droppedScenes > 0) {
-          toast({
-            title: 'Plan teilweise übernommen',
-            description: `${droppedScenes} Szene(n) konnten nicht validiert werden und wurden übersprungen.`,
-          });
-        }
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => '');
+        const err: any = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        err.body = bodyText;
+        throw err;
+      }
+      const data = await res.json();
+      const { plan, dropped, error: validationErr } = parsePlan(data);
+      if (!plan) throw new Error(validationErr || 'Plan-Validierung fehlgeschlagen');
+      if (dropped > 0) {
+        toast({
+          title: 'Plan teilweise übernommen',
+          description: `${dropped} Szene(n) konnten nicht validiert werden und wurden übersprungen.`,
+        });
       }
 
       // Smoothly drive the bar to 100% before swapping to the plan sheet.
