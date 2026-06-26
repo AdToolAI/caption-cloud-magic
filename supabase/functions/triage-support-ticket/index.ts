@@ -79,6 +79,14 @@ serve(async (req) => {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
+    const attachmentsList = Array.isArray((ticket as Record<string, unknown>).attachments)
+      ? ((ticket as Record<string, unknown>).attachments as Array<{ type?: string; name?: string }>)
+      : [];
+    const visualEvidence = attachmentsList.filter((a) =>
+      (a.type || "").startsWith("image/") || (a.type || "").startsWith("video/")
+    );
+    const hasVisualEvidence = visualEvidence.length > 0;
+
     const userPrompt = `Triage this support ticket. Reply in the same language as the customer.
 
 CUSTOMER TICKET:
@@ -90,6 +98,7 @@ Description: ${ticket.description ?? ""}
 Expected: ${ticket.expected_result ?? ""}
 Actual: ${ticket.actual_result ?? ""}
 Repro: ${ticket.reproduction_steps ?? ""}
+Visual evidence attached: ${hasVisualEvidence ? `YES (${visualEvidence.length} file(s)) — assume ~60% faster reproduction time, so reduce ETA accordingly.` : "NO — without visual we may need a clarifying question first."}
 
 USER PROFILE:
 ${profile ? JSON.stringify(profile) : "Anonymous"}
@@ -98,6 +107,7 @@ CURRENTLY KNOWN OPEN INCIDENTS:
 ${(incidents ?? []).map((i) => `- [${i.id}] (${i.severity}) ${i.title}: ${i.body?.slice(0, 200)}`).join("\n") || "None"}
 
 Return strict JSON via the tool call.`;
+
 
     const aiRes = await fetch(LOVABLE_AI_URL, {
       method: "POST",
