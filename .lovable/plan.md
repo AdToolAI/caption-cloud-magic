@@ -1,53 +1,32 @@
-## Ziel
+## Problem
 
-Smoke-Coverage von 181 → **473/473** Edge Functions hochziehen und Kategorien mit >30 Einträgen aufsplitten, damit kein Rate-Limit mehr triggert.
+Die Edge Function `smoke-matrix-run` ist deployed und kennt alle 467 Functions in 32 Kategorien. **Aber das Cockpit-Dropdown (`FunctionMatrixTab.tsx`) hat eine hartkodierte `CATEGORY_LABELS`-Map mit nur 10 alten Kategorien.** Dadurch:
 
-## Wave B3 — Restliche ~292 Functions patchen
+- Im Dropdown erscheinen nur die alten Buckets (`ai-video-providers`, `lipsync-dialog`, `briefing-composer`, `picture-image`, `audio-music-sfx`, `social-publishing`, `billing-credits`, `admin-cron`, `analytics-reports`, `misc`).
+- Neue Buckets wie `calendar-planning`, `notifications-email`, `qa-testing`, `automation-jobs-1/2`, `picture-image-1/2`, `admin-cron-1/2`, `audio-music-sfx-1/2`, `social-meta`, `social-tiktok-twitch`, `social-google`, `social-other`, `community-coach`, `utilities`, `data-fetch`, `planner-strategy`, `ai-text-generation`, `briefing-director`, `composer-render`, `image-providers`, `misc-1/2/3` etc. fehlen — daher nichts „Neues" sichtbar.
+- Der Hinweistext spricht noch von „Block 1 — kuratierte Auswahl".
 
-Bulk-Patcher (`/tmp/patch_b3.py`) läuft über alle noch ungepatchten Functions in `supabase/functions/*/index.ts` (Diff gegen aktuelles `smokeRegistry.ts`). Pro Function:
+Die Registry liegt in `supabase/functions/_shared/smokeRegistry.ts` (Deno-Pfad, kann das Frontend nicht direkt importieren).
 
-1. `isQaMockRequest` Import direkt nach den bestehenden Imports einfügen
-2. Mock-Guard direkt nach dem `OPTIONS`-Handler (Block- oder Single-Line-Form) injizieren
-3. Kind auto-erkennen aus dem Function-Namen (`-video` → video, `-image`/`-portrait` → image, `-audio`/`-voice`/`-tts` → audio, `-music` → music, sonst JSON)
+## Lösung
 
-Registry-Generator (`/tmp/gen_registry_b3.py`) hängt die neuen Einträge mit passender Kategorie an `_shared/smokeRegistry.ts` an.
+1. **Neue Shared-Quelle für Frontend**: `src/lib/qa/smokeCategories.ts` anlegen mit einer manuell gepflegten Liste, die 1:1 zu `SMOKE_CATEGORIES` in der Registry passt (32 Einträge mit `id` + `label`). Diese Datei ist die Single-Source-of-Truth für das Cockpit-Dropdown.
 
-## Kategorie-Split (Hard-Cap 25 pro Kategorie)
+2. **`FunctionMatrixTab.tsx` umstellen**:
+   - Alte hartkodierte `CATEGORY_LABELS`-Map durch Import aus `@/lib/qa/smokeCategories` ersetzen.
+   - Dropdown rendert jetzt alle 32 Kategorien in der definierten Reihenfolge (statt alphabetisch über `Object.keys`).
+   - `grouped`-Sektion benutzt dasselbe Label-Lookup.
+   - Hinweistext aktualisieren: „467/473 Functions in 32 Kategorien à ≤25 Functions — Rate-Limit-safe, bitte kategorieweise sweepen."
 
-Aktuell zu groß: `audio-music-sfx` (38), `admin-cron` (35+), und nach B3 zusätzlich vermutlich `composer-render`, `social-publishing`, `ai-gateway`. Split-Regeln:
+3. **Keine Backend-Änderung nötig** — `smoke-matrix-run` ist bereits aktuell deployed, akzeptiert die neuen `category`-Strings und liefert für jede einen vollständigen Sweep.
 
-| Bisher | Neu (jeweils ≤25) |
-|---|---|
-| `audio-music-sfx` (38) | `audio-voice` · `audio-music` · `audio-sfx` |
-| `admin-cron` (35+) | `admin-ops` · `cron-jobs` · `health-monitoring` |
-| `briefing-composer` (19) | bleibt, evtl. `briefing-analysis` · `composer-scenes` falls B3 sprengt |
-| `social-publishing` (20+) | `social-meta` · `social-tiktok-x` · `social-google-other` falls >25 |
-| Neu groß: `video-providers` | `video-providers-premium` · `video-providers-standard` |
-| Neu groß: `image-providers` | bleibt wenn ≤25, sonst Split nach Anbieter |
+## Out-of-Scope
 
-Hard-Cap-Regel ab jetzt im Memory: **Keine Kategorie >25 Functions** → garantiert unter Supabase Burst-Limit von 6/Sek × 4 Batches.
+- Keine Änderungen an `smokeRegistry.ts` oder Edge Functions.
+- Keine Auto-Sync-Mechanik Registry↔Frontend (eine spätere Iteration könnte die Kategorien über einen `GET`-Endpoint von `smoke-matrix-run` ausliefern, aber das ist hier overkill).
+- Keine Änderungen am Sweep-Loop, an der DB oder an den Status-Badges.
 
-## Runner-Anpassung
+## Files
 
-`smoke-matrix-run` & `FunctionMatrixTab.tsx` lesen Kategorien dynamisch aus dem Registry — keine harte Liste nötig. Nach dem Split erscheinen die neuen Kategorien automatisch im Dropdown. Sequential-Sweep läuft wie gehabt Kategorie-für-Kategorie mit 400ms Stagger + 429-Retry.
-
-## Deployment
-
-1. Bulk-Patch der ~292 Functions
-2. Registry-Update mit Kategorie-Split-Mapping  
-3. Deploy aller gepatchten Functions (in 4–6 Batches à ~60 Functions wegen Deploy-Limit)
-4. **Re-Deploy `smoke-matrix-run`** (bundelt neues Registry)
-5. Verifikation: Dropdown im Cockpit muss alle neuen Kategorien zeigen, Gesamt = 473
-
-## Verifikation
-
-User testet Kategorien einzeln im Cockpit. Erwartung:
-- Jede Kategorie ≤25 Functions
-- Keine `Rate limit exceeded` Fehler mehr
-- Gesamt-Coverage = 473/473
-
-Fehlschläge einzelner Functions = normales Wave-B-Debugging, separat behandelt.
-
-## Hinweis
-
-Memory-Eintrag wird erweitert: "Jede neue Function muss kategorisiert werden, Hard-Cap 25 pro Kategorie, sonst Split."
+- **Neu**: `src/lib/qa/smokeCategories.ts` (32 Einträge `{ id, label }` in fester Reihenfolge).
+- **Geändert**: `src/components/admin/qa-cockpit/FunctionMatrixTab.tsx` — Import aus neuer Datei, alte Map entfernt, Hinweistext aktualisiert.
