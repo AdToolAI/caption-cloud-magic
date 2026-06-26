@@ -7,6 +7,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
+import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
@@ -23,6 +24,10 @@ interface Body {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockResponse({ corsHeaders, kind: "audio" });
+  }
 
   try {
     const HUME_API_KEY = Deno.env.get('HUME_API_KEY');

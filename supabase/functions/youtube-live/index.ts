@@ -7,6 +7,7 @@ const corsHeaders = {
 import { decryptToken } from '../_shared/crypto.ts';
 import { refreshYouTubeToken } from '../_shared/token-refresh.ts';
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const YT_API = 'https://www.googleapis.com/youtube/v3';
 
 async function getYouTubeToken(supabase: any, userId: string): Promise<string> {
@@ -50,6 +51,10 @@ async function ytFetch(token: string, endpoint: string, options?: RequestInit) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "youtube-live" });
   }
 
   try {

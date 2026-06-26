@@ -20,6 +20,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -35,6 +36,10 @@ function json(body: unknown, status = 200) {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "reset-lipsync-scene" });
+  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

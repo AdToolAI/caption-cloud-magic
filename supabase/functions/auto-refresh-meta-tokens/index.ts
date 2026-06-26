@@ -7,6 +7,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
 
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -17,6 +18,10 @@ const SECRET_NAME = 'IG_PAGE_ACCESS_TOKEN';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "auto-refresh-meta-tokens" });
+  }
 
   try {
     const url = new URL(req.url);

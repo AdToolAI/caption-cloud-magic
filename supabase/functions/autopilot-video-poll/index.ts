@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { recordHeartbeat } from "../_shared/heartbeat.ts";
 import { withSentryCron } from "../_shared/sentryCron.ts";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -16,6 +17,10 @@ const TIMEOUT_MIN = 15;
 
 Deno.serve(withSentryCron("autopilot-video-poll", { schedule: "* * * * *", maxRuntime: 5 }, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-video-poll" });
+  }
 
   const hbStart = Date.now();
   const replicateKey = Deno.env.get("REPLICATE_API_KEY");

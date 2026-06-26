@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import {
   ALL_EFFECT_IDS,
   EFFECT_DESCRIPTIONS,
@@ -152,6 +153,10 @@ Use sceneType values loosely — map "hook"=opening, "problem"=conflict beats, "
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "compose-video-storyboard" });
   }
 
   try {

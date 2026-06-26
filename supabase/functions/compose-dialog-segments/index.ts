@@ -109,6 +109,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 
 
+import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -587,6 +588,10 @@ function frameCandidatesForTurn(turn: SegmentItem, totalSec: number, fps: number
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockResponse({ corsHeaders, kind: "video" });
+  }
 
   // v33: strict per-scene single-flight lock. Released in `finally` below so
   // every return path (including early 202s, 422s, and thrown errors) frees it.

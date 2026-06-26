@@ -34,6 +34,7 @@ import {
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
+import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 const ANCHOR_AUDIT_VERSION = 9;
 
 const corsHeaders = {
@@ -134,6 +135,10 @@ interface ClipRequest {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockResponse({ corsHeaders, kind: "video" });
   }
 
   // Stage marker for diagnostics — updated as we progress so a fatal

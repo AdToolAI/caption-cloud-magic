@@ -4,6 +4,7 @@ import { refreshAccessToken, getUserInfo, needsRefresh } from '../_shared/tiktok
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
 import { upsertProfile } from '../_shared/db-repo.ts';
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
@@ -12,6 +13,10 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "tiktok-sync" });
   }
 
   // Warmup ping early-return (no auth required)

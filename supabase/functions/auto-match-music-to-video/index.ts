@@ -6,6 +6,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -157,6 +158,10 @@ function buildMusicPrompt(mood: MoodAnalysis, bpm: number, durationSec: number):
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockResponse({ corsHeaders, kind: "music" });
   }
 
   try {

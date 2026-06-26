@@ -2,6 +2,7 @@
 // Inserts into notification_queue and (optionally) triggers a Web Push.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
@@ -36,6 +37,10 @@ const HIGH_PRIORITY: AutopilotNotificationType[] = [
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "autopilot-emit-notification" });
+  }
   try {
     // SECURITY: server-to-server only. The Authorization header must carry the
     // SUPABASE_SERVICE_ROLE_KEY, otherwise any internet caller could inject
