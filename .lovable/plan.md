@@ -1,61 +1,63 @@
-# Pre-Launch Bottleneck Audit + AWS Support Email
+## Diagnose
 
-## Ziel
-1. Echte Bottlenecks vor dem Go-Live identifizieren (nicht nur AWS).
-2. Fertige Support-Email an AWS aufsetzen für Lambda-Concurrency-Erhöhung auf 100, inkl. Hinweis auf den gesperrten Vor-Account.
+Die Auto-Analyse ist beim "3 Uhr nachts"-Briefing in den **Local-Fallback-Plan** gekippt (Toast: „Analyse offline"). Belege:
 
----
+- Letzter DB-Eintrag in `composer_production_plans` ist vom **23.06.** (founder-avatar), kein neuer für „3 Uhr nachts" → das deep-parse Ergebnis ist nie persistiert worden → Fallback wurde benutzt.
+- Der Local-Fallback (`buildLocalFallbackPlan` in `src/hooks/useStoryboardTransition.ts`) erzeugt zwar `shotDirector` + `performance` + `musicCue` korrekt, **lässt aber `voiceover.text` und `dialogTurns` komplett leer** und setzt `anchorPromptEN` auf generisches `"Hook beat for AdTool AI: …"`.
+- In `useApplyProductionPlan.planSceneToComposerScene` wird `dialogScript` nur befüllt wenn `dialogTurns` ODER `voiceover.text` existiert → bei Fallback bleibt `dialogScript = undefined` → das Studio zeigt seine Default-Zeile **„Samuel Dusatko: Hi, willkommen!"**.
+- Shot-Director-Felder (Framing/Angle/Movement/Lighting) **werden** an die Szene geschrieben — sind aber in der ProductionPlanSheet-/SceneCard-Übersicht aktuell schwer zu verifizieren ohne jede Szene einzeln zu öffnen.
 
-## Teil A — Bottleneck-Analyse (Liefer-Artefakt: Report im Chat)
+Also zwei reale Probleme:
+1. **Drehbuch fehlt** → Fallback überträgt das im Briefing **explizit ausgeschriebene** Skript nicht.
+2. **Sichtbarkeit** → Du musst jede Szene aufklappen um zu sehen ob Kamera/Licht/Performance wirklich angekommen sind.
 
-Ich prüfe in einer Runde live über die vorhandenen Tools:
+## Plan
 
-1. **AWS Lambda Remotion** (heißester Kandidat)
-   - Aktuell: `MAX_LAMBDAS=8`, `framesPerLambda` min 270, `concurrencyPerLambda=1`. Peak-Schätzung: 5 parallele Renders × 8 λ = **~40 gleichzeitige Lambda-Invocations**.
-   - AWS Default-Account-Quota: **10** concurrent executions auf neuen Accounts → wir laufen heute schon ins Limit, sobald 2 User parallel rendern.
-   - Burst-Quota Region eu-central-1: 500, aber Account-Reserved/Unreserved muss freigeschaltet werden.
-   - → klare Empfehlung: **Quota auf 100 hoch** (passt zu 12 parallelen Composer-Renders).
+### 1. Fallback-Plan: Dialog aus dem Briefing extrahieren
+`src/hooks/useStoryboardTransition.ts → buildLocalFallbackPlan`:
+- Vor der Beat-Verteilung das Briefing nach **expliziten Dialog-Markern** scannen:
+  - Pattern A: `DIALOG (…): "…"` oder `DIALOG (DE, …): "…"`
+  - Pattern B: `SPRECHER: <Name>` gefolgt von `DIALOG …: "…"`
+  - Pattern C: `SZENE 1 … DIALOG … "…"` Block-Aware (eine Quote pro `SZENE n`)
+- Pro gefundener Szene `voiceover.text` setzen UND `lipSync: true` wenn ein Cast-Mention existiert.
+- Pro Szene zusätzlich aus dem Briefing-Block die **Shot-Hints** ziehen (`SHOT:`, `KAMERA:`, `EMOTION:`) und in `shotDirector` / `performance` / `anchorPromptEN` einfließen lassen statt generischer Beats.
+- Wenn weniger Dialog-Blöcke als Beats → bestehende generische Beats nur für ungedeckte Indexe nutzen.
 
-2. **Supabase Edge Cold-Starts** via `synthetic-probe` Daten der letzten 24h prüfen (Layer-3 Probes).
+### 2. Fallback transparent machen
+- Toast-Text: „Analyse offline — **Briefing-Dialog wurde extrahiert** und in den Plan übernommen. Vor Render prüfen." (statt „Basis-Plan")
+- Im `ProductionPlanSheet` Badge **„Local Fallback Plan"** rechts oben (gelb), wenn `plan._meta.source === 'local-fallback'`. Quelle in `buildLocalFallbackPlan` setzen.
 
-3. **pg_cron Locks** — `poll-dialog-shots-every-minute`, `qa-watchdog`, `process-email-queue`, autopilot, probes. `supabase--slow_queries` + `supabase--db_health` für Sättigung.
+### 3. UI-Verifizierung pro Szene (in ProductionPlanSheet)
+Neue kompakte Status-Zeile pro Szene im Sheet:
+```
+S01  ✓ Skript  ✓ Cast  ✓ Voice  ✓ Shot-Director  ✓ Performance  ⚠ Music
+```
+- Grün ✓ wenn Feld gesetzt, gelb ⚠ wenn leer/Default, rot ✗ wenn als Pflicht für gewählte Engine nötig aber leer (z. B. `voice` bei `lipSync: true`).
+- Tooltip pro Chip mit dem Wert (z. B. „medium-close-up · eye-level · slow-push-in · soft-window").
+- Liest direkt aus `TPlanScene` — kein neuer Edge-Call.
 
-4. **Replicate / Provider-Concurrency**
-   - Hailuo, HappyHorse, Sync.so (Creator-Plan $19 → harte Sync.so-Concurrency-Caps prüfen).
-   - Sync.so ist beim Multi-Speaker-Lipsync der knappste Provider.
+### 4. Drift-Detection erweitern (sichtbar nach Apply)
+`src/lib/video-composer/briefing/driftDetector.ts`:
+- Zusätzlicher Check **`script_not_applied`**: wenn `plan.scene.voiceover.text` oder `dialogTurns` gesetzt war aber `composerScene.dialogScript` leer ist nach Apply.
+- Zusätzlicher Check **`shot_director_not_applied`**: wenn `plan.scene.shotDirector.*` gesetzt war aber `composerScene.shotDirector` leer.
+- Im `DriftReportPanel` ein Quick-Fix-Button „Felder erneut übernehmen" pro Szene (re-mapper auf Einzelszene).
 
-5. **Storage Egress** — `composer-frames`, `talking-head-renders`, `brand-assets` Buckets, Anzahl Files + Bandbreite.
+### 5. Watchdog für Late-Arrival
+Aktuell läuft das Late-Arrival-Refetch **nur bei AbortError**. Erweitern auf:
+- 504 Gateway Timeout
+- 502/503 (Edge cold start)
+So dass auch in diesen Fällen der echte Plan im Hintergrund nachgeladen wird und den Fallback ersetzt.
 
-6. **Realtime Channels** — Composer-Collaboration + qa_live_runs Polling. Bei >50 gleichzeitigen Usern relevant.
+## Out of scope (Lipsync-Safety)
+- Keine Änderungen an `compose-dialog-segments`, `sync-so-webhook`, `dialog_shots`, `composer_scenes.dialog_*`.
+- Keine Änderung am Apply-Guard für protected scenes.
+- Keine Änderung am Voice-Resolver / Cast-Resolver in `briefing-deep-parse`.
 
-Ergebnis: Ranked Bottleneck-Liste mit „Fix vor Launch" / „OK für Launch" / „Skalierungs-Backlog".
-
----
-
-## Teil B — AWS Lambda Quota-Increase Email (Liefer-Artefakt: copy-paste Text im Chat)
-
-Eine Englisch + eine Deutsch-Version, beide enthalten:
-
-- **Subject**: Service Quota Increase — Lambda Concurrent Executions (eu-central-1) + Re-instatement of suspended account
-- **Account context**: Neuer Workspace + Verweis auf den gesperrten Vor-Account `bestofproducts4u@gmail.com` (6 Monate aktiv, keine Antwort auf Sperr-Inquiry, Bitte um Review/Closure-Statement).
-- **Use case**: SaaS video-rendering platform (AdTool / useadtool.ai), Remotion Lambda renders, Go-Live in den nächsten Tagen, erwartete 50–100 parallele Renders.
-- **Konkrete Requests**:
-  1. Concurrent executions: 10 → **100** (Region eu-central-1).
-  2. Ggf. burst concurrency Bestätigung.
-  3. Klärung zum gesperrten Account (Grund + ob er reaktivierbar ist oder ob Migration sauber ist).
-- **Technical details**: Function-Memory 3008 MB, Timeout 600 s, durchschnittliche Invocation 2–3 s/frame, Architektur x86_64, Workload Spike-Pattern (User-initiated, 1–5 Min Bursts).
-- **Business justification**: Paid Beta-Launch, EU-Kunden, Stripe-Billing live, Compliance EU-AI-Act, MRR-Projektion.
-- **Contact**: Geschäftliche Email, Telefon-Optional-Feld leer lassen.
-
-Versendet wird die Mail vom User selbst über AWS Support Center → „Service quota increase" Case-Type (kein API-Call von uns, da wir keine AWS-Credentials haben).
-
----
-
-## Out of Scope
-- Keine Code-Änderungen am Lambda-Pfad in diesem Schritt (Code ist bereits optimiert: r42 scheduling, Circuit-Breaker, framesPerLambda=270 min).
-- Keine Provider-Plan-Upgrades automatisch — nur Empfehlung.
-
-## Output nach Approval
-1. Bottleneck-Report (priorisiert, mit konkreten Metriken aus db_health / slow_queries / probes).
-2. Zwei fertige Email-Texte (EN + DE) zum direkten Versenden an AWS Support.
-3. Optional: kurze Checkliste „Go-Live Readiness" (1 Seite).
+## Verification
+1. Briefing „3 Uhr nachts" erneut ausführen mit getrenntem Netz → Fallback greift → Sheet zeigt:
+   - Badge „Local Fallback Plan"
+   - S01 mit Skript-Chip ✓, Tooltip enthält „Es ist 3 Uhr nachts. Und ich bearbeite… schon wieder… ein Reel."
+   - shotDirector-Chip ✓ („extreme-close-up · eye-level · static · laptop-glow")
+2. Apply → SceneCard S01 hat `dialogScript` korrekt vorbelegt, Shot-Director-Felder gesetzt.
+3. Drift-Panel zeigt 0 neue Findings.
+4. Mit funktionierender Analyse: Sheet-Badge zeigt **nicht** „Local Fallback".
