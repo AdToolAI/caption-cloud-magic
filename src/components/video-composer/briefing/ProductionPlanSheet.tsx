@@ -436,9 +436,16 @@ export default function ProductionPlanSheet({
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileText className="h-4 w-4 text-amber-300" />
             Production Plan — Briefing analysieren & übernehmen
+            {plan?._meta?.source === 'local-fallback' && (
+              <Badge variant="outline" className="ml-auto text-[10px] border-amber-400/40 text-amber-300 bg-amber-400/[0.06]">
+                Lokaler Fallback-Plan
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.
+            {plan?._meta?.source === 'local-fallback'
+              ? 'Die AI-Analyse war offline — dieser Plan wurde lokal aus deinem Briefing-Text extrahiert. Bitte vor dem Übernehmen prüfen.'
+              : 'Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -527,6 +534,57 @@ export default function ProductionPlanSheet({
                           </Badge>
                         )}
                         <span className="text-muted-foreground">{s.durationSec}s</span>
+                      </div>
+
+                      {/* Verification status chips — at-a-glance check that
+                          the plan actually carries the implemented fields. */}
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${s.voiceover?.text ? 'border-emerald-400/40 text-emerald-300' : 'border-amber-400/40 text-amber-300'}`}
+                          title={s.voiceover?.text ? s.voiceover.text : 'Kein Skript im Plan — Szene würde ohne Voiceover/Lip-Sync rendern.'}
+                        >
+                          {s.voiceover?.text ? '✓ Skript' : '— Skript'}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${s.shotDirector?.framing || s.shotDirector?.movement ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
+                          title={
+                            s.shotDirector
+                              ? `framing=${s.shotDirector.framing ?? '—'} · angle=${s.shotDirector.angle ?? '—'} · movement=${s.shotDirector.movement ?? '—'} · lighting=${s.shotDirector.lighting ?? '—'}`
+                              : 'Keine Kameraführung im Plan.'
+                          }
+                        >
+                          {s.shotDirector?.framing || s.shotDirector?.movement ? '✓ Shot-Director' : '— Shot-Director'}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${(s.cast ?? []).length > 0 ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
+                          title={(s.cast ?? []).map((c) => c.mentionKey || c.characterName).join(', ') || 'Kein Cast im Plan.'}
+                        >
+                          {(s.cast ?? []).length > 0 ? `✓ Cast (${(s.cast ?? []).length})` : '— Cast'}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${s.anchorPromptEN ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
+                          title={s.anchorPromptEN ?? 'Kein Anchor-Prompt im Plan.'}
+                        >
+                          {s.anchorPromptEN ? '✓ Anchor-Prompt' : '— Anchor-Prompt'}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick) ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
+                          title={s.performance ? `mimik=${s.performance.mimik ?? '—'} · gestik=${s.performance.gestik ?? '—'} · blick=${s.performance.blick ?? '—'} · energy=${s.performance.energy ?? '—'}` : 'Keine Performance-Anweisung.'}
+                        >
+                          {s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick) ? '✓ Performance' : '— Performance'}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${s.lipSync ? 'border-amber-400/40 text-amber-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
+                          title={s.lipSync ? 'Lip-Sync aktiv — HappyHorse Primary, Hailuo Fallback.' : 'B-Roll/HeyGen-Modus.'}
+                        >
+                          {s.lipSync ? '✓ Lip-Sync' : 'B-Roll'}
+                        </Badge>
                       </div>
 
                       {s.voiceover?.text && (
