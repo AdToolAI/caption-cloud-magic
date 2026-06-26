@@ -263,50 +263,66 @@ export function useStoryboardTransition({
     });
     startProgressLoop();
 
+    // Direct fetch with 180s AbortController — `supabase.functions.invoke`
+    // imposes a ~30s timeout that kicks in before deep-parse (research +
+    // gemini pass) can finish (~40–90s typical, up to 150s with research).
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 180_000);
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse`;
+    const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token ?? anon;
+
+    const parsePlan = (data: any): { plan: TProductionPlan | null; dropped: number; error?: string } => {
+      let dropped = 0;
+      const parsed = ProductionPlan.safeParse(data?.plan);
+      if (parsed.success) return { plan: parsed.data, dropped };
+      console.error('[useStoryboardTransition] plan validation failed', parsed.error.flatten());
+      const rawScenes: any[] = Array.isArray(data?.plan?.scenes) ? data.plan.scenes : [];
+      const survivors: any[] = [];
+      for (const s of rawScenes) {
+        const sp = PlanScene.safeParse(s);
+        if (sp.success) survivors.push(sp.data); else dropped += 1;
+      }
+      if (survivors.length > 0) {
+        const retry = ProductionPlan.safeParse({ ...(data?.plan ?? {}), scenes: survivors });
+        if (retry.success) return { plan: retry.data, dropped };
+      }
+      const issues = parsed.error.issues.slice(0, 2)
+        .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join(' · ');
+      return { plan: null, dropped, error: `Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}` };
+    };
+
     try {
-      const { data, error } = await supabase.functions.invoke('briefing-deep-parse', {
-        body: { briefing: text, projectId, language },
+      const res = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anon,
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ briefing: text, projectId, language }),
       });
+      window.clearTimeout(timeoutId);
       stopProgress();
       if (cancelledRef.current) return { handled: true };
-      if (error) throw error;
 
-      let plan: TProductionPlan | null = null;
-      let droppedScenes = 0;
-
-      const parsed = ProductionPlan.safeParse(data?.plan);
-      if (parsed.success) {
-        plan = parsed.data;
-      } else {
-        // Per-scene recovery: keep what we can.
-        console.error('[useStoryboardTransition] plan validation failed', parsed.error.flatten());
-        const rawScenes: any[] = Array.isArray(data?.plan?.scenes) ? data.plan.scenes : [];
-        const survivors: any[] = [];
-        for (const s of rawScenes) {
-          const sp = PlanScene.safeParse(s);
-          if (sp.success) survivors.push(sp.data);
-          else droppedScenes += 1;
-        }
-        if (survivors.length > 0) {
-          const retry = ProductionPlan.safeParse({ ...(data?.plan ?? {}), scenes: survivors });
-          if (retry.success) {
-            plan = retry.data;
-          } else {
-            console.error('[useStoryboardTransition] retry failed', retry.error.flatten());
-          }
-        }
-        if (!plan) {
-          const issues = parsed.error.issues.slice(0, 2)
-            .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
-            .join(' · ');
-          throw new Error(`Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}`);
-        }
-        if (droppedScenes > 0) {
-          toast({
-            title: 'Plan teilweise übernommen',
-            description: `${droppedScenes} Szene(n) konnten nicht validiert werden und wurden übersprungen.`,
-          });
-        }
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => '');
+        const err: any = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        err.body = bodyText;
+        throw err;
+      }
+      const data = await res.json();
+      const { plan, dropped, error: validationErr } = parsePlan(data);
+      if (!plan) throw new Error(validationErr || 'Plan-Validierung fehlgeschlagen');
+      if (dropped > 0) {
+        toast({
+          title: 'Plan teilweise übernommen',
+          description: `${dropped} Szene(n) konnten nicht validiert werden und wurden übersprungen.`,
+        });
       }
 
       // Smoothly drive the bar to 100% before swapping to the plan sheet.
@@ -323,20 +339,21 @@ export function useStoryboardTransition({
       });
       return { handled: true };
     } catch (e: any) {
+      window.clearTimeout(timeoutId);
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
-      const details = await extractFunctionsErrorDetails(e);
-      const status = details.status;
-      const msg = details.message || 'Deep-Parse fehlgeschlagen';
-      console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: details.body });
+      const isAbort = e?.name === 'AbortError';
+      const status: number | undefined = e?.status;
+      const msg: string = isAbort ? 'Timeout nach 180s' : (e?.message || 'Deep-Parse fehlgeschlagen');
+      console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: e?.body, isAbort });
 
       // Hard blocks (credits / rate-limit / payload): keep classic toast + navigate.
-      if (status === 402 || status === 429 || status === 413 || /402|429/.test(msg)) {
+      if (status === 402 || status === 429 || status === 413) {
         toast({
           title: 'Briefing-Analyse fehlgeschlagen',
-          description: status === 402 || /402/.test(msg) ? 'Keine AI-Credits mehr — bitte aufladen.'
-            : status === 429 || /429/.test(msg) ? 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.'
+          description: status === 402 ? 'Keine AI-Credits mehr — bitte aufladen.'
+            : status === 429 ? 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.'
             : 'Briefing zu lang — bitte kürzen.',
           variant: 'destructive',
         });
@@ -345,16 +362,16 @@ export function useStoryboardTransition({
         return { handled: true };
       }
 
-      // Soft fail (500 / network / validation): build a local fallback plan
-      // so the user is never stuck. Open the plan sheet for review.
+      // Soft fail: build a local fallback plan so the user is never stuck.
       try {
         const fallback = buildLocalFallbackPlan(briefing, text);
-        const reason = status
-          ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
-          : (msg.toLowerCase().includes('timeout') ? 'Timeout' : 'Netzwerkfehler');
+        const reason = isAbort
+          ? 'Timeout (>180s)'
+          : status ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
+          : 'Netzwerkfehler';
         toast({
-          title: 'Auto-Analyse offline',
-          description: `${reason} — Basis-Plan (3 Szenen) erstellt, bitte prüfen & anpassen.`,
+          title: 'Auto-Analyse dauert länger als erwartet',
+          description: `${reason} — Basis-Plan eingeblendet. Wir versuchen den vollen Plan im Hintergrund nachzuladen.`,
         });
         setState({
           warRoomOpen: false,
@@ -364,6 +381,42 @@ export function useStoryboardTransition({
           planSheetOpen: true,
           initialPlan: fallback,
         });
+
+        // LATE-ARRIVAL: if the timeout fired but the function is still
+        // running on the backend, retry once without a timeout and swap
+        // the fallback plan when the real one arrives — but only while
+        // the user is still viewing the (untouched) fallback sheet.
+        if (isAbort) {
+          (async () => {
+            try {
+              const lateRes = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': anon,
+                  'Authorization': `Bearer ${authToken}`,
+                },
+                body: JSON.stringify({ briefing: text, projectId, language }),
+              });
+              if (!lateRes.ok) return;
+              const lateData = await lateRes.json();
+              const { plan: latePlan } = parsePlan(lateData);
+              if (!latePlan) return;
+              setState((s) => {
+                if (!s.planSheetOpen) return s;
+                // Only swap if the user is still on the fallback plan.
+                if (s.initialPlan !== fallback) return s;
+                toast({
+                  title: '✨ Vollständiger Plan nachgeladen',
+                  description: 'Der AI-generierte Plan ist jetzt verfügbar.',
+                });
+                return { ...s, initialPlan: latePlan };
+              });
+            } catch (lateErr) {
+              console.warn('[useStoryboardTransition] late-arrival failed', lateErr);
+            }
+          })();
+        }
       } catch (fallbackErr: any) {
         console.error('[useStoryboardTransition] local fallback failed', fallbackErr);
         toast({
