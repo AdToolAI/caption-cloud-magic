@@ -374,7 +374,7 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
   };
 
   return (
-    <div className="space-y-6">
+    <div ref={rootRef} className="space-y-6">
       {/* Step indicator */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-mono tracking-wider uppercase">
@@ -391,6 +391,10 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
           ))}
         </div>
       </div>
+
+      {/* Persistent Evidence Boost banner */}
+      <EvidenceBoostBanner variant="compact" />
+
 
       {step === 1 && (
         <div className="space-y-5">
