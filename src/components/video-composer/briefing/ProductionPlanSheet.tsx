@@ -821,6 +821,13 @@ export default function ProductionPlanSheet({
           </ScrollArea>
         )}
 
+        {/* Pre-Apply Summary (Briefing Intelligence v2) — sticky above footer */}
+        {step === 'review' && plan && (
+          <div className="shrink-0">
+            <BriefingPlanSummary plan={plan} />
+          </div>
+        )}
+
         <DialogFooter className="gap-2 shrink-0 border-t border-border/40 pt-3">
           {step === 'paste' && (
             <>
