@@ -11,7 +11,8 @@ import {
 } from '@/config/aiVideoModelRegistry';
 import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Lock, Wrench } from 'lucide-react';
+import { Lock, Wrench, Crown } from 'lucide-react';
+import { isPremiumEngine } from '@/lib/cost/videoProviderMargins';
 
 interface ModelSelectorProps {
   value: string;
@@ -99,6 +100,16 @@ export function ModelSelector({ value, onChange, currency, models, className }: 
                           <span className="font-medium text-sm">{m.name}</span>
                           {isMaintenance && <Wrench className="h-3 w-3 text-amber-400" />}
                           {isComingSoon && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          {isPremiumEngine(m.id) && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] px-1 py-0 h-3.5 border-amber-400/40 text-amber-300 gap-0.5"
+                              title="Premium-Engine: echte Provider-Kosten werden direkt durchgereicht"
+                            >
+                              <Crown className="h-2.5 w-2.5" />
+                              Premium-Engine
+                            </Badge>
+                          )}
                           {m.badge && (
                             <Badge
                               variant="outline"
@@ -120,6 +131,7 @@ export function ModelSelector({ value, onChange, currency, models, className }: 
                         {symbol}{m.costPerSecond[currency].toFixed(2)}/s
                       </span>
                     </div>
+
                   </SelectItem>
                 );
               })}

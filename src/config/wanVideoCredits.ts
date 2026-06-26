@@ -1,5 +1,6 @@
 import { Currency } from './pricing';
 
+// Margin policy: Replicate $0.04/$0.07 per second → user 0.12/0.20 €/s (~67/65% margin)
 export const WAN_VIDEO_MODELS = {
   'wan-standard': {
     name: 'Wan 2.5 Standard',
@@ -7,15 +8,15 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.5',
     costPerSecond: {
-      EUR: 0.10,
-      USD: 0.10,
+      EUR: 0.12,
+      USD: 0.12,
     },
     minDuration: 5,
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: 'Schnelle AI-Videos ab 0,50€ pro 5 Sekunden',
-      USD: 'Fast AI videos from $0.50 per 5 seconds',
+      EUR: 'Schnelle AI-Videos ab 0,60€ pro 5 Sekunden',
+      USD: 'Fast AI videos from $0.60 per 5 seconds',
     },
     badge: 'Standard',
   },
@@ -25,15 +26,15 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.5',
     costPerSecond: {
-      EUR: 0.15,
-      USD: 0.15,
+      EUR: 0.20,
+      USD: 0.20,
     },
     minDuration: 5,
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 0,75€ pro 5 Sekunden',
-      USD: 'Premium 1080p quality from $0.75 per 5 seconds',
+      EUR: 'Premium 1080p-Qualität ab 1,00€ pro 5 Sekunden',
+      USD: 'Premium 1080p quality from $1.00 per 5 seconds',
     },
     badge: 'Premium',
   },
@@ -43,8 +44,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.6',
     costPerSecond: {
-      EUR: 0.10,
-      USD: 0.10,
+      EUR: 0.12,
+      USD: 0.12,
     },
     minDuration: 5,
     maxDuration: 10,
@@ -61,8 +62,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.6',
     costPerSecond: {
-      EUR: 0.15,
-      USD: 0.15,
+      EUR: 0.20,
+      USD: 0.20,
     },
     minDuration: 5,
     maxDuration: 10,

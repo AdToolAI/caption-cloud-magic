@@ -226,7 +226,8 @@ serve(async (req) => {
       );
     }
 
-    const costPerSecond = 0.15;
+    // Margin policy: Runway Gen-4 Aleph V2V ~$0.08/s → user €0.23/s (~65% margin)
+    const costPerSecond = 0.23;
     const totalCost = duration * costPerSecond;
     const sym = wallet.currency === "USD" ? "$" : "€";
 

@@ -10,19 +10,22 @@
  */
 export type ClipQuality = "standard" | "pro";
 
+// Margin policy: ~60-70% across the board. Sora/Veo/Grok = Premium-Engine tier (~65%).
+// Keep aligned with `src/types/video-composer.ts` (CLIP_SOURCE_COSTS) and
+// `src/lib/cost/videoProviderMargins.ts`.
 export const CLIP_COSTS: Record<string, Record<ClipQuality, number>> = {
-  "ai-hailuo":     { standard: 0.15, pro: 0.20 },
-  "ai-kling":      { standard: 0.15, pro: 0.21 },
-  "ai-sora":       { standard: 0.25, pro: 0.53 },
-  "ai-wan":        { standard: 0.10, pro: 0.18 },
-  "ai-seedance":   { standard: 0.12, pro: 0.20 },
-  "ai-luma":       { standard: 0.20, pro: 0.32 },
-  "ai-veo":        { standard: 0.20, pro: 1.40 },
-  "ai-runway":     { standard: 0.15, pro: 0.15 },
-  "ai-pika":       { standard: 0.10, pro: 0.18 },
-  "ai-happyhorse": { standard: 0.28, pro: 0.56 }, // 720p / 1080p (Replicate 50% margin)
-  "ai-vidu":       { standard: 0.09, pro: 0.09 }, // flat €0.45 / 5s
-  "ai-grok":       { standard: 0.20, pro: 0.20 }, // 1080p only
+  "ai-hailuo":     { standard: 0.15, pro: 0.22 },
+  "ai-kling":      { standard: 0.18, pro: 0.28 },
+  "ai-sora":       { standard: 0.55, pro: 1.30 },
+  "ai-wan":        { standard: 0.12, pro: 0.20 },
+  "ai-seedance":   { standard: 0.15, pro: 0.20 },
+  "ai-luma":       { standard: 0.20, pro: 0.35 },
+  "ai-veo":        { standard: 0.42, pro: 3.15 },
+  "ai-runway":     { standard: 0.23, pro: 0.23 },
+  "ai-pika":       { standard: 0.14, pro: 0.26 },
+  "ai-happyhorse": { standard: 0.40, pro: 0.80 }, // 720p / 1080p (~65% margin)
+  "ai-vidu":       { standard: 0.13, pro: 0.13 }, // flat €0.65 / 5s
+  "ai-grok":       { standard: 0.42, pro: 0.42 }, // 1080p only (premium-engine)
   "ai-ltx":        { standard: 0.08, pro: 0.12 },
   "ai-image":      { standard: 0.01, pro: 0.015 },
 };

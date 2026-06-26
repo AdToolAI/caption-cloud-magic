@@ -11,10 +11,10 @@ const corsHeaders = {
 };
 
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'wan-standard': { EUR: 0.10, USD: 0.10 },
-  'wan-pro': { EUR: 0.15, USD: 0.15 },
-  'wan-2-6-standard': { EUR: 0.10, USD: 0.10 },
-  'wan-2-6-pro': { EUR: 0.15, USD: 0.15 },
+  'wan-standard':      { EUR: 0.12, USD: 0.12 },
+  'wan-pro':           { EUR: 0.20, USD: 0.20 },
+  'wan-2-6-standard':  { EUR: 0.12, USD: 0.12 },
+  'wan-2-6-pro':       { EUR: 0.20, USD: 0.20 },
 };
 
 const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {

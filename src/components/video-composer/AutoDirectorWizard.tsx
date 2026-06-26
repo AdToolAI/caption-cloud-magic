@@ -119,9 +119,10 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
   };
 
   const totalEstimate = editedScenes.reduce((sum, s) => {
+    // Keep aligned with `src/types/video-composer.ts` CLIP_SOURCE_COSTS (standard tier).
     const cost: Record<string, number> = {
-      'ai-hailuo': 0.15, 'ai-kling': 0.15, 'ai-sora': 0.25,
-      'ai-wan': 0.10, 'ai-seedance': 0.12, 'ai-luma': 0.20,
+      'ai-hailuo': 0.15, 'ai-kling': 0.18, 'ai-sora': 0.55,
+      'ai-wan': 0.12, 'ai-seedance': 0.15, 'ai-luma': 0.20,
     };
     return sum + (cost[s.recommendedEngine] ?? 0.15) * s.durationSeconds;
   }, 0);

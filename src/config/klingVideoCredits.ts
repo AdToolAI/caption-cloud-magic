@@ -1,19 +1,20 @@
 import { Currency } from './pricing';
 
+// Margin policy: Replicate $0.06/$0.10 per second → user 0.18/0.28 €/s (~67/64% margin)
 export const KLING_VIDEO_MODELS = {
   'kling-3-standard': {
     name: 'Kling 3.0 Standard',
     provider: 'Kuaishou (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.15,
-      USD: 0.15,
+      EUR: 0.18,
+      USD: 0.18,
     },
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Hochwertige AI-Videos ab 0,75€ pro 5 Sekunden',
-      USD: 'High-quality AI videos from $0.75 per 5 seconds',
+      EUR: 'Hochwertige AI-Videos ab 0,90€ pro 5 Sekunden',
+      USD: 'High-quality AI videos from $0.90 per 5 seconds',
     },
     badge: 'Empfohlen',
   },
@@ -22,14 +23,14 @@ export const KLING_VIDEO_MODELS = {
     provider: 'Kuaishou (Replicate)',
     quality: '1080p',
     costPerSecond: {
-      EUR: 0.20,
-      USD: 0.20,
+      EUR: 0.28,
+      USD: 0.28,
     },
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 1,00€ pro 5 Sekunden',
-      USD: 'Premium 1080p quality from $1.00 per 5 seconds',
+      EUR: 'Premium 1080p-Qualität ab 1,40€ pro 5 Sekunden',
+      USD: 'Premium 1080p quality from $1.40 per 5 seconds',
     },
     badge: 'Premium',
   },

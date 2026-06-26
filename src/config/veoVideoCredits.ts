@@ -2,13 +2,13 @@ import { Currency } from './pricing';
 
 /**
  * Google Veo 3.1 Pricing — alle 4 Varianten
- * Basis: Replicate Cost (USD) → Verkaufspreis mit ≥70% Marge
+ * Basis: Replicate Listenpreis (USD/s, Stand Juni 2026) → Verkaufspreis ~65% Marge
  *
  * | Variante     | Replicate $/s | Verkauf €/s | Marge |
- * | lite-720p    | 0.05          | 0.20        | 75%   |
- * | lite-1080p   | 0.08          | 0.30        | 73%   |
- * | fast         | 0.15          | 0.55        | 73%   |
- * | pro          | 0.40          | 1.40        | 71%   |
+ * | lite-720p    | 0.15          | 0.42        | 64%   |
+ * | lite-1080p   | 0.22          | 0.62        | 65%   |
+ * | fast         | 0.40          | 1.15        | 65%   |
+ * | pro          | 1.10          | 3.15        | 65%   |
  */
 export const VEO_VIDEO_MODELS = {
   'veo-3.1-lite-720p': {
@@ -18,15 +18,15 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '720p' as const,
     costPerSecond: {
-      EUR: 0.20,
-      USD: 0.20,
+      EUR: 0.42,
+      USD: 0.42,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Native Audio + 720p Video ab 0,80€ pro 4 Sekunden',
-      USD: 'Native Audio + 720p Video from $0.80 per 4 seconds',
+      EUR: 'Native Audio + 720p Video ab 1,68€ pro 4 Sekunden',
+      USD: 'Native Audio + 720p Video from $1.68 per 4 seconds',
     },
     badge: '🎵 Native Audio',
   },
@@ -37,15 +37,15 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 0.30,
-      USD: 0.30,
+      EUR: 0.62,
+      USD: 0.62,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: '1080p Lite mit Audio ab 1,20€ pro 4 Sekunden',
-      USD: '1080p Lite with audio from $1.20 per 4 seconds',
+      EUR: '1080p Lite mit Audio ab 2,48€ pro 4 Sekunden',
+      USD: '1080p Lite with audio from $2.48 per 4 seconds',
     },
     badge: '🎵 HD Audio',
   },
@@ -56,17 +56,17 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 0.55,
-      USD: 0.55,
+      EUR: 1.15,
+      USD: 1.15,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Schnelle 1080p-Generierung ab 2,20€ pro 4 Sekunden',
-      USD: 'Fast 1080p generation from $2.20 per 4 seconds',
+      EUR: 'Schnelle 1080p-Generierung ab 4,60€ pro 4 Sekunden',
+      USD: 'Fast 1080p generation from $4.60 per 4 seconds',
     },
-    badge: '⚡ Fast',
+    badge: '⚡ Premium-Engine',
   },
   'veo-3.1-pro': {
     name: 'Veo 3.1 Pro',
@@ -75,17 +75,17 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 1.40,
-      USD: 1.40,
+      EUR: 3.15,
+      USD: 3.15,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Premium Cinematic 1080p ab 5,60€ pro 4 Sekunden',
-      USD: 'Premium Cinematic 1080p from $5.60 per 4 seconds',
+      EUR: 'Premium Cinematic 1080p ab 12,60€ pro 4 Sekunden',
+      USD: 'Premium Cinematic 1080p from $12.60 per 4 seconds',
     },
-    badge: '👑 Premium',
+    badge: '👑 Premium-Engine',
   },
 } as const;
 
