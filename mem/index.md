@@ -18,6 +18,7 @@ Updated: today
 - **Lip-Sync Sync.so Compliance**: Never send undocumented `segments_secs`; gate silent speaker audio before Sync.so dispatch.
 - **Lip-Sync Unified Pipeline (v60+v61+v62+v64+v129.29+v130+v140)**: Every dialog scene uses the chained per-speaker Sync.so pipeline. **`sync-3` is the ONLY model for dialog lip-sync**; `lipsync-2`/`lipsync-2-pro` disabled. **v140 (2026-06-20)**: final Sync.so wire ASD is canonicalized exactly once immediately before fetch; no post-payload ASD mutations. Valid shapes only: auto, flat `[x,y]`, bbox_url, bbox_inline.
 - **Lip-Sync Pipeline FROZEN (≤4 speakers)**: Read `mem://architecture/lipsync/FROZEN-INVARIANTS` before editing `compose-dialog-segments`, `sync-so-webhook`, `compose-video-clips` (neutralTwoShotPrompt / CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE), `_shared/cast-validation.ts` (MAX_SPEAKERS=4), or `StoryboardTab` cast handling. Grep `FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md` for load-bearing sites.
+- **Hailuo Lip-Sync Duration Lock**: Read `mem://architecture/video-composer/hailuo-lipsync-duration-lock` before editing duration/audio probing logic. Hailuo + Lip-Sync must preserve the user's selected 6s/10s bucket; never auto-extend from VO length or probed MP4/container duration.
 
 ## Memories
 - [Production Plan Pipeline](mem://features/video-composer/production-plan-pipeline) — 2-Pass Briefing-Deep-Parse (Gemini 2.5 Pro) in editierbaren Drehplan; Apply respektiert harten Lip-Sync-Schutz (clip_status/clip_url/lipSyncStatus/dialogLockedAt/lockReferenceUrl + dialog_shots Probe)
