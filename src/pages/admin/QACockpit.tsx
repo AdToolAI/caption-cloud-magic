@@ -20,6 +20,8 @@ import { ProbesTab } from "@/pages/admin/ProbesTab";
 import { MetaTokenHealthTab } from "@/pages/admin/MetaTokenHealthTab";
 import { IncidentManager } from "@/components/admin/qa-cockpit/IncidentManager";
 import { FunctionMatrixTab } from "@/components/admin/qa-cockpit/FunctionMatrixTab";
+import { SupportInboxTab } from "@/components/admin/qa-cockpit/SupportInboxTab";
+
 
 
 const TIER_COLORS: Record<string, string> = {
