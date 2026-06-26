@@ -155,7 +155,7 @@ export function FunctionMatrixTab() {
                 <SelectContent>
                   <SelectItem value="all">Alle Kategorien</SelectItem>
                   {categories.map((c) => (
-                    <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
