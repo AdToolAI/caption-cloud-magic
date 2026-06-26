@@ -329,13 +329,16 @@ serve(async (req) => {
         input: hhInput,
       });
     } catch (err: any) {
-      console.error("[generate-happyhorse-video] ❌ Submit failed:", err);
+      const greenNetReject = isGreenNetRejection(err);
+      const errorClass = greenNetReject ? "green_net_rejected" : "happyhorse_submit_failed";
+      console.error(`[generate-happyhorse-video] ❌ Submit failed (${errorClass}):`, err?.message ?? err);
       await supabaseAdmin
         .from("ai_video_generations")
         .update({
           status: "failed",
           failed_at: new Date().toISOString(),
           error_message: err?.message ?? "HappyHorse submit failed",
+          error_class: errorClass,
         })
         .eq("id", generation.id);
       await supabaseAdmin.rpc("refund_ai_video_credits", {
@@ -345,11 +348,15 @@ serve(async (req) => {
       });
       return new Response(
         JSON.stringify({
-          error: "HappyHorse submission failed. Credits refunded.",
-          code: "HAPPYHORSE_ERROR",
+          error: greenNetReject
+            ? "HappyHorse content filter (Green Net) rejected the prompt. Credits refunded. Try Hailuo as fallback."
+            : "HappyHorse submission failed. Credits refunded.",
+          code: greenNetReject ? "green_net_rejected" : "HAPPYHORSE_ERROR",
+          suggested_fallback: greenNetReject ? "ai-hailuo" : undefined,
+          touched: greenNetReject ? greenNet.touched : undefined,
           details: err?.message,
         }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: greenNetReject ? 422 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
