@@ -2820,7 +2820,9 @@ export type Database = {
           brand_kit_id: string
           created_at: string | null
           id: string
-          sample_text: string
+          kind: string
+          sample_text: string | null
+          text: string | null
           user_id: string
         }
         Insert: {
@@ -2828,7 +2830,9 @@ export type Database = {
           brand_kit_id: string
           created_at?: string | null
           id?: string
-          sample_text: string
+          kind?: string
+          sample_text?: string | null
+          text?: string | null
           user_id: string
         }
         Update: {
@@ -2836,7 +2840,9 @@ export type Database = {
           brand_kit_id?: string
           created_at?: string | null
           id?: string
-          sample_text?: string
+          kind?: string
+          sample_text?: string | null
+          text?: string | null
           user_id?: string
         }
         Relationships: [
