@@ -1,53 +1,116 @@
 
-# Support Wizard — Fix Upload Visibility & Bond 2028 Polish
+# Feature A — "Cross-Post Magic" (One-Click pro Plattform optimiert)
 
-Zwei klare Probleme aus dem Screenshot:
+## 🎯 Ziel
+Statt **einer** generischen Caption für alle Kanäle generiert die KI nach dem Render automatisch **pro Plattform** eine optimierte Variante (Caption + Hashtags + Title/Description) — basierend auf dem Briefing-Plan, der das Video tatsächlich kennt. Creator klickt 1× "Publish All".
 
-1. **Upload nirgendwo in Schritt 1 zu sehen** — der AttachmentUploader sitzt aktuell nur in Schritt 3. Im ursprünglichen Plan war "Upload schon in Step 1 unter Subject" vorgesehen, das wurde nicht umgesetzt.
-2. **Look passt nicht zum Rest** — Karten (Kategorie/Severity) und Banner sind sehr neutral (border-white/10), während die restliche Plattform Bond-2028-Stil hat (Gold-Glow, Glass, Cyan-Akzente, Playfair-Serif-Headlines mit Subline-Mono-Caps).
+## 🧩 Was sich konkret ändert (User-Flow)
 
-## Was sich ändert
+**Vorher:** Render → Tab "Publish" → 1 Caption-Feld → manuell für alle Kanäle gleich → Publish.
 
-### A) Inline-Upload in Step 1 (Drop-Zone direkt unter Subject)
-- Neue kompakte "Quick Evidence"-Card direkt unter dem Subject-Feld in Step 1.
-- Wiederverwendet `AttachmentUploader` mit neuer `variant="compact"` Prop:
-  - Kleinere Drop-Zone (ein Row, ~80px hoch statt 6er-Padding)
-  - "Choose files / Record / Paste"-Buttons inline rechts
-  - 60%-Badge integriert (kein separater Bar)
-- State (`attachments`) bleibt im Wizard, wird sowohl in Step 1 als auch Step 3 an dieselbe Instanz gebunden — beide Steps zeigen die gleichen Thumbnails.
-- Bei `category` ∈ {bug, rendering, technical} + `severity` ∈ {high, blocking}: rote Variante des Banners ("ohne Visual nicht reproduzierbar").
+**Nachher:** Render → Tab "Publish" → **"✨ Cross-Post Magic"-Button** → 4 Tabs (1 pro ausgewähltem Kanal) mit fertigen Drafts → Inline-Edit pro Tab → **"Publish All"**.
 
-### B) Bond 2028 Visual Pass
-- **Category-Cards**: aktiv = Gold-Border + Gold-Glow + Gradient-Tint (statt nur `bg-primary/10`); idle = subtiler Cyan-Hover, Icon im Gold-Frame-Square statt nackt.
-- **Severity-Pills**: aktiv erhält statt Bunt-Background ein konsistentes Gold-Outline + farbcodierter linker Akzent-Strich (low=emerald, normal=cyan, high=amber, blocking=red).
-- **Step-Indikator**: aktive Bars als Gold-Gradient mit Schimmer-Animation.
-- **Headlines**: Playfair-Serif behalten, aber Subline als Mono-Caps Kicker drüber (wie Hub-Pages: `▸ Schritt 1 · Triage`).
-- **Evidence-Banner**: stärkerer Gold-Glow + Sparkle-Shimmer im Hero-Variant, "+60%"-Badge als Pill mit Border-Glow.
-- **AttachmentUploader Drop-Zone**: Gold-Dashed-Border mit innerem Gradient-Fade, Hover-State = Cyan-Pulse statt grauer Hover.
-- **Footer-Buttons**: "Weiter" als Gold-Gradient + Glow (passend zu anderen CTAs der Plattform), "Zurück" als Glass-Outline.
+```text
+┌─────────────────────────────────────────────────────┐
+│  ✨ Cross-Post Magic  [Regenerate] [Tone: Default▾] │
+├──────┬──────┬──────────┬─────────┬──────────────────┤
+│  IG  │TikTok│ LinkedIn │ YouTube │                  │
+├──────┴──────┴──────────┴─────────┴──────────────────┤
+│  Caption (max 2200)              [142 / 2200]       │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ Stopp ❌ wenn dir das auch passiert...        │  │
+│  │ ✨ Hier ist mein 60-Sekunden-Hack...          │  │
+│  └───────────────────────────────────────────────┘  │
+│  Hashtags  [#contentcreator #ai #adtool +12]        │
+│  Hook-Score: 8.7/10 ✅   Best-Time: Heute 19:42     │
+└─────────────────────────────────────────────────────┘
+[ ← Edit Master ]              [ 🚀 Publish All (4) ] │
+```
 
-### C) Lokalisierung
-- Neue DE/EN/ES-Strings für: `s1QuickEvidence`, `s1QuickEvidenceHint`, "Drop files here" → lokalisiert (AttachmentUploader hard-codet aktuell Englisch — Localization-Pass mitziehen).
-- Kicker-Texts pro Step lokalisiert.
+## 🏗️ Architektur
 
-## Out-of-Scope (bewusst nicht)
-- Keine Änderungen am Backend / `triage-support-ticket` / Storage-Bucket.
-- Kein neues DB-Schema.
+### Datenfluss
+```text
+ProductionPlan (Briefing)
+        │
+        ▼
+generate-cross-post-captions  (neue Edge Function, Lovable AI Gateway)
+        │   Input: { videoUrl, briefingPlan, channels[], tone, language }
+        │   Output: { instagram: {caption,hashtags,hookScore},
+        │             tiktok:   {caption,hashtags,hookScore},
+        │             linkedin: {caption,hashtags,hookScore},
+        │             youtube:  {title,description,tags,hookScore} }
+        ▼
+cross_post_drafts (neue Tabelle)
+        │
+        ▼
+CrossPostMagicPanel.tsx (neue UI in PublishToSocialTab)
+        │
+        ▼
+publishToMultiplePlatforms (existing) — übergibt jetzt **pro Channel** eigenen Payload
+```
 
-## Technische Details (Files)
+### Plattform-Regeln (KI-Prompt-Constraints)
+| Channel | Caption | Hashtags | Style |
+|---|---|---|---|
+| Instagram | ≤2200, 3 Zeilen Hook + Story + CTA | 8–15, mix nische+breit | Emojis, Storytelling |
+| TikTok | ≤150, brutal kurzer Hook | 3–5 trending | Casual, Slang, kein Corporate |
+| LinkedIn | 200–800, Pro-Tone, 1 Insight | 3–5 fachlich | Erste-Person, keine Emojis-Flut |
+| YouTube | Title ≤70 + Desc 200–400 + 10 Tags | Tags statt # | SEO-Keywords vorne |
 
-- `src/components/support/AttachmentUploader.tsx`
-  - Neue Prop `variant?: "compact" | "full"` (default "full")
-  - Lokalisierungs-Strings (DE/EN/ES) via `useTranslation`
-  - Compact-Variant: 1-row layout, kein separater Badge-Bar
-- `src/components/support/SupportWizard.tsx`
-  - In Step 1 unter Subject: `<AttachmentUploader variant="compact" .../>` mit gleichem Ref/State
-  - Step 3: behält `variant="full"`
-  - Neue Kicker-Lines pro Step
-  - Restyle: Category-Cards, Severity-Pills, Step-Indikator, Footer-Buttons
-  - Conditional urgent banner auch in Step 1 wenn high/blocking + technische Kategorie
-- `src/components/support/EvidenceBoostBanner.tsx`
-  - Hero-Variant: Sparkle-Shimmer-Layer + stärkerer Gold-Glow
-  - Compact-Variant: Pill-Badge mit Border-Glow
+Alle Regeln zentral in `src/config/crossPostRules.ts` → Edge Function liest mit, UI zeigt Counter/Warnings.
 
-Verifikation: Playwright-Screenshot von `/support` (Step 1 + Step 3) im DE-Locale nach den Änderungen, Vergleich gegen den User-Screenshot.
+## 📁 Files (Neu / Geändert)
+
+### Neu
+- `supabase/functions/generate-cross-post-captions/index.ts` — Lovable AI (`google/gemini-2.5-flash`), Tool-Calling für strict JSON-Output, Sprache aus Briefing
+- `src/config/crossPostRules.ts` — Per-Channel-Constraints + Beispiel-Prompts
+- `src/hooks/useCrossPostMagic.ts` — Mutation + Cache, Regenerate, Tone-Switch
+- `src/components/composer/CrossPostMagicPanel.tsx` — Tab-UI, Hook-Score-Badge, Best-Time-Hint, Inline-Edit
+- `src/components/composer/HookScoreBadge.tsx` — kleine Wiederverwendung
+- Migration: Tabelle `cross_post_drafts` (`id, user_id, video_id, channel, caption, hashtags, title, description, hook_score, tone, generated_at`) + RLS + GRANT
+
+### Geändert
+- `src/components/composer/PublishToSocialTab.tsx` — neuer "✨ Magic"-Toggle ganz oben; wenn aktiv → CrossPostMagicPanel statt geteiltem Caption-Feld
+- `src/hooks/useSocialPublishing.ts` — `publishToMultiplePlatforms` akzeptiert jetzt optional `perChannelConfig: Record<Platform, PublishConfig>` und nutzt das **statt** des globalen Configs
+- `src/components/planner/PublishNowButton.tsx` — Magic standardmäßig **on** wenn `briefing_plan_id` vorhanden
+- i18n (DE/EN/ES): `composer.crossPostMagic.*` strings
+
+## 🎨 Design (Bond 2028)
+- Magic-Button: Gold-Gradient + Sparkle-Icon, Hover-Glow
+- Tabs als Cyan-Underline-Style (wie Hub-Pages)
+- Hook-Score-Badge: 0–4 rot, 5–6 amber, 7+ gold mit subtilem Glow
+- "Regenerate"-Button: Glass-Outline mit Refresh-Icon
+- Loading-State: Skeleton-Lines pro Tab, "✨ Schreibt deine Captions…" Kicker-Text
+
+## 💰 Kosten
+- Gemini 2.5 Flash, ~1 Call pro Render, ~2k Tokens → praktisch kostenlos pro Generierung
+- Caching in `cross_post_drafts` → Regenerate explizit user-getriggert, sonst kein Re-Call
+- Kein neuer API-Key (Lovable AI Gateway)
+
+## 🛡️ Edge-Cases
+- **Briefing fehlt** (Direct-Upload ohne Composer): Fallback-Prompt nutzt nur `videoUrl` + User-Hinweis "Tipp: Mit Briefing 3× bessere Captions"
+- **Kein Kanal verbunden**: Magic disabled mit Tooltip "Verbinde mindestens 1 Kanal"
+- **Edit-Drift**: Wenn User editiert + dann Regenerate klickt → Confirm-Dialog "Deine Änderungen überschreiben?"
+- **Sprache**: Captions immer in `briefing.language`; UI bietet manuellen Override-Dropdown (DE/EN/ES)
+- **TikTok-Sandbox**: Magic generiert trotzdem normal — die Sandbox-Limitation (Draft-only) bleibt orthogonal, lösen wir in Feature C
+
+## ✅ Akzeptanz-Kriterien
+1. Render → Publish-Tab → Magic-Button sichtbar (Gold, prominent)
+2. 1 Klick → ≤8s später 4 Tabs mit plattform-spezifischen Captions in der Briefing-Sprache
+3. Jeder Tab respektiert Length-Limits, zeigt Live-Counter + Warn-State bei Overflow
+4. Inline-Edit funktioniert, Änderungen persistieren in `cross_post_drafts`
+5. "Publish All" pusht **pro Channel** den jeweils editierten Payload (nicht den globalen)
+6. Regenerate funktioniert mit Tone-Switch (Default / Witzig / Professionell / Provokant)
+7. Drafts überleben Reload (DB-Persistenz)
+
+## 🚀 Verifikation
+- Playwright: Render-Mock → Publish-Tab → Magic klicken → 4 Tabs sichtbar → Screenshot
+- Edge-Function-Test mit `x-qa-mock: true` (returnt feste Beispiel-Captions, kein AI-Call)
+- DE/EN/ES Smoke: Briefing in jeder Sprache → korrekte Output-Sprache
+
+## ⏱️ Aufwand
+~1–2 Tage. Reihenfolge: Migration → Edge Function (mock zuerst) → Hook → Panel → Integration in PublishToSocialTab → i18n → Playwright.
+
+## ❓ Eine Entscheidung von dir
+**Tone-Presets**: Sollen wir mit 4 starten (*Default / Witzig / Professionell / Provokant*) oder direkt mit den 6 Ad-Director-Tonalities aligned (*Default / Hype / Educational / Story / Bold / Premium*)? Empfehlung: **6 alignen** — konsistent mit Ad-Director, kein extra Mapping nötig.
