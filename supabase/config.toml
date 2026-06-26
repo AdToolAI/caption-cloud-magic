@@ -832,3 +832,6 @@ timeout_sec = 120
 [functions.auth-email-hook]
 verify_jwt = false
 
+
+[functions.extract-brand-dna]
+verify_jwt = true
