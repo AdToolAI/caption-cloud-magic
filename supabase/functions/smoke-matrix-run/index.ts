@@ -9,6 +9,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { SMOKE_REGISTRY, type SmokeEntry } from "../_shared/smokeRegistry.ts";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -161,6 +162,11 @@ async function runInBatches(entries: SmokeEntry[], batchSize: number): Promise<R
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // QA smoke short-circuit (prevents recursive self-call during sweep)
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "smoke-matrix-run" });
+
+
 
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
