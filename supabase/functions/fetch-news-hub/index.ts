@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -237,6 +238,11 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { articles: [], total: 0 });
+  }
+
 
   try {
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");

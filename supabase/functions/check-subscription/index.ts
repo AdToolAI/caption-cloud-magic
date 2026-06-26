@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,11 @@ serve(withTelemetry("check-subscription", async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { subscribed: false, plan: "free", trial: true });
+  }
+
 
   try {
     const authHeader = req.headers.get("Authorization");
