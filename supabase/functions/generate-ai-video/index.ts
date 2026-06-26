@@ -28,9 +28,10 @@ interface GenerateRequest {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders }
-  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { url: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4", videoUrl: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4", output: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4", predictionId: "qa-mock-video", status: "succeeded", duration: 5 });
 );
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { url: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4", videoUrl: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4", output: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4", predictionId: "qa-mock-video", status: "succeeded", duration: 5 });
+
 
   try {
     const supabaseClient = createClient(
