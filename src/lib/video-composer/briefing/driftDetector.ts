@@ -148,16 +148,41 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
       severity = escalate(severity, 'warn');
     }
 
-    // Voiceover text presence
+    // Voiceover / dialog-script text presence.
+    // useApplyProductionPlan writes plan voiceover.text → scene.dialogScript
+    // (for lipsync) or → scene.voiceoverText (for B-Roll), so check both.
     const planVo = (ps.voiceover?.text ?? '').trim();
-    const sceneVo = String((ss as any).voiceoverText ?? (ss as any).vo?.text ?? '').trim();
+    const sceneVo = String(
+      (ss as any).dialogScript ??
+      (ss as any).voiceoverText ??
+      (ss as any).vo?.text ??
+      ''
+    ).trim();
     if (planVo && !sceneVo) {
       findings.push({
         sceneIndex: idx,
         field: 'voiceover.text',
-        severity: 'warn',
-        message: 'Voiceover-Text aus dem Plan fehlt in der Szene.',
+        severity: 'error',
+        message: 'Skript aus dem Plan wurde NICHT in die Szene übernommen.',
         expected: planVo.slice(0, 80) + (planVo.length > 80 ? '…' : ''),
+        actual: '—',
+      });
+      severity = escalate(severity, 'error');
+    }
+
+    // Shot-Director (Framing / Movement / Lighting) — must propagate.
+    const planSD = ps.shotDirector ?? {};
+    const sceneSD = ((ss as any).shotDirector ?? {}) as Record<string, unknown>;
+    const sdFields: Array<keyof typeof planSD> = ['framing', 'angle', 'movement', 'lighting'];
+    const sdMissing = sdFields.filter((f) => planSD[f] && !sceneSD[f as string]);
+    if (sdMissing.length) {
+      findings.push({
+        sceneIndex: idx,
+        field: 'shotDirector',
+        severity: 'warn',
+        message: `Shot-Director-Felder fehlen in der Szene: ${sdMissing.join(', ')}.`,
+        expected: sdMissing.map((f) => `${f}=${planSD[f]}`).join(' · '),
+        actual: sdMissing.map((f) => `${f}=${sceneSD[f as string] ?? '—'}`).join(' · '),
       });
       severity = escalate(severity, 'warn');
     }
