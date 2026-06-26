@@ -151,6 +151,16 @@ export function estimateSceneRenderCost(
   }
 
   const totalCredits = providerCredits + voCredits + lipsyncCredits;
+
+  // ETA: base provider time + VO synth + lipsync passes (sequential after clip).
+  const providerEta = computeProviderEta(scene.clipSource, durationSec, quality).etaSeconds;
+  let etaSeconds = providerEta;
+  if (voCredits > 0) etaSeconds += VO_ETA_SECONDS;
+  if (lipsyncCredits > 0) {
+    const passes = opts.passes ?? passesForScene(scene);
+    etaSeconds += LIPSYNC_ETA_BASE_SECONDS + passes * LIPSYNC_ETA_PER_PASS_SECONDS;
+  }
+
   return {
     sceneId: scene.id,
     sceneIndex: (scene.orderIndex ?? 0) + 1,
@@ -160,6 +170,8 @@ export function estimateSceneRenderCost(
     totalCredits,
     totalEur: totalCredits / CREDIT_PER_EUR,
     lines,
+    etaSeconds,
+    warnings: getRenderWarnings(scene),
   };
 }
 
@@ -168,10 +180,16 @@ export function aggregateCost(
   opts: EstimateOpts = {},
 ): AggregatedCost {
   const breakdowns = scenes.map((s) => estimateSceneRenderCost(s, opts));
+  // Scenes render in parallel (Promise.all in handleGenerateAll) → wall-clock
+  // is roughly the slowest scene plus a small overhead for orchestration.
+  const slowest = breakdowns.reduce((mx, b) => Math.max(mx, b.etaSeconds), 0);
+  const etaSeconds = Math.round(slowest * 1.2) + (breakdowns.length > 1 ? STITCH_ETA_SECONDS : 0);
   return {
     scenes: breakdowns,
     totalCredits: breakdowns.reduce((sum, b) => sum + b.totalCredits, 0),
     totalEur: breakdowns.reduce((sum, b) => sum + b.totalEur, 0),
+    etaSeconds,
+    warnings: aggregateWarnings(scenes),
   };
 }
 
