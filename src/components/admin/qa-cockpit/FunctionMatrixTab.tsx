@@ -133,10 +133,7 @@ export function FunctionMatrixTab() {
     };
   }, [runs.data]);
 
-  const categories = useMemo(
-    () => Array.from(new Set(Object.keys(CATEGORY_LABELS))),
-    [],
-  );
+  const categories = useMemo(() => SMOKE_CATEGORIES, []);
 
   return (
     <div className="space-y-4 mt-4">
