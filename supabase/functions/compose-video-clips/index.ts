@@ -3131,11 +3131,30 @@ serve(async (req) => {
             Math.max(3, Math.round(scene.durationSeconds)),
           );
           const hhResolution = quality === "pro" ? "1080p" : "720p";
-          const hhPrompt = isCinematicSyncHH
+          const hhPromptRaw = isCinematicSyncHH
             ? buildCinematicSyncMasterPrompt(scene)
             : scene.aiPrompt;
+          // Pre-submit Green-Net sanitation: strip [SceneAction]/[Dialog]
+          // tags, dark-bedroom/3-AM/laptop-screen triggers, duplicates.
+          // The Alibaba content filter rejects raw prompts with these
+          // tokens BEFORE GPU spend (DataInspectionFailed).
+          const hhSan = sanitizeForHappyHorse(String(hhPromptRaw ?? ""));
+          const hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
+          if (hhSan.touched.length > 0) {
+            console.log(
+              `[compose-video-clips] HappyHorse scene ${scene.id} green-net sanitized: ${hhSan.touched.join(", ")}`,
+            );
+            // Persist cleaned prompt so the UI reflects what was actually
+            // sent and future retries don't re-trigger Green-Net.
+            try {
+              await supabaseAdmin
+                .from("composer_scenes")
+                .update({ ai_prompt: hhCleanPrompt })
+                .eq("id", scene.id);
+            } catch (_e) { /* non-fatal */ }
+          }
           const hhInput: Record<string, unknown> = {
-            prompt: enrichPrompt(hhPrompt, undefined, isI2V),
+            prompt: enrichPrompt(hhCleanPrompt, undefined, isI2V),
             duration: hhDuration,
             resolution: hhResolution,
             seed: Math.floor(Math.random() * 2_147_483_647),
