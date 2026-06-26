@@ -8,6 +8,7 @@
  * so the renderer always has a safe shape.
  */
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { isQaMockRequest } from '../_shared/qaMock.ts';
 import { createOpenAICompatible } from 'npm:@ai-sdk/openai-compatible';
 import { generateText, Output } from 'npm:ai';
 import { z } from 'npm:zod';
