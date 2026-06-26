@@ -138,6 +138,40 @@ export const PlanScene = z.object({
     mood: z.string().max(80).optional(),
     delivery: z.string().max(240).optional(),
   })).max(20).optional(),
+
+  // ── Stage-3 plan→storyboard mapping completion ──────────────────────────
+  /**
+   * Transition into THIS scene (applied to `composer_scenes.transition_type`
+   * + `transition_duration`). Restricted to the engine's `TransitionStyle`
+   * union; fremde Werte fallen über `.catch` auf 'crossfade' zurück.
+   */
+  transition: z.object({
+    type: z.enum(['none', 'fade', 'crossfade', 'wipe', 'slide', 'zoom']).default('crossfade').catch('crossfade'),
+    durationSec: z.number().min(0).max(3).default(0.4),
+  }).optional(),
+  /**
+   * Per-scene burnt-in text overlay (mapped to `composer_scenes.text_overlay`).
+   * Independent of the global subtitle track.
+   */
+  textOverlay: z.object({
+    text: z.string().max(280),
+    position: z.enum(['top', 'center', 'bottom']).default('bottom'),
+    animation: z.enum(['none', 'fade-in', 'scale-bounce', 'slide-left', 'slide-right', 'word-by-word', 'glow-pulse']).default('fade-in').catch('fade-in'),
+    fontSizePx: z.number().int().min(16).max(160).optional(),
+    color: z.string().max(16).optional(),
+  }).optional(),
+  /**
+   * Scene-level creative tone (e.g. "cinematic", "documentary", "luxury").
+   * Drives `realismPreset` selection at apply-time when set; otherwise the
+   * briefing-level tone wins.
+   */
+  tone: z.string().max(80).optional(),
+  /**
+   * Deterministic master seed for the HQ render (mapped to
+   * `composer_scenes.seed`). When set, downstream i2v providers receive it
+   * so reroll / continuity is reproducible.
+   */
+  seed: z.number().int().min(0).max(2_147_483_647).optional(),
 });
 
 export const PlanVoice = z.object({
