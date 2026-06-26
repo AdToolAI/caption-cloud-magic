@@ -351,6 +351,9 @@ const BrandKit = () => {
           onCreateNew={() => setShowWizard(true)}
         />
 
+        {/* Sticky Brand Vault - Bond 2028 */}
+        <BrandVault brandKit={activeBrandKit} />
+
         {/* Active Brand Selector */}
         {brandKits.length > 0 && (
           <div className="mb-6">
