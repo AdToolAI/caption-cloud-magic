@@ -12,11 +12,13 @@ export interface SubtitleStyle {
   color: string;
   backgroundColor: string;
   backgroundOpacity: number;
-  animation: 'none' | 'fade' | 'slide' | 'bounce' | 'typewriter' | 'highlight' | 'scaleUp' | 'glitch';
+  animation: 'none' | 'fade' | 'slide' | 'bounce' | 'typewriter' | 'highlight' | 'scaleUp' | 'glitch' | 'hormozi';
   animationSpeed: number;
   outlineStyle: 'none' | 'stroke' | 'box' | 'box-stroke' | 'glow' | 'shadow';
   outlineColor: string;
   outlineWidth: number;
+  /** Hormozi mode: pill color for highlighted power-words (default #F5C76A gold). */
+  highlightColor?: string;
 }
 
 interface SubtitleStyleEditorProps {
