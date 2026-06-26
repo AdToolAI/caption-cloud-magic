@@ -915,11 +915,19 @@ serve(async (req) => {
         `[compose-twoshot-audio] scene ${scene_id} dialog overflow — extending sceneDur ${sceneDur.toFixed(2)}s → ${newDur.toFixed(2)}s (spoken=${spokenSec.toFixed(2)}s, overflow=${overflow.toFixed(2)}s)`,
       );
       sceneDur = newDur;
+    } else if (isHailuoScene && spokenSec > sceneDur + OVERFLOW_GRACE_SEC) {
+      console.warn(
+        `[compose-twoshot-audio] scene ${scene_id} Hailuo plate — keeping sceneDur=${sceneDur}s, Sync.so cut_off will trim spoken=${spokenSec.toFixed(2)}s.`,
+      );
     }
 
     const sceneSamples = Math.round(sceneDur * SAMPLE_RATE);
     // Never less than spoken length — guarantees Sarah's tail survives.
-    const totalSamples = Math.max(spokenSamples.length, sceneSamples);
+    // Hailuo exception: cap merged track to sceneDur so downstream renderers
+    // never see an audio length > 6s for a 6s plate.
+    const totalSamples = isHailuoScene
+      ? sceneSamples
+      : Math.max(spokenSamples.length, sceneSamples);
     const totalSec = totalSamples / SAMPLE_RATE;
     const tailSamples = Math.max(0, totalSamples - spokenSamples.length);
     let mergedSamples = tailSamples > 0
