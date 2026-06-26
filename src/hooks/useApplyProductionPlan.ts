@@ -138,16 +138,20 @@ function splitAction(anchorEN?: string): { characterAction?: string; environment
 
 /**
  * A scene is PROTECTED from being deleted/replaced when ANY of these is true:
- *  - clip_status !== 'pending'  (already generating or done)
  *  - clip_url is set            (a render exists)
  *  - lipSyncStatus is set       (lipsync pipeline touched it)
  *  - dialogLockedAt is set      (dialog lock placed)
  *  - lockReferenceUrl is set    (continuity lock placed)
+ *  - clip_status is 'generating' (mid-flight, do not yank)
  *  - has rows in dialog_shots   (checked via async DB lookup)
+ *
+ * NOTE: `clip_status === 'failed'` is intentionally NOT protected on its
+ * own — a failed scene with no lipsync state and no clip_url is exactly
+ * the case where re-running the Briefing should rewrite the bad prompt.
  */
 function isLocallyProtected(s: ComposerScene): boolean {
-  if (s.clipStatus && s.clipStatus !== 'pending') return true;
   if (s.clipUrl) return true;
+  if (s.clipStatus === 'generating') return true;
   const anyS = s as any;
   if (anyS.lipSyncStatus) return true;
   if (anyS.dialogLockedAt) return true;
