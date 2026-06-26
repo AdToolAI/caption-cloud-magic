@@ -413,7 +413,15 @@ export default function SceneInlinePlayer({
           const lower = rawErr.toLowerCase();
           // Map silent/opaque model fails to actionable text.
           let friendly: string;
-          if (!rawErr) {
+          const isGreenNet =
+            lower.includes('green_net_rejected') ||
+            lower.includes('datainspectionfailed') ||
+            lower.includes('green net check failed') ||
+            lower.includes('inappropriate content');
+          if (isGreenNet) {
+            friendly =
+              'HappyHorse-Inhaltsfilter (Alibaba „Green Net") hat den Prompt blockiert. Wir haben den Provider automatisch auf Hailuo umgestellt – klicke „Neu rendern", um es erneut zu versuchen.';
+          } else if (!rawErr) {
             friendly = 'Render fehlgeschlagen.';
           } else if (
             lower === 'model_failed_silently' ||
