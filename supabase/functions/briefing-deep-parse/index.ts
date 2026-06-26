@@ -151,6 +151,13 @@ const TOOL_PASS_A = {
                   required: ['speakerMentionKey', 'text'],
                 },
               },
+              _meta: {
+                type: 'object',
+                description: 'AI-enrichment trail for this scene. List the dotted field paths you filled in because the briefing did NOT explicitly state them (e.g. "shotDirector.lighting", "performance.gestik", "anchorPromptEN"). The UI shows a ✨ badge next to these so the creator sees what is theirs vs. AI-added.',
+                properties: {
+                  aiFilled: { type: 'array', items: { type: 'string' } },
+                },
+              },
             },
             required: ['index', 'durationSec'],
           },
