@@ -175,7 +175,13 @@ function planSceneToComposerScene(
     .map((c, i) =>
       ({
         characterId: stripPrefix(c.characterId as string),
-        shotType: i === 0 ? primaryShot : (primaryShot === 'detail' ? 'profile' : 'profile'),
+        // Per-cast override (Stage-3 mapping completion) wins over the
+        // scene default. Falls back to primary/profile split for 2-shots.
+        shotType: c.shotType
+          ? c.shotType
+          : i === 0
+            ? primaryShot
+            : (primaryShot === 'detail' ? 'profile' : 'profile'),
         // Propagate outfit selection — `prepareSceneAnchor` reads this
         // and swaps the avatar's default portrait for the outfit cover
         // image during anchor composition.
