@@ -270,6 +270,23 @@ const BrandKit = () => {
     });
   };
 
+  const handleApplyDna = (dna: BrandDnaResult) => {
+    setFormData((prev) => ({
+      ...prev,
+      brandName: dna.brand_name ?? prev.brandName,
+      brandDescription: dna.brand_description ?? prev.brandDescription,
+      primaryColor: dna.primary_color ?? prev.primaryColor,
+      secondaryColor: dna.secondary_color ?? prev.secondaryColor,
+      tonePreference: dna.tone ?? prev.tonePreference,
+      stylePreference: dna.mood ?? prev.stylePreference,
+      brandValues: dna.values?.length ? dna.values : prev.brandValues,
+    }));
+    toast({
+      title: "Brand DNA übernommen",
+      description: "Das Formular wurde mit den extrahierten Werten vorausgefüllt.",
+    });
+  };
+
   const handleDuplicate = async (kit: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
