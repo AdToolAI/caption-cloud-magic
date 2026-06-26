@@ -211,6 +211,13 @@ export const PlanMeta = z.object({
   aiFilled: z.array(z.string()).max(40).optional(),
   /** Cache hit info — pure telemetry, safe to ignore in UI. */
   researchCacheHit: z.boolean().optional(),
+  /**
+   * Provenance of this plan:
+   *  - 'ai'             — produced by briefing-deep-parse
+   *  - 'local-fallback' — produced by useStoryboardTransition.buildLocalFallbackPlan
+   *                       when the edge function timed out / failed
+   */
+  source: z.enum(['ai', 'local-fallback']).optional(),
 }).partial();
 
 export const ProductionPlan = z.object({
