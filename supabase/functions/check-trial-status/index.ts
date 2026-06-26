@@ -89,6 +89,10 @@ const normalizeLang = (raw?: string | null): Lang => {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { status: "active", daysRemaining: 14, processed: 0 });
+  }
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const startedAt = Date.now();
   let processed = 0, paused = 0, graceWarned = 0, emailsSent = 0;
