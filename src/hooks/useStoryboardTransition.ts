@@ -339,20 +339,21 @@ export function useStoryboardTransition({
       });
       return { handled: true };
     } catch (e: any) {
+      window.clearTimeout(timeoutId);
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
-      const details = await extractFunctionsErrorDetails(e);
-      const status = details.status;
-      const msg = details.message || 'Deep-Parse fehlgeschlagen';
-      console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: details.body });
+      const isAbort = e?.name === 'AbortError';
+      const status: number | undefined = e?.status;
+      const msg: string = isAbort ? 'Timeout nach 180s' : (e?.message || 'Deep-Parse fehlgeschlagen');
+      console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: e?.body, isAbort });
 
       // Hard blocks (credits / rate-limit / payload): keep classic toast + navigate.
-      if (status === 402 || status === 429 || status === 413 || /402|429/.test(msg)) {
+      if (status === 402 || status === 429 || status === 413) {
         toast({
           title: 'Briefing-Analyse fehlgeschlagen',
-          description: status === 402 || /402/.test(msg) ? 'Keine AI-Credits mehr — bitte aufladen.'
-            : status === 429 || /429/.test(msg) ? 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.'
+          description: status === 402 ? 'Keine AI-Credits mehr — bitte aufladen.'
+            : status === 429 ? 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.'
             : 'Briefing zu lang — bitte kürzen.',
           variant: 'destructive',
         });
@@ -361,16 +362,16 @@ export function useStoryboardTransition({
         return { handled: true };
       }
 
-      // Soft fail (500 / network / validation): build a local fallback plan
-      // so the user is never stuck. Open the plan sheet for review.
+      // Soft fail: build a local fallback plan so the user is never stuck.
       try {
         const fallback = buildLocalFallbackPlan(briefing, text);
-        const reason = status
-          ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
-          : (msg.toLowerCase().includes('timeout') ? 'Timeout' : 'Netzwerkfehler');
+        const reason = isAbort
+          ? 'Timeout (>180s)'
+          : status ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
+          : 'Netzwerkfehler';
         toast({
-          title: 'Auto-Analyse offline',
-          description: `${reason} — Basis-Plan (3 Szenen) erstellt, bitte prüfen & anpassen.`,
+          title: 'Auto-Analyse dauert länger als erwartet',
+          description: `${reason} — Basis-Plan eingeblendet. Wir versuchen den vollen Plan im Hintergrund nachzuladen.`,
         });
         setState({
           warRoomOpen: false,
@@ -380,6 +381,42 @@ export function useStoryboardTransition({
           planSheetOpen: true,
           initialPlan: fallback,
         });
+
+        // LATE-ARRIVAL: if the timeout fired but the function is still
+        // running on the backend, retry once without a timeout and swap
+        // the fallback plan when the real one arrives — but only while
+        // the user is still viewing the (untouched) fallback sheet.
+        if (isAbort) {
+          (async () => {
+            try {
+              const lateRes = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': anon,
+                  'Authorization': `Bearer ${authToken}`,
+                },
+                body: JSON.stringify({ briefing: text, projectId, language }),
+              });
+              if (!lateRes.ok) return;
+              const lateData = await lateRes.json();
+              const { plan: latePlan } = parsePlan(lateData);
+              if (!latePlan) return;
+              setState((s) => {
+                if (!s.planSheetOpen) return s;
+                // Only swap if the user is still on the fallback plan.
+                if (s.initialPlan !== fallback) return s;
+                toast({
+                  title: '✨ Vollständiger Plan nachgeladen',
+                  description: 'Der AI-generierte Plan ist jetzt verfügbar.',
+                });
+                return { ...s, initialPlan: latePlan };
+              });
+            } catch (lateErr) {
+              console.warn('[useStoryboardTransition] late-arrival failed', lateErr);
+            }
+          })();
+        }
       } catch (fallbackErr: any) {
         console.error('[useStoryboardTransition] local fallback failed', fallbackErr);
         toast({
