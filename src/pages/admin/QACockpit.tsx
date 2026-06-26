@@ -21,6 +21,7 @@ import { MetaTokenHealthTab } from "@/pages/admin/MetaTokenHealthTab";
 import { IncidentManager } from "@/components/admin/qa-cockpit/IncidentManager";
 import { FunctionMatrixTab } from "@/components/admin/qa-cockpit/FunctionMatrixTab";
 import { SupportInboxTab } from "@/components/admin/qa-cockpit/SupportInboxTab";
+import { EmailHealthTab } from "@/components/admin/qa-cockpit/EmailHealthTab";
 
 
 
@@ -400,6 +401,10 @@ export default function QACockpit() {
 
           <TabsContent value="support-inbox">
             <SupportInboxTab />
+          </TabsContent>
+
+          <TabsContent value="email-health">
+            <EmailHealthTab />
           </TabsContent>
 
 
