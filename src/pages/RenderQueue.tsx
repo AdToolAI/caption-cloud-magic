@@ -42,10 +42,10 @@ function timeAgo(iso: string): string {
 }
 
 function QueueRowCard({ row, onOpen }: { row: QueueRow; onOpen: (id: string) => void }) {
-  const provider =
-    row.clip_source && CLIP_SOURCE_LABELS[row.clip_source as keyof typeof CLIP_SOURCE_LABELS]
-      ? CLIP_SOURCE_LABELS[row.clip_source as keyof typeof CLIP_SOURCE_LABELS]
-      : row.clip_source ?? '—';
+  const providerEntry = row.clip_source
+    ? CLIP_SOURCE_LABELS[row.clip_source as keyof typeof CLIP_SOURCE_LABELS]
+    : undefined;
+  const provider = providerEntry?.de ?? row.clip_source ?? '—';
   return (
     <Card className="p-3 flex items-center justify-between gap-3 hover:border-primary/40 transition-colors">
       <div className="flex items-center gap-3 min-w-0">
