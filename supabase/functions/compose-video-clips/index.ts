@@ -35,6 +35,7 @@ import {
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 const ANCHOR_AUDIT_VERSION = 9;
 
 const corsHeaders = {
