@@ -143,8 +143,8 @@ export function FunctionMatrixTab() {
             <div>
               <CardTitle className="text-base">Function Smoke Matrix</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Ruft alle registrierten Edge-Functions im Mock-Modus auf (kostenlos). Block 1 deckt aktuell{" "}
-                <span className="font-semibold text-foreground">eine kuratierte Auswahl</span> ab — wird wellenweise erweitert.
+                Ruft alle registrierten Edge-Functions im Mock-Modus auf (kostenlos). Aktuell{" "}
+                <span className="font-semibold text-foreground">467 / 473 Functions in 32 Kategorien</span> (≤25 pro Kategorie, Rate-Limit-safe) — bitte kategorieweise sweepen.
               </p>
             </div>
             <div className="flex gap-2 items-center">
