@@ -55,7 +55,7 @@ export default function MusicBrowser() {
       .from('user_audio_library')
       .select('external_id')
       .eq('user_id', user.id)
-      .eq('asset_type', 'stock_music');
+      .eq('type', 'music');
     if (data) setFavorites(new Set(data.map((r: any) => r.external_id)));
   }
 
@@ -89,7 +89,7 @@ export default function MusicBrowser() {
         .from('user_audio_library')
         .delete()
         .eq('user_id', user.id)
-        .eq('asset_type', 'stock_music')
+        .eq('type', 'music')
         .eq('external_id', track.id);
       favorites.delete(track.id);
       setFavorites(new Set(favorites));
@@ -105,7 +105,7 @@ export default function MusicBrowser() {
     }
     const { error } = await supabase.from('user_audio_library').insert({
       user_id: user.id,
-      asset_type: 'stock_music',
+      type: 'music',
       external_id: track.id,
       source: 'jamendo',
       title: track.title,
