@@ -153,6 +153,54 @@ export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, Attachmen
           setDragOver(false);
           if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
         }}
+  return (
+    <div className="space-y-3">
+      {/* 60% badge bar */}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-foreground/85">
+          <Zap className="h-3.5 w-3.5 text-primary" />
+          <span>Tickets with media are resolved <strong className="text-primary">60% faster</strong>.</span>
+        </div>
+        {recorder.supported && (
+          recorder.recording ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={recorder.stop}
+              className="gap-1.5 animate-pulse"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+              Stop · {recorder.elapsed}s / {recorder.maxSeconds}s
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={recorder.start}
+              disabled={uploading || attachments.length >= maxFiles}
+              className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+            >
+              <Video className="h-3.5 w-3.5" />
+              Record screen
+            </Button>
+          )
+        )}
+      </div>
+
+      {recorder.error && (
+        <p className="text-xs text-red-400">{recorder.error}</p>
+      )}
+
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
+        }}
         className={`relative rounded-xl border-2 border-dashed transition-all ${
           dragOver
             ? "border-primary bg-primary/10"
@@ -172,10 +220,10 @@ export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, Attachmen
             ? <Loader2 className="h-8 w-8 animate-spin text-primary" />
             : <Upload className="h-8 w-8 text-primary" />}
           <p className="text-sm text-foreground/80">
-            <span className="font-medium">Drop files here</span> or click to browse
+            <span className="font-medium">Drop files here</span>, paste with ⌘V or click to browse
           </p>
           <p className="text-xs text-muted-foreground">
-            Images, videos (MP4/MOV), PDF · max {maxFiles} files · up to {(maxBytes / 1024 / 1024).toFixed(0)} MB each
+            Images, videos (MP4/MOV/WebM), PDF · max {maxFiles} files · up to {(maxBytes / 1024 / 1024).toFixed(0)} MB each
           </p>
           <Button
             type="button"
@@ -204,6 +252,10 @@ export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, Attachmen
                   alt={att.name}
                   className="w-full h-24 object-cover"
                 />
+              ) : att.type.startsWith("video/") ? (
+                <div className="w-full h-24 flex items-center justify-center bg-black/60 text-primary">
+                  <Film className="h-6 w-6" />
+                </div>
               ) : (
                 <div className="w-full h-24 flex items-center justify-center bg-black/30 text-primary">
                   {iconFor(att.type)}
@@ -229,4 +281,5 @@ export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, Attachmen
       )}
     </div>
   );
-}
+});
+
