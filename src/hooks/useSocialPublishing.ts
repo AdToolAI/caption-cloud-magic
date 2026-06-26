@@ -171,25 +171,28 @@ export function useSocialPublishing() {
 
   const publishToMultiplePlatforms = async (
     config: Omit<PublishConfig, 'platform'>,
-    platforms: Platform[]
+    platforms: Platform[],
+    perChannelConfig?: Partial<Record<Platform, Omit<PublishConfig, 'platform'>>>
   ): Promise<Record<Platform, PublishResult>> => {
     const results: Partial<Record<Platform, PublishResult>> = {};
 
     const publishPromises = platforms.map(async (platform) => {
+      // Per-channel override wins, fall back to shared config.
+      const cfg = { ...config, ...(perChannelConfig?.[platform] ?? {}) };
       let result: PublishResult;
-      
+
       switch (platform) {
         case 'instagram':
-          result = await publishToInstagram(config);
+          result = await publishToInstagram(cfg);
           break;
         case 'tiktok':
-          result = await publishToTikTok(config);
+          result = await publishToTikTok(cfg);
           break;
         case 'linkedin':
-          result = await publishToLinkedIn(config);
+          result = await publishToLinkedIn(cfg);
           break;
         case 'youtube':
-          result = await publishToYouTube(config);
+          result = await publishToYouTube(cfg);
           break;
         default:
           result = { success: false, error: 'Unknown platform' };

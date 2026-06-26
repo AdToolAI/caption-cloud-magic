@@ -6762,6 +6762,63 @@ export type Database = {
         }
         Relationships: []
       }
+      cross_post_drafts: {
+        Row: {
+          caption: string | null
+          channel: string
+          description: string | null
+          edited_by_user: boolean | null
+          generated_at: string
+          hashtags: string[] | null
+          hook_score: number | null
+          id: string
+          language: string | null
+          tags: string[] | null
+          title: string | null
+          tone: string | null
+          updated_at: string
+          user_id: string
+          video_id: string | null
+          video_url: string | null
+        }
+        Insert: {
+          caption?: string | null
+          channel: string
+          description?: string | null
+          edited_by_user?: boolean | null
+          generated_at?: string
+          hashtags?: string[] | null
+          hook_score?: number | null
+          id?: string
+          language?: string | null
+          tags?: string[] | null
+          title?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id: string
+          video_id?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          caption?: string | null
+          channel?: string
+          description?: string | null
+          edited_by_user?: boolean | null
+          generated_at?: string
+          hashtags?: string[] | null
+          hook_score?: number | null
+          id?: string
+          language?: string | null
+          tags?: string[] | null
+          title?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id?: string
+          video_id?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       custom_voices: {
         Row: {
           created_at: string | null
