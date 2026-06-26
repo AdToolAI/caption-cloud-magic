@@ -189,6 +189,26 @@ const TOOL_PASS_A = {
           },
         },
         negativePrompt: { type: 'string' },
+        _meta: {
+          type: 'object',
+          description: 'Briefing-Intelligence v2 telemetry. Set `mode` to one of storytelling | brand | product | educational | other (best guess based on the briefing). Set `modeConfidence` 0..1. Use `research` as a short array of factual bullets you leaned on to enrich the plan (general knowledge; do NOT fabricate sources). Use `aiFilled` to list plan-level dotted paths you invented (e.g. "captions.font", "voice.voiceName") because the briefing did not state them.',
+          properties: {
+            mode: { type: 'string' },
+            modeConfidence: { type: 'number' },
+            research: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  fact: { type: 'string' },
+                  source: { type: 'string' },
+                },
+                required: ['fact'],
+              },
+            },
+            aiFilled: { type: 'array', items: { type: 'string' } },
+          },
+        },
       },
       required: ['scenes'],
     },
