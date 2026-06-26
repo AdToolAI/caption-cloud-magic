@@ -839,3 +839,20 @@ verify_jwt = false
 
 [functions.extract-brand-dna]
 verify_jwt = true
+timeout_sec = 60
+
+[functions.brand-consistency-scan]
+verify_jwt = true
+timeout_sec = 180
+
+[functions.export-brand-guidelines-pdf]
+verify_jwt = true
+timeout_sec = 120
+
+[functions.share-brand-kit]
+verify_jwt = true
+timeout_sec = 30
+
+[functions.brand-trends-radar]
+verify_jwt = true
+timeout_sec = 90
