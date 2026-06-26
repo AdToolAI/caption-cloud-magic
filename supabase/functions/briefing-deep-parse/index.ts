@@ -611,6 +611,16 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       if (Object.keys(p).length) performance = p;
     }
 
+    // Per-scene aiFilled trail (BriefingIntel v2). Sanitized: stringify,
+    // de-dupe, max 30 entries. UI shows a ✨ badge next to these fields.
+    let sceneMeta: any = undefined;
+    if (s._meta && Array.isArray(s._meta.aiFilled)) {
+      const af = Array.from(new Set(
+        s._meta.aiFilled.map((p: any) => String(p ?? '').trim()).filter(Boolean),
+      )).slice(0, 30);
+      if (af.length) sceneMeta = { aiFilled: af };
+    }
+
     return stripUndef({
       index: Number.isFinite(Number(s.index)) ? Math.max(1, Math.floor(Number(s.index))) : i + 1,
       label: s.label,
@@ -631,6 +641,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       continuityHint: s.continuityHint,
       musicCue,
       dialogTurns,
+      _meta: sceneMeta,
     });
   });
 
