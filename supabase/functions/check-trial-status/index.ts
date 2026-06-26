@@ -58,6 +58,81 @@ const graceWarningCopy: Record<Lang, { subject: string; heading: string; intro: 
   },
 };
 
+// Countdown reminders (Day 3 / 6 / 9 — soft, cap-aware)
+const countdownCopy: Record<Lang, (daysLeft: number) => { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
+  de: (d) => ({
+    subject: `Noch ${d} Tage in deinem Enterprise-Trial ⏳`,
+    heading: `Noch ${d} Tage volle Power`,
+    intro: `Du hast noch ${d} Tage in deinem 14-Tage Enterprise-Trial — alle Premium-Features, Lip-Sync, 4K-Renders und Cross-Post Magic. Nutze die Zeit, um dein erstes Creator-Reel live zu schalten.`,
+    cta: "Studio öffnen",
+    footnote: "Du erhältst diese Erinnerung maximal alle 3 Tage — keine Spam-Mails versprochen.",
+  }),
+  en: (d) => ({
+    subject: `${d} days left in your Enterprise trial ⏳`,
+    heading: `${d} days of full power left`,
+    intro: `You have ${d} days left in your 14-day Enterprise trial — full premium access, Lip-Sync, 4K renders and Cross-Post Magic. Make them count.`,
+    cta: "Open Studio",
+    footnote: "We send this reminder at most every 3 days — no spam, promise.",
+  }),
+  es: (d) => ({
+    subject: `Quedan ${d} días de tu prueba Enterprise ⏳`,
+    heading: `${d} días de potencia completa`,
+    intro: `Te quedan ${d} días en tu prueba Enterprise de 14 días — acceso premium completo, Lip-Sync, renders 4K y Cross-Post Magic. Aprovecha el tiempo.`,
+    cta: "Abrir Studio",
+    footnote: "Enviamos este recordatorio como máximo cada 3 días — sin spam.",
+  }),
+};
+
+// Final-day warning (Day 13 — bypass cap, also push)
+const finalDayCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
+  de: {
+    subject: "⚠ Letzter Tag: Dein Enterprise-Trial endet morgen",
+    heading: "Letzter Tag deines Trials",
+    intro: "Morgen endet dein 14-Tage Enterprise-Trial. Danach starten 14 zusätzliche Grace-Tage, bevor dein Konto pausiert wird. Sicher dir jetzt deinen Plan und vermeide jede Unterbrechung.",
+    cta: "Plan jetzt sichern",
+    footnote: "Du wirst diese Warnung nur einmal sehen.",
+  },
+  en: {
+    subject: "⚠ Final day: your Enterprise trial ends tomorrow",
+    heading: "Final day of your trial",
+    intro: "Your 14-day Enterprise trial ends tomorrow. After that, 14 grace days start before your account is paused. Lock in your plan now to avoid any interruption.",
+    cta: "Lock in plan now",
+    footnote: "You'll only see this warning once.",
+  },
+  es: {
+    subject: "⚠ Último día: tu prueba Enterprise termina mañana",
+    heading: "Último día de tu prueba",
+    intro: "Tu prueba Enterprise de 14 días termina mañana. Después comienzan 14 días de gracia antes de que se pause tu cuenta. Asegura tu plan ahora para evitar cualquier interrupción.",
+    cta: "Asegurar plan ahora",
+    footnote: "Solo verás esta advertencia una vez.",
+  },
+};
+
+// Pre-pause warning (1 day before account pause — bypass cap)
+const prePauseCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
+  de: {
+    subject: "⚠ Letzter Tag bevor dein Konto pausiert wird",
+    heading: "Morgen wird dein Konto pausiert",
+    intro: "Deine 14-Tage Grace-Period endet morgen. Wenn du bis dahin keinen Plan wählst, wird dein Konto pausiert. Deine Daten bleiben gespeichert, aber Renders, Posts und Lip-Sync sind dann blockiert.",
+    cta: "Konto reaktivieren",
+    footnote: "Diese Warnung erhältst du nur einmal — wir möchten dich nicht überraschen.",
+  },
+  en: {
+    subject: "⚠ Final day before your account is paused",
+    heading: "Your account will be paused tomorrow",
+    intro: "Your 14-day grace period ends tomorrow. If you don't pick a plan by then, your account will be paused. Your data stays safe, but rendering, publishing and Lip-Sync will be blocked.",
+    cta: "Reactivate account",
+    footnote: "You'll only get this warning once — no surprises.",
+  },
+  es: {
+    subject: "⚠ Último día antes de que se pause tu cuenta",
+    heading: "Mañana se pausará tu cuenta",
+    intro: "Tu período de gracia de 14 días termina mañana. Si no eliges un plan, tu cuenta será pausada. Tus datos siguen seguros, pero el renderizado, publicación y Lip-Sync se bloquearán.",
+    cta: "Reactivar cuenta",
+    footnote: "Solo recibirás esta advertencia una vez — sin sorpresas.",
+  },
+};
+
 function renderEmail(
   copy: { subject: string; heading: string; intro: string; cta: string; footnote: string },
   appUrl: string,
