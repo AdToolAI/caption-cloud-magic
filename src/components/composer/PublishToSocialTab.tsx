@@ -30,7 +30,7 @@ interface PublishToSocialTabProps {
   onPublished?: () => void;
 }
 
-export function PublishToSocialTab({ videoUrl, defaultCaption = '', defaultHashtags = [], onPublished }: PublishToSocialTabProps) {
+export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingText, defaultCaption = '', defaultHashtags = [], onPublished }: PublishToSocialTabProps) {
   const { t, language } = useTranslation();
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([]);
   const [caption, setCaption] = useState(defaultCaption);
@@ -40,6 +40,7 @@ export function PublishToSocialTab({ videoUrl, defaultCaption = '', defaultHasht
   const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
   const [scheduledDate, setScheduledDate] = useState<Date>();
   const [scheduledTime, setScheduledTime] = useState('12:00');
+  const [magicMode, setMagicMode] = useState<boolean>(Boolean(briefingPlan || briefingText));
 
   const { publishToMultiplePlatforms, publishing } = useSocialPublishing();
   const { schedulePublication, loading: scheduling } = useScheduledPublishing();
@@ -70,6 +71,18 @@ export function PublishToSocialTab({ videoUrl, defaultCaption = '', defaultHasht
     } else {
       await publishToMultiplePlatforms({ videoUrl, caption, title, description, hashtags: hashtagArray }, selectedPlatforms);
     }
+    onPublished?.();
+  };
+
+  const handleMagicPublishAll = async (perChannel: Record<Platform, { caption: string; hashtags: string[]; title?: string; description?: string; tags?: string[] }>) => {
+    if (selectedPlatforms.length === 0) return;
+    await publishToMultiplePlatforms(
+      { videoUrl, caption, title, description, hashtags: [] },
+      selectedPlatforms,
+      Object.fromEntries(
+        selectedPlatforms.map((p) => [p, { ...perChannel[p], videoUrl }])
+      ) as Partial<Record<Platform, { videoUrl: string; caption: string; hashtags: string[]; title?: string; description?: string; tags?: string[] }>>,
+    );
     onPublished?.();
   };
 
