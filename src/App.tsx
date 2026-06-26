@@ -144,6 +144,7 @@ const MusicStudio = lazy(() => import("./pages/MusicStudio"));
 const SfxLibrary = lazy(() => import("./pages/SfxLibrary"));
 const StockVideos = lazy(() => import("./pages/StockVideos"));
 const VerifyLicense = lazy(() => import("./pages/VerifyLicense"));
+const SharedBrandKit = lazy(() => import("./pages/SharedBrandKit"));
 const MyLicenses = lazy(() => import("./pages/MyLicenses"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
 const HubPage = lazy(() => import("./pages/HubPage"));
@@ -163,7 +164,7 @@ function AppLayout() {
   useSessionTracking(user?.id);
   
   // Landing page routes
-  const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/imprint', '/delete-data', '/coming-soon'].includes(location.pathname) || location.pathname.startsWith('/legal/');
+  const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/imprint', '/delete-data', '/coming-soon'].includes(location.pathname) || location.pathname.startsWith('/legal/') || location.pathname.startsWith('/brand/');
   
   return (
     <div className="flex w-full">
@@ -218,6 +219,7 @@ function AppLayout() {
                     <Route path="/coming-soon" element={<ComingSoon />} />
                     <Route path="/status" element={<Status />} />
                     <Route path="/verify/:token" element={<VerifyLicense />} />
+                    <Route path="/brand/:token" element={<SharedBrandKit />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />

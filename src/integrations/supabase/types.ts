@@ -2547,6 +2547,7 @@ export type Database = {
           example_caption: string | null
           font_pairing: Json
           id: string
+          industry: string | null
           is_active: boolean | null
           keywords: Json | null
           last_consistency_check: string | null
@@ -2556,6 +2557,8 @@ export type Database = {
           primary_color: string
           recommended_hashtags: Json | null
           secondary_color: string | null
+          share_expires_at: string | null
+          share_token: string | null
           shared_with: Json | null
           style_direction: string | null
           target_audience: string | null
@@ -2579,6 +2582,7 @@ export type Database = {
           example_caption?: string | null
           font_pairing?: Json
           id?: string
+          industry?: string | null
           is_active?: boolean | null
           keywords?: Json | null
           last_consistency_check?: string | null
@@ -2588,6 +2592,8 @@ export type Database = {
           primary_color: string
           recommended_hashtags?: Json | null
           secondary_color?: string | null
+          share_expires_at?: string | null
+          share_token?: string | null
           shared_with?: Json | null
           style_direction?: string | null
           target_audience?: string | null
@@ -2611,6 +2617,7 @@ export type Database = {
           example_caption?: string | null
           font_pairing?: Json
           id?: string
+          industry?: string | null
           is_active?: boolean | null
           keywords?: Json | null
           last_consistency_check?: string | null
@@ -2620,6 +2627,8 @@ export type Database = {
           primary_color?: string
           recommended_hashtags?: Json | null
           secondary_color?: string | null
+          share_expires_at?: string | null
+          share_token?: string | null
           shared_with?: Json | null
           style_direction?: string | null
           target_audience?: string | null
@@ -2780,6 +2789,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "brand_templates_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_trends_cache: {
+        Row: {
+          brand_kit_id: string | null
+          expires_at: string
+          generated_at: string
+          id: string
+          industry: string | null
+          locale: string | null
+          trends: Json
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          industry?: string | null
+          locale?: string | null
+          trends?: Json
+        }
+        Update: {
+          brand_kit_id?: string | null
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          industry?: string | null
+          locale?: string | null
+          trends?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_trends_cache_brand_kit_id_fkey"
             columns: ["brand_kit_id"]
             isOneToOne: false
             referencedRelation: "brand_kits"
