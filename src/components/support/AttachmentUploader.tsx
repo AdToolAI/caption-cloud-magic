@@ -145,16 +145,6 @@ export const AttachmentUploader = forwardRef<AttachmentUploaderHandle, Attachmen
 
   return (
     <div className="space-y-3">
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
-        }}
-  return (
-    <div className="space-y-3">
       {/* 60% badge bar */}
       <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
         <div className="flex items-center gap-2 text-xs text-foreground/85">
