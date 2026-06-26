@@ -6,7 +6,7 @@ import {
   FolderOpen, Mic2, Music2, Video, Film, Edit, Layers, Languages, User,
   Users, Palette,
   ShieldCheck, Settings,
-  Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon, AudioWaveform, FileBadge2, Activity,
+  Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon, AudioWaveform, FileBadge2, Activity, Library,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -88,6 +88,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/video-composer", titleKey: "videoComposer.title", descKey: "hubItemDesc.videoComposer", icon: Scissors },
       { route: "/queue", titleKey: "Render-Queue", descKey: "Live-Status aller Motion-Studio-Renderjobs", icon: Activity },
       { route: "/library", titleKey: "Cast & World Library", descKey: "Avatare, Locations, Buildings & Props — alles in einer Bibliothek, mit @-Mention überall einsetzbar", icon: Users },
+      { route: "/creator-library", titleKey: "Creator Library", descKey: "Videos · Photos · Music · SFX — royalty-free Bundle, inklusive in allen Paid-Plans", icon: Library },
       { route: "/video-translator", titleKey: "vidTrans.hubTitle", descKey: "hubItemDesc.videoTranslator", icon: Languages },
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
       { route: "/marketplace", titleKey: "Template Marketplace", descKey: "Community-Templates entdecken & kaufen", icon: Store },
