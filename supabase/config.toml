@@ -304,6 +304,15 @@ verify_jwt = true
 [functions.send-support-ticket]
 verify_jwt = true
 
+[functions.triage-support-ticket]
+verify_jwt = false
+timeout_sec = 60
+
+[functions.notify-ticket-resolved]
+verify_jwt = false
+timeout_sec = 30
+
+
 [functions.upgrade-to-enterprise]
 verify_jwt = false
 timeout_sec = 30
