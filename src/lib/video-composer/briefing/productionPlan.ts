@@ -177,13 +177,51 @@ export const PlanUnresolved = z.object({
   severity: z.enum(['info', 'warn', 'error']).default('warn'),
 });
 
+/**
+ * Per-scene AI-enrichment trail. Lists the dotted field paths that the
+ * gap-fill pass added on top of what the user actually wrote in the
+ * briefing (e.g. "shotDirector.lighting", "performance.gestik"). The UI
+ * renders a ✨ badge next to these fields so creators see what is theirs
+ * and what the AI invented.
+ *
+ * Lipsync invariant: this is metadata ONLY. It never reaches dialog_shots,
+ * syncso_* or composer_scenes.dialog_*. The applier strips it before write.
+ */
+export const PlanSceneMeta = z.object({
+  aiFilled: z.array(z.string()).default([]),
+}).partial();
+
+/**
+ * Top-level enrichment metadata produced by Pass 0 (mode detection)
+ * and Pass 0.5 (research). Cached server-side in
+ * `briefing_research_cache`; surfaced to the UI as the "Pre-Apply
+ * Summary" footer.
+ */
+export const PlanMeta = z.object({
+  /** storytelling | brand | product | educational | other */
+  mode: z.string().max(40).optional(),
+  /** Confidence of the mode detection 0..1. */
+  modeConfidence: z.number().min(0).max(1).optional(),
+  /** Compact research bullets the gap-fill pass leaned on. */
+  research: z.array(z.object({
+    fact: z.string().max(400),
+    source: z.string().max(120).optional(),
+  })).max(20).optional(),
+  /** Plan-level dotted paths that were AI-filled (not per-scene). */
+  aiFilled: z.array(z.string()).max(40).optional(),
+  /** Cache hit info — pure telemetry, safe to ignore in UI. */
+  researchCacheHit: z.boolean().optional(),
+}).partial();
+
 export const ProductionPlan = z.object({
   project: PlanProject.optional(),
-  scenes: z.array(PlanScene).default([]),
+  scenes: z.array(PlanScene.extend({ _meta: PlanSceneMeta.optional() })).default([]),
   voice: PlanVoice,
   captions: PlanCaptions,
   negativePrompt: z.string().max(4000).optional(),
   unresolved: z.array(PlanUnresolved).default([]),
+  /** Briefing-Intelligence v2 metadata. Optional for backward compat. */
+  _meta: PlanMeta.optional(),
 });
 
 export type TProductionPlan = z.infer<typeof ProductionPlan>;
