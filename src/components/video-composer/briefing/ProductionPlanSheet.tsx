@@ -431,7 +431,7 @@ export default function ProductionPlanSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[90dvh] max-h-[90dvh] overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto] p-4 gap-3">
+      <DialogContent className="max-w-4xl w-[95vw] h-[90dvh] max-h-[90dvh] overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto_auto] p-4 gap-3">
         <DialogHeader className="space-y-1 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileText className="h-4 w-4 text-amber-300" />
