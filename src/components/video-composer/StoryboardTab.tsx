@@ -661,7 +661,7 @@ export default function StoryboardTab({
 
       {/* Plan ↔ Storyboard Drift-Check — Briefing-Intelligence v2 */}
       {scenes.length > 0 && (
-        <DriftReportPanel projectId={projectId} scenes={scenes} />
+        <DriftReportPanel projectId={projectId} scenes={scenes} onUpdateScene={updateScene} />
       )}
 
       {/* Cast Consistency Map — Bond glass wrapper for Briefing-parity */}
