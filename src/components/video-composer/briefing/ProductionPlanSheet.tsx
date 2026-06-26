@@ -585,44 +585,92 @@ export default function ProductionPlanSheet({
                         >
                           {s.lipSync ? '✓ Lip-Sync' : 'B-Roll'}
                         </Badge>
-                        {/* Stage-3 mapping completion chips */}
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${s.transition?.type ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={s.transition ? `${s.transition.type} · ${s.transition.durationSec ?? 0.4}s` : 'Default crossfade 0.4s.'}
-                        >
-                          {s.transition?.type ? `✓ Transition (${s.transition.type})` : '— Transition'}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${s.textOverlay?.text ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={s.textOverlay?.text ? `${s.textOverlay.text} (${s.textOverlay.position ?? 'bottom'})` : 'Kein burnt-in Overlay.'}
-                        >
-                          {s.textOverlay?.text ? '✓ Overlay' : '— Overlay'}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${s.tone ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={s.tone ?? 'Kein Szene-Tone gesetzt — Briefing-Tone wird verwendet.'}
-                        >
-                          {s.tone ? `✓ Tone (${s.tone})` : '— Tone'}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${typeof s.seed === 'number' ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={typeof s.seed === 'number' ? `Seed=${s.seed} (reproduzierbarer Render)` : 'Kein Seed im Plan — jeder Render variiert.'}
-                        >
-                          {typeof s.seed === 'number' ? `✓ Seed (${s.seed})` : '— Seed'}
-                        </Badge>
-                        {(s.cast ?? []).some((c) => (c as any).shotType) && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] border-emerald-400/40 text-emerald-300"
-                            title={(s.cast ?? []).filter((c) => (c as any).shotType).map((c) => `${c.mentionKey}=${(c as any).shotType}`).join(' · ')}
-                          >
-                            ✓ Cast-Shots
-                          </Badge>
-                        )}
+                        {/* Stage-3 mapping completion chips — 3-state:
+                            ✓ explicit (emerald) · ✨ AI-inferred (amber) ·
+                            — composer default (muted). */}
+                        {(() => {
+                          const aiFilled = new Set<string>(
+                            ((s as any)._meta?.aiFilled ?? []) as string[],
+                          );
+                          const chip = (
+                            key: string,
+                            present: boolean,
+                            label: string,
+                            valueTitle: string,
+                            defaultTitle: string,
+                          ) => {
+                            const inferred = aiFilled.has(key) && present;
+                            const explicit = present && !inferred;
+                            const cls = explicit
+                              ? 'border-emerald-400/40 text-emerald-300'
+                              : inferred
+                                ? 'border-amber-400/40 text-amber-300'
+                                : 'border-muted-foreground/30 text-muted-foreground';
+                            const icon = explicit ? '✓' : inferred ? '✨' : '—';
+                            const titleSuffix = explicit
+                              ? ' · explizit im Briefing'
+                              : inferred
+                                ? ' · von KI ergänzt'
+                                : '';
+                            return (
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] ${cls}`}
+                                title={(present ? valueTitle : defaultTitle) + titleSuffix}
+                              >
+                                {icon} {label}
+                                {present && icon !== '—' ? '' : ''}
+                              </Badge>
+                            );
+                          };
+                          return (
+                            <>
+                              {chip(
+                                'transition.type',
+                                !!s.transition?.type,
+                                s.transition?.type
+                                  ? `Transition: ${s.transition.type} · ${s.transition.durationSec ?? 0.4}s`
+                                  : '',
+                                `Transition: ${s.transition?.type ?? 'crossfade'} (Default)`,
+                                'Default crossfade 0.4s.',
+                              )}
+                              {chip(
+                                'textOverlay.text',
+                                !!s.textOverlay?.text,
+                                s.textOverlay?.text
+                                  ? `Overlay: "${s.textOverlay.text}" (${s.textOverlay.position ?? 'bottom'})`
+                                  : '',
+                                `Overlay: "${s.textOverlay?.text ?? ''}"`,
+                                'Kein burnt-in Overlay (gewollt).',
+                              )}
+                              {chip(
+                                'tone',
+                                !!s.tone,
+                                `Tone: ${s.tone}`,
+                                `Tone: ${s.tone}`,
+                                'Briefing-Tone fällt durch (gewollt).',
+                              )}
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] ${typeof s.seed === 'number' ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
+                                title={typeof s.seed === 'number'
+                                  ? `Seed=${s.seed} · reproduzierbarer Render`
+                                  : 'Kein Seed — Composer würfelt pro Render (gewollt für A/B-Tests).'}
+                              >
+                                {typeof s.seed === 'number' ? `✓ Seed (${s.seed})` : '— Seed · random'}
+                              </Badge>
+                              {(s.cast ?? []).some((c) => (c as any).shotType) && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-emerald-400/40 text-emerald-300"
+                                  title={(s.cast ?? []).filter((c) => (c as any).shotType).map((c) => `${c.mentionKey}=${(c as any).shotType}`).join(' · ')}
+                                >
+                                  ✓ Cast-Shots
+                                </Badge>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {s.voiceover?.text && (
