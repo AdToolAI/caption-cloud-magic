@@ -621,7 +621,13 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
         ) : (
           <Button
             type="button"
-            onClick={submit}
+            onClick={() => {
+              if (shouldNudgeMedia) {
+                setCoachOpen(true);
+              } else {
+                submit();
+              }
+            }}
             disabled={submitting || !canAdvanceFrom1}
             className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 shadow-[0_0_20px_hsl(var(--primary)/0.4)]"
           >
@@ -630,6 +636,44 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
           </Button>
         )}
       </div>
+
+      {/* AI Media Coach */}
+      <AlertDialog open={coachOpen} onOpenChange={setCoachOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" />
+              {t.coachTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t.coachDesc}
+              {severity === "blocking" && (
+                <span className="block mt-2 text-red-300/90">{t.coachBlockingNote}</span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setCoachOpen(false);
+                submit();
+              }}
+            >
+              {t.coachSendAnyway}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setCoachOpen(false);
+                setStep(3);
+              }}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {t.coachAddMedia}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
