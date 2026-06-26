@@ -228,6 +228,35 @@ export const SMOKE_REGISTRY: SmokeEntry[] = [
     body: { subtitles: [{ id: "1", text: "this is a test line" }], language: "en" },
     expect: "any-2xx",
   },
+
+  // ────────────── Wave B1 — Trivial Mocks (Health / Check / Get / Fetch) ──────────────
+  // Admin / Cron / Health
+  { name: "check-calendar-deadlines",     category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "check-content-video-status",   category: "admin-cron", body: { videoId: "qa-mock" }, expect: "any-2xx" },
+  { name: "check-remotion-progress",      category: "admin-cron", body: { renderId: "qa-mock" }, expect: "any-2xx" },
+  { name: "check-render-cache",           category: "admin-cron", body: { cacheKey: "qa-mock" }, expect: "any-2xx" },
+  { name: "check-render-status",          category: "admin-cron", body: { renderId: "qa-mock" }, expect: "any-2xx" },
+  { name: "check-scheduled-publications", category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "check-streak-breaks",          category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "check-subscription",           category: "billing-credits", body: {}, expect: "any-2xx" },
+  { name: "check-trial-status",           category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "check-video-status",           category: "admin-cron", body: { videoId: "qa-mock" }, expect: "any-2xx" },
+  { name: "health-alerter",               category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "health-check",                 category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "health-ig",                    category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "health-li",                    category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "health-tt",                    category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "health-x",                     category: "admin-cron", body: {}, expect: "any-2xx" },
+  { name: "health-yt",                    category: "admin-cron", body: {}, expect: "any-2xx" },
+  // Get / Fetch (read-only lookups)
+  { name: "get-ab-test-results",          category: "analytics-reports", body: {}, expect: "any-2xx" },
+  { name: "get-comments",                 category: "social-publishing", body: { postId: "qa-mock" }, expect: "any-2xx" },
+  { name: "get-invoices",                 category: "billing-credits", body: {}, expect: "any-2xx" },
+  { name: "get-video-templates",          category: "misc", body: {}, expect: "any-2xx" },
+  { name: "fetch-analytics",              category: "analytics-reports", body: {}, expect: "any-2xx" },
+  { name: "fetch-news-hub",               category: "misc", body: { language: "en" }, expect: "any-2xx" },
+  { name: "fetch-news-radar",             category: "misc", body: { language: "en" }, expect: "any-2xx" },
+  { name: "fetch-trends",                 category: "misc", body: { language: "en" }, expect: "any-2xx" },
 ];
 
 /** Categories in display order for the Cockpit UI. */
