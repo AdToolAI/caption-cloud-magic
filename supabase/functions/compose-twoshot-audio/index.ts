@@ -609,6 +609,19 @@ serve(async (req) => {
         // regenerate as WAV.
         const isCurrentPipeline = url.includes("/twoshot-vo/") && url.endsWith(".wav");
         if (isCurrentPipeline) {
+          const existingSceneDur = Number((existing[0] as any)?.metadata?.scene_duration_seconds ?? 0);
+          const requestedSceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
+          const sceneClipSource = String((scene as any).clip_source ?? "");
+          const hailuoDurationMismatch =
+            sceneClipSource === "ai-hailuo" &&
+            requestedSceneDur > 0 &&
+            existingSceneDur > 0 &&
+            Math.abs(existingSceneDur - requestedSceneDur) > 0.05;
+          if (hailuoDurationMismatch) {
+            console.warn(
+              `[compose-twoshot-audio] existing Hailuo twoshot WAV duration ${existingSceneDur}s != scene ${requestedSceneDur}s — regenerating instead of reusing stale 10s audio_plan.`,
+            );
+          } else {
           return json({
             success: true,
             already: true,
@@ -618,6 +631,7 @@ serve(async (req) => {
               ? (existing[0] as any).metadata.speakers
               : blocks.length,
           });
+          }
         }
       }
     }

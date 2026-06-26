@@ -417,6 +417,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
     // Probe each just-ready clip for its real MP4 duration. Update DB + UI
     // when the real value differs from the configured nominal duration.
+    // Hailuo/Cinematic-Sync exception: the user-selected bucket (6s/10s) is
+    // the contract for pricing, VO padding and Sync.so timing. Some provider
+    // files report a 10s container even when the requested scene bucket is 6s;
+    // never write that metadata duration back to composer_scenes.
     // We do this *after* the main state update so the user sees the clip
     // immediately, then sees the corrected duration shortly after.
     if (justReady.length > 0) {
@@ -426,6 +430,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             const realDur = await probeMediaDuration(clipUrl);
             const sceneNow = updatedScenes.find(s => s.id === sceneId);
             const nominal = sceneNow?.durationSeconds ?? 0;
+            const locksUserDuration =
+              sceneNow?.clipSource === 'ai-hailuo' ||
+              sceneNow?.engineOverride === 'cinematic-sync' ||
+              sceneNow?.engineOverride === 'sync-segments';
+            if (locksUserDuration) {
+              console.log(
+                `[ClipsTab] Scene ${sceneId} real duration ${realDur.toFixed(3)}s (nominal ${nominal}s) — keeping user-picked duration for Hailuo/Lip-Sync`,
+              );
+              return { sceneId, realDur, persisted: false };
+            }
             // Only persist if there is a meaningful drift (>50ms)
             if (Math.abs(realDur - nominal) > 0.05) {
               console.log(`[ClipsTab] Scene ${sceneId} real duration ${realDur.toFixed(3)}s (nominal ${nominal}s) — syncing`);
