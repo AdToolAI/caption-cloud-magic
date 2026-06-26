@@ -143,10 +143,19 @@ export function SupportInboxTab() {
                         🔗 incident
                       </Badge>
                     )}
+                    {Array.isArray((t as Record<string, unknown>).attachments) &&
+                      ((t as Record<string, unknown>).attachments as Array<{ type?: string }>).some(
+                        (a) => (a?.type || "").startsWith("image/") || (a?.type || "").startsWith("video/")
+                      ) && (
+                        <Badge variant="outline" className="text-[10px] text-emerald-300 border-emerald-500/40">
+                          📎 evidence
+                        </Badge>
+                      )}
                     <span className="text-[10px] text-muted-foreground ml-auto">
                       {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
                     </span>
                   </div>
+
                   <div className="text-sm font-medium truncate">{t.subject}</div>
                   <div className="text-xs text-muted-foreground truncate">
                     {t.contact_email ?? "—"} · {t.affected_module ?? "—"}
