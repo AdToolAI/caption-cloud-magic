@@ -37,6 +37,26 @@ Deno.serve(withTelemetry('analyze-image-v2', async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (isQaMockRequest(req)) {
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        mock: true,
+        quality: {
+          resolution: { width: 1920, height: 1080 },
+          aspectRatio: '16:9',
+          fileSize: 0,
+          qualityScore: 90,
+          issues: [],
+        },
+        crops: { square: '', portrait: '', story: '' },
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
