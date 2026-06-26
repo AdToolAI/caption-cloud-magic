@@ -200,6 +200,87 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
       });
       severity = escalate(severity, 'info');
     }
+
+    // Stage-3: Transition propagation
+    const planTrans = ps.transition?.type;
+    const sceneTrans = (ss as any).transitionType as string | undefined;
+    if (planTrans && sceneTrans && planTrans !== sceneTrans) {
+      findings.push({
+        sceneIndex: idx,
+        field: 'transition.type',
+        severity: 'info',
+        message: 'Übergangstyp aus dem Plan wurde nicht 1:1 übernommen.',
+        expected: planTrans,
+        actual: sceneTrans,
+      });
+      severity = escalate(severity, 'info');
+    }
+
+    // Stage-3: Text-overlay propagation
+    const planOverlay = (ps.textOverlay?.text ?? '').trim();
+    const sceneOverlay = String((ss as any).textOverlay?.text ?? '').trim();
+    if (planOverlay && !sceneOverlay) {
+      findings.push({
+        sceneIndex: idx,
+        field: 'textOverlay.text',
+        severity: 'warn',
+        message: 'Burnt-in Text-Overlay aus dem Plan fehlt in der Szene.',
+        expected: planOverlay.slice(0, 80) + (planOverlay.length > 80 ? '…' : ''),
+        actual: '—',
+      });
+      severity = escalate(severity, 'warn');
+    }
+
+    // Stage-3: Seed propagation
+    const planSeed = ps.seed;
+    const sceneSeed = (ss as any).seed;
+    if (typeof planSeed === 'number' && sceneSeed != null && Number(sceneSeed) !== planSeed) {
+      findings.push({
+        sceneIndex: idx,
+        field: 'seed',
+        severity: 'warn',
+        message: 'Plan-Seed weicht vom Storyboard-Seed ab — Render wäre nicht reproduzierbar.',
+        expected: String(planSeed),
+        actual: String(sceneSeed),
+      });
+      severity = escalate(severity, 'warn');
+    }
+
+    // Stage-3: Per-cast shotType override
+    const planCastShots = (ps.cast ?? [])
+      .filter((c) => c.characterId && c.shotType)
+      .map((c) => ({ id: String(c.characterId).toLowerCase(), shotType: c.shotType }));
+    if (planCastShots.length) {
+      const sceneShots = ((ss as any).characterShots ?? []) as Array<{ characterId?: string; shotType?: string }>;
+      const missing = planCastShots.filter((p) => {
+        const match = sceneShots.find((sh) => String(sh.characterId ?? '').toLowerCase() === p.id);
+        return !match || match.shotType !== p.shotType;
+      });
+      if (missing.length) {
+        findings.push({
+          sceneIndex: idx,
+          field: 'cast.shotType',
+          severity: 'info',
+          message: 'Per-Cast Shot-Typ aus dem Plan wurde nicht übernommen.',
+          expected: missing.map((m) => `${m.id.slice(0, 8)}=${m.shotType}`).join(' · '),
+        });
+        severity = escalate(severity, 'info');
+      }
+    }
+
+    // Stage-3: Tone → realismPreset
+    const planTone = (ps.tone ?? '').toLowerCase();
+    const scenePreset = String((ss as any).realismPreset ?? '');
+    if (planTone && !scenePreset) {
+      findings.push({
+        sceneIndex: idx,
+        field: 'tone',
+        severity: 'info',
+        message: 'Szene-Tone aus dem Plan ergab keinen Realism-Preset.',
+        expected: planTone,
+      });
+      severity = escalate(severity, 'info');
+    }
   }
 
   return {
