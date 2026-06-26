@@ -622,15 +622,15 @@ serve(async (req) => {
               `[compose-twoshot-audio] existing Hailuo twoshot WAV duration ${existingSceneDur}s != scene ${requestedSceneDur}s — regenerating instead of reusing stale 10s audio_plan.`,
             );
           } else {
-          return json({
-            success: true,
-            already: true,
-            url,
-            duration: existing[0].duration,
-            speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
-              ? (existing[0] as any).metadata.speakers
-              : blocks.length,
-          });
+            return json({
+              success: true,
+              already: true,
+              url,
+              duration: existing[0].duration,
+              speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
+                ? (existing[0] as any).metadata.speakers
+                : blocks.length,
+            });
           }
         }
       }
@@ -1193,7 +1193,7 @@ serve(async (req) => {
     };
     // If we extended the scene to fit the dialog, propagate the new duration
     // so downstream renderers (compose-dialog-segments / Remotion mux) align.
-    if (dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
+    if (!isHailuoScene && dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
       sceneUpdate.duration_seconds = Math.round(totalSec * 1000) / 1000;
     }
     await supabase
