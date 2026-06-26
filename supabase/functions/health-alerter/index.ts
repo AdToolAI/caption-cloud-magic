@@ -53,6 +53,10 @@ const isTestAddr = (email: string) =>
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { alerts: [], checks: 5 });
+  }
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
