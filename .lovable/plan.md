@@ -1,78 +1,61 @@
+# Pre-Launch Bottleneck Audit + AWS Support Email
 
-# Marge-Anhebung — NUR direkte AI-Video-Provider (60–70%)
+## Ziel
+1. Echte Bottlenecks vor dem Go-Live identifizieren (nicht nur AWS).
+2. Fertige Support-Email an AWS aufsetzen für Lambda-Concurrency-Erhöhung auf 100, inkl. Hinweis auf den gesperrten Vor-Account.
 
-## Scope
-**Nur die 11 Video-Provider.** Lipsync (Sync.so), HeyGen Talking-Head, ElevenLabs Audio, Music-Studio und Picture-Studio bleiben **unverändert** — keine Preis-, keine Pipeline-Änderungen.
+---
 
-## Ist vs. Neu
+## Teil A — Bottleneck-Analyse (Liefer-Artefakt: Report im Chat)
 
-| Provider | Alt €/s | Echtkost €/s | **Neu €/s** | Marge |
-|---|---|---|---|---|
-| Hailuo 2.3 Std 768p | 0.15 | 0.045 | **0.15** ✓ | 70% |
-| Hailuo 2.3 Pro 1080p | 0.20 | 0.075 | **0.22** | 66% |
-| HappyHorse 720p | 0.28 | 0.14 | **0.40** | 65% |
-| HappyHorse Pro 1080p | 0.56 | 0.28 | **0.80** | 65% |
-| Seedance Std 720p | 0.15 | 0.03 | **0.15** ✓ | 80% |
-| Seedance Pro 1080p | 0.20 | 0.06 | **0.20** ✓ | 70% |
-| Kling 3 Std 720p | 0.15 | 0.06 | **0.18** | 67% |
-| Kling 3 Pro 1080p | 0.20 | 0.10 | **0.28** | 64% |
-| Wan 2.5/2.6 Std | 0.10 | 0.04 | **0.12** | 67% |
-| Wan 2.5/2.6 Pro | 0.15 | 0.07 | **0.20** | 65% |
-| Luma Ray 2 Std | 0.18 | 0.07 | **0.20** | 65% |
-| Luma Ray 2 Pro | 0.25 | 0.12 | **0.35** | 66% |
-| LTX 2 Std | 0.08 | 0.02 | **0.08** ✓ | 75% |
-| LTX 2 Pro | 0.12 | 0.04 | **0.12** ✓ | 67% |
-| **Veo 3.1 Lite 720p** | 0.20 | 0.15 | **0.42** | 64% |
-| **Veo 3.1 Lite 1080p** | 0.30 | 0.22 | **0.62** | 65% |
-| **Veo 3.1 Fast 1080p** | 0.55 | 0.40 | **1.15** | 65% |
-| **Veo 3.1 Pro 1080p** | 1.40 | 1.10 | **3.15** | 65% |
-| **Sora 2 Std** | 0.25 | 0.20 | **0.55** | 64% |
-| **Sora 2 Pro** | 0.53 | 0.45 | **1.30** | 65% |
-| **Grok Imagine** | 0.20 | 0.15 | **0.42** | 64% |
-| Vidu Q2 (flat 5s) | ~0.40 | ~0.20 | **0.58** | 66% |
-| Runway Gen-4 Aleph | derzeit ~30% | hoch | **+50% Markup** | ~60% |
-| Pika 2.2 (Maint.) | — | — | bei Reaktivierung **+40%** | 65% |
+Ich prüfe in einer Runde live über die vorhandenen Tools:
 
-Premium-Engines (Sora/Veo/Grok) erhalten den größten Sprung (~2–2.5x) — dort ist die Marge heute am schlechtesten.
+1. **AWS Lambda Remotion** (heißester Kandidat)
+   - Aktuell: `MAX_LAMBDAS=8`, `framesPerLambda` min 270, `concurrencyPerLambda=1`. Peak-Schätzung: 5 parallele Renders × 8 λ = **~40 gleichzeitige Lambda-Invocations**.
+   - AWS Default-Account-Quota: **10** concurrent executions auf neuen Accounts → wir laufen heute schon ins Limit, sobald 2 User parallel rendern.
+   - Burst-Quota Region eu-central-1: 500, aber Account-Reserved/Unreserved muss freigeschaltet werden.
+   - → klare Empfehlung: **Quota auf 100 hoch** (passt zu 12 parallelen Composer-Renders).
 
-## Strategie für Premium-Schock
-- **Beta-Disclaimer** im Provider-Picker: „Premium-Engine — echte Provider-Kosten. Founder-Tier bekommt 30% Rabatt bis 31.12.2026"
-- Hailuo / HappyHorse / Seedance bleiben weiterhin als „günstig & profitabel" Default-Empfehlung sichtbar.
+2. **Supabase Edge Cold-Starts** via `synthetic-probe` Daten der letzten 24h prüfen (Layer-3 Probes).
 
-## Files
-1. `src/config/aiVideoCredits.ts` — Sora 2
-2. `src/config/veoVideoCredits.ts` — alle 4 Stufen
-3. `src/config/grokVideoCredits.ts`
-4. `src/config/hailuoVideoCredits.ts` — Pro
-5. `src/config/happyhorseVideoCredits.ts`
-6. `src/config/klingVideoCredits.ts`
-7. `src/config/wanVideoCredits.ts` (beide Versionen 2.5 + 2.6)
-8. `src/config/lumaVideoCredits.ts`
-9. `src/config/ltxVideoCredits.ts` — bleibt (nur Doku-Kommentar)
-10. `src/config/viduVideoCredits.ts` — flatCosts
-11. `src/config/seedanceVideoCredits.ts` — bleibt
-12. Runway- + Pika-Markup in deren jeweiligen Configs
-13. **NEU** `src/lib/cost/videoProviderMargins.ts` — zentrale Map `{provider → {sellPrice, replicateCost, margin}}` für Admin-Cockpit
-14. `src/pages/admin/CostMonitor.tsx` — neue Karte „Video-Provider Live-Marge" mit <60%-Warn-Badge
-15. Provider-Picker im Toolkit + Composer: Disclaimer-Badge bei Sora/Veo/Grok
-16. Description-Strings in den Configs nachziehen (z.B. „ab 1,32€ pro 6 Sek")
+3. **pg_cron Locks** — `poll-dialog-shots-every-minute`, `qa-watchdog`, `process-email-queue`, autopilot, probes. `supabase--slow_queries` + `supabase--db_health` für Sättigung.
 
-## Was NICHT angefasst wird
-- Lipsync (`lipsync-engine`, `compose-dialog-scene`, `compose-twoshot-audio`, Sync.so Pricing)
-- HeyGen Talking-Head Pricing
-- ElevenLabs TTS/STT Pricing
-- Music-Studio Pricing
-- Picture-Studio Pricing
-- Credit-Pack-Bonus (separater Plan)
-- Beta-Founder-Preis €14.95 (separates Marketing)
+4. **Replicate / Provider-Concurrency**
+   - Hailuo, HappyHorse, Sync.so (Creator-Plan $19 → harte Sync.so-Concurrency-Caps prüfen).
+   - Sync.so ist beim Multi-Speaker-Lipsync der knappste Provider.
 
-### User-Aktion
-Keine. Alles läuft über das Credit-Wallet → neue `costPerSecond` greift sofort. Keine Stripe-Änderung.
+5. **Storage Egress** — `composer-frames`, `talking-head-renders`, `brand-assets` Buckets, Anzahl Files + Bandbreite.
 
-## Erwarteter Effekt
-- **Video-Blended-Margin**: ~42% → **~66%**
-- Größter Hebel: Sora/Veo/Grok (von 15–27% auf 64–65%)
-- Lipsync-Marge bleibt wie heute (22%) — wie gewünscht unangetastet
+6. **Realtime Channels** — Composer-Collaboration + qa_live_runs Polling. Bei >50 gleichzeitigen Usern relevant.
 
-## Bereit zum Bauen?
-Geschätzte Dauer: 1 Build-Iteration über die 11 Config-Files + Admin-Karte + Disclaimer-Badge. Sag „go" und ich setze es um.
+Ergebnis: Ranked Bottleneck-Liste mit „Fix vor Launch" / „OK für Launch" / „Skalierungs-Backlog".
+
+---
+
+## Teil B — AWS Lambda Quota-Increase Email (Liefer-Artefakt: copy-paste Text im Chat)
+
+Eine Englisch + eine Deutsch-Version, beide enthalten:
+
+- **Subject**: Service Quota Increase — Lambda Concurrent Executions (eu-central-1) + Re-instatement of suspended account
+- **Account context**: Neuer Workspace + Verweis auf den gesperrten Vor-Account `bestofproducts4u@gmail.com` (6 Monate aktiv, keine Antwort auf Sperr-Inquiry, Bitte um Review/Closure-Statement).
+- **Use case**: SaaS video-rendering platform (AdTool / useadtool.ai), Remotion Lambda renders, Go-Live in den nächsten Tagen, erwartete 50–100 parallele Renders.
+- **Konkrete Requests**:
+  1. Concurrent executions: 10 → **100** (Region eu-central-1).
+  2. Ggf. burst concurrency Bestätigung.
+  3. Klärung zum gesperrten Account (Grund + ob er reaktivierbar ist oder ob Migration sauber ist).
+- **Technical details**: Function-Memory 3008 MB, Timeout 600 s, durchschnittliche Invocation 2–3 s/frame, Architektur x86_64, Workload Spike-Pattern (User-initiated, 1–5 Min Bursts).
+- **Business justification**: Paid Beta-Launch, EU-Kunden, Stripe-Billing live, Compliance EU-AI-Act, MRR-Projektion.
+- **Contact**: Geschäftliche Email, Telefon-Optional-Feld leer lassen.
+
+Versendet wird die Mail vom User selbst über AWS Support Center → „Service quota increase" Case-Type (kein API-Call von uns, da wir keine AWS-Credentials haben).
+
+---
+
+## Out of Scope
+- Keine Code-Änderungen am Lambda-Pfad in diesem Schritt (Code ist bereits optimiert: r42 scheduling, Circuit-Breaker, framesPerLambda=270 min).
+- Keine Provider-Plan-Upgrades automatisch — nur Empfehlung.
+
+## Output nach Approval
+1. Bottleneck-Report (priorisiert, mit konkreten Metriken aus db_health / slow_queries / probes).
+2. Zwei fertige Email-Texte (EN + DE) zum direkten Versenden an AWS Support.
+3. Optional: kurze Checkliste „Go-Live Readiness" (1 Seite).
