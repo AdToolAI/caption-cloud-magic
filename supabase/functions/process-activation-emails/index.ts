@@ -69,6 +69,13 @@ async function processStage(
       continue;
     }
 
+    // Global 3-day frequency cap (day_0 = welcome bypasses cap as transactional-class)
+    const tpl = `activation_${stage}`;
+    if (stage !== "day_0" && !(await canSendMarketingEmail(supabase, u.id, tpl))) {
+      skipped++;
+      continue;
+    }
+
     try {
       const lang = normalizeLang(u.language as string);
       const { subject, html } = renderActivationEmail({
@@ -81,7 +88,7 @@ async function processStage(
         to: u.email as string,
         subject,
         html,
-        template: `activation_${stage}`,
+        template: tpl,
         category: "marketing",
       });
 
@@ -92,6 +99,8 @@ async function processStage(
           activation_emails_sent: { ...sentMap, [stage]: new Date().toISOString() },
         })
         .eq("id", u.id);
+
+      if (stage !== "day_0") await markMarketingEmailSent(supabase, u.id);
 
       sent++;
     } catch (e) {
