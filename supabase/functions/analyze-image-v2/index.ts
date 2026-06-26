@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { isQaMockRequest } from '../_shared/qaMock.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
