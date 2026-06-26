@@ -39,6 +39,13 @@ type SceneHint = {
   framing?: string;
   movement?: string;
   lighting?: string;
+  // Stage-3: plan→storyboard mapping completion
+  transition?: 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
+  transitionDurationSec?: number;
+  overlayText?: string;
+  overlayPosition?: 'top' | 'center' | 'bottom';
+  tone?: string;
+  seed?: number;
 };
 
 const FRAMING_TOKENS: Array<[RegExp, string]> = [
