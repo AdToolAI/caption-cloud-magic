@@ -153,15 +153,7 @@ Return strict JSON via the tool call.`;
     if (!toolCall) throw new Error("no tool call in AI response");
     const triage = JSON.parse(toolCall.function.arguments);
 
-    // === Write back ===
-    await supabase.from("support_tickets").update({
-      ai_category: triage.category,
-      ai_severity: triage.severity,
-      ai_root_cause: triage.root_cause,
-      ai_eta_hours: triage.eta_hours,
-      ai_suggested_reply: triage.suggested_reply,
-      ai_language: triage.language,
-      ai_confidence: triage.confidence,
+
     // Apply visual-evidence boost: shrink ETA by 40% when image/video attached
     if (hasVisualEvidence && typeof triage.eta_hours === "number") {
       triage.eta_hours = Math.max(1, Math.round(triage.eta_hours * 0.6));
