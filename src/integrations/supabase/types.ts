@@ -2740,6 +2740,42 @@ export type Database = {
           },
         ]
       }
+      briefing_research_cache: {
+        Row: {
+          briefing_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          language: string
+          meta: Json
+          mode: string | null
+          research: Json
+          user_id: string
+        }
+        Insert: {
+          briefing_hash: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          language?: string
+          meta?: Json
+          mode?: string | null
+          research?: Json
+          user_id: string
+        }
+        Update: {
+          briefing_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          language?: string
+          meta?: Json
+          mode?: string | null
+          research?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       bug_reports: {
         Row: {
           admin_notes: string | null
@@ -5320,6 +5356,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "composer_pipeline_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "composer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      composer_plan_drift_reports: {
+        Row: {
+          created_at: string
+          findings: Json
+          id: string
+          plan_version: number | null
+          project_id: string
+          severity: string
+          snapshot: Json
+        }
+        Insert: {
+          created_at?: string
+          findings?: Json
+          id?: string
+          plan_version?: number | null
+          project_id: string
+          severity?: string
+          snapshot?: Json
+        }
+        Update: {
+          created_at?: string
+          findings?: Json
+          id?: string
+          plan_version?: number | null
+          project_id?: string
+          severity?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composer_plan_drift_reports_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "composer_projects"
