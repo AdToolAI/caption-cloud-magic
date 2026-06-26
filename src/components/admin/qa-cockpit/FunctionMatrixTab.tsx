@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Loader2, Play, CheckCircle2, XCircle, MinusCircle, Clock, RotateCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { SMOKE_CATEGORIES, SMOKE_CATEGORY_LABELS } from "@/lib/qa/smokeCategories";
 
 type SmokeStatus = "pass" | "fail" | "skip" | "timeout";
 
@@ -44,18 +45,7 @@ interface SmokeSweep {
   duration_ms: number | null;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  "ai-video-providers": "AI Video Providers",
-  "lipsync-dialog": "Lipsync & Dialog",
-  "briefing-composer": "Briefing & Composer",
-  "picture-image": "Picture / Image",
-  "audio-music-sfx": "Audio / Music / SFX",
-  "social-publishing": "Social Publishing",
-  "billing-credits": "Billing / Credits",
-  "admin-cron": "Admin / Cron / Health",
-  "analytics-reports": "Analytics / Reports",
-  "misc": "Misc",
-};
+const CATEGORY_LABELS = SMOKE_CATEGORY_LABELS;
 
 const STATUS_STYLES: Record<SmokeStatus, { bg: string; icon: typeof CheckCircle2; label: string }> = {
   pass: { bg: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40", icon: CheckCircle2, label: "Pass" },
@@ -143,10 +133,7 @@ export function FunctionMatrixTab() {
     };
   }, [runs.data]);
 
-  const categories = useMemo(
-    () => Array.from(new Set(Object.keys(CATEGORY_LABELS))),
-    [],
-  );
+  const categories = useMemo(() => SMOKE_CATEGORIES, []);
 
   return (
     <div className="space-y-4 mt-4">
@@ -156,8 +143,8 @@ export function FunctionMatrixTab() {
             <div>
               <CardTitle className="text-base">Function Smoke Matrix</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Ruft alle registrierten Edge-Functions im Mock-Modus auf (kostenlos). Block 1 deckt aktuell{" "}
-                <span className="font-semibold text-foreground">eine kuratierte Auswahl</span> ab — wird wellenweise erweitert.
+                Ruft alle registrierten Edge-Functions im Mock-Modus auf (kostenlos). Aktuell{" "}
+                <span className="font-semibold text-foreground">467 / 473 Functions in 32 Kategorien</span> (≤25 pro Kategorie, Rate-Limit-safe) — bitte kategorieweise sweepen.
               </p>
             </div>
             <div className="flex gap-2 items-center">
@@ -168,7 +155,7 @@ export function FunctionMatrixTab() {
                 <SelectContent>
                   <SelectItem value="all">Alle Kategorien</SelectItem>
                   {categories.map((c) => (
-                    <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
