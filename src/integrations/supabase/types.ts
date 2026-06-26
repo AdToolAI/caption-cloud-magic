@@ -13786,17 +13786,29 @@ export type Database = {
         Row: {
           actual_result: string | null
           affected_module: string | null
+          ai_analyzed_at: string | null
+          ai_category: string | null
+          ai_confidence: number | null
+          ai_eta_hours: number | null
+          ai_language: string | null
+          ai_root_cause: string | null
+          ai_severity: string | null
+          ai_suggested_reply: string | null
           attachments: Json
           browser_info: Json | null
           category: string
+          contact_email: string | null
+          contact_name: string | null
           conversation_id: string | null
           created_at: string | null
           description: string | null
           expected_result: string | null
           id: string
+          linked_incident_id: string | null
           metadata: Json | null
           priority: string | null
           reproduction_steps: string | null
+          resolved_notification_sent_at: string | null
           severity: string
           status: string | null
           subject: string
@@ -13806,17 +13818,29 @@ export type Database = {
         Insert: {
           actual_result?: string | null
           affected_module?: string | null
+          ai_analyzed_at?: string | null
+          ai_category?: string | null
+          ai_confidence?: number | null
+          ai_eta_hours?: number | null
+          ai_language?: string | null
+          ai_root_cause?: string | null
+          ai_severity?: string | null
+          ai_suggested_reply?: string | null
           attachments?: Json
           browser_info?: Json | null
           category: string
+          contact_email?: string | null
+          contact_name?: string | null
           conversation_id?: string | null
           created_at?: string | null
           description?: string | null
           expected_result?: string | null
           id?: string
+          linked_incident_id?: string | null
           metadata?: Json | null
           priority?: string | null
           reproduction_steps?: string | null
+          resolved_notification_sent_at?: string | null
           severity?: string
           status?: string | null
           subject: string
@@ -13826,17 +13850,29 @@ export type Database = {
         Update: {
           actual_result?: string | null
           affected_module?: string | null
+          ai_analyzed_at?: string | null
+          ai_category?: string | null
+          ai_confidence?: number | null
+          ai_eta_hours?: number | null
+          ai_language?: string | null
+          ai_root_cause?: string | null
+          ai_severity?: string | null
+          ai_suggested_reply?: string | null
           attachments?: Json
           browser_info?: Json | null
           category?: string
+          contact_email?: string | null
+          contact_name?: string | null
           conversation_id?: string | null
           created_at?: string | null
           description?: string | null
           expected_result?: string | null
           id?: string
+          linked_incident_id?: string | null
           metadata?: Json | null
           priority?: string | null
           reproduction_steps?: string | null
+          resolved_notification_sent_at?: string | null
           severity?: string
           status?: string | null
           subject?: string
@@ -13849,6 +13885,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "companion_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_linked_incident_id_fkey"
+            columns: ["linked_incident_id"]
+            isOneToOne: false
+            referencedRelation: "status_incidents"
             referencedColumns: ["id"]
           },
         ]
