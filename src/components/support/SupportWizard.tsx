@@ -373,19 +373,26 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
     }
   };
 
+  const urgentEvidence =
+    mediaRecommendedCategories.has(category) &&
+    (severity === "blocking" || severity === "high") &&
+    attachments.length === 0;
+
   return (
     <div ref={rootRef} className="space-y-6">
       {/* Step indicator */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span className="font-mono tracking-wider uppercase">
+        <span className="font-mono tracking-[0.2em] uppercase text-primary/80">
           {t.step} {step} {t.of} 3
         </span>
         <div className="flex gap-1.5">
           {[1, 2, 3].map((n) => (
             <div
               key={n}
-              className={`h-1 w-8 rounded-full transition-all ${
-                n <= step ? "bg-primary shadow-[0_0_8px_hsl(var(--primary))]" : "bg-white/10"
+              className={`h-1 w-10 rounded-full transition-all ${
+                n <= step
+                  ? "bg-gradient-to-r from-primary via-primary to-amber-300 shadow-[0_0_12px_hsl(var(--primary)/0.7)]"
+                  : "bg-white/10"
               }`}
             />
           ))}
@@ -397,15 +404,15 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
 
 
       {step === 1 && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-serif text-foreground">{t.s1Title}</h2>
+            <h2 className="text-2xl font-serif text-foreground tracking-tight">{t.s1Title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{t.s1Sub}</p>
           </div>
 
           {/* Category cards */}
           <div className="space-y-2">
-            <Label>{t.category}</Label>
+            <Label className="text-[11px] uppercase tracking-[0.2em] font-mono text-muted-foreground">{t.category}</Label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
@@ -415,14 +422,21 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
                     key={cat.id}
                     type="button"
                     onClick={() => setCategory(cat.id)}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border text-center transition-all ${
+                    className={`group relative flex flex-col items-center gap-2 p-3 rounded-xl border text-center transition-all overflow-hidden ${
                       active
-                        ? "border-primary bg-primary/10 shadow-[0_0_16px_hsl(var(--primary)/0.3)]"
-                        : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                        ? "border-primary/70 bg-gradient-to-br from-primary/20 via-primary/8 to-transparent shadow-[0_0_24px_hsl(var(--primary)/0.35)]"
+                        : "border-white/10 bg-white/[0.02] hover:border-primary/40 hover:bg-primary/[0.04]"
                     }`}
                   >
-                    <Icon className={`h-5 w-5 ${cat.color}`} />
-                    <span className="text-xs text-foreground/90">
+                    {active && (
+                      <span className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+                    )}
+                    <div className={`rounded-lg p-2 transition-colors ${
+                      active ? "bg-primary/15 border border-primary/40" : "bg-white/[0.03] border border-white/10 group-hover:border-primary/30"
+                    }`}>
+                      <Icon className={`h-4 w-4 ${cat.color}`} />
+                    </div>
+                    <span className="text-xs text-foreground/90 font-medium">
                       {t.categoryLabels[cat.id as keyof typeof t.categoryLabels]}
                     </span>
                   </button>
@@ -433,24 +447,27 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
 
           {/* Severity pills */}
           <div className="space-y-2">
-            <Label>{t.severity}</Label>
+            <Label className="text-[11px] uppercase tracking-[0.2em] font-mono text-muted-foreground">{t.severity}</Label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {SEVERITY_OPTIONS.map((s) => {
                 const active = severity === s;
-                const colorClass =
-                  s === "blocking" ? "border-red-500/60 bg-red-500/15" :
-                  s === "high" ? "border-amber-500/60 bg-amber-500/15" :
-                  s === "normal" ? "border-blue-500/60 bg-blue-500/15" :
-                  "border-emerald-500/60 bg-emerald-500/15";
+                const accent =
+                  s === "blocking" ? "bg-red-400" :
+                  s === "high" ? "bg-amber-400" :
+                  s === "normal" ? "bg-cyan-400" :
+                  "bg-emerald-400";
                 return (
                   <button
                     key={s}
                     type="button"
                     onClick={() => setSeverity(s)}
-                    className={`p-3 rounded-lg border text-left transition-all ${
-                      active ? `${colorClass} shadow-[0_0_12px_rgba(255,255,255,0.1)]` : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                    className={`relative p-3 pl-4 rounded-xl border text-left transition-all overflow-hidden ${
+                      active
+                        ? "border-primary/60 bg-gradient-to-br from-primary/12 via-primary/4 to-transparent shadow-[0_0_18px_hsl(var(--primary)/0.25)]"
+                        : "border-white/10 bg-white/[0.02] hover:border-primary/30"
                     }`}
                   >
+                    <span className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full ${accent} ${active ? "opacity-100 shadow-[0_0_10px_currentColor]" : "opacity-40"}`} />
                     <div className="text-sm font-medium text-foreground">{t.severityLabels[s]}</div>
                     <div className="text-[11px] text-muted-foreground">{t.severityHints[s]}</div>
                   </button>
@@ -462,9 +479,9 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
           {/* Module + subject */}
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="module">{t.module}</Label>
+              <Label htmlFor="module" className="text-[11px] uppercase tracking-[0.2em] font-mono text-muted-foreground">{t.module}</Label>
               <Select value={affectedModule} onValueChange={setAffectedModule}>
-                <SelectTrigger id="module"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="module" className="bg-white/[0.03] border-white/10 hover:border-primary/40 transition-colors"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {MODULE_OPTIONS.map((m) => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
@@ -473,15 +490,33 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="subject">{t.subject}</Label>
+              <Label htmlFor="subject" className="text-[11px] uppercase tracking-[0.2em] font-mono text-muted-foreground">{t.subject}</Label>
               <Input
                 id="subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder={t.subjectPh}
                 maxLength={200}
+                className="bg-white/[0.03] border-white/10 focus-visible:border-primary/60 focus-visible:ring-primary/30"
               />
             </div>
+          </div>
+
+          {/* Inline Quick Evidence uploader — same state as Step 3 */}
+          <div className="space-y-2">
+            <Label className="text-[11px] uppercase tracking-[0.2em] font-mono text-muted-foreground flex items-center gap-2">
+              <Camera className="h-3 w-3" />
+              {t.s3Title}
+            </Label>
+            <AttachmentUploader
+              ref={uploaderRef}
+              userId={userId}
+              draftId={draftId}
+              attachments={attachments}
+              onChange={setAttachments}
+              variant="compact"
+            />
+            {urgentEvidence && <EvidenceBoostBanner urgent />}
           </div>
         </div>
       )}
@@ -613,7 +648,7 @@ export function SupportWizard({ userId, userEmail, userName, onSubmitted }: Supp
             type="button"
             onClick={() => setStep((s) => (s + 1) as 2 | 3)}
             disabled={step === 1 && !canAdvanceFrom1}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="bg-gradient-to-r from-primary to-amber-300 text-primary-foreground hover:opacity-90 shadow-[0_0_18px_hsl(var(--primary)/0.45)]"
           >
             {t.next}
             <ChevronRight className="h-4 w-4 ml-1" />
