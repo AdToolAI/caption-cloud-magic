@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { sanitizeForHappyHorse, isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -252,7 +253,24 @@ serve(async (req) => {
       );
     }
 
-    const finalPrompt = (prompt ?? "").trim();
+    const rawPrompt = (prompt ?? "").trim();
+    const greenNet = sanitizeForHappyHorse(rawPrompt);
+    const finalPrompt = greenNet.clean;
+
+    if (greenNet.emptied && !hasImage) {
+      return new Response(
+        JSON.stringify({
+          error: "Prompt was emptied by HappyHorse content filter sanitizer. Please rephrase in English without late-night / device-screen / first-person monologue wording.",
+          code: "prompt_emptied_by_filter",
+          touched: greenNet.touched,
+          suggested_fallback: "ai-hailuo",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (greenNet.touched.length > 0) {
+      console.log("[generate-happyhorse-video] green-net sanitizer touched:", greenNet.touched);
+    }
 
     // Create generation row
     const { data: generation, error: genError } = await supabaseAdmin
