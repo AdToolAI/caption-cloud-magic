@@ -23,6 +23,9 @@ import { BrandBoard } from "@/components/brand/BrandBoard";
 import { ConsistencyScore } from "@/components/brand/ConsistencyScore";
 import { ActiveBrandSelector } from "@/components/brand/ActiveBrandSelector";
 import { BrandKitHeroHeader } from "@/components/brand/BrandKitHeroHeader";
+import { BrandVault } from "@/components/brand/BrandVault";
+import { BrandDnaExtractor } from "@/components/brand/BrandDnaExtractor";
+import type { BrandDnaResult } from "@/hooks/useBrandDnaExtractor";
 
 const BrandKit = () => {
   const { t } = useTranslation();
@@ -267,6 +270,23 @@ const BrandKit = () => {
     });
   };
 
+  const handleApplyDna = (dna: BrandDnaResult) => {
+    setFormData((prev) => ({
+      ...prev,
+      brandName: dna.brand_name ?? prev.brandName,
+      brandDescription: dna.brand_description ?? prev.brandDescription,
+      primaryColor: dna.primary_color ?? prev.primaryColor,
+      secondaryColor: dna.secondary_color ?? prev.secondaryColor,
+      tonePreference: dna.tone ?? prev.tonePreference,
+      stylePreference: dna.mood ?? prev.stylePreference,
+      brandValues: dna.values?.length ? dna.values : prev.brandValues,
+    }));
+    toast({
+      title: "Brand DNA übernommen",
+      description: "Das Formular wurde mit den extrahierten Werten vorausgefüllt.",
+    });
+  };
+
   const handleDuplicate = async (kit: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -348,6 +368,9 @@ const BrandKit = () => {
           onCreateNew={() => setShowWizard(true)}
         />
 
+        {/* Sticky Brand Vault - Bond 2028 */}
+        <BrandVault brandKit={activeBrandKit} />
+
         {/* Active Brand Selector */}
         {brandKits.length > 0 && (
           <div className="mb-6">
@@ -398,6 +421,8 @@ const BrandKit = () => {
           <AnimatePresence mode="wait">
             {/* Create Tab */}
             <TabsContent value="create" className="space-y-6">
+              {/* Brand DNA Extractor — fills the form via URL/screenshot */}
+              <BrandDnaExtractor onApply={handleApplyDna} />
               <motion.div
                 key="create"
                 variants={tabVariants}

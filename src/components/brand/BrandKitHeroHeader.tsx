@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Paintbrush, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandParticleField } from "./BrandParticleField";
 
 interface BrandKitHeroHeaderProps {
   brandKitCount: number;
@@ -9,32 +10,32 @@ interface BrandKitHeroHeaderProps {
 
 export function BrandKitHeroHeader({ brandKitCount, onCreateNew }: BrandKitHeroHeaderProps) {
   return (
-    <div className="relative overflow-hidden rounded-2xl mb-8">
+    <div className="relative overflow-hidden rounded-2xl mb-8 border border-white/10 bg-gradient-to-br from-background via-card/40 to-background">
+      {/* Bond 2028 Particle Field */}
+      <div className="absolute inset-0 pointer-events-none opacity-70">
+        <BrandParticleField />
+      </div>
+
+      {/* Grain overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.04] mix-blend-overlay"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
+        }}
+      />
+
       {/* Background Glow Orbs */}
       <div className="absolute inset-0 pointer-events-none">
         <motion.div
           className="absolute top-0 right-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           className="absolute bottom-0 left-1/4 w-80 h-80 bg-accent/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.4, 0.6, 0.4],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.6, 0.4] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 
