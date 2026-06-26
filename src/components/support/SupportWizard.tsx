@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Loader2, Send, Bug, Film, Share2, CreditCard, User as UserIcon, Sparkles, HelpCircle, Wrench } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ChevronLeft, ChevronRight, Loader2, Send, Bug, Film, Share2, CreditCard, User as UserIcon, Sparkles, HelpCircle, Wrench, Camera, Video, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { AttachmentUploader, type UploadedAttachment } from "./AttachmentUploader";
+import { AttachmentUploader, type AttachmentUploaderHandle, type UploadedAttachment } from "./AttachmentUploader";
+import { EvidenceBoostBanner } from "./EvidenceBoostBanner";
 import { collectBrowserInfo, detectAffectedModule, type BrowserInfo } from "@/lib/support/contextCollector";
 import { useTranslation } from "@/hooks/useTranslation";
+
 
 type Severity = "low" | "normal" | "high" | "blocking";
 
