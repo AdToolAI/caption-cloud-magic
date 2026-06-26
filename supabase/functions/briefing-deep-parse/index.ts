@@ -652,6 +652,35 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
 
   console.log('[briefing-deep-parse] merge done — scenes:', scenes.length, 'unresolved:', (resolution?.unresolved ?? []).length);
 
+  // Plan-level _meta (mode, research, aiFilled) sanitized.
+  let planMeta: any = undefined;
+  if (manifest?._meta && typeof manifest._meta === 'object') {
+    const m = manifest._meta;
+    const modeRaw = String(m.mode ?? '').toLowerCase();
+    const ALLOWED_MODE = new Set(['storytelling','brand','product','educational','other']);
+    const research = Array.isArray(m.research)
+      ? m.research
+          .map((r: any) => stripUndef({
+            fact: String(r?.fact ?? '').trim().slice(0, 400),
+            source: r?.source ? String(r.source).slice(0, 120) : undefined,
+          }))
+          .filter((r: any) => r.fact)
+          .slice(0, 20)
+      : undefined;
+    const aiFilled = Array.isArray(m.aiFilled)
+      ? Array.from(new Set(m.aiFilled.map((p: any) => String(p ?? '').trim()).filter(Boolean))).slice(0, 40)
+      : undefined;
+    planMeta = stripUndef({
+      mode: ALLOWED_MODE.has(modeRaw) ? modeRaw : (modeRaw ? 'other' : undefined),
+      modeConfidence: typeof m.modeConfidence === 'number'
+        ? clamp(m.modeConfidence, 0, 1, 0.5)
+        : undefined,
+      research: research?.length ? research : undefined,
+      aiFilled: aiFilled?.length ? aiFilled : undefined,
+    });
+    if (!Object.keys(planMeta).length) planMeta = undefined;
+  }
+
   return {
     project: manifest?.project,
     scenes,
@@ -666,6 +695,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
     captions: manifest?.captions,
     negativePrompt: manifest?.negativePrompt,
     unresolved: resolution?.unresolved ?? [],
+    _meta: planMeta,
   };
 }
 
