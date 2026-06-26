@@ -11237,6 +11237,98 @@ export type Database = {
         }
         Relationships: []
       }
+      qa_smoke_runs: {
+        Row: {
+          category: string
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          function_name: string
+          id: string
+          response_hash: string | null
+          status: string
+          status_code: number | null
+          sweep_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          function_name: string
+          id?: string
+          response_hash?: string | null
+          status: string
+          status_code?: number | null
+          sweep_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          function_name?: string
+          id?: string
+          response_hash?: string | null
+          status?: string
+          status_code?: number | null
+          sweep_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_smoke_runs_sweep_id_fkey"
+            columns: ["sweep_id"]
+            isOneToOne: false
+            referencedRelation: "qa_smoke_sweeps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_smoke_sweeps: {
+        Row: {
+          category_filter: string | null
+          duration_ms: number | null
+          fail_count: number
+          finished_at: string | null
+          id: string
+          pass_count: number
+          skip_count: number
+          source: string
+          started_at: string
+          timeout_count: number
+          total: number
+          triggered_by: string | null
+        }
+        Insert: {
+          category_filter?: string | null
+          duration_ms?: number | null
+          fail_count?: number
+          finished_at?: string | null
+          id?: string
+          pass_count?: number
+          skip_count?: number
+          source?: string
+          started_at?: string
+          timeout_count?: number
+          total?: number
+          triggered_by?: string | null
+        }
+        Update: {
+          category_filter?: string | null
+          duration_ms?: number | null
+          fail_count?: number
+          finished_at?: string | null
+          id?: string
+          pass_count?: number
+          skip_count?: number
+          source?: string
+          started_at?: string
+          timeout_count?: number
+          total?: number
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       qa_test_assets: {
         Row: {
           asset_type: string
