@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { renderEmail, type Stage, type Lang } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -203,6 +204,11 @@ async function processStage(
 
   for (const user of candidates) {
     try {
+      // Global 3-day cap (all winback stages are marketing-class)
+      if (!(await canSendMarketingEmail(supabase, user.id, `winback_${stage}`))) {
+        continue;
+      }
+
       // Day-14: grant reward BEFORE email so we can mention it accurately
       if (stage === "day_14") {
         const granted = await grantDay14Reward(supabase, user.id);
@@ -255,6 +261,7 @@ async function processStage(
       // Push parallel (fire-and-forget)
       sendPushIfEnabled(supabase, user.id, pushTitle, pushBody, ctaUrl).catch(() => {});
 
+      await markMarketingEmailSent(supabase, user.id);
       sent++;
     } catch (err) {
       console.error(`[winback] processing error for ${user.email}:`, err);

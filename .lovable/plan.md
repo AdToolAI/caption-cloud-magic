@@ -1,116 +1,131 @@
 
-# Feature A — "Cross-Post Magic" (One-Click pro Plattform optimiert)
+## Bestandsaufnahme — was läuft aktuell
 
-## 🎯 Ziel
-Statt **einer** generischen Caption für alle Kanäle generiert die KI nach dem Render automatisch **pro Plattform** eine optimierte Variante (Caption + Hashtags + Title/Description) — basierend auf dem Briefing-Plan, der das Video tatsächlich kennt. Creator klickt 1× "Publish All".
+**Sechs Email/Notification-Systeme feuern parallel auf denselben User:**
 
-## 🧩 Was sich konkret ändert (User-Flow)
-
-**Vorher:** Render → Tab "Publish" → 1 Caption-Feld → manuell für alle Kanäle gleich → Publish.
-
-**Nachher:** Render → Tab "Publish" → **"✨ Cross-Post Magic"-Button** → 4 Tabs (1 pro ausgewähltem Kanal) mit fertigen Drafts → Inline-Edit pro Tab → **"Publish All"**.
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  ✨ Cross-Post Magic  [Regenerate] [Tone: Default▾] │
-├──────┬──────┬──────────┬─────────┬──────────────────┤
-│  IG  │TikTok│ LinkedIn │ YouTube │                  │
-├──────┴──────┴──────────┴─────────┴──────────────────┤
-│  Caption (max 2200)              [142 / 2200]       │
-│  ┌───────────────────────────────────────────────┐  │
-│  │ Stopp ❌ wenn dir das auch passiert...        │  │
-│  │ ✨ Hier ist mein 60-Sekunden-Hack...          │  │
-│  └───────────────────────────────────────────────┘  │
-│  Hashtags  [#contentcreator #ai #adtool +12]        │
-│  Hook-Score: 8.7/10 ✅   Best-Time: Heute 19:42     │
-└─────────────────────────────────────────────────────┘
-[ ← Edit Master ]              [ 🚀 Publish All (4) ] │
-```
-
-## 🏗️ Architektur
-
-### Datenfluss
-```text
-ProductionPlan (Briefing)
-        │
-        ▼
-generate-cross-post-captions  (neue Edge Function, Lovable AI Gateway)
-        │   Input: { videoUrl, briefingPlan, channels[], tone, language }
-        │   Output: { instagram: {caption,hashtags,hookScore},
-        │             tiktok:   {caption,hashtags,hookScore},
-        │             linkedin: {caption,hashtags,hookScore},
-        │             youtube:  {title,description,tags,hookScore} }
-        ▼
-cross_post_drafts (neue Tabelle)
-        │
-        ▼
-CrossPostMagicPanel.tsx (neue UI in PublishToSocialTab)
-        │
-        ▼
-publishToMultiplePlatforms (existing) — übergibt jetzt **pro Channel** eigenen Payload
-```
-
-### Plattform-Regeln (KI-Prompt-Constraints)
-| Channel | Caption | Hashtags | Style |
+| Funktion | Cron-Frequenz | Was sie macht | Problem |
 |---|---|---|---|
-| Instagram | ≤2200, 3 Zeilen Hook + Story + CTA | 8–15, mix nische+breit | Emojis, Storytelling |
-| TikTok | ≤150, brutal kurzer Hook | 3–5 trending | Casual, Slang, kein Corporate |
-| LinkedIn | 200–800, Pro-Tone, 1 Insight | 3–5 fachlich | Erste-Person, keine Emojis-Flut |
-| YouTube | Title ≤70 + Desc 200–400 + 10 Tags | Tags statt # | SEO-Keywords vorne |
+| `process-drip-emails` | **stündlich** (`0 * * * *`) | Onboarding-Steps Tag 1/3/7 | Stündliche Frequenz → bei Logik-Slip mehrfach pro Tag |
+| `process-activation-emails` | täglich 10:00 | day_0, day_1, day_3, day_7 nach Verify | OK, aber überlappt mit Drip |
+| `process-push-reminders` | **stündlich** :15 | Push-Reminder Step 1/3/7 | Stündlich = ggf. mehrfach täglich |
+| `process-verify-reminders` | **alle 30 Min** | Verify-Reminder 24–72h nach Signup | Übertrieben häufig |
+| `check-trial-status` | täglich 09:00 | Nur **grace_warning** (Tag 14) + **trial_expired** (Tag 28) | **Keine Reminder während Trial, keine 24h-vor-Pause-Warnung** |
+| `process-winback-emails` | täglich 11:00 | Tag 14 + Tag 30 Inaktivität | OK |
 
-Alle Regeln zentral in `src/config/crossPostRules.ts` → Edge Function liest mit, UI zeigt Counter/Warnings.
+**Ergebnis:** An einem einzigen Tag kann ein User Activation-Email + Drip-Email + Push-Reminder + Winback bekommen — vier Touches/Tag ist real, bei Edge-Cases (Multi-Step gleichzeitig fällig) bis zu 8.
 
-## 📁 Files (Neu / Geändert)
+**Was komplett fehlt:**
+- Kein globaler Frequenz-Cap über alle Marketing-Emails hinweg
+- Keine Trial-Countdown-Reminder (alle 3 Tage)
+- Keine **Last-Day-Warnung vor Trial-Ende** (Tag 13)
+- Keine **24h-vor-Pause-Warnung** (Tag 27, vor Grace-End)
 
-### Neu
-- `supabase/functions/generate-cross-post-captions/index.ts` — Lovable AI (`google/gemini-2.5-flash`), Tool-Calling für strict JSON-Output, Sprache aus Briefing
-- `src/config/crossPostRules.ts` — Per-Channel-Constraints + Beispiel-Prompts
-- `src/hooks/useCrossPostMagic.ts` — Mutation + Cache, Regenerate, Tone-Switch
-- `src/components/composer/CrossPostMagicPanel.tsx` — Tab-UI, Hook-Score-Badge, Best-Time-Hint, Inline-Edit
-- `src/components/composer/HookScoreBadge.tsx` — kleine Wiederverwendung
-- Migration: Tabelle `cross_post_drafts` (`id, user_id, video_id, channel, caption, hashtags, title, description, hook_score, tone, generated_at`) + RLS + GRANT
+---
 
-### Geändert
-- `src/components/composer/PublishToSocialTab.tsx` — neuer "✨ Magic"-Toggle ganz oben; wenn aktiv → CrossPostMagicPanel statt geteiltem Caption-Feld
-- `src/hooks/useSocialPublishing.ts` — `publishToMultiplePlatforms` akzeptiert jetzt optional `perChannelConfig: Record<Platform, PublishConfig>` und nutzt das **statt** des globalen Configs
-- `src/components/planner/PublishNowButton.tsx` — Magic standardmäßig **on** wenn `briefing_plan_id` vorhanden
-- i18n (DE/EN/ES): `composer.crossPostMagic.*` strings
+## Plan — 3 chirurgische Eingriffe
 
-## 🎨 Design (Bond 2028)
-- Magic-Button: Gold-Gradient + Sparkle-Icon, Hover-Glow
-- Tabs als Cyan-Underline-Style (wie Hub-Pages)
-- Hook-Score-Badge: 0–4 rot, 5–6 amber, 7+ gold mit subtilem Glow
-- "Regenerate"-Button: Glass-Outline mit Refresh-Icon
-- Loading-State: Skeleton-Lines pro Tab, "✨ Schreibt deine Captions…" Kicker-Text
+### Schritt 1 — Globaler 3-Tage-Frequenz-Cap (das wichtigste Fix)
 
-## 💰 Kosten
-- Gemini 2.5 Flash, ~1 Call pro Render, ~2k Tokens → praktisch kostenlos pro Generierung
-- Caching in `cross_post_drafts` → Regenerate explizit user-getriggert, sonst kein Re-Call
-- Kein neuer API-Key (Lovable AI Gateway)
+Neuer Shared-Helper `supabase/functions/_shared/emailFrequency.ts`:
 
-## 🛡️ Edge-Cases
-- **Briefing fehlt** (Direct-Upload ohne Composer): Fallback-Prompt nutzt nur `videoUrl` + User-Hinweis "Tipp: Mit Briefing 3× bessere Captions"
-- **Kein Kanal verbunden**: Magic disabled mit Tooltip "Verbinde mindestens 1 Kanal"
-- **Edit-Drift**: Wenn User editiert + dann Regenerate klickt → Confirm-Dialog "Deine Änderungen überschreiben?"
-- **Sprache**: Captions immer in `briefing.language`; UI bietet manuellen Override-Dropdown (DE/EN/ES)
-- **TikTok-Sandbox**: Magic generiert trotzdem normal — die Sandbox-Limitation (Draft-only) bleibt orthogonal, lösen wir in Feature C
+```text
+canSendMarketingEmail(userId, templateName)
+  → liest email_send_log: letzter Send mit category='marketing' für diesen User
+  → returnt false wenn < 3 Tage her (Ausnahmen: final_day, pre_pause, account_paused)
+  → returnt true sonst
+```
 
-## ✅ Akzeptanz-Kriterien
-1. Render → Publish-Tab → Magic-Button sichtbar (Gold, prominent)
-2. 1 Klick → ≤8s später 4 Tabs mit plattform-spezifischen Captions in der Briefing-Sprache
-3. Jeder Tab respektiert Length-Limits, zeigt Live-Counter + Warn-State bei Overflow
-4. Inline-Edit funktioniert, Änderungen persistieren in `cross_post_drafts`
-5. "Publish All" pusht **pro Channel** den jeweils editierten Payload (nicht den globalen)
-6. Regenerate funktioniert mit Tone-Switch (Default / Witzig / Professionell / Provokant)
-7. Drafts überleben Reload (DB-Persistenz)
+**Eingebaut in** alle vier kritischen Funktionen:
+- `process-drip-emails`
+- `process-activation-emails`
+- `process-winback-emails`
+- `check-trial-status` (nur für die neuen Countdown-Reminder, nicht für Pflicht-Warnungen)
 
-## 🚀 Verifikation
-- Playwright: Render-Mock → Publish-Tab → Magic klicken → 4 Tabs sichtbar → Screenshot
-- Edge-Function-Test mit `x-qa-mock: true` (returnt feste Beispiel-Captions, kein AI-Call)
-- DE/EN/ES Smoke: Briefing in jeder Sprache → korrekte Output-Sprache
+**Bypass-Liste** (immer senden, egal wann letzte Email kam):
+- Auth-Emails (signup/verify/recovery/magic-link)
+- `trial_final_day` (Tag 13 — letzte Chance)
+- `trial_pre_pause` (Tag 27 — 24h vor Account-Pause)
+- `trial_expired` / `account_paused` (Pflicht-Info)
+- Ticket-Updates, Password-Reset, etc.
 
-## ⏱️ Aufwand
-~1–2 Tage. Reihenfolge: Migration → Edge Function (mock zuerst) → Hook → Panel → Integration in PublishToSocialTab → i18n → Playwright.
+### Schritt 2 — Trial-Lifecycle neu strukturieren
 
-## ❓ Eine Entscheidung von dir
-**Tone-Presets**: Sollen wir mit 4 starten (*Default / Witzig / Professionell / Provokant*) oder direkt mit den 6 Ad-Director-Tonalities aligned (*Default / Hype / Educational / Story / Bold / Premium*)? Empfehlung: **6 alignen** — konsistent mit Ad-Director, kein extra Mapping nötig.
+Erweiterung von `check-trial-status` um eine **Phase 0: Countdown-Reminder während Trial**:
+
+```text
+Trial Tag 0   → Welcome (bereits via activation day_0)
+Trial Tag 3   → Reminder "So holst du das Maximum raus"   (nur wenn cap erlaubt)
+Trial Tag 6   → Reminder "Was Power-User in Woche 1 bauen" (nur wenn cap erlaubt)
+Trial Tag 9   → Reminder "Noch 5 Tage — bist du bereit?"   (nur wenn cap erlaubt)
+Trial Tag 13  → ⚠ FINAL DAY: "Letzter Tag deines Trials"   (BYPASS cap)
+Trial Tag 14  → Grace-Warning "Trial vorbei — 14 Tage Grace" (bereits da, BYPASS)
+Grace Tag 27  → ⚠ PRE-PAUSE: "Morgen wird dein Account pausiert" (BYPASS cap — NEU)
+Grace Tag 28  → Account-Paused-Notice (bereits da, BYPASS)
+```
+
+**Auto-Suppression-Regeln** (zusätzlich zum 3-Tage-Cap):
+- User hat in den letzten 24h einen Post veröffentlicht → skip Countdown-Reminder (er ist aktiv)
+- User hat bezahlt → alle Trial-Mails sofort stoppen
+- User hat unsubscribed (`suppressed_emails`) → skip, außer Pflicht-Pause-Notice
+
+**Storage:** `profiles.activation_emails_sent` JSONB (existiert bereits) bekommt neue Keys: `trial_day_3`, `trial_day_6`, `trial_day_9`, `trial_final_day`, `pre_pause_warning`.
+
+### Schritt 3 — Cron-Frequenzen entschärfen
+
+| Cron | Vorher | Nachher | Begründung |
+|---|---|---|---|
+| `process-drip-emails` | stündlich | **täglich 10:30** | Steps sind tagebasiert, stündlich macht null Sinn |
+| `process-push-reminders` | stündlich | **täglich 18:00** | Push-Reminder = 1×/Tag Abend, optimal für CTR |
+| `process-verify-reminders` | alle 30 Min | **alle 6h** | Verify-Reminder einmal nach 24h reicht, 30-Min-Scan ist verschwenderisch |
+
+Alle drei via `supabase--insert` (cron.alter_job / unschedule+schedule), kein Migration-Tool.
+
+---
+
+## UI-Eingriff (klein)
+
+Ein neuer Admin-Tab im QA-Cockpit: **Email Health**
+- Letzte 7 Tage: Sends pro Template (deduped via `message_id`)
+- Top-10-User mit meisten Sends/7d (Sanity-Check)
+- "Force Pause All Marketing" Big-Red-Button (Notbremse, setzt System-Flag in `system_config`, alle Cap-Helpers respektieren ihn)
+- Trial-Funnel-Sicht: Wie viele User sind in Tag 1/3/6/9/13/14/27/28
+
+---
+
+## Files
+
+**Neu**
+- `supabase/functions/_shared/emailFrequency.ts` (Cap-Helper)
+- `src/components/admin/EmailHealthTab.tsx`
+- `src/hooks/useEmailHealth.ts`
+
+**Modifiziert**
+- `supabase/functions/check-trial-status/index.ts` — Phase 0 Countdown + Phase 1.5 Pre-Pause (~80 Zeilen)
+- `supabase/functions/process-drip-emails/index.ts` — Cap-Check (~5 Zeilen)
+- `supabase/functions/process-activation-emails/index.ts` — Cap-Check (~5 Zeilen)
+- `supabase/functions/process-winback-emails/index.ts` — Cap-Check (~5 Zeilen)
+- `src/pages/admin/QACockpit.tsx` — neuer Tab
+
+**SQL via `insert`-Tool** (kein Migration-Tool weil Cron-Daten user-spezifisch)
+- 3× `cron.unschedule()` + `cron.schedule()` für die Frequenz-Änderungen
+
+**Keine Schema-Migration nötig** — nutzt bestehende `activation_emails_sent` JSONB und `email_send_log`.
+
+---
+
+## Was bewusst NICHT angefasst wird
+- Auth-Email-Hook (signup/verify/recovery) — funktioniert
+- Render-Pipeline, Lipsync, Composer — null Berührung
+- Ticket-Resolution-Mails (`notify-ticket-resolved`) — Pflicht-Trigger
+- Calendar-Notifications (User-konfiguriert pro Event)
+
+---
+
+## Aufwand
+~1h, in einer Sitzung machbar. Effekt: Statt 4–8 Mails/Tag im Worst-Case maximal **1 Marketing-Mail / 3 Tage** + die zwei Pflicht-Warnungen am Tag 13 & 27.
+
+---
+
+## Eine offene Frage an dich
+
+Beim **Tag 13 (Final-Day)** und **Tag 27 (Pre-Pause)** — sollen diese auch eine zusätzliche **Push-Benachrichtigung** auslösen (falls User Push erlaubt hat), oder nur Email? Empfehlung: **Beides** — das sind die zwei einzigen wirklich konversions-kritischen Touches.

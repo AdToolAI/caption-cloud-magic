@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { renderActivationEmail, type ActivationStage, type Lang } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,6 +70,13 @@ async function processStage(
       continue;
     }
 
+    // Global 3-day frequency cap (day_0 = welcome bypasses cap as transactional-class)
+    const tpl = `activation_${stage}`;
+    if (stage !== "day_0" && !(await canSendMarketingEmail(supabase, u.id, tpl))) {
+      skipped++;
+      continue;
+    }
+
     try {
       const lang = normalizeLang(u.language as string);
       const { subject, html } = renderActivationEmail({
@@ -81,7 +89,7 @@ async function processStage(
         to: u.email as string,
         subject,
         html,
-        template: `activation_${stage}`,
+        template: tpl,
         category: "marketing",
       });
 
@@ -92,6 +100,8 @@ async function processStage(
           activation_emails_sent: { ...sentMap, [stage]: new Date().toISOString() },
         })
         .eq("id", u.id);
+
+      if (stage !== "day_0") await markMarketingEmailSent(supabase, u.id);
 
       sent++;
     } catch (e) {

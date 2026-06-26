@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
 
 type Lang = "de" | "en" | "es";
 
@@ -57,6 +58,81 @@ const graceWarningCopy: Record<Lang, { subject: string; heading: string; intro: 
   },
 };
 
+// Countdown reminders (Day 3 / 6 / 9 — soft, cap-aware)
+const countdownCopy: Record<Lang, (daysLeft: number) => { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
+  de: (d) => ({
+    subject: `Noch ${d} Tage in deinem Enterprise-Trial ⏳`,
+    heading: `Noch ${d} Tage volle Power`,
+    intro: `Du hast noch ${d} Tage in deinem 14-Tage Enterprise-Trial — alle Premium-Features, Lip-Sync, 4K-Renders und Cross-Post Magic. Nutze die Zeit, um dein erstes Creator-Reel live zu schalten.`,
+    cta: "Studio öffnen",
+    footnote: "Du erhältst diese Erinnerung maximal alle 3 Tage — keine Spam-Mails versprochen.",
+  }),
+  en: (d) => ({
+    subject: `${d} days left in your Enterprise trial ⏳`,
+    heading: `${d} days of full power left`,
+    intro: `You have ${d} days left in your 14-day Enterprise trial — full premium access, Lip-Sync, 4K renders and Cross-Post Magic. Make them count.`,
+    cta: "Open Studio",
+    footnote: "We send this reminder at most every 3 days — no spam, promise.",
+  }),
+  es: (d) => ({
+    subject: `Quedan ${d} días de tu prueba Enterprise ⏳`,
+    heading: `${d} días de potencia completa`,
+    intro: `Te quedan ${d} días en tu prueba Enterprise de 14 días — acceso premium completo, Lip-Sync, renders 4K y Cross-Post Magic. Aprovecha el tiempo.`,
+    cta: "Abrir Studio",
+    footnote: "Enviamos este recordatorio como máximo cada 3 días — sin spam.",
+  }),
+};
+
+// Final-day warning (Day 13 — bypass cap, also push)
+const finalDayCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
+  de: {
+    subject: "⚠ Letzter Tag: Dein Enterprise-Trial endet morgen",
+    heading: "Letzter Tag deines Trials",
+    intro: "Morgen endet dein 14-Tage Enterprise-Trial. Danach starten 14 zusätzliche Grace-Tage, bevor dein Konto pausiert wird. Sicher dir jetzt deinen Plan und vermeide jede Unterbrechung.",
+    cta: "Plan jetzt sichern",
+    footnote: "Du wirst diese Warnung nur einmal sehen.",
+  },
+  en: {
+    subject: "⚠ Final day: your Enterprise trial ends tomorrow",
+    heading: "Final day of your trial",
+    intro: "Your 14-day Enterprise trial ends tomorrow. After that, 14 grace days start before your account is paused. Lock in your plan now to avoid any interruption.",
+    cta: "Lock in plan now",
+    footnote: "You'll only see this warning once.",
+  },
+  es: {
+    subject: "⚠ Último día: tu prueba Enterprise termina mañana",
+    heading: "Último día de tu prueba",
+    intro: "Tu prueba Enterprise de 14 días termina mañana. Después comienzan 14 días de gracia antes de que se pause tu cuenta. Asegura tu plan ahora para evitar cualquier interrupción.",
+    cta: "Asegurar plan ahora",
+    footnote: "Solo verás esta advertencia una vez.",
+  },
+};
+
+// Pre-pause warning (1 day before account pause — bypass cap)
+const prePauseCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
+  de: {
+    subject: "⚠ Letzter Tag bevor dein Konto pausiert wird",
+    heading: "Morgen wird dein Konto pausiert",
+    intro: "Deine 14-Tage Grace-Period endet morgen. Wenn du bis dahin keinen Plan wählst, wird dein Konto pausiert. Deine Daten bleiben gespeichert, aber Renders, Posts und Lip-Sync sind dann blockiert.",
+    cta: "Konto reaktivieren",
+    footnote: "Diese Warnung erhältst du nur einmal — wir möchten dich nicht überraschen.",
+  },
+  en: {
+    subject: "⚠ Final day before your account is paused",
+    heading: "Your account will be paused tomorrow",
+    intro: "Your 14-day grace period ends tomorrow. If you don't pick a plan by then, your account will be paused. Your data stays safe, but rendering, publishing and Lip-Sync will be blocked.",
+    cta: "Reactivate account",
+    footnote: "You'll only get this warning once — no surprises.",
+  },
+  es: {
+    subject: "⚠ Último día antes de que se pause tu cuenta",
+    heading: "Mañana se pausará tu cuenta",
+    intro: "Tu período de gracia de 14 días termina mañana. Si no eliges un plan, tu cuenta será pausada. Tus datos siguen seguros, pero el renderizado, publicación y Lip-Sync se bloquearán.",
+    cta: "Reactivar cuenta",
+    footnote: "Solo recibirás esta advertencia una vez — sin sorpresas.",
+  },
+};
+
 function renderEmail(
   copy: { subject: string; heading: string; intro: string; cta: string; footnote: string },
   appUrl: string,
@@ -96,11 +172,69 @@ serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const startedAt = Date.now();
-  let processed = 0, paused = 0, graceWarned = 0, emailsSent = 0;
+  let processed = 0, paused = 0, graceWarned = 0, emailsSent = 0, countdownSent = 0, prePauseSent = 0;
 
   try {
-    const nowIso = new Date().toISOString();
-    const graceCutoffIso = new Date(Date.now() - GRACE_PERIOD_DAYS * 86400_000).toISOString();
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const graceCutoffIso = new Date(now - GRACE_PERIOD_DAYS * 86400_000).toISOString();
+
+    // --- Phase 0: Trial-countdown reminders (Day 3 / 6 / 9 / 13) ---
+    // Day 3/6/9 = soft (cap-aware). Day 13 = final-day warning (bypass cap).
+    const { data: activeUsers } = await supabase
+      .from("profiles")
+      .select("id, email, language, trial_ends_at, activation_emails_sent")
+      .eq("trial_status", "active")
+      .gt("trial_ends_at", nowIso)
+      .limit(2000);
+
+    const COUNTDOWN_STEPS: Array<{ key: string; daysRemaining: number; bypass: boolean }> = [
+      { key: "countdown_d11", daysRemaining: 11, bypass: false }, // ~ day 3
+      { key: "countdown_d8",  daysRemaining: 8,  bypass: false }, // ~ day 6
+      { key: "countdown_d5",  daysRemaining: 5,  bypass: false }, // ~ day 9
+      { key: "trial_final_day", daysRemaining: 1, bypass: true }, // day 13
+    ];
+
+    for (const u of activeUsers ?? []) {
+      if (!u.trial_ends_at) continue;
+      const daysLeft = Math.ceil((new Date(u.trial_ends_at).getTime() - now) / 86_400_000);
+      const step = COUNTDOWN_STEPS.find((s) => s.daysRemaining === daysLeft);
+      if (!step) continue;
+
+      const sentMap = (u.activation_emails_sent as Record<string, string> | null) || {};
+      if (sentMap[step.key]) continue;
+
+      const templateName = step.key === "trial_final_day" ? "trial_final_day" : `trial_${step.key}`;
+
+      if (!step.bypass && !(await canSendMarketingEmail(supabase, u.id, templateName))) {
+        continue; // global cap → wait for next run
+      }
+
+      try {
+        const lang = normalizeLang(u.language);
+        const copy = step.bypass
+          ? finalDayCopy[lang]
+          : countdownCopy[lang](daysLeft);
+        const { subject, html } = renderEmail(copy, APP_URL, u.email);
+        await sendEmail({
+          to: u.email,
+          subject,
+          html,
+          template: templateName,
+          category: "marketing",
+        });
+        await supabase
+          .from("profiles")
+          .update({ activation_emails_sent: { ...sentMap, [step.key]: new Date().toISOString() } })
+          .eq("id", u.id);
+        if (!step.bypass) await markMarketingEmailSent(supabase, u.id);
+        countdownSent++;
+        emailsSent++;
+        processed++;
+      } catch (e) {
+        console.error(`[check-trial-status] countdown ${step.key} error:`, e);
+      }
+    }
 
     // --- Phase 1: Trial just expired → enter grace period + send warning email ---
     const { data: graceUsers } = await supabase
@@ -140,6 +274,42 @@ serve(async (req) => {
         emailsSent++;
       } catch (e) {
         console.error("[check-trial-status] grace email error:", e);
+      }
+    }
+
+    // --- Phase 1.5: Grace pre-pause warning (1 day before pause, bypass cap) ---
+    const prePauseLowerIso = new Date(now - (GRACE_PERIOD_DAYS - 1) * 86_400_000).toISOString();
+    const prePauseUpperIso = new Date(now - (GRACE_PERIOD_DAYS - 2) * 86_400_000).toISOString();
+    const { data: prePauseUsers } = await supabase
+      .from("profiles")
+      .select("id, email, language, trial_ends_at, activation_emails_sent")
+      .eq("trial_status", "grace")
+      .gte("trial_ends_at", prePauseLowerIso)
+      .lt("trial_ends_at", prePauseUpperIso)
+      .limit(500);
+
+    for (const u of prePauseUsers ?? []) {
+      const sentMap = (u.activation_emails_sent as Record<string, string> | null) || {};
+      if (sentMap.pre_pause) continue;
+      try {
+        const lang = normalizeLang(u.language);
+        const { subject, html } = renderEmail(prePauseCopy[lang], APP_URL, u.email);
+        await sendEmail({
+          to: u.email,
+          subject,
+          html,
+          template: "trial_pre_pause",
+          category: "marketing",
+        });
+        await supabase
+          .from("profiles")
+          .update({ activation_emails_sent: { ...sentMap, pre_pause: new Date().toISOString() } })
+          .eq("id", u.id);
+        prePauseSent++;
+        emailsSent++;
+        processed++;
+      } catch (e) {
+        console.error("[check-trial-status] pre-pause email error:", e);
       }
     }
 
@@ -210,6 +380,8 @@ serve(async (req) => {
         processed,
         graceWarned,
         paused,
+        countdownSent,
+        prePauseSent,
         emailsSent,
         durationMs: Date.now() - startedAt,
       }),

@@ -6,6 +6,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 import { renderDripEmail, isSupportedLang } from "../_shared/drip-templates/index.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -224,6 +225,12 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (existing) continue;
 
+        // Global 3-day frequency cap
+        if (!(await canSendMarketingEmail(supabase, u.id, `drip_step_${w.step}`))) {
+          summary.push({ step: w.step, user_id: u.id, status: "capped" });
+          continue;
+        }
+
         const result = await sendOneDrip(
           supabase,
           { id: u.id, email: u.email!, created_at: u.created_at },
@@ -242,6 +249,9 @@ Deno.serve(async (req) => {
             resend_message_id: result.messageId ?? null,
             error_message: result.error ?? null,
           });
+          if (result.status === "sent") {
+            await markMarketingEmailSent(supabase, u.id);
+          }
         }
         summary.push({ step: w.step, user_id: u.id, status: result.status, error: result.error });
       }

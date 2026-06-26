@@ -10204,6 +10204,7 @@ export type Database = {
           is_test_user: boolean
           language: string | null
           last_active_at: string | null
+          last_marketing_email_at: string | null
           level_auto_pause_until: string | null
           login_notification_enabled: boolean | null
           name: string | null
@@ -10258,6 +10259,7 @@ export type Database = {
           is_test_user?: boolean
           language?: string | null
           last_active_at?: string | null
+          last_marketing_email_at?: string | null
           level_auto_pause_until?: string | null
           login_notification_enabled?: boolean | null
           name?: string | null
@@ -10312,6 +10314,7 @@ export type Database = {
           is_test_user?: boolean
           language?: string | null
           last_active_at?: string | null
+          last_marketing_email_at?: string | null
           level_auto_pause_until?: string | null
           login_notification_enabled?: boolean | null
           name?: string | null
