@@ -882,10 +882,16 @@ serve(async (req) => {
     // ("…and that's wh-"). The extension is capped at +5.0 s to guard against
     // wildly oversized scripts; beyond that we fail-fast so the UI can ask
     // the user to shorten the text or extend the scene manually.
+    // June 26 2026 — Hailuo guard: Hailuo only supports 6s | 10s buckets.
+    // Auto-extending wegen Audio-Overflow überschreibt die Nutzer-Wahl
+    // (6s → ~7s → render-time 10s). Für Hailuo strikt verboten — Sync.so
+    // kürzt am Ende (`cut_off`). HappyHorse (3–15s) darf weiterhin verlängern.
+    const sceneClipSource = String((scene as any).clip_source ?? "");
+    const isHailuoScene = sceneClipSource === "ai-hailuo";
     const OVERFLOW_GRACE_SEC = 0.30;
     const MAX_EXTEND_SEC = 5.0;
     let dialogOverflowExtended: { from: number; to: number; overflowSec: number } | null = null;
-    if (spokenSec > sceneDur + OVERFLOW_GRACE_SEC) {
+    if (!isHailuoScene && spokenSec > sceneDur + OVERFLOW_GRACE_SEC) {
       const overflow = spokenSec - sceneDur;
       if (overflow > MAX_EXTEND_SEC) {
         return json({
