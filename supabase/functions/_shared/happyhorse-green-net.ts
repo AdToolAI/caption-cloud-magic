@@ -110,6 +110,12 @@ export function sanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
   // collapse whitespace
   s = s.replace(/[ \t]+/g, " ").replace(/\n{2,}/g, "\n").trim();
 
+  // dedupe repeated sentences (after tag/word rewrites a sentence often
+  // appears twice — that pattern itself is a Green-Net heuristic).
+  const dd = dedupeSentences(s);
+  if (dd.touched) touched.push("dedupe-sentences");
+  s = dd.out;
+
   // forensics: flag if still heavily non-English (>20% non-ASCII).
   const nonAscii = (s.match(NON_ASCII) ?? []).length;
   if (s.length > 0 && nonAscii / s.length > 0.2) {
