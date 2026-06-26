@@ -77,6 +77,7 @@ const TOOL_PASS_A = {
                   properties: {
                     mentionKey: { type: 'string' },
                     outfit: { type: 'string' },
+                    shotType: { type: 'string', enum: ['full','profile','back','detail','pov','silhouette'], description: 'Per-cast framing override for two-shot scenes. Omit when the scene-level framing applies to every speaker.' },
                   },
                   required: ['mentionKey'],
                 },
