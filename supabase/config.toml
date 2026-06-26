@@ -4,6 +4,10 @@ project_id = "lbunafpxuskwmsrraqxl"
 verify_jwt = true
 timeout_sec = 300
 
+[functions.generate-brand-asset-pack]
+verify_jwt = true
+timeout_sec = 300
+
 
 [functions.process-email-queue]
 verify_jwt = true
