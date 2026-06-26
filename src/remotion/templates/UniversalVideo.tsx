@@ -4,6 +4,7 @@ import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInter
 import { ZoomIn } from '../components/animations/ZoomIn';
 import { PanEffect } from '../components/animations/PanEffect';
 import { LottieIcons } from '../components/LottieIcons';
+import { HormoziCaption, type HormoziSegment } from '../components/HormoziCaption';
 
 // Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
 const AudioLayer = memo(function AudioLayer({
