@@ -27,7 +27,14 @@ export function useBrandVoiceSamples(brandKitId: string | null | undefined) {
         .eq("brand_kit_id", brandKitId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as BrandVoiceSample[];
+      return ((data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        brand_kit_id: r.brand_kit_id,
+        user_id: r.user_id,
+        kind: (r.kind ?? "do") as VoiceSampleKind,
+        text: r.text ?? r.sample_text ?? "",
+        created_at: r.created_at,
+      })) as BrandVoiceSample[];
     },
   });
 
@@ -36,12 +43,14 @@ export function useBrandVoiceSamples(brandKitId: string | null | undefined) {
       if (!brandKitId) throw new Error("no_brand_kit");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("unauthorized");
+      const text = input.text.trim();
       const { error } = await supabase.from("brand_voice_samples").insert({
         brand_kit_id: brandKitId,
         user_id: user.id,
         kind: input.kind,
-        text: input.text.trim(),
-      });
+        text,
+        sample_text: text, // legacy mirror
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
