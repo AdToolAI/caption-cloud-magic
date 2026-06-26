@@ -201,37 +201,52 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
       severity = escalate(severity, 'info');
     }
 
+    // Stage-3: AI-fill aware severity. When the plan value came from
+    // AI inference (listed in scene._meta.aiFilled) drop *_not_applied
+    // findings to 'info' — the composer default is acceptable.
+    const aiFilled = new Set<string>(
+      (((ps as any)._meta?.aiFilled ?? []) as string[]),
+    );
+    const sevFor = (path: string, hard: 'warn' | 'error'): 'info' | 'warn' | 'error' =>
+      aiFilled.has(path) ? 'info' : hard;
+
     // Stage-3: Transition propagation
     const planTrans = ps.transition?.type;
     const sceneTrans = (ss as any).transitionType as string | undefined;
     if (planTrans && sceneTrans && planTrans !== sceneTrans) {
+      const sev = sevFor('transition.type', 'warn');
       findings.push({
         sceneIndex: idx,
         field: 'transition.type',
-        severity: 'info',
-        message: 'Übergangstyp aus dem Plan wurde nicht 1:1 übernommen.',
+        severity: sev,
+        message: aiFilled.has('transition.type')
+          ? 'Übergangstyp war KI-Vorschlag — Composer-Default greift, OK.'
+          : 'Übergangstyp aus dem Plan wurde nicht 1:1 übernommen.',
         expected: planTrans,
         actual: sceneTrans,
       });
-      severity = escalate(severity, 'info');
+      severity = escalate(severity, sev);
     }
 
     // Stage-3: Text-overlay propagation
     const planOverlay = (ps.textOverlay?.text ?? '').trim();
     const sceneOverlay = String((ss as any).textOverlay?.text ?? '').trim();
     if (planOverlay && !sceneOverlay) {
+      const sev = sevFor('textOverlay.text', 'warn');
       findings.push({
         sceneIndex: idx,
         field: 'textOverlay.text',
-        severity: 'warn',
-        message: 'Burnt-in Text-Overlay aus dem Plan fehlt in der Szene.',
+        severity: sev,
+        message: aiFilled.has('textOverlay.text')
+          ? 'Overlay war KI-Vorschlag und kam nicht durch — Composer rendert ohne, OK.'
+          : 'Burnt-in Text-Overlay aus dem Plan fehlt in der Szene.',
         expected: planOverlay.slice(0, 80) + (planOverlay.length > 80 ? '…' : ''),
         actual: '—',
       });
-      severity = escalate(severity, 'warn');
+      severity = escalate(severity, sev);
     }
 
-    // Stage-3: Seed propagation
+    // Stage-3: Seed propagation (never AI-inferred — always hard).
     const planSeed = ps.seed;
     const sceneSeed = (ss as any).seed;
     if (typeof planSeed === 'number' && sceneSeed != null && Number(sceneSeed) !== planSeed) {
@@ -276,7 +291,9 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         sceneIndex: idx,
         field: 'tone',
         severity: 'info',
-        message: 'Szene-Tone aus dem Plan ergab keinen Realism-Preset.',
+        message: aiFilled.has('tone')
+          ? 'Tone war KI-Vorschlag — kein Realism-Preset gemappt, Composer-Default greift.'
+          : 'Szene-Tone aus dem Plan ergab keinen Realism-Preset.',
         expected: planTone,
       });
       severity = escalate(severity, 'info');

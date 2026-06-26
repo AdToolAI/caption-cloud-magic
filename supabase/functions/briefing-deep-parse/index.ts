@@ -307,6 +307,42 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
 
+INTELLIGENT DEFAULTS — Transition / Overlay / Tone (NEVER leave undefined):
+You MUST always fill scenes[i].transition, scenes[i].textOverlay (or leave
+empty when no overlay belongs there), and scenes[i].tone — using the
+following heuristics — and list each inferred path in scenes[i]._meta.aiFilled
+(e.g. "transition.type", "textOverlay.text", "tone"):
+
+  • transition.type & durationSec (use the beat of THIS scene):
+      Hook / Cold-Open / Pain           → "cut",        0.0
+      Reveal / Twist / Proof            → "crossfade",  0.5
+      CTA / Endcard / Outro             → "fade",       0.6
+      anything else                     → "crossfade",  0.4
+      First scene (index=1) ALWAYS gets "fade" 0.6 (intro from black).
+
+  • textOverlay (only set "text" when an overlay actually belongs):
+      CTA scene  → text = brand cta line if present, else "Jetzt testen",
+                   position="bottom", animation="scale-bounce".
+      Hook scene → text = first 3–5 words of voiceover.text in ALL CAPS
+                   when the briefing already pushes a punchy claim,
+                   position="top", animation="fade-in".
+                   If voiceover is conversational or longer than 8 words,
+                   leave textOverlay UNDEFINED instead of forcing one.
+      Otherwise  → leave textOverlay UNDEFINED.
+
+  • tone: copy project.tone / briefing tone keyword when present.
+      If the briefing names no tone, pick from {"cinematic","documentary",
+      "luxury","energetic","intimate","editorial"} based on beat + mode:
+        Reveal/Proof + brand   → "cinematic"
+        Pain                   → "intimate"
+        CTA                    → "energetic"
+        Educational            → "documentary"
+        default                → "cinematic"
+
+  • seed: DO NOT auto-fill. Leave undefined unless the briefing literally
+    names a number ("Seed: 12345"). Random per render is the correct A/B
+    behaviour — the UI explains this.
+
 DO NOT invent IDs. Only use @-mentions that appear in the "## Cast" section.
 DO NOT invent voice IDs. Voice resolution is the resolver's job.
 
