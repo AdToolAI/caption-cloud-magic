@@ -1,8 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload, X, Paperclip, Image as ImageIcon, FileText, Film } from "lucide-react";
+import { Loader2, Upload, X, Paperclip, Image as ImageIcon, FileText, Film, Video, Square, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useScreenRecorder } from "@/hooks/useScreenRecorder";
+
 
 export interface UploadedAttachment {
   path: string;
