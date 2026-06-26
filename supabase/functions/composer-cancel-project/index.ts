@@ -20,6 +20,7 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +39,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "composer-cancel-project" });
+
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

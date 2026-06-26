@@ -10,6 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { suppressEmail } from "../_shared/email-send.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,6 +83,9 @@ async function verifySvix(req: Request, body: string): Promise<boolean> {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "resend-webhook" });
+
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }

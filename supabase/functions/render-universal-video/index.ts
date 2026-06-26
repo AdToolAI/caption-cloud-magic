@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
@@ -35,6 +36,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
+
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

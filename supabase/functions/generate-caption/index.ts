@@ -5,6 +5,7 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { ErrorResponses, createErrorResponse } from '../_shared/errorHandler.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { lookupAiCache, storeAiCache } from '../_shared/ai-semantic-cache.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,8 @@ serve(withTelemetry('generate-caption', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "generate-caption" });
+
 
   const requestId = crypto.randomUUID();
   

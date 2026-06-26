@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "generate-optimized-prompt" });
+
 
   try {
     // Input validation

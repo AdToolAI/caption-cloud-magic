@@ -4,6 +4,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +48,9 @@ const PROMO_LOOKUP   = "pro_monthly_eur_promo_1499";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "admin-stripe-setup-pricing-v2" });
+
   const denied = await requireAdmin(req);
   if (denied) return denied;
   try {

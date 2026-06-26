@@ -7,6 +7,7 @@
 // applies the returned plan to its local Studio Mode state.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,6 +103,9 @@ function safeParse(raw: string): DirectorPlan | null {
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "motion-studio-director" });
+
 
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");

@@ -31,6 +31,7 @@ import {
   logSyncDispatch,
 } from "../_shared/syncso-preflight.ts";
 import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 
 const corsHeaders = {
@@ -172,6 +173,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
+
   if (req.method !== "POST") return ok({ ok: true, skipped: "non_post" });
 
   const unauth = verifyWebhookRequest(req);

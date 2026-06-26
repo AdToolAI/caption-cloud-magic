@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -173,6 +174,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "render-directors-cut" });
+
 
   try {
     const supabaseClient = createClient(

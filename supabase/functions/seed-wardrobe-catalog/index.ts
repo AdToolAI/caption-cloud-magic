@@ -5,6 +5,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 import { THEME_PACKS, listAllOutfitSlots } from '../_shared/wardrobe-themes.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,6 +86,9 @@ async function generateOne(opts: {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "image" });
+
 
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;

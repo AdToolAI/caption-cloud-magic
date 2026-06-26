@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -324,6 +325,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "render-with-remotion" });
+
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';

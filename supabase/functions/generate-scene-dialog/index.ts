@@ -11,6 +11,7 @@
 // Returns: { script: "Sarah: ...\nMatthew: ..." }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +29,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "generate-scene-dialog" });
+
   try {
     const { language = 'en', sceneContext = '', durationSeconds = 6, cast = [] } =
       await req.json();

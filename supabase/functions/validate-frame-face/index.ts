@@ -40,6 +40,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -345,6 +346,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "validate-frame-face" });
+
   try {
     const body = await req.json().catch(() => ({}));
     const videoUrl: string | undefined = body.video_url;

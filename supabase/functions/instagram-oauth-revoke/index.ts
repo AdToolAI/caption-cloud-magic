@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +32,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "instagram-oauth-revoke" });
+
 
   try {
     const authHeader = req.headers.get('Authorization');

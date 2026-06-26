@@ -2,6 +2,7 @@
 // Persists the prediction id and a video_job audit row.
 // The poller (autopilot-video-poll) handles completion and credit refund.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +36,9 @@ const PROVIDERS: Record<string, { model: string; creditsPerSec: number; ratioMap
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
+
   try {
     const { slot_id, visual_prompt_en } = (await req.json()) as Body;
     if (!slot_id || !visual_prompt_en) return json({ ok: false, error: "missing params" }, 400);

@@ -2,6 +2,7 @@
 // Mirrors the architecture of ai-superuser-test-runner but tests ONLY motion-studio paths.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -738,6 +739,9 @@ async function cleanupOldTestProjects(userId: string, keepProjectId: string): Pr
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "motion-studio-superuser" });
+
 
   try {
     const body = await req.json().catch(() => ({}));

@@ -19,6 +19,7 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 // orchestrator can also self-heal on demand (no manual "Bootstrap Assets"
 // click required).
 import { ensureHeyGenTalkingPhoto } from "../_shared/heygen-bootstrap.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 // Reliable public MP4/MP3 samples — Big Buck Bunny H.264/AAC is the de-facto
 // industry test sample and plays cleanly in Chromium on Lambda. The previous
@@ -253,6 +254,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-live-sweep-bootstrap" });
+
 
   // Admin guard
   const authHeader = req.headers.get("Authorization");

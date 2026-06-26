@@ -27,6 +27,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -311,6 +312,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "recover-stuck-composer-clip" });
+
 
   try {
     const body = await req.json().catch(() => ({}));

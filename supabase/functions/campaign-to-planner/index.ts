@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { getRedisCache } from "../_shared/redis-cache.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "campaign-to-planner" });
+
 
   try {
     const supabaseClient = createClient(

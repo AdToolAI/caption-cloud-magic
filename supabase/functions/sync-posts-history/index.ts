@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -598,6 +599,8 @@ Deno.serve(withTelemetry('sync-posts-history', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "sync-posts-history" });
+
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

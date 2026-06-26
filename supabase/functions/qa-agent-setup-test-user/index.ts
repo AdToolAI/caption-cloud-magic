@@ -4,6 +4,7 @@
 // Admin-only.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,9 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-agent-setup-test-user" });
+
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

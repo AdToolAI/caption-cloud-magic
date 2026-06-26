@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { renderReminderEmail, type Lang } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,9 @@ const normalizeLang = (raw?: string | null): Lang => {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "process-verify-reminders" });
+
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const startedAt = Date.now();

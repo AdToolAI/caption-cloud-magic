@@ -4,6 +4,7 @@ import { withTelemetry, trackSocialPublish } from '../_shared/telemetry.ts';
 import { generateContentHash } from '../_shared/content-hash.ts';
 import { withTimeout } from '../_shared/timeout.ts';
 import { 
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
   instagramCircuitBreaker, 
   linkedinCircuitBreaker, 
   xCircuitBreaker,
@@ -1352,6 +1353,8 @@ Deno.serve(withTelemetry('publish', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "publish" });
+
 
   try {
     console.log('[Orchestrator] Incoming publish request');

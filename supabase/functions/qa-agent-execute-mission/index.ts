@@ -4,6 +4,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { runBrowserlessFunction, buildSmokeNavigationScript } from "../_shared/browserlessClient.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +42,9 @@ function consoleSignature(text: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-agent-execute-mission" });
+
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

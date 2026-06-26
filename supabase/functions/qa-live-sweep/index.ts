@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { ensureHeyGenTalkingPhoto } from "../_shared/heygen-bootstrap.ts";
 import { recordHeartbeat } from "../_shared/heartbeat.ts";
 import { withSentryCron } from "../_shared/sentryCron.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -566,6 +567,8 @@ Deno.serve(withSentryCron("qa-live-sweep", { schedule: null, maxRuntime: 30 }, a
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-live-sweep" });
+
 
   // Admin-only: require user JWT and verify role
   const authHeader = req.headers.get("Authorization");

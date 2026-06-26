@@ -5,6 +5,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import JSZip from "npm:jszip@3.10.1";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import {
   buildBundleReadme,
   buildEDL,
@@ -64,6 +65,9 @@ const extFromUrl = (url: string, fallback: string) => {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "composer-export-bundle" });
+
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

@@ -3,6 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
 import QRCode from 'https://esm.sh/qrcode@1.5.3';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import {
   resolveLicenseInfo,
   generateCertificateNumber,
@@ -36,6 +37,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "issue-license-certificate" });
+
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return json(null, 204);
   }
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "instagram-token-debug" });
+
 
   try {
     // 1) Read token from secure database first, fallback to ENV
