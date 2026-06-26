@@ -1,32 +1,45 @@
 ## Problem
 
-Die Edge Function `smoke-matrix-run` ist deployed und kennt alle 467 Functions in 32 Kategorien. **Aber das Cockpit-Dropdown (`FunctionMatrixTab.tsx`) hat eine hartkodierte `CATEGORY_LABELS`-Map mit nur 10 alten Kategorien.** Dadurch:
+Im QA-Cockpit zeigen 5 Functions Fehler — alle sind Smoke-Test-Artefakte, keine echten Produktionsbugs:
 
-- Im Dropdown erscheinen nur die alten Buckets (`ai-video-providers`, `lipsync-dialog`, `briefing-composer`, `picture-image`, `audio-music-sfx`, `social-publishing`, `billing-credits`, `admin-cron`, `analytics-reports`, `misc`).
-- Neue Buckets wie `calendar-planning`, `notifications-email`, `qa-testing`, `automation-jobs-1/2`, `picture-image-1/2`, `admin-cron-1/2`, `audio-music-sfx-1/2`, `social-meta`, `social-tiktok-twitch`, `social-google`, `social-other`, `community-coach`, `utilities`, `data-fetch`, `planner-strategy`, `ai-text-generation`, `briefing-director`, `composer-render`, `image-providers`, `misc-1/2/3` etc. fehlen — daher nichts „Neues" sichtbar.
-- Der Hinweistext spricht noch von „Block 1 — kuratierte Auswahl".
-
-Die Registry liegt in `supabase/functions/_shared/smokeRegistry.ts` (Deno-Pfad, kann das Frontend nicht direkt importieren).
+| Function | Status | Ursache |
+|---|---|---|
+| `facebook-list-pages` | 500 Internal | `qaMockJson(corsHeaders, …)` referenziert `corsHeaders` — die Variable heißt aber `CORS` → ReferenceError |
+| `facebook-select-page` | 500 Internal | Gleicher ReferenceError (`corsHeaders` statt `CORS`) |
+| `auth-email-hook` | 401 Invalid signature | `isQaMockRequest`-Guard steht in einer Helper-Funktion (Zeile 94), aber NICHT im echten `Deno.serve`-Handler (Zeile 298) → Smoke-Call läuft direkt in `verifyWebhookRequest` und scheitert |
+| `qa-weekly-deep-sweep` | 401 Invalid token | Kein `isQaMockRequest`-Guard im Handler — Admin-Token-Check schlägt im Mock-Modus zu |
+| `smoke-matrix-run` | 401 unauthorized | Kein `isQaMockRequest`-Guard — Self-Call beim Sweep läuft in eigenen Admin-Check |
 
 ## Lösung
 
-1. **Neue Shared-Quelle für Frontend**: `src/lib/qa/smokeCategories.ts` anlegen mit einer manuell gepflegten Liste, die 1:1 zu `SMOKE_CATEGORIES` in der Registry passt (32 Einträge mit `id` + `label`). Diese Datei ist die Single-Source-of-Truth für das Cockpit-Dropdown.
+**Reine Mock-Guard-Korrekturen, keine Geschäftslogik-Änderungen.**
 
-2. **`FunctionMatrixTab.tsx` umstellen**:
-   - Alte hartkodierte `CATEGORY_LABELS`-Map durch Import aus `@/lib/qa/smokeCategories` ersetzen.
-   - Dropdown rendert jetzt alle 32 Kategorien in der definierten Reihenfolge (statt alphabetisch über `Object.keys`).
-   - `grouped`-Sektion benutzt dasselbe Label-Lookup.
-   - Hinweistext aktualisieren: „467/473 Functions in 32 Kategorien à ≤25 Functions — Rate-Limit-safe, bitte kategorieweise sweepen."
+1. **`facebook-list-pages` & `facebook-select-page`**: `qaMockJson(corsHeaders, …)` → `qaMockJson(CORS, …)` (Variablenname korrigieren).
 
-3. **Keine Backend-Änderung nötig** — `smoke-matrix-run` ist bereits aktuell deployed, akzeptiert die neuen `category`-Strings und liefert für jede einen vollständigen Sweep.
+2. **`auth-email-hook`**: Im Handler (`Deno.serve` bei Zeile 298) direkt nach dem OPTIONS-Preflight ein `if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "auth-email-hook" });` einfügen — vor der Signature-Verifikation. Die existierende Zeile 94 (im Helper) unangetastet lassen.
+
+3. **`qa-weekly-deep-sweep`**: Im Handler (Zeile 727) nach OPTIONS-Preflight Mock-Guard einfügen — vor dem Admin-Token-Check (Zeile 744). Import von `isQaMockRequest, qaMockJson` aus `../_shared/qaMock.ts` ergänzen.
+
+4. **`smoke-matrix-run`**: Im Handler (Zeile 162) nach OPTIONS-Preflight Mock-Guard einfügen — vor dem Admin-Check (Zeile 175). Wichtig: damit kann sich der Sweep nicht mehr selbst aufrufen — der Registry-Eintrag für `smoke-matrix-run` selbst sollte als Self-Reference ausgeschlossen werden (in `smokeRegistry.ts` entfernen oder als `skip` markieren), sonst läuft der Sweep rekursiv.
+
+## Verifikation
+
+Nach Deploy:
+- Kategorie **Social — Meta** erneut sweepen → `facebook-list-pages` + `facebook-select-page` grün.
+- Kategorie **Notifications & Email** sweepen → `auth-email-hook` grün.
+- Kategorie **QA & Testing** sweepen → `qa-weekly-deep-sweep` + `smoke-matrix-run` grün (bzw. `smoke-matrix-run` aus Registry entfernt → 16/16 statt 17).
 
 ## Out-of-Scope
 
-- Keine Änderungen an `smokeRegistry.ts` oder Edge Functions.
-- Keine Auto-Sync-Mechanik Registry↔Frontend (eine spätere Iteration könnte die Kategorien über einen `GET`-Endpoint von `smoke-matrix-run` ausliefern, aber das ist hier overkill).
-- Keine Änderungen am Sweep-Loop, an der DB oder an den Status-Badges.
+- Keine Änderungen am Auth-Flow, an Meta-Discovery oder am Deep-Sweep-Orchestrator.
+- Keine Änderungen an `_shared/qaMock.ts`.
+- Keine UI-Änderungen im Cockpit.
 
 ## Files
 
-- **Neu**: `src/lib/qa/smokeCategories.ts` (32 Einträge `{ id, label }` in fester Reihenfolge).
-- **Geändert**: `src/components/admin/qa-cockpit/FunctionMatrixTab.tsx` — Import aus neuer Datei, alte Map entfernt, Hinweistext aktualisiert.
+- `supabase/functions/facebook-list-pages/index.ts` — 1-Zeilen-Fix (`corsHeaders` → `CORS`).
+- `supabase/functions/facebook-select-page/index.ts` — 1-Zeilen-Fix.
+- `supabase/functions/auth-email-hook/index.ts` — Mock-Guard im Deno.serve-Handler.
+- `supabase/functions/qa-weekly-deep-sweep/index.ts` — Import + Mock-Guard im Handler.
+- `supabase/functions/smoke-matrix-run/index.ts` — Import + Mock-Guard im Handler.
+- `supabase/functions/_shared/smokeRegistry.ts` — `smoke-matrix-run` aus Registry entfernen (Self-Reference).

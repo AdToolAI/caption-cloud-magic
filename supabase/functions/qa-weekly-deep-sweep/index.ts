@@ -10,6 +10,7 @@
 //     x-qa-user-id: <admin>   (used by QA-aware functions for the user context)
 
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -726,6 +727,11 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // QA smoke short-circuit (must come before admin-token check)
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-weekly-deep-sweep" });
+
+
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {

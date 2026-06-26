@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS });
   }
-  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "facebook-list-pages" });
+  if (isQaMockRequest(req)) return qaMockJson(CORS, { name: "facebook-list-pages" });
 
 
   try {

@@ -303,6 +303,9 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  // QA smoke short-circuit (must come before signature verification)
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "auth-email-hook" });
+
   // Route to preview handler for /preview path
   if (url.pathname.endsWith('/preview')) {
     return handlePreview(req)
