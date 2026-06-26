@@ -586,8 +586,6 @@ export default function ProductionPlanSheet({
                           {s.lipSync ? '✓ Lip-Sync' : 'B-Roll'}
                         </Badge>
                       </div>
-                      <div className="hidden">{/* keep prior layout */}</div>
-                      <div className="-mt-1.5"></div>
 
                       {s.voiceover?.text && (
                         <div className="italic text-muted-foreground line-clamp-2">
