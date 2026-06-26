@@ -64,10 +64,10 @@ const ENGINE_BY_PREF: Record<EnginePref, string[]> = {
   budget:  ['ai-wan', 'ai-seedance', 'ai-hailuo'],
 };
 
-// Cost per second per engine (standard quality, mirrors compose-video-clips)
+// Cost per second per engine (standard quality, mirrors compose-video-clips / clip-costs.ts)
 const COST_PER_SEC: Record<string, number> = {
-  'ai-hailuo': 0.15, 'ai-kling': 0.15, 'ai-veo': 0.20,
-  'ai-wan': 0.10, 'ai-seedance': 0.12, 'ai-luma': 0.20,
+  'ai-hailuo': 0.15, 'ai-kling': 0.18, 'ai-veo': 0.42,
+  'ai-wan': 0.12, 'ai-seedance': 0.15, 'ai-luma': 0.20,
 };
 
 const FALLBACK_ENGINE = 'ai-hailuo';

@@ -9,12 +9,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Pricing in EUR/USD per second (≥70% Marge gegenüber Replicate)
+// Pricing in EUR/USD per second — Premium-Engine tier (~65-70% margin)
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'veo-3.1-lite-720p': { EUR: 0.20, USD: 0.20 },
-  'veo-3.1-lite-1080p': { EUR: 0.30, USD: 0.30 },
-  'veo-3.1-fast': { EUR: 0.55, USD: 0.55 },
-  'veo-3.1-pro': { EUR: 1.40, USD: 1.40 },
+  'veo-3.1-lite-720p':  { EUR: 0.42, USD: 0.42 },
+  'veo-3.1-lite-1080p': { EUR: 0.62, USD: 0.62 },
+  'veo-3.1-fast':       { EUR: 1.15, USD: 1.15 },
+  'veo-3.1-pro':        { EUR: 3.15, USD: 3.15 },
 };
 
 const REPLICATE_MODELS: Record<string, string> = {

@@ -18,10 +18,10 @@ const REPLICATE_MODEL = "alibaba/happyhorse-1.0";
 
 // Per-second prices (EUR). Replicate billing is per second of output.
 // 720p ≈ $0.14/s, 1080p ≈ $0.28/s — user-facing prices include margin.
-// 50% margin policy: user price = Replicate cost × 2
+// 65% margin policy (Direct AI Video Provider Margin Policy)
 const COST_PER_SECOND_EUR: Record<HappyHorseModel, number> = {
-  "happyhorse-standard": 0.28,
-  "happyhorse-pro": 0.56,
+  "happyhorse-standard": 0.40,
+  "happyhorse-pro":      0.80,
 };
 
 const RESOLUTIONS: Record<HappyHorseModel, "720p" | "1080p"> = {

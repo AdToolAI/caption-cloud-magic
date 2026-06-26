@@ -13,7 +13,7 @@ const corsHeaders = {
 
 const MODEL_PRICING: Record<string, Record<string, number>> = {
   'hailuo-standard': { EUR: 0.15, USD: 0.15 },
-  'hailuo-pro': { EUR: 0.20, USD: 0.20 },
+  'hailuo-pro': { EUR: 0.22, USD: 0.22 },
 };
 
 interface GenerateRequest {
