@@ -162,9 +162,24 @@ Return strict JSON via the tool call.`;
       ai_suggested_reply: triage.suggested_reply,
       ai_language: triage.language,
       ai_confidence: triage.confidence,
+    // Apply visual-evidence boost: shrink ETA by 40% when image/video attached
+    if (hasVisualEvidence && typeof triage.eta_hours === "number") {
+      triage.eta_hours = Math.max(1, Math.round(triage.eta_hours * 0.6));
+    }
+
+    // === Write back ===
+    await supabase.from("support_tickets").update({
+      ai_category: triage.category,
+      ai_severity: triage.severity,
+      ai_root_cause: triage.root_cause,
+      ai_eta_hours: triage.eta_hours,
+      ai_suggested_reply: triage.suggested_reply,
+      ai_language: triage.language,
+      ai_confidence: triage.confidence,
       ai_analyzed_at: new Date().toISOString(),
       linked_incident_id: triage.linked_incident_id || null,
     }).eq("id", ticket_id);
+
 
     // === Email customer with AI analysis ===
     const customerEmail = ticket.contact_email;
