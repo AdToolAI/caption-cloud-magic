@@ -771,7 +771,21 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           backgroundMusicVolume={backgroundMusicVolume}
         />
         {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
-        {currentSubtitleSegment && subtitleStyle && (
+        {subtitleStyle?.animation === 'hormozi' && subtitles && subtitles.length > 0 && (
+          <HormoziCaption
+            segments={subtitles as HormoziSegment[]}
+            style={{
+              position: subtitleStyle.position,
+              font: subtitleStyle.font,
+              fontSize: subtitleStyle.fontSize,
+              color: subtitleStyle.color,
+              outlineColor: subtitleStyle.outlineColor,
+              outlineWidth: subtitleStyle.outlineWidth,
+              highlightColor: subtitleStyle.highlightColor || '#F5C76A',
+            }}
+          />
+        )}
+        {currentSubtitleSegment && subtitleStyle && subtitleStyle.animation !== 'hormozi' && (
           <AbsoluteFill style={{
             display: 'flex',
             flexDirection: 'column',
