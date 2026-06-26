@@ -24,6 +24,14 @@ const ReqSchema = z.object({
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  if (isQaMockRequest(req)) {
+    return new Response(
+      JSON.stringify({ mock: true, results: [{ id: '1', keywords: ['test'] }] }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+
   const key = Deno.env.get('LOVABLE_API_KEY');
   if (!key) {
     return new Response(JSON.stringify({ error: 'missing_lovable_api_key' }), {
