@@ -5,13 +5,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useSocialPublishing, Platform } from '@/hooks/useSocialPublishing';
 import { useScheduledPublishing } from '@/hooks/useScheduledPublishing';
 import { usePlatformCredentials } from '@/hooks/usePlatformCredentials';
 import { PlatformOptimizationHelper } from '@/components/publishing/PlatformOptimizationHelper';
-import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon } from 'lucide-react';
+import { CrossPostMagicPanel } from './CrossPostMagicPanel';
+import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { es } from 'date-fns/locale';
@@ -20,6 +22,9 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 interface PublishToSocialTabProps {
   videoUrl: string;
+  videoId?: string;
+  briefingPlan?: unknown;
+  briefingText?: string;
   defaultCaption?: string;
   defaultHashtags?: string[];
   onPublished?: () => void;
