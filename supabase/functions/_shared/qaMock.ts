@@ -102,3 +102,19 @@ export function qaMockResponse({ corsHeaders, kind, extra }: MockOpts): Response
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+/**
+ * Minimal JSON mock for trivial endpoints (lookups, status checks, lists).
+ * Returns the given body merged with `{ ok: true, mock: true }`.
+ */
+export function qaMockJson(
+  corsHeaders: Record<string, string>,
+  body: Record<string, unknown> = {},
+): Response {
+  const merged = { ok: true, mock: true, ...body };
+  console.log(`[qaMock] json short-circuit → ${JSON.stringify(Object.keys(merged))}`);
+  return new Response(JSON.stringify(merged), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}

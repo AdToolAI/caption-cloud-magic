@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,11 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { overallProgress: 1, done: true, outputUrl: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4" });
+  }
+
 
   try {
     const { render_id, renderId, source } = await req.json();

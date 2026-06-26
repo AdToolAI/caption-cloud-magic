@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { status: "ready", videoUrl: "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4" });
+  }
+
 
   try {
     const authHeader = req.headers.get('Authorization');
