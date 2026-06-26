@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
@@ -10,6 +11,10 @@ Deno.serve(async (req) => {
     return json(null, 204);
   }
 
+  // QA smoke short-circuit
+  if (isQaMockRequest(req)) {
+    return qaMockJson(corsHeaders, { fn: "instagram-token-test" });
+  }
   try {
     // 1) Eingaben: Token aus Datenbank (Fallback: ENV), igUserId aus Body oder Secret
     const { igUserId } = await req.json().catch(() => ({}));
