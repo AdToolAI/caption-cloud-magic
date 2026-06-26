@@ -258,16 +258,91 @@ serve(async (req) => {
 
     await sendEmail({
       to: email,
-      subject: "We received your support ticket",
+      subject: "We received your support ticket — AI analysing now",
       html: confirmHtml,
       template: "support_ticket_confirmation",
       category: "transactional",
     });
 
+    // === Persist ticket to DB ===
+    let ticketId: string | null = null;
+    try {
+      // Best-effort: derive user_id from JWT if present
+      const authHeader = req.headers.get("Authorization");
+      let userId: string | null = null;
+      if (authHeader?.startsWith("Bearer ")) {
+        const { data: userData } = await supabaseAdmin.auth.getUser(authHeader.slice(7));
+        userId = userData?.user?.id ?? null;
+      }
+
+      const dbCategory = ["bug", "feature", "account", "billing", "other"].includes(category)
+        ? category
+        : "other";
+
+      const dbPriority = severity === "blocking" ? "urgent"
+        : severity === "high" ? "high"
+        : severity === "low" ? "low"
+        : "normal";
+
+      const combinedDescription = [
+        expected && `Expected: ${expected}`,
+        actual && `Actual: ${actual}`,
+        repro && `Steps:\n${repro}`,
+        fallbackMessage,
+      ].filter(Boolean).join("\n\n");
+
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from("support_tickets")
+        .insert({
+          user_id: userId ?? "00000000-0000-0000-0000-000000000000",
+          category: dbCategory,
+          subject,
+          description: combinedDescription,
+          severity,
+          priority: dbPriority,
+          affected_module: affectedModule,
+          attachments,
+          browser_info: browserInfo,
+          expected_result: expected || null,
+          actual_result: actual || null,
+          reproduction_steps: repro || null,
+          contact_email: email,
+          contact_name: name,
+          status: "open",
+        })
+        .select("id")
+        .single();
+
+      if (insertErr) {
+        console.error("Ticket insert failed:", insertErr.message);
+      } else {
+        ticketId = inserted?.id ?? null;
+      }
+    } catch (e) {
+      console.error("Ticket persist error:", (e as Error).message);
+    }
+
+    // === Kick off AI triage (fire & forget) ===
+    if (ticketId) {
+      const projectUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      EdgeRuntime.waitUntil(
+        fetch(`${projectUrl}/functions/v1/triage-support-ticket`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({ ticket_id: ticketId }),
+        }).catch((e) => console.error("triage trigger failed:", e.message))
+      );
+    }
+
     return new Response(
-      JSON.stringify({ success: true, message: "Ticket submitted successfully" }),
+      JSON.stringify({ success: true, ticket_id: ticketId, message: "Ticket submitted successfully" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
+
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "unknown error";
     console.error("Error in send-support-ticket function:", msg);
