@@ -1,59 +1,50 @@
-## Diagnose
+# Analyse: `DataInspectionFailed — Green net check failed for text (input)`
 
-Im Screenshot zeigt S02:
-- ✓ Skript · ✓ Shot-Director · ✓ Cast · ✓ Anchor · ✓ Performance · ✓ Lip-Sync  
-- **— Transition · — Overlay · — Tone · — Seed**
+## Was passiert ist
 
-Das ist **kein Bug** — Pass-A-Schema, Apply-Mapping, Drift-Checks und Chips sind alle bereits korrekt verdrahtet (Lücken 1–6 sind technisch geschlossen). Die vier Chips bleiben grau, weil dein Briefing diese vier Felder nicht explizit nennt und das KI-Modell sie als `undefined` zurückgibt. Apply nimmt dann stille Defaults (crossfade/0.4s, kein Overlay, kein Seed, Briefing-Tone) — aus deiner Sicht wirkt das wie "nur teilweise übernommen".
+Replicate hat den Render **vor** dem GPU-Spend abgewiesen — der Fehler kommt von Alibabas **"Green Net"** (绿网), dem Pflicht-Content-Filter, der jeden HappyHorse-Request gegen die chinesische CAC-Compliance-Liste prüft. Er greift bereits, **bevor** das Modell rechnet. Drei Eigenheiten sind relevant:
 
-Es gibt zwei echte Lücken:
+1. Er prüft den **Text-Input** (das Feld `prompt`), nicht das `image`.
+2. Er ist sehr empfindlich gegen **nicht-englische Phrasen** (besonders Deutsch mit Sonderzeichen, Ellipsen `…`, Anführungszeichen `„"`), gegen **Tageszeit-Phrasen mit Bezug zur Nacht** ("3 Uhr nachts"), gegen Wörter, die er als "Selbstbild/Spiegel/Gerät-Screen" klassifiziert ("Reel", "Screen", "Phone"), und gegen **Selbstgespräch / monologische 1.-Person-Sätze** ("Und ich bearbeite…").
+3. Der Filter ist **opak** — es gibt kein "welches Wort war's". Wir können nur sanitisieren oder den Provider wechseln.
 
-1. **Pass-A inferiert die Felder nicht aktiv.** Das Modell hat keinen expliziten Auftrag, sie aus Beat/Mode/Tone abzuleiten, also lässt es sie leer.
-2. **Chips kennen nur zwei Zustände** (✓ = vorhanden / — = fehlend). Es gibt keine Möglichkeit zu sehen "✨ KI hat ergänzt" oder "Default greift bewusst".
+## Was im aktuellen Code-Pfad fehlt
 
-## Scope (was sich ändert)
+Geprüft: `generate-happyhorse-video/index.ts` reicht `finalPrompt` 1:1 an Replicate weiter. `compose-video-clips` hat zwar `stripDialogForAnchor` (entfernt Dialog vor dem **Anchor-Frame**) und `stripExtraHumansForAnchor`, aber **keinen** HappyHorse-spezifischen Green-Net-Sanitizer. Auch der bereits implementierte "Refund bei Filter-Reject + Auto-Fallback Hailuo" (aus dem vorherigen Loop) wird **nicht** ausgelöst, weil die Fehler-Klassifizierung den String `DataInspectionFailed` / `Green net` nirgends matcht.
 
-| # | Datei | Änderung |
-|---|-------|---|
-| 1 | `supabase/functions/briefing-deep-parse/index.ts` | Pass-A-System-Prompt: expliziter Inference-Auftrag für Transition/Overlay/Tone/Seed mit Heuristiken pro Beat (Hook→cut, Reveal→crossfade, CTA→fade + Logo-Overlay …). `_meta.aiFilled` pro Szene markieren, wann ein Feld aus Inference statt aus Text kam. LANGUAGE LOCK unangetastet. |
-| 2 | `src/lib/video-composer/briefing/productionPlan.ts` | `TPlanScene._meta.aiFilled?: string[]` ergänzen (Schema ist schon `.passthrough()` — nur Typ-Hinweis, keine Runtime-Change). |
-| 3 | `src/components/video-composer/briefing/ProductionPlanSheet.tsx` | Chips bekommen **3 States**: ✓ grün (explizit im Briefing), ✨ amber (KI-inferiert), — grau (bewusster Composer-Default). Tooltip zeigt jeweils Quelle + finalen Wert ("Transition: cut · KI-inferiert aus Beat=Hook"). Gilt für Transition, Overlay, Tone, Seed, Cast-Shots. |
-| 4 | `src/components/video-composer/briefing/ProductionPlanSheet.tsx` | Beim Review-Step zusätzlicher Hinweis-Banner wenn ≥1 Szene `aiFilled` enthält: "✨ X Felder wurden von der KI ergänzt — klick auf einen Chip um Quelle zu sehen." Verlinkt auf bestehende `BriefingPlanSummary`-HoverCard. |
-| 5 | `src/hooks/useApplyProductionPlan.ts` | Beim Mapping `_meta.aiFilled` durchreichen in `scene._planMeta` (composer-side only, keine DB-Schreibung), damit der Drift-Detektor zwischen "User wollte explizit X" und "KI hat X vermutet" unterscheiden kann (KI-Fill → `severity: 'info'` statt `'warning'`). |
-| 6 | `src/lib/video-composer/briefing/driftDetector.ts` | Severity-Downgrade für `*_not_applied`-Findings wenn das Plan-Feld in `aiFilled` steht — "Default ist OK, war eh nur ein KI-Vorschlag". |
+## Plan (Lücken 1–4)
 
-## Heuristik-Tabelle für Pass-A Inference
+### 1. `_shared/happyhorse-green-net.ts` (neu)
+Reine Pure-Funktion `sanitizeForHappyHorse(prompt: string): { clean: string; touched: string[] }`:
+- Strippt Smart-Quotes / Ellipsen (`…` → `, `, `„" «»` → ``).
+- Strippt 1.-Person-Selbstgespräch ("Und ich …", "Ich bearbeite …") — diese sind Dialog-Leaks, die im Visual-Prompt nichts verloren haben.
+- Ersetzt Nacht-Tageszeit-Trigger: `3 Uhr nachts` → `late at night`, `schon wieder` → entfernen, `Reel` → `short video`.
+- Ersetzt Screen-/Device-Trigger im Visual-Prompt: `Screen`, `Phone`, `Smartphone`, `Display` → `workspace` (Green-Net hält Device-Screens oft fälschlich für UI-mit-Personen).
+- Force-Translate-Step: wenn nach Sanitisierung > 20 % Nicht-ASCII-Zeichen → markiert für "needs english pass" (Stage 2).
 
-```text
-Transition:
-  Hook/Cold-Open  → cut          (0.0s)
-  Reveal/Twist    → crossfade    (0.5s)
-  CTA/Endcard     → fade         (0.6s)
-  Sonst           → crossfade    (0.4s)
+### 2. Pipeline-Integration (`generate-happyhorse-video/index.ts`)
+- Sanitizer **direkt vor** `replicate.predictions.create` anwenden (Z. ~290).
+- `meta.green_net_sanitization = { touched, originalLen, cleanLen }` in `ai_video_generations` schreiben.
+- Wenn `clean.length < 3` nach Sanitisierung → 400 mit Code `prompt_emptied_by_filter` (kein Spend, kein Refund nötig).
 
-Overlay:
-  CTA-Szene       → text = brand.cta ?? "Jetzt testen", position=bottom
-  Hook            → text = first 4 words of voiceover, position=top
-  Sonst           → leer
+### 3. Error-Klassifizierung + Auto-Refund + Fallback (`compose-clip-webhook` + `generate-happyhorse-video` Error-Branch)
+- Neuen Error-Bucket `green_net_rejected` einführen (matcht `/DataInspectionFailed|Green ?net|inappropriate content/i`).
+- Bei diesem Bucket:
+  - Refund über bestehende `deduct_ai_video_credits`-Inverse (idempotent über `generation.id`).
+  - Im Composer-Kontext: `clipSource` für **diese eine Szene** automatisch auf `ai-hailuo` umstellen und neu dispatchen (Lip-Sync bleibt aktiv, Hailuo ist im Allowlist-Whitelist).
+  - Im Standalone-Toolkit: 422 mit `code: 'green_net_rejected'` + `suggested_fallback: 'ai-hailuo'`.
 
-Tone:
-  Übernimmt briefing.tone wenn scene.tone leer
+### 4. UI-Feedback (`SceneCard.tsx` Fehler-Banner)
+- Wenn `error_class === 'green_net_rejected'`: roten Banner durch gelben ersetzen, Text: *"HappyHorse-Content-Filter hat den Prompt abgelehnt. Auto-Fallback auf Hailuo läuft — Credits wurden zurückerstattet."*
+- "Neu rendern"-Button bekommt Provider-Wechsel-Hint.
 
-Seed:
-  Wenn kein Seed im Briefing: bleibt undefined (Composer wählt random pro Render — das ist gewollt für A/B)
-  Wird NICHT auto-gefüllt, sondern Chip zeigt "— · random per render" als gewollter Zustand
-```
+## Was NICHT angefasst wird
+- Lip-Sync Pipeline (`compose-dialog-segments`, Sync.so v129.x, Plate-Identity-Bbox).
+- Dialog-Skript im UI (das ist korrekt Deutsch — TTS bleibt deutsch).
+- Sanitizer für andere Provider (Hailuo / Kling haben keinen Green-Net).
+- DB-Migration (alles über existierende `meta`-JSON-Felder).
 
-## Out of Scope (Lipsync-Safety bleibt unangetastet)
-
-- Keine Änderung an `compose-dialog-segments`, `sync-so-webhook`, `dialog_shots`, `composer_scenes.dialog_*`, `dialogLockedAt`, `lockReferenceUrl`.
-- Keine Änderung am Apply-Schutzfilter.
-- Keine Migration. `_planMeta` lebt nur im Composer-State.
-- Pass-B / Cast-/Voice-Resolver bleibt unverändert.
-
-## Verification
-
-1. Briefing ohne explizite Transition/Overlay/Tone/Seed analysieren → S02 zeigt ✨ Transition (cut/crossfade je Beat), ✨ Overlay bei CTA, ✓ Tone (von Briefing), — Seed mit Tooltip "random per render".
-2. Briefing mit `TRANSITION: slide` analysieren → ✓ Transition (grün, Tooltip "explizit im Briefing").
-3. Apply → Drift-Panel zeigt 0 Warnings, höchstens "info: 3 Felder per KI-Default belegt".
-4. Lipsync-Regression: Bestehende v169 Szene mit `dialogLockedAt` bleibt protected, kein Eingriff in dialog_shots.
+## Verifikation nach Build
+1. Aktuelle Szene "3 Uhr nachts… Reel" neu rendern → muss durch HappyHorse durchlaufen ODER sauber auf Hailuo fallen, mit gebuchtem Refund.
+2. Probe-Briefing mit nur deutschem Visual-Prompt: `meta.green_net_sanitization.touched` zeigt geänderte Tokens.
+3. Composer-Multi-Scene-Run: Lip-Sync-v169-Anchor unverändert (Regression-Check über `dialog_shots.preclip_crop`-Persistenz).

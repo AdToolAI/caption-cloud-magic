@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { sanitizeForHappyHorse, isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,13 +132,15 @@ async function rehostAndPersist(params: {
     }
     throw new Error(`HappyHorse prediction timed out after ${Math.round(MAX_POLL_MS / 1000)}s`);
   } catch (err: any) {
-    console.error(`[generate-happyhorse-video] ❌ Failure:`, err?.message ?? err);
+    const greenNetReject = isGreenNetRejection(err);
+    const tag = greenNetReject ? "green_net_rejected" : "happyhorse_failed";
+    console.error(`[generate-happyhorse-video] ❌ Failure (${tag}):`, err?.message ?? err);
     await supabaseAdmin
       .from("ai_video_generations")
       .update({
         status: "failed",
         failed_at: new Date().toISOString(),
-        error_message: err?.message ?? "HappyHorse generation failed",
+        error_message: `[${tag}] ${err?.message ?? "HappyHorse generation failed"}`,
       })
       .eq("id", generationId);
 
@@ -252,7 +255,24 @@ serve(async (req) => {
       );
     }
 
-    const finalPrompt = (prompt ?? "").trim();
+    const rawPrompt = (prompt ?? "").trim();
+    const greenNet = sanitizeForHappyHorse(rawPrompt);
+    const finalPrompt = greenNet.clean;
+
+    if (greenNet.emptied && !hasImage) {
+      return new Response(
+        JSON.stringify({
+          error: "Prompt was emptied by HappyHorse content filter sanitizer. Please rephrase in English without late-night / device-screen / first-person monologue wording.",
+          code: "prompt_emptied_by_filter",
+          touched: greenNet.touched,
+          suggested_fallback: "ai-hailuo",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (greenNet.touched.length > 0) {
+      console.log("[generate-happyhorse-video] green-net sanitizer touched:", greenNet.touched);
+    }
 
     // Create generation row
     const { data: generation, error: genError } = await supabaseAdmin
@@ -311,13 +331,15 @@ serve(async (req) => {
         input: hhInput,
       });
     } catch (err: any) {
-      console.error("[generate-happyhorse-video] ❌ Submit failed:", err);
+      const greenNetReject = isGreenNetRejection(err);
+      const errorClass = greenNetReject ? "green_net_rejected" : "happyhorse_submit_failed";
+      console.error(`[generate-happyhorse-video] ❌ Submit failed (${errorClass}):`, err?.message ?? err);
       await supabaseAdmin
         .from("ai_video_generations")
         .update({
           status: "failed",
           failed_at: new Date().toISOString(),
-          error_message: err?.message ?? "HappyHorse submit failed",
+          error_message: `[${errorClass}] ${err?.message ?? "HappyHorse submit failed"}`,
         })
         .eq("id", generation.id);
       await supabaseAdmin.rpc("refund_ai_video_credits", {
@@ -327,11 +349,15 @@ serve(async (req) => {
       });
       return new Response(
         JSON.stringify({
-          error: "HappyHorse submission failed. Credits refunded.",
-          code: "HAPPYHORSE_ERROR",
+          error: greenNetReject
+            ? "HappyHorse content filter (Green Net) rejected the prompt. Credits refunded. Try Hailuo as fallback."
+            : "HappyHorse submission failed. Credits refunded.",
+          code: greenNetReject ? "green_net_rejected" : "HAPPYHORSE_ERROR",
+          suggested_fallback: greenNetReject ? "ai-hailuo" : undefined,
+          touched: greenNetReject ? greenNet.touched : undefined,
           details: err?.message,
         }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: greenNetReject ? 422 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
