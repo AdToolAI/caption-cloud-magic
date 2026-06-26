@@ -348,6 +348,11 @@ export default function QACockpit() {
               <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
               Status
             </TabsTrigger>
+            <TabsTrigger value="support-inbox" className="text-[#F5C76A]">
+              <LifeBuoy className="h-3.5 w-3.5 mr-1.5" />
+              Support Inbox
+            </TabsTrigger>
+
             <TabsTrigger value="meta-token" className="text-[#F5C76A]">
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
               Meta Token
