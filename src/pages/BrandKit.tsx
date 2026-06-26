@@ -27,6 +27,9 @@ import { BrandVault } from "@/components/brand/BrandVault";
 import { BrandDnaExtractor } from "@/components/brand/BrandDnaExtractor";
 import { BrandVoiceLibrary } from "@/components/brand/BrandVoiceLibrary";
 import { BrandAssetFactory } from "@/components/brand/BrandAssetFactory";
+import { BrandDriftDossier } from "@/components/brand/BrandDriftDossier";
+import { BrandShareExport } from "@/components/brand/BrandShareExport";
+import { BrandTrendsRadar } from "@/components/brand/BrandTrendsRadar";
 import type { BrandDnaResult } from "@/hooks/useBrandDnaExtractor";
 
 const BrandKit = () => {
@@ -751,6 +754,10 @@ const BrandKit = () => {
                       score={activeBrandKit.consistency_score || 85} 
                       brandKit={activeBrandKit}
                     />
+                    <BrandDriftDossier brandKitId={activeBrandKit.id} />
+                    <BrandTrendsRadar brandKitId={activeBrandKit.id} />
+                    <BrandShareExport brandKit={activeBrandKit} />
+
 
                     {/* Premium Hashtags Card */}
                     <motion.div
