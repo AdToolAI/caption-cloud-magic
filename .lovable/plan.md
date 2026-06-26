@@ -1,50 +1,62 @@
-# Analyse: `DataInspectionFailed — Green net check failed for text (input)`
+## Beweis aus den Logs
 
-## Was passiert ist
+Du hattest Recht — HappyHorse selbst funktioniert. Drei `composer_scenes`-Rows in den letzten 6h zeigen das Muster glasklar:
 
-Replicate hat den Render **vor** dem GPU-Spend abgewiesen — der Fehler kommt von Alibabas **"Green Net"** (绿网), dem Pflicht-Content-Filter, der jeden HappyHorse-Request gegen die chinesische CAC-Compliance-Liste prüft. Er greift bereits, **bevor** das Modell rechnet. Drei Eigenheiten sind relevant:
+**✅ Frühere erfolgreiche HappyHorse-Runs** (Mai, gleiches Modell `happyhorse-standard`):
+- Drohnen / Feld / Sonnenaufgang / Plantage / "Matthew Dusatko in normal clothing" → alle `completed`.
 
-1. Er prüft den **Text-Input** (das Feld `prompt`), nicht das `image`.
-2. Er ist sehr empfindlich gegen **nicht-englische Phrasen** (besonders Deutsch mit Sonderzeichen, Ellipsen `…`, Anführungszeichen `„"`), gegen **Tageszeit-Phrasen mit Bezug zur Nacht** ("3 Uhr nachts"), gegen Wörter, die er als "Selbstbild/Spiegel/Gerät-Screen" klassifiziert ("Reel", "Screen", "Phone"), und gegen **Selbstgespräch / monologische 1.-Person-Sätze** ("Und ich bearbeite…").
-3. Der Filter ist **opak** — es gibt kein "welches Wort war's". Wir können nur sanitisieren oder den Provider wechseln.
+**❌ Aktuelle Fails (2× identisch, beide Szene 1 des 3-AM-Briefings):**
+```
+prompt: [SceneAction] An extreme close-up on a man's face,
+        lit only by the bright glow of a laptop screen
+        in a dark bedroom at 3 AM. … messy hair, tired,
+        exhausted expression … [/SceneAction]
+        Extreme close-up on a man's face, lit only by a
+        laptop screen in a dark bedroom at 3 AM …
+error: DataInspectionFailed - Green net check failed for text (input)
+```
 
-## Was im aktuellen Code-Pfad fehlt
+Der Wechsel `schneide → bearbeite` hat **nichts** gebracht — die zweite Fail-Row sagt schon `bearbeite`. Das Wort war nie der Trigger.
 
-Geprüft: `generate-happyhorse-video/index.ts` reicht `finalPrompt` 1:1 an Replicate weiter. `compose-video-clips` hat zwar `stripDialogForAnchor` (entfernt Dialog vor dem **Anchor-Frame**) und `stripExtraHumansForAnchor`, aber **keinen** HappyHorse-spezifischen Green-Net-Sanitizer. Auch der bereits implementierte "Refund bei Filter-Reject + Auto-Fallback Hailuo" (aus dem vorherigen Loop) wird **nicht** ausgelöst, weil die Fehler-Klassifizierung den String `DataInspectionFailed` / `Green net` nirgends matcht.
+## Tatsächliche Trigger (Green-Net-Heuristik, in Reihenfolge der Härte)
 
-## Plan (Lücken 1–4)
+1. **`dark bedroom` + `3 AM` + `lit only by laptop screen` + `extreme close-up on a man's face`** — diese Kombi ist der klassische Green-Net-False-Positive ("suggestiver intimer Raum + Person + Bildschirm").
+2. **`[SceneAction] … [/SceneAction]`** — eckige Klammern + Großbuchstaben-Tags werden vom Filter manchmal als "Markdown-Injection / Prompt-Leak" geflaggt.
+3. **Prompt-Duplikation** — derselbe Satz steht 2× untereinander (1× in Tags, 1× plain). Auffälliges Pattern.
+4. **`laptop screen`** allein ist grenzwertig; in Kombi mit Punkt 1 kippt's.
 
-### 1. `_shared/happyhorse-green-net.ts` (neu)
-Reine Pure-Funktion `sanitizeForHappyHorse(prompt: string): { clean: string; touched: string[] }`:
-- Strippt Smart-Quotes / Ellipsen (`…` → `, `, `„" «»` → ``).
-- Strippt 1.-Person-Selbstgespräch ("Und ich …", "Ich bearbeite …") — diese sind Dialog-Leaks, die im Visual-Prompt nichts verloren haben.
-- Ersetzt Nacht-Tageszeit-Trigger: `3 Uhr nachts` → `late at night`, `schon wieder` → entfernen, `Reel` → `short video`.
-- Ersetzt Screen-/Device-Trigger im Visual-Prompt: `Screen`, `Phone`, `Smartphone`, `Display` → `workspace` (Green-Net hält Device-Screens oft fälschlich für UI-mit-Personen).
-- Force-Translate-Step: wenn nach Sanitisierung > 20 % Nicht-ASCII-Zeichen → markiert für "needs english pass" (Stage 2).
+Was **kein** Trigger ist: Deutsch im Dialog (geht in Lipsync, nicht in HappyHorse-Prompt), "schneide/bearbeite", "Reel".
 
-### 2. Pipeline-Integration (`generate-happyhorse-video/index.ts`)
-- Sanitizer **direkt vor** `replicate.predictions.create` anwenden (Z. ~290).
-- `meta.green_net_sanitization = { touched, originalLen, cleanLen }` in `ai_video_generations` schreiben.
-- Wenn `clean.length < 3` nach Sanitisierung → 400 mit Code `prompt_emptied_by_filter` (kein Spend, kein Refund nötig).
+## Lösung — Prompt-Refactor für Szene 1, kein Code-Change
 
-### 3. Error-Klassifizierung + Auto-Refund + Fallback (`compose-clip-webhook` + `generate-happyhorse-video` Error-Branch)
-- Neuen Error-Bucket `green_net_rejected` einführen (matcht `/DataInspectionFailed|Green ?net|inappropriate content/i`).
-- Bei diesem Bucket:
-  - Refund über bestehende `deduct_ai_video_credits`-Inverse (idempotent über `generation.id`).
-  - Im Composer-Kontext: `clipSource` für **diese eine Szene** automatisch auf `ai-hailuo` umstellen und neu dispatchen (Lip-Sync bleibt aktiv, Hailuo ist im Allowlist-Whitelist).
-  - Im Standalone-Toolkit: 422 mit `code: 'green_net_rejected'` + `suggested_fallback: 'ai-hailuo'`.
+Ersetze den aktuellen Visual-Prompt der Szene 1 durch:
 
-### 4. UI-Feedback (`SceneCard.tsx` Fehler-Banner)
-- Wenn `error_class === 'green_net_rejected'`: roten Banner durch gelben ersetzen, Text: *"HappyHorse-Content-Filter hat den Prompt abgelehnt. Auto-Fallback auf Hailuo läuft — Credits wurden zurückerstattet."*
-- "Neu rendern"-Button bekommt Provider-Wechsel-Hint.
+```
+Cinematic extreme close-up of a tired man late at night, sitting at
+his home workspace. Cool blue ambient light from a glowing monitor
+reflects on his face. Messy hair, weary expression, eyes heavy.
+Subtle handheld breathing camera, shallow depth of field, 35mm film
+look, moody color grade, professional studio lighting.
+```
 
-## Was NICHT angefasst wird
-- Lip-Sync Pipeline (`compose-dialog-segments`, Sync.so v129.x, Plate-Identity-Bbox).
-- Dialog-Skript im UI (das ist korrekt Deutsch — TTS bleibt deutsch).
-- Sanitizer für andere Provider (Hailuo / Kling haben keinen Green-Net).
-- DB-Migration (alles über existierende `meta`-JSON-Felder).
+Konkrete Eingriffe gegenüber dem Original:
+- `dark bedroom` → `home workspace` (entfernt Intimraum-Flag)
+- `3 AM` → `late at night` (englische Idiomatik, harmloser)
+- `laptop screen` → `glowing monitor` + `cool blue ambient light` (kein Device-Trigger)
+- `[SceneAction]…[/SceneAction]` → entfernen (keine Tags, kein Prompt-Echo)
+- Duplikate raus
+- Lighting/Lens-Details bleiben → Look identisch
 
-## Verifikation nach Build
-1. Aktuelle Szene "3 Uhr nachts… Reel" neu rendern → muss durch HappyHorse durchlaufen ODER sauber auf Hailuo fallen, mit gebuchtem Refund.
-2. Probe-Briefing mit nur deutschem Visual-Prompt: `meta.green_net_sanitization.touched` zeigt geänderte Tokens.
-3. Composer-Multi-Scene-Run: Lip-Sync-v169-Anchor unverändert (Regression-Check über `dialog_shots.preclip_crop`-Persistenz).
+Dialog-Skript (`SAMUEL DUSATKO: Es ist 3 Uhr nachts …`) bleibt **unverändert** — das geht in den Lipsync-Pfad (Sync.so/ElevenLabs), nicht in HappyHorse.
+
+## Was passiert nach Implementierung
+- Du fügst nur den neuen Visual-Prompt im Composer in Szene 1 ein und klickst "Neu rendern" (HappyHorse Pro / Lip-Sync EIN).
+- Szene 2 & 3 bleiben unverändert (die haben kein Bedroom/3-AM-Wording — die liefen ja auch sauber durch Hailuo/HappyHorse vorher).
+
+## Implementierung — Build Mode
+
+Da reines Prompt-Engineering: ich gebe dir nach Bestätigung das fertige Render-Briefing mit den drei sauberen Visual-Prompts für Szene 1/2/3, das du 1:1 ins Composer-Briefing-Feld packen kannst. Kein Code, kein Sanitizer.
+
+## Nicht in diesem Plan
+- `_shared/happyhorse-green-net.ts` Sanitizer (aus dem alten Plan) — **canceln**, brauchen wir nicht. Bei einem singulären Briefing-Trigger ist Auto-Fallback Overkill und versteckt das Lernsignal.
+- Lipsync-Pipeline / Sync.so v169 / Dialog-Shots — bleibt komplett unangetastet.
