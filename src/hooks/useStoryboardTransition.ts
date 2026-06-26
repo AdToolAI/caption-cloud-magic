@@ -198,13 +198,22 @@ export function useStoryboardTransition({
     stopProgress();
     progressTimerRef.current = window.setInterval(() => {
       setState((s) => {
-        // Cap at 95% until the real response lands.
+        // Cap at 70% until the real response lands.
         const next = Math.min(s.progress + (s.progress < 50 ? 1.1 : 0.35), 70);
         const phase: Phase = next < 60 ? 'A' : 'B';
+        // Briefing-Intelligence v2 — 4 inhaltliche Schritte:
+        //   0–20%  Briefing-Modus erkennen (Storytelling/Brand/Produkt/…)
+        //   20–45% Research & Wissens-Anreicherung (KI füllt Lücken)
+        //   45–65% Strukturextraktion (Szenen, VO, Cast)
+        //   65–95% Cast & Locations gegen deine Library auflösen
         const phaseLabel =
-          phase === 'A'
-            ? 'Pass A · Strukturextraktion (Tabellen, VO-Skript, Cast)'
-            : 'Pass B · Cast & Locations gegen Library auflösen';
+          next < 20
+            ? 'Schritt 1/4 · Briefing-Modus erkennen'
+            : next < 45
+              ? 'Schritt 2/4 · Research & Wissens-Anreicherung (KI füllt Lücken)'
+              : next < 65
+                ? 'Schritt 3/4 · Strukturextraktion (Szenen, VO, Cast)'
+                : 'Schritt 4/4 · Cast & Locations gegen Library auflösen';
         return { ...s, progress: next, phase, phaseLabel };
       });
     }, 700);
@@ -248,7 +257,7 @@ export function useStoryboardTransition({
       warRoomOpen: true,
       phase: 'A',
       progress: 2,
-      phaseLabel: 'Pass A · Strukturextraktion startet …',
+      phaseLabel: 'Schritt 1/4 · Briefing-Modus erkennen …',
       planSheetOpen: false,
       initialPlan: null,
     });
