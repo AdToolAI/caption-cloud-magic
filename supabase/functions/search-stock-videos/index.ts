@@ -3,11 +3,12 @@
 // 24h cache via stock_video_cache table.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { isQaMockRequest } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
 interface VideoFile {
