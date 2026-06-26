@@ -126,6 +126,7 @@ const Locations = lazy(() => import("./pages/Locations"));
 const Library = lazy(() => import("./pages/Library"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const RenderQueue = lazy(() => import("./pages/RenderQueue"));
+const CreatorLibrary = lazy(() => import("./pages/CreatorLibrary"));
 const EmailDirector = lazy(() => import("./pages/EmailDirector"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
 const MotionStudioHub = lazy(() => import("./pages/MotionStudio/Hub"));
@@ -300,7 +301,8 @@ function AppLayout() {
            <Route path="/sora-long-form" element={<Navigate to="/video-composer" replace />} />
            <Route path="/video-composer" element={<VideoComposer />} />
            <Route path="/queue" element={<ProtectedRoute><RenderQueue /></ProtectedRoute>} />
-           <Route path="/render-queue" element={<Navigate to="/queue" replace />} />
+            <Route path="/render-queue" element={<Navigate to="/queue" replace />} />
+            <Route path="/creator-library" element={<ProtectedRoute><CreatorLibrary /></ProtectedRoute>} />
            <Route path="/email-director" element={<ProtectedRoute><EmailDirector /></ProtectedRoute>} />
            <Route path="/motion-studio" element={<MotionStudioHub />} />
            <Route path="/motion-studio/studio" element={<MotionStudioStudioMode />} />
