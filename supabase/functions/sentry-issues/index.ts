@@ -3,6 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const SENTRY_AUTH_TOKEN = Deno.env.get('SENTRY_AUTH_TOKEN');
 const SENTRY_ORG_SLUG = Deno.env.get('SENTRY_ORG_SLUG');
@@ -30,6 +31,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "sentry-issues" });
+
 
   try {
     if (!SENTRY_AUTH_TOKEN || !SENTRY_ORG_SLUG || !SENTRY_PROJECT_SLUG) {

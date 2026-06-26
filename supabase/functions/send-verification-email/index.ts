@@ -7,6 +7,7 @@ import {
 } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -59,6 +60,8 @@ const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "send-verification-email" });
+
 
   try {
     const { email, userId, language: bodyLang, appUrl: bodyAppUrl }: SendVerificationRequest = await req.json();

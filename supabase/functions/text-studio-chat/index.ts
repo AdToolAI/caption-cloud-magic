@@ -3,6 +3,7 @@
 // Streams OpenAI-compatible SSE deltas to the client (uniform parser on frontend).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +38,9 @@ function jsonResponse(body: unknown, status = 200) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "text-studio-chat" });
+
 
   try {
     const authHeader = req.headers.get("Authorization");

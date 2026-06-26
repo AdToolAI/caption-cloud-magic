@@ -1,3 +1,4 @@
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 // Streams a remote video through this edge function with permissive CORS so
 // that the browser can decode it into a tainted-free <video>/<canvas> for
 // client-side scene detection. Only used when the original host (e.g. the
@@ -32,6 +33,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "proxy-video-bytes" });
+
 
   const url = new URL(req.url);
   const target = url.searchParams.get('url');

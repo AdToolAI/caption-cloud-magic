@@ -3,6 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-qa-mock',
 };
 import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 interface RequestBody {
   campaignId: string;
@@ -13,6 +14,9 @@ interface RequestBody {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "send-email-campaign-test" });
+
 
   try {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');

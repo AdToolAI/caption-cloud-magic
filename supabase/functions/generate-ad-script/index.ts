@@ -1,3 +1,4 @@
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 // supabase/functions/generate-ad-script/index.ts
 // Generates per-beat ad copy lines for the Ad Director Mode.
 // Uses Lovable AI Gateway (LOVABLE_API_KEY) — no external secret required.
@@ -135,6 +136,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "generate-ad-script" });
+
 
   try {
     const body = await req.json();

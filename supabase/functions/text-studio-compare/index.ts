@@ -2,6 +2,7 @@
 // Calls all 3 models in parallel (non-streaming) and returns aggregated results.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -114,6 +115,9 @@ async function callModel(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "text-studio-compare" });
+
 
   try {
     const authHeader = req.headers.get("Authorization");

@@ -3,6 +3,7 @@
 // Otherwise we create a placeholder row with invited_email so the owner can reshare later.
 
 import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,9 @@ interface RequestBody {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "invite-composer-collaborator" });
+
 
   try {
     const authHeader = req.headers.get('Authorization');

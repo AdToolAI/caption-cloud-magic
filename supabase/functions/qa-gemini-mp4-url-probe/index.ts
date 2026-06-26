@@ -7,6 +7,7 @@
 // No DB writes, no cache, no credit refunds. One-shot diagnostic.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -121,6 +122,9 @@ async function fetchAsBase64(url: string, maxBytes = 18 * 1024 * 1024): Promise<
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-gemini-mp4-url-probe" });
+
 
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) {

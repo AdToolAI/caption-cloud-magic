@@ -3,6 +3,7 @@ import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sendEmail } from "../_shared/email-send.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +33,8 @@ serve(withTelemetry('stripe-webhook', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "stripe-webhook" });
+
 
   try {
     const signature = req.headers.get('stripe-signature');

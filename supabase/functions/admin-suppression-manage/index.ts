@@ -2,6 +2,7 @@
 // Requires the caller to have the 'admin' role (checked via has_role RPC).
 
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +21,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "admin-suppression-manage" });
+
 
   try {
     const authHeader = req.headers.get("Authorization");

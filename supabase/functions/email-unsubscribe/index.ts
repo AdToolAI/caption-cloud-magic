@@ -7,6 +7,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { generateUnsubscribeToken, suppressEmail } from "../_shared/email-send.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,6 +46,9 @@ function page(title: string, message: string, status = 200): Response {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "email-unsubscribe" });
+
 
   const url = new URL(req.url);
   const email = (url.searchParams.get("email") || "").trim().toLowerCase();

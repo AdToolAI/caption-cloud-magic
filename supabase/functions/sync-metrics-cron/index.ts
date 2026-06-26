@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { recordHeartbeat } from '../_shared/heartbeat.ts';
 import { withSentryCron } from '../_shared/sentryCron.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,8 @@ Deno.serve(withSentryCron('sync-metrics-cron', { schedule: '0 * * * *', maxRunti
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "sync-metrics-cron" });
+
 
   const hbStart = Date.now();
   try {

@@ -1,32 +1,53 @@
+## Ziel
 
-## Problem
+Smoke-Coverage von 181 → **473/473** Edge Functions hochziehen und Kategorien mit >30 Einträgen aufsplitten, damit kein Rate-Limit mehr triggert.
 
-Die Smoke Matrix UI zeigt pro Kategorie viel zu wenige Functions (Social Publishing: 1 statt 20, Audio/Music: 5 statt 38). Insgesamt nur ~29 statt 182.
+## Wave B3 — Restliche ~292 Functions patchen
 
-## Ursache
+Bulk-Patcher (`/tmp/patch_b3.py`) läuft über alle noch ungepatchten Functions in `supabase/functions/*/index.ts` (Diff gegen aktuelles `smokeRegistry.ts`). Pro Function:
 
-`_shared/smokeRegistry.ts` enthält lokal bereits alle 182 Einträge (verifiziert: 20 social-publishing, 38 audio-music-sfx, 19 briefing-composer, 14 analytics, 35 admin-cron …). Die Edge Function `smoke-matrix-run` importiert dieses Shared-File aber zur **Deploy-Zeit** als Bundle. Da `smoke-matrix-run` selbst seit dem Registry-Wachstum nicht erneut deployed wurde, läuft im Cloud noch die alte 75er-Version.
+1. `isQaMockRequest` Import direkt nach den bestehenden Imports einfügen
+2. Mock-Guard direkt nach dem `OPTIONS`-Handler (Block- oder Single-Line-Form) injizieren
+3. Kind auto-erkennen aus dem Function-Namen (`-video` → video, `-image`/`-portrait` → image, `-audio`/`-voice`/`-tts` → audio, `-music` → music, sonst JSON)
 
-Die 106 frisch deployten Provider-Functions sind korrekt oben — sie werden nur nicht aufgerufen, weil der Runner sie nicht kennt.
+Registry-Generator (`/tmp/gen_registry_b3.py`) hängt die neuen Einträge mit passender Kategorie an `_shared/smokeRegistry.ts` an.
 
-## Fix
+## Kategorie-Split (Hard-Cap 25 pro Kategorie)
 
-Einzig nötiger Schritt:
+Aktuell zu groß: `audio-music-sfx` (38), `admin-cron` (35+), und nach B3 zusätzlich vermutlich `composer-render`, `social-publishing`, `ai-gateway`. Split-Regeln:
 
-1. **Re-deploy `smoke-matrix-run`** über `supabase--deploy_edge_functions`. Das bundelt `_shared/smokeRegistry.ts` neu mit allen 182 Einträgen.
+| Bisher | Neu (jeweils ≤25) |
+|---|---|
+| `audio-music-sfx` (38) | `audio-voice` · `audio-music` · `audio-sfx` |
+| `admin-cron` (35+) | `admin-ops` · `cron-jobs` · `health-monitoring` |
+| `briefing-composer` (19) | bleibt, evtl. `briefing-analysis` · `composer-scenes` falls B3 sprengt |
+| `social-publishing` (20+) | `social-meta` · `social-tiktok-x` · `social-google-other` falls >25 |
+| Neu groß: `video-providers` | `video-providers-premium` · `video-providers-standard` |
+| Neu groß: `image-providers` | bleibt wenn ≤25, sonst Split nach Anbieter |
 
-Keine Code-Änderung nötig.
+Hard-Cap-Regel ab jetzt im Memory: **Keine Kategorie >25 Functions** → garantiert unter Supabase Burst-Limit von 6/Sek × 4 Batches.
+
+## Runner-Anpassung
+
+`smoke-matrix-run` & `FunctionMatrixTab.tsx` lesen Kategorien dynamisch aus dem Registry — keine harte Liste nötig. Nach dem Split erscheinen die neuen Kategorien automatisch im Dropdown. Sequential-Sweep läuft wie gehabt Kategorie-für-Kategorie mit 400ms Stagger + 429-Retry.
+
+## Deployment
+
+1. Bulk-Patch der ~292 Functions
+2. Registry-Update mit Kategorie-Split-Mapping  
+3. Deploy aller gepatchten Functions (in 4–6 Batches à ~60 Functions wegen Deploy-Limit)
+4. **Re-Deploy `smoke-matrix-run`** (bundelt neues Registry)
+5. Verifikation: Dropdown im Cockpit muss alle neuen Kategorien zeigen, Gesamt = 473
 
 ## Verifikation
 
-Nach Deploy im Cockpit:
-- Dropdown "Social Publishing" → "Sweep starten" sollte 20 Functions zeigen
-- "Audio / Music / SFX" sollte 38 Functions zeigen
-- "Briefing & Composer" sollte 19 zeigen
-- "Alle Kategorien sequentiell" Gesamt ≈ 182
+User testet Kategorien einzeln im Cockpit. Erwartung:
+- Jede Kategorie ≤25 Functions
+- Keine `Rate limit exceeded` Fehler mehr
+- Gesamt-Coverage = 473/473
 
-Falls einzelne neu gepatchte Functions failen → das ist erwartete Wave-B-Fehlersuche, separat zu behandeln.
+Fehlschläge einzelner Functions = normales Wave-B-Debugging, separat behandelt.
 
-## Hinweis für künftige Waves
+## Hinweis
 
-Jede Änderung an `_shared/smokeRegistry.ts` muss zwingend von einem Re-Deploy von `smoke-matrix-run` begleitet werden, sonst läuft der Cloud-Runner mit einer veralteten Bundled-Kopie. Werde ich ab jetzt automatisch mit-deployen.
+Memory-Eintrag wird erweitert: "Jede neue Function muss kategorisiert werden, Hard-Cap 25 pro Kategorie, sonst Split."

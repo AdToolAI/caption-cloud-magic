@@ -5,6 +5,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 import { renderDripEmail, isSupportedLang } from "../_shared/drip-templates/index.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,6 +136,9 @@ async function sendOneDrip(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "process-drip-emails" });
+
 
   const url = new URL(req.url);
   const dryRun = url.searchParams.get("dry_run") === "true";

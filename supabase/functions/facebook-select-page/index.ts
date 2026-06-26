@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { encryptToken } from '../_shared/crypto.ts';
 import { verifyPageInstagramLink } from '../_shared/meta-page-discovery.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +12,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "facebook-select-page" });
+
 
   try {
     const authHeader = req.headers.get('Authorization');

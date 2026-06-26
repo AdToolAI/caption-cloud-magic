@@ -1,6 +1,7 @@
 // Posting Times API - Returns optimal posting times based on historical data or industry benchmarks
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { getRedisCache } from '../_shared/redis-cache.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -329,6 +330,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "posting-times-api" });
+
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

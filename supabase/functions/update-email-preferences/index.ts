@@ -5,6 +5,7 @@
 // Supports both drip_emails_enabled and reminder_pushes_enabled
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,6 +37,9 @@ async function setPushEnabled(admin: any, userId: string, value: boolean) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "update-email-preferences" });
+
 
   try {
     const body = await req.json().catch(() => ({}));

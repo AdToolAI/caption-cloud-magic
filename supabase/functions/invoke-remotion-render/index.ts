@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics, type NormalizedStartPayload } from "../_shared/remotion-payload.ts";
 import { getLambdaFunctionName, AWS_REGION } from "../_shared/aws-lambda.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "invoke-remotion-render" });
+
 
   try {
     const { lambdaPayload, pendingRenderId, userId, progressId } = await req.json();

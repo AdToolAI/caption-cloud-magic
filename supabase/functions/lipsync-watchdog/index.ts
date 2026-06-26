@@ -25,6 +25,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -163,6 +164,9 @@ async function pollAndForward(opts: {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
+
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

@@ -3,6 +3,7 @@
 // Idempotent — skips generation if cache already exists, unless force=true.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.0";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +36,9 @@ const FALLBACK_PROMPTS: Record<string, PromptItem[]> = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
+
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

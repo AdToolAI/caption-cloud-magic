@@ -4,6 +4,7 @@
 // to the user's wallet via the existing `refund-credits` function, then
 // removes the consumed entry from the stack.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,9 @@ interface UndoRow {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "composer-undo" });
+
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

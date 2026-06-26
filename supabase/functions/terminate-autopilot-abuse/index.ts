@@ -1,6 +1,7 @@
 // Terminates an account on Critical-Strike: archives data, locks autopilot, signs out, marks profile.
 // Hard-deletion runs separately after retention period; this function is the immediate termination trigger.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,9 @@ interface Body {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "terminate-autopilot-abuse" });
+
   try {
     // SECURITY: server-to-server only. Reject anything that doesn't carry the
     // SUPABASE_SERVICE_ROLE_KEY in the Authorization header.

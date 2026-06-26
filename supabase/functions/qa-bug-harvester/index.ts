@@ -13,6 +13,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
 import { recordHeartbeat } from '../_shared/heartbeat.ts';
 import { withSentryCron } from '../_shared/sentryCron.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,6 +74,8 @@ Deno.serve(withSentryCron('qa-bug-harvester', { schedule: '*/15 * * * *', maxRun
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-bug-harvester" });
+
 
   const hbStart = Date.now();
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);

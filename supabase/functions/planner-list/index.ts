@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { getRedisCache } from '../_shared/redis-cache.ts';
 import { getSupabaseClient } from '../_shared/db-client.ts';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 // PostHog tracking (fire-and-forget, non-blocking)
 function trackEvent(eventName: string, properties: Record<string, any>): void {
@@ -33,6 +34,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "planner-list" });
+
 
   try {
     console.log('[planner-list] Version: Phase3.1-Fix (2025-11-13)');

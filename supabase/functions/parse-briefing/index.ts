@@ -11,6 +11,7 @@
 // Costs ~Lovable-AI Flash tokens; NO credits are deducted here.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -204,6 +205,9 @@ async function callGateway(briefing: string, model: string) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "parse-briefing" });
+
 
   try {
     // Auth (verify_jwt is on by default for new functions in this project, but
