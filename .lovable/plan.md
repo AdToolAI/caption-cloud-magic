@@ -1,53 +1,41 @@
-## Plan: Drift Auto-Fix + Hormozi-Captions
 
-Zwei unabhängige Features, nacheinander ausgeliefert. Keine Eingriffe in die Lip-Sync-Pipeline.
+## Ziel
+26/29 → 29/29 grün. Die drei Fails sind **keine echten Bugs**, sondern reine Smoke-Mock-Lücken — die Functions wurden noch nicht in den `x-qa-mock`-Pfad eingebunden.
 
----
+## Root-Cause pro Fail
 
-### Feature 1 — Drift Auto-Fix (Briefing-Loop schließen)
+| Function | Fehler | Ursache |
+|---|---|---|
+| `analyze-image-v2` | 401 Unauthorized | Ruft `supabase.auth.getUser()` mit dem Anon-Header des Sweep-Callers → kein echter User → 401. Hat zwar `x-qa-mock` in CORS, aber **kein Short-Circuit** im Handler. |
+| `search-stock-videos` | 401 Unauthorized | Gleiche Mechanik (User-Check vor Mock-Pfad), und `x-qa-mock` fehlt sogar in CORS. |
+| `extract-subtitle-keywords` | 500 `extraction_failed` „No ob[ject generated]" | Geht direkt zum Lovable-AI-Gateway (Gemini structured output) — kein `qaMock`-Pfad. Wenn das Gateway im Sweep-Kontext kein valides Object liefert, schlägt es hart fehl. |
 
-**Ziel:** Die bestehende `DriftReportPanel`-Card bekommt einen "Storyboard angleichen"-Button, der safe Felder automatisch vom `ProductionPlan` in die `composer_scenes` schreibt.
+## Fix (3 kleine, gleichartige Patches)
 
-**Safe-Liste (auto-fixable):**
-- `durationSeconds` (sofern Provider die Dauer unterstützt — sonst skip mit Hinweis)
-- `voiceoverText` (nur wenn Szenenfeld leer ist; bestehender Text wird NIE überschrieben)
-- `aiPrompt` (nur wenn leer oder < 8 Zeichen)
+In jeder der drei Edge-Functions ganz am Anfang des Handlers (direkt nach dem OPTIONS-Return) den standardisierten Mock-Guard einbauen:
 
-**Hard-Excluded (niemals auto-fix):**
-- Lip-Sync-Engine, `dialogMode`, `dialog_shots`, `syncso_*`
-- Cast / `characterShots` / Anchor-Slots (Identity-Bridge bleibt unangetastet)
-- Scene-Count (Hinzufügen/Löschen von Szenen bleibt manuell)
+```ts
+import { isQaMockRequest, qaMockResponse } from '../_shared/qaMock.ts';
+…
+if (isQaMockRequest(req)) {
+  return qaMockResponse({ /* function-spezifischer Sample-Body */ });
+}
+```
 
-**Implementierung:**
-- Neu: `src/lib/video-composer/briefing/driftAutoFix.ts` — pure Builder, gibt `{ updates: Partial<ComposerScene>[], skipped: DriftFinding[] }` zurück.
-- `DriftReportPanel.tsx`: Button "Safe Auto-Fix anwenden" (nur sichtbar wenn ≥1 auto-fixable Finding); Bestätigungs-Dialog mit Diff-Vorschau (vorher/nachher), schreibt via existierendem Composer-Scene-Update-Hook, persistiert Audit-Eintrag in `composer_plan_drift_reports` (`auto_fix_applied_at`, `fixed_fields[]`).
-- Findings, die nicht in der Safe-Liste sind, bleiben sichtbar mit Label „manuell prüfen".
+Function-spezifische Mock-Payloads:
 
----
+- **extract-subtitle-keywords** → `{ results: [{ id: '1', keywords: ['test'] }] }`
+- **search-stock-videos** → `{ ok: true, videos: [], total: 0, source: 'mock' }`
+- **analyze-image-v2** → `{ ok: true, quality: { resolution:{width:1920,height:1080}, aspectRatio:'16:9', fileSize:0, qualityScore:90, issues:[] }, crops:{square:'',portrait:'',story:''} }`
 
-### Feature 2 — Hormozi-Style Captions
+Zusätzlich bei `search-stock-videos` `x-qa-mock` in den CORS-Allow-Headers ergänzen (analog zu `analyze-image-v2`).
 
-**Ziel:** Word-by-Word animierte Untertitel mit Keyword-Highlights als optionaler Caption-Style im Director's Cut Export. Eigenständiges Feature, keine Composer-Pipeline-Änderung.
+## Verifikation
+1. Functions deployen.
+2. Im QA-Cockpit erneut „Sweep starten".
+3. Erwartung: **29/29 Pass**, keine 401/500 mehr in Briefing, Misc und Picture/Image.
 
-**Scope:**
-- Neuer Caption-Style „Hormozi" in der bestehenden Subtitle-Library (zusätzlich zu aktuellen Stilen).
-- Word-Level Timing: bereits vorhanden über ElevenLabs/Whisper-Output (`word_timestamps`); falls nur Satz-Timing existiert → linear über Wortanzahl interpolieren (Fallback).
-- Renderer: neue Remotion-Komponente `HormoziCaption.tsx` unter `src/remotion/components/` — Pop-In-Scale + Highlight-Box für Keywords, max 3 Wörter pro Frame.
-- Keyword-Detection: Lovable-AI-Call (Gemini Flash) extrahiert 1–3 Power-Words pro Satz → in DB-Feld `subtitle_keywords` cached pro Clip.
-- UI: Style-Switcher in `DirectorsCut` Subtitle-Panel — Toggle „Hormozi-Mode" + Farbpicker für Highlight (Default: Gold #F5C76A).
-- Burned-in: läuft über die existierende Subtitle-Hard-Crop-Pipeline (Memory: Burned-in Subtitle Reframe) — keine Änderungen nötig.
-
-**Edge Function:** `extract-subtitle-keywords` (Lovable AI Gateway, Gemini 3 Flash, structured output) — Input: Subtitle-Array; Output: pro Subtitle `{ keywords: string[] }`. Caching in `translation_cache`-Style Tabelle wiederverwendbar.
-
----
-
-### Reihenfolge
-1. Drift Auto-Fix (klein, ~1 Session) — schließt offenen Loop sofort.
-2. Hormozi-Captions (mittel, ~2 Sessions) — eigenständiges Conversion-Feature für Solo-Creator.
-
-### Out of Scope
-- Magic Mode (durch Briefing Intelligence v2 abgedeckt — gestrichen)
-- Skit-Templates (redundant — gestrichen)
-- Auto-Fix für Cast/Lip-Sync (Pipeline-Schutz)
-
-Soll ich so loslegen?
+## Nicht im Scope
+- Keine Änderungen an Produktions-Logik der drei Functions.
+- Keine Registry-Body-Anpassungen nötig (Bodies sind valide).
+- Wave B (weitere ~250 Functions) bleibt separates Paket.

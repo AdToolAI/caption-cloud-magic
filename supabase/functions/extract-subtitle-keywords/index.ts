@@ -8,6 +8,7 @@
  * so the renderer always has a safe shape.
  */
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { isQaMockRequest } from '../_shared/qaMock.ts';
 import { createOpenAICompatible } from 'npm:@ai-sdk/openai-compatible';
 import { generateText, Output } from 'npm:ai';
 import { z } from 'npm:zod';
@@ -22,6 +23,14 @@ const ReqSchema = z.object({
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  if (isQaMockRequest(req)) {
+    return new Response(
+      JSON.stringify({ mock: true, results: [{ id: '1', keywords: ['test'] }] }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
 
   const key = Deno.env.get('LOVABLE_API_KEY');
   if (!key) {
