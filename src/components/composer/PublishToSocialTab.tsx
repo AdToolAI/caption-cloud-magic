@@ -111,26 +111,53 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
         </div>
       </Card>
 
-      {selectedPlatforms.length > 0 && <PlatformOptimizationHelper platform={selectedPlatforms[0]} videoUrl={videoUrl} caption={caption} />}
-
-      <Card className="p-6 space-y-4">
-        <div>
-          <Label htmlFor="title">{t('composer.titleYoutube')}</Label>
-          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('composer.titleYoutubePlaceholder')} maxLength={100} />
-        </div>
-        <div>
-          <Label htmlFor="caption">Caption</Label>
-          <Textarea id="caption" value={caption} onChange={(e) => setCaption(e.target.value)} placeholder={t('composer.captionPlaceholder')} rows={4} />
-        </div>
-        <div>
-          <Label htmlFor="description">{t('composer.descYoutube')}</Label>
-          <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('composer.descYoutubePlaceholder')} rows={3} />
-        </div>
-        <div>
-          <Label htmlFor="hashtags">Hashtags</Label>
-          <Input id="hashtags" value={hashtags} onChange={(e) => setHashtags(e.target.value)} placeholder="#hashtag1 #hashtag2 #hashtag3" />
+      {/* Cross-Post Magic toggle */}
+      <Card className="p-4 border-[#F5C76A]/30 bg-gradient-to-r from-[#1a1208]/40 via-black/30 to-[#1a1208]/40">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-9 w-9 place-items-center rounded-md bg-gradient-to-br from-[#F5C76A] to-[#b8862f] text-black">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-white">Cross-Post Magic</div>
+              <div className="text-xs text-muted-foreground">KI-optimierte Caption pro Plattform · 1 Klick veröffentlichen</div>
+            </div>
+          </div>
+          <Switch checked={magicMode} onCheckedChange={setMagicMode} />
         </div>
       </Card>
+
+      {magicMode ? (
+        <CrossPostMagicPanel
+          videoId={videoId}
+          videoUrl={videoUrl}
+          briefingPlan={briefingPlan}
+          briefingText={briefingText}
+          language={language}
+          selectedChannels={selectedPlatforms}
+          onPublishAll={handleMagicPublishAll}
+          publishing={isPublishing}
+        />
+      ) : (
+        <Card className="p-6 space-y-4">
+          <div>
+            <Label htmlFor="title">{t('composer.titleYoutube')}</Label>
+            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('composer.titleYoutubePlaceholder')} maxLength={100} />
+          </div>
+          <div>
+            <Label htmlFor="caption">Caption</Label>
+            <Textarea id="caption" value={caption} onChange={(e) => setCaption(e.target.value)} placeholder={t('composer.captionPlaceholder')} rows={4} />
+          </div>
+          <div>
+            <Label htmlFor="description">{t('composer.descYoutube')}</Label>
+            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('composer.descYoutubePlaceholder')} rows={3} />
+          </div>
+          <div>
+            <Label htmlFor="hashtags">Hashtags</Label>
+            <Input id="hashtags" value={hashtags} onChange={(e) => setHashtags(e.target.value)} placeholder="#hashtag1 #hashtag2 #hashtag3" />
+          </div>
+        </Card>
+      )}
 
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">{t('composer.publication')}</h3>
