@@ -1,63 +1,73 @@
-## Diagnose
+## Ziel
+Alle aktuell ignorierten Felder aus dem Production Plan sauber ins Storyboard durchreichen und über `driftDetector` verifizierbar machen. Lipsync-Pipeline bleibt unangetastet (kein Eingriff in `dialog_shots`, `syncso_*`, `dialogLockedAt`, `lockReferenceUrl`, Apply-Schutzfilter).
 
-Die Auto-Analyse ist beim "3 Uhr nachts"-Briefing in den **Local-Fallback-Plan** gekippt (Toast: „Analyse offline"). Belege:
+## Lücken die geschlossen werden
 
-- Letzter DB-Eintrag in `composer_production_plans` ist vom **23.06.** (founder-avatar), kein neuer für „3 Uhr nachts" → das deep-parse Ergebnis ist nie persistiert worden → Fallback wurde benutzt.
-- Der Local-Fallback (`buildLocalFallbackPlan` in `src/hooks/useStoryboardTransition.ts`) erzeugt zwar `shotDirector` + `performance` + `musicCue` korrekt, **lässt aber `voiceover.text` und `dialogTurns` komplett leer** und setzt `anchorPromptEN` auf generisches `"Hook beat for AdTool AI: …"`.
-- In `useApplyProductionPlan.planSceneToComposerScene` wird `dialogScript` nur befüllt wenn `dialogTurns` ODER `voiceover.text` existiert → bei Fallback bleibt `dialogScript = undefined` → das Studio zeigt seine Default-Zeile **„Samuel Dusatko: Hi, willkommen!"**.
-- Shot-Director-Felder (Framing/Angle/Movement/Lighting) **werden** an die Szene geschrieben — sind aber in der ProductionPlanSheet-/SceneCard-Übersicht aktuell schwer zu verifizieren ohne jede Szene einzeln zu öffnen.
+| # | Plan-Feld | Heute | Neu |
+|---|-----------|-------|-----|
+| 1 | `transition` (type+duration) | hart `crossfade`/0.4s | Plan-Wert übernehmen, Fallback bleibt crossfade |
+| 2 | `textOverlay` (text/position/animation/fontSize/color) | leerer Default | Plan-Wert übernehmen |
+| 3 | `tone` (scene-level) | nur `briefing.tone` | scene-tone gewinnt, briefing-tone als Fallback |
+| 4 | `actionBeat` (character/environment/intensity) | Heuristik aus anchorEN | explizite Plan-Felder gewinnen, Heuristik nur Fallback |
+| 5 | `seed` / `seedVariations` | ignoriert | direkt durchreichen |
+| 6 | 2. Cast-Member `shotType` | hardcoded `profile` | pro Cast-Eintrag eigenes `shotType` im Plan + Mapping |
 
-Also zwei reale Probleme:
-1. **Drehbuch fehlt** → Fallback überträgt das im Briefing **explizit ausgeschriebene** Skript nicht.
-2. **Sichtbarkeit** → Du musst jede Szene aufklappen um zu sehen ob Kamera/Licht/Performance wirklich angekommen sind.
+## Änderungen
 
-## Plan
+### 1. Schema-Erweiterung (`src/lib/video-composer/briefing/productionPlan.ts`)
+- `TPlanScene` bekommt optionale Felder:
+  - `transition?: { type: 'crossfade'|'fade'|'cut'|'slide'|'wipe'|'zoom'|'blur'|'push'; durationSec?: number }`
+  - `textOverlay?: { text: string; position?: 'top'|'middle'|'bottom'; animation?: string; fontSizePx?: number; color?: string }`
+  - `tone?: string`
+  - `seed?: number`
+  - `seedVariations?: number[]`
+- `TPlanCast` bekommt `shotType?: CharacterShotType` (full|profile|back|detail|pov|silhouette)
+- Alle Felder optional → bestehende Pläne bleiben kompatibel.
 
-### 1. Fallback-Plan: Dialog aus dem Briefing extrahieren
-`src/hooks/useStoryboardTransition.ts → buildLocalFallbackPlan`:
-- Vor der Beat-Verteilung das Briefing nach **expliziten Dialog-Markern** scannen:
-  - Pattern A: `DIALOG (…): "…"` oder `DIALOG (DE, …): "…"`
-  - Pattern B: `SPRECHER: <Name>` gefolgt von `DIALOG …: "…"`
-  - Pattern C: `SZENE 1 … DIALOG … "…"` Block-Aware (eine Quote pro `SZENE n`)
-- Pro gefundener Szene `voiceover.text` setzen UND `lipSync: true` wenn ein Cast-Mention existiert.
-- Pro Szene zusätzlich aus dem Briefing-Block die **Shot-Hints** ziehen (`SHOT:`, `KAMERA:`, `EMOTION:`) und in `shotDirector` / `performance` / `anchorPromptEN` einfließen lassen statt generischer Beats.
-- Wenn weniger Dialog-Blöcke als Beats → bestehende generische Beats nur für ungedeckte Indexe nutzen.
+### 2. Pass-A Prompt (`supabase/functions/briefing-deep-parse/index.ts`)
+- JSON-Schema im System-Prompt um die neuen Felder erweitern, mit Beispielen.
+- Explizit dokumentieren: `transition` zwischen Szene n und n+1, `textOverlay.text` darf leer bleiben.
+- LANGUAGE LOCK bleibt unangetastet.
 
-### 2. Fallback transparent machen
-- Toast-Text: „Analyse offline — **Briefing-Dialog wurde extrahiert** und in den Plan übernommen. Vor Render prüfen." (statt „Basis-Plan")
-- Im `ProductionPlanSheet` Badge **„Local Fallback Plan"** rechts oben (gelb), wenn `plan._meta.source === 'local-fallback'`. Quelle in `buildLocalFallbackPlan` setzen.
+### 3. Apply-Mapping (`src/hooks/useApplyProductionPlan.ts → planSceneToComposerScene`)
+- `transitionType` / `transitionDuration` aus `ps.transition` (Fallback crossfade/0.4).
+- `textOverlay` aus `ps.textOverlay` (Fallback DEFAULT_TEXT_OVERLAY).
+- `realismPreset = realismFromTone(ps.tone ?? briefingTone)`.
+- `actionBeat`: wenn `ps.actionBeat` existiert → übernehmen; sonst aktuelle `splitAction` + `motionIntensityFromMusic` Heuristik.
+- `seed` / `seedVariations` direkt setzen.
+- `characterShots`-Builder: pro Cast-Eintrag `c.shotType ?? (i===0 ? primaryShot : 'profile')` — eliminiert Hardcode für 2. Sprecher.
 
-### 3. UI-Verifizierung pro Szene (in ProductionPlanSheet)
-Neue kompakte Status-Zeile pro Szene im Sheet:
-```
-S01  ✓ Skript  ✓ Cast  ✓ Voice  ✓ Shot-Director  ✓ Performance  ⚠ Music
-```
-- Grün ✓ wenn Feld gesetzt, gelb ⚠ wenn leer/Default, rot ✗ wenn als Pflicht für gewählte Engine nötig aber leer (z. B. `voice` bei `lipSync: true`).
-- Tooltip pro Chip mit dem Wert (z. B. „medium-close-up · eye-level · slow-push-in · soft-window").
-- Liest direkt aus `TPlanScene` — kein neuer Edge-Call.
+### 4. Drift-Checks (`src/lib/video-composer/briefing/driftDetector.ts`)
+Neue Checks (alle severity = `warning` außer 1+2 die `error` sind wenn Plan-Wert non-default):
+- `transition_not_applied` — plan hatte type, composer hat anderen type
+- `text_overlay_not_applied` — plan.textOverlay.text gesetzt, composer.textOverlay.text leer
+- `tone_not_applied` — plan.tone gesetzt, composer.realismPreset undefined
+- `action_beat_not_applied` — plan.actionBeat.characterAction gesetzt, composer.actionBeat.characterAction abweichend
+- `seed_not_applied` — plan.seed gesetzt, composer.seed null
+- `cast_shot_type_not_applied` — plan.cast[i].shotType abweichend von composer.characterShots[i].shotType
 
-### 4. Drift-Detection erweitern (sichtbar nach Apply)
-`src/lib/video-composer/briefing/driftDetector.ts`:
-- Zusätzlicher Check **`script_not_applied`**: wenn `plan.scene.voiceover.text` oder `dialogTurns` gesetzt war aber `composerScene.dialogScript` leer ist nach Apply.
-- Zusätzlicher Check **`shot_director_not_applied`**: wenn `plan.scene.shotDirector.*` gesetzt war aber `composerScene.shotDirector` leer.
-- Im `DriftReportPanel` ein Quick-Fix-Button „Felder erneut übernehmen" pro Szene (re-mapper auf Einzelszene).
+### 5. Verification Chips (`src/components/video-composer/briefing/ProductionPlanSheet.tsx`)
+Pro Szene 6 neue Mini-Chips dazu:
+`✓ Transition · ✓ Overlay · ✓ Tone · ✓ Beat · ✓ Seed · ✓ Cast-Shots`
+Tooltip zeigt jeweiligen Wert. Gleiche Mechanik wie bestehende Skript/Shot-Director-Chips.
 
-### 5. Watchdog für Late-Arrival
-Aktuell läuft das Late-Arrival-Refetch **nur bei AbortError**. Erweitern auf:
-- 504 Gateway Timeout
-- 502/503 (Edge cold start)
-So dass auch in diesen Fällen der echte Plan im Hintergrund nachgeladen wird und den Fallback ersetzt.
+### 6. Local-Fallback-Plan (`src/hooks/useStoryboardTransition.ts → buildLocalFallbackPlan`)
+Regex-Extraktion erweitern um:
+- `TRANSITION:` / `ÜBERGANG:` → `transition.type`
+- `OVERLAY:` / `TEXT:` → `textOverlay.text`
+- `TONE:` / `TON:` → `tone`
+- `SEED: <n>` → `seed`
+- `SHOT (sprecher2):` → 2. Cast-shotType
 
-## Out of scope (Lipsync-Safety)
-- Keine Änderungen an `compose-dialog-segments`, `sync-so-webhook`, `dialog_shots`, `composer_scenes.dialog_*`.
-- Keine Änderung am Apply-Guard für protected scenes.
-- Keine Änderung am Voice-Resolver / Cast-Resolver in `briefing-deep-parse`.
+## Außerhalb des Scopes (Lipsync-Safety)
+- Keine Änderung an `compose-dialog-segments`, `sync-so-webhook`, `dialog_shots`, `composer_scenes.dialog_*`, `dialogLockedAt`, `lockReferenceUrl`.
+- Keine Änderung am Apply-Schutzfilter (`isLocallyProtected` + DB-Probe).
+- Keine Änderung an Voice-/Cast-Resolver in `briefing-deep-parse` Pass B.
+- Keine Migration an `composer_scenes` — alle Felder existieren bereits (transition_type, transition_duration, text_overlay, seed, seed_variations).
 
 ## Verification
-1. Briefing „3 Uhr nachts" erneut ausführen mit getrenntem Netz → Fallback greift → Sheet zeigt:
-   - Badge „Local Fallback Plan"
-   - S01 mit Skript-Chip ✓, Tooltip enthält „Es ist 3 Uhr nachts. Und ich bearbeite… schon wieder… ein Reel."
-   - shotDirector-Chip ✓ („extreme-close-up · eye-level · static · laptop-glow")
-2. Apply → SceneCard S01 hat `dialogScript` korrekt vorbelegt, Shot-Director-Felder gesetzt.
-3. Drift-Panel zeigt 0 neue Findings.
-4. Mit funktionierender Analyse: Sheet-Badge zeigt **nicht** „Local Fallback".
+1. Test-Briefing mit allen 6 Feldern (Transition: slide, Overlay: "ENDE", Tone: dramatic, Seed: 42, 2 Sprecher unterschiedliche shotTypes).
+2. Deep-parse → Plan-Sheet zeigt alle 6 neuen Chips grün mit korrekten Werten.
+3. Apply → ProductionPlanSheet öffnet Drift-Panel: 0 Findings.
+4. SceneCard inspizieren: transitionType=slide, textOverlay.text="ENDE", seed=42, cast[1].shotType wie spezifiziert.
+5. Mit funktionierender Lipsync-Szene erneut: keine Regression auf dialog_shots / lock-Felder.
