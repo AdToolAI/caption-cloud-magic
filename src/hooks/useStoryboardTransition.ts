@@ -505,7 +505,8 @@ export function useStoryboardTransition({
         // running on the backend, retry once without a timeout and swap
         // the fallback plan when the real one arrives — but only while
         // the user is still viewing the (untouched) fallback sheet.
-        if (isAbort) {
+        // Also retry on 502/503/504 — the function is often still running.
+        if (isAbort || status === 504 || status === 502 || status === 503) {
           (async () => {
             try {
               const lateRes = await fetch(url, {
