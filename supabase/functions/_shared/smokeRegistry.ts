@@ -340,6 +340,9 @@ export const SMOKE_REGISTRY: SmokeEntry[] = [
   { name: "send-password-reset-email", category: "notifications-email", body: {}, expect: "any-2xx" },
   { name: "send-push-notification", category: "notifications-email", body: {}, expect: "any-2xx" },
   { name: "send-support-ticket", category: "notifications-email", body: {}, expect: "any-2xx" },
+  { name: "triage-support-ticket", category: "notifications-email", body: {}, expect: "any-2xx" },
+  { name: "notify-ticket-resolved", category: "notifications-email", body: {}, expect: "any-2xx" },
+
   { name: "send-verification-email", category: "notifications-email", body: {}, expect: "any-2xx" },
   { name: "update-email-preferences", category: "notifications-email", body: {}, expect: "any-2xx" },
   { name: "verify-email", category: "notifications-email", body: {}, expect: "any-2xx" },
