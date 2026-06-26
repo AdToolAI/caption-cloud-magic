@@ -23,15 +23,106 @@ import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
 
 /**
- * Build a deterministic 3-scene Hook/Reveal/CTA arc so the user is never
- * blocked when the AI gateway is unreachable. Mirrors the server-side
- * safety arc in briefing-deep-parse (lines 627-669).
+ * Build a deterministic Hook/Reveal/CTA arc so the user is never blocked
+ * when the AI gateway is unreachable. Mirrors the server-side safety arc
+ * in briefing-deep-parse but additionally **scans the raw briefing text**
+ * for explicit `SZENE N` / `DIALOG …: "…"` / `SHOT:` / `KAMERA:` blocks
+ * and lifts the user's actual values into the plan so the storyboard
+ * isn't reduced to generic placeholders.
  */
+type SceneHint = {
+  beat?: string;
+  dialog?: string;
+  shot?: string;
+  camera?: string;
+  emotion?: string;
+  framing?: string;
+  movement?: string;
+  lighting?: string;
+};
+
+const FRAMING_TOKENS: Array<[RegExp, string]> = [
+  [/extreme[-\s]?close[-\s]?up|ECU/i, 'extreme-close-up'],
+  [/close[-\s]?up|\bCU\b/i, 'close-up'],
+  [/medium[-\s]?close[-\s]?up|MCU/i, 'medium-close-up'],
+  [/medium[-\s]?shot|medium\b/i, 'medium'],
+  [/wide[-\s]?shot|extreme[-\s]?wide|establishing|wide\b/i, 'wide'],
+  [/over[-\s]?the[-\s]?shoulder|OTS/i, 'over-the-shoulder'],
+];
+const MOVEMENT_TOKENS: Array<[RegExp, string]> = [
+  [/static|statisch/i, 'static'],
+  [/push[-\s]?in|dolly[-\s]?in/i, 'slow-push-in'],
+  [/pull[-\s]?out|dolly[-\s]?out/i, 'slow-pull-out'],
+  [/pan/i, 'pan'],
+  [/track(ing)?/i, 'tracking'],
+  [/handheld|breathing/i, 'handheld'],
+];
+const LIGHTING_TOKENS: Array<[RegExp, string]> = [
+  [/laptop[-\s]?glow|monitor[-\s]?glow|screen[-\s]?glow/i, 'screen-glow'],
+  [/golden[-\s]?hour/i, 'golden-hour'],
+  [/window|tageslicht|natural[-\s]?light/i, 'soft-window'],
+  [/neon/i, 'neon'],
+  [/low[-\s]?key|dunkel|dark/i, 'low-key'],
+  [/high[-\s]?key|hell|bright/i, 'high-key'],
+];
+
+function classify(text: string | undefined, table: Array<[RegExp, string]>): string | undefined {
+  if (!text) return undefined;
+  for (const [re, v] of table) if (re.test(text)) return v;
+  return undefined;
+}
+
+/**
+ * Splits the briefing into SZENE-blocks and pulls out DIALOG / SHOT /
+ * KAMERA / EMOTION lines per block. Works on both German and English
+ * briefings; tolerant of whitespace and ASCII dashes.
+ */
+function extractSceneHints(briefingText: string): SceneHint[] {
+  if (!briefingText) return [];
+  // Split on "SZENE N" / "SCENE N" / "SZENE 1 —" markers.
+  const parts = briefingText.split(/(?:^|\n)\s*(?:SZENE|SCENE)\s+(\d+)\b/i);
+  // parts = [pre, '1', block1, '2', block2, ...]
+  const blocks: Array<{ idx: number; body: string }> = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const idx = Number(parts[i]);
+    const body = String(parts[i + 1] ?? '');
+    if (Number.isFinite(idx) && body) blocks.push({ idx, body });
+  }
+  if (blocks.length === 0) return [];
+
+  // Quoted dialog ("..." or „…" or “…”). First match wins per block.
+  const dialogRe = /DIALOG[^"„“]*["„“]([^"„“]+)["“”]/i;
+  const shotRe = /SHOT\s*:\s*([^\n]+)/i;
+  const camRe = /(?:KAMERA|CAMERA)\s*:\s*([^\n]+)/i;
+  const emoRe = /(?:EMOTION|MOOD)\s*:\s*([^\n]+)/i;
+  const beatRe = /(?:^|\n)\s*(?:—\s*)?(HOOK|REVEAL|PUNCHLINE|CTA|PROBLEM|PAIN|SOLUTION|LÖSUNG|DEMO|PROOF)\b/i;
+
+  return blocks
+    .sort((a, b) => a.idx - b.idx)
+    .map(({ body }) => {
+      const dialog = body.match(dialogRe)?.[1]?.trim();
+      const shot = body.match(shotRe)?.[1]?.trim();
+      const camera = body.match(camRe)?.[1]?.trim();
+      const emotion = body.match(emoRe)?.[1]?.trim();
+      const beat = body.match(beatRe)?.[1]?.trim();
+      const blob = `${shot ?? ''} ${camera ?? ''}`;
+      return {
+        beat,
+        dialog,
+        shot,
+        camera,
+        emotion,
+        framing: classify(blob, FRAMING_TOKENS),
+        movement: classify(blob, MOVEMENT_TOKENS),
+        lighting: classify(`${shot ?? ''} ${body}`, LIGHTING_TOKENS),
+      } as SceneHint;
+    });
+}
+
 function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
+  const hints = extractSceneHints(briefingText);
   const total = Number(briefing.duration) || 15;
-  const per = Math.max(3, Math.min(12, Math.round(total / 3)));
-  const mentionMatch = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i);
-  const firstMention = mentionMatch ? mentionMatch[0] : null;
+  const firstMention = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i)?.[0] ?? null;
   const firstChar = briefing.characters?.[0];
   const cast = firstMention
     ? [{
@@ -41,43 +132,71 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
         voiceId: null,
       }]
     : [];
-  const engine = firstMention ? 'cinematic-sync' as const : 'broll' as const;
-  const beats: Array<{ beat: string; framing: string; movement: string; energy: 'low' | 'mid' | 'high' }> = [
+
+  const defaultBeats: Array<{ beat: string; framing: string; movement: string; energy: 'low' | 'mid' | 'high' }> = [
     { beat: 'Hook',   framing: 'medium-close-up', movement: 'slow-push-in', energy: 'high' },
     { beat: 'Reveal', framing: 'wide',            movement: 'tracking',     energy: 'mid'  },
     { beat: 'CTA',    framing: 'medium',          movement: 'static',       energy: 'high' },
   ];
+
+  const sceneCount = Math.max(hints.length, defaultBeats.length);
+  const per = Math.max(3, Math.min(12, Math.round(total / sceneCount)));
+
+  const hasDialogAnywhere = hints.some((h) => !!h.dialog);
+
+  const scenes = Array.from({ length: sceneCount }).map((_, i) => {
+    const h = hints[i];
+    const fallback = defaultBeats[i] ?? defaultBeats[defaultBeats.length - 1];
+    const beatLabel = h?.beat ?? fallback.beat;
+    const framing = h?.framing ?? fallback.framing;
+    const movement = h?.movement ?? fallback.movement;
+    const lighting = h?.lighting ?? 'soft-window';
+    const anchor = h?.shot
+      ? h.shot
+      : `${beatLabel} beat for ${briefing.productName ?? 'the brand'}: cinematic ${framing} shot, ${movement}, ${lighting} lighting.`;
+    const voiceover = h?.dialog ? { text: h.dialog } : undefined;
+    const sceneCast = h?.dialog ? cast : (i === 0 ? cast : cast); // keep cast on every scene if available
+    return {
+      index: i + 1,
+      label: beatLabel,
+      beat: beatLabel,
+      durationSec: per,
+      engine: (firstMention && (h?.dialog || !hasDialogAnywhere)) ? 'cinematic-sync' as const : 'broll' as const,
+      lipSync: !!(firstMention && h?.dialog),
+      cast: sceneCast,
+      shotDirector: {
+        framing,
+        angle: 'eye-level',
+        movement,
+        lighting,
+      },
+      anchorPromptEN: anchor,
+      voiceover,
+      performance: {
+        mimik: h?.emotion ?? (beatLabel.toLowerCase().includes('hook') ? 'confident' : beatLabel.toLowerCase().includes('cta') ? 'warm-smile' : 'curious'),
+        gestik: beatLabel.toLowerCase().includes('cta') ? 'open-palms' : 'still',
+        blick: (h?.dialog || beatLabel.toLowerCase().includes('cta')) ? 'to-camera' : 'away',
+        energy: fallback.energy === 'high' ? 4 : 3,
+      },
+      musicCue: { energy: fallback.energy },
+    };
+  });
+
   return ProductionPlan.parse({
     project: {
       name: briefing.productName,
       aspectRatio: briefing.aspectRatio as any,
-      totalDurationSec: per * 3,
+      totalDurationSec: per * sceneCount,
     },
-    scenes: beats.map((b, i) => ({
-      index: i + 1,
-      label: b.beat,
-      beat: b.beat,
-      durationSec: per,
-      engine,
-      lipSync: !!firstMention,
-      cast,
-      shotDirector: {
-        framing: b.framing, angle: 'eye-level', movement: b.movement, lighting: 'soft-window',
-      },
-      anchorPromptEN: `${b.beat} beat for ${briefing.productName ?? 'the brand'}: cinematic establishing shot in a relevant setting.`,
-      performance: {
-        mimik: b.beat === 'Hook' ? 'confident' : b.beat === 'CTA' ? 'warm-smile' : 'curious',
-        gestik: b.beat === 'CTA' ? 'open-palms' : 'still',
-        blick: b.beat === 'CTA' ? 'to-camera' : 'away',
-        energy: b.energy === 'high' ? 4 : 3,
-      },
-      musicCue: { energy: b.energy },
-    })),
+    scenes,
     unresolved: [{
       field: 'auto-director',
-      reason: 'AI-Director offline — deterministischer 3-Szenen-Plan erstellt. Bitte vor dem Rendern prüfen.',
+      reason: hints.length
+        ? `Auto-Analyse offline — ${hints.length} Szene(n) wurden direkt aus deinem Briefing-Text extrahiert. Vor Render prüfen.`
+        : 'AI-Director offline — deterministischer Plan erstellt. Bitte vor dem Rendern prüfen.',
       severity: 'warn',
     }],
+    _meta: { source: 'local-fallback' },
   });
 }
 
