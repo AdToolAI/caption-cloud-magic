@@ -261,6 +261,7 @@ async function processStage(
       // Push parallel (fire-and-forget)
       sendPushIfEnabled(supabase, user.id, pushTitle, pushBody, ctaUrl).catch(() => {});
 
+      await markMarketingEmailSent(supabase, user.id);
       sent++;
     } catch (err) {
       console.error(`[winback] processing error for ${user.email}:`, err);
