@@ -1046,6 +1046,10 @@ export default function VideoComposerDashboard() {
           lock_reference_url: s.lockReferenceUrl ?? null,
           continuity_source_scene_id: s.continuationSourceSceneId ?? null,
           frame_pick_seconds: s.framePickSeconds ?? null,
+          // v175: denormalised mention IDs + first-speaker voice (Apply-Plan path).
+          mentioned_character_ids: (s as any).mentionedCharacterIds ?? null,
+          mentioned_location_ids: (s as any).mentionedLocationIds ?? null,
+          character_voice_id: (s as any).characterVoiceId ?? null,
         } as any)
         .eq('id', s.id)
         .eq('project_id', projectId)
@@ -1232,6 +1236,10 @@ export default function VideoComposerDashboard() {
           dialog_takes: (baseScene.dialogTakes ?? {}) as any,
           engine_override: baseScene.engineOverride ?? 'auto',
           character_shots: (baseScene.characterShots ?? null) as any,
+          // v175: denormalised mention IDs + first-speaker voice (initial insert).
+          mentioned_character_ids: ((baseScene as any).mentionedCharacterIds ?? null) as any,
+          mentioned_location_ids: ((baseScene as any).mentionedLocationIds ?? null) as any,
+          character_voice_id: ((baseScene as any).characterVoiceId ?? null) as any,
         } as any)
         .select('id')
         .single();

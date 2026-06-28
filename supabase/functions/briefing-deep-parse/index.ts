@@ -1112,7 +1112,10 @@ This overrides any English wording in the briefing's scaffolding
     } catch (_) { /* noop */ }
 
     // ── Persist (versioned) ───────────────────────────────────────────────
+    // v175: explicit `.error` check + log — previously silent RLS / schema
+    // failures caused the table to receive ZERO new rows since Jun 23.
     let version = 1;
+    let persistError: string | null = null;
     try {
       if (projectId) {
         const { data: prev } = await supabase
@@ -1124,25 +1127,34 @@ This overrides any English wording in the briefing's scaffolding
           .maybeSingle();
         if (prev?.version) version = (prev.version as number) + 1;
       }
-      await supabase.from('composer_production_plans').insert({
-        user_id: userId,
-        project_id: projectId,
-        version,
-        source_text: briefing,
-        manifest: plan,
-        unresolved: plan.unresolved,
-        parser_meta: {
-          passA_ms: tA - t0,
-          passB_ms: tB - tA,
-          total_ms: Date.now() - t0,
-          model: passAModelUsed,
-          passA_error: passAError,
-          passA_diagnostics: passADiagnostics,
-          passB_diagnostics: passBDiagnostics,
-        },
-      });
+      const { error: insErr } = await supabase
+        .from('composer_production_plans')
+        .insert({
+          user_id: userId,
+          project_id: projectId,
+          version,
+          source_text: briefing,
+          manifest: plan,
+          unresolved: plan.unresolved,
+          parser_meta: {
+            passA_ms: tA - t0,
+            passB_ms: tB - tA,
+            total_ms: Date.now() - t0,
+            model: passAModelUsed,
+            passA_error: passAError,
+            passA_diagnostics: passADiagnostics,
+            passB_diagnostics: passBDiagnostics,
+          },
+        });
+      if (insErr) {
+        persistError = `${(insErr as any).code ?? ''} ${insErr.message ?? insErr}`.trim();
+        console.error('[briefing-deep-parse] persist returned error:', persistError);
+      } else {
+        console.log('[briefing-deep-parse] persisted plan', { projectId, version, userId });
+      }
     } catch (e: any) {
-      console.warn('[briefing-deep-parse] persist failed (non-fatal):', e?.message);
+      persistError = e?.message ?? String(e);
+      console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
     return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passA_model: passAModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics }), {

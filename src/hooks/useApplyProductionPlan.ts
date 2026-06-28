@@ -285,6 +285,20 @@ function planSceneToComposerScene(
       }
     : undefined;
 
+  // v175: also surface the resolved cast/location IDs as denormalised arrays
+  // so downstream readers (Performance-Memory, Brand-Consistency-Scan,
+  // Auto-Re-Plan) don't have to re-walk characterShots / shotDirector.
+  const mentionedCharacterIds = Array.from(
+    new Set(
+      (ps.cast ?? [])
+        .map((c) => (c.characterId ? stripPrefix(c.characterId) : null))
+        .filter((x): x is string => !!x),
+    ),
+  );
+  const mentionedLocationIds = ps.location?.locationId
+    ? [ps.location.locationId]
+    : [];
+
   return {
     id: newSceneId(),
     projectId,
@@ -341,8 +355,15 @@ function planSceneToComposerScene(
     musicCue: ps.musicCue,
     continuityHint: ps.continuityHint,
     negativePromptScene: ps.negativePromptScene,
+    // v175: denormalised mention IDs for downstream analytics / Brand-Scan.
+    mentionedCharacterIds,
+    mentionedLocationIds,
+    // v175: per-cast voiceId on the scene root so the upcoming insert path
+    // can drop the first speaker into character_voice_id (single-speaker fast-path).
+    characterVoiceId: ((ps.cast ?? []).find((c) => c.voiceId)?.voiceId) ?? undefined,
   } as ComposerScene;
 }
+
 
 function buildAssembly(
   plan: TProductionPlan,
