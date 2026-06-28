@@ -574,25 +574,9 @@ export function useApplyProductionPlan() {
       }
     }
 
-    // 5) Hard-delete deletableScenes from DB (so realtime doesn't bring them back).
-    if (projectId && deletableScenes.length > 0) {
-      const persistedDeletable = deletableScenes
-        .map((s) => s.id)
-        .filter((id) => isUuid(id));
-      if (persistedDeletable.length > 0) {
-        const { error } = await supabase
-          .from('composer_scenes')
-          .delete()
-          .in('id', persistedDeletable)
-          .eq('project_id', projectId);
-        if (error) {
-          console.error('[useApplyProductionPlan] DB delete failed', error);
-          throw new Error(`Alte Storyboard-Szenen konnten nicht ersetzt werden: ${error.message}`);
-        }
-      }
-    }
-
-    // 6) INSERT new plan-scenes into DB directly.
+    // 5) INSERT new plan-scenes into DB directly, at append-order first. Only
+    // after the insert verifies do we delete stale fallback rows. This avoids
+    // leaving the project empty if an INSERT constraint/RLS error occurs.
     //     The dashboard's debounced `persistScenesToDb` path only UPDATEs
     //     rows with UUID ids; freshly minted plan-scenes carry temp
     //     `scene_xxx_yyy` ids and were therefore never persisted. Result:
@@ -601,7 +585,7 @@ export function useApplyProductionPlan() {
     //     temp ids for real UUIDs before handing off to onUpdateScenes.
     if (projectId && newScenes.length > 0) {
         const insertStartOrder = protectedScenes.length > 0
-          ? Math.max(...protectedScenes.map((s) => Number(s.orderIndex ?? 0))) + 1
+          ? Math.max(...currentScenes.map((s) => Number(s.orderIndex ?? 0))) + 1
           : 0;
         const rows = newScenes.map((s, i) => ({
           project_id: projectId,
@@ -681,14 +665,37 @@ export function useApplyProductionPlan() {
     });
     if (lipsyncRowsMissingVoice.length > 0) warnings.push(`${lipsyncRowsMissingVoice.length} Lip-Sync-Szene(n) ohne Voice-ID.`);
 
-    // 8) Merge: keep protected scenes at their current order, append new ones.
+    // 8) Now remove replaceable old/fallback rows. If that fails, roll back the
+    // newly inserted plan rows so the user does not end up with duplicate scenes.
+    if (deletableScenes.length > 0) {
+      const persistedDeletable = deletableScenes
+        .map((s) => s.id)
+        .filter((id) => isUuid(id));
+      if (persistedDeletable.length > 0) {
+        const { error } = await supabase
+          .from('composer_scenes')
+          .delete()
+          .in('id', persistedDeletable)
+          .eq('project_id', projectId);
+        if (error) {
+          const insertedIds = newScenes.map((s) => s.id).filter((id) => isUuid(id));
+          if (insertedIds.length > 0) {
+            await supabase.from('composer_scenes').delete().in('id', insertedIds).eq('project_id', projectId);
+          }
+          console.error('[useApplyProductionPlan] DB delete failed', error);
+          throw new Error(`Alte Storyboard-Szenen konnten nicht ersetzt werden: ${error.message}`);
+        }
+      }
+    }
+
+    // 9) Merge: keep protected scenes at their current order, append new ones.
     const merged = [
       ...protectedScenes.map((s, i) => ({ ...s, orderIndex: i })),
       ...newScenes.map((s, i) => ({ ...s, orderIndex: protectedScenes.length + i })),
     ];
     onUpdateScenes(merged);
 
-    // 9) Assembly (voice + captions).
+    // 10) Assembly (voice + captions).
     const nextAssembly = buildAssembly(plan, currentAssembly, language);
     onApplyAssembly(nextAssembly);
 
