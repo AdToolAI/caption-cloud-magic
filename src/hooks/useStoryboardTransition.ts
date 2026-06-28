@@ -289,7 +289,8 @@ function isProtected(s: ComposerScene): boolean {
 }
 
 function isRepairableFailedScene(s: ComposerScene): boolean {
-  return (s.clipStatus === 'failed' || s.clipStatus === 'canceled') && !isProtected(s);
+  const status = String(s.clipStatus ?? '');
+  return (status === 'failed' || status === 'canceled') && !isProtected(s);
 }
 
 /** Slugify a character name into a stable @-mention key. */
