@@ -1036,7 +1036,7 @@ This overrides any English wording in the briefing's scaffolding
             OUTPUT_LANGUAGE: langKey,
             MANIFEST: manifest,
             LIBRARY: {
-              characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id })),
+              characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id, gender: c.gender, description: c.description })),
               locations: locations.map((l: any) => ({ id: l.id, name: l.name })),
               voices,
             },
