@@ -1,76 +1,47 @@
-## Diagnose: Briefing → Storyboard Voice-Auto-Assignment
+## Ziel
+Sicherstellen, dass jede:r Sprecher:in **immer** eine Stimme bekommt – auch wenn das Briefing keine nennt und der Charakter (z.B. Samuel) keine `default_voice_id` hinterlegt hat.
 
-### Ergebnis der Prüfung anhand Screenshot + Codepfad
+## Status heute
+- **Pass-B (Gemini)** in `briefing-deep-parse` versucht bereits, Stimmen zuzuordnen → schlägt aber still fehl, wenn Gemini eine UUID zurückgibt oder leer lässt.
+- **`useApplyProductionPlan.ts`** fällt nur auf `brand_characters.default_voice_id` oder die Projekt-Voice zurück. Hat Samuel keine Default-Voice → `character_voice_id = NULL`.
+- **`SceneDialogStudio.tsx`** zeigt dann "Stimme wählen", weil es nicht auf die im Plan vorgeschlagene Voice zurückgreift.
 
-Der Briefing-Plan wurde **größtenteils ins Storyboard übertragen**:
-- Es wurden 3 Szenen übernommen/verifiziert.
-- Szene 1 enthält das deutsche Skript: `SAMUEL DUSATKO: Es ist 3 Uhr nachts...`
-- Cast-Auflösung funktioniert sichtbar: Samuel Dusatko wird im Sprecherbereich erkannt.
-- Dauer ist korrekt bei 5s sichtbar.
+→ Resultat: ohne manuelle Brand-Default bleibt das Feld leer. Genau das war im letzten Run zu sehen.
 
-**Nicht korrekt ist die Voice-Zuordnung in der UI:** Im Storyboard steht weiterhin `Stimme wählen`.
+## 4-Schritt-Fix
 
-### Wahrscheinliche technische Ursache
+### 1. Deterministischer Auto-Voice-Pool (Client)
+In `useApplyProductionPlan.ts` lokale Pools ergänzen:
+- **Male:** Brian, Liam, George, Will, Eric, Chris
+- **Female:** Sarah, Laura, Alice, Matilda, Lily, Jessica
 
-Es gibt zwei Schutzlücken im aktuellen Flow:
+Logik pro Sprecher (Reihenfolge):
+1. `character_voice_id` aus Plan (sofern ElevenLabs-ID, keine UUID)
+2. `brand_characters.default_voice_id`
+3. **NEU:** Round-Robin aus Pool, gemappt auf `brand_characters.gender`
+4. Projekt-Default
 
-1. **Apply-Plan fallbackt nur auf Character-Default oder Projektvoice.**  
-   In `src/hooks/useApplyProductionPlan.ts` wird `dialogVoices` aus `ps.cast[].voiceId`, `brand_characters.default_voice_id` oder `projectVoiceId` gebaut. Wenn Samuel keine `default_voice_id` hat und der Plan trotz Edge-Fallback keine Voice mitschickt, bleibt die Szene ohne gültige Voice.
+So ist `character_voice_id` **nie NULL**, sobald ein Sprecher existiert.
 
-2. **SceneDialogStudio bindet nur Brand-Defaults automatisch.**  
-   In `src/components/video-composer/SceneDialogStudio.tsx` setzt der Auto-Bind nur `defaultVoiceByCharId`. Wenn ein Charakter keinen Brand-Default hat, zeigt die UI bewusst `SETUP` und lässt die Voice leer — selbst wenn wir eigentlich eine KI-Fallback-Stimme wollen.
+### 2. Gender-Mapping anreichern
+`brand_characters.gender` mit in den Cast-Kontext laden, damit der Pool-Picker geschlechtsgerecht wählt (Samuel → male pool → Brian).
 
-### Schlanker Fix-Plan
+### 3. UI-Fallback in `SceneDialogStudio.tsx`
+Wenn `defaultVoiceByCharId[charId]` leer ist, aber die Scene bereits eine `character_voice_id` trägt → diese binden und als "⚡ Auto" Badge anzeigen, statt "Stimme wählen".
 
-#### 1) `useApplyProductionPlan.ts`: deterministische Auto-Voice als letzter Fallback
+### 4. Hydration-Fix in `VideoComposerDashboard.tsx`
+Beim Laden aus DB sicherstellen, dass `character_voice_id` + `dialog_voices` (JSONB) korrekt in den `ComposerScene` State zurückgemappt werden – aktuell geht das beim Reload teilweise verloren.
 
-Direkt im Storyboard-Apply eine lokale Voice-Auswahl ergänzen, damit der Client unabhängig vom Edge-Function-Ergebnis robuste Voices schreibt:
+## Server-Seite (bereits aktiv, nur verifizieren)
+- Pass-B in `briefing-deep-parse` repariert UUID-Voices (Stage Patch v3 aus letztem Turn).
+- Telemetrie loggt `null project_id` und `voice_assignment_source` (plan/brand/pool/project).
 
-- Voice-Katalog lokal spiegeln:
-  - Male Pool: Brian, Liam, George, Charlie, Eric, Chris, Daniel, Bill, Roger
-  - Female Pool: Sarah, Laura, Alice, Matilda, Lily
-- `brand_characters` Query von `id, default_voice_id` auf `id, default_voice_id, gender` erweitern.
-- Beim Aufbau von `dialogVoices`:
-  1. `ps.cast[].voiceId`
-  2. `default_voice_id`
-  3. `projectVoiceId`
-  4. **neu:** Auto-Pick aus Gender-Pool, pro Szene dedupliziert
-- Als Objekt speichern statt plain string:
-  ```ts
-  dialogVoices[characterId] = {
-    engine: 'elevenlabs',
-    voiceId: pickedId,
-    voiceName: voiceNameById[pickedId],
-  };
-  ```
-- `characterVoiceId` ebenfalls aus dieser finalen Auswahl ableiten.
+## Akzeptanzkriterium
+Briefing ohne Voice-Angabe + Charakter ohne `default_voice_id`:
+- Storyboard zeigt für jeden Sprecher eine konkrete Stimme (z.B. „Brian ⚡ AI") statt „Stimme wählen".
+- DB-Row `composer_scenes.character_voice_id` enthält gültige ElevenLabs-ID.
+- Up to 4 Sprecher pro Szene werden unterschiedlich (round-robin) versorgt.
 
-#### 2) `SceneDialogStudio.tsx`: UI-Fallback für vorhandene Root-Voice
-
-Wenn `scene.dialogVoices` leer ist, aber `scene.characterVoiceId` vorhanden ist, soll die Sprecherzeile diese Stimme übernehmen. Das deckt Single-Speaker-Szenen ab.
-
-#### 3) `VideoComposerDashboard.tsx`: Hydration ergänzen
-
-Beim Laden aus `composer_scenes` zusätzlich `character_voice_id` in den lokalen Scene-State mappen:
-
-```ts
-characterVoiceId: row.character_voice_id ?? local?.characterVoiceId
-```
-
-Aktuell wird `character_voice_id` gespeichert, aber im gezeigten Hydration-Code nicht sichtbar zurück in `ComposerScene` gesetzt.
-
-#### 4) Verifikation
-
-- Neues Samuel-Briefing ohne Avatar-Default analysieren.
-- Erwartung:
-  - `dialog_script` gefüllt
-  - `dialog_voices` enthält Samuels Character-ID mit z.B. Brian/Liam
-  - `character_voice_id` ist gesetzt
-  - UI zeigt nicht mehr `Stimme wählen`, sondern die gewählte ElevenLabs-Stimme
-  - Multi-Speaker bis 4 Sprecher: unterschiedliche Voices innerhalb der Szene
-
-### Nicht anfassen
-
-- Keine Änderung an Lipsync/Sync.so/HappyHorse Pipeline
-- Keine Persistierung in `brand_characters.default_voice_id`
-- Keine neue Migration nötig
+## Nicht im Scope
+- Keine Änderung an Hailuo/Sync.so Pipelines.
+- Keine UI-Redesigns der Voice-Picker, nur Default-Binding + Badge.
