@@ -435,15 +435,36 @@ export function useStoryboardTransition({
     });
     startProgressLoop();
 
-    // Direct fetch with 180s AbortController — `supabase.functions.invoke`
-    // imposes a ~30s timeout that kicks in before deep-parse (research +
-    // gemini pass) can finish (~40–90s typical, up to 150s with research).
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 180_000);
+    // Direct fetch with 120s AbortController. Backend now uses a Flash-first
+    // chain (Flash 35s ×2 → Pro 60s → Flash-Lite 25s) that typically returns
+    // in 8-25s; 120s is the worst-case ceiling with all fallbacks burning.
+    // `supabase.functions.invoke` imposes a ~30s timeout that kicks in before
+    // deep-parse can finish, so we use raw fetch.
+    const CLIENT_TIMEOUT_MS = 120_000;
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse`;
     const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
     const { data: { session } } = await supabase.auth.getSession();
     const authToken = session?.access_token ?? anon;
+
+    const doFetch = async (): Promise<Response> => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
+      try {
+        return await fetch(url, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': anon,
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ briefing: text, projectId, language }),
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    };
+
 
     const parsePlan = (data: any): { plan: TProductionPlan | null; dropped: number; error?: string } => {
       let dropped = 0;
