@@ -347,17 +347,31 @@ function planSceneToComposerScene(
   const aiPrompt = promptParts.join(' ') || undefined;
 
   // Per-character dialog voices (cinematic-sync / heygen use these).
-  // Fallback to project-level voice if the resolved cast member has no voiceId,
-  // so compose-dialog-segments never errors with `missing_voice`.
+  // Fallback chain: plan voice → brand default → deterministic AI pool (gender-aware,
+  // round-robin across the whole apply run) → project-level voice. Result: a speaker
+  // is NEVER left without a voice, even when the briefing and the avatar both omit one.
   const dialogVoices: Record<string, string> = {};
   for (const c of ps.cast ?? []) {
     if (!c.characterId) continue;
     const characterId = stripPrefix(c.characterId as string);
-    const vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
-      || cleanVoiceId(defaultVoicesByCharacter[characterId])
-      || cleanVoiceId(projectVoiceId);
+    let vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
+      || cleanVoiceId(defaultVoicesByCharacter[characterId]);
+    if (!vid && voicePoolPicker) {
+      // Stable per-character: pick once per apply-run, reuse for every scene
+      // that features this speaker so the same person keeps the same voice.
+      const cached = voicePoolAssignments[characterId];
+      if (cached) {
+        vid = cached;
+      } else {
+        const picked = voicePoolPicker.pick(genderByCharacter[characterId]);
+        voicePoolAssignments[characterId] = picked.id;
+        vid = picked.id;
+      }
+    }
+    if (!vid) vid = cleanVoiceId(projectVoiceId);
     if (vid) dialogVoices[characterId] = vid;
   }
+
 
 
   const engine = ps.engine ?? 'auto';
