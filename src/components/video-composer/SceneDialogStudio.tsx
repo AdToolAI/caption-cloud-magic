@@ -588,7 +588,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   };
 
   const handlePreview = async (speakerId: string) => {
-    const cfg = voicePerSpeaker[speakerId];
+    const cfg = getResolvedVoiceForSpeakerId(speakerId);
     if (!cfg?.voiceId) return;
     setPreviewing(speakerId);
     try {
@@ -816,7 +816,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     try {
       const dialogPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, language);
       if (dialogPrompt !== (scene.aiPrompt || '')) {
-        onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
+        onUpdate({ dialogScript: script, dialogVoices: resolvedDialogVoiceMap, aiPrompt: dialogPrompt });
       }
     } catch (_) { /* noop — non-fatal */ }
     let okCount = 0;
@@ -852,7 +852,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const block = blocks[bi];
         const c = sceneCast.find((x) => x.id === block.speakerId);
         if (!c) continue;
-        const cfg = voicePerSpeaker[block.speakerId];
+        const cfg = getResolvedVoiceForSpeakerId(block.speakerId);
         if (!cfg?.voiceId) continue;
 
         // ── Take-System A/B/C reuse (Phase B + C: tonality-aware key) ──
@@ -1016,7 +1016,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       return;
     }
     for (const sp of speakers) {
-      if (!voicePerSpeaker[sp.id]?.voiceId) {
+      if (!getResolvedVoiceForSpeakerId(sp.id)?.voiceId) {
         toast({ title: t.voiceMissing(sp.name), variant: 'destructive' });
         return;
       }
@@ -1026,7 +1026,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     if (speakers.length >= 2) {
       const seen = new Map<string, string>();
       for (const sp of speakers) {
-        const cfg = voicePerSpeaker[sp.id];
+        const cfg = getResolvedVoiceForSpeakerId(sp.id);
         const vid = cfg?.isCustom ? cfg?.elevenlabsVoiceId : cfg?.voiceId;
         if (!vid) continue;
         if (seen.has(vid)) {
@@ -1061,7 +1061,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           {
             ...scene,
             dialogScript: script,
-            dialogVoices: voicePerSpeaker,
+            dialogVoices: resolvedDialogVoiceMap,
             withAudio: true,
           } as typeof scene,
         ],
@@ -1082,7 +1082,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     try {
       const dialogPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, language);
       if (dialogPrompt !== (scene.aiPrompt || '')) {
-        onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
+        onUpdate({ dialogScript: script, dialogVoices: resolvedDialogVoiceMap, aiPrompt: dialogPrompt });
       }
     } catch (_) { /* noop */ }
 
@@ -1198,7 +1198,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               : `${c.name} has no portrait — assign a cast Brand-Character with a portrait.`,
           );
         }
-        const cfg = voicePerSpeaker[block.speakerId];
+        const cfg = getResolvedVoiceForSpeakerId(block.speakerId);
         if (!cfg?.voiceId) {
           throw new Error(t.voiceMissing(c.name));
         }
@@ -1258,7 +1258,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             ? `Generando voz ${i + 1}/${blocks.length} (${c.name})…`
             : `Generating voice ${i + 1}/${blocks.length} (${c.name})…`,
         );
-        const cfg = voicePerSpeaker[block.speakerId]!;
+        const cfg = getResolvedVoiceForSpeakerId(block.speakerId)!;
 
         // Take-System A/B/C reuse (Phase B + C: tonality-aware key).
         const lineKey = dialogLineKey(i, block.text, block.tonality);
@@ -1327,9 +1327,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               Math.round((timedParentBlocks[i].startSec! + s.durationSec) * 100) / 100,
             text: s.block.text,
             engine: s.engine,
-            voiceId: voicePerSpeaker[s.block.speakerId]?.isCustom
-              ? voicePerSpeaker[s.block.speakerId]?.elevenlabsVoiceId
-              : voicePerSpeaker[s.block.speakerId]?.voiceId,
+            voiceId: getResolvedVoiceForSpeakerId(s.block.speakerId)?.isCustom
+              ? getResolvedVoiceForSpeakerId(s.block.speakerId)?.elevenlabsVoiceId
+              : getResolvedVoiceForSpeakerId(s.block.speakerId)?.voiceId,
             audioUrl: s.audioUrl,
           })),
           totalSec: Math.round((cursor - INTER_SPEAKER_GAP_SEC) * 100) / 100,
@@ -1410,8 +1410,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const dialogScriptText = synthed.map((s) => `${s.character.name}: ${s.block.text}`).join('\n');
         const dialogVoicesMap: Record<string, DialogVoiceCfg> = {};
         for (const s of synthed) {
-          const cfg = voicePerSpeaker[s.block.speakerId];
-          if (cfg) dialogVoicesMap[s.character.id] = cfg;
+          const cfg = getResolvedVoiceForSpeakerId(s.block.speakerId);
+          if (cfg) {
+            for (const key of getSpeakerAliases(s.character.id)) dialogVoicesMap[key] = cfg;
+          }
         }
 
         // Optimistic state — UI immediately shows "Generating".
