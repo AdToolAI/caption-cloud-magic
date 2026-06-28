@@ -122,6 +122,11 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
           }
         }
 
+        // v173 — compose final prompt for single-scene invokes too. Previously
+        // performance/actionBeat from the Briefing-Plan were dropped here
+        // because we sent the raw scene.aiPrompt.
+        const composedInvoke = buildInvokePrompt(workingScene, opts.characters, 'en');
+
         const { data, error } = await supabase.functions.invoke('compose-video-clips', {
           body: {
             projectId: pid,
@@ -132,7 +137,8 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 id: workingScene.id,
                 clipSource: workingScene.clipSource,
                 clipQuality: workingScene.clipQuality || 'standard',
-                aiPrompt: workingScene.aiPrompt,
+                aiPrompt: composedInvoke.aiPrompt,
+                negativePrompt: composedInvoke.negativePrompt,
                 stockKeywords: workingScene.stockKeywords,
                 uploadUrl: workingScene.uploadUrl,
                 referenceImageUrl: workingScene.referenceImageUrl,
