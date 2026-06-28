@@ -1112,20 +1112,13 @@ This overrides any English wording in the briefing's scaffolding
     } catch (_) { /* noop */ }
 
     // ── Persist (versioned) ───────────────────────────────────────────────
-    // v175: switched to service-role for the insert because the user-scoped
-    // client occasionally failed RLS write checks during the parallel pass
-    // (auth context race). The row carries user_id explicitly so audit is
-    // unaffected. We also log .error explicitly — previously a silent RLS
-    // failure caused the table to receive ZERO new rows since Jun 23.
+    // v175: explicit `.error` check + log — previously silent RLS / schema
+    // failures caused the table to receive ZERO new rows since Jun 23.
     let version = 1;
     let persistError: string | null = null;
     try {
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-      const writer = serviceKey
-        ? createClient(SUPABASE_URL, serviceKey)
-        : supabase;
       if (projectId) {
-        const { data: prev } = await writer
+        const { data: prev } = await supabase
           .from('composer_production_plans')
           .select('version')
           .eq('project_id', projectId)
@@ -1134,25 +1127,27 @@ This overrides any English wording in the briefing's scaffolding
           .maybeSingle();
         if (prev?.version) version = (prev.version as number) + 1;
       }
-      const { error: insErr } = await writer.from('composer_production_plans').insert({
-        user_id: userId,
-        project_id: projectId,
-        version,
-        source_text: briefing,
-        manifest: plan,
-        unresolved: plan.unresolved,
-        parser_meta: {
-          passA_ms: tA - t0,
-          passB_ms: tB - tA,
-          total_ms: Date.now() - t0,
-          model: passAModelUsed,
-          passA_error: passAError,
-          passA_diagnostics: passADiagnostics,
-          passB_diagnostics: passBDiagnostics,
-        },
-      });
+      const { error: insErr } = await supabase
+        .from('composer_production_plans')
+        .insert({
+          user_id: userId,
+          project_id: projectId,
+          version,
+          source_text: briefing,
+          manifest: plan,
+          unresolved: plan.unresolved,
+          parser_meta: {
+            passA_ms: tA - t0,
+            passB_ms: tB - tA,
+            total_ms: Date.now() - t0,
+            model: passAModelUsed,
+            passA_error: passAError,
+            passA_diagnostics: passADiagnostics,
+            passB_diagnostics: passBDiagnostics,
+          },
+        });
       if (insErr) {
-        persistError = `${insErr.code ?? ''} ${insErr.message ?? insErr}`.trim();
+        persistError = `${(insErr as any).code ?? ''} ${insErr.message ?? insErr}`.trim();
         console.error('[briefing-deep-parse] persist returned error:', persistError);
       } else {
         console.log('[briefing-deep-parse] persisted plan', { projectId, version, userId });
