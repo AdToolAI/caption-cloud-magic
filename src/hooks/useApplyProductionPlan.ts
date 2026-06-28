@@ -730,8 +730,15 @@ export function useApplyProductionPlan() {
     const lipsyncRowsMissingVoice = persistedNewRows.filter((r: any) => {
       const rowScene = newScenes.find((s) => s.id === String(r.id));
       const needsVoice = rowScene?.dialogMode || !!rowScene?.dialogScript;
-      const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? Object.keys(r.dialog_voices).length : 0;
-      return needsVoice && !r.character_voice_id && voices === 0;
+      if (!needsVoice) return false;
+      const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? r.dialog_voices as Record<string, unknown> : {};
+      const speakerIds = new Set(
+        (rowScene?.characterShots ?? (rowScene?.characterShot ? [rowScene.characterShot] : []))
+          .map((shot) => String(shot.characterId ?? '').trim())
+          .filter(Boolean),
+      );
+      const missingSpeakerVoice = Array.from(speakerIds).some((id) => !voices[id]);
+      return !r.character_voice_id || speakerIds.size === 0 || missingSpeakerVoice;
     });
     if (lipsyncRowsMissingVoice.length > 0) warnings.push(`${lipsyncRowsMissingVoice.length} Lip-Sync-Szene(n) ohne Voice-ID.`);
 

@@ -1794,6 +1794,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               const isHume = cfg?.engine === 'hume';
               const brandDefault = defaultVoiceByCharId[sp.id];
               const isBrandVoice = !!brandDefault && cfg?.voiceId === brandDefault && cfg?.engine !== 'hume';
+              const isAutoVoice = !isBrandVoice && cfg?.engine === 'elevenlabs' && !!getAutoVoiceName(cfg.voiceId);
               const brandLookupId = sceneCast.find((c) => c.id === sp.id)?.brandCharacterId ?? sp.id;
               return (
                 <div
@@ -1826,7 +1827,22 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                         Brand
                       </span>
                     )}
-                    {!brandDefault && (
+                    {isAutoVoice && (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/10 px-1 py-px text-[9px] uppercase tracking-wide text-primary"
+                        title={
+                          language === 'de'
+                            ? 'Automatisch zugewiesene Stimme'
+                            : language === 'es'
+                            ? 'Voz asignada automáticamente'
+                            : 'Automatically assigned voice'
+                        }
+                      >
+                        <Sparkles className="h-2.5 w-2.5" />
+                        Auto
+                      </span>
+                    )}
+                    {!brandDefault && !cfg?.voiceId && (
                       <Link
                         to={`/avatars/${brandLookupId}`}
                         className="inline-flex items-center gap-0.5 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[9px] uppercase tracking-wide text-amber-400 hover:bg-amber-500/20"
