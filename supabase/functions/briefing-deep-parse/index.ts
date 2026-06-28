@@ -483,8 +483,16 @@ You receive:
 Resolve every cast mention (@founder-avatar etc.) and every location mention (@home-office etc.) to a library entry. Normalize: strip "@", lowercase, remove separators (- _ space), allow substring match in either direction. When unresolved, set characterId/locationId = null and add an unresolved item with severity=warn and a clear suggestion like "Avatar 'Founder Default' im Library nicht gefunden — manuell zuordnen".
 
 For voice resolution:
-- If the briefing names a voice (id OR name), resolve to LIBRARY.voices and copy voiceId/voiceName to the project-level voice settings.
-- For each cast member, copy default_voice_id from the matched brand_character into ResolvedCast.voiceId, or null if missing.
+- Project-level voice: if briefing names a voice (id OR name), resolve via LIBRARY.voices.
+- Per-cast voice resolution (priority order):
+  1. brand_character.default_voice_id (if set and looks like an ElevenLabs id — opaque ~20-char alphanum, NEVER a UUID).
+  2. AUTO-MATCH from LIBRARY.voices using briefing language (OUTPUT_LANGUAGE), character.gender, character.description (persona/age hints), and scene tonality (energetic/warm/calm/authoritative/playful).
+  3. Within a single scene with multiple speakers, NEVER assign the same voiceId twice — rotate to another fitting voice from LIBRARY.voices.
+- For every auto-matched voice (rule 2), add an `aiFilled` dotted entry `cast.<characterId>.voiceId` so the UI can flag it.
+- Voice catalog hints by gender:
+  Male: George, Roger, Charlie, Liam, Eric, Chris, Brian, Daniel, Bill
+  Female: Alice, Sarah, Laura, Matilda, Lily
+- NEVER copy a Character-UUID into voiceId. ElevenLabs voiceIds are opaque (e.g. "JBFqnCBsd6RMkjVDRZzb").
 
 Consistency checks (each becomes an unresolved entry when violated):
 - Sum of scene durationSec must equal project.totalDurationSec (severity=warn).
