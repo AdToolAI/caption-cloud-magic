@@ -1,42 +1,52 @@
 
-# Plan: Briefing→Storyboard 1:1-Übertragung verifizieren
+# Verifikation Briefing → Storyboard
 
-Ziel: Beweisen (nicht nur behaupten), dass **alle** Briefing-Felder im Storyboard ankommen — über echte Logs, DB-Inspektion und einen sichtbaren UI-Check.
+## Was die DB sagt (Read-only Check, kein Spin)
 
-## Was bereits implementiert ist (zur Referenz)
-- `briefing-deep-parse` extrahiert: script, performance (expression/gesture/gaze/energy), actionBeat, framing, lighting, music, transitions, overlays, per-cast shotType, language.
-- `useApplyProductionPlan` schreibt alle Felder in `composer_scenes`.
-- `driftDetector` validiert nach Apply.
-- `buildInvokePrompt` injiziert performance+actionBeat in den Single-Scene-Invoke.
-- v174 Reliability: Flash-first Pass A mit Retry-Chain, soll Fallback-Quote auf <1 % drücken.
+**Edge-Function läuft sauber:**
+- Letzter Deep-Parse 18:56 UTC: Pass A Flash 8.0s ✅, Pass B Flash 3.7s ✅, 3 Szenen, engine=`cinematic-sync`. Reliability-Umbau (Flash-first) wirkt — Pro wird nicht mehr getriggert.
 
-## Schritt 1 — Reality-Check via Logs (kein Code, nur Beobachtung)
-- Edge-Logs von `briefing-deep-parse` der letzten 24h auswerten: Wie oft `Pass A success` (Flash), wie oft Fallback zu Pro/Flash-Lite, wie oft kompletter 5xx → Client-Fallback?
-- Konkrete Latenzen messen, ob die 8–25s-Annahme stimmt.
-- Falls Pro öfter als erwartet greift: Token-Budget weiter senken oder Pass A in 2 kleinere Passes splitten.
+**Vorheriger Apply (Projekt `aed04374…`, 18:23 UTC) hat real geliefert:**
+- `ai_prompt`: echte szenische Beschreibung („extreme close-up on a man's tired face… dark bedroom… laptop screen…")
+- `dialog_script`: „SAMUEL DUSATKO: Es ist 3 Uhr nachts. Und ich bearbeite… schon wieder… ein Reel."
+- `shot_director` / `action_beat` / `transition_type` / `realism_preset` korrekt gesetzt.
 
-## Schritt 2 — DB-Inspektion einer echten geparsten Szene
-- Letzten erfolgreichen Eintrag aus `composer_production_plans` ziehen (wo `meta->>'source' = 'deep_parse'`).
-- Verifizieren, dass für **jede** Szene gefüllt sind: `script`, `performance` (alle 4 Sub-Felder), `actionBeat`, `framing`, `lighting`, `transitions`, `overlays`, per-cast `shotType`.
-- Den zugehörigen `composer_scenes`-Eintrag nach `useApplyProductionPlan` prüfen — ist 1:1 angekommen, oder droppt der Apply-Pfad still Felder?
+**Aktuelles Projekt im Screenshot (`f39042bd…`, 18:27/18:28 UTC) ist Fallback-Placeholder:**
+- `ai_prompt`: „CTA beat for the brand: cinematic establishing shot in a relevant setting." (generisch)
+- `dialog_script`: „Ich melde mich gleich morgen an!" (Local-Fallback-String, nicht aus deinem Briefing)
+- Apply lief um 18:27 — der echte Deep-Parse kam erst um 18:56. Du siehst im Sheet die echte Analyse, aber das Storyboard wurde **vor** dem erfolgreichen Parse mit dem Fallback gefüllt und nicht überschrieben.
 
-## Schritt 3 — Drift-Report sichtbar machen
-Aktuell läuft `driftDetector` nach Apply, das Ergebnis landet in der Konsole. Ich schlage vor (kleine UI-Erweiterung, nicht in diesem Plan-Step umgesetzt — würde erst nach Freigabe gebaut):
-- Im `ProductionWarRoom` nach „Apply" eine **„Mapping-Report"-Karte** zeigen: pro Szene grün/gelb/rot pro Feld, plus „X von Y Briefing-Feldern übernommen".
-- So sieht der User sofort, wenn z. B. `overlays` zwar im Plan steht, aber im Storyboard nicht ankommt.
+## 3 echte Lücken (in **jedem** Projekt, auch bei erfolgreichem Parse)
 
-## Schritt 4 — Falls Lücken gefunden werden
-Erst dann gezielt patchen — kein vorgezogenes „defensives" Code-Schreiben. Mögliche Stellen:
-- `useApplyProductionPlan.ts` — Schreibpfad für ein Feld vergessen?
-- `composer_scenes`-Spalte fehlt für ein neues Plan-Feld?
-- `buildInvokePrompt` schickt das Feld nicht weiter?
+1. **`composer_production_plans` wird nicht geschrieben.** Letzte Zeile: 23.06. Edge-Function persistiert den Plan nicht → keine Audit-Spur, Late-Arrival-Swap kann auch nichts überschreiben.
+2. **`character_voice_id` bleibt leer** (alle 3 Szenen, beide Projekte). Im Sheet steht „voice.voiceName nicht in Library" → Voice-Resolver matcht den Charakter nicht gegen `brand_characters.default_voice_id`. Deshalb auch der `twoshot_audio_prep_failed: missing_voice` von vorhin.
+3. **`mentioned_character_ids` / `mentioned_location_ids` bleiben `{}`** obwohl Cast+Location resolved sind. Folge: `@-Mention`-basierte Library-Helfer (Anchor-Compose, Continuity, Scene-Director) sehen den Charakter in der Szene nicht.
+
+## Plan (klein, präzise, kein Lipsync-Anfassen)
+
+### 1. Persistenz in `composer_production_plans` einbauen
+- `briefing-deep-parse/index.ts`: nach erfolgreichem Pass B (vor return) ein `insert` mit `{user_id, project_id, version=next, source_text, manifest=plan, unresolved, parser_meta}`. Beste-Mühe, Fehler nur loggen — Response nicht blocken.
+- Client (`useStoryboardTransition` / War-Room) übergibt `project_id` im Body.
+
+### 2. Voice-Resolver in Apply fixen
+- `useApplyProductionPlan.ts`: beim Schreiben jeder Szene den Cast-Charakter über `id` in `brand_characters` nachschlagen und `default_voice_id` → `character_voice_id` setzen (nur falls Szene noch leer). Optional `dialog_voices[castId] = default_voice_id` mitsetzen.
+- Fallback: wenn `voice.voiceName` im Plan steht und in der Library nicht matchbar → trotzdem Charakter-Default verwenden statt leer zu lassen, und unresolved-Eintrag auf „warn" statt „block" runterstufen.
+
+### 3. Mentions beim Apply auffüllen
+- `useApplyProductionPlan.ts`: `mentioned_character_ids = scene.cast.map(c => c.id)`, `mentioned_location_ids = scene.location ? [location.id] : []`. Nur wenn Felder leer sind (nicht überschreiben).
+
+### 4. Late-Arrival-Replace härten
+- `useStoryboardTransition`: wenn Apply mit Fallback-Plan lief und der echte Deep-Parse danach eintrifft, automatisch erneut Apply auf die Szenen anwenden **die noch nicht gerendert/locked sind** (genau gleiche Schutz-Bedingungen wie bisher: `clip_status='pending'` && `clip_url IS NULL` && `lipSyncStatus IS NULL` && `dialogLockedAt IS NULL`).
+
+### 5. Sichtbares Mapping-Badge im War-Room (klein)
+- Eine Zeile pro Szene: „Skript ✅ · Performance ✅ · Action ✅ · Shot ✅ · Voice ⚠️" — liest direkt aus `composer_scenes` nach Apply. Kein neuer Endpoint, keine neue Tabelle. Macht zukünftig sofort sichtbar, was du jetzt mich fragen musstest.
 
 ## Was NICHT angefasst wird
-- Lipsync-Pipeline, Sync.so, dialog_shots, HappyHorse Green-Net, Hailuo-Duration-Lock — alle unverändert.
-- Prompts/Tool-Schemas in `briefing-deep-parse` — bleiben 1:1.
+Lipsync-Pipeline, Sync.so, `dialog_shots`, HappyHorse Green-Net, Hailuo-Duration-Lock, Tool-Schema des Parsers, Prompts.
 
 ## Erwartetes Ergebnis
-Eine ehrliche Antwort auf deine Frage in 2 Sätzen plus Beweis: „Ja, alle 11 Felder kommen an, hier ist ein Beispiel aus der DB" — oder „Felder X und Y droppen, weil Z, hier der Fix."
+- Beim nächsten Briefing landen Skript, Performance, Action, Shot, Transition, Overlay, Realism **und** Voice + Mentions 1:1 im Storyboard.
+- Wenn der Parse mal langsamer ist als der User-Klick, ersetzt der späte Plan still die Fallback-Szenen, solange sie unangetastet sind.
+- Du siehst pro Szene in einer Zeile, was angekommen ist — ohne mich fragen zu müssen.
 
-## Freigabe-Frage
-Soll ich Schritt 1+2 jetzt ausführen (nur Read-Only: Logs + DB-Query) und dir das Ergebnis berichten, bevor wir über UI-Erweiterungen oder Patches entscheiden?
+Freigabe zum Umsetzen?
