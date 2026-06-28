@@ -493,10 +493,21 @@ Consistency checks (each becomes an unresolved entry when violated):
 
 DO NOT invent IDs. Only emit characterId / locationId that exist in LIBRARY. If you are unsure, set null and add an unresolved entry.`;
 
-interface CallOpts { model: string; system: string; tool: any; user: string; timeoutMs?: number; }
+interface CallOpts {
+  model: string;
+  system: string;
+  tool: any;
+  user: string;
+  timeoutMs?: number;
+  maxTokens?: number;
+  retries?: number; // total attempts = retries + 1
+}
 
-async function callGateway(opts: CallOpts) {
-  const timeoutMs = opts.timeoutMs ?? 90_000;
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+async function callGatewayOnce(opts: CallOpts): Promise<any> {
+  const timeoutMs = opts.timeoutMs ?? 35_000;
+  const maxTokens = opts.maxTokens ?? 6000;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   let res: Response;
@@ -516,15 +527,17 @@ async function callGateway(opts: CallOpts) {
         ],
         tools: [opts.tool],
         tool_choice: { type: 'function', function: { name: opts.tool.function.name } },
-        max_tokens: 12000,
+        max_tokens: maxTokens,
       }),
     });
   } catch (e: any) {
     if (e?.name === 'AbortError') {
       const err: any = new Error(`gateway timeout after ${timeoutMs}ms (model=${opts.model})`);
       err.status = 504;
+      err.retryable = true;
       throw err;
     }
+    (e as any).retryable = true;
     throw e;
   } finally {
     clearTimeout(t);
@@ -533,13 +546,60 @@ async function callGateway(opts: CallOpts) {
     const text = await res.text();
     const err: any = new Error(`gateway ${res.status}: ${text.slice(0, 400)}`);
     err.status = res.status;
+    err.retryable = RETRYABLE_STATUS.has(res.status);
     throw err;
   }
   const json = await res.json();
   const call = json?.choices?.[0]?.message?.tool_calls?.[0];
-  if (!call?.function?.arguments) throw new Error('no tool call returned');
+  if (!call?.function?.arguments) {
+    const err: any = new Error('no tool call returned');
+    err.retryable = true;
+    throw err;
+  }
   return JSON.parse(call.function.arguments);
 }
+
+async function callGateway(opts: CallOpts): Promise<any> {
+  const retries = opts.retries ?? 1;
+  let lastErr: any;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await callGatewayOnce(opts);
+    } catch (e: any) {
+      lastErr = e;
+      if (!e?.retryable || attempt === retries) throw e;
+      const backoff = 500 + Math.floor(Math.random() * 1000) + attempt * 500;
+      console.warn(`[briefing-deep-parse] retry ${attempt + 1}/${retries} for ${opts.model} after ${backoff}ms — ${e?.message?.slice(0, 120)}`);
+      await new Promise((r) => setTimeout(r, backoff));
+    }
+  }
+  throw lastErr;
+}
+
+interface ChainStep { model: string; timeoutMs: number; maxTokens?: number; retries?: number; }
+
+async function callGatewayChain(base: Omit<CallOpts, 'model' | 'timeoutMs' | 'maxTokens' | 'retries'>, chain: ChainStep[], label: string): Promise<{ result: any; modelUsed: string; diagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> }> {
+  const diagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> = [];
+  let lastErr: any;
+  for (const step of chain) {
+    const t0 = Date.now();
+    try {
+      const result = await callGateway({ ...base, model: step.model, timeoutMs: step.timeoutMs, maxTokens: step.maxTokens, retries: step.retries ?? 0 });
+      const ms = Date.now() - t0;
+      diagnostics.push({ model: step.model, ok: true, ms });
+      console.log(`[briefing-deep-parse] ${label} success in ${ms}ms (model=${step.model})`);
+      return { result, modelUsed: step.model, diagnostics };
+    } catch (e: any) {
+      const ms = Date.now() - t0;
+      const errMsg = e?.message?.slice(0, 200) ?? 'unknown';
+      diagnostics.push({ model: step.model, ok: false, ms, error: errMsg });
+      console.warn(`[briefing-deep-parse] ${label} failed on ${step.model} after ${ms}ms — ${errMsg}`);
+      lastErr = e;
+    }
+  }
+  throw lastErr ?? new Error(`${label}: all chain models failed`);
+}
+
 
 function normalizeMention(s: string): string {
   return String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
