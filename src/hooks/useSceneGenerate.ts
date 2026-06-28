@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
 import type {
   ComposerScene,
   ComposerCharacter,
