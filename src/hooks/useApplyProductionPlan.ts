@@ -52,12 +52,30 @@ const INVALID_VOICE_TOKENS = new Set([
   'lipsync-2', 'lipsync-2-pro', 'sync-3', 'sync.so', 'cinematic-sync', 'happyhorse', 'hailuo',
 ]);
 
-function cleanVoiceId(raw?: string | null): string | undefined {
+/**
+ * cleanVoiceId — strip engine tokens and reject UUIDs (which are almost always
+ * a Character-UUID that the planner mistakenly piped into voiceId). Real
+ * ElevenLabs voice IDs are 20 opaque alphanumeric chars with no dashes.
+ *
+ * When `defaultVoicesByCharacter` is provided and `raw` looks like a UUID, we
+ * try to look up the character's default voice as a fallback before bailing.
+ */
+function cleanVoiceId(
+  raw?: string | null,
+  defaultVoicesByCharacter?: Record<string, string | undefined>,
+): string | undefined {
   const v = String(raw ?? '').trim();
   if (!v) return undefined;
   if (INVALID_VOICE_TOKENS.has(v.toLowerCase())) return undefined;
   // ElevenLabs/custom voice IDs are opaque, but never model names with slash/colon.
   if (/^(sync|lipsync|hailuo|happyhorse|cinematic|model)[\w\-/:.]*$/i.test(v)) return undefined;
+  // UUID-shape → almost always a Character-UUID that leaked into voiceId.
+  // Try the character→default_voice_id map; otherwise reject.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) {
+    const fallback = defaultVoicesByCharacter?.[v];
+    if (fallback && !/^[0-9a-f]{8}-/i.test(fallback)) return fallback;
+    return undefined;
+  }
   return v;
 }
 
