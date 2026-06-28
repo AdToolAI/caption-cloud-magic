@@ -402,6 +402,8 @@ export default function VideoComposerDashboard() {
             dismissedCharacterIds: local?.dismissedCharacterIds ?? [],
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
+            characterVoiceId: ((row as any).character_voice_id as any) ?? (local as any)?.characterVoiceId ?? undefined,
+
             dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
             dialogTakes: ((row as any).dialog_takes as any) ?? local?.dialogTakes ?? {},
             engineOverride: resolveEngineOverrideValue(row.id, ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto'),
