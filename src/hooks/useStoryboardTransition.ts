@@ -487,17 +487,17 @@ export function useStoryboardTransition({
     };
 
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': anon,
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ briefing: text, projectId, language }),
-      });
-      window.clearTimeout(timeoutId);
+      // First attempt; on transient 502/503/504, retry once after 2s before
+      // surfacing any error — backend chain has its own retries but a fresh
+      // edge-runtime cold start can still kick a 503.
+      let res = await doFetch();
+      if (!res.ok && (res.status === 502 || res.status === 503 || res.status === 504)) {
+        console.warn(`[useStoryboardTransition] deep-parse ${res.status} — 1× client retry after 2s`);
+        try { await res.text(); } catch { /* drain */ }
+        await new Promise((r) => setTimeout(r, 2000));
+        if (cancelledRef.current) return { handled: true };
+        res = await doFetch();
+      }
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
@@ -532,14 +532,14 @@ export function useStoryboardTransition({
       });
       return { handled: true };
     } catch (e: any) {
-      window.clearTimeout(timeoutId);
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
       const isAbort = e?.name === 'AbortError';
       const status: number | undefined = e?.status;
-      const msg: string = isAbort ? 'Timeout nach 180s' : (e?.message || 'Deep-Parse fehlgeschlagen');
+      const msg: string = isAbort ? `Timeout nach ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s` : (e?.message || 'Deep-Parse fehlgeschlagen');
       console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: e?.body, isAbort });
+
 
       // Hard blocks (credits / rate-limit / payload): keep classic toast + navigate.
       if (status === 402 || status === 429 || status === 413) {
