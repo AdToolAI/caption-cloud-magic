@@ -680,28 +680,50 @@ export function useApplyProductionPlan() {
         .filter((x): x is string => !!x),
     ));
     const defaultVoicesByCharacter: Record<string, string | undefined> = {};
+    const genderByCharacter: Record<string, 'male' | 'female' | 'neutral' | null | undefined> = {};
     if (characterIds.length > 0) {
       const { data, error } = await supabase
         .from('brand_characters')
-        .select('id, default_voice_id')
+        .select('id, default_voice_id, gender')
         .in('id', characterIds);
       if (!error) {
         for (const row of (data ?? []) as any[]) {
           const voice = cleanVoiceId(row?.default_voice_id);
           if (row?.id && voice) defaultVoicesByCharacter[String(row.id)] = voice;
+          if (row?.id) {
+            const g = row?.gender as string | null | undefined;
+            genderByCharacter[String(row.id)] = (g === 'male' || g === 'female' || g === 'neutral') ? g : null;
+          }
         }
       } else {
         console.warn('[useApplyProductionPlan] default voice lookup failed:', error);
       }
     }
 
-    // 4) Build new scenes from plan.
+    // 4) Build new scenes from plan. The pool-picker is created once per apply-run
+    // so round-robin allocation spans all scenes (max 4 speakers stay distinct),
+    // and `voicePoolAssignments` keeps the same character on the same voice
+    // across scenes.
+    const voicePoolPicker = createVoicePoolPicker();
+    const voicePoolAssignments: Record<string, string> = {};
     const newScenes: ComposerScene[] = (plan.scenes ?? [])
       .slice()
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
-        planSceneToComposerScene(s, protectedScenes.length + i, projectId, plan.negativePrompt, currentBriefing?.tone, cleanVoiceId(plan.voice?.voiceId), defaultVoicesByCharacter),
+        planSceneToComposerScene(
+          s,
+          protectedScenes.length + i,
+          projectId,
+          plan.negativePrompt,
+          currentBriefing?.tone,
+          cleanVoiceId(plan.voice?.voiceId),
+          defaultVoicesByCharacter,
+          genderByCharacter,
+          voicePoolPicker,
+          voicePoolAssignments,
+        ),
       );
+
 
     // Diagnostic: warn when a lipSync-engine scene resolved to 0 characterShots.
     for (const ns of newScenes) {
