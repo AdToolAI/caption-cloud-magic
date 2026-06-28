@@ -1876,7 +1876,7 @@ export default function VideoComposerDashboard() {
       <ProductionPlanSheet
         open={storyboardTransition.state.planSheetOpen}
         onOpenChange={(v) => storyboardTransition.setPlanSheetOpen(v)}
-        projectId={project.id}
+        projectId={storyboardTransition.state.activeProjectId || project.id}
         language={project.language}
         currentScenes={project.scenes}
         currentAssembly={project.assemblyConfig}
