@@ -841,7 +841,13 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const briefing: string = String(body?.briefing ?? '').trim();
-    const projectId: string | null = body?.projectId ?? null;
+    // v176: coerce empty/whitespace strings to null so the UUID column doesn't
+    // reject the insert with "22P02 invalid input syntax for type uuid".
+    const rawProjectId = body?.projectId;
+    const projectId: string | null =
+      typeof rawProjectId === 'string' && rawProjectId.trim().length > 0
+        ? rawProjectId.trim()
+        : null;
     const rawLang: string = String(body?.language ?? 'de').toLowerCase().slice(0, 5);
     const LANG_NAME: Record<string, string> = {
       de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
