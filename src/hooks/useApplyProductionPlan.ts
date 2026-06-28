@@ -269,7 +269,11 @@ function planSceneToComposerScene(
   briefingTone: string | undefined,
   projectVoiceId: string | undefined,
   defaultVoicesByCharacter: Record<string, string | undefined> = {},
+  genderByCharacter: Record<string, 'male' | 'female' | 'neutral' | null | undefined> = {},
+  voicePoolPicker?: VoicePoolPicker,
+  voicePoolAssignments: Record<string, string> = {},
 ): ComposerScene {
+
   // Build characterShots from resolved cast. The plan stores `characterId`
   // as the BASE brand_characters.id (CastRef invariant) plus an optional
   // separate `outfitLookId`. We still defensively strip any legacy mention
