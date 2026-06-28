@@ -759,6 +759,14 @@ serve(async (req) => {
       // visible, unobstructed lip-line) — which is what sync-3 actually needs
       // to drive lipsync — but remove the *motion* instruction. Plate mouths
       // stay still; only the per-pass lipsync model opens the active mouth.
+      // v173 (Jun 28 2026) — Single-speaker closing clause: drop the
+      // "heads stay steady / no nodding" instruction for n=1 so scene
+      // performance, gestik and actionBeat from the Briefing-Plan actually
+      // surface visibly. The multi-speaker plate still needs the steady-head
+      // lock because parallel lipsync passes share one base frame.
+      if (speakerSlugs.length === 1) {
+        return `Lip-ready single-subject plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep the facial expression natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the speaker's mouth in post). The character keeps their mouth softly closed in the plate itself — no idle mouth, jaw or lip motion in the plate. Eyes stay open and alert throughout. Camera, framing, body posture and on-set action follow the scene description faithfully.`;
+      }
       return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself. Eyes stay open and alert throughout the entire plate; heads stay steady — no nodding, no head bobbing.`;
     };
 
