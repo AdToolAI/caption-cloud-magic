@@ -209,7 +209,7 @@ function planSceneToComposerScene(
   const stripPrefix = (id: string) =>
     id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
-  const characterShots: CharacterShot[] = (ps.cast ?? [])
+  const rawShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
     .map((c, i) =>
       ({
@@ -227,6 +227,38 @@ function planSceneToComposerScene(
         outfitLookId: c.outfitLookId ?? undefined,
       }) as CharacterShot,
     );
+
+  // Cast-Dedup: collapse multiple slots that resolve to the same person
+  // (UUID + legacy slug, or duplicate UUID entries). First occurrence wins
+  // its slot index; if a later entry has a more specific shotType, prefer it.
+  // Without this dedup, Multi-Portrait Nano Banana 2 burns a slot on a ghost
+  // entry and Cast Consistency Map shows a phantom badge.
+  const shotSpecificity: Record<string, number> = {
+    absent: 0, full: 1, profile: 2, pov: 3, detail: 4,
+  };
+  const dedupMap = new Map<string, CharacterShot>();
+  for (const shot of rawShots) {
+    const key = String(shot.characterId).toLowerCase().trim();
+    if (!key) continue;
+    const existing = dedupMap.get(key);
+    if (!existing) {
+      dedupMap.set(key, shot);
+      continue;
+    }
+    // Keep the more specific shotType, but preserve the existing outfit
+    // selection if the new one doesn't have one.
+    const existingRank = shotSpecificity[existing.shotType ?? 'full'] ?? 1;
+    const newRank = shotSpecificity[shot.shotType ?? 'full'] ?? 1;
+    if (newRank > existingRank) {
+      dedupMap.set(key, {
+        ...shot,
+        outfitLookId: shot.outfitLookId ?? existing.outfitLookId,
+      });
+    } else if (!existing.outfitLookId && shot.outfitLookId) {
+      dedupMap.set(key, { ...existing, outfitLookId: shot.outfitLookId });
+    }
+  }
+  const characterShots: CharacterShot[] = Array.from(dedupMap.values());
 
   // Build the i2v prompt: English anchor hint + continuity + brand note +
   // scene-level + global negative-prompt suffix.
