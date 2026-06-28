@@ -597,14 +597,22 @@ export function useStoryboardTransition({
               const { plan: latePlan } = parsePlan(lateData);
               if (!latePlan) return;
               setState((s) => {
-                if (!s.planSheetOpen) return s;
-                // Only swap if the user is still on the fallback plan.
-                if (s.initialPlan !== fallback) return s;
+                // v176: even if the user already closed the sheet (e.g. clicked
+                // "Plan anwenden" against the fallback), reopen it with the
+                // real plan so they can re-apply. The apply-hook's protection
+                // filter (clip_status='pending' && clip_url IS NULL &&
+                // !lipSyncStatus && !dialogLockedAt) ensures we never overwrite
+                // rendered or locked scenes.
+                const sheetWasClosed = !s.planSheetOpen;
                 toast({
-                  title: '✨ Vollständiger Plan nachgeladen',
-                  description: 'Der AI-generierte Plan ist jetzt verfügbar.',
+                  title: sheetWasClosed
+                    ? '✨ Vollständiger Plan nachgeladen — bitte erneut anwenden'
+                    : '✨ Vollständiger Plan nachgeladen',
+                  description: sheetWasClosed
+                    ? 'Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden", um Fallback-Szenen zu ersetzen.'
+                    : 'Der AI-generierte Plan ist jetzt verfügbar.',
                 });
-                return { ...s, initialPlan: latePlan };
+                return { ...s, planSheetOpen: true, initialPlan: latePlan };
               });
             } catch (lateErr) {
               console.warn('[useStoryboardTransition] late-arrival failed', lateErr);

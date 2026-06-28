@@ -1,52 +1,51 @@
+## Antwort auf deine Frage
 
-# Verifikation Briefing → Storyboard
+**Nein — das Storyboard zeigt aktuell den Local-Fallback, nicht dein Briefing.** DB-Beweis aus dem aktiven Projekt:
 
-## Was die DB sagt (Read-only Check, kein Spin)
+| Szene | `dialog_script` | `ai_prompt` | voice | mentions |
+|---|---|---|---|---|
+| 0 | `"Samuel Dusatko: Ich melde mich gleich morgen an!"` | `"[SceneAction] Establishing shot: A relevant setting…"` | `null` | `[]` |
+| 1 | *(leer)* | `"Reveal beat for the brand: cinematic establishing shot…"` | `null` | `[]` |
+| 2 | *(leer)* | `"CTA beat for the brand: cinematic establishing shot…"` | `null` | `[]` |
 
-**Edge-Function läuft sauber:**
-- Letzter Deep-Parse 18:56 UTC: Pass A Flash 8.0s ✅, Pass B Flash 3.7s ✅, 3 Szenen, engine=`cinematic-sync`. Reliability-Umbau (Flash-first) wirkt — Pro wird nicht mehr getriggert.
+Das sind 1:1 die Fallback-Strings. Dein „3 Uhr nachts"-Briefing ist nirgends im Storyboard angekommen. Das Sheet zeigt dir die echte Analyse (siehe Screenshot rechts), aber **angewendet wurde der Fallback**.
 
-**Vorheriger Apply (Projekt `aed04374…`, 18:23 UTC) hat real geliefert:**
-- `ai_prompt`: echte szenische Beschreibung („extreme close-up on a man's tired face… dark bedroom… laptop screen…")
-- `dialog_script`: „SAMUEL DUSATKO: Es ist 3 Uhr nachts. Und ich bearbeite… schon wieder… ein Reel."
-- `shot_director` / `action_beat` / `transition_type` / `realism_preset` korrekt gesetzt.
+## Warum
 
-**Aktuelles Projekt im Screenshot (`f39042bd…`, 18:27/18:28 UTC) ist Fallback-Placeholder:**
-- `ai_prompt`: „CTA beat for the brand: cinematic establishing shot in a relevant setting." (generisch)
-- `dialog_script`: „Ich melde mich gleich morgen an!" (Local-Fallback-String, nicht aus deinem Briefing)
-- Apply lief um 18:27 — der echte Deep-Parse kam erst um 18:56. Du siehst im Sheet die echte Analyse, aber das Storyboard wurde **vor** dem erfolgreichen Parse mit dem Fallback gefüllt und nicht überschrieben.
+Edge-Log von vor wenigen Minuten:
 
-## 3 echte Lücken (in **jedem** Projekt, auch bei erfolgreichem Parse)
+```
+ERROR [briefing-deep-parse] persist returned error:
+  22P02 invalid input syntax for type uuid: ""
+```
 
-1. **`composer_production_plans` wird nicht geschrieben.** Letzte Zeile: 23.06. Edge-Function persistiert den Plan nicht → keine Audit-Spur, Late-Arrival-Swap kann auch nichts überschreiben.
-2. **`character_voice_id` bleibt leer** (alle 3 Szenen, beide Projekte). Im Sheet steht „voice.voiceName nicht in Library" → Voice-Resolver matcht den Charakter nicht gegen `brand_characters.default_voice_id`. Deshalb auch der `twoshot_audio_prep_failed: missing_voice` von vorhin.
-3. **`mentioned_character_ids` / `mentioned_location_ids` bleiben `{}`** obwohl Cast+Location resolved sind. Folge: `@-Mention`-basierte Library-Helfer (Anchor-Compose, Continuity, Scene-Director) sehen den Charakter in der Szene nicht.
+`composer_production_plans` hat seit 23.06. **keine** neue Zeile — Pass A/B laufen sauber, aber der Insert scheitert weil `project_id` als leerer String statt `null` reinkommt. Folge-Effekte:
 
-## Plan (klein, präzise, kein Lipsync-Anfassen)
+1. **Kein Late-Arrival-Replace.** Der echte Plan ist nicht in der DB → die Fallback-Szenen werden nie überschrieben wenn der Parse spät landet.
+2. **Voice + Mentions leer.** Apply lief gegen einen Fallback-Plan ohne resolved cast/location → `mentioned_*` bleiben `{}`, `character_voice_id` bleibt `null`.
+3. **5 offene Punkte im Sheet** (Duration-Mismatch + 2 Locations) — der Plan im Sheet ist echt, aber er wurde nie ins Storyboard geschrieben, weil du auf Fallback-Szenen schaust.
 
-### 1. Persistenz in `composer_production_plans` einbauen
-- `briefing-deep-parse/index.ts`: nach erfolgreichem Pass B (vor return) ein `insert` mit `{user_id, project_id, version=next, source_text, manifest=plan, unresolved, parser_meta}`. Beste-Mühe, Fehler nur loggen — Response nicht blocken.
-- Client (`useStoryboardTransition` / War-Room) übergibt `project_id` im Body.
+## Fix (3 Edits, keinen Lipsync-Code anfassen)
 
-### 2. Voice-Resolver in Apply fixen
-- `useApplyProductionPlan.ts`: beim Schreiben jeder Szene den Cast-Charakter über `id` in `brand_characters` nachschlagen und `default_voice_id` → `character_voice_id` setzen (nur falls Szene noch leer). Optional `dialog_voices[castId] = default_voice_id` mitsetzen.
-- Fallback: wenn `voice.voiceName` im Plan steht und in der Library nicht matchbar → trotzdem Charakter-Default verwenden statt leer zu lassen, und unresolved-Eintrag auf „warn" statt „block" runterstufen.
+### 1. `supabase/functions/briefing-deep-parse/index.ts` — Persist reparieren
+- Vor dem Insert: `const safeProjectId = projectId && projectId.trim() ? projectId : null;` und denselben Wert auch beim Vorgänger-Version-Lookup verwenden.
+- Insert-Payload nutzt `safeProjectId`. Damit landen ab sofort alle Pläne in `composer_production_plans` → Audit-Trail + Late-Arrival-Voraussetzung erfüllt.
 
-### 3. Mentions beim Apply auffüllen
-- `useApplyProductionPlan.ts`: `mentioned_character_ids = scene.cast.map(c => c.id)`, `mentioned_location_ids = scene.location ? [location.id] : []`. Nur wenn Felder leer sind (nicht überschreiben).
+### 2. `src/hooks/useStoryboardTransition.ts` — Late-Arrival aktiv schalten
+- Nach erfolgreichem späten Parse: prüfen ob aktuell angewendete Szenen **Fallback-Signatur** tragen (`ai_prompt` matcht `/cinematic establishing shot in a relevant setting/i` oder `dialog_script === 'Ich melde mich gleich morgen an!'`) **und** die bestehenden Schutzfilter erfüllt sind (`clip_status='pending'`, `clip_url IS NULL`, `lipSyncStatus IS NULL`, `dialogLockedAt IS NULL`).
+- Wenn ja: `useApplyProductionPlan` erneut mit dem echten Plan aufrufen → Fallback-Szenen werden still durch echte ersetzt. Eine Toast-Nachricht „Briefing nachträglich übernommen — 3 Szenen aktualisiert".
 
-### 4. Late-Arrival-Replace härten
-- `useStoryboardTransition`: wenn Apply mit Fallback-Plan lief und der echte Deep-Parse danach eintrifft, automatisch erneut Apply auf die Szenen anwenden **die noch nicht gerendert/locked sind** (genau gleiche Schutz-Bedingungen wie bisher: `clip_status='pending'` && `clip_url IS NULL` && `lipSyncStatus IS NULL` && `dialogLockedAt IS NULL`).
+### 3. Sichtbare Diagnose im War-Room / ProductionPlanSheet
+- Banner oben im Sheet wenn der gerade gezeigte Plan **nicht** der ist, der angewendet wurde (Vergleich Plan-Version im Sheet vs. letzter Apply): „⚠️ Dieser Plan ist neuer als deine Storyboard-Szenen. [Erneut anwenden]"-Button → ruft Apply manuell auf.
+- Im `Plan anwenden`-Button ein kleines Mapping-Badge nach Apply: „Skript ✅ · Performance ✅ · Voice ⚠️ (kein default)" pro Szene, gelesen direkt aus `composer_scenes` 2s nach Apply. Macht den Drift sofort sichtbar ohne DB-Check.
 
-### 5. Sichtbares Mapping-Badge im War-Room (klein)
-- Eine Zeile pro Szene: „Skript ✅ · Performance ✅ · Action ✅ · Shot ✅ · Voice ⚠️" — liest direkt aus `composer_scenes` nach Apply. Kein neuer Endpoint, keine neue Tabelle. Macht zukünftig sofort sichtbar, was du jetzt mich fragen musstest.
+## Was bewusst NICHT angefasst wird
+Lipsync-Pipeline, Sync.so, `dialog_shots`, HappyHorse Green-Net, Hailuo-Duration-Lock, Pass-A/B-Tool-Schema, Prompts.
 
-## Was NICHT angefasst wird
-Lipsync-Pipeline, Sync.so, `dialog_shots`, HappyHorse Green-Net, Hailuo-Duration-Lock, Tool-Schema des Parsers, Prompts.
-
-## Erwartetes Ergebnis
-- Beim nächsten Briefing landen Skript, Performance, Action, Shot, Transition, Overlay, Realism **und** Voice + Mentions 1:1 im Storyboard.
-- Wenn der Parse mal langsamer ist als der User-Klick, ersetzt der späte Plan still die Fallback-Szenen, solange sie unangetastet sind.
-- Du siehst pro Szene in einer Zeile, was angekommen ist — ohne mich fragen zu müssen.
+## Erwartetes Ergebnis nach Fix
+- Beim nächsten Briefing landet der Plan **in der DB** (Persist-Fehler weg).
+- Wenn du „Plan anwenden" drückst bevor Pass B fertig ist: Fallback wird sofort durch echten Plan ersetzt, sobald er ankommt.
+- Im Sheet siehst du pro Szene was wirklich im Storyboard steht — Drift wird in einer Zeile sichtbar statt dass du mich fragen musst.
+- Die 5 offenen Punkte (Duration 5s vs. Voice 3s, Locations fehlen) sind echte Plan-Lücken — die löst du mit dem bestehenden **Auto-Resolve**-Button im Sheet bzw. durch Anlegen der zwei Locations in der Library.
 
 Freigabe zum Umsetzen?
