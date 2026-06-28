@@ -1,57 +1,42 @@
 
-# Plan: Deep-Parse 100% zuverlässig — Fallback wird obsolet
+# Plan: Briefing→Storyboard 1:1-Übertragung verifizieren
 
-## Root-Cause-Analyse
-- **Pass A** nutzt `google/gemini-2.5-pro` mit `max_tokens: 12000` und 90s Timeout. Pro ist tendenziell langsam/überlastet → genau hier kippt der Run in den Client-Fallback.
-- **Pass B** (Flash, 45s) ist okay, hat aber keinen Retry.
-- **Sequenziell**: Pass A muss komplett fertig sein, bevor Library + Pass B starten — verschenkte Zeit.
-- **Kein Retry**: Ein einzelner 5xx/Abort kippt den ganzen Run sofort.
-- **Output groß**: 12k Tokens Tool-Call für ~3 Szenen ist 4–6× zu viel und verlängert die Antwortzeit linear.
+Ziel: Beweisen (nicht nur behaupten), dass **alle** Briefing-Felder im Storyboard ankommen — über echte Logs, DB-Inspektion und einen sichtbaren UI-Check.
 
-## Lösung — vier Stellschrauben, alle in `supabase/functions/briefing-deep-parse/index.ts`
+## Was bereits implementiert ist (zur Referenz)
+- `briefing-deep-parse` extrahiert: script, performance (expression/gesture/gaze/energy), actionBeat, framing, lighting, music, transitions, overlays, per-cast shotType, language.
+- `useApplyProductionPlan` schreibt alle Felder in `composer_scenes`.
+- `driftDetector` validiert nach Apply.
+- `buildInvokePrompt` injiziert performance+actionBeat in den Single-Scene-Invoke.
+- v174 Reliability: Flash-first Pass A mit Retry-Chain, soll Fallback-Quote auf <1 % drücken.
 
-### 1. Modell-Strategie umdrehen (größter Hebel)
-- **Pass A primär: `google/gemini-2.5-flash`** mit 35s Timeout. Flash schafft strukturierte Tool-Calls für Briefings dieser Größe zuverlässig in 8–20s.
-- **Fallback-Kette innerhalb Pass A** (in dieser Reihenfolge, jeder mit eigenem Retry):
-  1. `gemini-2.5-flash` (35s, 1 Retry bei 5xx/abort/no-tool-call)
-  2. `gemini-2.5-pro` (60s, 1 Versuch) — nur wenn Flash 2× scheitert
-  3. `gemini-2.5-flash-lite` (25s, 1 Versuch) — letzter Rettungsanker
-- Damit ist Pass A im 99-%-Fall in <25s durch, statt potenziell 90s zu hängen.
+## Schritt 1 — Reality-Check via Logs (kein Code, nur Beobachtung)
+- Edge-Logs von `briefing-deep-parse` der letzten 24h auswerten: Wie oft `Pass A success` (Flash), wie oft Fallback zu Pro/Flash-Lite, wie oft kompletter 5xx → Client-Fallback?
+- Konkrete Latenzen messen, ob die 8–25s-Annahme stimmt.
+- Falls Pro öfter als erwartet greift: Token-Budget weiter senken oder Pass A in 2 kleinere Passes splitten.
 
-### 2. `callGateway` mit eingebautem Retry + Jitter
-- Neue Signatur: `callGateway({ ..., retries: 1, retryOn: [408, 429, 500, 502, 503, 504] })`.
-- Retry nur bei den genannten Status-Codes und bei `AbortError`/`no tool call returned`.
-- Exponential backoff mit Jitter (500ms → 1500ms).
-- Saubere Fehler-Klassifizierung: `network` / `timeout` / `rate_limit` / `bad_response` — wird in der Response als `meta.passADiagnostics` mitgegeben (sichtbar im War-Room für Debugging).
+## Schritt 2 — DB-Inspektion einer echten geparsten Szene
+- Letzten erfolgreichen Eintrag aus `composer_production_plans` ziehen (wo `meta->>'source' = 'deep_parse'`).
+- Verifizieren, dass für **jede** Szene gefüllt sind: `script`, `performance` (alle 4 Sub-Felder), `actionBeat`, `framing`, `lighting`, `transitions`, `overlays`, per-cast `shotType`.
+- Den zugehörigen `composer_scenes`-Eintrag nach `useApplyProductionPlan` prüfen — ist 1:1 angekommen, oder droppt der Apply-Pfad still Felder?
 
-### 3. Token-Budget halbieren
-- `max_tokens: 6000` für Pass A (3-Szenen-Briefings brauchen typisch 1.5–3k) und `4000` für Pass B.
-- Spart 30–50 % Antwortzeit bei großen Modellen.
+## Schritt 3 — Drift-Report sichtbar machen
+Aktuell läuft `driftDetector` nach Apply, das Ergebnis landet in der Konsole. Ich schlage vor (kleine UI-Erweiterung, nicht in diesem Plan-Step umgesetzt — würde erst nach Freigabe gebaut):
+- Im `ProductionWarRoom` nach „Apply" eine **„Mapping-Report"-Karte** zeigen: pro Szene grün/gelb/rot pro Feld, plus „X von Y Briefing-Feldern übernommen".
+- So sieht der User sofort, wenn z. B. `overlays` zwar im Plan steht, aber im Storyboard nicht ankommt.
 
-### 4. Library-Snapshot parallelisieren
-- `Promise.all([passA, librarySnapshot])` statt sequenziell. Spart 200–600ms.
-- Pass B startet, sobald beide fertig sind.
+## Schritt 4 — Falls Lücken gefunden werden
+Erst dann gezielt patchen — kein vorgezogenes „defensives" Code-Schreiben. Mögliche Stellen:
+- `useApplyProductionPlan.ts` — Schreibpfad für ein Feld vergessen?
+- `composer_scenes`-Spalte fehlt für ein neues Plan-Feld?
+- `buildInvokePrompt` schickt das Feld nicht weiter?
 
-### 5. Server-Side Warm-Path (kleiner Bonus)
-- Erster `fetch` zum Gateway schickt einen Mini-Health-Ping (`max_tokens: 1`) in `EdgeRuntime.waitUntil` **nach** der Response — wärmt die Gateway-Connection für den nächsten Aufruf desselben Users.
+## Was NICHT angefasst wird
+- Lipsync-Pipeline, Sync.so, dialog_shots, HappyHorse Green-Net, Hailuo-Duration-Lock — alle unverändert.
+- Prompts/Tool-Schemas in `briefing-deep-parse` — bleiben 1:1.
 
-## Client-Anpassung (`src/hooks/useStoryboardTransition.ts`)
-- Client-Timeout von 180s → **120s** (jetzt sicher genug, und schnelleres User-Feedback wenn doch was kippt).
-- Bei `503/504` vom Endpoint: **automatischer 1× Client-Retry** nach 2s, bevor überhaupt der Fallback-Pfad in Betracht gezogen wird.
-- Telemetrie: `passADiagnostics` + Gesamt-Latenz in `production_plan.meta` schreiben, damit wir bei künftigen Beschwerden sehen, welcher Pass wie lange brauchte (kein UI-Banner, nur Daten).
+## Erwartetes Ergebnis
+Eine ehrliche Antwort auf deine Frage in 2 Sätzen plus Beweis: „Ja, alle 11 Felder kommen an, hier ist ein Beispiel aus der DB" — oder „Felder X und Y droppen, weil Z, hier der Fix."
 
-## Was bewusst NICHT geändert wird
-- Prompts (`SYSTEM_PASS_A`, `SYSTEM_PASS_B`, `LANGUAGE LOCK`) — bleiben 1:1.
-- Tool-Schemas (`TOOL_PASS_A`, `TOOL_PASS_B`) — bleiben 1:1, damit Output-Qualität identisch.
-- Lokaler Fallback-Builder bleibt als allerletztes Netz drin, sollte aber unter Normalbedingungen nie mehr greifen.
-- Lipsync-Pipeline, Green-Net, Hailuo-Lock — alle unverändert.
-
-## Erwartetes Verhalten nach dem Patch
-- Briefing-Plan kommt in **8–25 Sekunden** zurück (statt 60–120s oder Timeout).
-- Pro-Modell wird nur noch in <1 % der Fälle berührt — kein Flaschenhals mehr.
-- `meta.source === 'deep_parse'` praktisch immer → starre-Sprecher-Logik und Mapping-Vollständigkeit greifen automatisch.
-- Falls Lovable AI Gateway wirklich komplett offline ist, sieht der User das nach max. ~75s (35+60+25 + 2s Backoff) und bekommt den lokalen Fallback — aber nur dann.
-
-## Verifikation
-- Edge-Logs nach Deploy prüfen: `[briefing-deep-parse] Pass A success in Xms (model=…)` als neues Log-Statement.
-- Drei Test-Briefings (kurz / mittel / das „3 AM Moment") durchschicken, Latenz im War-Room beobachten.
+## Freigabe-Frage
+Soll ich Schritt 1+2 jetzt ausführen (nur Read-Only: Logs + DB-Query) und dir das Ergebnis berichten, bevor wir über UI-Erweiterungen oder Patches entscheiden?
