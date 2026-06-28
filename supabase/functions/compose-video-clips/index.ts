@@ -662,21 +662,20 @@ serve(async (req) => {
         ? "framed in a clean front, three-quarter or natural profile angle (sync-3 handles profile and partial-occlusion natively) so the mouth and jaw remain clearly visible and unobstructed by hands, microphones or props"
         : n === 2
           ? "each visible exactly once, in a natural two-shot — front, three-quarter, profile or over-the-shoulder angles are all acceptable (sync-3 handles profile/OTS natively); the mouth and jaw of every person must stay clearly visible and unobstructed by hands, microphones or props"
-          // v9 (Jun 19 2026) — anti-split-screen ensemble framing. The prior
-          // wording ("single horizontal line / equal screen share / clear
-          // gaps / no overlap") was being interpreted literally by Hailuo
-          // and Nano-Banana-2 as a quad-split-screen layout (each person
-          // in their own vertical panel with hard seams). Replaced with
-          // language that emphasises ONE shared physical room and one
-          // continuous camera take. Negative prompt still hard-blocks
-          // panel/grid/collage compositions.
           : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
-      // IMPORTANT: do NOT instruct the model to keep lips closed or "rest" the
-      // mouth posture — that produces a frozen, ventriloquist-style face that
-      // Sync.so cannot meaningfully animate on top of. We only ask for a
-      // natural, lip-ready neutral expression with the mouth area clearly
-      // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
-      // constraints live exclusively in the negative_prompt.
+
+      // v173 (Jun 28 2026) — Single-speaker carve-out. The previous wrapper
+      // forced a LOCKED static tripod camera and "heads stay steady" even for
+      // n=1, which made every solo Cinematic-Sync clip read as a rigid
+      // talking-head bust regardless of the user's performance / actionBeat /
+      // shot-director settings. For n=1 we keep only the lip-ready geometry
+      // (mouth visible, no occlusion, lips not pre-puckered) and let the
+      // scene prompt drive camera, framing and body motion. For n≥2 the
+      // hard LOCK stays — multi-speaker lipsync passes need a stable plate.
+      if (n === 1) {
+        return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression; mouth and jaw stay still and softly closed in the plate (no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap) — only the downstream lipsync model will open the mouth. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      }
+
       return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. BUT mouths and jaws stay still and softly closed — no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap, no listener mouth movement. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
