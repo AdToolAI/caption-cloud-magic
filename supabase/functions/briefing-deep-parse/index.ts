@@ -930,7 +930,7 @@ This overrides any English wording in the briefing's scaffolding
     const libraryPromise = Promise.all([
       supabase
         .from('brand_characters')
-        .select('id,name,default_voice_id')
+        .select('id,name,default_voice_id,gender,description')
         .eq('user_id', userId)
         .limit(200),
       supabase
