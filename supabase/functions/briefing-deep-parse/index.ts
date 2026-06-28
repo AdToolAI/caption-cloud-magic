@@ -1002,25 +1002,35 @@ This overrides any English wording in the briefing's scaffolding
 
     // ── Pass B — resolution + validation ──────────────────────────────────
     let resolution: any = { scenes: [], unresolved: [] };
+    let passBDiagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> = [];
     try {
-      resolution = await callGateway({
-        model: 'google/gemini-2.5-flash',
-        system: LANGUAGE_LOCK + '\n' + SYSTEM_PASS_B,
-        tool: TOOL_PASS_B,
-        user: JSON.stringify({
-          OUTPUT_LANGUAGE: langKey,
-          MANIFEST: manifest,
-          LIBRARY: {
-            characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id })),
-            locations: locations.map((l: any) => ({ id: l.id, name: l.name })),
-            voices,
-          },
-        }),
-        timeoutMs: 45_000,
-      });
+      const passBOut = await callGatewayChain(
+        {
+          system: LANGUAGE_LOCK + '\n' + SYSTEM_PASS_B,
+          tool: TOOL_PASS_B,
+          user: JSON.stringify({
+            OUTPUT_LANGUAGE: langKey,
+            MANIFEST: manifest,
+            LIBRARY: {
+              characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id })),
+              locations: locations.map((l: any) => ({ id: l.id, name: l.name })),
+              voices,
+            },
+          }),
+        },
+        [
+          { model: 'google/gemini-2.5-flash',      timeoutMs: 30_000, maxTokens: 4000, retries: 1 },
+          { model: 'google/gemini-2.5-flash-lite', timeoutMs: 20_000, maxTokens: 4000, retries: 0 },
+        ],
+        'Pass B',
+      );
+      resolution = passBOut.result;
+      passBDiagnostics = passBOut.diagnostics;
     } catch (e: any) {
       console.warn('[briefing-deep-parse] Pass B failed, falling back to local resolution:', e?.message);
+      passBDiagnostics = (e as any)?.diagnostics ?? [];
       // Local fallback resolution
+
       const resolvedScenes = (manifest?.scenes ?? []).map((s: any) => {
         const cast = (s.cast ?? []).map((c: any) => {
           const needle = normalizeMention(c.mentionKey);
