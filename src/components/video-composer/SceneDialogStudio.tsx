@@ -36,6 +36,7 @@ import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
+import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import {
   resolveDialogVoice,
