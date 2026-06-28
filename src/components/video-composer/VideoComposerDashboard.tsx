@@ -1236,6 +1236,10 @@ export default function VideoComposerDashboard() {
           dialog_takes: (baseScene.dialogTakes ?? {}) as any,
           engine_override: baseScene.engineOverride ?? 'auto',
           character_shots: (baseScene.characterShots ?? null) as any,
+          // v175: denormalised mention IDs + first-speaker voice (initial insert).
+          mentioned_character_ids: ((baseScene as any).mentionedCharacterIds ?? null) as any,
+          mentioned_location_ids: ((baseScene as any).mentionedLocationIds ?? null) as any,
+          character_voice_id: ((baseScene as any).characterVoiceId ?? null) as any,
         } as any)
         .select('id')
         .single();
