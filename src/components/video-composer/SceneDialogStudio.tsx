@@ -1553,7 +1553,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     if (!autoSplitOnMount) return;
     if (generating) return;
     if (blocks.length < 2) return;
-    const allVoicesSet = speakers.every((sp) => Boolean(voicePerSpeaker[sp.id]?.voiceId));
+    const allVoicesSet = speakers.every((sp) => Boolean(getResolvedVoiceForSpeakerId(sp.id)?.voiceId));
     if (!allVoicesSet) {
       toast({
         title:
@@ -1773,7 +1773,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               const missing = !sp?.referenceImageUrl;
               const lineKey = dialogLineKey(i, b.text, b.tonality);
               const bundle = dialogTakes[lineKey];
-              const cfg = voicePerSpeaker[b.speakerId];
+              const cfg = getResolvedVoiceForSpeakerId(b.speakerId);
               const tuning = cfg?.engine === 'elevenlabs' ? buildTuningForBlock(b) : undefined;
               return (
                 <div key={i} className="space-y-0.5">
@@ -1841,7 +1841,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           <Label className="text-[10px] text-muted-foreground">{t.voices}</Label>
           <div className="space-y-1.5">
             {speakers.map((sp) => {
-              const cfg = voicePerSpeaker[sp.id];
+              const cfg = getResolvedVoiceForSpeakerId(sp.id);
               const isHume = cfg?.engine === 'hume';
               const brandDefault = defaultVoiceByCharId[sp.id];
               const isBrandVoice = !!brandDefault && cfg?.voiceId === brandDefault && cfg?.engine !== 'hume';
