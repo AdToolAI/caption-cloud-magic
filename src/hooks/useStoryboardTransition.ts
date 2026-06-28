@@ -261,9 +261,14 @@ interface Args {
   scenes: ComposerScene[];
   /** Project language (de/en/es/…) — forwarded to deep-parse for LANGUAGE LOCK. */
   language: string;
+  /** Ensures a draft project has a real DB UUID before deep-parse/plan persistence. */
+  ensureProjectId?: () => Promise<string>;
   /** Navigation hook: switches the dashboard tab to 'storyboard'. */
   navigateToStoryboard: () => void;
 }
+
+const isUuid = (val?: string | null) =>
+  !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
 /**
  * Returns true when a scene is "off-limits" for plan replacement.
@@ -271,13 +276,20 @@ interface Args {
  * consistent between the entry guard and the apply guard.
  */
 function isProtected(s: ComposerScene): boolean {
-  if (s.clipStatus && s.clipStatus !== 'pending') return true;
   if (s.clipUrl) return true;
+  // Failed/canceled scenes without a render are repairable fallback rows and
+  // MUST be replaceable by a later full Briefing plan. Protect only real output
+  // or in-flight state.
+  if (s.clipStatus === 'generating' || s.clipStatus === 'ready') return true;
   const a = s as any;
   if (a.lipSyncStatus) return true;
   if (a.dialogLockedAt) return true;
   if (a.lockReferenceUrl) return true;
   return false;
+}
+
+function isRepairableFailedScene(s: ComposerScene): boolean {
+  return (s.clipStatus === 'failed' || s.clipStatus === 'canceled') && !isProtected(s);
 }
 
 /** Slugify a character name into a stable @-mention key. */
@@ -344,7 +356,7 @@ export interface StoryboardTransitionState {
 }
 
 export function useStoryboardTransition({
-  briefing, projectId, scenes, language, navigateToStoryboard,
+  briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard,
 }: Args) {
   const [state, setState] = useState<StoryboardTransitionState>({
     warRoomOpen: false,
@@ -414,14 +426,46 @@ export function useStoryboardTransition({
     if (scenes.some(isProtected)) {
       return { handled: false };
     }
-    // GUARD 2 — already has any scenes: skip auto-analyse (user can re-trigger manually).
-    if (scenes.length > 0) {
+    // GUARD 2 — already has user-created scenes: skip auto-analyse. Exception:
+    // failed/canceled fallback rows are repairable and should be replaced by the
+    // full plan instead of trapping the user in stale placeholders.
+    if (scenes.length > 0 && !scenes.every(isRepairableFailedScene)) {
       return { handled: false };
     }
     // GUARD 3 — empty briefing: nothing to analyse.
     const text = buildBriefingText(briefing);
     if (text.length < 40) {
       return { handled: false };
+    }
+
+    let activeProjectId = projectId;
+    if (!isUuid(activeProjectId)) {
+      if (!ensureProjectId) {
+        toast({
+          title: 'Projekt noch nicht gespeichert',
+          description: 'Bitte kurz speichern und erneut versuchen.',
+          variant: 'destructive',
+        });
+        return { handled: true };
+      }
+      try {
+        activeProjectId = await ensureProjectId();
+      } catch (err: any) {
+        toast({
+          title: 'Projekt konnte nicht vorbereitet werden',
+          description: err?.message ?? String(err),
+          variant: 'destructive',
+        });
+        return { handled: true };
+      }
+      if (!isUuid(activeProjectId)) {
+        toast({
+          title: 'Projekt-ID fehlt',
+          description: 'Die Analyse wurde gestoppt, damit kein unverbundener Plan entsteht.',
+          variant: 'destructive',
+        });
+        return { handled: true };
+      }
     }
 
     cancelledRef.current = false;
@@ -458,7 +502,7 @@ export function useStoryboardTransition({
             'apikey': anon,
             'Authorization': `Bearer ${authToken}`,
           },
-          body: JSON.stringify({ briefing: text, projectId, language }),
+          body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
         });
       } finally {
         window.clearTimeout(timeoutId);
@@ -590,7 +634,7 @@ export function useStoryboardTransition({
                   'apikey': anon,
                   'Authorization': `Bearer ${authToken}`,
                 },
-                body: JSON.stringify({ briefing: text, projectId, language }),
+                  body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
               });
               if (!lateRes.ok) return;
               const lateData = await lateRes.json();
@@ -631,7 +675,7 @@ export function useStoryboardTransition({
       }
       return { handled: true };
     }
-  }, [briefing, projectId, scenes, navigateToStoryboard]);
+  }, [briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard]);
 
   const setPlanSheetOpen = useCallback((open: boolean) => {
     setState((s) => ({ ...s, planSheetOpen: open, initialPlan: open ? s.initialPlan : null }));
