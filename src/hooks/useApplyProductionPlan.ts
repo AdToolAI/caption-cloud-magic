@@ -534,6 +534,63 @@ export function useApplyProductionPlan() {
       }
     }
 
+    // 4b) v177 — INSERT new plan-scenes into DB directly.
+    //     The dashboard's debounced `persistScenesToDb` path only UPDATEs
+    //     rows with UUID ids; freshly minted plan-scenes carry temp
+    //     `scene_xxx_yyy` ids and were therefore never persisted. Result:
+    //     toast said "3 neu / 3 ersetzt" but DB still held the old rows
+    //     and reloads brought the Fallback back. Persist here, then swap
+    //     temp ids for real UUIDs before handing off to onUpdateScenes.
+    if (projectId && newScenes.length > 0) {
+      try {
+        const rows = newScenes.map((s, i) => ({
+          project_id: projectId,
+          order_index: protectedScenes.length + i,
+          scene_type: s.sceneType,
+          duration_seconds: s.durationSeconds,
+          clip_source: s.clipSource,
+          clip_quality: s.clipQuality || 'standard',
+          clip_status: s.clipStatus ?? 'pending',
+          with_audio: s.withAudio !== false,
+          lip_sync_with_voiceover: (s as any).lipSyncWithVoiceover === true,
+          dialog_mode: (s as any).dialogMode === true,
+          ai_prompt: s.aiPrompt ?? null,
+          text_overlay: (s.textOverlay ?? null) as any,
+          transition_type: s.transitionType,
+          transition_duration: s.transitionDuration,
+          character_shot: (s.characterShot ?? null) as any,
+          character_shots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : null)) as any,
+          dialog_script: s.dialogScript ?? null,
+          dialog_voices: ((s as any).dialogVoices ?? {}) as any,
+          engine_override: (s as any).engineOverride ?? 'auto',
+          shot_director: (s.shotDirector ?? {}) as any,
+          scene_action_user: (s as any).sceneActionUser ?? null,
+          scene_action_en: (s as any).sceneActionEn ?? null,
+          mentioned_character_ids: ((s as any).mentionedCharacterIds ?? null) as any,
+          mentioned_location_ids: ((s as any).mentionedLocationIds ?? null) as any,
+          character_voice_id: ((s as any).characterVoiceId ?? null) as any,
+        }));
+        const { data, error } = await supabase
+          .from('composer_scenes')
+          .insert(rows as any)
+          .select('id, order_index');
+        if (error) {
+          console.error('[useApplyProductionPlan] INSERT failed', error);
+        } else if (Array.isArray(data)) {
+          // Map returned UUIDs back into newScenes (by order_index — stable
+          // because we built rows in that exact order).
+          const byOrder = new Map<number, string>();
+          for (const r of data as any[]) byOrder.set(Number(r.order_index), String(r.id));
+          for (let i = 0; i < newScenes.length; i++) {
+            const realId = byOrder.get(protectedScenes.length + i);
+            if (realId) newScenes[i] = { ...newScenes[i], id: realId };
+          }
+        }
+      } catch (e) {
+        console.error('[useApplyProductionPlan] INSERT crashed (non-fatal)', e);
+      }
+    }
+
     // 5) Merge: keep protected scenes at their current order, append new ones.
     const merged = [
       ...protectedScenes.map((s, i) => ({ ...s, orderIndex: i })),
