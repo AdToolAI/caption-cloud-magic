@@ -881,26 +881,58 @@ This overrides any English wording in the briefing's scaffolding
 
     const t0 = Date.now();
 
-    // ── Pass A — structural extraction (Gemini 2.5 Pro for quality) ───────
-    // Defensive: if the gateway fails (5xx / timeout / no tool call), we
-    // continue with an empty manifest so the safety arc below still gives
-    // the user a usable plan instead of a hard 500.
+    // ── Pass A + Library snapshot in parallel ────────────────────────────
+    // Pass A uses a fast model chain: Flash (2 attempts) → Pro (1) → Flash-Lite (1).
+    // Flash handles ~99% of briefings in 8-25s; Pro is only touched if Flash fails twice.
     let manifest: any;
     let passAError: string | null = null;
-    try {
-      manifest = await callGateway({
-        model: 'google/gemini-2.5-pro',
+    let passADiagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> = [];
+    let passAModelUsed = 'unknown';
+
+    const passAPromise = callGatewayChain(
+      {
         system: LANGUAGE_LOCK + '\n' + SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
         user: `BRIEFING (source language: ${languageDisplay}):\n\n${briefing}`,
-        timeoutMs: 90_000,
-      });
-    } catch (e: any) {
-      passAError = e?.message ?? 'pass A failed';
-      console.error('[briefing-deep-parse] Pass A failed — using fallback arc:', passAError);
+      },
+      [
+        { model: 'google/gemini-2.5-flash',      timeoutMs: 35_000, maxTokens: 6000, retries: 1 },
+        { model: 'google/gemini-2.5-pro',        timeoutMs: 60_000, maxTokens: 6000, retries: 0 },
+        { model: 'google/gemini-2.5-flash-lite', timeoutMs: 25_000, maxTokens: 6000, retries: 0 },
+      ],
+      'Pass A',
+    );
+
+    const libraryPromise = Promise.all([
+      supabase
+        .from('brand_characters')
+        .select('id,name,default_voice_id')
+        .eq('user_id', userId)
+        .limit(200),
+      supabase
+        .from('brand_locations')
+        .select('id,name')
+        .eq('user_id', userId)
+        .limit(200),
+    ]);
+
+    const [passAResult, libResult] = await Promise.allSettled([passAPromise, libraryPromise]);
+
+    if (passAResult.status === 'fulfilled') {
+      manifest = passAResult.value.result;
+      passAModelUsed = passAResult.value.modelUsed;
+      passADiagnostics = passAResult.value.diagnostics;
+    } else {
+      passAError = passAResult.reason?.message ?? 'pass A failed';
+      passADiagnostics = (passAResult.reason as any)?.diagnostics ?? [];
+      console.error('[briefing-deep-parse] Pass A chain exhausted — using synthesized arc:', passAError);
       manifest = { project: {}, scenes: [] };
     }
     const tA = Date.now();
+
+    const [charRes, locRes] = libResult.status === 'fulfilled'
+      ? libResult.value
+      : [{ data: [] } as any, { data: [] } as any];
 
     // ── Safety net: if Pass A returned 0 scenes (modelblip / extreme thin
     //    briefing), synthesize a deterministic 3-scene arc so the user is
@@ -946,20 +978,6 @@ This overrides any English wording in the briefing's scaffolding
       if (!manifest.project.totalDurationSec) manifest.project.totalDurationSec = per * 3;
     }
 
-
-    // ── Library snapshot (small, no PII) ──────────────────────────────────
-    const [charRes, locRes] = await Promise.all([
-      supabase
-        .from('brand_characters')
-        .select('id,name,default_voice_id')
-        .eq('user_id', userId)
-        .limit(200),
-      supabase
-        .from('brand_locations')
-        .select('id,name')
-        .eq('user_id', userId)
-        .limit(200),
-    ]);
     const characters = charRes.data ?? [];
     const locations = locRes.data ?? [];
 
@@ -980,6 +998,7 @@ This overrides any English wording in the briefing's scaffolding
       { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', language: 'multilingual' },
       { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill', language: 'multilingual' },
     ];
+
 
     // ── Pass B — resolution + validation ──────────────────────────────────
     let resolution: any = { scenes: [], unresolved: [] };
