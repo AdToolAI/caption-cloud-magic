@@ -1112,10 +1112,20 @@ This overrides any English wording in the briefing's scaffolding
     } catch (_) { /* noop */ }
 
     // ── Persist (versioned) ───────────────────────────────────────────────
+    // v175: switched to service-role for the insert because the user-scoped
+    // client occasionally failed RLS write checks during the parallel pass
+    // (auth context race). The row carries user_id explicitly so audit is
+    // unaffected. We also log .error explicitly — previously a silent RLS
+    // failure caused the table to receive ZERO new rows since Jun 23.
     let version = 1;
+    let persistError: string | null = null;
     try {
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      const writer = serviceKey
+        ? createClient(SUPABASE_URL, serviceKey)
+        : supabase;
       if (projectId) {
-        const { data: prev } = await supabase
+        const { data: prev } = await writer
           .from('composer_production_plans')
           .select('version')
           .eq('project_id', projectId)
@@ -1124,7 +1134,7 @@ This overrides any English wording in the briefing's scaffolding
           .maybeSingle();
         if (prev?.version) version = (prev.version as number) + 1;
       }
-      await supabase.from('composer_production_plans').insert({
+      const { error: insErr } = await writer.from('composer_production_plans').insert({
         user_id: userId,
         project_id: projectId,
         version,
@@ -1141,8 +1151,15 @@ This overrides any English wording in the briefing's scaffolding
           passB_diagnostics: passBDiagnostics,
         },
       });
+      if (insErr) {
+        persistError = `${insErr.code ?? ''} ${insErr.message ?? insErr}`.trim();
+        console.error('[briefing-deep-parse] persist returned error:', persistError);
+      } else {
+        console.log('[briefing-deep-parse] persisted plan', { projectId, version, userId });
+      }
     } catch (e: any) {
-      console.warn('[briefing-deep-parse] persist failed (non-fatal):', e?.message);
+      persistError = e?.message ?? String(e);
+      console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
     return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passA_model: passAModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics }), {
