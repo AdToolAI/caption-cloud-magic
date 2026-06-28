@@ -53,6 +53,74 @@ const INVALID_VOICE_TOKENS = new Set([
 ]);
 
 /**
+ * Deterministic ElevenLabs voice pools used as a last-resort fallback when:
+ *  - the briefing did not specify a voice for a speaker, and
+ *  - the brand character has no `default_voice_id` set, and
+ *  - the project has no global voice.
+ *
+ * Round-robin per gender so up to 4 speakers in one scene each get a distinct voice.
+ * IDs sourced from the curated ElevenLabs preset list in elevenlabs-tts knowledge.
+ */
+const VOICE_POOL_MALE: string[] = [
+  'nPczCjzI2devNBz1zQrb', // Brian
+  'TX3LPaxmHKxFdv7VOQHJ', // Liam
+  'JBFqnCBsd6RMkjVDRZzb', // George
+  'bIHbv24MWmeRgasZH58o', // Will
+  'cjVigY5qzO86Huf0OWal', // Eric
+  'iP95p4xoKVk53GoZ742B', // Chris
+];
+const VOICE_POOL_FEMALE: string[] = [
+  'EXAVITQu4vr4xnSDxMaL', // Sarah
+  'FGY2WhTYpPnrIDTdsKH5', // Laura
+  'Xb7hH8MSUJpSbSDYk0k2', // Alice
+  'XrExE9yKIg1WjnnlVkGX', // Matilda
+  'pFZP5JQG7iQjIQuC4Bku', // Lily
+  'cgSgspJ2msm6clMCkdW9', // Jessica
+];
+const VOICE_POOL_NEUTRAL: string[] = [
+  'SAz9YHcvj6GT2YYXdXww', // River
+  'IKne3meq5aSn9XLyUdCD', // Charlie
+];
+
+const VOICE_POOL_NAMES: Record<string, string> = {
+  nPczCjzI2devNBz1zQrb: 'Brian',
+  TX3LPaxmHKxFdv7VOQHJ: 'Liam',
+  JBFqnCBsd6RMkjVDRZzb: 'George',
+  bIHbv24MWmeRgasZH58o: 'Will',
+  cjVigY5qzO86Huf0OWal: 'Eric',
+  iP95p4xoKVk53GoZ742B: 'Chris',
+  EXAVITQu4vr4xnSDxMaL: 'Sarah',
+  FGY2WhTYpPnrIDTdsKH5: 'Laura',
+  Xb7hH8MSUJpSbSDYk0k2: 'Alice',
+  XrExE9yKIg1WjnnlVkGX: 'Matilda',
+  pFZP5JQG7iQjIQuC4Bku: 'Lily',
+  cgSgspJ2msm6clMCkdW9: 'Jessica',
+  SAz9YHcvj6GT2YYXdXww: 'River',
+  IKne3meq5aSn9XLyUdCD: 'Charlie',
+};
+
+/** Stateful round-robin picker (per apply-run) so each speaker gets a unique voice. */
+interface VoicePoolPicker {
+  pick: (gender: 'male' | 'female' | 'neutral' | null | undefined) => { id: string; name: string };
+}
+function createVoicePoolPicker(): VoicePoolPicker {
+  let mi = 0, fi = 0, ni = 0;
+  return {
+    pick: (gender) => {
+      const g = (gender ?? '').toLowerCase();
+      let pool: string[];
+      let idx: number;
+      if (g === 'female') { pool = VOICE_POOL_FEMALE; idx = fi++ % pool.length; }
+      else if (g === 'neutral') { pool = VOICE_POOL_NEUTRAL; idx = ni++ % pool.length; }
+      else { pool = VOICE_POOL_MALE; idx = mi++ % pool.length; }
+      const id = pool[idx];
+      return { id, name: VOICE_POOL_NAMES[id] ?? 'Voice' };
+    },
+  };
+}
+
+
+/**
  * cleanVoiceId — strip engine tokens and reject UUIDs (which are almost always
  * a Character-UUID that the planner mistakenly piped into voiceId). Real
  * ElevenLabs voice IDs are 20 opaque alphanumeric chars with no dashes.
