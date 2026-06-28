@@ -475,6 +475,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const [aiBusy, setAiBusy] = useState(false);
   const [renderAsSeparateScenes, setRenderAsSeparateScenes] = useState(false);
 
+  const cleanDialogVoiceCfg = (cfg?: DialogVoiceCfg): DialogVoiceCfg | undefined => {
+    if (!cfg?.voiceId) return undefined;
+    if (cfg.engine === 'hume') return cfg;
+    const voiceId = cleanVoiceId(cfg.voiceId);
+    return voiceId ? { ...cfg, voiceId, voiceName: cfg.voiceName || getAutoVoiceName(voiceId) || voiceId } : undefined;
+  };
+
+  const getSpeakerAliases = (speakerId: string) => {
+    const castEntry = sceneCast.find((c) => c.id === speakerId || c.brandCharacterId === speakerId);
+    const brandId = castEntry?.brandCharacterId ?? speakerId;
+    return Array.from(new Set([speakerId, brandId].filter(Boolean)));
+  };
+
   // Sync only when switching to a different scene — otherwise the parent's
   // re-render after our own debounced save would clobber the user's in-flight
   // typing (cursor jump / dropped characters).
@@ -498,12 +511,21 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   /** Persist voice map immediately on change */
   const updateSpeakerVoice = (speakerId: string, patch: Partial<DialogVoiceCfg>) => {
     const cur = voicePerSpeaker[speakerId];
-    const next: Record<string, DialogVoiceCfg> = {
-      ...voicePerSpeaker,
-      [speakerId]: { ...(cur ?? { engine: 'elevenlabs', voiceId: '' }), ...patch },
+    const nextCfg: DialogVoiceCfg = {
+      ...(cur ?? { engine: 'elevenlabs', voiceId: '' }),
+      ...patch,
     };
+    const next: Record<string, DialogVoiceCfg> = { ...voicePerSpeaker };
+    for (const key of getSpeakerAliases(speakerId)) next[key] = nextCfg;
     setVoicePerSpeaker(next);
-    onUpdate({ dialogVoices: next });
+    const nextCharacterVoiceId =
+      speakers.length === 1 && nextCfg.engine === 'elevenlabs'
+        ? cleanVoiceId(nextCfg.isCustom ? nextCfg.elevenlabsVoiceId : nextCfg.voiceId)
+        : undefined;
+    onUpdate({
+      dialogVoices: next,
+      ...(nextCharacterVoiceId ? { characterVoiceId: nextCharacterVoiceId } : {}),
+    });
   };
 
   /** Persist take-bundle for a single dialog line (Take-System A/B/C). */
@@ -596,44 +618,71 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
   const speakers = useMemo(() => uniqueSpeakers(blocks, sceneCast), [blocks, sceneCast]);
 
-  // ── Voice Auto-Bind (Phase A+) ─────────────────────────────────────────
-  // Existing dialog voice → brand-id alias → single-speaker characterVoiceId
-  // → Avatar default_voice_id → deterministic AI pool.
-  useEffect(() => {
-    if (speakers.length === 0) return;
+  const resolvedVoicePerSpeaker = useMemo<Record<string, DialogVoiceCfg>>(() => {
     const sceneVoices = normalizeVoiceMap(scene.dialogVoices);
     const poolPicker = createVoicePoolPicker();
-    let patched: Record<string, DialogVoiceCfg> | null = null;
-    let nextCharacterVoiceId = cleanVoiceId((scene as any).characterVoiceId);
-
-    const cleanCfg = (cfg?: DialogVoiceCfg): DialogVoiceCfg | undefined => {
-      if (!cfg?.voiceId) return undefined;
-      if (cfg.engine === 'hume') return cfg;
-      const voiceId = cleanVoiceId(cfg.voiceId);
-      return voiceId ? { ...cfg, voiceId, voiceName: cfg.voiceName || getAutoVoiceName(voiceId) || voiceId } : undefined;
-    };
+    const out: Record<string, DialogVoiceCfg> = {};
 
     for (const sp of speakers) {
       const castEntry = sceneCast.find((c) => c.id === sp.id);
       const lookupId = castEntry?.brandCharacterId ?? sp.id;
       const brand = accessibleChars.find((b) => b.id === lookupId);
-      const existing = cleanCfg(voicePerSpeaker[sp.id])
-        ?? cleanCfg(voicePerSpeaker[lookupId])
-        ?? cleanCfg(sceneVoices[sp.id])
-        ?? cleanCfg(sceneVoices[lookupId]);
-      const fromSceneRoot = speakers.length === 1 && nextCharacterVoiceId
-        ? toElevenLabsDialogVoice(nextCharacterVoiceId, getAutoVoiceName(nextCharacterVoiceId), true)
+      const aliases = Array.from(new Set([sp.id, lookupId].filter(Boolean)));
+      const existing = aliases
+        .map((key) => cleanDialogVoiceCfg(voicePerSpeaker[key]) ?? cleanDialogVoiceCfg(sceneVoices[key]))
+        .find(Boolean);
+      const rootVoiceId = speakers.length === 1 ? cleanVoiceId((scene as any).characterVoiceId) : undefined;
+      const fromSceneRoot = rootVoiceId
+        ? toElevenLabsDialogVoice(rootVoiceId, getAutoVoiceName(rootVoiceId), true)
         : undefined;
       const defaultId = cleanVoiceId(defaultVoiceByCharId[sp.id] ?? defaultVoiceByCharId[lookupId]);
-      const fromBrand = defaultId ? toElevenLabsDialogVoice(defaultId, getAutoVoiceName(defaultId) ?? sp.name) : undefined;
+      const fromBrand = defaultId
+        ? toElevenLabsDialogVoice(defaultId, getAutoVoiceName(defaultId) ?? sp.name)
+        : undefined;
       const picked = poolPicker.pick(normalizeAutoVoiceGender((brand as any)?.gender));
       const fromPool = toElevenLabsDialogVoice(picked.id, picked.name, true);
       const chosen = existing ?? fromSceneRoot ?? fromBrand ?? fromPool;
+      if (chosen?.voiceId) out[sp.id] = chosen;
+    }
+
+    return out;
+  }, [speakers, sceneCast, accessibleChars, voicePerSpeaker, scene.dialogVoices, (scene as any).characterVoiceId, defaultVoiceByCharId]);
+
+  const resolvedDialogVoiceMap = useMemo<Record<string, DialogVoiceCfg>>(() => {
+    const next: Record<string, DialogVoiceCfg> = { ...voicePerSpeaker };
+    for (const sp of speakers) {
+      const chosen = resolvedVoicePerSpeaker[sp.id];
       if (!chosen?.voiceId) continue;
-      const cur = cleanCfg(voicePerSpeaker[sp.id]);
-      if (cur?.engine !== chosen.engine || cur?.voiceId !== chosen.voiceId || cur?.voiceName !== chosen.voiceName) {
-        patched = patched ?? { ...voicePerSpeaker };
-        patched[sp.id] = chosen;
+      for (const key of getSpeakerAliases(sp.id)) next[key] = chosen;
+    }
+    return next;
+  }, [voicePerSpeaker, resolvedVoicePerSpeaker, speakers, sceneCast]);
+
+  const getResolvedVoiceForSpeakerId = (speakerId: string): DialogVoiceCfg | undefined => {
+    const sp = speakers.find((s) => s.id === speakerId);
+    return (sp ? resolvedVoicePerSpeaker[sp.id] : undefined) ?? cleanDialogVoiceCfg(voicePerSpeaker[speakerId]);
+  };
+
+  // ── Voice Auto-Bind (Phase A+) ─────────────────────────────────────────
+  // Existing dialog voice → brand-id alias → single-speaker characterVoiceId
+  // → Avatar default_voice_id → deterministic AI pool.
+  useEffect(() => {
+    if (speakers.length === 0) return;
+    let patched: Record<string, DialogVoiceCfg> | null = null;
+    let nextCharacterVoiceId = cleanVoiceId((scene as any).characterVoiceId);
+
+    for (const sp of speakers) {
+      const castEntry = sceneCast.find((c) => c.id === sp.id);
+      const lookupId = castEntry?.brandCharacterId ?? sp.id;
+      const chosen = resolvedVoicePerSpeaker[sp.id];
+      if (!chosen?.voiceId) continue;
+      const keys = Array.from(new Set([sp.id, lookupId].filter(Boolean)));
+      for (const key of keys) {
+        const cur = cleanDialogVoiceCfg(voicePerSpeaker[key]);
+        if (cur?.engine !== chosen.engine || cur?.voiceId !== chosen.voiceId || cur?.voiceName !== chosen.voiceName) {
+          patched = patched ?? { ...voicePerSpeaker };
+          patched[key] = chosen;
+        }
       }
       if (speakers.length === 1 && chosen.engine === 'elevenlabs' && !nextCharacterVoiceId) {
         nextCharacterVoiceId = cleanVoiceId(chosen.voiceId);
@@ -651,7 +700,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       onUpdate(update);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speakers, defaultVoiceByCharId, scene.dialogVoices, (scene as any).characterVoiceId, sceneCast, accessibleChars, voicePerSpeaker]);
+  }, [speakers, resolvedVoicePerSpeaker, (scene as any).characterVoiceId, sceneCast, voicePerSpeaker]);
 
 
   const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
