@@ -36,6 +36,9 @@ import type {
 
 type Step = 'paste' | 'parsing' | 'review';
 
+const isUuid = (val?: string | null) =>
+  !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -72,6 +75,11 @@ export default function ProductionPlanSheet({
   const { characters, locations } = useUnifiedMentionLibrary();
   const applyPlan = useApplyProductionPlan();
   const [applying, setApplying] = useState(false);
+  const [applyResult, setApplyResult] = useState<{
+    ok: boolean;
+    message: string;
+    warnings: string[];
+  } | null>(null);
 
   // When a new initialPlan arrives (subsequent re-opens), refresh local state.
   useEffect(() => {
@@ -187,6 +195,7 @@ export default function ProductionPlanSheet({
         setText('');
         setPlan(null);
         setProgress(null);
+        setApplyResult(null);
       }, 200);
     }
   }, [open]);
@@ -197,6 +206,14 @@ export default function ProductionPlanSheet({
       toast({
         title: 'Briefing zu kurz',
         description: 'Mindestens ein paar Sätze einfügen.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!isUuid(projectId)) {
+      toast({
+        title: 'Projekt noch nicht gespeichert',
+        description: 'Bitte erst über den Briefing-Flow ins Storyboard wechseln, damit ein echtes Projekt angelegt wird.',
         variant: 'destructive',
       });
       return;
@@ -259,6 +276,17 @@ export default function ProductionPlanSheet({
 
   const handleApply = async () => {
     if (!plan) return;
+    setApplyResult(null);
+    if (!isUuid(projectId)) {
+      const message = 'Projekt-ID fehlt — Plan wurde nicht angewendet.';
+      setApplyResult({ ok: false, message, warnings: [] });
+      toast({
+        title: 'Plan blockiert',
+        description: message,
+        variant: 'destructive',
+      });
+      return;
+    }
     setApplying(true);
     try {
       const result = await applyPlan({
@@ -272,13 +300,25 @@ export default function ProductionPlanSheet({
         onUpdateScenes,
         onApplyAssembly,
       });
-      toast({
-        title: 'Plan übernommen',
-        description: `${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
+      const warnings = result.warnings ?? [];
+      setApplyResult({
+        ok: warnings.length === 0,
+        message: `DB-verifiziert: ${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
+        warnings,
       });
-      onApplied?.();
-      onOpenChange(false);
+      toast({
+        title: warnings.length ? 'Plan übernommen — bitte Hinweise prüfen' : 'Plan übernommen und verifiziert',
+        description: warnings.length
+          ? warnings.join(' · ')
+          : `${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
+        variant: warnings.length ? 'destructive' : undefined,
+      });
+      if (warnings.length === 0) {
+        onApplied?.();
+        onOpenChange(false);
+      }
     } catch (e: any) {
+      setApplyResult({ ok: false, message: e?.message ?? String(e), warnings: [] });
       toast({
         title: 'Plan konnte nicht angewendet werden',
         description: e?.message ?? String(e),
@@ -973,6 +1013,14 @@ export default function ProductionPlanSheet({
         )}
 
         <DialogFooter className="gap-2 shrink-0 border-t border-border/40 pt-3">
+          {step === 'review' && applyResult && (
+            <div className={`mr-auto rounded-lg border px-3 py-2 text-xs ${applyResult.ok ? 'border-emerald-400/40 bg-emerald-400/[0.06] text-emerald-300' : 'border-destructive/40 bg-destructive/[0.06] text-destructive'}`}>
+              <div className="font-medium">{applyResult.message}</div>
+              {applyResult.warnings.length > 0 && (
+                <div className="mt-1 text-muted-foreground">{applyResult.warnings.join(' · ')}</div>
+              )}
+            </div>
+          )}
           {step === 'paste' && (
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
