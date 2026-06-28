@@ -669,6 +669,19 @@ export default function VideoComposerDashboard() {
     }
   }, [project, ensureProjectPersisted]);
 
+  const ensureStoryboardProjectId = useCallback(async (): Promise<string> => {
+    if (isUuid(projectIdRef.current)) return projectIdRef.current!;
+    setIsPersisting(true);
+    try {
+      const result = await ensureProjectPersisted(project);
+      projectIdRef.current = result.projectId;
+      setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
+      return result.projectId;
+    } finally {
+      setIsPersisting(false);
+    }
+  }, [project, ensureProjectPersisted]);
+
   const [isResetting, setIsResetting] = useState(false);
   const handleReset = useCallback(async () => {
     const oldId = project.id;
@@ -778,6 +791,7 @@ export default function VideoComposerDashboard() {
     projectId: project.id,
     scenes: project.scenes,
     language: project.language,
+    ensureProjectId: ensureStoryboardProjectId,
     navigateToStoryboard: () => setActiveTab('storyboard'),
   });
 
