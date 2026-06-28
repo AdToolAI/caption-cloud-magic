@@ -848,6 +848,16 @@ Deno.serve(async (req) => {
       typeof rawProjectId === 'string' && rawProjectId.trim().length > 0
         ? rawProjectId.trim()
         : null;
+    // Telemetry: surface NULL projectId so we can trace which caller failed
+    // to wire activeProjectId through `ensureProjectId` (Edge-Function logs).
+    if (!projectId) {
+      console.warn('[briefing-deep-parse] projectId NULL — plan will not be linked to a project', {
+        userId,
+        briefingLen: briefing.length,
+        rawProjectIdType: typeof rawProjectId,
+        rawProjectIdEmpty: typeof rawProjectId === 'string' && rawProjectId.trim().length === 0,
+      });
+    }
     const rawLang: string = String(body?.language ?? 'de').toLowerCase().slice(0, 5);
     const LANG_NAME: Record<string, string> = {
       de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
