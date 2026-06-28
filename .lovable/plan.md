@@ -1,72 +1,57 @@
-## Du hast Recht — Root Cause korrigiert
 
-Ich habe es jetzt sauber durchverfolgt. Die echte Lücke liegt **nicht** in v172, sondern im **Mapping vom Plan in den finalen Render-Prompt**:
+# Plan: Deep-Parse 100% zuverlässig — Fallback wird obsolet
 
-### Was heute passiert
+## Root-Cause-Analyse
+- **Pass A** nutzt `google/gemini-2.5-pro` mit `max_tokens: 12000` und 90s Timeout. Pro ist tendenziell langsam/überlastet → genau hier kippt der Run in den Client-Fallback.
+- **Pass B** (Flash, 45s) ist okay, hat aber keinen Retry.
+- **Sequenziell**: Pass A muss komplett fertig sein, bevor Library + Pass B starten — verschenkte Zeit.
+- **Kein Retry**: Ein einzelner 5xx/Abort kippt den ganzen Run sofort.
+- **Output groß**: 12k Tokens Tool-Call für ~3 Szenen ist 4–6× zu viel und verlängert die Antwortzeit linear.
 
-1. `briefing-deep-parse/index.ts` (Z. 100–107, 660–671) füllt pro Szene korrekt:
-   - `performance.mimik` (Gesicht)
-   - `performance.gestik` (Gestik)
-   - `performance.blick` (Blickrichtung)
-   - `performance.energy` (1–5)
-   - `anchorPromptEN` (Action/Setting)
-   - inkl. AI-Auto-Fill mit ✨-Badge.
+## Lösung — vier Stellschrauben, alle in `supabase/functions/briefing-deep-parse/index.ts`
 
-2. `ProductionPlanSheet` zeigt die Felder → sieht für dich korrekt aus.
+### 1. Modell-Strategie umdrehen (größter Hebel)
+- **Pass A primär: `google/gemini-2.5-flash`** mit 35s Timeout. Flash schafft strukturierte Tool-Calls für Briefings dieser Größe zuverlässig in 8–20s.
+- **Fallback-Kette innerhalb Pass A** (in dieser Reihenfolge, jeder mit eigenem Retry):
+  1. `gemini-2.5-flash` (35s, 1 Retry bei 5xx/abort/no-tool-call)
+  2. `gemini-2.5-pro` (60s, 1 Versuch) — nur wenn Flash 2× scheitert
+  3. `gemini-2.5-flash-lite` (25s, 1 Versuch) — letzter Rettungsanker
+- Damit ist Pass A im 99-%-Fall in <25s durch, statt potenziell 90s zu hängen.
 
-3. `useApplyProductionPlan.ts` (Z. 256–318) schreibt sie in die Szene:
-   - `scene.performance[characterId] = { expression, gesture, gaze, energy }`
-   - `scene.actionBeat = { characterAction, environmentMotion, motionIntensity }`
-   - `scene.sceneActionEn = anchorPromptEN`
+### 2. `callGateway` mit eingebautem Retry + Jitter
+- Neue Signatur: `callGateway({ ..., retries: 1, retryOn: [408, 429, 500, 502, 503, 504] })`.
+- Retry nur bei den genannten Status-Codes und bei `AbortError`/`no tool call returned`.
+- Exponential backoff mit Jitter (500ms → 1500ms).
+- Saubere Fehler-Klassifizierung: `network` / `timeout` / `rate_limit` / `bad_response` — wird in der Response als `meta.passADiagnostics` mitgegeben (sichtbar im War-Room für Debugging).
 
-4. **Bruchstelle**: `compose-video-clips/index.ts` (Cinematic-Sync-Plate-Builder) verwendet **keines** dieser Felder. Es greift nur auf `scene.aiPrompt` zu, läuft `stripFaceOcclusionForPlate` darüber und packt am Ende einen generischen „Lip-ready neutral master plate"-Wrapper drum.
-   - `performance.*` → ignoriert.
-   - `actionBeat.characterAction` / `environmentMotion` / `motionIntensity` → ignoriert.
-   - `sceneActionEn` → ignoriert (es zählt nur `aiPrompt`).
-   - Zusätzlich entfernt `stripFaceOcclusionForPlate` Aktionen wie „looking down at laptop / rubbing forehead / head down" — also genau die im Briefing autorisierten Handlungen.
+### 3. Token-Budget halbieren
+- `max_tokens: 6000` für Pass A (3-Szenen-Briefings brauchen typisch 1.5–3k) und `4000` für Pass B.
+- Spart 30–50 % Antwortzeit bei großen Modellen.
 
-Ergebnis: Hailuo sieht nur noch das Setting + den neutralen Wrapper. Gestik/Mimik/Action aus dem Plan landen nie im Modell. Daher der starre Sprecher.
+### 4. Library-Snapshot parallelisieren
+- `Promise.all([passA, librarySnapshot])` statt sequenziell. Spart 200–600ms.
+- Pass B startet, sobald beide fertig sind.
 
-## Plan
+### 5. Server-Side Warm-Path (kleiner Bonus)
+- Erster `fetch` zum Gateway schickt einen Mini-Health-Ping (`max_tokens: 1`) in `EdgeRuntime.waitUntil` **nach** der Response — wärmt die Gateway-Connection für den nächsten Aufruf desselben Users.
 
-### 1. Performance & Action in den Cinematic-Sync-Prompt injizieren
-In `buildCinematicSyncMasterPrompt` (compose-video-clips/index.ts):
-- Pro Sprecher die zugehörige `scene.performance[characterId]` in eine kompakte Englisch-Klausel rendern, z.B.:
-  `"{Name}: warm-smile expression, open-palms gesture, gaze to camera, energy 4/5."`
-- `scene.actionBeat.characterAction` + `environmentMotion` als eigene Klausel anhängen:
-  `"Action: he is bearbeitet ein Reel at a cluttered desk; ambient: dim warm desk lamp glow."`
-- `motionIntensity` (low/medium/high) auf eine kurze Bewegungsanweisung mappen (subtle body motion → noticeable body motion → energetic body motion). Ersetzt das pauschale „subtle idle body motion".
+## Client-Anpassung (`src/hooks/useStoryboardTransition.ts`)
+- Client-Timeout von 180s → **120s** (jetzt sicher genug, und schnelleres User-Feedback wenn doch was kippt).
+- Bei `503/504` vom Endpoint: **automatischer 1× Client-Retry** nach 2s, bevor überhaupt der Fallback-Pfad in Betracht gezogen wird.
+- Telemetrie: `passADiagnostics` + Gesamt-Latenz in `production_plan.meta` schreiben, damit wir bei künftigen Beschwerden sehen, welcher Pass wie lange brauchte (kein UI-Banner, nur Daten).
 
-### 2. `stripFaceOcclusionForPlate` entschärfen
-- Nicht mehr alles wegwerfen, was „looking down at laptop" oder „head down" enthält.
-- Stattdessen nur **echte plate-face-detect-Blocker** neutralisieren:
-  - Hand vor Gesicht / Augen geschlossen / Rücken zur Kamera / Gesicht in Händen.
-- „Looking at laptop / typing at desk / sitting at desk" bleibt erhalten — sind sync-3 kompatibel (sync-3 kann Profile und partial occlusion).
+## Was bewusst NICHT geändert wird
+- Prompts (`SYSTEM_PASS_A`, `SYSTEM_PASS_B`, `LANGUAGE LOCK`) — bleiben 1:1.
+- Tool-Schemas (`TOOL_PASS_A`, `TOOL_PASS_B`) — bleiben 1:1, damit Output-Qualität identisch.
+- Lokaler Fallback-Builder bleibt als allerletztes Netz drin, sollte aber unter Normalbedingungen nie mehr greifen.
+- Lipsync-Pipeline, Green-Net, Hailuo-Lock — alle unverändert.
 
-### 3. N=1 Wrapper schlanker
-Für Single-Speaker bleibt der Wrapper bestehen, aber:
-- Kameraführung/Licht/Setting aus `aiPrompt` + `anchorPromptEN` werden **vor** den lip-ready Sicherheitsregeln injiziert, nicht ersetzt.
-- „LOCKED static camera"/„no other humans"-Block bleibt nur für N≥2 (Geometry-/ASD-kritisch), für N=1 reicht „mouth & jaw clearly visible, hands away from face".
+## Erwartetes Verhalten nach dem Patch
+- Briefing-Plan kommt in **8–25 Sekunden** zurück (statt 60–120s oder Timeout).
+- Pro-Modell wird nur noch in <1 % der Fälle berührt — kein Flaschenhals mehr.
+- `meta.source === 'deep_parse'` praktisch immer → starre-Sprecher-Logik und Mapping-Vollständigkeit greifen automatisch.
+- Falls Lovable AI Gateway wirklich komplett offline ist, sieht der User das nach max. ~75s (35+60+25 + 2s Backoff) und bekommt den lokalen Fallback — aber nur dann.
 
-### 4. Drift-Detector erweitern
-- `driftDetector.ts`: zusätzlich prüfen, ob `performance.*` und `actionBeat.*` aus dem Plan tatsächlich im finalen `ai_prompt` der Szene wiederzufinden sind (Keyword-Match). Sonst rote Chip „Performance not applied".
-
-### 5. Verifikation
-- Eine Single-Speaker-Szene mit klar gesetztem `gestik=open-palms, mimik=tired, action=sitting at laptop at night` rendern.
-- In den Edge-Logs prüfen, dass der Final-Prompt diese Tokens enthält.
-- Visuell prüfen: Szene + natürliche Körperbewegung statt starres Talking-Head.
-
-## Betroffene Dateien
-
-- `supabase/functions/compose-video-clips/index.ts` — `buildCinematicSyncMasterPrompt`, `stripFaceOcclusionForPlate`, `neutralTwoShotPrompt` (nur N=1-Pfad).
-- `src/lib/video-composer/driftDetector.ts` — neue Verification-Chips für performance/actionBeat.
-
-## Bewusst NICHT angefasst
-
-- Multi-Speaker Wrapper (N≥2) — ASD-/Geometry-kritisch.
-- Sync.so-Pipeline, sync-3 Optionen, Webhook, Watchdog.
-- Briefing-Deep-Parse-Schema — emittiert alles bereits korrekt.
-
-## Erwartetes Ergebnis
-
-Gestik/Mimik/Blick/Energy aus dem Briefing-Plan landen tatsächlich im Hailuo-Prompt. Der Sprecher agiert wieder szenisch (am Laptop, mit natürlicher Bewegung), Sync.so läuft weiterhin sauber, und der Drift-Detector zeigt sofort an, wenn ein Feld doch nicht angekommen ist.
+## Verifikation
+- Edge-Logs nach Deploy prüfen: `[briefing-deep-parse] Pass A success in Xms (model=…)` als neues Log-Statement.
+- Drei Test-Briefings (kurz / mittel / das „3 AM Moment") durchschicken, Latenz im War-Room beobachten.
