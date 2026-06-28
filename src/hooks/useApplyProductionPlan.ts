@@ -584,7 +584,7 @@ export function useApplyProductionPlan() {
     //     and reloads brought the Fallback back. Persist here, then swap
     //     temp ids for real UUIDs before handing off to onUpdateScenes.
     if (projectId && newScenes.length > 0) {
-        const insertStartOrder = protectedScenes.length > 0
+        const insertStartOrder = currentScenes.length > 0
           ? Math.max(...currentScenes.map((s) => Number(s.orderIndex ?? 0))) + 1
           : 0;
         const rows = newScenes.map((s, i) => ({
