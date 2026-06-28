@@ -489,7 +489,7 @@ For voice resolution:
   1. brand_character.default_voice_id (if set and looks like an ElevenLabs id — opaque ~20-char alphanum, NEVER a UUID).
   2. AUTO-MATCH from LIBRARY.voices using briefing language (OUTPUT_LANGUAGE), character.gender, character.description (persona/age hints), and scene tonality (energetic/warm/calm/authoritative/playful).
   3. Within a single scene with multiple speakers, NEVER assign the same voiceId twice — rotate to another fitting voice from LIBRARY.voices.
-- For every auto-matched voice (rule 2), add an `aiFilled` dotted entry `cast.<characterId>.voiceId` so the UI can flag it.
+- For every auto-matched voice (rule 2), add an "aiFilled" dotted entry "cast.<characterId>.voiceId" so the UI can flag it. Also set cast.voiceAutoAssigned=true.
 - Voice catalog hints by gender:
   Male: George, Roger, Charlie, Liam, Eric, Chris, Brian, Daniel, Bill
   Female: Alice, Sarah, Laura, Matilda, Lily
