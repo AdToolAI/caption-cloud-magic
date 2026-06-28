@@ -46,6 +46,14 @@ import {
 } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import {
+  AUTO_VOICE_OPTIONS,
+  cleanVoiceId,
+  createVoicePoolPicker,
+  getAutoVoiceName,
+  normalizeAutoVoiceGender,
+  toElevenLabsDialogVoice,
+} from '@/lib/video-composer/autoVoiceAssignment';
 import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
 import { DialogTakeStrip } from './DialogTakeStrip';
 import PerTurnShotChip from './PerTurnShotChip';
@@ -355,7 +363,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     for (const c of sceneCast) {
       const lookupId = c.brandCharacterId ?? c.id;
       const brand = accessibleChars.find((b) => b.id === lookupId);
-      if (brand?.default_voice_id) out[c.id] = brand.default_voice_id;
+      const voice = cleanVoiceId((brand as any)?.default_voice_id);
+      if (voice) {
+        out[c.id] = voice;
+        out[lookupId] = voice;
+      }
     }
     return out;
   }, [sceneCast, accessibleChars]);
@@ -424,7 +436,17 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         elevenlabsVoiceId: v.elevenlabs_voice_id,
         gender: undefined as string | undefined,
       }));
-    return [...lib, ...custom];
+    const existing = new Set([...lib, ...custom].map((v) => v.id));
+    const autoFallbacks = AUTO_VOICE_OPTIONS
+      .filter((v) => !existing.has(v.id))
+      .map((v) => ({
+        id: v.id,
+        name: v.name,
+        isCustom: false as const,
+        elevenlabsVoiceId: undefined as string | undefined,
+        gender: v.gender,
+      }));
+    return [...lib, ...custom, ...autoFallbacks];
   }, [elVoices, customVoices]);
 
   // ── Voice map state — backwards-compatible (string → DialogVoiceCfg) ──
@@ -574,31 +596,62 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
   const speakers = useMemo(() => uniqueSpeakers(blocks, sceneCast), [blocks, sceneCast]);
 
-  // ── Voice Auto-Bind (Phase A) ─────────────────────────────────────────
-  // When a speaker appears for the first time and has no voice yet, inherit
-  // the brand character's default_voice_id. Keeps users out of the trap of
-  // hearing the wrong voice because they forgot to pick one per scene.
+  // ── Voice Auto-Bind (Phase A+) ─────────────────────────────────────────
+  // Existing dialog voice → brand-id alias → single-speaker characterVoiceId
+  // → Avatar default_voice_id → deterministic AI pool.
   useEffect(() => {
     if (speakers.length === 0) return;
+    const sceneVoices = normalizeVoiceMap(scene.dialogVoices);
+    const poolPicker = createVoicePoolPicker();
     let patched: Record<string, DialogVoiceCfg> | null = null;
+    let nextCharacterVoiceId = cleanVoiceId((scene as any).characterVoiceId);
+
+    const cleanCfg = (cfg?: DialogVoiceCfg): DialogVoiceCfg | undefined => {
+      if (!cfg?.voiceId) return undefined;
+      if (cfg.engine === 'hume') return cfg;
+      const voiceId = cleanVoiceId(cfg.voiceId);
+      return voiceId ? { ...cfg, voiceId, voiceName: cfg.voiceName || getAutoVoiceName(voiceId) || voiceId } : undefined;
+    };
+
     for (const sp of speakers) {
-      const cur = voicePerSpeaker[sp.id];
-      if (cur?.voiceId) continue;
-      const defaultId = defaultVoiceByCharId[sp.id];
-      if (!defaultId) continue;
-      patched = patched ?? { ...voicePerSpeaker };
-      patched[sp.id] = {
-        engine: 'elevenlabs',
-        voiceId: defaultId,
-        voiceName: sp.name,
-      };
+      const castEntry = sceneCast.find((c) => c.id === sp.id);
+      const lookupId = castEntry?.brandCharacterId ?? sp.id;
+      const brand = accessibleChars.find((b) => b.id === lookupId);
+      const existing = cleanCfg(voicePerSpeaker[sp.id])
+        ?? cleanCfg(voicePerSpeaker[lookupId])
+        ?? cleanCfg(sceneVoices[sp.id])
+        ?? cleanCfg(sceneVoices[lookupId]);
+      const fromSceneRoot = speakers.length === 1 && nextCharacterVoiceId
+        ? toElevenLabsDialogVoice(nextCharacterVoiceId, getAutoVoiceName(nextCharacterVoiceId), true)
+        : undefined;
+      const defaultId = cleanVoiceId(defaultVoiceByCharId[sp.id] ?? defaultVoiceByCharId[lookupId]);
+      const fromBrand = defaultId ? toElevenLabsDialogVoice(defaultId, getAutoVoiceName(defaultId) ?? sp.name) : undefined;
+      const picked = poolPicker.pick(normalizeAutoVoiceGender((brand as any)?.gender));
+      const fromPool = toElevenLabsDialogVoice(picked.id, picked.name, true);
+      const chosen = existing ?? fromSceneRoot ?? fromBrand ?? fromPool;
+      if (!chosen?.voiceId) continue;
+      const cur = cleanCfg(voicePerSpeaker[sp.id]);
+      if (cur?.engine !== chosen.engine || cur?.voiceId !== chosen.voiceId || cur?.voiceName !== chosen.voiceName) {
+        patched = patched ?? { ...voicePerSpeaker };
+        patched[sp.id] = chosen;
+      }
+      if (speakers.length === 1 && chosen.engine === 'elevenlabs' && !nextCharacterVoiceId) {
+        nextCharacterVoiceId = cleanVoiceId(chosen.voiceId);
+      }
     }
+    const update: Partial<ComposerScene> = {};
     if (patched) {
       setVoicePerSpeaker(patched);
-      onUpdate({ dialogVoices: patched });
+      update.dialogVoices = patched;
+    }
+    if (nextCharacterVoiceId && nextCharacterVoiceId !== cleanVoiceId((scene as any).characterVoiceId)) {
+      (update as any).characterVoiceId = nextCharacterVoiceId;
+    }
+    if (Object.keys(update).length > 0) {
+      onUpdate(update);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speakers, defaultVoiceByCharId]);
+  }, [speakers, defaultVoiceByCharId, scene.dialogVoices, (scene as any).characterVoiceId, sceneCast, accessibleChars, voicePerSpeaker]);
 
 
   const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
