@@ -45,7 +45,7 @@ const LIPSYNC_ENGINES = new Set([
   'cinematic-sync', 'sync-polish', 'sync-segments', 'native-dialogue', 'heygen',
 ]);
 
-const isUuid = (val?: string | null) =>
+const isUuid = (val?: string | null): val is string =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
 const INVALID_VOICE_TOKENS = new Set([
