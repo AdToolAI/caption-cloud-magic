@@ -400,7 +400,10 @@ function planSceneToComposerScene(
     // can drop the first speaker into character_voice_id (single-speaker fast-path).
     characterVoiceId: (() => {
       const firstWithVoice = (ps.cast ?? [])
-        .map((c) => c.characterId ? cleanVoiceId(c.voiceId) || cleanVoiceId(defaultVoicesByCharacter[stripPrefix(c.characterId)]) : undefined)
+        .map((c) => c.characterId
+          ? (cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
+              || cleanVoiceId(defaultVoicesByCharacter[stripPrefix(c.characterId)]))
+          : undefined)
         .find(Boolean);
       return firstWithVoice || cleanVoiceId(projectVoiceId);
     })(),
