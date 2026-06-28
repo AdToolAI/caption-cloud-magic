@@ -1135,6 +1135,30 @@ This overrides any English wording in the briefing's scaffolding
           }
           if (!c.voiceId && projectVoiceId && !looksLikeUuid(projectVoiceId)) c.voiceId = projectVoiceId;
         }
+        // AUTO-MATCH pass — for any cast still without a voice, pick one from
+        // the curated catalog by gender (fallback: male). Dedup within scene.
+        const MALE_POOL = ['nPczCjzI2devNBz1zQrb','TX3LPaxmHKxFdv7VOQHJ','JBFqnCBsd6RMkjVDRZzb','IKne3meq5aSn9XLyUdCD','cjVigY5qzO86Huf0OWal','iP95p4xoKVk53GoZ742B','onwK4e9ZLuTAKqWW03F9','pqHfZKP75CvOlQylNhV4','CwhRBWXzGAHq8TQ4Fs17'];
+        const FEMALE_POOL = ['EXAVITQu4vr4xnSDxMaL','FGY2WhTYpPnrIDTdsKH5','Xb7hH8MSUJpSbSDYk0k2','XrExE9yKIg1WjnnlVkGX','pFZP5JQG7iQjIQuC4Bku'];
+        const usedInScene = new Set<string>(
+          (sc.cast ?? []).map((c: any) => c.voiceId).filter((v: any) => typeof v === 'string'),
+        );
+        for (const c of sc.cast ?? []) {
+          if (c.voiceId) continue;
+          const ch = c.characterId ? charById.get(String(c.characterId)) : null;
+          const gender = String(ch?.gender ?? '').toLowerCase();
+          const pool = gender.startsWith('f') || gender === 'weiblich' || gender === 'female'
+            ? FEMALE_POOL : MALE_POOL;
+          const pick = pool.find((v) => !usedInScene.has(v)) ?? pool[0];
+          if (pick) {
+            c.voiceId = pick;
+            c.voiceAutoAssigned = true;
+            usedInScene.add(pick);
+            try {
+              plan.aiFilled = Array.isArray(plan.aiFilled) ? plan.aiFilled : [];
+              if (c.characterId) plan.aiFilled.push(`cast.${c.characterId}.voiceId`);
+            } catch { /* noop */ }
+          }
+        }
       }
       // Also clean the project-level voice.
       if (plan?.voice && looksLikeUuid((plan.voice as any).voiceId)) {
