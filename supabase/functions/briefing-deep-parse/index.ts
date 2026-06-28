@@ -428,6 +428,7 @@ const TOOL_PASS_B = {
                     characterName: { type: 'string' },
                     voiceId: { type: 'string', nullable: true },
                     voiceName: { type: 'string' },
+                    voiceAutoAssigned: { type: 'boolean' },
                     outfit: { type: 'string' },
                   },
                   required: ['mentionKey', 'characterName'],
@@ -483,8 +484,16 @@ You receive:
 Resolve every cast mention (@founder-avatar etc.) and every location mention (@home-office etc.) to a library entry. Normalize: strip "@", lowercase, remove separators (- _ space), allow substring match in either direction. When unresolved, set characterId/locationId = null and add an unresolved item with severity=warn and a clear suggestion like "Avatar 'Founder Default' im Library nicht gefunden — manuell zuordnen".
 
 For voice resolution:
-- If the briefing names a voice (id OR name), resolve to LIBRARY.voices and copy voiceId/voiceName to the project-level voice settings.
-- For each cast member, copy default_voice_id from the matched brand_character into ResolvedCast.voiceId, or null if missing.
+- Project-level voice: if briefing names a voice (id OR name), resolve via LIBRARY.voices.
+- Per-cast voice resolution (priority order):
+  1. brand_character.default_voice_id (if set and looks like an ElevenLabs id — opaque ~20-char alphanum, NEVER a UUID).
+  2. AUTO-MATCH from LIBRARY.voices using briefing language (OUTPUT_LANGUAGE), character.gender, character.description (persona/age hints), and scene tonality (energetic/warm/calm/authoritative/playful).
+  3. Within a single scene with multiple speakers, NEVER assign the same voiceId twice — rotate to another fitting voice from LIBRARY.voices.
+- For every auto-matched voice (rule 2), add an "aiFilled" dotted entry "cast.<characterId>.voiceId" so the UI can flag it. Also set cast.voiceAutoAssigned=true.
+- Voice catalog hints by gender:
+  Male: George, Roger, Charlie, Liam, Eric, Chris, Brian, Daniel, Bill
+  Female: Alice, Sarah, Laura, Matilda, Lily
+- NEVER copy a Character-UUID into voiceId. ElevenLabs voiceIds are opaque (e.g. "JBFqnCBsd6RMkjVDRZzb").
 
 Consistency checks (each becomes an unresolved entry when violated):
 - Sum of scene durationSec must equal project.totalDurationSec (severity=warn).
@@ -664,6 +673,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
         characterName: rCast?.characterName ?? String(c.mentionKey ?? '').replace(/^@/, ''),
         voiceId: typeof rCast?.voiceId === 'string' ? rCast.voiceId : null,
         voiceName: rCast?.voiceName,
+        voiceAutoAssigned: rCast?.voiceAutoAssigned === true ? true : undefined,
         referenceImageUrl: null,
       });
     });
@@ -922,7 +932,7 @@ This overrides any English wording in the briefing's scaffolding
     const libraryPromise = Promise.all([
       supabase
         .from('brand_characters')
-        .select('id,name,default_voice_id')
+        .select('id,name,default_voice_id,gender,description')
         .eq('user_id', userId)
         .limit(200),
       supabase
@@ -1028,7 +1038,7 @@ This overrides any English wording in the briefing's scaffolding
             OUTPUT_LANGUAGE: langKey,
             MANIFEST: manifest,
             LIBRARY: {
-              characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id })),
+              characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id, gender: c.gender, description: c.description })),
               locations: locations.map((l: any) => ({ id: l.id, name: l.name })),
               voices,
             },
@@ -1126,6 +1136,30 @@ This overrides any English wording in the briefing's scaffolding
             if (typeof def === 'string' && !looksLikeUuid(def)) c.voiceId = def;
           }
           if (!c.voiceId && projectVoiceId && !looksLikeUuid(projectVoiceId)) c.voiceId = projectVoiceId;
+        }
+        // AUTO-MATCH pass — for any cast still without a voice, pick one from
+        // the curated catalog by gender (fallback: male). Dedup within scene.
+        const MALE_POOL = ['nPczCjzI2devNBz1zQrb','TX3LPaxmHKxFdv7VOQHJ','JBFqnCBsd6RMkjVDRZzb','IKne3meq5aSn9XLyUdCD','cjVigY5qzO86Huf0OWal','iP95p4xoKVk53GoZ742B','onwK4e9ZLuTAKqWW03F9','pqHfZKP75CvOlQylNhV4','CwhRBWXzGAHq8TQ4Fs17'];
+        const FEMALE_POOL = ['EXAVITQu4vr4xnSDxMaL','FGY2WhTYpPnrIDTdsKH5','Xb7hH8MSUJpSbSDYk0k2','XrExE9yKIg1WjnnlVkGX','pFZP5JQG7iQjIQuC4Bku'];
+        const usedInScene = new Set<string>(
+          (sc.cast ?? []).map((c: any) => c.voiceId).filter((v: any) => typeof v === 'string'),
+        );
+        for (const c of sc.cast ?? []) {
+          if (c.voiceId) continue;
+          const ch = c.characterId ? charById.get(String(c.characterId)) : null;
+          const gender = String(ch?.gender ?? '').toLowerCase();
+          const pool = gender.startsWith('f') || gender === 'weiblich' || gender === 'female'
+            ? FEMALE_POOL : MALE_POOL;
+          const pick = pool.find((v) => !usedInScene.has(v)) ?? pool[0];
+          if (pick) {
+            c.voiceId = pick;
+            c.voiceAutoAssigned = true;
+            usedInScene.add(pick);
+            try {
+              plan.aiFilled = Array.isArray(plan.aiFilled) ? plan.aiFilled : [];
+              if (c.characterId) plan.aiFilled.push(`cast.${c.characterId}.voiceId`);
+            } catch { /* noop */ }
+          }
         }
       }
       // Also clean the project-level voice.

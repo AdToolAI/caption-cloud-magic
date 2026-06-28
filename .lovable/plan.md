@@ -1,64 +1,59 @@
-## Mini-Patch: Voice-Resolver + Cast-Dedup + Telemetrie
+## Plan: Auto-Voice-Assignment für Cast-Mitglieder
 
-Der letzte Run (Projekt `779aeb60…`) hat den Briefing-Plan **korrekt** ins Storyboard übertragen — Prompt, Drehbuch, Cast, Dauer und Provider sind sauber in `composer_scenes`. Nur drei kleine Restlücken bleiben offen. Dieser Patch schließt sie gezielt, ohne den Rest der Pipeline anzufassen.
+### Problem
+Aktuell: Wenn ein Brand-Character keine `default_voice_id` hat (z.B. Samuel), bleibt `character_voice_id = NULL` und der User muss im Audio-Sheet manuell eine Stimme wählen.
 
----
+Ursache: In `briefing-deep-parse` (Pass B) wird laut Prompt nur die **Character-Default** kopiert (Zeile 487: *"copy default_voice_id from the matched brand_character into ResolvedCast.voiceId, or null if missing"*). Der Resolver darf also keine Stimme aus dem Katalog wählen, wenn der Character keine hat.
 
-### 1. Voice-Resolver härten — Character-UUID → echte ElevenLabs-Voice
+### Lösung — KI wählt selbst eine passende Stimme
+Den Resolver befähigen, für **bis zu 4 Sprecher** eine passende ElevenLabs-Stimme aus dem 14-Voice-Katalog (`voices` array, Zeile 1001–1016) zuzuordnen, basierend auf:
+- **Sprache des Briefings** (LANGUAGE_LOCK, z.B. DE)
+- **Charakter-Metadaten**: `gender`, `age`, `persona_description` aus `brand_characters`
+- **Tonality** der Szene (z.B. "energisch" → Brian/Liam, "warm" → Sarah/Laura)
+- **Deduplication**: keine Stimme zweimal innerhalb einer Szene (Multi-Speaker)
 
-**Problem:** Der Plan setzt `voiceId = "483f9cdc-eb31-4486-bf67-9c5e7d955016"` — das ist die **Character-UUID**, keine ElevenLabs-Voice-ID. Folge: gelbe "voices unresolved"-Warnung im Plan-Sheet und `character_voice_id = NULL` in allen 3 Szenen → User muss Voice manuell wählen.
+### Konkrete Änderungen
 
-**Fix in `src/hooks/useApplyProductionPlan.ts`:**
-- `cleanVoiceId(rawVoiceId, characters)` erweitern:
-  - Wenn `rawVoiceId` in `brand_characters.id` existiert → `default_voice_id` dieses Characters zurückgeben.
-  - Wenn das Ergebnis immer noch leer/keine echte Voice-ID-Form (`/^[a-zA-Z0-9]{15,30}$/`) → `null` + Warning ins Result-Panel.
-- Beim Insert: `character_voice_id` nur setzen wenn aufgelöst, sonst `null` lassen (kein Engine-Token).
+**1. `supabase/functions/briefing-deep-parse/index.ts`**
 
-**Fix in `supabase/functions/briefing-deep-parse/index.ts`:**
-- Im Pass-B-Resolver (Cast → Voice): wenn Gemini für `characterVoiceId` nur eine Character-UUID zurückgibt, in der `brand_characters`-Library nach `default_voice_id` für diesen Character schauen und damit ersetzen, bevor der Plan persistiert wird.
+a) **Library-Query erweitern** (Zeile 925): zusätzlich `gender, age, persona_description` aus `brand_characters` laden und in das LIBRARY-Payload für Pass B mitgeben.
 
----
+b) **System-Prompt Pass B** (Zeile 485–487) ersetzen durch:
+```
+For voice resolution:
+- Project-level voice: if briefing names a voice (id OR name), resolve via LIBRARY.voices.
+- Per-cast voice resolution (priority order):
+  1. brand_character.default_voice_id (if set)
+  2. AUTO-MATCH from LIBRARY.voices using:
+     - briefing language (OUTPUT_LANGUAGE)
+     - character.gender / age / persona_description
+     - scene tonality (energetic/warm/calm/authoritative)
+  3. Within a single scene with multiple speakers, NEVER assign the same voiceId twice.
+- For every auto-matched voice, add an "aiFilled" entry: cast.<characterId>.voiceId
+- Voice catalog hints (gender):
+  Male: George, Roger, Charlie, Liam, Eric, Chris, Brian, Daniel, Bill
+  Female: Alice, Sarah, Laura, Matilda, Lily
+```
 
-### 2. Cast-Dedup nach Insert
+c) **Lokaler Fallback** (Zeile 1050 ff.): heuristisches Auto-Match — wenn `default_voice_id` fehlt, deterministische Auswahl per `character.gender` (♂ → Brian, ♀ → Sarah) + Round-Robin bei Multi-Cast.
 
-**Problem:** Szene 1 enthält `character_shots: [{characterId: "483f9cdc…"}, {characterId: "samuel-dusatko"}]` — zwei Slots für **dieselbe Person** (Library-UUID vs. Legacy-Slug). Triggert Multi-Portrait-Logik und kostet einen Slot.
+**2. `src/hooks/useApplyProductionPlan.ts`**
 
-**Fix in `src/hooks/useApplyProductionPlan.ts`:**
-- Vor dem `insert`: `character_shots` über `resolveCharacterId()` (gibt es bereits in `src/lib/video-composer/resolveCharacterId.ts`) auf canonical IDs mappen und nach `characterId` deduppen — erstes Vorkommen gewinnt, `shotType` des spezifischeren Slots (`detail` > `full` > `absent`) wird bevorzugt.
+`cleanVoiceId` Map um die jetzt vom Resolver gefüllten echten Voice-IDs ergänzen → bestehender Code übernimmt sie automatisch.
 
----
+**3. UI-Anzeige (`ProductionPlanSheet.tsx`)**
 
-### 3. Telemetrie-Log für künftige NULL-projectId Diagnose
-
-**Problem:** Plans aus 19:43 und 20:01 hatten noch `project_id = NULL` — der 20:31-Run war korrekt. Damit wir bei der nächsten Anomalie direkt sehen, woher der NULL kommt:
-
-**Fix in `supabase/functions/briefing-deep-parse/index.ts`:**
-- Direkt nach dem Body-Parsing:
-  ```ts
-  if (!projectId) {
-    console.warn('[deep-parse] projectId NULL', {
-      userId: user?.id,
-      briefingLen: briefing?.length ?? 0,
-      hasAuth: !!authHeader,
-    });
-  }
-  ```
-- Kein Verhalten ändert sich, nur Sichtbarkeit im Edge-Function-Log.
-
----
-
-### Verifikation nach Deploy
-
-1. Neue Briefing-Analyse mit Samuel als Sprecher starten.
-2. `composer_production_plans` letzter Eintrag → `project_id` ist UUID **und** im `manifest.scenes[].characterVoiceId` steht eine echte ElevenLabs-Voice-ID (z.B. `JBFqnCBsd6RMkjVDRZzb`).
-3. Nach "Plan anwenden": `composer_scenes.character_voice_id` ist gesetzt, im Audio-Sheet steht die Stimme automatisch vorgewählt, `character_shots` enthält **einen** Eintrag pro Person.
-4. Plan-Sheet zeigt **keine** gelbe "voices unresolved"-Warnung mehr.
-
----
+Bei auto-zugewiesenen Stimmen einen ⚡ "AI-gewählt"-Badge neben dem Voice-Chip anzeigen (analog zu den existierenden 3-State-Chips für AI-Fill).
 
 ### Was NICHT angefasst wird
-- `useStoryboardTransition` (Handoff funktioniert)
-- Lipsync-Pipeline, Sync.so, HappyHorse-Green-Net
-- Prompt-Komposition, Shot Director, Cinematic Style Presets
+- Lipsync-Pipeline, Sync.so, HappyHorse-Green-Net, Pricing
+- `default_voice_id` in `brand_characters` wird **nicht** persistent überschrieben — Auto-Match gilt nur für diesen Plan. Optional späterer "Als Standard speichern"-Button im Avatar-Detail.
 
-**Geschätzter Aufwand:** 3 Dateien, ~40 Zeilen Diff insgesamt.
+### Aufwand
+1 Edge Function + 1 Hook + 1 UI-Komponente, ~60 Zeilen Diff. Kein neuer API-Call, nutzt bereits laufenden Pass-B Gemini-Call.
+
+### Verifikation
+1. Briefing mit Samuel (kein default_voice_id) analysieren.
+2. `composer_scenes.character_voice_id` ist gesetzt (z.B. `nPczCjzI2devNBz1zQrb` Brian für männlichen DE-Sprecher).
+3. Multi-Speaker-Szene (2 Sprecher) → zwei **unterschiedliche** Voice-IDs.
+4. Im Plan-Sheet steht ⚡ "AI-gewählt" neben der Stimme.

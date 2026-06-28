@@ -862,7 +862,14 @@ export default function ProductionPlanSheet({
                                     </SelectContent>
                                   </Select>
                                 )}
-                                {c.voiceName && <Badge variant="secondary" className="text-[10px]">🎙 {c.voiceName}</Badge>}
+                                {(c.voiceName || c.voiceId) && (
+                                  <Badge variant="secondary" className="text-[10px]">
+                                    🎙 {c.voiceName ?? 'Stimme'}
+                                    {(c as any).voiceAutoAssigned && (
+                                      <span className="ml-1 text-amber-300" title="Stimme automatisch von der KI zugeordnet">⚡ AI</span>
+                                    )}
+                                  </Badge>
+                                )}
                               </div>
                             );
                           })}

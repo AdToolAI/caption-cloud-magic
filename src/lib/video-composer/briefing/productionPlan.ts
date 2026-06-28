@@ -46,6 +46,8 @@ export const ResolvedCast = z.object({
   /** ElevenLabs voice id this character should speak with, when known. */
   voiceId: z.string().nullable().optional(),
   voiceName: z.string().optional(),
+  /** True if the resolver auto-picked this voice from the catalog (no default_voice_id on the character). UI shows a "⚡ AI" badge. */
+  voiceAutoAssigned: z.boolean().optional(),
   /**
    * Explicit shot framing for THIS cast member in this scene. Overrides
    * the scene-default derived from `shotDirector.framing`. Useful for
