@@ -249,7 +249,9 @@ function planSceneToComposerScene(
   for (const c of ps.cast ?? []) {
     if (!c.characterId) continue;
     const characterId = stripPrefix(c.characterId as string);
-    const vid = cleanVoiceId(c.voiceId) || cleanVoiceId(defaultVoicesByCharacter[characterId]) || cleanVoiceId(projectVoiceId);
+    const vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
+      || cleanVoiceId(defaultVoicesByCharacter[characterId])
+      || cleanVoiceId(projectVoiceId);
     if (vid) dialogVoices[characterId] = vid;
   }
 
