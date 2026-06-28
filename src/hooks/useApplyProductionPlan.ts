@@ -517,14 +517,15 @@ function planSceneToComposerScene(
     // v175: per-cast voiceId on the scene root so the upcoming insert path
     // can drop the first speaker into character_voice_id (single-speaker fast-path).
     characterVoiceId: (() => {
-      const firstWithVoice = (ps.cast ?? [])
-        .map((c) => c.characterId
-          ? (cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
-              || cleanVoiceId(defaultVoicesByCharacter[stripPrefix(c.characterId)]))
-          : undefined)
-        .find(Boolean);
-      return firstWithVoice || cleanVoiceId(projectVoiceId);
+      // Prefer the first speaker's resolved voice from `dialogVoices` (already
+      // includes the AI pool fallback above), then project default.
+      const firstCharId = (ps.cast ?? [])
+        .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : null))
+        .find((x): x is string => !!x);
+      const fromDialog = firstCharId ? dialogVoices[firstCharId] : undefined;
+      return fromDialog || cleanVoiceId(projectVoiceId);
     })(),
+
   } as ComposerScene;
 }
 
