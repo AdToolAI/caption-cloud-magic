@@ -1135,15 +1135,18 @@ This overrides any English wording in the briefing's scaffolding
           passA_ms: tA - t0,
           passB_ms: tB - tA,
           total_ms: Date.now() - t0,
-          model: 'gemini-2.5-pro',
+          model: passAModelUsed,
           passA_error: passAError,
+          passA_diagnostics: passADiagnostics,
+          passB_diagnostics: passBDiagnostics,
         },
       });
     } catch (e: any) {
       console.warn('[briefing-deep-parse] persist failed (non-fatal):', e?.message);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA }, passA_error: passAError }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passA_model: passAModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics }), {
+
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
