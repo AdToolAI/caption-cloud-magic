@@ -1,78 +1,100 @@
 ## Befund
 
-Nein — der Briefing-Plan wurde größtenteils korrekt erstellt und ins Storyboard übernommen, aber die automatische Stimme ist noch nicht sauber umgesetzt.
+Ja — die Voice wird inzwischen in der Datenbank automatisch gesetzt, aber das Frontend zeigt sie noch nicht korrekt an.
 
-Auf deinem Screenshot sieht man:
-- Skript wurde übernommen.
-- Sprecher Samuel wurde erkannt.
-- Scene wurde angewendet/verifiziert.
-- Aber im Dialog-Studio steht weiterhin **„Stimme wählen“**.
+Aktueller DB-Stand der neuesten 3 Szenen:
 
-Die Codeprüfung zeigt den wahrscheinlichsten Grund: Die Auto-Voice-Zuweisung existiert bereits im Apply-Hook, aber die Dialog-UI bindet sie nicht zuverlässig, weil sie beim Öffnen fast nur `scene.dialogVoices` und Avatar-Defaults nutzt. Wenn Samuel keine Avatar-Default-Voice hat und/oder `dialog_voices` leer bzw. unter einem anderen Character-Key gespeichert wurde, fällt die UI zurück auf „Stimme wählen“, obwohl `characterVoiceId` ggf. vorhanden sein kann.
+- `character_voice_id = JBFqnCBsd6RMkjVDRZzb` → George
+- `dialog_voices = { 483f9cdc...: JBFqnCBsd6RMkjVDRZzb }`
+- Samuel hat weiterhin keine Avatar-Default-Voice, aber `gender = male`
+
+Das heißt: Die Auto-Zuweisung funktioniert backend-/persistenzseitig. Der sichtbare Fehler ist jetzt die UI-Bindung in `SceneDialogStudio.tsx`.
+
+Warum zeigt der Select trotzdem „Stimme wählen“?
+
+- Die DB speichert `dialog_voices` unter der Brand-Character-ID `483f9cdc...`.
+- Die UI-Speaker-Liste nutzt aber häufig die lokale Composer-Character-ID `sp.id`.
+- Im Render liest der Select nur `voicePerSpeaker[sp.id]`.
+- Dadurch existiert die Voice unter dem Alias-Key, aber der sichtbare Select schaut auf den falschen Key.
 
 ## Ziel
 
-Wenn ein Sprecher im Briefing erkannt wird, muss immer automatisch eine konkrete Voice angezeigt und gespeichert werden — auch wenn im Briefing keine Voice genannt wurde und der Avatar keine Standard-Stimme hat.
+Wenn `dialog_voices`, `character_voice_id` oder ein AI-Pool-Fallback existiert, darf das Frontend nie mehr „Stimme wählen“ zeigen.
 
 Akzeptanz:
-- Samuel zeigt nicht mehr „Stimme wählen“, sondern z. B. **Brian** oder eine andere passende ElevenLabs-Stimme.
-- Die Voice wird in `dialog_voices` pro Sprecher gespeichert.
-- `character_voice_id` wird für Single-Speaker-Szenen ebenfalls gesetzt.
-- Nach Reload bleibt die Stimme erhalten.
-- Bei bis zu 4 Sprechern erhalten die Sprecher unterschiedliche Stimmen.
+- Samuel zeigt sofort eine konkrete Stimme, z. B. George/Brian/Liam.
+- Das Auto-Badge erscheint, wenn die Stimme aus dem AI-Pool kommt.
+- Der Play-Button ist aktiv.
+- Nach Reload bleibt die Stimme sichtbar.
+- Bei bis zu 4 Sprechern bleiben die Stimmen unterscheidbar.
 
 ## Patch-Plan
 
-### 1. Gemeinsame Auto-Voice-Logik zentralisieren
-Eine kleine gemeinsame Utility anlegen/verwenden für:
-- gültige ElevenLabs Voice IDs
-- Male/Female/Neutral Pools
-- Voice-ID-Säuberung
-- Gender-aware Round-Robin
-- Voice-Name-Auflösung
+### 1. UI-Key-Resolver für Sprecher einbauen
+In `SceneDialogStudio.tsx` eine kleine Helper-Funktion ergänzen:
 
-Damit `useApplyProductionPlan.ts` und `SceneDialogStudio.tsx` dieselbe Logik verwenden und nicht auseinanderlaufen.
+```ts
+getSpeakerVoice(sp)
+```
 
-### 2. Apply-Hook härten
-In `useApplyProductionPlan.ts` sicherstellen:
-- Jede erkannte Cast-Person bekommt einen Eintrag in `dialogVoices`.
-- Key ist immer der normalisierte Brand-Character-ID-Key, den die UI später auch findet.
-- `characterVoiceId` wird aus dem ersten `dialogVoices`-Eintrag abgeleitet.
-- Verifikation schlägt nicht nur bei komplett leerer Voice an, sondern auch wenn ein Dialog-Speaker ohne konkrete Voice bleibt.
+Diese liest in dieser Reihenfolge:
 
-### 3. Dialog-UI Fallback reparieren
-In `SceneDialogStudio.tsx` die Auto-Bind-Logik erweitern:
+1. `voicePerSpeaker[sp.id]`
+2. `voicePerSpeaker[brandCharacterId]`
+3. `scene.dialogVoices[sp.id]`
+4. `scene.dialogVoices[brandCharacterId]`
+5. bei Single-Speaker: `scene.characterVoiceId`
+6. Avatar `default_voice_id`
+7. Auto-Pool-Fallback nach Gender
 
-Fallback-Reihenfolge pro Sprecher:
-1. vorhandene `scene.dialogVoices[speakerId]`
-2. vorhandene Voice unter `brandCharacterId`
-3. `scene.characterVoiceId` bei Single-Speaker-Szenen
-4. Avatar `default_voice_id`
-5. neue Auto-Pool-Stimme nach Gender
+Wichtig: Der Helper gibt immer eine normalisierte `DialogVoiceCfg` zurück, nicht nur eine String-ID.
 
-Danach sofort `onUpdate({ dialogVoices, characterVoiceId })`, damit es gespeichert wird.
+### 2. Render-Select auf resolved Voice umstellen
+Im Sprecher-UI-Block:
 
-### 4. UI-Feedback verbessern
-Wenn eine Stimme automatisch gesetzt wurde:
-- Select zeigt den Voice-Namen statt „Stimme wählen“.
-- Badge neben dem Sprecher: **Auto** oder **AI** statt nur „Setup“.
-- „Setup“ nur noch anzeigen, wenn wirklich weder Brand-Default noch Auto-Voice vorhanden ist.
+- aktuell: `const cfg = voicePerSpeaker[sp.id]`
+- neu: `const cfg = getSpeakerVoice(sp)`
 
-### 5. Persistenz/Reload absichern
-In `VideoComposerDashboard.tsx` nur minimal prüfen/anpassen:
-- DB-Feld `dialog_voices` bleibt DB-first.
-- `character_voice_id` bleibt DB-first.
-- Wenn `dialog_voices` leer ist, aber `character_voice_id` vorhanden und genau ein Sprecher existiert, soll die Szene beim Laden nicht wieder „voice-los“ wirken.
+Damit zeigt der Select die persistierte DB-Voice auch dann, wenn sie unter der Brand-ID gespeichert wurde.
 
-### 6. Verifikation
-Nach Umsetzung prüfen:
-- Neue Briefing-Plan-Anwendung ohne Voice-Angabe.
-- Samuel ohne Avatar-Default zeigt automatisch z. B. Brian.
-- Screenshot-Zustand darf nicht mehr „Stimme wählen“ zeigen.
-- Datenbankzeile enthält `dialog_voices` und `character_voice_id`.
+### 3. Auto-Bind persistiert beide Alias-Keys
+Der bestehende Auto-Bind-Effekt soll bei einer gefundenen Voice beide Keys setzen:
 
-## Nicht im Scope
+- `patched[sp.id] = chosen`
+- `patched[brandCharacterId] = chosen`
 
-- Keine Änderung an Lip-Sync, HappyHorse, Hailuo oder Sync.so.
-- Kein Redesign des Dialog-Studios.
-- Keine Änderung am Briefing-Inhalt selbst, außer Voice-Mapping/Anzeige/Persistenz.
+So funktionieren Parser, Select, Voiceover-Generation und Reload unabhängig davon, ob ein Flow mit lokaler ID oder Brand-ID arbeitet.
+
+### 4. `characterVoiceId` nicht nur setzen, sondern im UI nutzen
+Wenn genau ein Sprecher vorhanden ist und `characterVoiceId` gesetzt ist:
+
+- Select zeigt diese Voice direkt an.
+- `dialogVoices` wird automatisch daraus ergänzt.
+- `onUpdate({ dialogVoices, characterVoiceId })` speichert die Reparatur zurück.
+
+### 5. Voice-Namen robust anzeigen
+Falls `list-voices` die Voice-Library noch lädt oder die ID nicht in der Liste steht:
+
+- Auto-Voice IDs aus `AUTO_VOICE_OPTIONS` bleiben im Picker enthalten.
+- Für bekannte IDs wird Name angezeigt (`George`, `Brian`, etc.).
+- Wenn unbekannt, wird die ID angezeigt statt leerem Placeholder.
+
+### 6. Keine Änderung an Generation/Lip-Sync
+Nicht anfassen:
+
+- HappyHorse/Hailuo/Sync.so
+- Render-Provider
+- Prompt-Generierung
+- Briefing-Parser
+
+Das ist ein reiner Frontend-Binding-/Persistenz-Fix.
+
+## Verifikation
+
+Nach Implementierung prüfen:
+
+1. Aktuelles Projekt öffnen.
+2. Szene 1 mit Samuel öffnen.
+3. Erwartung: Select zeigt `George` statt „Stimme wählen“.
+4. Setup-Badge ist weg, Auto-/Voice-Badge sichtbar.
+5. DB bleibt unverändert korrekt: `dialog_voices` + `character_voice_id` gesetzt.
