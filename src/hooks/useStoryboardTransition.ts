@@ -354,6 +354,7 @@ export interface StoryboardTransitionState {
   phaseLabel: string;
   planSheetOpen: boolean;
   initialPlan: TProductionPlan | null;
+  activeProjectId: string | null;
 }
 
 export function useStoryboardTransition({
@@ -366,6 +367,7 @@ export function useStoryboardTransition({
     phaseLabel: '',
     planSheetOpen: false,
     initialPlan: null,
+    activeProjectId: null,
   });
 
   const cancelledRef = useRef(false);
@@ -414,6 +416,7 @@ export function useStoryboardTransition({
       phaseLabel: '',
       planSheetOpen: false,
       initialPlan: null,
+      activeProjectId: null,
     });
   }, []);
 
@@ -477,6 +480,7 @@ export function useStoryboardTransition({
       phaseLabel: 'Schritt 1/4 · Briefing-Modus erkennen …',
       planSheetOpen: false,
       initialPlan: null,
+      activeProjectId,
     });
     startProgressLoop();
 
@@ -574,6 +578,7 @@ export function useStoryboardTransition({
         phaseLabel: '',
         planSheetOpen: true,
         initialPlan: plan,
+        activeProjectId,
       });
       return { handled: true };
     } catch (e: any) {
@@ -618,6 +623,7 @@ export function useStoryboardTransition({
           phaseLabel: '',
           planSheetOpen: true,
           initialPlan: fallback,
+          activeProjectId,
         });
 
         // LATE-ARRIVAL: if the timeout fired but the function is still
@@ -657,7 +663,7 @@ export function useStoryboardTransition({
                     ? 'Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden", um Fallback-Szenen zu ersetzen.'
                     : 'Der AI-generierte Plan ist jetzt verfügbar.',
                 });
-                return { ...s, planSheetOpen: true, initialPlan: latePlan };
+                return { ...s, planSheetOpen: true, initialPlan: latePlan, activeProjectId };
               });
             } catch (lateErr) {
               console.warn('[useStoryboardTransition] late-arrival failed', lateErr);
