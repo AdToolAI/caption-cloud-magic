@@ -673,6 +673,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
         characterName: rCast?.characterName ?? String(c.mentionKey ?? '').replace(/^@/, ''),
         voiceId: typeof rCast?.voiceId === 'string' ? rCast.voiceId : null,
         voiceName: rCast?.voiceName,
+        voiceAutoAssigned: rCast?.voiceAutoAssigned === true ? true : undefined,
         referenceImageUrl: null,
       });
     });
