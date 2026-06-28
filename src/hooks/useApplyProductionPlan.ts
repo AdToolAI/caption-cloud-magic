@@ -53,6 +53,74 @@ const INVALID_VOICE_TOKENS = new Set([
 ]);
 
 /**
+ * Deterministic ElevenLabs voice pools used as a last-resort fallback when:
+ *  - the briefing did not specify a voice for a speaker, and
+ *  - the brand character has no `default_voice_id` set, and
+ *  - the project has no global voice.
+ *
+ * Round-robin per gender so up to 4 speakers in one scene each get a distinct voice.
+ * IDs sourced from the curated ElevenLabs preset list in elevenlabs-tts knowledge.
+ */
+const VOICE_POOL_MALE: string[] = [
+  'nPczCjzI2devNBz1zQrb', // Brian
+  'TX3LPaxmHKxFdv7VOQHJ', // Liam
+  'JBFqnCBsd6RMkjVDRZzb', // George
+  'bIHbv24MWmeRgasZH58o', // Will
+  'cjVigY5qzO86Huf0OWal', // Eric
+  'iP95p4xoKVk53GoZ742B', // Chris
+];
+const VOICE_POOL_FEMALE: string[] = [
+  'EXAVITQu4vr4xnSDxMaL', // Sarah
+  'FGY2WhTYpPnrIDTdsKH5', // Laura
+  'Xb7hH8MSUJpSbSDYk0k2', // Alice
+  'XrExE9yKIg1WjnnlVkGX', // Matilda
+  'pFZP5JQG7iQjIQuC4Bku', // Lily
+  'cgSgspJ2msm6clMCkdW9', // Jessica
+];
+const VOICE_POOL_NEUTRAL: string[] = [
+  'SAz9YHcvj6GT2YYXdXww', // River
+  'IKne3meq5aSn9XLyUdCD', // Charlie
+];
+
+const VOICE_POOL_NAMES: Record<string, string> = {
+  nPczCjzI2devNBz1zQrb: 'Brian',
+  TX3LPaxmHKxFdv7VOQHJ: 'Liam',
+  JBFqnCBsd6RMkjVDRZzb: 'George',
+  bIHbv24MWmeRgasZH58o: 'Will',
+  cjVigY5qzO86Huf0OWal: 'Eric',
+  iP95p4xoKVk53GoZ742B: 'Chris',
+  EXAVITQu4vr4xnSDxMaL: 'Sarah',
+  FGY2WhTYpPnrIDTdsKH5: 'Laura',
+  Xb7hH8MSUJpSbSDYk0k2: 'Alice',
+  XrExE9yKIg1WjnnlVkGX: 'Matilda',
+  pFZP5JQG7iQjIQuC4Bku: 'Lily',
+  cgSgspJ2msm6clMCkdW9: 'Jessica',
+  SAz9YHcvj6GT2YYXdXww: 'River',
+  IKne3meq5aSn9XLyUdCD: 'Charlie',
+};
+
+/** Stateful round-robin picker (per apply-run) so each speaker gets a unique voice. */
+interface VoicePoolPicker {
+  pick: (gender: 'male' | 'female' | 'neutral' | null | undefined) => { id: string; name: string };
+}
+function createVoicePoolPicker(): VoicePoolPicker {
+  let mi = 0, fi = 0, ni = 0;
+  return {
+    pick: (gender) => {
+      const g = (gender ?? '').toLowerCase();
+      let pool: string[];
+      let idx: number;
+      if (g === 'female') { pool = VOICE_POOL_FEMALE; idx = fi++ % pool.length; }
+      else if (g === 'neutral') { pool = VOICE_POOL_NEUTRAL; idx = ni++ % pool.length; }
+      else { pool = VOICE_POOL_MALE; idx = mi++ % pool.length; }
+      const id = pool[idx];
+      return { id, name: VOICE_POOL_NAMES[id] ?? 'Voice' };
+    },
+  };
+}
+
+
+/**
  * cleanVoiceId — strip engine tokens and reject UUIDs (which are almost always
  * a Character-UUID that the planner mistakenly piped into voiceId). Real
  * ElevenLabs voice IDs are 20 opaque alphanumeric chars with no dashes.
@@ -201,7 +269,11 @@ function planSceneToComposerScene(
   briefingTone: string | undefined,
   projectVoiceId: string | undefined,
   defaultVoicesByCharacter: Record<string, string | undefined> = {},
+  genderByCharacter: Record<string, 'male' | 'female' | 'neutral' | null | undefined> = {},
+  voicePoolPicker?: VoicePoolPicker,
+  voicePoolAssignments: Record<string, string> = {},
 ): ComposerScene {
+
   // Build characterShots from resolved cast. The plan stores `characterId`
   // as the BASE brand_characters.id (CastRef invariant) plus an optional
   // separate `outfitLookId`. We still defensively strip any legacy mention
@@ -275,17 +347,31 @@ function planSceneToComposerScene(
   const aiPrompt = promptParts.join(' ') || undefined;
 
   // Per-character dialog voices (cinematic-sync / heygen use these).
-  // Fallback to project-level voice if the resolved cast member has no voiceId,
-  // so compose-dialog-segments never errors with `missing_voice`.
+  // Fallback chain: plan voice → brand default → deterministic AI pool (gender-aware,
+  // round-robin across the whole apply run) → project-level voice. Result: a speaker
+  // is NEVER left without a voice, even when the briefing and the avatar both omit one.
   const dialogVoices: Record<string, string> = {};
   for (const c of ps.cast ?? []) {
     if (!c.characterId) continue;
     const characterId = stripPrefix(c.characterId as string);
-    const vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
-      || cleanVoiceId(defaultVoicesByCharacter[characterId])
-      || cleanVoiceId(projectVoiceId);
+    let vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
+      || cleanVoiceId(defaultVoicesByCharacter[characterId]);
+    if (!vid && voicePoolPicker) {
+      // Stable per-character: pick once per apply-run, reuse for every scene
+      // that features this speaker so the same person keeps the same voice.
+      const cached = voicePoolAssignments[characterId];
+      if (cached) {
+        vid = cached;
+      } else {
+        const picked = voicePoolPicker.pick(genderByCharacter[characterId]);
+        voicePoolAssignments[characterId] = picked.id;
+        vid = picked.id;
+      }
+    }
+    if (!vid) vid = cleanVoiceId(projectVoiceId);
     if (vid) dialogVoices[characterId] = vid;
   }
+
 
 
   const engine = ps.engine ?? 'auto';
@@ -431,14 +517,15 @@ function planSceneToComposerScene(
     // v175: per-cast voiceId on the scene root so the upcoming insert path
     // can drop the first speaker into character_voice_id (single-speaker fast-path).
     characterVoiceId: (() => {
-      const firstWithVoice = (ps.cast ?? [])
-        .map((c) => c.characterId
-          ? (cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
-              || cleanVoiceId(defaultVoicesByCharacter[stripPrefix(c.characterId)]))
-          : undefined)
-        .find(Boolean);
-      return firstWithVoice || cleanVoiceId(projectVoiceId);
+      // Prefer the first speaker's resolved voice from `dialogVoices` (already
+      // includes the AI pool fallback above), then project default.
+      const firstCharId = (ps.cast ?? [])
+        .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : null))
+        .find((x): x is string => !!x);
+      const fromDialog = firstCharId ? dialogVoices[firstCharId] : undefined;
+      return fromDialog || cleanVoiceId(projectVoiceId);
     })(),
+
   } as ComposerScene;
 }
 
@@ -593,28 +680,50 @@ export function useApplyProductionPlan() {
         .filter((x): x is string => !!x),
     ));
     const defaultVoicesByCharacter: Record<string, string | undefined> = {};
+    const genderByCharacter: Record<string, 'male' | 'female' | 'neutral' | null | undefined> = {};
     if (characterIds.length > 0) {
       const { data, error } = await supabase
         .from('brand_characters')
-        .select('id, default_voice_id')
+        .select('id, default_voice_id, gender')
         .in('id', characterIds);
       if (!error) {
         for (const row of (data ?? []) as any[]) {
           const voice = cleanVoiceId(row?.default_voice_id);
           if (row?.id && voice) defaultVoicesByCharacter[String(row.id)] = voice;
+          if (row?.id) {
+            const g = row?.gender as string | null | undefined;
+            genderByCharacter[String(row.id)] = (g === 'male' || g === 'female' || g === 'neutral') ? g : null;
+          }
         }
       } else {
         console.warn('[useApplyProductionPlan] default voice lookup failed:', error);
       }
     }
 
-    // 4) Build new scenes from plan.
+    // 4) Build new scenes from plan. The pool-picker is created once per apply-run
+    // so round-robin allocation spans all scenes (max 4 speakers stay distinct),
+    // and `voicePoolAssignments` keeps the same character on the same voice
+    // across scenes.
+    const voicePoolPicker = createVoicePoolPicker();
+    const voicePoolAssignments: Record<string, string> = {};
     const newScenes: ComposerScene[] = (plan.scenes ?? [])
       .slice()
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
-        planSceneToComposerScene(s, protectedScenes.length + i, projectId, plan.negativePrompt, currentBriefing?.tone, cleanVoiceId(plan.voice?.voiceId), defaultVoicesByCharacter),
+        planSceneToComposerScene(
+          s,
+          protectedScenes.length + i,
+          projectId,
+          plan.negativePrompt,
+          currentBriefing?.tone,
+          cleanVoiceId(plan.voice?.voiceId),
+          defaultVoicesByCharacter,
+          genderByCharacter,
+          voicePoolPicker,
+          voicePoolAssignments,
+        ),
       );
+
 
     // Diagnostic: warn when a lipSync-engine scene resolved to 0 characterShots.
     for (const ns of newScenes) {
