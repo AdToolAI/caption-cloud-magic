@@ -36,6 +36,7 @@ import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
+import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import {
   resolveDialogVoice,
@@ -1349,14 +1350,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           // add prompt/name-match duplicates before the server audit runs.
           const composedFirstFrame: string | undefined = undefined;
 
+          // v173 — run composeFinalPrompt so performance (mimik/gestik/blick/
+          // energy) and actionBeat from the Briefing-Plan actually reach the
+          // Cinematic-Sync wrapper. Previously this path sent scene.aiPrompt
+          // raw, which silently dropped those fields.
+          const composedInvoke = buildInvokePrompt(scene as any, characters as any, language);
+
           const scenePayload = {
             id: sceneIdFinal,
             projectId: pidFinal,
             sceneType: scene.sceneType,
             clipSource: masterProvider,
             clipQuality: scene.clipQuality || 'standard',
-            aiPrompt: scene.aiPrompt || '',
-            negativePrompt: (scene as any).negativePrompt || undefined,
+            aiPrompt: composedInvoke.aiPrompt || scene.aiPrompt || '',
+            negativePrompt: composedInvoke.negativePrompt || (scene as any).negativePrompt || undefined,
             uploadUrl: scene.uploadUrl,
             referenceImageUrl: composedFirstFrame,
             durationSeconds: masterDuration,
