@@ -45,6 +45,22 @@ const LIPSYNC_ENGINES = new Set([
   'cinematic-sync', 'sync-polish', 'sync-segments', 'native-dialogue', 'heygen',
 ]);
 
+const isUuid = (val?: string | null) =>
+  !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+const INVALID_VOICE_TOKENS = new Set([
+  'lipsync-2', 'lipsync-2-pro', 'sync-3', 'sync.so', 'cinematic-sync', 'happyhorse', 'hailuo',
+]);
+
+function cleanVoiceId(raw?: string | null): string | undefined {
+  const v = String(raw ?? '').trim();
+  if (!v) return undefined;
+  if (INVALID_VOICE_TOKENS.has(v.toLowerCase())) return undefined;
+  // ElevenLabs/custom voice IDs are opaque, but never model names with slash/colon.
+  if (/^(sync|lipsync|hailuo|happyhorse|cinematic|model)[\w\-/:.]*$/i.test(v)) return undefined;
+  return v;
+}
+
 // ── Free-form → enum mappers for Performance Layer ────────────────────────
 
 function mapExpression(raw?: string): PerformanceExpression | undefined {
@@ -166,6 +182,7 @@ function planSceneToComposerScene(
   negativePrompt: string | undefined,
   briefingTone: string | undefined,
   projectVoiceId: string | undefined,
+  defaultVoicesByCharacter: Record<string, string | undefined> = {},
 ): ComposerScene {
   // Build characterShots from resolved cast. The plan stores `characterId`
   // as the BASE brand_characters.id (CastRef invariant) plus an optional
@@ -213,8 +230,9 @@ function planSceneToComposerScene(
   const dialogVoices: Record<string, string> = {};
   for (const c of ps.cast ?? []) {
     if (!c.characterId) continue;
-    const vid = c.voiceId || projectVoiceId;
-    if (vid) dialogVoices[stripPrefix(c.characterId)] = vid;
+    const characterId = stripPrefix(c.characterId as string);
+    const vid = cleanVoiceId(c.voiceId) || cleanVoiceId(defaultVoicesByCharacter[characterId]) || cleanVoiceId(projectVoiceId);
+    if (vid) dialogVoices[characterId] = vid;
   }
 
 
@@ -360,7 +378,12 @@ function planSceneToComposerScene(
     mentionedLocationIds,
     // v175: per-cast voiceId on the scene root so the upcoming insert path
     // can drop the first speaker into character_voice_id (single-speaker fast-path).
-    characterVoiceId: ((ps.cast ?? []).find((c) => c.voiceId)?.voiceId) ?? undefined,
+    characterVoiceId: (() => {
+      const firstWithVoice = (ps.cast ?? [])
+        .map((c) => c.characterId ? cleanVoiceId(c.voiceId) || cleanVoiceId(defaultVoicesByCharacter[stripPrefix(c.characterId)]) : undefined)
+        .find(Boolean);
+      return firstWithVoice || cleanVoiceId(projectVoiceId);
+    })(),
   } as ComposerScene;
 }
 
@@ -439,6 +462,8 @@ export interface ApplyPlanResult {
   scenesNew: number;
   scenesProtected: number;
   scenesReplaced: number;
+  verified: boolean;
+  warnings: string[];
 }
 
 export function useApplyProductionPlan() {
@@ -448,6 +473,10 @@ export function useApplyProductionPlan() {
       currentScenes, currentAssembly, currentBriefing,
       onUpdateBriefing, onUpdateScenes, onApplyAssembly,
     } = args;
+
+    if (!isUuid(projectId)) {
+      throw new Error('Projekt-ID fehlt — Plan wurde nicht angewendet, damit keine unverbundenen Szenen entstehen.');
+    }
 
     // 1) Project metadata
     const briefingPatch: Partial<ComposerBriefing> = {};
@@ -470,20 +499,24 @@ export function useApplyProductionPlan() {
       try {
         const ids = candidateForDelete
           .map((s) => s.id)
-          .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id));
+          .filter((id) => isUuid(id));
         if (ids.length > 0) {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('dialog_shots' as any)
             .select('scene_id')
             .in('scene_id', ids);
+          if (error) throw error;
           for (const row of (data ?? []) as any[]) {
             if (row?.scene_id) dbProtectedIds.add(row.scene_id);
           }
         }
       } catch (e) {
-        console.warn('[useApplyProductionPlan] dialog_shots probe failed, treating all as protected (safe-fail):', e);
-        // Safe-fail: if we can't verify, we KEEP all scenes (never delete).
-        for (const s of candidateForDelete) dbProtectedIds.add(s.id);
+        console.warn('[useApplyProductionPlan] dialog_shots probe failed, fail-open for failed/canceled repair rows:', e);
+        // Fail-open for visibly broken scenes; fail-closed for pending unknowns.
+        for (const s of candidateForDelete) {
+          const status = String(s.clipStatus ?? '');
+          if (status !== 'failed' && status !== 'canceled') dbProtectedIds.add(s.id);
+        }
       }
     }
 
@@ -495,12 +528,37 @@ export function useApplyProductionPlan() {
       (s) => !protectedScenes.includes(s),
     );
 
-    // 3) Build new scenes from plan.
+    // 3) Resolve default voices for cast characters that the parser matched but
+    // did not attach a voiceId to. This never touches the lipsync pipeline; it
+    // only fills composer_scenes.dialog_voices / character_voice_id for new rows.
+    const characterIds = Array.from(new Set(
+      (plan.scenes ?? [])
+        .flatMap((s) => s.cast ?? [])
+        .map((c) => c.characterId ? String(c.characterId).replace(/^lib:/, '').replace(/^(outfit|catalog):/, '') : null)
+        .filter((x): x is string => !!x),
+    ));
+    const defaultVoicesByCharacter: Record<string, string | undefined> = {};
+    if (characterIds.length > 0) {
+      const { data, error } = await supabase
+        .from('brand_characters')
+        .select('id, default_voice_id')
+        .in('id', characterIds);
+      if (!error) {
+        for (const row of (data ?? []) as any[]) {
+          const voice = cleanVoiceId(row?.default_voice_id);
+          if (row?.id && voice) defaultVoicesByCharacter[String(row.id)] = voice;
+        }
+      } else {
+        console.warn('[useApplyProductionPlan] default voice lookup failed:', error);
+      }
+    }
+
+    // 4) Build new scenes from plan.
     const newScenes: ComposerScene[] = (plan.scenes ?? [])
       .slice()
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
-        planSceneToComposerScene(s, protectedScenes.length + i, projectId ?? '', plan.negativePrompt, currentBriefing?.tone, plan.voice?.voiceId),
+        planSceneToComposerScene(s, protectedScenes.length + i, projectId, plan.negativePrompt, currentBriefing?.tone, cleanVoiceId(plan.voice?.voiceId), defaultVoicesByCharacter),
       );
 
     // Diagnostic: warn when a lipSync-engine scene resolved to 0 characterShots.
@@ -516,25 +574,25 @@ export function useApplyProductionPlan() {
       }
     }
 
-    // 4) Hard-delete deletableScenes from DB (so realtime doesn't bring them back).
+    // 5) Hard-delete deletableScenes from DB (so realtime doesn't bring them back).
     if (projectId && deletableScenes.length > 0) {
       const persistedDeletable = deletableScenes
         .map((s) => s.id)
-        .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id));
+        .filter((id) => isUuid(id));
       if (persistedDeletable.length > 0) {
-        try {
-          await supabase
-            .from('composer_scenes')
-            .delete()
-            .in('id', persistedDeletable)
-            .eq('project_id', projectId);
-        } catch (e) {
-          console.warn('[useApplyProductionPlan] DB delete failed (non-fatal):', e);
+        const { error } = await supabase
+          .from('composer_scenes')
+          .delete()
+          .in('id', persistedDeletable)
+          .eq('project_id', projectId);
+        if (error) {
+          console.error('[useApplyProductionPlan] DB delete failed', error);
+          throw new Error(`Alte Storyboard-Szenen konnten nicht ersetzt werden: ${error.message}`);
         }
       }
     }
 
-    // 4b) v177 — INSERT new plan-scenes into DB directly.
+    // 6) INSERT new plan-scenes into DB directly.
     //     The dashboard's debounced `persistScenesToDb` path only UPDATEs
     //     rows with UUID ids; freshly minted plan-scenes carry temp
     //     `scene_xxx_yyy` ids and were therefore never persisted. Result:
@@ -542,10 +600,12 @@ export function useApplyProductionPlan() {
     //     and reloads brought the Fallback back. Persist here, then swap
     //     temp ids for real UUIDs before handing off to onUpdateScenes.
     if (projectId && newScenes.length > 0) {
-      try {
+        const insertStartOrder = protectedScenes.length > 0
+          ? Math.max(...protectedScenes.map((s) => Number(s.orderIndex ?? 0))) + 1
+          : 0;
         const rows = newScenes.map((s, i) => ({
           project_id: projectId,
-          order_index: protectedScenes.length + i,
+          order_index: insertStartOrder + i,
           scene_type: s.sceneType,
           duration_seconds: s.durationSeconds,
           clip_source: s.clipSource,
@@ -555,50 +615,80 @@ export function useApplyProductionPlan() {
           lip_sync_with_voiceover: (s as any).lipSyncWithVoiceover === true,
           dialog_mode: (s as any).dialogMode === true,
           ai_prompt: s.aiPrompt ?? null,
-          text_overlay: (s.textOverlay ?? null) as any,
-          transition_type: s.transitionType,
-          transition_duration: s.transitionDuration,
+          text_overlay: (s.textOverlay ?? DEFAULT_TEXT_OVERLAY) as any,
+          transition_type: s.transitionType ?? 'crossfade',
+          transition_duration: s.transitionDuration ?? 0.4,
+          retry_count: s.retryCount ?? 0,
+          cost_euros: s.costEuros ?? 0,
           character_shot: (s.characterShot ?? null) as any,
-          character_shots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : null)) as any,
+          character_shots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])) as any,
           dialog_script: s.dialogScript ?? null,
           dialog_voices: ((s as any).dialogVoices ?? {}) as any,
+          dialog_takes: ((s as any).dialogTakes ?? {}) as any,
           engine_override: (s as any).engineOverride ?? 'auto',
+          director_modifiers: (s.directorModifiers ?? {}) as any,
           shot_director: (s.shotDirector ?? {}) as any,
           scene_action_user: (s as any).sceneActionUser ?? null,
           scene_action_en: (s as any).sceneActionEn ?? null,
           mentioned_character_ids: ((s as any).mentionedCharacterIds ?? null) as any,
           mentioned_location_ids: ((s as any).mentionedLocationIds ?? null) as any,
           character_voice_id: ((s as any).characterVoiceId ?? null) as any,
+          action_beat: ((s as any).actionBeat ?? null) as any,
+          realism_preset: (s as any).realismPreset ?? null,
+          seed: (s as any).seed ?? null,
         }));
         const { data, error } = await supabase
           .from('composer_scenes')
           .insert(rows as any)
-          .select('id, order_index');
+          .select('id, order_index, dialog_script, dialog_voices, ai_prompt, mentioned_character_ids, character_voice_id');
         if (error) {
           console.error('[useApplyProductionPlan] INSERT failed', error);
+          throw new Error(`Neue Plan-Szenen konnten nicht gespeichert werden: ${error.message}`);
         } else if (Array.isArray(data)) {
           // Map returned UUIDs back into newScenes (by order_index — stable
           // because we built rows in that exact order).
           const byOrder = new Map<number, string>();
           for (const r of data as any[]) byOrder.set(Number(r.order_index), String(r.id));
           for (let i = 0; i < newScenes.length; i++) {
-            const realId = byOrder.get(protectedScenes.length + i);
-            if (realId) newScenes[i] = { ...newScenes[i], id: realId };
+            const realId = byOrder.get(insertStartOrder + i);
+            if (realId) newScenes[i] = { ...newScenes[i], id: realId, orderIndex: insertStartOrder + i };
           }
         }
-      } catch (e) {
-        console.error('[useApplyProductionPlan] INSERT crashed (non-fatal)', e);
-      }
     }
 
-    // 5) Merge: keep protected scenes at their current order, append new ones.
+    // 7) Verify DB state before telling the UI this succeeded.
+    const { data: verifyRows, error: verifyError } = await supabase
+      .from('composer_scenes')
+      .select('id, order_index, dialog_script, dialog_voices, ai_prompt, mentioned_character_ids, character_voice_id')
+      .eq('project_id', projectId)
+      .order('order_index', { ascending: true });
+    if (verifyError) {
+      throw new Error(`Storyboard-Verifikation fehlgeschlagen: ${verifyError.message}`);
+    }
+    const newIds = new Set(newScenes.filter((s) => isUuid(s.id)).map((s) => s.id));
+    const persistedNewRows = (verifyRows ?? []).filter((r: any) => newIds.has(String(r.id)));
+    const warnings: string[] = [];
+    if (persistedNewRows.length !== newScenes.length) {
+      throw new Error(`Plan nur teilweise gespeichert: ${persistedNewRows.length}/${newScenes.length} Szenen in der Datenbank gefunden.`);
+    }
+    const fallbackRows = persistedNewRows.filter((r: any) => /Establishing shot: A relevant setting|Reveal beat for the brand|CTA beat for the brand/i.test(String(r.ai_prompt ?? '')));
+    if (fallbackRows.length > 0) warnings.push(`${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`);
+    const lipsyncRowsMissingVoice = persistedNewRows.filter((r: any) => {
+      const rowScene = newScenes.find((s) => s.id === String(r.id));
+      const needsVoice = rowScene?.dialogMode || !!rowScene?.dialogScript;
+      const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? Object.keys(r.dialog_voices).length : 0;
+      return needsVoice && !r.character_voice_id && voices === 0;
+    });
+    if (lipsyncRowsMissingVoice.length > 0) warnings.push(`${lipsyncRowsMissingVoice.length} Lip-Sync-Szene(n) ohne Voice-ID.`);
+
+    // 8) Merge: keep protected scenes at their current order, append new ones.
     const merged = [
       ...protectedScenes.map((s, i) => ({ ...s, orderIndex: i })),
       ...newScenes.map((s, i) => ({ ...s, orderIndex: protectedScenes.length + i })),
     ];
     onUpdateScenes(merged);
 
-    // 6) Assembly (voice + captions).
+    // 9) Assembly (voice + captions).
     const nextAssembly = buildAssembly(plan, currentAssembly, language);
     onApplyAssembly(nextAssembly);
 
@@ -606,6 +696,8 @@ export function useApplyProductionPlan() {
       scenesNew: newScenes.length,
       scenesProtected: protectedScenes.length,
       scenesReplaced: deletableScenes.length,
+      verified: true,
+      warnings,
     };
   }, []);
 }
