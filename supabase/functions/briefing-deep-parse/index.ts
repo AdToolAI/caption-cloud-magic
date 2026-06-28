@@ -1080,6 +1080,13 @@ This overrides any English wording in the briefing's scaffolding
     try {
       const projectVoiceId: string | null =
         (plan?.voice?.voiceId as string | undefined) ?? null;
+      // Mini-Patch: reject UUID-shaped voiceIds (almost always a Character-UUID
+      // that leaked into voiceId from Gemini) and back-fill from the resolved
+      // character's default_voice_id. ElevenLabs voice IDs are opaque 20-char
+      // alphanum strings, never UUIDs.
+      const looksLikeUuid = (v: any) =>
+        typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      const charById = new Map<string, any>(characters.map((c: any) => [String(c.id), c]));
       for (const sc of plan.scenes ?? []) {
         for (const c of sc.cast ?? []) {
           if (!c.characterId) {
@@ -1096,8 +1103,24 @@ This overrides any English wording in the briefing's scaffolding
               }
             }
           }
-          if (!c.voiceId && projectVoiceId) c.voiceId = projectVoiceId;
+          // Repair: voiceId carries a Character-UUID → swap for that
+          // character's default_voice_id, or null it out.
+          if (looksLikeUuid(c.voiceId)) {
+            const ch = charById.get(String(c.voiceId)) ?? (c.characterId ? charById.get(String(c.characterId)) : null);
+            const def = ch?.default_voice_id;
+            c.voiceId = typeof def === 'string' && !looksLikeUuid(def) ? def : null;
+          }
+          if (!c.voiceId && c.characterId) {
+            const ch = charById.get(String(c.characterId));
+            const def = ch?.default_voice_id;
+            if (typeof def === 'string' && !looksLikeUuid(def)) c.voiceId = def;
+          }
+          if (!c.voiceId && projectVoiceId && !looksLikeUuid(projectVoiceId)) c.voiceId = projectVoiceId;
         }
+      }
+      // Also clean the project-level voice.
+      if (plan?.voice && looksLikeUuid((plan.voice as any).voiceId)) {
+        (plan.voice as any).voiceId = null;
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
