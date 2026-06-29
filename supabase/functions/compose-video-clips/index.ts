@@ -1666,7 +1666,10 @@ serve(async (req) => {
                     .eq("scene_id", scene.id);
                 };
 
-                // Evaluate: face count + human count + identity audit.
+                // Evaluate: cast-integrity audit (no clone, no swap, no missing).
+                // v170 — headcount checks (countFaces/countHumans) are kept as
+                // pure telemetry; they no longer block. Bystanders, crowd, and
+                // depicted persons (screens/posters/photos/mirrors) are allowed.
                 const evaluate = async (url: string, label: string) => {
                   const [fc, hc] = await Promise.all([
                     countFacesInImage(url, LOVABLE_API_KEY!, { kind: "image" }),
@@ -1681,16 +1684,8 @@ serve(async (req) => {
                     | null = null;
                   let notes = "";
                   let mismatched: string[] = [];
-                  if (hc !== null && hc > expectedFaces) {
-                    identity = "extra";
-                    notes = `human count ${hc} > expected ${expectedFaces}`;
-                  } else if (fc !== null && fc > expectedFaces) {
-                    identity = "extra";
-                    notes = `face count ${fc} > expected ${expectedFaces}`;
-                  }
-                  if (portraitUrls.length >= 2) {
-                    // v111 — audit against IDENTITY refs (canonical headshots)
-                    // when available; otherwise fall back to the wardrobe refs.
+                  if (portraitUrls.length >= 1) {
+                    // v170 — audit runs for N=1 too (extras ignored, clones/swap/missing still caught).
                     const auditRefs = identityPortraitUrls.length === portraitUrls.length
                       ? identityPortraitUrls
                       : portraitUrls;
@@ -1701,7 +1696,7 @@ serve(async (req) => {
                       LOVABLE_API_KEY!,
                     );
                     if (audit && !audit.ok) {
-                      identity = audit.reason ?? identity ?? "ambiguous";
+                      identity = (audit.reason as typeof identity) ?? "ambiguous";
                       notes = audit.detail || notes;
                       if (audit.reason === "swap" && Array.isArray(audit.mismatched)) {
                         mismatched = audit.mismatched;
@@ -1709,10 +1704,11 @@ serve(async (req) => {
                     }
                   }
                   console.log(
-                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} humans=${hc}/${expectedFaces} identity=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] notes="${notes.slice(0, 120)}"`,
+                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
                   );
                   return { faceCount: fc, humanCount: hc, identity, notes, mismatched };
                 };
+
 
                 let composedUrl: string | null = null;
                 let faceCount: number | null = null;
