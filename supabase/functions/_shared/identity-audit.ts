@@ -47,27 +47,29 @@ export async function auditAnchorIdentity(
   lovableKey: string,
   timeoutMs = 25_000,
 ): Promise<IdentityAuditResult | null> {
-  if (!anchorUrl || portraitUrls.length < 2 || !lovableKey) return null;
+  if (!anchorUrl || portraitUrls.length < 1 || !lovableKey) return null;
   const N = portraitUrls.length;
   const refLabel = portraitUrls
     .map((_, i) => `reference #${i + 1}${names[i] ? ` = ${names[i]}` : ""}`)
     .join(", ");
+  // v170 — Cast-Integrity audit (Artlist parity):
+  //   We check CAST INTEGRITY (each reference appears exactly once, correct face),
+  //   NOT total headcount. Background bystanders, pedestrians, crowd, depicted
+  //   persons on screens/posters/photos/mirrors/statues are EXTRAS and are
+  //   allowed — they do not break lipsync because face-targeting matches the
+  //   cast portrait, not "any face in frame".
   const text =
-    `You will receive a COMPOSED SCENE image followed by ${N} REFERENCE PORTRAITS (${refLabel}). ` +
-    `The composed scene MUST contain EXACTLY ${N} distinct humans, with each reference person appearing EXACTLY ONCE and matching the reference. ` +
-    `Audit it carefully. Watch for: ` +
-    `(a) "cloning" — the same reference appears twice, or two anchor faces look identical; ` +
-    `(b) "extra people" — additional humans in the frame (colleagues at the desk, bystanders, posters/photos of people, mirror reflections of people, mannequins, statues, on-screen people); ` +
-    `(c) "missing" — a reference person does not appear at all; ` +
-    `(d) "swap" — for some reference, a person APPEARS in the slot but is OBVIOUSLY a different person (different sex, very different age, different hair color/length, completely different face). Be strict: if a male reference is rendered as a clearly female person (or vice versa), that is a SWAP. ` +
-    `Count posters/screens/mirrors/statues showing a human face as a "person" for this audit. ` +
-    `For each reference, also rate faceMatch as "match" (clearly the same person), "mismatch" (clearly a different person — different sex/age/face), or "uncertain". ` +
+    `You will receive a COMPOSED SCENE image followed by ${N} CAST REFERENCE PORTRAIT${N === 1 ? "" : "S"} (${refLabel}). ` +
+    `Audit CAST INTEGRITY only — extras and bystanders are ALLOWED. Specifically check: ` +
+    `(a) "clone" — the same CAST reference appears two or more times as a real person in the frame (duplicated identity, triptych/panels of the same person, side-by-side variations of the same person, mirror duplicates of the same person); ` +
+    `(b) "missing" — a CAST reference person does not appear at all as a real, physically present human; ` +
+    `(c) "swap" — a CAST reference is filled by a clearly DIFFERENT person (different sex, very different age, different hair color/length, completely different face). Be strict on sex/age. ` +
+    `IMPORTANT — these are NOT failures and must be IGNORED: background pedestrians, bystanders, crowd, coworkers, people walking by, unknown additional humans that do not match any CAST reference, AND any depicted persons on laptop screens, phones, TVs, posters, framed photos, mirrors, statues, mannequins, paintings. Treat depicted persons as scene props, not as humans, and do NOT count them in "appearances". ` +
+    `For each CAST reference, count how many times that exact identity appears as a REAL physically present human (not as a screen image or photo on the wall), and rate faceMatch as "match" (clearly the same person), "mismatch" (clearly a different person), or "uncertain". ` +
     `Reply with STRICT JSON only, no prose:\n` +
     `{` +
-    `"totalPeople": <integer — distinct humans visible, including extras>,` +
     `"perReference": [{"ref": 1, "appearances": <0|1|2|...>, "faceMatch": "match"|"mismatch"|"uncertain", "mismatchNotes": "<short>"}, ...],` +
-    `"extraPeople": <integer — humans not matching any reference>,` +
-    `"reason": "ok|clone|extra|missing|swap|ambiguous",` +
+    `"reason": "ok|clone|missing|swap|ambiguous",` +
     `"notes": "<short>"` +
     `}.`;
 
