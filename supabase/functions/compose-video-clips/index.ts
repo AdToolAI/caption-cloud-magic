@@ -3088,35 +3088,31 @@ serve(async (req) => {
           const isCinematicSyncHH =
             (scene.engineOverride ?? "auto") === "cinematic-sync";
 
-          // STAGE 4 (May 30 2026) + June 2026 soft-fallback:
-          // Cinematic-Sync + HappyHorse must NEVER start without a freshly
-          // composed scene-anchor as I2V reference — otherwise HappyHorse
-          // invents the scene from text and v5 lip-sync ends up on a raw
-          // avatar bust. The Stage 2 guard above already migrates virtually
-          // all such scenes to Hailuo. If we still land here (rare edge:
-          // cast had a portrait that failed to render, or no dialog/cast at
-          // all but engineOverride is cinematic-sync), do NOT hard-fail.
-          // Auto-migrate to ai-hailuo and re-queue as pending so the next
-          // dispatch picks it up. The Lip-Sync pipeline itself is NOT
-          // touched — only clip_source + clip_status.
+          // v174 (Jun 30 2026) — RESPECT USER PROVIDER CHOICE.
+          // Previously HH+cinematic-sync without composed anchor was silently
+          // migrated to ai-hailuo. That changed the visible provider and kept
+          // the original duration, so user-picked 7s/8s HH scenes then failed
+          // on the next click with `invalid_duration_for_provider` 400 —
+          // surfacing as the generic "Edge Function returned a non-2xx status
+          // code" toast. Now we fail loudly with an actionable message and
+          // KEEP clip_source on ai-happyhorse so the UI doesn't lie.
           if (isCinematicSyncHH && !isI2V) {
             const msg =
-              "happyhorse_cinematic_sync_missing_anchor → automatisch auf Hailuo migriert. Bitte Render erneut starten oder das Cast-Portrait prüfen.";
+              "happyhorse_cinematic_sync_missing_anchor: HappyHorse Lip-Sync braucht einen Scene-Anchor (Cast-Portrait). Bitte mindestens einen Charakter mit Portrait dem Cast hinzufügen oder Engine auf Standard wechseln. HappyHorse wurde NICHT auf Hailuo umgestellt — deine Auswahl bleibt erhalten.";
             console.warn(
-              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} — no composed reference_image_url, auto-migrating to ai-hailuo and re-queueing as pending.`,
+              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} — no composed reference_image_url, failing loud (v174, no silent Hailuo migration).`,
             );
             await supabaseAdmin
               .from("composer_scenes")
               .update({
-                clip_source: "ai-hailuo",
-                clip_status: "pending",
+                clip_status: "failed",
                 clip_error: msg,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
-              status: "migrated_pending",
+              status: "failed",
               error: msg,
             });
             continue;
