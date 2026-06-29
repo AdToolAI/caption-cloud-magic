@@ -1838,10 +1838,9 @@ serve(async (req) => {
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
                   if (!skipAuditPersist) {
-                    const okFinal =
-                      identityFailure === null &&
-                      (faceCount === null || faceCount === expectedFaces) &&
-                      (humanCount === null || humanCount === expectedFaces);
+                    // v170 — okFinal is cast-integrity only. Headcount diffs
+                    // (extras/bystanders) are no longer failures.
+                    const okFinal = identityFailure === null;
                     const auditMeta = {
                       anchor_face_audit: {
                         version: ANCHOR_AUDIT_VERSION,
