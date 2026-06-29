@@ -770,7 +770,18 @@ serve(async (req) => {
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
       const speakerSlugs = uniqueSpeakerSlugsFromScript(scene.dialogScript);
       const cleanedVisualPromptRaw = stripDialogForAnchor(scene.aiPrompt || "");
-      const cleanedVisualPrompt = stripFaceOcclusionForPlate(cleanedVisualPromptRaw);
+      const occlusionSanitized = stripFaceOcclusionForPlate(cleanedVisualPromptRaw);
+      // v166 — strip camera-push tokens so the AI plate stays framed
+      // identically frame-to-frame. The v163 preclip overlay sits at a
+      // static crop; any plate push-in drifts the underlying face away
+      // from the overlay → lipsync looks misaligned.
+      const cameraSanitized = stripCameraMotionForPlate(occlusionSanitized);
+      if (cameraSanitized.stripped.length > 0) {
+        console.log(
+          `[compose-video-clips] v166_camera_lock_sanitize scene=${scene.id ?? "?"} n=${speakerSlugs.length} stripped=${JSON.stringify(cameraSanitized.stripped.slice(0, 12))}`,
+        );
+      }
+      const cleanedVisualPrompt = cameraSanitized.out;
       // v172 — N=0 (no speakers): nothing to lip-sync, fall through unchanged
       // so non-dialog cinematic-sync plates are not over-constrained.
       if (speakerSlugs.length === 0)
