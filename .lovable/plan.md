@@ -1,48 +1,68 @@
-
 ## Symptom
 
-Single-Speaker Cinematic-Sync Szene zoomt über die 5s langsam ins Gesicht rein („Nahaufnahme"-Effekt), und schon beim ersten Frame sitzt der Lip-Sync nicht richtig auf dem Mund.
+Cinematic-Sync N=1 Szene rendert jetzt zwar als korrekte Nahaufnahme mit statischer Kamera (v166 funktioniert), aber **Samuel öffnet die Lippen kaum** — der Sync-3 Lipsync greift sichtbar nicht durch, obwohl exakt dieselbe Szene "davor super funktioniert" hat.
 
-## Root Cause
+## Root Cause (klar identifiziert)
 
-Das Hailuo-i2v Master-Plate macht von sich aus einen leichten Push-In/Dolly. Unsere v163-Preclip-Pipeline berechnet aber einen **statischen** Face-Crop `(cropX, cropY, cropSize)` einmalig aus den hydratisierten Rekognition-Koordinaten am Anfang des Sprecher-Fensters. Das lipgesynchte Square-Crop wird in Remotion (`CroppedOverlay` in `DialogStitchVideo.tsx`) an exakt diesen statischen Koordinaten zurück auf die Plate gemalt.
+Im Plate-Prompt für N=1 steht jetzt an **zwei** Stellen explizit "Mund zu, kein idle motion":
 
-Während der Push-In läuft, wandert das Gesicht auf der Master-Plate nach vorne/oben — das Lipsync-Overlay bleibt eingefroren stehen. Ergebnis: Mund-Overlay sitzt zunehmend daneben, Sync wirkt sofort falsch und wird schlimmer.
+1. **`neutralTwoShotPrompt(n=1)`** in `compose-video-clips/index.ts` Z. 674: 
+   `"mouth and jaw stay still and softly closed in the plate (no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap)"`
 
-Der bestehende `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` Camera-Lock („LOCKED static camera, no zoom, no push-in, no dolly, no pan, no reframing, framing stays identical from first frame to last frame") wird in `supabase/functions/compose-video-clips/index.ts` heute **nur für N≥2 Plates** gesetzt. Der Single-Speaker-Pfad fällt auf den freien User-/Scene-Prompt zurück, der oft cinematische Push-Ins enthält.
+2. **N=1 Closing-Clause** Z. 840-841: 
+   `"The character keeps their mouth softly closed in the plate itself — no idle mouth, jaw or lip motion in the plate."`
 
-## Plan (v166 — Static-Plate Contract für alle N)
+Das widerspricht direkt dem **offiziellen Sync.so Tipp** (Z. 812-817 als Kommentar dokumentiert):
+> "the character should be speaking naturally" — produziert die kleine idle mouth/jaw motion, die **sync-3 zwingend braucht**, um Lipsync auf AI-generierten Plates zu treiben. **Ohne diese Motion rendert sync-3 das Input-Plate nahezu unverändert** → genau das Symptom (Lippen öffnen sich kaum).
 
-### 1. Camera-Lock auf N=1 ausweiten
+### Wann ist das reingekommen?
+- **v171** (22. Juni) "Ghost-Speaker Fix" hat die idle-mouth-Motion **bewusst entfernt**, weil bei **parallelen Multi-Speaker-Passes** alle Sprecher gleichzeitig "ghost-mouthen" würden.
+- **v173** (28. Juni) hat die N=1-Carve-Out hinzugefügt — aber den geschlossenen Mund **mitgenommen**, obwohl bei N=1 **kein Ghost-Speaker-Risiko** besteht (es gibt nur ein Gesicht und nur einen Pass).
+- **v166** (heute) hat den Camera-Lock korrigiert, aber das Mund-Problem nicht angefasst — deshalb sieht der Schwenk-Bug gefixt aus, der Sync-Bug bleibt.
+
+Nahaufnahme verschlimmert den Effekt nur optisch (man sieht es besser), Root-Cause ist nicht die Brennweite.
+
+## Plan (v167 — N=1 Sync-Drive Restore)
+
+### 1. N=1 Mund-Motion zurückholen (nur N=1)
 `supabase/functions/compose-video-clips/index.ts`:
-- Den `n>=2`-Branch (~Z. 673) so umstellen, dass der "LOCKED static camera"-Suffix und das `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` Negative-Prompt-Block **immer** für cinematic-sync Plates gelten (auch N=1), nicht nur für Multi-Speaker.
-- Bestehender Mouth/Idle-Motion-Text bleibt unverändert — Mund-Stille ist weiterhin Voraussetzung für sauberen Sync.
 
-### 2. Push-In Tokens aus dem Scene-Prompt strippen
-In demselben File die existierende `stripDialogPatterns`-ähnliche Sanitizer-Logik um Kamera-Bewegungs-Tokens erweitern, bevor der Plate-Prompt gerendert wird:
-- Whitelist: `static`, `locked`, `tripod`, `still camera`.
-- Strip / move to negative: `push-in`, `push in`, `zoom in`, `dolly in`, `dolly out`, `crane`, `tracking shot`, `pull in`, `move closer`, `reframe`, `slow zoom`.
-- Logging: `v166_camera_lock_sanitize stripped=[…]` damit man in `edge_function_logs` sieht, was entfernt wurde.
+**`neutralTwoShotPrompt`, N=1 branch (~Z. 673-674):**
+- Ersetze `"mouth and jaw stay still and softly closed in the plate (no idle mouth motion, …, no lip-flap)"` durch die v112-Formulierung:
+  `"the character is speaking naturally with subtle idle mouth and jaw motion throughout the clip (small, natural openings — the downstream lipsync model needs an animatable mouth to drive)"`.
+- Camera-Lock-Suffix bleibt **wortwörtlich** wie in v166 erhalten — nur die Mund-Anweisung wird gedreht.
 
-### 3. Telemetrie: Drift-Sentinel
-`supabase/functions/compose-dialog-segments/index.ts`:
-- Nach erfolgreicher Face-Detect-Pass für den Preclip ein zweites AWS-Rekognition Sample am letzten Frame des Fensters laufen lassen (1 zusätzlicher Detect-Call, kein neuer Provider).
-- Wenn `|Δcenter| / cropSize > 0.25` oder `|Δsize| / cropSize > 0.20` → Log `v166_plate_camera_drift level=warn dx=… dy=… ds=…`. Kein Hard-Fail, nur sichtbar in Logs für künftiges Tuning.
+**N=1 Closing-Clause (~Z. 840-841):**
+- Ersetze `"The character keeps their mouth softly closed in the plate itself — no idle mouth, jaw or lip motion in the plate."` durch:
+  `"The character is speaking naturally with small, continuous idle mouth and jaw motion in the plate — sync-3 drives the actual lip-sync in post."`.
+- Lip-ready-Geometry, Augen-offen-Klausel und LOCKED-Camera-Block bleiben unangetastet.
+
+**N≥2 bleibt 1:1 unverändert** — Ghost-Speaker-Lock auf Multi-Speaker ist weiterhin korrekt (parallele Passes auf einer geteilten Plate).
+
+### 2. Telemetrie
+- Bestehender Log `v166_camera_lock_sanitize` bleibt.
+- Neuer Log `v167_n1_sync_drive enabled=true` einmal pro Build-Call wenn `speakerSlugs.length === 1`, damit man im `edge_function_logs` sieht, dass die N=1-Carve-Out aktiv ist.
+
+### 3. Nicht angefasst (bewusst)
+- `compose-dialog-segments` (Anchor-Bridge, Pre-Clip-JSON, sync-3 Dispatch) bleibt 1:1 — Pipeline-Kern ist heil, das hat der User selbst bestätigt ("v166-A-bis-Z").
+- Negative-Prompt-Block `CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE` bleibt unverändert. Er listet "talking, lip-flap" nicht als Verbote auf für N=1, also kollidiert er nicht.
+- `stripCameraMotionForPlate` Sanitizer bleibt 1:1.
+- Keine DB-Migration, keine Schema-Änderung, keine Remotion-Bundle-Änderung.
 
 ### 4. Akzeptanz
-- Re-Run der getesteten 5s Single-Speaker Szene zeigt eine wirklich statische Plate (keine Annäherung mehr) und der Sync-Mund liegt vom ersten bis zum letzten Frame auf dem Plate-Mund.
-- `compose-video-clips` Logs enthalten `v166_camera_lock_sanitize` mit den entfernten Tokens.
-- Kein neuer Provider, keine Schema-Migration, keine Sync.so-Vertragsänderung.
-
-## Was bewusst NICHT in v166 ist (Follow-up bei Bedarf)
-
-Ein "Dynamic Face Tracking Overlay" (Rekognition pro Sekunde, animierte `left/top/size` in `CroppedOverlay`) wäre die langlebigere Lösung, falls Hailuo trotz Static-Lock noch driftet. Das ist ein größerer Remotion-Stitcher-Umbau und wird erst aufgesetzt, wenn der Drift-Sentinel in echten Runs anschlägt.
+- Re-Run derselben N=1 Samuel-Szene zeigt **deutlich sichtbar geöffnete Lippen** synchron zur deutschen VO, Kamera weiterhin frame-identisch statisch (v166 hält).
+- Logs enthalten `v167_n1_sync_drive enabled=true` und (falls Sanitizer was zu tun hatte) `v166_camera_lock_sanitize`.
 
 ## Technische Details
 
 | Datei | Änderung |
 |---|---|
-| `supabase/functions/compose-video-clips/index.ts` | Camera-Lock + Sanitizer für N≥1 statt N≥2 in cinematic-sync Branch |
-| `supabase/functions/compose-dialog-segments/index.ts` | Drift-Sentinel: 2. Rekognition-Sample + `v166_plate_camera_drift` log |
-| Remotion-Bundle | unverändert — kein neuer Deploy nötig |
-| DB / Migration | keine |
+| `supabase/functions/compose-video-clips/index.ts` | N=1-Mund-Klausel in `neutralTwoShotPrompt` (Z. 674) und Closing-Clause (Z. 840-841) auf "speaking naturally with subtle idle mouth/jaw motion" zurückdrehen; Camera-Lock wortwörtlich erhalten; neues `v167_n1_sync_drive` Log. |
+| `mem/architecture/lipsync/v167-n1-sync-drive-restore.md` | Neue Memory: erklärt warum N=1 idle-mouth wieder anhat, während N≥2 weiter geschlossen bleibt (Ghost-Speaker-Trennlinie). |
+| DB / Migration / Remotion | unverändert |
+
+## Was bewusst NICHT in v167 ist
+
+- Negative-Prompt-Block bleibt — er sperrt keine "talking"-Tokens; muss also nicht gedreht werden.
+- N≥2 wird nicht angefasst — die v171-Ghost-Speaker-Logik ist für Multi-Speaker weiterhin korrekt.
+- Kein Dynamic-Face-Tracking-Overlay (das wäre v168, falls statischer Crop in anderen Szenarien zu eng wird).
