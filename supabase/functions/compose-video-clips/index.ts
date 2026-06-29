@@ -1892,75 +1892,21 @@ serve(async (req) => {
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? "?"}/${expectedFaces}, humans=${humanCount ?? "?"}/${expectedFaces}, identity=${identityFailure ?? "ok"}) → ${composedUrl.slice(0, 80)}…`,
                   );
 
-                  // Hard-abort BEFORE Hailuo/Sync.so spend credits.
+                  // v170 — Hard-abort BEFORE Hailuo/Sync.so spend credits.
+                  // Only true cast-integrity failures block: clone, swap, missing,
+                  // ambiguous. "extra" reason and headcount-> checks are gone —
+                  // bystanders, crowd, and depicted persons (screens/photos/
+                  // mirrors) are allowed (Artlist parity).
                   const reasonMap: Record<string, string> = {
                     clone: "anchor_identity_duplicate_detected",
-                    extra: "anchor_extra_person_detected",
                     missing: "anchor_identity_missing_detected",
                     ambiguous: "anchor_identity_ambiguous",
+                    swap: "anchor_identity_swap_detected",
                   };
-                  if (identityFailure) {
+                  if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
-                    const msg = `${code}: ${identityNotes || identityFailure} (faces=${faceCount ?? "?"}/${expectedFaces}, humans=${humanCount ?? "?"}/${expectedFaces}) — Anchor wurde 2× neu gerendert und ist weiterhin nicht sauber. Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
-                  }
-                  if (humanCount !== null && humanCount > expectedFaces) {
-                    const msg = `anchor_extra_person_detected: ${humanCount}/${expectedFaces} Personen sichtbar — ein zusätzlicher Mensch wurde in die Szene gerendert (eventuell im Profil/Hintergrund).`;
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
-                  }
-                  if (
-                    faceCount !== null &&
-                    faceCount < expectedFaces &&
-                    (humanCount === null || humanCount < expectedFaces)
-                  ) {
-                    const msg = `anchor_missing_speakers: ${faceCount}/${expectedFaces} Gesichter sichtbar nach 2 Compose-Versuchen`;
-                    console.warn(
-                      `[compose-video-clips] cinematic-sync scene ${scene.id}: aborting — ${msg}`,
-                    );
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
-                  }
-                  if (faceCount !== null && faceCount > expectedFaces) {
-                    const msg = `anchor_extra_person_detected: ${faceCount}/${expectedFaces} Gesichter sichtbar — eine zusätzliche Person wurde gerendert.`;
+                    const msg = `${code}: ${identityNotes || identityFailure} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
                     await supabaseAdmin
                       .from("composer_scenes")
                       .update({
