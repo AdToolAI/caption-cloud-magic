@@ -4504,7 +4504,12 @@ serve(async (req) => {
     }
 
 
-    if (speakerWindowsSecs.length > 0 && !tightAudioInfo) {
+    // v169.1 — Gate nur scharf schalten wenn Tight-Slicing tatsächlich versucht
+    // wurde (N≥2). Bei N=1 ist `allowTightSlice=false` und die volle VO geht
+    // intentionally als pass.audio_url an Sync.so (Plate-länge Lipsync,
+    // direkt als Master, kein Overlay-Mux). Ohne diese Einschränkung
+    // feuerte das Gate für jeden Single-Speaker-Pass `prepare_failed_no_tight_audio`.
+    if (allowTightSlice && speakerWindowsSecs.length > 0 && !tightAudioInfo) {
       return await failBeforeProviderDispatch(
         "prepare_failed_no_tight_audio",
         "input_audio_prepare_failed",
