@@ -664,16 +664,14 @@ serve(async (req) => {
           ? "each visible exactly once, in a natural two-shot — front, three-quarter, profile or over-the-shoulder angles are all acceptable (sync-3 handles profile/OTS natively); the mouth and jaw of every person must stay clearly visible and unobstructed by hands, microphones or props"
           : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
 
-      // v173 (Jun 28 2026) — Single-speaker carve-out. The previous wrapper
-      // forced a LOCKED static tripod camera and "heads stay steady" even for
-      // n=1, which made every solo Cinematic-Sync clip read as a rigid
-      // talking-head bust regardless of the user's performance / actionBeat /
-      // shot-director settings. For n=1 we keep only the lip-ready geometry
-      // (mouth visible, no occlusion, lips not pre-puckered) and let the
-      // scene prompt drive camera, framing and body motion. For n≥2 the
-      // hard LOCK stays — multi-speaker lipsync passes need a stable plate.
+      // v173 (Jun 28 2026) — Single-speaker carve-out (revised v166): the
+      // previous wrapper forced a tripod-locked camera AND "heads stay
+      // steady" for N=1, which read as a rigid talking-head bust. v166
+      // re-adds the camera-only lock (the v163 static face-crop overlay
+      // requires it) but keeps body / head / gesture motion free so the
+      // scene performance still surfaces.
       if (n === 1) {
-        return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression; mouth and jaw stay still and softly closed in the plate (no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap) — only the downstream lipsync model will open the mouth. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+        return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression; mouth and jaw stay still and softly closed in the plate (no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap) — only the downstream lipsync model will open the mouth. LOCKED static camera on a fixed tripod for the entire clip — no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no shot change; the focal length, framing and the subject's position and size in the frame stay identical from the first frame to the last frame. Natural body motion, gestures and head motion driven by the scene performance are allowed, but the camera itself never moves. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
       }
 
       return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. BUT mouths and jaws stay still and softly closed — no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap, no listener mouth movement. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
@@ -712,10 +710,76 @@ serve(async (req) => {
       return out;
     };
 
+    /**
+     * v166 (Jun 29 2026) — Camera-Motion-Sanitizer for cinematic-sync plates.
+     * The v163 preclip pipeline overlays the lipsynced face-crop at STATIC
+     * (cropX, cropY, cropSize). If the AI plate pushes in / dollies / zooms,
+     * the underlying face drifts while the overlay stays glued to its initial
+     * position → mouth no longer aligns → lip-sync looks "off" even at t=0
+     * and gets worse over time. We strip every camera-push token from the
+     * positive prompt before composing the plate prompt. The negative block
+     * (CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE) already lists the same tokens
+     * so the model gets a consistent "do not move the camera" signal on both
+     * sides. Applied for N=1..N (the previous N≥2 LOCKED static suffix
+     * already covered multi-speaker; this closes the N=1 hole).
+     */
+    const stripCameraMotionForPlate = (text: string): { out: string; stripped: string[] } => {
+      if (!text) return { out: text, stripped: [] };
+      const stripped: string[] = [];
+      let out = text;
+      const patterns: RegExp[] = [
+        /\bslow(?:\s+|-)(?:push[- ]?in|zoom[- ]?in|dolly[- ]?in|pull[- ]?in|creep[- ]?in)\b/gi,
+        /\bpush[- ]?in(?:ning)?\b/gi,
+        /\bpush(?:es|ing)?\s+in\b/gi,
+        /\bpull[- ]?out\b/gi,
+        /\bzoom[- ]?in(?:ning)?\b/gi,
+        /\bzoom(?:s|ing)?\s+in\b/gi,
+        /\bzoom[- ]?out\b/gi,
+        /\bdolly(?:\s+(?:in|out|forward|back(?:wards?)?))?\b/gi,
+        /\bcrane(?:\s+(?:up|down))?\b/gi,
+        /\btracking\s+shot\b/gi,
+        /\btruck(?:ing)?\s+(?:in|out|left|right)\b/gi,
+        /\bsteadicam\s+(?:push|pull|move|glide)\b/gi,
+        /\b(?:camera\s+)?move(?:s|ment)?\s+(?:closer|in|forward|toward(?:s)?)\b/gi,
+        /\bmoves?\s+closer\s+to\s+(?:the\s+)?(?:subject|character|face)\b/gi,
+        /\bcamera\s+(?:push|pull|dolly|crane|zoom|tracks?|moves?)\b/gi,
+        /\breframe(?:s|ing)?\b/gi,
+        /\bwhip\s+pan\b/gi,
+        /\bpan(?:s|ning)?\s+(?:left|right|across)\b/gi,
+        /\btilt(?:s|ing)?\s+(?:up|down)\b/gi,
+        /\bdrift(?:s|ing)?\s+(?:closer|inward|forward)\b/gi,
+      ];
+      for (const re of patterns) {
+        out = out.replace(re, (match) => {
+          stripped.push(match);
+          return "";
+        });
+      }
+      // Tidy up dangling commas / double spaces left behind.
+      out = out
+        .replace(/\s*,\s*,+/g, ",")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\s+([,.])/g, "$1")
+        .replace(/^[\s,.;]+|[\s,;]+$/g, "")
+        .trim();
+      return { out, stripped };
+    };
+
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
       const speakerSlugs = uniqueSpeakerSlugsFromScript(scene.dialogScript);
       const cleanedVisualPromptRaw = stripDialogForAnchor(scene.aiPrompt || "");
-      const cleanedVisualPrompt = stripFaceOcclusionForPlate(cleanedVisualPromptRaw);
+      const occlusionSanitized = stripFaceOcclusionForPlate(cleanedVisualPromptRaw);
+      // v166 — strip camera-push tokens so the AI plate stays framed
+      // identically frame-to-frame. The v163 preclip overlay sits at a
+      // static crop; any plate push-in drifts the underlying face away
+      // from the overlay → lipsync looks misaligned.
+      const cameraSanitized = stripCameraMotionForPlate(occlusionSanitized);
+      if (cameraSanitized.stripped.length > 0) {
+        console.log(
+          `[compose-video-clips] v166_camera_lock_sanitize scene=${scene.id ?? "?"} n=${speakerSlugs.length} stripped=${JSON.stringify(cameraSanitized.stripped.slice(0, 12))}`,
+        );
+      }
+      const cleanedVisualPrompt = cameraSanitized.out;
       // v172 — N=0 (no speakers): nothing to lip-sync, fall through unchanged
       // so non-dialog cinematic-sync plates are not over-constrained.
       if (speakerSlugs.length === 0)
@@ -764,8 +828,17 @@ serve(async (req) => {
       // performance, gestik and actionBeat from the Briefing-Plan actually
       // surface visibly. The multi-speaker plate still needs the steady-head
       // lock because parallel lipsync passes share one base frame.
+      // v166 (Jun 29 2026) — N=1 static-camera lock. The v173 N=1 carve-out
+      // dropped the "LOCKED static camera" clause to let scene performance
+      // surface, but it also let push-ins / dolly-ins from the user prompt
+      // through. Because the v163 preclip overlays the lipsynced face at a
+      // STATIC crop, any plate camera motion drifts the underlying face
+      // away from the overlay and visibly breaks lipsync from t=0. We
+      // re-add a camera-only lock (no zoom, no push-in, no dolly, no pan,
+      // no tilt, no reframing) while still allowing natural body / gesture
+      // / facial-performance motion driven by the scene description.
       if (speakerSlugs.length === 1) {
-        return `Lip-ready single-subject plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep the facial expression natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the speaker's mouth in post). The character keeps their mouth softly closed in the plate itself — no idle mouth, jaw or lip motion in the plate. Eyes stay open and alert throughout. Camera, framing, body posture and on-set action follow the scene description faithfully.`;
+        return `Lip-ready single-subject plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep the facial expression natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the speaker's mouth in post). The character keeps their mouth softly closed in the plate itself — no idle mouth, jaw or lip motion in the plate. Eyes stay open and alert throughout. LOCKED static camera on a fixed tripod for the entire clip — the focal length, framing and the speaker's position and size in the frame stay identical from the first frame to the last frame: no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no second camera. The camera does not move closer to or further from the subject. Body posture, gestures, facial performance and any on-set action follow the scene description faithfully, but the camera itself never moves.`;
       }
       return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself. Eyes stay open and alert throughout the entire plate; heads stay steady — no nodding, no head bobbing.`;
     };
