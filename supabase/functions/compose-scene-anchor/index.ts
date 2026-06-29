@@ -286,7 +286,12 @@ serve(async (req) => {
         `FORBIDDEN: duplicating any reference person, rendering the same identity twice, twins, doppelgängers, clones, mirror reflections of a person, posters/photos of a person on the wall, screens showing a person, statues or mannequins of a person. ` +
         `FORBIDDEN: any additional human beyond the ${N} references — no extra colleague, no bystander at the desk/table, no waiter, no passer-by in the background, no crowd, no silhouettes of other people, no hands or arms of unseen people entering the frame. ` +
         `Empty background humans (out-of-focus crowd) are also FORBIDDEN. The frame contains EXACTLY ${N} people total.`
-      : "";
+      : ` EXACT PERSON COUNT — NON-NEGOTIABLE: the final image must show EXACTLY 1 human being — not 2, not 3, not more. ` +
+        `The single reference person appears EXACTLY ONCE in ONE continuous frame. ` +
+        `FORBIDDEN: duplicating the reference person, rendering the same identity twice or three times, twins, doppelgängers, clones, mirror reflections of the same person, posters/photos/screens/statues/mannequins showing the same person. ` +
+        `FORBIDDEN: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid, "variations of the same person" composition. ` +
+        `FORBIDDEN: any additional human beyond the 1 reference — no extra colleague, no bystander, no passer-by, no crowd, no silhouettes, no background humans. ` +
+        `The frame contains EXACTLY 1 person total in 1 continuous shot.`;
     // Two-shot framing enforcement — when ≥2 portraits, the downstream
     // lipsync pipeline REQUIRES that all N faces are clearly visible and
     // separable in the first frame. Without this, Hailuo i2v often crops
@@ -301,9 +306,11 @@ serve(async (req) => {
       ? (hasAsymmetricCast
         ? ` AVOID: any reference person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated identity, extra unreferenced person.`
         : ` AVOID: single person, solo close-up, one face cropped to frame, back of head, full profile silhouette where the face is hidden, one character occluded by the other, faces overlapping, three people when only two are referenced, extra coworker, extra colleague, extra bystander, background crowd, twins, identical-looking people, repeated face.`)
-      : "";
-    const STRICT_RETRY_SUFFIX = strictMode && isMulti
-      ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity, an extra human body, or a partial third person in frame. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} HUMAN BEINGS total — count every visible body, including profile views, partial bodies, background humans, mirror reflections, posters, screens, mannequins, statues. The total human count anywhere in the frame must equal ${N}. ISOLATE the ${N} reference people: clear or empty the rest of the environment (empty office, empty hallway, empty street). Crop/frame tight enough to physically EXCLUDE any additional humans. Do NOT add coworkers, colleagues, bystanders, passers-by, or a "third figure" to balance the composition. Do NOT repeat any reference person. Final human headcount in frame: ${N}. Repeat: exactly ${N} bodies, no more, no fewer.`
+      : ` AVOID: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid, mirror duplicates, twins, doppelgängers, repeated face, two of the same person, three of the same person, extra unreferenced human, background bystander, coworker, crowd.`;
+    const STRICT_RETRY_SUFFIX = strictMode
+      ? (isMulti
+        ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity, an extra human body, or a partial third person in frame. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} HUMAN BEINGS total — count every visible body, including profile views, partial bodies, background humans, mirror reflections, posters, screens, mannequins, statues. The total human count anywhere in the frame must equal ${N}. ISOLATE the ${N} reference people: clear or empty the rest of the environment (empty office, empty hallway, empty street). Crop/frame tight enough to physically EXCLUDE any additional humans. Do NOT add coworkers, colleagues, bystanders, passers-by, or a "third figure" to balance the composition. Do NOT repeat any reference person. Final human headcount in frame: ${N}. Repeat: exactly ${N} bodies, no more, no fewer.`
+        : ` STRICT RETRY MODE — the previous attempt FAILED because it produced MULTIPLE instances of the same person (triptych, split-screen panels, side-by-side duplicates, or two/three bodies of the same identity). Render EXACTLY 1 single human being in 1 single continuous frame — no panels, no grid, no split-screen, no side-by-side variations, no mirror duplicates, no posters/screens/statues of the same person. ISOLATE the single reference person: empty the rest of the environment of other humans. Final human headcount in frame: 1. Repeat: exactly 1 body, in 1 continuous shot, no panels.`)
       : "";
 
     // v111 — STRICT SWAP RETRY: the previous attempt rendered the WRONG face
