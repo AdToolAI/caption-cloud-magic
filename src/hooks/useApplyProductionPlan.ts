@@ -184,8 +184,15 @@ function planSceneToComposerScene(
   // as the BASE brand_characters.id (CastRef invariant) plus an optional
   // separate `outfitLookId`. We still defensively strip any legacy mention
   // prefix in case an older plan flows through.
-  const stripPrefix = (id: string) =>
-    id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
+  const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  const stripPrefix = (id: string) => {
+    if (!id) return id;
+    // Multi-segment mention IDs like `catalog:location:<uuid>` or
+    // `catalog:character:<uuid>` → return the trailing UUID.
+    const m = id.match(UUID_RE);
+    if (m && id.includes(':')) return m[0];
+    return id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
+  };
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
   const rawShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
