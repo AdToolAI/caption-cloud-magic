@@ -280,37 +280,39 @@ serve(async (req) => {
     // the anchor showing EXACTLY N distinct faces — no extras, no duplicates,
     // no background bystanders. This is the single biggest source of the
     // "character appears twice / a third stranger appears" failure mode.
+    // v170 — Cast-Integrity rule (Artlist parity). Background extras,
+    // bystanders, pedestrians and crowd are ALLOWED if natural for the
+    // scene. We only forbid duplicating/cloning a cast member or rendering
+    // multiple copies of the same identity. Lipsync targets cast portraits,
+    // not arbitrary faces, so extras do not break the pipeline.
     const EXACT_COUNT_SUFFIX = isMulti
-      ? ` EXACT PERSON COUNT — NON-NEGOTIABLE: the final image must show EXACTLY ${N} human beings — not ${N - 1}, not ${N + 1}, not ${N + 2}. ` +
-        `Each of the ${N} reference people appears EXACTLY ONCE. ` +
-        `FORBIDDEN: duplicating any reference person, rendering the same identity twice, twins, doppelgängers, clones, mirror reflections of a person, posters/photos of a person on the wall, screens showing a person, statues or mannequins of a person. ` +
-        `FORBIDDEN: any additional human beyond the ${N} references — no extra colleague, no bystander at the desk/table, no waiter, no passer-by in the background, no crowd, no silhouettes of other people, no hands or arms of unseen people entering the frame. ` +
-        `Empty background humans (out-of-focus crowd) are also FORBIDDEN. The frame contains EXACTLY ${N} people total.`
-      : ` EXACT PERSON COUNT — NON-NEGOTIABLE: the final image must show EXACTLY 1 human being — not 2, not 3, not more. ` +
-        `The single reference person appears EXACTLY ONCE in ONE continuous frame. ` +
-        `FORBIDDEN: duplicating the reference person, rendering the same identity twice or three times, twins, doppelgängers, clones, mirror reflections of the same person, posters/photos/screens/statues/mannequins showing the same person. ` +
-        `FORBIDDEN: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid, "variations of the same person" composition. ` +
-        `FORBIDDEN: any additional human beyond the 1 reference — no extra colleague, no bystander, no passer-by, no crowd, no silhouettes, no background humans. ` +
-        `The frame contains EXACTLY 1 person total in 1 continuous shot.`;
+      ? ` CAST COUNT — NON-NEGOTIABLE: the final image must show the ${N} CAST reference people, each appearing EXACTLY ONCE as a clearly visible, individually recognizable person. ` +
+        `FORBIDDEN: duplicating any cast reference, rendering the same cast identity twice, twins, doppelgängers, clones, mirror reflections of a cast person, posters/photos/screens/statues/mannequins depicting a cast person. ` +
+        `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people whose face is not a cast reference — include them naturally when the scene calls for it. ` +
+        `Each of the ${N} cast people remains clearly identifiable and unobstructed.`
+      : ` CAST COUNT — NON-NEGOTIABLE: the final image must contain the 1 CAST reference person, appearing EXACTLY ONCE as a clearly visible, individually recognizable person in ONE continuous frame. ` +
+        `FORBIDDEN: duplicating the cast person, rendering the same identity twice or three times, twins, doppelgängers, clones, mirror duplicates of the cast person, triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid. ` +
+        `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people — include them naturally when the scene calls for it. Decorative depicted humans on laptop/phone/TV screens, framed photos, mirror reflections of bystanders, posters and statues are also allowed. ` +
+        `The cast person stays in one continuous shot.`;
     // Two-shot framing enforcement — when ≥2 portraits, the downstream
-    // lipsync pipeline REQUIRES that all N faces are clearly visible and
-    // separable in the first frame. Without this, Hailuo i2v often crops
-    // to a single character or stacks faces and the multi-pass face-target
-    // lipsync collapses to one speaker. This rule is Artlist-parity.
+    // lipsync pipeline REQUIRES that all N cast faces are clearly visible
+    // and separable in the first frame. Without this, Hailuo i2v often
+    // crops to a single character or stacks faces and the multi-pass
+    // face-target lipsync collapses to one speaker.
     const TWO_SHOT_FRAMING_SUFFIX = isMulti
       ? (hasAsymmetricCast
-        ? ` MULTI-CHARACTER FRAMING (asymmetric, per CHARACTER ACTIONS above): all ${N} reference people must be clearly visible and individually recognizable in the SAME frame. Screen share may be UNEQUAL — honor the per-character placement (foreground/background, primary/secondary, near/far) exactly as written in CHARACTER ACTIONS. Each face must still be unobstructed enough that a face detector can locate ${N} distinct faces (no full back-of-head, no fully hidden face, no silhouette). Do NOT collapse the scene to a symmetric side-by-side shot if the actions describe different positions.`
-        : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} characters are fully visible in the SAME frame at roughly EQUAL screen share. Each face must be unobstructed, front-3/4 to camera, with clear separation between subjects (no occlusion, no overlap of heads). NEVER produce a single-character close-up, NEVER cut anyone out of frame, NEVER show only the back of a head. Position the subjects left/right or in a slight arc so a face detector can find ${N} distinct faces.`)
+        ? ` MULTI-CHARACTER FRAMING (asymmetric, per CHARACTER ACTIONS above): all ${N} cast people must be clearly visible and individually recognizable in the SAME frame. Screen share may be UNEQUAL — honor the per-character placement (foreground/background, primary/secondary, near/far) exactly as written in CHARACTER ACTIONS. Each cast face must still be unobstructed enough that a face detector can locate ${N} distinct cast faces (no full back-of-head, no fully hidden face, no silhouette).`
+        : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} cast characters are fully visible in the SAME frame at roughly EQUAL screen share. Each cast face must be unobstructed, front-3/4 to camera, with clear separation between subjects. NEVER produce a single-character close-up, NEVER cut a cast member out of frame, NEVER show only the back of a head.`)
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
       ? (hasAsymmetricCast
-        ? ` AVOID: any reference person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated identity, extra unreferenced person.`
-        : ` AVOID: single person, solo close-up, one face cropped to frame, back of head, full profile silhouette where the face is hidden, one character occluded by the other, faces overlapping, three people when only two are referenced, extra coworker, extra colleague, extra bystander, background crowd, twins, identical-looking people, repeated face.`)
-      : ` AVOID: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid, mirror duplicates, twins, doppelgängers, repeated face, two of the same person, three of the same person, extra unreferenced human, background bystander, coworker, crowd.`;
+        ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity.`
+        : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face.`)
+      : ` AVOID: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same cast person, photo collage, contact sheet, before/after grid, mirror duplicates of the cast person, twins of the cast person, doppelgängers, repeated cast face, two of the same cast person, three of the same cast person.`;
     const STRICT_RETRY_SUFFIX = strictMode
       ? (isMulti
-        ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity, an extra human body, or a partial third person in frame. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} HUMAN BEINGS total — count every visible body, including profile views, partial bodies, background humans, mirror reflections, posters, screens, mannequins, statues. The total human count anywhere in the frame must equal ${N}. ISOLATE the ${N} reference people: clear or empty the rest of the environment (empty office, empty hallway, empty street). Crop/frame tight enough to physically EXCLUDE any additional humans. Do NOT add coworkers, colleagues, bystanders, passers-by, or a "third figure" to balance the composition. Do NOT repeat any reference person. Final human headcount in frame: ${N}. Repeat: exactly ${N} bodies, no more, no fewer.`
-        : ` STRICT RETRY MODE — the previous attempt FAILED because it produced MULTIPLE instances of the same person (triptych, split-screen panels, side-by-side duplicates, or two/three bodies of the same identity). Render EXACTLY 1 single human being in 1 single continuous frame — no panels, no grid, no split-screen, no side-by-side variations, no mirror duplicates, no posters/screens/statues of the same person. ISOLATE the single reference person: empty the rest of the environment of other humans. Final human headcount in frame: 1. Repeat: exactly 1 body, in 1 continuous shot, no panels.`)
+        ? ` STRICT RETRY MODE — the previous attempt FAILED the cast-integrity audit (duplicated cast identity, swapped face, or missing cast member). Render each of the ${N} cast references EXACTLY ONCE — no duplicates, no twins, no mirror copies, no posters/screens of a cast person. Background extras are allowed but do not duplicate any cast face among them. Do NOT add a second instance of any cast member to balance the composition.`
+        : ` STRICT RETRY MODE — the previous attempt FAILED because it produced MULTIPLE instances of the same cast person (triptych, split-screen panels, side-by-side duplicates, or two/three bodies of the same identity). Render the 1 cast reference EXACTLY ONCE in 1 single continuous frame — no panels, no grid, no split-screen, no side-by-side variations, no mirror duplicates, no posters/screens/statues depicting the cast person elsewhere in the frame. Background bystanders/pedestrians remain allowed, but none of them may look like the cast person.`)
       : "";
 
     // v111 — STRICT SWAP RETRY: the previous attempt rendered the WRONG face
