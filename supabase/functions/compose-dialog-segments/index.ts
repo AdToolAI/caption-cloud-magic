@@ -3615,13 +3615,19 @@ serve(async (req) => {
     // `startFrom` seek — making the pipeline INDEPENDENT of the deployed
     // Lambda bundle version (v38 needed a bundle-redeploy; v39 doesn't).
     let tightAudioInfo: { url: string; durSec: number } | null = null;
-    // v64 — Tight-slice now also runs for N=1. Sync.so reproducibly throws
-    // `provider_unknown_error` when the per-speaker WAV is mostly trailing
-    // silence (the 1-speaker case where speech is e.g. 0–2.2s on a 10s plate).
-    // Slicing to the voiced window matches the N≥2 success path; the silent
-    // tail of the scene is filled back in by the audio-mux Lambda (see
-    // render-sync-segments-audio-mux, useOverlay branch).
-    if (speakerWindowsSecs.length > 0) {
+    // v169 — Tight-Slice nur ab N≥2. Bei N=1 (Single-Speaker Cinematic-Sync)
+    // führt das Tight-Slice in Kombination mit dem v167-Plate-Prompt
+    // ("subtle idle mouth motion") und dem Overlay-Mux dazu, dass nach dem
+    // Turn-Fenster die pristine Plate mit weiterhin bewegtem Mund sichtbar
+    // wird (Tail-Talk). N=1 nutzt jetzt wieder das volle VO (inkl. trailing
+    // silence): Sync.so liefert einen Lipsync-Clip in Plate-Länge, der direkt
+    // als Master verwendet wird — sync-3 schließt während Stille natürlich
+    // den Mund. Body-Motion (Auto fahren, joggen, gestikulieren) bleibt durch
+    // die Hailuo-Plate unverändert, weil sync-3 nur die Mund-/Kieferregion
+    // verändert.
+    const allowTightSlice = passes.length >= 2;
+    if (allowTightSlice && speakerWindowsSecs.length > 0) {
+
       try {
         const wavResp = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
         if (!wavResp.ok) throw new Error(`fetch ${wavResp.status}`);

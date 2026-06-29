@@ -185,14 +185,20 @@ serve(async (req) => {
         Number.isFinite(Number(p.coords[0])) &&
         Number.isFinite(Number(p.coords[1])),
     );
-    // v64 — Overlay branch now triggers for ANY done pass that used a tight
-    // per-turn WAV, not just N≥2 fan-out. Single-speaker tight scenes need
-    // the same overlay-on-master-plate compositing because Sync.so returned
-    // only the ~speech-duration clip and the rest of the scene must come
-    // from the original pristine plate.
+    // v169 — Overlay-Mode wird für N=1 (Single-Speaker) explizit deaktiviert.
+    // Bei nur einem Sprecher gibt es kein "Fenster zwischen anderen Sprechern",
+    // das mit der pristine Plate gefüllt werden müsste. Das alte v64-Verhalten
+    // (Overlay auch bei N=1 wenn Tight-Audio vorhanden) hat in Kombination mit
+    // dem v167-Plate-Prompt ("subtle idle mouth motion") sichtbaren Tail-Talk
+    // erzeugt: nach Ende des Turn-Fensters wurde die pristine Plate sichtbar,
+    // deren Mund weiter wackelte. Mit v169 nutzt N=1 das volle (nicht
+    // tight-geslicte) Sync.so-Output als Master — Plate-Länge = Audio-Länge,
+    // Mund schließt nach dem Skript automatisch, Body-Motion bleibt erhalten.
     const anyTight = donePasses.some((p: any) => !!p?.audio_tight);
     const isFanout = donePasses.length >= 2;
-    const useOverlay = isFanout || (donePasses.length >= 1 && anyTight);
+    const isSingleSpeaker = donePasses.length === 1 && !isFanout;
+    const useOverlay = !isSingleSpeaker && (isFanout || (donePasses.length >= 1 && anyTight));
+
     const sourcePlateUrl = String((state as any).source_clip_url ?? "");
 
     // v75 — Professional Artlist-style default: keep the moving i2v master
