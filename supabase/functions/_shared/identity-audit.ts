@@ -47,27 +47,29 @@ export async function auditAnchorIdentity(
   lovableKey: string,
   timeoutMs = 25_000,
 ): Promise<IdentityAuditResult | null> {
-  if (!anchorUrl || portraitUrls.length < 2 || !lovableKey) return null;
+  if (!anchorUrl || portraitUrls.length < 1 || !lovableKey) return null;
   const N = portraitUrls.length;
   const refLabel = portraitUrls
     .map((_, i) => `reference #${i + 1}${names[i] ? ` = ${names[i]}` : ""}`)
     .join(", ");
+  // v170 — Cast-Integrity audit (Artlist parity):
+  //   We check CAST INTEGRITY (each reference appears exactly once, correct face),
+  //   NOT total headcount. Background bystanders, pedestrians, crowd, depicted
+  //   persons on screens/posters/photos/mirrors/statues are EXTRAS and are
+  //   allowed — they do not break lipsync because face-targeting matches the
+  //   cast portrait, not "any face in frame".
   const text =
-    `You will receive a COMPOSED SCENE image followed by ${N} REFERENCE PORTRAITS (${refLabel}). ` +
-    `The composed scene MUST contain EXACTLY ${N} distinct humans, with each reference person appearing EXACTLY ONCE and matching the reference. ` +
-    `Audit it carefully. Watch for: ` +
-    `(a) "cloning" — the same reference appears twice, or two anchor faces look identical; ` +
-    `(b) "extra people" — additional humans in the frame (colleagues at the desk, bystanders, posters/photos of people, mirror reflections of people, mannequins, statues, on-screen people); ` +
-    `(c) "missing" — a reference person does not appear at all; ` +
-    `(d) "swap" — for some reference, a person APPEARS in the slot but is OBVIOUSLY a different person (different sex, very different age, different hair color/length, completely different face). Be strict: if a male reference is rendered as a clearly female person (or vice versa), that is a SWAP. ` +
-    `Count posters/screens/mirrors/statues showing a human face as a "person" for this audit. ` +
-    `For each reference, also rate faceMatch as "match" (clearly the same person), "mismatch" (clearly a different person — different sex/age/face), or "uncertain". ` +
+    `You will receive a COMPOSED SCENE image followed by ${N} CAST REFERENCE PORTRAIT${N === 1 ? "" : "S"} (${refLabel}). ` +
+    `Audit CAST INTEGRITY only — extras and bystanders are ALLOWED. Specifically check: ` +
+    `(a) "clone" — the same CAST reference appears two or more times as a real person in the frame (duplicated identity, triptych/panels of the same person, side-by-side variations of the same person, mirror duplicates of the same person); ` +
+    `(b) "missing" — a CAST reference person does not appear at all as a real, physically present human; ` +
+    `(c) "swap" — a CAST reference is filled by a clearly DIFFERENT person (different sex, very different age, different hair color/length, completely different face). Be strict on sex/age. ` +
+    `IMPORTANT — these are NOT failures and must be IGNORED: background pedestrians, bystanders, crowd, coworkers, people walking by, unknown additional humans that do not match any CAST reference, AND any depicted persons on laptop screens, phones, TVs, posters, framed photos, mirrors, statues, mannequins, paintings. Treat depicted persons as scene props, not as humans, and do NOT count them in "appearances". ` +
+    `For each CAST reference, count how many times that exact identity appears as a REAL physically present human (not as a screen image or photo on the wall), and rate faceMatch as "match" (clearly the same person), "mismatch" (clearly a different person), or "uncertain". ` +
     `Reply with STRICT JSON only, no prose:\n` +
     `{` +
-    `"totalPeople": <integer — distinct humans visible, including extras>,` +
     `"perReference": [{"ref": 1, "appearances": <0|1|2|...>, "faceMatch": "match"|"mismatch"|"uncertain", "mismatchNotes": "<short>"}, ...],` +
-    `"extraPeople": <integer — humans not matching any reference>,` +
-    `"reason": "ok|clone|extra|missing|swap|ambiguous",` +
+    `"reason": "ok|clone|missing|swap|ambiguous",` +
     `"notes": "<short>"` +
     `}.`;
 
@@ -95,6 +97,8 @@ export async function auditAnchorIdentity(
     const parsed = JSON.parse(m[0]);
     const reason = String(parsed?.reason ?? "").toLowerCase();
     const detail = String(parsed?.notes ?? "").slice(0, 240);
+    // v170 — totalPeople/extraPeople are no longer required (Cast-Integrity
+    // audit ignores extras). Read defensively in case the model still emits them.
     const totalPeople = Number.isFinite(Number(parsed?.totalPeople)) ? Number(parsed.totalPeople) : undefined;
     const extraPeople = Number.isFinite(Number(parsed?.extraPeople)) ? Number(parsed.extraPeople) : undefined;
     const perRef: Array<{ ref: number; appearances?: number; faceMatch?: string; mismatchNotes?: string }> = Array.isArray(parsed?.perReference) ? parsed.perReference : [];
@@ -114,10 +118,10 @@ export async function auditAnchorIdentity(
       }
     }
 
-    // Priority of failures: swap > clone > extra > missing > ambiguous. A
-    // swap is the most damaging because the lipsync will animate the wrong
-    // face and the wardrobe/scene around it looks correct, so the user only
-    // notices the bug at preview time. Detect it BEFORE shipping.
+    // v170 — Priority: swap > clone > missing > ambiguous.
+    // "extra" is intentionally removed — bystanders/crowd/depicted persons are
+    // allowed and do not break the lipsync pipeline (face-targeting matches
+    // cast portraits, not arbitrary faces).
     if (mismatched.length > 0 || reason === "swap") {
       return {
         ok: false,
@@ -136,15 +140,6 @@ export async function auditAnchorIdentity(
         totalPeople,
         extraPeople,
         detail: detail || `duplicated: ${duplicated.join(", ") || "unspecified"}`,
-      };
-    }
-    if ((extraPeople !== undefined && extraPeople > 0) || reason === "extra" || (totalPeople !== undefined && totalPeople > N)) {
-      return {
-        ok: false,
-        reason: "extra",
-        totalPeople,
-        extraPeople,
-        detail: detail || `extra people in frame (total=${totalPeople ?? "?"}, expected=${N})`,
       };
     }
     if (missing.length > 0 || reason === "missing") {

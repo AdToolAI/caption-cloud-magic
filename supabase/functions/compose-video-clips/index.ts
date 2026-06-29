@@ -36,7 +36,7 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
-const ANCHOR_AUDIT_VERSION = 10;
+const ANCHOR_AUDIT_VERSION = 11;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1666,7 +1666,10 @@ serve(async (req) => {
                     .eq("scene_id", scene.id);
                 };
 
-                // Evaluate: face count + human count + identity audit.
+                // Evaluate: cast-integrity audit (no clone, no swap, no missing).
+                // v170 — headcount checks (countFaces/countHumans) are kept as
+                // pure telemetry; they no longer block. Bystanders, crowd, and
+                // depicted persons (screens/posters/photos/mirrors) are allowed.
                 const evaluate = async (url: string, label: string) => {
                   const [fc, hc] = await Promise.all([
                     countFacesInImage(url, LOVABLE_API_KEY!, { kind: "image" }),
@@ -1681,16 +1684,8 @@ serve(async (req) => {
                     | null = null;
                   let notes = "";
                   let mismatched: string[] = [];
-                  if (hc !== null && hc > expectedFaces) {
-                    identity = "extra";
-                    notes = `human count ${hc} > expected ${expectedFaces}`;
-                  } else if (fc !== null && fc > expectedFaces) {
-                    identity = "extra";
-                    notes = `face count ${fc} > expected ${expectedFaces}`;
-                  }
-                  if (portraitUrls.length >= 2) {
-                    // v111 — audit against IDENTITY refs (canonical headshots)
-                    // when available; otherwise fall back to the wardrobe refs.
+                  if (portraitUrls.length >= 1) {
+                    // v170 — audit runs for N=1 too (extras ignored, clones/swap/missing still caught).
                     const auditRefs = identityPortraitUrls.length === portraitUrls.length
                       ? identityPortraitUrls
                       : portraitUrls;
@@ -1701,7 +1696,7 @@ serve(async (req) => {
                       LOVABLE_API_KEY!,
                     );
                     if (audit && !audit.ok) {
-                      identity = audit.reason ?? identity ?? "ambiguous";
+                      identity = (audit.reason as typeof identity) ?? "ambiguous";
                       notes = audit.detail || notes;
                       if (audit.reason === "swap" && Array.isArray(audit.mismatched)) {
                         mismatched = audit.mismatched;
@@ -1709,10 +1704,11 @@ serve(async (req) => {
                     }
                   }
                   console.log(
-                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} humans=${hc}/${expectedFaces} identity=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] notes="${notes.slice(0, 120)}"`,
+                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
                   );
                   return { faceCount: fc, humanCount: hc, identity, notes, mismatched };
                 };
+
 
                 let composedUrl: string | null = null;
                 let faceCount: number | null = null;
@@ -1765,10 +1761,9 @@ serve(async (req) => {
                       at: new Date().toISOString(),
                     });
 
-                    const needsRetry =
-                      identityFailure !== null ||
-                      (faceCount !== null && faceCount !== expectedFaces) ||
-                      (humanCount !== null && humanCount !== expectedFaces);
+                    // v170 — retry only on real cast-integrity failures.
+                    // Headcount differences alone (extras/bystanders) are OK.
+                    const needsRetry = identityFailure !== null;
                     if (needsRetry) {
                       const isSwap = identityFailure === "swap";
                       console.log(
@@ -1843,10 +1838,9 @@ serve(async (req) => {
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
                   if (!skipAuditPersist) {
-                    const okFinal =
-                      identityFailure === null &&
-                      (faceCount === null || faceCount === expectedFaces) &&
-                      (humanCount === null || humanCount === expectedFaces);
+                    // v170 — okFinal is cast-integrity only. Headcount diffs
+                    // (extras/bystanders) are no longer failures.
+                    const okFinal = identityFailure === null;
                     const auditMeta = {
                       anchor_face_audit: {
                         version: ANCHOR_AUDIT_VERSION,
@@ -1898,75 +1892,21 @@ serve(async (req) => {
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? "?"}/${expectedFaces}, humans=${humanCount ?? "?"}/${expectedFaces}, identity=${identityFailure ?? "ok"}) → ${composedUrl.slice(0, 80)}…`,
                   );
 
-                  // Hard-abort BEFORE Hailuo/Sync.so spend credits.
+                  // v170 — Hard-abort BEFORE Hailuo/Sync.so spend credits.
+                  // Only true cast-integrity failures block: clone, swap, missing,
+                  // ambiguous. "extra" reason and headcount-> checks are gone —
+                  // bystanders, crowd, and depicted persons (screens/photos/
+                  // mirrors) are allowed (Artlist parity).
                   const reasonMap: Record<string, string> = {
                     clone: "anchor_identity_duplicate_detected",
-                    extra: "anchor_extra_person_detected",
                     missing: "anchor_identity_missing_detected",
                     ambiguous: "anchor_identity_ambiguous",
+                    swap: "anchor_identity_swap_detected",
                   };
-                  if (identityFailure) {
+                  if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
-                    const msg = `${code}: ${identityNotes || identityFailure} (faces=${faceCount ?? "?"}/${expectedFaces}, humans=${humanCount ?? "?"}/${expectedFaces}) — Anchor wurde 2× neu gerendert und ist weiterhin nicht sauber. Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
-                  }
-                  if (humanCount !== null && humanCount > expectedFaces) {
-                    const msg = `anchor_extra_person_detected: ${humanCount}/${expectedFaces} Personen sichtbar — ein zusätzlicher Mensch wurde in die Szene gerendert (eventuell im Profil/Hintergrund).`;
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
-                  }
-                  if (
-                    faceCount !== null &&
-                    faceCount < expectedFaces &&
-                    (humanCount === null || humanCount < expectedFaces)
-                  ) {
-                    const msg = `anchor_missing_speakers: ${faceCount}/${expectedFaces} Gesichter sichtbar nach 2 Compose-Versuchen`;
-                    console.warn(
-                      `[compose-video-clips] cinematic-sync scene ${scene.id}: aborting — ${msg}`,
-                    );
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
-                  }
-                  if (faceCount !== null && faceCount > expectedFaces) {
-                    const msg = `anchor_extra_person_detected: ${faceCount}/${expectedFaces} Gesichter sichtbar — eine zusätzliche Person wurde gerendert.`;
+                    const msg = `${code}: ${identityNotes || identityFailure} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
                     await supabaseAdmin
                       .from("composer_scenes")
                       .update({
