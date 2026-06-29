@@ -97,6 +97,8 @@ export async function auditAnchorIdentity(
     const parsed = JSON.parse(m[0]);
     const reason = String(parsed?.reason ?? "").toLowerCase();
     const detail = String(parsed?.notes ?? "").slice(0, 240);
+    // v170 — totalPeople/extraPeople are no longer required (Cast-Integrity
+    // audit ignores extras). Read defensively in case the model still emits them.
     const totalPeople = Number.isFinite(Number(parsed?.totalPeople)) ? Number(parsed.totalPeople) : undefined;
     const extraPeople = Number.isFinite(Number(parsed?.extraPeople)) ? Number(parsed.extraPeople) : undefined;
     const perRef: Array<{ ref: number; appearances?: number; faceMatch?: string; mismatchNotes?: string }> = Array.isArray(parsed?.perReference) ? parsed.perReference : [];
@@ -116,10 +118,10 @@ export async function auditAnchorIdentity(
       }
     }
 
-    // Priority of failures: swap > clone > extra > missing > ambiguous. A
-    // swap is the most damaging because the lipsync will animate the wrong
-    // face and the wardrobe/scene around it looks correct, so the user only
-    // notices the bug at preview time. Detect it BEFORE shipping.
+    // v170 — Priority: swap > clone > missing > ambiguous.
+    // "extra" is intentionally removed — bystanders/crowd/depicted persons are
+    // allowed and do not break the lipsync pipeline (face-targeting matches
+    // cast portraits, not arbitrary faces).
     if (mismatched.length > 0 || reason === "swap") {
       return {
         ok: false,
@@ -138,15 +140,6 @@ export async function auditAnchorIdentity(
         totalPeople,
         extraPeople,
         detail: detail || `duplicated: ${duplicated.join(", ") || "unspecified"}`,
-      };
-    }
-    if ((extraPeople !== undefined && extraPeople > 0) || reason === "extra" || (totalPeople !== undefined && totalPeople > N)) {
-      return {
-        ok: false,
-        reason: "extra",
-        totalPeople,
-        extraPeople,
-        detail: detail || `extra people in frame (total=${totalPeople ?? "?"}, expected=${N})`,
       };
     }
     if (missing.length > 0 || reason === "missing") {
