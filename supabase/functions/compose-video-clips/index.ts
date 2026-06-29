@@ -1761,10 +1761,9 @@ serve(async (req) => {
                       at: new Date().toISOString(),
                     });
 
-                    const needsRetry =
-                      identityFailure !== null ||
-                      (faceCount !== null && faceCount !== expectedFaces) ||
-                      (humanCount !== null && humanCount !== expectedFaces);
+                    // v170 — retry only on real cast-integrity failures.
+                    // Headcount differences alone (extras/bystanders) are OK.
+                    const needsRetry = identityFailure !== null;
                     if (needsRetry) {
                       const isSwap = identityFailure === "swap";
                       console.log(
