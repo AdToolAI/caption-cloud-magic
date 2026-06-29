@@ -365,7 +365,7 @@ function planSceneToComposerScene(
     ),
   );
   const mentionedLocationIds = ps.location?.locationId
-    ? [ps.location.locationId]
+    ? [stripPrefix(ps.location.locationId)].filter((x) => UUID_RE.test(x))
     : [];
 
   return {
