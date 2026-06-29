@@ -712,6 +712,61 @@ serve(async (req) => {
       return out;
     };
 
+    /**
+     * v166 (Jun 29 2026) — Camera-Motion-Sanitizer for cinematic-sync plates.
+     * The v163 preclip pipeline overlays the lipsynced face-crop at STATIC
+     * (cropX, cropY, cropSize). If the AI plate pushes in / dollies / zooms,
+     * the underlying face drifts while the overlay stays glued to its initial
+     * position → mouth no longer aligns → lip-sync looks "off" even at t=0
+     * and gets worse over time. We strip every camera-push token from the
+     * positive prompt before composing the plate prompt. The negative block
+     * (CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE) already lists the same tokens
+     * so the model gets a consistent "do not move the camera" signal on both
+     * sides. Applied for N=1..N (the previous N≥2 LOCKED static suffix
+     * already covered multi-speaker; this closes the N=1 hole).
+     */
+    const stripCameraMotionForPlate = (text: string): { out: string; stripped: string[] } => {
+      if (!text) return { out: text, stripped: [] };
+      const stripped: string[] = [];
+      let out = text;
+      const patterns: RegExp[] = [
+        /\bslow(?:\s+|-)(?:push[- ]?in|zoom[- ]?in|dolly[- ]?in|pull[- ]?in|creep[- ]?in)\b/gi,
+        /\bpush[- ]?in(?:ning)?\b/gi,
+        /\bpush(?:es|ing)?\s+in\b/gi,
+        /\bpull[- ]?out\b/gi,
+        /\bzoom[- ]?in(?:ning)?\b/gi,
+        /\bzoom(?:s|ing)?\s+in\b/gi,
+        /\bzoom[- ]?out\b/gi,
+        /\bdolly(?:\s+(?:in|out|forward|back(?:wards?)?))?\b/gi,
+        /\bcrane(?:\s+(?:up|down))?\b/gi,
+        /\btracking\s+shot\b/gi,
+        /\btruck(?:ing)?\s+(?:in|out|left|right)\b/gi,
+        /\bsteadicam\s+(?:push|pull|move|glide)\b/gi,
+        /\b(?:camera\s+)?move(?:s|ment)?\s+(?:closer|in|forward|toward(?:s)?)\b/gi,
+        /\bmoves?\s+closer\s+to\s+(?:the\s+)?(?:subject|character|face)\b/gi,
+        /\bcamera\s+(?:push|pull|dolly|crane|zoom|tracks?|moves?)\b/gi,
+        /\breframe(?:s|ing)?\b/gi,
+        /\bwhip\s+pan\b/gi,
+        /\bpan(?:s|ning)?\s+(?:left|right|across)\b/gi,
+        /\btilt(?:s|ing)?\s+(?:up|down)\b/gi,
+        /\bdrift(?:s|ing)?\s+(?:closer|inward|forward)\b/gi,
+      ];
+      for (const re of patterns) {
+        out = out.replace(re, (match) => {
+          stripped.push(match);
+          return "";
+        });
+      }
+      // Tidy up dangling commas / double spaces left behind.
+      out = out
+        .replace(/\s*,\s*,+/g, ",")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\s+([,.])/g, "$1")
+        .replace(/^[\s,.;]+|[\s,;]+$/g, "")
+        .trim();
+      return { out, stripped };
+    };
+
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
       const speakerSlugs = uniqueSpeakerSlugsFromScript(scene.dialogScript);
       const cleanedVisualPromptRaw = stripDialogForAnchor(scene.aiPrompt || "");
