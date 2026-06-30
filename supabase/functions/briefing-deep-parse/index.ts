@@ -1298,15 +1298,47 @@ This overrides any English wording in the briefing's scaffolding
       // "@home-office" even though the library carries "Home Office".
       // Substring-match both directions via normalizeMention.
       const resolvedLocationIndexes = new Set<number>();
+      const UUID_RE_LOC = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+      const locStats = { viaSlug: 0, viaSubstring: 0, viaCatalogUuid: 0, stillUnresolved: 0 };
       for (const sc of plan.scenes ?? []) {
         const loc = sc?.location;
-        if (loc && !loc.locationId) {
-          const needle = normalizeMention(loc.mentionKey ?? loc.locationName ?? '');
+        if (!loc) continue;
+        // (c) Catalog multi-segment id like "catalog:location:<uuid>" or
+        // any string that already carries a UUID — extract & verify against
+        // the user's library so the Sheet dropdown actually matches.
+        if (loc.locationId && typeof loc.locationId === 'string' && loc.locationId.includes(':')) {
+          const m = loc.locationId.match(UUID_RE_LOC);
+          if (m) {
+            const hit = locations.find((l: any) => String(l.id) === m[0]);
+            if (hit) {
+              loc.locationId = hit.id;
+              loc.locationName = hit.name;
+              resolvedLocationIndexes.add(sc.index);
+              locStats.viaCatalogUuid += 1;
+              continue;
+            } else {
+              // UUID didn't match user library → null it out so the UI
+              // can offer "Als Location speichern" instead of a dead id.
+              loc.locationId = null;
+            }
+          }
+        }
+        if (!loc.locationId) {
+          const rawMention = String(loc.mentionKey ?? loc.locationName ?? '');
+          const needle = normalizeMention(rawMention);
           if (needle) {
-            const hit = locations.find((l: any) => {
-              const n = normalizeMention(l.name);
-              return n && (n.includes(needle) || needle.includes(n));
-            });
+            // (a) exact slug match
+            let hit = locations.find((l: any) => normalizeMention(l.name) === needle);
+            if (hit) {
+              locStats.viaSlug += 1;
+            } else {
+              // (b) substring both directions
+              hit = locations.find((l: any) => {
+                const n = normalizeMention(l.name);
+                return n && (n.includes(needle) || needle.includes(n));
+              });
+              if (hit) locStats.viaSubstring += 1;
+            }
             if (hit) {
               loc.locationId = hit.id;
               loc.locationName = hit.name;
@@ -1314,14 +1346,18 @@ This overrides any English wording in the briefing's scaffolding
               console.log('[briefing-deep-parse] location_local_fill', {
                 scene: sc.index, mention: loc.mentionKey, resolved: hit.name,
               });
+            } else {
+              locStats.stillUnresolved += 1;
             }
           }
         }
       }
+      // expose to parser_meta via plan (read below when persisting)
+      (plan as any)._locationResolution = locStats;
       // Drop now-resolved entries from plan.unresolved
       if (resolvedLocationIndexes.size > 0 && Array.isArray(plan.unresolved)) {
         plan.unresolved = plan.unresolved.filter((u: any) => {
-          const m = String(u?.path ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
+          const m = String(u?.path ?? u?.field ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
           if (!m) return true;
           const arrIdx = parseInt(m[1], 10);
           // arrIdx is 0-based, scene.index is 1-based
