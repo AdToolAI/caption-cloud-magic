@@ -416,7 +416,11 @@ in for that scene WITHOUT explicit briefing input — examples:
 Omit fields the briefing explicitly stated. The creator uses this list
 to know what is AI-generated and what is theirs.
 
-In LITERAL mode, DO NOT invent fields the briefing does not state.`;
+In LITERAL mode, DO NOT invent NARRATIVE content the briefing does not
+state (voiceover.text, dialogTurns.text, brandAnchor copy). The Intelligent
+Defaults above for transition / textOverlay / tone / performance ALWAYS
+apply — also in LITERAL mode — because they are dramaturgical scaffolding,
+not invented content.`;
 
 // ── Pass B — Resolution & validation ─────────────────────────────────────────
 
