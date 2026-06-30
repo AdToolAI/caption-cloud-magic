@@ -153,6 +153,8 @@ import {
   derivePerformanceEntries,
   countDirectedPerformances,
 } from "@/lib/motion-studio/buildPerformanceBlock";
+import { resolveCatalogChip } from "@/lib/video-composer/catalog/useCatalogLabel";
+import type { CatalogAxis } from "@/lib/video-composer/catalog";
 
 
 import {
@@ -1893,6 +1895,10 @@ export default function SceneCard({
               {scene.clipSource.startsWith("ai-") && characters && characters.length > 0 && (
                 <>
                   <SceneStudioSectionHeader tab="performance" language={lang} />
+                  {/* Wave 3.1 — Catalog-ID chips. Shows the resolved
+                      axis labels (Mimik · Gestik · Blick · Framing · Light)
+                      with an ⚡-AI badge when the value came from Pass-C. */}
+                  <SceneCatalogChipStrip scene={scene} />
                   <ScenePerformancePanel
                     scene={scene}
                     characters={characters}
