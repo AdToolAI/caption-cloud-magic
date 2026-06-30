@@ -127,7 +127,7 @@ function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
     }
 
     let location = scene.location;
-    if (!location && (lastLocation ?? firstLocation) && shouldInheritPlanContinuity(scene, 'location')) {
+    if (!location && (lastLocation ?? firstLocation)) {
       location = { ...(lastLocation ?? firstLocation)! };
     }
     if (location?.locationId) {
