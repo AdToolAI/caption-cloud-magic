@@ -608,18 +608,21 @@ export default function ProductionPlanSheet({
   const liveUnresolved = useMemo(() => {
     if (!plan) return [] as TProductionPlan['unresolved'];
     return (plan.unresolved ?? []).filter((u) => {
+      // Gemini/Pass-B has emitted both 0-based paths (scenes[0]) and
+      // 1-based scene indexes (scenes[1]). Prefer the actual scene.index
+      // contract, then fall back to array position for legacy rows.
+      const sceneByPathRef = (ref: number) =>
+        plan.scenes.find((s) => s.index === ref) ?? plan.scenes[ref];
       const m = /^scenes\[(\d+)\]\.cast\[(\d+)\]\.characterId$/.exec(u.field);
       if (m) {
-        const sIdx = Number(m[1]);
+        const scene = sceneByPathRef(Number(m[1]));
         const cIdx = Number(m[2]);
-        const scene = plan.scenes[sIdx];
         const slot = scene?.cast?.[cIdx];
         if (slot?.characterId) return false;
       }
       const ml = /^scenes\[(\d+)\]\.location\.locationId$/.exec(u.field);
       if (ml) {
-        const sIdx = Number(ml[1]);
-        const loc = plan.scenes[sIdx]?.location;
+        const loc = sceneByPathRef(Number(ml[1]))?.location;
         if (loc && findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey)) return false;
       }
       if (u.field === 'project.totalDurationSec') {
