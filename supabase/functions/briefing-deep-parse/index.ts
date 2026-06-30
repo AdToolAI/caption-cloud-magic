@@ -1490,6 +1490,7 @@ This overrides any English wording in the briefing's scaffolding
             catalog_unresolved: passCStats.unresolved,
             catalog_unresolved_samples: passCStats.unresolvedSamples,
             location_resolution: (plan as any)._locationResolution ?? null,
+          },
         });
       if (insErr) {
         persistError = `${(insErr as any).code ?? ''} ${insErr.message ?? insErr}`.trim();
