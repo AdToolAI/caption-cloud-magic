@@ -1419,6 +1419,10 @@ This overrides any English wording in the briefing's scaffolding
             passA_diagnostics: passADiagnostics,
             passB_diagnostics: passBDiagnostics,
             scene_count_corrected: sceneCountCorrection,
+            catalog_version: CATALOG_VERSION,
+            catalog_resolved: passCStats.resolved,
+            catalog_unresolved: passCStats.unresolved,
+            catalog_unresolved_samples: passCStats.unresolvedSamples,
           },
         });
       if (insErr) {
