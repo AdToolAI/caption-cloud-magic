@@ -636,7 +636,7 @@ function normalizeMention(s: string): string {
   return String(s ?? '')
     .trim()
     .replace(/^@/, '')
-    .replace(/^(location|locationid|ort|place|setting)\s*@?\s*/i, '')
+    .replace(/^(locationid|location|ort|place|setting)\s*@?\s*/i, '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
