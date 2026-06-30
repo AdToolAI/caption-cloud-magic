@@ -410,7 +410,7 @@ function planSceneToComposerScene(
           ...(ps.shotDirector as any).movementId     ? { movementId:     (ps.shotDirector as any).movementId } : {},
           ...(ps.shotDirector as any).lightingId     ? { lightingId:     (ps.shotDirector as any).lightingId } : {},
           ...(ps.shotDirector as any).stylePresetId  ? { stylePresetId:  (ps.shotDirector as any).stylePresetId } : {},
-          rawLocationId?.startsWith('catalog:')       ? { locationCatalogId: rawLocationId } : {},
+          ...(rawLocationId?.startsWith('catalog:') ? { locationCatalogId: rawLocationId } : {}),
         }
       : undefined,
     sceneActionUser: ps.anchorPromptEN ?? ps.voiceover?.text,
