@@ -1248,13 +1248,46 @@ This overrides any English wording in the briefing's scaffolding
           }
         }
       }
-      // Also clean the project-level voice.
-      if (plan?.voice && looksLikeUuid((plan.voice as any).voiceId)) {
-        (plan.voice as any).voiceId = null;
+
+      // v177: Local LOCATION fill-pass — analog to cast. Pass-B (Gemini)
+      // sometimes returns locationId=null for slug-style mentions like
+      // "@home-office" even though the library carries "Home Office".
+      // Substring-match both directions via normalizeMention.
+      const resolvedLocationIndexes = new Set<number>();
+      for (const sc of plan.scenes ?? []) {
+        const loc = sc?.location;
+        if (loc && !loc.locationId) {
+          const needle = normalizeMention(loc.mentionKey ?? loc.locationName ?? '');
+          if (needle) {
+            const hit = locations.find((l: any) => {
+              const n = normalizeMention(l.name);
+              return n && (n.includes(needle) || needle.includes(n));
+            });
+            if (hit) {
+              loc.locationId = hit.id;
+              loc.locationName = hit.name;
+              resolvedLocationIndexes.add(sc.index);
+              console.log('[briefing-deep-parse] location_local_fill', {
+                scene: sc.index, mention: loc.mentionKey, resolved: hit.name,
+              });
+            }
+          }
+        }
+      }
+      // Drop now-resolved entries from plan.unresolved
+      if (resolvedLocationIndexes.size > 0 && Array.isArray(plan.unresolved)) {
+        plan.unresolved = plan.unresolved.filter((u: any) => {
+          const m = String(u?.path ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
+          if (!m) return true;
+          const arrIdx = parseInt(m[1], 10);
+          // arrIdx is 0-based, scene.index is 1-based
+          return !resolvedLocationIndexes.has(arrIdx + 1);
+        });
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
     }
+
 
     try {
       console.log('[briefing-deep-parse] plan summary', {
