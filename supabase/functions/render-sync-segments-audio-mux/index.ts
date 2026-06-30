@@ -185,19 +185,17 @@ serve(async (req) => {
         Number.isFinite(Number(p.coords[0])) &&
         Number.isFinite(Number(p.coords[1])),
     );
-    // v169 — Overlay-Mode wird für N=1 (Single-Speaker) explizit deaktiviert.
-    // Bei nur einem Sprecher gibt es kein "Fenster zwischen anderen Sprechern",
-    // das mit der pristine Plate gefüllt werden müsste. Das alte v64-Verhalten
-    // (Overlay auch bei N=1 wenn Tight-Audio vorhanden) hat in Kombination mit
-    // dem v167-Plate-Prompt ("subtle idle mouth motion") sichtbaren Tail-Talk
-    // erzeugt: nach Ende des Turn-Fensters wurde die pristine Plate sichtbar,
-    // deren Mund weiter wackelte. Mit v169 nutzt N=1 das volle (nicht
-    // tight-geslicte) Sync.so-Output als Master — Plate-Länge = Audio-Länge,
-    // Mund schließt nach dem Skript automatisch, Body-Motion bleibt erhalten.
+    // v175 — Overlay-Mode wieder für ALLE N≥1 (revert v169). Mit v175 ist die
+    // N=1 Plate closed-mouth (compose-video-clips), Tight-Slice ist wieder an
+    // (compose-dialog-segments) → der Sync.so-Output liegt im Speaker-Window
+    // und außerhalb zeigt die pristine Plate einen geschlossenen Mund. Damit
+    // ist Tail-Talk gelöst OHNE Tight-Slice/Overlay für N=1 zu deaktivieren,
+    // und der v64-Fix gegen `generation_unknown_error` (trailing silence)
+    // bleibt aktiv.
     const anyTight = donePasses.some((p: any) => !!p?.audio_tight);
     const isFanout = donePasses.length >= 2;
-    const isSingleSpeaker = donePasses.length === 1 && !isFanout;
-    const useOverlay = !isSingleSpeaker && (isFanout || (donePasses.length >= 1 && anyTight));
+    const useOverlay = isFanout || (donePasses.length >= 1 && anyTight);
+
 
     const sourcePlateUrl = String((state as any).source_clip_url ?? "");
 

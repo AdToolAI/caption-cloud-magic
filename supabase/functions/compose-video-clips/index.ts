@@ -838,9 +838,19 @@ serve(async (req) => {
       // no tilt, no reframing) while still allowing natural body / gesture
       // / facial-performance motion driven by the scene description.
       if (speakerSlugs.length === 1) {
-        console.log(`[compose-video-clips] v167_n1_sync_drive enabled=true scene=${scene.id ?? "?"}`);
-        return `Lip-ready single-subject plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep the facial expression natural and animatable, with the mouth area soft, clearly visible and unobstructed. The character is speaking naturally with small, continuous idle mouth and jaw motion in the plate — sync-3 drives the actual lip-sync in post and needs an animatable mouth to work on. Eyes stay open and alert throughout. LOCKED static camera on a fixed tripod for the entire clip — the focal length, framing and the speaker's position and size in the frame stay identical from the first frame to the last frame: no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no second camera. The camera does not move closer to or further from the subject. Body posture, gestures, facial performance and any on-set action follow the scene description faithfully, but the camera itself never moves.`;
+        // v175 (Jun 30 2026) — Closed-mouth N=1 plate. v167 had asked for
+        // "small, continuous idle mouth and jaw motion" on the plate so
+        // sync-3 had something to drive. Combined with v169-Overlay-Mode
+        // disable that worked, but with v175 we re-enable Overlay-Mode for
+        // N=1 to fix `generation_unknown_error` via tight-slice — and idle
+        // mouth motion outside the speech window becomes visible Tail-Talk.
+        // Sync-3 animates closed-mouth plates fine (built-in obstruction +
+        // face-open). We therefore force the plate mouth to stay softly
+        // closed; sync-3 opens it during the speech window only.
+        console.log(`[compose-video-clips] v175_n1_closed_mouth enabled=true scene=${scene.id ?? "?"}`);
+        return `Lip-ready single-subject plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep the facial expression natural and animatable, with the mouth area soft, clearly visible and unobstructed. The character keeps the mouth softly closed in a natural neutral resting position throughout the plate — NO idle mouth motion, NO jaw motion, NO lip-flap, NO muttering, NO chewing; the downstream sync-3 lipsync model opens the mouth in post only during the actual speech window. Eyes stay open and alert throughout. LOCKED static camera on a fixed tripod for the entire clip — the focal length, framing and the speaker's position and size in the frame stay identical from the first frame to the last frame: no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no second camera. The camera does not move closer to or further from the subject. Body posture, gestures, facial performance and any on-set action follow the scene description faithfully, but the camera itself never moves.`;
       }
+
       return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can open the active speaker's mouth in post). All visible characters keep their mouths softly closed in a natural listening pose throughout the plate — no character produces idle mouth, jaw or lip motion in the plate itself. Eyes stay open and alert throughout the entire plate; heads stay steady — no nodding, no head bobbing.`;
     };
 
