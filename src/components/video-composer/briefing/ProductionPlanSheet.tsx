@@ -912,13 +912,20 @@ export default function ProductionPlanSheet({
                       )}
 
 
-                      {s.shotDirector && (
-                        <div className="flex flex-wrap gap-1">
-                          {s.shotDirector.framing && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.framing}</Badge>}
-                          {s.shotDirector.angle && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.angle}</Badge>}
-                          {s.shotDirector.movement && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.movement}</Badge>}
-                          {s.shotDirector.lighting && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.lighting}</Badge>}
-                        </div>
+                      {(s.shotDirector || (s.shotDirector as any)) && (
+                        ((s.shotDirector?.framing || s.shotDirector?.angle || s.shotDirector?.movement || s.shotDirector?.lighting ||
+                          (s.shotDirector as any)?.framingId || (s.shotDirector as any)?.angleId || (s.shotDirector as any)?.movementId || (s.shotDirector as any)?.lightingId || (s.shotDirector as any)?.stylePresetId) ? (
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Shot Director</Label>
+                            <div className="flex flex-wrap gap-1">
+                              <CatalogChip axis="framing"      id={(s.shotDirector as any)?.framingId}     raw={s.shotDirector?.framing}     label="Framing" />
+                              <CatalogChip axis="angle"        id={(s.shotDirector as any)?.angleId}       raw={s.shotDirector?.angle}       label="Angle" />
+                              <CatalogChip axis="movement"     id={(s.shotDirector as any)?.movementId}    raw={s.shotDirector?.movement}    label="Move" />
+                              <CatalogChip axis="lighting"     id={(s.shotDirector as any)?.lightingId}    raw={s.shotDirector?.lighting}    label="Licht" />
+                              <CatalogChip axis="style_preset" id={(s.shotDirector as any)?.stylePresetId} raw={(s.shotDirector as any)?.stylePreset} label="Style" />
+                            </div>
+                          </div>
+                        ) : null)
                       )}
 
                       {/* Cast resolver — CastRef: base character + optional outfit (separate dropdowns) */}
