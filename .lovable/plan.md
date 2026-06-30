@@ -1,70 +1,82 @@
-# v175 — N=1 `generation_unknown_error` Fix
+## Problem
 
-## Was passiert (Evidenz)
+Trotz v174 wird HappyHorse weiterhin still auf Hailuo umgeschrieben — der Trigger sitzt nicht in `compose-video-clips` (die ist sauber), sondern im **`compose-clip-webhook`**, also genau dann wenn der HappyHorse-Render *zurückkommt*. Zwei Stellen sind übrig:
 
-Dispatch-Log für Scene `6490729c…` (gestern 23:59):
+### Trigger A — Erfolgs-Pfad (der jetzt sichtbare Fall)
+`supabase/functions/compose-clip-webhook/index.ts`, Zeile 158-181:
 
-- `model: sync-3`, `sync_mode: loop`, `bounding_boxes_url` gesetzt — Payload ist doc-strict für sync-3, also nicht das Problem.
-- Audio: **8.0s WAV, voiced_end 6.8s → 1.2s trailing silence**.
-- Sync.so antwortet: *"Something went wrong while processing this generation."* (`generation_unknown_error`).
+```ts
+const staleHappyHorseLabel =
+  String(preUpdateScene?.clip_source ?? '') === 'ai-happyhorse';
+...
+if (isCinematicSync) {
+  if (staleHappyHorseLabel) sceneUpdate.clip_source = 'ai-hailuo'; // ← Bug
+  ...
+}
+```
 
-Das ist **exakt der Failure-Mode den v64 dokumentiert hat** und damals durch Tight-Slice gefixt wurde:
+Der Kommentar darüber sagt *"legacy / stale from before the Stage 2 hotfix"* — das stimmt seit v174 nicht mehr. HappyHorse **ist** jetzt eine legitime Cinematic-Sync-Master-Plate (Zeile 3092-3214 in `compose-video-clips`). Damit relabelt der Webhook bei **jedem** erfolgreichen HH-Cinematic-Sync-Render `clip_source` auf `ai-hailuo` — UI zeigt Hailuo, Lip-Sync läuft auf der HH-Plate.
 
-> v64 Kommentar (jetzt entfernt): *"Sync.so reproducibly throws `provider_unknown_error` when the per-speaker WAV is mostly trailing silence (the 1-speaker case where speech is e.g. 0–2.2s on a 10s plate). Slicing to the voiced window matches the N≥2 success path."*
+Beweis aus DB: jüngste „ready"-Szene `7f04d44c…` zeigt `clip_source=ai-hailuo`, `engine_override=cinematic-sync`, `lip_sync_status=done` — exakt das Symptom, das du siehst.
 
-## Was sich geändert hat (Regression)
+### Trigger B — Fail-Pfad (Green-Net)
+Zeile 498-510: wenn Alibaba die HH-Generierung mit `DataInspectionFailed` ablehnt, switched der Webhook `clip_source` automatisch auf `ai-hailuo`, damit der nächste „Neu rendern"-Klick HH umgeht. Auch das überschreibt deine Provider-Wahl ohne Rückfrage.
 
-`v169` (Tail-Talk-Fix) hat in `compose-dialog-segments/index.ts` ZWEI Dinge gemacht:
+## v176 — Silent-Hailuo-Migration im Webhook entfernen
 
-1. **Tight-Slice für N=1 abgeschaltet** (`allowTightSlice = passes.length >= 2`). → genau der Code-Pfad den v64 als Voraussetzung gegen `provider_unknown_error` markiert hatte.
-2. Overlay-Mode für N=1 in `render-sync-segments-audio-mux` deaktiviert (single-audio-swap).
+### 1. `compose-clip-webhook/index.ts` Zeile 165-177 (Trigger A)
 
-Punkt 1 ist die Ursache des aktuellen Fehlers. v172 hatte Tight-Slice für N=1 noch an — deshalb lief es.
+```ts
+// VORHER
+const staleHappyHorseLabel =
+  String((preUpdateScene as any)?.clip_source ?? '') === 'ai-happyhorse';
+...
+if (isCinematicSync) {
+  if (staleHappyHorseLabel) sceneUpdate.clip_source = 'ai-hailuo';
+  sceneUpdate.lip_sync_status = 'pending';
+  sceneUpdate.twoshot_stage = 'master_clip';
+}
 
-Tail-Talk (der Grund für v169) kam aber NICHT primär aus Tight-Slice, sondern aus **v167's Plate-Prompt-Erweiterung** *"speaking naturally with subtle idle mouth and jaw motion"* in `compose-video-clips`. Mit Idle-Mouth-Motion in der Hailuo-Plate UND Overlay-Mode wurde nach dem Sprech-Fenster die pristine Plate mit bewegtem Mund sichtbar.
+// NACHHER (v176 — respect user provider, HH ist legitime Master-Plate)
+if (isCinematicSync) {
+  sceneUpdate.lip_sync_status = 'pending';
+  sceneUpdate.twoshot_stage = 'master_clip';
+  // clip_source bleibt unverändert — ai-happyhorse ist seit v174 valider Master.
+}
+```
 
-## Fix
+### 2. `compose-clip-webhook/index.ts` Zeile 498-527 (Trigger B)
 
-Drei chirurgische Änderungen, alles andere bleibt:
+Green-Net-Rejection darf den Provider nicht still wechseln. Stattdessen:
+- `clip_source` bleibt auf `ai-happyhorse`
+- Fehlertext wird klar & aktionsorientiert: `"happyhorse_content_filter: Alibaba hat den Prompt blockiert. Schreibe ihn um oder wechsle den Provider manuell im Provider-Dropdown auf Hailuo. (HappyHorse wurde NICHT automatisch umgestellt — deine Auswahl bleibt erhalten.)"`
+- Refund läuft wie bisher
 
-### A) `supabase/functions/compose-dialog-segments/index.ts` — Tight-Slice für N=1 wieder an
+```ts
+// Entfernen: ...(isGreenNet ? { clip_source: 'ai-hailuo' } : {})
+// Tagged-Error bleibt als [green_net_rejected]-Marker erhalten, damit die UI
+// den Banner "Provider manuell wechseln?" anzeigen kann.
+```
 
-`allowTightSlice = passes.length >= 1` (statt `>= 2`). Das ist die direkte v64-Logik. WAV wird auf voiced-Window getrimmt (z.B. 0.1–6.8s statt 0–8s) → kein trailing-silence-Mismatch mehr → Sync.so akzeptiert wieder.
+### 3. UI-Banner für `[green_net_rejected]` (optional, klein)
 
-Das v169.1 Preflight-Gate (`prepare_failed_no_tight_audio`) bleibt 1:1 wie zuletzt gepatcht — es feuert dann automatisch wieder ab N≥1.
+`src/components/video-composer/SceneCard.tsx` zeigt bereits `clip_error`. Erweitern um einen Hint-Button „Auf Hailuo wechseln" wenn der Error mit `[green_net_rejected]` beginnt — dann ist der Provider-Switch **explizit** vom Nutzer initiiert, nicht still vom System.
 
-### B) `supabase/functions/compose-video-clips/index.ts` — v167 Idle-Mouth-Motion für N=1 entfernen
+### 4. Memory aktualisieren
 
-Den v167-Suffix *"speaking naturally with subtle idle mouth and jaw motion"* aus dem N=1 Plate-Prompt streichen und stattdessen *"natural closed-mouth idle, mouth opens only when speaking, subtle micro-expressions"* setzen.
-
-Sync-3 hat built-in obstruction/face-recovery — es braucht keine vorbewegten Lippen auf der Plate, um zu animieren. Mit Closed-Mouth-Plate in der Stille bleibt nach dem Sprechfenster der Mund visuell geschlossen → Tail-Talk weg, auch im Overlay-Mode.
-
-### C) `supabase/functions/render-sync-segments-audio-mux/index.ts` — Overlay-Mode für N=1 wieder erlauben
-
-Den v169 N=1-Bypass (`isSingleSpeaker → useOverlay=false`) zurücknehmen. Mit (A)+(B) ist die Plate jetzt closed-mouth außerhalb des Sprechfensters → Overlay-Mode (Sync-Clip nur im Speaker-Window, sonst pristine Plate) produziert kein Tail-Talk mehr und ist symmetrisch zum N≥2-Pfad.
-
-### D) Memory-Update
-
-`mem/architecture/lipsync/v169-n1-tail-talk-fix.md` → ersetzen durch `v175-n1-unknown-error-fix.md`:
-
-> Invariante: N=1 Cinematic-Sync verwendet Tight-Slice + Overlay-Mode wie N≥2. Tail-Talk wird verhindert durch closed-mouth Idle in der Hailuo-Plate (compose-video-clips), nicht durch Disablen von Tight/Overlay. v64-Provider-Stop-Loss bleibt damit aktiv.
+`mem/architecture/lipsync/` neue Notiz `v176-no-silent-hailuo-migration.md`:
+> Silent `clip_source` rewrites von `ai-happyhorse` → `ai-hailuo` sind in **keiner** Edge Function mehr erlaubt (weder `compose-video-clips` v174 noch `compose-clip-webhook` v176). Green-Net-Rejections und stale-Label-Normalisierung müssen den Provider unverändert lassen; ein Wechsel braucht einen expliziten Nutzer-Klick.
 
 ## Was unverändert bleibt
 
-- v168 Anti-Clone Anchor-Lock (N=1 darf nicht 3× Samuel sein)
-- v170 Cast-Integrity Audit (Bystanders erlaubt)
-- v174 Respect-User-Provider (HappyHorse migriert nicht still auf Hailuo)
-- v131.6 Face-Lock, v77/v78 Plate-Face-Targeting
-- Refund / Watchdog / Webhook / ASD-Builder
+- v174 Respect-User-Provider in `compose-video-clips` (kein Re-Map)
+- v175 N=1 Tight-Slice + Overlay
+- v168 Anti-Clone, v170 Cast-Integrity
+- Refund-Logik (Green-Net-Refund läuft genauso)
+- Sora→Veo und Pika→Hailuo Sunset/Maintenance-Migrationen (das sind echte EOL-Provider, kein User-Override-Konflikt)
 
 ## Verifikation
 
-1. Trigger "🎥 Clip + Lip-Sync neu rendern" auf Scene 1 (`6490729c…`).
-2. Dispatch-Log: `tight_audio_dur_sec ≈ voiced_sec` (z.B. 6.7s statt 8.0s), `tight_audio_url` gesetzt, `payloadSyncMode='cut_off'`.
-3. Sync.so callback: `status=completed`, kein `generation_unknown_error`.
-4. Final Clip: Lippen synchron, am Sprech-Ende geschlossen, kein sichtbares Mund-Wackeln in der Stille.
-5. N=2 Regression: weiter wie gehabt (Tight-Slice + Overlay-Mux unverändert).
-
-## Deploy
-
-`compose-dialog-segments`, `compose-video-clips`, `render-sync-segments-audio-mux` neu deployen. Frontend unverändert.
+1. Neue HH-Cinematic-Sync-Szene rendern → DB-Row behält `clip_source='ai-happyhorse'` auch nach `clip_status='ready'`.
+2. UI im Storyboard zeigt HappyHorse-Badge statt Hailuo.
+3. Green-Net-Trigger (z.B. „3 AM Moment"-Prompt) → `clip_status='failed'`, `clip_source` bleibt `ai-happyhorse`, Banner verlinkt manuellen Wechsel.

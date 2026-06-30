@@ -162,8 +162,6 @@ serve(async (req) => {
         .maybeSingle();
       const isCinematicSync =
         String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
-      const staleHappyHorseLabel =
-        String((preUpdateScene as any)?.clip_source ?? '') === 'ai-happyhorse';
       const sceneUpdate: Record<string, unknown> = {
         clip_url: permanentUrl,
         clip_status: 'ready',
@@ -171,7 +169,14 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       };
       if (isCinematicSync) {
-        if (staleHappyHorseLabel) sceneUpdate.clip_source = 'ai-hailuo';
+        // v176 (Jun 30 2026) — RESPECT USER PROVIDER.
+        // Previously: if clip_source === 'ai-happyhorse', we silently rewrote
+        // it to 'ai-hailuo' here under the legacy assumption that HH could
+        // not serve as a Cinematic-Sync master plate. Since v174 HH IS a
+        // valid master plate (compose-video-clips L3092+), so the rewrite
+        // overrode every successful HH render and the UI lied "Hailuo".
+        // clip_source is now left untouched — the provider the user picked
+        // is the provider we report.
         sceneUpdate.lip_sync_status = 'pending';
         sceneUpdate.twoshot_stage = 'master_clip';
       }
