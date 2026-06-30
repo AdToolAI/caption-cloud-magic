@@ -1,68 +1,81 @@
-# Stand heute (ehrlich)
+## Diagnose
+Der Screenshot zeigt nicht primär ein neues UI-Problem, sondern eine Lücke im Location-ID-Vertrag:
 
-Das Catalog-ID-System ist **teilweise** integriert, aber noch **nicht vollständig verdrahtet**:
+- `home-office` wird als Location-Mention erkannt.
+- Der Backend-Resolver prüft aber nur `brand_locations` per `user_id`.
+- Die Frontend-Liste nutzt zusätzlich Katalog-/World-Locations (`catalog:location:...`) aus der auswählbaren Liste.
+- Dadurch kann eine Location in der UI sichtbar sein, aber im Briefing-Plan trotzdem als „nicht in der Bibliothek gefunden“ markiert werden.
+- Zusätzlich löst der Auto-Resolve-Button aktuell nur Cast, nicht Locations.
 
-| Ebene | Status |
-|---|---|
-| Catalog-Registry (`src/lib/video-composer/catalog/index.ts`) | ✅ vorhanden |
-| Pass-C Resolver im Parser (`briefing-deep-parse`) | ✅ produziert `mimicId/gestureId/gazeId/framingId/angleId/movementId/lightingId/stylePresetId` |
-| Apply-Hook (`useApplyProductionPlan`) | ✅ persistiert Shadow-Fields 1:1 |
-| Briefing-Plan-Review (`ProductionPlanSheet`) | ✅ zeigt `CatalogChip` mit ⚡-Badge |
-| **Storyboard-Editor `ScenePerformancePanel`** | ❌ liest/schreibt weiterhin Free-Text (`mimic`, `gesture`, `gaze`) — kein ID-Binding |
-| **Storyboard-Editor `SceneShotDirectorPanel`** | ❌ nutzt legacy `ShotSelection` über `@/config/shotDirector`, keine `catalog:*` IDs |
-| **`SceneCard` Storyboard-Anzeige** | ❌ keine `useCatalogLabel`-Auflösung; zeigt Free-Text |
-| Telemetrie `parser_meta.catalog_resolution` | ✅ vorhanden |
-| Telemetrie `apply-plan catalog_ids_persisted` | ✅ |
-| PostHog `composer_catalog_id_select` | ❌ noch nicht emitted |
+## Plan: v179 — Location ID Contract schließen
 
-Konsequenz: IDs sind heute reine **Lese-Spiegel im Briefing-Sheet**. Sobald der User im Storyboard etwas ändert, geht die ID verloren (Free-Text überschreibt). Drift zwischen Briefing-Plan und Szene kann wieder entstehen.
+### 1. Einheitlichen Location-Normalizer einführen
+Ich erstelle/verwende eine zentrale Normalisierung für Location-Namen und IDs:
 
-# Was Wave 3.1 macht (Mapping/UI-only)
+```text
+@Home Office
+home-office
+Home_Office
+catalog:location:<uuid>
+<uuid>
+```
 
-Strikt UI — **kein** Eingriff in `compose-*`, `render-*`, `poll-dialog-shots`, `sync-so-*`, `dialog_shots`, `composer_scenes.dialog_voices`, `character_voice_id`. v169.1 / v174 / v175 / v176 / v178 Invarianten unangetastet.
+werden deterministisch auf denselben Match-Key gebracht.
 
-## 1) `ScenePerformancePanel.tsx`
-- Dropdown-`value` an `scene.mimicId / gestureId / gazeId` binden (Fallback: Free-Text→ID via `CATALOG_REGISTRY` Label-Match).
-- `onChange` schreibt **beide**: `*Id` (Catalog-Slug) und `*` (Free-Text aus Registry-Label) → Render-Prompt bleibt bit-identisch.
-- 3-State-Chip: `⚡ AI` (Pass-C), `manuell` (User-Edit), `leer`.
-- Optionen-Quelle: `CATALOG_REGISTRY.mimic/gesture/gaze` (sortiert nach `order`).
+### 2. Backend-Resolver erweitert auf Katalog-Locations
+In `briefing-deep-parse` wird der Location-Snapshot erweitert:
 
-## 2) `SceneShotDirectorPanel.tsx`
-- 5 Achsen (Framing/Angle/Movement/Lighting/Lens) auf Catalog-IDs umstellen.
-- Mapping-Tabelle legacy `ShotSelection` ↔ `catalog:framing|angle|movement|lighting|lens:<slug>` in einer kleinen Adapter-Datei `src/config/shotDirectorCatalogAdapter.ts` (eine Datei, ein Map-Objekt, keine Logik-Änderung am ShotDirector selbst).
-- Free-Text-Spiegel weiterhin synchron schreiben (`shotDirector.framing` etc.) → Prompt-Composer (`composePromptLayers`) unverändert.
+- weiterhin persönliche Locations aus `brand_locations`
+- zusätzlich verfügbare World-/Catalog-Locations aus `location_catalog_previews`
+- IDs sauber als `catalog:location:<uuid>` markieren
+- Resolver darf dann entweder echte Library-UUIDs oder `catalog:location:*` zurückgeben
 
-## 3) `SceneCard.tsx`
-- Neue Helper-Spalte „Achsen": kompakte `CatalogChip`-Reihe (Mimik · Gestik · Blick · Shot) via `useCatalogLabel`.
-- Fallback auf Free-Text wenn ID fehlt.
+Wichtig: Das betrifft nur Briefing-Analyse/Plan-Erstellung, nicht Lip-Sync oder Render-Pipeline.
 
-## 4) `useApplyProductionPlan.ts`
-- `stripPrefix` whitelistet jetzt explizit `catalog:character|outfit|location:<uuid>` → wird auf UUID reduziert.
-- `catalog:mimic|gesture|gaze|framing|angle|movement|lighting|lens|style_preset:<slug>` → **1:1 erhalten** (kein Strip).
-- Hydration: vor DB-Insert Free-Text-Spiegel-Felder aus `CATALOG_REGISTRY` neu setzen, falls `*Id` vorhanden aber Free-Text leer → garantiert konsistente Prompts.
+### 3. Plan-Validation darf Catalog-Location-IDs akzeptieren
+Die aktuelle Warnlogik behandelt nicht aufgelöste `locationId` als Fehler. Ich passe sie so an:
 
-## 5) PostHog
-- `composer_catalog_id_select { axis, id, source: 'ai'|'manual' }` aus den 3 Panels emitten.
+- echte UUID aus `brand_locations` = resolved
+- `catalog:location:<uuid>` aus Catalog-Snapshot = resolved
+- nur unbekannte Slugs bleiben Warnung
 
-## 6) Doku
-- `mem/architecture/video-composer/wave3-1-id-binding.md` mit der Adapter-Map und Invarianten-Checkliste.
+Damit verschwindet „Location home-office nicht gefunden“, wenn Home Office in der auswählbaren Liste existiert.
 
-# Garantien (Pipeline 0-Impact)
-- Prompt-Generierung (`composePromptLayers`, `compose-video-clips`, `compose-scene-anchor`) liest weiterhin **nur** Free-Text-Spiegel-Felder.
-- Keine Schreibzugriffe auf Render-/Lipsync-Tabellen.
-- Apply-Hook-Schutzfilter (rendered scenes) bleibt aktiv.
-- Catalog-Achsen werden nicht erweitert — nur sichtbar/persistent gemacht.
+### 4. ProductionPlanSheet Auto-Resolve für Locations ergänzen
+Der Button „Auto-Resolve“ soll nicht mehr nur Sprecher reparieren, sondern auch Locations:
 
-# Akzeptanz-Test
-1. Briefing „Samuel lacht herzlich" → Plan-Sheet: ⚡ `Mimik: Lächeln (warm)`. Apply → Storyboard ScenePerformancePanel zeigt selben Wert, ID `catalog:mimic:warm_smile` in DB.
-2. User wechselt im Editor auf „Konzentriert" → Chip `manuell`, DB-Update auf `catalog:mimic:focused`, Free-Text-Spiegel `mimic = "focused expression"`.
-3. Render-Klick → Prompt identisch zu heute. Lipsync-Pipeline läuft durch.
-4. Re-Apply auf gerenderte Szene → Schutzfilter greift, keine Überschreibung.
+- jede Szene mit `locationId === null` gegen `locOptions` matchen
+- exakter Slug-Match vor fuzzy Match
+- alle gleichen Mentions in Szene 1/2/3 gemeinsam aktualisieren
+- offene Punkte live entfernen
 
-# Nicht enthalten
-- Voice-Pool / Performance-Achsen erweitern
-- Catalog-Übersetzungen (DE/EN/ES) der Labels
-- Migration alter `composer_scenes` ohne IDs (Backfill optional in Wave 3.2)
+### 5. Dropdown-Value stabilisieren
+Im Review-Sheet wird geprüft, ob `s.location.locationId` wirklich in `locOptions` existiert:
 
-# Rollback
-Pro Datei isoliert revertierbar (5 Dateien). Bei Issues: Bindings auf Free-Text zurück, Registry bleibt als Shadow.
+- wenn ja: Dropdown zeigt die Location korrekt ausgewählt
+- wenn nein: Wert bleibt leer und Warnung bleibt sichtbar
+- verhindert tote IDs, die nicht auswählbar sind
+
+### 6. Apply-Hook schützt Catalog-IDs korrekt
+Beim Übernehmen ins Storyboard:
+
+- `mentionedLocationIds` speichert echte UUIDs weiterhin als UUID
+- Catalog-Locations bleiben als `catalog:location:<uuid>` erhalten, statt durch UUID-Filter verloren zu gehen
+- Prompt-/Render-Pipeline bleibt unverändert, nur Metadaten werden sauberer
+
+### 7. Kurzer Smoke-Test-Pfad
+Nach Umsetzung prüfe ich per Codepfad:
+
+```text
+Briefing: Location @home-office
+Plan: location.locationId = catalog:location:<uuid> oder echte UUID
+Review-Sheet: Dropdown zeigt Home Office
+Offene Punkte: keine location.locationId-Warnung mehr
+Apply: Szene behält mentionedLocationIds
+```
+
+## Nicht angefasst
+- keine Änderungen an Sync.so / Lip-Sync
+- keine Änderungen an HappyHorse/Hailuo Providerlogik
+- keine Render- oder Clip-Tab-Änderungen
+- keine Datenbank-Schemaänderung nötig
