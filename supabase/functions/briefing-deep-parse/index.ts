@@ -780,7 +780,20 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       engine,
       lipSync: s.lipSync === true
         || ['cinematic-sync','sync-polish','sync-segments','native-dialogue','heygen'].includes(engine),
-      voiceover: s.voiceover,
+      voiceover: (() => {
+        // v177.1 — Clamp voiceover timecodes to scene duration to avoid
+        // cosmetic "VO endet nach Szene" warnings from purely model-rounding.
+        const vo: any = s.voiceover;
+        if (!vo || typeof vo !== 'object') return vo;
+        const out = { ...vo };
+        if (Number.isFinite(Number(out.timecodeStartSec))) {
+          out.timecodeStartSec = Math.max(0, Math.min(Number(out.timecodeStartSec), durationSec));
+        }
+        if (Number.isFinite(Number(out.timecodeEndSec))) {
+          out.timecodeEndSec = Math.max(0, Math.min(Number(out.timecodeEndSec), durationSec));
+        }
+        return out;
+      })(),
       cast,
       location,
       shotDirector: s.shotDirector,

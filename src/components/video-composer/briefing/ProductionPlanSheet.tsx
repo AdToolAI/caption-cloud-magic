@@ -17,8 +17,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, CheckCircle2, FileText, Loader2, Shield, Sparkles, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Loader2, Plus, Shield, Sparkles, Wand2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
@@ -73,8 +74,10 @@ export default function ProductionPlanSheet({
   const [progress, setProgress] = useState<'A' | 'B' | null>(null);
   const [progressLabel, setProgressLabel] = useState('');
   const { characters, locations } = useUnifiedMentionLibrary();
+  const queryClient = useQueryClient();
   const applyPlan = useApplyProductionPlan();
   const [applying, setApplying] = useState(false);
+  const [creatingLoc, setCreatingLoc] = useState<number | null>(null);
   const [applyResult, setApplyResult] = useState<{
     ok: boolean;
     message: string;
@@ -391,6 +394,43 @@ export default function ProductionPlanSheet({
         };
       }),
     });
+  };
+
+  /**
+   * v177.1 — Quick-create a stub Location in `brand_locations` when the
+   * briefing mentions a location the library does not yet contain. Uses a
+   * placeholder reference image so the row satisfies the NOT NULL constraint;
+   * the user can re-shoot the reference in the Location library later.
+   */
+  const quickCreateLocation = async (sceneIndex: number, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCreatingLoc(sceneIndex);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) throw new Error('Not authenticated');
+      const placeholder = `https://placehold.co/1024x576/050816/F5C76A?text=${encodeURIComponent(trimmed)}`;
+      const { data: row, error } = await supabase
+        .from('brand_locations' as any)
+        .insert({
+          user_id: auth.user.id,
+          name: trimmed,
+          description: `Stub angelegt aus Briefing — Referenzbild später ersetzen.`,
+          reference_image_url: placeholder,
+          tags: ['briefing-stub'],
+        })
+        .select('id, name')
+        .single();
+      if (error) throw error;
+      const created = row as unknown as { id: string; name: string };
+      await queryClient.invalidateQueries({ queryKey: ['brand-locations'] });
+      updateSceneLocation(sceneIndex, created.id);
+      toast({ title: 'Location angelegt', description: `„${created.name}" ist jetzt in der Library.` });
+    } catch (e: any) {
+      toast({ title: 'Konnte Location nicht anlegen', description: e?.message || 'Unbekannter Fehler', variant: 'destructive' });
+    } finally {
+      setCreatingLoc(null);
+    }
   };
 
   const totalPlanSec = useMemo(
@@ -897,6 +937,23 @@ export default function ProductionPlanSheet({
                                 ))}
                               </SelectContent>
                             </Select>
+                            {!s.location.locationId && s.location.mentionKey && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[10px] gap-1 whitespace-nowrap"
+                                disabled={creatingLoc === s.index}
+                                onClick={() => quickCreateLocation(s.index, s.location!.locationName || s.location!.mentionKey)}
+                                title="Als neue Location in der Library speichern"
+                              >
+                                {creatingLoc === s.index ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Plus className="h-3 w-3" />
+                                )}
+                                Anlegen
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
