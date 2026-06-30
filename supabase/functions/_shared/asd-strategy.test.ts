@@ -443,4 +443,51 @@ Deno.test("v131.5 — coords-pro + clean single-face preclip → auto_detect wit
 });
 
 
+Deno.test("Rule 4 v181 — N=1 with plateFaceCount>=2 and cast box → single_face_bbox_strict", () => {
+  // Simulate a Rule-4-eligible state: usePreclip=false (v153 unified path),
+  // single speaker, plate has 2 faces (cast + phone screen), cast box known.
+  const r = buildAsdStrategy(
+    input({
+      usePreclip: false,
+      isMultiSpeaker: false,
+      geometry: {
+        ...baseGeometry,
+        preclipFaceCount: null,
+        preclipAmbiguityRisk: null,
+        plateFaceCount: 2,
+        castSpeakerPlateBox: [120, 200, 360, 520],
+      },
+    }),
+  );
+  assertEquals(r.mode, "single_face_bbox_strict");
+  const asd: any = r.asd;
+  assertEquals(asd.auto_detect, false);
+  assert(Array.isArray(asd.bounding_boxes));
+  assertEquals(asd.bounding_boxes.length, 1);
+  assertEquals(asd.bounding_boxes[0], [120, 200, 360, 520]);
+  // Must NOT carry coordinates / frame_number with auto_detect:false bbox path
+  assert(!("coordinates" in asd));
+  assert(!("frame_number" in asd));
+  assertEquals(r.diagnostics.v181_n1_depicted_face_lock, true);
+});
+
+Deno.test("Rule 4 v181 — N=1 with plateFaceCount=1 → unchanged single_face_auto", () => {
+  const r = buildAsdStrategy(
+    input({
+      usePreclip: true,
+      isMultiSpeaker: false,
+      geometry: {
+        ...baseGeometry,
+        plateFaceCount: 1,
+        castSpeakerPlateBox: [120, 200, 360, 520],
+      },
+    }),
+  );
+  // Rule 0 will fire first on clean preclip; either way must NOT be strict bbox.
+  assert(r.mode !== "single_face_bbox_strict");
+  assertEquals((r.asd as any).auto_detect, true);
+});
+
+
+
 
