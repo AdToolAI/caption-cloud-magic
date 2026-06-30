@@ -1341,6 +1341,7 @@ This overrides any English wording in the briefing's scaffolding
             passA_error: passAError,
             passA_diagnostics: passADiagnostics,
             passB_diagnostics: passBDiagnostics,
+            scene_count_corrected: sceneCountCorrection,
           },
         });
       if (insErr) {
