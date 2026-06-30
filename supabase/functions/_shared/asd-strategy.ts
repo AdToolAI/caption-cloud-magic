@@ -100,6 +100,15 @@ export interface PassGeometry {
   prebuiltBoundingBoxesUrl?: string;
   /** Inline per-frame bounding boxes (graceful-degrade fallback for Rule 2). */
   prebuiltBoundingBoxes?: ([number, number, number, number] | null)[];
+  /** v181 — Total number of distinct faces detected in the FULL plate
+   *  (not just the preclip). Used by Rule 4 to detect "depicted faces"
+   *  in N=1 scenes (phone screen, photo on wall, mirror, background
+   *  person). When ≥2 and N=1, we force a strict bounding_boxes lock
+   *  on the cast speaker box so Sync.so cannot wander to the wrong face. */
+  plateFaceCount?: number | null;
+  /** v181 — Plate-native face bbox of the cast speaker (px, plate space).
+   *  Required for the `single_face_bbox_strict` lock. */
+  castSpeakerPlateBox?: [number, number, number, number] | null;
 }
 
 
