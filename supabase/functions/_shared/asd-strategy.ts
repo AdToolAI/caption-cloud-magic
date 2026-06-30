@@ -39,6 +39,7 @@ export type AsdMode =
   | "bbox_url"
   | "preclip_coord_strict"
   | "single_face_auto"
+  | "single_face_bbox_strict"
   | "last_resort_auto";
 
 export type AsdCoord = [number, number];
