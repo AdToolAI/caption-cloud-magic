@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -156,6 +157,47 @@ export default function ProductionPlanSheet({
     }
     return map;
   }, [outfitMentions]);
+
+  // v178 Wave 2 — DB fallback for outfit look names.
+  // When the unified mention library is still warming up (or the look was
+  // saved after the last library refresh), the Sheet would otherwise label
+  // the outfit "Standard-Look" / "Unbenannter Look". Pull names directly
+  // from `avatar_outfit_looks` once and merge into the lookup map below.
+  const outfitLookIdsInPlan = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of plan?.scenes ?? []) {
+      for (const c of (s.cast ?? [])) {
+        if (c.outfitLookId) set.add(c.outfitLookId);
+      }
+    }
+    return Array.from(set);
+  }, [plan]);
+  const { data: dbOutfitLooks = [] } = useQuery({
+    queryKey: ['avatar-outfit-looks-by-plan', outfitLookIdsInPlan.sort().join(',')],
+    enabled: outfitLookIdsInPlan.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('avatar_outfit_looks')
+        .select('id, name, avatar_id')
+        .in('id', outfitLookIdsInPlan);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; avatar_id: string }>;
+    },
+    staleTime: 60_000,
+  });
+  const outfitLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    // Library mentions first.
+    for (const [lookId, info] of outfitById) {
+      if (info.name && info.name !== 'Standard-Look') map.set(lookId, info.name);
+    }
+    // DB fallback wins for explicit names (avoids "Standard-Look" flicker).
+    for (const row of dbOutfitLooks) {
+      const trimmed = String(row?.name ?? '').trim();
+      if (row?.id && trimmed) map.set(row.id, trimmed);
+    }
+    return map;
+  }, [outfitById, dbOutfitLooks]);
 
   /** Resolve any raw cast id (legacy `outfit:` or base UUID) to base + look. */
   const splitCastId = (rawId: string | null | undefined): { baseId: string | null; outfitLookId: string | null } => {
@@ -424,8 +466,40 @@ export default function ProductionPlanSheet({
       if (error) throw error;
       const created = row as unknown as { id: string; name: string };
       await queryClient.invalidateQueries({ queryKey: ['brand-locations'] });
-      updateSceneLocation(sceneIndex, created.id);
-      toast({ title: 'Location angelegt', description: `„${created.name}" ist jetzt in der Library.` });
+
+      // v178 Wave 2 — fan out the resolved locationId to ALL scenes that
+      // reference the same mention/name. Without this every scene with
+      // the same "@Home Office" would need its own quick-create click.
+      const normalize = (s: string) =>
+        String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
+      const trigger = plan?.scenes.find((s) => s.index === sceneIndex);
+      const triggerKey = normalize(
+        trigger?.location?.mentionKey ?? trigger?.location?.locationName ?? trimmed,
+      );
+      let matched = 0;
+      setPlan((p) =>
+        p && {
+          ...p,
+          scenes: p.scenes.map((s) => {
+            if (!s.location) return s;
+            const key = normalize(s.location.mentionKey ?? s.location.locationName ?? '');
+            if (s.index === sceneIndex || key === triggerKey) {
+              matched += 1;
+              return {
+                ...s,
+                location: { ...s.location, locationId: created.id, locationName: created.name },
+              };
+            }
+            return s;
+          }),
+        },
+      );
+      toast({
+        title: 'Location angelegt',
+        description: matched > 1
+          ? `„${created.name}" — für ${matched} Szenen übernommen.`
+          : `„${created.name}" ist jetzt in der Library.`,
+      });
     } catch (e: any) {
       toast({ title: 'Konnte Location nicht anlegen', description: e?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
@@ -861,11 +935,17 @@ export default function ProductionPlanSheet({
                             // Ensure the selected look is always a valid
                             // option in the dropdown — even if the library
                             // hasn't loaded it under this avatar yet.
-                            const merged = [...fromCharacter];
+                            // v178 Wave 2 — prefer DB-backed name over mention label.
+                            const stableName = (id: string, fallback?: string) =>
+                              outfitLabelById.get(id) ?? fallback ?? 'Gespeicherter Look';
+                            const merged = fromCharacter.map((o) => ({
+                              lookId: o.lookId,
+                              name: stableName(o.lookId, o.name),
+                            }));
                             if (outfitId && !merged.some((o) => o.lookId === outfitId)) {
                               merged.push({
                                 lookId: outfitId,
-                                name: lookHit?.name ?? 'Gespeicherter Look',
+                                name: stableName(outfitId, lookHit?.name),
                               });
                             }
                             const showOutfitPicker = !!baseId && merged.length > 0;

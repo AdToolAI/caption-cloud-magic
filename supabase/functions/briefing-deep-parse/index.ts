@@ -1074,17 +1074,47 @@ This overrides any English wording in the briefing's scaffolding
             // Truncate keep first N
             manifest.scenes = manifest.scenes.slice(0, detected);
           } else {
-            // Pad: clone last scene shape with new index/beat
+            // v178 Wave 2 — Slot inheritance on pad.
+            // Find a template scene (last scene with non-empty cast, else
+            // first scene, else empty). Clone its cast/location/shotDirector/
+            // engine into every padded scene so ProductionPlanSheet and
+            // SceneCard render the same Sprecher/Outfit/Location dropdowns
+            // for ALL scenes — never empty {engine:'broll'} skeletons.
             const beatRing = ['Hook', 'Pain', 'Reveal', 'Proof', 'CTA'];
+            const template =
+              [...manifest.scenes].reverse().find((x: any) => Array.isArray(x?.cast) && x.cast.length > 0)
+              ?? manifest.scenes[0]
+              ?? {};
+            const cloneCast = (cast: any[] | undefined) =>
+              Array.isArray(cast)
+                ? cast.map((c: any) => ({
+                    mentionKey: c?.mentionKey,
+                    outfit: c?.outfit,
+                    // strip per-turn fields so the padded scene is editable
+                  }))
+                : undefined;
+            const cloneLocation = (loc: any) =>
+              loc && typeof loc === 'object' && loc.mentionKey
+                ? { mentionKey: loc.mentionKey }
+                : undefined;
             while (manifest.scenes.length < detected) {
               const i = manifest.scenes.length;
-              manifest.scenes.push({
+              const padded: any = {
                 index: i + 1,
                 label: beatRing[i % beatRing.length],
                 beat: beatRing[i % beatRing.length],
                 durationSec: perScene,
-                engine: 'broll',
-              });
+                engine: template.engine ?? 'broll',
+                cast: cloneCast(template.cast),
+                location: cloneLocation(template.location),
+                shotDirector: template.shotDirector ? { ...template.shotDirector } : undefined,
+                _meta: { aiFilled: ['padded_from_template'] },
+              };
+              // Drop undefined keys so downstream `stripUndef` stays clean.
+              if (!padded.cast) delete padded.cast;
+              if (!padded.location) delete padded.location;
+              if (!padded.shotDirector) delete padded.shotDirector;
+              manifest.scenes.push(padded);
             }
           }
           // Redistribute durations + reindex
@@ -1268,15 +1298,47 @@ This overrides any English wording in the briefing's scaffolding
       // "@home-office" even though the library carries "Home Office".
       // Substring-match both directions via normalizeMention.
       const resolvedLocationIndexes = new Set<number>();
+      const UUID_RE_LOC = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+      const locStats = { viaSlug: 0, viaSubstring: 0, viaCatalogUuid: 0, stillUnresolved: 0 };
       for (const sc of plan.scenes ?? []) {
         const loc = sc?.location;
-        if (loc && !loc.locationId) {
-          const needle = normalizeMention(loc.mentionKey ?? loc.locationName ?? '');
+        if (!loc) continue;
+        // (c) Catalog multi-segment id like "catalog:location:<uuid>" or
+        // any string that already carries a UUID — extract & verify against
+        // the user's library so the Sheet dropdown actually matches.
+        if (loc.locationId && typeof loc.locationId === 'string' && loc.locationId.includes(':')) {
+          const m = loc.locationId.match(UUID_RE_LOC);
+          if (m) {
+            const hit = locations.find((l: any) => String(l.id) === m[0]);
+            if (hit) {
+              loc.locationId = hit.id;
+              loc.locationName = hit.name;
+              resolvedLocationIndexes.add(sc.index);
+              locStats.viaCatalogUuid += 1;
+              continue;
+            } else {
+              // UUID didn't match user library → null it out so the UI
+              // can offer "Als Location speichern" instead of a dead id.
+              loc.locationId = null;
+            }
+          }
+        }
+        if (!loc.locationId) {
+          const rawMention = String(loc.mentionKey ?? loc.locationName ?? '');
+          const needle = normalizeMention(rawMention);
           if (needle) {
-            const hit = locations.find((l: any) => {
-              const n = normalizeMention(l.name);
-              return n && (n.includes(needle) || needle.includes(n));
-            });
+            // (a) exact slug match
+            let hit = locations.find((l: any) => normalizeMention(l.name) === needle);
+            if (hit) {
+              locStats.viaSlug += 1;
+            } else {
+              // (b) substring both directions
+              hit = locations.find((l: any) => {
+                const n = normalizeMention(l.name);
+                return n && (n.includes(needle) || needle.includes(n));
+              });
+              if (hit) locStats.viaSubstring += 1;
+            }
             if (hit) {
               loc.locationId = hit.id;
               loc.locationName = hit.name;
@@ -1284,14 +1346,18 @@ This overrides any English wording in the briefing's scaffolding
               console.log('[briefing-deep-parse] location_local_fill', {
                 scene: sc.index, mention: loc.mentionKey, resolved: hit.name,
               });
+            } else {
+              locStats.stillUnresolved += 1;
             }
           }
         }
       }
+      // expose to parser_meta via plan (read below when persisting)
+      (plan as any)._locationResolution = locStats;
       // Drop now-resolved entries from plan.unresolved
       if (resolvedLocationIndexes.size > 0 && Array.isArray(plan.unresolved)) {
         plan.unresolved = plan.unresolved.filter((u: any) => {
-          const m = String(u?.path ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
+          const m = String(u?.path ?? u?.field ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
           if (!m) return true;
           const arrIdx = parseInt(m[1], 10);
           // arrIdx is 0-based, scene.index is 1-based
@@ -1401,6 +1467,8 @@ This overrides any English wording in the briefing's scaffolding
           .maybeSingle();
         if (prev?.version) version = (prev.version as number) + 1;
       }
+      const locResolutionForMeta = (plan as any)._locationResolution ?? null;
+      try { delete (plan as any)._locationResolution; } catch { /* noop */ }
       const { error: insErr } = await supabase
         .from('composer_production_plans')
         .insert({
@@ -1423,6 +1491,7 @@ This overrides any English wording in the briefing's scaffolding
             catalog_resolved: passCStats.resolved,
             catalog_unresolved: passCStats.unresolved,
             catalog_unresolved_samples: passCStats.unresolvedSamples,
+            location_resolution: locResolutionForMeta,
           },
         });
       if (insErr) {

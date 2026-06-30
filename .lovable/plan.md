@@ -1,107 +1,68 @@
-# v178 — Universal ID Contract für alle wählbaren Achsen
 
-## Ziel
-Jede Wahl, die ein Kunde im Briefing oder Storyboard treffen kann, bekommt eine stabile, lesbare ID statt eines freien Textlabels. Der Parser, das UI und die Render-Pipeline arbeiten ausschließlich mit IDs — Labels sind nur noch Anzeige. Damit verschwinden die aktuellen Symptome (leeres Location-Feld, „Unbenannter Look", fehlende Mimik/Gestik) strukturell.
+# v178 Wave 2 — Briefing→Storyboard Mapping Persistence
 
-## Geltungsbereich der IDs
+Strikt auf den Mapping-Pfad beschränkt. **Keine Änderungen** an `compose-*`, `render-*`, `poll-dialog-shots`, `sync-so-*`, `dialog_shots`, `syncso_*`. v169.1 / v174 / v175 / v176 Invarianten bleiben unangetastet.
 
-Zwei Klassen — bewusst getrennt, damit nichts kollidiert:
+## Symptome heute
 
-1. **Library-IDs (dynamisch, pro Workspace, UUID)** — gehören in eine DB-Tabelle:
-   - `character` → `brand_characters.id`
-   - `outfit` → `avatar_outfit_looks.id`
-   - `location` → `brand_locations.id`
-   - `prop` → `brand_props.id`
-   - `building` → `brand_buildings.id`
-   - `voice` → ElevenLabs Voice ID (extern, behandelt wie Library-ID)
+1. Szene 2 & 3 zeigen keine Auswahlfelder für Sprecher / Outfit / Location — manchmal kommen sie, manchmal nicht.
+2. Location bleibt leer obwohl im Briefing "Location@Home Office" steht und "Home Office" in der Library liegt.
+3. Outfits zeigen mal `casual`, mal `Unbenannter Look`.
 
-2. **Catalog-IDs (statisch, global, slug)** — gehören in einen versionierten Katalog im Code:
-   - `mimik` (z. B. `mimik.confident`, `mimik.warm_smile`, `mimik.curious`)
-   - `gestik` (z. B. `gestik.open_palms`, `gestik.still`, `gestik.point_to_camera`)
-   - `blick` (z. B. `blick.to_camera`, `blick.away`, `blick.down`)
-   - `energy` (`energy.1` … `energy.5`)
-   - `framing` (`framing.wide`, `framing.medium`, `framing.medium_close_up`, `framing.close_up`, `framing.extreme_close_up`, `framing.establishing`)
-   - `angle` (`angle.eye_level`, `angle.low`, `angle.high`, `angle.dutch`, `angle.over_shoulder`)
-   - `movement` (`movement.static`, `movement.slow_push_in`, `movement.tracking`, `movement.handheld`, `movement.orbit`, …)
-   - `lighting` (`lighting.soft_window`, `lighting.golden_hour`, `lighting.neon`, `lighting.high_key`, `lighting.low_key`, …)
-   - `style_preset` (genau die 12 Cinematic Style Presets, die es schon im Toolkit gibt)
-   - `delivery` / `voice_tone` (`delivery.warm`, `delivery.urgent`, `delivery.calm`, …)
-   - `music_energy` (`music.low`, `music.mid`, `music.high`)
+## Root Causes
 
-Catalog-IDs sind **lowercase, snake_case, namespaced mit Punkt**, z. B. `framing.medium_close_up`. Jede ID hat:
-- `id`
-- `label_de`, `label_en`
-- `synonyms` (Mapping freie KI-Antworten → ID)
-- `engine_hint` (englischer Token, der direkt in den AI-Prompt geht)
+| # | Symptom | Ursache |
+|---|---|---|
+| 1 | Szene 2/3 ohne Slots | Scene-Count-Guard padded fehlende Szenen mit `{engine:'broll'}` ohne `cast[]` / `location` zu erben → SceneCard rendert keine Picker weil keine Slot-Templates existieren. |
+| 2 | Location leer trotz Match | Pass-B Fuzzy greift nur per Substring; Slug-Mentions (`home-office`, `@home_office`) und Catalog-IDs (`catalog:location:<uuid>`) werden nicht normalisiert. Quick-Create wirkt nur auf 1 Szene statt alle Szenen mit gleichem Mention. |
+| 3 | Outfit-Label flackert | Apply-Hook hydratisiert Outfit-Namen aus `mention.name` (raw briefing string) statt aus `avatar_outfit_looks.name`. Wenn der Look-Lookup fehlschlägt, fällt das Label auf "Unbenannter Look" zurück. |
 
-## Architektur
+## Patch (4 Dateien, ~ein gemeinsamer Commit)
 
-### 1. Zentrales Katalog-Modul
-**Neue Datei:** `src/lib/video-composer/catalog/index.ts`
+### 1) `supabase/functions/briefing-deep-parse/index.ts` — Slot-Inheritance beim Padding
+Im Scene-Count-Guard (Z. 1076–1088): statt leerer `{engine:'broll'}`-Stubs eine **Template-Szene** klonen.
+- Template = letzte Szene mit nicht-leerem `cast[]` (oder Szene 1 als Fallback).
+- Geklont werden: `cast` (deep copy, ohne `dialogText`/`voiceoverText`), `location`, `framing`/`shotDirector`-Defaults, `engine`.
+- Neue Felder pro Pad-Szene: eigener `index`, `beat` aus `beatRing`, leerer `voiceover.text` + leere `dialogTurns`, `_meta.aiFilled: ['padded_from_template']`.
+- So bekommt jede Pad-Szene garantiert mind. 1 Cast-Slot und 1 Location-Slot → ProductionPlanSheet **und** SceneCard rendern Dropdowns deterministisch.
 
-Exportiert für jede Achse einen `Record<ID, CatalogEntry>` und Helper:
-- `resolveCatalogId(axis, raw)` — Fuzzy/Synonym-Match auf eine ID. Fallback: `null`.
-- `getCatalogLabel(axis, id, lang)` — für UI.
-- `getCatalogPromptToken(axis, id)` — für Prompt-Komposition (immer englisch).
-- `listCatalog(axis)` — für Dropdowns.
+### 2) `supabase/functions/briefing-deep-parse/index.ts` — Location-Resolver härten
+Lokaler Fuzzy-Pass nach Pass-B (existierende Schleife) erweitern:
+- Normalisierung `normalizeMention(s)`: lowercase, `-`/`_`/Whitespace kollabieren, deutsche Umlaute entfalten.
+- Match-Reihenfolge: (a) exakter Slug, (b) Substring beidseitig, (c) Catalog-ID `catalog:location:<uuid>` → direkt resolven aus `locations`-Library via UUID, (d) Catalog-Slug aus `location_catalog_previews`.
+- Telemetrie: `parser_meta.location_resolution = { resolved: n, viaSlug, viaSubstring, viaCatalog, stillUnresolved }`.
 
-Single Source of Truth, getypt, lint-bar. Keine DB-Migration nötig.
+### 3) `src/hooks/useApplyProductionPlan.ts` — Persistenz hardening
+- `stripPrefix` bereits vorhanden; ergänzen um Catalog-Multi-Segment (`catalog:location:<uuid>`, `catalog:outfit:<uuid>`) mit UUID-Regex.
+- **Outfit-Label-Stabilisierung**: vor Persist `avatar_outfit_looks` (id, name, avatar_id) one-shot fetchen für alle `outfitLookId` der Plan-Szenen (eine Query, Map). Wenn `mention.name` leer / "Unbenannter Look" / unscharf → durch `look.name` ersetzen. Sonst Briefing-Name behalten.
+- **Multi-Scene Location-Fan-Out**: wenn mehrere Szenen denselben unresolved Location-Mention tragen und der User in Szene N "+ Als Location speichern" klickt, soll der neue `locationId` via `onUpdateScenes` an alle Szenen mit identischem normalisiertem Mention propagiert werden. → reine Frontend-Helper-Funktion `applyLocationToMatchingScenes(scenes, mention, locationId)`.
 
-### 2. Schema-Erweiterung im Production-Plan
-**Datei:** `src/lib/video-composer/briefing/productionPlan.ts`
+### 4) `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Quick-Create fan-out
+- `handleQuickCreateLocation(sceneIdx, mention)` nach erfolgreicher `createLocation`-Mutation: `applyLocationToMatchingScenes` aufrufen statt nur die eine Szene zu patchen.
+- Toast: "Location für N Szenen übernommen".
+- Auswahl-Dropdowns in den Slot-Sektionen (`SceneCastSlot`, `SceneOutfitSlot`, `SceneLocationSlot`) bekommen einen sichtbaren Empty-State "Auswählen …" auch wenn `cast[]` leer ist — werden aber dank Patch #1 nur noch in Edge-Cases benötigt.
 
-Pro Szene werden ID-Felder ergänzt:
-- `performance.mimikId`, `performance.gestikId`, `performance.blickId`, `performance.energyId`
-- `shotDirector.framingId`, `angleId`, `movementId`, `lightingId`, `stylePresetId`
-- `voiceover.deliveryId`
-- `musicCue.energyId`
+## Was NICHT angefasst wird (Garantien)
 
-Die bestehenden freien Stringfelder bleiben als `*Label` erhalten — rein zur Anzeige und als KI-Hint. Der Renderer nutzt ausschließlich `*Id`.
+- `compose-dialog-segments`, `compose-video-clips`, `compose-scene-anchor`, `render-sync-segments-audio-mux`, `sync-so-webhook`, `poll-dialog-shots`
+- Tabellen: `dialog_shots`, `syncso_*`, `composer_scenes.dialog_voices`, `composer_scenes.character_voice_id`, `clip_*`
+- Apply-Hook-Schutzfilter für gerenderte/lipsync-aktive Szenen (`clip_status`, `lipSyncStatus`, `dialogLockedAt`, `lockReferenceUrl`, DB-Probe in `dialog_shots`) bleibt bit-identisch.
+- Catalog-Module aus Wave 1 (`src/lib/video-composer/catalog/*`) bleiben Schattenfelder — kein UI-Switch in dieser Wave.
 
-### 3. Parser: alles auf IDs auflösen
-**Datei:** `supabase/functions/briefing-deep-parse/index.ts`
+## Telemetrie nach Deploy
 
-- Pass-A bleibt frei (KI darf natürlich antworten).
-- Neuer **Pass-C Resolver** (lokal, kein KI-Call): nimmt die freien Werte aus Pass-A/Pass-B und mappt sie via `resolveCatalogId` auf die ID. Bei Synonym-Treffer wird das Label überschrieben mit dem kanonischen Label.
-- Wenn kein Match: `*Id = null`, `_unresolved.push({axis, raw})` → UI zeigt einen sichtbaren Warn-Chip.
+`parser_meta` bekommt zusätzlich:
+- `padded_scenes_inherited_template: boolean`
+- `location_resolution: {...}` (siehe oben)
+- `outfit_label_repaired: number` (im Apply-Hook über `console.info`)
 
-### 4. Storyboard-Apply
-**Datei:** `src/hooks/useApplyProductionPlan.ts`
+## Akzeptanz-Test (manuell, mit deinem letzten Briefing)
 
-Schreibt in `composer_scenes` **nur IDs**. Label-Spalten werden für Backwards-Compat parallel befüllt, aber nirgends mehr gelesen. Validierung: jede ID muss entweder im Catalog vorhanden sein oder eine gültige UUID einer existierenden Library-Zeile sein, sonst Insert-Reject mit klarer Fehlermeldung.
+1. „3 Szenen × 10s" mit `@Samuel`, `@Casual`, `@Home Office` → alle 3 Szenen zeigen Sprecher + Outfit + Location-Dropdowns, alle drei vorausgewählt.
+2. „Total 30s, kein Szenen-Count" → 5 Szenen mit identischem Cast/Location (geerbt).
+3. Briefing mit `@home-office` (Slug) → wird auf `Home Office`-Library-Eintrag resolved.
+4. Bestehende, bereits gerenderte Szene mit Lipsync → wird vom Apply-Hook **nicht** überschrieben (DB-Probe greift).
 
-### 5. UI: Dropdowns überall einheitlich
-**Datei:** `src/components/video-composer/briefing/ProductionPlanSheet.tsx` plus `ScenePerformancePanel.tsx`, `SceneShotDirector*.tsx`.
+## Rollback
 
-- Jeder Picker wird auf `listCatalog(axis)` umgestellt.
-- Anzeige: kanonisches Label, darunter klein die ID als Mono-Chip (Pro-Look, debug-freundlich).
-- Unresolved-Warn-Chip mit „Auto-Resolve"-Button (lokaler Synonym-Match in einem Klick).
-- Fan-Out-Logik (eine Auswahl auf alle gleich-benannten Slots aller Szenen anwenden) gilt jetzt einheitlich für jede Achse, nicht nur Location.
-
-### 6. Render-Pipeline
-**Dateien:** `supabase/functions/compose-video-clips/index.ts`, `compose-scene-anchor/index.ts`.
-
-`composePromptLayers` zieht den englischen `engine_hint` aus dem Catalog statt freie Strings zu interpolieren. Das stabilisiert die Prompts (kein „warm-smile" vs „warmes Lächeln" mehr) und schützt die Lip-Sync-Pipeline, weil identische Eingaben → identische Outputs.
-
-### 7. Telemetrie + Migrationspfad
-- Neue Felder in `parser_meta`: `resolved_ids`, `unresolved_ids`, `catalog_version`.
-- Bestehende Projekte: Lazy-Migrate beim Öffnen — ein einmaliger Resolver-Lauf füllt die `*Id`-Felder nach, ohne die Label zu verändern.
-- Keine DB-Migration nötig: die ID-Strings werden in den bestehenden JSON-Spalten der Szenen gespeichert.
-
-## Schutz vor Regressions
-
-- **Lip-Sync-Pipeline** wird nicht angefasst — `compose-dialog-segments`, `render-sync-segments-audio-mux`, Sync.so-Webhook bleiben byte-identisch.
-- **Catalog ist additiv** — neue IDs brechen keine alten Szenen, weil der Resolver Synonyme behält und alte Label weiter akzeptiert.
-- **Type-Safe** — die Catalog-IDs werden als TypeScript-Literal-Unions exportiert, sodass Tippfehler im Code beim Build auffallen.
-- **Catalog-Version** — `catalog_version` Konstante; jede Änderung erzwingt eine Re-Resolution beim nächsten Öffnen, sodass keine Szene mit veralteter ID hängen bleibt.
-- **Rollout in 3 Wellen**, jede für sich getestet:
-  1. Catalog-Modul + Parser-Pass-C, ohne UI-Änderung — nur Schattenfelder befüllen.
-  2. UI auf IDs umstellen (Dropdowns), Render-Pipeline weiter auf Label.
-  3. Render-Pipeline auf `engine_hint` umstellen.
-
-## Ergebnis nach Umsetzung
-
-- Jede vom Kunden wählbare Eigenschaft (Mimik, Gestik, Blick, Energy, Framing, Angle, Movement, Lighting, Style Preset, Delivery, Music Energy, plus Library-Items) hat eine stabile, sprechende ID.
-- Briefings in DE/EN/ES landen über Synonyme deterministisch auf derselben ID.
-- „Unbenannter Look", leere Performance-Felder und stille Drift im Render-Prompt sind strukturell ausgeschlossen — nicht mehr nur gepatcht.
-- Storyboard und Briefing-Plan zeigen pro Szene exakt dieselbe ID, jede Abweichung ist sofort sichtbar.
+Alle 4 Änderungen sind isoliert. Bei Problemen: einzeln revert; Schattenfelder aus Wave 1 bleiben intakt.
