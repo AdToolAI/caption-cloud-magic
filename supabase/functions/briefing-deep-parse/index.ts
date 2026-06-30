@@ -1074,17 +1074,47 @@ This overrides any English wording in the briefing's scaffolding
             // Truncate keep first N
             manifest.scenes = manifest.scenes.slice(0, detected);
           } else {
-            // Pad: clone last scene shape with new index/beat
+            // v178 Wave 2 — Slot inheritance on pad.
+            // Find a template scene (last scene with non-empty cast, else
+            // first scene, else empty). Clone its cast/location/shotDirector/
+            // engine into every padded scene so ProductionPlanSheet and
+            // SceneCard render the same Sprecher/Outfit/Location dropdowns
+            // for ALL scenes — never empty {engine:'broll'} skeletons.
             const beatRing = ['Hook', 'Pain', 'Reveal', 'Proof', 'CTA'];
+            const template =
+              [...manifest.scenes].reverse().find((x: any) => Array.isArray(x?.cast) && x.cast.length > 0)
+              ?? manifest.scenes[0]
+              ?? {};
+            const cloneCast = (cast: any[] | undefined) =>
+              Array.isArray(cast)
+                ? cast.map((c: any) => ({
+                    mentionKey: c?.mentionKey,
+                    outfit: c?.outfit,
+                    // strip per-turn fields so the padded scene is editable
+                  }))
+                : undefined;
+            const cloneLocation = (loc: any) =>
+              loc && typeof loc === 'object' && loc.mentionKey
+                ? { mentionKey: loc.mentionKey }
+                : undefined;
             while (manifest.scenes.length < detected) {
               const i = manifest.scenes.length;
-              manifest.scenes.push({
+              const padded: any = {
                 index: i + 1,
                 label: beatRing[i % beatRing.length],
                 beat: beatRing[i % beatRing.length],
                 durationSec: perScene,
-                engine: 'broll',
-              });
+                engine: template.engine ?? 'broll',
+                cast: cloneCast(template.cast),
+                location: cloneLocation(template.location),
+                shotDirector: template.shotDirector ? { ...template.shotDirector } : undefined,
+                _meta: { aiFilled: ['padded_from_template'] },
+              };
+              // Drop undefined keys so downstream `stripUndef` stays clean.
+              if (!padded.cast) delete padded.cast;
+              if (!padded.location) delete padded.location;
+              if (!padded.shotDirector) delete padded.shotDirector;
+              manifest.scenes.push(padded);
             }
           }
           // Redistribute durations + reindex
