@@ -1,95 +1,41 @@
-## Ziel
-Alle Szenen im Production Plan müssen immer bearbeitbare Felder für **Sprecher, Outfit, Location und Voice** haben. Szene 2/3 dürfen nicht mehr ohne Cast-Feld erscheinen, und Lip-Sync-Szenen dürfen nach dem Anwenden nicht mehr als „ohne Voice-ID“ verifiziert werden.
+## v181 — N=1 Depicted-Face Lock
 
-## Diagnose
-Der Screenshot zeigt drei gekoppelte Probleme im Review-/Apply-Mapping, nicht in der Lip-Sync-Renderpipeline:
+**Ziel:** Bei Single-Speaker-Szenen mit einem zweiten Gesicht im Bild (Handy-Display, Foto, Spiegel, Bildschirm, Hintergrund-Person) zwingt die ASD-Strategie Sync.so deterministisch auf das Gesicht des Cast-Sprechers. Kein Pfad mehr, auf dem Sync.so "freiwillig" das falsche Gesicht animiert.
 
-1. **Cast-Feld wird versteckt**, sobald `s.cast.length === 0` ist. Deshalb fehlt bei Szene 2/3 das Sprecher-/Outfit-Feld komplett.
-2. **Location-Healing funktioniert nur für vorhandene Location-Objekte.** Wenn Szene 2/3 kein `location` Objekt haben, bleibt das Dropdown zwar sichtbar, aber ohne echte Zuordnung.
-3. **Voice-ID-Warnung ist eine Folge des fehlenden Casts.** Der Apply-Hook kann nur eine automatische Voice-ID zuweisen, wenn ein Sprecher/Charakter in der Szene vorhanden ist. Wenn Szene 2/3 keinen Cast haben, gibt es keinen Speaker-Key für `dialog_voices` und `character_voice_id`.
+### Änderungen (eng begrenzt)
 
-Wichtig: Es gibt bereits einen Auto-Voice-Pool mit echten Voice IDs. Wir brauchen also nicht zwingend manuell neue Voice IDs, sondern müssen sicherstellen, dass jede Lip-Sync-Szene einen Sprecher-Slot hat, damit die Auto-Voice-Zuweisung greifen kann.
+**1. `supabase/functions/_shared/asd-strategy.ts` — Rule 4 erweitern**
+- Neue Bedingung am Anfang von Rule 4 (N=1 + plate-native Box vorhanden):
+  - Wenn `plateFaceCount >= 2` → strategy `single_face_bbox_strict`:
+    - `active_speaker_detection: false`
+    - `bounding_boxes: [<castSpeakerBox>]` (plate-native px-Koordinaten, single entry)
+    - Telemetry-Tag `v181_n1_depicted_face_lock`
+  - Sonst (plateFaceCount ≤ 1): bestehender `single_face_auto`-Pfad bleibt unverändert.
+- Keine Änderung an Rule 0/1/2/3/5.
 
-## Plan
+**2. `supabase/functions/compose-dialog-segments/index.ts` — plateFaceCount durchreichen**
+- Aus dem bestehenden Plate-Identity-Map / Face-Detector-Ergebnis die Anzahl Gesichter lesen.
+- An die `chooseAsdStrategy()`-Aufrufstelle als neuer Parameter `plateFaceCount` übergeben.
+- Kein Verhalten ändern, wenn das Feld 0/1 ist.
 
-### 1. ProductionPlanSheet: fehlende Slots automatisch hydratisieren
-Im Review-State wird jede Szene vor dem Anzeigen normalisiert:
+**3. `_shared/asd-sync3-sanitizer.ts` — keine Änderung nötig**
+- v124 entfernt bereits unzulässige Felder; `bounding_boxes` ist für sync-3 erlaubt.
 
-```text
-Für jede Szene:
-- cast fehlt oder ist leer → cast[0] als leerer editierbarer Slot
-- location fehlt → leeres location Objekt
-- Continuity: "same founder / gleicher Avatar" → Cast + Outfit aus vorheriger gültiger Szene übernehmen
-- Continuity: "same desk / gleiche Location" → Location aus vorheriger gültiger Szene übernehmen
-```
+**4. Telemetry**
+- `console.log('[v181] n1_depicted_face_lock', { sceneId, plateFaceCount, castBox })` in `asd-strategy.ts`.
+- In `dialog_shots.diagnostics` (falls vorhanden) das Tag `v181_n1_depicted_face_lock` persistieren.
 
-Dadurch sind Szene 2 und 3 auch dann vollständig editierbar, wenn die KI unvollständige Arrays liefert.
+**5. Tests**
+- `asd-strategy.test.ts`: zwei neue Cases
+  - N=1, plateFaceCount=2, castBox vorhanden → `single_face_bbox_strict`, kein `auto_detect: true`.
+  - N=1, plateFaceCount=1 → unverändert `single_face_auto`.
 
-### 2. Cast-UI immer anzeigen
-Die aktuelle Bedingung:
+### Was explizit NICHT angefasst wird
 
-```text
-nur anzeigen, wenn s.cast.length > 0
-```
+HappyHorse/Hailuo Plate-Generation, Anchor-Pipeline (v168/v170), Sync.so Webhook & Watchdog, Audio-Mux, Refund-Logik, Briefing→Storyboard-Mapping, Voice-Pool, Multi-Speaker-Pfade (Rule 2/3).
 
-wird entfernt. Stattdessen zeigt jede Szene mindestens einen Slot:
+### Deploy & Verify
 
-```text
-Cast: — nicht zugeordnet —
-Outfit: erscheint nach Avatar-Auswahl
-Voice: Auto/Default-Badge, sobald eine Stimme ableitbar ist
-```
-
-### 3. Update-Funktionen robust machen
-`updateSceneCastChar` und `updateSceneCastOutfit` werden so geändert, dass sie fehlende Slots erzeugen statt abzubrechen.
-
-```text
-Nutzer wählt Samuel in Szene 2
-→ cast[0] wird angelegt
-→ characterId = Samuel
-→ outfitLookId separat wählbar
-→ Auto-Voice kann greifen
-```
-
-### 4. Location-Zuordnung auf alle Szenen ausweiten
-Die Location-Logik wird erweitert:
-
-- `findLocationOption` prüft weiter echte Library-IDs und `catalog:*` IDs.
-- Wenn Szene 2/3 keine Location haben, wird der beste bekannte Location-Wert aus Szene 1/Continuity übernommen.
-- Wenn „Home Office“ in der Liste existiert, wird es im Dropdown ausgewählt statt `— nicht zugeordnet —`.
-
-### 5. Auto-Resolve repariert fehlende Slots, nicht nur vorhandene
-Der Auto-Resolve-Button soll künftig auch leere Szenen reparieren:
-
-```text
-Cast leer → primären Sprecher aus erster gültiger Szene übernehmen
-Outfit leer → Outfit des gleichen Avatars aus erster/vorheriger Szene übernehmen
-Location leer → Location aus erster/vorheriger Szene übernehmen
-```
-
-### 6. Voice-ID-Fallback im Apply-Hook absichern
-Zusätzlich wird der Apply-Hook defensiv gehärtet:
-
-- Wenn eine Lip-Sync-Szene einen Cast hat, aber keine `voiceId`, wird weiter der vorhandene Auto-Voice-Pool genutzt.
-- Wenn `character_voice_id` leer wäre, wird die erste Stimme aus `dialogVoices` gesetzt.
-- Die Verifikation soll nur noch warnen, wenn wirklich kein Sprecher vorhanden ist oder die Voice-Zuordnung technisch nicht geschrieben wurde.
-
-### 7. Kein Eingriff in die Render-/Lip-Sync-Pipeline
-Nicht angefasst werden:
-
-- Sync.so Pipeline
-- HappyHorse/Hailuo Providerlogik
-- `dialog_shots`
-- Clip-Rendering
-- Anchor-/Plate-Generation
-
-## Erwartetes Ergebnis
-Nach Umsetzung:
-
-```text
-S01: Sprecher auswählbar, Outfit auswählbar, Location Home Office, Voice vorhanden
-S02: Sprecher auswählbar, Outfit auswählbar, Location Home Office, Voice vorhanden
-S03: Sprecher auswählbar, Outfit auswählbar, Location Home Office, Voice vorhanden
-```
-
-Und beim Anwenden sollte die Warnung `Lip-Sync-Szene(n) ohne Voice-ID` verschwinden, sofern mindestens ein Sprecher pro Lip-Sync-Szene ausgewählt oder automatisch übernommen wurde.
+- Deploy: `compose-dialog-segments`, geteilt: `asd-strategy.ts` wird mit beiden compose-Functions neu gebündelt → auch `compose-video-clips` redeployen, falls es das Shared-Modul mitzieht.
+- Verify: nächste N=1-Szene mit Handy/Foto im Bild rendern; Logs auf `v181_n1_depicted_face_lock` prüfen; Lip-Sync muss auf Cast-Gesicht sitzen.
+- Memory: neues File `mem://architecture/lipsync/v181-n1-depicted-face-lock.md` + Index-Eintrag.
