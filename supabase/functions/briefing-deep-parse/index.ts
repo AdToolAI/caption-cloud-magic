@@ -1025,8 +1025,73 @@ This overrides any English wording in the briefing's scaffolding
       if (!manifest.project.totalDurationSec) manifest.project.totalDurationSec = per * 3;
     }
 
+    // ── v177: Scene-count guard — when the briefing literally names N scenes
+    //    but Gemini over-/under-shot, truncate/pad to N and redistribute
+    //    durationSec evenly across project.totalDurationSec. Pass B then runs
+    //    on the corrected list.
+    let sceneCountCorrection: { detected: number; gemini: number } | null = null;
+    try {
+      const text = String(briefing ?? '');
+      // a) explicit "N Szenen / scenes / shots / beats"
+      const numWordMatch = text.match(/(\d{1,2})\s*(szenen?|scenes?|shots?|beats?)\b/i);
+      const numFromWord = numWordMatch ? parseInt(numWordMatch[1], 10) : null;
+      // b) numbered markers "Szene 1", "Scene 2", "Shot 3"  → take max
+      const markerRe = /\b(?:szene|scene|shot)\s*(\d{1,2})\b/gi;
+      let maxMarker = 0;
+      for (const m of text.matchAll(markerRe)) {
+        const n = parseInt(m[1], 10);
+        if (Number.isFinite(n)) maxMarker = Math.max(maxMarker, n);
+      }
+      // c) numbered list "1." "2." "3." at line start  → count ≥3
+      const listMatches = text.match(/^\s*\d{1,2}[.):]\s+\S/gm);
+      const listCount = listMatches && listMatches.length >= 3 ? listMatches.length : 0;
+
+      const candidates = [numFromWord, maxMarker || null, listCount || null]
+        .filter((n): n is number => typeof n === 'number' && n >= 1 && n <= 12);
+      // Prefer the most specific: numbered markers > "N Szenen" word > list count
+      const detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
+
+      if (detected && Array.isArray(manifest?.scenes)) {
+        const got = manifest.scenes.length;
+        if (got !== detected) {
+          const total = Number(manifest?.project?.totalDurationSec) || (got * 5);
+          const perScene = Math.max(2, Math.min(30, Math.round(total / detected)));
+          if (got > detected) {
+            // Truncate keep first N
+            manifest.scenes = manifest.scenes.slice(0, detected);
+          } else {
+            // Pad: clone last scene shape with new index/beat
+            const beatRing = ['Hook', 'Pain', 'Reveal', 'Proof', 'CTA'];
+            while (manifest.scenes.length < detected) {
+              const i = manifest.scenes.length;
+              manifest.scenes.push({
+                index: i + 1,
+                label: beatRing[i % beatRing.length],
+                beat: beatRing[i % beatRing.length],
+                durationSec: perScene,
+                engine: 'broll',
+              });
+            }
+          }
+          // Redistribute durations + reindex
+          manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+            ...s,
+            index: i + 1,
+            durationSec: perScene,
+          }));
+          if (!manifest.project) manifest.project = {};
+          manifest.project.totalDurationSec = perScene * detected;
+          sceneCountCorrection = { detected, gemini: got };
+          console.log('[briefing-deep-parse] scene_count_corrected', { detected, gemini: got, perScene });
+        }
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] scene-count guard failed (non-fatal):', e?.message);
+    }
+
     const characters = charRes.data ?? [];
     const locations = locRes.data ?? [];
+
 
     // Curated voice list (mirror of src/lib/elevenlabs-voices catalog).
     const voices = [
