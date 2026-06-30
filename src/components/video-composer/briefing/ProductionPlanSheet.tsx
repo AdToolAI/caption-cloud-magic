@@ -937,6 +937,23 @@ export default function ProductionPlanSheet({
                                 ))}
                               </SelectContent>
                             </Select>
+                            {!s.location.locationId && s.location.mentionKey && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[10px] gap-1 whitespace-nowrap"
+                                disabled={creatingLoc === s.index}
+                                onClick={() => quickCreateLocation(s.index, s.location!.locationName || s.location!.mentionKey)}
+                                title="Als neue Location in der Library speichern"
+                              >
+                                {creatingLoc === s.index ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Plus className="h-3 w-3" />
+                                )}
+                                Anlegen
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
