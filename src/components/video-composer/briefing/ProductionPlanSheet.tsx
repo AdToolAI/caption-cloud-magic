@@ -28,6 +28,8 @@ import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/brief
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
 import BriefingPlanSummary from './BriefingPlanSummary';
+import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
+import type { CatalogAxis } from '@/lib/video-composer/catalog';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
 import type {
   ComposerScene,
