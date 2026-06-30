@@ -47,7 +47,7 @@ const normalizeAssetKey = (value?: string | null) =>
   String(value ?? '')
     .trim()
     .replace(/^@/, '')
-    .replace(/^(location|locationid|ort|place|setting)\s*@?\s*/i, '')
+    .replace(/^(locationid|location|ort|place|setting)\s*@?\s*/i, '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -178,6 +178,32 @@ export default function ProductionPlanSheet({
       });
     };
   }, [locOptions]);
+
+  // v179 UI safety net: plans created before the backend catalog resolver was
+  // fixed can still contain locationId=null + locationName="home-office".
+  // As soon as the unified library/catalog finishes loading, heal those slots
+  // in-place so warnings disappear and Apply persists the resolved selection.
+  useEffect(() => {
+    if (!plan || locOptions.length === 0) return;
+    let changed = false;
+    const scenes = plan.scenes.map((s) => {
+      const loc = s.location;
+      if (!loc) return s;
+      const matched = findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey);
+      if (!matched) return s;
+      if (loc.locationId === matched.id && loc.locationName === matched.name) return s;
+      changed = true;
+      return {
+        ...s,
+        location: {
+          ...loc,
+          locationId: matched.id,
+          locationName: matched.name,
+        },
+      };
+    });
+    if (changed) setPlan({ ...plan, scenes });
+  }, [plan, locOptions.length, findLocationOption]);
 
   /** Outfit looks belonging to a given base character id. */
   const outfitsByCharacter = useMemo(() => {
@@ -594,7 +620,7 @@ export default function ProductionPlanSheet({
       if (ml) {
         const sIdx = Number(ml[1]);
         const loc = plan.scenes[sIdx]?.location;
-        if (loc?.locationId && findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey)) return false;
+        if (loc && findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey)) return false;
       }
       if (u.field === 'project.totalDurationSec') {
         const proj = plan.project?.totalDurationSec;
@@ -1080,18 +1106,17 @@ export default function ProductionPlanSheet({
                       )}
 
 
-                      {/* Location resolver */}
-                      {s.location && (
+                      {/* Location resolver — always visible so every scene can be manually mapped. */}
+                      {(() => {
+                        const loc = s.location;
+                        const selectedLocation = findLocationOption(loc?.locationId, loc?.locationName ?? loc?.mentionKey);
+                        return (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Location</Label>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-[10px]">{s.location.mentionKey}</Badge>
-                            {(() => {
-                              const selectedLocation = findLocationOption(s.location.locationId, s.location.locationName ?? s.location.mentionKey);
-                              const selectValue = selectedLocation?.id ?? '__none__';
-                              return (
+                            <Badge variant="outline" className="text-[10px]">{loc?.mentionKey ?? 'Location'}</Badge>
                             <Select
-                              value={selectValue}
+                              value={selectedLocation?.id ?? '__none__'}
                               onValueChange={(v) => updateSceneLocation(s.index, v === '__none__' ? null : v)}
                             >
                               <SelectTrigger className="h-7 text-xs">
@@ -1104,15 +1129,13 @@ export default function ProductionPlanSheet({
                                 ))}
                               </SelectContent>
                             </Select>
-                              );
-                            })()}
-                            {!findLocationOption(s.location.locationId, s.location.locationName ?? s.location.mentionKey) && s.location.mentionKey && (
+                            {!selectedLocation && loc?.mentionKey && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="h-7 px-2 text-[10px] gap-1 whitespace-nowrap"
                                 disabled={creatingLoc === s.index}
-                                onClick={() => quickCreateLocation(s.index, s.location!.locationName || s.location!.mentionKey)}
+                                onClick={() => quickCreateLocation(s.index, loc.locationName || loc.mentionKey)}
                                 title="Als neue Location in der Library speichern"
                               >
                                 {creatingLoc === s.index ? (
@@ -1125,7 +1148,8 @@ export default function ProductionPlanSheet({
                             )}
                           </div>
                         </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Per-scene quick edits */}
                       <div className="grid grid-cols-2 gap-2 pt-1">
