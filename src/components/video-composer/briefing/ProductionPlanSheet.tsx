@@ -1086,8 +1086,12 @@ export default function ProductionPlanSheet({
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Location</Label>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-[10px]">{s.location.mentionKey}</Badge>
+                            {(() => {
+                              const selectedLocation = findLocationOption(s.location.locationId, s.location.locationName ?? s.location.mentionKey);
+                              const selectValue = selectedLocation?.id ?? '__none__';
+                              return (
                             <Select
-                              value={s.location.locationId ?? '__none__'}
+                              value={selectValue}
                               onValueChange={(v) => updateSceneLocation(s.index, v === '__none__' ? null : v)}
                             >
                               <SelectTrigger className="h-7 text-xs">
@@ -1100,7 +1104,9 @@ export default function ProductionPlanSheet({
                                 ))}
                               </SelectContent>
                             </Select>
-                            {!s.location.locationId && s.location.mentionKey && (
+                              );
+                            })()}
+                            {!findLocationOption(s.location.locationId, s.location.locationName ?? s.location.mentionKey) && s.location.mentionKey && (
                               <Button
                                 size="sm"
                                 variant="outline"
