@@ -500,7 +500,7 @@ const SYSTEM_PASS_B = `You validate and resolve a parsed briefing manifest again
 You receive:
 - MANIFEST: the structural extraction from pass A
 - LIBRARY.characters: brand_characters available to the user (id, name, default_voice_id)
-- LIBRARY.locations: brand_locations available to the user (id, name)
+- LIBRARY.locations: all locations visible in the UI: personal brand_locations plus read-only world/catalog entries. Catalog IDs are valid and look like "catalog:location:<uuid>", "catalog:building:<uuid>", or "catalog:prop:<uuid>".
 - LIBRARY.voices: ElevenLabs voices known to the system (id, name, language)
 
 Resolve every cast mention (@founder-avatar etc.) and every location mention (@home-office etc.) to a library entry. Normalize: strip "@", lowercase, remove separators (- _ space), allow substring match in either direction. When unresolved, set characterId/locationId = null and add an unresolved item with severity=warn and a clear suggestion like "Avatar 'Founder Default' im Library nicht gefunden — manuell zuordnen".
@@ -522,7 +522,7 @@ Consistency checks (each becomes an unresolved entry when violated):
 - Every cinematic-sync / heygen / sync-* / native-dialogue scene MUST have at least one cast member (severity=error if none).
 - VO timecodes within a scene must fit inside its durationSec (severity=warn).
 
-DO NOT invent IDs. Only emit characterId / locationId that exist in LIBRARY. If you are unsure, set null and add an unresolved entry.`;
+DO NOT invent IDs. Only emit characterId / locationId that exist in LIBRARY. Catalog location IDs from LIBRARY are valid and should be copied exactly including the "catalog:*:" prefix. If you are unsure, set null and add an unresolved entry.`;
 
 interface CallOpts {
   model: string;
@@ -633,7 +633,45 @@ async function callGatewayChain(base: Omit<CallOpts, 'model' | 'timeoutMs' | 'ma
 
 
 function normalizeMention(s: string): string {
-  return String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
+  return String(s ?? '')
+    .trim()
+    .replace(/^@/, '')
+    .replace(/^(locationid|location|ort|place|setting)\s*@?\s*/i, '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function buildLocationLibrary(
+  brandRows: any[] = [],
+  catalogLocations: any[] = [],
+  catalogBuildings: any[] = [],
+  catalogProps: any[] = [],
+) {
+  const seen = new Set<string>();
+  const out: Array<{ id: string; name: string; kind?: string; source?: string }> = [];
+  const push = (id: any, name: any, source: string, kind?: string) => {
+    const cleanId = typeof id === 'string' ? id.trim() : '';
+    const cleanName = typeof name === 'string' ? name.trim() : '';
+    if (!cleanId || !cleanName) return;
+    const key = normalizeMention(cleanName);
+    // Personal library wins over catalog when labels collide, mirroring
+    // useUnifiedMentionLibrary.dedupe() in the frontend.
+    if (key && seen.has(key)) return;
+    if (key) seen.add(key);
+    out.push({ id: cleanId, name: cleanName, source, kind });
+  };
+  for (const l of brandRows ?? []) push(l?.id, l?.name, 'brand', 'location');
+  const pushCatalog = (rows: any[] = [], kind: 'location' | 'building' | 'prop') => {
+    for (const r of rows ?? []) {
+      push(`catalog:${kind}:${r?.id}`, r?.label ?? r?.name, 'catalog', kind);
+    }
+  };
+  pushCatalog(catalogLocations, 'location');
+  pushCatalog(catalogBuildings, 'building');
+  pushCatalog(catalogProps, 'prop');
+  return out;
 }
 
 const ENGINE_ALIASES: Record<string, string> = {
@@ -975,6 +1013,24 @@ This overrides any English wording in the briefing's scaffolding
         .select('id,name')
         .eq('user_id', userId)
         .limit(200),
+      supabase
+        .from('location_catalog_previews')
+        .select('id,label,theme_pack')
+        .order('theme_pack', { ascending: true })
+        .order('label', { ascending: true })
+        .limit(500),
+      supabase
+        .from('building_catalog_previews')
+        .select('id,label,theme_pack')
+        .order('theme_pack', { ascending: true })
+        .order('label', { ascending: true })
+        .limit(500),
+      supabase
+        .from('prop_catalog_previews')
+        .select('id,label,theme_pack')
+        .order('theme_pack', { ascending: true })
+        .order('label', { ascending: true })
+        .limit(500),
     ]);
 
     const [passAResult, libResult] = await Promise.allSettled([passAPromise, libraryPromise]);
@@ -991,9 +1047,9 @@ This overrides any English wording in the briefing's scaffolding
     }
     const tA = Date.now();
 
-    const [charRes, locRes] = libResult.status === 'fulfilled'
+    const [charRes, locRes, catalogLocRes, catalogBuildingRes, catalogPropRes] = libResult.status === 'fulfilled'
       ? libResult.value
-      : [{ data: [] } as any, { data: [] } as any];
+      : [{ data: [] } as any, { data: [] } as any, { data: [] } as any, { data: [] } as any, { data: [] } as any];
 
     // ── Safety net: if Pass A returned 0 scenes (modelblip / extreme thin
     //    briefing), synthesize a deterministic 3-scene arc so the user is
@@ -1134,7 +1190,12 @@ This overrides any English wording in the briefing's scaffolding
     }
 
     const characters = charRes.data ?? [];
-    const locations = locRes.data ?? [];
+    const locations = buildLocationLibrary(
+      locRes.data ?? [],
+      catalogLocRes.data ?? [],
+      catalogBuildingRes.data ?? [],
+      catalogPropRes.data ?? [],
+    );
 
 
     // Curated voice list (mirror of src/lib/elevenlabs-voices catalog).
@@ -1169,7 +1230,7 @@ This overrides any English wording in the briefing's scaffolding
             MANIFEST: manifest,
             LIBRARY: {
               characters: characters.map((c: any) => ({ id: c.id, name: c.name, default_voice_id: c.default_voice_id, gender: c.gender, description: c.description })),
-              locations: locations.map((l: any) => ({ id: l.id, name: l.name })),
+              locations: locations.map((l: any) => ({ id: l.id, name: l.name, kind: l.kind, source: l.source })),
               voices,
             },
           }),
@@ -1300,16 +1361,27 @@ This overrides any English wording in the briefing's scaffolding
       const resolvedLocationIndexes = new Set<number>();
       const UUID_RE_LOC = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
       const locStats = { viaSlug: 0, viaSubstring: 0, viaCatalogUuid: 0, stillUnresolved: 0 };
+      const locationIdSet = new Set(locations.map((l: any) => String(l.id)));
       for (const sc of plan.scenes ?? []) {
         const loc = sc?.location;
         if (!loc) continue;
+        if (loc.locationId && locationIdSet.has(String(loc.locationId))) {
+          const hit = locations.find((l: any) => String(l.id) === String(loc.locationId));
+          if (hit) {
+            loc.locationId = hit.id;
+            loc.locationName = hit.name;
+            resolvedLocationIndexes.add(sc.index);
+            if (String(hit.id).startsWith('catalog:')) locStats.viaCatalogUuid += 1;
+            continue;
+          }
+        }
         // (c) Catalog multi-segment id like "catalog:location:<uuid>" or
         // any string that already carries a UUID — extract & verify against
         // the user's library so the Sheet dropdown actually matches.
         if (loc.locationId && typeof loc.locationId === 'string' && loc.locationId.includes(':')) {
           const m = loc.locationId.match(UUID_RE_LOC);
           if (m) {
-            const hit = locations.find((l: any) => String(l.id) === m[0]);
+            const hit = locations.find((l: any) => String(l.id) === m[0] || String(l.id).endsWith(`:${m[0]}`));
             if (hit) {
               loc.locationId = hit.id;
               loc.locationName = hit.name;
@@ -1360,8 +1432,9 @@ This overrides any English wording in the briefing's scaffolding
           const m = String(u?.path ?? u?.field ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
           if (!m) return true;
           const arrIdx = parseInt(m[1], 10);
-          // arrIdx is 0-based, scene.index is 1-based
-          return !resolvedLocationIndexes.has(arrIdx + 1);
+          // Pass-B has produced both 0-based array paths (scenes[0]) and
+          // 1-based scene.index paths (scenes[1]). Treat either as resolved.
+          return !(resolvedLocationIndexes.has(arrIdx) || resolvedLocationIndexes.has(arrIdx + 1));
         });
       }
 

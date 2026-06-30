@@ -376,6 +376,7 @@ function planSceneToComposerScene(
   const mentionedLocationIds = ps.location?.locationId
     ? [stripPrefix(ps.location.locationId)].filter((x) => UUID_RE.test(x))
     : [];
+  const rawLocationId = ps.location?.locationId ? String(ps.location.locationId) : undefined;
 
   return {
     id: newSceneId(),
@@ -396,19 +397,20 @@ function planSceneToComposerScene(
     dialogMode,
     dialogScript,
     dialogVoices: Object.keys(dialogVoices).length ? dialogVoices : undefined,
-    shotDirector: ps.shotDirector
+    shotDirector: (ps.shotDirector || rawLocationId?.startsWith('catalog:'))
       ? {
-          framing: ps.shotDirector.framing,
-          angle: ps.shotDirector.angle,
-          movement: ps.shotDirector.movement,
-          lighting: ps.shotDirector.lighting,
+          framing: ps.shotDirector?.framing,
+          angle: ps.shotDirector?.angle,
+          movement: ps.shotDirector?.movement,
+          lighting: ps.shotDirector?.lighting,
           // Wave 3: forward Catalog-IDs (read-only shadow fields) so
           // downstream UI can show ⚡-AI chips. No prompt impact.
-          ...(ps.shotDirector as any).framingId      ? { framingId:      (ps.shotDirector as any).framingId } : {},
-          ...(ps.shotDirector as any).angleId        ? { angleId:        (ps.shotDirector as any).angleId } : {},
-          ...(ps.shotDirector as any).movementId     ? { movementId:     (ps.shotDirector as any).movementId } : {},
-          ...(ps.shotDirector as any).lightingId     ? { lightingId:     (ps.shotDirector as any).lightingId } : {},
-          ...(ps.shotDirector as any).stylePresetId  ? { stylePresetId:  (ps.shotDirector as any).stylePresetId } : {},
+          ...(ps.shotDirector && (ps.shotDirector as any).framingId      ? { framingId:      (ps.shotDirector as any).framingId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).angleId        ? { angleId:        (ps.shotDirector as any).angleId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).movementId     ? { movementId:     (ps.shotDirector as any).movementId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).lightingId     ? { lightingId:     (ps.shotDirector as any).lightingId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).stylePresetId  ? { stylePresetId:  (ps.shotDirector as any).stylePresetId } : {}),
+          ...(rawLocationId?.startsWith('catalog:') ? { locationCatalogId: rawLocationId } : {}),
         }
       : undefined,
     sceneActionUser: ps.anchorPromptEN ?? ps.voiceover?.text,

@@ -43,6 +43,19 @@ type Step = 'paste' | 'parsing' | 'review';
 const isUuid = (val?: string | null) =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
+const normalizeAssetKey = (value?: string | null) =>
+  String(value ?? '')
+    .trim()
+    .replace(/^@/, '')
+    .replace(/^(locationid|location|ort|place|setting)\s*@?\s*/i, '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const uuidInside = (value?: string | null) =>
+  String(value ?? '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+
 /**
  * Wave 3 chip: renders a catalog-resolved label (preferred) or the raw
  * free-text value, plus an `⚡ AI` micro-badge when the value came from a
@@ -142,9 +155,55 @@ export default function ProductionPlanSheet({
     [baseChars],
   );
   const locOptions = useMemo(
-    () => (locations ?? []).map((l: any) => ({ id: l.id, name: l.name })),
+    () => (locations ?? []).map((l: any) => ({ id: String(l.id), name: String(l.name ?? 'Location') })),
     [locations],
   );
+  const findLocationOption = useMemo(() => {
+    return (rawId?: string | null, rawName?: string | null) => {
+      const id = rawId ? String(rawId) : '';
+      if (id) {
+        const exact = locOptions.find((o) => o.id === id);
+        if (exact) return exact;
+        const innerUuid = uuidInside(id);
+        if (innerUuid) {
+          const byUuid = locOptions.find((o) => o.id === innerUuid || o.id.endsWith(`:${innerUuid}`));
+          if (byUuid) return byUuid;
+        }
+      }
+      const key = normalizeAssetKey(rawName);
+      if (!key) return undefined;
+      return locOptions.find((o) => {
+        const n = normalizeAssetKey(o.name);
+        return n === key || n.includes(key) || key.includes(n);
+      });
+    };
+  }, [locOptions]);
+
+  // v179 UI safety net: plans created before the backend catalog resolver was
+  // fixed can still contain locationId=null + locationName="home-office".
+  // As soon as the unified library/catalog finishes loading, heal those slots
+  // in-place so warnings disappear and Apply persists the resolved selection.
+  useEffect(() => {
+    if (!plan || locOptions.length === 0) return;
+    let changed = false;
+    const scenes = plan.scenes.map((s) => {
+      const loc = s.location;
+      if (!loc) return s;
+      const matched = findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey);
+      if (!matched) return s;
+      if (loc.locationId === matched.id && loc.locationName === matched.name) return s;
+      changed = true;
+      return {
+        ...s,
+        location: {
+          ...loc,
+          locationId: matched.id,
+          locationName: matched.name,
+        },
+      };
+    });
+    if (changed) setPlan({ ...plan, scenes });
+  }, [plan, locOptions.length, findLocationOption]);
 
   /** Outfit looks belonging to a given base character id. */
   const outfitsByCharacter = useMemo(() => {
@@ -459,12 +518,12 @@ export default function ProductionPlanSheet({
       ...p,
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
-        const matched = locOptions.find((x) => x.id === locationId);
+        const matched = findLocationOption(locationId, null);
         return {
           ...s,
           location: s.location
-            ? { ...s.location, locationId, locationName: matched?.name ?? s.location.locationName }
-            : (matched ? { mentionKey: matched.name, locationId, locationName: matched.name } : s.location),
+            ? { ...s.location, locationId: matched?.id ?? locationId, locationName: matched?.name ?? s.location.locationName }
+            : (matched ? { mentionKey: matched.name, locationId: matched.id, locationName: matched.name } : s.location),
         };
       }),
     });
@@ -502,10 +561,8 @@ export default function ProductionPlanSheet({
       // v178 Wave 2 — fan out the resolved locationId to ALL scenes that
       // reference the same mention/name. Without this every scene with
       // the same "@Home Office" would need its own quick-create click.
-      const normalize = (s: string) =>
-        String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
       const trigger = plan?.scenes.find((s) => s.index === sceneIndex);
-      const triggerKey = normalize(
+      const triggerKey = normalizeAssetKey(
         trigger?.location?.mentionKey ?? trigger?.location?.locationName ?? trimmed,
       );
       let matched = 0;
@@ -514,7 +571,7 @@ export default function ProductionPlanSheet({
           ...p,
           scenes: p.scenes.map((s) => {
             if (!s.location) return s;
-            const key = normalize(s.location.mentionKey ?? s.location.locationName ?? '');
+            const key = normalizeAssetKey(s.location.mentionKey ?? s.location.locationName ?? '');
             if (s.index === sceneIndex || key === triggerKey) {
               matched += 1;
               return {
@@ -551,18 +608,22 @@ export default function ProductionPlanSheet({
   const liveUnresolved = useMemo(() => {
     if (!plan) return [] as TProductionPlan['unresolved'];
     return (plan.unresolved ?? []).filter((u) => {
+      // Gemini/Pass-B has emitted both 0-based paths (scenes[0]) and
+      // 1-based scene indexes (scenes[1]). Prefer the actual scene.index
+      // contract, then fall back to array position for legacy rows.
+      const scenesByPathRef = (ref: number) =>
+        [plan.scenes.find((s) => s.index === ref), plan.scenes[ref]].filter(Boolean);
       const m = /^scenes\[(\d+)\]\.cast\[(\d+)\]\.characterId$/.exec(u.field);
       if (m) {
-        const sIdx = Number(m[1]);
         const cIdx = Number(m[2]);
-        const scene = plan.scenes[sIdx];
-        const slot = scene?.cast?.[cIdx];
-        if (slot?.characterId) return false;
+        if (scenesByPathRef(Number(m[1])).some((scene) => scene?.cast?.[cIdx]?.characterId)) return false;
       }
       const ml = /^scenes\[(\d+)\]\.location\.locationId$/.exec(u.field);
       if (ml) {
-        const sIdx = Number(ml[1]);
-        if (plan.scenes[sIdx]?.location?.locationId) return false;
+        if (scenesByPathRef(Number(ml[1])).some((scene) => {
+          const loc = scene?.location;
+          return !!(loc && findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey));
+        })) return false;
       }
       if (u.field === 'project.totalDurationSec') {
         const proj = plan.project?.totalDurationSec;
@@ -570,33 +631,30 @@ export default function ProductionPlanSheet({
       }
       return true;
     });
-  }, [plan, totalPlanSec]);
+  }, [plan, totalPlanSec, findLocationOption]);
 
   /**
-   * Auto-Resolve: for every cast slot that has `characterId === null`,
-   * run a fuzzy match (normalize → lowercase, strip @ / separators →
-   * substring both directions) against the base avatars library. The
-   * first hit wins. Same algorithm as the server-side resolver — runs
-   * locally so the user gets instant feedback.
+   * Auto-Resolve: for every missing cast/location slot, run the same fuzzy
+   * matching as the server-side resolver. Location resolution accepts both
+   * real UUIDs and catalog:* IDs from the unified mention library.
    */
   const handleAutoResolve = () => {
     if (!plan) return;
-    const norm = (s: string) =>
-      s.toLowerCase().replace(/^@/, '').replace(/[\s_\-]+/g, '');
-    let fixed = 0;
+    let castFixed = 0;
+    let locationFixed = 0;
     setPlan((p) => {
       if (!p) return p;
       const scenes = p.scenes.map((s) => {
         const cast = (s.cast ?? []).map((c) => {
           if (c.characterId) return c;
-          const needle = norm(c.mentionKey || c.characterName || '');
+          const needle = normalizeAssetKey(c.mentionKey || c.characterName || '');
           if (!needle) return c;
           const hit = charOptions.find((o) => {
-            const n = norm(o.name);
+            const n = normalizeAssetKey(o.name);
             return n.includes(needle) || needle.includes(n);
           });
           if (!hit) return c;
-          fixed += 1;
+          castFixed += 1;
           return {
             ...c,
             characterId: hit.id,
@@ -604,13 +662,28 @@ export default function ProductionPlanSheet({
             outfitLookId: null,
           };
         });
-        return { ...s, cast };
+        let location = s.location;
+        if (location && !findLocationOption(location.locationId, location.locationName ?? location.mentionKey)) {
+          const hit = findLocationOption(null, location.mentionKey ?? location.locationName);
+          if (hit) {
+            locationFixed += 1;
+            location = {
+              ...location,
+              locationId: hit.id,
+              locationName: hit.name,
+            };
+          }
+        }
+        return { ...s, cast, location };
       });
       return { ...p, scenes };
     });
+    const fixed = castFixed + locationFixed;
     toast({
-      title: fixed > 0 ? `${fixed} Cast-Slots automatisch zugewiesen` : 'Keine weiteren Auto-Matches',
-      description: fixed > 0 ? 'Du kannst die Zuordnung im Dropdown noch anpassen.' : undefined,
+      title: fixed > 0 ? `${fixed} Zuordnung${fixed === 1 ? '' : 'en'} automatisch repariert` : 'Keine weiteren Auto-Matches',
+      description: fixed > 0
+        ? `${castFixed} Cast · ${locationFixed} Location — du kannst alles im Dropdown noch anpassen.`
+        : undefined,
     });
   };
 
@@ -1036,14 +1109,17 @@ export default function ProductionPlanSheet({
                       )}
 
 
-                      {/* Location resolver */}
-                      {s.location && (
+                      {/* Location resolver — always visible so every scene can be manually mapped. */}
+                      {(() => {
+                        const loc = s.location;
+                        const selectedLocation = findLocationOption(loc?.locationId, loc?.locationName ?? loc?.mentionKey);
+                        return (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Location</Label>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-[10px]">{s.location.mentionKey}</Badge>
+                            <Badge variant="outline" className="text-[10px]">{loc?.mentionKey ?? 'Location'}</Badge>
                             <Select
-                              value={s.location.locationId ?? '__none__'}
+                              value={selectedLocation?.id ?? '__none__'}
                               onValueChange={(v) => updateSceneLocation(s.index, v === '__none__' ? null : v)}
                             >
                               <SelectTrigger className="h-7 text-xs">
@@ -1056,13 +1132,13 @@ export default function ProductionPlanSheet({
                                 ))}
                               </SelectContent>
                             </Select>
-                            {!s.location.locationId && s.location.mentionKey && (
+                            {!selectedLocation && loc?.mentionKey && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="h-7 px-2 text-[10px] gap-1 whitespace-nowrap"
                                 disabled={creatingLoc === s.index}
-                                onClick={() => quickCreateLocation(s.index, s.location!.locationName || s.location!.mentionKey)}
+                                onClick={() => quickCreateLocation(s.index, loc.locationName || loc.mentionKey)}
                                 title="Als neue Location in der Library speichern"
                               >
                                 {creatingLoc === s.index ? (
@@ -1075,7 +1151,8 @@ export default function ProductionPlanSheet({
                             )}
                           </div>
                         </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Per-scene quick edits */}
                       <div className="grid grid-cols-2 gap-2 pt-1">
