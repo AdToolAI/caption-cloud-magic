@@ -200,9 +200,19 @@ export default function ScenePerformancePanel({ scene, characters, language, onU
       </div>
 
       <div className="space-y-2">
-        {cast.map((slot) => {
-          const ch = characters.find((c) => c.id === slot.characterId);
-          if (!ch) return null;
+        {cast.map((slot, slotIdx) => {
+          const lookup = characters.find((c) => c.id === slot.characterId);
+          // v177.1 — Cast fallback: render the row even when the global
+          // character library lookup fails (e.g. briefing referenced a
+          // character that has not been persisted to brand_characters yet).
+          // Performance lives on the scene by characterId, so we still want
+          // editable Mimik/Gestik/Blick/Energy fields here.
+          const fallbackId = slot.characterId || `__cast_${slotIdx}__`;
+          const fallbackName =
+            slot.characterId
+              ? `Charakter ${slot.characterId.slice(0, 6)}`
+              : `Sprecher ${slotIdx + 1}`;
+          const ch = lookup ?? { id: fallbackId, name: fallbackName };
           const perf = performance[ch.id] ?? {};
           const hasAny = !!(perf.expression || perf.gesture || perf.gaze || perf.energy);
 
