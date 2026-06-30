@@ -53,6 +53,92 @@ const LIPSYNC_ENGINES = new Set([
 const isUuid = (val?: string | null): val is string =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
+const PLAN_UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+function stripPlanId(id: string) {
+  if (!id) return id;
+  const m = id.match(PLAN_UUID_RE);
+  if (m && id.includes(':')) return m[0];
+  return id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
+}
+
+type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
+type PlanLocationSlot = NonNullable<TPlanScene['location']>;
+
+function emptyPlanCastSlot(sceneIndex: number): PlanCastSlot {
+  return {
+    mentionKey: `S${String(sceneIndex).padStart(2, '0')} Sprecher`,
+    characterId: null,
+    characterName: 'Sprecher',
+    outfitLookId: null,
+    voiceId: null,
+  };
+}
+
+function shouldInheritPlanContinuity(scene: TPlanScene, axis: 'cast' | 'location') {
+  const haystack = [
+    scene.continuityHint,
+    scene.anchorPromptEN,
+    scene.label,
+    scene.beat,
+    scene.voiceover?.text,
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (axis === 'cast') {
+    return scene.lipSync || !!scene.voiceover?.text || !!scene.dialogTurns?.length
+      || /(same|gleiche|gleichen|selbe|derselbe|avatar|founder|sprecher|speaker|charakter|character)/i.test(haystack);
+  }
+  return /(same|gleiche|gleichen|selbe|derselbe|desk|location|ort|setting|home\s*office|büro|office)/i.test(haystack);
+}
+
+function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
+  let lastCast: PlanCastSlot | null = null;
+  let firstCast: PlanCastSlot | null = null;
+  let lastLocation: PlanLocationSlot | null = null;
+  let firstLocation: PlanLocationSlot | null = null;
+
+  return scenes.map((scene) => {
+    const cast = [...(scene.cast ?? [])];
+    const sourceCast = lastCast ?? firstCast;
+    if (cast.length === 0) {
+      cast.push(sourceCast && shouldInheritPlanContinuity(scene, 'cast')
+        ? { ...sourceCast, mentionKey: sourceCast.mentionKey || `S${String(scene.index).padStart(2, '0')} Sprecher` }
+        : emptyPlanCastSlot(scene.index));
+    } else if (sourceCast && shouldInheritPlanContinuity(scene, 'cast')) {
+      for (let i = 0; i < cast.length; i += 1) {
+        if (!cast[i].characterId) {
+          cast[i] = {
+            ...cast[i],
+            characterId: sourceCast.characterId,
+            characterName: sourceCast.characterName,
+            referenceImageUrl: sourceCast.referenceImageUrl,
+            outfitLookId: cast[i].outfitLookId ?? sourceCast.outfitLookId ?? null,
+            voiceId: cast[i].voiceId ?? sourceCast.voiceId ?? null,
+            voiceName: cast[i].voiceName ?? sourceCast.voiceName,
+            voiceAutoAssigned: cast[i].voiceAutoAssigned ?? sourceCast.voiceAutoAssigned,
+          };
+        }
+      }
+    }
+
+    const resolvedCast = cast.find((c) => c.characterId || c.outfitLookId) ?? null;
+    if (resolvedCast) {
+      lastCast = resolvedCast;
+      if (!firstCast) firstCast = resolvedCast;
+    }
+
+    let location = scene.location;
+    if (!location && (lastLocation ?? firstLocation) && shouldInheritPlanContinuity(scene, 'location')) {
+      location = { ...(lastLocation ?? firstLocation)! };
+    }
+    if (location?.locationId) {
+      lastLocation = location;
+      if (!firstLocation) firstLocation = location;
+    }
+
+    return { ...scene, cast, ...(location ? { location } : {}) };
+  });
+}
+
 // ── Free-form → enum mappers for Performance Layer ────────────────────────
 
 function mapExpression(raw?: string): PerformanceExpression | undefined {
@@ -184,15 +270,7 @@ function planSceneToComposerScene(
   // as the BASE brand_characters.id (CastRef invariant) plus an optional
   // separate `outfitLookId`. We still defensively strip any legacy mention
   // prefix in case an older plan flows through.
-  const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-  const stripPrefix = (id: string) => {
-    if (!id) return id;
-    // Multi-segment mention IDs like `catalog:location:<uuid>` or
-    // `catalog:character:<uuid>` → return the trailing UUID.
-    const m = id.match(UUID_RE);
-    if (m && id.includes(':')) return m[0];
-    return id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
-  };
+  const stripPrefix = stripPlanId;
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
   const rawShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
