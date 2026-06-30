@@ -1,54 +1,63 @@
-## Problem
+# Fix: Lip-Sync startet trotz fehlgeschlagener Szene
 
-Szene S03 wird mit `anchor_identity_swap_detected: reference 1 is not the same person` hart geblockt — obwohl im Bild eindeutig derselbe Founder (Samuel) wie im Avatar-Portrait zu sehen ist. Gleichzeitig wird S02 mit demselben Setup als "Generiert" durchgewunken.
+## Symptom
+Wenn der Master-Clip einer Szene fehlschlägt (`clip_status='failed'`, `clip_error` gesetzt, oder `twoshot_stage='failed'`), springt der Lip-Sync-Auto-Trigger in `useTwoShotAutoTrigger.ts` trotzdem an — entweder über die `audio-prep`-Stufe (optimistisch `twoshot_stage='audio'`), die `master_clip`-Brücke, oder direkt als Kandidat — sobald irgendein älterer `clip_url`/`audio_plan` noch in der Row steht.
 
-## Root Cause
+Heute prüft jede der drei Stufen nur `clip_status && clip_status !== 'ready'`. Das schützt nicht gegen:
+- `clip_status=null` + `clip_error` gesetzt (transienter Render-Fail vor Status-Update),
+- `twoshot_stage='failed'` mit altem `clip_url` aus vorigem Lauf,
+- `clip_status='failed'` Race: optimistic `audio-prep` Tick rennt vor dem Webhook-Update an.
 
-`supabase/functions/_shared/identity-audit.ts` ruft Gemini 2.5 Flash auf und vertraut dessen `faceMatch: "mismatch"` blind. Flash ist bei N=1 + leichten Pose-/Lichtunterschieden zwischen Studio-Portrait und Szenen-Plate notorisch unzuverlässig (gleicher Mann, andere Lichtstimmung → "mismatch"). Ergebnis: **False-positive Swap** trotz korrekter Identität.
+## Lösung — ein einziger Realized-Scene-Guard
 
-Aktuelle Logik in `identity-audit.ts` (Z. 116–134) feuert Swap bereits, wenn **ein einziger** `mismatched`-Eintrag kommt — ohne zweite Meinung, ohne Konfidenz, ohne Sonderbehandlung für N=1.
+Wir führen `isRealizedScene(scene)` als Single-Source-of-Truth ein und verwenden ihn in **allen** Stufen, die Lip-Sync-Arbeit anstoßen.
 
-## Fix — v171 N=1 Swap-Confirmation (chirurgisch, additiv)
+```text
+isRealizedScene(scene) :=
+  clip_status === 'ready'
+  AND typeof clip_url === 'string' AND clip_url.length > 0
+  AND !clip_error
+  AND twoshot_stage !== 'failed'
+  AND lip_sync_status !== 'failed'
+  AND lip_sync_status !== 'canceled'
+```
 
-Drei kleine Änderungen, ausschließlich in `supabase/functions/_shared/identity-audit.ts`. Pipeline (Compose, Hailuo, Sync.so, Webhook) wird **nicht** berührt.
+Alles andere ist „nicht realisiert" → kein Audio-Prep, kein Stage-Advance, kein Lip-Sync-Candidate. Punkt.
 
-### 1. Prompt-Härtung gegen False-Positives
-Im Audit-Prompt ergänzen:
-- "If the rendered person is the same sex, similar age, similar hair, and a plausible same-person under different lighting/angle/expression, you MUST return `match`, not `mismatch`."
-- "Only return `mismatch` if you are highly confident it is a clearly different human (different sex, very different age, completely different facial structure). When in doubt → `uncertain`."
+## Änderungen
 
-### 2. N=1 Single-Face Soft-Pass
-Wenn `portraitUrls.length === 1`:
-- Vor dem Hard-Fail einen zweiten Audit-Call gegen **Gemini 2.5 Pro** (statt Flash) absetzen.
-- Nur wenn **beide** Pässe (Flash + Pro) `mismatch` für ref #1 melden → Swap.
-- Sonst: `ok: true` mit Log `v171_n1_swap_softpass: flash=mismatch, pro=match`.
+### 1. Neue Util: `src/lib/composer/isRealizedScene.ts`
+- Reine Funktion, keine Side-Effects.
+- Wird vom Hook UND von `PipelineProgressBar` benutzt, damit der Balken eine failed Szene nie als „läuft" zeigt.
 
-### 3. Konfidenz-Schwelle für Multi-Cast
-Wenn `mismatched.length === 1` UND `reason !== "swap"` (Modell selbst sagt nicht swap, nur einzelne Slot-Bewertung):
-- Soft-Warn, kein Hard-Block. Verhindert, dass ein Wackel-Match in 4-Cast-Szenen den ganzen Render killt.
+### 2. `src/hooks/useTwoShotAutoTrigger.ts`
+- `audioReadyButNotAdvanced` Filter: erste Zeile `if (!isRealizedScene(d)) return false;`
+- `needsAudioPrep` Filter: dito, ganz oben — verhindert den optimistischen `twoshot_stage='audio'` Write, der den Balken fälschlich startete.
+- `candidates` Filter (Lip-Sync Kick): dito.
+- Bestehende detaillierte Checks bleiben unverändert dahinter stehen (Defense-in-Depth).
 
-### Telemetrie
-- Logs: `v171_swap_confirm: pass1=<flash>, pass2=<pro>, decision=<final>`
-- Persistiert in `audio_plan.twoshot.anchor_face_audit.v171`.
+### 3. `src/components/video-composer/PipelineProgressBar.tsx` (nur Anzeige)
+- `hasFailure` greift bereits — zusätzlich: `lipsyncRunning` wird nur true, wenn die Szene auch `isRealizedScene` erfüllt. So zeigt der Balken bei einem geplatzten Master-Clip sofort den Fehler statt „Lip-Sync läuft…".
 
-## Was NICHT angefasst wird
+### 4. Server-Seite (defensiv, ein Punkt)
+- `compose-twoshot-audio/index.ts`: vor der Edge-Function-Arbeit reload der Szene → bei `clip_status === 'failed' || twoshot_stage === 'failed'` 422 mit Reason `scene_not_realized_no_lipsync` zurückgeben und KEINEN State-Write machen.
+- Verhindert, dass ein Client-Race (Tick → Failure-Webhook gleich danach) doch noch `audio_plan` materialisiert.
 
-- `compose-scene-anchor` (Anchor-Generierung, Anti-Triptych v168) — unverändert.
-- `compose-dialog-segments` + Sync.so-Payload-Contract (v153/v160/v181) — unverändert.
-- Hailuo/HappyHorse-Plate-Pipeline — unverändert.
-- `compose-video-clips` Hard-Abort-Logik (Z. 1916) — unverändert; bekommt durch v171 nur seltener `ok:false` geliefert.
-- UI / Frontend — unverändert.
+## Was bewusst NICHT geändert wird
 
-## Recovery für aktuelle Szene S03
+- `compose-dialog-scene` / `compose-dialog-segments`: haben bereits eigene Pre-Flight-Gates (`source_clip_unusable`).
+- `lipsync-watchdog`, `failLipSync`, Sync.so-Webhook: unverändert.
+- Bestehende Auto-Retry-Regex (`RETRYABLE_REGEX`) und Hard-Fail-Liste: unverändert.
+- Refund-Pfade: unverändert.
+- Cinematic-Sync v23 State-Machine (Server-Owned): unverändert.
 
-Nach Deploy: User drückt "🔄 Neu rendern" auf S03 — Audit läuft erneut, mit v171-Confirmation. Bei tatsächlich korrekter Identität geht die Szene durch.
+## Validierung
 
-## Files
+1. Eine Szene mit `clip_status='failed'` + altem `clip_url` + `audio_plan.twoshot.url` darf nach Reload **keinen** Tick mehr triggern (Console: kein `[useTwoShotAutoTrigger] self-heal`).
+2. PipelineProgressBar zeigt `failure`-Zustand sofort, keinen „Lip-Sync läuft"-Phantom-Spinner.
+3. Manueller „Sauber neu starten"-Klick (reset-lipsync-scene) räumt failed → pending und Lip-Sync läuft beim nächsten Tick normal.
+4. `compose-twoshot-audio` returns 422 `scene_not_realized_no_lipsync` bei direktem Aufruf auf failed Szene (curl-Test).
 
-- `supabase/functions/_shared/identity-audit.ts` (Prompt + N=1-Doppelcheck + Multi-Cast-Schwelle)
-- `mem/architecture/lipsync/v171-n1-swap-confirmation.md` (neu, Doku)
+## Risiko
 
-## Risiken
-
-- **Latenz**: Bei N=1 + Flash-mismatch ein zusätzlicher Gemini-Pro-Call (~3–6 s). Nur im Fehlerfall, nicht im Happy Path.
-- **Echte Swaps**: Werden weiterhin gefangen, wenn beide Modelle übereinstimmen. Defense-in-Depth bleibt.
+Minimal. Reiner Guard, kein Pipeline-Eingriff. Worst-Case-Regression: eine zu früh als „nicht realisiert" markierte Szene wird beim nächsten Tick (8s) neu evaluiert, sobald der Master-Clip-Webhook `clip_status='ready'` setzt — kein Datenverlust, kein Credit-Burn.
