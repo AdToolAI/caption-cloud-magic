@@ -1221,10 +1221,10 @@ export default function ProductionPlanSheet({
                                     </SelectContent>
                                   </Select>
                                 )}
-                                {(c.voiceName || c.voiceId) && (
+                                {(c.voiceName || c.voiceId || baseId) && (
                                   <Badge variant="secondary" className="text-[10px]">
-                                    🎙 {c.voiceName ?? 'Stimme'}
-                                    {(c as any).voiceAutoAssigned && (
+                                    🎙 {c.voiceName ?? (c.voiceId ? 'Stimme' : 'Auto-Voice beim Anwenden')}
+                                    {((c as any).voiceAutoAssigned || (!c.voiceId && !c.voiceName && baseId)) && (
                                       <span className="ml-1 text-amber-300" title="Stimme automatisch von der KI zugeordnet">⚡ AI</span>
                                     )}
                                   </Badge>
