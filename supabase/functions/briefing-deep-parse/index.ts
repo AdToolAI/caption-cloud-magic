@@ -1467,6 +1467,8 @@ This overrides any English wording in the briefing's scaffolding
           .maybeSingle();
         if (prev?.version) version = (prev.version as number) + 1;
       }
+      const locResolutionForMeta = (plan as any)._locationResolution ?? null;
+      try { delete (plan as any)._locationResolution; } catch { /* noop */ }
       const { error: insErr } = await supabase
         .from('composer_production_plans')
         .insert({
