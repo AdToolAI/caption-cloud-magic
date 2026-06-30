@@ -495,11 +495,11 @@ serve(async (req) => {
         }
       }
 
-      // ── Green-Net (Alibaba HappyHorse content filter) → auto-fallback ──────
-      // Switch this scene's clip_source to ai-hailuo so the next "Neu rendern"
-      // click bypasses HappyHorse entirely. Prepend a tagged marker so the UI
-      // can render a friendly explainer banner instead of the cryptic
-      // DataInspectionFailed string.
+      // ── Green-Net (Alibaba HappyHorse content filter) → tag, do NOT switch ──
+      // v176: previously we silently rewrote clip_source to ai-hailuo so the
+      // next "Neu rendern" click bypassed HH. That overrode the user's
+      // provider choice without consent. Now we only TAG the error so the UI
+      // can render a banner with a manual "Auf Hailuo wechseln"-button.
       const isGreenNet =
         isGreenNetRejection(enrichedError) &&
         String((scene as any)?.clip_source ?? '') === 'ai-happyhorse';
@@ -512,7 +512,7 @@ serve(async (req) => {
           clip_status: 'failed',
           retry_count: currentRetry + 1,
           clip_error: taggedError,
-          ...(isGreenNet ? { clip_source: 'ai-hailuo' } : {}),
+          // v176: clip_source stays untouched on Green-Net — user decides.
           ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
             ? {
                 lip_sync_status: null,
@@ -527,7 +527,7 @@ serve(async (req) => {
 
       if (isGreenNet) {
         console.warn(
-          `[compose-clip-webhook] green-net rejection on scene ${sceneId} → auto-switched clip_source to ai-hailuo`,
+          `[compose-clip-webhook] green-net rejection on scene ${sceneId} → tagged, clip_source kept on ai-happyhorse (v176, no silent migration)`,
         );
       }
 
