@@ -275,6 +275,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // permanent in 'audio' hängen, der globale Balken verschwindet,
         // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
         const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
+          if (!isRealizedScene(d)) return false;
           if (!isDialogEngine(d.engine_override)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
