@@ -613,11 +613,15 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
         const matched = findLocationOption(locationId, null);
+        const baseLocation = s.location ?? emptyLocationSlot();
         return {
           ...s,
-          location: s.location
-            ? { ...s.location, locationId: matched?.id ?? locationId, locationName: matched?.name ?? s.location.locationName }
-            : (matched ? { mentionKey: matched.name, locationId: matched.id, locationName: matched.name } : s.location),
+          location: {
+            ...baseLocation,
+            mentionKey: matched?.name ?? baseLocation.mentionKey,
+            locationId: matched?.id ?? locationId,
+            locationName: matched?.name ?? baseLocation.locationName,
+          },
         };
       }),
     });
@@ -738,6 +742,11 @@ export default function ProductionPlanSheet({
     let locationFixed = 0;
     setPlan((p) => {
       if (!p) return p;
+      let lastCast: PlanCastSlot | null = null;
+      let firstCast: PlanCastSlot | null = null;
+      let lastLocation: PlanLocationSlot | null = null;
+      let firstLocation: PlanLocationSlot | null = null;
+
       const scenes = p.scenes.map((s) => {
         const cast = (s.cast ?? []).map((c) => {
           if (c.characterId) return c;
@@ -756,6 +765,19 @@ export default function ProductionPlanSheet({
             outfitLookId: null,
           };
         });
+        if (cast.length === 0) cast.push(emptyCastSlot(s.index));
+        for (let i = 0; i < cast.length; i += 1) {
+          if (!cast[i].characterId && (lastCast ?? firstCast)) {
+            cast[i] = cloneCastSlot((lastCast ?? firstCast)!, s.index);
+            castFixed += 1;
+          }
+        }
+        const resolvedCast = cast.find((c) => c.characterId || c.outfitLookId) ?? null;
+        if (resolvedCast) {
+          lastCast = resolvedCast;
+          if (!firstCast) firstCast = resolvedCast;
+        }
+
         let location = s.location ?? emptyLocationSlot();
         if (!findLocationOption(location.locationId, location.locationName ?? location.mentionKey)) {
           const hit = findLocationOption(null, location.mentionKey ?? location.locationName);
@@ -766,10 +788,17 @@ export default function ProductionPlanSheet({
               locationId: hit.id,
               locationName: hit.name,
             };
+          } else if (lastLocation ?? firstLocation) {
+            locationFixed += 1;
+            location = { ...(lastLocation ?? firstLocation)! };
           }
         }
-        if (cast.length === 0) cast.push(emptyCastSlot(s.index));
-        if (!location) location = emptyLocationSlot();
+        const resolvedLocation = findLocationOption(location.locationId, location.locationName ?? location.mentionKey);
+        if (resolvedLocation) {
+          location = { ...location, locationId: resolvedLocation.id, locationName: resolvedLocation.name };
+          lastLocation = location;
+          if (!firstLocation) firstLocation = location;
+        }
         return { ...s, cast, location };
       });
       return { ...p, scenes };
@@ -1128,10 +1157,12 @@ export default function ProductionPlanSheet({
                       )}
 
                       {/* Cast resolver — CastRef: base character + optional outfit (separate dropdowns) */}
-                      {(s.cast ?? []).length > 0 && (
+                      {(() => {
+                        const castSlots = (s.cast ?? []).length > 0 ? (s.cast ?? []) : [emptyCastSlot(s.index)];
+                        return (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cast</Label>
-                          {s.cast.map((c, i) => {
+                          {castSlots.map((c, i) => {
                             const split = splitCastId(c.characterId);
                             const explicitLookId = c.outfitLookId ?? split.outfitLookId ?? null;
                             const lookHit = explicitLookId ? outfitById.get(explicitLookId) ?? null : null;
@@ -1202,7 +1233,8 @@ export default function ProductionPlanSheet({
                             );
                           })}
                         </div>
-                      )}
+                        );
+                      })()}
 
 
                       {/* Location resolver — always visible so every scene can be manually mapped. */}
