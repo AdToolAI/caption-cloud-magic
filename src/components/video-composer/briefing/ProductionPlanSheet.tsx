@@ -24,9 +24,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
-import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
+import { ProductionPlan, type TProductionPlan, type TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
-import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
 import BriefingPlanSummary from './BriefingPlanSummary';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
 import type { CatalogAxis } from '@/lib/video-composer/catalog';
@@ -55,6 +54,46 @@ const normalizeAssetKey = (value?: string | null) =>
 
 const uuidInside = (value?: string | null) =>
   String(value ?? '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+
+type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
+type PlanLocationSlot = NonNullable<TPlanScene['location']>;
+
+const emptyCastSlot = (sceneIndex: number): PlanCastSlot => ({
+  mentionKey: `S${String(sceneIndex).padStart(2, '0')} Sprecher`,
+  characterId: null,
+  characterName: 'Sprecher',
+  outfitLookId: null,
+  voiceId: null,
+});
+
+const emptyLocationSlot = (): PlanLocationSlot => ({
+  mentionKey: 'Location',
+  locationId: null,
+  locationName: '',
+  referenceImageUrl: null,
+});
+
+const cloneCastSlot = (slot: PlanCastSlot, sceneIndex: number): PlanCastSlot => ({
+  ...slot,
+  mentionKey: slot.mentionKey || `S${String(sceneIndex).padStart(2, '0')} Sprecher`,
+  characterName: slot.characterName || 'Sprecher',
+});
+
+const shouldInheritContinuity = (scene: TPlanScene, axis: 'cast' | 'location') => {
+  const haystack = [
+    scene.continuityHint,
+    scene.anchorPromptEN,
+    scene.label,
+    scene.beat,
+    scene.voiceover?.text,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (axis === 'cast') {
+    return scene.lipSync || !!scene.voiceover?.text || !!scene.dialogTurns?.length
+      || /(same|gleiche|gleichen|selbe|derselbe|avatar|founder|sprecher|speaker|charakter|character)/i.test(haystack);
+  }
+  return /(same|gleiche|gleichen|selbe|derselbe|desk|location|ort|setting|home\s*office|büro|office)/i.test(haystack);
+};
 
 /**
  * Wave 3 chip: renders a catalog-resolved label (preferred) or the raw
@@ -179,31 +218,86 @@ export default function ProductionPlanSheet({
     };
   }, [locOptions]);
 
-  // v179 UI safety net: plans created before the backend catalog resolver was
-  // fixed can still contain locationId=null + locationName="home-office".
-  // As soon as the unified library/catalog finishes loading, heal those slots
-  // in-place so warnings disappear and Apply persists the resolved selection.
+  // v180 Review Slot Hydrator: the parser may return incomplete scenes
+  // (especially padded/continuity scenes). The review UI must still expose
+  // editable Cast/Outfit/Location slots for EVERY scene, and Lip-Sync scenes
+  // need a character slot so the Auto-Voice pool can assign a real Voice-ID.
   useEffect(() => {
-    if (!plan || locOptions.length === 0) return;
+    if (!plan) return;
     let changed = false;
+    let lastResolvedCast: PlanCastSlot | null = null;
+    let firstResolvedCast: PlanCastSlot | null = null;
+    let lastResolvedLocation: PlanLocationSlot | null = null;
+    let firstResolvedLocation: PlanLocationSlot | null = null;
+
     const scenes = plan.scenes.map((s) => {
-      const loc = s.location;
-      if (!loc) return s;
-      const matched = findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey);
-      if (!matched) return s;
-      if (loc.locationId === matched.id && loc.locationName === matched.name) return s;
-      changed = true;
+      let next = s;
+      const sourceCast = lastResolvedCast ?? firstResolvedCast;
+      const cast = [...(s.cast ?? [])];
+
+      if (cast.length === 0) {
+        const inherited = sourceCast && shouldInheritContinuity(s, 'cast')
+          ? cloneCastSlot(sourceCast, s.index)
+          : emptyCastSlot(s.index);
+        cast.push(inherited);
+        changed = true;
+      } else if (sourceCast && shouldInheritContinuity(s, 'cast')) {
+        for (let i = 0; i < cast.length; i += 1) {
+          if (!cast[i]?.characterId) {
+            cast[i] = {
+              ...cast[i],
+              characterId: sourceCast.characterId,
+              characterName: sourceCast.characterName,
+              referenceImageUrl: sourceCast.referenceImageUrl,
+              outfitLookId: cast[i].outfitLookId ?? sourceCast.outfitLookId ?? null,
+              voiceId: cast[i].voiceId ?? sourceCast.voiceId ?? null,
+              voiceName: cast[i].voiceName ?? sourceCast.voiceName,
+              voiceAutoAssigned: cast[i].voiceAutoAssigned ?? sourceCast.voiceAutoAssigned,
+            };
+            changed = true;
+          }
+        }
+      }
+
+      const resolvedCast = cast.find((c) => c.characterId || c.outfitLookId) ?? null;
+      if (resolvedCast) {
+        lastResolvedCast = resolvedCast;
+        if (!firstResolvedCast) firstResolvedCast = resolvedCast;
+      }
+      if (cast !== s.cast) next = { ...next, cast };
+
+      const loc = next.location ?? null;
+      const matched = findLocationOption(loc?.locationId, loc?.locationName ?? loc?.mentionKey);
+      let location: PlanLocationSlot = loc ?? emptyLocationSlot();
+
+      if (!loc) {
+        const inherited = lastResolvedLocation ?? firstResolvedLocation;
+        if (inherited && shouldInheritContinuity(s, 'location')) {
+          location = { ...inherited };
+        }
+        changed = true;
+      } else if (matched && (loc.locationId !== matched.id || loc.locationName !== matched.name)) {
+        location = { ...loc, locationId: matched.id, locationName: matched.name };
+        changed = true;
+      } else if (!matched && !loc.locationId && (lastResolvedLocation ?? firstResolvedLocation) && shouldInheritContinuity(s, 'location')) {
+        location = { ...(lastResolvedLocation ?? firstResolvedLocation)! };
+        changed = true;
+      }
+
+      const resolvedLocation = findLocationOption(location.locationId, location.locationName ?? location.mentionKey);
+      if (resolvedLocation) {
+        location = { ...location, locationId: resolvedLocation.id, locationName: resolvedLocation.name };
+        lastResolvedLocation = location;
+        if (!firstResolvedLocation) firstResolvedLocation = location;
+      }
+
       return {
-        ...s,
-        location: {
-          ...loc,
-          locationId: matched.id,
-          locationName: matched.name,
-        },
+        ...next,
+        location,
       };
     });
     if (changed) setPlan({ ...plan, scenes });
-  }, [plan, locOptions.length, findLocationOption]);
+  }, [plan, findLocationOption]);
 
   /** Outfit looks belonging to a given base character id. */
   const outfitsByCharacter = useMemo(() => {
@@ -483,8 +577,8 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
         const cast = [...(s.cast ?? [])];
-        const c = cast[castIdx];
-        if (!c) return s;
+        while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
+        const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
         const matched = charOptions.find((x) => x.id === characterId);
         cast[castIdx] = {
           ...c,
@@ -505,8 +599,8 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
         const cast = [...(s.cast ?? [])];
-        const c = cast[castIdx];
-        if (!c) return s;
+        while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
+        const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
         cast[castIdx] = { ...c, outfitLookId };
         return { ...s, cast };
       }),
@@ -662,8 +756,8 @@ export default function ProductionPlanSheet({
             outfitLookId: null,
           };
         });
-        let location = s.location;
-        if (location && !findLocationOption(location.locationId, location.locationName ?? location.mentionKey)) {
+        let location = s.location ?? emptyLocationSlot();
+        if (!findLocationOption(location.locationId, location.locationName ?? location.mentionKey)) {
           const hit = findLocationOption(null, location.mentionKey ?? location.locationName);
           if (hit) {
             locationFixed += 1;
@@ -674,6 +768,8 @@ export default function ProductionPlanSheet({
             };
           }
         }
+        if (cast.length === 0) cast.push(emptyCastSlot(s.index));
+        if (!location) location = emptyLocationSlot();
         return { ...s, cast, location };
       });
       return { ...p, scenes };
