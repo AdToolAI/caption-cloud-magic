@@ -1,64 +1,70 @@
-# v170 — Artlist-Parity: Extras & Bystander allowed, Cast Lock unverändert
+# v175 — N=1 `generation_unknown_error` Fix
 
-## Was du willst (und was Artlist macht)
-- **N=1 spricht, andere laufen vorbei** → OK
-- **4 Charaktere im Cast, nur einer spricht** → OK
-- **Laptop-Bildschirm / Foto an der Wand / Spiegelung** → OK (gehört zur Welt)
+## Was passiert (Evidenz)
 
-Was NICHT OK ist (das muss Audit weiter blocken):
-- Cast-Person wird **dupliziert** (Samuel zweimal im Frame)
-- Cast-Person **fehlt** (Sprecher ist gar nicht da)
-- Cast-Person bekommt **falsches Gesicht** (Swap)
+Dispatch-Log für Scene `6490729c…` (gestern 23:59):
 
-Heute scheitert die Pipeline an „Audit zählt jeden Menschen / jedes dargestellte Gesicht und vergleicht mit Cast-Count". Das ist falsch.
+- `model: sync-3`, `sync_mode: loop`, `bounding_boxes_url` gesetzt — Payload ist doc-strict für sync-3, also nicht das Problem.
+- Audio: **8.0s WAV, voiced_end 6.8s → 1.2s trailing silence**.
+- Sync.so antwortet: *"Something went wrong while processing this generation."* (`generation_unknown_error`).
 
-## Neue Invariante
-> Anchor-Audit prüft **Cast-Integrität**, nicht Total-Headcount.
-> Extras (Bystanders, Crowd, vorbeilaufende Personen, depicted persons auf Screens/Fotos/Spiegeln) sind erlaubt, solange:
-> 1. Jedes Cast-Mitglied ist genau einmal als reale Person im Frame.
-> 2. Kein Cast-Gesicht erscheint zweimal (Clone).
-> 3. Kein Cast-Slot zeigt ein falsches Gesicht (Swap).
+Das ist **exakt der Failure-Mode den v64 dokumentiert hat** und damals durch Tight-Slice gefixt wurde:
 
-## Eingriffe
+> v64 Kommentar (jetzt entfernt): *"Sync.so reproducibly throws `provider_unknown_error` when the per-speaker WAV is mostly trailing silence (the 1-speaker case where speech is e.g. 0–2.2s on a 10s plate). Slicing to the voiced window matches the N≥2 success path."*
 
-### 1. `supabase/functions/_shared/identity-audit.ts` — Cast-only Audit, jetzt auch für N=1
-- `auditAnchorIdentity` läuft **auch für N=1** (heute: `portraitUrls.length < 2 → return null`). Bei N=1 prüft sie nur „erscheint Samuel genau einmal, nicht zweimal, nicht swap, nicht missing".
-- Prompt erweitert: *„Bystanders, background pedestrians, crowd, people walking by, people on screens/posters/photos/mirrors/statues are EXTRAS and do NOT count toward `perReference`. Only count REAL physically present humans that visually match each reference portrait."* Felder `perReference[].appearances` + `faceMatch` bleiben, `extraPeople` wird kein Fail-Grund mehr.
-- Failure-Priorität bleibt: `swap > clone > missing`. `extra` wird komplett gestrichen.
+## Was sich geändert hat (Regression)
 
-### 2. `supabase/functions/compose-video-clips/index.ts` — `evaluate()` & Hard-Aborts
-- `evaluate()`: `countHumansInImage` / `countFacesInImage` Aufrufe entfernt für die **Fail-Entscheidung**. Wir loggen sie weiter zu Telemetriezwecken, aber sie blocken nichts mehr.
-- Hard-Abort-Block (Zeilen 1908–1984):
-  - `extra` Reason wird gestrichen → nur noch `swap | clone | missing | ambiguous` blocken.
-  - `humanCount > expectedFaces` und `faceCount > expectedFaces` Checks entfernt.
-  - `faceCount < expectedFaces && humanCount < expectedFaces` bleibt als „missing"-Signal — Wert kommt jetzt aus Audit, nicht aus countHumans.
-- N=1 läuft jetzt durch den Audit-Pfad (mind. 1 Portrait → Audit wird aufgerufen).
-- `ANCHOR_AUDIT_VERSION` 10 → 11 invalidiert kaputten Cache.
+`v169` (Tail-Talk-Fix) hat in `compose-dialog-segments/index.ts` ZWEI Dinge gemacht:
 
-### 3. `supabase/functions/compose-scene-anchor/index.ts` — Prompt-Liberalisierung
-- `EXACT_COUNT_SUFFIX` (beide Zweige) wird umformuliert von „EXACTLY N people total" zu **„EXACTLY N CAST people (each reference appears once); background extras / bystanders / pedestrians / crowd are allowed if natural for the scene"**.
-- `TWO_SHOT_NEGATIVE` behält Clone-/Triptych-/Mirror-Verbote, streicht „background bystander / coworker / crowd / extra unreferenced human" aus der AVOID-Liste.
-- `STRICT_RETRY_SUFFIX` adressiert weiterhin Clone/Triptych/Swap, nicht Extras.
-- Cast-Bindung („each reference appears exactly once, no duplicates, no swap") bleibt 1:1 erhalten.
+1. **Tight-Slice für N=1 abgeschaltet** (`allowTightSlice = passes.length >= 2`). → genau der Code-Pfad den v64 als Voraussetzung gegen `provider_unknown_error` markiert hatte.
+2. Overlay-Mode für N=1 in `render-sync-segments-audio-mux` deaktiviert (single-audio-swap).
 
-### 4. Memory
-`mem/architecture/lipsync/v170-cast-integrity-not-headcount.md`:
-> Anchor-Audit prüft Cast-Integrität (no clone, no swap, no missing per reference). Extras/Bystanders/depicted persons sind erlaubt — Artlist-Parität. Headcount-Vergleich wurde entfernt. v168 Anti-Triptych bleibt (Clone-Schutz). v131.6 Face-Lock bleibt (Swap-Schutz).
+Punkt 1 ist die Ursache des aktuellen Fehlers. v172 hatte Tight-Slice für N=1 noch an — deshalb lief es.
 
-## Was bleibt UNVERÄNDERT
-- v167 Plate-Prompt (camera-lock + subtle mouth motion N=1)
-- v168 Anti-Triptych / Anti-Clone für N=1 (Samuel-3x-nebeneinander wird weiter geblockt — das ist Clone, nicht Extra)
-- v169 N=1 Tail-Talk-Fix (Overlay-Mode bypass)
-- v131.6 Face-Lock Attempt-3
-- Plate-Face-Targeting v77/v78 (Lipsync trifft trotz Bystanders das richtige Cast-Gesicht, weil Targeting per Portrait-Match läuft)
-- Refund/Watchdog/ASD
+Tail-Talk (der Grund für v169) kam aber NICHT primär aus Tight-Slice, sondern aus **v167's Plate-Prompt-Erweiterung** *"speaking naturally with subtle idle mouth and jaw motion"* in `compose-video-clips`. Mit Idle-Mouth-Motion in der Hailuo-Plate UND Overlay-Mode wurde nach dem Sprech-Fenster die pristine Plate mit bewegtem Mund sichtbar.
+
+## Fix
+
+Drei chirurgische Änderungen, alles andere bleibt:
+
+### A) `supabase/functions/compose-dialog-segments/index.ts` — Tight-Slice für N=1 wieder an
+
+`allowTightSlice = passes.length >= 1` (statt `>= 2`). Das ist die direkte v64-Logik. WAV wird auf voiced-Window getrimmt (z.B. 0.1–6.8s statt 0–8s) → kein trailing-silence-Mismatch mehr → Sync.so akzeptiert wieder.
+
+Das v169.1 Preflight-Gate (`prepare_failed_no_tight_audio`) bleibt 1:1 wie zuletzt gepatcht — es feuert dann automatisch wieder ab N≥1.
+
+### B) `supabase/functions/compose-video-clips/index.ts` — v167 Idle-Mouth-Motion für N=1 entfernen
+
+Den v167-Suffix *"speaking naturally with subtle idle mouth and jaw motion"* aus dem N=1 Plate-Prompt streichen und stattdessen *"natural closed-mouth idle, mouth opens only when speaking, subtle micro-expressions"* setzen.
+
+Sync-3 hat built-in obstruction/face-recovery — es braucht keine vorbewegten Lippen auf der Plate, um zu animieren. Mit Closed-Mouth-Plate in der Stille bleibt nach dem Sprechfenster der Mund visuell geschlossen → Tail-Talk weg, auch im Overlay-Mode.
+
+### C) `supabase/functions/render-sync-segments-audio-mux/index.ts` — Overlay-Mode für N=1 wieder erlauben
+
+Den v169 N=1-Bypass (`isSingleSpeaker → useOverlay=false`) zurücknehmen. Mit (A)+(B) ist die Plate jetzt closed-mouth außerhalb des Sprechfensters → Overlay-Mode (Sync-Clip nur im Speaker-Window, sonst pristine Plate) produziert kein Tail-Talk mehr und ist symmetrisch zum N≥2-Pfad.
+
+### D) Memory-Update
+
+`mem/architecture/lipsync/v169-n1-tail-talk-fix.md` → ersetzen durch `v175-n1-unknown-error-fix.md`:
+
+> Invariante: N=1 Cinematic-Sync verwendet Tight-Slice + Overlay-Mode wie N≥2. Tail-Talk wird verhindert durch closed-mouth Idle in der Hailuo-Plate (compose-video-clips), nicht durch Disablen von Tight/Overlay. v64-Provider-Stop-Loss bleibt damit aktiv.
+
+## Was unverändert bleibt
+
+- v168 Anti-Clone Anchor-Lock (N=1 darf nicht 3× Samuel sein)
+- v170 Cast-Integrity Audit (Bystanders erlaubt)
+- v174 Respect-User-Provider (HappyHorse migriert nicht still auf Hailuo)
+- v131.6 Face-Lock, v77/v78 Plate-Face-Targeting
+- Refund / Watchdog / Webhook / ASD-Builder
 
 ## Verifikation
-1. **N=1 mit Laptop-Reflektion** → Audit `ok`, Szene rendert.
-2. **N=1 in Coworking-Space mit 3 vorbeilaufenden Personen** → Audit `ok`.
-3. **N=4 Cast, 1 spricht** (Cinematic-Sync 4-Personen, eine Lipsync-Pass) → Audit prüft alle 4 Cast vorhanden + keiner dupliziert; Lipsync läuft nur auf dem aktiven Sprecher (bestehender v90-Pfad).
-4. **Regression Samuel-Triptychon (N=1, 3× Samuel)** → Audit `clone` → blockt korrekt mit v168-Verhalten.
-5. **Regression Swap (N=2, falsches Gesicht in Slot)** → Audit `swap` → Face-Lock-Retry feuert wie gehabt.
+
+1. Trigger "🎥 Clip + Lip-Sync neu rendern" auf Scene 1 (`6490729c…`).
+2. Dispatch-Log: `tight_audio_dur_sec ≈ voiced_sec` (z.B. 6.7s statt 8.0s), `tight_audio_url` gesetzt, `payloadSyncMode='cut_off'`.
+3. Sync.so callback: `status=completed`, kein `generation_unknown_error`.
+4. Final Clip: Lippen synchron, am Sprech-Ende geschlossen, kein sichtbares Mund-Wackeln in der Stille.
+5. N=2 Regression: weiter wie gehabt (Tight-Slice + Overlay-Mux unverändert).
 
 ## Deploy
-`compose-video-clips`, `compose-scene-anchor` neu deployen; Frontend unverändert.
+
+`compose-dialog-segments`, `compose-video-clips`, `render-sync-segments-audio-mux` neu deployen. Frontend unverändert.
