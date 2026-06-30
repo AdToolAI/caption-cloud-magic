@@ -631,7 +631,7 @@ export default function ProductionPlanSheet({
       }
       return true;
     });
-  }, [plan, totalPlanSec]);
+  }, [plan, totalPlanSec, findLocationOption]);
 
   /**
    * Auto-Resolve: for every missing cast/location slot, run the same fuzzy
