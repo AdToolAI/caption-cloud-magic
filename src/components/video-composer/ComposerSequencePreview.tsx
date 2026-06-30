@@ -1124,6 +1124,7 @@ export default function ComposerSequencePreview({
 
         {/* Slot A */}
         <video
+          key={`A:${playableSignature}`}
           ref={videoARef}
           playsInline
           preload="auto"
@@ -1138,6 +1139,7 @@ export default function ComposerSequencePreview({
 
         {/* Slot B */}
         <video
+          key={`B:${playableSignature}`}
           ref={videoBRef}
           playsInline
           preload="auto"
@@ -1153,6 +1155,7 @@ export default function ComposerSequencePreview({
         {/* Slot C — hidden prefetch holder (always sceneIdx + 2). Decodes the
             moov atom + first frame so the next-next transition is instant. */}
         <video
+          key={`C:${playableSignature}`}
           ref={videoCRef}
           playsInline
           preload="auto"
@@ -1169,6 +1172,7 @@ export default function ComposerSequencePreview({
             top: -9999,
           }}
         />
+
 
         {/* Global timeline-based text overlays (independent of scene boundaries) */}
         {globalTextOverlays && globalTextOverlays.length > 0 && (
