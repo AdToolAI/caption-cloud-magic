@@ -611,19 +611,19 @@ export default function ProductionPlanSheet({
       // Gemini/Pass-B has emitted both 0-based paths (scenes[0]) and
       // 1-based scene indexes (scenes[1]). Prefer the actual scene.index
       // contract, then fall back to array position for legacy rows.
-      const sceneByPathRef = (ref: number) =>
-        plan.scenes.find((s) => s.index === ref) ?? plan.scenes[ref];
+      const scenesByPathRef = (ref: number) =>
+        [plan.scenes.find((s) => s.index === ref), plan.scenes[ref]].filter(Boolean);
       const m = /^scenes\[(\d+)\]\.cast\[(\d+)\]\.characterId$/.exec(u.field);
       if (m) {
-        const scene = sceneByPathRef(Number(m[1]));
         const cIdx = Number(m[2]);
-        const slot = scene?.cast?.[cIdx];
-        if (slot?.characterId) return false;
+        if (scenesByPathRef(Number(m[1])).some((scene) => scene?.cast?.[cIdx]?.characterId)) return false;
       }
       const ml = /^scenes\[(\d+)\]\.location\.locationId$/.exec(u.field);
       if (ml) {
-        const loc = sceneByPathRef(Number(ml[1]))?.location;
-        if (loc && findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey)) return false;
+        if (scenesByPathRef(Number(ml[1])).some((scene) => {
+          const loc = scene?.location;
+          return !!(loc && findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey));
+        })) return false;
       }
       if (u.field === 'project.totalDurationSec') {
         const proj = plan.project?.totalDurationSec;
