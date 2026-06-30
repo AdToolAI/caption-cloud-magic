@@ -10,6 +10,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { resolveCatalogId, CATALOG_VERSION, type CatalogAxis } from "./catalog.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -1307,6 +1308,69 @@ This overrides any English wording in the briefing's scaffolding
     }
 
 
+    // ── Pass C — Catalog-ID Resolver (v178, Wave 1) ───────────────────────
+    // Maps free-text axis values (Mimik/Gestik/Blick/Energy/Framing/Angle/
+    // Movement/Lighting/Delivery/MusicEnergy/StylePreset) to stable catalog
+    // IDs. Shadow fields only — original strings remain untouched so legacy
+    // consumers keep working. UI / render switch to *Id in later waves.
+    const passCStats = { resolved: 0, unresolved: 0, unresolvedSamples: [] as Array<{ axis: string; raw: string }> };
+    try {
+      const setId = (obj: any, key: string, axis: CatalogAxis, raw: unknown) => {
+        if (!obj || typeof obj !== 'object') return;
+        if (obj[key] != null) return; // already an id
+        const id = resolveCatalogId(axis, raw);
+        if (id) {
+          obj[key] = id;
+          passCStats.resolved += 1;
+        } else if (raw != null && String(raw).trim()) {
+          passCStats.unresolved += 1;
+          if (passCStats.unresolvedSamples.length < 20) {
+            passCStats.unresolvedSamples.push({ axis, raw: String(raw).slice(0, 80) });
+          }
+        }
+      };
+
+      for (const sc of plan.scenes ?? []) {
+        // Performance axes
+        const p = sc.performance ?? (sc.performance = {});
+        setId(p, 'mimikId',  'mimik',  p.mimik);
+        setId(p, 'gestikId', 'gestik', p.gestik);
+        setId(p, 'blickId',  'blick',  p.blick);
+        // Energy can come as number (1..5) or string — normalize to slug.
+        const energyRaw = typeof p.energy === 'number'
+          ? (['very_low','low','mid','high','very_high'][Math.min(4, Math.max(0, p.energy - 1))] ?? null)
+          : p.energy;
+        setId(p, 'energyId', 'energy', energyRaw);
+
+        // Shot Director axes
+        const sd = sc.shotDirector ?? (sc.shotDirector = {});
+        setId(sd, 'framingId',     'framing',      sd.framing);
+        setId(sd, 'angleId',       'angle',        sd.angle);
+        setId(sd, 'movementId',    'movement',     sd.movement);
+        setId(sd, 'lightingId',    'lighting',     sd.lighting);
+        setId(sd, 'stylePresetId', 'style_preset', sd.stylePreset);
+
+        // Voiceover delivery
+        if (sc.voiceover && typeof sc.voiceover === 'object') {
+          setId(sc.voiceover, 'deliveryId', 'delivery', sc.voiceover.delivery);
+        }
+
+        // Music cue energy
+        if (sc.musicCue && typeof sc.musicCue === 'object') {
+          setId(sc.musicCue, 'energyId', 'music_energy', sc.musicCue.energy);
+        }
+      }
+
+      console.log('[briefing-deep-parse] pass_c_catalog_resolved', {
+        resolved: passCStats.resolved,
+        unresolved: passCStats.unresolved,
+        samples: passCStats.unresolvedSamples,
+        version: CATALOG_VERSION,
+      });
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] pass-C catalog resolver failed (non-fatal):', e?.message);
+    }
+
     try {
       console.log('[briefing-deep-parse] plan summary', {
         scenes: plan.scenes?.length ?? 0,
@@ -1355,6 +1419,10 @@ This overrides any English wording in the briefing's scaffolding
             passA_diagnostics: passADiagnostics,
             passB_diagnostics: passBDiagnostics,
             scene_count_corrected: sceneCountCorrection,
+            catalog_version: CATALOG_VERSION,
+            catalog_resolved: passCStats.resolved,
+            catalog_unresolved: passCStats.unresolved,
+            catalog_unresolved_samples: passCStats.unresolvedSamples,
           },
         });
       if (insErr) {

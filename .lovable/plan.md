@@ -1,82 +1,107 @@
-## Problem
+# v178 — Universal ID Contract für alle wählbaren Achsen
 
-Trotz v174 wird HappyHorse weiterhin still auf Hailuo umgeschrieben — der Trigger sitzt nicht in `compose-video-clips` (die ist sauber), sondern im **`compose-clip-webhook`**, also genau dann wenn der HappyHorse-Render *zurückkommt*. Zwei Stellen sind übrig:
+## Ziel
+Jede Wahl, die ein Kunde im Briefing oder Storyboard treffen kann, bekommt eine stabile, lesbare ID statt eines freien Textlabels. Der Parser, das UI und die Render-Pipeline arbeiten ausschließlich mit IDs — Labels sind nur noch Anzeige. Damit verschwinden die aktuellen Symptome (leeres Location-Feld, „Unbenannter Look", fehlende Mimik/Gestik) strukturell.
 
-### Trigger A — Erfolgs-Pfad (der jetzt sichtbare Fall)
-`supabase/functions/compose-clip-webhook/index.ts`, Zeile 158-181:
+## Geltungsbereich der IDs
 
-```ts
-const staleHappyHorseLabel =
-  String(preUpdateScene?.clip_source ?? '') === 'ai-happyhorse';
-...
-if (isCinematicSync) {
-  if (staleHappyHorseLabel) sceneUpdate.clip_source = 'ai-hailuo'; // ← Bug
-  ...
-}
-```
+Zwei Klassen — bewusst getrennt, damit nichts kollidiert:
 
-Der Kommentar darüber sagt *"legacy / stale from before the Stage 2 hotfix"* — das stimmt seit v174 nicht mehr. HappyHorse **ist** jetzt eine legitime Cinematic-Sync-Master-Plate (Zeile 3092-3214 in `compose-video-clips`). Damit relabelt der Webhook bei **jedem** erfolgreichen HH-Cinematic-Sync-Render `clip_source` auf `ai-hailuo` — UI zeigt Hailuo, Lip-Sync läuft auf der HH-Plate.
+1. **Library-IDs (dynamisch, pro Workspace, UUID)** — gehören in eine DB-Tabelle:
+   - `character` → `brand_characters.id`
+   - `outfit` → `avatar_outfit_looks.id`
+   - `location` → `brand_locations.id`
+   - `prop` → `brand_props.id`
+   - `building` → `brand_buildings.id`
+   - `voice` → ElevenLabs Voice ID (extern, behandelt wie Library-ID)
 
-Beweis aus DB: jüngste „ready"-Szene `7f04d44c…` zeigt `clip_source=ai-hailuo`, `engine_override=cinematic-sync`, `lip_sync_status=done` — exakt das Symptom, das du siehst.
+2. **Catalog-IDs (statisch, global, slug)** — gehören in einen versionierten Katalog im Code:
+   - `mimik` (z. B. `mimik.confident`, `mimik.warm_smile`, `mimik.curious`)
+   - `gestik` (z. B. `gestik.open_palms`, `gestik.still`, `gestik.point_to_camera`)
+   - `blick` (z. B. `blick.to_camera`, `blick.away`, `blick.down`)
+   - `energy` (`energy.1` … `energy.5`)
+   - `framing` (`framing.wide`, `framing.medium`, `framing.medium_close_up`, `framing.close_up`, `framing.extreme_close_up`, `framing.establishing`)
+   - `angle` (`angle.eye_level`, `angle.low`, `angle.high`, `angle.dutch`, `angle.over_shoulder`)
+   - `movement` (`movement.static`, `movement.slow_push_in`, `movement.tracking`, `movement.handheld`, `movement.orbit`, …)
+   - `lighting` (`lighting.soft_window`, `lighting.golden_hour`, `lighting.neon`, `lighting.high_key`, `lighting.low_key`, …)
+   - `style_preset` (genau die 12 Cinematic Style Presets, die es schon im Toolkit gibt)
+   - `delivery` / `voice_tone` (`delivery.warm`, `delivery.urgent`, `delivery.calm`, …)
+   - `music_energy` (`music.low`, `music.mid`, `music.high`)
 
-### Trigger B — Fail-Pfad (Green-Net)
-Zeile 498-510: wenn Alibaba die HH-Generierung mit `DataInspectionFailed` ablehnt, switched der Webhook `clip_source` automatisch auf `ai-hailuo`, damit der nächste „Neu rendern"-Klick HH umgeht. Auch das überschreibt deine Provider-Wahl ohne Rückfrage.
+Catalog-IDs sind **lowercase, snake_case, namespaced mit Punkt**, z. B. `framing.medium_close_up`. Jede ID hat:
+- `id`
+- `label_de`, `label_en`
+- `synonyms` (Mapping freie KI-Antworten → ID)
+- `engine_hint` (englischer Token, der direkt in den AI-Prompt geht)
 
-## v176 — Silent-Hailuo-Migration im Webhook entfernen
+## Architektur
 
-### 1. `compose-clip-webhook/index.ts` Zeile 165-177 (Trigger A)
+### 1. Zentrales Katalog-Modul
+**Neue Datei:** `src/lib/video-composer/catalog/index.ts`
 
-```ts
-// VORHER
-const staleHappyHorseLabel =
-  String((preUpdateScene as any)?.clip_source ?? '') === 'ai-happyhorse';
-...
-if (isCinematicSync) {
-  if (staleHappyHorseLabel) sceneUpdate.clip_source = 'ai-hailuo';
-  sceneUpdate.lip_sync_status = 'pending';
-  sceneUpdate.twoshot_stage = 'master_clip';
-}
+Exportiert für jede Achse einen `Record<ID, CatalogEntry>` und Helper:
+- `resolveCatalogId(axis, raw)` — Fuzzy/Synonym-Match auf eine ID. Fallback: `null`.
+- `getCatalogLabel(axis, id, lang)` — für UI.
+- `getCatalogPromptToken(axis, id)` — für Prompt-Komposition (immer englisch).
+- `listCatalog(axis)` — für Dropdowns.
 
-// NACHHER (v176 — respect user provider, HH ist legitime Master-Plate)
-if (isCinematicSync) {
-  sceneUpdate.lip_sync_status = 'pending';
-  sceneUpdate.twoshot_stage = 'master_clip';
-  // clip_source bleibt unverändert — ai-happyhorse ist seit v174 valider Master.
-}
-```
+Single Source of Truth, getypt, lint-bar. Keine DB-Migration nötig.
 
-### 2. `compose-clip-webhook/index.ts` Zeile 498-527 (Trigger B)
+### 2. Schema-Erweiterung im Production-Plan
+**Datei:** `src/lib/video-composer/briefing/productionPlan.ts`
 
-Green-Net-Rejection darf den Provider nicht still wechseln. Stattdessen:
-- `clip_source` bleibt auf `ai-happyhorse`
-- Fehlertext wird klar & aktionsorientiert: `"happyhorse_content_filter: Alibaba hat den Prompt blockiert. Schreibe ihn um oder wechsle den Provider manuell im Provider-Dropdown auf Hailuo. (HappyHorse wurde NICHT automatisch umgestellt — deine Auswahl bleibt erhalten.)"`
-- Refund läuft wie bisher
+Pro Szene werden ID-Felder ergänzt:
+- `performance.mimikId`, `performance.gestikId`, `performance.blickId`, `performance.energyId`
+- `shotDirector.framingId`, `angleId`, `movementId`, `lightingId`, `stylePresetId`
+- `voiceover.deliveryId`
+- `musicCue.energyId`
 
-```ts
-// Entfernen: ...(isGreenNet ? { clip_source: 'ai-hailuo' } : {})
-// Tagged-Error bleibt als [green_net_rejected]-Marker erhalten, damit die UI
-// den Banner "Provider manuell wechseln?" anzeigen kann.
-```
+Die bestehenden freien Stringfelder bleiben als `*Label` erhalten — rein zur Anzeige und als KI-Hint. Der Renderer nutzt ausschließlich `*Id`.
 
-### 3. UI-Banner für `[green_net_rejected]` (optional, klein)
+### 3. Parser: alles auf IDs auflösen
+**Datei:** `supabase/functions/briefing-deep-parse/index.ts`
 
-`src/components/video-composer/SceneCard.tsx` zeigt bereits `clip_error`. Erweitern um einen Hint-Button „Auf Hailuo wechseln" wenn der Error mit `[green_net_rejected]` beginnt — dann ist der Provider-Switch **explizit** vom Nutzer initiiert, nicht still vom System.
+- Pass-A bleibt frei (KI darf natürlich antworten).
+- Neuer **Pass-C Resolver** (lokal, kein KI-Call): nimmt die freien Werte aus Pass-A/Pass-B und mappt sie via `resolveCatalogId` auf die ID. Bei Synonym-Treffer wird das Label überschrieben mit dem kanonischen Label.
+- Wenn kein Match: `*Id = null`, `_unresolved.push({axis, raw})` → UI zeigt einen sichtbaren Warn-Chip.
 
-### 4. Memory aktualisieren
+### 4. Storyboard-Apply
+**Datei:** `src/hooks/useApplyProductionPlan.ts`
 
-`mem/architecture/lipsync/` neue Notiz `v176-no-silent-hailuo-migration.md`:
-> Silent `clip_source` rewrites von `ai-happyhorse` → `ai-hailuo` sind in **keiner** Edge Function mehr erlaubt (weder `compose-video-clips` v174 noch `compose-clip-webhook` v176). Green-Net-Rejections und stale-Label-Normalisierung müssen den Provider unverändert lassen; ein Wechsel braucht einen expliziten Nutzer-Klick.
+Schreibt in `composer_scenes` **nur IDs**. Label-Spalten werden für Backwards-Compat parallel befüllt, aber nirgends mehr gelesen. Validierung: jede ID muss entweder im Catalog vorhanden sein oder eine gültige UUID einer existierenden Library-Zeile sein, sonst Insert-Reject mit klarer Fehlermeldung.
 
-## Was unverändert bleibt
+### 5. UI: Dropdowns überall einheitlich
+**Datei:** `src/components/video-composer/briefing/ProductionPlanSheet.tsx` plus `ScenePerformancePanel.tsx`, `SceneShotDirector*.tsx`.
 
-- v174 Respect-User-Provider in `compose-video-clips` (kein Re-Map)
-- v175 N=1 Tight-Slice + Overlay
-- v168 Anti-Clone, v170 Cast-Integrity
-- Refund-Logik (Green-Net-Refund läuft genauso)
-- Sora→Veo und Pika→Hailuo Sunset/Maintenance-Migrationen (das sind echte EOL-Provider, kein User-Override-Konflikt)
+- Jeder Picker wird auf `listCatalog(axis)` umgestellt.
+- Anzeige: kanonisches Label, darunter klein die ID als Mono-Chip (Pro-Look, debug-freundlich).
+- Unresolved-Warn-Chip mit „Auto-Resolve"-Button (lokaler Synonym-Match in einem Klick).
+- Fan-Out-Logik (eine Auswahl auf alle gleich-benannten Slots aller Szenen anwenden) gilt jetzt einheitlich für jede Achse, nicht nur Location.
 
-## Verifikation
+### 6. Render-Pipeline
+**Dateien:** `supabase/functions/compose-video-clips/index.ts`, `compose-scene-anchor/index.ts`.
 
-1. Neue HH-Cinematic-Sync-Szene rendern → DB-Row behält `clip_source='ai-happyhorse'` auch nach `clip_status='ready'`.
-2. UI im Storyboard zeigt HappyHorse-Badge statt Hailuo.
-3. Green-Net-Trigger (z.B. „3 AM Moment"-Prompt) → `clip_status='failed'`, `clip_source` bleibt `ai-happyhorse`, Banner verlinkt manuellen Wechsel.
+`composePromptLayers` zieht den englischen `engine_hint` aus dem Catalog statt freie Strings zu interpolieren. Das stabilisiert die Prompts (kein „warm-smile" vs „warmes Lächeln" mehr) und schützt die Lip-Sync-Pipeline, weil identische Eingaben → identische Outputs.
+
+### 7. Telemetrie + Migrationspfad
+- Neue Felder in `parser_meta`: `resolved_ids`, `unresolved_ids`, `catalog_version`.
+- Bestehende Projekte: Lazy-Migrate beim Öffnen — ein einmaliger Resolver-Lauf füllt die `*Id`-Felder nach, ohne die Label zu verändern.
+- Keine DB-Migration nötig: die ID-Strings werden in den bestehenden JSON-Spalten der Szenen gespeichert.
+
+## Schutz vor Regressions
+
+- **Lip-Sync-Pipeline** wird nicht angefasst — `compose-dialog-segments`, `render-sync-segments-audio-mux`, Sync.so-Webhook bleiben byte-identisch.
+- **Catalog ist additiv** — neue IDs brechen keine alten Szenen, weil der Resolver Synonyme behält und alte Label weiter akzeptiert.
+- **Type-Safe** — die Catalog-IDs werden als TypeScript-Literal-Unions exportiert, sodass Tippfehler im Code beim Build auffallen.
+- **Catalog-Version** — `catalog_version` Konstante; jede Änderung erzwingt eine Re-Resolution beim nächsten Öffnen, sodass keine Szene mit veralteter ID hängen bleibt.
+- **Rollout in 3 Wellen**, jede für sich getestet:
+  1. Catalog-Modul + Parser-Pass-C, ohne UI-Änderung — nur Schattenfelder befüllen.
+  2. UI auf IDs umstellen (Dropdowns), Render-Pipeline weiter auf Label.
+  3. Render-Pipeline auf `engine_hint` umstellen.
+
+## Ergebnis nach Umsetzung
+
+- Jede vom Kunden wählbare Eigenschaft (Mimik, Gestik, Blick, Energy, Framing, Angle, Movement, Lighting, Style Preset, Delivery, Music Energy, plus Library-Items) hat eine stabile, sprechende ID.
+- Briefings in DE/EN/ES landen über Synonyme deterministisch auf derselben ID.
+- „Unbenannter Look", leere Performance-Felder und stille Drift im Render-Prompt sind strukturell ausgeschlossen — nicht mehr nur gepatcht.
+- Storyboard und Briefing-Plan zeigen pro Szene exakt dieselbe ID, jede Abweichung ist sofort sichtbar.
