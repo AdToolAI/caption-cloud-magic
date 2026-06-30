@@ -452,7 +452,7 @@ function planSceneToComposerScene(
     ),
   );
   const mentionedLocationIds = ps.location?.locationId
-    ? [stripPrefix(ps.location.locationId)].filter((x) => UUID_RE.test(x))
+    ? [stripPrefix(ps.location.locationId)].filter((x) => PLAN_UUID_RE.test(x))
     : [];
   const rawLocationId = ps.location?.locationId ? String(ps.location.locationId) : undefined;
 
@@ -682,11 +682,13 @@ export function useApplyProductionPlan() {
     // 3) Resolve default voices for cast characters that the parser matched but
     // did not attach a voiceId to. This never touches the lipsync pipeline; it
     // only fills composer_scenes.dialog_voices / character_voice_id for new rows.
+    const hydratedScenes = hydratePlanScenesForApply(plan.scenes ?? []);
+
     const characterIds = Array.from(new Set(
-      (plan.scenes ?? [])
+      hydratedScenes
         .flatMap((s) => s.cast ?? [])
-        .map((c) => c.characterId ? String(c.characterId).replace(/^lib:/, '').replace(/^(outfit|catalog):/, '') : null)
-        .filter((x): x is string => !!x),
+        .map((c) => c.characterId ? stripPlanId(String(c.characterId)) : null)
+        .filter((x): x is string => !!x && PLAN_UUID_RE.test(x)),
     ));
     const defaultVoicesByCharacter: Record<string, string | undefined> = {};
     const genderByCharacter: Record<string, 'male' | 'female' | 'neutral' | null | undefined> = {};
@@ -715,7 +717,7 @@ export function useApplyProductionPlan() {
     // across scenes.
     const voicePoolPicker = createVoicePoolPicker();
     const voicePoolAssignments: Record<string, string> = {};
-    const newScenes: ComposerScene[] = (plan.scenes ?? [])
+    const newScenes: ComposerScene[] = hydratedScenes
       .slice()
       .sort((a, b) => a.index - b.index)
       .map((s, i) =>
