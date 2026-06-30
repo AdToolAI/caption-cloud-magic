@@ -18,15 +18,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, CheckCircle2, FileText, Loader2, Plus, Shield, Sparkles, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Loader2, Plus, Shield, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
-import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
+import { ProductionPlan, type TProductionPlan, type TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
-import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
 import BriefingPlanSummary from './BriefingPlanSummary';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
 import type { CatalogAxis } from '@/lib/video-composer/catalog';
@@ -55,6 +54,46 @@ const normalizeAssetKey = (value?: string | null) =>
 
 const uuidInside = (value?: string | null) =>
   String(value ?? '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+
+type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
+type PlanLocationSlot = NonNullable<TPlanScene['location']>;
+
+const emptyCastSlot = (sceneIndex: number): PlanCastSlot => ({
+  mentionKey: `S${String(sceneIndex).padStart(2, '0')} Sprecher`,
+  characterId: null,
+  characterName: 'Sprecher',
+  outfitLookId: null,
+  voiceId: null,
+});
+
+const emptyLocationSlot = (): PlanLocationSlot => ({
+  mentionKey: 'Location',
+  locationId: null,
+  locationName: '',
+  referenceImageUrl: null,
+});
+
+const cloneCastSlot = (slot: PlanCastSlot, sceneIndex: number): PlanCastSlot => ({
+  ...slot,
+  mentionKey: slot.mentionKey || `S${String(sceneIndex).padStart(2, '0')} Sprecher`,
+  characterName: slot.characterName || 'Sprecher',
+});
+
+const shouldInheritContinuity = (scene: TPlanScene, axis: 'cast' | 'location') => {
+  const haystack = [
+    scene.continuityHint,
+    scene.anchorPromptEN,
+    scene.label,
+    scene.beat,
+    scene.voiceover?.text,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (axis === 'cast') {
+    return scene.lipSync || !!scene.voiceover?.text || !!scene.dialogTurns?.length
+      || /(same|gleiche|gleichen|selbe|derselbe|avatar|founder|sprecher|speaker|charakter|character)/i.test(haystack);
+  }
+  return /(same|gleiche|gleichen|selbe|derselbe|desk|location|ort|setting|home\s*office|büro|office)/i.test(haystack);
+};
 
 /**
  * Wave 3 chip: renders a catalog-resolved label (preferred) or the raw
@@ -179,31 +218,86 @@ export default function ProductionPlanSheet({
     };
   }, [locOptions]);
 
-  // v179 UI safety net: plans created before the backend catalog resolver was
-  // fixed can still contain locationId=null + locationName="home-office".
-  // As soon as the unified library/catalog finishes loading, heal those slots
-  // in-place so warnings disappear and Apply persists the resolved selection.
+  // v180 Review Slot Hydrator: the parser may return incomplete scenes
+  // (especially padded/continuity scenes). The review UI must still expose
+  // editable Cast/Outfit/Location slots for EVERY scene, and Lip-Sync scenes
+  // need a character slot so the Auto-Voice pool can assign a real Voice-ID.
   useEffect(() => {
-    if (!plan || locOptions.length === 0) return;
+    if (!plan) return;
     let changed = false;
+    let lastResolvedCast: PlanCastSlot | null = null;
+    let firstResolvedCast: PlanCastSlot | null = null;
+    let lastResolvedLocation: PlanLocationSlot | null = null;
+    let firstResolvedLocation: PlanLocationSlot | null = null;
+
     const scenes = plan.scenes.map((s) => {
-      const loc = s.location;
-      if (!loc) return s;
-      const matched = findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey);
-      if (!matched) return s;
-      if (loc.locationId === matched.id && loc.locationName === matched.name) return s;
-      changed = true;
+      let next = s;
+      const sourceCast = lastResolvedCast ?? firstResolvedCast;
+      const cast = [...(s.cast ?? [])];
+
+      if (cast.length === 0) {
+        const inherited = sourceCast && shouldInheritContinuity(s, 'cast')
+          ? cloneCastSlot(sourceCast, s.index)
+          : emptyCastSlot(s.index);
+        cast.push(inherited);
+        changed = true;
+      } else if (sourceCast && shouldInheritContinuity(s, 'cast')) {
+        for (let i = 0; i < cast.length; i += 1) {
+          if (!cast[i]?.characterId) {
+            cast[i] = {
+              ...cast[i],
+              characterId: sourceCast.characterId,
+              characterName: sourceCast.characterName,
+              referenceImageUrl: sourceCast.referenceImageUrl,
+              outfitLookId: cast[i].outfitLookId ?? sourceCast.outfitLookId ?? null,
+              voiceId: cast[i].voiceId ?? sourceCast.voiceId ?? null,
+              voiceName: cast[i].voiceName ?? sourceCast.voiceName,
+              voiceAutoAssigned: cast[i].voiceAutoAssigned ?? sourceCast.voiceAutoAssigned,
+            };
+            changed = true;
+          }
+        }
+      }
+
+      const resolvedCast = cast.find((c) => c.characterId || c.outfitLookId) ?? null;
+      if (resolvedCast) {
+        lastResolvedCast = resolvedCast;
+        if (!firstResolvedCast) firstResolvedCast = resolvedCast;
+      }
+      if (cast !== s.cast) next = { ...next, cast };
+
+      const loc = next.location ?? null;
+      const matched = findLocationOption(loc?.locationId, loc?.locationName ?? loc?.mentionKey);
+      let location: PlanLocationSlot = loc ?? emptyLocationSlot();
+
+      if (!loc) {
+        const inherited = lastResolvedLocation ?? firstResolvedLocation;
+        if (inherited) {
+          location = { ...inherited };
+        }
+        changed = true;
+      } else if (matched && (loc.locationId !== matched.id || loc.locationName !== matched.name)) {
+        location = { ...loc, locationId: matched.id, locationName: matched.name };
+        changed = true;
+      } else if (!matched && !loc.locationId && (lastResolvedLocation ?? firstResolvedLocation)) {
+        location = { ...(lastResolvedLocation ?? firstResolvedLocation)! };
+        changed = true;
+      }
+
+      const resolvedLocation = findLocationOption(location.locationId, location.locationName ?? location.mentionKey);
+      if (resolvedLocation) {
+        location = { ...location, locationId: resolvedLocation.id, locationName: resolvedLocation.name };
+        lastResolvedLocation = location;
+        if (!firstResolvedLocation) firstResolvedLocation = location;
+      }
+
       return {
-        ...s,
-        location: {
-          ...loc,
-          locationId: matched.id,
-          locationName: matched.name,
-        },
+        ...next,
+        location,
       };
     });
     if (changed) setPlan({ ...plan, scenes });
-  }, [plan, locOptions.length, findLocationOption]);
+  }, [plan, findLocationOption]);
 
   /** Outfit looks belonging to a given base character id. */
   const outfitsByCharacter = useMemo(() => {
@@ -301,7 +395,7 @@ export default function ProductionPlanSheet({
         outfitLookId: lookId,
       };
     }
-    if (rawId.startsWith('catalog:')) return { baseId: rawId.split(':', 2)[1] ?? null, outfitLookId: null };
+    if (rawId.startsWith('catalog:')) return { baseId: uuidInside(rawId) ?? rawId.split(':').pop() ?? null, outfitLookId: null };
     if (rawId.startsWith('lib:')) return { baseId: rawId.slice(4), outfitLookId: null };
     return { baseId: rawId, outfitLookId: null };
   };
@@ -483,8 +577,8 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
         const cast = [...(s.cast ?? [])];
-        const c = cast[castIdx];
-        if (!c) return s;
+        while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
+        const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
         const matched = charOptions.find((x) => x.id === characterId);
         cast[castIdx] = {
           ...c,
@@ -505,8 +599,8 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
         const cast = [...(s.cast ?? [])];
-        const c = cast[castIdx];
-        if (!c) return s;
+        while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
+        const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
         cast[castIdx] = { ...c, outfitLookId };
         return { ...s, cast };
       }),
@@ -519,11 +613,15 @@ export default function ProductionPlanSheet({
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
         const matched = findLocationOption(locationId, null);
+        const baseLocation = s.location ?? emptyLocationSlot();
         return {
           ...s,
-          location: s.location
-            ? { ...s.location, locationId: matched?.id ?? locationId, locationName: matched?.name ?? s.location.locationName }
-            : (matched ? { mentionKey: matched.name, locationId: matched.id, locationName: matched.name } : s.location),
+          location: {
+            ...baseLocation,
+            mentionKey: matched?.name ?? baseLocation.mentionKey,
+            locationId: matched?.id ?? locationId,
+            locationName: matched?.name ?? baseLocation.locationName,
+          },
         };
       }),
     });
@@ -644,6 +742,11 @@ export default function ProductionPlanSheet({
     let locationFixed = 0;
     setPlan((p) => {
       if (!p) return p;
+      let lastCast: PlanCastSlot | null = null;
+      let firstCast: PlanCastSlot | null = null;
+      let lastLocation: PlanLocationSlot | null = null;
+      let firstLocation: PlanLocationSlot | null = null;
+
       const scenes = p.scenes.map((s) => {
         const cast = (s.cast ?? []).map((c) => {
           if (c.characterId) return c;
@@ -662,8 +765,21 @@ export default function ProductionPlanSheet({
             outfitLookId: null,
           };
         });
-        let location = s.location;
-        if (location && !findLocationOption(location.locationId, location.locationName ?? location.mentionKey)) {
+        if (cast.length === 0) cast.push(emptyCastSlot(s.index));
+        for (let i = 0; i < cast.length; i += 1) {
+          if (!cast[i].characterId && (lastCast ?? firstCast)) {
+            cast[i] = cloneCastSlot((lastCast ?? firstCast)!, s.index);
+            castFixed += 1;
+          }
+        }
+        const resolvedCast = cast.find((c) => c.characterId || c.outfitLookId) ?? null;
+        if (resolvedCast) {
+          lastCast = resolvedCast;
+          if (!firstCast) firstCast = resolvedCast;
+        }
+
+        let location = s.location ?? emptyLocationSlot();
+        if (!findLocationOption(location.locationId, location.locationName ?? location.mentionKey)) {
           const hit = findLocationOption(null, location.mentionKey ?? location.locationName);
           if (hit) {
             locationFixed += 1;
@@ -672,7 +788,16 @@ export default function ProductionPlanSheet({
               locationId: hit.id,
               locationName: hit.name,
             };
+          } else if (lastLocation ?? firstLocation) {
+            locationFixed += 1;
+            location = { ...(lastLocation ?? firstLocation)! };
           }
+        }
+        const resolvedLocation = findLocationOption(location.locationId, location.locationName ?? location.mentionKey);
+        if (resolvedLocation) {
+          location = { ...location, locationId: resolvedLocation.id, locationName: resolvedLocation.name };
+          lastLocation = location;
+          if (!firstLocation) firstLocation = location;
         }
         return { ...s, cast, location };
       });
@@ -1032,10 +1157,12 @@ export default function ProductionPlanSheet({
                       )}
 
                       {/* Cast resolver — CastRef: base character + optional outfit (separate dropdowns) */}
-                      {(s.cast ?? []).length > 0 && (
+                      {(() => {
+                        const castSlots = (s.cast ?? []).length > 0 ? (s.cast ?? []) : [emptyCastSlot(s.index)];
+                        return (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cast</Label>
-                          {s.cast.map((c, i) => {
+                          {castSlots.map((c, i) => {
                             const split = splitCastId(c.characterId);
                             const explicitLookId = c.outfitLookId ?? split.outfitLookId ?? null;
                             const lookHit = explicitLookId ? outfitById.get(explicitLookId) ?? null : null;
@@ -1094,10 +1221,10 @@ export default function ProductionPlanSheet({
                                     </SelectContent>
                                   </Select>
                                 )}
-                                {(c.voiceName || c.voiceId) && (
+                                {(c.voiceName || c.voiceId || baseId) && (
                                   <Badge variant="secondary" className="text-[10px]">
-                                    🎙 {c.voiceName ?? 'Stimme'}
-                                    {(c as any).voiceAutoAssigned && (
+                                    🎙 {c.voiceName ?? (c.voiceId ? 'Stimme' : 'Auto-Voice beim Anwenden')}
+                                    {((c as any).voiceAutoAssigned || (!c.voiceId && !c.voiceName && baseId)) && (
                                       <span className="ml-1 text-amber-300" title="Stimme automatisch von der KI zugeordnet">⚡ AI</span>
                                     )}
                                   </Badge>
@@ -1106,7 +1233,8 @@ export default function ProductionPlanSheet({
                             );
                           })}
                         </div>
-                      )}
+                        );
+                      })()}
 
 
                       {/* Location resolver — always visible so every scene can be manually mapped. */}
