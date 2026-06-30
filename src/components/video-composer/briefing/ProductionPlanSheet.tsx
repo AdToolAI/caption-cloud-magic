@@ -272,7 +272,7 @@ export default function ProductionPlanSheet({
 
       if (!loc) {
         const inherited = lastResolvedLocation ?? firstResolvedLocation;
-        if (inherited && shouldInheritContinuity(s, 'location')) {
+        if (inherited) {
           location = { ...inherited };
         }
         changed = true;
