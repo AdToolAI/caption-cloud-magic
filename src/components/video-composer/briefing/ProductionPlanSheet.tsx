@@ -28,6 +28,8 @@ import { ProductionPlan, type TProductionPlan } from '@/lib/video-composer/brief
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import { mentionToCastRef } from '@/lib/video-composer/mentionToCastRef';
 import BriefingPlanSummary from './BriefingPlanSummary';
+import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
+import type { CatalogAxis } from '@/lib/video-composer/catalog';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
 import type {
   ComposerScene,
@@ -40,6 +42,36 @@ type Step = 'paste' | 'parsing' | 'review';
 
 const isUuid = (val?: string | null) =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+/**
+ * Wave 3 chip: renders a catalog-resolved label (preferred) or the raw
+ * free-text value, plus an `⚡ AI` micro-badge when the value came from a
+ * Pass-C catalog id. Hidden when there's nothing to show.
+ */
+function CatalogChip({
+  axis,
+  id,
+  raw,
+  label,
+}: {
+  axis: CatalogAxis;
+  id?: string | null;
+  raw?: unknown;
+  label: string;
+}) {
+  const chip = resolveCatalogChip(axis, id ?? null, raw);
+  if (chip.empty) return null;
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[10px] ${chip.fromCatalog ? 'border-amber-300/40 text-amber-200' : ''}`}
+      title={id ? `${label}: ${chip.label} · catalog:${id}` : `${label}: ${chip.label}`}
+    >
+      {label}: {chip.label}
+      {chip.fromCatalog ? <span className="ml-1 opacity-70">⚡</span> : null}
+    </Badge>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -841,14 +873,14 @@ export default function ProductionPlanSheet({
                       )}
 
                       {/* Performance: Mimik / Gestik / Blick / Energy */}
-                      {s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick || s.performance.energy) && (
+                      {s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick || s.performance.energy != null || (s.performance as any).mimikId || (s.performance as any).gestikId || (s.performance as any).blickId || (s.performance as any).energyId) && (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Performance</Label>
                           <div className="flex flex-wrap gap-1">
-                            {s.performance.mimik && <Badge variant="outline" className="text-[10px]">Mimik: {s.performance.mimik}</Badge>}
-                            {s.performance.gestik && <Badge variant="outline" className="text-[10px]">Gestik: {s.performance.gestik}</Badge>}
-                            {s.performance.blick && <Badge variant="outline" className="text-[10px]">Blick: {s.performance.blick}</Badge>}
-                            {s.performance.energy != null && <Badge variant="outline" className="text-[10px]">Energy: {s.performance.energy}/5</Badge>}
+                            <CatalogChip axis="mimik"  id={(s.performance as any).mimikId}  raw={s.performance.mimik}  label="Mimik" />
+                            <CatalogChip axis="gestik" id={(s.performance as any).gestikId} raw={s.performance.gestik} label="Gestik" />
+                            <CatalogChip axis="blick"  id={(s.performance as any).blickId}  raw={s.performance.blick}  label="Blick" />
+                            <CatalogChip axis="energy" id={(s.performance as any).energyId} raw={s.performance.energy != null ? `${s.performance.energy}/5` : undefined} label="Energy" />
                           </div>
                         </div>
                       )}
@@ -910,13 +942,20 @@ export default function ProductionPlanSheet({
                       )}
 
 
-                      {s.shotDirector && (
-                        <div className="flex flex-wrap gap-1">
-                          {s.shotDirector.framing && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.framing}</Badge>}
-                          {s.shotDirector.angle && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.angle}</Badge>}
-                          {s.shotDirector.movement && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.movement}</Badge>}
-                          {s.shotDirector.lighting && <Badge variant="secondary" className="text-[10px]">{s.shotDirector.lighting}</Badge>}
-                        </div>
+                      {(s.shotDirector || (s.shotDirector as any)) && (
+                        ((s.shotDirector?.framing || s.shotDirector?.angle || s.shotDirector?.movement || s.shotDirector?.lighting ||
+                          (s.shotDirector as any)?.framingId || (s.shotDirector as any)?.angleId || (s.shotDirector as any)?.movementId || (s.shotDirector as any)?.lightingId || (s.shotDirector as any)?.stylePresetId) ? (
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Shot Director</Label>
+                            <div className="flex flex-wrap gap-1">
+                              <CatalogChip axis="framing"      id={(s.shotDirector as any)?.framingId}     raw={s.shotDirector?.framing}     label="Framing" />
+                              <CatalogChip axis="angle"        id={(s.shotDirector as any)?.angleId}       raw={s.shotDirector?.angle}       label="Angle" />
+                              <CatalogChip axis="movement"     id={(s.shotDirector as any)?.movementId}    raw={s.shotDirector?.movement}    label="Move" />
+                              <CatalogChip axis="lighting"     id={(s.shotDirector as any)?.lightingId}    raw={s.shotDirector?.lighting}    label="Licht" />
+                              <CatalogChip axis="style_preset" id={(s.shotDirector as any)?.stylePresetId} raw={(s.shotDirector as any)?.stylePreset} label="Style" />
+                            </div>
+                          </div>
+                        ) : null)
                       )}
 
                       {/* Cast resolver — CastRef: base character + optional outfit (separate dropdowns) */}
