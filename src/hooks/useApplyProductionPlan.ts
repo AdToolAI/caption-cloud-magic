@@ -397,12 +397,12 @@ function planSceneToComposerScene(
     dialogMode,
     dialogScript,
     dialogVoices: Object.keys(dialogVoices).length ? dialogVoices : undefined,
-    shotDirector: ps.shotDirector
+    shotDirector: (ps.shotDirector || rawLocationId?.startsWith('catalog:'))
       ? {
-          framing: ps.shotDirector.framing,
-          angle: ps.shotDirector.angle,
-          movement: ps.shotDirector.movement,
-          lighting: ps.shotDirector.lighting,
+          framing: ps.shotDirector?.framing,
+          angle: ps.shotDirector?.angle,
+          movement: ps.shotDirector?.movement,
+          lighting: ps.shotDirector?.lighting,
           // Wave 3: forward Catalog-IDs (read-only shadow fields) so
           // downstream UI can show ⚡-AI chips. No prompt impact.
           ...(ps.shotDirector as any).framingId      ? { framingId:      (ps.shotDirector as any).framingId } : {},
