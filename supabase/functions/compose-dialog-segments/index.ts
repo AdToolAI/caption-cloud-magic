@@ -3289,8 +3289,24 @@ serve(async (req) => {
       (pass as any).preclip_error = null;
       (pass as any)._v152BboxPrimary = true; // legacy flag name kept for downstream gates
       (pass as any)._v153BboxPrimary = true;
+      // v181 — N=1 Depicted-Face Lock telemetry.
+      // When a single-speaker scene has 2+ faces in the FULL plate (phone
+      // screen, photo, mirror, background person), the bbox-url-pro path
+      // already pins Sync.so to the cast speaker box. We surface a clear
+      // log line so QA can verify the lock fired and so future regressions
+      // are visible without re-reading source.
+      const v181PlateFaceCount = Number(plateIdentityMap?.faces?.length ?? 0);
+      const v181CastBox = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
+      if (speakers.length === 1 && v181PlateFaceCount >= 2) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v181_n1_depicted_face_lock ` +
+          `plate_face_count=${v181PlateFaceCount} cast_box=${JSON.stringify(v181CastBox)} ` +
+          `speaker=${pass.speaker_name ?? "?"} — forcing strict bbox-url-pro on cast face`,
+        );
+        (pass as any)._v181DepictedFaceLock = true;
+      }
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.2_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v153.2_unified_bbox_primary speakers=${speakers.length} plate_box=yes resolved=${plateIdentityMap?.resolvedCount ?? "?"} speaker=${pass.speaker_name ?? "?"} plate_face_count=${v181PlateFaceCount} — bbox-url-pro SINGLE PATH (no preclip, no auto_detect, no synthetic)`,
       );
     }
 
