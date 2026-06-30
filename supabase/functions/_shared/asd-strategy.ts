@@ -429,6 +429,48 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
     };
   }
 
+  // ── Rule 4 (v181) — N=1 Depicted-Face Lock.
+  // Before the legacy `single_face_auto` path, detect single-speaker scenes
+  // that have a SECONDARY face anywhere in the FULL plate (phone screen,
+  // photo on wall, mirror, background person). Sync.so's Active Speaker
+  // Detection can lock onto the more "lip-active" depicted face and leave
+  // the cast member static. Force a strict single-entry `bounding_boxes`
+  // payload around the cast speaker box so Sync.so cannot wander.
+  const v181IsN1WithDepictedFace =
+    !isMultiSpeaker &&
+    typeof geometry.plateFaceCount === "number" &&
+    geometry.plateFaceCount >= 2 &&
+    Array.isArray(geometry.castSpeakerPlateBox) &&
+    geometry.castSpeakerPlateBox.length === 4 &&
+    !isCoordsProRetry(retryVariant) &&
+    !isBboxRetry(retryVariant);
+
+  if (v181IsN1WithDepictedFace) {
+    const box = geometry.castSpeakerPlateBox as [number, number, number, number];
+    console.log(
+      `[v181] n1_depicted_face_lock plateFaceCount=${geometry.plateFaceCount} castBox=${JSON.stringify(box)} retry=${retryVariant ?? "none"}`,
+    );
+    return {
+      mode: "single_face_bbox_strict",
+      asd: {
+        auto_detect: false,
+        bounding_boxes: [box],
+      },
+      frameNumber: null,
+      coordSpace: "plate",
+      source: "default",
+      diagnostics: {
+        rule: "rule_4_v181_n1_depicted_face_lock",
+        v181_n1_depicted_face_lock: true,
+        retry_variant: retryVariant,
+        plate_face_count: geometry.plateFaceCount,
+        cast_speaker_plate_box: box,
+        is_multi_speaker_scene: isMultiSpeaker,
+        reason: "n1_scene_with_secondary_depicted_face_in_plate",
+      },
+    };
+  }
+
   // ── Rule 4: Clean single-face preclip / single-speaker → auto_detect.
   // Empirically (v129.24) explicit coords on a tight 1-face crop trigger
   // Sync.so `generation_unknown_error`; auto_detect is the safe default.
