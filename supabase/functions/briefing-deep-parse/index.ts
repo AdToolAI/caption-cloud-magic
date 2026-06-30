@@ -1432,8 +1432,9 @@ This overrides any English wording in the briefing's scaffolding
           const m = String(u?.path ?? u?.field ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
           if (!m) return true;
           const arrIdx = parseInt(m[1], 10);
-          // arrIdx is 0-based, scene.index is 1-based
-          return !resolvedLocationIndexes.has(arrIdx + 1);
+          // Pass-B has produced both 0-based array paths (scenes[0]) and
+          // 1-based scene.index paths (scenes[1]). Treat either as resolved.
+          return !(resolvedLocationIndexes.has(arrIdx) || resolvedLocationIndexes.has(arrIdx + 1));
         });
       }
 
