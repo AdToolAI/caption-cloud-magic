@@ -376,6 +376,7 @@ function planSceneToComposerScene(
   const mentionedLocationIds = ps.location?.locationId
     ? [stripPrefix(ps.location.locationId)].filter((x) => UUID_RE.test(x))
     : [];
+  const rawLocationId = ps.location?.locationId ? String(ps.location.locationId) : undefined;
 
   return {
     id: newSceneId(),
@@ -409,6 +410,7 @@ function planSceneToComposerScene(
           ...(ps.shotDirector as any).movementId     ? { movementId:     (ps.shotDirector as any).movementId } : {},
           ...(ps.shotDirector as any).lightingId     ? { lightingId:     (ps.shotDirector as any).lightingId } : {},
           ...(ps.shotDirector as any).stylePresetId  ? { stylePresetId:  (ps.shotDirector as any).stylePresetId } : {},
+          rawLocationId?.startsWith('catalog:')       ? { locationCatalogId: rawLocationId } : {},
         }
       : undefined,
     sceneActionUser: ps.anchorPromptEN ?? ps.voiceover?.text,
