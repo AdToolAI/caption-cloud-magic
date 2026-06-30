@@ -1284,6 +1284,11 @@ This overrides any English wording in the briefing's scaffolding
           return !resolvedLocationIndexes.has(arrIdx + 1);
         });
       }
+
+      // Also clean the project-level voice (UUID-shaped → null).
+      if (plan?.voice && looksLikeUuid((plan.voice as any).voiceId)) {
+        (plan.voice as any).voiceId = null;
+      }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
     }
