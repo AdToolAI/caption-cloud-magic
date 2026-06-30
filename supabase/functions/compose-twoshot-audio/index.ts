@@ -514,10 +514,39 @@ serve(async (req) => {
     // Load scene + ownership
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, dialog_script, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source")
+      .select("id, project_id, dialog_script, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status")
       .eq("id", scene_id)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
+
+    // v182: Hard guard — refuse to prep audio for a scene whose master clip
+    // is failed/missing. Prevents phantom lip-sync runs when a client race
+    // fires the audio-prep tick microseconds before the failure webhook
+    // lands. The auto-trigger will silently retry once the master clip is
+    // genuinely ready again.
+    const cs = (scene as any).clip_status;
+    const ce = (scene as any).clip_error;
+    const ts = (scene as any).twoshot_stage;
+    const ls = (scene as any).lip_sync_status;
+    const cu = (scene as any).clip_url;
+    if (
+      cs === "failed" ||
+      ts === "failed" ||
+      ts === "audio_mux_failed" ||
+      ls === "failed" ||
+      ls === "canceled" ||
+      !!ce ||
+      typeof cu !== "string" ||
+      cu.length === 0
+    ) {
+      return json(
+        {
+          error: "scene_not_realized_no_lipsync",
+          detail: { clip_status: cs, twoshot_stage: ts, lip_sync_status: ls, has_clip_url: !!cu, has_clip_error: !!ce },
+        },
+        422,
+      );
+    }
 
     const { data: project } = await supabase
       .from("composer_projects")

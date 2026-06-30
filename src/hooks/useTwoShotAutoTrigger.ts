@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
+import { isRealizedScene } from '@/lib/composer/isRealizedScene';
 
 // v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
 // per scene). DB select is filtered by project_id + indexed, load negligible.
@@ -274,6 +275,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // permanent in 'audio' hängen, der globale Balken verschwindet,
         // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
         const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
+          if (!isRealizedScene(d)) return false;
           if (!isDialogEngine(d.engine_override)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
@@ -297,6 +299,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         }
 
         const needsAudioPrep = (data as any[]).filter((d) => {
+          if (!isRealizedScene(d)) return false;
           if (!isDialogEngine(d.engine_override)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
@@ -376,6 +379,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         
 
         const candidates = (data as any[]).filter((d) => {
+          if (!isRealizedScene(d)) return false;
           if (!isDialogEngine(d.engine_override)) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           // Master clip must be READY — never try lip-sync on a failed/generating master.
