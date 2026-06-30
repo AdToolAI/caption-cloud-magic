@@ -432,6 +432,8 @@ export default function ProductionPlanSheet({
       setCreatingLoc(null);
     }
   };
+
+  const totalPlanSec = useMemo(
     () => (plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0),
     [plan],
   );
