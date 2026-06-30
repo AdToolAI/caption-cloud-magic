@@ -302,12 +302,51 @@ export default function ComposerSequencePreview({
     slotCSrcRef.current = undefined;
 
     if (playableRef.current.length > 0) {
-      // Init: load scene 0 → A, scene 1 → B, scene 2 → hidden prefetch C.
-      preloadSlot('A', 0);
-      preloadSlot('B', 1);
-      preloadSlot('C', 2);
-      setOpacityForSlot('A', 1);
-      setOpacityForSlot('B', 0);
+      // The three <video> slots use `key={playableSignature}` so they
+      // re-mount whenever the playable list changes. Refs may still be
+      // pointing at the OLD detached element on the first synchronous
+      // tick of this effect — wait one rAF so the freshly-mounted
+      // <video> nodes are wired up before we set `src` on them.
+      const armSlots = () => {
+        if (
+          !videoARef.current ||
+          !videoBRef.current ||
+          !videoCRef.current
+        ) {
+          // refs not yet attached → try again next frame.
+          requestAnimationFrame(armSlots);
+          return;
+        }
+        // Init: load scene 0 → A, scene 1 → B, scene 2 → hidden prefetch C.
+        preloadSlot('A', 0);
+        preloadSlot('B', 1);
+        preloadSlot('C', 2);
+        setOpacityForSlot('A', 1);
+        setOpacityForSlot('B', 0);
+
+        // First-Frame Paint Pulse on Slot A: a remounted <video> in
+        // Chromium does not paint frame 0 until decode is unblocked by
+        // `play()`. We trigger a silent play→pause cycle so the user
+        // sees the scene's first frame immediately instead of black.
+        const a = videoARef.current;
+        if (a && !playingRef.current) {
+          const wasMuted = a.muted;
+          a.muted = true;
+          const p = a.play();
+          if (p && typeof p.then === 'function') {
+            p.then(() => {
+              try {
+                a.pause();
+                a.currentTime = 0;
+                a.muted = wasMuted;
+              } catch { /* noop */ }
+            }).catch(() => {
+              try { a.muted = wasMuted; } catch { /* noop */ }
+            });
+          }
+        }
+      };
+      requestAnimationFrame(armSlots);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playableSignature]);

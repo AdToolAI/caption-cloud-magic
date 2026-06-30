@@ -1,41 +1,61 @@
-## v181 — N=1 Depicted-Face Lock
+# Bug — Scene 1 bleibt im Voiceover & Untertitel‑Preview schwarz, Scene 2 spielt anschließend normal
 
-**Ziel:** Bei Single-Speaker-Szenen mit einem zweiten Gesicht im Bild (Handy-Display, Foto, Spiegel, Bildschirm, Hintergrund-Person) zwingt die ASD-Strategie Sync.so deterministisch auf das Gesicht des Cast-Sprechers. Kein Pfad mehr, auf dem Sync.so "freiwillig" das falsche Gesicht animiert.
+## Beobachtung
+Im Tab „Voiceover & Untertitel“ → Karte „Gesamtes Video — Vorschau“:
+- Chip oben links zeigt korrekt „Szene 1 von 2“.
+- Slot A bleibt komplett schwarz, Timer steht auf `0:00`.
+- Nach exakt der Länge von Szene 1 wechselt die Anzeige zu Szene 2, die normal abspielt.
+- Tritt erst auf, **nachdem** eine zweite Szene angelegt wurde. Mit nur einer Szene funktioniert dieselbe Komponente.
+- Der gleiche Bug trat schon einmal auf und „löste sich von selbst“ – das war kein echter Fix, das Symptom kam zurück.
 
-### Änderungen (eng begrenzt)
+## Analyse (Code‑Ebene)
 
-**1. `supabase/functions/_shared/asd-strategy.ts` — Rule 4 erweitern**
-- Neue Bedingung am Anfang von Rule 4 (N=1 + plate-native Box vorhanden):
-  - Wenn `plateFaceCount >= 2` → strategy `single_face_bbox_strict`:
-    - `active_speaker_detection: false`
-    - `bounding_boxes: [<castSpeakerBox>]` (plate-native px-Koordinaten, single entry)
-    - Telemetry-Tag `v181_n1_depicted_face_lock`
-  - Sonst (plateFaceCount ≤ 1): bestehender `single_face_auto`-Pfad bleibt unverändert.
-- Keine Änderung an Rule 0/1/2/3/5.
+`src/components/video-composer/ComposerSequencePreview.tsx` arbeitet mit einem stateless Triple‑Buffer aus drei `<video>`‑Elementen (Slot A/B/C). Geladene Quelle und Opazität werden ausschließlich imperativ über Refs gesetzt; ein `forceRender()` kopiert sie in den Style.
 
-**2. `supabase/functions/compose-dialog-segments/index.ts` — plateFaceCount durchreichen**
-- Aus dem bestehenden Plate-Identity-Map / Face-Detector-Ergebnis die Anzahl Gesichter lesen.
-- An die `chooseAsdStrategy()`-Aufrufstelle als neuer Parameter `plateFaceCount` übergeben.
-- Kein Verhalten ändern, wenn das Feld 0/1 ist.
+Beim Hinzufügen einer zweiten Szene ändert sich die `playableSignature` (Zeilen 284–287) → der „destructive reset“‑Effect (Zeilen 288–313) läuft:
 
-**3. `_shared/asd-sync3-sanitizer.ts` — keine Änderung nötig**
-- v124 entfernt bereits unzulässige Felder; `bounding_boxes` ist für sync-3 erlaubt.
+1. `activeSlotRef.current = 'A'`, `slotMapRef = {A:-1,B:-1,C:-1}`, alle `slot*SrcRef = undefined`.
+2. `preloadSlot('A', 0)` → setzt `<video A>.src = scene1.clipUrl`, `el.load()`, `el.currentTime = 0`.
+3. `preloadSlot('B', 1)` → `<video B>.src = scene2.clipUrl`.
+4. `setOpacityForSlot('A', 1)` / `('B', 0)`.
 
-**4. Telemetry**
-- `console.log('[v181] n1_depicted_face_lock', { sceneId, plateFaceCount, castBox })` in `asd-strategy.ts`.
-- In `dialog_shots.diagnostics` (falls vorhanden) das Tag `v181_n1_depicted_face_lock` persistieren.
+Der Bug entsteht, weil `<video A>` über den Tab‑Wechsel hinweg im DOM erhalten bleibt. Beim Re‑Init wird derselbe HTMLMediaElement‑Knoten erneut benutzt – nur via `el.src = …; el.load()`. Chromium dekodiert in diesem Pfad nicht zuverlässig den ersten Frame, solange wir nicht `play()` aufrufen. Beim anschließenden Klick auf Play startet `v.play()` zwar die Decode‑Pipeline, aber das Element bleibt für die Dauer der ersten Szene auf Frame 0 schwarz (Decoder rendert keine Frames bis zum nächsten Seek/Reload), während `timeupdate` weiter feuert → nach exakt `durationSeconds` advanced er zu Scene 2, das auf Slot B sauber dekodiert wurde, weil dort der erste `.src`‑Set Aufruf wirklich neu war.
 
-**5. Tests**
-- `asd-strategy.test.ts`: zwei neue Cases
-  - N=1, plateFaceCount=2, castBox vorhanden → `single_face_bbox_strict`, kein `auto_detect: true`.
-  - N=1, plateFaceCount=1 → unverändert `single_face_auto`.
+Das ist deckungsgleich mit dem Symptom („genau die Szenenlänge schwarz, dann Szene 2 normal“). Slot C (Prefetch) zeigt das nicht, weil Slot C versteckt ist und für die Wiedergabe nie als aktiv genutzt wird. Mit nur einer Szene wird der Reset gar nicht zweimal getriggert.
 
-### Was explizit NICHT angefasst wird
+## Fix‑Strategie — schmal, ohne Logikbruch
 
-HappyHorse/Hailuo Plate-Generation, Anchor-Pipeline (v168/v170), Sync.so Webhook & Watchdog, Audio-Mux, Refund-Logik, Briefing→Storyboard-Mapping, Voice-Pool, Multi-Speaker-Pfade (Rule 2/3).
+Ich fasse genau eine Stelle an: das Mounten der `<video>`‑Elemente in `ComposerSequencePreview`. Alles andere bleibt unverändert.
 
-### Deploy & Verify
+1. **`key`‑basiertes Re‑Mount der drei Video‑Slots**
+   - Den drei `<video>`‑Elementen (A/B/C) wird `key={playableSignature}` gegeben.
+   - Wenn die Signatur sich ändert (= Szene wurde hinzugefügt/entfernt/clipUrl gewechselt), unmountet React die alten Elemente und mountet frische. Damit gibt es **keinen** wiederverwendeten `HTMLVideoElement`‑Decoder mehr und das „Frame 0 bleibt schwarz“ kann konstruktionsbedingt nicht mehr auftreten.
+   - Die bestehenden Refs (`videoARef`, `videoBRef`, `videoCRef`) füllen sich automatisch neu.
+2. **Slot‑Init nach Re‑Mount erzwingen**
+   - Direkt nach dem Reset‑Effect (gleicher useEffect, Zeilen 288–313) zusätzlich ein `requestAnimationFrame` schedulen, das `setSrcForSlot('A', scene0.clipUrl)` + `setSrcForSlot('B', scene1.clipUrl)` nochmal aufruft, falls die Refs zum Zeitpunkt des Effects noch leer sind (kann beim Re‑Mount ein Tick dauern).
+   - Garantiert, dass die `src`‑Attribute auf den **frisch gemounteten** Knoten landen und nicht auf den alten.
+3. **Defensive „First‑Frame Paint“‑Pulse für Slot A**
+   - Nach dem Setzen von `src` einmalig `el.play().then(() => el.pause())` mit `currentTime = 0` und `muted = true`. Das erzwingt Decode + Render des ersten Frames, ohne hörbar zu sein.
+   - Nur für Slot A, nur einmal nach Reset, und nur wenn der User noch nicht auf Play geklickt hat.
 
-- Deploy: `compose-dialog-segments`, geteilt: `asd-strategy.ts` wird mit beiden compose-Functions neu gebündelt → auch `compose-video-clips` redeployen, falls es das Shared-Modul mitzieht.
-- Verify: nächste N=1-Szene mit Handy/Foto im Bild rendern; Logs auf `v181_n1_depicted_face_lock` prüfen; Lip-Sync muss auf Cast-Gesicht sitzen.
-- Memory: neues File `mem://architecture/lipsync/v181-n1-depicted-face-lock.md` + Index-Eintrag.
+Punkte 1+2 alleine sollten reichen; Punkt 3 ist eine zusätzliche Versicherung, die ich nur einbaue, wenn die ersten beiden in der lokalen Wiedergabe noch nicht 100 % liefern.
+
+## Was NICHT angefasst wird
+- Crossfade‑Logik (`performTransition`), Watchdog, Image‑Ticker, Voiceover‑/Music‑/SFX‑Sync, Subtitle‑Renderer.
+- `VoiceSubtitlesTab.tsx`, Hooks, Edge‑Functions, Render‑Pipelines, Lip‑Sync, Sync.so‑Pfad.
+- Keine neuen Props, keine Datenbankänderungen, keine Migrations.
+
+## Risiken
+- Der `key`‑Wechsel beim Hinzufügen/Entfernen einer Szene re‑mountet die `<video>`‑Tags – ein laufender Decode wird verworfen. Da der Reset‑Effect ohnehin alle Timer killt, `setPlaying(false)` setzt und auf Szene 0 springt, ist das das erwartete Verhalten und ohne sichtbaren Nachteil.
+- Kein Einfluss auf bereits funktionierende Single‑Scene‑Vorschauen, da deren Signatur erst beim Editieren wechselt.
+
+## Verifikation
+- Manuell: 1 Szene rendern → Tab öffnen → Play → läuft. Zweite Szene rendern → Tab erneut öffnen → Play → Scene 1 zeigt Bild ab Frame 0, läuft, crossfade in Scene 2.
+- Console‑Log eines bestehenden `[Preview]`‑Marker zur Bestätigung, dass kein Watchdog mehr feuert.
+
+## Technical Section
+- Datei: `src/components/video-composer/ComposerSequencePreview.tsx`
+- Änderungen:
+  - JSX (Slot A/B/C): `key={playableSignature}` ergänzen.
+  - Reset‑Effect: nach `preloadSlot(...)` einen `requestAnimationFrame` setzen, der die Slot‑Init wiederholt falls Refs gerade frisch sind.
+  - Optional Pulse: nach Init für Slot A `el.muted=true; el.play().then(()=>el.pause()).catch(()=>{})`.
