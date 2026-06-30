@@ -43,6 +43,36 @@ type Step = 'paste' | 'parsing' | 'review';
 const isUuid = (val?: string | null) =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
+/**
+ * Wave 3 chip: renders a catalog-resolved label (preferred) or the raw
+ * free-text value, plus an `⚡ AI` micro-badge when the value came from a
+ * Pass-C catalog id. Hidden when there's nothing to show.
+ */
+function CatalogChip({
+  axis,
+  id,
+  raw,
+  label,
+}: {
+  axis: CatalogAxis;
+  id?: string | null;
+  raw?: unknown;
+  label: string;
+}) {
+  const chip = resolveCatalogChip(axis, id ?? null, raw);
+  if (chip.empty) return null;
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[10px] ${chip.fromCatalog ? 'border-amber-300/40 text-amber-200' : ''}`}
+      title={id ? `${label}: ${chip.label} · catalog:${id}` : `${label}: ${chip.label}`}
+    >
+      {label}: {chip.label}
+      {chip.fromCatalog ? <span className="ml-1 opacity-70">⚡</span> : null}
+    </Badge>
+  );
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
