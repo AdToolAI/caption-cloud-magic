@@ -307,11 +307,13 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
 
-INTELLIGENT DEFAULTS — Transition / Overlay / Tone (NEVER leave undefined):
+INTELLIGENT DEFAULTS — Transition / Overlay / Tone / Performance (NEVER leave undefined):
 You MUST always fill scenes[i].transition, scenes[i].textOverlay (or leave
-empty when no overlay belongs there), and scenes[i].tone — using the
-following heuristics — and list each inferred path in scenes[i]._meta.aiFilled
-(e.g. "transition.type", "textOverlay.text", "tone"):
+empty when no overlay belongs there), scenes[i].tone, AND scenes[i].performance
+— using the following heuristics — and list each inferred path in
+scenes[i]._meta.aiFilled (e.g. "transition.type", "textOverlay.text",
+"tone", "performance.mimik", "performance.gestik", "performance.blick",
+"performance.energy"):
 
   • transition.type & durationSec (use the beat of THIS scene):
       Hook / Cold-Open / Pain           → "cut",        0.0
@@ -339,9 +341,24 @@ following heuristics — and list each inferred path in scenes[i]._meta.aiFilled
         Educational            → "documentary"
         default                → "cinematic"
 
+  • performance.{mimik, gestik, blick, energy} — ALWAYS fill all four axes
+    based on beat. DIALOG-SAFE: never produce gestures that occlude the
+    face on dialog scenes (no "hand-on-face", "looking-down", "away" on
+    lip-sync turns). Use these defaults:
+        Hook           → mimik="confident",     gestik="open-palms", blick="to-camera", energy=4
+        Pain / Problem → mimik="concerned",     gestik="still",      blick="to-camera", energy=2
+        Reveal / Twist → mimik="focused",       gestik="point",      blick="to-camera", energy=3
+        Proof / Social → mimik="confident",     gestik="open-palms", blick="to-camera", energy=3
+        CTA / Endcard  → mimik="warm-smile",    gestik="open-palms", blick="to-camera", energy=4
+        default        → mimik="neutral",       gestik="still",      blick="to-camera", energy=3
+    Override only when the briefing names a different cue (e.g. "ruhig",
+    "energetisch", "nachdenklich"). Always add the filled axes to
+    scenes[i]._meta.aiFilled when the briefing did not state them.
+
   • seed: DO NOT auto-fill. Leave undefined unless the briefing literally
     names a number ("Seed: 12345"). Random per render is the correct A/B
     behaviour — the UI explains this.
+
 
 DO NOT invent IDs. Only use @-mentions that appear in the "## Cast" section.
 DO NOT invent voice IDs. Voice resolution is the resolver's job.
