@@ -379,6 +379,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         
 
         const candidates = (data as any[]).filter((d) => {
+          if (!isRealizedScene(d)) return false;
           if (!isDialogEngine(d.engine_override)) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           // Master clip must be READY — never try lip-sync on a failed/generating master.
