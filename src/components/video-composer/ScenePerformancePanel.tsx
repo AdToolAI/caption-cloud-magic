@@ -26,6 +26,11 @@ import type {
 } from '@/types/video-composer';
 import type { DirectorLanguage } from '@/lib/motion-studio/composeFinalPrompt';
 import { cn } from '@/lib/utils';
+import {
+  expressionToCatalogId,
+  gestureToCatalogId,
+  gazeToCatalogId,
+} from '@/config/catalogAdapters';
 
 interface Props {
   scene: Pick<ComposerScene, 'performance' | 'characterShots' | 'characterShot'>;
@@ -176,7 +181,17 @@ export default function ScenePerformancePanel({ scene, characters, language, onU
 
   function updateChar(charId: string, patch: Partial<ScenePerformance>) {
     const current = performance[charId] ?? {};
-    const merged = clean({ ...current, ...patch });
+    const mergedRaw = { ...current, ...patch } as ScenePerformance & {
+      mimikId?: string | null;
+      gestikId?: string | null;
+      blickId?: string | null;
+    };
+    // Wave 3.1 — keep Catalog-ID shadow fields in sync with the enum
+    // selection. Zero impact on render prompts (they read enum mirrors).
+    if ('expression' in patch) mergedRaw.mimikId = expressionToCatalogId(mergedRaw.expression);
+    if ('gesture' in patch) mergedRaw.gestikId = gestureToCatalogId(mergedRaw.gesture);
+    if ('gaze' in patch) mergedRaw.blickId = gazeToCatalogId(mergedRaw.gaze);
+    const merged = clean(mergedRaw);
     const next = { ...performance };
     if (merged) next[charId] = merged;
     else delete next[charId];

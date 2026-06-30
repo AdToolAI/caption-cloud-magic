@@ -33,7 +33,29 @@ import {
   type PresetCategory,
 } from '@/lib/motion-studio/directorPresets';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
+import { resolveShotOptionToCatalogId } from '@/config/catalogAdapters';
 import type { ComposerScene } from '@/types/video-composer';
+
+/**
+ * Wave 3.1 — augment a ShotSelection with Catalog-ID shadow fields
+ * (framingId / angleId / movementId / lightingId) so the Briefing-Plan ↔
+ * Storyboard ID contract stays intact across every editor write. Zero
+ * impact on render prompts — only adds keys onto the JSONB blob.
+ */
+function withCatalogShadowIds(sel: ShotSelection): ShotSelection & {
+  framingId?: string | null;
+  angleId?: string | null;
+  movementId?: string | null;
+  lightingId?: string | null;
+} {
+  return {
+    ...sel,
+    framingId: resolveShotOptionToCatalogId('framing', sel.framing),
+    angleId: resolveShotOptionToCatalogId('angle', sel.angle),
+    movementId: resolveShotOptionToCatalogId('movement', sel.movement),
+    lightingId: resolveShotOptionToCatalogId('lighting', sel.lighting),
+  };
+}
 
 type Lang = 'de' | 'en' | 'es';
 
@@ -270,7 +292,7 @@ export default function SceneStyleSheet({
             <TabsContent value="looks" className="mt-0">
               <CinematicStylePresets
                 value={shot}
-                onApply={(sel) => onUpdate({ shotDirector: sel })}
+                onApply={(sel) => onUpdate({ shotDirector: withCatalogShadowIds(sel) })}
                 layout="grid"
                 hideHeader
               />
@@ -279,7 +301,9 @@ export default function SceneStyleSheet({
             <TabsContent value="fine" className="mt-0">
               <SceneShotDirectorPanel
                 value={shot}
-                onChange={(shotDirector) => onUpdate({ shotDirector })}
+                onChange={(shotDirector) =>
+                  onUpdate({ shotDirector: withCatalogShadowIds(shotDirector) })
+                }
                 language={language}
                 layout="master-detail"
               />

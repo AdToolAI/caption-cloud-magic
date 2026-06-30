@@ -334,14 +334,23 @@ function planSceneToComposerScene(
       gaze: mapGaze(ps.performance.blick),
       energy: clampEnergy(ps.performance.energy),
     };
-    // Keep only when at least one axis resolved.
-    if (sp.expression || sp.gesture || sp.gaze || sp.energy) {
+    // Wave 3.1 — forward Pass-C Catalog-ID shadow fields if the parser
+    // produced them (`mimikId/gestikId/blickId`). They survive in the
+    // ScenePerformance JSONB and feed the ⚡-AI chips. Zero prompt impact.
+    const psPerf = ps.performance as any;
+    const shadow = {
+      mimikId: psPerf.mimikId ?? psPerf.mimicId ?? null,
+      gestikId: psPerf.gestikId ?? psPerf.gestureId ?? null,
+      blickId: psPerf.blickId ?? psPerf.gazeId ?? null,
+    };
+    if (sp.expression || sp.gesture || sp.gaze || sp.energy || shadow.mimikId || shadow.gestikId || shadow.blickId) {
       performance = {};
       for (const cs of characterShots) {
-        performance[cs.characterId] = { ...sp };
+        performance[cs.characterId] = { ...sp, ...shadow } as ScenePerformance;
       }
     }
   }
+
 
   // ── ActionBeat (CharacterAction / EnvironmentMotion / MotionIntensity) ─
   const split = splitAction(ps.anchorPromptEN);

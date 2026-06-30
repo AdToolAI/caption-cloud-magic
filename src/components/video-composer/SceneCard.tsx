@@ -153,6 +153,8 @@ import {
   derivePerformanceEntries,
   countDirectedPerformances,
 } from "@/lib/motion-studio/buildPerformanceBlock";
+import { resolveCatalogChip } from "@/lib/video-composer/catalog/useCatalogLabel";
+import type { CatalogAxis } from "@/lib/video-composer/catalog";
 
 
 import {
@@ -171,6 +173,50 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useSceneRenderConfirm } from "@/lib/composer/sceneRenderConfirm";
+
+/**
+ * Wave 3.1 — compact Catalog-ID chip strip. Reads scene-level shadow IDs
+ * (`shotDirector.framingId/angleId/movementId/lightingId`) plus the first
+ * cast member's performance shadow IDs (`mimikId/gestikId/blickId`). Pure
+ * presentation — no writes, no prompt impact.
+ */
+function SceneCatalogChipStrip({ scene }: { scene: ComposerScene }) {
+  const sd = (scene.shotDirector ?? {}) as Record<string, unknown>;
+  const perfMap = (scene.performance ?? {}) as Record<string, Record<string, unknown>>;
+  const firstPerf = Object.values(perfMap)[0] ?? {};
+  const items: Array<{ axis: CatalogAxis; id: unknown; raw: unknown; key: string }> = [
+    { axis: 'mimik', id: firstPerf.mimikId, raw: firstPerf.expression, key: 'mimik' },
+    { axis: 'gestik', id: firstPerf.gestikId, raw: firstPerf.gesture, key: 'gestik' },
+    { axis: 'blick', id: firstPerf.blickId, raw: firstPerf.gaze, key: 'blick' },
+    { axis: 'framing', id: sd.framingId, raw: sd.framing, key: 'framing' },
+    { axis: 'angle', id: sd.angleId, raw: sd.angle, key: 'angle' },
+    { axis: 'movement', id: sd.movementId, raw: sd.movement, key: 'movement' },
+    { axis: 'lighting', id: sd.lightingId, raw: sd.lighting, key: 'lighting' },
+  ];
+  const chips = items
+    .map((it) => ({ ...it, r: resolveCatalogChip(it.axis, it.id as string | null, it.raw, 'de') }))
+    .filter((it) => !it.r.empty);
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-2">
+      {chips.map((it) => (
+        <span
+          key={it.key}
+          className={
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ' +
+            (it.r.fromCatalog
+              ? 'border-violet-400/40 bg-violet-500/10 text-violet-200'
+              : 'border-border/40 bg-muted/30 text-muted-foreground')
+          }
+          title={`${it.axis}${it.r.fromCatalog ? ' · Catalog-ID' : ''}`}
+        >
+          {it.r.fromCatalog && <span className="text-[9px]">⚡</span>}
+          {it.r.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -1893,6 +1939,10 @@ export default function SceneCard({
               {scene.clipSource.startsWith("ai-") && characters && characters.length > 0 && (
                 <>
                   <SceneStudioSectionHeader tab="performance" language={lang} />
+                  {/* Wave 3.1 — Catalog-ID chips. Shows the resolved
+                      axis labels (Mimik · Gestik · Blick · Framing · Light)
+                      with an ⚡-AI badge when the value came from Pass-C. */}
+                  <SceneCatalogChipStrip scene={scene} />
                   <ScenePerformancePanel
                     scene={scene}
                     characters={characters}
