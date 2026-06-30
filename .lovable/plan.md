@@ -1,68 +1,76 @@
+# Wave 3 — UI-Switch auf Catalog-IDs (Universal ID Contract)
 
-# v178 Wave 2 — Briefing→Storyboard Mapping Persistence
+Strikt Mapping/UI. **Keine Änderungen** an `compose-*`, `render-*`, `poll-dialog-shots`, `sync-so-*`, `dialog_shots`, `syncso_*`, `composer_scenes.dialog_voices`, `composer_scenes.character_voice_id`. v169.1 / v174 / v175 / v176 Invarianten bleiben unangetastet.
 
-Strikt auf den Mapping-Pfad beschränkt. **Keine Änderungen** an `compose-*`, `render-*`, `poll-dialog-shots`, `sync-so-*`, `dialog_shots`, `syncso_*`. v169.1 / v174 / v175 / v176 Invarianten bleiben unangetastet.
+## Ziel
 
-## Symptome heute
+Wave 1 hat Schattenfelder produziert (`mimicId`, `gestureId`, `gazeId`, `cameraId`, `lightingId`, `framingId`, `angleId`, `movementId`). Wave 3 macht sie sichtbar und persistierbar: Jede vom User wählbare Achse bekommt eine geordnete, stabile ID im Storyboard — kein Free-Text-Drift mehr zwischen Briefing-Plan und Szene.
 
-1. Szene 2 & 3 zeigen keine Auswahlfelder für Sprecher / Outfit / Location — manchmal kommen sie, manchmal nicht.
-2. Location bleibt leer obwohl im Briefing "Location@Home Office" steht und "Home Office" in der Library liegt.
-3. Outfits zeigen mal `casual`, mal `Unbenannter Look`.
+## Was sichtbar wird
 
-## Root Causes
+Im **ProductionPlanSheet** (Briefing-Plan-Review) und in der **SceneCard** (Storyboard):
 
-| # | Symptom | Ursache |
+| Achse | Quelle | ID-Format |
 |---|---|---|
-| 1 | Szene 2/3 ohne Slots | Scene-Count-Guard padded fehlende Szenen mit `{engine:'broll'}` ohne `cast[]` / `location` zu erben → SceneCard rendert keine Picker weil keine Slot-Templates existieren. |
-| 2 | Location leer trotz Match | Pass-B Fuzzy greift nur per Substring; Slug-Mentions (`home-office`, `@home_office`) und Catalog-IDs (`catalog:location:<uuid>`) werden nicht normalisiert. Quick-Create wirkt nur auf 1 Szene statt alle Szenen mit gleichem Mention. |
-| 3 | Outfit-Label flackert | Apply-Hook hydratisiert Outfit-Namen aus `mention.name` (raw briefing string) statt aus `avatar_outfit_looks.name`. Wenn der Look-Lookup fehlschlägt, fällt das Label auf "Unbenannter Look" zurück. |
+| Mimik | `catalog/performance.ts` | `catalog:mimic:<slug>` |
+| Gestik | `catalog/performance.ts` | `catalog:gesture:<slug>` |
+| Blick | `catalog/performance.ts` | `catalog:gaze:<slug>` |
+| Framing | `catalog/shot.ts` (49 Optionen) | `catalog:framing:<slug>` |
+| Angle | `catalog/shot.ts` | `catalog:angle:<slug>` |
+| Movement | `catalog/shot.ts` | `catalog:movement:<slug>` |
+| Lighting | `catalog/shot.ts` | `catalog:lighting:<slug>` |
+| Kamera/Lens | `catalog/shot.ts` | `catalog:lens:<slug>` |
 
-## Patch (4 Dateien, ~ein gemeinsamer Commit)
+Library-Felder (Character, Outfit, Location) bleiben wie in Wave 2 — UUID statt Catalog-Slug.
 
-### 1) `supabase/functions/briefing-deep-parse/index.ts` — Slot-Inheritance beim Padding
-Im Scene-Count-Guard (Z. 1076–1088): statt leerer `{engine:'broll'}`-Stubs eine **Template-Szene** klonen.
-- Template = letzte Szene mit nicht-leerem `cast[]` (oder Szene 1 als Fallback).
-- Geklont werden: `cast` (deep copy, ohne `dialogText`/`voiceoverText`), `location`, `framing`/`shotDirector`-Defaults, `engine`.
-- Neue Felder pro Pad-Szene: eigener `index`, `beat` aus `beatRing`, leerer `voiceover.text` + leere `dialogTurns`, `_meta.aiFilled: ['padded_from_template']`.
-- So bekommt jede Pad-Szene garantiert mind. 1 Cast-Slot und 1 Location-Slot → ProductionPlanSheet **und** SceneCard rendern Dropdowns deterministisch.
+## Patch (5 Dateien)
 
-### 2) `supabase/functions/briefing-deep-parse/index.ts` — Location-Resolver härten
-Lokaler Fuzzy-Pass nach Pass-B (existierende Schleife) erweitern:
-- Normalisierung `normalizeMention(s)`: lowercase, `-`/`_`/Whitespace kollabieren, deutsche Umlaute entfalten.
-- Match-Reihenfolge: (a) exakter Slug, (b) Substring beidseitig, (c) Catalog-ID `catalog:location:<uuid>` → direkt resolven aus `locations`-Library via UUID, (d) Catalog-Slug aus `location_catalog_previews`.
-- Telemetrie: `parser_meta.location_resolution = { resolved: n, viaSlug, viaSubstring, viaCatalog, stillUnresolved }`.
+### 1) `src/lib/video-composer/catalog/index.ts` — Single-Source-of-Truth
+Export einer `CATALOG_REGISTRY` Map mit Label + Order + Group pro ID. Bereits in Wave 1 angelegt, hier nur konsolidiert + Sortierung verifiziert (Hook → Pain → Reveal → Proof → CTA Reihenfolge bleibt, innerhalb Achsen nach Häufigkeit/Cinematic-Logik).
 
-### 3) `src/hooks/useApplyProductionPlan.ts` — Persistenz hardening
-- `stripPrefix` bereits vorhanden; ergänzen um Catalog-Multi-Segment (`catalog:location:<uuid>`, `catalog:outfit:<uuid>`) mit UUID-Regex.
-- **Outfit-Label-Stabilisierung**: vor Persist `avatar_outfit_looks` (id, name, avatar_id) one-shot fetchen für alle `outfitLookId` der Plan-Szenen (eine Query, Map). Wenn `mention.name` leer / "Unbenannter Look" / unscharf → durch `look.name` ersetzen. Sonst Briefing-Name behalten.
-- **Multi-Scene Location-Fan-Out**: wenn mehrere Szenen denselben unresolved Location-Mention tragen und der User in Szene N "+ Als Location speichern" klickt, soll der neue `locationId` via `onUpdateScenes` an alle Szenen mit identischem normalisiertem Mention propagiert werden. → reine Frontend-Helper-Funktion `applyLocationToMatchingScenes(scenes, mention, locationId)`.
+### 2) `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
+- **ScenePerformancePanel** (`mimicId`/`gestureId`/`gazeId`): Dropdowns binden an `catalog:*` IDs aus Wave 1, zeigen Label aus Registry, behalten 3-State-Chip (`AI ⚡` / `manuell` / `leer`).
+- **SceneShotDirectorPanel** (neu hinzufügen falls fehlt): Framing/Angle/Movement/Lighting/Lens als 5 Dropdowns mit derselben Logik.
+- Persistenz: `onUpdateScenes` patcht **nur** die `*Id`-Felder, die Free-Text-Spiegel-Felder (`mimic`, `gesture`, ...) werden bei Save automatisch aus der Registry hydratisiert → SceneCard zeigt weiterhin Klartext.
 
-### 4) `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Quick-Create fan-out
-- `handleQuickCreateLocation(sceneIdx, mention)` nach erfolgreicher `createLocation`-Mutation: `applyLocationToMatchingScenes` aufrufen statt nur die eine Szene zu patchen.
-- Toast: "Location für N Szenen übernommen".
-- Auswahl-Dropdowns in den Slot-Sektionen (`SceneCastSlot`, `SceneOutfitSlot`, `SceneLocationSlot`) bekommen einen sichtbaren Empty-State "Auswählen …" auch wenn `cast[]` leer ist — werden aber dank Patch #1 nur noch in Edge-Cases benötigt.
+### 3) `src/components/video-composer/SceneCard.tsx`
+- Beim Render eine `useCatalogLabel(id)`-Helper-Hook nutzen, der den Label aus `CATALOG_REGISTRY` zieht. Fallback: bestehender Free-Text.
+- Editor-Dropdowns (Mimik/Gestik/Blick/Shot-Director) lesen/schreiben jetzt IDs statt Strings.
 
-## Was NICHT angefasst wird (Garantien)
+### 4) `src/hooks/useApplyProductionPlan.ts`
+- Bereits in Wave 2 gehärtet für Library-IDs. Hier ergänzen: Catalog-IDs werden **1:1** persistiert (nicht ge-stripped), `stripPrefix` greift nur bei `catalog:character|outfit|location:<uuid>`.
+- Telemetrie: `console.info('[apply-plan] catalog_ids_persisted', { mimic, gesture, gaze, framing, angle, movement, lighting, lens })`.
 
-- `compose-dialog-segments`, `compose-video-clips`, `compose-scene-anchor`, `render-sync-segments-audio-mux`, `sync-so-webhook`, `poll-dialog-shots`
-- Tabellen: `dialog_shots`, `syncso_*`, `composer_scenes.dialog_voices`, `composer_scenes.character_voice_id`, `clip_*`
-- Apply-Hook-Schutzfilter für gerenderte/lipsync-aktive Szenen (`clip_status`, `lipSyncStatus`, `dialogLockedAt`, `lockReferenceUrl`, DB-Probe in `dialog_shots`) bleibt bit-identisch.
-- Catalog-Module aus Wave 1 (`src/lib/video-composer/catalog/*`) bleiben Schattenfelder — kein UI-Switch in dieser Wave.
+### 5) `supabase/functions/briefing-deep-parse/index.ts`
+- Pass-C Resolver (Wave 1) ergänzen: Wenn das Modell statt einer ID einen Free-Text liefert (`mimic: "freundlich"`), versuche Fuzzy-Match gegen `CATALOG_REGISTRY` Label/Alias. Bei Treffer `mimicId` setzen.
+- Telemetrie in `parser_meta.catalog_resolution = { resolvedFromLabel, resolvedFromAlias, stillFreeText }`.
+
+## Garantien (Pipeline 0-Impact)
+
+- Keine Schreibzugriffe auf Render-/Lipsync-Tabellen.
+- Keine Änderung der Prompt-Generierung in `compose-video-clips` oder `compose-scene-anchor` — die ziehen weiterhin die Free-Text-Spiegel-Felder. Wave 3 garantiert nur, dass diese Spiegel-Felder **konsistent** aus Registry-Labels stammen.
+- Apply-Hook-Schutzfilter (clip_status / dialog_shots-Probe) bleibt bit-identisch.
+- Catalog-Module (`src/lib/video-composer/catalog/*`) bekommen keine neuen Achsen — nur UI-Sichtbarkeit.
+
+## Akzeptanz-Test
+
+1. Briefing „Samuel lacht herzlich" → ScenePerformancePanel zeigt `Mimik: Lächeln (warm)` mit `⚡ AI`-Chip.
+2. User wählt manuell `Mimik: Konzentriert` → Chip wechselt auf `manuell`, persistiert in DB als `catalog:mimic:focused`.
+3. Render-Klick auf Szene → Prompt enthält weiterhin Free-Text `"focused expression"` (aus Registry-Label hydratisiert), Lipsync-Pipeline läuft identisch wie heute.
+4. Plan-Re-Apply auf bestehende Szene mit gerendertem Clip → Szene bleibt unverändert (Schutzfilter greift).
 
 ## Telemetrie nach Deploy
 
-`parser_meta` bekommt zusätzlich:
-- `padded_scenes_inherited_template: boolean`
-- `location_resolution: {...}` (siehe oben)
-- `outfit_label_repaired: number` (im Apply-Hook über `console.info`)
-
-## Akzeptanz-Test (manuell, mit deinem letzten Briefing)
-
-1. „3 Szenen × 10s" mit `@Samuel`, `@Casual`, `@Home Office` → alle 3 Szenen zeigen Sprecher + Outfit + Location-Dropdowns, alle drei vorausgewählt.
-2. „Total 30s, kein Szenen-Count" → 5 Szenen mit identischem Cast/Location (geerbt).
-3. Briefing mit `@home-office` (Slug) → wird auf `Home Office`-Library-Eintrag resolved.
-4. Bestehende, bereits gerenderte Szene mit Lipsync → wird vom Apply-Hook **nicht** überschrieben (DB-Probe greift).
+- `parser_meta.catalog_resolution`
+- `apply-plan catalog_ids_persisted`
+- SceneCard-Chip-Counts via PostHog Event `composer_catalog_id_select`
 
 ## Rollback
 
-Alle 4 Änderungen sind isoliert. Bei Problemen: einzeln revert; Schattenfelder aus Wave 1 bleiben intakt.
+Pro Datei isoliert revertierbar. Bei Issues: Dropdown-Bindings auf Free-Text zurück, Registry bleibt als Schattenfeld bestehen.
+
+## Nicht in Wave 3
+
+- Voice-Pool-Erweiterung (separater Plan)
+- Performance-Achsen erweitern (neue Mimik-Optionen) — kommt in Wave 4 falls gewünscht
+- Catalog-Übersetzungen (DE/EN/ES) — Wave 4
