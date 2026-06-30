@@ -279,7 +279,7 @@ export default function ProductionPlanSheet({
       } else if (matched && (loc.locationId !== matched.id || loc.locationName !== matched.name)) {
         location = { ...loc, locationId: matched.id, locationName: matched.name };
         changed = true;
-      } else if (!matched && !loc.locationId && (lastResolvedLocation ?? firstResolvedLocation) && shouldInheritContinuity(s, 'location')) {
+      } else if (!matched && !loc.locationId && (lastResolvedLocation ?? firstResolvedLocation)) {
         location = { ...(lastResolvedLocation ?? firstResolvedLocation)! };
         changed = true;
       }
