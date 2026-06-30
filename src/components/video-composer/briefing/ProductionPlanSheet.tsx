@@ -396,7 +396,42 @@ export default function ProductionPlanSheet({
     });
   };
 
-  const totalPlanSec = useMemo(
+  /**
+   * v177.1 — Quick-create a stub Location in `brand_locations` when the
+   * briefing mentions a location the library does not yet contain. Uses a
+   * placeholder reference image so the row satisfies the NOT NULL constraint;
+   * the user can re-shoot the reference in the Location library later.
+   */
+  const quickCreateLocation = async (sceneIndex: number, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCreatingLoc(sceneIndex);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) throw new Error('Not authenticated');
+      const placeholder = `https://placehold.co/1024x576/050816/F5C76A?text=${encodeURIComponent(trimmed)}`;
+      const { data: row, error } = await supabase
+        .from('brand_locations' as any)
+        .insert({
+          user_id: auth.user.id,
+          name: trimmed,
+          description: `Stub angelegt aus Briefing — Referenzbild später ersetzen.`,
+          reference_image_url: placeholder,
+          tags: ['briefing-stub'],
+        })
+        .select('id, name')
+        .single();
+      if (error) throw error;
+      const created = row as unknown as { id: string; name: string };
+      await queryClient.invalidateQueries({ queryKey: ['brand-locations'] });
+      updateSceneLocation(sceneIndex, created.id);
+      toast({ title: 'Location angelegt', description: `„${created.name}" ist jetzt in der Library.` });
+    } catch (e: any) {
+      toast({ title: 'Konnte Location nicht anlegen', description: e?.message || 'Unbekannter Fehler', variant: 'destructive' });
+    } finally {
+      setCreatingLoc(null);
+    }
+  };
     () => (plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0),
     [plan],
   );
