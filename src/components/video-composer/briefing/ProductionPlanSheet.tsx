@@ -395,7 +395,7 @@ export default function ProductionPlanSheet({
         outfitLookId: lookId,
       };
     }
-    if (rawId.startsWith('catalog:')) return { baseId: rawId.split(':', 2)[1] ?? null, outfitLookId: null };
+    if (rawId.startsWith('catalog:')) return { baseId: uuidInside(rawId) ?? rawId.split(':').pop() ?? null, outfitLookId: null };
     if (rawId.startsWith('lib:')) return { baseId: rawId.slice(4), outfitLookId: null };
     return { baseId: rawId, outfitLookId: null };
   };
