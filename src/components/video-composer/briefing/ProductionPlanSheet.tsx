@@ -43,6 +43,19 @@ type Step = 'paste' | 'parsing' | 'review';
 const isUuid = (val?: string | null) =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
+const normalizeAssetKey = (value?: string | null) =>
+  String(value ?? '')
+    .trim()
+    .replace(/^@/, '')
+    .replace(/^(location|locationid|ort|place|setting)\s*@?\s*/i, '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const uuidInside = (value?: string | null) =>
+  String(value ?? '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+
 /**
  * Wave 3 chip: renders a catalog-resolved label (preferred) or the raw
  * free-text value, plus an `⚡ AI` micro-badge when the value came from a
@@ -142,9 +155,29 @@ export default function ProductionPlanSheet({
     [baseChars],
   );
   const locOptions = useMemo(
-    () => (locations ?? []).map((l: any) => ({ id: l.id, name: l.name })),
+    () => (locations ?? []).map((l: any) => ({ id: String(l.id), name: String(l.name ?? 'Location') })),
     [locations],
   );
+  const findLocationOption = useMemo(() => {
+    return (rawId?: string | null, rawName?: string | null) => {
+      const id = rawId ? String(rawId) : '';
+      if (id) {
+        const exact = locOptions.find((o) => o.id === id);
+        if (exact) return exact;
+        const innerUuid = uuidInside(id);
+        if (innerUuid) {
+          const byUuid = locOptions.find((o) => o.id === innerUuid || o.id.endsWith(`:${innerUuid}`));
+          if (byUuid) return byUuid;
+        }
+      }
+      const key = normalizeAssetKey(rawName);
+      if (!key) return undefined;
+      return locOptions.find((o) => {
+        const n = normalizeAssetKey(o.name);
+        return n === key || n.includes(key) || key.includes(n);
+      });
+    };
+  }, [locOptions]);
 
   /** Outfit looks belonging to a given base character id. */
   const outfitsByCharacter = useMemo(() => {
@@ -459,7 +492,7 @@ export default function ProductionPlanSheet({
       ...p,
       scenes: p.scenes.map((s) => {
         if (s.index !== sceneIndex) return s;
-        const matched = locOptions.find((x) => x.id === locationId);
+        const matched = findLocationOption(locationId, null);
         return {
           ...s,
           location: s.location
@@ -502,10 +535,8 @@ export default function ProductionPlanSheet({
       // v178 Wave 2 — fan out the resolved locationId to ALL scenes that
       // reference the same mention/name. Without this every scene with
       // the same "@Home Office" would need its own quick-create click.
-      const normalize = (s: string) =>
-        String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
       const trigger = plan?.scenes.find((s) => s.index === sceneIndex);
-      const triggerKey = normalize(
+      const triggerKey = normalizeAssetKey(
         trigger?.location?.mentionKey ?? trigger?.location?.locationName ?? trimmed,
       );
       let matched = 0;
@@ -514,7 +545,7 @@ export default function ProductionPlanSheet({
           ...p,
           scenes: p.scenes.map((s) => {
             if (!s.location) return s;
-            const key = normalize(s.location.mentionKey ?? s.location.locationName ?? '');
+            const key = normalizeAssetKey(s.location.mentionKey ?? s.location.locationName ?? '');
             if (s.index === sceneIndex || key === triggerKey) {
               matched += 1;
               return {
@@ -562,7 +593,8 @@ export default function ProductionPlanSheet({
       const ml = /^scenes\[(\d+)\]\.location\.locationId$/.exec(u.field);
       if (ml) {
         const sIdx = Number(ml[1]);
-        if (plan.scenes[sIdx]?.location?.locationId) return false;
+        const loc = plan.scenes[sIdx]?.location;
+        if (loc?.locationId && findLocationOption(loc.locationId, loc.locationName ?? loc.mentionKey)) return false;
       }
       if (u.field === 'project.totalDurationSec') {
         const proj = plan.project?.totalDurationSec;
@@ -573,30 +605,27 @@ export default function ProductionPlanSheet({
   }, [plan, totalPlanSec]);
 
   /**
-   * Auto-Resolve: for every cast slot that has `characterId === null`,
-   * run a fuzzy match (normalize → lowercase, strip @ / separators →
-   * substring both directions) against the base avatars library. The
-   * first hit wins. Same algorithm as the server-side resolver — runs
-   * locally so the user gets instant feedback.
+   * Auto-Resolve: for every missing cast/location slot, run the same fuzzy
+   * matching as the server-side resolver. Location resolution accepts both
+   * real UUIDs and catalog:* IDs from the unified mention library.
    */
   const handleAutoResolve = () => {
     if (!plan) return;
-    const norm = (s: string) =>
-      s.toLowerCase().replace(/^@/, '').replace(/[\s_\-]+/g, '');
-    let fixed = 0;
+    let castFixed = 0;
+    let locationFixed = 0;
     setPlan((p) => {
       if (!p) return p;
       const scenes = p.scenes.map((s) => {
         const cast = (s.cast ?? []).map((c) => {
           if (c.characterId) return c;
-          const needle = norm(c.mentionKey || c.characterName || '');
+          const needle = normalizeAssetKey(c.mentionKey || c.characterName || '');
           if (!needle) return c;
           const hit = charOptions.find((o) => {
-            const n = norm(o.name);
+            const n = normalizeAssetKey(o.name);
             return n.includes(needle) || needle.includes(n);
           });
           if (!hit) return c;
-          fixed += 1;
+          castFixed += 1;
           return {
             ...c,
             characterId: hit.id,
@@ -604,13 +633,28 @@ export default function ProductionPlanSheet({
             outfitLookId: null,
           };
         });
-        return { ...s, cast };
+        let location = s.location;
+        if (location && !findLocationOption(location.locationId, location.locationName ?? location.mentionKey)) {
+          const hit = findLocationOption(null, location.mentionKey ?? location.locationName);
+          if (hit) {
+            locationFixed += 1;
+            location = {
+              ...location,
+              locationId: hit.id,
+              locationName: hit.name,
+            };
+          }
+        }
+        return { ...s, cast, location };
       });
       return { ...p, scenes };
     });
+    const fixed = castFixed + locationFixed;
     toast({
-      title: fixed > 0 ? `${fixed} Cast-Slots automatisch zugewiesen` : 'Keine weiteren Auto-Matches',
-      description: fixed > 0 ? 'Du kannst die Zuordnung im Dropdown noch anpassen.' : undefined,
+      title: fixed > 0 ? `${fixed} Zuordnung${fixed === 1 ? '' : 'en'} automatisch repariert` : 'Keine weiteren Auto-Matches',
+      description: fixed > 0
+        ? `${castFixed} Cast · ${locationFixed} Location — du kannst alles im Dropdown noch anpassen.`
+        : undefined,
     });
   };
 
