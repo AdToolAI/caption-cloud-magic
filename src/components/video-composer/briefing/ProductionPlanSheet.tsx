@@ -496,8 +496,8 @@ export default function ProductionPlanSheet({
         return {
           ...s,
           location: s.location
-            ? { ...s.location, locationId, locationName: matched?.name ?? s.location.locationName }
-            : (matched ? { mentionKey: matched.name, locationId, locationName: matched.name } : s.location),
+            ? { ...s.location, locationId: matched?.id ?? locationId, locationName: matched?.name ?? s.location.locationName }
+            : (matched ? { mentionKey: matched.name, locationId: matched.id, locationName: matched.name } : s.location),
         };
       }),
     });
