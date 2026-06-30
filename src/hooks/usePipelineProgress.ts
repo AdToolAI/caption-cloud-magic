@@ -411,10 +411,21 @@ export function usePipelineProgress({
       return { progress: 0, running: false, done: false, applicable: false, failed: false };
     }
     const targets = scenes.filter(
-      (s) =>
-        (s as any).twoshotStage ||
-        s.engineOverride === 'cinematic-sync' ||
-        dialogVoiceCount(s) > 1,
+      (s) => {
+        // v182: failed master clip must never count as "lipsync running" — the
+        // bar would otherwise spin on a scene where lip-sync is impossible.
+        const cs = (s as any).clipStatus ?? (s as any).clip_status;
+        const ts = (s as any).twoshotStage ?? (s as any).twoshot_stage;
+        const ls = (s as any).lipSyncStatus ?? (s as any).lip_sync_status;
+        if (cs === 'failed') return false;
+        if (ts === 'failed' || ts === 'audio_mux_failed') return false;
+        if (ls === 'canceled') return false;
+        return (
+          (s as any).twoshotStage ||
+          s.engineOverride === 'cinematic-sync' ||
+          dialogVoiceCount(s) > 1
+        );
+      },
     );
 
     const getDialogShots = (s: any) => (s.dialogShots ?? s.dialog_shots ?? null) as
