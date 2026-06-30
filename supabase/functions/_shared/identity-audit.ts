@@ -16,56 +16,68 @@
  *   4. SWAP      — a reference slot is filled by the WRONG person (e.g. male
  *                  reference rendered as a woman). v111.
  *
- * Returns:
- *   - { ok: true }
- *   - { ok: false, reason: 'swap' | 'clone' | 'extra' | 'missing' | 'ambiguous', ... }
- *   - null on transport failure (caller decides)
+ * v171 — N=1 Swap-Confirmation against Flash false-positives:
+ *   - Prompt hardened: "match" must be the default for plausible same-person
+ *     under different lighting/angle/expression. Only "mismatch" when clearly
+ *     a different human (different sex, very different age, completely
+ *     different face). When in doubt → "uncertain".
+ *   - For N=1 (single-cast), a "mismatch" verdict from Flash is re-checked
+ *     with Gemini 2.5 Pro; only when BOTH agree do we fail with swap.
+ *   - For multi-cast, a lone single "mismatch" without reason==='swap' is
+ *     downgraded to soft-warn (logged), not a hard block.
  */
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 export interface IdentityAuditResult {
   ok: boolean;
   reason?: "clone" | "missing" | "ambiguous" | "extra" | "swap";
-  /** Names of references that did not appear in the anchor. */
   missing?: string[];
-  /** Names of references that appear more than once. */
   duplicated?: string[];
-  /** v111 — names of references whose rendered face does NOT match the
-   *  reference portrait (wrong person in the slot). */
   mismatched?: string[];
-  /** Total number of distinct humans in the anchor (best-effort). */
   totalPeople?: number;
-  /** Number of extra humans beyond the reference set. */
   extraPeople?: number;
   detail?: string;
+  /** v171 — diagnostic trail of the audit decision. */
+  v171?: {
+    pass1?: string;
+    pass2?: string;
+    decision?: string;
+    note?: string;
+  };
 }
 
-export async function auditAnchorIdentity(
+type RawAudit = {
+  reason: string;
+  detail: string;
+  missing: string[];
+  duplicated: string[];
+  mismatched: string[];
+  totalPeople?: number;
+  extraPeople?: number;
+};
+
+async function runAuditOnce(
   anchorUrl: string,
   portraitUrls: string[],
   names: string[],
   lovableKey: string,
-  timeoutMs = 25_000,
-): Promise<IdentityAuditResult | null> {
-  if (!anchorUrl || portraitUrls.length < 1 || !lovableKey) return null;
+  model: string,
+  timeoutMs: number,
+): Promise<RawAudit | null> {
   const N = portraitUrls.length;
   const refLabel = portraitUrls
     .map((_, i) => `reference #${i + 1}${names[i] ? ` = ${names[i]}` : ""}`)
     .join(", ");
-  // v170 — Cast-Integrity audit (Artlist parity):
-  //   We check CAST INTEGRITY (each reference appears exactly once, correct face),
-  //   NOT total headcount. Background bystanders, pedestrians, crowd, depicted
-  //   persons on screens/posters/photos/mirrors/statues are EXTRAS and are
-  //   allowed — they do not break lipsync because face-targeting matches the
-  //   cast portrait, not "any face in frame".
+  // v170 + v171 — Cast-Integrity audit with hardened "mismatch" gate.
   const text =
     `You will receive a COMPOSED SCENE image followed by ${N} CAST REFERENCE PORTRAIT${N === 1 ? "" : "S"} (${refLabel}). ` +
     `Audit CAST INTEGRITY only — extras and bystanders are ALLOWED. Specifically check: ` +
     `(a) "clone" — the same CAST reference appears two or more times as a real person in the frame (duplicated identity, triptych/panels of the same person, side-by-side variations of the same person, mirror duplicates of the same person); ` +
     `(b) "missing" — a CAST reference person does not appear at all as a real, physically present human; ` +
-    `(c) "swap" — a CAST reference is filled by a clearly DIFFERENT person (different sex, very different age, different hair color/length, completely different face). Be strict on sex/age. ` +
+    `(c) "swap" — a CAST reference is filled by a clearly DIFFERENT person. Be conservative on swap. ` +
     `IMPORTANT — these are NOT failures and must be IGNORED: background pedestrians, bystanders, crowd, coworkers, people walking by, unknown additional humans that do not match any CAST reference, AND any depicted persons on laptop screens, phones, TVs, posters, framed photos, mirrors, statues, mannequins, paintings. Treat depicted persons as scene props, not as humans, and do NOT count them in "appearances". ` +
-    `For each CAST reference, count how many times that exact identity appears as a REAL physically present human (not as a screen image or photo on the wall), and rate faceMatch as "match" (clearly the same person), "mismatch" (clearly a different person), or "uncertain". ` +
+    `STRICT "mismatch" RULE (v171): If the rendered person is the same sex, similar age range, similar hair, and a plausible same-person under different lighting/angle/expression/wardrobe, you MUST return faceMatch="match". Only return "mismatch" when you are HIGHLY CONFIDENT it is a clearly different human (different sex, very different age, completely different facial structure, completely different hair color). When in doubt → "uncertain", NEVER "mismatch". ` +
+    `For each CAST reference, count appearances as a REAL physically present human (not screen/photo) and rate faceMatch. ` +
     `Reply with STRICT JSON only, no prose:\n` +
     `{` +
     `"perReference": [{"ref": 1, "appearances": <0|1|2|...>, "faceMatch": "match"|"mismatch"|"uncertain", "mismatchNotes": "<short>"}, ...],` +
@@ -83,10 +95,7 @@ export async function auditAnchorIdentity(
     const resp = await fetch(GATEWAY, {
       method: "POST",
       headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content }],
-      }),
+      body: JSON.stringify({ model, messages: [{ role: "user", content }] }),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!resp.ok) return null;
@@ -97,11 +106,9 @@ export async function auditAnchorIdentity(
     const parsed = JSON.parse(m[0]);
     const reason = String(parsed?.reason ?? "").toLowerCase();
     const detail = String(parsed?.notes ?? "").slice(0, 240);
-    // v170 — totalPeople/extraPeople are no longer required (Cast-Integrity
-    // audit ignores extras). Read defensively in case the model still emits them.
     const totalPeople = Number.isFinite(Number(parsed?.totalPeople)) ? Number(parsed.totalPeople) : undefined;
     const extraPeople = Number.isFinite(Number(parsed?.extraPeople)) ? Number(parsed.extraPeople) : undefined;
-    const perRef: Array<{ ref: number; appearances?: number; faceMatch?: string; mismatchNotes?: string }> = Array.isArray(parsed?.perReference) ? parsed.perReference : [];
+    const perRef: Array<{ ref: number; appearances?: number; faceMatch?: string }> = Array.isArray(parsed?.perReference) ? parsed.perReference : [];
 
     const missing: string[] = [];
     const duplicated: string[] = [];
@@ -117,39 +124,104 @@ export async function auditAnchorIdentity(
         mismatched.push(name);
       }
     }
-
-    // v170 — Priority: swap > clone > missing > ambiguous.
-    // "extra" is intentionally removed — bystanders/crowd/depicted persons are
-    // allowed and do not break the lipsync pipeline (face-targeting matches
-    // cast portraits, not arbitrary faces).
-    if (mismatched.length > 0 || reason === "swap") {
-      return {
-        ok: false,
-        reason: "swap",
-        mismatched: mismatched.length > 0 ? mismatched : undefined,
-        totalPeople,
-        extraPeople,
-        detail: detail || `swap: ${mismatched.join(", ") || "unspecified"}`,
-      };
-    }
-    if (duplicated.length > 0 || reason === "clone") {
-      return {
-        ok: false,
-        reason: "clone",
-        duplicated: duplicated.length > 0 ? duplicated : undefined,
-        totalPeople,
-        extraPeople,
-        detail: detail || `duplicated: ${duplicated.join(", ") || "unspecified"}`,
-      };
-    }
-    if (missing.length > 0 || reason === "missing") {
-      return { ok: false, reason: "missing", missing, totalPeople, extraPeople, detail };
-    }
-    if (reason === "ambiguous") {
-      return { ok: false, reason: "ambiguous", totalPeople, extraPeople, detail };
-    }
-    return { ok: true, totalPeople, extraPeople };
+    return { reason, detail, missing, duplicated, mismatched, totalPeople, extraPeople };
   } catch {
     return null;
   }
+}
+
+export async function auditAnchorIdentity(
+  anchorUrl: string,
+  portraitUrls: string[],
+  names: string[],
+  lovableKey: string,
+  timeoutMs = 25_000,
+): Promise<IdentityAuditResult | null> {
+  if (!anchorUrl || portraitUrls.length < 1 || !lovableKey) return null;
+  const N = portraitUrls.length;
+
+  const pass1 = await runAuditOnce(anchorUrl, portraitUrls, names, lovableKey, "google/gemini-2.5-flash", timeoutMs);
+  if (!pass1) return null;
+
+  const { reason, detail, missing, duplicated, mismatched, totalPeople, extraPeople } = pass1;
+
+  // Priority: swap > clone > missing > ambiguous.
+  const flashSaysSwap = mismatched.length > 0 || reason === "swap";
+
+  if (flashSaysSwap) {
+    // v171.1 — N=1 confirmation with Gemini 2.5 Pro before hard-blocking.
+    if (N === 1) {
+      console.log(`[identity-audit] v171 N=1 swap flagged by Flash (mismatched=${mismatched.join(",") || "—"}, reason=${reason}); confirming with Pro…`);
+      const pass2 = await runAuditOnce(anchorUrl, portraitUrls, names, lovableKey, "google/gemini-2.5-pro", Math.max(timeoutMs, 30_000));
+      const proSaysSwap = !!pass2 && (pass2.mismatched.length > 0 || pass2.reason === "swap");
+      if (!proSaysSwap) {
+        console.log(`[identity-audit] v171_n1_swap_softpass: flash=mismatch, pro=${pass2 ? "match" : "null"} → ok`);
+        return {
+          ok: true,
+          totalPeople: pass2?.totalPeople ?? totalPeople,
+          extraPeople: pass2?.extraPeople ?? extraPeople,
+          v171: {
+            pass1: "swap",
+            pass2: pass2 ? (pass2.reason || "match") : "null",
+            decision: "softpass_ok",
+            note: "Flash flagged swap, Pro disagreed — N=1 soft-pass.",
+          },
+        };
+      }
+      console.log(`[identity-audit] v171_n1_swap_confirmed: flash + pro both mismatch → hard fail`);
+      return {
+        ok: false,
+        reason: "swap",
+        mismatched: pass2.mismatched.length > 0 ? pass2.mismatched : mismatched,
+        totalPeople: pass2.totalPeople ?? totalPeople,
+        extraPeople: pass2.extraPeople ?? extraPeople,
+        detail: pass2.detail || detail || `swap (confirmed): ${mismatched.join(", ") || "unspecified"}`,
+        v171: { pass1: "swap", pass2: "swap", decision: "hard_fail" },
+      };
+    }
+
+    // v171.2 — Multi-cast: a lone single "mismatch" without reason==='swap'
+    // is a low-confidence signal → soft-warn instead of hard-block.
+    if (mismatched.length === 1 && reason !== "swap") {
+      console.log(`[identity-audit] v171_multicast_lowconf_softpass: single mismatch=${mismatched[0]}, reason=${reason} → soft-warn ok`);
+      return {
+        ok: true,
+        totalPeople,
+        extraPeople,
+        v171: {
+          pass1: "swap_lowconf",
+          decision: "softpass_ok",
+          note: `Single mismatch (${mismatched[0]}) without reason=swap — downgraded to soft-warn.`,
+        },
+      };
+    }
+
+    return {
+      ok: false,
+      reason: "swap",
+      mismatched: mismatched.length > 0 ? mismatched : undefined,
+      totalPeople,
+      extraPeople,
+      detail: detail || `swap: ${mismatched.join(", ") || "unspecified"}`,
+      v171: { pass1: "swap", decision: "hard_fail" },
+    };
+  }
+
+  if (duplicated.length > 0 || reason === "clone") {
+    return {
+      ok: false,
+      reason: "clone",
+      duplicated: duplicated.length > 0 ? duplicated : undefined,
+      totalPeople,
+      extraPeople,
+      detail: detail || `duplicated: ${duplicated.join(", ") || "unspecified"}`,
+    };
+  }
+  if (missing.length > 0 || reason === "missing") {
+    return { ok: false, reason: "missing", missing, totalPeople, extraPeople, detail };
+  }
+  if (reason === "ambiguous") {
+    return { ok: false, reason: "ambiguous", totalPeople, extraPeople, detail };
+  }
+  return { ok: true, totalPeople, extraPeople };
 }

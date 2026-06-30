@@ -1,61 +1,54 @@
-# Bug — Scene 1 bleibt im Voiceover & Untertitel‑Preview schwarz, Scene 2 spielt anschließend normal
+## Problem
 
-## Beobachtung
-Im Tab „Voiceover & Untertitel“ → Karte „Gesamtes Video — Vorschau“:
-- Chip oben links zeigt korrekt „Szene 1 von 2“.
-- Slot A bleibt komplett schwarz, Timer steht auf `0:00`.
-- Nach exakt der Länge von Szene 1 wechselt die Anzeige zu Szene 2, die normal abspielt.
-- Tritt erst auf, **nachdem** eine zweite Szene angelegt wurde. Mit nur einer Szene funktioniert dieselbe Komponente.
-- Der gleiche Bug trat schon einmal auf und „löste sich von selbst“ – das war kein echter Fix, das Symptom kam zurück.
+Szene S03 wird mit `anchor_identity_swap_detected: reference 1 is not the same person` hart geblockt — obwohl im Bild eindeutig derselbe Founder (Samuel) wie im Avatar-Portrait zu sehen ist. Gleichzeitig wird S02 mit demselben Setup als "Generiert" durchgewunken.
 
-## Analyse (Code‑Ebene)
+## Root Cause
 
-`src/components/video-composer/ComposerSequencePreview.tsx` arbeitet mit einem stateless Triple‑Buffer aus drei `<video>`‑Elementen (Slot A/B/C). Geladene Quelle und Opazität werden ausschließlich imperativ über Refs gesetzt; ein `forceRender()` kopiert sie in den Style.
+`supabase/functions/_shared/identity-audit.ts` ruft Gemini 2.5 Flash auf und vertraut dessen `faceMatch: "mismatch"` blind. Flash ist bei N=1 + leichten Pose-/Lichtunterschieden zwischen Studio-Portrait und Szenen-Plate notorisch unzuverlässig (gleicher Mann, andere Lichtstimmung → "mismatch"). Ergebnis: **False-positive Swap** trotz korrekter Identität.
 
-Beim Hinzufügen einer zweiten Szene ändert sich die `playableSignature` (Zeilen 284–287) → der „destructive reset“‑Effect (Zeilen 288–313) läuft:
+Aktuelle Logik in `identity-audit.ts` (Z. 116–134) feuert Swap bereits, wenn **ein einziger** `mismatched`-Eintrag kommt — ohne zweite Meinung, ohne Konfidenz, ohne Sonderbehandlung für N=1.
 
-1. `activeSlotRef.current = 'A'`, `slotMapRef = {A:-1,B:-1,C:-1}`, alle `slot*SrcRef = undefined`.
-2. `preloadSlot('A', 0)` → setzt `<video A>.src = scene1.clipUrl`, `el.load()`, `el.currentTime = 0`.
-3. `preloadSlot('B', 1)` → `<video B>.src = scene2.clipUrl`.
-4. `setOpacityForSlot('A', 1)` / `('B', 0)`.
+## Fix — v171 N=1 Swap-Confirmation (chirurgisch, additiv)
 
-Der Bug entsteht, weil `<video A>` über den Tab‑Wechsel hinweg im DOM erhalten bleibt. Beim Re‑Init wird derselbe HTMLMediaElement‑Knoten erneut benutzt – nur via `el.src = …; el.load()`. Chromium dekodiert in diesem Pfad nicht zuverlässig den ersten Frame, solange wir nicht `play()` aufrufen. Beim anschließenden Klick auf Play startet `v.play()` zwar die Decode‑Pipeline, aber das Element bleibt für die Dauer der ersten Szene auf Frame 0 schwarz (Decoder rendert keine Frames bis zum nächsten Seek/Reload), während `timeupdate` weiter feuert → nach exakt `durationSeconds` advanced er zu Scene 2, das auf Slot B sauber dekodiert wurde, weil dort der erste `.src`‑Set Aufruf wirklich neu war.
+Drei kleine Änderungen, ausschließlich in `supabase/functions/_shared/identity-audit.ts`. Pipeline (Compose, Hailuo, Sync.so, Webhook) wird **nicht** berührt.
 
-Das ist deckungsgleich mit dem Symptom („genau die Szenenlänge schwarz, dann Szene 2 normal“). Slot C (Prefetch) zeigt das nicht, weil Slot C versteckt ist und für die Wiedergabe nie als aktiv genutzt wird. Mit nur einer Szene wird der Reset gar nicht zweimal getriggert.
+### 1. Prompt-Härtung gegen False-Positives
+Im Audit-Prompt ergänzen:
+- "If the rendered person is the same sex, similar age, similar hair, and a plausible same-person under different lighting/angle/expression, you MUST return `match`, not `mismatch`."
+- "Only return `mismatch` if you are highly confident it is a clearly different human (different sex, very different age, completely different facial structure). When in doubt → `uncertain`."
 
-## Fix‑Strategie — schmal, ohne Logikbruch
+### 2. N=1 Single-Face Soft-Pass
+Wenn `portraitUrls.length === 1`:
+- Vor dem Hard-Fail einen zweiten Audit-Call gegen **Gemini 2.5 Pro** (statt Flash) absetzen.
+- Nur wenn **beide** Pässe (Flash + Pro) `mismatch` für ref #1 melden → Swap.
+- Sonst: `ok: true` mit Log `v171_n1_swap_softpass: flash=mismatch, pro=match`.
 
-Ich fasse genau eine Stelle an: das Mounten der `<video>`‑Elemente in `ComposerSequencePreview`. Alles andere bleibt unverändert.
+### 3. Konfidenz-Schwelle für Multi-Cast
+Wenn `mismatched.length === 1` UND `reason !== "swap"` (Modell selbst sagt nicht swap, nur einzelne Slot-Bewertung):
+- Soft-Warn, kein Hard-Block. Verhindert, dass ein Wackel-Match in 4-Cast-Szenen den ganzen Render killt.
 
-1. **`key`‑basiertes Re‑Mount der drei Video‑Slots**
-   - Den drei `<video>`‑Elementen (A/B/C) wird `key={playableSignature}` gegeben.
-   - Wenn die Signatur sich ändert (= Szene wurde hinzugefügt/entfernt/clipUrl gewechselt), unmountet React die alten Elemente und mountet frische. Damit gibt es **keinen** wiederverwendeten `HTMLVideoElement`‑Decoder mehr und das „Frame 0 bleibt schwarz“ kann konstruktionsbedingt nicht mehr auftreten.
-   - Die bestehenden Refs (`videoARef`, `videoBRef`, `videoCRef`) füllen sich automatisch neu.
-2. **Slot‑Init nach Re‑Mount erzwingen**
-   - Direkt nach dem Reset‑Effect (gleicher useEffect, Zeilen 288–313) zusätzlich ein `requestAnimationFrame` schedulen, das `setSrcForSlot('A', scene0.clipUrl)` + `setSrcForSlot('B', scene1.clipUrl)` nochmal aufruft, falls die Refs zum Zeitpunkt des Effects noch leer sind (kann beim Re‑Mount ein Tick dauern).
-   - Garantiert, dass die `src`‑Attribute auf den **frisch gemounteten** Knoten landen und nicht auf den alten.
-3. **Defensive „First‑Frame Paint“‑Pulse für Slot A**
-   - Nach dem Setzen von `src` einmalig `el.play().then(() => el.pause())` mit `currentTime = 0` und `muted = true`. Das erzwingt Decode + Render des ersten Frames, ohne hörbar zu sein.
-   - Nur für Slot A, nur einmal nach Reset, und nur wenn der User noch nicht auf Play geklickt hat.
-
-Punkte 1+2 alleine sollten reichen; Punkt 3 ist eine zusätzliche Versicherung, die ich nur einbaue, wenn die ersten beiden in der lokalen Wiedergabe noch nicht 100 % liefern.
+### Telemetrie
+- Logs: `v171_swap_confirm: pass1=<flash>, pass2=<pro>, decision=<final>`
+- Persistiert in `audio_plan.twoshot.anchor_face_audit.v171`.
 
 ## Was NICHT angefasst wird
-- Crossfade‑Logik (`performTransition`), Watchdog, Image‑Ticker, Voiceover‑/Music‑/SFX‑Sync, Subtitle‑Renderer.
-- `VoiceSubtitlesTab.tsx`, Hooks, Edge‑Functions, Render‑Pipelines, Lip‑Sync, Sync.so‑Pfad.
-- Keine neuen Props, keine Datenbankänderungen, keine Migrations.
+
+- `compose-scene-anchor` (Anchor-Generierung, Anti-Triptych v168) — unverändert.
+- `compose-dialog-segments` + Sync.so-Payload-Contract (v153/v160/v181) — unverändert.
+- Hailuo/HappyHorse-Plate-Pipeline — unverändert.
+- `compose-video-clips` Hard-Abort-Logik (Z. 1916) — unverändert; bekommt durch v171 nur seltener `ok:false` geliefert.
+- UI / Frontend — unverändert.
+
+## Recovery für aktuelle Szene S03
+
+Nach Deploy: User drückt "🔄 Neu rendern" auf S03 — Audit läuft erneut, mit v171-Confirmation. Bei tatsächlich korrekter Identität geht die Szene durch.
+
+## Files
+
+- `supabase/functions/_shared/identity-audit.ts` (Prompt + N=1-Doppelcheck + Multi-Cast-Schwelle)
+- `mem/architecture/lipsync/v171-n1-swap-confirmation.md` (neu, Doku)
 
 ## Risiken
-- Der `key`‑Wechsel beim Hinzufügen/Entfernen einer Szene re‑mountet die `<video>`‑Tags – ein laufender Decode wird verworfen. Da der Reset‑Effect ohnehin alle Timer killt, `setPlaying(false)` setzt und auf Szene 0 springt, ist das das erwartete Verhalten und ohne sichtbaren Nachteil.
-- Kein Einfluss auf bereits funktionierende Single‑Scene‑Vorschauen, da deren Signatur erst beim Editieren wechselt.
 
-## Verifikation
-- Manuell: 1 Szene rendern → Tab öffnen → Play → läuft. Zweite Szene rendern → Tab erneut öffnen → Play → Scene 1 zeigt Bild ab Frame 0, läuft, crossfade in Scene 2.
-- Console‑Log eines bestehenden `[Preview]`‑Marker zur Bestätigung, dass kein Watchdog mehr feuert.
-
-## Technical Section
-- Datei: `src/components/video-composer/ComposerSequencePreview.tsx`
-- Änderungen:
-  - JSX (Slot A/B/C): `key={playableSignature}` ergänzen.
-  - Reset‑Effect: nach `preloadSlot(...)` einen `requestAnimationFrame` setzen, der die Slot‑Init wiederholt falls Refs gerade frisch sind.
-  - Optional Pulse: nach Init für Slot A `el.muted=true; el.play().then(()=>el.pause()).catch(()=>{})`.
+- **Latenz**: Bei N=1 + Flash-mismatch ein zusätzlicher Gemini-Pro-Call (~3–6 s). Nur im Fehlerfall, nicht im Happy Path.
+- **Echte Swaps**: Werden weiterhin gefangen, wenn beide Modelle übereinstimmen. Defense-in-Depth bleibt.
