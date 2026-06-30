@@ -903,11 +903,17 @@ export default function ProductionPlanSheet({
                             // Ensure the selected look is always a valid
                             // option in the dropdown — even if the library
                             // hasn't loaded it under this avatar yet.
-                            const merged = [...fromCharacter];
+                            // v178 Wave 2 — prefer DB-backed name over mention label.
+                            const stableName = (id: string, fallback?: string) =>
+                              outfitLabelById.get(id) ?? fallback ?? 'Gespeicherter Look';
+                            const merged = fromCharacter.map((o) => ({
+                              lookId: o.lookId,
+                              name: stableName(o.lookId, o.name),
+                            }));
                             if (outfitId && !merged.some((o) => o.lookId === outfitId)) {
                               merged.push({
                                 lookId: outfitId,
-                                name: lookHit?.name ?? 'Gespeicherter Look',
+                                name: stableName(outfitId, lookHit?.name),
                               });
                             }
                             const showOutfitPicker = !!baseId && merged.length > 0;
