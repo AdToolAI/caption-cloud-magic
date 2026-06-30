@@ -299,6 +299,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         }
 
         const needsAudioPrep = (data as any[]).filter((d) => {
+          if (!isRealizedScene(d)) return false;
           if (!isDialogEngine(d.engine_override)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
