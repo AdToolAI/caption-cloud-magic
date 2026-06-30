@@ -307,11 +307,13 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
 
-INTELLIGENT DEFAULTS — Transition / Overlay / Tone (NEVER leave undefined):
+INTELLIGENT DEFAULTS — Transition / Overlay / Tone / Performance (NEVER leave undefined):
 You MUST always fill scenes[i].transition, scenes[i].textOverlay (or leave
-empty when no overlay belongs there), and scenes[i].tone — using the
-following heuristics — and list each inferred path in scenes[i]._meta.aiFilled
-(e.g. "transition.type", "textOverlay.text", "tone"):
+empty when no overlay belongs there), scenes[i].tone, AND scenes[i].performance
+— using the following heuristics — and list each inferred path in
+scenes[i]._meta.aiFilled (e.g. "transition.type", "textOverlay.text",
+"tone", "performance.mimik", "performance.gestik", "performance.blick",
+"performance.energy"):
 
   • transition.type & durationSec (use the beat of THIS scene):
       Hook / Cold-Open / Pain           → "cut",        0.0
@@ -339,9 +341,24 @@ following heuristics — and list each inferred path in scenes[i]._meta.aiFilled
         Educational            → "documentary"
         default                → "cinematic"
 
+  • performance.{mimik, gestik, blick, energy} — ALWAYS fill all four axes
+    based on beat. DIALOG-SAFE: never produce gestures that occlude the
+    face on dialog scenes (no "hand-on-face", "looking-down", "away" on
+    lip-sync turns). Use these defaults:
+        Hook           → mimik="confident",     gestik="open-palms", blick="to-camera", energy=4
+        Pain / Problem → mimik="concerned",     gestik="still",      blick="to-camera", energy=2
+        Reveal / Twist → mimik="focused",       gestik="point",      blick="to-camera", energy=3
+        Proof / Social → mimik="confident",     gestik="open-palms", blick="to-camera", energy=3
+        CTA / Endcard  → mimik="warm-smile",    gestik="open-palms", blick="to-camera", energy=4
+        default        → mimik="neutral",       gestik="still",      blick="to-camera", energy=3
+    Override only when the briefing names a different cue (e.g. "ruhig",
+    "energetisch", "nachdenklich"). Always add the filled axes to
+    scenes[i]._meta.aiFilled when the briefing did not state them.
+
   • seed: DO NOT auto-fill. Leave undefined unless the briefing literally
     names a number ("Seed: 12345"). Random per render is the correct A/B
     behaviour — the UI explains this.
+
 
 DO NOT invent IDs. Only use @-mentions that appear in the "## Cast" section.
 DO NOT invent voice IDs. Voice resolution is the resolver's job.
@@ -399,7 +416,11 @@ in for that scene WITHOUT explicit briefing input — examples:
 Omit fields the briefing explicitly stated. The creator uses this list
 to know what is AI-generated and what is theirs.
 
-In LITERAL mode, DO NOT invent fields the briefing does not state.`;
+In LITERAL mode, DO NOT invent NARRATIVE content the briefing does not
+state (voiceover.text, dialogTurns.text, brandAnchor copy). The Intelligent
+Defaults above for transition / textOverlay / tone / performance ALWAYS
+apply — also in LITERAL mode — because they are dramaturgical scaffolding,
+not invented content.`;
 
 // ── Pass B — Resolution & validation ─────────────────────────────────────────
 
@@ -1004,8 +1025,73 @@ This overrides any English wording in the briefing's scaffolding
       if (!manifest.project.totalDurationSec) manifest.project.totalDurationSec = per * 3;
     }
 
+    // ── v177: Scene-count guard — when the briefing literally names N scenes
+    //    but Gemini over-/under-shot, truncate/pad to N and redistribute
+    //    durationSec evenly across project.totalDurationSec. Pass B then runs
+    //    on the corrected list.
+    let sceneCountCorrection: { detected: number; gemini: number } | null = null;
+    try {
+      const text = String(briefing ?? '');
+      // a) explicit "N Szenen / scenes / shots / beats"
+      const numWordMatch = text.match(/(\d{1,2})\s*(szenen?|scenes?|shots?|beats?)\b/i);
+      const numFromWord = numWordMatch ? parseInt(numWordMatch[1], 10) : null;
+      // b) numbered markers "Szene 1", "Scene 2", "Shot 3"  → take max
+      const markerRe = /\b(?:szene|scene|shot)\s*(\d{1,2})\b/gi;
+      let maxMarker = 0;
+      for (const m of text.matchAll(markerRe)) {
+        const n = parseInt(m[1], 10);
+        if (Number.isFinite(n)) maxMarker = Math.max(maxMarker, n);
+      }
+      // c) numbered list "1." "2." "3." at line start  → count ≥3
+      const listMatches = text.match(/^\s*\d{1,2}[.):]\s+\S/gm);
+      const listCount = listMatches && listMatches.length >= 3 ? listMatches.length : 0;
+
+      const candidates = [numFromWord, maxMarker || null, listCount || null]
+        .filter((n): n is number => typeof n === 'number' && n >= 1 && n <= 12);
+      // Prefer the most specific: numbered markers > "N Szenen" word > list count
+      const detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
+
+      if (detected && Array.isArray(manifest?.scenes)) {
+        const got = manifest.scenes.length;
+        if (got !== detected) {
+          const total = Number(manifest?.project?.totalDurationSec) || (got * 5);
+          const perScene = Math.max(2, Math.min(30, Math.round(total / detected)));
+          if (got > detected) {
+            // Truncate keep first N
+            manifest.scenes = manifest.scenes.slice(0, detected);
+          } else {
+            // Pad: clone last scene shape with new index/beat
+            const beatRing = ['Hook', 'Pain', 'Reveal', 'Proof', 'CTA'];
+            while (manifest.scenes.length < detected) {
+              const i = manifest.scenes.length;
+              manifest.scenes.push({
+                index: i + 1,
+                label: beatRing[i % beatRing.length],
+                beat: beatRing[i % beatRing.length],
+                durationSec: perScene,
+                engine: 'broll',
+              });
+            }
+          }
+          // Redistribute durations + reindex
+          manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+            ...s,
+            index: i + 1,
+            durationSec: perScene,
+          }));
+          if (!manifest.project) manifest.project = {};
+          manifest.project.totalDurationSec = perScene * detected;
+          sceneCountCorrection = { detected, gemini: got };
+          console.log('[briefing-deep-parse] scene_count_corrected', { detected, gemini: got, perScene });
+        }
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] scene-count guard failed (non-fatal):', e?.message);
+    }
+
     const characters = charRes.data ?? [];
     const locations = locRes.data ?? [];
+
 
     // Curated voice list (mirror of src/lib/elevenlabs-voices catalog).
     const voices = [
@@ -1162,13 +1248,51 @@ This overrides any English wording in the briefing's scaffolding
           }
         }
       }
-      // Also clean the project-level voice.
+
+      // v177: Local LOCATION fill-pass — analog to cast. Pass-B (Gemini)
+      // sometimes returns locationId=null for slug-style mentions like
+      // "@home-office" even though the library carries "Home Office".
+      // Substring-match both directions via normalizeMention.
+      const resolvedLocationIndexes = new Set<number>();
+      for (const sc of plan.scenes ?? []) {
+        const loc = sc?.location;
+        if (loc && !loc.locationId) {
+          const needle = normalizeMention(loc.mentionKey ?? loc.locationName ?? '');
+          if (needle) {
+            const hit = locations.find((l: any) => {
+              const n = normalizeMention(l.name);
+              return n && (n.includes(needle) || needle.includes(n));
+            });
+            if (hit) {
+              loc.locationId = hit.id;
+              loc.locationName = hit.name;
+              resolvedLocationIndexes.add(sc.index);
+              console.log('[briefing-deep-parse] location_local_fill', {
+                scene: sc.index, mention: loc.mentionKey, resolved: hit.name,
+              });
+            }
+          }
+        }
+      }
+      // Drop now-resolved entries from plan.unresolved
+      if (resolvedLocationIndexes.size > 0 && Array.isArray(plan.unresolved)) {
+        plan.unresolved = plan.unresolved.filter((u: any) => {
+          const m = String(u?.path ?? '').match(/scenes\[(\d+)\]\.location\.locationId/);
+          if (!m) return true;
+          const arrIdx = parseInt(m[1], 10);
+          // arrIdx is 0-based, scene.index is 1-based
+          return !resolvedLocationIndexes.has(arrIdx + 1);
+        });
+      }
+
+      // Also clean the project-level voice (UUID-shaped → null).
       if (plan?.voice && looksLikeUuid((plan.voice as any).voiceId)) {
         (plan.voice as any).voiceId = null;
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
     }
+
 
     try {
       console.log('[briefing-deep-parse] plan summary', {
@@ -1217,6 +1341,7 @@ This overrides any English wording in the briefing's scaffolding
             passA_error: passAError,
             passA_diagnostics: passADiagnostics,
             passB_diagnostics: passBDiagnostics,
+            scene_count_corrected: sceneCountCorrection,
           },
         });
       if (insErr) {
