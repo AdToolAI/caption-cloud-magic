@@ -843,14 +843,14 @@ export default function ProductionPlanSheet({
                       )}
 
                       {/* Performance: Mimik / Gestik / Blick / Energy */}
-                      {s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick || s.performance.energy) && (
+                      {s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick || s.performance.energy != null || (s.performance as any).mimikId || (s.performance as any).gestikId || (s.performance as any).blickId || (s.performance as any).energyId) && (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Performance</Label>
                           <div className="flex flex-wrap gap-1">
-                            {s.performance.mimik && <Badge variant="outline" className="text-[10px]">Mimik: {s.performance.mimik}</Badge>}
-                            {s.performance.gestik && <Badge variant="outline" className="text-[10px]">Gestik: {s.performance.gestik}</Badge>}
-                            {s.performance.blick && <Badge variant="outline" className="text-[10px]">Blick: {s.performance.blick}</Badge>}
-                            {s.performance.energy != null && <Badge variant="outline" className="text-[10px]">Energy: {s.performance.energy}/5</Badge>}
+                            <CatalogChip axis="mimik"  id={(s.performance as any).mimikId}  raw={s.performance.mimik}  label="Mimik" />
+                            <CatalogChip axis="gestik" id={(s.performance as any).gestikId} raw={s.performance.gestik} label="Gestik" />
+                            <CatalogChip axis="blick"  id={(s.performance as any).blickId}  raw={s.performance.blick}  label="Blick" />
+                            <CatalogChip axis="energy" id={(s.performance as any).energyId} raw={s.performance.energy != null ? `${s.performance.energy}/5` : undefined} label="Energy" />
                           </div>
                         </div>
                       )}
