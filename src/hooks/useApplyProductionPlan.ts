@@ -405,11 +405,11 @@ function planSceneToComposerScene(
           lighting: ps.shotDirector?.lighting,
           // Wave 3: forward Catalog-IDs (read-only shadow fields) so
           // downstream UI can show ⚡-AI chips. No prompt impact.
-          ...(ps.shotDirector as any).framingId      ? { framingId:      (ps.shotDirector as any).framingId } : {},
-          ...(ps.shotDirector as any).angleId        ? { angleId:        (ps.shotDirector as any).angleId } : {},
-          ...(ps.shotDirector as any).movementId     ? { movementId:     (ps.shotDirector as any).movementId } : {},
-          ...(ps.shotDirector as any).lightingId     ? { lightingId:     (ps.shotDirector as any).lightingId } : {},
-          ...(ps.shotDirector as any).stylePresetId  ? { stylePresetId:  (ps.shotDirector as any).stylePresetId } : {},
+          ...(ps.shotDirector && (ps.shotDirector as any).framingId      ? { framingId:      (ps.shotDirector as any).framingId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).angleId        ? { angleId:        (ps.shotDirector as any).angleId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).movementId     ? { movementId:     (ps.shotDirector as any).movementId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).lightingId     ? { lightingId:     (ps.shotDirector as any).lightingId } : {}),
+          ...(ps.shotDirector && (ps.shotDirector as any).stylePresetId  ? { stylePresetId:  (ps.shotDirector as any).stylePresetId } : {}),
           ...(rawLocationId?.startsWith('catalog:') ? { locationCatalogId: rawLocationId } : {}),
         }
       : undefined,
