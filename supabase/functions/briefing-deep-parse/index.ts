@@ -10,6 +10,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { resolveCatalogId, CATALOG_VERSION, type CatalogAxis } from "./catalog.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
