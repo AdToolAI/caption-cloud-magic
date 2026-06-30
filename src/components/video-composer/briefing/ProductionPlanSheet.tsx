@@ -466,8 +466,40 @@ export default function ProductionPlanSheet({
       if (error) throw error;
       const created = row as unknown as { id: string; name: string };
       await queryClient.invalidateQueries({ queryKey: ['brand-locations'] });
-      updateSceneLocation(sceneIndex, created.id);
-      toast({ title: 'Location angelegt', description: `„${created.name}" ist jetzt in der Library.` });
+
+      // v178 Wave 2 — fan out the resolved locationId to ALL scenes that
+      // reference the same mention/name. Without this every scene with
+      // the same "@Home Office" would need its own quick-create click.
+      const normalize = (s: string) =>
+        String(s ?? '').replace(/^@/, '').toLowerCase().replace(/[-_\s]/g, '');
+      const trigger = plan?.scenes.find((s) => s.index === sceneIndex);
+      const triggerKey = normalize(
+        trigger?.location?.mentionKey ?? trigger?.location?.locationName ?? trimmed,
+      );
+      let matched = 0;
+      setPlan((p) =>
+        p && {
+          ...p,
+          scenes: p.scenes.map((s) => {
+            if (!s.location) return s;
+            const key = normalize(s.location.mentionKey ?? s.location.locationName ?? '');
+            if (s.index === sceneIndex || key === triggerKey) {
+              matched += 1;
+              return {
+                ...s,
+                location: { ...s.location, locationId: created.id, locationName: created.name },
+              };
+            }
+            return s;
+          }),
+        },
+      );
+      toast({
+        title: 'Location angelegt',
+        description: matched > 1
+          ? `„${created.name}" — für ${matched} Szenen übernommen.`
+          : `„${created.name}" ist jetzt in der Library.`,
+      });
     } catch (e: any) {
       toast({ title: 'Konnte Location nicht anlegen', description: e?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
