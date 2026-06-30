@@ -74,8 +74,10 @@ export default function ProductionPlanSheet({
   const [progress, setProgress] = useState<'A' | 'B' | null>(null);
   const [progressLabel, setProgressLabel] = useState('');
   const { characters, locations } = useUnifiedMentionLibrary();
+  const queryClient = useQueryClient();
   const applyPlan = useApplyProductionPlan();
   const [applying, setApplying] = useState(false);
+  const [creatingLoc, setCreatingLoc] = useState<number | null>(null);
   const [applyResult, setApplyResult] = useState<{
     ok: boolean;
     message: string;
