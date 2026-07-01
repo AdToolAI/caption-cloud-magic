@@ -432,35 +432,8 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Inline time editing when selected */}
-                    {selectedSceneId === scene.id && onTrimScene && (
-                      <div className="flex items-center gap-2 ml-8 mt-1" onClick={(e) => e.stopPropagation()}>
-                        <label className="text-[9px] text-white/30">Start:</label>
-                        <input
-                          type="number"
-                          step={0.01}
-                          min={0}
-                          value={scene.start_time.toFixed(2)}
-                          onChange={(e) => {
-                            const val = Math.max(0, parseFloat(e.target.value) || 0);
-                            if (val < scene.end_time - 0.5) onTrimScene(scene.id, val, scene.end_time);
-                          }}
-                          className="w-14 h-5 px-1 bg-[#050816] border border-white/10 rounded text-[9px] text-white/80 text-center"
-                        />
-                        <label className="text-[9px] text-white/30">End:</label>
-                        <input
-                          type="number"
-                          step={0.01}
-                          min={0}
-                          value={scene.end_time.toFixed(2)}
-                          onChange={(e) => {
-                            const val = Math.max(scene.start_time + 0.5, parseFloat(e.target.value) || 0);
-                            onTrimScene(scene.id, scene.start_time, val);
-                          }}
-                          className="w-14 h-5 px-1 bg-[#050816] border border-white/10 rounded text-[9px] text-white/80 text-center"
-                        />
-                      </div>
-                    )}
+                    {/* Inline-Mini-Trim entfernt — Trim erfolgt jetzt komfortabel
+                        im Inspector rechts über den SceneTrimInspector. */}
                   </div>
 
                   {/* Transition Block between scenes (not after last scene) */}
