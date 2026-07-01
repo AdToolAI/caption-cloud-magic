@@ -285,7 +285,6 @@ export function RemotionPreviewPlayer({
         style={{ aspectRatio }}
       >
         <MemoizedPlayer
-          key={audioFingerprint}
           playerRef={playerRef}
           inputProps={inputProps}
           compositionWidth={width}
