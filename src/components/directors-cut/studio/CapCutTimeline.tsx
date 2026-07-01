@@ -49,6 +49,8 @@ interface CapCutTimelineProps {
   selectedSubtitleId?: string | null;
   onSplitAtPlayhead?: () => void;
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
+  onSceneDuplicate?: (sceneId: string) => void;
+  onInsertAtPlayhead?: () => void;
   /** AI-detected cut points used as magnetic snap targets. */
   cutMarkers?: CutMarker[];
   /** Master toggle for snapping (default true). */
