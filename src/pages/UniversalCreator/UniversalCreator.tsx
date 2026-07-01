@@ -499,7 +499,7 @@ export function UniversalCreator() {
                   ...(contentConfig?.voiceoverUrl && {
                     voiceoverUrl: contentConfig.voiceoverUrl,
                     voiceoverDuration: contentConfig.voiceoverDuration || 30,
-                    voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
+                    voiceoverVolume: clampAudioVolume(contentConfig.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME),
                   }),
                   ...(selectedMusicUrl && {
                     backgroundMusicUrl: selectedMusicUrl,
@@ -509,23 +509,17 @@ export function UniversalCreator() {
                     ),
                   }),
                   subtitles: subtitleConfig?.segments || [],
-                  subtitleStyle: subtitleConfig?.style || {
-                    position: 'bottom', font: 'Inter', fontSize: 48, color: '#ffffff',
-                    backgroundColor: '#000000', backgroundOpacity: 0.5, animation: 'fade',
-                    animationSpeed: 1, outlineStyle: 'stroke', outlineColor: '#000000', outlineWidth: 2,
-                  },
+                  subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
                   background: scenes.length > 0 ? undefined : mapBackgroundAssetToUniversalVideo(backgroundAsset),
                   scenes: scenes.length > 0 ? scenes : undefined,
                 }}
                 width={formatConfig.width}
                 height={formatConfig.height}
-                durationInFrames={Math.ceil(
-                  Math.max(
-                    contentConfig?.actualVoiceoverDuration || contentConfig?.voiceoverDuration || 0,
-                    scenes.reduce((sum, s) => sum + s.duration, 0),
-                    5
-                  ) * 30
-                ) || 150}
+                durationInFrames={computeDurationInFrames({
+                  voiceoverDuration: contentConfig?.voiceoverDuration,
+                  actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
+                  scenes,
+                }, 30)}
               />
             )}
 
