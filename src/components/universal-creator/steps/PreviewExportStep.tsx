@@ -90,8 +90,6 @@ export function PreviewExportStep({
   useEffect(() => {
     if (activeRenderIds.length === 0) return;
 
-    console.log('🎬 Setting up realtime subscription for render IDs:', activeRenderIds);
-
     const channel = supabase
       .channel('render-progress')
       .on(
@@ -102,28 +100,25 @@ export function PreviewExportStep({
           table: 'video_renders',
         },
         async (payload) => {
-          console.log('📡 Realtime update received:', payload);
           const newData = payload.new as any;
-          
+
           setRenderJobs(prev => {
             const updated = prev.map(j => {
               if (j.renderId !== newData.render_id) return j;
-              
-              console.log(`🎥 Updating job ${j.id} with status: ${newData.status}`);
-              
+
               if (newData.status === 'completed') {
                 toast.success(t('uc.renderCompleted', { platform: j.format.platform }));
-                return { 
-                  ...j, 
-                  status: 'completed' as const, 
-                  progress: 100, 
-                  downloadUrl: newData.video_url 
+                return {
+                  ...j,
+                  status: 'completed' as const,
+                  progress: 100,
+                  downloadUrl: newData.video_url
                 };
               } else if (newData.status === 'failed') {
                 toast.error(t('uc.renderFailed', { platform: j.format.platform }));
-                return { 
-                  ...j, 
-                  status: 'failed' as const, 
+                return {
+                  ...j,
+                  status: 'failed' as const,
                   error: newData.error_message || t('uc.failed')
                 };
               }
@@ -134,18 +129,16 @@ export function PreviewExportStep({
             const allDone = updated.every(j => j.status === 'completed' || j.status === 'failed');
             if (allDone && reservationId) {
               const successCount = updated.filter(j => j.status === 'completed').length;
-              const failedCount = updated.filter(j => j.status === 'failed').length;
 
               if (successCount > 0) {
-                // Commit credits for successful renders
                 const actualCost = successCount * ESTIMATED_COSTS.video_render;
-                commit(reservationId, actualCost).catch(console.error);
+                commit(reservationId, actualCost).catch(() => undefined);
                 toast.success(t('uc.videosRendered', { count: String(successCount), credits: String(actualCost) }));
               } else {
-                refund(reservationId, "All renders failed").catch(console.error);
+                refund(reservationId, "All renders failed").catch(() => undefined);
                 toast.error(t('uc.renderAllFailed'));
               }
-              
+
               setReservationId(null);
               setIsRendering(false);
             }
@@ -157,7 +150,7 @@ export function PreviewExportStep({
       .subscribe();
 
     // Authoritative progress poll: checks DB + S3 reconciliation + server-side timeout/refund
-    const HARD_TIMEOUT_MS = 10 * 60 * 1000; // 10 Minuten — passt zur AWS-Retry-Backoff-Kette
+    const HARD_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes — matches AWS retry-backoff chain
 
     const pollDbStatus = async () => {
       try {
@@ -194,11 +187,11 @@ export function PreviewExportStep({
             return { ...j, progress: nextProgress };
           });
 
-          // Hard-timeout: nach 6 Minuten als failed markieren
+          // Hard-timeout: mark as failed after 10 minutes
           const timedOut = updated.map(j => {
             const startedAt = j.startedAt || Date.now();
             if (j.status === 'rendering' && Date.now() - startedAt > HARD_TIMEOUT_MS) {
-              return { ...j, status: 'failed' as const, progress: 0, error: 'Render-Timeout (>10 Min). Bitte erneut versuchen.' };
+              return { ...j, status: 'failed' as const, progress: 0, error: t('uc.renderTimeout') };
             }
             return j;
           });
@@ -208,10 +201,10 @@ export function PreviewExportStep({
             const successCount = timedOut.filter(j => j.status === 'completed').length;
             if (successCount > 0) {
               const actualCost = successCount * ESTIMATED_COSTS.video_render;
-              commit(reservationId, actualCost).catch(console.error);
+              commit(reservationId, actualCost).catch(() => undefined);
               toast.success(t('uc.videosRendered', { count: String(successCount), credits: String(actualCost) }));
             } else {
-              refund(reservationId, 'All renders failed or timed out').catch(console.error);
+              refund(reservationId, 'All renders failed or timed out').catch(() => undefined);
               toast.error(t('uc.renderAllFailed'));
             }
             setReservationId(null);
@@ -220,21 +213,21 @@ export function PreviewExportStep({
 
           return timedOut;
         });
-      } catch (e) {
-        console.error('Poll error:', e);
+      } catch {
+        // silent: polling failure is non-fatal, next tick retries
       }
     };
 
-    // Sofort einmal pollen, danach alle 8 Sekunden
+    // Poll immediately, then every 8 seconds
     pollDbStatus();
     const pollIntervalId = setInterval(pollDbStatus, 8000);
 
     return () => {
-      console.log('🧹 Cleaning up realtime subscription and polling');
       supabase.removeChannel(channel);
       clearInterval(pollIntervalId);
     };
   }, [activeRenderIds.join(','), reservationId]);
+
 
 
   // Additional format options for multi-format export
@@ -267,6 +260,136 @@ export function PreviewExportStep({
     );
   };
 
+  // Single-job start — reused by initial render and per-format retry.
+  // Does NOT touch credit reservation: the caller decides.
+  const startSingleJob = useCallback(async (
+    job: RenderJob,
+    sharedCustomizations: any,
+    calculatedDuration: number,
+  ): Promise<void> => {
+    setRenderJobs(prev =>
+      prev.map(j =>
+        j.id === job.id
+          ? { ...j, status: 'rendering', progress: 10, error: undefined, downloadUrl: undefined, renderId: undefined }
+          : j
+      )
+    );
+
+    try {
+      const { data, error } = await supabase.functions.invoke('render-with-remotion', {
+        body: {
+          project_id: projectId,
+          component_name: 'UniversalCreatorVideo',
+          quality: videoQuality,
+          customizations: {
+            ...sharedCustomizations,
+            voiceoverDuration: calculatedDuration,
+          },
+          format: 'mp4',
+          aspect_ratio: job.format.aspectRatio,
+        },
+      });
+
+      if (error) {
+        const detail = await extractFunctionsError(error);
+        const friendly = /idle.?timeout|aborted|timeout|IDLE_TIMEOUT/i.test(detail || '')
+          ? t('uc.renderStartSlow')
+          : (detail || t('uc.failed'));
+        throw new Error(friendly);
+      }
+
+      if (data && data.ok === false) {
+        const raw = String(data.error || '');
+        const friendly = /aborted|timeout|idle/i.test(raw)
+          ? t('uc.renderStartSlow')
+          : (raw || t('uc.failed'));
+        throw new Error(friendly);
+      }
+
+      if (!data?.render_id) {
+        throw new Error(t('uc.renderIdMissing'));
+      }
+
+      setRenderJobs(prev =>
+        prev.map(j =>
+          j.id === job.id
+            ? {
+                ...j,
+                status: 'rendering',
+                progress: 20,
+                renderId: data.render_id,
+                startedAt: Date.now(),
+              }
+            : j
+        )
+      );
+
+      toast.success(t('uc.renderStarted', { platform: job.format.platform }));
+    } catch (err: any) {
+      setRenderJobs(prev =>
+        prev.map(j =>
+          j.id === job.id
+            ? { ...j, status: 'failed', error: err?.message || String(err) }
+            : j
+        )
+      );
+      toast.error(`${t('uc.renderFailed', { platform: job.format.platform })}: ${err?.message || err}`);
+    }
+  }, [projectId, videoQuality, t]);
+
+  const buildSharedPayload = useCallback(() => {
+    const sharedCustomizations = buildUniversalCreatorCustomizations({
+      contentConfig,
+      subtitleConfig,
+      backgroundAsset,
+      scenes,
+      selectedMusicUrl,
+      musicVolume: normalizedMusicVolume,
+    });
+    const validatedScenes = validateScenes(scenes);
+    const calculatedDuration = computeTotalDurationSeconds({
+      voiceoverDuration: contentConfig.voiceoverDuration,
+      actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
+      scenes: validatedScenes,
+    });
+    return { sharedCustomizations, validatedScenes, calculatedDuration };
+  }, [contentConfig, subtitleConfig, backgroundAsset, scenes, selectedMusicUrl, normalizedMusicVolume]);
+
+  const handleRetryJob = async (jobId: string) => {
+    const job = renderJobs.find(j => j.id === jobId);
+    if (!job || job.status !== 'failed') return;
+
+    const { sharedCustomizations, validatedScenes, calculatedDuration } = buildSharedPayload();
+    if (scenes.length > 0 && validatedScenes.length === 0) {
+      toast.error(t('uc.noValidScenes'));
+      return;
+    }
+    if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
+      toast.error(t('uc.invalidDuration'));
+      return;
+    }
+
+    // Retry uses credits already reserved (or fresh spend if session expired).
+    // If no reservation is live any more, reserve just this one format.
+    let localReservationId = reservationId;
+    if (!localReservationId) {
+      try {
+        const reservation = await reserve(
+          FEATURE_COSTS.VIDEO_RENDER,
+          ESTIMATED_COSTS.video_render * qualityMultiplier,
+          { project_id: projectId, retry: true, format: `${job.format.platform}-${job.format.aspectRatio}` },
+        );
+        localReservationId = reservation.reservation_id;
+        setReservationId(localReservationId);
+      } catch {
+        return;
+      }
+    }
+
+    setIsRendering(true);
+    await startSingleJob(job, sharedCustomizations, calculatedDuration);
+  };
+
   const handleRenderVideo = async () => {
     if (selectedFormats.length === 0) {
       toast.error(t('uc.selectAtLeastOneFormat'));
@@ -274,6 +397,7 @@ export function PreviewExportStep({
     }
 
     // Check credits and reserve
+    let freshReservationId: string;
     try {
       const reservation = await reserve(
         FEATURE_COSTS.VIDEO_RENDER,
@@ -284,8 +408,9 @@ export function PreviewExportStep({
           formats: selectedFormats.map(f => `${f.platform}-${f.aspectRatio}`),
         }
       );
-      setReservationId(reservation.reservation_id); // Store for later commit/refund
-    } catch (error) {
+      freshReservationId = reservation.reservation_id;
+      setReservationId(freshReservationId);
+    } catch {
       // Reserve hook already shows error toast
       return;
     }
@@ -299,155 +424,47 @@ export function PreviewExportStep({
     }));
     setRenderJobs(jobs);
 
-    // Build the SAME customizations object once — every parallel job reuses it
-    // so Preview and Render can never silently diverge across formats.
-    const sharedCustomizations = buildUniversalCreatorCustomizations({
-      contentConfig,
-      subtitleConfig,
-      backgroundAsset,
-      scenes,
-      selectedMusicUrl,
-      musicVolume: normalizedMusicVolume,
-    });
+    const { sharedCustomizations, validatedScenes, calculatedDuration } = buildSharedPayload();
 
-    const validatedScenes = validateScenes(scenes);
     if (scenes.length > 0 && validatedScenes.length === 0) {
       toast.error(t('uc.noValidScenes'));
-      if (reservationId) {
-        await refund(reservationId, 'No valid scenes');
-        setReservationId(null);
-      }
+      await refund(freshReservationId, 'No valid scenes').catch(() => undefined);
+      setReservationId(null);
       setIsRendering(false);
       return;
     }
-
-    const calculatedDuration = computeTotalDurationSeconds({
-      voiceoverDuration: contentConfig.voiceoverDuration,
-      actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
-      scenes: validatedScenes,
-    });
     if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
       toast.error(t('uc.invalidDuration'));
-      if (reservationId) {
-        await refund(reservationId, 'Invalid duration');
-        setReservationId(null);
-      }
+      await refund(freshReservationId, 'Invalid duration').catch(() => undefined);
+      setReservationId(null);
       setIsRendering(false);
       return;
     }
 
-    console.log('🎬 Kicking off parallel renders:', {
-      formatCount: jobs.length,
-      sceneCount: validatedScenes.length,
-      calculatedDuration,
-      quality: videoQuality,
-    });
-
-    // Kick off every format render in parallel. Each Lambda invocation is
-    // independent and the webhook + Realtime subscription drives completion.
-    const startJob = async (job: RenderJob): Promise<void> => {
-      setRenderJobs(prev =>
-        prev.map(j =>
-          j.id === job.id ? { ...j, status: 'rendering', progress: 10 } : j
-        )
+    try {
+      await Promise.allSettled(
+        jobs.map(job => startSingleJob(job, sharedCustomizations, calculatedDuration))
       );
 
-      try {
-        const { data, error } = await supabase.functions.invoke('render-with-remotion', {
-          body: {
-            project_id: projectId,
-            component_name: 'UniversalCreatorVideo',
-            quality: videoQuality,
-            customizations: {
-              ...sharedCustomizations,
-              voiceoverDuration: calculatedDuration,
-            },
-            format: 'mp4',
-            aspect_ratio: job.format.aspectRatio,
-          },
-        });
-
-        if (error) {
-          const detail = await extractFunctionsError(error);
-          const friendly = /idle.?timeout|aborted|timeout|IDLE_TIMEOUT/i.test(detail || '')
-            ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
-            : (detail || t('uc.failed'));
-          throw new Error(friendly);
-        }
-
-        if (data && data.ok === false) {
-          const raw = String(data.error || '');
-          const friendly = /aborted|timeout|idle/i.test(raw)
-            ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
-            : (raw || t('uc.failed'));
-          throw new Error(friendly);
-        }
-
-        if (!data?.render_id) {
-          throw new Error(t('uc.renderIdMissing'));
-        }
-
-        console.log(`🎬 [${job.format.platform}-${job.format.aspectRatio}] render started:`, data.render_id);
-
-        setRenderJobs(prev =>
-          prev.map(j =>
-            j.id === job.id
-              ? {
-                  ...j,
-                  status: 'rendering',
-                  progress: 20,
-                  renderId: data.render_id,
-                  startedAt: Date.now(),
-                }
-              : j
-          )
-        );
-
-        toast.success(t('uc.renderStarted', { platform: job.format.platform }));
-      } catch (err: any) {
-        console.error(`[${job.format.platform}-${job.format.aspectRatio}] render start failed:`, err);
-        setRenderJobs(prev =>
-          prev.map(j =>
-            j.id === job.id
-              ? { ...j, status: 'failed', error: err?.message || String(err) }
-              : j
-          )
-        );
-        toast.error(`${t('uc.renderFailed', { platform: job.format.platform })}: ${err?.message || err}`);
-      }
-    };
-
-    try {
-      await Promise.allSettled(jobs.map(startJob));
-
       // If no job successfully started (all failed synchronously), refund immediately.
-      // Otherwise the Realtime handler owns commit/refund when webhooks arrive.
       setRenderJobs(current => {
         const anyStarted = current.some(j => j.status === 'rendering' && j.renderId);
-        if (!anyStarted && reservationId) {
-          refund(reservationId, 'All render starts failed').catch(console.error);
+        if (!anyStarted) {
+          refund(freshReservationId, 'All render starts failed').catch(() => undefined);
           setReservationId(null);
           setIsRendering(false);
           toast.error(t('uc.renderAllFailed'));
         }
         return current;
       });
-
-      // Credit commit/refund logic remains in Realtime handler
-      // Renders are now async and Realtime will notify us when they complete
-
     } catch (error: any) {
-      console.error('Error rendering videos:', error);
-      toast.error(`Fehler: ${error.message}`);
-      
-      // Refund on error if reservation exists
-      if (reservationId) {
-        await refund(reservationId, `Error: ${error.message}`);
-        setReservationId(null);
-      }
+      toast.error(`${t('uc.errorPrefix')}: ${error.message}`);
+      await refund(freshReservationId, `Error: ${error.message}`).catch(() => undefined);
+      setReservationId(null);
       setIsRendering(false);
     }
   };
+
 
   const handleDownload = (url: string, platform: string) => {
     const link = document.createElement('a');
@@ -591,7 +608,7 @@ export function PreviewExportStep({
             <div className="flex items-center gap-2">
               <Volume2 className="h-5 w-5 text-primary" />
               <div>
-                <h3 className="text-lg font-semibold">Hintergrundmusik</h3>
+                <h3 className="text-lg font-semibold">{t('uc.backgroundMusic')}</h3>
                 <p className="text-sm text-muted-foreground">
                   {Math.round(normalizedMusicVolume * 100)}%
                 </p>
@@ -600,7 +617,7 @@ export function PreviewExportStep({
             {onMusicClear && (
               <Button type="button" variant="outline" size="sm" onClick={onMusicClear}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Entfernen
+                {t('uc.remove')}
               </Button>
             )}
           </div>
@@ -743,8 +760,20 @@ export function PreviewExportStep({
                   </div>
                 )}
 
-                {job.status === 'failed' && job.error && (
-                  <p className="text-sm text-red-500">{job.error}</p>
+                {job.status === 'failed' && (
+                  <div className="space-y-2">
+                    {job.error && <p className="text-sm text-red-500">{job.error}</p>}
+                    <Button
+                      onClick={() => handleRetryJob(job.id)}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={isRendering}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      {t('uc.retryRender')}
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>

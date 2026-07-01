@@ -1,78 +1,46 @@
-## Ziel
-Der Universal Content Creator ist 8 Monate alt und funktioniert, aber ein Deep-Audit zeigt viele stille Divergenzen zwischen UI, Preview, Autosave und Render. Ich will die Pipeline in klaren Wellen aufräumen, ohne Motion Studio / Director's Cut / Composer anzufassen.
+## Was schon fertig ist
+- Welle 1 (Audio ehrlich & stabil)
+- Welle 2 (Preview/Render-Parität mit Live-Preview im Export-Step)
+- Welle 3 (`?project=<id>` Resume + Hydration-Guard + debounced Autosave)
+- Welle 4 (parallele Multi-Format-Renders via `Promise.allSettled`)
 
-## Flow (Ist-Zustand)
+## Was noch offen ist (Welle 5 – Polish & Hygiene)
 
-```text
-UI State (9x useState) ──► localStorage ("universal-creator-backup", 10s Poll)
-                       └─► Supabase content_projects (customizations + audio_config)
-                       └─► RemotionPreviewPlayer (inputProps live)
-                       └─► render-with-remotion  ─┐
-                       └─► render-universal-video ┴─► AWS Lambda ─► S3 ─► Webhook ─► video_renders ─► media_assets
-```
+Klein, aber macht die Pipeline "erwachsen" — nichts davon ist kritisch, aber alles davon merkt man in Support-Tickets später.
 
-## Wichtigste Fundstellen aus dem Audit
+### 1. Retry für fehlgeschlagene Formate
+- In `PreviewExportStep` einen "Erneut rendern"-Button pro Format bei Status `failed`.
+- Nutzt Credits nicht doppelt (Refund lief bereits), stößt nur die eine Format-Job neu an.
+- Löst das aktuelle "einer von vier Formaten failed → User muss den ganzen Wizard neu machen"-Problem.
 
-**Kritisch (verursacht direkt sichtbare Bugs):**
-- `render-universal-video` sendet `musicVolume` statt `backgroundMusicVolume` → wird von Zod stumm verworfen, Musik läuft auf hartem Default 0.35 statt User-Wert.
-- Musik-Slider zeigt Rohwert (z. B. 30%), Preview + Render nutzen aber sidechain-reduzierten Wert → User versteht die Skala nicht, denkt Slider ist kaputt.
-- `selectedMusicUrl` und `projectId` liegen NICHT im localStorage-Backup → nach Reload keine Musik im Preview + doppelte DB-Rows bei jedem Save.
-- `initiallyMuted` wird aus einem `ref` gelesen → Player-Mute-State ist nach Mount praktisch eingefroren.
-- `render-universal-video` läuft synchron gegen Lambda mit 300s Timeout, aber Edge Functions timeouten nach 150s → Frontend sieht Fehler, obwohl Lambda noch läuft.
+### 2. Async-Webhook-Vereinheitlichung
+- `render-universal-video` ruft Lambda noch synchron auf → bei kalten Lambdas droht 150s-Edge-Timeout, obwohl der Render weiterläuft.
+- Umstellung auf denselben Async-+-Webhook-Flow wie `render-with-remotion` (`video_renders`-Row + `remotion-render-webhook`).
+- Kein neuer Bucket, keine neuen Credits-Regeln — nur Aufruf-Pattern angleichen.
 
-**Mittel:**
-- Preview-Duration, Subtitle-Style-Defaults, Background-Asset-Mapping haben leicht unterschiedliche Werte zwischen Preview und Render.
-- Zwei Render-Pfade (`render-with-remotion` vs `render-universal-video`) mit unterschiedlicher Credit-Logik (Reservation vs. Direct-Deduct) → inkonsistente Abrechnung.
-- Kein Schema-Version-Flag im localStorage-Backup → alte Drafts überschreiben neue Defaults (genau das, was Sie in den letzten Runden erlebt haben).
-- Export-Step hat gar keinen echten Live-Preview, nur eine Icon-Karte.
+### 3. Vestigiale Felder entfernen
+- `audioConfig.voiceover_id`, `voiceover_volume`, `sound_effects` werden nirgendwo mehr geschrieben, aber im Restore-Pfad geclamped.
+- Aus `ContentConfig` + Restore + `content_projects.audio_config`-Reader entfernen. Rein Aufräumen.
 
-**Code-Qualität:**
-- `UniversalCreatorVideo.tsx` ist ein 3212-Zeilen-Monolith.
-- Debug-`console.log`-Effekte im Prod-Code.
-- Vestigiale Felder (`audioConfig.voiceover_id`, `voiceover_volume`, `sound_effects`) werden nie geschrieben.
-- Multi-Format-Render läuft sequenziell statt parallel.
+### 4. Debug-Logs & i18n-Rest
+- Verbliebene `console.log`-Effekte in `UniversalCreator.tsx`, `PreviewExportStep.tsx`, `RemotionPreviewPlayer.tsx` entfernen (Prod-Konsole leiser).
+- Hardcoded deutsche Toasts (`"Rendering gestartet…"`, `"Musik hinzugefügt"`) durch `t()` ersetzen — passt zum EN/DE/ES-Policy.
 
-## Umsetzung in 4 Wellen
+### 5. Optional: `UniversalCreatorVideo.tsx` splitten
+- 3212-Zeilen-Monolith in `SceneBackground.tsx`, `TextOverlay.tsx`, `SubtitleOverlay.tsx`, `Transitions.tsx`.
+- Reines Refactor, keine Verhaltensänderung, keine Render-Auswirkung.
+- Vorteil: nächstes Feature (z. B. neue Subtitle-Animation) braucht keinen 3k-Zeilen-Diff mehr.
 
-### Welle 1 – Audio-Mix ehrlich & stabil (dringend)
-1. `render-universal-video`: `musicVolume` → `backgroundMusicVolume` umbenennen, damit der Wert nicht mehr stumm verworfen wird.
-2. Sidechain-Skalierung transparent machen: Slider zeigt genau das, was hörbar ist. Entweder kein Sidechain mehr oder kleines Info-Label „bei Voiceover reduziert auf X %". Slider = Realität.
-3. `selectedMusicUrl` und `projectId` ins localStorage-Backup aufnehmen; Restore rehydriert beides.
-4. `voiceoverVolume` sauber in `contentConfig` typisieren und im Restore-Pfad clampen.
-5. `initiallyMuted` von Ref auf State umstellen, damit Play/Pause nach Interaktion konsistent bleibt.
-6. Ein einziger `DEFAULT_SUBTITLE_STYLE`, den Preview und Render beide importieren.
+## Was ich NICHT anfassen würde
+- Motion Studio / Composer / Director's Cut
+- Credit-Raten, Lambda-Config, Storage-Buckets
+- Bestehende Remotion-Composition-Logik selbst (außer 5. Split)
 
-### Welle 2 – Preview/Render-Parität
-1. Live-Remotion-Preview in `PreviewExportStep` einbauen (gleicher Player wie in der Sidebar) – User sieht vor dem Credit-Spend genau, was rauskommt.
-2. Zentraler `mapBackgroundAssetToRenderPayload()`, gemeinsam für Preview und Export-Payload.
-3. Duration-Berechnung an einer Stelle bündeln (`computeDurationInFrames()`), Preview + Export teilen sich die Funktion.
-4. Alle Divergenz-Konstanten (backgroundOpacity, animation, outlineStyle) in ein `universalCreator/defaults.ts`.
+## Reihenfolge-Vorschlag
+1. **Retry-Button** (größter User-Impact, ~30 min)
+2. **Async-Webhook** für `render-universal-video` (löst die letzte echte Timeout-Fehlerquelle)
+3. **Vestigiale Felder + Debug-Logs** (Hygiene, ~15 min)
+4. **i18n-Rest** (Support-relevant für ES/EN-User)
+5. **Optional Split** (nur wenn du eh gerade am Template arbeiten willst)
 
-### Welle 3 – Persistence & State härten
-1. Versioniertes localStorage-Schema (`{ version: 2, state: {...} }`) mit expliziter Migration.
-2. Autosave in ein einziges `useAutosave(state)`-Hook konsolidieren; kein doppeltes Interval + Effekt mehr.
-3. `projectId` in die URL (`?project=UUID`) für resumierbare Sessions und um Duplikat-Rows zu verhindern.
-4. Restore-Guard: nur überschreiben, wenn kein aktuelles Feld gesetzt ist ODER Backup neuer als aktuelle Session – so kann ein alter Draft nichts mehr „zurückrollen".
-5. Vestigiale Felder aus `audioConfig` entfernen.
-
-### Welle 4 – Render-Pipeline & UX-Politur
-1. `render-universal-video` auf Async-Invocation + Webhook umstellen (wie `render-with-remotion`); Credit-Modell auf Reservation/Commit vereinheitlichen.
-2. Multi-Format-Render parallel via `Promise.all`.
-3. „Retry"-Button für fehlgeschlagene Renders (nutzt die bereits refundeten Credits).
-4. `media_assets.storage_path` korrekt setzen (kein S3-URL mehr).
-5. Debug-`console.log`-Effekte entfernen, hardcoded deutsche Toasts durch `t()` ersetzen.
-6. Optional: `UniversalCreatorVideo.tsx` in Sub-Module splitten (SceneBackground, TextOverlay, Transitions, SubtitleOverlay). Rein Refactor, keine Verhaltensänderung.
-
-## Was NICHT angefasst wird
-- Motion Studio / Video Composer / Director's Cut / Talking Head / Lip-Sync / Credit-Rates / Provider-Pipelines / bestehende Remotion-Composition-Logik selbst (nur Splitten).
-- Kein neuer Storage-Bucket, keine DB-Migration außer `content_projects.customizations` optional versionieren.
-- Keine Änderung an der Renderqualität oder den Lambda-Concurrency-Regeln.
-
-## Verifikation pro Welle
-- Welle 1: Slider 10 / 30 / 70 % → Preview UND Export klingen gleich, Werte überleben Reload.
-- Welle 2: Export-Step-Preview zeigt exakt das gerenderte Ergebnis; Duration- und Subtitle-Style-Werte identisch.
-- Welle 3: Nach Hard-Reload + Restore keine Duplikat-Rows in `content_projects`, kein Rückfall auf alte Volume-Werte.
-- Welle 4: Fehlgeschlagener Render → Retry funktioniert ohne Doppelabbuchung; 3 Formate rendern parallel; keine 150s-Edge-Timeouts mehr.
-
-## Reihenfolge / Rollout
-Ich würde Welle 1 sofort umsetzen (löst die Ursachen der letzten Runden endgültig), dann nach Ihrer Freigabe Welle 2, 3, 4 einzeln. Sagen Sie mir einfach welche Welle ich starten soll – oder ob ich alle vier direkt hintereinander abarbeiten darf.
+Sag mir welche Punkte du willst — ich kann Punkt 1–4 in einem Rutsch machen, Punkt 5 nur auf explizite Ansage.
