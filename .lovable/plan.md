@@ -1,54 +1,62 @@
-## Welle 6 – Pro-Editing
+## Problem
 
-Bringt den Universal Cut auf CapCut/Descript-Niveau. Fokus: schnelle Batch-Operationen, Fehler-Rückgängigmachung und Discoverability.
+Im Inspector (rechte Seite) hast du `Trim Start` auf **2,10s** gesetzt — der Clip wird aber weder auf der Timeline kürzer, noch passiert visuell irgendetwas. Grund:
 
-### 1. Ripple Delete & Magnetic Timeline
-- Delete/Backspace auf einem Clip: Clip entfernen **und** alle nachfolgenden Clips auf derselben Spur nach links ziehen (Lücke schließen).
-- Alt+Delete = klassisches Delete (Lücke bleibt, für User die es explizit wollen).
-- Beim Verschieben eines Clips: automatisches Snapping an Nachbar-Clips (Magnet-Modus als Toggle in der Toolbar).
-- Toggle-State in `localStorage` persistieren (`dc:ripple-mode`, `dc:magnet-mode`).
+Die Trim-Inputs schreiben aktuell **nur** das Feld `clip.trimStart` (Audio-Playback-Offset). Sie fassen `clip.startTime` und `clip.duration` **nicht** an. Das heißt:
+- Timeline-Balken bleibt 14,9s breit
+- Audio spielt intern zwar ab 2,1s, aber der Clip belegt weiter den vollen Slot → wirkt "kaputt"
 
-### 2. Multi-Select
-- **Shift+Click**: Range-Select zwischen zwei Clips.
-- **Ctrl/Cmd+Click**: Einzelne Clips zur Auswahl toggeln.
-- **Rubber-Band-Select**: Klick+Drag auf leerem Timeline-Bereich zeichnet Auswahl-Rechteck.
-- Kontextmenü und Toolbar-Buttons reagieren auf Multi-Select (Delete, Duplicate, Split, Group).
-- Visuelle Anzeige: Cyan-Outline auf allen selektierten Clips + Zähler-Badge im Inspector ("3 Clips ausgewählt").
+Die **Handle-Drags** (Ziehen am Clip-Rand) machen es korrekt: `startTime`, `duration` und `trimStart/trimEnd` werden zusammen bewegt (siehe `CapCutEditor.tsx:1015-1028`). Die Inspector-Inputs spiegeln diese Logik nicht.
 
-### 3. Undo/Redo-Stack
-- Zentraler Command-Stack in `CapCutEditor.tsx` (History-Array mit `past` / `future`).
-- Jede Mutation (Add, Delete, Trim, Move, Split, Volume-Change) pusht einen Command.
-- **Ctrl+Z** = Undo, **Ctrl+Shift+Z** / **Ctrl+Y** = Redo.
-- Max. 50 States (Memory-Cap).
-- Toolbar-Buttons ↶ / ↷ mit disabled-State wenn Stack leer.
+Es gibt zusätzlich keinen expliziten **"Anwenden / Schneiden"**-Button neben den Inputs — Nutzer erwarten sichtbares Feedback.
 
-### 4. Keyboard-Shortcut-Overlay
-- **?**-Taste öffnet Modal mit allen Shortcuts (Split S, Delete, Space=Play, J/K/L=Shuttle, Ctrl+Z, etc.).
-- Suchbar, gruppiert nach Kategorie (Playback / Editing / Selection / Navigation).
-- Link "Shortcuts anzeigen" im Universal-Creator Help-Menü.
+## Fix (Welle 6.1 — Inspector Trim wiring)
 
-### 5. Zusätzliche Shortcuts (Pro-Feel)
-- **Space** = Play/Pause
-- **J / K / L** = Rückwärts / Pause / Vorwärts (Shuttle)
-- **← / →** = 1 Frame vor/zurück, **Shift+←/→** = 1 Sekunde
-- **Home / End** = Anfang / Ende
-- **I / O** = In/Out-Marker setzen (für spätere Range-Operationen)
-- **Ctrl+D** = Duplicate Selection
-- **Ctrl+A** = Select All
+**Datei:** `src/components/directors-cut/studio/CapCutPropertiesPanel.tsx`
 
-### 6. Betroffene Dateien
-- `src/components/universal-creator/capcut/CapCutEditor.tsx` — History-Stack, Multi-Select-State, Global-Keyboard-Handler
-- `src/components/universal-creator/capcut/CapCutTimeline.tsx` — Rubber-Band, Ripple-Logik, Shift/Ctrl-Click
-- `src/components/universal-creator/capcut/CapCutToolbar.tsx` — Undo/Redo/Ripple/Magnet-Buttons
-- `src/components/universal-creator/capcut/DraggableClip.tsx` — Multi-Select-Outline
-- `src/components/universal-creator/capcut/ShortcutOverlay.tsx` (**neu**) — ?-Modal
-- `src/hooks/useEditorHistory.ts` (**neu**) — Command-Stack-Hook
-- `src/hooks/useTimelineSelection.ts` (**neu**) — Multi-Select-State
+1. **`Trim Start`-Input umverdrahten**  
+   Beim Ändern:
+   - `delta = newTrimStart - clip.trimStart`
+   - `startTime += delta`
+   - `duration -= delta` (min 0.1s)
+   - `trimStart = newTrimStart`
+   
+   → Clip schrumpft links, springt korrekt weiter rechts an — identisch zum Left-Handle-Drag.
 
-### 7. Nicht enthalten (bewusst außerhalb Welle 6)
-- Speed-Ramping-UI in Timeline → eigene Welle 7 (existiert bereits im Director's Cut, muss portiert werden)
-- Nested Compound Clips / Groups
-- Blade-Tool mit Cursor-Wechsel (Split via S-Shortcut reicht vorerst)
+2. **`Trim End`-Input umverdrahten**  
+   Beim Ändern:
+   - `duration = newTrimEnd - clip.trimStart` (min 0.1s)
+   - `trimEnd = newTrimEnd`
+   
+   → Clip schrumpft rechts — identisch zum Right-Handle-Drag.
 
-### Erfolgs-Kriterium
-Nutzer kann eine Sequenz von 10 Clips ohne Maus durchschneiden, unerwünschte Segmente per Ripple-Delete entfernen und den letzten Fehler mit Ctrl+Z rückgängig machen — in unter 30 Sekunden.
+3. **Zweiter (duplizierter) Trim-Block (Zeilen 437–470)**  
+   Gleiche Logik anwenden — aktuell doppelter Code mit dem gleichen Bug.
+
+4. **UX-Verbesserungen im Trim-Panel**  
+   - Read-only Anzeige "Länge: X.XXs" unter den beiden Inputs (aktuell `Dauer` = `duration`, aber ohne Live-Update sichtbar)
+   - Neuer Button **"Am Playhead schneiden"** direkt im Trim-Block (ruft bestehende `handleSplitAtPlayhead`-Funktion), damit Splitten von genau dem Clip auch aus dem Inspector geht
+   - Kleiner Hinweistext: *"Trim kürzt die sichtbare Länge auf der Timeline."*
+
+5. **Value-Formatierung**  
+   Inputs verwenden `.toFixed(2)` — dadurch springt der Cursor. Auf `defaultValue` + `onBlur` umstellen (oder Debounce), damit `2,1` beim Tippen nicht auf `2,10` snapt und weiterspringt.
+
+## Technische Änderungen
+
+```
+src/components/directors-cut/studio/CapCutPropertiesPanel.tsx
+  - updateClip({trimStart}) → updateClipWithGeometry({trimStart}) 
+    (bewegt startTime/duration mit)
+  - Analog für trimEnd → duration
+  - Neue kleine Helper-Funktion applyTrim(edge: 'start'|'end', value)
+  - Neuer Button "Am Playhead schneiden" (props: onSplitAtPlayhead)
+  - Numeric-Input: value → defaultValue + onBlur/onKeyDown Enter
+src/components/directors-cut/studio/CapCutEditor.tsx
+  - handleSplitAtPlayhead als Prop an <CapCutPropertiesPanel /> durchreichen
+```
+
+## Nicht geändert
+
+- Keine Änderungen an Render-Pipeline, Preview-Player, oder Audio-Ducking
+- Keine Änderungen an der Split-Logik selbst (`S`-Taste, Toolbar-Button funktionieren weiter)
+- Handle-Drag am Clip-Rand bleibt unverändert (funktioniert bereits korrekt)
