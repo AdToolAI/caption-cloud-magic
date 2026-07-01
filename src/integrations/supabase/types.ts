@@ -15684,47 +15684,74 @@ export type Database = {
         Row: {
           aspect_ratio: string | null
           category: string
+          cold_start: boolean | null
           completed_at: string | null
           created_at: string
           duration_seconds: number | null
           error_message: string | null
+          frames_per_lambda: number | null
+          frames_total: number | null
           id: string
           input_props: Json | null
+          lambda_duration_ms: number | null
           output_url: string | null
+          preflight_ms: number | null
           render_id: string | null
+          source: string | null
+          started_at: string | null
           status: string
+          total_duration_ms: number | null
           updated_at: string
           user_id: string
+          workers_used: number | null
         }
         Insert: {
           aspect_ratio?: string | null
           category: string
+          cold_start?: boolean | null
           completed_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           error_message?: string | null
+          frames_per_lambda?: number | null
+          frames_total?: number | null
           id?: string
           input_props?: Json | null
+          lambda_duration_ms?: number | null
           output_url?: string | null
+          preflight_ms?: number | null
           render_id?: string | null
+          source?: string | null
+          started_at?: string | null
           status?: string
+          total_duration_ms?: number | null
           updated_at?: string
           user_id: string
+          workers_used?: number | null
         }
         Update: {
           aspect_ratio?: string | null
           category?: string
+          cold_start?: boolean | null
           completed_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           error_message?: string | null
+          frames_per_lambda?: number | null
+          frames_total?: number | null
           id?: string
           input_props?: Json | null
+          lambda_duration_ms?: number | null
           output_url?: string | null
+          preflight_ms?: number | null
           render_id?: string | null
+          source?: string | null
+          started_at?: string | null
           status?: string
+          total_duration_ms?: number | null
           updated_at?: string
           user_id?: string
+          workers_used?: number | null
         }
         Relationships: []
       }
