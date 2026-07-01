@@ -2922,7 +2922,14 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
       {!diagToggles.silentRender && voiceoverUrl && (
-          <Audio key="stable-voiceover-audio" src={voiceoverUrl} volume={masterVolume} startFrom={0} loop={false} pauseWhenBuffering />
+          <Audio
+            key={`stable-voiceover-audio-${voiceoverVolume}-${masterVolume}`}
+            src={voiceoverUrl}
+            volume={Math.max(0, Math.min(1, voiceoverVolume * masterVolume))}
+            startFrom={0}
+            loop={false}
+            pauseWhenBuffering
+          />
         )}
         {/* r64: Background music removed from template — added post-render via mux-audio-to-video */}
         
