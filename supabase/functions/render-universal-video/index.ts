@@ -340,6 +340,33 @@ serve(async (req) => {
       payload: inputPropsJson,
     };
 
+    // Welle 2: dynamic framesPerLambda + concurrency tuning
+    const { framesPerLambda, maxConcurrency } = pickLambdaConcurrency(durationInFrames);
+    console.log(
+      `[render-universal-video] Lambda concurrency: framesPerLambda=${framesPerLambda}, ` +
+      `maxConcurrency=${maxConcurrency}, totalFrames=${durationInFrames}`
+    );
+
+    // Welle 1: Telemetry insert — mark queued/rendering before Lambda call
+    const preflightMs = Date.now() - requestStartedAt;
+    const telemetryRow = {
+      user_id: userId,
+      render_id: pendingRenderId,
+      category: briefing.category || null,
+      status: 'rendering' as const,
+      source: 'universal-creator',
+      aspect_ratio: briefing.aspectRatio || '16:9',
+      duration_seconds: Math.round(totalDuration),
+      frames_total: durationInFrames,
+      frames_per_lambda: framesPerLambda,
+      preflight_ms: preflightMs,
+      input_props: { scenesCount: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl },
+      started_at: new Date().toISOString(),
+    };
+    supabase.from('universal_video_renders').insert(telemetryRow).then(({ error }) => {
+      if (error) console.warn('[render-universal-video] telemetry insert failed (non-fatal):', error.message);
+    });
+
     const lambdaPayload = normalizeStartPayload({
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
@@ -354,6 +381,9 @@ serve(async (req) => {
       jpegQuality: 80,
       maxRetries: 1,
       timeoutInMilliseconds: 300000,
+      framesPerLambda,
+      concurrencyPerLambda: 1,
+      maxConcurrency,
       privacy: 'public',
       // r61: Enable audio rendering for voiceover/music
       muted: false,
