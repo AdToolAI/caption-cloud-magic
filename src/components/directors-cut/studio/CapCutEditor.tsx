@@ -2326,6 +2326,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     onSubtitleDelete={handleSubtitleDelete}
                     onClipDelete={handleDeleteClip}
                     onSplitAtPlayhead={handleSplitAtPlayhead}
+                    selectedScene={selectedSceneId ? scenes.find(s => s.id === selectedSceneId) : undefined}
+                    selectedSceneIndex={selectedSceneId ? scenes.findIndex(s => s.id === selectedSceneId) : undefined}
+                    sourceDuration={originalVideoDuration}
+                    currentTime={currentTime}
+                    onTrimScene={handleTrimScene}
+                    onSceneDelete={handleSceneDelete}
                   />
                 </div>
               </>
