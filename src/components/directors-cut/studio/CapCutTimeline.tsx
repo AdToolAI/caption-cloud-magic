@@ -77,17 +77,20 @@ const DraggableScene: React.FC<{
   zoom: number;
   isSelected: boolean;
   isPlayheadInside: boolean;
+  currentTime: number;
   onSeek: (time: number) => void;
   onSelect: () => void;
   onDelete?: () => void;
   onSplit?: () => void;
+  onDuplicate?: () => void;
   onTrim?: (newStart: number, newEnd: number) => void;
   /** Optional snap function — returns the snapped time and whether a target was hit. */
   snapFn?: (value: number, excludeSceneId?: string) => { value: number; hit: { time: number } | null };
   onSnapPreview?: (time: number | null) => void;
-}> = ({ scene, index, zoom, isSelected, isPlayheadInside, onSeek, onSelect, onDelete, onSplit, onTrim, snapFn, onSnapPreview }) => {
+}> = ({ scene, index, zoom, isSelected, isPlayheadInside, currentTime, onSeek, onSelect, onDelete, onSplit, onDuplicate, onTrim, snapFn, onSnapPreview }) => {
   const { t } = useTranslation();
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
+  const [trimGhost, setTrimGhost] = useState<{ edge: 'left' | 'right'; time: number } | null>(null);
   const startXRef = useRef(0);
   const originalBoundsRef = useRef({ start: 0, end: 0 });
 
@@ -122,6 +125,7 @@ const DraggableScene: React.FC<{
     e.stopPropagation();
     e.preventDefault();
     setIsResizing(edge);
+    setTrimGhost({ edge, time: edge === 'left' ? scene.start_time : scene.end_time });
     startXRef.current = e.clientX;
     originalBoundsRef.current = { start: scene.start_time, end: scene.end_time };
 
@@ -133,18 +137,25 @@ const DraggableScene: React.FC<{
         const snap = snapFn?.(newStart, scene.id);
         if (snap?.hit) newStart = snap.value;
         onSnapPreview?.(snap?.hit ? snap.value : null);
-        if (newStart < scene.end_time - 1) onTrim?.(newStart, scene.end_time);
+        if (newStart < scene.end_time - 1) {
+          onTrim?.(newStart, scene.end_time);
+          setTrimGhost({ edge, time: newStart });
+        }
       } else {
         let newEnd = originalBoundsRef.current.end + deltaTime;
         const snap = snapFn?.(newEnd, scene.id);
         if (snap?.hit) newEnd = snap.value;
         onSnapPreview?.(snap?.hit ? snap.value : null);
-        if (newEnd > scene.start_time + 1) onTrim?.(scene.start_time, newEnd);
+        if (newEnd > scene.start_time + 1) {
+          onTrim?.(scene.start_time, newEnd);
+          setTrimGhost({ edge, time: newEnd });
+        }
       }
     };
 
     const handleMouseUp = () => {
       setIsResizing(null);
+      setTrimGhost(null);
       onSnapPreview?.(null);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
@@ -154,99 +165,165 @@ const DraggableScene: React.FC<{
     window.addEventListener('mouseup', handleMouseUp);
   };
 
+  const canTrimStartToPlayhead = onTrim && currentTime > scene.start_time + 0.3 && currentTime < scene.end_time - 0.5;
+  const canTrimEndToPlayhead = onTrim && currentTime > scene.start_time + 0.5 && currentTime < scene.end_time - 0.3;
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "absolute top-1 bottom-1 rounded-lg flex flex-col cursor-grab active:cursor-grabbing group transition-all border",
-        colorSet.bg, colorSet.border,
-        isDragging && "opacity-50 ring-2 ring-cyan-400",
-        isSelected && "ring-2 ring-cyan-400 ring-offset-1 ring-offset-[#050816] shadow-[0_0_15px_rgba(34,211,238,0.2)]",
-        isPlayheadInside && !isSelected && "ring-1 ring-[#F5C76A]/60"
-      )}
-      onClick={(e) => { e.stopPropagation(); onSelect(); onSeek(scene.start_time); }}
-      {...attributes}
-      {...listeners}
-    >
-      {/* Row 1: Grip + Number + Name + Actions */}
-      <div className="flex items-center gap-1 px-1.5 pt-1 min-w-0">
-        <GripVertical className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
-        <div className={cn(
-          "w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0",
-          scene.isBlackscreen ? "bg-zinc-700 text-zinc-400" : "bg-white/20 text-white"
-        )}>
-          {scene.isBlackscreen ? '⬛' : index + 1}
-        </div>
-        {sceneWidth > 60 && (
-          <span className="text-[10px] text-white/80 truncate flex-1 font-medium">
-            {scene.description?.slice(0, Math.floor(sceneWidth / 7)) || t('dc.sceneLabel', { index: index + 1 })}
-          </span>
-        )}
-        <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
-          {onSplit && isPlayheadInside && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onSplit(); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="w-5 h-5 flex items-center justify-center rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 transition-colors"
-              title={t('dc.splitAtPlayhead')}
-            >
-              <Scissors className="h-3 w-3" />
-            </button>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={style}
+          className={cn(
+            "absolute top-1 bottom-1 rounded-lg flex flex-col cursor-grab active:cursor-grabbing group transition-all border",
+            colorSet.bg, colorSet.border,
+            isDragging && "opacity-50 ring-2 ring-cyan-400",
+            isSelected && "ring-2 ring-cyan-400 ring-offset-1 ring-offset-[#050816] shadow-[0_0_15px_rgba(34,211,238,0.2)]",
+            isPlayheadInside && !isSelected && "ring-1 ring-[#F5C76A]/60"
           )}
-          {onDelete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="w-5 h-5 flex items-center justify-center rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 transition-colors"
-              title={t('dc.deleteScene')}
+          onClick={(e) => { e.stopPropagation(); onSelect(); onSeek(scene.start_time); }}
+          {...attributes}
+          {...listeners}
+        >
+          {/* Row 1: Grip + Number + Name + Actions */}
+          <div className="flex items-center gap-1 px-1.5 pt-1 min-w-0">
+            <GripVertical className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+            <div className={cn(
+              "w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0",
+              scene.isBlackscreen ? "bg-zinc-700 text-zinc-400" : "bg-white/20 text-white"
+            )}>
+              {scene.isBlackscreen ? '⬛' : index + 1}
+            </div>
+            {sceneWidth > 60 && (
+              <span className="text-[10px] text-white/80 truncate flex-1 font-medium">
+                {scene.description?.slice(0, Math.floor(sceneWidth / 7)) || t('dc.sceneLabel', { index: index + 1 })}
+              </span>
+            )}
+            <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+              {onSplit && isPlayheadInside && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSplit(); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="w-5 h-5 flex items-center justify-center rounded bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 transition-colors"
+                  title={t('dc.splitAtPlayhead')}
+                >
+                  <Scissors className="h-3 w-3" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="w-5 h-5 flex items-center justify-center rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 transition-colors"
+                  title={t('dc.deleteScene')}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: Time info */}
+          <div className="px-1.5 mt-0.5">
+            <span className="text-[9px] text-white/50 font-mono">
+              {formatTime(scene.start_time)} – {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
+            </span>
+          </div>
+
+          {/* Row 3: Visual bar */}
+          <div className="flex-1 mx-1.5 mb-1 mt-1 rounded-sm bg-white/10 overflow-hidden">
+            {scene.thumbnail_url ? (
+              <div className="h-full w-full bg-cover bg-center opacity-50" style={{ backgroundImage: `url(${scene.thumbnail_url})` }} />
+            ) : (
+              <div className="h-full w-full bg-gradient-to-r from-white/5 to-white/10" />
+            )}
+          </div>
+
+          {/* Trim Handle Left */}
+          <div
+            className={cn(
+              "absolute left-0 top-0 bottom-0 w-[6px] cursor-ew-resize rounded-l-lg z-10 transition-colors",
+              isResizing === 'left' ? "bg-cyan-400/60" : "bg-transparent hover:bg-white/30"
+            )}
+            onMouseDown={(e) => handleTrimStart(e, 'left')}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="absolute left-[2px] top-1/2 -translate-y-1/2 w-[2px] h-4 bg-white/40 rounded-full" />
+          </div>
+
+          {/* Trim Handle Right */}
+          <div
+            className={cn(
+              "absolute right-0 top-0 bottom-0 w-[6px] cursor-ew-resize rounded-r-lg z-10 transition-colors",
+              isResizing === 'right' ? "bg-cyan-400/60" : "bg-transparent hover:bg-white/30"
+            )}
+            onMouseDown={(e) => handleTrimStart(e, 'right')}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="absolute right-[2px] top-1/2 -translate-y-1/2 w-[2px] h-4 bg-white/40 rounded-full" />
+          </div>
+
+          {/* Trim Ghost Tooltip — floating chip near the active handle */}
+          {trimGhost && (
+            <div
+              className={cn(
+                "absolute -top-6 z-30 pointer-events-none",
+                "px-1.5 py-0.5 rounded bg-cyan-500 text-[10px] font-mono text-black shadow-lg",
+                trimGhost.edge === 'left' ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2"
+              )}
             >
-              <Trash2 className="h-3 w-3" />
-            </button>
+              {formatTime(trimGhost.time)}
+            </div>
           )}
         </div>
-      </div>
-
-      {/* Row 2: Time info */}
-      <div className="px-1.5 mt-0.5">
-        <span className="text-[9px] text-white/50 font-mono">
-          {formatTime(scene.start_time)} – {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
-        </span>
-      </div>
-
-      {/* Row 3: Visual bar */}
-      <div className="flex-1 mx-1.5 mb-1 mt-1 rounded-sm bg-white/10 overflow-hidden">
-        {scene.thumbnail_url ? (
-          <div className="h-full w-full bg-cover bg-center opacity-50" style={{ backgroundImage: `url(${scene.thumbnail_url})` }} />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-r from-white/5 to-white/10" />
+      </ContextMenuTrigger>
+      <ContextMenuContent className="bg-[#0a0a1a]/95 border-[#3a3a3a] text-white/90 w-56">
+        {onSplit && isPlayheadInside && (
+          <ContextMenuItem onClick={onSplit} className="cursor-pointer hover:bg-white/10 focus:bg-white/10">
+            <Scissors className="h-3.5 w-3.5 mr-2 text-cyan-300" />
+            {t('dc.splitAtPlayhead') || 'Am Playhead teilen'}
+            <kbd className="ml-auto text-[9px] text-white/40 border border-white/10 rounded px-1">S</kbd>
+          </ContextMenuItem>
         )}
-      </div>
-
-      {/* Trim Handle Left */}
-      <div
-        className={cn(
-          "absolute left-0 top-0 bottom-0 w-[6px] cursor-ew-resize rounded-l-lg z-10 transition-colors",
-          isResizing === 'left' ? "bg-cyan-400/60" : "bg-transparent hover:bg-white/30"
+        {onDuplicate && (
+          <ContextMenuItem onClick={onDuplicate} className="cursor-pointer hover:bg-white/10 focus:bg-white/10">
+            <Copy className="h-3.5 w-3.5 mr-2 text-white/60" />
+            Duplizieren
+          </ContextMenuItem>
         )}
-        onMouseDown={(e) => handleTrimStart(e, 'left')}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <div className="absolute left-[2px] top-1/2 -translate-y-1/2 w-[2px] h-4 bg-white/40 rounded-full" />
-      </div>
-
-      {/* Trim Handle Right */}
-      <div
-        className={cn(
-          "absolute right-0 top-0 bottom-0 w-[6px] cursor-ew-resize rounded-r-lg z-10 transition-colors",
-          isResizing === 'right' ? "bg-cyan-400/60" : "bg-transparent hover:bg-white/30"
+        {(canTrimStartToPlayhead || canTrimEndToPlayhead) && <ContextMenuSeparator className="bg-white/10" />}
+        {canTrimStartToPlayhead && (
+          <ContextMenuItem
+            onClick={() => onTrim?.(currentTime, scene.end_time)}
+            className="cursor-pointer hover:bg-white/10 focus:bg-white/10"
+          >
+            <ArrowLeftToLine className="h-3.5 w-3.5 mr-2 text-white/60" />
+            Anfang zum Playhead
+          </ContextMenuItem>
         )}
-        onMouseDown={(e) => handleTrimStart(e, 'right')}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <div className="absolute right-[2px] top-1/2 -translate-y-1/2 w-[2px] h-4 bg-white/40 rounded-full" />
-      </div>
-    </div>
+        {canTrimEndToPlayhead && (
+          <ContextMenuItem
+            onClick={() => onTrim?.(scene.start_time, currentTime)}
+            className="cursor-pointer hover:bg-white/10 focus:bg-white/10"
+          >
+            <ArrowRightToLine className="h-3.5 w-3.5 mr-2 text-white/60" />
+            Ende zum Playhead
+          </ContextMenuItem>
+        )}
+        {onDelete && (
+          <>
+            <ContextMenuSeparator className="bg-white/10" />
+            <ContextMenuItem
+              onClick={onDelete}
+              className="cursor-pointer text-red-300 hover:bg-red-500/20 focus:bg-red-500/20"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-2" />
+              {t('dc.deleteScene') || 'Löschen'}
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 };
 
