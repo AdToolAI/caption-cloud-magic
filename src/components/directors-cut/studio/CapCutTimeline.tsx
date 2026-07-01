@@ -52,7 +52,7 @@ interface CapCutTimelineProps {
 
 const TRACK_HEIGHT = 48;
 const VIDEO_TRACK_HEIGHT = 80;
-const HEADER_WIDTH = 120;
+const HEADER_WIDTH = 168;
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
