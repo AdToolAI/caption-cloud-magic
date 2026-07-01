@@ -410,7 +410,7 @@ export const AudioAssetSelector = ({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onMusicSelect(null);
+                        selectMusic(null, null);
                         toast({ title: t('uc.musicRemoved') });
                       }}
                     >
