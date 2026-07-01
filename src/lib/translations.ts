@@ -14315,8 +14315,6 @@ translations.en.uc = {
   retryRender: "Retry",
   renderTimeout: "Render timeout (>10 min). Please try again.",
   renderStartSlow: "AWS start is taking unusually long. Please try again in a minute.",
-  backgroundMusic: "Background music",
-  remove: "Remove",
   errorPrefix: "Error",
   // BackgroundAssetSelector
   chooseBackground: "Choose Background",
