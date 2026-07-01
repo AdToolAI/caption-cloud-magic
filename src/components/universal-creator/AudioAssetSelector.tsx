@@ -573,7 +573,7 @@ export const AudioAssetSelector = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              onMusicSelect(track.id);
+                              selectMusic(track.id, track.url ?? null);
                               toast({ title: t('uc.musicSelected') });
                             }}
                           >
