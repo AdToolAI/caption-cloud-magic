@@ -63,8 +63,11 @@ const WIZARD_STEPS: WizardStep[] = [
 export function UniversalCreator() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlProjectId = searchParams.get('project') || undefined;
+
   const [currentStep, setCurrentStep] = useState(0);
-  const [projectId, setProjectId] = useState<string>();
+  const [projectId, setProjectId] = useState<string | undefined>(urlProjectId);
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
   const [contentConfig, setContentConfig] = useState<ContentConfig | null>(null);
   const [backgroundAsset, setBackgroundAsset] = useState<BackgroundAsset | null>(null);
@@ -75,6 +78,8 @@ export function UniversalCreator() {
   const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
   const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
+  const [isHydrating, setIsHydrating] = useState<boolean>(!!urlProjectId);
+  const hydratedRef = useRef(false);
   
   const getDisplayDimensions = (format: FormatConfig, quality: 'hd' | '4k') => {
     if (quality === 'hd') {
