@@ -651,14 +651,81 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   return (
     <div className="h-full flex flex-col bg-[#050816]">
       {/* Toolbar */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
+      <div className="h-11 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[#F5C76A]/60 font-medium">Timeline</span>
+          <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/60 font-semibold">Timeline</span>
+
+          {/* Playhead chip: live time + scene position */}
+          <div className="ml-1 flex items-center gap-2 h-7 px-2.5 rounded-md bg-white/5 border border-white/10">
+            <span className="text-[11px] font-mono text-white/80 tabular-nums">
+              {formatTime(currentTime)}
+            </span>
+            {scenes.length > 0 && (() => {
+              const idx = scenes.findIndex(s => currentTime >= s.start_time && currentTime < s.end_time);
+              const activeIdx = idx >= 0 ? idx + 1 : Math.min(scenes.length, Math.max(1, Math.ceil((currentTime / Math.max(1, duration)) * scenes.length)));
+              return (
+                <span className="text-[10px] text-white/40 border-l border-white/10 pl-2">
+                  Szene {activeIdx}/{scenes.length}
+                </span>
+              );
+            })()}
+          </div>
+
+          {/* Split at playhead */}
+          {onSplitAtPlayhead && (
+            <button
+              onClick={onSplitAtPlayhead}
+              title={`${t('dc.splitAtPlayhead') || 'Am Playhead teilen'} (S)`}
+              className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 border border-cyan-500/30 transition-colors"
+            >
+              <Scissors className="h-3 w-3" />
+              Split
+              <kbd className="hidden sm:inline ml-1 text-[9px] text-cyan-300/60 border border-cyan-500/30 rounded px-1">S</kbd>
+            </button>
+          )}
+
+          {/* Add scene */}
+          {(onSceneAdd || onSceneAddFromMedia) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  title={t('dc.addNewScene') || 'Szene hinzufügen'}
+                  className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-[#F5C76A]/15 text-[#F5C76A] hover:bg-[#F5C76A]/25 border border-[#F5C76A]/40 transition-colors"
+                >
+                  <PlusCircle className="h-3 w-3" />
+                  {t('dc.addNewScene') || 'Szene'}
+                  <ChevronDown className="h-2.5 w-2.5 opacity-70" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-[#0a0a1a]/95 border-[#3a3a3a]">
+                {onSceneAddFromMedia && (
+                  <DropdownMenuItem
+                    onClick={onSceneAddFromMedia}
+                    className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                  >
+                    <Film className="h-4 w-4 mr-2 text-indigo-400" />
+                    {t('dc.videoFromLibrary') || 'Video aus Bibliothek'}
+                  </DropdownMenuItem>
+                )}
+                {onSceneAdd && (
+                  <DropdownMenuItem
+                    onClick={onSceneAdd}
+                    className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                  >
+                    <Square className="h-4 w-4 mr-2 text-zinc-400" />
+                    {t('dc.emptySceneBlackscreen') || 'Leere Szene (Schwarzbild)'}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Snap toggle */}
           <button
             onClick={() => onSnapEnabledChange?.(!snapEnabled)}
             title={snapEnabled ? t('dc.snapOn') : t('dc.snapOff')}
             className={cn(
-              "ml-2 h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium transition-colors border",
+              "h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium transition-colors border",
               snapEnabled
                 ? "bg-[#F5C76A]/15 text-[#F5C76A] border-[#F5C76A]/40"
                 : "bg-white/5 text-white/40 border-white/10 hover:text-white/70"
@@ -667,11 +734,13 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             <Magnet className="h-3 w-3" />
             {snapEnabled ? t('dc.snapOn') : t('dc.snapOff')}
           </button>
+
+          {/* Add cut marker */}
           {onAddCutMarker && (
             <button
               onClick={onAddCutMarker}
               title={t('dc.addCutMarker')}
-              className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-white/10 transition-colors"
+              className="hidden md:flex h-7 px-2 rounded items-center gap-1 text-[10px] font-medium bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-white/10 transition-colors"
             >
               <Scissors className="h-3 w-3" />
               {t('dc.addCutMarker')}
@@ -679,6 +748,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <span className="text-[10px] text-white/40 hidden sm:inline">Zoom</span>
           <Button
             variant="ghost"
             size="sm"
@@ -688,7 +758,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             <Minus className="h-3.5 w-3.5" />
           </Button>
           <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400"
               style={{ width: `${((zoom - 20) / 80) * 100}%` }}
             />
@@ -703,6 +773,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           </Button>
         </div>
       </div>
+
 
       {/* Timeline Content */}
       <div className="flex-1 flex overflow-hidden">
