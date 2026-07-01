@@ -214,6 +214,10 @@ export function UniversalCreator() {
           .single();
         if (error) throw error;
         setProjectId(data.id);
+        // Publish new projectId to the URL so reload / share resumes exactly this draft
+        const next = new URLSearchParams(searchParams);
+        next.set('project', data.id);
+        setSearchParams(next, { replace: true });
       } else {
         await supabase
           .from('content_projects')
