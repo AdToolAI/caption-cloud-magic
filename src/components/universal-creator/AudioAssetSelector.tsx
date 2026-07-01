@@ -152,7 +152,7 @@ export const AudioAssetSelector = ({
     onSuccess: (data) => {
       toast({ title: t('uc.musicAddedToLibrary') });
       queryClient.invalidateQueries({ queryKey: ['audio-library'] });
-      onMusicSelect(data.id);
+      selectMusic(data.id, data.url ?? null);
       setActiveTab('library');
     },
     onError: (error: any) => {
