@@ -35,11 +35,6 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
   initiallyMuted: boolean;
   component: React.ComponentType<any>;
 }) {
-  console.log('[MemoizedPlayer] Rendering with audio:', {
-    backgroundMusicUrl: !!inputProps?.backgroundMusicUrl,
-    voiceoverUrl: !!inputProps?.voiceoverUrl,
-  });
-  
   return (
     <Player
       ref={playerRef}
