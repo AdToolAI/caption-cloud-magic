@@ -516,6 +516,16 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
               </Button>
             )}
           </div>
+        ) : selectedScene && onTrimScene ? (
+          <SceneTrimInspector
+            scene={selectedScene}
+            sceneIndex={selectedSceneIndex ?? 0}
+            sourceDuration={sourceDuration ?? 0}
+            currentTime={currentTime ?? 0}
+            onTrim={onTrimScene}
+            onSplitAtPlayhead={onSplitAtPlayhead}
+            onDelete={onSceneDelete}
+          />
         ) : (
           <div className="text-center py-8">
             <div className="w-12 h-12 rounded-full bg-[#0a0a1a]/60 flex items-center justify-center mx-auto mb-3">
