@@ -1048,12 +1048,44 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, [scenes, onScenesUpdate]);
 
   // Trim scene handler — adjust start/end without recalculating other scenes
-  const handleTrimScene = useCallback((sceneId: string, newStart: number, newEnd: number) => {
+  // Interpretiert die Sidebar-Inputs als Quellen-Range (source in/out) und
+  // rippelt Nachfolge-Szenen. So schneidet der Preview-Player den Clip
+  // tatsächlich, statt den Timeline-Block nur zu verschieben.
+  const handleTrimScene = useCallback((sceneId: string, srcIn: number, srcOut: number) => {
     if (!onScenesUpdate) return;
-    const updatedScenes = scenes.map(s =>
-      s.id === sceneId ? { ...s, start_time: newStart, end_time: newEnd } : s
-    );
-    onScenesUpdate(updatedScenes);
+    const sorted = [...scenes].sort((a, b) => a.start_time - b.start_time);
+    const idx = sorted.findIndex(s => s.id === sceneId);
+    if (idx < 0) return;
+
+    const target = sorted[idx] as any;
+    const origStart = target.original_start_time ?? target.start_time;
+    const origEnd = target.original_end_time ?? target.end_time;
+
+    const newSrcIn = Math.max(origStart, Math.min(srcIn, srcOut - 0.1));
+    const newSrcOut = Math.min(origEnd, Math.max(srcOut, newSrcIn + 0.1));
+    const newDur = Math.max(0.1, newSrcOut - newSrcIn);
+
+    const timelineStart = target.start_time;
+    sorted[idx] = {
+      ...target,
+      original_start_time: newSrcIn,
+      original_end_time: newSrcOut,
+      start_time: timelineStart,
+      end_time: timelineStart + newDur,
+    };
+
+    // Ripple nachfolgende Szenen an das neue Ende
+    for (let i = idx + 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const dur = sorted[i].end_time - sorted[i].start_time;
+      sorted[i] = {
+        ...sorted[i],
+        start_time: prev.end_time,
+        end_time: prev.end_time + dur,
+      };
+    }
+
+    onScenesUpdate(sorted);
   }, [scenes, onScenesUpdate]);
 
   // Rename scene handler
