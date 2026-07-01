@@ -1516,7 +1516,8 @@ const SceneTransition: React.FC<{
   fps: number;
   beatAligned?: boolean;
   bpm?: number;
-}> = ({ children, frame, durationInFrames, transitionType = 'fade', fps, beatAligned = false, bpm }) => {
+  skipIntroFade?: boolean;
+}> = ({ children, frame, durationInFrames, transitionType = 'fade', fps, beatAligned = false, bpm, skipIntroFade = false }) => {
   // ✅ CRITICAL FIX: Use imported safeDuration function
   const safeDur = safeDuration(durationInFrames, 60);
   
@@ -1535,6 +1536,10 @@ const SceneTransition: React.FC<{
   let style: React.CSSProperties = {};
   
   switch (transitionType) {
+    case 'none':
+      style = { opacity: 1 };
+      break;
+
     case 'wipe':
       const wipeProgress = interpolate(frame, [0, transitionFrames], [0, 100], { extrapolateRight: 'clamp' });
       const wipeExit = interpolate(frame, [safeExitStart, safeDur], [100, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
@@ -1566,7 +1571,7 @@ const SceneTransition: React.FC<{
       
     case 'fade':
     default:
-      const fadeIn = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const fadeIn = skipIntroFade ? 1 : interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
       const fadeOut = interpolate(frame, [safeExitStart, safeDur], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       style = { opacity: Math.min(fadeIn, fadeOut) };
       break;
@@ -3014,10 +3019,14 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       
       {/* Render scenes as sequences */}
       {sceneTimings.map((scene, index) => {
-        const transitionType = (scene.transition?.type === 'morph' || scene.transition?.type === 'wipe' || 
-          scene.transition?.type === 'zoom' || scene.transition?.type === 'blur') 
-          ? scene.transition.type as 'morph' | 'wipe' | 'zoom' | 'dissolve'
-          : 'fade';
+        const transitionType = (() => {
+          if (scene.transition?.type === 'none') return 'none' as const;
+          if (scene.transition?.type === 'morph') return 'morph' as const;
+          if (scene.transition?.type === 'wipe') return 'wipe' as const;
+          if (scene.transition?.type === 'zoom') return 'zoom' as const;
+          if (scene.transition?.type === 'blur') return 'dissolve' as const;
+          return 'fade' as const;
+        })();
         
         // Phase 1: Get DrawOnEffect type for this scene
         const drawOnType = getDrawOnEffectType(scene.type);
@@ -3038,6 +3047,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
               fps={effectiveFps}
               beatAligned={scene.beatAligned}
               bpm={beatSyncData?.bpm}
+              skipIntroFade={index === 0}
             >
               <AbsoluteFill>
                 <SceneBackground
