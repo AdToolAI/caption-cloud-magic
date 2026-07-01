@@ -214,7 +214,7 @@ export function RemotionPreviewPlayer({
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
     if (!playerRef.current) return;
     // Mark that user has ever interacted (NEVER resets)
-    hasEverInteractedRef.current = true;
+    if (!hasEverInteracted) setHasEverInteracted(true);
     // 1. First unmute
     playerRef.current.unmute();
     // 2. Set volume
@@ -271,7 +271,7 @@ export function RemotionPreviewPlayer({
           durationInFrames={durationInFrames}
           loop={loop}
           numberOfSharedAudioTags={5}
-          initiallyMuted={!hasEverInteractedRef.current}
+          initiallyMuted={!hasEverInteracted}
           component={resolvedComponent}
         />
       </div>
