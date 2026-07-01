@@ -1,56 +1,41 @@
-## Problem
-Die Audio-Kette ist aktuell an zwei Stellen gebrochen:
+## Ziel
 
-1. **Preview reagiert nicht auf Musik-Prozentwerte**
-   - `RemotionPreviewPlayer` memoisiert den Player so stark, dass Änderungen an `backgroundMusicVolume`, `voiceoverVolume` und `masterVolume` ignoriert werden.
-   - Ergebnis: Der Slider zeigt z. B. 5%, aber der Player spielt weiter mit dem alten Mix.
+Der Preview-Player soll beim Ziehen des Musik-/Lautstärke-Sliders flüssig weiterlaufen. Die Lautstärke soll sich live ändern, ohne dass Video, Frame-Zeit, Play/Pause-State oder Audio neu gestartet werden.
 
-2. **Musik ist im Mix zu dominant**
-   - Der Musikwert wird technisch direkt weitergegeben, aber Musiktracks sind oft stark gemastert/komprimiert. Deshalb kann 30% Musik subjektiv lauter wirken als 100% Voice-over.
-   - Wichtig: Ich werde **keine sichtbare “Effektiv”-Anzeige** zurückbringen. Die UI bleibt professionell und zeigt nur den echten Sliderwert.
+## Diagnose
 
-## Plan
+Aktuell wird bei jeder Slider-Bewegung der komplette Remotion-Preview-Tree aktualisiert. Zusätzlich enthalten die `<Audio />`-Keys die Volume-Werte. Dadurch wird bei jedem Prozent-Schritt ein neues Audio-Element erzeugt; mit `pauseWhenBuffering` kann das den Player kurz blockieren oder ganz einfrieren. Für moderne UX ist das falsch: Lautstärke muss imperativ am Audio-Gain geändert werden, nicht durch Re-Mount der ganzen Komposition.
 
-### 1. Preview-Player wirklich live machen
-- In `src/components/universal-creator/RemotionPreviewPlayer.tsx` die Memo-Logik korrigieren:
-  - Audio-URL-Änderungen dürfen weiterhin keinen kaputten Play/Pause-State erzeugen.
-  - **Volume-Werte müssen aber Re-Renders auslösen**, damit Remotion `<Audio volume={...}>` neu bekommt.
-- In den Vergleich aufnehmen:
-  - `backgroundMusicVolume`
-  - `voiceoverVolume`
-  - `masterVolume`
-  - optional `scenes`, weil Szenen Audio/Timeline beeinflussen können.
+## Umsetzungsplan
 
-### 2. Musik-Slider und Voice-over-Mix einheitlich kalibrieren
-- In `src/lib/audioVolume.ts` eine saubere, zentrale Mix-Funktion einführen:
-  - Slider bleibt 0–100%.
-  - Intern wird Musik voice-over-freundlich begrenzt, wenn eine Stimme vorhanden ist.
-  - Kein UI-Debugtext, keine “effektiv”-Beschriftung.
-- Ziel-Mix:
-  - 100% Voice-over bleibt wirklich 100%.
-  - 30% Musik darf die Stimme nicht überdecken.
-  - 5%, 10%, 30%, 70%, 100% müssen hörbar unterschiedlich sein.
+1. **Preview-Audio vom Video-Render entkoppeln**
+   - Im `RemotionPreviewPlayer` eigene `HTMLAudioElement`-Refs für Voice-over und Hintergrundmusik verwalten.
+   - Der Remotion-Player rendert in der Preview nur Video/Subtitles/Visuals; Audio wird in der Preview extern gemischt.
+   - Für Export/Lambda bleibt der bestehende Remotion-Audio-Pfad erhalten.
 
-### 3. Preview und Export über denselben Payload absichern
-- `src/lib/universalCreatorRenderPayload.ts` bleibt Single Source of Truth.
-- Sicherstellen, dass exakt dieselben Werte an beide Wege gehen:
-  - Live Preview
-  - Export über `render-with-remotion`
-- Keine parallele Sonderlogik im Export-Step.
+2. **Live-Mixer ohne Re-Render bauen**
+   - Volume-Änderungen setzen direkt `audio.volume` auf den vorhandenen Audio-Elementen.
+   - Keine Remotion-Komposition neu rendern, kein Audio-Key-Wechsel, kein Player-Remount.
+   - Preview-Master-Volume, Mute, Voice-over-Volume und Background-Music-Volume werden sauber multipliziert.
 
-### 4. Render-Bundle-Audio absichern
-- In `src/remotion/templates/UniversalCreatorVideo.tsx` die Audio-Volumes robust clampen und mit stabilen Keys versehen, damit Remotion Preview und Lambda-Render die aktuellen Werte sicher übernehmen.
-- Prüfen, dass Hintergrundmusik nicht doppelt gerendert/gemuxt wird.
+3. **Playback-Sync sichern**
+   - Play/Pause steuert Player, Voice-over und Musik gemeinsam.
+   - Seek-Bar setzt `currentTime` der Audio-Elemente passend zu `frame / fps`.
+   - Hintergrundmusik looped sauber; Voice-over läuft linear.
+   - Kleine Drift-Korrektur während Playback, damit Audio und Video synchron bleiben.
 
-### 5. Kurzer Testpfad nach Umsetzung
-- Im Universal Content Creator:
-  - Musik auf 5%, 30%, 80% stellen.
-  - Preview abspielen und prüfen, ob die Lautstärke live hörbar springt.
-  - Voice-over bei 100% gegen Musik testen.
-  - Render-Payload prüfen, dass der gleiche Musikwert im Export landet.
+4. **Memo-Logik korrigieren**
+   - `MemoizedPlayer` darf bei reinen Volume-Änderungen nicht mehr neu rendern.
+   - Re-Render nur noch bei echten visuellen/timeline-relevanten Änderungen: Szenen, Subtitles, URLs, Dauer, Format, Komponente, Loop.
 
-## Erwartetes Ergebnis
-- Der Musik-Slider beeinflusst die Lautstärke sofort hörbar.
-- Preview und fertiger Render nutzen denselben Mix.
-- 30% Musik ist nicht mehr lauter als 100% Voice-over.
-- Die UI bleibt sauber ohne “effektiv”-Debuganzeige.
+5. **Template stabilisieren**
+   - Volume-Werte aus den `<Audio />`-Keys in `UniversalCreatorVideo.tsx` entfernen.
+   - Export verwendet weiterhin die final berechneten Lautstärken, aber ohne Re-Mount-Probleme in der Preview.
+
+6. **Slider-Verhalten glätten**
+   - Musik-Slider kann weiterhin live den Prozentwert anzeigen.
+   - Während Dragging wird nur der externe Preview-Mixer aktualisiert; Persistenz/Render-Payload bleiben korrekt über denselben zentralen Customization-Builder.
+
+7. **Verifikation**
+   - Preview starten, während Playback den Musik-Slider schnell hoch/runter bewegen.
+   - Prüfen: Video läuft weiter, Play/Pause bleibt bedienbar, Audio ändert sich live, Export-Payload nutzt dieselbe Lautstärke wie Preview.
