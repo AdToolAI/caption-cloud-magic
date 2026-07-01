@@ -1734,13 +1734,50 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C76A] to-[#FFE4A0] font-semibold text-sm drop-shadow-[0_0_8px_rgba(245,199,106,0.2)]">Director's Cut Studio</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+            onClick={() => { history.commit(); history.undo(); }}
+            disabled={!history.canUndo}
+            title={`Rückgängig (${navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl'}+Z) · ${history.historySize} Schritte`}
+          >
             <Undo2 className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+            onClick={() => { history.commit(); history.redo(); }}
+            disabled={!history.canRedo}
+            title={`Wiederherstellen (${navigator.platform.toUpperCase().includes('MAC') ? '⌘⇧' : 'Ctrl+Shift'}+Z)`}
+          >
             <Redo2 className="h-3.5 w-3.5" />
           </Button>
+          <button
+            type="button"
+            onClick={() => setRippleMode((v) => !v)}
+            title={rippleMode ? 'Ripple Delete AN — Lücken schließen automatisch' : 'Ripple Delete AUS — Lücken bleiben stehen'}
+            className={cn(
+              'h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium border transition-colors',
+              rippleMode
+                ? 'bg-cyan-500/15 text-cyan-200 border-cyan-500/40'
+                : 'bg-white/5 text-white/40 border-white/10 hover:text-white/70'
+            )}
+          >
+            Ripple
+          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setShortcutOverlayOpen(true)}
+            title="Tastatur-Shortcuts (?)"
+          >
+            <Keyboard className="h-3.5 w-3.5" />
+          </Button>
           <div className="w-px h-5 bg-[#F5C76A]/15 mx-1" />
+
           <Button 
             variant="ghost" 
             size="sm" 
