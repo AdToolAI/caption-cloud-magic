@@ -4,19 +4,23 @@ export function clampAudioVolume(value: number | null | undefined): number {
   return Math.max(0, Math.min(1, numeric));
 }
 
+const MUSIC_HEADROOM_WITH_VOICEOVER = 0.35;
+
 /**
- * Honest music volume policy — WYSIWYG.
+ * Universal Creator music mix policy.
  *
- * The slider value IS the volume the user hears — in preview AND in the
- * final render. No hidden sidechain math. If the mix feels off, the user
- * lowers the slider; the number on screen matches what they hear.
+ * The UI stays simple: users see and control a normal 0–100% music slider.
+ * Internally, when a voice-over is present, we reserve headroom so mastered
+ * music beds do not overpower narration. Preview and export both use this
+ * exact function, so the perceived mix remains identical everywhere.
  *
- * The `hasVoiceover` argument is kept for backwards compatibility but is
- * intentionally ignored so preview and export always agree with the slider.
+ * Without voice-over, the slider is direct because music is the primary audio.
  */
 export function getEffectiveBackgroundMusicVolume(
   rawVolume: number | null | undefined,
-  _hasVoiceover = false,
+  hasVoiceover = false,
 ): number {
-  return clampAudioVolume(rawVolume);
+  const sliderVolume = clampAudioVolume(rawVolume);
+  if (!hasVoiceover) return sliderVolume;
+  return clampAudioVolume(sliderVolume * MUSIC_HEADROOM_WITH_VOICEOVER);
 }

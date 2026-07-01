@@ -52,22 +52,28 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
     />
   );
 }, (prevProps, nextProps) => {
-  // Only remount the Player when the *identity* of the media changes.
-  // Volume changes flow through inputProps live and must NOT trigger a remount,
-  // otherwise every slider tick resets play state and the Play/Pause button
-  // appears frozen.
+  // Keep media identity stable, but do not block audio-mix changes. Remotion's
+  // <Audio volume={...}> only receives the new value if the composition rerenders.
   const audioIdentityEqual =
     prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
     prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
+
+  const audioMixEqual =
+    prevProps.inputProps?.backgroundMusicVolume === nextProps.inputProps?.backgroundMusicVolume &&
+    prevProps.inputProps?.voiceoverVolume === nextProps.inputProps?.voiceoverVolume &&
+    prevProps.inputProps?.masterVolume === nextProps.inputProps?.masterVolume;
 
   const subtitlesEqual =
     JSON.stringify(prevProps.inputProps?.subtitles) === JSON.stringify(nextProps.inputProps?.subtitles) &&
     JSON.stringify(prevProps.inputProps?.subtitleStyle) === JSON.stringify(nextProps.inputProps?.subtitleStyle);
 
+  const scenesEqual =
+    JSON.stringify(prevProps.inputProps?.scenes) === JSON.stringify(nextProps.inputProps?.scenes);
+
   const durationEqual = prevProps.durationInFrames === nextProps.durationInFrames;
   const loopEqual = prevProps.loop === nextProps.loop;
 
-  return audioIdentityEqual && subtitlesEqual && durationEqual && loopEqual;
+  return audioIdentityEqual && audioMixEqual && subtitlesEqual && scenesEqual && durationEqual && loopEqual;
 });
 
 interface RemotionPreviewPlayerProps {
