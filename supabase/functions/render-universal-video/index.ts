@@ -409,6 +409,7 @@ serve(async (req) => {
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
 
+    const lambdaStartedAt = Date.now();
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
@@ -416,8 +417,9 @@ serve(async (req) => {
       },
       body: asciiSafeJson,
     });
+    const lambdaDurationMs = Date.now() - lambdaStartedAt;
 
-    console.log('📥 Lambda response status:', lambdaResponse.status);
+    console.log('📥 Lambda response status:', lambdaResponse.status, `(took ${lambdaDurationMs}ms)`);
 
     if (!lambdaResponse.ok) {
       const errorText = await lambdaResponse.text();
@@ -429,6 +431,15 @@ serve(async (req) => {
         error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
         completed_at: new Date().toISOString(),
       }).eq('render_id', pendingRenderId);
+
+      // Welle 1: Telemetry — mark failed
+      supabase.from('universal_video_renders').update({
+        status: 'failed',
+        error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
+        lambda_duration_ms: lambdaDurationMs,
+        total_duration_ms: Date.now() - requestStartedAt,
+        completed_at: new Date().toISOString(),
+      }).eq('render_id', pendingRenderId).then(() => {});
 
       // Refund credits
       await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
