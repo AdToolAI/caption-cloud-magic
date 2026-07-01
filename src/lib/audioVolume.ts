@@ -4,17 +4,19 @@ export function clampAudioVolume(value: number | null | undefined): number {
   return Math.max(0, Math.min(1, numeric));
 }
 
+/**
+ * Honest music volume policy.
+ *
+ * The slider value IS the volume the user hears — in preview AND in the final
+ * render. The only automatic adjustment is a gentle sidechain when a voiceover
+ * is present: music is capped at 40 % of the slider value so narration stays
+ * intelligible without shrinking the slider into meaningless single digits.
+ */
 export function getEffectiveBackgroundMusicVolume(
   rawVolume: number | null | undefined,
   hasVoiceover = false,
 ): number {
   const clamped = clampAudioVolume(rawVolume);
-  const perceptual = clamped * clamped;
-  const duckFactor = hasVoiceover ? 0.28 : 1;
-  const ducked = perceptual * duckFactor;
-
-  // Keep music safely below narration when a voiceover exists. Many stock
-  // tracks are mastered much louder than generated VO, so a linear 30% still
-  // feels too hot without this ceiling.
-  return clampAudioVolume(hasVoiceover ? Math.min(ducked, 0.18) : ducked);
+  if (!hasVoiceover) return clamped;
+  return clampAudioVolume(clamped * 0.4);
 }

@@ -7,7 +7,7 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   UniversalVideo,
   UniversalCreatorVideo,
 };
-import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 
@@ -57,19 +57,22 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
     />
   );
 }, (prevProps, nextProps) => {
-  const audioEqual =
+  // Only remount the Player when the *identity* of the media changes.
+  // Volume changes flow through inputProps live and must NOT trigger a remount,
+  // otherwise every slider tick resets play state and the Play/Pause button
+  // appears frozen.
+  const audioIdentityEqual =
     prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
-    prevProps.inputProps?.backgroundMusicVolume === nextProps.inputProps?.backgroundMusicVolume &&
-    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl &&
-    prevProps.inputProps?.voiceoverVolume === nextProps.inputProps?.voiceoverVolume;
+    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
 
   const subtitlesEqual =
     JSON.stringify(prevProps.inputProps?.subtitles) === JSON.stringify(nextProps.inputProps?.subtitles) &&
     JSON.stringify(prevProps.inputProps?.subtitleStyle) === JSON.stringify(nextProps.inputProps?.subtitleStyle);
 
   const durationEqual = prevProps.durationInFrames === nextProps.durationInFrames;
+  const loopEqual = prevProps.loop === nextProps.loop;
 
-  return audioEqual && subtitlesEqual && durationEqual;
+  return audioIdentityEqual && subtitlesEqual && durationEqual && loopEqual;
 });
 
 interface RemotionPreviewPlayerProps {
@@ -92,7 +95,7 @@ export function RemotionPreviewPlayer({
   height = 1920,
   durationInFrames = 300,
   fps = 30,
-  loop = true,
+  loop: loopProp = false,
   autoPlay = false,
   showControls = true,
   className,
@@ -105,30 +108,29 @@ export function RemotionPreviewPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [loop, setLoop] = useState<boolean>(loopProp);
 
-  // Separate audio props to keep them STABLE across step changes
-  const stableAudioProps = useMemo(() => ({
+  // Only URLs are treated as "identity" props for remount decisions.
+  // Volumes are LIVE props — they flow through inputProps without remounting.
+  const stableAudioIdentity = useMemo(() => ({
     backgroundMusicUrl: customizations?.backgroundMusicUrl,
-    backgroundMusicVolume: customizations?.backgroundMusicVolume,
     voiceoverUrl: customizations?.voiceoverUrl,
-    voiceoverVolume: customizations?.voiceoverVolume,
   }), [
     customizations?.backgroundMusicUrl,
-    customizations?.backgroundMusicVolume,
     customizations?.voiceoverUrl,
-    customizations?.voiceoverVolume,
   ]);
 
   const resolvedComponent = useMemo(() => {
     return COMPONENT_REGISTRY[componentName] || UniversalCreatorVideo;
   }, [componentName]);
 
-  const inputProps = useMemo(() => ({
+  const inputProps: Record<string, any> = useMemo(() => ({
     ...customizations,
-    // Override with stable audio refs to prevent unnecessary remounts
-    ...stableAudioProps,
-  }), [customizations, stableAudioProps]);
+    ...stableAudioIdentity,
+  }), [customizations, stableAudioIdentity]);
 
+  // Fingerprint used ONLY to re-activate audio output after prop changes.
+  // It does NOT drive the Player's key.
   const audioFingerprint = useMemo(() => JSON.stringify({
     backgroundMusicUrl: inputProps?.backgroundMusicUrl || '',
     backgroundMusicVolume: inputProps?.backgroundMusicVolume ?? null,
@@ -283,7 +285,6 @@ export function RemotionPreviewPlayer({
         style={{ aspectRatio }}
       >
         <MemoizedPlayer
-          key={audioFingerprint}
           playerRef={playerRef}
           inputProps={inputProps}
           compositionWidth={width}
@@ -329,10 +330,22 @@ export function RemotionPreviewPlayer({
           <Button 
             size="icon" 
             variant="ghost" 
-            onClickCapture={isPlaying ? handlePauseClick : handlePlayClick}
+            onClick={isPlaying ? handlePauseClick : handlePlayClick}
             className="h-9 w-9 text-foreground hover:bg-primary/20"
           >
             {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          </Button>
+
+          {/* Loop Toggle */}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setLoop((l) => !l)}
+            title={loop ? 'Loop aus' : 'Loop an'}
+            aria-pressed={loop}
+            className={`h-8 w-8 ${loop ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
+          >
+            <Repeat className="h-4 w-4" />
           </Button>
 
           <div className="h-6 w-px bg-border/50" />

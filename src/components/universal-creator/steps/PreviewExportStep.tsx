@@ -581,7 +581,7 @@ export function PreviewExportStep({
               <div>
                 <h3 className="text-lg font-semibold">Hintergrundmusik</h3>
                 <p className="text-sm text-muted-foreground">
-                  {Math.round(normalizedMusicVolume * 100)}% · Export effektiv {Math.round(effectiveMusicVolume * 100)}%
+                  {Math.round(normalizedMusicVolume * 100)}%
                 </p>
               </div>
             </div>
