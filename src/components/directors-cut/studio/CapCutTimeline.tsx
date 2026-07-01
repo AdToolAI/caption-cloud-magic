@@ -655,6 +655,8 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   selectedSubtitleId,
   onSplitAtPlayhead,
   onTrimScene,
+  onSceneDuplicate,
+  onInsertAtPlayhead,
   cutMarkers = [],
   snapEnabled = true,
   onSnapEnabledChange,
