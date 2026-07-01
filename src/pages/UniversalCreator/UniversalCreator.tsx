@@ -302,19 +302,75 @@ export function UniversalCreator() {
     }
   };
 
+  // Debounced localStorage backup so rapid state changes don't thrash storage
+  const saveDebounceRef = useRef<number | null>(null);
   useEffect(() => {
-    if (formatConfig) {
+    if (!formatConfig || isHydrating) return;
+    if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
+    saveDebounceRef.current = window.setTimeout(() => {
       saveToLocalStorage();
-    }
+    }, 500);
+    return () => {
+      if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, selectedMusicUrl, projectId, videoQuality]);
+  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, selectedMusicUrl, projectId, videoQuality, isHydrating]);
+
+  // Hydrate from DB when ?project=<id> is present; otherwise fall back to localStorage backup
+  const hydrateFromDb = useCallback(async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('content_projects')
+        .select('id, customizations, audio_config, scenes')
+        .eq('id', id)
+        .maybeSingle();
+      if (error || !data) {
+        console.warn('[UniversalCreator] Could not hydrate project', id, error);
+        setIsHydrating(false);
+        // Fall back to any local backup so the user isn't stranded on a blank wizard
+        restoreFromLocalStorage();
+        return;
+      }
+      const c = (data.customizations || {}) as any;
+      if (c.format) setFormatConfig(c.format);
+      if (c.content) setContentConfig(c.content);
+      if (c.background) setBackgroundAsset(c.background);
+      if (c.subtitles) setSubtitleConfig(c.subtitles);
+      const ac = (data.audio_config || {}) as any;
+      setAudioConfig({
+        background_music_id: ac.background_music_id ?? null,
+        music_volume: clampAudioVolume(ac.music_volume ?? DEFAULT_MUSIC_VOLUME),
+      });
+      const sc = (data.scenes as any)?.scenes;
+      if (Array.isArray(sc)) setScenes(sc);
+      setProjectId(data.id);
+    } catch (err) {
+      console.error('[UniversalCreator] Hydration failed:', err);
+    } finally {
+      setIsHydrating(false);
+    }
+  }, [setScenes]);
 
   useEffect(() => {
-    if (!formatConfig && !contentConfig) {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    if (urlProjectId) {
+      void hydrateFromDb(urlProjectId);
+    } else if (!formatConfig && !contentConfig) {
       restoreFromLocalStorage();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // React to external URL changes (e.g. user pastes a share link) — reload the wizard
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (urlProjectId && urlProjectId !== projectId) {
+      setIsHydrating(true);
+      void hydrateFromDb(urlProjectId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlProjectId]);
 
   const canProceed = () => {
     switch (currentStep) {
