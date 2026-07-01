@@ -9,6 +9,7 @@
 
 import type { ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
+import type { Scene } from '@/types/scene';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { clampAudioVolume, getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
 import {
@@ -45,6 +46,55 @@ export function validateScenes(scenes?: any[] | null): any[] {
     }));
 }
 
+const mapSceneAnimation = (scene: Partial<Scene>) => {
+  switch (scene.backgroundAnimation?.type) {
+    case 'zoomIn':
+      return { animation: 'zoomIn' as const, kenBurnsDirection: 'in' as const };
+    case 'panLeft':
+      return { animation: 'kenBurns' as const, kenBurnsDirection: 'left' as const };
+    case 'panRight':
+      return { animation: 'kenBurns' as const, kenBurnsDirection: 'right' as const };
+    case 'panUp':
+      return { animation: 'kenBurns' as const, kenBurnsDirection: 'up' as const };
+    case 'panDown':
+      return { animation: 'kenBurns' as const, kenBurnsDirection: 'down' as const };
+    case 'none':
+    default:
+      return { animation: 'none' as const, kenBurnsDirection: 'in' as const };
+  }
+};
+
+/**
+ * Universal Creator UI scenes are intentionally lightweight. Remotion's
+ * production template expects richer scene fields, so normalize once here —
+ * the shared source of truth for both preview and export.
+ */
+export function normalizeScenesForUniversalCreatorVideo(scenes?: any[] | null): any[] {
+  return validateScenes(scenes).map((scene, index) => {
+    const animation = mapSceneAnimation(scene);
+    return {
+      ...scene,
+      id: scene.id || `scene-${index}`,
+      order: typeof scene.order === 'number' ? scene.order : index,
+      type: scene.type || 'hook',
+      title: scene.title || `Scene ${index + 1}`,
+      spokenText: scene.spokenText || '',
+      visualDescription: scene.visualDescription || '',
+      background: scene.background || { type: 'color', color: '#000000' },
+      transition: {
+        type: scene.transition?.type || 'fade',
+        duration: typeof scene.transition?.duration === 'number' ? scene.transition.duration : 0.5,
+        ...(scene.transition?.direction ? { direction: scene.transition.direction } : {}),
+      },
+      ...animation,
+      textOverlay: scene.textOverlay || { enabled: false, position: 'center', fontSize: 64, fontColor: '#FFFFFF', animation: 'none' },
+      soundEffectType: scene.soundEffectType || 'none',
+      useAnimation: Boolean(scene.useAnimation && scene.animatedVideoUrl),
+      beatAligned: Boolean(scene.beatAligned),
+    };
+  });
+}
+
 /**
  * Builds the `customizations` object shared by Preview and Export.
  */
@@ -58,7 +108,7 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
     musicVolume,
   } = input;
 
-  const validScenes = validateScenes(scenes);
+  const validScenes = normalizeScenesForUniversalCreatorVideo(scenes);
   const hasVoiceover = !!contentConfig?.voiceoverUrl;
 
   const durationSeconds = computeTotalDurationSeconds({
@@ -101,6 +151,6 @@ export function getUniversalCreatorDurationSeconds(input: BuildCustomizationsInp
   return computeTotalDurationSeconds({
     voiceoverDuration: input.contentConfig?.voiceoverDuration,
     actualVoiceoverDuration: input.contentConfig?.actualVoiceoverDuration,
-    scenes: validateScenes(input.scenes),
+    scenes: normalizeScenesForUniversalCreatorVideo(input.scenes),
   });
 }
