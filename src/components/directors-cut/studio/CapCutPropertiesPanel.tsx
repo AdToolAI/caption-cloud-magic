@@ -20,6 +20,7 @@ interface CapCutPropertiesPanelProps {
   onSubtitleUpdate?: (clipId: string, updates: Partial<SubtitleClip>) => void;
   onSubtitleDelete?: (clipId: string) => void;
   onClipDelete?: (clipId: string) => void;
+  onSplitAtPlayhead?: () => void;
 }
 
 // SUBTITLE_STYLES moved inside component as useMemo for i18n reactivity
