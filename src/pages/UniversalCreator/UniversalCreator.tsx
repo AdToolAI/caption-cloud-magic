@@ -338,6 +338,9 @@ export function UniversalCreator() {
       if (c.content) setContentConfig(c.content);
       if (c.background) setBackgroundAsset(c.background);
       if (c.subtitles) setSubtitleConfig(c.subtitles);
+      if (typeof c.current_step === 'number' && c.current_step >= 0 && c.current_step < WIZARD_STEPS.length) {
+        setCurrentStep(c.current_step);
+      }
       const ac = (data.audio_config || {}) as any;
       setAudioConfig({
         background_music_id: ac.background_music_id ?? null,
