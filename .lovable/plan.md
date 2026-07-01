@@ -1,54 +1,48 @@
-## Problem
-
-Im **AI Video Toolkit** (`/ai-video-toolkit`) wird das Avatar-Porträt (`brandCharacter.reference_image_url`) direkt als `startImageUrl` an den i2v-Provider gegeben. Dadurch ist der Portrait-Shot buchstäblich das **erste Bild jeder Szene** — der Charakter startet immer in seiner Referenz-Pose statt in der beschriebenen Szene.
-
-Im **Motion Studio (Composer)** passiert das nicht, weil dort `prepareSceneAnchor` → `compose-scene-anchor` (Nano Banana 2) läuft: das Porträt wird zuerst **in die beschriebene Szene komponiert** (Wide-Shot, Location, Action) und erst dieses komponierte Standbild wird als i2v-First-Frame an Hailuo/Kling/Seedance/HappyHorse geschickt.
-
-Der Toolkit-Generator (`src/components/ai-video/ToolkitGenerator.tsx`, ab Zeile 211) überspringt diesen Schritt komplett.
-
 ## Ziel
 
-Der AI Video Toolkit soll denselben Scene-Aware-Anchor-Pfad benutzen wie der Composer: Porträt → komponiertes Szenen-Standbild → i2v.
+AI Video Studio (Toolkit, `/ai-video-toolkit`) nutzt **exakt dieselben Cast- & World-IDs** wie das Motion Studio, damit ein Charakter/eine Location einmal angelegt und überall wiederverwendet werden kann. Keine Lipsync-Integration in diesem Schritt.
+
+## Root Cause (warum bisher das Avatar-Porträt als Startframe erscheint)
+
+`prepareSceneAnchor` → `resolveSceneCharacterAnchorsAll` findet nur Anchors, wenn der Scene entweder `characterShots` mit `characterId` hat oder der Charakter-Name im Prompt-Text steht. Toolkit übergibt heute einen `stubScene` **ohne** `characterShots`, und der User tippt den Namen selten manuell in den Prompt. → `anchors.length === 0` → `compose-scene-anchor` wird nie aufgerufen → Fallback aufs rohe Porträt. Location aus dem ToolkitCastPicker landet zusätzlich weder als @-Mention noch als Slug-Block im Prompt, `resolveSceneWorldRefs` sieht sie nie.
 
 ## Umsetzung
 
-### 1) Anchor-Preparation vor dem Provider-Call einfügen
+Nur `src/components/ai-video/ToolkitGenerator.tsx` und ein neuer schlanker Cast/World-Picker — **keine** Änderungen an `compose-scene-anchor`, `prepareSceneAnchor`, `scene_anchor_cache`, Motion-Studio-Code oder Lipsync-Pfaden.
 
-In `src/components/ai-video/ToolkitGenerator.tsx` innerhalb `handleGenerate`, direkt nach dem Bauen des `finalPrompt` und **vor** dem `startImageUrl`-Assignment (heute Z. 211-218):
+### 1) Einheitliche Cast- & World-Auswahl (Motion-Studio-Parität)
 
-- Nur ausführen, wenn ein Charakter (`brandCharacter` **oder** ein via @-Mention resolvter Char) da ist UND der User keinen manuellen `startImageUrl` hochgeladen hat (manueller Upload bleibt Vorrang, wie im Composer).
-- `prepareSceneAnchor` aufrufen mit einer minimalen `ComposerScene`-Shape, die aus dem Toolkit-State gebaut wird:
-  - `aiPrompt` = finalPrompt
-  - `characters` = `[brandCharacter]` als `ComposerCharacter[]`
-  - `location` = `castLocation` (falls gesetzt)
-  - `clipSource` = `model.family` gemappt auf ComposerClipSource-Wert (`ai-hailuo`, `ai-kling`, `ai-seedance`, `ai-happyhorse`, `ai-vidu`, `ai-pika`, `ai-runway`, `ai-luma`, `ai-wan`, `ai-grok`, `ai-sora`) — für die Strategy-Matrix (Vidu/Kling-Ref2V → subject-reference, Sora → text-only, Rest → first-frame-composed).
-- Ergebnis:
-  - `firstFrameUrl` → wird als `body.startImageUrl` gesetzt (statt rohem Porträt)
-  - `subjectReferenceUrls` → falls Provider `multiRef` unterstützt (Vidu), automatisch in `body.referenceImages` einspeisen, sonst ignorieren
-  - `strategy === 'text-only'` (Sora) → **kein** `startImageUrl`, wie heute bereits
+- Der aktuelle `ToolkitCastPicker` (1 Character + 1 Location) wird zum vollen **Cast & World Panel** ausgebaut, das dieselbe Datenquelle nutzt, die das Motion Studio verwendet: `useMotionStudioLibrary()` (bereits im Toolkit importiert) und `useUnifiedMentionLibrary()` für @-Mentions.
+- Slots im Toolkit-Panel (identisch zum Motion-Studio-Modell): **Characters** (bis 4, Multi-Select), **Location** (1), **Building** (1), **Props** (bis 3). Alle IDs sind die echten `brand_characters.id` / `brand_locations.id` — dieselben, die das Motion Studio persistiert. Keine neuen Tabellen, kein separates ID-Schema.
+- @-Mentions im Prompt bleiben unverändert und werden mit der Panel-Auswahl gemerged (Dedup nach `id`).
 
-### 2) Fallback & UX
+### 2) Motion-Studio-Anchor-Pfad 1:1 wiederverwenden
 
-- Wenn `compose-scene-anchor` fehlschlägt oder länger als ~25 s braucht: still auf das rohe Porträt zurückfallen (kein Hard-Fail) und ein leises `console.warn` schreiben — identisches Verhalten wie im Composer.
-- Während der Anchor-Komposition: Button-Label auf „Szene komponieren…" (DE) / „Composing scene…" (EN) setzen, danach wieder „Video generieren".
-- Ein kleines "🎬 Scene-Aware" Badge unter dem Prompt (analog Composer-`SceneAnchorBadge`), wenn ein komponiertes Frame verwendet wurde, damit der User sieht dass der Avatar-Look aktiv in die Szene übernommen wurde.
+- Vor jedem Toolkit-Render einen `stubScene: ComposerScene` bauen mit:
+  - `aiPrompt = applySceneAssetsToPrompt(finalPrompt, [castLocation, castBuilding, ...castProps, ...mentionWorldRefs])` — deterministischer Slug-Block, den `resolveSceneWorldRefs` bereits versteht.
+  - `characterShots = [{ characterId, shotType: 'medium' }, ...]` für **jeden** ausgewählten Charakter (Cap 4). Damit greift Pfad 1 in `resolveSceneCharacterAnchorsAll` — dieselben `characterId`s wie Motion Studio, `compose-scene-anchor` läuft.
+  - `clipSource` = Mapping via bestehendes `toolkitModelToClipSource(model)`.
+- `prepareSceneAnchor(stubScene, characters, brandChar, sceneAwarePrompt, aspectRatio, {}, libLocations)` mit **allen** ausgewählten Charakteren im 2. Argument aufrufen (nicht mehr `[anchorChar]`).
+- Ergebnis wie im Motion Studio verarbeiten:
+  - `first-frame-composed` → `body.startImageUrl = prep.firstFrameUrl`
+  - `subject-reference` (Vidu) → `body.referenceImages = prep.subjectReferenceUrls`
+  - `text-only` (Sora) → nichts anhängen
 
-### 3) Provider-Fälle (Strategy-Matrix greift automatisch)
+### 3) Anchor-Gate & Hard-Guard
 
-- **Hailuo / Kling-Std / Seedance / Luma / HappyHorse / Pika / Wan / Grok** → `first-frame-composed` (Nano-Banana-Standbild)
-- **Vidu Q2 (multiRef)** → `subject-reference`, Porträt landet in `referenceImages[role='character']`, kein Zwangs-Startframe
-- **Kling 3 Omni (v2v)** → wenn `referenceVideoUrl` gesetzt: unverändert V2V, sonst `first-frame-composed`
-- **Sora 2** → `text-only`, wie heute (Toast bleibt)
+- `shouldCompose = (characters ausgewählt oder World-Ref vorhanden) && clipSource && !manueller startImageUrl && !(multiRef mit viduReferences)`.
+- Wenn `shouldCompose === true` aber `prep.composed !== true` und keine `firstFrameUrl` zurückkommt: **kein** Fallback aufs rohe Porträt, sondern Toast + Abbruch. So kann „Toolkit startet wieder mit dem Avatar-Bild" strukturell nicht mehr passieren.
 
-### 4) Keine Änderungen am Composer / an Edge Functions
+### 4) Sichtbares Feedback
 
-`compose-scene-anchor`, `scene_anchor_cache`, `prepareSceneAnchor` und `resolveSceneCharacterAnchor` bleiben **unverändert**. Nur der Toolkit-Client konsumiert sie zusätzlich. Damit ist die bewährte Motion-Studio-Pipeline (v168 Anti-Clone, v170 Cast-Integrity Audit, v181 Depicted-Face-Lock) 1:1 auch im Toolkit aktiv, ohne Regressions-Risiko für den Composer.
+`SceneAnchorBadge` (analog Motion Studio) unter dem Prompt zeigt: „🎬 Scene-Aware · Samuel + Home Office + Laptop". Bei Fehler ein sichtbares rotes Badge mit dem Grund (statt stiller Fallback).
 
-## Betroffene Dateien
+## Nicht in diesem Schritt
 
-- `src/components/ai-video/ToolkitGenerator.tsx` — Anchor-Call + Provider-Wiring + Badge/Button-State
-- (optional) neuer kleiner Helper `src/lib/ai-video/toolkitModelToClipSource.ts` — Mapping `model.family → ComposerClipSource`
+- Lipsync / Dialog-Shot / Sync.so-Pipeline (bleibt komplett unangetastet).
+- Änderungen an Motion Studio / Composer.
+- Neue Edge Functions oder Tabellen — die Motion-Studio-IDs sind die Wahrheit.
 
 ## Ergebnis
 
-Jede Szene im AI Video Studio startet danach mit einem echten, zur Szenenbeschreibung passenden Frame (Charakter in der beschriebenen Umgebung/Pose), nicht mehr mit dem Avatar-Porträt — identisch zum Motion Studio.
+Ein Charakter, den der User im Motion Studio (oder auf `/avatars`) angelegt hat, taucht mit **derselben ID** im AI Video Studio auf, wird über den gleichen Anchor-Pfad in die beschriebene Szene komponiert und startet nicht mehr als Porträt-Standbild. Location/Building/Props aus der Cast-&-World-Library sind im Toolkit genauso verfügbar wie im Motion Studio.
