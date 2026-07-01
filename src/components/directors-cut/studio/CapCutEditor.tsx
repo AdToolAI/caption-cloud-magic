@@ -278,6 +278,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [renderStartedAt, setRenderStartedAt] = useState<number>(0);
   const renderPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Welle 6 — Pro-Editing state
+  const [rippleMode, setRippleMode] = useState<boolean>(() => {
+    try { return localStorage.getItem('dc:ripple-mode') !== '0'; } catch { return true; }
+  });
+  const [shortcutOverlayOpen, setShortcutOverlayOpen] = useState(false);
+  useEffect(() => {
+    try { localStorage.setItem('dc:ripple-mode', rippleMode ? '1' : '0'); } catch {}
+  }, [rippleMode]);
+
+
   // DnD sensors with activation constraint to allow clicks
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
