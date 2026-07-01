@@ -805,6 +805,18 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                     {t('dc.emptySceneBlackscreen') || 'Leere Szene (Schwarzbild)'}
                   </DropdownMenuItem>
                 )}
+                {onInsertAtPlayhead && (
+                  <>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem
+                      onClick={onInsertAtPlayhead}
+                      className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                    >
+                      <SplitSquareHorizontal className="h-4 w-4 mr-2 text-cyan-300" />
+                      Am Playhead einfügen
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
