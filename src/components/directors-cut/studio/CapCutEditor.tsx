@@ -1699,6 +1699,130 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     .flatMap(t => t.clips)
     .find(c => c.id === selectedClipId);
 
+  // Welle 6 — Ripple Delete for clips (also shifts subsequent clips on same track left).
+  const handleDeleteClipWithRipple = useCallback((clipId: string, ripple: boolean) => {
+    setAudioTracks(prev => prev.map(track => {
+      const target = track.clips.find(c => c.id === clipId);
+      if (!target) return track;
+      const gap = target.duration;
+      const remaining = track.clips.filter(c => c.id !== clipId);
+      if (!ripple) return { ...track, clips: remaining };
+      return {
+        ...track,
+        clips: remaining.map(c =>
+          c.startTime > target.startTime
+            ? { ...c, startTime: Math.max(0, c.startTime - gap) }
+            : c,
+        ),
+      };
+    }));
+    setSelectedClipId(null);
+  }, []);
+
+  // Welle 6 — Pro-Editing keyboard handler (Delete/Ripple, ?, arrows, Ctrl+D, Ctrl+A, Home/End)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // ? — open shortcut overlay
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setShortcutOverlayOpen(true);
+        return;
+      }
+
+      // S — split at playhead
+      if (!modKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSplitAtPlayhead();
+        return;
+      }
+
+      // Delete / Backspace — ripple delete (alt disables ripple)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const doRipple = rippleMode && !e.altKey;
+        if (selectedClipId) {
+          e.preventDefault();
+          handleDeleteClipWithRipple(selectedClipId, doRipple);
+          return;
+        }
+        if (selectedSceneId) {
+          e.preventDefault();
+          handleSceneDelete(selectedSceneId);
+          return;
+        }
+      }
+
+      // Ctrl+D — duplicate scene
+      if (modKey && (e.key === 'd' || e.key === 'D')) {
+        if (selectedSceneId) {
+          e.preventDefault();
+          handleDuplicateScene(selectedSceneId);
+        }
+        return;
+      }
+
+      // Arrow keys — nudge playhead (Shift = 1s, otherwise 1 frame ≈ 1/30s)
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const delta = e.shiftKey ? 1 : 1 / 30;
+        const sign = e.key === 'ArrowLeft' ? -1 : 1;
+        handleSeek(Math.max(0, Math.min(actualTotalDuration, currentTime + sign * delta)));
+        return;
+      }
+
+      // Home / End
+      if (e.key === 'Home') {
+        e.preventDefault();
+        handleSeek(0);
+        return;
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        handleSeek(actualTotalDuration);
+        return;
+      }
+
+      // J / K / L shuttle — simple play toggle on K; J/L nudge 1s
+      if (!modKey && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        handleSeek(Math.max(0, currentTime - 1));
+        return;
+      }
+      if (!modKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        handlePlayPause();
+        return;
+      }
+      if (!modKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        handleSeek(Math.min(actualTotalDuration, currentTime + 1));
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [
+    rippleMode,
+    selectedClipId,
+    selectedSceneId,
+    currentTime,
+    actualTotalDuration,
+    handleDeleteClipWithRipple,
+    handleSceneDelete,
+    handleDuplicateScene,
+    handleSplitAtPlayhead,
+    handleSeek,
+    handlePlayPause,
+  ]);
+
+
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#050816]">
       {/* Header Bar — James Bond 2028 Glassmorphism */}
