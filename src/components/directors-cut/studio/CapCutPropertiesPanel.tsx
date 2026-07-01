@@ -484,35 +484,8 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
               </div>
             </div>
 
-            {/* Trim */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Scissors className="h-3.5 w-3.5 text-[#00d4ff]" />
-                <label className="text-xs text-white/60">Trim</label>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-white/40 block mb-1">Trim Start</label>
-                  <Input
-                    type="number"
-                    value={selectedClip.trimStart.toFixed(1)}
-                    onChange={(e) => updateClip({ trimStart: parseFloat(e.target.value) || 0 })}
-                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
-                    step={0.1}
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-white/40 block mb-1">Trim End</label>
-                  <Input
-                    type="number"
-                    value={selectedClip.trimEnd.toFixed(1)}
-                    onChange={(e) => updateClip({ trimEnd: parseFloat(e.target.value) || 0 })}
-                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
-                    step={0.1}
-                  />
-                </div>
-              </div>
-            </div>
+            {/* (Duplicate Trim block removed — Trim now lives in Timing section above.) */}
+
 
             {/* Delete Audio Clip Button */}
             {onClipDelete && (
