@@ -260,7 +260,7 @@ export const AudioAssetSelector = ({
       
       // If deleted track was selected, deselect
       if (selectedMusicId === deletedId) {
-        onMusicSelect(null);
+        selectMusic(null, null);
       }
     },
     onError: (error: any) => {
