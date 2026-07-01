@@ -330,10 +330,22 @@ export function RemotionPreviewPlayer({
           <Button 
             size="icon" 
             variant="ghost" 
-            onClickCapture={isPlaying ? handlePauseClick : handlePlayClick}
+            onClick={isPlaying ? handlePauseClick : handlePlayClick}
             className="h-9 w-9 text-foreground hover:bg-primary/20"
           >
             {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          </Button>
+
+          {/* Loop Toggle */}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setLoop((l) => !l)}
+            title={loop ? 'Loop aus' : 'Loop an'}
+            aria-pressed={loop}
+            className={`h-8 w-8 ${loop ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
+          >
+            <Repeat className="h-4 w-4" />
           </Button>
 
           <div className="h-6 w-px bg-border/50" />
