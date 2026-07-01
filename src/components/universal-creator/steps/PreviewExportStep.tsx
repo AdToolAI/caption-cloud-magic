@@ -86,6 +86,29 @@ export function PreviewExportStep({
     [activeRenderJobs]
   );
 
+  // Welle 2: Prewarm Lambda when Export step mounts, so the real render click
+  // lands on a warm container (~5–15s cold-start saved).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/render-universal-video?prewarm=1`;
+        await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+          },
+          body: '{}',
+        });
+        if (!cancelled) console.debug('[UniversalCreator] Lambda prewarm ping sent');
+      } catch (e) {
+        console.debug('[UniversalCreator] prewarm ping failed (non-fatal)', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Realtime subscription for render updates with aggressive fallback polling
   useEffect(() => {
     if (activeRenderIds.length === 0) return;

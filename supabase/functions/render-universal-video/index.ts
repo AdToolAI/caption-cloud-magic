@@ -32,16 +32,52 @@ addEventListener('beforeunload', (ev: any) => {
   console.log('[render-universal-video] Function shutdown:', ev.detail?.reason || 'unknown');
 });
 
+// Welle 2: Dynamic Lambda concurrency tuning based on total frame count.
+// Buckets are aligned with the Lambda Concurrency Policy (max 7 parallel workers).
+function pickLambdaConcurrency(framesTotal: number): {
+  framesPerLambda: number;
+  maxConcurrency: number;
+} {
+  if (framesTotal <= 300) return { framesPerLambda: 150, maxConcurrency: 2 };   // ≤10s
+  if (framesTotal <= 900) return { framesPerLambda: 200, maxConcurrency: 5 };   // 10–30s
+  if (framesTotal <= 1800) return { framesPerLambda: 270, maxConcurrency: 7 };  // 30–60s
+  return { framesPerLambda: 360, maxConcurrency: 5 };                            // >60s
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
   if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
 
-
+  const requestStartedAt = Date.now();
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Welle 2: Prewarm mode — lightweight bundle-version check to warm the Lambda
+  // without triggering a real render. Called by PreviewExportStep when the user
+  // opens Step 5 so the actual click hits a warm container.
+  try {
+    if (req.method === 'POST') {
+      const url = new URL(req.url);
+      if (url.searchParams.get('prewarm') === '1') {
+        const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            prewarm: true,
+            serveUrlPresent: !!REMOTION_SERVE_URL,
+            lambdaFunction: LAMBDA_FUNCTION_NAME,
+            ts: Date.now(),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+  } catch (_prewarmErr) {
+    // fall through to normal handler
+  }
 
   // Initialize AWS client
   const aws = new AwsClient({
@@ -304,6 +340,33 @@ serve(async (req) => {
       payload: inputPropsJson,
     };
 
+    // Welle 2: dynamic framesPerLambda + concurrency tuning
+    const { framesPerLambda, maxConcurrency } = pickLambdaConcurrency(durationInFrames);
+    console.log(
+      `[render-universal-video] Lambda concurrency: framesPerLambda=${framesPerLambda}, ` +
+      `maxConcurrency=${maxConcurrency}, totalFrames=${durationInFrames}`
+    );
+
+    // Welle 1: Telemetry insert — mark queued/rendering before Lambda call
+    const preflightMs = Date.now() - requestStartedAt;
+    const telemetryRow = {
+      user_id: userId,
+      render_id: pendingRenderId,
+      category: briefing.category || null,
+      status: 'rendering' as const,
+      source: 'universal-creator',
+      aspect_ratio: briefing.aspectRatio || '16:9',
+      duration_seconds: Math.round(totalDuration),
+      frames_total: durationInFrames,
+      frames_per_lambda: framesPerLambda,
+      preflight_ms: preflightMs,
+      input_props: { scenesCount: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl },
+      started_at: new Date().toISOString(),
+    };
+    supabase.from('universal_video_renders').insert(telemetryRow).then(({ error }) => {
+      if (error) console.warn('[render-universal-video] telemetry insert failed (non-fatal):', error.message);
+    });
+
     const lambdaPayload = normalizeStartPayload({
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
@@ -318,6 +381,9 @@ serve(async (req) => {
       jpegQuality: 80,
       maxRetries: 1,
       timeoutInMilliseconds: 300000,
+      framesPerLambda,
+      concurrencyPerLambda: 1,
+      maxConcurrency,
       privacy: 'public',
       // r61: Enable audio rendering for voiceover/music
       muted: false,
@@ -343,6 +409,7 @@ serve(async (req) => {
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
 
+    const lambdaStartedAt = Date.now();
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
@@ -350,8 +417,9 @@ serve(async (req) => {
       },
       body: asciiSafeJson,
     });
+    const lambdaDurationMs = Date.now() - lambdaStartedAt;
 
-    console.log('📥 Lambda response status:', lambdaResponse.status);
+    console.log('📥 Lambda response status:', lambdaResponse.status, `(took ${lambdaDurationMs}ms)`);
 
     if (!lambdaResponse.ok) {
       const errorText = await lambdaResponse.text();
@@ -363,6 +431,15 @@ serve(async (req) => {
         error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
         completed_at: new Date().toISOString(),
       }).eq('render_id', pendingRenderId);
+
+      // Welle 1: Telemetry — mark failed
+      supabase.from('universal_video_renders').update({
+        status: 'failed',
+        error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
+        lambda_duration_ms: lambdaDurationMs,
+        total_duration_ms: Date.now() - requestStartedAt,
+        completed_at: new Date().toISOString(),
+      }).eq('render_id', pendingRenderId).then(() => {});
 
       // Refund credits
       await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
@@ -400,6 +477,17 @@ serve(async (req) => {
     } else {
       console.log('✅ Render record updated to completed');
     }
+
+    // Welle 1: Telemetry — mark completed with real timings
+    supabase.from('universal_video_renders').update({
+      status: 'completed',
+      output_url: outputUrl,
+      lambda_duration_ms: lambdaDurationMs,
+      total_duration_ms: Date.now() - requestStartedAt,
+      completed_at: new Date().toISOString(),
+    }).eq('render_id', pendingRenderId).then(({ error }) => {
+      if (error) console.warn('[render-universal-video] telemetry complete update failed:', error.message);
+    });
 
     // ✅ Auto-save to Media Library
     try {
