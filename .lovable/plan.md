@@ -1,62 +1,33 @@
 ## Problem
 
-Im Inspector (rechte Seite) hast du `Trim Start` auf **2,10s** gesetzt — der Clip wird aber weder auf der Timeline kürzer, noch passiert visuell irgendetwas. Grund:
+Der Screenshot zeigt: Video ist importiert (Preview + Original-Audio-Waveform sichtbar, Dauer 0:15), aber der **Video-Track ist leer** ("Szenen 0", "Timeline ist leer").
 
-Die Trim-Inputs schreiben aktuell **nur** das Feld `clip.trimStart` (Audio-Playback-Offset). Sie fassen `clip.startTime` und `clip.duration` **nicht** an. Das heißt:
-- Timeline-Balken bleibt 14,9s breit
-- Audio spielt intern zwar ab 2,1s, aber der Clip belegt weiter den vollen Slot → wirkt "kaputt"
+Grund im Code (`src/pages/DirectorsCut/DirectorsCut.tsx` → `handleVideoSelected`): Nach dem Import wird nur `handleStartAnalysis()` getriggert. Das läuft PySceneDetect → Frames → Boundaries → `setScenes(...)`. Wenn diese Kette langsam ist oder still fehlschlägt (Proxy-Extract, Boundary-Fusion), bleibt `scenes = []` — der Video-Track ist bis dahin komplett leer, obwohl Audio bereits da ist.
 
-Die **Handle-Drags** (Ziehen am Clip-Rand) machen es korrekt: `startTime`, `duration` und `trimStart/trimEnd` werden zusammen bewegt (siehe `CapCutEditor.tsx:1015-1028`). Die Inspector-Inputs spiegeln diese Logik nicht.
+## Fix — "Seed-Scene beim Import"
 
-Es gibt zusätzlich keinen expliziten **"Anwenden / Schneiden"**-Button neben den Inputs — Nutzer erwarten sichtbares Feedback.
+Sofort beim Import eine einzige Full-Length-Szene anlegen, damit die Timeline nie leer ist. Auto-Cut ersetzt diese Szene später durch die erkannten Cuts (idempotent, existierender Code in `handleStartAnalysis` überschreibt `scenes` ohnehin per `setScenes(normalizedScenes)`).
 
-## Fix (Welle 6.1 — Inspector Trim wiring)
+### Änderungen in `src/pages/DirectorsCut/DirectorsCut.tsx`
 
-**Datei:** `src/components/directors-cut/studio/CapCutPropertiesPanel.tsx`
+1. **`handleVideoSelected`**: direkt nach `setSelectedVideo(video)` (Zeile 968) eine Seed-Szene setzen:
+   - Dauer via `video.duration` oder — falls fehlend — `measureVideoDuration(video.url)` (async, schon vorhanden).
+   - `setScenes([{ id: 'seed-1', start_time: 0, end_time: duration, thumbnail_url: video.thumbnail_url ?? null, ... SceneAnalysis-Defaults }])`.
+   - Nur setzen, wenn `scenes.length === 0` (keine Draft-Wiederherstellung überschreiben).
 
-1. **`Trim Start`-Input umverdrahten**  
-   Beim Ändern:
-   - `delta = newTrimStart - clip.trimStart`
-   - `startTime += delta`
-   - `duration -= delta` (min 0.1s)
-   - `trimStart = newTrimStart`
-   
-   → Clip schrumpft links, springt korrekt weiter rechts an — identisch zum Left-Handle-Drag.
+2. **Auto-Cut Übergang schützen**: In `handleStartAnalysis` bleibt bestehende Logik. Der neue Seed-State soll den "looksLikeEdl"-Check nicht triggern → Seed bekommt Marker `source: 'seed'` und wird im Check ausgeschlossen.
 
-2. **`Trim End`-Input umverdrahten**  
-   Beim Ändern:
-   - `duration = newTrimEnd - clip.trimStart` (min 0.1s)
-   - `trimEnd = newTrimEnd`
-   
-   → Clip schrumpft rechts — identisch zum Right-Handle-Drag.
+3. **Composer-Handoff unverändert**: Wenn `video.composerProjectId` gesetzt ist, keine Seed-Szene (EDL kommt aus Composer-Pipeline).
 
-3. **Zweiter (duplizierter) Trim-Block (Zeilen 437–470)**  
-   Gleiche Logik anwenden — aktuell doppelter Code mit dem gleichen Bug.
+4. **Fehler-Fallback in Analyse**: Wenn `handleStartAnalysis` fehlschlägt und `scenes.length === 0`, im `catch`/`finally` sicherstellen, dass mindestens die Seed-Szene erhalten bleibt (nicht auf `[]` zurücksetzen).
 
-4. **UX-Verbesserungen im Trim-Panel**  
-   - Read-only Anzeige "Länge: X.XXs" unter den beiden Inputs (aktuell `Dauer` = `duration`, aber ohne Live-Update sichtbar)
-   - Neuer Button **"Am Playhead schneiden"** direkt im Trim-Block (ruft bestehende `handleSplitAtPlayhead`-Funktion), damit Splitten von genau dem Clip auch aus dem Inspector geht
-   - Kleiner Hinweistext: *"Trim kürzt die sichtbare Länge auf der Timeline."*
+### UX-Detail
 
-5. **Value-Formatierung**  
-   Inputs verwenden `.toFixed(2)` — dadurch springt der Cursor. Auf `defaultValue` + `onBlur` umstellen (oder Debounce), damit `2,1` beim Tippen nicht auf `2,10` snapt und weiterspringt.
+- Kein neuer Toast nötig — User sieht sofort einen Video-Clip in der Timeline mit der korrekten Länge.
+- Nach Auto-Cut ersetzen die erkannten Szenen den Seed nahtlos.
+- Manuelles "Am Playhead teilen" funktioniert dadurch **sofort** nach Import (aktuell scheitert es an `scenes = []`).
 
-## Technische Änderungen
+### Nicht Teil dieser Änderung
 
-```
-src/components/directors-cut/studio/CapCutPropertiesPanel.tsx
-  - updateClip({trimStart}) → updateClipWithGeometry({trimStart}) 
-    (bewegt startTime/duration mit)
-  - Analog für trimEnd → duration
-  - Neue kleine Helper-Funktion applyTrim(edge: 'start'|'end', value)
-  - Neuer Button "Am Playhead schneiden" (props: onSplitAtPlayhead)
-  - Numeric-Input: value → defaultValue + onBlur/onKeyDown Enter
-src/components/directors-cut/studio/CapCutEditor.tsx
-  - handleSplitAtPlayhead als Prop an <CapCutPropertiesPanel /> durchreichen
-```
-
-## Nicht geändert
-
-- Keine Änderungen an Render-Pipeline, Preview-Player, oder Audio-Ducking
-- Keine Änderungen an der Split-Logik selbst (`S`-Taste, Toolbar-Button funktionieren weiter)
-- Handle-Drag am Clip-Rand bleibt unverändert (funktioniert bereits korrekt)
+- PySceneDetect-Reliability, Frame-Extraction-Fallbacks, Composer-EDL — bleiben unverändert.
+- Sidebar-CTA "Video hinzufügen" / "Leere Szene" — Verdrahtung bleibt.
