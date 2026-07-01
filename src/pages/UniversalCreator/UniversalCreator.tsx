@@ -38,6 +38,7 @@ import {
   DEFAULT_VOICEOVER_VOLUME,
   computeDurationInFrames,
 } from '@/lib/universalCreatorDefaults';
+import { buildUniversalCreatorCustomizations } from '@/lib/universalCreatorRenderPayload';
 
 const BACKUP_STORAGE_KEY = 'universal-creator-backup';
 const BACKUP_SCHEMA_VERSION = 2;
@@ -495,24 +496,14 @@ export function UniversalCreator() {
             {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 3 && (
               <RemotionPreviewPlayer
                 componentName="UniversalCreatorVideo"
-                customizations={{
-                  ...(contentConfig?.voiceoverUrl && {
-                    voiceoverUrl: contentConfig.voiceoverUrl,
-                    voiceoverDuration: contentConfig.voiceoverDuration || 30,
-                    voiceoverVolume: clampAudioVolume(contentConfig.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME),
-                  }),
-                  ...(selectedMusicUrl && {
-                    backgroundMusicUrl: selectedMusicUrl,
-                    backgroundMusicVolume: getEffectiveBackgroundMusicVolume(
-                      audioConfig.music_volume,
-                      !!contentConfig?.voiceoverUrl,
-                    ),
-                  }),
-                  subtitles: subtitleConfig?.segments || [],
-                  subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
-                  background: scenes.length > 0 ? undefined : mapBackgroundAssetToUniversalVideo(backgroundAsset),
-                  scenes: scenes.length > 0 ? scenes : undefined,
-                }}
+                customizations={buildUniversalCreatorCustomizations({
+                  contentConfig,
+                  subtitleConfig,
+                  backgroundAsset,
+                  scenes,
+                  selectedMusicUrl,
+                  musicVolume: audioConfig.music_volume,
+                })}
                 width={formatConfig.width}
                 height={formatConfig.height}
                 durationInFrames={computeDurationInFrames({

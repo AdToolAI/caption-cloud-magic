@@ -18,7 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { clampAudioVolume, getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
-import { DEFAULT_SUBTITLE_STYLE, DEFAULT_VOICEOVER_VOLUME, computeTotalDurationSeconds } from '@/lib/universalCreatorDefaults';
+import { DEFAULT_SUBTITLE_STYLE, DEFAULT_VOICEOVER_VOLUME, computeTotalDurationSeconds, computeDurationInFrames } from '@/lib/universalCreatorDefaults';
+import { buildUniversalCreatorCustomizations, validateScenes } from '@/lib/universalCreatorRenderPayload';
+import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPreviewPlayer';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
@@ -307,30 +309,27 @@ export function PreviewExportStep({
         );
 
         try {
-          // ✅ CRITICAL: Validate and sanitize scenes BEFORE sending to Lambda
-          const validatedScenes = scenes
-            .filter(s => {
-              const dur = Number(s?.duration);
-              return Number.isFinite(dur) && dur > 0;
-            })
-            .map(s => ({
-              ...s,
-              duration: Math.max(0.1, Math.min(600, Number(s.duration))),
-            }));
-          
-          // Check if we have valid scenes to render
+          // Build the SAME customizations object the live preview uses,
+          // so Preview and Render can never silently diverge.
+          const sharedCustomizations = buildUniversalCreatorCustomizations({
+            contentConfig,
+            subtitleConfig,
+            backgroundAsset,
+            scenes,
+            selectedMusicUrl,
+            musicVolume: normalizedMusicVolume,
+          });
+
+          const validatedScenes = validateScenes(scenes);
           if (scenes.length > 0 && validatedScenes.length === 0) {
             throw new Error(t('uc.noValidScenes'));
           }
-          
-          // Calculate duration: use the LONGER of voiceover or scenes (shared helper)
+
           const calculatedDuration = computeTotalDurationSeconds({
             voiceoverDuration: contentConfig.voiceoverDuration,
             actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
             scenes: validatedScenes,
           });
-
-          // Validate calculatedDuration
           if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
             throw new Error(t('uc.invalidDuration'));
           }
@@ -348,22 +347,9 @@ export function PreviewExportStep({
               component_name: 'UniversalCreatorVideo',
               quality: videoQuality,
               customizations: {
-                voiceoverUrl: contentConfig.voiceoverUrl || '',
+                ...sharedCustomizations,
+                // Lambda expects the timeline length here; keep in sync with preview.
                 voiceoverDuration: calculatedDuration,
-                voiceoverVolume: clampAudioVolume(contentConfig.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME),
-                backgroundMusicUrl: selectedMusicUrl || '',
-                backgroundMusicVolume: effectiveMusicVolume,
-                subtitles: subtitleConfig?.segments || [],
-                subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
-                // Szenen für Multi-Scene Timeline - use validated scenes
-                scenes: validatedScenes.length > 0 ? validatedScenes : undefined,
-                // Background nur als Fallback wenn keine Szenen vorhanden
-                background: validatedScenes.length === 0 && backgroundAsset ? {
-                  type: backgroundAsset.type || 'video',
-                  videoUrl: backgroundAsset.type === 'video' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
-                  imageUrl: backgroundAsset.type === 'image' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
-                  color: backgroundAsset.type === 'color' ? backgroundAsset.color : undefined,
-                } : undefined,
               },
               format: 'mp4',
               aspect_ratio: job.format.aspectRatio,
@@ -525,42 +511,60 @@ export function PreviewExportStep({
         </RadioGroup>
       </Card>
 
-      {/* Preview */}
+      {/* Live Preview — identical customizations to the render call */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">{t('uc.preview')}</h3>
-        <div 
-          className="bg-muted rounded-lg overflow-hidden"
-          style={{
-            aspectRatio: formatConfig.aspectRatio === '16:9' ? '16/9' :
-                       formatConfig.aspectRatio === '9:16' ? '9/16' :
-                       formatConfig.aspectRatio === '1:1' ? '1/1' :
-                       formatConfig.aspectRatio === '4:5' ? '4/5' :
-                       formatConfig.aspectRatio === '4:3' ? '4/3' : '16/9',
-            maxHeight: '500px',
-          }}
-        >
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-            <div className="text-center space-y-4 p-8">
-              <Video className="h-16 w-16 mx-auto text-muted-foreground" />
-              <div>
-                <p className="font-medium">{t('uc.videoPreview')}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatConfig.width}x{formatConfig.height} • {contentConfig.voiceoverDuration || (scenes.length > 0 ? scenes.reduce((sum, s) => sum + s.duration, 0) : 0).toFixed(0)}s
-                </p>
-              </div>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p>✓ Voice-over: {contentConfig.voiceoverConfig?.voiceName}</p>
-                {subtitleConfig?.segments?.length ? (
-                  <>
-                    <p>✓ Untertitel: {subtitleConfig.segments.length} Segmente</p>
-                    {subtitleConfig.style && (
-                      <p>✓ Style: {subtitleConfig.style.font}, {subtitleConfig.style.fontSize}px</p>
-                    )}
-                  </>
-                ) : null}
-              </div>
+        {(contentConfig?.voiceoverUrl || (scenes && scenes.length > 0)) ? (
+          <div
+            className="bg-black rounded-lg overflow-hidden mx-auto"
+            style={{
+              aspectRatio:
+                formatConfig.aspectRatio === '16:9' ? '16/9' :
+                formatConfig.aspectRatio === '9:16' ? '9/16' :
+                formatConfig.aspectRatio === '1:1' ? '1/1' :
+                formatConfig.aspectRatio === '4:5' ? '4/5' :
+                formatConfig.aspectRatio === '4:3' ? '4/3' : '16/9',
+              maxHeight: '520px',
+              width: '100%',
+            }}
+          >
+            <RemotionPreviewPlayer
+              componentName="UniversalCreatorVideo"
+              customizations={buildUniversalCreatorCustomizations({
+                contentConfig,
+                subtitleConfig,
+                backgroundAsset,
+                scenes,
+                selectedMusicUrl,
+                musicVolume: normalizedMusicVolume,
+              })}
+              width={formatConfig.width}
+              height={formatConfig.height}
+              durationInFrames={computeDurationInFrames({
+                voiceoverDuration: contentConfig?.voiceoverDuration,
+                actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
+                scenes,
+              }, formatConfig.fps || 30)}
+              fps={formatConfig.fps || 30}
+            />
+          </div>
+        ) : (
+          <div
+            className="bg-muted rounded-lg overflow-hidden flex items-center justify-center text-center p-8"
+            style={{ aspectRatio: '16/9', maxHeight: '320px' }}
+          >
+            <div className="space-y-2">
+              <Video className="h-10 w-10 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                {t('uc.addScenesToSeePreview')}
+              </p>
             </div>
           </div>
+        )}
+        <div className="mt-3 text-xs text-muted-foreground text-center">
+          {formatConfig.width}x{formatConfig.height} • {formatConfig.fps}fps
+          {contentConfig?.voiceoverConfig?.voiceName && <> • Voice: {contentConfig.voiceoverConfig.voiceName}</>}
+          {subtitleConfig?.segments?.length ? <> • {subtitleConfig.segments.length} {t('uc.subtitleSegmentsCount')}</> : null}
         </div>
       </Card>
 
