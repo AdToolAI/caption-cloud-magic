@@ -364,11 +364,43 @@ export function UniversalCreator() {
     hydratedRef.current = true;
     if (urlProjectId) {
       void hydrateFromDb(urlProjectId);
-    } else if (!formatConfig && !contentConfig) {
-      restoreFromLocalStorage();
+      return;
     }
+    // Silent Auto-Resume: newest draft of this user, if <7d old.
+    (async () => {
+      try {
+        if (!user) {
+          restoreFromLocalStorage();
+          return;
+        }
+        const cutoff = new Date(Date.now() - AUTO_RESUME_MAX_AGE_MS).toISOString();
+        const { data, error } = await supabase
+          .from('content_projects')
+          .select('id, updated_at, status')
+          .eq('user_id', user.id)
+          .eq('content_type', 'universal')
+          .eq('status', 'draft')
+          .gte('updated_at', cutoff)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!error && data?.id) {
+          setIsHydrating(true);
+          const next = new URLSearchParams(searchParams);
+          next.set('project', data.id);
+          setSearchParams(next, { replace: true });
+          void hydrateFromDb(data.id);
+          return;
+        }
+      } catch (err) {
+        console.warn('[UniversalCreator] Auto-resume lookup failed:', err);
+      }
+      if (!formatConfig && !contentConfig) {
+        restoreFromLocalStorage();
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id]);
 
   // React to external URL changes (e.g. user pastes a share link) — reload the wizard
   useEffect(() => {
