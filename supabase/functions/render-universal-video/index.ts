@@ -171,7 +171,7 @@ serve(async (req) => {
       voiceoverUrl: voiceoverUrl || null,
       backgroundMusicUrl: musicUrl || null,
       voiceoverVolume: briefing.voiceoverVolume ?? 1,
-      musicVolume: briefing.musicVolume ?? 0.3,
+      backgroundMusicVolume: briefing.backgroundMusicVolume ?? briefing.musicVolume ?? 0.3,
       masterVolume: 1,
       useCharacter: briefing.hasCharacter !== false,
       characterType: briefing.characterType || 'lottie',

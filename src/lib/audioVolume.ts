@@ -5,18 +5,18 @@ export function clampAudioVolume(value: number | null | undefined): number {
 }
 
 /**
- * Honest music volume policy.
+ * Honest music volume policy — WYSIWYG.
  *
- * The slider value IS the volume the user hears — in preview AND in the final
- * render. The only automatic adjustment is a gentle sidechain when a voiceover
- * is present: music is capped at 40 % of the slider value so narration stays
- * intelligible without shrinking the slider into meaningless single digits.
+ * The slider value IS the volume the user hears — in preview AND in the
+ * final render. No hidden sidechain math. If the mix feels off, the user
+ * lowers the slider; the number on screen matches what they hear.
+ *
+ * The `hasVoiceover` argument is kept for backwards compatibility but is
+ * intentionally ignored so preview and export always agree with the slider.
  */
 export function getEffectiveBackgroundMusicVolume(
   rawVolume: number | null | undefined,
-  hasVoiceover = false,
+  _hasVoiceover = false,
 ): number {
-  const clamped = clampAudioVolume(rawVolume);
-  if (!hasVoiceover) return clamped;
-  return clampAudioVolume(clamped * 0.4);
+  return clampAudioVolume(rawVolume);
 }

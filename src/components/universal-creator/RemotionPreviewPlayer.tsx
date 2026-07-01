@@ -102,7 +102,9 @@ export function RemotionPreviewPlayer({
 }: RemotionPreviewPlayerProps) {
   const playerRef = useRef<PlayerRef>(null);
   const seekBarRef = useRef<HTMLDivElement>(null);
-  const hasEverInteractedRef = useRef(false); // NEVER resets - tracks if user ever clicked play
+  // Tracked as state (not a ref) so `initiallyMuted` correctly reflects the
+  // latest interaction — refs never trigger a re-render.
+  const [hasEverInteracted, setHasEverInteracted] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [volume, setVolume] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -129,36 +131,12 @@ export function RemotionPreviewPlayer({
     ...stableAudioIdentity,
   }), [customizations, stableAudioIdentity]);
 
-  // Fingerprint used ONLY to re-activate audio output after prop changes.
-  // It does NOT drive the Player's key.
-  const audioFingerprint = useMemo(() => JSON.stringify({
-    backgroundMusicUrl: inputProps?.backgroundMusicUrl || '',
-    backgroundMusicVolume: inputProps?.backgroundMusicVolume ?? null,
-    voiceoverUrl: inputProps?.voiceoverUrl || '',
-    voiceoverVolume: inputProps?.voiceoverVolume ?? null,
-  }), [
-    inputProps?.backgroundMusicUrl,
-    inputProps?.backgroundMusicVolume,
-    inputProps?.voiceoverUrl,
-    inputProps?.voiceoverVolume,
-  ]);
-
   const aspectRatio = width / height;
 
-  // Re-activate audio when audio props change.
-  useEffect(() => {
-    if (hasEverInteractedRef.current && playerRef.current) {
-      const timer = setTimeout(() => {
-        if (playerRef.current) {
-          console.log('[RemotionPreviewPlayer] Re-activating audio after props change');
-          playerRef.current.unmute();
-          playerRef.current.setVolume(volume);
-          setIsMuted(false);
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [audioFingerprint, volume]);
+  // NOTE: We intentionally do NOT auto-unmute or re-set volume when audio
+  // props change. Doing so hijacks the user's Play/Pause state and makes the
+  // Pause button appear broken. Volume changes flow through inputProps
+  // directly to the Remotion composition; playback state stays put.
 
   // Sync player state with component state
   useEffect(() => {
@@ -236,7 +214,7 @@ export function RemotionPreviewPlayer({
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
     if (!playerRef.current) return;
     // Mark that user has ever interacted (NEVER resets)
-    hasEverInteractedRef.current = true;
+    if (!hasEverInteracted) setHasEverInteracted(true);
     // 1. First unmute
     playerRef.current.unmute();
     // 2. Set volume
@@ -245,7 +223,7 @@ export function RemotionPreviewPlayer({
     setIsMuted(false);
     // 4. Play with event object (CRITICAL for browser policy)
     playerRef.current.play(e);
-  }, [volume]);
+  }, [volume, hasEverInteracted]);
 
   const handlePauseClick = useCallback(() => {
     if (!playerRef.current) return;
@@ -293,7 +271,7 @@ export function RemotionPreviewPlayer({
           durationInFrames={durationInFrames}
           loop={loop}
           numberOfSharedAudioTags={5}
-          initiallyMuted={!hasEverInteractedRef.current}
+          initiallyMuted={!hasEverInteracted}
           component={resolvedComponent}
         />
       </div>

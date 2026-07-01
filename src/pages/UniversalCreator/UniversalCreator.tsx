@@ -31,7 +31,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { useTranslation } from '@/hooks/useTranslation';
-import { getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
+import { getEffectiveBackgroundMusicVolume, clampAudioVolume } from '@/lib/audioVolume';
+import {
+  DEFAULT_SUBTITLE_STYLE,
+  DEFAULT_MUSIC_VOLUME,
+  DEFAULT_VOICEOVER_VOLUME,
+  computeDurationInFrames,
+} from '@/lib/universalCreatorDefaults';
+
+const BACKUP_STORAGE_KEY = 'universal-creator-backup';
+const BACKUP_SCHEMA_VERSION = 2;
+const BACKUP_MAX_AGE_MS = 3_600_000; // 1h
 
 interface WizardStep {
   id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
@@ -58,10 +68,7 @@ export function UniversalCreator() {
   const [backgroundAsset, setBackgroundAsset] = useState<BackgroundAsset | null>(null);
   const [audioConfig, setAudioConfig] = useState({
     background_music_id: null as string | null,
-    music_volume: 0.3,
-    voiceover_id: null as string | null,
-    voiceover_volume: 1.0,
-    sound_effects: [] as any[],
+    music_volume: DEFAULT_MUSIC_VOLUME,
   });
   const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
@@ -128,31 +135,14 @@ export function UniversalCreator() {
   }, [audioConfig.background_music_id, projectId]);
 
   useEffect(() => {
-    console.log('[UniversalCreator] Component mounted');
-    return () => console.log('[UniversalCreator] Component unmounted');
-  }, []);
-
-  useEffect(() => {
-    console.log('[UniversalCreator] Current Step:', currentStep, WIZARD_STEPS[currentStep].title);
-  }, [currentStep]);
-
-  useEffect(() => {
-    console.log('[UniversalCreator] State Update:', {
-      format: !!formatConfig,
-      content: !!contentConfig,
-      scenes: scenes.length,
-      audio: audioConfig,
-    });
-  }, [formatConfig, contentConfig, scenes, audioConfig]);
-
-  useEffect(() => {
     const interval = setInterval(() => {
       if (formatConfig) {
         saveProgress();
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, projectId, selectedMusicUrl, videoQuality]);
 
   const handleNext = async () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
@@ -168,23 +158,21 @@ export function UniversalCreator() {
   };
 
   const handleNewProject = () => {
-    localStorage.removeItem('universal-creator-backup');
+    localStorage.removeItem(BACKUP_STORAGE_KEY);
     setProjectId(undefined);
     setFormatConfig(null);
     setContentConfig(null);
     setBackgroundAsset(null);
     setAudioConfig({
       background_music_id: null,
-      music_volume: 0.3,
-      voiceover_id: null,
-      voiceover_volume: 1.0,
-      sound_effects: [],
+      music_volume: DEFAULT_MUSIC_VOLUME,
     });
     setSelectedMusicUrl(null);
     setSubtitleConfig(undefined);
     setScenes([]);
     setCurrentStep(0);
-    toast.success('Neues Projekt gestartet');
+    setVideoQuality('hd');
+    toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
   };
 
   const saveProgress = async () => {
@@ -233,35 +221,64 @@ export function UniversalCreator() {
   };
 
   const saveToLocalStorage = () => {
-    const state = {
-      currentStep,
-      formatConfig,
-      contentConfig,
-      backgroundAsset,
-      audioConfig,
-      scenes,
-      subtitleConfig,
+    const payload = {
+      version: BACKUP_SCHEMA_VERSION,
       timestamp: Date.now(),
+      state: {
+        currentStep,
+        projectId,
+        formatConfig,
+        contentConfig,
+        backgroundAsset,
+        audioConfig: {
+          background_music_id: audioConfig.background_music_id,
+          music_volume: clampAudioVolume(audioConfig.music_volume),
+        },
+        selectedMusicUrl,
+        scenes,
+        subtitleConfig,
+        videoQuality,
+      },
     };
-    localStorage.setItem('universal-creator-backup', JSON.stringify(state));
+    try {
+      localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('[UniversalCreator] Failed to persist backup:', err);
+    }
   };
 
   const restoreFromLocalStorage = () => {
     try {
-      const backup = localStorage.getItem('universal-creator-backup');
-      if (backup) {
-        const state = JSON.parse(backup);
-        const age = Date.now() - state.timestamp;
-        if (age < 3600000) {
-          setCurrentStep(state.currentStep);
-          setFormatConfig(state.formatConfig);
-          setContentConfig(state.contentConfig);
-          setBackgroundAsset(state.backgroundAsset);
-          setAudioConfig(state.audioConfig);
-          setScenes(state.scenes);
-          setSubtitleConfig(state.subtitleConfig);
-        }
+      const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+
+      // Reject old / unversioned backups so stale audio defaults can never
+      // silently overwrite the current session.
+      if (parsed?.version !== BACKUP_SCHEMA_VERSION) {
+        localStorage.removeItem(BACKUP_STORAGE_KEY);
+        return;
       }
+
+      const age = Date.now() - (parsed.timestamp || 0);
+      if (age >= BACKUP_MAX_AGE_MS) return;
+
+      const s = parsed.state || {};
+      if (typeof s.currentStep === 'number') setCurrentStep(s.currentStep);
+      if (s.projectId) setProjectId(s.projectId);
+      if (s.formatConfig) setFormatConfig(s.formatConfig);
+      if (s.contentConfig) setContentConfig(s.contentConfig);
+      if (s.backgroundAsset) setBackgroundAsset(s.backgroundAsset);
+      if (s.audioConfig) {
+        setAudioConfig({
+          background_music_id: s.audioConfig.background_music_id ?? null,
+          music_volume: clampAudioVolume(s.audioConfig.music_volume ?? DEFAULT_MUSIC_VOLUME),
+        });
+      }
+      if (s.selectedMusicUrl) setSelectedMusicUrl(s.selectedMusicUrl);
+      if (Array.isArray(s.scenes)) setScenes(s.scenes);
+      if (s.subtitleConfig) setSubtitleConfig(s.subtitleConfig);
+      if (s.videoQuality === 'hd' || s.videoQuality === '4k') setVideoQuality(s.videoQuality);
     } catch (error) {
       console.error('[UniversalCreator] Failed to restore backup:', error);
     }
@@ -271,12 +288,14 @@ export function UniversalCreator() {
     if (formatConfig) {
       saveToLocalStorage();
     }
-  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, selectedMusicUrl, projectId, videoQuality]);
 
   useEffect(() => {
     if (!formatConfig && !contentConfig) {
       restoreFromLocalStorage();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canProceed = () => {
@@ -480,7 +499,7 @@ export function UniversalCreator() {
                   ...(contentConfig?.voiceoverUrl && {
                     voiceoverUrl: contentConfig.voiceoverUrl,
                     voiceoverDuration: contentConfig.voiceoverDuration || 30,
-                    voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
+                    voiceoverVolume: clampAudioVolume(contentConfig.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME),
                   }),
                   ...(selectedMusicUrl && {
                     backgroundMusicUrl: selectedMusicUrl,
@@ -490,23 +509,17 @@ export function UniversalCreator() {
                     ),
                   }),
                   subtitles: subtitleConfig?.segments || [],
-                  subtitleStyle: subtitleConfig?.style || {
-                    position: 'bottom', font: 'Inter', fontSize: 48, color: '#ffffff',
-                    backgroundColor: '#000000', backgroundOpacity: 0.5, animation: 'fade',
-                    animationSpeed: 1, outlineStyle: 'stroke', outlineColor: '#000000', outlineWidth: 2,
-                  },
+                  subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
                   background: scenes.length > 0 ? undefined : mapBackgroundAssetToUniversalVideo(backgroundAsset),
                   scenes: scenes.length > 0 ? scenes : undefined,
                 }}
                 width={formatConfig.width}
                 height={formatConfig.height}
-                durationInFrames={Math.ceil(
-                  Math.max(
-                    contentConfig?.actualVoiceoverDuration || contentConfig?.voiceoverDuration || 0,
-                    scenes.reduce((sum, s) => sum + s.duration, 0),
-                    5
-                  ) * 30
-                ) || 150}
+                durationInFrames={computeDurationInFrames({
+                  voiceoverDuration: contentConfig?.voiceoverDuration,
+                  actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
+                  scenes,
+                }, 30)}
               />
             )}
 

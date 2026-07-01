@@ -1,68 +1,78 @@
-## Diagnose der aktuellen Pipeline
+## Ziel
+Der Universal Content Creator ist 8 Monate alt und funktioniert, aber ein Deep-Audit zeigt viele stille Divergenzen zwischen UI, Preview, Autosave und Render. Ich will die Pipeline in klaren Wellen aufräumen, ohne Motion Studio / Director's Cut / Composer anzufassen.
 
-Nach Review von `PreviewExportStep.tsx`, `UniversalCreator.tsx`, `RemotionPreviewPlayer.tsx`, `UniversalCreatorVideo.tsx` und `audioVolume.ts`:
+## Flow (Ist-Zustand)
 
-**1. "Export effektiv 7%" ist ein Debug-Leak.**
-Das Label in `PreviewExportStep.tsx:584` zeigt dem User die interne Ducking-Mathematik (`normalizedMusicVolume * normalizedMusicVolume * 0.28`). Das gehört nicht in eine Endkunden-UI — es entlarvt, dass der Slider nicht linear wirkt und verwirrt.
+```text
+UI State (9x useState) ──► localStorage ("universal-creator-backup", 10s Poll)
+                       └─► Supabase content_projects (customizations + audio_config)
+                       └─► RemotionPreviewPlayer (inputProps live)
+                       └─► render-with-remotion  ─┐
+                       └─► render-universal-video ┴─► AWS Lambda ─► S3 ─► Webhook ─► video_renders ─► media_assets
+```
 
-**2. Preview vs. Export sind numerisch bereits identisch, aber unehrlich.**
-Beide Seiten rufen `getEffectiveBackgroundMusicVolume(rawVolume, hasVoiceover)` auf und übergeben denselben Wert an Remotion. Der User hört also in Preview und Render dasselbe. **Aber**: der Slider zeigt 50% und der wahre Mix ist 7% — das fühlt sich für den User "falsch" an, weil Slider ≠ hörbare Realität.
+## Wichtigste Fundstellen aus dem Audit
 
-**3. Play/Pause reagiert nicht, Video loopt.**
-Root Cause in `RemotionPreviewPlayer.tsx`:
-- Zeile 286: `<MemoizedPlayer key={audioFingerprint} … />` — jeder Slider-Tick ändert `backgroundMusicVolume` → neuer Key → **kompletter Remount des Remotion-Players**. Play-State, Frame-Position und Event-Listener werden zerstört, bevor der User klicken kann.
-- Zeile 95: `loop = true` als Default → das Video läuft endlos.
-- Der Loop-Reset kombiniert mit ständigem Remount macht Pause optisch wirkungslos.
+**Kritisch (verursacht direkt sichtbare Bugs):**
+- `render-universal-video` sendet `musicVolume` statt `backgroundMusicVolume` → wird von Zod stumm verworfen, Musik läuft auf hartem Default 0.35 statt User-Wert.
+- Musik-Slider zeigt Rohwert (z. B. 30%), Preview + Render nutzen aber sidechain-reduzierten Wert → User versteht die Skala nicht, denkt Slider ist kaputt.
+- `selectedMusicUrl` und `projectId` liegen NICHT im localStorage-Backup → nach Reload keine Musik im Preview + doppelte DB-Rows bei jedem Save.
+- `initiallyMuted` wird aus einem `ref` gelesen → Player-Mute-State ist nach Mount praktisch eingefroren.
+- `render-universal-video` läuft synchron gegen Lambda mit 300s Timeout, aber Edge Functions timeouten nach 150s → Frontend sieht Fehler, obwohl Lambda noch läuft.
 
-**4. Doppel-Wiring von Audio-Props.**
-`stableAudioProps` (Zeile 110–120) inkludiert `backgroundMusicVolume` und `voiceoverVolume` als "stabil" — sie sind aber genau die Werte, die sich per Slider ändern. Der Memo greift dadurch nicht.
+**Mittel:**
+- Preview-Duration, Subtitle-Style-Defaults, Background-Asset-Mapping haben leicht unterschiedliche Werte zwischen Preview und Render.
+- Zwei Render-Pfade (`render-with-remotion` vs `render-universal-video`) mit unterschiedlicher Credit-Logik (Reservation vs. Direct-Deduct) → inkonsistente Abrechnung.
+- Kein Schema-Version-Flag im localStorage-Backup → alte Drafts überschreiben neue Defaults (genau das, was Sie in den letzten Runden erlebt haben).
+- Export-Step hat gar keinen echten Live-Preview, nur eine Icon-Karte.
 
----
+**Code-Qualität:**
+- `UniversalCreatorVideo.tsx` ist ein 3212-Zeilen-Monolith.
+- Debug-`console.log`-Effekte im Prod-Code.
+- Vestigiale Felder (`audioConfig.voiceover_id`, `voiceover_volume`, `sound_effects`) werden nie geschrieben.
+- Multi-Format-Render läuft sequenziell statt parallel.
 
-## Plan
+## Umsetzung in 4 Wellen
 
-### A. UI säubern (Kosmetik + Ehrlichkeit)
-- `PreviewExportStep.tsx`: Zeile 584 auf reines `{Math.round(normalizedMusicVolume * 100)}%` reduzieren. Kein "Export effektiv" mehr.
-- Slider-Wert = tatsächlich hörbarer Wert. Was der User einstellt, das kommt aus Preview UND Render — 1:1.
+### Welle 1 – Audio-Mix ehrlich & stabil (dringend)
+1. `render-universal-video`: `musicVolume` → `backgroundMusicVolume` umbenennen, damit der Wert nicht mehr stumm verworfen wird.
+2. Sidechain-Skalierung transparent machen: Slider zeigt genau das, was hörbar ist. Entweder kein Sidechain mehr oder kleines Info-Label „bei Voiceover reduziert auf X %". Slider = Realität.
+3. `selectedMusicUrl` und `projectId` ins localStorage-Backup aufnehmen; Restore rehydriert beides.
+4. `voiceoverVolume` sauber in `contentConfig` typisieren und im Restore-Pfad clampen.
+5. `initiallyMuted` von Ref auf State umstellen, damit Play/Pause nach Interaktion konsistent bleibt.
+6. Ein einziger `DEFAULT_SUBTITLE_STYLE`, den Preview und Render beide importieren.
 
-### B. Audio-Mix vereinfachen (ehrliche Kurve)
-In `src/lib/audioVolume.ts`:
-- Perceptual-Quadrat und aggressives 0.28/0.18-Ducking entfernen.
-- Neue Regel: **Slider-Wert wird direkt benutzt**. Wenn Voiceover vorhanden ist, wird die Musik auf max. 40% des Slider-Werts geduckt (leichter Sidechain, aber kein Faktor-10-Absturz).
-- Das VO wird mit `voiceoverVolume * masterVolume` gemischt (bleibt so).
-- Ergebnis: Slider auf 50% ≈ 50% (oder 20% bei VO) — deckungsgleich in Preview und Render.
+### Welle 2 – Preview/Render-Parität
+1. Live-Remotion-Preview in `PreviewExportStep` einbauen (gleicher Player wie in der Sidebar) – User sieht vor dem Credit-Spend genau, was rauskommt.
+2. Zentraler `mapBackgroundAssetToRenderPayload()`, gemeinsam für Preview und Export-Payload.
+3. Duration-Berechnung an einer Stelle bündeln (`computeDurationInFrames()`), Preview + Export teilen sich die Funktion.
+4. Alle Divergenz-Konstanten (backgroundOpacity, animation, outlineStyle) in ein `universalCreator/defaults.ts`.
 
-### C. Player-Verhalten reparieren
-In `RemotionPreviewPlayer.tsx`:
-- `audioFingerprint`-Key vom `<MemoizedPlayer>` entfernen. Remotion aktualisiert Volumen-Props live über `inputProps`; Remount ist unnötig.
-- `stableAudioProps` auf **URL-only** reduzieren (`backgroundMusicUrl`, `voiceoverUrl`) — Volume-Props sind Live-Props, keine Identitäts-Props.
-- Memo-Vergleich in `MemoizedPlayer` neu: nur bei URL-Wechsel oder Dauer-/Subtitle-Wechsel remounten.
-- Default `loop = false`. Kleine Loop-Toggle-Ikone neben Play/Pause hinzufügen, damit User bewusst wählen kann.
-- Play/Pause-Button: `onClickCapture` → `onClick` (sauberer, funktioniert nach Remount-Fix wieder).
+### Welle 3 – Persistence & State härten
+1. Versioniertes localStorage-Schema (`{ version: 2, state: {...} }`) mit expliziter Migration.
+2. Autosave in ein einziges `useAutosave(state)`-Hook konsolidieren; kein doppeltes Interval + Effekt mehr.
+3. `projectId` in die URL (`?project=UUID`) für resumierbare Sessions und um Duplikat-Rows zu verhindern.
+4. Restore-Guard: nur überschreiben, wenn kein aktuelles Feld gesetzt ist ODER Backup neuer als aktuelle Session – so kann ein alter Draft nichts mehr „zurückrollen".
+5. Vestigiale Felder aus `audioConfig` entfernen.
 
-### D. Kleiner Pipeline-Audit (Verbesserungsvorschläge)
-Nicht in dieser Iteration umgesetzt, nur aufgelistet:
-1. **Ein Master-Volume-Slider im Preview-Player entfernen** — er verwirrt neben Musik-/VO-Slider. Preview-Volume ist reine "Lautsprecher"-Regelung; Track-Mix macht der Export-Screen.
-2. **Waveform-Indikator** auf dem Musik-Slider (visuelles Feedback wie Ducking-Zonen).
-3. **VU-Mini-Meter** rechts vom Play-Button (grün/gelb/rot Peak Indikator, hilft dem User zu sehen, ob Musik VO überdeckt).
-4. **Keyboard-Shortcuts**: Leertaste = Play/Pause, ←/→ = ±1s, M = Mute.
-5. **"Only music"/"Only voice"-Solo-Buttons** zum Debugging des Mix.
-6. **Auto-Ducking-Preset-Buttons** ("Kein VO", "Podcast", "Werbung") statt reines Slider-Fummeln.
-7. **Preview-Player-Zustand persistieren** über Step-Wechsel (Frame-Position, Play-State) via sessionStorage.
-8. **Ersten Frame preloaden**, damit der Player nicht mit schwarzem Bild startet.
+### Welle 4 – Render-Pipeline & UX-Politur
+1. `render-universal-video` auf Async-Invocation + Webhook umstellen (wie `render-with-remotion`); Credit-Modell auf Reservation/Commit vereinheitlichen.
+2. Multi-Format-Render parallel via `Promise.all`.
+3. „Retry"-Button für fehlgeschlagene Renders (nutzt die bereits refundeten Credits).
+4. `media_assets.storage_path` korrekt setzen (kein S3-URL mehr).
+5. Debug-`console.log`-Effekte entfernen, hardcoded deutsche Toasts durch `t()` ersetzen.
+6. Optional: `UniversalCreatorVideo.tsx` in Sub-Module splitten (SceneBackground, TextOverlay, Transitions, SubtitleOverlay). Rein Refactor, keine Verhaltensänderung.
 
-Punkte 1–3 kann ich in einem Folge-Schritt umsetzen, sobald A–C laufen.
+## Was NICHT angefasst wird
+- Motion Studio / Video Composer / Director's Cut / Talking Head / Lip-Sync / Credit-Rates / Provider-Pipelines / bestehende Remotion-Composition-Logik selbst (nur Splitten).
+- Kein neuer Storage-Bucket, keine DB-Migration außer `content_projects.customizations` optional versionieren.
+- Keine Änderung an der Renderqualität oder den Lambda-Concurrency-Regeln.
 
-### E. Technische Nicht-Änderungen
-- `UniversalCreatorVideo.tsx` Template: keine Änderung — es liest bereits `voiceoverVolume`, `backgroundMusicVolume`, `masterVolume` korrekt.
-- Motion Studio, Lip-Sync, Composer, Render-Edge-Funktionen: unangetastet.
-- Credit-Kosten, Render-Payload-Format: unverändert.
+## Verifikation pro Welle
+- Welle 1: Slider 10 / 30 / 70 % → Preview UND Export klingen gleich, Werte überleben Reload.
+- Welle 2: Export-Step-Preview zeigt exakt das gerenderte Ergebnis; Duration- und Subtitle-Style-Werte identisch.
+- Welle 3: Nach Hard-Reload + Restore keine Duplikat-Rows in `content_projects`, kein Rückfall auf alte Volume-Werte.
+- Welle 4: Fehlgeschlagener Render → Retry funktioniert ohne Doppelabbuchung; 3 Formate rendern parallel; keine 150s-Edge-Timeouts mehr.
 
-## Verifikation
-- Slider 50 % → Preview-Musik hörbar bei ~50 % (bzw. ~20 % mit VO). Kein "effektiv"-Label.
-- Play startet, Pause hält an, Loop-Toggle steuert Wiederholung.
-- Volume-Slider-Änderung remountet den Player NICHT (Frame-Position bleibt erhalten).
-- Render-Payload nutzt exakt denselben Zahlenwert wie der Preview.
-
-## Risiko
-Sehr niedrig. Alle Änderungen sind auf den Universal Creator Audio/Preview-Layer beschränkt. Kein Eingriff in Render-Farm, Lip-Sync oder Composer.
+## Reihenfolge / Rollout
+Ich würde Welle 1 sofort umsetzen (löst die Ursachen der letzten Runden endgültig), dann nach Ihrer Freigabe Welle 2, 3, 4 einzeln. Sagen Sie mir einfach welche Welle ich starten soll – oder ob ich alle vier direkt hintereinander abarbeiten darf.
