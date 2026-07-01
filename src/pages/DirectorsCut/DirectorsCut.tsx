@@ -998,9 +998,9 @@ export function DirectorsCut() {
           suggested_effects: [],
           isFromOriginalVideo: true,
           sourceMode: 'original',
-          // @ts-expect-error — internal marker, ignored by renderer
+          // internal marker, ignored by renderer
           source: 'seed',
-        } as SceneAnalysis];
+        } as unknown as SceneAnalysis];
       });
 
       // Falls Dauer beim Import fehlte, exakt messen und Seed-Szene anpassen.
