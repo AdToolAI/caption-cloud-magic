@@ -1,85 +1,70 @@
-## Problem
+## Zwei Probleme
 
-Beim Trimmen einer Szene über die Sidebar-Eingaben ("Start"/"End" im Cut-Panel) und beim Trimmen des Original-Audio-Clips im Inspector wird das Video visuell nicht geschnitten. Der Preview-Player zeigt weiterhin das gesamte Original ab Sekunde 0.
+**1. 15s-Szene spielt nur 11s ab**
 
-## Root Cause (Technisch)
+Die Seed-Szene bekommt `end_time = video.duration`. Wenn `measureVideoDuration()` nach dem Import einen anderen Wert liefert (z.B. echte MP4-Dauer 11s statt der aus Composer übernommenen 15s), wird die Seed-Szene zwar aktualisiert — bei manuell hochgeladenen Videos oder Composer-Handoffs mit Duration-Drift bleibt aber ein Mismatch: der Timeline-Block ist 15s, das HTML-`<video>` läuft nur 11s → Player pausiert am Ende der Quelle.
 
-Der aktuelle `handleTrimScene` in `CapCutEditor.tsx` schreibt `newStart`/`newEnd` in `start_time`/`end_time` der Szene:
+Zusätzlich clampt `handleTrimScene` `srcOut` nur an `original_end_time` (die aus dem Seed 15s ist), nicht an die reale MP4-Länge. Der User kann also einen Bereich "wählen", der gar nicht existiert.
 
-```ts
-s.id === sceneId ? { ...s, start_time: newStart, end_time: newEnd } : s
-```
+**2. Trim-Eingabe ist eine Tortur**
 
-`CapCutPreviewPlayer.getVideoTime()` interpretiert `start_time`/`end_time` aber als **Timeline-Position**, nicht als Quellen-Offset. Für Seed-Szenen ohne `original_start_time` fällt es auf die Legacy-Kumulation zurück (`originalTime = currentTime - scene.start_time`). Ergebnis: Setzt der User Start=2, End=15, wandert der Szenen-Block auf der Timeline nach rechts, aber die Video-Quelle spielt trotzdem ab Sekunde 0 — kein echter Schnitt.
-
-Zusätzlich bleibt `duration` (via `Math.max(...scenes.map(s => s.end_time))`) auf 15s, so dass der 0–2s-Gap als schwarze Fläche/leere Zone bleibt statt zu verschwinden.
+- Inline-Inputs in `CutPanel` sind `w-14 h-5 text-[9px] step=0.01` — mikroskopisch, unmöglich präzise mit Maus/Touch zu bedienen.
+- Die Labels lauten "Start"/"End" und zeigen `scene.start_time`/`scene.end_time` (Timeline-Position), werden aber vom neuen `handleTrimScene` als **Quellen-Range** interpretiert → Anzeige ≠ Wirkung, verwirrend.
+- Es gibt keinen visuellen Slider, kein "Set to Playhead"-Shortcut, keine sichtbare Länge/Dauer live.
+- Der Inspector (`CapCutPropertiesPanel`) hat einen eigenen zweiten Trim-Block — Doppelung.
 
 ## Fix-Plan
 
-### 1. `handleTrimScene` in `src/components/directors-cut/studio/CapCutEditor.tsx` umschreiben
+### Fix 1 — Source-Duration korrekt tracken
 
-Die Sidebar-Inputs sollen als **Quellen-Range** (source in/out) interpretiert werden — das ist die natürliche User-Erwartung ("schneide die Szene bei 2s an, bei 15s ab"):
+`src/pages/DirectorsCut/DirectorsCut.tsx`
+- Nach `measureVideoDuration()` immer `selectedVideo.duration` auf den gemessenen Wert setzen (auch wenn schon einer da war und abweicht > 0.3s).
+- Seed-Szene und alle Szenen ohne `additionalMedia` auf `min(end_time, measuredDuration)` clampen, gleiche Logik für `original_end_time`.
 
-```ts
-const handleTrimScene = useCallback((sceneId: string, srcIn: number, srcOut: number) => {
-  if (!onScenesUpdate) return;
-  const sorted = [...scenes].sort((a, b) => a.start_time - b.start_time);
-  const idx = sorted.findIndex(s => s.id === sceneId);
-  if (idx < 0) return;
+`src/components/directors-cut/studio/CapCutEditor.tsx` — `handleTrimScene`:
+- Neuen Parameter aus Props/Context ziehen: `sourceDuration` (via `originalVideoDuration` durchreichen).
+- `newSrcOut = Math.min(sourceDuration || Infinity, ...)` statt nur `origEnd`.
 
-  const target = sorted[idx];
-  const origStart = target.original_start_time ?? target.start_time;
-  const origEnd   = target.original_end_time   ?? target.end_time;
+### Fix 2 — Neuer Trim-Editor "Cut Inspector"
 
-  // Clamp innerhalb der ursprünglichen Quelle
-  const newSrcIn  = Math.max(origStart, Math.min(srcIn, srcOut - 0.1));
-  const newSrcOut = Math.min(origEnd,   Math.max(srcOut, newSrcIn + 0.1));
-  const newDur    = newSrcOut - newSrcIn;
+**Inline-Mini-Inputs in `CutPanel.tsx` (Zeile 435–463) komplett entfernen.** Sidebar-Szenenliste bleibt reine Übersicht.
 
-  // Timeline-Position der Zielszene bleibt (Ripple über Nachfolger unten)
-  const timelineStart = target.start_time;
-  sorted[idx] = {
-    ...target,
-    original_start_time: newSrcIn,
-    original_end_time:   newSrcOut,
-    start_time: timelineStart,
-    end_time:   timelineStart + newDur,
-  };
+Stattdessen: **Ein einziger großzügiger Trim-Editor** im `CapCutPropertiesPanel` (Inspector rechts), sichtbar wenn eine Szene selektiert ist:
 
-  // Ripple: nachfolgende Szenen an neuen End-Punkt anhängen
-  for (let i = idx + 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1];
-    const dur  = sorted[i].end_time - sorted[i].start_time;
-    sorted[i] = {
-      ...sorted[i],
-      start_time: prev.end_time,
-      end_time:   prev.end_time + dur,
-    };
-  }
-
-  onScenesUpdate(sorted);
-}, [scenes, onScenesUpdate]);
+```text
+┌─ Szene 1 · Quelle 0.00s → 15.00s ─────────────┐
+│                                                │
+│  [Thumbnails-Filmstrip mit Dual-Range-Slider]  │
+│  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━●  │
+│                                                │
+│  Start                       Ende              │
+│  [  0.00 ]s [–][+][📍]    [ 15.00 ]s [–][+][📍]│
+│                                                │
+│  Länge: 15.00 s        [Auf Playhead schneiden]│
+│  [Zurücksetzen]        [Am Playhead splitten]  │
+└────────────────────────────────────────────────┘
 ```
 
-Damit:
-- Der Preview-Player nimmt in `getVideoTime()` bereits den `original_start_time`-Pfad (siehe `CapCutPreviewPlayer.tsx` Zeile 138–140) — d.h. der Schnitt wird sofort korrekt gerendert.
-- Die Timeline-Länge (`Math.max(...end_time)`) schrumpft auf die Netto-Dauer, kein leerer 0–2s-Gap mehr.
+Details:
+- **Dual-Range-Slider** (Radix `Slider` mit `value=[in,out]`) über dem Filmstrip → visuelles Trimmen per Drag, Ganzes-Fenster verschiebbar.
+- **Numerische Inputs** groß (`h-9 text-sm`), Steps `0.1` (nicht 0.01), mit `[–]/[+]`-Buttons für Feintuning.
+- **📍-Button** "Set to playhead" — schreibt aktuelle `currentTime` in Start bzw. Ende.
+- **Live-Länge** unter den Inputs.
+- **Zurücksetzen** = `original_start_time/end_time` löschen → Full Source.
+- **Splitten am Playhead** vorhandener Handler wiederverwendet.
+- Alles ist ein neues Sub-Modul `SceneTrimInspector.tsx` unter `src/components/directors-cut/studio/`.
 
-### 2. `duration`-Berechnung stabilisieren
+### Fix 3 — Label & Datenfluss korrigieren
 
-In `DirectorsCut.tsx` (Zeile ~279) wird die Preview-Dauer aus `Math.max(base, ...scenes.end_time)` bestimmt. Nach dem Ripple-Fix in Punkt 1 stimmt das automatisch — keine Änderung nötig.
+- Trim-Aufrufe passen `srcIn/srcOut` (Quellen-Range) an — nicht Timeline. Werte fürs Anzeigen kommen aus `original_start_time ?? 0` bzw. `original_end_time ?? sourceDuration`.
+- Dauer der Szene (Timeline-Länge) = `srcOut - srcIn`, automatisch synchron.
 
-### 3. CutPanel-Label klarstellen
+## Betroffene Dateien
 
-In `src/components/directors-cut/studio/sidebar/CutPanel.tsx` (Zeile ~443/455) die zwei Inputs klarer beschriften ("Quelle Start (s)" / "Quelle End (s)" statt "Start"/"End"), damit der User versteht, dass er den Bereich aus dem Original-Video wählt. Optional, nicht funktional relevant.
+- `src/pages/DirectorsCut/DirectorsCut.tsx` — measure clamp, `sourceDuration` an Editor durchreichen.
+- `src/components/directors-cut/studio/CapCutEditor.tsx` — `handleTrimScene` mit Quellen-Clamp gegen `sourceDuration`, Prop-Weitergabe an Inspector.
+- `src/components/directors-cut/studio/sidebar/CutPanel.tsx` — Mini-Inputs Zeile 435–463 entfernen.
+- `src/components/directors-cut/studio/CapCutPropertiesPanel.tsx` — alten Trim-Block durch `<SceneTrimInspector/>` ersetzen.
+- **neu**: `src/components/directors-cut/studio/SceneTrimInspector.tsx` — Filmstrip + Dual-Slider + große Inputs + Playhead-Buttons.
 
-### 4. Inspector-Audio-Trim bleibt wie ist
-
-`applyTrim` im `CapCutPropertiesPanel` funktioniert bereits korrekt (Trim Start/End verschiebt `trimStart`/`trimEnd` + `startTime`/`duration`). Das ist unabhängig vom Szenen-Trim.
-
-## Änderung nach Freigabe
-
-- `src/components/directors-cut/studio/CapCutEditor.tsx` — `handleTrimScene` neu (~15 Zeilen).
-- (optional) `src/components/directors-cut/studio/sidebar/CutPanel.tsx` — Labels umbenennen.
-
-Keine anderen Dateien, keine Backend-Änderungen, keine neuen Deps.
+Keine Backend-/DB-/Edge-Function-Änderungen, keine neuen Dependencies (Radix Slider + shadcn Input schon vorhanden).
