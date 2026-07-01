@@ -43,7 +43,8 @@ import { buildUniversalCreatorCustomizations } from '@/lib/universalCreatorRende
 
 const BACKUP_STORAGE_KEY = 'universal-creator-backup';
 const BACKUP_SCHEMA_VERSION = 2;
-const BACKUP_MAX_AGE_MS = 3_600_000; // 1h
+const BACKUP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7d — long enough for multi-day sessions
+const AUTO_RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface WizardStep {
   id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
@@ -203,6 +204,7 @@ export function UniversalCreator() {
               content: contentConfig,
               background: backgroundAsset,
               subtitles: subtitleConfig,
+              current_step: currentStep,
             } as any,
             audio_config: audioConfig,
             scenes: scenes.length > 0 ? (JSON.parse(JSON.stringify({ scenes })) as any) : null,
@@ -226,6 +228,7 @@ export function UniversalCreator() {
               content: contentConfig,
               background: backgroundAsset,
               subtitles: subtitleConfig,
+              current_step: currentStep,
             } as any,
             audio_config: audioConfig,
             scenes: scenes.length > 0 ? (JSON.parse(JSON.stringify({ scenes })) as any) : null,
@@ -308,6 +311,9 @@ export function UniversalCreator() {
     if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
     saveDebounceRef.current = window.setTimeout(() => {
       saveToLocalStorage();
+      // Also push a debounced DB save so ?project=<id> lands in the URL
+      // before the user clicks "Next". Guarded by user + formatConfig inside.
+      void saveProgress();
     }, 500);
     return () => {
       if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
@@ -335,6 +341,9 @@ export function UniversalCreator() {
       if (c.content) setContentConfig(c.content);
       if (c.background) setBackgroundAsset(c.background);
       if (c.subtitles) setSubtitleConfig(c.subtitles);
+      if (typeof c.current_step === 'number' && c.current_step >= 0 && c.current_step < WIZARD_STEPS.length) {
+        setCurrentStep(c.current_step);
+      }
       const ac = (data.audio_config || {}) as any;
       setAudioConfig({
         background_music_id: ac.background_music_id ?? null,
@@ -355,11 +364,43 @@ export function UniversalCreator() {
     hydratedRef.current = true;
     if (urlProjectId) {
       void hydrateFromDb(urlProjectId);
-    } else if (!formatConfig && !contentConfig) {
-      restoreFromLocalStorage();
+      return;
     }
+    // Silent Auto-Resume: newest draft of this user, if <7d old.
+    (async () => {
+      try {
+        if (!user) {
+          restoreFromLocalStorage();
+          return;
+        }
+        const cutoff = new Date(Date.now() - AUTO_RESUME_MAX_AGE_MS).toISOString();
+        const { data, error } = await supabase
+          .from('content_projects')
+          .select('id, updated_at, status')
+          .eq('user_id', user.id)
+          .eq('content_type', 'universal')
+          .eq('status', 'draft')
+          .gte('updated_at', cutoff)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!error && data?.id) {
+          setIsHydrating(true);
+          const next = new URLSearchParams(searchParams);
+          next.set('project', data.id);
+          setSearchParams(next, { replace: true });
+          void hydrateFromDb(data.id);
+          return;
+        }
+      } catch (err) {
+        console.warn('[UniversalCreator] Auto-resume lookup failed:', err);
+      }
+      if (!formatConfig && !contentConfig) {
+        restoreFromLocalStorage();
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id]);
 
   // React to external URL changes (e.g. user pastes a share link) — reload the wizard
   useEffect(() => {

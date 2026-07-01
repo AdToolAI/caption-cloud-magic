@@ -1,79 +1,53 @@
+## Problem
 
-# Render-Zeit Analyse & Speed-Plan (Universal Content Creator)
+Nach 3–5 min Arbeit (bis Export/Render) wirst du beim Wechsel zu anderem Tab / Browser / Reload wieder auf **Schritt 1 – Format wählen** geworfen — obwohl Format, Content, Szenen, Audio unten weiterhin ausgefüllt sind.
 
-## 1. Ist-Zustand (echte Messwerte, letzte 30 Tage)
+## Root Cause (im Code verifiziert)
 
-| Quelle | Anzahl | p50 | p95 | max |
-|---|---|---|---|---|
-| Universal Creator 1:1 (dialog-pass-preclip) | 857 | **29,6 s** | 61,5 s | – |
-| Universal Creator 16:9 (dialog-stitch) | 140 | **70,8 s** | 126,1 s | – |
-| Composer-Final-Renders | 2 | 128,6 s | 185,6 s | – |
-| Universal Creator 9:16 (jüngster Run, 01.07.) | 1 | – | – | **473,3 s** ⚠️ |
+`src/pages/UniversalCreator/UniversalCreator.tsx`
 
-Ableitungen:
-- **Kurze 1:1 Preclips** laufen sauber unter 1 min.
-- **16:9 Stitches** liegen bei ~1–2 min – im erwarteten Rahmen.
-- **9:16 Universal-Creator** ist ein **Ausreißer bei 7,9 min** – deutlich zu langsam, wahrscheinlich Cold-Start + framesPerLambda zu hoch für vertikales Format.
-- **`universal_video_renders`-Tabelle ist leer** → **Blindflug**: Der eigentliche Creator-Render logged nicht sauber, wir haben nur Zufallsdaten aus `video_renders`. Ohne Telemetrie kein sauberes Tuning.
+**Kern-Bug:** `hydrateFromDb()` (Zeile 319–351) restauriert alles außer `currentStep`. Der Wizard-Schritt existiert schlicht nicht im DB-Payload — er wird nur in localStorage gebackupt. Sobald du in einem anderen Browser bist (kein localStorage) oder das Backup abgelaufen ist (1 h Max Age), lädt die Seite Format+Content+Scenes aus der DB, setzt `currentStep` aber auf den Default `0`. → Rückwurf auf Schritt 1.
 
-## 2. Bottlenecks (Code-Review-Ergebnis)
+**Nebeneffekte:**
+1. **URL bekommt erst nach dem ersten "Weiter"-Klick ein `?project=<id>`** — davor kein DB-Draft, kein Cross-Browser-Resume.
+2. **`BACKUP_MAX_AGE_MS = 1 h`** ist zu kurz für Sessions, die man abends abbricht und morgens weitermacht.
+3. **Kein Auto-Resume**, wenn `/universal-creator` ohne `?project=` geöffnet wird, obwohl in der DB ein Draft von dir existiert.
 
-1. **`render-universal-video`**: `timeoutInMilliseconds: 300_000`, `maxRetries: 1`, aber **kein dynamisches `framesPerLambda`** – bei 9:16 & langen Voiceovers wird 1 Lambda überlastet.
-2. **Kein Prewarming**: Jeder erste Render eines Users hat ~5–15 s Lambda Cold-Start.
-3. **Preflight sequentiell**: Voiceover-Generation → Music-Fetch → Bundle-Check laufen nacheinander, nicht parallel.
-4. **Kein Telemetrie-Insert**: `universal_video_renders` wird beim Start/Ende nicht befüllt → weder p50/p95-Monitoring noch Alerting möglich.
-5. **Max 3–5 Worker-Concurrency-Policy** ist konservativ – für ≤600 Frames (20 s @30fps) könnten wir aggressiver splitten.
+## Fix-Plan
 
-## 3. Optimierungsplan (3 Wellen)
+### 1. `currentStep` in die DB persistieren *(Kern-Fix)*
+- `saveProgress()`: `current_step: currentStep` in das `customizations`-JSONB mitspeichern.
+- `hydrateFromDb()`: `setCurrentStep(customizations.current_step ?? 0)` beim Restore.
+- Effekt: Du landest **exakt auf dem Export-Schritt**, an dem du warst — auch in Chrome ↔ Safari.
 
-### Welle 1 — Telemetrie & Sichtbarkeit (Grundlage, 1 Datei-Set)
-- `universal_video_renders` beim Start (status=`queued`), Lambda-Invoke (status=`rendering`) und Webhook (status=`completed|failed`) sauber schreiben.
-- Zusätzlich Felder: `frames_total`, `frames_per_lambda`, `workers_used`, `lambda_duration_ms`, `preflight_ms`, `cold_start_bool`.
-- Admin-Widget in `/admin/qa-cockpit`-Tab **„Render Health"**: p50/p95/p99 nach Aspect + Länge, Cold-Start-Rate, Fehlerquote.
+### 2. Sofortiges DB-Draft + URL-Sync
+- Sobald `formatConfig` gewählt wurde, `saveProgress()` **debounced (500 ms)** im bestehenden Backup-`useEffect` mit-triggern (nicht mehr nur bei `handleNext` / 10-s-Intervall).
+- Ergebnis: `?project=<id>` steht in der URL, bevor du irgendwas anderes tust.
 
-### Welle 2 — Speed-Optimierungen (Kern)
-- **Dynamisches `framesPerLambda`** nach Frame-Count-Buckets:
-  - ≤300 frames (10 s) → 150 fpl (2 Worker)
-  - 301–900 frames (10–30 s) → 200 fpl (max 5 Worker)
-  - 901–1800 frames (30–60 s) → 270 fpl (max 7 Worker)
-  - über 1800 frames → 360 fpl (max 5 Worker, Memory-Schutz)
-- **Concurrency-Cap auf 7** heben (statt 5), guarded durch Lambda-Health-Metrics.
-- **Preflight parallelisieren** in `PreviewExportStep.tsx`: VO-Synthese, Music-URL-Resolve, Bundle-Version-Check via `Promise.all`.
-- **Lambda Prewarm-Ping** beim Öffnen von Step 5 (Export): leichter `invoke-remotion-render`-Health-Call, damit der eigentliche Render-Klick auf warmer Lambda landet.
-- **Payload-Preflight-Cache**: `universalCreatorRenderPayload.ts` cached die normalisierten Scenes im `sessionStorage`, damit Retry-Renders keine Re-Normalization brauchen.
+### 3. localStorage-Backup: 1 h → 7 Tage
+- `BACKUP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000`.
 
-### Welle 3 — UX-Feedback (kein Blindwarten)
-- **Live Progress-Balken** aus Lambda-Chunks (Remotion liefert `overallProgress` pro Chunk via Webhook-Poll).
-- **ETA-Anzeige** basierend auf gemessenem p50 für die jeweilige Länge/Aspect-Ratio (aus Welle 1 Telemetrie).
-- **Retry-Button** (schon vorhanden) mit Reuse des gecachten Payloads statt kompletter Rebuild.
+### 4. Silent Auto-Resume ohne URL-Parameter
+- Beim Mount, wenn weder `?project=` noch gültiges localStorage-Backup vorhanden:  
+  jüngstes `content_projects` mit `content_type='universal'`, `status='draft'`, `updated_at ≥ 7 d` laden, `?project=<id>` (`replace: true`) in URL setzen, `hydrateFromDb` laufen lassen.
+- Kein Toast-Prompt — du bist direkt an der letzten Stelle wieder da.
+- `handleNewProject()` bleibt unverändert (räumt gezielt auf).
 
-## 4. Erwartete Verbesserung
+## Technische Details
 
-| Video-Länge / Format | Heute (p50) | Nach Plan (Ziel p50) |
+**Betroffene Datei**
+- `src/pages/UniversalCreator/UniversalCreator.tsx` — 4 Stellen (`saveProgress`, `hydrateFromDb`, `BACKUP_MAX_AGE_MS`, Mount-Effekt).
+
+**Keine DB-Migration nötig** — `current_step` läuft in das bestehende `customizations`-JSONB.
+
+**Keine Änderung am Renderer, Preview-Player oder Audio-Mixer.**
+
+## Erwartetes Verhalten nach dem Fix
+
+| Szenario | Vorher | Nachher |
 |---|---|---|
-| 10 s / 1:1 | ~30 s | **~15 s** |
-| 30 s / 9:16 | ~120 s (extrapoliert) | **~40 s** |
-| 60 s / 16:9 | ~70 s | **~35 s** |
-| 9:16 Ausreißer | 473 s | **<90 s** (durch dynamisches framesPerLambda + Prewarm) |
-
-## 5. Technische Änderungen (Dateien)
-
-- `supabase/functions/render-universal-video/index.ts` – dynamisches `framesPerLambda`, Telemetrie-Inserts, Prewarm-Handler.
-- `supabase/functions/invoke-remotion-render/index.ts` – Concurrency-Cap-Anhebung, Warmup-Mode.
-- `supabase/functions/estimate-render-cost/index.ts` – p50-basierte ETA aus Telemetrie ableiten.
-- `supabase/migrations/*` – neue Felder in `universal_video_renders`, Index auf `(status, created_at)`.
-- `src/components/universal-creator/steps/PreviewExportStep.tsx` – Preflight-`Promise.all`, Prewarm-Trigger, ETA + Progress-UI.
-- `src/lib/universalCreatorRenderPayload.ts` – sessionStorage-Cache für Retry.
-- `src/components/admin/qa-cockpit/RenderHealthTab.tsx` (neu) – p50/p95-Dashboard.
-
-## 6. Was NICHT angefasst wird
-
-- Der Remotion-Bundle selbst (`UniversalCreatorVideo.tsx`) – der ist stabil, Änderungen dort riskieren neue Bugs.
-- Lambda-RAM (bleibt 3008 MB) und globaler Timeout (600 s) – kein Grund zur Änderung.
-- Sync.so / Composer-Pipeline – separate Domain, außerhalb des Scopes.
-
-## 7. Rollout-Reihenfolge
-
-1. Welle 1 mergen → **2–3 Tage Daten sammeln** (echte p50/p95 pro Bucket).
-2. Welle 2 auf Basis der Messdaten fein-tunen (framesPerLambda-Buckets ggf. justieren).
-3. Welle 3 UX zum Schluss – braucht die p50-Daten aus Welle 1 für sinnvolle ETAs.
+| Tab wechseln und wieder zurück | Schritt 1 | Export-Schritt |
+| Anderer Browser (eingeloggt) | Schritt 1 | Export-Schritt |
+| Reload nach 2 h Pause | Schritt 1 | Export-Schritt |
+| `/universal-creator` ohne URL-Param | Leerer Wizard | Letzter Draft resumt |
+| "Neues Projekt" Button | Schritt 1 | Schritt 1 (unverändert) |
