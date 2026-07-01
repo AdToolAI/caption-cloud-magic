@@ -1004,20 +1004,38 @@ export function DirectorsCut() {
         } as unknown as SceneAnalysis];
       });
 
-      // Falls Dauer beim Import fehlte, exakt messen und Seed-Szene anpassen.
-      if (!video.duration || !isFinite(video.duration) || video.duration <= 0) {
-        try {
-          const measured = await measureVideoDuration(video.url);
-          if (measured > 0) {
+      // Immer die echte MP4-Dauer messen und Szenen darauf clampen. Verhindert
+      // "15s-Szene spielt nur 11s" wenn die aus Composer/Meta übernommene
+      // Duration von der tatsächlichen Quelle abweicht.
+      try {
+        const measured = await measureVideoDuration(video.url);
+        if (measured > 0) {
+          const current = video.duration || 0;
+          const drift = Math.abs(measured - current);
+          if (!current || drift > 0.3) {
             setSelectedVideo(prev => prev ? { ...prev, duration: measured } : prev);
             setScenes(prev => {
-              if (!prev || prev.length !== 1 || (prev[0] as any).source !== 'seed') return prev;
-              return [{ ...prev[0], end_time: measured }];
+              if (!prev || prev.length === 0) return prev;
+              // Seed-Szene komplett auf die echte Länge setzen
+              if (prev.length === 1 && (prev[0] as any).source === 'seed') {
+                return [{ ...prev[0], end_time: measured, original_end_time: measured } as any];
+              }
+              // Ansonsten: alle Original-Szenen (keine additionalMedia) auf measured clampen
+              return prev.map(s => {
+                if ((s as any).additionalMedia) return s;
+                const origEnd = (s as any).original_end_time;
+                const clampedOrigEnd = typeof origEnd === 'number' ? Math.min(origEnd, measured) : undefined;
+                return {
+                  ...s,
+                  end_time: Math.min(s.end_time, s.start_time + measured),
+                  ...(clampedOrigEnd !== undefined ? { original_end_time: clampedOrigEnd } : {}),
+                } as any;
+              });
             });
           }
-        } catch (e) {
-          console.warn('[DirectorsCut] measureVideoDuration failed', e);
         }
+      } catch (e) {
+        console.warn('[DirectorsCut] measureVideoDuration failed', e);
       }
 
       // Otherwise: regular shot detection on the imported video.

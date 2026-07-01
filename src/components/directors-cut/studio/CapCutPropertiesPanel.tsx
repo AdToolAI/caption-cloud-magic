@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Volume2, Clock, Scissors, Music, MessageSquare, Trash2, Type, AlignVerticalJustifyCenter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SceneTrimInspector } from './SceneTrimInspector';
 
 interface CapCutPropertiesPanelProps {
   selectedClip: AudioClip | undefined;
@@ -21,6 +22,13 @@ interface CapCutPropertiesPanelProps {
   onSubtitleDelete?: (clipId: string) => void;
   onClipDelete?: (clipId: string) => void;
   onSplitAtPlayhead?: () => void;
+  // Scene trim (new)
+  selectedScene?: any;
+  selectedSceneIndex?: number;
+  sourceDuration?: number;
+  currentTime?: number;
+  onTrimScene?: (sceneId: string, srcIn: number, srcOut: number) => void;
+  onSceneDelete?: (sceneId: string) => void;
 }
 
 // SUBTITLE_STYLES moved inside component as useMemo for i18n reactivity
@@ -36,6 +44,12 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   onSubtitleDelete,
   onClipDelete,
   onSplitAtPlayhead,
+  selectedScene,
+  selectedSceneIndex,
+  sourceDuration,
+  currentTime,
+  onTrimScene,
+  onSceneDelete,
 }) => {
   const { t } = useTranslation();
 
@@ -502,6 +516,16 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
               </Button>
             )}
           </div>
+        ) : selectedScene && onTrimScene ? (
+          <SceneTrimInspector
+            scene={selectedScene}
+            sceneIndex={selectedSceneIndex ?? 0}
+            sourceDuration={sourceDuration ?? 0}
+            currentTime={currentTime ?? 0}
+            onTrim={onTrimScene}
+            onSplitAtPlayhead={onSplitAtPlayhead}
+            onDelete={onSceneDelete}
+          />
         ) : (
           <div className="text-center py-8">
             <div className="w-12 h-12 rounded-full bg-[#0a0a1a]/60 flex items-center justify-center mx-auto mb-3">
