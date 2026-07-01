@@ -213,11 +213,87 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         aspectRatio,
       };
 
-      // i2v: Brand Character image > manual upload > library character > resolved mention
+      // Scene-Aware Anchor (Motion-Studio parity):
+      // Instead of blindly sending the avatar portrait as i2v first-frame
+      // (which locks every scene to start on the portrait pose), pre-compose
+      // a scene-specific first frame via Nano Banana 2 (compose-scene-anchor).
+      // Manual uploads still win, as does the Vidu multiRef path below.
+      let composedFirstFrame: string | undefined;
+      let composedSubjectRefs: string[] | undefined;
+      let anchorComposed = false;
+      setLastAnchorComposed(false);
+
+      const anchorChar: ComposerCharacter | null =
+        brandCharacter
+          ? {
+              id: brandCharacter.id,
+              name: brandCharacter.name,
+              appearance: (brandCharacter as any).description ?? '',
+              signatureItems: '',
+              brandCharacterId: brandCharacter.id,
+              referenceImageUrl: brandCharacter.reference_image_url ?? undefined,
+            }
+          : castCharacter
+          ? {
+              id: castCharacter.id,
+              name: castCharacter.name,
+              appearance: (castCharacter as any).description ?? '',
+              signatureItems: (castCharacter as any).signature_items ?? '',
+              referenceImageUrl: castCharacter.reference_image_url ?? undefined,
+            }
+          : null;
+
+      const clipSource = toolkitModelToClipSource(model);
+      const shouldCompose =
+        !startImageUrl &&
+        !!anchorChar?.referenceImageUrl &&
+        !!clipSource &&
+        !(model.capabilities.multiRef && viduReferences.length > 0);
+
+      if (shouldCompose) {
+        try {
+          setComposingScene(true);
+          const stubScene: ComposerScene = {
+            id: `toolkit-${Date.now()}`,
+            projectId: 'toolkit',
+            orderIndex: 0,
+            sceneType: 'custom',
+            durationSeconds: duration,
+            clipSource: clipSource!,
+            clipQuality: 'standard',
+            aiPrompt: finalPrompt,
+          } as ComposerScene;
+          const ar =
+            aspectRatio === '9:16' ? '9:16'
+            : aspectRatio === '1:1' ? '1:1'
+            : '16:9';
+          const prep = await prepareSceneAnchor(
+            stubScene,
+            [anchorChar!],
+            brandCharacter
+              ? { id: brandCharacter.id, name: brandCharacter.name, reference_image_url: brandCharacter.reference_image_url ?? undefined }
+              : null,
+            finalPrompt,
+            ar,
+            {},
+            libLocations,
+          );
+          composedFirstFrame = prep.firstFrameUrl;
+          composedSubjectRefs = prep.subjectReferenceUrls;
+          anchorComposed = prep.composed === true;
+          setLastAnchorComposed(anchorComposed);
+        } catch (e) {
+          console.warn('[toolkit] compose-scene-anchor failed — falling back to raw portrait', e);
+        } finally {
+          setComposingScene(false);
+        }
+      }
+
+      // i2v: composed scene frame > manual upload > raw portrait fallbacks
       const referenceImage =
-        brandCharacter?.reference_image_url ??
+        composedFirstFrame ??
         startImageUrl ??
-        castCharacter?.reference_image_url ??
+        anchorChar?.referenceImageUrl ??
         mentionResolved.referenceImageUrl ??
         null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
