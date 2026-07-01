@@ -135,31 +135,14 @@ export function UniversalCreator() {
   }, [audioConfig.background_music_id, projectId]);
 
   useEffect(() => {
-    console.log('[UniversalCreator] Component mounted');
-    return () => console.log('[UniversalCreator] Component unmounted');
-  }, []);
-
-  useEffect(() => {
-    console.log('[UniversalCreator] Current Step:', currentStep, WIZARD_STEPS[currentStep].title);
-  }, [currentStep]);
-
-  useEffect(() => {
-    console.log('[UniversalCreator] State Update:', {
-      format: !!formatConfig,
-      content: !!contentConfig,
-      scenes: scenes.length,
-      audio: audioConfig,
-    });
-  }, [formatConfig, contentConfig, scenes, audioConfig]);
-
-  useEffect(() => {
     const interval = setInterval(() => {
       if (formatConfig) {
         saveProgress();
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, projectId, selectedMusicUrl, videoQuality]);
 
   const handleNext = async () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
