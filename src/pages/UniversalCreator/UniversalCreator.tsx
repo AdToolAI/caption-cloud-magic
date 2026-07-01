@@ -324,6 +324,7 @@ export function UniversalCreator() {
           musicVolume={audioConfig.music_volume}
           onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
           onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+          onMusicUrlChange={setSelectedMusicUrl}
         />
       );
       break;
