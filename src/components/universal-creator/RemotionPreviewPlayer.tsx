@@ -111,10 +111,12 @@ export function RemotionPreviewPlayer({
     backgroundMusicUrl: customizations?.backgroundMusicUrl,
     backgroundMusicVolume: customizations?.backgroundMusicVolume,
     voiceoverUrl: customizations?.voiceoverUrl,
+    voiceoverVolume: customizations?.voiceoverVolume,
   }), [
     customizations?.backgroundMusicUrl,
     customizations?.backgroundMusicVolume,
-    customizations?.voiceoverUrl
+    customizations?.voiceoverUrl,
+    customizations?.voiceoverVolume,
   ]);
 
   const resolvedComponent = useMemo(() => {
@@ -127,9 +129,21 @@ export function RemotionPreviewPlayer({
     ...stableAudioProps,
   }), [customizations, stableAudioProps]);
 
+  const audioFingerprint = useMemo(() => JSON.stringify({
+    backgroundMusicUrl: inputProps?.backgroundMusicUrl || '',
+    backgroundMusicVolume: inputProps?.backgroundMusicVolume ?? null,
+    voiceoverUrl: inputProps?.voiceoverUrl || '',
+    voiceoverVolume: inputProps?.voiceoverVolume ?? null,
+  }), [
+    inputProps?.backgroundMusicUrl,
+    inputProps?.backgroundMusicVolume,
+    inputProps?.voiceoverUrl,
+    inputProps?.voiceoverVolume,
+  ]);
+
   const aspectRatio = width / height;
 
-  // Re-activate audio when audio props change (NO REMOUNT - keep warmed audio tags!)
+  // Re-activate audio when audio props change.
   useEffect(() => {
     if (hasEverInteractedRef.current && playerRef.current) {
       const timer = setTimeout(() => {
@@ -142,7 +156,7 @@ export function RemotionPreviewPlayer({
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [inputProps?.backgroundMusicUrl, inputProps?.voiceoverUrl, volume]);
+  }, [audioFingerprint, volume]);
 
   // Sync player state with component state
   useEffect(() => {
@@ -269,6 +283,7 @@ export function RemotionPreviewPlayer({
         style={{ aspectRatio }}
       >
         <MemoizedPlayer
+          key={audioFingerprint}
           playerRef={playerRef}
           inputProps={inputProps}
           compositionWidth={width}
