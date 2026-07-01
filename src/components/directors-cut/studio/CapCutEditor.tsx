@@ -2063,11 +2063,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             </div>
           </div>
 
-          {/* Right Sidebar - Collapsible */}
-          <div className={cn(
-            "border-l border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200 flex-shrink-0",
-            propertiesCollapsed ? "w-12" : "w-64"
-          )}>
+          {/* Welle 5 — Preview ↔ Inspector Divider */}
+          {!propertiesCollapsed && (
+            <PanelDivider width={inspectorWidth} onWidthChange={setInspectorWidth} side="right" min={240} max={480} />
+          )}
+
+          {/* Welle 5 — Inspector Panel */}
+          <div
+            className="flex flex-col border-l border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-[width] duration-150 flex-shrink-0"
+            style={{ width: propertiesCollapsed ? 48 : inspectorWidth }}
+          >
             {propertiesCollapsed ? (
               <div className="flex flex-col items-center py-4">
                 <button 
@@ -2079,17 +2084,29 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 </button>
               </div>
             ) : (
-              <CapCutPropertiesPanel
-                selectedClip={selectedClip}
-                selectedSubtitle={selectedSubtitle}
-                audioTracks={audioTracks}
-                onTracksChange={setAudioTracks}
-                audioEnhancements={audioEnhancements}
-                onAudioChange={onAudioChange}
-                onSubtitleUpdate={handleSubtitleUpdate}
-                onSubtitleDelete={handleSubtitleDelete}
-                onClipDelete={handleDeleteClip}
-              />
+              <>
+                {/* Column header with live selection context */}
+                <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-[#F5C76A]" />
+                  <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">Inspector</span>
+                  <span className="ml-auto text-[10px] text-white/50">
+                    {selectedSubtitle ? 'Untertitel' : selectedClip ? 'Audio-Clip' : selectedSceneId ? 'Szene' : 'Nichts ausgewählt'}
+                  </span>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <CapCutPropertiesPanel
+                    selectedClip={selectedClip}
+                    selectedSubtitle={selectedSubtitle}
+                    audioTracks={audioTracks}
+                    onTracksChange={setAudioTracks}
+                    audioEnhancements={audioEnhancements}
+                    onAudioChange={onAudioChange}
+                    onSubtitleUpdate={handleSubtitleUpdate}
+                    onSubtitleDelete={handleSubtitleDelete}
+                    onClipDelete={handleDeleteClip}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
