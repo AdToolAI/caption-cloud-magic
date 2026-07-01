@@ -1187,6 +1187,73 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success(t('dc.sceneSplitAtPlayhead'));
   }, [scenes, currentTime, onScenesUpdate]);
 
+  // Insert new blackscreen scene AT playhead — splits the surrounding scene if inside one,
+  // otherwise appends after the scene closest to (but ending at/before) currentTime.
+  const handleInsertAtPlayhead = useCallback(() => {
+    if (!onScenesUpdate) return;
+    const INSERT_DURATION = 3;
+    // If empty timeline, just add a first scene
+    if (scenes.length === 0) {
+      onScenesUpdate([{
+        id: `scene-${Date.now()}`,
+        start_time: 0,
+        end_time: INSERT_DURATION,
+        description: t('dc.newSceneBlackscreen') || 'Neue Szene',
+        content_description: t('dc.emptySceneDesc') || '',
+        suggested_effects: [],
+        isBlackscreen: true,
+        sourceMode: 'blackscreen',
+      }]);
+      toast.success('Szene am Playhead eingefügt');
+      return;
+    }
+
+    const insideIdx = scenes.findIndex(s => currentTime > s.start_time + 0.01 && currentTime < s.end_time - 0.01);
+    let insertIdx: number;
+    let workingScenes: SceneAnalysis[] = scenes;
+
+    if (insideIdx >= 0) {
+      // Split current scene at playhead first
+      const target = scenes[insideIdx];
+      workingScenes = scenes.flatMap((s, i) => {
+        if (i !== insideIdx) return [s];
+        return [
+          { ...s, end_time: currentTime },
+          { ...s, id: `scene-${Date.now()}-tail`, start_time: currentTime, description: `${s.description} ${t('dc.partSuffix') || '(2)'}` },
+        ];
+      });
+      insertIdx = insideIdx + 1;
+    } else {
+      // Find the scene ending at/before currentTime — insert after it (or at start)
+      insertIdx = scenes.filter(s => s.end_time <= currentTime + 0.01).length;
+    }
+
+    const inserted: SceneAnalysis = {
+      id: `scene-${Date.now()}`,
+      start_time: 0, // recalculated below
+      end_time: INSERT_DURATION,
+      description: t('dc.newSceneBlackscreen') || 'Neue Szene',
+      content_description: t('dc.emptySceneDesc') || '',
+      suggested_effects: [],
+      isBlackscreen: true,
+      sourceMode: 'blackscreen',
+    };
+
+    const next = [...workingScenes];
+    next.splice(insertIdx, 0, inserted);
+
+    // Recalculate positions so timeline stays continuous
+    let cursor = 0;
+    const recalculated = next.map(s => {
+      const d = s.end_time - s.start_time;
+      const updated = { ...s, start_time: cursor, end_time: cursor + d };
+      cursor += d;
+      return updated;
+    });
+    onScenesUpdate(recalculated);
+    toast.success('Szene am Playhead eingefügt');
+  }, [scenes, currentTime, onScenesUpdate, t]);
+
   // Duplicate scene
   const handleDuplicateScene = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
