@@ -554,12 +554,23 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     // This is called from CapCutPreviewPlayer with the correct global time
   }, []);
 
-  // Keyboard shortcuts
+  // Welle 6 — Editor History (Undo/Redo)
+  const history = useEditorHistory({
+    state: useMemo(() => ({ scenes, audioTracks }), [scenes, audioTracks]),
+    onRestore: useCallback((snap: { scenes: SceneAnalysis[]; audioTracks: AudioTrack[] }) => {
+      setAudioTracks(snap.audioTracks);
+      onScenesUpdate?.(snap.scenes);
+    }, [onScenesUpdate]),
+    enabled: !isRendering,
+  });
+
+  // Keyboard shortcuts (Ctrl+Z/Y/Space)
   useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
-    onUndo: () => console.log('Undo'),
-    onRedo: () => console.log('Redo'),
+    onUndo: () => { history.commit(); history.undo(); },
+    onRedo: () => { history.commit(); history.redo(); },
   }, true);
+
 
   // Initialize audio tracks with original video audio AND voiceover
   useEffect(() => {
