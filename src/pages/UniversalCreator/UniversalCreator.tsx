@@ -31,6 +31,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
 
 interface WizardStep {
   id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
@@ -348,6 +349,11 @@ export function UniversalCreator() {
           scenes={scenes}
           selectedMusicUrl={selectedMusicUrl}
           musicVolume={audioConfig.music_volume}
+          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+          onMusicClear={() => {
+            setAudioConfig(prev => ({ ...prev, background_music_id: null }));
+            setSelectedMusicUrl(null);
+          }}
           videoQuality={videoQuality}
           onVideoQualityChange={setVideoQuality}
         />
@@ -478,12 +484,10 @@ export function UniversalCreator() {
                   }),
                   ...(selectedMusicUrl && {
                     backgroundMusicUrl: selectedMusicUrl,
-                    // Perceptual curve (linear→gefühlt) + Ducking gegen Voiceover.
-                    // Slider 0..1 → real (raw²) × (VO? 0.5 : 1)
-                    backgroundMusicVolume: Math.max(0, Math.min(1,
-                      (audioConfig.music_volume * audioConfig.music_volume) *
-                      (contentConfig?.voiceoverUrl ? 0.5 : 1)
-                    )),
+                    backgroundMusicVolume: getEffectiveBackgroundMusicVolume(
+                      audioConfig.music_volume,
+                      !!contentConfig?.voiceoverUrl,
+                    ),
                   }),
                   subtitles: subtitleConfig?.segments || [],
                   subtitleStyle: subtitleConfig?.style || {
