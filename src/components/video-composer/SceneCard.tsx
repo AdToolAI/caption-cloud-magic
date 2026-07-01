@@ -1429,7 +1429,38 @@ export default function SceneCard({
                           : lang === "es"
                             ? "HappyHorse, Hailuo, Kling, Seedance y Wan están certificados para Sync.so lip-sync."
                             : "HappyHorse, Hailuo, Kling, Seedance and Wan are certified for Sync.so lip-sync.";
-...
+
+                      return (
+                        <div className="space-y-2">
+                          {/* Dialog & Lip-Sync toggle — James-Bond-2028 gold accent */}
+                          <div
+                            className={cn(
+                              "flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 transition-all",
+                              dialogMode
+                                ? "border-amber-400/50 bg-amber-500/[0.06] shadow-[inset_2px_0_0_0_hsl(43_90%_60%/0.7)]"
+                                : "border-border/40 bg-card/40",
+                            )}
+                            title={toggleHint}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <MessageSquareQuote
+                                className={cn(
+                                  "h-3.5 w-3.5 shrink-0",
+                                  dialogMode ? "text-amber-300" : "text-muted-foreground",
+                                )}
+                              />
+                              <div className="flex flex-col min-w-0">
+                                <span
+                                  className={cn(
+                                    "text-[11px] font-medium leading-tight",
+                                    dialogMode ? "text-amber-200" : "text-foreground",
+                                  )}
+                                >
+                                  {toggleOnLabel}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground leading-tight truncate">
+                                  {dialogMode
+                                    ? lang === "de"
                                     ? "5 Modelle · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
                                     : lang === "es"
                                       ? "5 modelos · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
