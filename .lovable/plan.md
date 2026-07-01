@@ -1,48 +1,61 @@
-## Ziel
 
-AI Video Studio (Toolkit, `/ai-video-toolkit`) nutzt **exakt dieselben Cast- & World-IDs** wie das Motion Studio, damit ein Charakter/eine Location einmal angelegt und überall wiederverwendet werden kann. Keine Lipsync-Integration in diesem Schritt.
+# v183 — Provider-Allowlist erweitern (Pipeline unangetastet)
 
-## Root Cause (warum bisher das Avatar-Porträt als Startframe erscheint)
+**Ziel:** Nur die Allowlist öffnen. **Kein Pipeline-Touch**, kein Modell-Wechsel (`lipsync-2-pro` bleibt), keine neuen Prompt-Injections, keine neue Fallback-Logik.
 
-`prepareSceneAnchor` → `resolveSceneCharacterAnchorsAll` findet nur Anchors, wenn der Scene entweder `characterShots` mit `characterId` hat oder der Charakter-Name im Prompt-Text steht. Toolkit übergibt heute einen `stubScene` **ohne** `characterShots`, und der User tippt den Namen selten manuell in den Prompt. → `anchors.length === 0` → `compose-scene-anchor` wird nie aufgerufen → Fallback aufs rohe Porträt. Location aus dem ToolkitCastPicker landet zusätzlich weder als @-Mention noch als Slug-Block im Prompt, `resolveSceneWorldRefs` sieht sie nie.
+## Was Sync.so fordert (Zitat aus offizieller Doku)
 
-## Umsetzung
+- Menschenähnliches Gesicht (keine Tiere/Cartoons/Stilisierung)
+- Sichtbare, natürliche Sprechbewegung im Input-Video
+- Kein reines Profil, Gesicht ausreichend groß, keine dauerhafte Occlusion
+- Keine harten Scene-Cuts innerhalb 30–40s (bei uns unkritisch, weil Clips ≤10s)
 
-Nur `src/components/ai-video/ToolkitGenerator.tsx` und ein neuer schlanker Cast/World-Picker — **keine** Änderungen an `compose-scene-anchor`, `prepareSceneAnchor`, `scene_anchor_cache`, Motion-Studio-Code oder Lipsync-Pfaden.
+## Bewertung pro Provider gegen diese Kriterien
 
-### 1) Einheitliche Cast- & World-Auswahl (Motion-Studio-Parität)
+| Provider | Output-Charakter | Lipsync-tauglich? |
+|---|---|---|
+| **Hailuo 2.3** | Realistisch, gute Mundbewegung | ✅ validated (Status quo) |
+| **HappyHorse 1.0** | Realistisch, natürliche Sprechmotion | ✅ validated (Status quo) |
+| **Kling 3 Pro** | Photorealistisch, gute Lippen-Motorik | ✅ **NEU zulassen** |
+| **Seedance 1** | Realistisch, ByteDance-Qualität | ✅ **NEU zulassen** |
+| **Wan 2.5** | Realistisch, chinesische Foundation | ✅ **NEU zulassen** |
+| **Sora 2** | Photorealistisch | ⚠️ nicht zulassen — keine i2v-Reference-Konsistenz für Face-Gate |
+| **Runway Gen-4** | Photorealistisch, aber teuer + oft „closed mouth" | ❌ nicht zulassen |
+| **Veo** | Realistisch, aber restriktive Content-Policy filtert oft Gesichter | ❌ nicht zulassen |
+| **Luma Ray 2** | Realistisch, aber Kamera-Motion stört Face-Tracking | ❌ nicht zulassen |
+| **Vidu Q2** | Semi-stilisiert, Multi-Reference fokus | ❌ nicht zulassen |
+| **Pika 2.2** | Zu stilisiert | ❌ nicht zulassen |
 
-- Der aktuelle `ToolkitCastPicker` (1 Character + 1 Location) wird zum vollen **Cast & World Panel** ausgebaut, das dieselbe Datenquelle nutzt, die das Motion Studio verwendet: `useMotionStudioLibrary()` (bereits im Toolkit importiert) und `useUnifiedMentionLibrary()` für @-Mentions.
-- Slots im Toolkit-Panel (identisch zum Motion-Studio-Modell): **Characters** (bis 4, Multi-Select), **Location** (1), **Building** (1), **Props** (bis 3). Alle IDs sind die echten `brand_characters.id` / `brand_locations.id` — dieselben, die das Motion Studio persistiert. Keine neuen Tabellen, kein separates ID-Schema.
-- @-Mentions im Prompt bleiben unverändert und werden mit der Panel-Auswahl gemerged (Dedup nach `id`).
+**Neue Allowlist: Hailuo, HappyHorse, Kling, Seedance, Wan.**
 
-### 2) Motion-Studio-Anchor-Pfad 1:1 wiederverwenden
+## Änderungen (minimal)
 
-- Vor jedem Toolkit-Render einen `stubScene: ComposerScene` bauen mit:
-  - `aiPrompt = applySceneAssetsToPrompt(finalPrompt, [castLocation, castBuilding, ...castProps, ...mentionWorldRefs])` — deterministischer Slug-Block, den `resolveSceneWorldRefs` bereits versteht.
-  - `characterShots = [{ characterId, shotType: 'medium' }, ...]` für **jeden** ausgewählten Charakter (Cap 4). Damit greift Pfad 1 in `resolveSceneCharacterAnchorsAll` — dieselben `characterId`s wie Motion Studio, `compose-scene-anchor` läuft.
-  - `clipSource` = Mapping via bestehendes `toolkitModelToClipSource(model)`.
-- `prepareSceneAnchor(stubScene, characters, brandChar, sceneAwarePrompt, aspectRatio, {}, libLocations)` mit **allen** ausgewählten Charakteren im 2. Argument aufrufen (nicht mehr `[anchorChar]`).
-- Ergebnis wie im Motion Studio verarbeiten:
-  - `first-frame-composed` → `body.startImageUrl = prep.firstFrameUrl`
-  - `subject-reference` (Vidu) → `body.referenceImages = prep.subjectReferenceUrls`
-  - `text-only` (Sora) → nichts anhängen
+### 1. `src/lib/video-composer/providerCapabilities.ts`
+Für 3 Provider `lipsync: false → true` setzen:
+- `ai-kling` (Kling 3 Pro)
+- `ai-seedance`
+- `ai-wan`
 
-### 3) Anchor-Gate & Hard-Guard
+Alle anderen bleiben `false`.
 
-- `shouldCompose = (characters ausgewählt oder World-Ref vorhanden) && clipSource && !manueller startImageUrl && !(multiRef mit viduReferences)`.
-- Wenn `shouldCompose === true` aber `prep.composed !== true` und keine `firstFrameUrl` zurückkommt: **kein** Fallback aufs rohe Porträt, sondern Toast + Abbruch. So kann „Toolkit startet wieder mit dem Avatar-Bild" strukturell nicht mehr passieren.
+### 2. `src/lib/video-composer/validateSceneForCinematicSync.ts` Zeile 97
+Allowlist-Konstante erweitern:
+```
+const LIPSYNC_ALLOWED = ['ai-hailuo', 'ai-happyhorse', 'ai-kling', 'ai-seedance', 'ai-wan'];
+```
 
-### 4) Sichtbares Feedback
+### 3. UI-Badge im Motion Studio Provider-Picker
+Neben den 5 zulässigen Providern kleines „Lip-Sync ready"-Badge. Bei den restlichen bleibt der bestehende Warn-Hinweis („Auto-Fallback auf Hailuo für Cinematic-Sync") — keine neue Logik, nur sichtbar machen was schon existiert.
 
-`SceneAnchorBadge` (analog Motion Studio) unter dem Prompt zeigt: „🎬 Scene-Aware · Samuel + Home Office + Laptop". Bei Fehler ein sichtbares rotes Badge mit dem Grund (statt stiller Fallback).
+## Was NICHT geändert wird
 
-## Nicht in diesem Schritt
+- ❌ Sync.so-Modell (`lipsync-2-pro` bleibt, kein sync-3-Switch)
+- ❌ `compose-scene-anchor`, `compose-dialog-scene`, `compose-twoshot-lipsync`
+- ❌ Sync.so-Webhook, ASD-Strategie, Face-Gate, Preflight
+- ❌ Prompt-Layer, Shot-Director, Scene-Anchor-Composition
+- ❌ Credit-Refund-Logik, v176 No-Silent-Migration, v181 Depicted-Face-Lock, v182 Hard-Stop
 
-- Lipsync / Dialog-Shot / Sync.so-Pipeline (bleibt komplett unangetastet).
-- Änderungen an Motion Studio / Composer.
-- Neue Edge Functions oder Tabellen — die Motion-Studio-IDs sind die Wahrheit.
+## Risiko
 
-## Ergebnis
+Wenn Kling/Seedance/Wan im Face-Gate durchfallen, greift automatisch die **bestehende** Preflight-Rejection + Refund-Logik. Kein neuer Code-Pfad, kein neues Fehler-Verhalten. Falls sich zeigt, dass ein Provider real <80% Pass-Rate liefert, nehmen wir ihn manuell wieder raus — Ein-Zeilen-Änderung in der Allowlist.
 
-Ein Charakter, den der User im Motion Studio (oder auf `/avatars`) angelegt hat, taucht mit **derselben ID** im AI Video Studio auf, wird über den gleichen Anchor-Pfad in die beschriebene Szene komponiert und startet nicht mehr als Porträt-Standbild. Location/Building/Props aus der Cast-&-World-Library sind im Toolkit genauso verfügbar wie im Motion Studio.
