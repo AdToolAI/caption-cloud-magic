@@ -1,33 +1,85 @@
 ## Problem
 
-Der Screenshot zeigt: Video ist importiert (Preview + Original-Audio-Waveform sichtbar, Dauer 0:15), aber der **Video-Track ist leer** ("Szenen 0", "Timeline ist leer").
+Beim Trimmen einer Szene über die Sidebar-Eingaben ("Start"/"End" im Cut-Panel) und beim Trimmen des Original-Audio-Clips im Inspector wird das Video visuell nicht geschnitten. Der Preview-Player zeigt weiterhin das gesamte Original ab Sekunde 0.
 
-Grund im Code (`src/pages/DirectorsCut/DirectorsCut.tsx` → `handleVideoSelected`): Nach dem Import wird nur `handleStartAnalysis()` getriggert. Das läuft PySceneDetect → Frames → Boundaries → `setScenes(...)`. Wenn diese Kette langsam ist oder still fehlschlägt (Proxy-Extract, Boundary-Fusion), bleibt `scenes = []` — der Video-Track ist bis dahin komplett leer, obwohl Audio bereits da ist.
+## Root Cause (Technisch)
 
-## Fix — "Seed-Scene beim Import"
+Der aktuelle `handleTrimScene` in `CapCutEditor.tsx` schreibt `newStart`/`newEnd` in `start_time`/`end_time` der Szene:
 
-Sofort beim Import eine einzige Full-Length-Szene anlegen, damit die Timeline nie leer ist. Auto-Cut ersetzt diese Szene später durch die erkannten Cuts (idempotent, existierender Code in `handleStartAnalysis` überschreibt `scenes` ohnehin per `setScenes(normalizedScenes)`).
+```ts
+s.id === sceneId ? { ...s, start_time: newStart, end_time: newEnd } : s
+```
 
-### Änderungen in `src/pages/DirectorsCut/DirectorsCut.tsx`
+`CapCutPreviewPlayer.getVideoTime()` interpretiert `start_time`/`end_time` aber als **Timeline-Position**, nicht als Quellen-Offset. Für Seed-Szenen ohne `original_start_time` fällt es auf die Legacy-Kumulation zurück (`originalTime = currentTime - scene.start_time`). Ergebnis: Setzt der User Start=2, End=15, wandert der Szenen-Block auf der Timeline nach rechts, aber die Video-Quelle spielt trotzdem ab Sekunde 0 — kein echter Schnitt.
 
-1. **`handleVideoSelected`**: direkt nach `setSelectedVideo(video)` (Zeile 968) eine Seed-Szene setzen:
-   - Dauer via `video.duration` oder — falls fehlend — `measureVideoDuration(video.url)` (async, schon vorhanden).
-   - `setScenes([{ id: 'seed-1', start_time: 0, end_time: duration, thumbnail_url: video.thumbnail_url ?? null, ... SceneAnalysis-Defaults }])`.
-   - Nur setzen, wenn `scenes.length === 0` (keine Draft-Wiederherstellung überschreiben).
+Zusätzlich bleibt `duration` (via `Math.max(...scenes.map(s => s.end_time))`) auf 15s, so dass der 0–2s-Gap als schwarze Fläche/leere Zone bleibt statt zu verschwinden.
 
-2. **Auto-Cut Übergang schützen**: In `handleStartAnalysis` bleibt bestehende Logik. Der neue Seed-State soll den "looksLikeEdl"-Check nicht triggern → Seed bekommt Marker `source: 'seed'` und wird im Check ausgeschlossen.
+## Fix-Plan
 
-3. **Composer-Handoff unverändert**: Wenn `video.composerProjectId` gesetzt ist, keine Seed-Szene (EDL kommt aus Composer-Pipeline).
+### 1. `handleTrimScene` in `src/components/directors-cut/studio/CapCutEditor.tsx` umschreiben
 
-4. **Fehler-Fallback in Analyse**: Wenn `handleStartAnalysis` fehlschlägt und `scenes.length === 0`, im `catch`/`finally` sicherstellen, dass mindestens die Seed-Szene erhalten bleibt (nicht auf `[]` zurücksetzen).
+Die Sidebar-Inputs sollen als **Quellen-Range** (source in/out) interpretiert werden — das ist die natürliche User-Erwartung ("schneide die Szene bei 2s an, bei 15s ab"):
 
-### UX-Detail
+```ts
+const handleTrimScene = useCallback((sceneId: string, srcIn: number, srcOut: number) => {
+  if (!onScenesUpdate) return;
+  const sorted = [...scenes].sort((a, b) => a.start_time - b.start_time);
+  const idx = sorted.findIndex(s => s.id === sceneId);
+  if (idx < 0) return;
 
-- Kein neuer Toast nötig — User sieht sofort einen Video-Clip in der Timeline mit der korrekten Länge.
-- Nach Auto-Cut ersetzen die erkannten Szenen den Seed nahtlos.
-- Manuelles "Am Playhead teilen" funktioniert dadurch **sofort** nach Import (aktuell scheitert es an `scenes = []`).
+  const target = sorted[idx];
+  const origStart = target.original_start_time ?? target.start_time;
+  const origEnd   = target.original_end_time   ?? target.end_time;
 
-### Nicht Teil dieser Änderung
+  // Clamp innerhalb der ursprünglichen Quelle
+  const newSrcIn  = Math.max(origStart, Math.min(srcIn, srcOut - 0.1));
+  const newSrcOut = Math.min(origEnd,   Math.max(srcOut, newSrcIn + 0.1));
+  const newDur    = newSrcOut - newSrcIn;
 
-- PySceneDetect-Reliability, Frame-Extraction-Fallbacks, Composer-EDL — bleiben unverändert.
-- Sidebar-CTA "Video hinzufügen" / "Leere Szene" — Verdrahtung bleibt.
+  // Timeline-Position der Zielszene bleibt (Ripple über Nachfolger unten)
+  const timelineStart = target.start_time;
+  sorted[idx] = {
+    ...target,
+    original_start_time: newSrcIn,
+    original_end_time:   newSrcOut,
+    start_time: timelineStart,
+    end_time:   timelineStart + newDur,
+  };
+
+  // Ripple: nachfolgende Szenen an neuen End-Punkt anhängen
+  for (let i = idx + 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const dur  = sorted[i].end_time - sorted[i].start_time;
+    sorted[i] = {
+      ...sorted[i],
+      start_time: prev.end_time,
+      end_time:   prev.end_time + dur,
+    };
+  }
+
+  onScenesUpdate(sorted);
+}, [scenes, onScenesUpdate]);
+```
+
+Damit:
+- Der Preview-Player nimmt in `getVideoTime()` bereits den `original_start_time`-Pfad (siehe `CapCutPreviewPlayer.tsx` Zeile 138–140) — d.h. der Schnitt wird sofort korrekt gerendert.
+- Die Timeline-Länge (`Math.max(...end_time)`) schrumpft auf die Netto-Dauer, kein leerer 0–2s-Gap mehr.
+
+### 2. `duration`-Berechnung stabilisieren
+
+In `DirectorsCut.tsx` (Zeile ~279) wird die Preview-Dauer aus `Math.max(base, ...scenes.end_time)` bestimmt. Nach dem Ripple-Fix in Punkt 1 stimmt das automatisch — keine Änderung nötig.
+
+### 3. CutPanel-Label klarstellen
+
+In `src/components/directors-cut/studio/sidebar/CutPanel.tsx` (Zeile ~443/455) die zwei Inputs klarer beschriften ("Quelle Start (s)" / "Quelle End (s)" statt "Start"/"End"), damit der User versteht, dass er den Bereich aus dem Original-Video wählt. Optional, nicht funktional relevant.
+
+### 4. Inspector-Audio-Trim bleibt wie ist
+
+`applyTrim` im `CapCutPropertiesPanel` funktioniert bereits korrekt (Trim Start/End verschiebt `trimStart`/`trimEnd` + `startTime`/`duration`). Das ist unabhängig vom Szenen-Trim.
+
+## Änderung nach Freigabe
+
+- `src/components/directors-cut/studio/CapCutEditor.tsx` — `handleTrimScene` neu (~15 Zeilen).
+- (optional) `src/components/directors-cut/studio/sidebar/CutPanel.tsx` — Labels umbenennen.
+
+Keine anderen Dateien, keine Backend-Änderungen, keine neuen Deps.
