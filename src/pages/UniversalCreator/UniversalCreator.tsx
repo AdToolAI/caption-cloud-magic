@@ -31,7 +31,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { useTranslation } from '@/hooks/useTranslation';
-import { getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
+import { getEffectiveBackgroundMusicVolume, clampAudioVolume } from '@/lib/audioVolume';
+import {
+  DEFAULT_SUBTITLE_STYLE,
+  DEFAULT_MUSIC_VOLUME,
+  DEFAULT_VOICEOVER_VOLUME,
+  computeDurationInFrames,
+} from '@/lib/universalCreatorDefaults';
+
+const BACKUP_STORAGE_KEY = 'universal-creator-backup';
+const BACKUP_SCHEMA_VERSION = 2;
+const BACKUP_MAX_AGE_MS = 3_600_000; // 1h
 
 interface WizardStep {
   id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
