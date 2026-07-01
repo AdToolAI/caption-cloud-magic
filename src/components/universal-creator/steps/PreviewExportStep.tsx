@@ -511,42 +511,60 @@ export function PreviewExportStep({
         </RadioGroup>
       </Card>
 
-      {/* Preview */}
+      {/* Live Preview — identical customizations to the render call */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">{t('uc.preview')}</h3>
-        <div 
-          className="bg-muted rounded-lg overflow-hidden"
-          style={{
-            aspectRatio: formatConfig.aspectRatio === '16:9' ? '16/9' :
-                       formatConfig.aspectRatio === '9:16' ? '9/16' :
-                       formatConfig.aspectRatio === '1:1' ? '1/1' :
-                       formatConfig.aspectRatio === '4:5' ? '4/5' :
-                       formatConfig.aspectRatio === '4:3' ? '4/3' : '16/9',
-            maxHeight: '500px',
-          }}
-        >
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-            <div className="text-center space-y-4 p-8">
-              <Video className="h-16 w-16 mx-auto text-muted-foreground" />
-              <div>
-                <p className="font-medium">{t('uc.videoPreview')}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatConfig.width}x{formatConfig.height} • {contentConfig.voiceoverDuration || (scenes.length > 0 ? scenes.reduce((sum, s) => sum + s.duration, 0) : 0).toFixed(0)}s
-                </p>
-              </div>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p>✓ Voice-over: {contentConfig.voiceoverConfig?.voiceName}</p>
-                {subtitleConfig?.segments?.length ? (
-                  <>
-                    <p>✓ Untertitel: {subtitleConfig.segments.length} Segmente</p>
-                    {subtitleConfig.style && (
-                      <p>✓ Style: {subtitleConfig.style.font}, {subtitleConfig.style.fontSize}px</p>
-                    )}
-                  </>
-                ) : null}
-              </div>
+        {(contentConfig?.voiceoverUrl || (scenes && scenes.length > 0)) ? (
+          <div
+            className="bg-black rounded-lg overflow-hidden mx-auto"
+            style={{
+              aspectRatio:
+                formatConfig.aspectRatio === '16:9' ? '16/9' :
+                formatConfig.aspectRatio === '9:16' ? '9/16' :
+                formatConfig.aspectRatio === '1:1' ? '1/1' :
+                formatConfig.aspectRatio === '4:5' ? '4/5' :
+                formatConfig.aspectRatio === '4:3' ? '4/3' : '16/9',
+              maxHeight: '520px',
+              width: '100%',
+            }}
+          >
+            <RemotionPreviewPlayer
+              componentName="UniversalCreatorVideo"
+              customizations={buildUniversalCreatorCustomizations({
+                contentConfig,
+                subtitleConfig,
+                backgroundAsset,
+                scenes,
+                selectedMusicUrl,
+                musicVolume: normalizedMusicVolume,
+              })}
+              width={formatConfig.width}
+              height={formatConfig.height}
+              durationInFrames={computeDurationInFrames({
+                voiceoverDuration: contentConfig?.voiceoverDuration,
+                actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
+                scenes,
+              }, formatConfig.fps || 30)}
+              fps={formatConfig.fps || 30}
+            />
+          </div>
+        ) : (
+          <div
+            className="bg-muted rounded-lg overflow-hidden flex items-center justify-center text-center p-8"
+            style={{ aspectRatio: '16/9', maxHeight: '320px' }}
+          >
+            <div className="space-y-2">
+              <Video className="h-10 w-10 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                {t('uc.addScenesToSeePreview')}
+              </p>
             </div>
           </div>
+        )}
+        <div className="mt-3 text-xs text-muted-foreground text-center">
+          {formatConfig.width}x{formatConfig.height} • {formatConfig.fps}fps
+          {contentConfig?.voiceoverConfig?.voiceName && <> • Voice: {contentConfig.voiceoverConfig.voiceName}</>}
+          {subtitleConfig?.segments?.length ? <> • {subtitleConfig.segments.length} {t('uc.subtitleSegmentsCount')}</> : null}
         </div>
       </Card>
 
