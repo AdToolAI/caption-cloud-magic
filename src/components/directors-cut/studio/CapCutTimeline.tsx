@@ -6,6 +6,7 @@ import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square,
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { WaveformDisplay } from '@/components/directors-cut/timeline/WaveformDisplay';
 import { buildSnapTargets, snapToNearest, pxThresholdToSec, DEFAULT_SNAP_PX, type SnapTarget } from '@/lib/directors-cut/snap';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
