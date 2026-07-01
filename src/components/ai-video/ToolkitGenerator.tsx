@@ -212,15 +212,36 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     try {
       // Resolve @mentions against the unified library (brand + motion-studio)
       const mentionResolved = resolveMentions(prompt.trim(), mentionChars, mentionLocs);
-      // Build the prompt — inject Library cast/location, Brand Character (if locked) AND Shot Director cinematography
-      const castSuffix = buildCastPromptSuffix(castCharacter, castLocation);
+
+      // Build the prompt — inject Library cast/world, Brand Character (if
+      // locked) AND Shot Director cinematography.
+      const castSuffix = buildCastWorldPromptSuffix(
+        castCharacters,
+        castLocation,
+        castBuilding,
+        castProps,
+      );
       const brandSuffix = brandCharacter
         ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
         : '';
       const shotSuffix = buildShotPromptSuffix(shotSelection);
-      const finalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix]
+      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix]
         .filter(Boolean)
         .join('\n\n');
+
+      // Motion-Studio-Parität: World-Refs (Location/Building/Props) landen als
+      // deterministischer <!--scene-assets--> Slug-Block am Anfang des Prompts.
+      // resolveSceneWorldRefs liest den Block und reicht die Referenz-Bilder an
+      // Nano Banana / Vidu weiter — dieselben IDs wie im Motion Studio.
+      const worldMentions = [
+        castLocation ? { name: castLocation.name } : null,
+        castBuilding ? { name: castBuilding.name } : null,
+        ...castProps.map((p) => ({ name: p.name })),
+        ...(mentionResolved as any).locations
+          ? (mentionResolved as any).locations.map((l: { name: string }) => ({ name: l.name }))
+          : [],
+      ].filter((x): x is { name: string } => !!x);
+      const finalPrompt = applySceneAssetsToPrompt(proseFinalPrompt, worldMentions);
 
       const body: Record<string, unknown> = {
         prompt: finalPrompt,
@@ -230,39 +251,63 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       };
 
       // Scene-Aware Anchor (Motion-Studio parity):
-      // Instead of blindly sending the avatar portrait as i2v first-frame
-      // (which locks every scene to start on the portrait pose), pre-compose
-      // a scene-specific first frame via Nano Banana 2 (compose-scene-anchor).
-      // Manual uploads still win, as does the Vidu multiRef path below.
+      // Every picked cast character + the locked Brand Character + all
+      // @-mentioned characters become explicit `characterShots` slots on the
+      // stub scene, so `resolveSceneCharacterAnchorsAll` picks them up via
+      // Path 1 and `compose-scene-anchor` (Nano Banana 2) renders the whole
+      // cast into the described scene. IDs are the real Motion-Studio IDs.
       let composedFirstFrame: string | undefined;
       let composedSubjectRefs: string[] | undefined;
       let anchorComposed = false;
       setLastAnchorComposed(false);
 
-      const anchorChar: ComposerCharacter | null =
-        brandCharacter
-          ? {
-              id: brandCharacter.id,
-              name: brandCharacter.name,
-              appearance: (brandCharacter as any).description ?? '',
-              signatureItems: '',
-              brandCharacterId: brandCharacter.id,
-              referenceImageUrl: brandCharacter.reference_image_url ?? undefined,
-            }
-          : castCharacter
-          ? {
-              id: castCharacter.id,
-              name: castCharacter.name,
-              appearance: (castCharacter as any).description ?? '',
-              signatureItems: (castCharacter as any).signature_items ?? '',
-              referenceImageUrl: castCharacter.reference_image_url ?? undefined,
-            }
-          : null;
+      // Build the anchor character list — Motion-Studio character objects.
+      const anchorCharsMap = new Map<string, ComposerCharacter>();
+      const pushAnchor = (c: ComposerCharacter | null) => {
+        if (!c || !c.referenceImageUrl) return;
+        if (anchorCharsMap.has(c.id)) return;
+        anchorCharsMap.set(c.id, c);
+      };
+      if (brandCharacter) {
+        pushAnchor({
+          id: brandCharacter.id,
+          name: brandCharacter.name,
+          appearance: (brandCharacter as any).description ?? '',
+          signatureItems: '',
+          brandCharacterId: brandCharacter.id,
+          referenceImageUrl: brandCharacter.reference_image_url ?? undefined,
+        });
+      }
+      for (const c of castCharacters) {
+        pushAnchor({
+          id: c.id,
+          name: c.name,
+          appearance: c.description ?? '',
+          signatureItems: c.signature_items ?? '',
+          referenceImageUrl: c.reference_image_url ?? undefined,
+        });
+      }
+      for (const m of (mentionResolved as any).characters ?? []) {
+        pushAnchor({
+          id: (m as any).id,
+          name: (m as any).name,
+          appearance: (m as any).description ?? '',
+          signatureItems: (m as any).signature_items ?? '',
+          referenceImageUrl: (m as any).reference_image_url ?? undefined,
+        });
+      }
+      const anchorChars = Array.from(anchorCharsMap.values()).slice(0, 4);
+      const characterShots: CharacterShot[] = anchorChars.map((c) => ({
+        characterId: c.id,
+        shotType: 'full',
+      }));
 
       const clipSource = toolkitModelToClipSource(model);
+      const hasCastOrWorld =
+        anchorChars.length > 0 || !!castLocation || !!castBuilding || castProps.length > 0;
       const shouldCompose =
         !startImageUrl &&
-        !!anchorChar?.referenceImageUrl &&
+        hasCastOrWorld &&
         !!clipSource &&
         !(model.capabilities.multiRef && viduReferences.length > 0);
 
@@ -278,6 +323,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             clipSource: clipSource!,
             clipQuality: 'standard',
             aiPrompt: finalPrompt,
+            characterShots,
+            characterShot: characterShots[0],
           } as ComposerScene;
           const ar =
             aspectRatio === '9:16' ? '9:16'
@@ -285,7 +332,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             : '16:9';
           const prep = await prepareSceneAnchor(
             stubScene,
-            [anchorChar!],
+            anchorChars,
             brandCharacter
               ? { id: brandCharacter.id, name: brandCharacter.name, reference_image_url: brandCharacter.reference_image_url ?? undefined }
               : null,
@@ -298,18 +345,46 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           composedSubjectRefs = prep.subjectReferenceUrls;
           anchorComposed = prep.composed === true;
           setLastAnchorComposed(anchorComposed);
-        } catch (e) {
-          console.warn('[toolkit] compose-scene-anchor failed — falling back to raw portrait', e);
+
+          // Hard-Guard: wenn Scene-Aware angesagt war, aber weder ein
+          // komponierter Startframe noch subject-references zurückkommen,
+          // NICHT stillschweigend auf das rohe Porträt zurückfallen —
+          // sonst startet das Video wieder mit der Avatar-Aufnahme.
+          const providerSupportsSubjectRefs =
+            !!model.capabilities.multiRef ||
+            (Array.isArray(composedSubjectRefs) && composedSubjectRefs.length > 0);
+          if (
+            !composedFirstFrame &&
+            !(providerSupportsSubjectRefs && composedSubjectRefs && composedSubjectRefs.length > 0) &&
+            model.capabilities.i2v
+          ) {
+            throw new Error(
+              language === 'de'
+                ? 'Szenen-Komposition fehlgeschlagen. Bitte erneut versuchen.'
+                : 'Scene composition failed. Please try again.',
+            );
+          }
+        } catch (e: any) {
+          console.warn('[toolkit] compose-scene-anchor failed', e);
+          setComposingScene(false);
+          setGenerating(false);
+          toast.error(
+            e?.message ??
+              (language === 'de'
+                ? 'Szenen-Komposition fehlgeschlagen. Bitte erneut versuchen.'
+                : 'Scene composition failed. Please try again.'),
+          );
+          return;
         } finally {
           setComposingScene(false);
         }
       }
 
-      // i2v: composed scene frame > manual upload > raw portrait fallbacks
+      // i2v: composed scene frame > manual upload > @-mention fallback.
+      // Kein stiller Fallback aufs rohe Porträt mehr — dank Hard-Guard oben.
       const referenceImage =
         composedFirstFrame ??
         startImageUrl ??
-        anchorChar?.referenceImageUrl ??
         mentionResolved.referenceImageUrl ??
         null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
@@ -331,13 +406,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }
         body.referenceImages = viduReferences.map((s) => s.url);
         body.referenceRoles = viduReferences.map((s) => s.role);
+      } else if (composedSubjectRefs && composedSubjectRefs.length > 0) {
+        // Subject-reference providers (non-Vidu path is rare, but keep it symmetric).
+        body.referenceImages = composedSubjectRefs;
       }
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
       // Sora 2 cannot accept image input → toast hint when a character is selected
-      if (model.family === 'sora' && (castCharacter || brandCharacter)) {
+      if (model.family === 'sora' && (anchorChars.length > 0 || castLocation || castBuilding)) {
         toast.info(
           language === 'de'
             ? 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.'
