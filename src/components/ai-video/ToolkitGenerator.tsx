@@ -80,6 +80,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showOptimizer, setShowOptimizer] = useState(false);
+  const [composingScene, setComposingScene] = useState(false);
+  const [lastAnchorComposed, setLastAnchorComposed] = useState(false);
 
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
