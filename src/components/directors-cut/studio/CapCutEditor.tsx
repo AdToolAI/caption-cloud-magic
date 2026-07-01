@@ -12,7 +12,9 @@ import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
 import { RenderOverlay } from './RenderOverlay';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TRACK } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal } from 'lucide-react';
+import { useEditorHistory } from '@/hooks/useEditorHistory';
+import { ShortcutOverlay } from './ShortcutOverlay';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard } from 'lucide-react';
 import { PanelDivider } from './PanelDivider';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -275,6 +277,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [renderError, setRenderError] = useState<string | null>(null);
   const [renderStartedAt, setRenderStartedAt] = useState<number>(0);
   const renderPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Welle 6 — Pro-Editing state
+  const [rippleMode, setRippleMode] = useState<boolean>(() => {
+    try { return localStorage.getItem('dc:ripple-mode') !== '0'; } catch { return true; }
+  });
+  const [shortcutOverlayOpen, setShortcutOverlayOpen] = useState(false);
+  useEffect(() => {
+    try { localStorage.setItem('dc:ripple-mode', rippleMode ? '1' : '0'); } catch {}
+  }, [rippleMode]);
+
 
   // DnD sensors with activation constraint to allow clicks
   const mouseSensor = useSensor(MouseSensor, {
@@ -542,12 +554,23 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     // This is called from CapCutPreviewPlayer with the correct global time
   }, []);
 
-  // Keyboard shortcuts
+  // Welle 6 — Editor History (Undo/Redo)
+  const history = useEditorHistory({
+    state: useMemo(() => ({ scenes, audioTracks }), [scenes, audioTracks]),
+    onRestore: useCallback((snap: { scenes: SceneAnalysis[]; audioTracks: AudioTrack[] }) => {
+      setAudioTracks(snap.audioTracks);
+      onScenesUpdate?.(snap.scenes);
+    }, [onScenesUpdate]),
+    enabled: !isRendering,
+  });
+
+  // Keyboard shortcuts (Ctrl+Z/Y/Space)
   useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
-    onUndo: () => console.log('Undo'),
-    onRedo: () => console.log('Redo'),
+    onUndo: () => { history.commit(); history.undo(); },
+    onRedo: () => { history.commit(); history.redo(); },
   }, true);
+
 
   // Initialize audio tracks with original video audio AND voiceover
   useEffect(() => {
@@ -1676,6 +1699,130 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     .flatMap(t => t.clips)
     .find(c => c.id === selectedClipId);
 
+  // Welle 6 — Ripple Delete for clips (also shifts subsequent clips on same track left).
+  const handleDeleteClipWithRipple = useCallback((clipId: string, ripple: boolean) => {
+    setAudioTracks(prev => prev.map(track => {
+      const target = track.clips.find(c => c.id === clipId);
+      if (!target) return track;
+      const gap = target.duration;
+      const remaining = track.clips.filter(c => c.id !== clipId);
+      if (!ripple) return { ...track, clips: remaining };
+      return {
+        ...track,
+        clips: remaining.map(c =>
+          c.startTime > target.startTime
+            ? { ...c, startTime: Math.max(0, c.startTime - gap) }
+            : c,
+        ),
+      };
+    }));
+    setSelectedClipId(null);
+  }, []);
+
+  // Welle 6 — Pro-Editing keyboard handler (Delete/Ripple, ?, arrows, Ctrl+D, Ctrl+A, Home/End)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // ? — open shortcut overlay
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setShortcutOverlayOpen(true);
+        return;
+      }
+
+      // S — split at playhead
+      if (!modKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSplitAtPlayhead();
+        return;
+      }
+
+      // Delete / Backspace — ripple delete (alt disables ripple)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const doRipple = rippleMode && !e.altKey;
+        if (selectedClipId) {
+          e.preventDefault();
+          handleDeleteClipWithRipple(selectedClipId, doRipple);
+          return;
+        }
+        if (selectedSceneId) {
+          e.preventDefault();
+          handleSceneDelete(selectedSceneId);
+          return;
+        }
+      }
+
+      // Ctrl+D — duplicate scene
+      if (modKey && (e.key === 'd' || e.key === 'D')) {
+        if (selectedSceneId) {
+          e.preventDefault();
+          handleDuplicateScene(selectedSceneId);
+        }
+        return;
+      }
+
+      // Arrow keys — nudge playhead (Shift = 1s, otherwise 1 frame ≈ 1/30s)
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const delta = e.shiftKey ? 1 : 1 / 30;
+        const sign = e.key === 'ArrowLeft' ? -1 : 1;
+        handleSeek(Math.max(0, Math.min(actualTotalDuration, currentTime + sign * delta)));
+        return;
+      }
+
+      // Home / End
+      if (e.key === 'Home') {
+        e.preventDefault();
+        handleSeek(0);
+        return;
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        handleSeek(actualTotalDuration);
+        return;
+      }
+
+      // J / K / L shuttle — simple play toggle on K; J/L nudge 1s
+      if (!modKey && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        handleSeek(Math.max(0, currentTime - 1));
+        return;
+      }
+      if (!modKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        handlePlayPause();
+        return;
+      }
+      if (!modKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        handleSeek(Math.min(actualTotalDuration, currentTime + 1));
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [
+    rippleMode,
+    selectedClipId,
+    selectedSceneId,
+    currentTime,
+    actualTotalDuration,
+    handleDeleteClipWithRipple,
+    handleSceneDelete,
+    handleDuplicateScene,
+    handleSplitAtPlayhead,
+    handleSeek,
+    handlePlayPause,
+  ]);
+
+
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#050816]">
       {/* Header Bar — James Bond 2028 Glassmorphism */}
@@ -1711,13 +1858,50 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C76A] to-[#FFE4A0] font-semibold text-sm drop-shadow-[0_0_8px_rgba(245,199,106,0.2)]">Director's Cut Studio</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+            onClick={() => { history.commit(); history.undo(); }}
+            disabled={!history.canUndo}
+            title={`Rückgängig (${navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl'}+Z) · ${history.historySize} Schritte`}
+          >
             <Undo2 className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+            onClick={() => { history.commit(); history.redo(); }}
+            disabled={!history.canRedo}
+            title={`Wiederherstellen (${navigator.platform.toUpperCase().includes('MAC') ? '⌘⇧' : 'Ctrl+Shift'}+Z)`}
+          >
             <Redo2 className="h-3.5 w-3.5" />
           </Button>
+          <button
+            type="button"
+            onClick={() => setRippleMode((v) => !v)}
+            title={rippleMode ? 'Ripple Delete AN — Lücken schließen automatisch' : 'Ripple Delete AUS — Lücken bleiben stehen'}
+            className={cn(
+              'h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium border transition-colors',
+              rippleMode
+                ? 'bg-cyan-500/15 text-cyan-200 border-cyan-500/40'
+                : 'bg-white/5 text-white/40 border-white/10 hover:text-white/70'
+            )}
+          >
+            Ripple
+          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setShortcutOverlayOpen(true)}
+            title="Tastatur-Shortcuts (?)"
+          >
+            <Keyboard className="h-3.5 w-3.5" />
+          </Button>
           <div className="w-px h-5 bg-[#F5C76A]/15 mx-1" />
+
           <Button 
             variant="ghost" 
             size="sm" 
@@ -2167,6 +2351,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           }
         }}
       />
+      <ShortcutOverlay open={shortcutOverlayOpen} onOpenChange={setShortcutOverlayOpen} />
     </div>
   );
 };
