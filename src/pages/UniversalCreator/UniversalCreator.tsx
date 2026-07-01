@@ -68,10 +68,7 @@ export function UniversalCreator() {
   const [backgroundAsset, setBackgroundAsset] = useState<BackgroundAsset | null>(null);
   const [audioConfig, setAudioConfig] = useState({
     background_music_id: null as string | null,
-    music_volume: 0.3,
-    voiceover_id: null as string | null,
-    voiceover_volume: 1.0,
-    sound_effects: [] as any[],
+    music_volume: DEFAULT_MUSIC_VOLUME,
   });
   const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
