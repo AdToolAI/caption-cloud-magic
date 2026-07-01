@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Volume2, Clock, Scissors, Music, MessageSquare, Trash2, Type, AlignVerticalJustifyCenter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SceneTrimInspector } from './SceneTrimInspector';
 
 interface CapCutPropertiesPanelProps {
   selectedClip: AudioClip | undefined;
@@ -21,6 +22,13 @@ interface CapCutPropertiesPanelProps {
   onSubtitleDelete?: (clipId: string) => void;
   onClipDelete?: (clipId: string) => void;
   onSplitAtPlayhead?: () => void;
+  // Scene trim (new)
+  selectedScene?: any;
+  selectedSceneIndex?: number;
+  sourceDuration?: number;
+  currentTime?: number;
+  onTrimScene?: (sceneId: string, srcIn: number, srcOut: number) => void;
+  onSceneDelete?: (sceneId: string) => void;
 }
 
 // SUBTITLE_STYLES moved inside component as useMemo for i18n reactivity
