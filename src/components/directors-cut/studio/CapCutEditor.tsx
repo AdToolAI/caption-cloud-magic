@@ -2351,6 +2351,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           }
         }}
       />
+      <ShortcutOverlay open={shortcutOverlayOpen} onOpenChange={setShortcutOverlayOpen} />
     </div>
   );
 };
