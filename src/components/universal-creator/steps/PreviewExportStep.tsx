@@ -760,8 +760,20 @@ export function PreviewExportStep({
                   </div>
                 )}
 
-                {job.status === 'failed' && job.error && (
-                  <p className="text-sm text-red-500">{job.error}</p>
+                {job.status === 'failed' && (
+                  <div className="space-y-2">
+                    {job.error && <p className="text-sm text-red-500">{job.error}</p>}
+                    <Button
+                      onClick={() => handleRetryJob(job.id)}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={isRendering}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      {t('uc.retryRender')}
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>
