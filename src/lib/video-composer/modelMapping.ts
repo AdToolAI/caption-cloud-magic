@@ -60,6 +60,9 @@ export const LIPSYNC_FALLBACK_CLIP_SOURCE: ClipSource = 'ai-hailuo';
 export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
   LIPSYNC_PRIMARY_CLIP_SOURCE,
   LIPSYNC_FALLBACK_CLIP_SOURCE,
+  'ai-kling',
+  'ai-seedance',
+  'ai-wan',
 ];
 
 /**
@@ -68,7 +71,7 @@ export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
  */
 export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = LIPSYNC_CLIP_SOURCES;
 
-const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo']);
+const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'seedance', 'wan']);
 
 /**
  * Composer dropdown models filtered to the Lip-Sync-certified subset

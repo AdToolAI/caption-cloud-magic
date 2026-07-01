@@ -1425,51 +1425,20 @@ export default function SceneCard({
                             : "Dialog & Lip-Sync";
                       const toggleHint =
                         lang === "de"
-                          ? "Nur HappyHorse 1.0 (empfohlen · 3–15s) und Hailuo 2.3 (Fallback · 6/10s) sind für Sync.so Lip-Sync zertifiziert."
+                          ? "HappyHorse, Hailuo, Kling, Seedance und Wan sind für Sync.so Lip-Sync zertifiziert."
                           : lang === "es"
-                            ? "Solo HappyHorse 1.0 (recomendado · 3–15s) y Hailuo 2.3 (alternativa · 6/10s) están certificados para Sync.so lip-sync."
-                            : "Only HappyHorse 1.0 (recommended · 3–15s) and Hailuo 2.3 (fallback · 6/10s) are certified for Sync.so lip-sync.";
-
-                      return (
-                        <div className="space-y-2">
-                          {/* Dialog & Lip-Sync toggle — James-Bond-2028 gold accent */}
-                          <div
-                            className={cn(
-                              "flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 transition-all",
-                              dialogMode
-                                ? "border-amber-400/50 bg-amber-500/[0.06] shadow-[inset_2px_0_0_0_hsl(43_90%_60%/0.7)]"
-                                : "border-border/40 bg-card/40",
-                            )}
-                            title={toggleHint}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <MessageSquareQuote
-                                className={cn(
-                                  "h-3.5 w-3.5 shrink-0",
-                                  dialogMode ? "text-amber-300" : "text-muted-foreground",
-                                )}
-                              />
-                              <div className="flex flex-col min-w-0">
-                                <span
-                                  className={cn(
-                                    "text-[11px] font-medium leading-tight",
-                                    dialogMode ? "text-amber-200" : "text-foreground",
-                                  )}
-                                >
-                                  {toggleOnLabel}
-                                </span>
-                                <span className="text-[9px] text-muted-foreground leading-tight truncate">
-                                  {dialogMode
-                                    ? lang === "de"
-                                      ? "2 Modelle · HappyHorse + Hailuo (Sync.so Lip-Sync)"
-                                      : lang === "es"
-                                        ? "2 modelos · HappyHorse + Hailuo (Sync.so)"
-                                        : "2 models · HappyHorse + Hailuo (Sync.so)"
-                                    : lang === "de"
-                                      ? "B-Roll-Modus · 11 Modelle verfügbar"
-                                      : lang === "es"
-                                        ? "Modo B-roll · 11 modelos disponibles"
-                                        : "B-roll mode · 11 models available"}
+                            ? "HappyHorse, Hailuo, Kling, Seedance y Wan están certificados para Sync.so lip-sync."
+                            : "HappyHorse, Hailuo, Kling, Seedance and Wan are certified for Sync.so lip-sync.";
+...
+                                    ? "5 Modelle · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
+                                    : lang === "es"
+                                      ? "5 modelos · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
+                                      : "5 models · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
+                                  : lang === "de"
+                                    ? "B-Roll-Modus · 11 Modelle verfügbar"
+                                    : lang === "es"
+                                      ? "Modo B-roll · 11 modelos disponibles"
+                                      : "B-roll mode · 11 models available"}
 
                                 </span>
                               </div>
