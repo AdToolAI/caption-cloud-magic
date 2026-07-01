@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react'
 import { useTranslation } from '@/hooks/useTranslation';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
 import { SceneAnalysis, CutMarker } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare, Scissors, Trash2, Magnet } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare, Scissors, Trash2, Magnet, Copy, ArrowLeftToLine, ArrowRightToLine, SplitSquareHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 
 interface CapCutTimelineProps {
   tracks: AudioTrack[];
