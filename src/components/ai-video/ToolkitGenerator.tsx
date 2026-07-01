@@ -675,7 +675,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Button>
       </div>
 
-      <VideoPromptOptimizer
+      {lastAnchorComposed && (
+        <p className="text-center text-[11px] text-primary/80">
+          🎬 {language === 'de'
+            ? 'Scene-Aware: Charakter wurde in die Szene komponiert (kein Portrait-Startframe).'
+            : 'Scene-Aware: character composed into the scene (no portrait-locked first frame).'}
+        </p>
+      )}
+
+
         open={showOptimizer}
         onClose={() => setShowOptimizer(false)}
         onPromptGenerated={(p) => { setPrompt(p); setShowOptimizer(false); }}
