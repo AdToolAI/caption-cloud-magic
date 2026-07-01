@@ -18,7 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { clampAudioVolume, getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
-import { DEFAULT_SUBTITLE_STYLE, DEFAULT_VOICEOVER_VOLUME, computeTotalDurationSeconds } from '@/lib/universalCreatorDefaults';
+import { DEFAULT_SUBTITLE_STYLE, DEFAULT_VOICEOVER_VOLUME, computeTotalDurationSeconds, computeDurationInFrames } from '@/lib/universalCreatorDefaults';
+import { buildUniversalCreatorCustomizations, validateScenes } from '@/lib/universalCreatorRenderPayload';
+import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPreviewPlayer';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
