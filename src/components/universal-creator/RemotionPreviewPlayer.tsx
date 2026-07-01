@@ -57,19 +57,22 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
     />
   );
 }, (prevProps, nextProps) => {
-  const audioEqual =
+  // Only remount the Player when the *identity* of the media changes.
+  // Volume changes flow through inputProps live and must NOT trigger a remount,
+  // otherwise every slider tick resets play state and the Play/Pause button
+  // appears frozen.
+  const audioIdentityEqual =
     prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
-    prevProps.inputProps?.backgroundMusicVolume === nextProps.inputProps?.backgroundMusicVolume &&
-    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl &&
-    prevProps.inputProps?.voiceoverVolume === nextProps.inputProps?.voiceoverVolume;
+    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
 
   const subtitlesEqual =
     JSON.stringify(prevProps.inputProps?.subtitles) === JSON.stringify(nextProps.inputProps?.subtitles) &&
     JSON.stringify(prevProps.inputProps?.subtitleStyle) === JSON.stringify(nextProps.inputProps?.subtitleStyle);
 
   const durationEqual = prevProps.durationInFrames === nextProps.durationInFrames;
+  const loopEqual = prevProps.loop === nextProps.loop;
 
-  return audioEqual && subtitlesEqual && durationEqual;
+  return audioIdentityEqual && subtitlesEqual && durationEqual && loopEqual;
 });
 
 interface RemotionPreviewPlayerProps {
