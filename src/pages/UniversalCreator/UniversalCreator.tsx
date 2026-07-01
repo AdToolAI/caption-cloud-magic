@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,8 +63,11 @@ const WIZARD_STEPS: WizardStep[] = [
 export function UniversalCreator() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlProjectId = searchParams.get('project') || undefined;
+
   const [currentStep, setCurrentStep] = useState(0);
-  const [projectId, setProjectId] = useState<string>();
+  const [projectId, setProjectId] = useState<string | undefined>(urlProjectId);
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
   const [contentConfig, setContentConfig] = useState<ContentConfig | null>(null);
   const [backgroundAsset, setBackgroundAsset] = useState<BackgroundAsset | null>(null);
@@ -74,6 +78,8 @@ export function UniversalCreator() {
   const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
   const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
+  const [isHydrating, setIsHydrating] = useState<boolean>(!!urlProjectId);
+  const hydratedRef = useRef(false);
   
   const getDisplayDimensions = (format: FormatConfig, quality: 'hd' | '4k') => {
     if (quality === 'hd') {
@@ -137,13 +143,13 @@ export function UniversalCreator() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (formatConfig) {
+      if (formatConfig && !isHydrating) {
         saveProgress();
       }
     }, 10000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, projectId, selectedMusicUrl, videoQuality]);
+  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, projectId, selectedMusicUrl, videoQuality, isHydrating]);
 
   const handleNext = async () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
@@ -160,6 +166,7 @@ export function UniversalCreator() {
 
   const handleNewProject = () => {
     localStorage.removeItem(BACKUP_STORAGE_KEY);
+    hydratedRef.current = false;
     setProjectId(undefined);
     setFormatConfig(null);
     setContentConfig(null);
@@ -173,6 +180,12 @@ export function UniversalCreator() {
     setScenes([]);
     setCurrentStep(0);
     setVideoQuality('hd');
+    // Clear ?project from URL so no stale resume happens on reload
+    if (searchParams.get('project')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('project');
+      setSearchParams(next, { replace: true });
+    }
     toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
   };
 
@@ -201,6 +214,10 @@ export function UniversalCreator() {
           .single();
         if (error) throw error;
         setProjectId(data.id);
+        // Publish new projectId to the URL so reload / share resumes exactly this draft
+        const next = new URLSearchParams(searchParams);
+        next.set('project', data.id);
+        setSearchParams(next, { replace: true });
       } else {
         await supabase
           .from('content_projects')
@@ -285,19 +302,75 @@ export function UniversalCreator() {
     }
   };
 
+  // Debounced localStorage backup so rapid state changes don't thrash storage
+  const saveDebounceRef = useRef<number | null>(null);
   useEffect(() => {
-    if (formatConfig) {
+    if (!formatConfig || isHydrating) return;
+    if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
+    saveDebounceRef.current = window.setTimeout(() => {
       saveToLocalStorage();
-    }
+    }, 500);
+    return () => {
+      if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, selectedMusicUrl, projectId, videoQuality]);
+  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, selectedMusicUrl, projectId, videoQuality, isHydrating]);
+
+  // Hydrate from DB when ?project=<id> is present; otherwise fall back to localStorage backup
+  const hydrateFromDb = useCallback(async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('content_projects')
+        .select('id, customizations, audio_config, scenes')
+        .eq('id', id)
+        .maybeSingle();
+      if (error || !data) {
+        console.warn('[UniversalCreator] Could not hydrate project', id, error);
+        setIsHydrating(false);
+        // Fall back to any local backup so the user isn't stranded on a blank wizard
+        restoreFromLocalStorage();
+        return;
+      }
+      const c = (data.customizations || {}) as any;
+      if (c.format) setFormatConfig(c.format);
+      if (c.content) setContentConfig(c.content);
+      if (c.background) setBackgroundAsset(c.background);
+      if (c.subtitles) setSubtitleConfig(c.subtitles);
+      const ac = (data.audio_config || {}) as any;
+      setAudioConfig({
+        background_music_id: ac.background_music_id ?? null,
+        music_volume: clampAudioVolume(ac.music_volume ?? DEFAULT_MUSIC_VOLUME),
+      });
+      const sc = (data.scenes as any)?.scenes;
+      if (Array.isArray(sc)) setScenes(sc);
+      setProjectId(data.id);
+    } catch (err) {
+      console.error('[UniversalCreator] Hydration failed:', err);
+    } finally {
+      setIsHydrating(false);
+    }
+  }, [setScenes]);
 
   useEffect(() => {
-    if (!formatConfig && !contentConfig) {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    if (urlProjectId) {
+      void hydrateFromDb(urlProjectId);
+    } else if (!formatConfig && !contentConfig) {
       restoreFromLocalStorage();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // React to external URL changes (e.g. user pastes a share link) — reload the wizard
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (urlProjectId && urlProjectId !== projectId) {
+      setIsHydrating(true);
+      void hydrateFromDb(urlProjectId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlProjectId]);
 
   const canProceed = () => {
     switch (currentStep) {
