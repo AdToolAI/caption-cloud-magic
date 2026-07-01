@@ -384,6 +384,18 @@ const DraggableClip: React.FC<{
         className="absolute inset-0 opacity-90"
         style={{ backgroundColor: clip.color || '#6366f1' }}
       />
+
+      {/* Waveform overlay for real audio clips */}
+      {clip.url && (
+        <div className="absolute inset-0 opacity-70 pointer-events-none">
+          <WaveformDisplay
+            audioUrl={clip.url}
+            duration={clip.duration}
+            color="rgba(255,255,255,0.85)"
+            height={44}
+          />
+        </div>
+      )}
       
       {/* Left resize handle */}
       <div
