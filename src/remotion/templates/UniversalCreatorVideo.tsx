@@ -1890,7 +1890,7 @@ const SceneBackground: React.FC<{
   }
   
   // Standard animations
-  const entryOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  const entryOpacity = animation === 'none' ? 1 : interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
   let transform = 'scale(1)';
   let opacity = entryOpacity;
   
