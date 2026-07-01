@@ -522,13 +522,13 @@ export function UniversalCreator() {
       </Card>
 
       {/* Step Content with Live Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 min-h-[500px]">
+      <div className={`grid grid-cols-1 gap-6 ${currentStep === 5 ? '' : 'lg:grid-cols-3'}`}>
+        <div className={`${currentStep === 5 ? 'min-h-[500px]' : 'lg:col-span-2 min-h-[500px]'}`}>
           {stepContent}
         </div>
 
         {/* Live Preview Panel */}
-        <div className="lg:col-span-1">
+        {currentStep !== 5 && <div className="lg:col-span-1">
           <Card className="p-6 sticky top-6 space-y-4">
             <h3 className="text-lg font-semibold">{t('uc.livePreview')}</h3>
             
@@ -669,7 +669,7 @@ export function UniversalCreator() {
               )}
             </div>
           </Card>
-        </div>
+        </div>}
       </div>
 
       {/* Navigation Buttons */}
