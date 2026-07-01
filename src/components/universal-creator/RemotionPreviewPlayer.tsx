@@ -111,10 +111,12 @@ export function RemotionPreviewPlayer({
     backgroundMusicUrl: customizations?.backgroundMusicUrl,
     backgroundMusicVolume: customizations?.backgroundMusicVolume,
     voiceoverUrl: customizations?.voiceoverUrl,
+    voiceoverVolume: customizations?.voiceoverVolume,
   }), [
     customizations?.backgroundMusicUrl,
     customizations?.backgroundMusicVolume,
-    customizations?.voiceoverUrl
+    customizations?.voiceoverUrl,
+    customizations?.voiceoverVolume,
   ]);
 
   const resolvedComponent = useMemo(() => {
