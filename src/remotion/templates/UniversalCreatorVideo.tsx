@@ -230,6 +230,7 @@ export const UniversalCreatorVideoSchema = z.object({
   // Audio
   voiceoverUrl: z.string().optional(),
   voiceoverDuration: z.number().optional(),
+  voiceoverVolume: z.number().default(1.0),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().default(0.35),
   masterVolume: z.number().default(1.0),
@@ -2665,6 +2666,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   scenes = [],
   subtitles,
   voiceoverUrl,
+  voiceoverVolume = 1.0,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.35,
   masterVolume = 1.0,
@@ -2975,9 +2977,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         * ============================================================ */}
       {!diagToggles.silentRender && voiceoverUrl && (
         <Audio
-          key="stable-voiceover-audio"
+          key={`stable-voiceover-audio-${voiceoverVolume}-${masterVolume}`}
           src={voiceoverUrl}
-          volume={masterVolume}
+          volume={Math.max(0, Math.min(1, voiceoverVolume * masterVolume))}
           startFrom={0}
           loop={false}
           pauseWhenBuffering
@@ -2986,9 +2988,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       {/* r67: Background music rendered directly in Lambda — same as UniversalVideo.tsx */}
       {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && isValidRemoteUrl(backgroundMusicUrl) && (
         <Audio
-          key="stable-background-music"
+          key={`stable-background-music-${backgroundMusicVolume}-${masterVolume}`}
           src={backgroundMusicUrl}
-          volume={backgroundMusicVolume * masterVolume}
+          volume={Math.max(0, Math.min(1, backgroundMusicVolume * masterVolume))}
           startFrom={0}
           loop={true}
           pauseWhenBuffering
