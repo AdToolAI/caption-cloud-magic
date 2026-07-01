@@ -223,7 +223,7 @@ export function RemotionPreviewPlayer({
     setIsMuted(false);
     // 4. Play with event object (CRITICAL for browser policy)
     playerRef.current.play(e);
-  }, [volume]);
+  }, [volume, hasEverInteracted]);
 
   const handlePauseClick = useCallback(() => {
     if (!playerRef.current) return;
