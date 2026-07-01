@@ -1015,10 +1015,12 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   zoom={zoom}
                   isSelected={scene.id === selectedSceneId}
                   isPlayheadInside={currentTime >= scene.start_time && currentTime < scene.end_time}
+                  currentTime={currentTime}
                   onSeek={onSeek}
                   onSelect={() => onSceneSelect?.(scene.id)}
                   onDelete={onSceneDelete ? () => onSceneDelete(scene.id) : undefined}
                   onSplit={onSplitAtPlayhead}
+                  onDuplicate={onSceneDuplicate ? () => onSceneDuplicate(scene.id) : undefined}
                   onTrim={onTrimScene ? (newStart, newEnd) => onTrimScene(scene.id, newStart, newEnd) : undefined}
                   snapFn={snapFn}
                   onSnapPreview={setSnapPreview}
