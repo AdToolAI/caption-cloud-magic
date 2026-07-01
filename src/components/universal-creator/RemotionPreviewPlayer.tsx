@@ -124,7 +124,7 @@ export function RemotionPreviewPlayer({
     return COMPONENT_REGISTRY[componentName] || UniversalCreatorVideo;
   }, [componentName]);
 
-  const inputProps = useMemo(() => ({
+  const inputProps: Record<string, any> = useMemo(() => ({
     ...customizations,
     ...stableAudioIdentity,
   }), [customizations, stableAudioIdentity]);
