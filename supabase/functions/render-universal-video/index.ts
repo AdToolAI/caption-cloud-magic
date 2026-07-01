@@ -478,6 +478,17 @@ serve(async (req) => {
       console.log('✅ Render record updated to completed');
     }
 
+    // Welle 1: Telemetry — mark completed with real timings
+    supabase.from('universal_video_renders').update({
+      status: 'completed',
+      output_url: outputUrl,
+      lambda_duration_ms: lambdaDurationMs,
+      total_duration_ms: Date.now() - requestStartedAt,
+      completed_at: new Date().toISOString(),
+    }).eq('render_id', pendingRenderId).then(({ error }) => {
+      if (error) console.warn('[render-universal-video] telemetry complete update failed:', error.message);
+    });
+
     // ✅ Auto-save to Media Library
     try {
       await supabase.from('video_creations').insert({
