@@ -299,124 +299,141 @@ export function PreviewExportStep({
     }));
     setRenderJobs(jobs);
 
-    try {
-      // Render each format sequentially
-      for (const job of jobs) {
+    // Build the SAME customizations object once — every parallel job reuses it
+    // so Preview and Render can never silently diverge across formats.
+    const sharedCustomizations = buildUniversalCreatorCustomizations({
+      contentConfig,
+      subtitleConfig,
+      backgroundAsset,
+      scenes,
+      selectedMusicUrl,
+      musicVolume: normalizedMusicVolume,
+    });
+
+    const validatedScenes = validateScenes(scenes);
+    if (scenes.length > 0 && validatedScenes.length === 0) {
+      toast.error(t('uc.noValidScenes'));
+      if (reservationId) {
+        await refund(reservationId, 'No valid scenes');
+        setReservationId(null);
+      }
+      setIsRendering(false);
+      return;
+    }
+
+    const calculatedDuration = computeTotalDurationSeconds({
+      voiceoverDuration: contentConfig.voiceoverDuration,
+      actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
+      scenes: validatedScenes,
+    });
+    if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
+      toast.error(t('uc.invalidDuration'));
+      if (reservationId) {
+        await refund(reservationId, 'Invalid duration');
+        setReservationId(null);
+      }
+      setIsRendering(false);
+      return;
+    }
+
+    console.log('🎬 Kicking off parallel renders:', {
+      formatCount: jobs.length,
+      sceneCount: validatedScenes.length,
+      calculatedDuration,
+      quality: videoQuality,
+    });
+
+    // Kick off every format render in parallel. Each Lambda invocation is
+    // independent and the webhook + Realtime subscription drives completion.
+    const startJob = async (job: RenderJob): Promise<void> => {
+      setRenderJobs(prev =>
+        prev.map(j =>
+          j.id === job.id ? { ...j, status: 'rendering', progress: 10 } : j
+        )
+      );
+
+      try {
+        const { data, error } = await supabase.functions.invoke('render-with-remotion', {
+          body: {
+            project_id: projectId,
+            component_name: 'UniversalCreatorVideo',
+            quality: videoQuality,
+            customizations: {
+              ...sharedCustomizations,
+              voiceoverDuration: calculatedDuration,
+            },
+            format: 'mp4',
+            aspect_ratio: job.format.aspectRatio,
+          },
+        });
+
+        if (error) {
+          const detail = await extractFunctionsError(error);
+          const friendly = /idle.?timeout|aborted|timeout|IDLE_TIMEOUT/i.test(detail || '')
+            ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
+            : (detail || t('uc.failed'));
+          throw new Error(friendly);
+        }
+
+        if (data && data.ok === false) {
+          const raw = String(data.error || '');
+          const friendly = /aborted|timeout|idle/i.test(raw)
+            ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
+            : (raw || t('uc.failed'));
+          throw new Error(friendly);
+        }
+
+        if (!data?.render_id) {
+          throw new Error(t('uc.renderIdMissing'));
+        }
+
+        console.log(`🎬 [${job.format.platform}-${job.format.aspectRatio}] render started:`, data.render_id);
+
         setRenderJobs(prev =>
           prev.map(j =>
-            j.id === job.id ? { ...j, status: 'rendering', progress: 10 } : j
+            j.id === job.id
+              ? {
+                  ...j,
+                  status: 'rendering',
+                  progress: 20,
+                  renderId: data.render_id,
+                  startedAt: Date.now(),
+                }
+              : j
           )
         );
 
-        try {
-          // Build the SAME customizations object the live preview uses,
-          // so Preview and Render can never silently diverge.
-          const sharedCustomizations = buildUniversalCreatorCustomizations({
-            contentConfig,
-            subtitleConfig,
-            backgroundAsset,
-            scenes,
-            selectedMusicUrl,
-            musicVolume: normalizedMusicVolume,
-          });
-
-          const validatedScenes = validateScenes(scenes);
-          if (scenes.length > 0 && validatedScenes.length === 0) {
-            throw new Error(t('uc.noValidScenes'));
-          }
-
-          const calculatedDuration = computeTotalDurationSeconds({
-            voiceoverDuration: contentConfig.voiceoverDuration,
-            actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
-            scenes: validatedScenes,
-          });
-          if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
-            throw new Error(t('uc.invalidDuration'));
-          }
-
-          console.log('🎬 Sending to render:', {
-            sceneCount: validatedScenes.length,
-            calculatedDuration,
-            quality: videoQuality,
-          });
-
-          // Call render-with-remotion edge function (AWS Lambda)
-          const { data, error } = await supabase.functions.invoke('render-with-remotion', {
-            body: {
-              project_id: projectId,
-              component_name: 'UniversalCreatorVideo',
-              quality: videoQuality,
-              customizations: {
-                ...sharedCustomizations,
-                // Lambda expects the timeline length here; keep in sync with preview.
-                voiceoverDuration: calculatedDuration,
-              },
-              format: 'mp4',
-              aspect_ratio: job.format.aspectRatio,
-            },
-          });
-
-          if (error) {
-            const detail = await extractFunctionsError(error);
-            const friendly = /idle.?timeout|aborted|timeout|IDLE_TIMEOUT/i.test(detail || '')
-              ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
-              : (detail || t('uc.failed'));
-            throw new Error(friendly);
-          }
-
-          // Edge function may return { ok:false, error, error_category } for clean failures
-          // (e.g. AWS throttling) — surface them immediately instead of polling for 10 min.
-          if (data && data.ok === false) {
-            const raw = String(data.error || '');
-            const friendly = /aborted|timeout|idle/i.test(raw)
-              ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
-              : (raw || t('uc.failed'));
-            throw new Error(friendly);
-          }
-
-          // New webhook-based architecture: receive render_id, not output_url
-          if (!data?.render_id) {
-            throw new Error(t('uc.renderIdMissing'));
-          }
-
-          console.log('🎬 Render started with ID:', data.render_id);
-
-          // Update job with render_id and status 'rendering'
-          // Realtime subscription will update to 'completed' when webhook fires
-          setRenderJobs(prev =>
-            prev.map(j =>
-              j.id === job.id
-                ? {
-                    ...j,
-                    status: 'rendering',
-                    progress: 20,
-                    renderId: data.render_id,
-                    startedAt: Date.now(),
-                  }
-                : j
-            )
-          );
-
-          toast.success(t('uc.renderStarted', { platform: job.format.platform }));
-
-        } catch (error: any) {
-          console.error('Error rendering format:', error);
-          setRenderJobs(prev =>
-            prev.map(j =>
-              j.id === job.id
-                ? {
-                    ...j,
-                    status: 'failed',
-                    error: error.message,
-                  }
-                : j
-            )
-          );
-          toast.error(`${t('uc.renderFailed', { platform: job.format.platform })}: ${error.message}`);
-        }
+        toast.success(t('uc.renderStarted', { platform: job.format.platform }));
+      } catch (err: any) {
+        console.error(`[${job.format.platform}-${job.format.aspectRatio}] render start failed:`, err);
+        setRenderJobs(prev =>
+          prev.map(j =>
+            j.id === job.id
+              ? { ...j, status: 'failed', error: err?.message || String(err) }
+              : j
+          )
+        );
+        toast.error(`${t('uc.renderFailed', { platform: job.format.platform })}: ${err?.message || err}`);
       }
+    };
 
-      // Credit commit/refund logic moved to Realtime handler
+    try {
+      await Promise.allSettled(jobs.map(startJob));
+
+      // If no job successfully started (all failed synchronously), refund immediately.
+      // Otherwise the Realtime handler owns commit/refund when webhooks arrive.
+      setRenderJobs(current => {
+        const anyStarted = current.some(j => j.status === 'rendering' && j.renderId);
+        if (!anyStarted && reservationId) {
+          refund(reservationId, 'All render starts failed').catch(console.error);
+          setReservationId(null);
+          setIsRendering(false);
+          toast.error(t('uc.renderAllFailed'));
+        }
+        return current;
+      });
+
+      // Credit commit/refund logic remains in Realtime handler
       // Renders are now async and Realtime will notify us when they complete
 
     } catch (error: any) {
