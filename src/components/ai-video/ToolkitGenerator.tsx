@@ -30,6 +30,9 @@ import { BrandCharacterSelector } from '@/components/brand-characters/BrandChara
 import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
 import type { ShotSelection } from '@/config/shotDirector';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
+import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
+import { toolkitModelToClipSource } from '@/lib/ai-video/toolkitModelToClipSource';
+import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
