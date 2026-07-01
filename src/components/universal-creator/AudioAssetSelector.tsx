@@ -36,6 +36,8 @@ interface AudioAssetSelectorProps {
   musicVolume?: number;
   onMusicSelect: (assetId: string | null) => void;
   onMusicVolumeChange: (volume: number) => void;
+  /** Optional: also receive the resolved public URL so the renderer can play it. */
+  onMusicUrlChange?: (url: string | null) => void;
 }
 
 export const AudioAssetSelector = ({
@@ -43,7 +45,14 @@ export const AudioAssetSelector = ({
   musicVolume = 0.3,
   onMusicSelect,
   onMusicVolumeChange,
+  onMusicUrlChange,
 }: AudioAssetSelectorProps) => {
+  // Wrapper: keep id + url in lockstep so the render pipeline actually
+  // receives a backgroundMusicUrl (parent state used to stay null).
+  const selectMusic = (id: string | null, url: string | null) => {
+    onMusicSelect(id);
+    onMusicUrlChange?.(url);
+  };
   const { toast } = useToast();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -143,7 +152,7 @@ export const AudioAssetSelector = ({
     onSuccess: (data) => {
       toast({ title: t('uc.musicAddedToLibrary') });
       queryClient.invalidateQueries({ queryKey: ['audio-library'] });
-      onMusicSelect(data.id);
+      selectMusic(data.id, data.url ?? null);
       setActiveTab('library');
     },
     onError: (error: any) => {
@@ -208,7 +217,7 @@ export const AudioAssetSelector = ({
     onSuccess: (data) => {
       toast({ title: t('uc.musicUploaded') });
       queryClient.invalidateQueries({ queryKey: ['audio-library'] });
-      onMusicSelect(data.id);
+      selectMusic(data.id, data.url ?? null);
     },
     onError: (error: any) => {
       toast({
@@ -251,7 +260,7 @@ export const AudioAssetSelector = ({
       
       // If deleted track was selected, deselect
       if (selectedMusicId === deletedId) {
-        onMusicSelect(null);
+        selectMusic(null, null);
       }
     },
     onError: (error: any) => {
@@ -401,7 +410,7 @@ export const AudioAssetSelector = ({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onMusicSelect(null);
+                        selectMusic(null, null);
                         toast({ title: t('uc.musicRemoved') });
                       }}
                     >
@@ -564,7 +573,7 @@ export const AudioAssetSelector = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              onMusicSelect(track.id);
+                              selectMusic(track.id, track.url ?? null);
                               toast({ title: t('uc.musicSelected') });
                             }}
                           >

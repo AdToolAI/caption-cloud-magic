@@ -1,61 +1,55 @@
+## Problem
 
-# v183 — Provider-Allowlist erweitern (Pipeline unangetastet)
+Der Lautstärke-Slider in **Step 4 (Audio)** ändert im finalen Export-Video nichts. Zwei Ursachen:
 
-**Ziel:** Nur die Allowlist öffnen. **Kein Pipeline-Touch**, kein Modell-Wechsel (`lipsync-2-pro` bleibt), keine neuen Prompt-Injections, keine neue Fallback-Logik.
+1. **Musik landet gar nicht im Render.** In `src/pages/UniversalCreator/UniversalCreator.tsx` (Zeile 65) gibt es einen State `selectedMusicUrl`, aber dessen Setter `setSelectedMusicUrl` wird **nirgendwo aufgerufen**. Der `AudioAssetSelector` liefert nur die `background_music_id`. Im Render-Payload steht `...(selectedMusicUrl && { backgroundMusicUrl, backgroundMusicVolume })` — d.h. weil `selectedMusicUrl` immer `null` bleibt, wird **weder URL noch Volume** an Remotion geschickt. Deshalb spielt entweder gar keine Musik oder ein hartkodiertes Default — und der Slider hat keinen Effekt.
 
-## Was Sync.so fordert (Zitat aus offizieller Doku)
+2. **Volume ist linear.** Selbst wenn Musik ankommt, ist Remotions `<Audio volume>` linear. 0.3 klingt gefühlt wie ~55 %, weil menschliches Hören logarithmisch ist. Zusätzlich wird gegen das Voiceover nicht geduckt.
 
-- Menschenähnliches Gesicht (keine Tiere/Cartoons/Stilisierung)
-- Sichtbare, natürliche Sprechbewegung im Input-Video
-- Kein reines Profil, Gesicht ausreichend groß, keine dauerhafte Occlusion
-- Keine harten Scene-Cuts innerhalb 30–40s (bei uns unkritisch, weil Clips ≤10s)
+## Änderungen
 
-## Bewertung pro Provider gegen diese Kriterien
+### A) `selectedMusicUrl` sauber auflösen — Slider bekommt überhaupt etwas zu steuern
 
-| Provider | Output-Charakter | Lipsync-tauglich? |
-|---|---|---|
-| **Hailuo 2.3** | Realistisch, gute Mundbewegung | ✅ validated (Status quo) |
-| **HappyHorse 1.0** | Realistisch, natürliche Sprechmotion | ✅ validated (Status quo) |
-| **Kling 3 Pro** | Photorealistisch, gute Lippen-Motorik | ✅ **NEU zulassen** |
-| **Seedance 1** | Realistisch, ByteDance-Qualität | ✅ **NEU zulassen** |
-| **Wan 2.5** | Realistisch, chinesische Foundation | ✅ **NEU zulassen** |
-| **Sora 2** | Photorealistisch | ⚠️ nicht zulassen — keine i2v-Reference-Konsistenz für Face-Gate |
-| **Runway Gen-4** | Photorealistisch, aber teuer + oft „closed mouth" | ❌ nicht zulassen |
-| **Veo** | Realistisch, aber restriktive Content-Policy filtert oft Gesichter | ❌ nicht zulassen |
-| **Luma Ray 2** | Realistisch, aber Kamera-Motion stört Face-Tracking | ❌ nicht zulassen |
-| **Vidu Q2** | Semi-stilisiert, Multi-Reference fokus | ❌ nicht zulassen |
-| **Pika 2.2** | Zu stilisiert | ❌ nicht zulassen |
+**Datei:** `src/components/universal-creator/AudioAssetSelector.tsx`
+- Neuer optionaler Prop `onMusicUrlChange?: (url: string | null) => void`.
+- Immer wenn `onMusicSelect(id)` gerufen wird (Library-Klick, Stock-Add, Upload, „Remove"), zusätzlich `onMusicUrlChange(track.url ?? null)` aufrufen. Wir haben die URL an all diesen Stellen bereits in der Hand.
 
-**Neue Allowlist: Hailuo, HappyHorse, Kling, Seedance, Wan.**
+**Datei:** `src/pages/UniversalCreator/UniversalCreator.tsx`
+- Callback im Audio-Step verdrahten: `onMusicUrlChange={setSelectedMusicUrl}`.
+- Zusätzlich Reload-Safety-Net: `useEffect` — falls `background_music_id` beim Reload gesetzt ist und `selectedMusicUrl` noch `null`, aus `universal_audio_assets` per ID nachladen und setzen.
 
-## Änderungen (minimal)
+### B) Perzeptive Lautstärke + Voiceover-Ducking
 
-### 1. `src/lib/video-composer/providerCapabilities.ts`
-Für 3 Provider `lipsync: false → true` setzen:
-- `ai-kling` (Kling 3 Pro)
-- `ai-seedance`
-- `ai-wan`
+An **beiden** Stellen, wo `backgroundMusicVolume` ins Payload geht (Live-Preview `UniversalCreator.tsx` Zeile 478–481 und finaler Render in `PreviewExportStep.tsx` Zeile 344):
 
-Alle anderen bleiben `false`.
-
-### 2. `src/lib/video-composer/validateSceneForCinematicSync.ts` Zeile 97
-Allowlist-Konstante erweitern:
-```
-const LIPSYNC_ALLOWED = ['ai-hailuo', 'ai-happyhorse', 'ai-kling', 'ai-seedance', 'ai-wan'];
+```ts
+const hasVO = !!contentConfig?.voiceoverUrl;
+const raw = audioConfig.music_volume;                // 0..1 vom Slider
+const perceptual = raw * raw;                        // gefühlt linear
+const duckFactor = hasVO ? 0.5 : 1.0;                // -6 dB unter VO
+backgroundMusicVolume: Math.max(0, Math.min(1, perceptual * duckFactor)),
 ```
 
-### 3. UI-Badge im Motion Studio Provider-Picker
-Neben den 5 zulässigen Providern kleines „Lip-Sync ready"-Badge. Bei den restlichen bleibt der bestehende Warn-Hinweis („Auto-Fallback auf Hailuo für Cinematic-Sync") — keine neue Logik, nur sichtbar machen was schon existiert.
+Ergebnis: Slider auf 30 % → real ~4,5 % unter Sprache, klingt wie ein Musikbett statt wie ein Konkurrent zum VO. Slider-UI bleibt 0–100 %.
 
-## Was NICHT geändert wird
+### C) Slider auch im Export-Step verfügbar
 
-- ❌ Sync.so-Modell (`lipsync-2-pro` bleibt, kein sync-3-Switch)
-- ❌ `compose-scene-anchor`, `compose-dialog-scene`, `compose-twoshot-lipsync`
-- ❌ Sync.so-Webhook, ASD-Strategie, Face-Gate, Preflight
-- ❌ Prompt-Layer, Shot-Director, Scene-Anchor-Composition
-- ❌ Credit-Refund-Logik, v176 No-Silent-Migration, v181 Depicted-Face-Lock, v182 Hard-Stop
+**Datei:** `src/components/universal-creator/steps/PreviewExportStep.tsx`
+- Neue Props: `onMusicVolumeChange: (v: number) => void`, optional `onMusicClear: () => void`.
+- Neue kleine Karte „🎵 Hintergrundmusik" oberhalb des Render-Buttons (nur wenn `selectedMusicUrl` gesetzt): Track-Name, Volume-Slider 0–100 %, „Entfernen"-Button.
+- Slider wirkt **live** auf die Remotion-Preview, weil `audioConfig.music_volume` im Parent liegt.
+- Aus `UniversalCreator.tsx` als `onMusicVolumeChange={(vol) => setAudioConfig(p => ({...p, music_volume: vol}))}` durchreichen.
 
-## Risiko
+## Was NICHT angefasst wird
 
-Wenn Kling/Seedance/Wan im Face-Gate durchfallen, greift automatisch die **bestehende** Preflight-Rejection + Refund-Logik. Kein neuer Code-Pfad, kein neues Fehler-Verhalten. Falls sich zeigt, dass ein Provider real <80% Pass-Rate liefert, nehmen wir ihn manuell wieder raus — Ein-Zeilen-Änderung in der Allowlist.
+- Lip-Sync-Pipeline, Motion Studio, Composer, Director's Cut.
+- Voiceover-Volume-Logik.
+- Remotion-Template und Lambda-Bundle.
+- Keine DB-Migration.
 
+## Ergebnis
+
+- Musik-URL kommt garantiert im Render an.
+- Der bestehende Slider in Step 4 wirkt sofort — sowohl auf Preview als auch auf finalen Render.
+- Zusätzliche schnelle Feinjustierung direkt im Export-Step ohne Zurück-Springen.
+- 30 % klingt endlich wie 30 %, und Sprache bleibt vorne.

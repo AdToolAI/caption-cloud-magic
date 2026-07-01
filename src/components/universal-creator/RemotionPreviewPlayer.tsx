@@ -57,16 +57,18 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
     />
   );
 }, (prevProps, nextProps) => {
-  const audioEqual = 
+  const audioEqual =
     prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
-    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
-  
-  const subtitlesEqual = 
+    prevProps.inputProps?.backgroundMusicVolume === nextProps.inputProps?.backgroundMusicVolume &&
+    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl &&
+    prevProps.inputProps?.voiceoverVolume === nextProps.inputProps?.voiceoverVolume;
+
+  const subtitlesEqual =
     JSON.stringify(prevProps.inputProps?.subtitles) === JSON.stringify(nextProps.inputProps?.subtitles) &&
     JSON.stringify(prevProps.inputProps?.subtitleStyle) === JSON.stringify(nextProps.inputProps?.subtitleStyle);
-  
+
   const durationEqual = prevProps.durationInFrames === nextProps.durationInFrames;
-  
+
   return audioEqual && subtitlesEqual && durationEqual;
 });
 
