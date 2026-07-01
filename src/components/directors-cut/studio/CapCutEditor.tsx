@@ -1742,11 +1742,21 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       {/* Main Content with shared DndContext */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar - Collapsible */}
-           <div className={cn(
-            "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-all duration-200 flex-shrink-0",
-            sidebarCollapsed ? "w-12" : "w-96"
-          )}>
+          {/* Welle 5 — Library Panel */}
+           <div
+            className={cn(
+             "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-[width] duration-150 flex-shrink-0"
+           )}
+           style={{ width: sidebarCollapsed ? 48 : sidebarWidth }}
+           >
+            {/* Column header */}
+            {!sidebarCollapsed && (
+              <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60">
+                <Library className="h-3.5 w-3.5 text-[#F5C76A]" />
+                <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">Bibliothek</span>
+                <span className="ml-auto text-[10px] text-white/40">{scenes.length} Szenen</span>
+              </div>
+            )}
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center gap-3 py-4">
                 <button
