@@ -316,6 +316,12 @@ export type UniversalCreatorVideoProps = z.infer<typeof UniversalCreatorVideoSch
 type UniversalCreatorScene = z.infer<typeof UniversalCreatorSceneSchema>;
 type Subtitle = z.infer<typeof SubtitleSchema>;
 
+const clampVolume = (value: number | null | undefined): number => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(1, numeric));
+};
+
 // ============================================================
 // 🎬 PROFESSIONAL ANIMATION COMPONENTS (Phase 1)
 // ============================================================
@@ -2693,6 +2699,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const effectiveFps = propsFps || fps;
+  const effectiveVoiceoverVolume = clampVolume(voiceoverVolume) * clampVolume(masterVolume);
+  const effectiveBackgroundMusicVolume = clampVolume(backgroundMusicVolume) * clampVolume(masterVolume);
   
   // Category-aware contrast overlay type
   const contrastOverlayType = getCategoryContrastType(category);
@@ -2923,9 +2931,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
       {!diagToggles.silentRender && voiceoverUrl && (
           <Audio
-            key={`stable-voiceover-audio-${voiceoverVolume}-${masterVolume}`}
+            key={`stable-voiceover-audio-${effectiveVoiceoverVolume.toFixed(3)}`}
             src={voiceoverUrl}
-            volume={Math.max(0, Math.min(1, voiceoverVolume * masterVolume))}
+            volume={effectiveVoiceoverVolume}
             startFrom={0}
             loop={false}
             pauseWhenBuffering
@@ -2984,9 +2992,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         * ============================================================ */}
       {!diagToggles.silentRender && voiceoverUrl && (
         <Audio
-          key={`stable-voiceover-audio-${voiceoverVolume}-${masterVolume}`}
+          key={`stable-voiceover-audio-${effectiveVoiceoverVolume.toFixed(3)}`}
           src={voiceoverUrl}
-          volume={Math.max(0, Math.min(1, voiceoverVolume * masterVolume))}
+          volume={effectiveVoiceoverVolume}
           startFrom={0}
           loop={false}
           pauseWhenBuffering
@@ -2995,9 +3003,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       {/* r67: Background music rendered directly in Lambda — same as UniversalVideo.tsx */}
       {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && isValidRemoteUrl(backgroundMusicUrl) && (
         <Audio
-          key={`stable-background-music-${backgroundMusicVolume}-${masterVolume}`}
+          key={`stable-background-music-${effectiveBackgroundMusicVolume.toFixed(3)}`}
           src={backgroundMusicUrl}
-          volume={Math.max(0, Math.min(1, backgroundMusicVolume * masterVolume))}
+          volume={effectiveBackgroundMusicVolume}
           startFrom={0}
           loop={true}
           pauseWhenBuffering

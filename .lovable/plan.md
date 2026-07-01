@@ -1,46 +1,56 @@
-## Was schon fertig ist
-- Welle 1 (Audio ehrlich & stabil)
-- Welle 2 (Preview/Render-Parität mit Live-Preview im Export-Step)
-- Welle 3 (`?project=<id>` Resume + Hydration-Guard + debounced Autosave)
-- Welle 4 (parallele Multi-Format-Renders via `Promise.allSettled`)
+## Problem
+Die Audio-Kette ist aktuell an zwei Stellen gebrochen:
 
-## Was noch offen ist (Welle 5 – Polish & Hygiene)
+1. **Preview reagiert nicht auf Musik-Prozentwerte**
+   - `RemotionPreviewPlayer` memoisiert den Player so stark, dass Änderungen an `backgroundMusicVolume`, `voiceoverVolume` und `masterVolume` ignoriert werden.
+   - Ergebnis: Der Slider zeigt z. B. 5%, aber der Player spielt weiter mit dem alten Mix.
 
-Klein, aber macht die Pipeline "erwachsen" — nichts davon ist kritisch, aber alles davon merkt man in Support-Tickets später.
+2. **Musik ist im Mix zu dominant**
+   - Der Musikwert wird technisch direkt weitergegeben, aber Musiktracks sind oft stark gemastert/komprimiert. Deshalb kann 30% Musik subjektiv lauter wirken als 100% Voice-over.
+   - Wichtig: Ich werde **keine sichtbare “Effektiv”-Anzeige** zurückbringen. Die UI bleibt professionell und zeigt nur den echten Sliderwert.
 
-### 1. Retry für fehlgeschlagene Formate
-- In `PreviewExportStep` einen "Erneut rendern"-Button pro Format bei Status `failed`.
-- Nutzt Credits nicht doppelt (Refund lief bereits), stößt nur die eine Format-Job neu an.
-- Löst das aktuelle "einer von vier Formaten failed → User muss den ganzen Wizard neu machen"-Problem.
+## Plan
 
-### 2. Async-Webhook-Vereinheitlichung
-- `render-universal-video` ruft Lambda noch synchron auf → bei kalten Lambdas droht 150s-Edge-Timeout, obwohl der Render weiterläuft.
-- Umstellung auf denselben Async-+-Webhook-Flow wie `render-with-remotion` (`video_renders`-Row + `remotion-render-webhook`).
-- Kein neuer Bucket, keine neuen Credits-Regeln — nur Aufruf-Pattern angleichen.
+### 1. Preview-Player wirklich live machen
+- In `src/components/universal-creator/RemotionPreviewPlayer.tsx` die Memo-Logik korrigieren:
+  - Audio-URL-Änderungen dürfen weiterhin keinen kaputten Play/Pause-State erzeugen.
+  - **Volume-Werte müssen aber Re-Renders auslösen**, damit Remotion `<Audio volume={...}>` neu bekommt.
+- In den Vergleich aufnehmen:
+  - `backgroundMusicVolume`
+  - `voiceoverVolume`
+  - `masterVolume`
+  - optional `scenes`, weil Szenen Audio/Timeline beeinflussen können.
 
-### 3. Vestigiale Felder entfernen
-- `audioConfig.voiceover_id`, `voiceover_volume`, `sound_effects` werden nirgendwo mehr geschrieben, aber im Restore-Pfad geclamped.
-- Aus `ContentConfig` + Restore + `content_projects.audio_config`-Reader entfernen. Rein Aufräumen.
+### 2. Musik-Slider und Voice-over-Mix einheitlich kalibrieren
+- In `src/lib/audioVolume.ts` eine saubere, zentrale Mix-Funktion einführen:
+  - Slider bleibt 0–100%.
+  - Intern wird Musik voice-over-freundlich begrenzt, wenn eine Stimme vorhanden ist.
+  - Kein UI-Debugtext, keine “effektiv”-Beschriftung.
+- Ziel-Mix:
+  - 100% Voice-over bleibt wirklich 100%.
+  - 30% Musik darf die Stimme nicht überdecken.
+  - 5%, 10%, 30%, 70%, 100% müssen hörbar unterschiedlich sein.
 
-### 4. Debug-Logs & i18n-Rest
-- Verbliebene `console.log`-Effekte in `UniversalCreator.tsx`, `PreviewExportStep.tsx`, `RemotionPreviewPlayer.tsx` entfernen (Prod-Konsole leiser).
-- Hardcoded deutsche Toasts (`"Rendering gestartet…"`, `"Musik hinzugefügt"`) durch `t()` ersetzen — passt zum EN/DE/ES-Policy.
+### 3. Preview und Export über denselben Payload absichern
+- `src/lib/universalCreatorRenderPayload.ts` bleibt Single Source of Truth.
+- Sicherstellen, dass exakt dieselben Werte an beide Wege gehen:
+  - Live Preview
+  - Export über `render-with-remotion`
+- Keine parallele Sonderlogik im Export-Step.
 
-### 5. Optional: `UniversalCreatorVideo.tsx` splitten
-- 3212-Zeilen-Monolith in `SceneBackground.tsx`, `TextOverlay.tsx`, `SubtitleOverlay.tsx`, `Transitions.tsx`.
-- Reines Refactor, keine Verhaltensänderung, keine Render-Auswirkung.
-- Vorteil: nächstes Feature (z. B. neue Subtitle-Animation) braucht keinen 3k-Zeilen-Diff mehr.
+### 4. Render-Bundle-Audio absichern
+- In `src/remotion/templates/UniversalCreatorVideo.tsx` die Audio-Volumes robust clampen und mit stabilen Keys versehen, damit Remotion Preview und Lambda-Render die aktuellen Werte sicher übernehmen.
+- Prüfen, dass Hintergrundmusik nicht doppelt gerendert/gemuxt wird.
 
-## Was ich NICHT anfassen würde
-- Motion Studio / Composer / Director's Cut
-- Credit-Raten, Lambda-Config, Storage-Buckets
-- Bestehende Remotion-Composition-Logik selbst (außer 5. Split)
+### 5. Kurzer Testpfad nach Umsetzung
+- Im Universal Content Creator:
+  - Musik auf 5%, 30%, 80% stellen.
+  - Preview abspielen und prüfen, ob die Lautstärke live hörbar springt.
+  - Voice-over bei 100% gegen Musik testen.
+  - Render-Payload prüfen, dass der gleiche Musikwert im Export landet.
 
-## Reihenfolge-Vorschlag
-1. **Retry-Button** (größter User-Impact, ~30 min)
-2. **Async-Webhook** für `render-universal-video` (löst die letzte echte Timeout-Fehlerquelle)
-3. **Vestigiale Felder + Debug-Logs** (Hygiene, ~15 min)
-4. **i18n-Rest** (Support-relevant für ES/EN-User)
-5. **Optional Split** (nur wenn du eh gerade am Template arbeiten willst)
-
-Sag mir welche Punkte du willst — ich kann Punkt 1–4 in einem Rutsch machen, Punkt 5 nur auf explizite Ansage.
+## Erwartetes Ergebnis
+- Der Musik-Slider beeinflusst die Lautstärke sofort hörbar.
+- Preview und fertiger Render nutzen denselben Mix.
+- 30% Musik ist nicht mehr lauter als 100% Voice-over.
+- Die UI bleibt sauber ohne “effektiv”-Debuganzeige.

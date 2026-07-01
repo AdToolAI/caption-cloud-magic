@@ -17,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { extractFunctionsError } from '@/lib/functionsError';
-import { clampAudioVolume, getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
+import { clampAudioVolume } from '@/lib/audioVolume';
 import { DEFAULT_SUBTITLE_STYLE, DEFAULT_VOICEOVER_VOLUME, computeTotalDurationSeconds, computeDurationInFrames } from '@/lib/universalCreatorDefaults';
 import { buildUniversalCreatorCustomizations, validateScenes } from '@/lib/universalCreatorRenderPayload';
 import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPreviewPlayer';
@@ -74,7 +74,6 @@ export function PreviewExportStep({
   const qualityMultiplier = videoQuality === '4k' ? 2 : 1;
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render * qualityMultiplier;
   const normalizedMusicVolume = clampAudioVolume(musicVolume);
-  const effectiveMusicVolume = getEffectiveBackgroundMusicVolume(normalizedMusicVolume, !!contentConfig?.voiceoverUrl);
 
   // Extract active render IDs to prevent infinite loop
   const activeRenderJobs = useMemo(

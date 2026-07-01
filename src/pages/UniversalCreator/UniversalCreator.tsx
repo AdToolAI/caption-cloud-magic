@@ -32,7 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { useTranslation } from '@/hooks/useTranslation';
-import { getEffectiveBackgroundMusicVolume, clampAudioVolume } from '@/lib/audioVolume';
+import { clampAudioVolume } from '@/lib/audioVolume';
 import {
   DEFAULT_SUBTITLE_STYLE,
   DEFAULT_MUSIC_VOLUME,
