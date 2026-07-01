@@ -221,35 +221,64 @@ export function UniversalCreator() {
   };
 
   const saveToLocalStorage = () => {
-    const state = {
-      currentStep,
-      formatConfig,
-      contentConfig,
-      backgroundAsset,
-      audioConfig,
-      scenes,
-      subtitleConfig,
+    const payload = {
+      version: BACKUP_SCHEMA_VERSION,
       timestamp: Date.now(),
+      state: {
+        currentStep,
+        projectId,
+        formatConfig,
+        contentConfig,
+        backgroundAsset,
+        audioConfig: {
+          background_music_id: audioConfig.background_music_id,
+          music_volume: clampAudioVolume(audioConfig.music_volume),
+        },
+        selectedMusicUrl,
+        scenes,
+        subtitleConfig,
+        videoQuality,
+      },
     };
-    localStorage.setItem('universal-creator-backup', JSON.stringify(state));
+    try {
+      localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('[UniversalCreator] Failed to persist backup:', err);
+    }
   };
 
   const restoreFromLocalStorage = () => {
     try {
-      const backup = localStorage.getItem('universal-creator-backup');
-      if (backup) {
-        const state = JSON.parse(backup);
-        const age = Date.now() - state.timestamp;
-        if (age < 3600000) {
-          setCurrentStep(state.currentStep);
-          setFormatConfig(state.formatConfig);
-          setContentConfig(state.contentConfig);
-          setBackgroundAsset(state.backgroundAsset);
-          setAudioConfig(state.audioConfig);
-          setScenes(state.scenes);
-          setSubtitleConfig(state.subtitleConfig);
-        }
+      const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+
+      // Reject old / unversioned backups so stale audio defaults can never
+      // silently overwrite the current session.
+      if (parsed?.version !== BACKUP_SCHEMA_VERSION) {
+        localStorage.removeItem(BACKUP_STORAGE_KEY);
+        return;
       }
+
+      const age = Date.now() - (parsed.timestamp || 0);
+      if (age >= BACKUP_MAX_AGE_MS) return;
+
+      const s = parsed.state || {};
+      if (typeof s.currentStep === 'number') setCurrentStep(s.currentStep);
+      if (s.projectId) setProjectId(s.projectId);
+      if (s.formatConfig) setFormatConfig(s.formatConfig);
+      if (s.contentConfig) setContentConfig(s.contentConfig);
+      if (s.backgroundAsset) setBackgroundAsset(s.backgroundAsset);
+      if (s.audioConfig) {
+        setAudioConfig({
+          background_music_id: s.audioConfig.background_music_id ?? null,
+          music_volume: clampAudioVolume(s.audioConfig.music_volume ?? DEFAULT_MUSIC_VOLUME),
+        });
+      }
+      if (s.selectedMusicUrl) setSelectedMusicUrl(s.selectedMusicUrl);
+      if (Array.isArray(s.scenes)) setScenes(s.scenes);
+      if (s.subtitleConfig) setSubtitleConfig(s.subtitleConfig);
+      if (s.videoQuality === 'hd' || s.videoQuality === '4k') setVideoQuality(s.videoQuality);
     } catch (error) {
       console.error('[UniversalCreator] Failed to restore backup:', error);
     }
@@ -259,12 +288,14 @@ export function UniversalCreator() {
     if (formatConfig) {
       saveToLocalStorage();
     }
-  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, selectedMusicUrl, projectId, videoQuality]);
 
   useEffect(() => {
     if (!formatConfig && !contentConfig) {
       restoreFromLocalStorage();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canProceed = () => {
