@@ -43,7 +43,8 @@ import { buildUniversalCreatorCustomizations } from '@/lib/universalCreatorRende
 
 const BACKUP_STORAGE_KEY = 'universal-creator-backup';
 const BACKUP_SCHEMA_VERSION = 2;
-const BACKUP_MAX_AGE_MS = 3_600_000; // 1h
+const BACKUP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7d — long enough for multi-day sessions
+const AUTO_RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface WizardStep {
   id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
