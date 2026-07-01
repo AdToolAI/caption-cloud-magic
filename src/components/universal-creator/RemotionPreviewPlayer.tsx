@@ -158,9 +158,9 @@ export function RemotionPreviewPlayer({
   const aspectRatio = width / height;
 
   const getPreviewTime = useCallback(() => {
-    const frame = playerRef.current?.getCurrentFrame?.() ?? currentFrame;
+    const frame = playerRef.current?.getCurrentFrame?.() ?? lastSeekedFrameRef.current;
     return Math.max(0, frame / fps);
-  }, [currentFrame, fps]);
+  }, [fps]);
 
   const applyPreviewAudioVolume = useCallback(() => {
     const master = isMuted ? 0 : clampAudioVolume(volume);
