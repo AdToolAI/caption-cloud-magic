@@ -323,20 +323,22 @@ export function PreviewExportStep({
             throw new Error(t('uc.noValidScenes'));
           }
           
-          // Calculate duration: use the LONGER of voiceover or scenes
-          const sceneDuration = validatedScenes.length > 0 ? validatedScenes.reduce((sum, s) => sum + s.duration, 0) : 0;
-          const voiceoverDur = contentConfig.actualVoiceoverDuration || contentConfig.voiceoverDuration || 0;
-          const calculatedDuration = Math.max(sceneDuration, voiceoverDur, 5);
+          // Calculate duration: use the LONGER of voiceover or scenes (shared helper)
+          const calculatedDuration = computeTotalDurationSeconds({
+            voiceoverDuration: contentConfig.voiceoverDuration,
+            actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
+            scenes: validatedScenes,
+          });
 
           // Validate calculatedDuration
           if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
             throw new Error(t('uc.invalidDuration'));
           }
 
-          console.log('🎬 Sending to render:', { 
-            sceneCount: validatedScenes.length, 
+          console.log('🎬 Sending to render:', {
+            sceneCount: validatedScenes.length,
             calculatedDuration,
-            quality: videoQuality 
+            quality: videoQuality,
           });
 
           // Call render-with-remotion edge function (AWS Lambda)
@@ -348,23 +350,11 @@ export function PreviewExportStep({
               customizations: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
                 voiceoverDuration: calculatedDuration,
-                voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
+                voiceoverVolume: clampAudioVolume(contentConfig.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME),
                 backgroundMusicUrl: selectedMusicUrl || '',
                 backgroundMusicVolume: effectiveMusicVolume,
                 subtitles: subtitleConfig?.segments || [],
-                subtitleStyle: subtitleConfig?.style || {
-                  position: 'bottom',
-                  font: 'Inter',
-                  fontSize: 48,
-                  color: '#FFFFFF',
-                  backgroundColor: '#000000',
-                  backgroundOpacity: 0.7,
-                  animation: 'fade',
-                  animationSpeed: 1,
-                  outlineStyle: 'stroke',
-                  outlineColor: '#000000',
-                  outlineWidth: 2,
-                },
+                subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
                 // Szenen für Multi-Scene Timeline - use validated scenes
                 scenes: validatedScenes.length > 0 ? validatedScenes : undefined,
                 // Background nur als Fallback wenn keine Szenen vorhanden
