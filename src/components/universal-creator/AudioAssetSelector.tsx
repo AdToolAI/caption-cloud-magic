@@ -23,6 +23,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
+import { clampAudioVolume } from '@/lib/audioVolume';
 import {
   Select,
   SelectContent,
@@ -69,6 +70,12 @@ export const AudioAssetSelector = ({
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+
+  useEffect(() => {
+    if (audioElement) {
+      audioElement.volume = clampAudioVolume(musicVolume);
+    }
+  }, [audioElement, musicVolume]);
 
   // Helper function to proxy Jamendo URLs through CORS proxy
   const getProxiedUrl = (url: string | null): string | null => {
@@ -287,6 +294,7 @@ export const AudioAssetSelector = ({
       
       const audio = new Audio();
       audio.preload = 'auto';
+      audio.volume = clampAudioVolume(musicVolume);
       
       audio.addEventListener('canplaythrough', () => {
         setIsLoadingAudio(false);
