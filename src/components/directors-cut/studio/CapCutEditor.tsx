@@ -215,6 +215,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Collapsible panels
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
+
+  // Welle 5 — Resizable Library / Inspector widths, persisted in localStorage
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 384;
+    const v = parseInt(window.localStorage.getItem('dc:sidebar-w') || '', 10);
+    return Number.isFinite(v) && v >= 260 && v <= 560 ? v : 384;
+  });
+  const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 288;
+    const v = parseInt(window.localStorage.getItem('dc:inspector-w') || '', 10);
+    return Number.isFinite(v) && v >= 240 && v <= 480 ? v : 288;
+  });
+  useEffect(() => { try { window.localStorage.setItem('dc:sidebar-w', String(sidebarWidth)); } catch {} }, [sidebarWidth]);
+  useEffect(() => { try { window.localStorage.setItem('dc:inspector-w', String(inspectorWidth)); } catch {} }, [inspectorWidth]);
   
   // Audio Effects State (lifted from sidebar for Web Audio API integration)
   const [audioEffects, setAudioEffects] = useState<AudioEffects>(DEFAULT_AUDIO_EFFECTS);
