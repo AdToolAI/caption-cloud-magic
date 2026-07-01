@@ -32,16 +32,52 @@ addEventListener('beforeunload', (ev: any) => {
   console.log('[render-universal-video] Function shutdown:', ev.detail?.reason || 'unknown');
 });
 
+// Welle 2: Dynamic Lambda concurrency tuning based on total frame count.
+// Buckets are aligned with the Lambda Concurrency Policy (max 7 parallel workers).
+function pickLambdaConcurrency(framesTotal: number): {
+  framesPerLambda: number;
+  maxConcurrency: number;
+} {
+  if (framesTotal <= 300) return { framesPerLambda: 150, maxConcurrency: 2 };   // ≤10s
+  if (framesTotal <= 900) return { framesPerLambda: 200, maxConcurrency: 5 };   // 10–30s
+  if (framesTotal <= 1800) return { framesPerLambda: 270, maxConcurrency: 7 };  // 30–60s
+  return { framesPerLambda: 360, maxConcurrency: 5 };                            // >60s
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
   if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
 
-
+  const requestStartedAt = Date.now();
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Welle 2: Prewarm mode — lightweight bundle-version check to warm the Lambda
+  // without triggering a real render. Called by PreviewExportStep when the user
+  // opens Step 5 so the actual click hits a warm container.
+  try {
+    if (req.method === 'POST') {
+      const url = new URL(req.url);
+      if (url.searchParams.get('prewarm') === '1') {
+        const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            prewarm: true,
+            serveUrlPresent: !!REMOTION_SERVE_URL,
+            lambdaFunction: LAMBDA_FUNCTION_NAME,
+            ts: Date.now(),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+  } catch (_prewarmErr) {
+    // fall through to normal handler
+  }
 
   // Initialize AWS client
   const aws = new AwsClient({
