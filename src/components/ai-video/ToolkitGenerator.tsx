@@ -683,7 +683,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </p>
       )}
 
-
+      <VideoPromptOptimizer
         open={showOptimizer}
         onClose={() => setShowOptimizer(false)}
         onPromptGenerated={(p) => { setPrompt(p); setShowOptimizer(false); }}
