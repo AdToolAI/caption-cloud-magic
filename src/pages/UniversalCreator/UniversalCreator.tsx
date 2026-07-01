@@ -143,13 +143,13 @@ export function UniversalCreator() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (formatConfig) {
+      if (formatConfig && !isHydrating) {
         saveProgress();
       }
     }, 10000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, projectId, selectedMusicUrl, videoQuality]);
+  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig, projectId, selectedMusicUrl, videoQuality, isHydrating]);
 
   const handleNext = async () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
