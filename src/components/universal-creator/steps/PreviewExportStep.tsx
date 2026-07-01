@@ -608,7 +608,7 @@ export function PreviewExportStep({
             <div className="flex items-center gap-2">
               <Volume2 className="h-5 w-5 text-primary" />
               <div>
-                <h3 className="text-lg font-semibold">Hintergrundmusik</h3>
+                <h3 className="text-lg font-semibold">{t('uc.backgroundMusic')}</h3>
                 <p className="text-sm text-muted-foreground">
                   {Math.round(normalizedMusicVolume * 100)}%
                 </p>
@@ -617,7 +617,7 @@ export function PreviewExportStep({
             {onMusicClear && (
               <Button type="button" variant="outline" size="sm" onClick={onMusicClear}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Entfernen
+                {t('uc.remove')}
               </Button>
             )}
           </div>
