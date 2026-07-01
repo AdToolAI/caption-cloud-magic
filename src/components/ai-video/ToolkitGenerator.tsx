@@ -530,10 +530,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         locationId={castLocationId}
         buildingId={castBuildingId}
         propIds={castPropIds}
-        onCharactersChange={setCastCharacterIds}
-        onLocationChange={setCastLocationId}
-        onBuildingChange={setCastBuildingId}
-        onPropsChange={setCastPropIds}
+        onCharacterIdsChange={setCastCharacterIds}
+        onLocationIdChange={setCastLocationId}
+        onBuildingIdChange={setCastBuildingId}
+        onPropIdsChange={setCastPropIds}
         consistencyKey={consistencyKey}
         supportsImageInput={model.capabilities.i2v}
       />
