@@ -100,7 +100,6 @@ export function UniversalCreator() {
   useEffect(() => {
     const fetchMusicUrl = async () => {
       if (audioConfig.background_music_id) {
-        console.log('[UniversalCreator] Fetching music URL for ID:', audioConfig.background_music_id);
         try {
           const { data, error } = await supabase
             .from('universal_audio_assets')
