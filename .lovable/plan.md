@@ -1,31 +1,28 @@
-## Ziel
-Der Musiklautstärke-Regler soll tatsächlich hörbar wirken: in Step 4, in der rechten Live-Preview und im finalen Export.
-
-## Ursache
-Die aktuelle UI setzt zwar `audioConfig.music_volume`, aber der laufende Remotion Player aktualisiert die Audio-Lautstärke nicht zuverlässig während der Wiedergabe. Zusätzlich gibt es im Export-Step noch keine direkte Nachjustierung, obwohl dort oft erst auffällt, dass die Musik zu laut/leise ist.
+## Diagnose
+Der Slider ändert zwar den State, aber der eigentliche Mix im `UniversalCreatorVideo` nutzt die Voiceover-Lautstärke nicht korrekt: `voiceoverVolume` wird im Template gar nicht aus den Props gelesen, sondern Voiceover läuft nur über `masterVolume`. Gleichzeitig wird Musik über `backgroundMusicVolume * masterVolume` gemischt. Dadurch kann die Musik trotz 30% subjektiv lauter bleiben und Slider-Änderungen wirken in der Live-Preview nicht zuverlässig.
 
 ## Plan
-1. **Zentrale Lautstärke-Funktion einführen**
-   - Eine kleine Helper-Funktion für `music_volume` erstellen: clamp 0..1, perzeptive Kurve, optionales Voiceover-Ducking.
-   - Dadurch nutzen Live-Preview und Export exakt dieselbe Berechnung.
+1. **Voiceover-Lautstärke im Remotion-Template korrekt anschließen**
+   - `voiceoverVolume` in `UniversalCreatorVideoSchema` ergänzen.
+   - `voiceoverVolume` in `UniversalCreatorVideo` aus Props lesen.
+   - Voiceover-Audio mit `voiceoverVolume * masterVolume` statt nur `masterVolume` rendern.
 
-2. **Live-Preview wirklich aktualisieren**
-   - `RemotionPreviewPlayer` so erweitern, dass Änderungen an `backgroundMusicVolume` nicht nur Props ändern, sondern den laufenden Player sauber neu synchronisieren.
-   - Falls nötig: gezielter Re-Mount nur bei Audio-Volume/Audio-URL-Änderungen, nicht bei jeder visuellen Änderung.
+2. **Hintergrundmusik stärker und konsistenter ducken**
+   - Die zentrale Helper-Funktion so anpassen, dass Musik bei vorhandenem Voiceover deutlich niedriger gemischt wird.
+   - Ziel: 30% Musik darf niemals lauter wirken als 100% Voiceover.
+   - Live-Preview und Export nutzen weiter dieselbe Funktion, damit kein Unterschied zwischen Vorschau und finalem Render entsteht.
 
-3. **Step-4-Regler als echte Audio-Steuerung reparieren**
-   - `AudioAssetSelector` lässt `onMusicVolumeChange` wie bisher bestehen.
-   - Sicherstellen, dass der geänderte Wert sofort in den Preview-Payload geht und nicht durch alten Player-State überdeckt wird.
+3. **Live-Preview-Player robuster re-synchronisieren**
+   - Den Remotion-Player bei Audio-Mix-Änderungen gezielt remounten lassen, aber den Player-Master-Volume nicht als Ersatz für Track-Mix verwenden.
+   - Der Control-Slider unten rechts bleibt Master-Lautstärke; der Musik-Slider bleibt Track-Lautstärke.
 
-4. **Export-Step-Regler hinzufügen/verdrahten**
-   - `PreviewExportStep` bekommt `onMusicVolumeChange` und optional `onMusicClear`.
-   - Wenn Musik ausgewählt ist: kleine Hintergrundmusik-Karte mit Slider anzeigen.
-   - Änderung wirkt auf Parent-State und damit direkt auf Preview und finalen Render-Payload.
+4. **Export-Payload unverändert in der Pipeline lassen**
+   - Keine Änderungen an Motion Studio, Lip-Sync, Composer, Datenbank oder Render-Funktionen.
+   - Nur die Universal-Creator-Audio-Props werden korrigiert.
 
-5. **Render-Payload robust machen**
-   - Finaler Export sendet immer die aktuell berechnete `backgroundMusicVolume` mit, wenn `selectedMusicUrl` vorhanden ist.
-   - Keine Änderungen an Lip-Sync, Motion Studio, Composer oder Voiceover-Pipeline.
+5. **Verifikation**
+   - Prüfen, dass `backgroundMusicVolume` bei 0%, 30%, 100% sichtbar unterschiedliche Werte in Preview und Export-Payload erhält.
+   - Prüfen, dass `voiceoverVolume` im Template nicht mehr ignoriert wird.
 
-6. **Kurzer Check nach Umsetzung**
-   - Prüfen, dass sich beim Bewegen des Sliders der `backgroundMusicVolume`-Wert in Preview und Export-Payload ändert.
-   - Falls möglich per Browser-Test: Slider auf 0 %, 30 %, 100 % setzen und prüfen, dass die Preview-Komponente neu reagiert.
+## Risiko
+Sehr gering: Die Änderung betrifft nur den Audio-Mix des Universal Content Creators. Die bestehende Video-/Lip-Sync-Pipeline wird nicht angefasst.

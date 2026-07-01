@@ -10,6 +10,11 @@ export function getEffectiveBackgroundMusicVolume(
 ): number {
   const clamped = clampAudioVolume(rawVolume);
   const perceptual = clamped * clamped;
-  const duckFactor = hasVoiceover ? 0.5 : 1;
-  return clampAudioVolume(perceptual * duckFactor);
+  const duckFactor = hasVoiceover ? 0.28 : 1;
+  const ducked = perceptual * duckFactor;
+
+  // Keep music safely below narration when a voiceover exists. Many stock
+  // tracks are mastered much louder than generated VO, so a linear 30% still
+  // feels too hot without this ceiling.
+  return clampAudioVolume(hasVoiceover ? Math.min(ducked, 0.18) : ducked);
 }
