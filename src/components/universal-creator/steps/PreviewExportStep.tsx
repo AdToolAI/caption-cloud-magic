@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Download, Video, Sparkles, Coins, FolderOpen } from 'lucide-react';
+import { Loader2, Download, Video, Sparkles, Coins, FolderOpen, Volume2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Slider } from '@/components/ui/slider';
 import { useCreditReservation } from '@/hooks/useCreditReservation';
 import { useCredits } from '@/hooks/useCredits';
 import { FEATURE_COSTS, ESTIMATED_COSTS } from '@/lib/featureCosts';
@@ -16,6 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { extractFunctionsError } from '@/lib/functionsError';
+import { clampAudioVolume, getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
@@ -26,6 +28,8 @@ interface PreviewExportStepProps {
   scenes?: any[];
   selectedMusicUrl?: string | null;
   musicVolume?: number;
+  onMusicVolumeChange?: (volume: number) => void;
+  onMusicClear?: () => void;
   videoQuality: 'hd' | '4k';
   onVideoQualityChange: (quality: 'hd' | '4k') => void;
 }
@@ -50,6 +54,8 @@ export function PreviewExportStep({
   scenes = [],
   selectedMusicUrl = null,
   musicVolume = 0.3,
+  onMusicVolumeChange,
+  onMusicClear,
   videoQuality,
   onVideoQualityChange,
 }: PreviewExportStepProps) {
@@ -64,6 +70,8 @@ export function PreviewExportStep({
   
   const qualityMultiplier = videoQuality === '4k' ? 2 : 1;
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render * qualityMultiplier;
+  const normalizedMusicVolume = clampAudioVolume(musicVolume);
+  const effectiveMusicVolume = getEffectiveBackgroundMusicVolume(normalizedMusicVolume, !!contentConfig?.voiceoverUrl);
 
   // Extract active render IDs to prevent infinite loop
   const activeRenderJobs = useMemo(
@@ -341,12 +349,7 @@ export function PreviewExportStep({
                 voiceoverDuration: calculatedDuration,
                 voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
                 backgroundMusicUrl: selectedMusicUrl || '',
-                // Perceptual curve + Voiceover-Ducking, damit 30% wirklich wie 30%
-                // klingt und die Musik nicht mit der Sprache konkurriert.
-                backgroundMusicVolume: Math.max(0, Math.min(1,
-                  (musicVolume * musicVolume) *
-                  (contentConfig?.voiceoverUrl ? 0.5 : 1)
-                )),
+                backgroundMusicVolume: effectiveMusicVolume,
                 subtitles: subtitleConfig?.segments || [],
                 subtitleStyle: subtitleConfig?.style || {
                   position: 'bottom',
@@ -569,6 +572,35 @@ export function PreviewExportStep({
           </div>
         </div>
       </Card>
+
+      {selectedMusicUrl && (
+        <Card className="p-6">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Volume2 className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="text-lg font-semibold">Hintergrundmusik</h3>
+                <p className="text-sm text-muted-foreground">
+                  {Math.round(normalizedMusicVolume * 100)}% · Export effektiv {Math.round(effectiveMusicVolume * 100)}%
+                </p>
+              </div>
+            </div>
+            {onMusicClear && (
+              <Button type="button" variant="outline" size="sm" onClick={onMusicClear}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Entfernen
+              </Button>
+            )}
+          </div>
+          <Slider
+            value={[normalizedMusicVolume]}
+            onValueChange={([value]) => onMusicVolumeChange?.(value)}
+            min={0}
+            max={1}
+            step={0.01}
+          />
+        </Card>
+      )}
 
       {/* Credit Balance & Render Button */}
       <Card className="p-4 bg-primary/5 border-primary/20">
