@@ -38,6 +38,7 @@ import {
   DEFAULT_VOICEOVER_VOLUME,
   computeDurationInFrames,
 } from '@/lib/universalCreatorDefaults';
+import { buildUniversalCreatorCustomizations } from '@/lib/universalCreatorRenderPayload';
 
 const BACKUP_STORAGE_KEY = 'universal-creator-backup';
 const BACKUP_SCHEMA_VERSION = 2;
