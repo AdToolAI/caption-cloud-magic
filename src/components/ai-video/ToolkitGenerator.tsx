@@ -91,15 +91,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
   const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
-  const [castCharacterId, setCastCharacterId] = useState<string | null>(null);
+  const [castCharacterIds, setCastCharacterIds] = useState<string[]>([]);
   const [castLocationId, setCastLocationId] = useState<string | null>(null);
-  const castCharacter = useMemo(
-    () => libCharacters.find((c) => c.id === castCharacterId) ?? null,
-    [libCharacters, castCharacterId],
+  const [castBuildingId, setCastBuildingId] = useState<string | null>(null);
+  const [castPropIds, setCastPropIds] = useState<string[]>([]);
+
+  const castCharacters = useMemo(
+    () => castCharacterIds.map((id) => libCharacters.find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c),
+    [libCharacters, castCharacterIds],
   );
   const castLocation = useMemo(
     () => libLocations.find((l) => l.id === castLocationId) ?? null,
     [libLocations, castLocationId],
+  );
+  const castBuilding = useMemo(
+    () => libLocations.find((l) => l.id === castBuildingId) ?? null,
+    [libLocations, castBuildingId],
+  );
+  const castProps = useMemo(
+    () => castPropIds.map((id) => libLocations.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l),
+    [libLocations, castPropIds],
   );
   const consistencyKey = `ai-${model.family}`;
 
