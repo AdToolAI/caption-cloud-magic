@@ -154,3 +154,43 @@ export function getUniversalCreatorDurationSeconds(input: BuildCustomizationsInp
     scenes: normalizeScenesForUniversalCreatorVideo(input.scenes),
   });
 }
+
+/**
+ * Welle 2: sessionStorage cache for normalized scenes so Retry-Renders skip
+ * the re-normalization work. Keyed by projectId. Cleared on successful export.
+ */
+const PAYLOAD_CACHE_KEY = (projectId: string) => `universal-creator:payload-cache:${projectId}`;
+
+export function cacheRenderPayload(projectId: string, payload: unknown): void {
+  if (!projectId || typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(
+      PAYLOAD_CACHE_KEY(projectId),
+      JSON.stringify({ payload, ts: Date.now() })
+    );
+  } catch {
+    // sessionStorage full or unavailable — ignore, cache is best-effort
+  }
+}
+
+export function readCachedRenderPayload<T = unknown>(projectId: string, maxAgeMs = 10 * 60_000): T | null {
+  if (!projectId || typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(PAYLOAD_CACHE_KEY(projectId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { payload: T; ts: number };
+    if (Date.now() - parsed.ts > maxAgeMs) return null;
+    return parsed.payload;
+  } catch {
+    return null;
+  }
+}
+
+export function clearCachedRenderPayload(projectId: string): void {
+  if (!projectId || typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(PAYLOAD_CACHE_KEY(projectId));
+  } catch {
+    // ignore
+  }
+}
