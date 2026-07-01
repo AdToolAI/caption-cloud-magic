@@ -6,6 +6,7 @@ import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square,
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { WaveformDisplay } from '@/components/directors-cut/timeline/WaveformDisplay';
 import { buildSnapTargets, snapToNearest, pxThresholdToSec, DEFAULT_SNAP_PX, type SnapTarget } from '@/lib/directors-cut/snap';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
@@ -230,12 +231,30 @@ const DraggableScene: React.FC<{
             </span>
           </div>
 
-          {/* Row 3: Visual bar */}
-          <div className="flex-1 mx-1.5 mb-1 mt-1 rounded-sm bg-white/10 overflow-hidden">
+          {/* Row 3: Filmstrip (repeating thumbnail frames for NLE feel) */}
+          <div className="flex-1 mx-1.5 mb-1 mt-1 rounded-sm bg-black/40 overflow-hidden relative border border-white/5">
             {scene.thumbnail_url ? (
-              <div className="h-full w-full bg-cover bg-center opacity-50" style={{ backgroundImage: `url(${scene.thumbnail_url})` }} />
+              <>
+                <div
+                  className="absolute inset-0 opacity-70"
+                  style={{
+                    backgroundImage: `url(${scene.thumbnail_url})`,
+                    backgroundSize: '48px 100%',
+                    backgroundRepeat: 'repeat-x',
+                    backgroundPosition: 'left center',
+                  }}
+                />
+                {/* Sprocket-hole dividers to sell the filmstrip look */}
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-60"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(to right, rgba(0,0,0,0.55) 0px, rgba(0,0,0,0.55) 1px, transparent 1px, transparent 48px)',
+                  }}
+                />
+              </>
             ) : (
-              <div className="h-full w-full bg-gradient-to-r from-white/5 to-white/10" />
+              <div className="h-full w-full bg-gradient-to-r from-white/5 via-white/10 to-white/5" />
             )}
           </div>
 
@@ -365,6 +384,18 @@ const DraggableClip: React.FC<{
         className="absolute inset-0 opacity-90"
         style={{ backgroundColor: clip.color || '#6366f1' }}
       />
+
+      {/* Waveform overlay for real audio clips */}
+      {clip.url && (
+        <div className="absolute inset-0 opacity-70 pointer-events-none">
+          <WaveformDisplay
+            audioUrl={clip.url}
+            duration={clip.duration}
+            color="rgba(255,255,255,0.85)"
+            height={44}
+          />
+        </div>
+      )}
       
       {/* Left resize handle */}
       <div
