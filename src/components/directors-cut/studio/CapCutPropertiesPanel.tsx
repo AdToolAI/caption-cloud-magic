@@ -35,6 +35,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   onSubtitleUpdate,
   onSubtitleDelete,
   onClipDelete,
+  onSplitAtPlayhead,
 }) => {
   const { t } = useTranslation();
 
@@ -55,6 +56,28 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
         ),
       }))
     );
+  };
+
+  // Welle 6.1 — Trim-Inputs bewegen startTime/duration mit, wie Left/Right-Handle-Drag.
+  const applyTrim = (edge: 'start' | 'end', rawValue: number) => {
+    if (!selectedClip) return;
+    const clip = selectedClip;
+    if (edge === 'start') {
+      const newTrimStart = Math.max(0, Math.min(rawValue, clip.trimEnd - 0.1));
+      const delta = newTrimStart - clip.trimStart;
+      updateClip({
+        trimStart: newTrimStart,
+        startTime: Math.max(0, clip.startTime + delta),
+        duration: Math.max(0.1, clip.duration - delta),
+      });
+    } else {
+      const newTrimEnd = Math.max(clip.trimStart + 0.1, rawValue);
+      const newDuration = Math.max(0.1, newTrimEnd - clip.trimStart);
+      updateClip({
+        trimEnd: newTrimEnd,
+        duration: newDuration,
+      });
+    }
   };
 
   return (
