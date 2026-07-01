@@ -95,7 +95,7 @@ export function RemotionPreviewPlayer({
   height = 1920,
   durationInFrames = 300,
   fps = 30,
-  loop = true,
+  loop: loopProp = false,
   autoPlay = false,
   showControls = true,
   className,
@@ -108,18 +108,16 @@ export function RemotionPreviewPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [loop, setLoop] = useState<boolean>(loopProp);
 
-  // Separate audio props to keep them STABLE across step changes
-  const stableAudioProps = useMemo(() => ({
+  // Only URLs are treated as "identity" props for remount decisions.
+  // Volumes are LIVE props — they flow through inputProps without remounting.
+  const stableAudioIdentity = useMemo(() => ({
     backgroundMusicUrl: customizations?.backgroundMusicUrl,
-    backgroundMusicVolume: customizations?.backgroundMusicVolume,
     voiceoverUrl: customizations?.voiceoverUrl,
-    voiceoverVolume: customizations?.voiceoverVolume,
   }), [
     customizations?.backgroundMusicUrl,
-    customizations?.backgroundMusicVolume,
     customizations?.voiceoverUrl,
-    customizations?.voiceoverVolume,
   ]);
 
   const resolvedComponent = useMemo(() => {
@@ -128,10 +126,11 @@ export function RemotionPreviewPlayer({
 
   const inputProps = useMemo(() => ({
     ...customizations,
-    // Override with stable audio refs to prevent unnecessary remounts
-    ...stableAudioProps,
-  }), [customizations, stableAudioProps]);
+    ...stableAudioIdentity,
+  }), [customizations, stableAudioIdentity]);
 
+  // Fingerprint used ONLY to re-activate audio output after prop changes.
+  // It does NOT drive the Player's key.
   const audioFingerprint = useMemo(() => JSON.stringify({
     backgroundMusicUrl: inputProps?.backgroundMusicUrl || '',
     backgroundMusicVolume: inputProps?.backgroundMusicVolume ?? null,
