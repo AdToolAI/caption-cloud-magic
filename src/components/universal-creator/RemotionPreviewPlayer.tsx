@@ -269,6 +269,11 @@ export function RemotionPreviewPlayer({
     };
     const handleFrameUpdate = () => {
       const frame = player.getCurrentFrame();
+      const previousFrame = lastSeekedFrameRef.current;
+      if (loop && isPlaying && frame + 2 < previousFrame) {
+        seekPreviewAudio(frame / fps);
+        void playPreviewAudio();
+      }
       lastSeekedFrameRef.current = frame;
       if (!isDragging) setCurrentFrame(frame);
     };
@@ -284,7 +289,7 @@ export function RemotionPreviewPlayer({
       player.removeEventListener('ended', handleEnded);
       player.removeEventListener('frameupdate', handleFrameUpdate);
     };
-  }, [isDragging, pausePreviewAudio, playPreviewAudio]);
+  }, [fps, isDragging, isPlaying, loop, pausePreviewAudio, playPreviewAudio, seekPreviewAudio]);
 
   useEffect(() => {
     if (!isPlaying) {
