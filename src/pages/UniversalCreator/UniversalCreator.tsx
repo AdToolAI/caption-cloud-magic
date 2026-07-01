@@ -477,7 +477,12 @@ export function UniversalCreator() {
                   }),
                   ...(selectedMusicUrl && {
                     backgroundMusicUrl: selectedMusicUrl,
-                    backgroundMusicVolume: audioConfig.music_volume,
+                    // Perceptual curve (linear→gefühlt) + Ducking gegen Voiceover.
+                    // Slider 0..1 → real (raw²) × (VO? 0.5 : 1)
+                    backgroundMusicVolume: Math.max(0, Math.min(1,
+                      (audioConfig.music_volume * audioConfig.music_volume) *
+                      (contentConfig?.voiceoverUrl ? 0.5 : 1)
+                    )),
                   }),
                   subtitles: subtitleConfig?.segments || [],
                   subtitleStyle: subtitleConfig?.style || {
