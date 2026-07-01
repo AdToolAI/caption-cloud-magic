@@ -7,7 +7,7 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   UniversalVideo,
   UniversalCreatorVideo,
 };
-import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 
