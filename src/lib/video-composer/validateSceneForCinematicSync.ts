@@ -93,12 +93,21 @@ export function validateSceneForCinematicSync(
     });
   }
 
-  // Provider lip-sync allowlist (June 2026 policy: HappyHorse + Hailuo only)
-  if (provider !== 'ai-happyhorse' && provider !== 'ai-hailuo') {
+  // Provider lip-sync allowlist (July 2026 policy: providers whose i2v output
+  // reliably produces realistic, speaking human faces that pass Sync.so's
+  // face-gate on lipsync-2-pro. Pipeline itself is unchanged.)
+  const LIPSYNC_ALLOWED = new Set([
+    'ai-hailuo',
+    'ai-happyhorse',
+    'ai-kling',
+    'ai-seedance',
+    'ai-wan',
+  ]);
+  if (!LIPSYNC_ALLOWED.has(provider)) {
     out.push({
       code: 'provider_no_lipsync_support',
       level: 'warning',
-      message: `Lip-Sync läuft nur über HappyHorse (empfohlen · 3–15s) oder Hailuo (Fallback · 6/10s). Aktuell: ${PROVIDER_CAPS[provider]?.label ?? provider}.`,
+      message: `Lip-Sync ist zertifiziert für HappyHorse, Hailuo, Kling, Seedance und Wan. Aktuell: ${PROVIDER_CAPS[provider]?.label ?? provider} — Auto-Fallback auf Hailuo.`,
     });
   }
 

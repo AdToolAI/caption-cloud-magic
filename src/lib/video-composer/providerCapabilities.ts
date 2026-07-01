@@ -55,7 +55,7 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
   },
   'ai-kling': {
     durations: [5, 10],
-    lipsync: false,
+    lipsync: true,
     multiSpeaker: false,
     label: 'Kling',
   },
@@ -67,13 +67,13 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
   },
   'ai-wan': {
     durations: [5, 10],
-    lipsync: false,
+    lipsync: true,
     multiSpeaker: false,
     label: 'Wan',
   },
   'ai-seedance': {
     durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    lipsync: false,
+    lipsync: true,
     multiSpeaker: false,
     label: 'Seedance',
   },
