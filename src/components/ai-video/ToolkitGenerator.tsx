@@ -525,11 +525,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         />
       </Card>
 
-      <ToolkitCastPicker
-        characterId={castCharacterId}
+      <ToolkitCastWorldPicker
+        characterIds={castCharacterIds}
         locationId={castLocationId}
-        onCharacterChange={setCastCharacterId}
+        buildingId={castBuildingId}
+        propIds={castPropIds}
+        onCharactersChange={setCastCharacterIds}
         onLocationChange={setCastLocationId}
+        onBuildingChange={setCastBuildingId}
+        onPropsChange={setCastPropIds}
         consistencyKey={consistencyKey}
         supportsImageInput={model.capabilities.i2v}
       />
