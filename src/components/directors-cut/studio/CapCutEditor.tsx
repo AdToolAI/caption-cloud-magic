@@ -1058,11 +1058,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     if (idx < 0) return;
 
     const target = sorted[idx] as any;
-    const origStart = target.original_start_time ?? target.start_time;
-    const origEnd = target.original_end_time ?? target.end_time;
+    // Bei Original-Szenen ist die verfügbare Quelle das gesamte Ausgangsvideo
+    // [0, originalVideoDuration]. Bei additionalMedia bleibt die alte Range.
+    const isAdditional = !!target.additionalMedia;
+    const hardMax = isAdditional
+      ? (target.original_end_time ?? target.end_time)
+      : (originalVideoDuration && originalVideoDuration > 0 ? originalVideoDuration : (target.original_end_time ?? target.end_time));
+    const hardMin = isAdditional ? (target.original_start_time ?? target.start_time) : 0;
 
-    const newSrcIn = Math.max(origStart, Math.min(srcIn, srcOut - 0.1));
-    const newSrcOut = Math.min(origEnd, Math.max(srcOut, newSrcIn + 0.1));
+    const newSrcIn = Math.max(hardMin, Math.min(srcIn, srcOut - 0.1));
+    const newSrcOut = Math.min(hardMax, Math.max(srcOut, newSrcIn + 0.1));
     const newDur = Math.max(0.1, newSrcOut - newSrcIn);
 
     const timelineStart = target.start_time;
@@ -1086,7 +1091,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
 
     onScenesUpdate(sorted);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, originalVideoDuration]);
 
   // Rename scene handler
   const handleSceneRename = useCallback((sceneId: string, newName: string) => {
