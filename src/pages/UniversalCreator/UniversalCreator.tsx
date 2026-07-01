@@ -204,6 +204,7 @@ export function UniversalCreator() {
               content: contentConfig,
               background: backgroundAsset,
               subtitles: subtitleConfig,
+              current_step: currentStep,
             } as any,
             audio_config: audioConfig,
             scenes: scenes.length > 0 ? (JSON.parse(JSON.stringify({ scenes })) as any) : null,
