@@ -1,17 +1,36 @@
-import React, { useMemo, useRef, useState, useCallback, useEffect, memo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
 import { UniversalCreatorVideo } from '@/remotion/templates/UniversalCreatorVideo';
+import { Volume2, VolumeX, Play, Pause, Repeat } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { clampAudioVolume } from '@/lib/audioVolume';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   UniversalVideo,
   UniversalCreatorVideo,
 };
-import { Volume2, VolumeX, Play, Pause, Repeat } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
 
-// MemoizedPlayer - ONLY re-renders when audio URLs change, NOT for visual prop changes
+const AUDIO_MIX_KEYS = new Set([
+  'backgroundMusicVolume',
+  'voiceoverVolume',
+  'masterVolume',
+]);
+
+const stripAudioMixForVisualCompare = (value: any): any => {
+  if (Array.isArray(value)) return value.map(stripAudioMixForVisualCompare);
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.keys(value)
+    .sort()
+    .reduce<Record<string, any>>((acc, key) => {
+      if (!AUDIO_MIX_KEYS.has(key)) {
+        acc[key] = stripAudioMixForVisualCompare(value[key]);
+      }
+      return acc;
+    }, {});
+};
+
 const MemoizedPlayer = memo(function MemoizedPlayer({
   playerRef,
   inputProps,
@@ -52,28 +71,20 @@ const MemoizedPlayer = memo(function MemoizedPlayer({
     />
   );
 }, (prevProps, nextProps) => {
-  // Keep media identity stable, but do not block audio-mix changes. Remotion's
-  // <Audio volume={...}> only receives the new value if the composition rerenders.
-  const audioIdentityEqual =
-    prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
-    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
+  if (
+    prevProps.component !== nextProps.component ||
+    prevProps.compositionWidth !== nextProps.compositionWidth ||
+    prevProps.compositionHeight !== nextProps.compositionHeight ||
+    prevProps.fps !== nextProps.fps ||
+    prevProps.durationInFrames !== nextProps.durationInFrames ||
+    prevProps.loop !== nextProps.loop ||
+    prevProps.initiallyMuted !== nextProps.initiallyMuted
+  ) {
+    return false;
+  }
 
-  const audioMixEqual =
-    prevProps.inputProps?.backgroundMusicVolume === nextProps.inputProps?.backgroundMusicVolume &&
-    prevProps.inputProps?.voiceoverVolume === nextProps.inputProps?.voiceoverVolume &&
-    prevProps.inputProps?.masterVolume === nextProps.inputProps?.masterVolume;
-
-  const subtitlesEqual =
-    JSON.stringify(prevProps.inputProps?.subtitles) === JSON.stringify(nextProps.inputProps?.subtitles) &&
-    JSON.stringify(prevProps.inputProps?.subtitleStyle) === JSON.stringify(nextProps.inputProps?.subtitleStyle);
-
-  const scenesEqual =
-    JSON.stringify(prevProps.inputProps?.scenes) === JSON.stringify(nextProps.inputProps?.scenes);
-
-  const durationEqual = prevProps.durationInFrames === nextProps.durationInFrames;
-  const loopEqual = prevProps.loop === nextProps.loop;
-
-  return audioIdentityEqual && audioMixEqual && subtitlesEqual && scenesEqual && durationEqual && loopEqual;
+  return JSON.stringify(stripAudioMixForVisualCompare(prevProps.inputProps)) ===
+    JSON.stringify(stripAudioMixForVisualCompare(nextProps.inputProps));
 });
 
 interface RemotionPreviewPlayerProps {
@@ -103,8 +114,11 @@ export function RemotionPreviewPlayer({
 }: RemotionPreviewPlayerProps) {
   const playerRef = useRef<PlayerRef>(null);
   const seekBarRef = useRef<HTMLDivElement>(null);
-  // Tracked as state (not a ref) so `initiallyMuted` correctly reflects the
-  // latest interaction — refs never trigger a re-render.
+  const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const syncRafRef = useRef<number | null>(null);
+  const lastSeekedFrameRef = useRef<number>(0);
+
   const [hasEverInteracted, setHasEverInteracted] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [volume, setVolume] = useState(1);
@@ -113,44 +127,155 @@ export function RemotionPreviewPlayer({
   const [isDragging, setIsDragging] = useState(false);
   const [loop, setLoop] = useState<boolean>(loopProp);
 
-  // Only URLs are treated as "identity" props for remount decisions.
-  // Volumes are LIVE props — they flow through inputProps without remounting.
-  const stableAudioIdentity = useMemo(() => ({
-    backgroundMusicUrl: customizations?.backgroundMusicUrl,
-    voiceoverUrl: customizations?.voiceoverUrl,
-  }), [
-    customizations?.backgroundMusicUrl,
-    customizations?.voiceoverUrl,
-  ]);
-
   const resolvedComponent = useMemo(() => {
     return COMPONENT_REGISTRY[componentName] || UniversalCreatorVideo;
   }, [componentName]);
 
+  const previewAudio = useMemo(() => ({
+    voiceoverUrl: customizations?.voiceoverUrl || null,
+    backgroundMusicUrl: customizations?.backgroundMusicUrl || null,
+    voiceoverVolume: clampAudioVolume(customizations?.voiceoverVolume ?? 1),
+    backgroundMusicVolume: clampAudioVolume(customizations?.backgroundMusicVolume ?? 0),
+    masterVolume: clampAudioVolume(customizations?.masterVolume ?? 1),
+  }), [
+    customizations?.voiceoverUrl,
+    customizations?.backgroundMusicUrl,
+    customizations?.voiceoverVolume,
+    customizations?.backgroundMusicVolume,
+    customizations?.masterVolume,
+  ]);
+
   const inputProps: Record<string, any> = useMemo(() => ({
     ...customizations,
-    ...stableAudioIdentity,
-  }), [customizations, stableAudioIdentity]);
+    // Preview audio is mixed through persistent HTMLAudioElements below. This
+    // keeps Remotion from remounting <Audio /> nodes on every slider movement.
+    diag: {
+      ...(customizations?.diag || {}),
+      silentRender: true,
+    },
+  }), [customizations]);
 
   const aspectRatio = width / height;
 
-  // NOTE: We intentionally do NOT auto-unmute or re-set volume when audio
-  // props change. Doing so hijacks the user's Play/Pause state and makes the
-  // Pause button appear broken. Volume changes flow through inputProps
-  // directly to the Remotion composition; playback state stays put.
+  const getPreviewTime = useCallback(() => {
+    const frame = playerRef.current?.getCurrentFrame?.() ?? lastSeekedFrameRef.current;
+    return Math.max(0, frame / fps);
+  }, [fps]);
 
-  // Sync player state with component state
+  const applyPreviewAudioVolume = useCallback(() => {
+    const master = isMuted ? 0 : clampAudioVolume(volume);
+    if (voiceoverAudioRef.current) {
+      voiceoverAudioRef.current.volume = clampAudioVolume(previewAudio.voiceoverVolume * previewAudio.masterVolume * master);
+    }
+    if (musicAudioRef.current) {
+      musicAudioRef.current.volume = clampAudioVolume(previewAudio.backgroundMusicVolume * previewAudio.masterVolume * master);
+    }
+  }, [isMuted, previewAudio.backgroundMusicVolume, previewAudio.masterVolume, previewAudio.voiceoverVolume, volume]);
+
+  const seekPreviewAudio = useCallback((timeSeconds: number) => {
+    const safeTime = Math.max(0, timeSeconds);
+    const voice = voiceoverAudioRef.current;
+    const music = musicAudioRef.current;
+
+    if (voice && Number.isFinite(voice.duration)) {
+      voice.currentTime = Math.min(safeTime, Math.max(0, voice.duration - 0.05));
+    }
+
+    if (music) {
+      const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
+      music.currentTime = duration > 0 ? safeTime % duration : safeTime;
+    }
+  }, []);
+
+  const playPreviewAudio = useCallback(async () => {
+    applyPreviewAudioVolume();
+    seekPreviewAudio(getPreviewTime());
+    await Promise.allSettled([
+      voiceoverAudioRef.current?.play(),
+      musicAudioRef.current?.play(),
+    ].filter(Boolean) as Promise<void>[]);
+  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio]);
+
+  const pausePreviewAudio = useCallback(() => {
+    voiceoverAudioRef.current?.pause();
+    musicAudioRef.current?.pause();
+  }, []);
+
+  useEffect(() => {
+    applyPreviewAudioVolume();
+  }, [applyPreviewAudioVolume]);
+
+  useEffect(() => {
+    const voice = voiceoverAudioRef.current;
+    const music = musicAudioRef.current;
+
+    voice?.pause();
+    music?.pause();
+
+    if (previewAudio.voiceoverUrl) {
+      voiceoverAudioRef.current = new Audio(previewAudio.voiceoverUrl);
+      voiceoverAudioRef.current.preload = 'auto';
+      voiceoverAudioRef.current.loop = false;
+    } else {
+      voiceoverAudioRef.current = null;
+    }
+
+    if (previewAudio.backgroundMusicUrl) {
+      musicAudioRef.current = new Audio(previewAudio.backgroundMusicUrl);
+      musicAudioRef.current.preload = 'auto';
+      musicAudioRef.current.loop = true;
+    } else {
+      musicAudioRef.current = null;
+    }
+
+    applyPreviewAudioVolume();
+
+    if (isPlaying) {
+      void playPreviewAudio();
+    }
+
+    return () => {
+      voiceoverAudioRef.current?.pause();
+      musicAudioRef.current?.pause();
+    };
+    // URL changes intentionally rebuild the persistent audio elements.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewAudio.voiceoverUrl, previewAudio.backgroundMusicUrl]);
+
+  useEffect(() => {
+    if (!autoPlay || !playerRef.current) return;
+    setHasEverInteracted(true);
+    setIsMuted(false);
+    playerRef.current.unmute();
+    playerRef.current.play();
+    void playPreviewAudio();
+  }, [autoPlay, playPreviewAudio]);
+
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      void playPreviewAudio();
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      pausePreviewAudio();
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      pausePreviewAudio();
+    };
     const handleFrameUpdate = () => {
-      if (!isDragging) {
-        setCurrentFrame(player.getCurrentFrame());
+      const frame = player.getCurrentFrame();
+      const previousFrame = lastSeekedFrameRef.current;
+      if (loop && isPlaying && frame + 2 < previousFrame) {
+        seekPreviewAudio(frame / fps);
+        void playPreviewAudio();
       }
+      lastSeekedFrameRef.current = frame;
+      if (!isDragging) setCurrentFrame(frame);
     };
 
     player.addEventListener('play', handlePlay);
@@ -164,24 +289,58 @@ export function RemotionPreviewPlayer({
       player.removeEventListener('ended', handleEnded);
       player.removeEventListener('frameupdate', handleFrameUpdate);
     };
-  }, [isDragging]);
+  }, [fps, isDragging, isPlaying, loop, pausePreviewAudio, playPreviewAudio, seekPreviewAudio]);
 
-  // Handle seek bar dragging
+  useEffect(() => {
+    if (!isPlaying) {
+      if (syncRafRef.current !== null) cancelAnimationFrame(syncRafRef.current);
+      syncRafRef.current = null;
+      return;
+    }
+
+    const sync = () => {
+      const expected = getPreviewTime();
+      const voice = voiceoverAudioRef.current;
+      const music = musicAudioRef.current;
+
+      if (voice && !voice.paused && Math.abs(voice.currentTime - expected) > 0.22) {
+        voice.currentTime = Math.min(expected, Number.isFinite(voice.duration) ? Math.max(0, voice.duration - 0.05) : expected);
+      }
+
+      if (music && !music.paused) {
+        const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
+        const expectedMusicTime = duration > 0 ? expected % duration : expected;
+        if (Math.abs(music.currentTime - expectedMusicTime) > 0.35) {
+          music.currentTime = expectedMusicTime;
+        }
+      }
+
+      syncRafRef.current = requestAnimationFrame(sync);
+    };
+
+    syncRafRef.current = requestAnimationFrame(sync);
+    return () => {
+      if (syncRafRef.current !== null) cancelAnimationFrame(syncRafRef.current);
+      syncRafRef.current = null;
+    };
+  }, [getPreviewTime, isPlaying]);
+
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const updateFromPointer = (clientX: number) => {
       if (!seekBarRef.current || !playerRef.current) return;
       const rect = seekBarRef.current.getBoundingClientRect();
-      const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      const pos = Math.max(0, Math.min(clientX - rect.left, rect.width));
       const frame = Math.round((pos / rect.width) * (durationInFrames - 1));
       setCurrentFrame(frame);
+      lastSeekedFrameRef.current = frame;
       playerRef.current.seekTo(frame);
+      seekPreviewAudio(frame / fps);
     };
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
+    const handleMouseMove = (e: MouseEvent) => updateFromPointer(e.clientX);
+    const handleMouseUp = () => setIsDragging(false);
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
@@ -190,9 +349,8 @@ export function RemotionPreviewPlayer({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, durationInFrames]);
+  }, [durationInFrames, fps, isDragging, seekPreviewAudio]);
 
-  // Format time from frames
   const formatTime = useCallback((frames: number) => {
     const seconds = Math.floor(frames / fps);
     const mins = Math.floor(seconds / 60);
@@ -200,66 +358,61 @@ export function RemotionPreviewPlayer({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, [fps]);
 
-  // Handle seek bar click
   const handleSeekStart = useCallback((e: React.PointerEvent) => {
     if (!seekBarRef.current || !playerRef.current) return;
     const rect = seekBarRef.current.getBoundingClientRect();
     const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     const frame = Math.round((pos / rect.width) * (durationInFrames - 1));
     setCurrentFrame(frame);
+    lastSeekedFrameRef.current = frame;
     playerRef.current.seekTo(frame);
+    seekPreviewAudio(frame / fps);
     setIsDragging(true);
-  }, [durationInFrames]);
+  }, [durationInFrames, fps, seekPreviewAudio]);
 
-  // Play with event object - required for browser autoplay policy!
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
     if (!playerRef.current) return;
-    // Mark that user has ever interacted (NEVER resets)
     if (!hasEverInteracted) setHasEverInteracted(true);
-    // 1. First unmute
     playerRef.current.unmute();
-    // 2. Set volume
-    playerRef.current.setVolume(volume);
-    // 3. Update state
+    playerRef.current.setVolume(0);
     setIsMuted(false);
-    // 4. Play with event object (CRITICAL for browser policy)
     playerRef.current.play(e);
-  }, [volume, hasEverInteracted]);
+    void playPreviewAudio();
+  }, [hasEverInteracted, playPreviewAudio]);
 
   const handlePauseClick = useCallback(() => {
-    if (!playerRef.current) return;
-    playerRef.current.pause();
-  }, []);
+    playerRef.current?.pause();
+    pausePreviewAudio();
+  }, [pausePreviewAudio]);
 
   const toggleMute = useCallback(() => {
-    if (!playerRef.current) return;
     if (isMuted) {
-      playerRef.current.unmute();
-      playerRef.current.setVolume(volume);
       setIsMuted(false);
+      playerRef.current?.unmute();
+      playerRef.current?.setVolume(0);
+      if (isPlaying) void playPreviewAudio();
     } else {
-      playerRef.current.mute();
       setIsMuted(true);
+      pausePreviewAudio();
     }
-  }, [isMuted, volume]);
+  }, [isMuted, isPlaying, pausePreviewAudio, playPreviewAudio]);
 
   const handleVolumeChange = useCallback((value: number[]) => {
-    if (!playerRef.current) return;
-    const newVolume = value[0];
-    playerRef.current.setVolume(newVolume);
+    const newVolume = clampAudioVolume(value[0]);
     setVolume(newVolume);
     if (newVolume === 0) {
-      playerRef.current.mute();
       setIsMuted(true);
     } else if (isMuted) {
-      playerRef.current.unmute();
       setIsMuted(false);
+      if (isPlaying) void playPreviewAudio();
     }
-  }, [isMuted]);
+  }, [isMuted, isPlaying, playPreviewAudio]);
+
+  const progressPercent = durationInFrames > 0 ? (currentFrame / durationInFrames) * 100 : 0;
 
   return (
     <div className={className}>
-      <div 
+      <div
         className="relative w-full overflow-hidden rounded-lg bg-black"
         style={{ aspectRatio }}
       >
@@ -271,87 +424,83 @@ export function RemotionPreviewPlayer({
           fps={fps}
           durationInFrames={durationInFrames}
           loop={loop}
-          numberOfSharedAudioTags={5}
+          numberOfSharedAudioTags={0}
           initiallyMuted={!hasEverInteracted}
           component={resolvedComponent}
         />
       </div>
-      
-      {/* Custom Controls - Event-based for browser audio policy */}
-      <div className="flex flex-col gap-2 mt-3 px-3 py-2.5 bg-muted/30 rounded-lg border border-border/50">
-        {/* Timeline/SeekBar */}
-        <div className="flex items-center gap-2 w-full">
-          <span className="text-xs text-muted-foreground min-w-[2.5rem] text-right">
-            {formatTime(currentFrame)}
-          </span>
-          <div 
-            ref={seekBarRef}
-            className="flex-1 h-2 bg-muted rounded-full cursor-pointer relative group"
-            onPointerDown={handleSeekStart}
-          >
-            <div 
-              className="h-full bg-primary rounded-full transition-all"
-              style={{ width: `${(currentFrame / durationInFrames) * 100}%` }}
-            />
-            <div 
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ left: `calc(${(currentFrame / durationInFrames) * 100}% - 6px)` }}
-            />
+
+      {showControls && (
+        <div className="flex flex-col gap-2 mt-3 px-3 py-2.5 bg-muted/30 rounded-lg border border-border/50">
+          <div className="flex items-center gap-2 w-full">
+            <span className="text-xs text-muted-foreground min-w-[2.5rem] text-right">
+              {formatTime(currentFrame)}
+            </span>
+            <div
+              ref={seekBarRef}
+              className="flex-1 h-2 bg-muted rounded-full cursor-pointer relative group"
+              onPointerDown={handleSeekStart}
+            >
+              <div
+                className="h-full bg-primary rounded-full transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ left: `calc(${progressPercent}% - 6px)` }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground min-w-[2.5rem]">
+              {formatTime(durationInFrames)}
+            </span>
           </div>
-          <span className="text-xs text-muted-foreground min-w-[2.5rem]">
-            {formatTime(durationInFrames)}
-          </span>
+
+          <div className="flex items-center gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={isPlaying ? handlePauseClick : handlePlayClick}
+              className="h-9 w-9 text-foreground hover:bg-primary/20"
+            >
+              {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            </Button>
+
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setLoop((l) => !l)}
+              title={loop ? 'Loop aus' : 'Loop an'}
+              aria-pressed={loop}
+              className={`h-8 w-8 ${loop ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
+            >
+              <Repeat className="h-4 w-4" />
+            </Button>
+
+            <div className="h-6 w-px bg-border/50" />
+
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={toggleMute}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            >
+              {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </Button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={isMuted ? 0 : volume}
+              onChange={(e) => handleVolumeChange([parseFloat(e.target.value)])}
+              className="w-24 h-1.5 bg-muted rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:rounded-full"
+            />
+            <span className="text-xs text-muted-foreground min-w-[2.5rem]">
+              {Math.round((isMuted ? 0 : volume) * 100)}%
+            </span>
+          </div>
         </div>
-
-        {/* Playback Controls */}
-        <div className="flex items-center gap-3">
-          {/* Play/Pause Button */}
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            onClick={isPlaying ? handlePauseClick : handlePlayClick}
-            className="h-9 w-9 text-foreground hover:bg-primary/20"
-          >
-            {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-          </Button>
-
-          {/* Loop Toggle */}
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setLoop((l) => !l)}
-            title={loop ? 'Loop aus' : 'Loop an'}
-            aria-pressed={loop}
-            className={`h-8 w-8 ${loop ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}
-          >
-            <Repeat className="h-4 w-4" />
-          </Button>
-
-          <div className="h-6 w-px bg-border/50" />
-
-          {/* Volume Controls */}
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            onClick={toggleMute}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          >
-            {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-          </Button>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={isMuted ? 0 : volume}
-            onChange={(e) => handleVolumeChange([parseFloat(e.target.value)])}
-            className="w-24 h-1.5 bg-muted rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:rounded-full"
-          />
-          <span className="text-xs text-muted-foreground min-w-[2.5rem]">
-            {Math.round((isMuted ? 0 : volume) * 100)}%
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

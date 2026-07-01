@@ -2931,7 +2931,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
       {!diagToggles.silentRender && voiceoverUrl && (
           <Audio
-            key={`stable-voiceover-audio-${effectiveVoiceoverVolume.toFixed(3)}`}
+            key="stable-voiceover-audio"
             src={voiceoverUrl}
             volume={effectiveVoiceoverVolume}
             startFrom={0}
@@ -2992,7 +2992,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         * ============================================================ */}
       {!diagToggles.silentRender && voiceoverUrl && (
         <Audio
-          key={`stable-voiceover-audio-${effectiveVoiceoverVolume.toFixed(3)}`}
+          key="stable-voiceover-audio"
           src={voiceoverUrl}
           volume={effectiveVoiceoverVolume}
           startFrom={0}
@@ -3003,7 +3003,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       {/* r67: Background music rendered directly in Lambda — same as UniversalVideo.tsx */}
       {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && isValidRemoteUrl(backgroundMusicUrl) && (
         <Audio
-          key={`stable-background-music-${effectiveBackgroundMusicVolume.toFixed(3)}`}
+          key="stable-background-music"
           src={backgroundMusicUrl}
           volume={effectiveBackgroundMusicVolume}
           startFrom={0}
