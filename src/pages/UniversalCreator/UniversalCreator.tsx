@@ -311,6 +311,9 @@ export function UniversalCreator() {
     if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
     saveDebounceRef.current = window.setTimeout(() => {
       saveToLocalStorage();
+      // Also push a debounced DB save so ?project=<id> lands in the URL
+      // before the user clicks "Next". Guarded by user + formatConfig inside.
+      void saveProgress();
     }, 500);
     return () => {
       if (saveDebounceRef.current) window.clearTimeout(saveDebounceRef.current);
