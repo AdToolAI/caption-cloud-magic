@@ -935,8 +935,44 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   onSnapPreview={setSnapPreview}
                 />
               ))}
-              {/* Add Scene Button with Dropdown */}
-              {(onSceneAdd || onSceneAddFromMedia) && (
+              {/* Hero empty state — replaces the tiny ⊕-Kachel when timeline is empty */}
+              {scenes.length === 0 && (onSceneAdd || onSceneAddFromMedia) && (
+                <div
+                  className="absolute inset-y-1 left-1 right-1 flex items-center justify-center gap-3 rounded-lg border-2 border-dashed border-[#F5C76A]/30 bg-gradient-to-r from-[#F5C76A]/[0.03] via-cyan-500/[0.04] to-[#F5C76A]/[0.03]"
+                  style={{ minWidth: 320 }}
+                >
+                  <div className="flex flex-col items-center gap-1 text-center px-4">
+                    <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">
+                      Timeline ist leer
+                    </span>
+                    <span className="text-[10px] text-white/40">
+                      Ziehe ein Video hierher — oder starte mit einer Szene
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {onSceneAddFromMedia && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onSceneAddFromMedia(); }}
+                        className="h-8 px-3 rounded-md flex items-center gap-1.5 text-[11px] font-medium bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 border border-indigo-400/40 transition-colors"
+                      >
+                        <Film className="h-3.5 w-3.5" />
+                        Aus Bibliothek
+                      </button>
+                    )}
+                    {onSceneAdd && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onSceneAdd(); }}
+                        className="h-8 px-3 rounded-md flex items-center gap-1.5 text-[11px] font-medium bg-[#F5C76A]/20 text-[#F5C76A] hover:bg-[#F5C76A]/30 border border-[#F5C76A]/40 transition-colors"
+                      >
+                        <PlusCircle className="h-3.5 w-3.5" />
+                        Leere Szene
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {/* Add Scene Button with Dropdown — only shown when scenes exist */}
+              {scenes.length > 0 && (onSceneAdd || onSceneAddFromMedia) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -970,6 +1006,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
+
             </div>
 
             {/* Audio Tracks - before subtitle */}
