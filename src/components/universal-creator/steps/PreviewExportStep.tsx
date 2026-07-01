@@ -90,8 +90,6 @@ export function PreviewExportStep({
   useEffect(() => {
     if (activeRenderIds.length === 0) return;
 
-    console.log('🎬 Setting up realtime subscription for render IDs:', activeRenderIds);
-
     const channel = supabase
       .channel('render-progress')
       .on(
@@ -102,28 +100,25 @@ export function PreviewExportStep({
           table: 'video_renders',
         },
         async (payload) => {
-          console.log('📡 Realtime update received:', payload);
           const newData = payload.new as any;
-          
+
           setRenderJobs(prev => {
             const updated = prev.map(j => {
               if (j.renderId !== newData.render_id) return j;
-              
-              console.log(`🎥 Updating job ${j.id} with status: ${newData.status}`);
-              
+
               if (newData.status === 'completed') {
                 toast.success(t('uc.renderCompleted', { platform: j.format.platform }));
-                return { 
-                  ...j, 
-                  status: 'completed' as const, 
-                  progress: 100, 
-                  downloadUrl: newData.video_url 
+                return {
+                  ...j,
+                  status: 'completed' as const,
+                  progress: 100,
+                  downloadUrl: newData.video_url
                 };
               } else if (newData.status === 'failed') {
                 toast.error(t('uc.renderFailed', { platform: j.format.platform }));
-                return { 
-                  ...j, 
-                  status: 'failed' as const, 
+                return {
+                  ...j,
+                  status: 'failed' as const,
                   error: newData.error_message || t('uc.failed')
                 };
               }
@@ -134,18 +129,16 @@ export function PreviewExportStep({
             const allDone = updated.every(j => j.status === 'completed' || j.status === 'failed');
             if (allDone && reservationId) {
               const successCount = updated.filter(j => j.status === 'completed').length;
-              const failedCount = updated.filter(j => j.status === 'failed').length;
 
               if (successCount > 0) {
-                // Commit credits for successful renders
                 const actualCost = successCount * ESTIMATED_COSTS.video_render;
-                commit(reservationId, actualCost).catch(console.error);
+                commit(reservationId, actualCost).catch(() => undefined);
                 toast.success(t('uc.videosRendered', { count: String(successCount), credits: String(actualCost) }));
               } else {
-                refund(reservationId, "All renders failed").catch(console.error);
+                refund(reservationId, "All renders failed").catch(() => undefined);
                 toast.error(t('uc.renderAllFailed'));
               }
-              
+
               setReservationId(null);
               setIsRendering(false);
             }
@@ -157,7 +150,7 @@ export function PreviewExportStep({
       .subscribe();
 
     // Authoritative progress poll: checks DB + S3 reconciliation + server-side timeout/refund
-    const HARD_TIMEOUT_MS = 10 * 60 * 1000; // 10 Minuten — passt zur AWS-Retry-Backoff-Kette
+    const HARD_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes — matches AWS retry-backoff chain
 
     const pollDbStatus = async () => {
       try {
@@ -194,11 +187,11 @@ export function PreviewExportStep({
             return { ...j, progress: nextProgress };
           });
 
-          // Hard-timeout: nach 6 Minuten als failed markieren
+          // Hard-timeout: mark as failed after 10 minutes
           const timedOut = updated.map(j => {
             const startedAt = j.startedAt || Date.now();
             if (j.status === 'rendering' && Date.now() - startedAt > HARD_TIMEOUT_MS) {
-              return { ...j, status: 'failed' as const, progress: 0, error: 'Render-Timeout (>10 Min). Bitte erneut versuchen.' };
+              return { ...j, status: 'failed' as const, progress: 0, error: t('uc.renderTimeout') };
             }
             return j;
           });
@@ -208,10 +201,10 @@ export function PreviewExportStep({
             const successCount = timedOut.filter(j => j.status === 'completed').length;
             if (successCount > 0) {
               const actualCost = successCount * ESTIMATED_COSTS.video_render;
-              commit(reservationId, actualCost).catch(console.error);
+              commit(reservationId, actualCost).catch(() => undefined);
               toast.success(t('uc.videosRendered', { count: String(successCount), credits: String(actualCost) }));
             } else {
-              refund(reservationId, 'All renders failed or timed out').catch(console.error);
+              refund(reservationId, 'All renders failed or timed out').catch(() => undefined);
               toast.error(t('uc.renderAllFailed'));
             }
             setReservationId(null);
@@ -220,21 +213,21 @@ export function PreviewExportStep({
 
           return timedOut;
         });
-      } catch (e) {
-        console.error('Poll error:', e);
+      } catch {
+        // silent: polling failure is non-fatal, next tick retries
       }
     };
 
-    // Sofort einmal pollen, danach alle 8 Sekunden
+    // Poll immediately, then every 8 seconds
     pollDbStatus();
     const pollIntervalId = setInterval(pollDbStatus, 8000);
 
     return () => {
-      console.log('🧹 Cleaning up realtime subscription and polling');
       supabase.removeChannel(channel);
       clearInterval(pollIntervalId);
     };
   }, [activeRenderIds.join(','), reservationId]);
+
 
 
   // Additional format options for multi-format export
