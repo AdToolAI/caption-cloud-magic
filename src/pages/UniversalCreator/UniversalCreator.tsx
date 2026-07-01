@@ -166,6 +166,7 @@ export function UniversalCreator() {
 
   const handleNewProject = () => {
     localStorage.removeItem(BACKUP_STORAGE_KEY);
+    hydratedRef.current = false;
     setProjectId(undefined);
     setFormatConfig(null);
     setContentConfig(null);
@@ -179,6 +180,12 @@ export function UniversalCreator() {
     setScenes([]);
     setCurrentStep(0);
     setVideoQuality('hd');
+    // Clear ?project from URL so no stale resume happens on reload
+    if (searchParams.get('project')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('project');
+      setSearchParams(next, { replace: true });
+    }
     toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
   };
 
