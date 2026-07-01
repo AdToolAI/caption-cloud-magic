@@ -18,7 +18,10 @@ import {
 
 import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
-import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
+import {
+  ToolkitCastWorldPicker,
+  buildCastWorldPromptSuffix,
+} from './ToolkitCastWorldPicker';
 import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
 import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
@@ -31,8 +34,10 @@ import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter 
 import type { ShotSelection } from '@/config/shotDirector';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
+import { applySceneAssetsToPrompt } from '@/lib/motion-studio/applySceneAssetsToPrompt';
 import { toolkitModelToClipSource } from '@/lib/ai-video/toolkitModelToClipSource';
-import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
+import type { MotionStudioLocation } from '@/types/motion-studio';
+import type { CharacterShot, ComposerCharacter, ComposerScene } from '@/types/video-composer';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
