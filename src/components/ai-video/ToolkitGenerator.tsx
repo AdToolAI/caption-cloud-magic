@@ -665,7 +665,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           disabled={generating || !prompt.trim() || !canAfford}
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          {generating ? (
+          {composingScene ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Szene komponieren…' : 'Composing scene…'}</>
+          ) : generating ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Generiere…' : 'Generating…'}</>
           ) : (
             <><Sparkles className="h-4 w-4 mr-2" /> {language === 'de' ? 'Video generieren' : 'Generate video'}</>
