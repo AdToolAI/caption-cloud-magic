@@ -14312,6 +14312,12 @@ translations.en.uc = {
   noValidScenes: "No valid scenes to render. Please check the scene duration.",
   invalidDuration: "Invalid video duration. Please check voiceover or scenes.",
   renderIdMissing: "Render ID not received",
+  retryRender: "Retry",
+  renderTimeout: "Render timeout (>10 min). Please try again.",
+  renderStartSlow: "AWS start is taking unusually long. Please try again in a minute.",
+  backgroundMusic: "Background music",
+  remove: "Remove",
+  errorPrefix: "Error",
   // BackgroundAssetSelector
   chooseBackground: "Choose Background",
   colors: "Colors",
