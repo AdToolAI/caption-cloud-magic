@@ -626,6 +626,7 @@ export function DirectorsCut() {
     const looksLikeEdl =
       scenes.length >= 3 &&
       scenes.every((s: any) => {
+        if (s?.source === 'seed') return false;
         const e = Number(s.end_time ?? 0);
         return e > 0 && Math.abs(e * 100 - Math.round(e * 100)) < 0.001 && (e * 100) % 50 !== 0;
       });
