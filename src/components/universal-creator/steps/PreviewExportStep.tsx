@@ -341,7 +341,12 @@ export function PreviewExportStep({
                 voiceoverDuration: calculatedDuration,
                 voiceoverVolume: contentConfig.voiceoverVolume ?? 1.0,
                 backgroundMusicUrl: selectedMusicUrl || '',
-                backgroundMusicVolume: musicVolume,
+                // Perceptual curve + Voiceover-Ducking, damit 30% wirklich wie 30%
+                // klingt und die Musik nicht mit der Sprache konkurriert.
+                backgroundMusicVolume: Math.max(0, Math.min(1,
+                  (musicVolume * musicVolume) *
+                  (contentConfig?.voiceoverUrl ? 0.5 : 1)
+                )),
                 subtitles: subtitleConfig?.segments || [],
                 subtitleStyle: subtitleConfig?.style || {
                   position: 'bottom',
