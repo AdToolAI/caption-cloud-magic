@@ -309,30 +309,27 @@ export function PreviewExportStep({
         );
 
         try {
-          // ✅ CRITICAL: Validate and sanitize scenes BEFORE sending to Lambda
-          const validatedScenes = scenes
-            .filter(s => {
-              const dur = Number(s?.duration);
-              return Number.isFinite(dur) && dur > 0;
-            })
-            .map(s => ({
-              ...s,
-              duration: Math.max(0.1, Math.min(600, Number(s.duration))),
-            }));
-          
-          // Check if we have valid scenes to render
+          // Build the SAME customizations object the live preview uses,
+          // so Preview and Render can never silently diverge.
+          const sharedCustomizations = buildUniversalCreatorCustomizations({
+            contentConfig,
+            subtitleConfig,
+            backgroundAsset,
+            scenes,
+            selectedMusicUrl,
+            musicVolume: normalizedMusicVolume,
+          });
+
+          const validatedScenes = validateScenes(scenes);
           if (scenes.length > 0 && validatedScenes.length === 0) {
             throw new Error(t('uc.noValidScenes'));
           }
-          
-          // Calculate duration: use the LONGER of voiceover or scenes (shared helper)
+
           const calculatedDuration = computeTotalDurationSeconds({
             voiceoverDuration: contentConfig.voiceoverDuration,
             actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
             scenes: validatedScenes,
           });
-
-          // Validate calculatedDuration
           if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
             throw new Error(t('uc.invalidDuration'));
           }
@@ -350,22 +347,9 @@ export function PreviewExportStep({
               component_name: 'UniversalCreatorVideo',
               quality: videoQuality,
               customizations: {
-                voiceoverUrl: contentConfig.voiceoverUrl || '',
+                ...sharedCustomizations,
+                // Lambda expects the timeline length here; keep in sync with preview.
                 voiceoverDuration: calculatedDuration,
-                voiceoverVolume: clampAudioVolume(contentConfig.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME),
-                backgroundMusicUrl: selectedMusicUrl || '',
-                backgroundMusicVolume: effectiveMusicVolume,
-                subtitles: subtitleConfig?.segments || [],
-                subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
-                // Szenen für Multi-Scene Timeline - use validated scenes
-                scenes: validatedScenes.length > 0 ? validatedScenes : undefined,
-                // Background nur als Fallback wenn keine Szenen vorhanden
-                background: validatedScenes.length === 0 && backgroundAsset ? {
-                  type: backgroundAsset.type || 'video',
-                  videoUrl: backgroundAsset.type === 'video' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
-                  imageUrl: backgroundAsset.type === 'image' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
-                  color: backgroundAsset.type === 'color' ? backgroundAsset.color : undefined,
-                } : undefined,
               },
               format: 'mp4',
               aspect_ratio: job.format.aspectRatio,
