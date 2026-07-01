@@ -20,6 +20,7 @@ interface CapCutPropertiesPanelProps {
   onSubtitleUpdate?: (clipId: string, updates: Partial<SubtitleClip>) => void;
   onSubtitleDelete?: (clipId: string) => void;
   onClipDelete?: (clipId: string) => void;
+  onSplitAtPlayhead?: () => void;
 }
 
 // SUBTITLE_STYLES moved inside component as useMemo for i18n reactivity
@@ -34,6 +35,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   onSubtitleUpdate,
   onSubtitleDelete,
   onClipDelete,
+  onSplitAtPlayhead,
 }) => {
   const { t } = useTranslation();
 
@@ -54,6 +56,28 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
         ),
       }))
     );
+  };
+
+  // Welle 6.1 — Trim-Inputs bewegen startTime/duration mit, wie Left/Right-Handle-Drag.
+  const applyTrim = (edge: 'start' | 'end', rawValue: number) => {
+    if (!selectedClip) return;
+    const clip = selectedClip;
+    if (edge === 'start') {
+      const newTrimStart = Math.max(0, Math.min(rawValue, clip.trimEnd - 0.1));
+      const delta = newTrimStart - clip.trimStart;
+      updateClip({
+        trimStart: newTrimStart,
+        startTime: Math.max(0, clip.startTime + delta),
+        duration: Math.max(0.1, clip.duration - delta),
+      });
+    } else {
+      const newTrimEnd = Math.max(clip.trimStart + 0.1, rawValue);
+      const newDuration = Math.max(0.1, newTrimEnd - clip.trimStart);
+      updateClip({
+        trimEnd: newTrimEnd,
+        duration: newDuration,
+      });
+    }
   };
 
   return (
@@ -368,14 +392,18 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                   />
                 </div>
               </div>
-              {/* Trim */}
+              {/* Trim (Welle 6.1: bewegt startTime/duration mit) */}
               <div className="grid grid-cols-2 gap-2 mt-2">
                 <div>
                   <label className="text-[10px] text-white/40 block mb-1">Trim Start (s)</label>
                   <Input
                     type="number"
-                    value={selectedClip.trimStart.toFixed(2)}
-                    onChange={(e) => updateClip({ trimStart: Math.max(0, parseFloat(e.target.value) || 0) })}
+                    key={`ts-${selectedClip.id}-${selectedClip.trimStart}`}
+                    defaultValue={selectedClip.trimStart.toFixed(2)}
+                    onBlur={(e) => applyTrim('start', parseFloat(e.target.value) || 0)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    }}
                     className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.05}
                     min={0}
@@ -385,19 +413,41 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                   <label className="text-[10px] text-white/40 block mb-1">Trim End (s)</label>
                   <Input
                     type="number"
-                    value={selectedClip.trimEnd.toFixed(2)}
-                    onChange={(e) => updateClip({ trimEnd: Math.max(0, parseFloat(e.target.value) || 0) })}
+                    key={`te-${selectedClip.id}-${selectedClip.trimEnd}`}
+                    defaultValue={selectedClip.trimEnd.toFixed(2)}
+                    onBlur={(e) => applyTrim('end', parseFloat(e.target.value) || 0)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    }}
                     className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
                     step={0.05}
                     min={0}
                   />
                 </div>
               </div>
-              {/* End time (calculated) */}
+              <p className="text-[10px] text-white/40 mt-1.5 leading-tight">
+                Trim kürzt die sichtbare Länge des Clips auf der Timeline. Enter zum Anwenden.
+              </p>
+              {/* Length + End time (calculated, live) */}
               <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded mt-2">
+                <span>Länge</span>
+                <span>{selectedClip.duration.toFixed(2)}s</span>
+              </div>
+              <div className="flex justify-between text-xs text-white/50 bg-[#0a0a1a]/60 px-2 py-1.5 rounded mt-1">
                 <span>End</span>
                 <span>{(selectedClip.startTime + selectedClip.duration).toFixed(2)}s</span>
               </div>
+              {onSplitAtPlayhead && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onSplitAtPlayhead}
+                  className="w-full mt-2 border-[#00d4ff]/30 text-[#00d4ff] hover:bg-[#00d4ff]/10"
+                >
+                  <Scissors className="h-3.5 w-3.5 mr-2" />
+                  Am Playhead schneiden
+                </Button>
+              )}
             </div>
 
             {/* Fade */}
@@ -434,35 +484,8 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
               </div>
             </div>
 
-            {/* Trim */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Scissors className="h-3.5 w-3.5 text-[#00d4ff]" />
-                <label className="text-xs text-white/60">Trim</label>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-white/40 block mb-1">Trim Start</label>
-                  <Input
-                    type="number"
-                    value={selectedClip.trimStart.toFixed(1)}
-                    onChange={(e) => updateClip({ trimStart: parseFloat(e.target.value) || 0 })}
-                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
-                    step={0.1}
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-white/40 block mb-1">Trim End</label>
-                  <Input
-                    type="number"
-                    value={selectedClip.trimEnd.toFixed(1)}
-                    onChange={(e) => updateClip({ trimEnd: parseFloat(e.target.value) || 0 })}
-                    className="h-7 bg-[#0a0a1a]/60 border-[#F5C76A]/10 text-xs text-white"
-                    step={0.1}
-                  />
-                </div>
-              </div>
-            </div>
+            {/* (Duplicate Trim block removed — Trim now lives in Timing section above.) */}
+
 
             {/* Delete Audio Clip Button */}
             {onClipDelete && (

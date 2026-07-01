@@ -2288,6 +2288,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     onSubtitleUpdate={handleSubtitleUpdate}
                     onSubtitleDelete={handleSubtitleDelete}
                     onClipDelete={handleDeleteClip}
+                    onSplitAtPlayhead={handleSplitAtPlayhead}
                   />
                 </div>
               </>
