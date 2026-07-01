@@ -175,23 +175,21 @@ export function UniversalCreator() {
   };
 
   const handleNewProject = () => {
-    localStorage.removeItem('universal-creator-backup');
+    localStorage.removeItem(BACKUP_STORAGE_KEY);
     setProjectId(undefined);
     setFormatConfig(null);
     setContentConfig(null);
     setBackgroundAsset(null);
     setAudioConfig({
       background_music_id: null,
-      music_volume: 0.3,
-      voiceover_id: null,
-      voiceover_volume: 1.0,
-      sound_effects: [],
+      music_volume: DEFAULT_MUSIC_VOLUME,
     });
     setSelectedMusicUrl(null);
     setSubtitleConfig(undefined);
     setScenes([]);
     setCurrentStep(0);
-    toast.success('Neues Projekt gestartet');
+    setVideoQuality('hd');
+    toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
   };
 
   const saveProgress = async () => {
