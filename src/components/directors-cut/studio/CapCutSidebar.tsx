@@ -897,58 +897,51 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   return (
     <div className="w-full flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
-        {/* Tab Icons — Cyan glow on active */}
-        <TabsList className="grid grid-cols-7 gap-0.5 p-1.5 bg-[#050816] border-b border-[#F5C76A]/10 h-auto rounded-none">
-          <TabsTrigger 
-            value="cut" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title={t('dc.tabCut')}
-          >
-            <Scissors className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger 
-            value="look" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title={t('dc.tabLook')}
-          >
-            <Palette className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger 
-            value="fx" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-purple-500/15 data-[state=active]:text-purple-400 data-[state=active]:shadow-[0_0_12px_rgba(168,85,247,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title={t('dc.tabFX')}
-          >
-            <Wand2 className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger 
-            value="subtitle" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title={t('dc.tabSubtitle')}
-          >
-            <Type className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger 
-            value="audio-fx" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-pink-500/15 data-[state=active]:text-pink-400 data-[state=active]:shadow-[0_0_12px_rgba(236,72,153,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title={t('dc.tabAudio')}
-          >
-            <Music className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger 
-            value="export" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-[#F5C76A]/15 data-[state=active]:text-[#F5C76A] data-[state=active]:shadow-[0_0_12px_rgba(245,199,106,0.2)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title={t('dc.tabExport')}
-          >
-            <Download className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger 
-            value="settings" 
-            className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-[0_0_8px_rgba(255,255,255,0.1)] text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
-            title={t('dc.tabSettings')}
-          >
-            <Settings className="h-3.5 w-3.5" />
-          </TabsTrigger>
-        </TabsList>
+        {/* Library-first shell: icon + label + count badge — Wave 1 Shell */}
+        {(() => {
+          const totalTextCount = (captionCount || 0) + (textOverlayCount || 0);
+          const libraryTabs = [
+            { value: 'cut',      icon: Scissors, label: t('dc.tabCut'),      count: sceneCount || 0,   glow: 'data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)]' },
+            { value: 'look',     icon: Palette,  label: t('dc.tabLook'),     count: 0,                 glow: 'data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)]' },
+            { value: 'fx',       icon: Wand2,    label: t('dc.tabFX'),       count: 0,                 glow: 'data-[state=active]:bg-purple-500/15 data-[state=active]:text-purple-400 data-[state=active]:shadow-[0_0_12px_rgba(168,85,247,0.2)]' },
+            { value: 'subtitle', icon: Type,     label: t('dc.tabSubtitle'), count: totalTextCount,    glow: 'data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)]' },
+            { value: 'audio-fx', icon: Music,    label: t('dc.tabAudio'),    count: 0,                 glow: 'data-[state=active]:bg-pink-500/15 data-[state=active]:text-pink-400 data-[state=active]:shadow-[0_0_12px_rgba(236,72,153,0.2)]' },
+            { value: 'export',   icon: Download, label: t('dc.tabExport'),   count: 0,                 glow: 'data-[state=active]:bg-[#F5C76A]/15 data-[state=active]:text-[#F5C76A] data-[state=active]:shadow-[0_0_12px_rgba(245,199,106,0.2)]' },
+          ] as const;
+          return (
+            <TabsList className="flex flex-col gap-1 p-1.5 bg-[#050816] border-b border-[#F5C76A]/10 h-auto rounded-none">
+              <div className="grid grid-cols-3 gap-1 w-full">
+                {libraryTabs.map(({ value, icon: Icon, label, count, glow }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    title={label}
+                    className={cn(
+                      "relative flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg text-white/50 hover:text-white/80 hover:bg-white/5 transition-all",
+                      glow
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-[10px] font-medium leading-none tracking-wide uppercase">{label}</span>
+                    {count > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#F5C76A]/20 text-[#F5C76A] text-[9px] font-semibold flex items-center justify-center">
+                        {count > 99 ? '99+' : count}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </div>
+              <TabsTrigger
+                value="settings"
+                title={t('dc.tabSettings')}
+                className="flex items-center justify-center gap-1.5 py-1 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-[0_0_8px_rgba(255,255,255,0.1)] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+              >
+                <Settings className="h-3 w-3" />
+                <span className="text-[10px] tracking-wide uppercase">{t('dc.tabSettings')}</span>
+              </TabsTrigger>
+            </TabsList>
+          );
+        })()}
 
         <ScrollArea className="flex-1">
           {/* TAB: Cut (Schnitt) */}
