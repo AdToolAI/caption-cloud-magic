@@ -74,6 +74,7 @@ export function PreviewExportStep({
   const qualityMultiplier = videoQuality === '4k' ? 2 : 1;
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render * qualityMultiplier;
   const normalizedMusicVolume = clampAudioVolume(musicVolume);
+  const previewMaxWidth = Math.min(920, Math.round(520 * (formatConfig.width / formatConfig.height)));
 
   // Extract active render IDs to prevent infinite loop
   const activeRenderJobs = useMemo(
@@ -549,17 +550,8 @@ export function PreviewExportStep({
         <h3 className="text-lg font-semibold mb-4">{t('uc.preview')}</h3>
         {(contentConfig?.voiceoverUrl || (scenes && scenes.length > 0)) ? (
           <div
-            className="bg-black rounded-lg overflow-hidden mx-auto"
-            style={{
-              aspectRatio:
-                formatConfig.aspectRatio === '16:9' ? '16/9' :
-                formatConfig.aspectRatio === '9:16' ? '9/16' :
-                formatConfig.aspectRatio === '1:1' ? '1/1' :
-                formatConfig.aspectRatio === '4:5' ? '4/5' :
-                formatConfig.aspectRatio === '4:3' ? '4/3' : '16/9',
-              maxHeight: '520px',
-              width: '100%',
-            }}
+            className="mx-auto w-full"
+            style={{ maxWidth: `${previewMaxWidth}px` }}
           >
             <RemotionPreviewPlayer
               componentName="UniversalCreatorVideo"
@@ -579,6 +571,7 @@ export function PreviewExportStep({
                 scenes,
               }, formatConfig.fps || 30)}
               fps={formatConfig.fps || 30}
+              className="w-full"
             />
           </div>
         ) : (
