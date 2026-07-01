@@ -1979,10 +1979,21 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             )}
           </div>
 
-          {/* Center Area */}
+          {/* Welle 5 — Library ↔ Preview Divider */}
+          {!sidebarCollapsed && (
+            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={280} max={560} />
+          )}
+
+          {/* Welle 5 — Preview + Timeline Panel */}
           <div className="flex-1 flex flex-col min-w-0">
+            {/* Column header */}
+            <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60">
+              <MonitorPlay className="h-3.5 w-3.5 text-[#00d4ff]" />
+              <span className="text-[11px] uppercase tracking-wider text-[#00d4ff]/80 font-semibold">Vorschau &amp; Timeline</span>
+              <span className="ml-auto text-[10px] text-white/40 tabular-nums">{currentTime.toFixed(2)}s / {actualTotalDuration.toFixed(2)}s</span>
+            </div>
             {/* Preview Player */}
-            <div className="h-[50%] min-h-[280px] p-2 bg-[#050816] overflow-hidden flex flex-col">
+            <div className="h-[calc(50%-1rem)] min-h-[280px] p-2 bg-[#050816] overflow-hidden flex flex-col">
               <DirectorsCutPreviewPlayer
                 fillContainer={true}
                 videoUrl={cleanedVideoUrl || videoUrl}
