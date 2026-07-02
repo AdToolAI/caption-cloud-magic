@@ -437,5 +437,5 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl, isPlayingRef]);
+  }, [scenes, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl, isPlayingRef]);
 }
