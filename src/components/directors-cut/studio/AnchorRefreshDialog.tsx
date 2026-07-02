@@ -22,6 +22,7 @@ import {
   type AnchorDrift,
 } from '@/lib/directors-cut/anchorRefresh';
 import { extractVideoFrame } from '@/lib/directors-cut/videoFrameExtractor';
+import { trackUDC } from '@/lib/analytics';
 
 interface Props {
   open: boolean;
