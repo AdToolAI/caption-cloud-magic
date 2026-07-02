@@ -404,7 +404,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         startImageUrl ??
         mentionResolved.referenceImageUrl ??
         null;
-      if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
+      // Route the reference image according to the user-selected placement.
+      // 'end' needs capabilities.endFrame; 'anchor' routes into referenceImages[]
+      // when the provider supports subject-reference (Vidu multiRef).
+      const effectivePlacement: 'start' | 'end' | 'anchor' =
+        referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
+        : referencePlacement === 'anchor' && !model.capabilities.multiRef ? 'start'
+        : referencePlacement;
+
+      if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
+        body.startImageUrl = referenceImage;
+      } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
+        body.endImageUrl = referenceImage;
+      }
+      // 'anchor' → don't set start/end; if the provider supports multiRef, the
+      // uploaded image is merged into referenceImages[] below.
       // v2v: pass reference clip + reference type (Kling-3 omni)
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
