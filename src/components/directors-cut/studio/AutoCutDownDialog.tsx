@@ -44,6 +44,11 @@ export function AutoCutDownDialog({
     [scenes],
   );
 
+  useEffect(() => {
+    if (open) trackUDC('udc_autocut_opened', { current_total: currentTotal, target });
+  }, [open, currentTotal, target]);
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-[#0A0B14] border-[#F5C76A]/20 text-white">
