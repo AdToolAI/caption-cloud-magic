@@ -117,7 +117,54 @@ const SubtitleClipSchema = z.object({
   source: z.string().optional(),
 }).passthrough();
 
-// ========== SHARED SUBTITLE RENDERER — single source of truth for all paths ==========
+// ========== TIMELINE AUDIO TRACKS — SFX + extra VO/music clips (audit C1) ==========
+// Renders every non-muted timeline clip as its own <Audio> so nothing that shows
+// up on the timeline is silently dropped by the render (previously the payload
+// only carried voiceover_url + background_music_url singletons).
+type TimelineAudioTrack = NonNullable<z.infer<typeof DirectorsCutVideoSchema>['audioTracks']>[number];
+const TimelineAudioTracksRenderer: React.FC<{
+  tracks: TimelineAudioTrack[] | undefined;
+  fps: number;
+  hasVoiceoverForDucking: boolean;
+}> = ({ tracks, fps, hasVoiceoverForDucking }) => {
+  if (!tracks || tracks.length === 0) return null;
+  const anySolo = tracks.some(t => t.solo);
+  return (
+    <>
+      {tracks.map(track => {
+        if (track.muted) return null;
+        if (anySolo && !track.solo) return null;
+        const trackVol = Math.max(0, Math.min(100, track.volume ?? 100)) / 100;
+        const isMusicTrack = track.type === 'background-music';
+        return (track.clips || []).map(clip => {
+          if (!clip.url) return null;
+          const clipVol = Math.max(0, Math.min(100, clip.volume ?? 100)) / 100;
+          const trimStart = Math.max(0, clip.trimStart ?? 0);
+          const trimEnd = Math.max(trimStart, clip.trimEnd ?? clip.duration);
+          const usable = Math.max(0.05, trimEnd - trimStart);
+          const startFrame = Math.max(0, Math.round((clip.startTime ?? 0) * fps));
+          const durationFrames = Math.max(1, Math.round(usable * fps));
+          // Duck background music under voiceovers to match preview mixer.
+          const duck = isMusicTrack && hasVoiceoverForDucking ? 0.35 : 1;
+          const finalVol = Math.max(0, Math.min(1, trackVol * clipVol * duck));
+          if (finalVol <= 0) return null;
+          return (
+            <Sequence key={clip.id} from={startFrame} durationInFrames={durationFrames} layout="none">
+              <Audio
+                src={clip.url}
+                volume={finalVol}
+                startFrom={Math.round(trimStart * fps)}
+                pauseWhenBuffering
+              />
+            </Sequence>
+          );
+        });
+      })}
+    </>
+  );
+};
+
+
 const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => {
   const strokeEnabled = clip.textStroke && (clip.textStrokeWidth ?? 0) > 0;
   const strokeColor = clip.textStrokeColor || '#000000';
@@ -240,6 +287,28 @@ export const DirectorsCutVideoSchema = z.object({
   voiceoverVolume: z.number().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
+  // Full timeline audio (SFX + extra clips beyond the singletons above).
+  // Each clip is rendered as its own <Audio> at its timeline startTime,
+  // trimmed by [trimStart, trimEnd], scaled by track volume × clip volume.
+  audioTracks: z.array(z.object({
+    id: z.string(),
+    type: z.enum(['voiceover', 'background-music', 'sound-effect', 'original']).optional(),
+    volume: z.number().optional(),
+    muted: z.boolean().optional(),
+    solo: z.boolean().optional(),
+    clips: z.array(z.object({
+      id: z.string(),
+      url: z.string(),
+      startTime: z.number(),
+      duration: z.number(),
+      trimStart: z.number().optional(),
+      trimEnd: z.number().optional(),
+      volume: z.number().optional(),
+      fadeIn: z.number().optional(),
+      fadeOut: z.number().optional(),
+      source: z.string().optional(),
+    })).optional(),
+  })).optional(),
   // Sound Design
   soundDesign: z.object({
     enabled: z.boolean(),
@@ -637,6 +706,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   voiceoverVolume = 100,
   backgroundMusicUrl,
   backgroundMusicVolume = 30,
+  audioTracks,
   soundDesign,
   textOverlays = [],
   subtitleTrack,
@@ -953,6 +1023,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         {!previewMode && voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
         {/* Background Music - skip in preview mode */}
         {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={effectiveMusicVolume} loop pauseWhenBuffering />}
+        {!previewMode && <TimelineAudioTracksRenderer tracks={audioTracks} fps={fps} hasVoiceoverForDucking={!!voiceoverUrl} />}
         {/* Text Overlays */}
         {textOverlays.map((overlay) => {
           const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
@@ -1312,6 +1383,17 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           pauseWhenBuffering
         />
       )}
+
+      {/* Timeline audio tracks (SFX + extra clips) — audit C1 */}
+      {!previewMode && (
+        <TimelineAudioTracksRenderer
+          tracks={audioTracks}
+          fps={fps}
+          hasVoiceoverForDucking={!!voiceoverUrl}
+        />
+      )}
+
+
 
       {/* Sound Design Audio */}
       {!previewMode && soundDesign?.enabled && soundDesign.ambientUrl && (

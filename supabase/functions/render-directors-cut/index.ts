@@ -248,6 +248,8 @@ serve(async (req) => {
       // collisions when triggered from the Deep Sweep alongside other Lambda jobs.
       qa_stability_mode,
       max_lambda_workers,
+      // Timeline audio tracks (SFX, extra VO/music clips beyond the legacy singletons)
+      audio_tracks,
     } = await req.json();
 
     if (!source_video_url) {
@@ -578,6 +580,9 @@ serve(async (req) => {
       voiceoverVolume: audio_settings?.voiceover_volume || 100,
       backgroundMusicUrl: background_music_url,
       backgroundMusicVolume: audio_settings?.background_music_volume || 30,
+      // Full timeline audio (SFX + extra clips) — Remotion renders each clip
+      // as its own <Audio> so nothing is silently dropped (audit C1).
+      audioTracks: Array.isArray(audio_tracks) ? audio_tracks : undefined,
       // Sound Design
       soundDesign: sound_design?.enabled ? {
         enabled: true,
