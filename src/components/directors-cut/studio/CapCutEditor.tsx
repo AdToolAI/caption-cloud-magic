@@ -1279,14 +1279,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       return [
         {
           ...sc,
-          id: sc.id,
+          id: `scene-${now}-a`,
           end_time: currentTime,
           original_start_time: srcInBase,
           original_end_time: srcSplit,
         },
         {
           ...sc,
-          id: `scene-${now}`,
+          id: `scene-${now}-b`,
           start_time: currentTime,
           original_start_time: srcSplit,
           original_end_time: srcOutBase,
@@ -1295,6 +1295,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       ];
     });
     onScenesUpdate(newScenes);
+    // Nudge the playhead 1 frame into the new second segment so an immediate
+    // re-split works AND the preview player force-rebinds the overlay video.
+    setCurrentTime(Math.min(currentTime + 0.03, targetScene.end_time - 0.02));
     toast.success(t('dc.sceneSplitAtPlayhead'));
   }, [scenes, currentTime, onScenesUpdate, t]);
 
