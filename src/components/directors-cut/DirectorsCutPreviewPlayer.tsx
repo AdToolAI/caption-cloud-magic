@@ -597,6 +597,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
   }, []);
 
+  // Publish the concrete implementation to the forward-ref used by handleVideoEnded.
+  useEffect(() => {
+    resetToPrimaryVideoSlotRef.current = resetToPrimaryVideoSlot;
+    return () => { resetToPrimaryVideoSlotRef.current = null; };
+  }, [resetToPrimaryVideoSlot]);
+
   const seekToTimelineTime = useCallback((timelineTime: number, options?: { resetGuards?: boolean; forcePrimarySlot?: boolean }) => {
     const safeTimelineTime = Math.max(0, Math.min(timelineTime, duration));
     const sourceTime = timelineToSourceTime(safeTimelineTime);
