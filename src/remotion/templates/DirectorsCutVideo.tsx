@@ -563,7 +563,7 @@ const SceneVideo: React.FC<{
         // Render video (original source or additionalMedia video)
         <Video
           src={mediaUrl}
-          startFrom={hasAdditionalMedia ? 0 : sourceStartFrame}
+          startFrom={sourceStartFrame}
           playbackRate={playbackRate}
           pauseWhenBuffering={!previewMode}
           style={{
