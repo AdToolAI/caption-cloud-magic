@@ -1749,6 +1749,42 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // W4.4 Auto Cut-Down — 15s / 6s ad ableger
   const [cutDownOpen, setCutDownOpen] = useState(false);
 
+  // W4.5 Cut-Down als Snapshot — bewahrt den Master vor destruktiven Cut-Downs.
+  const snapshotKey = useMemo(
+    () => (projectId ? `udc:master-snapshot:${projectId}` : null),
+    [projectId],
+  );
+  const [masterSnapshot, setMasterSnapshot] = useState<{
+    scenes: SceneAnalysis[];
+    target: number;
+    at: number;
+  } | null>(() => {
+    if (typeof window === 'undefined' || !snapshotKey) return null;
+    try {
+      const raw = window.sessionStorage.getItem(snapshotKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined' || !snapshotKey) return;
+    if (masterSnapshot) {
+      try {
+        window.sessionStorage.setItem(snapshotKey, JSON.stringify(masterSnapshot));
+      } catch {
+        /* quota — safe to ignore */
+      }
+    } else {
+      try {
+        window.sessionStorage.removeItem(snapshotKey);
+      } catch {
+        /* noop */
+      }
+    }
+  }, [snapshotKey, masterSnapshot]);
+
+
 
 
   const handleExportVideo = useCallback(async () => {
@@ -2228,6 +2264,23 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             <Scissors className="h-3.5 w-3.5" />
           </Button>
+          {masterSnapshot && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1 text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10 border border-emerald-500/30"
+              onClick={() => {
+                commitHistory();
+                onScenesUpdate?.(masterSnapshot.scenes);
+                setMasterSnapshot(null);
+                toast.success('Master wiederhergestellt — Cut-Down verworfen.');
+              }}
+              title={`Master wiederherstellen (Cut-Down ${masterSnapshot.target}s aktiv)`}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide">Master</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -2722,10 +2775,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         open={cutDownOpen}
         onOpenChange={setCutDownOpen}
         scenes={scenes}
+        hasMasterSnapshot={!!masterSnapshot}
         onApply={(next, target) => {
+          // Snapshot master BEFORE mutating so the user can always restore it.
+          if (!masterSnapshot) {
+            setMasterSnapshot({ scenes, target, at: Date.now() });
+          }
           commitHistory();
           onScenesUpdate?.(next);
-          toast.success(`Auto Cut-Down ${target}s angewendet — ${next.length} Szene(n) auf Timeline.`);
+          toast.success(
+            `Auto Cut-Down ${target}s angewendet — Master als Snapshot gesichert.`,
+            {
+              description: 'Über den ↺-Button in der Toolbar jederzeit wiederherstellbar.',
+            },
+          );
         }}
       />
 

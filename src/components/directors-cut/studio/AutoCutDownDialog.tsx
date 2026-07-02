@@ -19,6 +19,8 @@ interface AutoCutDownDialogProps {
   onOpenChange: (v: boolean) => void;
   scenes: SceneAnalysis[];
   onApply: (nextScenes: SceneAnalysis[], target: number) => void;
+  /** When true, master already backed up — dialog shows a reassuring note. */
+  hasMasterSnapshot?: boolean;
 }
 
 const PRESETS: { value: CutDownPreset; label: string; sub: string }[] = [
@@ -31,6 +33,7 @@ export function AutoCutDownDialog({
   onOpenChange,
   scenes,
   onApply,
+  hasMasterSnapshot = false,
 }: AutoCutDownDialogProps) {
   const [target, setTarget] = useState<CutDownPreset>(15);
 
@@ -51,8 +54,18 @@ export function AutoCutDownDialog({
           <DialogDescription className="text-white/60">
             Erzeuge aus deinem {currentTotal.toFixed(1)}s Master automatisch eine
             Ad-Kürze — Hook + Payoff bleiben immer erhalten.
+            {hasMasterSnapshot ? (
+              <span className="block mt-1 text-emerald-300/90 text-xs">
+                Master ist bereits als Snapshot gesichert — Restore-Button in der Toolbar.
+              </span>
+            ) : (
+              <span className="block mt-1 text-white/40 text-xs">
+                Beim Anwenden wird dein Master automatisch als Snapshot gesichert.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
+
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
