@@ -108,7 +108,15 @@ export function CIPreflightDialog({
                 Zuerst beheben
               </Button>
               <Button
-                onClick={onIgnoreAndRender}
+                onClick={() => {
+                  if (!hasBlockers && findings.length > 0) {
+                    trackUDC('udc_preflight_bypassed', {
+                      warn: findings.filter((f) => f.severity === 'warn').length,
+                      info: findings.filter((f) => f.severity === 'info').length,
+                    });
+                  }
+                  onIgnoreAndRender();
+                }}
                 disabled={hasBlockers}
                 variant={hasBlockers ? 'secondary' : 'default'}
               >
