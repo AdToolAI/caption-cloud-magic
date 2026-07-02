@@ -580,6 +580,9 @@ serve(async (req) => {
       voiceoverVolume: audio_settings?.voiceover_volume || 100,
       backgroundMusicUrl: background_music_url,
       backgroundMusicVolume: audio_settings?.background_music_volume || 30,
+      // Full timeline audio (SFX + extra clips) — Remotion renders each clip
+      // as its own <Audio> so nothing is silently dropped (audit C1).
+      audioTracks: Array.isArray(audio_tracks) ? audio_tracks : undefined,
       // Sound Design
       soundDesign: sound_design?.enabled ? {
         enabled: true,
