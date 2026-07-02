@@ -2653,6 +2653,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         }}
       />
       <ShortcutOverlay open={shortcutOverlayOpen} onOpenChange={setShortcutOverlayOpen} />
+      <CIPreflightDialog
+        open={preflightOpen}
+        onOpenChange={setPreflightOpen}
+        findings={preflightFindings}
+        onIgnoreAndRender={() => {
+          setPreflightOpen(false);
+          void runExportInternal();
+        }}
+        onFixIssues={() => setPreflightOpen(false)}
+      />
     </div>
   );
 };
