@@ -52,6 +52,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   currentTime,
   onTrimScene,
   onSplitAtTrim,
+  onSeek,
   onSceneDelete,
 }) => {
   const { t } = useTranslation();
