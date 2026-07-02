@@ -1145,6 +1145,8 @@ export function DirectorsCut() {
         projectId={projectId}
         onCleanedVideoUrlChange={handleCleanedVideoUrlChange}
         onSaveProject={saveProject}
+        autosaveStatus={autosaveStatus}
+        autosaveLastSavedAt={autosaveLastSavedAt}
         subtitleSafeZone={subtitleSafeZone}
         onSubtitleSafeZoneChange={setSubtitleSafeZone}
         onResetProject={handleResetProject}
