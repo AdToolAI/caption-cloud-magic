@@ -271,12 +271,13 @@ export function DirectorsCut() {
     return selectedVideo?.duration || 0;
   }, [selectedVideo?.duration]);
 
-  // Timeline (composite) duration — extends beyond the source when scenes
-  // are appended (e.g. uploaded clips) but never shrinks below the source.
+  // Timeline (composite) duration — source duration is kept separately above.
+  // Once scenes exist, the timeline duration must be the edited EDL length;
+  // otherwise trims/deletes still preview/export the full original video.
   const actualTotalDuration = useMemo(() => {
     const base = originalVideoDuration || 30;
     if (scenes.length === 0) return base;
-    return Math.max(base, ...scenes.map(s => s.end_time));
+    return Math.max(0.1, ...scenes.map(s => s.end_time));
   }, [scenes, originalVideoDuration]);
 
   // AI Co-Pilot command handler
