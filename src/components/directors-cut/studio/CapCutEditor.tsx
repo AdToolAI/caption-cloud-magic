@@ -1176,7 +1176,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       cells: anchorGrid.cells,
       playhead: currentTime,
       occupiedRanges: occupied,
-      preferredMinDuration: 1,
+      preferredMinDuration: opts.naturalDuration ?? 1,
     });
     if (cell) {
       return {
