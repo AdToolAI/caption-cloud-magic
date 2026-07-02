@@ -565,6 +565,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     enabled: !isRendering,
   });
 
+  // Stable ref to history.commit so mutation handlers (defined below) can flush
+  // the pending debounce synchronously without adding `history` to their deps.
+  const historyCommitRef = useRef<() => void>(() => {});
+  useEffect(() => { historyCommitRef.current = history.commit; }, [history.commit]);
+  const commitHistory = useCallback(() => historyCommitRef.current(), []);
+
   // Keyboard shortcuts (Ctrl+Z/Y/Space)
   useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
