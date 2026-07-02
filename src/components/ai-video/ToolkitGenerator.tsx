@@ -538,6 +538,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           value={model.id}
           onChange={setModelId}
           currency={currency}
+          lockedModelIds={
+            referencePlacement === 'end'
+              ? AI_VIDEO_TOOLKIT_MODELS.filter((m) => !m.capabilities.endFrame).map((m) => m.id)
+              : referencePlacement === 'anchor'
+              ? AI_VIDEO_TOOLKIT_MODELS.filter((m) => !m.capabilities.anchorOnly).map((m) => m.id)
+              : undefined
+          }
+          lockedReason={
+            referencePlacement === 'end'
+              ? (language === 'de'
+                  ? 'Endframe wird nur von Luma Ray 2 unterstützt. Placement zurück auf „Am Anfang" setzen, um andere Modelle zu wählen.'
+                  : 'End-frame is only supported by Luma Ray 2. Reset placement to "At start" to select other models.')
+              : (language === 'de'
+                  ? 'Anker-Modus wird nur von Vidu Q2 und Kling 3 unterstützt.'
+                  : 'Anchor mode is only supported by Vidu Q2 and Kling 3.')
+          }
         />
       </div>
 
