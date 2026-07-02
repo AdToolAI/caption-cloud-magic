@@ -1749,6 +1749,42 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // W4.4 Auto Cut-Down — 15s / 6s ad ableger
   const [cutDownOpen, setCutDownOpen] = useState(false);
 
+  // W4.5 Cut-Down als Snapshot — bewahrt den Master vor destruktiven Cut-Downs.
+  const snapshotKey = useMemo(
+    () => (projectId ? `udc:master-snapshot:${projectId}` : null),
+    [projectId],
+  );
+  const [masterSnapshot, setMasterSnapshot] = useState<{
+    scenes: SceneAnalysis[];
+    target: number;
+    at: number;
+  } | null>(() => {
+    if (typeof window === 'undefined' || !snapshotKey) return null;
+    try {
+      const raw = window.sessionStorage.getItem(snapshotKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined' || !snapshotKey) return;
+    if (masterSnapshot) {
+      try {
+        window.sessionStorage.setItem(snapshotKey, JSON.stringify(masterSnapshot));
+      } catch {
+        /* quota — safe to ignore */
+      }
+    } else {
+      try {
+        window.sessionStorage.removeItem(snapshotKey);
+      } catch {
+        /* noop */
+      }
+    }
+  }, [snapshotKey, masterSnapshot]);
+
+
 
 
   const handleExportVideo = useCallback(async () => {
