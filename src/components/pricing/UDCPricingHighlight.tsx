@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Mic, RefreshCw, Scissors, ArrowRight, Sparkles } from "lucide-react";
+import { trackUDC } from "@/lib/analytics";
 
 /**
  * UDC-specific pricing positioning card.
