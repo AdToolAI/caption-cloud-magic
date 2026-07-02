@@ -537,7 +537,7 @@ const SceneVideo: React.FC<{
 
 
   // Determine if this scene uses additional media (video or image)
-  const hasAdditionalMedia = scene.additionalMedia && scene.isFromOriginalVideo === false;
+  const hasAdditionalMedia = !!scene.additionalMedia && (scene.sourceMode === 'media' || scene.isFromOriginalVideo === false);
   const isImage = hasAdditionalMedia && scene.additionalMedia?.type === 'image';
   const mediaUrl = hasAdditionalMedia && scene.additionalMedia?.url ? scene.additionalMedia.url : sourceVideoUrl;
 
