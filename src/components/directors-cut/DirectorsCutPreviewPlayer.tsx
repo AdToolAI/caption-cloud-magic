@@ -1718,6 +1718,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                 el.currentTime = src;
               } catch {}
             }}
+            onSeeked={(e) => {
+              // Symmetric to Slot A: only reveal Slot B once its seek to the
+              // pre-handle in-point has actually landed. Prevents a one-frame
+              // flash of frame 0 while the transition ramps its opacity in.
+              if (activeSlotRef.current === 'B') {
+                e.currentTarget.style.opacity = '1';
+              }
+            }}
           />
 
           {/* Media Overlay (uploaded video clips for `media` scenes) */}
