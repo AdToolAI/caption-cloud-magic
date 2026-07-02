@@ -420,20 +420,35 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         mentionResolved.referenceImageUrl ??
         null;
       // Route the reference image according to the user-selected placement.
-      // 'end' needs capabilities.endFrame; 'anchor' routes into referenceImages[]
-      // when the provider supports subject-reference (Vidu multiRef).
+      // 'end'    → capabilities.endFrame (only Luma Ray 2 supports end-only)
+      // 'anchor' → capabilities.anchorOnly (Vidu Q2 / Kling 3 subject-reference)
       const effectivePlacement: 'start' | 'end' | 'anchor' =
         referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
-        : referencePlacement === 'anchor' && !model.capabilities.multiRef ? 'start'
+        : referencePlacement === 'anchor' && !model.capabilities.anchorOnly ? 'start'
         : referencePlacement;
+
+      // Safety-net: block invalid end-placement submissions (UI should already prevent this)
+      if (referencePlacement === 'end' && !model.capabilities.endFrame) {
+        toast.error(
+          language === 'de'
+            ? `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`
+            : `${model.name} does not support end-frame. Please switch to Luma Ray 2.`,
+        );
+        setGenerating(false);
+        return;
+      }
 
       if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
         body.startImageUrl = referenceImage;
       } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
         body.endImageUrl = referenceImage;
+      } else if (referenceImage && effectivePlacement === 'anchor' && model.capabilities.anchorOnly) {
+        // Anchor mode: pass image via referenceImages[] without forcing a frame.
+        // Kling 3 accepts up to 7 refs, Vidu Q2 handles this through its own multi-ref path.
+        if (!model.capabilities.multiRef) {
+          body.referenceImages = [referenceImage];
+        }
       }
-      // 'anchor' → don't set start/end; if the provider supports multiRef, the
-      // uploaded image is merged into referenceImages[] below.
       // v2v: pass reference clip + reference type (Kling-3 omni)
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
