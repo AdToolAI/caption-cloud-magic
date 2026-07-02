@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mic, Sparkles, Play, Volume2, Pause, Loader2, Info, Plus } from 'lucide-react';
+import { Mic, Sparkles, Play, Volume2, Pause, Loader2, Info, Plus, Lock, Unlock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -59,6 +59,18 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // W4.1 Voice-Lock: pin voice/language/tone across all UDC voiceovers for this project
+  const lockStorageKey = projectId ? `udc-voice-lock:${projectId}` : null;
+  const [lockedVoiceId, setLockedVoiceId] = useState<string | null>(() => {
+    if (!lockStorageKey) return null;
+    try {
+      const raw = localStorage.getItem(lockStorageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.voiceId ?? null;
+    } catch { return null; }
+  });
+
   // Load voices dynamically (premium + account + cloned)
   const loadVoices = async () => {
     setLoadingVoices(true);
@@ -85,15 +97,57 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
   const currentTabVoices = voicesForLang(selectedLanguageTab);
 
-  // Auto-select first voice when switching tabs if current is not in tab
+  // Hydrate locked voice into settings once voices load
+  useEffect(() => {
+    if (!lockStorageKey || loadingVoices || !lockedVoiceId) return;
+    try {
+      const raw = localStorage.getItem(lockStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.voiceId && parsed.voiceId !== settings.voiceId) {
+        onSettingsChange({
+          ...settings,
+          voiceId: parsed.voiceId,
+          language: parsed.language ?? settings.language,
+          emotionalTone: parsed.emotionalTone ?? settings.emotionalTone,
+        });
+      }
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingVoices, lockedVoiceId]);
+
+  // Auto-select first voice when switching tabs if current is not in tab (respect lock)
   useEffect(() => {
     if (loadingVoices || currentTabVoices.length === 0) return;
+    if (lockedVoiceId) return; // locked → do not auto-swap
     if (!currentTabVoices.find((v) => v.id === settings.voiceId)) {
       const newLang = selectedLanguageTab === 'de' ? 'de-DE' : selectedLanguageTab === 'es' ? 'es-ES' : 'en-US';
       onSettingsChange({ ...settings, voiceId: currentTabVoices[0].id, language: newLang });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLanguageTab, loadingVoices, voices.length]);
+  }, [selectedLanguageTab, loadingVoices, voices.length, lockedVoiceId]);
+
+  const toggleVoiceLock = () => {
+    if (!lockStorageKey) {
+      toast.error('Voice-Lock benötigt ein gespeichertes Projekt');
+      return;
+    }
+    if (lockedVoiceId) {
+      localStorage.removeItem(lockStorageKey);
+      setLockedVoiceId(null);
+      toast.success('Voice-Lock entfernt');
+    } else {
+      const payload = {
+        voiceId: settings.voiceId,
+        language: settings.language,
+        emotionalTone: settings.emotionalTone,
+      };
+      localStorage.setItem(lockStorageKey, JSON.stringify(payload));
+      setLockedVoiceId(settings.voiceId);
+      const voice = voices.find((v) => v.id === settings.voiceId);
+      toast.success(`Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!settings.scriptText.trim()) {
@@ -139,6 +193,10 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   };
 
   const handleVoiceSelect = (voiceId: string) => {
+    if (lockedVoiceId && voiceId !== lockedVoiceId) {
+      toast.warning('Voice-Lock aktiv – entsperre zuerst, um die Stimme zu wechseln', { id: 'udc-voice-lock-warn' });
+      return;
+    }
     const voice = voices.find((v) => v.id === voiceId);
     const lang = voice?.language || selectedLanguageTab;
     const newLanguage = lang === 'de' ? 'de-DE' : lang === 'es' ? 'es-ES' : 'en-US';
@@ -147,6 +205,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   };
 
   const estimatedDuration = Math.ceil(settings.scriptText.length / 15 / settings.speed);
+  const lockedVoiceName = lockedVoiceId ? (voices.find((v) => v.id === lockedVoiceId)?.name ?? lockedVoiceId) : null;
 
   return (
     <Card className="p-4 space-y-4">
@@ -154,11 +213,29 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
         <div className="flex items-center gap-2">
           <Mic className="h-5 w-5 text-primary" />
           <h3 className="font-semibold">AI Voice-Over</h3>
+          {lockedVoiceName && (
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 gap-1 bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+              <Lock className="h-2.5 w-2.5" /> {lockedVoiceName}
+            </Badge>
+          )}
         </div>
-        <Switch
-          checked={settings.enabled}
-          onCheckedChange={(enabled) => onSettingsChange({ ...settings, enabled })}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={toggleVoiceLock}
+            className="h-7 px-2 text-xs gap-1"
+            title={lockedVoiceId ? 'Voice-Lock entfernen' : 'Aktuelle Stimme für dieses Projekt sperren'}
+          >
+            {lockedVoiceId ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+            {lockedVoiceId ? 'Entsperren' : 'Sperren'}
+          </Button>
+          <Switch
+            checked={settings.enabled}
+            onCheckedChange={(enabled) => onSettingsChange({ ...settings, enabled })}
+          />
+        </div>
       </div>
 
       {settings.enabled && (
