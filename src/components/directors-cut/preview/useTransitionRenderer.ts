@@ -422,6 +422,14 @@ export function useTransitionRenderer(
               : getSceneSourceStart(incomingScene)
             : undefined;
           seekStandby(rt.incomingSceneId, scenes, preSeekTime);
+
+          // Pre-arm media overlay early so it is fully decoded and ready to
+          // paint the exact handoff frame with zero rebind delay.
+          if (incomingScene && incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video') {
+            const incomingRate = (incomingScene as any).playbackRate ?? 1;
+            const overlayHandoffTime = getSceneSourceStart(incomingScene) + rt.duration * incomingRate;
+            preArmMediaOverlay(incomingScene, overlayHandoffTime);
+          }
           standby.style.opacity = '0';
           standby.style.pointerEvents = 'none';
           // Also make sure standby is paused during pre-seek if the user paused.
