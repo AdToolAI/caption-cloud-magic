@@ -24,11 +24,15 @@ interface ModelSelectorProps {
   models?: ToolkitModel[];
   /** Optional className for the trigger (e.g. compact size). */
   className?: string;
+  /** Model ids that should render as disabled (e.g. locked by placement mode). */
+  lockedModelIds?: string[];
+  /** Tooltip / hint shown when a lockedModelIds entry is hovered. */
+  lockedReason?: string;
 }
 
 const GROUP_ORDER: ToolkitModelGroup[] = ['recommended', 'audio', 'fast', 'premium'];
 
-export function ModelSelector({ value, onChange, currency, models, className }: ModelSelectorProps) {
+export function ModelSelector({ value, onChange, currency, models, className, lockedModelIds, lockedReason }: ModelSelectorProps) {
   const { language } = useTranslation();
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as 'de' | 'en' | 'es';
   const symbol = currency === 'USD' ? '$' : '€';
