@@ -183,7 +183,46 @@ export const ANALYTICS_EVENTS = {
   CHARACTER_REPORTED: 'character_reported',
   MARKETPLACE_VIEWED: 'marketplace_viewed',
   MARKETPLACE_SEARCH: 'marketplace_search',
+
+  // Universal Directors Cut — Moat features (Consistency-First NLE)
+  UDC_VOICE_LOCK_SET: 'udc_voice_lock_set',
+  UDC_VOICE_LOCK_MISMATCH_SHOWN: 'udc_voice_lock_mismatch_shown',
+  UDC_ANCHOR_REFRESH_OPENED: 'udc_anchor_refresh_opened',
+  UDC_ANCHOR_SNAP_APPLIED: 'udc_anchor_snap_applied',
+  UDC_PREFLIGHT_OPENED: 'udc_preflight_opened',
+  UDC_PREFLIGHT_BLOCKED_EXPORT: 'udc_preflight_blocked_export',
+  UDC_PREFLIGHT_BYPASSED: 'udc_preflight_bypassed',
+  UDC_AUTOCUT_OPENED: 'udc_autocut_opened',
+  UDC_AUTOCUT_GENERATED: 'udc_autocut_generated',
+  UDC_MASTER_RESTORED: 'udc_master_restored',
+  UDC_EXPORT_COMPLETED: 'udc_export_completed',
+  UDC_SHOWCASE_CTA_CLICKED: 'udc_showcase_cta_clicked',
+  UDC_PRICING_CTA_CLICKED: 'udc_pricing_cta_clicked',
 } as const;
+
+/**
+ * UDC moat-feature tracking helper. Prefixes stay stable so we can build a
+ * Consistency-First funnel in PostHog without hunting through event names.
+ */
+export const trackUDC = (
+  event:
+    | 'udc_voice_lock_set'
+    | 'udc_voice_lock_mismatch_shown'
+    | 'udc_anchor_refresh_opened'
+    | 'udc_anchor_snap_applied'
+    | 'udc_preflight_opened'
+    | 'udc_preflight_blocked_export'
+    | 'udc_preflight_bypassed'
+    | 'udc_autocut_opened'
+    | 'udc_autocut_generated'
+    | 'udc_master_restored'
+    | 'udc_export_completed'
+    | 'udc_showcase_cta_clicked'
+    | 'udc_pricing_cta_clicked',
+  properties: Record<string, any> = {},
+) => {
+  trackEvent(event, { surface: 'universal-directors-cut', ...properties });
+};
 
 /**
  * Track a feature's first ever use per user (idempotent via localStorage).
