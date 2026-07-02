@@ -1,10 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
-import { TransitionSeries, linearTiming } from '@remotion/transitions';
-import { fade } from '@remotion/transitions/fade';
-import { slide } from '@remotion/transitions/slide';
-import { wipe } from '@remotion/transitions/wipe';
-import { resolveTransitions, findActiveTransition } from '../../utils/transitionResolver';
+import { AbsoluteFill, Video, Audio, Sequence, Freeze, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { resolveTransitions, findActiveTransition, type ResolvedTransition } from '../../utils/transitionResolver';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { safeFrame, safeDurationFrames, isValidRemoteMediaUrl } from '../utils/safeFrame';
 import { z } from 'zod';
@@ -663,6 +659,113 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return [...scenes].sort((a, b) => a.startTime - b.startTime);
   }, [scenes]);
 
+  const resolvedRenderTransitions = useMemo(() => resolveTransitions(
+    sortedScenes.map(s => ({
+      id: s.id,
+      originalStartTime: s.originalStartTime,
+      originalEndTime: s.originalEndTime,
+      startTime: s.startTime,
+      endTime: s.endTime,
+    })),
+    (transitions || []).map(t => ({
+      sceneId: (t as any).sceneId || '',
+      sceneIndex: t.sceneIndex,
+      transitionType: t.type || 'none',
+      type: t.type,
+      duration: t.duration || 0.8,
+      offsetSeconds: t.offsetSeconds,
+    })),
+  ), [sortedScenes, transitions]);
+
+  const renderTransitionLayer = (rt: ResolvedTransition) => {
+    const outgoing = sortedScenes.find(s => s.id === rt.outgoingSceneId);
+    if (!outgoing) return null;
+
+    const from = safeFrame(rt.tStart, fps, durationInFrames - 1);
+    const durationFrames = Math.max(1, Math.round(rt.duration * fps));
+    const localFrame = Math.max(0, frame - from);
+    const raw = Math.min(1, Math.max(0, localFrame / Math.max(1, durationFrames)));
+    const progress = Math.pow(0.5 - 0.5 * Math.cos(raw * Math.PI), 0.7);
+
+    const holdSourceTime = Math.max(0, rt.originalBoundary - 1 / fps);
+    const holdScene = {
+      ...outgoing,
+      startTime: rt.tStart,
+      endTime: rt.tEnd,
+      originalStartTime: holdSourceTime,
+      originalEndTime: holdSourceTime + rt.duration,
+      playbackRate: 1,
+    };
+
+    let outgoingStyle: React.CSSProperties = { opacity: 1 - progress };
+    let blackOpacity = 0;
+    switch (rt.baseType) {
+      case 'fade':
+        outgoingStyle = { opacity: progress < 0.5 ? 1 - progress * 2 : 0 };
+        blackOpacity = progress < 0.5 ? progress * 2 : (1 - progress) * 2;
+        break;
+      case 'wipe':
+        outgoingStyle = rt.direction === 'right'
+          ? { clipPath: `inset(0 0 0 ${progress * 100}%)` }
+          : rt.direction === 'up'
+            ? { clipPath: `inset(0 0 ${progress * 100}% 0)` }
+            : rt.direction === 'down'
+              ? { clipPath: `inset(${progress * 100}% 0 0 0)` }
+              : { clipPath: `inset(0 ${progress * 100}% 0 0)` };
+        break;
+      case 'slide':
+      case 'push':
+        outgoingStyle = rt.direction === 'right'
+          ? { transform: `translateX(${progress * 100}%)` }
+          : rt.direction === 'up'
+            ? { transform: `translateY(${-progress * 100}%)` }
+            : rt.direction === 'down'
+              ? { transform: `translateY(${progress * 100}%)` }
+              : { transform: `translateX(${-progress * 100}%)` };
+        break;
+      case 'blur':
+        outgoingStyle = { opacity: 1 - progress, filter: `blur(${progress * 10}px)` };
+        break;
+      case 'zoom':
+        outgoingStyle = { opacity: 1 - progress, transform: `scale(${1 + progress * 0.12})` };
+        break;
+    }
+
+    return (
+      <Sequence key={`transition-${rt.outgoingSceneId}-${rt.incomingSceneId}`} from={from} durationInFrames={durationFrames}>
+        <AbsoluteFill style={{ overflow: 'hidden', zIndex: 20, pointerEvents: 'none', ...outgoingStyle }}>
+          <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+            <Freeze frame={0}>
+              <SceneVideo
+                sourceVideoUrl={sourceVideoUrl}
+                scene={holdScene}
+                sceneIndex={rt.sceneIndex}
+                totalScenes={sortedScenes.length}
+                brightness={brightness}
+                contrast={contrast}
+                saturation={saturation}
+                sharpness={sharpness}
+                temperature={temperature}
+                vignette={vignette}
+                globalFilter={filter}
+                styleTransfer={styleTransfer}
+                colorGrading={colorGrading}
+                sceneColorGrading={sceneColorGrading}
+                sceneEffects={sceneEffects}
+                transitions={[]}
+                chromaKey={chromaKey}
+                kenBurns={kenBurns}
+                sceneDurationFrames={durationFrames}
+                previewMode={false}
+              />
+            </Freeze>
+          </div>
+        </AbsoluteFill>
+        {blackOpacity > 0 && <AbsoluteFill style={{ backgroundColor: `rgba(0,0,0,${blackOpacity})`, zIndex: 21 }} />}
+      </Sequence>
+    );
+  };
+
   // Subtitle Safe Zone crop style
   const safeZoneCropStyle: React.CSSProperties = subtitleSafeZone?.enabled ? {
     clipPath: `inset(0 0 ${subtitleSafeZone.bottomBandPercent}% 0)`,
@@ -1026,96 +1129,46 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* SCENES — rendered via TransitionSeries for automatic overlap, z-order, and premounting */}
-      <TransitionSeries>
-        {sortedScenes.map((scene, idx) => {
-          const sceneStartFrame = Math.floor(scene.startTime * fps);
-          const sceneEndFrame = Math.floor(scene.endTime * fps);
-          const sceneDurationFrames = Math.max(1, sceneEndFrame - sceneStartFrame);
+      {/* SCENES — absolute timeline render, so cuts stay exactly where the user placed them */}
+      {sortedScenes.map((scene, idx) => {
+        const sceneStartFrame = Math.floor(scene.startTime * fps);
+        const sceneEndFrame = Math.floor(scene.endTime * fps);
+        const sceneDurationFrames = Math.max(1, sceneEndFrame - sceneStartFrame);
 
-          // Find transition by sceneId (robust) with fallback to sceneIndex
-          const currentTransition = transitions?.find(t =>
-            t.sceneId ? t.sceneId === scene.id : t.sceneIndex === idx
-          );
-          const hasTransitionToNext = idx < sortedScenes.length - 1 && currentTransition && currentTransition.type && currentTransition.type !== 'none';
-          // Account for offsetSeconds: positive offset extends the scene before transition starts
-          const offsetFrames = hasTransitionToNext ? Math.round((currentTransition!.offsetSeconds || 0) * fps) : 0;
-          const baseDuration = Math.max(0.6, currentTransition?.duration || 0.5);
-          const transitionDurationFrames = hasTransitionToNext ? Math.max(1, Math.floor(baseDuration * fps)) : 0;
-
-          // Build the presentation based on transition type
-          const getPresentation = (): any => {
-            if (!currentTransition || !currentTransition.type) return fade();
-            const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
-            
-            const directionMap: Record<string, 'from-left' | 'from-right' | 'from-top' | 'from-bottom'> = {
-              left: 'from-left',
-              right: 'from-right',
-              up: 'from-top',
-              down: 'from-bottom',
-            };
-
-            switch (baseType) {
-              case 'crossfade':
-              case 'dissolve':
-                return fade();
-              case 'fade':
-                return fade();
-              case 'blur':
-                return fade();
-              case 'zoom':
-                return slide({ direction: 'from-bottom' });
-              case 'wipe':
-                return wipe({ direction: directionMap[direction] || 'from-left' });
-              case 'slide':
-                return slide({ direction: directionMap[direction] || 'from-left' });
-              case 'push':
-                return slide({ direction: directionMap[direction] || 'from-left' });
-              default:
-                return fade();
-            }
-          };
-
-          return (
-            <React.Fragment key={scene.id}>
-              <TransitionSeries.Sequence durationInFrames={sceneDurationFrames} premountFor={60}>
-                <AbsoluteFill style={{ overflow: 'hidden' }}>
-                  <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
-                  <SceneVideo
-                    sourceVideoUrl={sourceVideoUrl}
-                    scene={scene}
-                    sceneIndex={idx}
-                    totalScenes={sortedScenes.length}
-                    brightness={brightness}
-                    contrast={contrast}
-                    saturation={saturation}
-                    sharpness={sharpness}
-                    temperature={temperature}
-                    vignette={vignette}
-                    globalFilter={filter}
-                    styleTransfer={styleTransfer}
-                    colorGrading={colorGrading}
-                    sceneColorGrading={sceneColorGrading}
-                    sceneEffects={sceneEffects}
-                    transitions={[]}
-                    chromaKey={chromaKey}
-                    kenBurns={kenBurns}
-                    sceneDurationFrames={sceneDurationFrames}
-                    previewMode={false}
-                  />
-                  </div>
-                </AbsoluteFill>
-              </TransitionSeries.Sequence>
-              {hasTransitionToNext && transitionDurationFrames > 0 && (
-                <TransitionSeries.Transition
-                  presentation={getPresentation()}
-                  timing={linearTiming({ durationInFrames: transitionDurationFrames })}
+        return (
+          <Sequence key={scene.id} from={sceneStartFrame} durationInFrames={sceneDurationFrames}>
+            <AbsoluteFill style={{ overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+                <SceneVideo
+                  sourceVideoUrl={sourceVideoUrl}
+                  scene={scene}
+                  sceneIndex={idx}
+                  totalScenes={sortedScenes.length}
+                  brightness={brightness}
+                  contrast={contrast}
+                  saturation={saturation}
+                  sharpness={sharpness}
+                  temperature={temperature}
+                  vignette={vignette}
+                  globalFilter={filter}
+                  styleTransfer={styleTransfer}
+                  colorGrading={colorGrading}
+                  sceneColorGrading={sceneColorGrading}
+                  sceneEffects={sceneEffects}
+                  transitions={[]}
+                  chromaKey={chromaKey}
+                  kenBurns={kenBurns}
+                  sceneDurationFrames={sceneDurationFrames}
+                  previewMode={false}
                 />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </TransitionSeries>
+              </div>
+            </AbsoluteFill>
+          </Sequence>
+        );
+      })}
+
+      {/* Transitions start at the cut and overlay the held outgoing frame over the incoming scene */}
+      {resolvedRenderTransitions.map(renderTransitionLayer)}
       {/* AUDIO - Skip all Remotion audio in preview mode (native audio handles it) */}
       {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
         <Audio

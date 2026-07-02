@@ -213,7 +213,7 @@ const TransitionBlock: React.FC<{
                     style={{ width: `${(activeDuration / MAX_TRANSITION_DURATION) * 100}%` }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-white/90">
-                    −{(activeDuration / 2).toFixed(2)}s | Cut | +{(activeDuration / 2).toFixed(2)}s
+                    Cut | +{activeDuration.toFixed(1)}s Übergang
                   </div>
                 </div>
               </div>

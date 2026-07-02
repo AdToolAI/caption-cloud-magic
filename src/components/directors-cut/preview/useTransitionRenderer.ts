@@ -122,13 +122,6 @@ export function useTransitionRenderer(
         ? computeFilterForTimeRef.current(time)
         : (videoFilterRef.current || '');
 
-      // Mirror playbackRate during active phase
-      if (phaseRef.current === 'active') {
-        if (Math.abs(standby.playbackRate - active.playbackRate) > 0.01) {
-          standby.playbackRate = active.playbackRate;
-        }
-      }
-
       // === PRIORITY 1: ACTIVE TRANSITION ===
       const activeTransition = findActiveTransition(time, resolvedTransitions);
       if (activeTransition) {
@@ -148,18 +141,29 @@ export function useTransitionRenderer(
 
         seekStandby(rt.incomingSceneId, scenes);
 
-        // Start playing standby ONLY when entering active phase
-        if (standby.paused) {
-          if (wasNotActive) {
-            const incomingScene = scenes.find(s => s.id === rt.incomingSceneId);
-            if (incomingScene) {
-              const sourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
-              const expectedTime = sourceStart + 0.05;
-              if (Math.abs(standby.currentTime - expectedTime) > 0.1) {
-                standby.currentTime = expectedTime;
-              }
-            }
+        // NLE-style handoff: hold the outgoing clip on its cut frame while the
+        // incoming clip plays from its own in-point for the full transition.
+        const outgoingHoldTime = Math.max(0, rt.originalBoundary - 1 / 60);
+        if (wasNotActive || Math.abs(active.currentTime - outgoingHoldTime) > 0.08) {
+          try { active.currentTime = outgoingHoldTime; } catch {}
+        }
+        if (!active.paused) active.pause();
+
+        const incomingScene = scenes.find(s => s.id === rt.incomingSceneId);
+        if (incomingScene) {
+          const sourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
+          const incomingRate = (incomingScene as any).playbackRate ?? 1;
+          const expectedTime = sourceStart + Math.max(0, time - rt.tStart) * incomingRate + 0.02;
+          if (wasNotActive || Math.abs(standby.currentTime - expectedTime) > 0.25) {
+            try { standby.currentTime = expectedTime; } catch {}
           }
+          if (Math.abs(standby.playbackRate - incomingRate) > 0.01) {
+            standby.playbackRate = incomingRate;
+          }
+        }
+
+        // Start/keep playing incoming layer during the transition.
+        if (standby.paused) {
           standby.play().catch(() => {});
         }
 

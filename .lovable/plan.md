@@ -1,26 +1,45 @@
-## Problem
+## Plan: Übergänge nicht mehr zu früh abspielen
 
-Im Inspector (rechte Spalte, "SZENE"-Panel) zeigen die Number-Inputs für **Start**, **Ende** und **Länge** die nativen Browser-Spinner-Buttons an — das sieht aus wie eine kleine weiße Scrollbar innerhalb jedes Feldes und wirkt unprofessionell. Wir haben ohnehin die dedizierten `−` / `+` Buttons daneben, die Spinner sind also doppelt gemoppelt und stören nur optisch.
+### Ziel
+Der Übergang soll nicht schon sichtbar in der vorherigen Szene ablaufen und danach erst die nächste Szene zeigen. Wenn du 3 Sekunden einstellst, muss der Übergang sichtbar 3 Sekunden lang an der Szenengrenze wirken.
 
-## Fix
+### Umsetzung
+1. **Transition-Timing korrigieren**
+   - Die aktuelle Logik zentriert den Übergang um die Szenengrenze: `-1.5s | Cut | +1.5s` bei 3s Dauer.
+   - Ich ändere das Standardverhalten auf ein NLE-verständlicheres Modell:
 
-Native Spin-Buttons an allen Number-Inputs im Inspector ausblenden:
+```text
+Vorher aktuell:
+Szene 1 läuft → Übergang startet zu früh → Cut → Übergang läuft weiter
 
-- `src/components/directors-cut/studio/SceneTrimInspector.tsx` — zwei `<input type="number">` (Start, Ende) bekommen Tailwind-Klassen zum Verstecken der Spinner.
-- `src/components/directors-cut/studio/CapCutPropertiesPanel.tsx` — sechs `<input type="number">` (Trim-Start/Ende, Clip-Properties) analog behandeln.
-
-Konkret pro Input diese Klassen ergänzen:
-
-```
-[appearance:textfield]
-[&::-webkit-outer-spin-button]:appearance-none
-[&::-webkit-outer-spin-button]:m-0
-[&::-webkit-inner-spin-button]:appearance-none
-[&::-webkit-inner-spin-button]:m-0
+Neu:
+Szene 1 läuft normal bis Ende → Übergang beginnt an der Schnittkante → Szene 2 wird während des Übergangs eingeblendet
 ```
 
-Das entfernt sowohl Chromium/Safari-Spinner als auch Firefox-Spinner. Funktionalität bleibt identisch — Werte lassen sich weiter tippen, und die vorhandenen `−`/`+`-Buttons übernehmen das Inkrementieren.
+2. **Resolver als Single Source of Truth reparieren**
+   - `transitionResolver.ts` wird angepasst, damit `duration`, `offsetSeconds` und das vorhandene `anchorTime` wirklich berücksichtigt werden.
+   - Standard: Übergangsfenster startet an `scene.end_time + offsetSeconds` und endet nach `duration`.
+   - Dadurch wirkt der Dauer-Regler wirklich sichtbar auf den Zeitpunkt und die Länge.
 
-## Scope
+3. **Preview-Renderer an neues Timing anpassen**
+   - `useTransitionRenderer.ts` wird so angepasst, dass die ausgehende Szene am Übergang nicht einfach „weiterläuft“ und dadurch zu früh wirkt.
+   - Während des Übergangs wird die ausgehende Szene sauber gehalten/geblendet, während die nächste Szene am Anfang startet.
+   - Handoff zur nächsten Szene passiert erst am Ende des Übergangs.
 
-Rein visueller Fix, keine Logik-Änderungen, keine neuen Dateien. Kein Backend-Impact.
+4. **Playback-Advance nicht gegen Transition arbeiten lassen**
+   - `DirectorsCutPreviewPlayer.tsx` wird geprüft/angepasst, damit die Boundary-Logik nicht vorzeitig zur nächsten Szene springt oder den Übergang überspringt.
+   - Ziel: Playhead, Preview und Szene-Auswahl bleiben synchron.
+
+5. **Timeline-Markierung optional korrigieren**
+   - Falls die visuelle Transition-Markierung aktuell noch zentriert oder irreführend angezeigt wird, wird sie auf das neue echte Fenster gesetzt:
+
+```text
+Schnittkante |========= Übergang =========| nächste Szene sichtbar
+```
+
+### Akzeptanzkriterien
+- Bei 3.0s Dauer ist der Übergang deutlich 3 Sekunden lang sichtbar.
+- Der Übergang startet nicht mehr mitten im Ende der vorherigen Szene.
+- Szene 2 erscheint während des Übergangs, nicht erst nachdem der Übergang optisch vorbei ist.
+- Dauer-Regler und +/- Eingabe ändern das sichtbare Timing sofort.
+- Kein schwarzer Frame oder Sprung an der Szenengrenze.
