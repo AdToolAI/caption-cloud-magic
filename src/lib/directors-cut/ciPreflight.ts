@@ -276,6 +276,50 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     });
   }
 
+  // 12. Missing thumbnails on real scenes (asset not fully loaded / broken URL)
+  const missingThumbs = input.scenes.filter(
+    (s) => !s.isBlackscreen && !s.thumbnail_url,
+  );
+  if (missingThumbs.length > 0) {
+    findings.push({
+      id: 'missing-thumbnails',
+      severity: 'warn',
+      title: `${missingThumbs.length} Szene${missingThumbs.length > 1 ? 'n' : ''} ohne geladenes Asset`,
+      detail: 'Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video.',
+      hint: 'Öffne die Szene und lade das Asset neu oder ersetze es.',
+    });
+  }
+
+  // 13. Consecutive blackscreens — usually an editing artefact
+  let blackRun = 0;
+  let blackRunMax = 0;
+  for (const s of input.scenes) {
+    if (s.isBlackscreen) {
+      blackRun += 1;
+      blackRunMax = Math.max(blackRunMax, blackRun);
+    } else {
+      blackRun = 0;
+    }
+  }
+  if (blackRunMax >= 2) {
+    findings.push({
+      id: 'consecutive-blackscreens',
+      severity: 'info',
+      title: `${blackRunMax} Blackscreens in Folge`,
+      hint: 'Meist ein Restartefakt vom Schneiden — zusammenfassen oder entfernen.',
+    });
+  }
+
+  // 14. Social-format hook-fatigue guard — >90s often underperforms in feed
+  if (input.totalDuration > 90) {
+    findings.push({
+      id: 'too-long-for-social',
+      severity: 'info',
+      title: `Video ${Math.round(input.totalDuration)}s lang`,
+      hint: 'Für TikTok / Reels / Shorts liefern 15–60s meist die beste Retention. Nutze Auto Cut-Down für kürzere Varianten.',
+    });
+  }
+
   return findings;
 }
 
