@@ -1068,16 +1068,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // tatsächlich, statt den Timeline-Block nur zu verschieben.
   const handleTrimScene = useCallback((sceneId: string, srcIn: number, srcOut: number) => {
     if (!onScenesUpdate) return;
-    commitHistory();
     const sorted = [...scenes].sort((a, b) => a.start_time - b.start_time);
     const idx = sorted.findIndex(s => s.id === sceneId);
     if (idx < 0) return;
 
     const target = sorted[idx] as any;
-    // Bei Original-Szenen ist die verfügbare Quelle das gesamte Ausgangsvideo
-    // [0, originalVideoDuration]. Bei additionalMedia die volle Media-Range —
-    // media_source_* (nie durch Trim überschrieben), sonst additionalMedia.duration
-    // als Fallback, sonst großzügig gegen aktuelles Trim-Fenster.
     const isAdditional = !!target.additionalMedia;
     const mediaClipDur = typeof target.additionalMedia?.duration === 'number' ? target.additionalMedia.duration : undefined;
     const hardMax = isAdditional
@@ -1088,6 +1083,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const newSrcIn = Math.max(hardMin, Math.min(srcIn, srcOut - 0.1));
     const newSrcOut = Math.min(hardMax, Math.max(srcOut, newSrcIn + 0.1));
     const newDur = Math.max(0.1, newSrcOut - newSrcIn);
+
+    // No-op guard — if the committed values match current source range, skip.
+    const currentIn = target.original_start_time ?? target.start_time;
+    const currentOut = target.original_end_time ?? target.end_time;
+    if (Math.abs(currentIn - newSrcIn) < 0.001 && Math.abs(currentOut - newSrcOut) < 0.001) {
+      return;
+    }
+
+    // Commit history only when the trim actually changes (called from onValueCommit / onBlur).
+    commitHistory();
 
     const timelineStart = target.start_time;
     sorted[idx] = {
