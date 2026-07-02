@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { trackUDC } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Lock, Users, Scissors, ShieldCheck, Sparkles, ArrowRight } from "lucide-react";
 
