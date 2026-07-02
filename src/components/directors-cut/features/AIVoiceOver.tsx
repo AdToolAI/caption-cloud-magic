@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mic, Sparkles, Play, Volume2, Pause, Loader2, Info, Plus } from 'lucide-react';
+import { Mic, Sparkles, Play, Volume2, Pause, Loader2, Info, Plus, Lock, Unlock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
