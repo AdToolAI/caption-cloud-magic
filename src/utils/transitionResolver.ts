@@ -28,6 +28,20 @@ export interface ResolvedTransition {
   timelineBoundary: number;
   /** Offset in seconds */
   offsetSeconds: number;
+  /** NLE placement model chosen by the resolver */
+  placement: 'centered' | 'start-at-cut';
+  /** Whether the outgoing clip has enough tail handle for a centered transition */
+  hasOutgoingHandle: boolean;
+  /** Whether the incoming clip has enough head handle for a centered transition */
+  hasIncomingHandle: boolean;
+  /** Alias used by UI/export code */
+  effectiveDuration: number;
+  /** Alias used by UI/export code */
+  visualStart: number;
+  /** Alias used by UI/export code */
+  visualEnd: number;
+  /** Timeline cut point between outgoing and incoming scenes */
+  cutTime: number;
 }
 
 export interface TransitionInput {
@@ -52,10 +66,22 @@ export interface SceneInput {
   endTime?: number;
   originalStartTime?: number;
   originalEndTime?: number;
+  media_source_start?: number;
+  media_source_end?: number;
+  mediaSourceStart?: number;
+  mediaSourceEnd?: number;
+  playbackRate?: number;
 }
 
 const DEFAULT_DURATION = 1.2;
 const MIN_DURATION = 0.1;
+
+const readStart = (scene: SceneInput) => scene.start_time ?? scene.startTime ?? 0;
+const readEnd = (scene: SceneInput) => scene.end_time ?? scene.endTime ?? readStart(scene);
+const readSourceStart = (scene: SceneInput) => scene.original_start_time ?? scene.originalStartTime ?? readStart(scene);
+const readSourceEnd = (scene: SceneInput) => scene.original_end_time ?? scene.originalEndTime ?? readEnd(scene);
+const readFullSourceStart = (scene: SceneInput) => scene.media_source_start ?? scene.mediaSourceStart ?? readSourceStart(scene);
+const readFullSourceEnd = (scene: SceneInput) => scene.media_source_end ?? scene.mediaSourceEnd ?? readSourceEnd(scene);
 
 /**
  * Resolve all transition windows from scenes and transition assignments.
@@ -90,7 +116,7 @@ export function resolveTransitions(
     const baseType = parts[0];
     const direction = parts[1] || 'left';
 
-    const tDuration = Math.max(MIN_DURATION, transition.duration || DEFAULT_DURATION);
+    const requestedDuration = Math.max(MIN_DURATION, transition.duration || DEFAULT_DURATION);
     // Legacy builds allowed negative offsets / custom anchors. Those make the
     // transition start before the cut, which reads as "the transition is already
     // over when the next scene appears". Keep only positive delay support and
@@ -98,18 +124,33 @@ export function resolveTransitions(
     const offset = Math.max(0, transition.offsetSeconds ?? 0);
 
     // Get original boundary in source time domain
-    const originalBoundary =
-      scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime ?? 0;
+    const originalBoundary = readSourceEnd(scene);
     
     // Use TIMELINE boundary (end_time) for transition window calculation.
     // NLE-friendly default: the transition starts AT the cut, not half before it.
     // Deprecated anchorTime is intentionally ignored to avoid stale early anchors.
-    const timelineBoundary = scene.end_time ?? scene.endTime ?? originalBoundary;
-    const anchor = timelineBoundary;
-    const boundary = anchor + offset;
+    const timelineBoundary = readEnd(scene);
+    const cutTime = timelineBoundary;
+    const halfDuration = requestedDuration / 2;
 
-    const tStart = Math.max(boundary, prevEnd);
-    const tEnd = tStart + tDuration;
+    // Professional NLEs use centered transitions when both clips expose
+    // source handles around the cut. If the editor cannot prove handles exist,
+    // fall back to a deterministic edge transition that starts at the cut and
+    // holds the outgoing frame while the incoming clip plays underneath.
+    const outgoingTailHandle = Math.max(0, readFullSourceEnd(scene) - readSourceEnd(scene));
+    const incomingHeadHandle = Math.max(0, readSourceStart(nextScene) - readFullSourceStart(nextScene));
+    const hasOutgoingHandle = outgoingTailHandle >= halfDuration - 0.001;
+    const hasIncomingHandle = incomingHeadHandle >= halfDuration - 0.001;
+    const canCenterOnTimeline = readStart(scene) <= cutTime - halfDuration && readEnd(nextScene) >= cutTime + halfDuration;
+    const placement: ResolvedTransition['placement'] =
+      hasOutgoingHandle && hasIncomingHandle && canCenterOnTimeline ? 'centered' : 'start-at-cut';
+
+    const rawStart = placement === 'centered'
+      ? cutTime - halfDuration + offset
+      : cutTime + offset;
+
+    const tStart = Math.max(rawStart, prevEnd);
+    const tEnd = tStart + requestedDuration;
     prevEnd = tEnd;
 
     resolved.push({
@@ -125,6 +166,13 @@ export function resolveTransitions(
       originalBoundary,
       timelineBoundary,
       offsetSeconds: offset,
+      placement,
+      hasOutgoingHandle,
+      hasIncomingHandle,
+      effectiveDuration: tEnd - tStart,
+      visualStart: tStart,
+      visualEnd: tEnd,
+      cutTime,
     });
   }
 

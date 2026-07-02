@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from '@/hooks/useTranslation';
 import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
+import { resolveTransitions, type ResolvedTransition } from '@/utils/transitionResolver';
 
 interface CutPanelProps {
   scenes: SceneAnalysis[];
@@ -59,8 +60,9 @@ const TransitionBlock: React.FC<{
   t: (key: string, params?: Record<string, string | number>) => any;
   sceneId: string;
   transition?: TransitionAssignment;
+  resolvedTransition?: ResolvedTransition;
   onTransitionChange: (sceneId: string, type: string | null, duration?: number) => void;
-}> = ({ t, sceneId, transition, onTransitionChange }) => {
+}> = ({ t, sceneId, transition, resolvedTransition, onTransitionChange }) => {
   const [expanded, setExpanded] = useState(false);
   const hasTransition = transition && transition.transitionType !== 'none';
   const activeDuration = hasTransition ? transition!.duration : DEFAULT_TRANSITION_DURATION;
@@ -206,16 +208,33 @@ const TransitionBlock: React.FC<{
 
               {/* Visual transition window preview */}
               <div className="pt-1">
-                <div className="text-[8px] text-white/30 mb-1 uppercase tracking-wider">Übergangsfenster</div>
+                <div className="flex items-center justify-between text-[8px] text-white/30 mb-1 uppercase tracking-wider">
+                  <span>Übergangsfenster</span>
+                  <span className={cn(
+                    "rounded px-1 py-0.5 normal-case tracking-normal",
+                    resolvedTransition?.placement === 'centered'
+                      ? "bg-emerald-500/10 text-emerald-300"
+                      : "bg-cyan-500/10 text-cyan-300"
+                  )}>
+                    {resolvedTransition?.placement === 'centered' ? 'NLE-zentriert' : 'ab Schnittkante'}
+                  </span>
+                </div>
                 <div className="relative h-4 rounded overflow-hidden bg-black/40 border border-white/5">
                   <div
                     className="absolute inset-y-0 left-0 bg-gradient-to-r from-fuchsia-500/40 to-cyan-500/40"
                     style={{ width: `${(activeDuration / MAX_TRANSITION_DURATION) * 100}%` }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-white/90">
-                    Cut | +{activeDuration.toFixed(1)}s Übergang
+                    {resolvedTransition?.placement === 'centered'
+                      ? `-${(activeDuration / 2).toFixed(1)}s | Cut | +${(activeDuration / 2).toFixed(1)}s`
+                      : `Cut | +${activeDuration.toFixed(1)}s Übergang`}
                   </div>
                 </div>
+                {resolvedTransition?.placement !== 'centered' && (
+                  <p className="mt-1 text-[8px] leading-snug text-white/35">
+                    Keine freien Handles erkannt – deshalb sauberer Edge-Übergang statt zu frühem Vorziehen.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -263,6 +282,11 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const resolvedTransitions = useMemo(
+    () => resolveTransitions([...scenes].sort((a, b) => a.start_time - b.start_time), transitions),
+    [scenes, transitions],
+  );
 
   const startEditing = (scene: SceneAnalysis) => {
     setEditingSceneId(scene.id);
@@ -519,6 +543,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       t={t}
                       sceneId={scene.id}
                       transition={transitions.find(t => t.sceneId === scene.id)}
+                      resolvedTransition={resolvedTransitions.find(t => t.outgoingSceneId === scene.id)}
                       onTransitionChange={handleTransitionChange}
                     />
                   )}

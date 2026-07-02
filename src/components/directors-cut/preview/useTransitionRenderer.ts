@@ -25,6 +25,7 @@ export interface HandoffBoundaryMarker {
 export function useTransitionRenderer(
   videoRefA: React.RefObject<HTMLVideoElement | null>,
   videoRefB: React.RefObject<HTMLVideoElement | null>,
+  baseVideoUrl: string,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   visualTimeRef: React.RefObject<number>,
   scenes: SceneAnalysis[],
@@ -60,20 +61,38 @@ export function useTransitionRenderer(
     return slot === 'A' ? videoRefB.current : videoRefA.current;
   }, [videoRefA, videoRefB, activeSlotRef]);
 
-  const seekStandby = useCallback((incomingSceneId: string, scenes: SceneAnalysis[]) => {
+  const getSceneSourceStart = useCallback((scene: SceneAnalysis) => scene.original_start_time ?? scene.start_time, []);
+  const getSceneSourceEnd = useCallback((scene: SceneAnalysis) => {
+    const sourceStart = scene.original_start_time ?? scene.start_time;
+    const rate = (scene as any).playbackRate ?? 1;
+    return scene.original_end_time ?? (sourceStart + Math.max(0, scene.end_time - scene.start_time) * rate);
+  }, []);
+
+  const getSceneSourceUrl = useCallback((scene: SceneAnalysis) => {
+    return scene.sourceMode === 'media' && scene.additionalMedia?.type === 'video' && scene.additionalMedia.url
+      ? scene.additionalMedia.url
+      : baseVideoUrl;
+  }, [baseVideoUrl]);
+
+  const seekStandby = useCallback((incomingSceneId: string, scenes: SceneAnalysis[], sourceTime?: number) => {
     const standby = getStandby();
     if (!standby) return;
 
     const scene = scenes.find(s => s.id === incomingSceneId);
     if (!scene) return;
 
-    const seekKey = incomingSceneId;
+    const targetSrc = getSceneSourceUrl(scene);
+    if (targetSrc && standby.getAttribute('src') !== targetSrc && standby.currentSrc !== targetSrc) {
+      standby.src = targetSrc;
+    }
+
+    const targetTime = sourceTime ?? getSceneSourceStart(scene);
+    const seekKey = `${incomingSceneId}:${targetSrc}:${targetTime.toFixed(3)}`;
     if (lastStandbySeekRef.current === seekKey) return;
     lastStandbySeekRef.current = seekKey;
 
-    const sourceStart = scene.original_start_time ?? scene.start_time;
-    standby.currentTime = sourceStart + 0.05;
-  }, [getStandby]);
+    standby.currentTime = Math.max(0, targetTime + 0.02);
+  }, [getStandby, getSceneSourceStart, getSceneSourceUrl]);
 
   const setPhase = useCallback((phase: 'idle' | 'preparing' | 'active' | 'handoff') => {
     phaseRef.current = phase;
@@ -139,21 +158,49 @@ export function useTransitionRenderer(
         const wasNotActive = phaseRef.current !== 'active';
         setPhase('active');
 
-        seekStandby(rt.incomingSceneId, scenes);
-
-        // NLE-style handoff: hold the outgoing clip on its cut frame while the
-        // incoming clip plays from its own in-point for the full transition.
-        const outgoingHoldTime = Math.max(0, rt.originalBoundary - 1 / 60);
-        if (wasNotActive || Math.abs(active.currentTime - outgoingHoldTime) > 0.08) {
-          try { active.currentTime = outgoingHoldTime; } catch {}
-        }
-        if (!active.paused) active.pause();
-
+        const elapsed = Math.max(0, time - rt.tStart);
+        const halfDuration = rt.duration / 2;
+        const outgoingScene = scenes.find(s => s.id === rt.outgoingSceneId);
         const incomingScene = scenes.find(s => s.id === rt.incomingSceneId);
+        const incomingSourceStart = incomingScene ? getSceneSourceStart(incomingScene) : 0;
+        const incomingTransitionStart = rt.placement === 'centered'
+          ? Math.max(0, incomingSourceStart - halfDuration)
+          : incomingSourceStart;
+
+        seekStandby(rt.incomingSceneId, scenes, incomingTransitionStart);
+
+        if (rt.placement === 'centered' && outgoingScene) {
+          const outgoingSrc = getSceneSourceUrl(outgoingScene);
+          if (outgoingSrc && active.getAttribute('src') !== outgoingSrc && active.currentSrc !== outgoingSrc) {
+            active.src = outgoingSrc;
+          }
+          const outgoingTransitionStart = Math.max(0, getSceneSourceEnd(outgoingScene) - halfDuration);
+          const outgoingRate = (outgoingScene as any).playbackRate ?? 1;
+          const expectedOutgoing = outgoingTransitionStart + elapsed * outgoingRate;
+          if (wasNotActive || Math.abs(active.currentTime - expectedOutgoing) > 0.25) {
+            try { active.currentTime = expectedOutgoing; } catch {}
+          }
+          if (Math.abs(active.playbackRate - outgoingRate) > 0.01) active.playbackRate = outgoingRate;
+          if (active.paused) active.play().catch(() => {});
+        } else {
+          // Safe edge fallback: hold outgoing clip on its cut frame while the
+          // incoming clip plays from its own in-point for the full transition.
+          if (outgoingScene) {
+            const outgoingSrc = getSceneSourceUrl(outgoingScene);
+            if (outgoingSrc && active.getAttribute('src') !== outgoingSrc && active.currentSrc !== outgoingSrc) {
+              active.src = outgoingSrc;
+            }
+          }
+          const outgoingHoldTime = Math.max(0, rt.originalBoundary - 1 / 60);
+          if (wasNotActive || Math.abs(active.currentTime - outgoingHoldTime) > 0.08) {
+            try { active.currentTime = outgoingHoldTime; } catch {}
+          }
+          if (!active.paused) active.pause();
+        }
+
         if (incomingScene) {
-          const sourceStart = incomingScene.original_start_time ?? incomingScene.start_time;
           const incomingRate = (incomingScene as any).playbackRate ?? 1;
-          const expectedTime = sourceStart + Math.max(0, time - rt.tStart) * incomingRate + 0.02;
+          const expectedTime = incomingTransitionStart + elapsed * incomingRate + 0.02;
           if (wasNotActive || Math.abs(standby.currentTime - expectedTime) > 0.25) {
             try { standby.currentTime = expectedTime; } catch {}
           }
@@ -218,7 +265,7 @@ export function useTransitionRenderer(
         active.style.filter = syncFilter || '';
         standby.style.opacity = '0';
         standby.style.pointerEvents = 'none';
-        seekStandby(freezeRT.incomingSceneId, scenes);
+          seekStandby(freezeRT.incomingSceneId, scenes);
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -283,7 +330,13 @@ export function useTransitionRenderer(
       for (const rt of resolvedTransitions) {
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           setPhase('preparing');
-          seekStandby(rt.incomingSceneId, scenes);
+          const incomingScene = scenes.find(s => s.id === rt.incomingSceneId);
+          const preSeekTime = incomingScene
+            ? rt.placement === 'centered'
+              ? Math.max(0, getSceneSourceStart(incomingScene) - rt.duration / 2)
+              : getSceneSourceStart(incomingScene)
+            : undefined;
+          seekStandby(rt.incomingSceneId, scenes, preSeekTime);
           standby.style.opacity = '0';
           standby.style.pointerEvents = 'none';
           active.style.opacity = '1';
@@ -333,5 +386,5 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef]);
+  }, [scenes, transitions, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl]);
 }
