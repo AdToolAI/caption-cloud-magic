@@ -647,6 +647,15 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
+  // Music mix policy (mirror src/lib/audioVolume.ts so preview === export):
+  // when a voice-over is present, reserve headroom under the narration.
+  const MUSIC_HEADROOM_WITH_VOICEOVER = 0.35;
+  const effectiveMusicVolume = (() => {
+    const slider = Math.max(0, Math.min(100, backgroundMusicVolume ?? 30)) / 100;
+    if (!voiceoverUrl) return slider;
+    return Math.max(0, Math.min(1, slider * MUSIC_HEADROOM_WITH_VOICEOVER));
+  })();
+
   // Log render version once on first frame for bundle verification
   useEffect(() => {
     const clipCount = subtitleTrack?.clips?.length ?? 0;
