@@ -1503,11 +1503,28 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             ref={videoRefA}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
-            style={{ zIndex: 1 }}
+            style={{ zIndex: 1, opacity: 0 }}
             muted
             playsInline
             preload="auto"
             onEnded={handleVideoEnded}
+            onLoadedMetadata={(e) => {
+              // Re-apply the trim-aware source time as soon as metadata is ready,
+              // otherwise the browser paints frame 0 for a beat before our seek lands.
+              const el = e.currentTarget;
+              try {
+                const src = timelineToSourceTime(visualTimeRef.current);
+                el.currentTime = src;
+              } catch {}
+            }}
+            onSeeked={(e) => {
+              // Reveal slot A only after the first real seek finished — this
+              // guarantees the first painted frame is the trimmed in-point,
+              // never frame 0 of the underlying source video.
+              if (activeSlotRef.current === 'A') {
+                e.currentTarget.style.opacity = '1';
+              }
+            }}
           />
 
           {/* Video Slot B */}
@@ -1515,11 +1532,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             ref={videoRefB}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
-            style={{ zIndex: 2 }}
+            style={{ zIndex: 2, opacity: 0 }}
             muted
             playsInline
             preload="auto"
             onEnded={handleVideoEnded}
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              try {
+                const src = timelineToSourceTime(visualTimeRef.current);
+                el.currentTime = src;
+              } catch {}
+            }}
           />
 
           {/* Media Overlay (uploaded video clips for `media` scenes) */}
