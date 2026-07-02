@@ -19,6 +19,8 @@ interface AutoCutDownDialogProps {
   onOpenChange: (v: boolean) => void;
   scenes: SceneAnalysis[];
   onApply: (nextScenes: SceneAnalysis[], target: number) => void;
+  /** When true, master already backed up — dialog shows a reassuring note. */
+  hasMasterSnapshot?: boolean;
 }
 
 const PRESETS: { value: CutDownPreset; label: string; sub: string }[] = [
