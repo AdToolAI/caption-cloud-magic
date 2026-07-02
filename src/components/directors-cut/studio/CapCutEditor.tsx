@@ -1060,7 +1060,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setCurrentTime(recalculatedScenes.length > 0 ? safeTime : 0);
     }
     onScenesUpdate(recalculatedScenes);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, commitHistory]);
 
   // Trim scene handler — adjust start/end without recalculating other scenes
   // Interpretiert die Sidebar-Inputs als Quellen-Range (source in/out) und
@@ -1068,6 +1068,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // tatsächlich, statt den Timeline-Block nur zu verschieben.
   const handleTrimScene = useCallback((sceneId: string, srcIn: number, srcOut: number) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const sorted = [...scenes].sort((a, b) => a.start_time - b.start_time);
     const idx = sorted.findIndex(s => s.id === sceneId);
     if (idx < 0) return;
