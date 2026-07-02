@@ -1453,7 +1453,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (!video) return;
 
     if (isPlaying) {
-      video.pause();
+      // Pause BOTH slots — during a transition Slot B may be the one running.
+      videoRefA.current?.pause();
+      videoRefB.current?.pause();
       setIsPlaying(false);
       stopAllAudio();
       onPlayingChange?.(false);
