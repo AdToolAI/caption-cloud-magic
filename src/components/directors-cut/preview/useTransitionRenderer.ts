@@ -228,7 +228,10 @@ export function useTransitionRenderer(
         active.style.width = '100%';
         active.style.height = '100%';
         active.style.objectFit = 'contain';
-        active.style.zIndex = '1';
+        // Keep the A/B transition layer above media/image/blackscreen overlays.
+        // Otherwise added clips can cover the prepared transition videos and the
+        // user only sees a hard cut at the boundary.
+        active.style.zIndex = '10';
 
         const activeTransitionFilter = (styles.baseStyle as any).filter || '';
         active.style.opacity = styles.baseStyle.opacity != null ? String(styles.baseStyle.opacity) : '1';
@@ -243,7 +246,7 @@ export function useTransitionRenderer(
         standby.style.width = '100%';
         standby.style.height = '100%';
         standby.style.objectFit = 'contain';
-        standby.style.zIndex = '2';
+        standby.style.zIndex = '11';
 
         const standbyTransitionFilter = (styles.incomingStyle as any).filter || '';
         standby.style.opacity = styles.incomingStyle.opacity != null ? String(styles.incomingStyle.opacity) : '1';
@@ -330,7 +333,26 @@ export function useTransitionRenderer(
       for (const rt of resolvedTransitions) {
         if (time >= rt.tStart - PRE_SEEK_WINDOW && time < rt.tStart) {
           setPhase('preparing');
+          const outgoingScene = scenes.find(s => s.id === rt.outgoingSceneId);
           const incomingScene = scenes.find(s => s.id === rt.incomingSceneId);
+
+          // For uploaded/library clips the visible media overlay is not the
+          // same element as the transition A/B slot. Pre-bind the outgoing slot
+          // before the cut so an edge transition can hold the real last frame
+          // instead of flashing black or looking like a normal jump cut.
+          if (outgoingScene?.sourceMode === 'media' && outgoingScene.additionalMedia?.type === 'video') {
+            const outgoingSrc = getSceneSourceUrl(outgoingScene);
+            const outgoingPreTime = rt.placement === 'centered'
+              ? Math.max(0, getSceneSourceEnd(outgoingScene) - rt.duration / 2)
+              : Math.max(0, rt.originalBoundary - 1 / 60);
+            if (outgoingSrc && active.getAttribute('src') !== outgoingSrc && active.currentSrc !== outgoingSrc) {
+              active.src = outgoingSrc;
+            }
+            try { active.currentTime = outgoingPreTime; } catch {}
+            if (!active.paused) active.pause();
+            active.style.opacity = '0';
+          }
+
           const preSeekTime = incomingScene
             ? rt.placement === 'centered'
               ? Math.max(0, getSceneSourceStart(incomingScene) - rt.duration / 2)
