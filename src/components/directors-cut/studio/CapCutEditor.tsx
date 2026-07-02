@@ -1474,11 +1474,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     });
     onScenesUpdate(recalculated);
     toast.success('Szene am Playhead eingefügt');
-  }, [scenes, currentTime, onScenesUpdate, t]);
+  }, [scenes, currentTime, onScenesUpdate, t, commitHistory]);
 
   // Duplicate scene
   const handleDuplicateScene = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const scene = scenes.find(s => s.id === sceneId);
     if (!scene) return;
     const idx = scenes.indexOf(scene);
