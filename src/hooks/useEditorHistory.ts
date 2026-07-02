@@ -179,6 +179,7 @@ export function useEditorHistory<T>({
   }, [onRestore, flushPending]);
 
   const redo = useCallback(() => {
+    flushPending();
     setFuture((f) => {
       if (f.length === 0) return f;
       const [next, ...rest] = f;
@@ -192,7 +193,7 @@ export function useEditorHistory<T>({
       onRestore(next);
       return rest;
     });
-  }, [onRestore]);
+  }, [onRestore, flushPending]);
 
   const reset = useCallback(() => {
     setPast([]);
