@@ -1396,7 +1396,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         backgroundMusicAudioRef.current?.play().catch(() => {});
       }
     } else if (!externalIsPlaying && isPlaying) {
-      video.pause();
+      // Pause BOTH slots — Slot B may still be running from a transition.
+      videoRefA.current?.pause();
+      videoRefB.current?.pause();
       setIsPlaying(false);
       sourceAudioRef.current?.pause();
       voiceoverShouldRecoverRef.current = false;
