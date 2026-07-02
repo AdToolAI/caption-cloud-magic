@@ -392,13 +392,12 @@ export function useTransitionRenderer(
           seekStandby(rt.incomingSceneId, scenes, preSeekTime);
           standby.style.opacity = '0';
           standby.style.pointerEvents = 'none';
+          // Also make sure standby is paused during pre-seek if the user paused.
+          if (isPlayingRef?.current === false && !standby.paused) standby.pause();
           active.style.opacity = '1';
           active.style.transform = 'none';
           active.style.clipPath = 'none';
           active.style.filter = syncFilter || '';
-          active.style.position = '';
-          active.style.inset = '';
-          active.style.zIndex = '';
 
           rafRef.current = requestAnimationFrame(tick);
           return;
@@ -413,24 +412,25 @@ export function useTransitionRenderer(
         standby.style.transform = 'none';
         standby.style.clipPath = 'none';
         standby.style.filter = 'none';
-        standby.style.position = '';
-        standby.style.inset = '';
-        standby.style.width = '';
-        standby.style.height = '';
-        standby.style.objectFit = '';
         standby.style.zIndex = '';
         lastStandbySeekRef.current = '';
         setPhase('idle');
       }
 
-      // Active normal styles
+      // Active normal styles — layout is class-driven; only touch visuals.
       active.style.opacity = '1';
       active.style.transform = 'none';
       active.style.clipPath = 'none';
       active.style.filter = syncFilter || '';
-      active.style.position = '';
-      active.style.inset = '';
       active.style.zIndex = '';
+
+      // If the user paused mid-tick, make sure both slots really stay paused.
+      if (isPlayingRef?.current === false) {
+        if (!active.paused) active.pause();
+        if (!standby.paused) standby.pause();
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
 
       rafRef.current = requestAnimationFrame(tick);
     };
