@@ -248,6 +248,8 @@ serve(async (req) => {
       // collisions when triggered from the Deep Sweep alongside other Lambda jobs.
       qa_stability_mode,
       max_lambda_workers,
+      // Timeline audio tracks (SFX, extra VO/music clips beyond the legacy singletons)
+      audio_tracks,
     } = await req.json();
 
     if (!source_video_url) {
