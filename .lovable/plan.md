@@ -1,28 +1,35 @@
-# Fix: Neue Szene wird auf Original-Länge geklemmt statt Timeline zu verlängern
+## Problem
+
+Beim Anhängen eines 9-Sekunden-Clips aus der Mediathek wird die neue Szene auf **2.5s** geklemmt (12.5 → 15.0), statt die Timeline auf **21.5s** wachsen zu lassen.
 
 ## Root Cause
-`findBestInsertionCell` in `src/lib/directors-cut/timelineAnchors.ts` (Zeile 151–152) fällt zurück auf die **größte existierende Zelle** wenn keine freie Zelle gefunden wird. Bei voller Timeline (z. B. Scene 1 0→12.6s + Scene 2 12.6→15s) sind alle Zellen belegt, aber die Funktion gibt die größte belegte Zelle (0→12.6s) zurück statt `null`. `fitSceneToCell` platziert die neue Szene dann bei `start=0, end=5` — **überlappend** mit Scene 1, statt hinter Scene 2 angehängt.
 
-Der Fallback in `pickInsertionFit` (`CapCutEditor.tsx:1187–1190`, "append after last scene") wird dadurch nie erreicht.
+`pickInsertionFit` → `findBestInsertionCell` → `fitSceneToCell` in `src/lib/directors-cut/timelineAnchors.ts`:
 
-## Fix (1 Datei, 2 Zeilen)
-`src/lib/directors-cut/timelineAnchors.ts` Zeilen 151–152 ersetzen:
+1. `normalizeCutAnchors` fügt einen virtuellen **`timeline`-End-Anchor** bei `max(videoDuration, effectiveSourceDuration) = 15.0s` ein.
+2. Nach Szene 1 (endet 12.5s) existiert dadurch eine **freie Rest-Zelle 12.5 → 15.0** (2.5s breit).
+3. `findBestInsertionCell` liefert diese Zelle zurück, obwohl `preferredMinDuration` (aktuell fest `1`) nichts mit der Cliplänge zu tun hat.
+4. `fitSceneToCell` klemmt den 9s-Clip auf die 2.5s-Zelle → das ist der sichtbare Bug.
 
-```ts
-// vorher
-// Fallback: largest cell
-return [...cells].sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+Der bereits eingebaute `null`-Fallback (Append hinter letzter Szene) greift nicht, weil die Rest-Zelle „passt".
 
-// nachher
-// No free cell → signal caller to append past the timeline end instead
-// of overlapping an occupied region.
-return null;
-```
+## Fix
 
-Damit greift `pickInsertionFit`'s Append-Fallback: neue Szene startet bei `lastScene.end_time`, Timeline wächst auf 15 + 5 = 20 s (bzw. 15 + Clip-Länge).
+**`src/lib/directors-cut/timelineAnchors.ts`**
+- `fitSceneToCell`: NICHT klemmen, wenn die Zelle rechts vom `timeline`-Anchor begrenzt wird (offene Timeline-Kante) — Dauer = `naturalDuration` unverändert.
+- `findBestInsertionCell`: Wenn `preferredMinDuration` gesetzt ist und keine Zelle groß genug ist, `null` zurückgeben (statt der kleinsten freien) → Append-Fallback greift.
 
-## Auswirkung
-- Empty-Scene-Add (`handleSceneAdd`): 5 s werden ans Ende angehängt.
-- Video-Import als Szene (`handleAddVideoAsScene`): volle Clip-Länge wird ans Ende angehängt.
-- `actualTotalDuration = max(scene.end_time)` erweitert Preview-Player, Timeline und Export automatisch.
-- Kein Regress für Insert-am-Playhead-in-freie-Zelle-Cases (die laufen weiterhin über den Free-Cell-Pfad).
+**`src/components/directors-cut/studio/CapCutEditor.tsx`**
+- `pickInsertionFit`: `preferredMinDuration: opts.naturalDuration ?? 1` durchreichen, damit oben genannte Regel wirkt.
+
+Damit wird ein 9s-Clip:
+- Playhead in einer Lücke ≥9s → snapt an die Lücke.
+- Timeline-Ende / keine passende Lücke → hängt hinten an, Timeline wächst auf `letztes_end + naturalDuration`.
+
+## Zweiter Punkt („2 Szenen werden markiert")
+
+Das ist mit dem Screenshot nicht eindeutig reproduzierbar — nach dem Duration-Fix sollte die neue Szene volle 9s lang und klar als einzige neue Szene sichtbar sein. Falls die Doppel-Markierung dann noch besteht, bitte kurze Beschreibung/Screenshot **direkt nach dem Klick** — dann trace ich Selection-State (`selectedSceneId`, ID-Kollision durch `scene-${Date.now()}` bei schnellem Doppel-Add).
+
+## Files touched
+- `src/lib/directors-cut/timelineAnchors.ts` (2 Funktionen)
+- `src/components/directors-cut/studio/CapCutEditor.tsx` (1 Zeile in `pickInsertionFit`)
