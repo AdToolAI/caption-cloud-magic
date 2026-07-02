@@ -108,6 +108,9 @@ const Index = () => {
           {/* Live Demo Showcase - Before/After */}
           <LiveDemoShowcase />
 
+          {/* UDC — Consistency-First moat */}
+          <UDCShowcase />
+
           {/* AI Arsenal - all integrated AI modules */}
           <AIArsenalShowcase />
 
