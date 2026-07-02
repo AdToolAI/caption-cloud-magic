@@ -115,7 +115,25 @@ export function useTransitionRenderer(
     setPhase('idle');
     lastStandbySeekRef.current = '';
     lastActiveTransitionRef.current = null;
+    pendingHideRef.current = null;
   }, [scenes, structuralKey, setPhase]);
+
+  // Expose a reset function so the outer player can wipe stale state on
+  // replay / natural end. Without this the internal phase/seek markers can
+  // survive across playbacks and freeze the visible slot on scene 2.
+  useEffect(() => {
+    if (!resetTransitionStateRef) return;
+    resetTransitionStateRef.current = () => {
+      phaseRef.current = 'idle';
+      if (transitionPhaseRef) transitionPhaseRef.current = 'idle';
+      lastStandbySeekRef.current = '';
+      lastActiveTransitionRef.current = null;
+      pendingHideRef.current = null;
+    };
+    return () => {
+      if (resetTransitionStateRef) resetTransitionStateRef.current = null;
+    };
+  }, [resetTransitionStateRef, transitionPhaseRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
