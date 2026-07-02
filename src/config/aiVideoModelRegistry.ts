@@ -340,7 +340,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-luma-video',
     group: 'premium',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false },
+    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [5, 9],
     resolution: '1080p',
     aspectRatios: sharedAspect,
