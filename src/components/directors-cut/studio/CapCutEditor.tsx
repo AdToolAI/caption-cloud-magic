@@ -2758,10 +2758,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         open={cutDownOpen}
         onOpenChange={setCutDownOpen}
         scenes={scenes}
+        hasMasterSnapshot={!!masterSnapshot}
         onApply={(next, target) => {
+          // Snapshot master BEFORE mutating so the user can always restore it.
+          if (!masterSnapshot) {
+            setMasterSnapshot({ scenes, target, at: Date.now() });
+          }
           commitHistory();
           onScenesUpdate?.(next);
-          toast.success(`Auto Cut-Down ${target}s angewendet — ${next.length} Szene(n) auf Timeline.`);
+          toast.success(
+            `Auto Cut-Down ${target}s angewendet — Master als Snapshot gesichert.`,
+            {
+              description: 'Über den ↺-Button in der Toolbar jederzeit wiederherstellbar.',
+            },
+          );
         }}
       />
 
