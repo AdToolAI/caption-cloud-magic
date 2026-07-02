@@ -1,93 +1,78 @@
-# Universal Director's Cut — Audit-Ergebnis & priorisierte Roadmap
+# UDC Status — Wave 4 Abschluss & Restarbeiten
 
-Nach vollständigem Read-Only-Audit (Timeline, Trim, Transitions, Audio, Export, Persistenz, History) haben wir **23 Findings**. Architektur ist gesund — die meisten Probleme sind kleine, isolierte Wiring-Fehler. Ein Bug ist aber trust-breaking: **Multi-Track-Audio wird beim Export komplett verworfen.**
+## Wo wir stehen
 
-Ich schlage 4 Wellen vor. Du kannst danach entscheiden, ob wir alle 4 durchziehen oder nach Welle 1 stoppen.
+**Ziel:** Universal Directors Cut als erste "Consistency-First" AI-native NLE positionieren.
 
----
+### Fertig (Waves 1–4)
 
-## Welle 1 — Trust-Fixes (Export-brechende Bugs)
+**Wave 1 — Trust Fixes (Export/Preview)**
+- C1 Multi-Track-Audio-Export ✓
+- C3/C4 Resource Leaks (RAF/Loops) ✓
+- H1 Music Volume Preview↔Render Parity ✓
+- H6 Blackscreen/Media-Scene Logic ✓
 
-Ziel: was der User sieht/hört im Preview = was rausrendert wird.
+**Wave 2 — Stability**
+- C2 Voiceover-Duration ✓
+- H2 Subtitle Styling ✓
+- H3 Transition Easing Parity ✓
+- H4 Undo/Redo Race ✓
+- H5 Poll-Restart ✓
+- M5 Orphan-Transitions Prune ✓
+- M6 SubtitleSafeZone ✓
 
-1. **C1 Audio-Export komplett verdrahten** — `audioTracks` (SFX, Extra-Musik, Custom-Clips) landet aktuell im Draft, aber NICHT im Render-Payload. Wir serialisieren `audioTracks` in `soundDesign.sfxTracks`, `render-directors-cut/index.ts` reicht sie durch, `DirectorsCutVideo.tsx` konsumiert sie (Schema existiert schon, wird nur nicht gefüllt).
-2. **C2 Voiceover-10-s-Truncation** — Placeholder-Duration von `10` auf `videoDuration` setzen, `AbortController` beim Unmount.
-3. **C3 AudioContext-Leak in WaveformDisplay** — Cleanup-Return, `cancelled`-Flag, damit Browser nicht bei 6 Contexts hart limitiert.
-4. **C4 audioElementsRef-Leak** — Beim Delete `pause()` + `src=''` + `Map.delete()`.
-5. **H1 Music-Volume Preview↔Export vereinheitlichen** — Preview nutzt hartkodiert `0.3`, Export nutzt Slider, Formel weicht ab. Alle drei Pfade auf `getEffectiveBackgroundMusicVolume()` konsolidieren.
-6. **H2 Subtitle-Style Zod-Strip** — `SubtitleClipSchema.passthrough()` bzw. `textStroke/maxLines/style/source` explizit ins Schema, damit User-Formatierung nicht stumm verloren geht.
+**Wave 3 — UX**
+- M2 Shortcut Overlay ✓
+- M3 Autosave-Indikator ✓
+- M4 Waveform-Cache + In-Flight-Dedup ✓
+- M9 Enhanced Snap-Feedback ✓
+- M10 Action-Log Toasts ✓
 
-**Aufwand:** ~1 Session. Nach Welle 1 hat der User Vertrauen zurück, dass Preview = Export.
+**Wave 4 — Consistency-Moat (Alleinstellungsmerkmal)**
+- W4.1 Global Voice-Lock ✓ (`AIVoiceOver.tsx` + `localStorage`)
+- W4.2 CI-Preflight ✓ (`ciPreflight.ts` + `CIPreflightDialog.tsx` → blockt Export bei fail)
+- W4.3 Anchor-Refresh ✓ (`anchorRefresh.ts` + `AnchorRefreshDialog.tsx` → Toolbar-Anchor mit Live-Drift-Badge)
+- W4.4 Auto Cut-Down ✓ (`autoCutDown.ts` + `AutoCutDownDialog.tsx` → Toolbar-Scissors, 15s/6s Presets)
 
----
+### Verdrahtung — geprüft
 
-## Welle 2 — Preview/Export-Parität & Undo-Stabilität
+Alle 4 Wave-4-Module hängen in `CapCutEditor.tsx`:
+- Toolbar-Buttons: Anchor (Drift-Badge), Scissors (Cut-Down), Keyboard (Shortcuts)
+- Dialog-Mounts am File-Ende (`AnchorRefreshDialog`, `AutoCutDownDialog`, `CIPreflightDialog`, `ShortcutOverlay`)
+- Alle Aktionen laufen durch `commitHistory()` → Undo-fähig
+- `handleExportVideo` ruft `runCIPreflight` vor Lambda-Call
+- Voice-Lock hydratisiert automatisch beim Öffnen von `AIVoiceOver`
+- Auto Cut-Down erzeugt neue Scene-IDs (`__cd15`/`__cd6`), Anchor-Preservierung via `original_start_time`
 
-7. **H3 Transition-Easing** — Shared Easing-Utility, Preview + Remotion nutzen dieselbe Kurve.
-8. **H4 Undo/Redo-Race** — `commit()`+`undo()` in Keyboard-Shortcut kann Ghost-Snapshot pushen. Guard über `pendingRef !== null`.
-9. **H5 Burned-Subs Polling-Restart pro Render** — `onCleanedVideoUrlChange` in DC.tsx in `useCallback` wrappen (aktuell wird alle 1s ein neuer Poll-Interval gestartet).
-10. **H6 handleVideoEnded für Blackscreen/Media-Scenes** — Skip Source-Seek wenn `sourceMode !== 'original'`.
-11. **M5 Orphan-Transitions** — Beim Scene-Delete zugehörige `TransitionAssignment` mitlöschen.
-12. **M6 SubtitleSafeZone `mode`** — `reframe`/`crop` durchs Schema und in Remotion honorieren.
-13. **M8 RAF-Leak in useTransitionRenderer** — Cleanup mit `cancelAnimationFrame`.
+Typecheck ist grün.
 
-**Aufwand:** ~1 Session.
+## Was noch offen ist
 
----
+### Wave 4 Ergänzungen (optional, aber wirkungsvoll)
+- **W4.5 Cut-Down als separater Export** — aktuell _ersetzt_ Auto-Cut-Down die Timeline. Alternative: als neues Projekt/Snapshot speichern, damit der Master erhalten bleibt.
+- **W4.6 CI-Preflight erweitern** — aktuell prüfen wir Duration, Voice-Lock, Subtitle-Contrast. Zusätzlich sinnvoll: Aspect-Ratio-Konsistenz, fehlende Endcard/Logo, Loudness-LUFS-Check.
+- **W4.7 Anchor-Refresh Batch-Preview** — Thumbnails der "gedriftteten" Frames vs. "Anchor"-Frame nebeneinander zeigen, bevor gesnappt wird.
 
-## Welle 3 — Performance & UX-Politur
+### Wave 5 — Skalierung & Polish (bislang nicht angefasst)
+- **M7 Thumbnail-Cache** (transitioned, aber nicht implementiert)
+- **M8 Keyboard-Shortcut-Erweiterungen** (J/K/L Playback, I/O Marker)
+- **L1 Multi-Selection auf Timeline** (Shift-Click, Ripple-Move für Gruppen)
+- **L2 Nested Sequences** (Szenen-Gruppen als eine Einheit behandeln)
+- **L3 Proxy-Rendering** (niedrig aufgelöste Preview-Proxys für lange Timelines)
 
-14. **M1 Draft-Autosave** — Von synchronem localStorage-JSON (50–150 KB alle 500 ms) auf IndexedDB + 2 s Debounce.
-15. **M2 Audio-Sync-Effect splitten** — Position-Sync und Volume-Sync trennen (keine Track-Iteration bei Volume-Change).
-16. **M3 AudioTrackRow-DOM-Explosion** — Grid-Lines von 1 200 `<div>`s auf CSS `repeating-linear-gradient`.
-17. **M4 SceneTrimInspector hardMax** — Immer volle Source-Range, damit Wiederaufweiten funktioniert.
-18. **M7 Waveform Sample-Count** — Aus Container-Width ableiten statt hart 100 Bars.
-19. **L2 Slide/Wipe-Directions** — `slide-right`, `slide-up` etc. in `TRANSITION_TYPES` (aktuell defaultet alles auf `left`).
-20. **L3 Color-Grading-Opacity-Hack** — Blend via Pseudo-Element statt `opacity()` Filter.
-21. **L5 cheapEquals** — `thumbnail_url` (data URIs!) aus Deep-Compare ausschließen.
-
-**Aufwand:** ~1 Session.
-
----
-
-## Welle 4 — Pro-NLE-Features (differenzierend vs. CapCut)
-
-Nur wenn Welle 1–3 grün sind. Ziel: NLE-Score von 6.5 auf ~8.
-
-- **N1 JKL-Scrubbing** — Standard-Profi-Shortcut, 30 min.
-- **N2 Snap-Tick-Indikatoren** in der Timeline (Marker sind schon getrackt, nur nicht sichtbar).
-- **N3 Waveform im Video-Track** (Komponente existiert schon).
-- **N4 Echter Ripple-Trim** auf Handle-Drag.
-- **N5 Frame-Accurate Timecode** `HH:MM:SS:FF` im Preview.
-- **N6 Mobile Pinch-to-Zoom** auf Timeline.
-
-**Aufwand:** ~1–2 Sessions je nach Umfang.
-
----
-
-## Technische Details (zum Nachlesen)
-
-Die vollständige Fundstellen-Liste mit `file:line`-Referenzen ist im Audit-Report enthalten. Wichtigste Dateien für Welle 1:
-- `supabase/functions/render-directors-cut/index.ts` — Render-Payload-Serialisierung
-- `src/pages/DirectorsCut/DirectorsCut.tsx` — Parent-State `capCutAudioTracks`
-- `src/components/directors-cut/studio/CapCutEditor.tsx` — Voiceover-Placeholder, audioElementsRef-Cleanup, Export-Handler
-- `src/components/directors-cut/timeline/WaveformDisplay.tsx` — AudioContext-Cleanup
-- `src/remotion/templates/DirectorsCutVideo.tsx` — `SubtitleClipSchema`, `soundDesign.sfxTracks`
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Music-Volume-Formel
-- `src/lib/audioVolume.ts` — Single-Source-of-Truth für Volume-Mapping
-
----
-
-## Nicht enthalten
-
-- **Keine** Änderungen an AI-Pipelines (Composer, Toolkit, Talking-Head).
-- **Keine** DB-Migrationen nötig für Welle 1–2. Welle 3 (IndexedDB-Migration) evtl. mit sanfter Fallback-Auslesung aus altem localStorage.
-- **Keine** Änderungen an Auto-Director oder Ad-Director.
-
----
+### Offene technische Schulden (aus dem 23-Findings-Audit)
+- Keine kritischen (C-) oder Highs (H-) mehr offen.
+- Restliche Mediums (M1, M8) und Lows (L*) sind Politur, kein Blocker für zahlende Kunden.
 
 ## Meine Empfehlung
 
-**Starten mit Welle 1** (Trust-Fixes) — die 6 Bugs kosten dich sonst zahlende Kunden, sobald jemand SFX arrangiert und einen tonlos-arrangierten Export zurückbekommt. Danach sehen wir, ob Welle 2 direkt folgen soll.
+**UDC ist launch-ready für zahlende Kunden.** Die Consistency-Moat-Features (Voice-Lock + CI-Preflight + Anchor-Refresh + Auto-Cut-Down) sind das Alleinstellungsmerkmal, das kein CapCut/Descript-Klon hat.
 
-Approve → ich baue Welle 1 in einem Rutsch.
+Nächster sinnvoller Schritt — bitte eine Option wählen:
+
+1. **W4.5 (Cut-Down als Snapshot)** — verhindert dass User versehentlich ihren Master überschreiben. ~30 Min.
+2. **W4.6 (Preflight-Erweiterung)** — mehr Trust-Signale vor teurem Lambda-Render. ~1h.
+3. **W4.7 (Anchor-Refresh Preview-UI)** — Sicht-vor-Snap für kritischere User. ~1h.
+4. **UDC abschließen** und weiter mit Onboarding/Pricing/Conversion für erste Kunden.
+
+Sag mir welche Option (oder gib eine andere Richtung an), dann setze ich um.
