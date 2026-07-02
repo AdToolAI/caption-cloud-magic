@@ -2443,6 +2443,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     sourceDuration={originalVideoDuration}
                     currentTime={currentTime}
                     onTrimScene={handleTrimScene}
+                    onSplitAtTrim={handleSplitAtTrim}
                     onSceneDelete={handleSceneDelete}
                   />
                 </div>
