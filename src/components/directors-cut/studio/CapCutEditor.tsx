@@ -1161,7 +1161,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       };
     }
     onScenesUpdate(sorted);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, commitHistory]);
 
   // Effective source video duration — falls back to timeline duration when
   // the source duration is unknown (legacy callers). Used to decide whether
