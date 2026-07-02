@@ -555,9 +555,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       slotB.style.zIndex = '';
     }
     if (slotA) {
+      // Only reveal Slot A once the seek to the trimmed in-point has actually
+      // landed — otherwise the browser paints the previous currentTime (often
+      // frame 0 of the source video) for one frame before the seek completes.
+      const alreadyThere =
+        slotA.readyState >= 1 && Math.abs(slotA.currentTime - sourceTime) < 0.02;
       try { slotA.currentTime = sourceTime; } catch {}
-      slotA.style.opacity = '1';
+      slotA.style.opacity = alreadyThere ? '1' : '0';
       slotA.style.pointerEvents = 'auto';
+      // The onSeeked handler on <video ref={videoRefA}> will flip opacity to 1
+      // as soon as the browser confirms the seek has landed.
     }
     const overlay = mediaVideoRef.current;
     if (overlay) {
