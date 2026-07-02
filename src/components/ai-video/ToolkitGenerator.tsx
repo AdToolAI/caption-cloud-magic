@@ -958,6 +958,48 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         onPromptGenerated={(p) => { setPrompt(p); setShowOptimizer(false); }}
       />
 
+      {/* Model auto-switch confirmation for end-frame / anchor placements */}
+      <AlertDialog
+        open={!!pendingPlacement}
+        onOpenChange={(open) => { if (!open) setPendingPlacement(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingPlacement?.placement === 'end'
+                ? (language === 'de' ? 'Endframe nur mit Luma Ray 2' : 'End-frame only with Luma Ray 2')
+                : (language === 'de' ? 'Anker-Modus benötigt Vidu Q2 oder Kling 3' : 'Anchor mode needs Vidu Q2 or Kling 3')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingPlacement?.placement === 'end'
+                ? (language === 'de'
+                    ? `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende" aktiv ist, sind andere Modelle im Picker ausgegraut.`
+                    : `The end-frame option is exclusive to Luma Ray 2. Switch to ${pendingPlacement?.targetModelName} now? While "At end" is active, other models will be greyed out.`)
+                : (language === 'de'
+                    ? `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`
+                    : `Anchor mode (reference image without a forced frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {language === 'de' ? 'Abbrechen' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingPlacement) return;
+                setModelId(pendingPlacement.targetModelId);
+                setReferencePlacement(pendingPlacement.placement);
+                setPendingPlacement(null);
+              }}
+            >
+              {language === 'de'
+                ? `Zu ${pendingPlacement?.targetModelName} wechseln`
+                : `Switch to ${pendingPlacement?.targetModelName}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">
         {language === 'de'
