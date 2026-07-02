@@ -1308,11 +1308,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const target: any = scenes[targetIdx];
 
     const isAdditional = !!target.additionalMedia;
+    const mediaClipDur = typeof target.additionalMedia?.duration === 'number' ? target.additionalMedia.duration : undefined;
     const hardMin = isAdditional
-      ? (target.original_start_time ?? target.start_time)
+      ? (target.media_source_start ?? 0)
       : 0;
     const hardMax = isAdditional
-      ? (target.original_end_time ?? target.end_time)
+      ? (target.media_source_end ?? mediaClipDur ?? (target.original_end_time ?? target.end_time))
       : (originalVideoDuration && originalVideoDuration > 0
           ? originalVideoDuration
           : (target.original_end_time ?? target.end_time));
