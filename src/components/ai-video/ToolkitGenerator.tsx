@@ -137,9 +137,24 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
     if (!model.capabilities.multiRef) setViduReferences([]);
-    // Reset placement to 'start' if the current one isn't available on this model
-    if (referencePlacement === 'end' && !model.capabilities.endFrame) setReferencePlacement('start');
-    if (referencePlacement === 'anchor' && !model.capabilities.multiRef) setReferencePlacement('start');
+    // Reset placement to 'start' if the current one isn't available on this model.
+    // 'end' → only Luma Ray 2 (capabilities.endFrame). 'anchor' → Vidu/Kling (capabilities.anchorOnly).
+    if (referencePlacement === 'end' && !model.capabilities.endFrame) {
+      setReferencePlacement('start');
+      toast.info(
+        language === 'de'
+          ? `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Endframe.`
+          : `Placement reset to "At start" — ${model.name} does not support end-frame.`,
+      );
+    }
+    if (referencePlacement === 'anchor' && !model.capabilities.anchorOnly) {
+      setReferencePlacement('start');
+      toast.info(
+        language === 'de'
+          ? `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`
+          : `Placement reset to "At start" — ${model.name} does not support anchor mode.`,
+      );
+    }
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
