@@ -1738,6 +1738,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [preflightOpen, setPreflightOpen] = useState(false);
   const [preflightFindings, setPreflightFindings] = useState<PreflightFinding[]>([]);
 
+  // W4.3 Anchor-Refresh — cross-scene identity anchor drift detection
+  const [anchorRefreshOpen, setAnchorRefreshOpen] = useState(false);
+  const anchorDriftCount = useMemo(
+    () => analyzeAnchorDrift(scenes).filter((d) => d.severity !== 'ok').length,
+    [scenes],
+  );
+
+
   const handleExportVideo = useCallback(async () => {
     const findings = runCIPreflight({
       projectId,
