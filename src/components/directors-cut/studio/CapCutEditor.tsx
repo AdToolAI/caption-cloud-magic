@@ -634,9 +634,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 name: t('dc.aiVoiceOverClip'),
                 url: voiceOverUrl,
                 startTime: 0,
-                duration: 10, // Temporary duration until actual audio loads
+                duration: videoDuration || 60, // Placeholder = full video length, updated on loadedmetadata
                 trimStart: 0,
-                trimEnd: 10,
+                trimEnd: videoDuration || 60,
                 volume: 100,
                 fadeIn: 0.2,
                 fadeOut: 0.2,
@@ -1003,6 +1003,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
     commitHistory();
+    // Release the HTMLAudioElement so we don't leak network connections + memory.
+    const existing = audioElementsRef.current.get(clipId);
+    if (existing) {
+      try { existing.pause(); } catch { /* noop */ }
+      try { existing.src = ''; existing.load?.(); } catch { /* noop */ }
+      audioElementsRef.current.delete(clipId);
+    }
     setAudioTracks(prev => prev.map(track => ({
       ...track,
       clips: track.clips.filter(c => c.id !== clipId)
@@ -1927,6 +1934,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Welle 6 — Ripple Delete for clips (also shifts subsequent clips on same track left).
   const handleDeleteClipWithRipple = useCallback((clipId: string, ripple: boolean) => {
     commitHistory();
+    // Release the HTMLAudioElement (same cleanup path as handleDeleteClip).
+    const existing = audioElementsRef.current.get(clipId);
+    if (existing) {
+      try { existing.pause(); } catch { /* noop */ }
+      try { existing.src = ''; existing.load?.(); } catch { /* noop */ }
+      audioElementsRef.current.delete(clipId);
+    }
     setAudioTracks(prev => prev.map(track => {
       const target = track.clips.find(c => c.id === clipId);
       if (!target) return track;

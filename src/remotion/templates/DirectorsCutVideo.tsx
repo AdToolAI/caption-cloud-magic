@@ -96,7 +96,9 @@ const SceneSchema = z.object({
   sourceMode: z.enum(['original', 'blackscreen', 'media']).optional(),
 });
 
-// Subtitle Clip Schema
+// Subtitle Clip Schema — .passthrough() so style extensions (textStroke, maxLines,
+// style presets, source flag) survive Zod validation and reach the renderer instead
+// of being silently stripped by strict parsing.
 const SubtitleClipSchema = z.object({
   id: z.string(),
   startTime: z.number(),
@@ -107,38 +109,58 @@ const SubtitleClipSchema = z.object({
   color: z.string().optional(),
   backgroundColor: z.string().optional(),
   fontFamily: z.string().optional(),
-});
+  textStroke: z.boolean().optional(),
+  textStrokeColor: z.string().optional(),
+  textStrokeWidth: z.number().optional(),
+  maxLines: z.number().optional(),
+  style: z.string().optional(),
+  source: z.string().optional(),
+}).passthrough();
 
 // ========== SHARED SUBTITLE RENDERER — single source of truth for all paths ==========
-const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => (
-  <div style={{
-    position: 'absolute',
-    left: 0, right: 0, top: 0, bottom: 0,
-    width: '100%', height: '100%',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
-    paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
-    paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
-    paddingLeft: '5%', paddingRight: '5%',
-    pointerEvents: 'none',
-    zIndex: SUBTITLE_Z_INDEX,
-  }}>
+const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => {
+  const strokeEnabled = clip.textStroke && (clip.textStrokeWidth ?? 0) > 0;
+  const strokeColor = clip.textStrokeColor || '#000000';
+  const strokeWidth = clip.textStrokeWidth ?? 2;
+  const maxLines = clip.maxLines && clip.maxLines > 0 ? clip.maxLines : undefined;
+
+  return (
     <div style={{
-      backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
-      color: clip.color || SUBTITLE_DEFAULT_COLOR,
-      padding: '14px 28px', borderRadius: '8px',
-      fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
-      fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY,
-      fontWeight: 'bold',
-      textAlign: 'center' as const,
-      maxWidth: '90%', lineHeight: 1.4,
-      textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+      position: 'absolute',
+      left: 0, right: 0, top: 0, bottom: 0,
+      width: '100%', height: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
+      paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
+      paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
+      paddingLeft: '5%', paddingRight: '5%',
+      pointerEvents: 'none',
+      zIndex: SUBTITLE_Z_INDEX,
     }}>
-      {clip.text}
+      <div style={{
+        backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
+        color: clip.color || SUBTITLE_DEFAULT_COLOR,
+        padding: '14px 28px', borderRadius: '8px',
+        fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
+        fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY,
+        fontWeight: 'bold',
+        textAlign: 'center' as const,
+        maxWidth: '90%', lineHeight: 1.4,
+        textShadow: strokeEnabled
+          ? `${strokeWidth}px 0 0 ${strokeColor}, -${strokeWidth}px 0 0 ${strokeColor}, 0 ${strokeWidth}px 0 ${strokeColor}, 0 -${strokeWidth}px 0 ${strokeColor}, 0 2px 4px rgba(0,0,0,0.5)`
+          : '0 2px 4px rgba(0,0,0,0.5)',
+        WebkitTextStroke: strokeEnabled ? `${strokeWidth}px ${strokeColor}` : undefined,
+        display: maxLines ? '-webkit-box' : undefined,
+        WebkitLineClamp: maxLines,
+        WebkitBoxOrient: maxLines ? ('vertical' as const) : undefined,
+        overflow: maxLines ? 'hidden' : undefined,
+      }}>
+        {clip.text}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // SubtitleTrack Schema
 const SubtitleTrackSchema = z.object({
@@ -625,6 +647,15 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
+  // Music mix policy (mirror src/lib/audioVolume.ts so preview === export):
+  // when a voice-over is present, reserve headroom under the narration.
+  const MUSIC_HEADROOM_WITH_VOICEOVER = 0.35;
+  const effectiveMusicVolume = (() => {
+    const slider = Math.max(0, Math.min(100, backgroundMusicVolume ?? 30)) / 100;
+    if (!voiceoverUrl) return slider;
+    return Math.max(0, Math.min(1, slider * MUSIC_HEADROOM_WITH_VOICEOVER));
+  })();
+
   // Log render version once on first frame for bundle verification
   useEffect(() => {
     const clipCount = subtitleTrack?.clips?.length ?? 0;
@@ -921,7 +952,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         {/* Voiceover - skip in preview mode */}
         {!previewMode && voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
         {/* Background Music - skip in preview mode */}
-        {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
+        {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={effectiveMusicVolume} loop pauseWhenBuffering />}
         {/* Text Overlays */}
         {textOverlays.map((overlay) => {
           const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
@@ -1276,7 +1307,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       {!previewMode && backgroundMusicUrl && frame >= 30 && (
         <Audio
           src={backgroundMusicUrl}
-          volume={(backgroundMusicVolume || 30) / 100}
+          volume={effectiveMusicVolume}
           loop
           pauseWhenBuffering
         />
