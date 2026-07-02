@@ -1103,7 +1103,7 @@ export function DirectorsCut() {
         onBackgroundMusicUrlChange={setBackgroundMusicUrl}
         initialSubtitleTrack={capCutSubtitleTrack}
         projectId={projectId}
-        onCleanedVideoUrlChange={(url) => setCleanedVideoUrl(url || undefined)}
+        onCleanedVideoUrlChange={useCallback((url: string | null) => setCleanedVideoUrl(url || undefined), [])}
         onSaveProject={saveProject}
         subtitleSafeZone={subtitleSafeZone}
         onSubtitleSafeZoneChange={setSubtitleSafeZone}
