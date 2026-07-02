@@ -102,6 +102,27 @@ export function useTransitionRenderer(
     standby.currentTime = Math.max(0, targetTime + 0.02);
   }, [getStandby, getSceneSourceStart, getSceneSourceUrl]);
 
+  // Pre-arm the media overlay <video> for an incoming media-video scene so
+  // that when the transition ends and the media branch takes over there is
+  // no src rebind (which would drop the current frame → visible flash).
+  // Called during preparing / active phases.
+  const preArmMediaOverlay = useCallback((incomingScene: SceneAnalysis | undefined, targetSourceTime: number) => {
+    const overlay = mediaOverlayRef?.current;
+    if (!overlay || !incomingScene) return;
+    const isMediaVideo = incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video' && incomingScene.additionalMedia.url;
+    if (!isMediaVideo) return;
+    const url = incomingScene.additionalMedia!.url!;
+    if (overlay.getAttribute('src') !== url && overlay.currentSrc !== url) {
+      overlay.src = url;
+    }
+    // Only re-seek if we're drifted; avoids a stutter loop each rAF.
+    if (Math.abs(overlay.currentTime - targetSourceTime) > 0.08) {
+      try { overlay.currentTime = Math.max(0, targetSourceTime); } catch {}
+    }
+    // Keep paused during transition — visible A/B slots own the display.
+    if (!overlay.paused) overlay.pause();
+  }, [mediaOverlayRef]);
+
   const setPhase = useCallback((phase: 'idle' | 'preparing' | 'active' | 'handoff') => {
     phaseRef.current = phase;
     if (transitionPhaseRef) transitionPhaseRef.current = phase;
