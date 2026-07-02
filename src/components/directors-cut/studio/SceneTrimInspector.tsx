@@ -258,8 +258,8 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               step={STEP}
               min={hardMin}
               max={hardMax}
-              key={`out-${scene.id}-${srcOut}`}
-              defaultValue={srcOut.toFixed(2)}
+              value={outText}
+              onChange={(e) => setOutText(e.target.value)}
               onBlur={(e) => applyOut(parseFloat(e.target.value) || 0)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
