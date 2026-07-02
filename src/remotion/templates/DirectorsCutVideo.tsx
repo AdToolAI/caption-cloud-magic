@@ -1384,6 +1384,17 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
+      {/* Timeline audio tracks (SFX + extra clips) — audit C1 */}
+      {!previewMode && (
+        <TimelineAudioTracksRenderer
+          tracks={audioTracks}
+          fps={fps}
+          hasVoiceoverForDucking={!!voiceoverUrl}
+        />
+      )}
+
+
+
       {/* Sound Design Audio */}
       {!previewMode && soundDesign?.enabled && soundDesign.ambientUrl && (
         <Audio
