@@ -1021,7 +1021,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       clips: track.clips.filter(c => c.id !== clipId)
     })));
     setSelectedClipId(null);
-  }, [commitHistory]);
+    toast.success(t('dc.clipDeleted'));
+  }, [commitHistory, t]);
 
   // Resize clip handler (for trimming from both sides)
   const handleClipResize = useCallback((clipId: string, side: 'left' | 'right', newStartTime: number, newDuration: number) => {
@@ -1071,7 +1072,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setCurrentTime(recalculatedScenes.length > 0 ? safeTime : 0);
     }
     onScenesUpdate(recalculatedScenes);
-  }, [scenes, onScenesUpdate, commitHistory]);
+    toast.success(t('dc.sceneDeleted'));
+  }, [scenes, onScenesUpdate, commitHistory, t]);
 
   // Trim scene handler — adjust start/end without recalculating other scenes
   // Interpretiert die Sidebar-Inputs als Quellen-Range (source in/out) und
@@ -1126,7 +1128,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
 
     onScenesUpdate(sorted);
-  }, [scenes, onScenesUpdate, originalVideoDuration, commitHistory]);
+    toast.success(t('dc.sceneTrimmed'), { id: 'dc-scene-trimmed' });
+  }, [scenes, onScenesUpdate, originalVideoDuration, commitHistory, t]);
 
   // Rename scene handler
   const handleSceneRename = useCallback((sceneId: string, newName: string) => {
@@ -1963,7 +1966,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       };
     }));
     setSelectedClipId(null);
-  }, [commitHistory]);
+    toast.success(t('dc.clipDeleted'));
+  }, [commitHistory, t]);
 
   // Welle 6 — Pro-Editing keyboard handler (Delete/Ripple, ?, arrows, Ctrl+D, Ctrl+A, Home/End)
   useEffect(() => {
