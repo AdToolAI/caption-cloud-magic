@@ -728,7 +728,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     switch (rt.baseType) {
       case 'crossfade':
       case 'dissolve':
-        outgoingStyle = { opacity: 1 - progress };
+        // Professional A/B dissolve: keep the outgoing clip solid underneath
+        // and reveal the incoming clip over it. Fading both layers can create a
+        // visible black dip or make the transition read like a hard cut.
+        outgoingStyle = { opacity: 1 };
         incomingStyle = { opacity: progress };
         break;
       case 'fade':
