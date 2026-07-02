@@ -137,6 +137,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
     if (!model.capabilities.multiRef) setViduReferences([]);
+    // Reset placement to 'start' if the current one isn't available on this model
+    if (referencePlacement === 'end' && !model.capabilities.endFrame) setReferencePlacement('start');
+    if (referencePlacement === 'anchor' && !model.capabilities.multiRef) setReferencePlacement('start');
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
