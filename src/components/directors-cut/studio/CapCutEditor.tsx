@@ -15,7 +15,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useEditorHistory } from '@/hooks/useEditorHistory';
 import { ShortcutOverlay } from './ShortcutOverlay';
 import { AutosaveBadge } from './AutosaveBadge';
-import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard, Anchor } from 'lucide-react';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard, Anchor, Scissors } from 'lucide-react';
 import { PanelDivider } from './PanelDivider';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -29,6 +29,7 @@ import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
 import { CIPreflightDialog } from './CIPreflightDialog';
 import { runCIPreflight, preflightBlocks, type PreflightFinding } from '@/lib/directors-cut/ciPreflight';
 import { AnchorRefreshDialog } from './AnchorRefreshDialog';
+import { AutoCutDownDialog } from './AutoCutDownDialog';
 import { analyzeAnchorDrift } from '@/lib/directors-cut/anchorRefresh';
 import {
   normalizeCutAnchors,
@@ -1745,6 +1746,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     [scenes],
   );
 
+  // W4.4 Auto Cut-Down — 15s / 6s ad ableger
+  const [cutDownOpen, setCutDownOpen] = useState(false);
+
+
 
   const handleExportVideo = useCallback(async () => {
     const findings = runCIPreflight({
@@ -2213,6 +2218,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 {anchorDriftCount}
               </span>
             )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setCutDownOpen(true)}
+            title="Auto Cut-Down — 15s / 6s Ad-Ableger erzeugen"
+          >
+            <Scissors className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
@@ -2704,6 +2718,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           toast.success('Anchor-Refresh angewendet — Identity-Frames wiederhergestellt.');
         }}
       />
+      <AutoCutDownDialog
+        open={cutDownOpen}
+        onOpenChange={setCutDownOpen}
+        scenes={scenes}
+        onApply={(next, target) => {
+          commitHistory();
+          onScenesUpdate?.(next);
+          toast.success(`Auto Cut-Down ${target}s angewendet — ${next.length} Szene(n) auf Timeline.`);
+        }}
+      />
+
     </div>
   );
 };
