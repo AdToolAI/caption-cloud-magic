@@ -2770,12 +2770,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         open={anchorRefreshOpen}
         onOpenChange={setAnchorRefreshOpen}
         scenes={scenes}
+        sourceVideoUrl={cleanedVideoUrl || videoUrl}
         onScenesUpdate={(next) => {
           commitHistory();
           onScenesUpdate?.(next);
           toast.success('Anchor-Refresh angewendet — Identity-Frames wiederhergestellt.');
         }}
       />
+
       <AutoCutDownDialog
         open={cutDownOpen}
         onOpenChange={setCutDownOpen}
