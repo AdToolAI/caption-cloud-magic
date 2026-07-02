@@ -1718,7 +1718,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             muted
             playsInline
             preload="auto"
-            onEnded={handleVideoEnded}
+            onEnded={(e) => { if (e.currentTarget === getActiveVideo()) handleVideoEnded(); }}
             onLoadedMetadata={(e) => {
               const el = e.currentTarget;
               try {
