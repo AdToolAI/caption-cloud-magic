@@ -380,6 +380,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [audio.master_volume]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
+  // Forward ref for resetToPrimaryVideoSlot — declared here so `handleVideoEnded`
+  // can reach it without triggering TDZ (its concrete definition lives further down).
+  const resetToPrimaryVideoSlotRef = useRef<((sourceTime: number) => void) | null>(null);
+
   const handleVideoEnded = useCallback(() => {
     // Check if there are remaining scenes on the timeline after the current position
     const currentTime = visualTimeRef.current;
