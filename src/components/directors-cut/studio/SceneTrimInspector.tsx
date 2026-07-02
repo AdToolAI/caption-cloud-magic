@@ -24,6 +24,7 @@ interface SceneTrimInspectorProps {
   onTrim: (sceneId: string, srcIn: number, srcOut: number) => void;
   onSplitAtPlayhead?: () => void;
   onSplitAtTrim?: (sceneId: string) => void;
+  onSeek?: (timelineTime: number) => void;
   onDelete?: (sceneId: string) => void;
 }
 
