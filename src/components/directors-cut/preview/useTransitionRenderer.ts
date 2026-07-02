@@ -34,6 +34,7 @@ export function useTransitionRenderer(
   frameCacheRef: React.RefObject<Map<string, ImageBitmap>>,
   computeFilterForTimeRef?: React.RefObject<(time: number) => string>,
   transitionCooldownRef?: React.MutableRefObject<number>,
+  postTransitionHoldFramesRef?: React.MutableRefObject<number>,
   lastHandoffBoundaryRef?: React.MutableRefObject<HandoffBoundaryMarker | null>,
   transitionPhaseRef?: React.MutableRefObject<'idle' | 'preparing' | 'active' | 'handoff'>,
   activeSlotRef?: React.MutableRefObject<'A' | 'B'>,
@@ -122,6 +123,12 @@ export function useTransitionRenderer(
     // Keep paused during transition — visible A/B slots own the display.
     if (!overlay.paused) overlay.pause();
   }, [mediaOverlayRef]);
+
+  const getOverlayHandoffTime = useCallback((incomingScene: SceneAnalysis, timelineHandoffTime: number) => {
+    const incomingRate = (incomingScene as any).playbackRate ?? 1;
+    const sourceStart = getSceneSourceStart(incomingScene);
+    return sourceStart + Math.max(0, timelineHandoffTime - incomingScene.start_time) * incomingRate;
+  }, [getSceneSourceStart]);
 
   const setPhase = useCallback((phase: 'idle' | 'preparing' | 'active' | 'handoff') => {
     phaseRef.current = phase;
@@ -221,8 +228,7 @@ export function useTransitionRenderer(
         // frame that matches where the timeline will be when handoff runs
         // (incomingSourceStart + duration * incomingRate).
         if (incomingScene && incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video') {
-          const incomingRate = (incomingScene as any).playbackRate ?? 1;
-          const overlayHandoffTime = getSceneSourceStart(incomingScene) + rt.duration * incomingRate;
+          const overlayHandoffTime = getOverlayHandoffTime(incomingScene, rt.tEnd);
           preArmMediaOverlay(incomingScene, overlayHandoffTime);
         }
 
@@ -376,6 +382,9 @@ export function useTransitionRenderer(
         if (transitionCooldownRef) {
           transitionCooldownRef.current = 30;
         }
+        if (postTransitionHoldFramesRef) {
+          postTransitionHoldFramesRef.current = 2;
+        }
 
         setPhase('idle');
 
@@ -426,8 +435,7 @@ export function useTransitionRenderer(
           // Pre-arm media overlay early so it is fully decoded and ready to
           // paint the exact handoff frame with zero rebind delay.
           if (incomingScene && incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video') {
-            const incomingRate = (incomingScene as any).playbackRate ?? 1;
-            const overlayHandoffTime = getSceneSourceStart(incomingScene) + rt.duration * incomingRate;
+            const overlayHandoffTime = getOverlayHandoffTime(incomingScene, rt.tEnd);
             preArmMediaOverlay(incomingScene, overlayHandoffTime);
           }
           standby.style.opacity = '0';
@@ -477,5 +485,5 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl, isPlayingRef, preArmMediaOverlay]);
+  }, [scenes, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl, isPlayingRef, preArmMediaOverlay, getOverlayHandoffTime, postTransitionHoldFramesRef]);
 }
