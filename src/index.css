@@ -246,6 +246,18 @@
     @apply border-border;
   }
 
+  /* Hide native number-input spinners globally — we provide explicit −/+ buttons. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+
   html {
     /* Prevent horizontal overflow from decorative blur orbs, sub-pixel rounding,
        and transform-scaled hero elements (caught by mobile-responsive E2E test).
