@@ -308,7 +308,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (backgroundMusicUrl) {
       const bg = new Audio(backgroundMusicUrl);
       bg.preload = 'auto';
-      bg.volume = isMuted ? 0 : 0.3;
+      // Music mix policy: default 30% slider; when a voiceover is present we
+      // reserve headroom via getEffectiveBackgroundMusicVolume so the preview
+      // matches what the Remotion export produces (see DirectorsCutVideo.tsx).
+      const musicBase = 0.3;
+      bg.volume = isMuted ? 0 : getEffectiveBackgroundMusicVolume(musicBase, !!voiceoverUrl);
       bg.loop = true;
       bg.defaultPlaybackRate = 1;
       bg.playbackRate = 1;
