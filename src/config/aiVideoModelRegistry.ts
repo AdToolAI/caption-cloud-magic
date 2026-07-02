@@ -61,6 +61,12 @@ export interface ToolkitModel {
      * articulation matched to the generated audio.
      */
     nativeDialogue?: boolean;
+    /**
+     * End-frame guidance: model accepts an `endImageUrl` so the reference
+     * image appears at the END of the clip instead of frame 0. Currently
+     * supported by Kling 3 Std/Pro, Pika 2.2 Std/Pro, Luma Ray 2.
+     */
+    endFrame?: boolean;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
