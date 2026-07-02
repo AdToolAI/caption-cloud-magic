@@ -97,24 +97,57 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
   const currentTabVoices = voicesForLang(selectedLanguageTab);
 
-  // Auto-select first voice when switching tabs if current is not in tab
+  // Hydrate locked voice into settings once voices load
+  useEffect(() => {
+    if (!lockStorageKey || loadingVoices || !lockedVoiceId) return;
+    try {
+      const raw = localStorage.getItem(lockStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.voiceId && parsed.voiceId !== settings.voiceId) {
+        onSettingsChange({
+          ...settings,
+          voiceId: parsed.voiceId,
+          language: parsed.language ?? settings.language,
+          emotionalTone: parsed.emotionalTone ?? settings.emotionalTone,
+        });
+      }
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingVoices, lockedVoiceId]);
+
+  // Auto-select first voice when switching tabs if current is not in tab (respect lock)
   useEffect(() => {
     if (loadingVoices || currentTabVoices.length === 0) return;
+    if (lockedVoiceId) return; // locked → do not auto-swap
     if (!currentTabVoices.find((v) => v.id === settings.voiceId)) {
       const newLang = selectedLanguageTab === 'de' ? 'de-DE' : selectedLanguageTab === 'es' ? 'es-ES' : 'en-US';
       onSettingsChange({ ...settings, voiceId: currentTabVoices[0].id, language: newLang });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLanguageTab, loadingVoices, voices.length]);
+  }, [selectedLanguageTab, loadingVoices, voices.length, lockedVoiceId]);
 
-  const handleGenerate = async () => {
-    if (!settings.scriptText.trim()) {
-      toast.error('Bitte gib einen Text für das Voice-Over ein');
+  const toggleVoiceLock = () => {
+    if (!lockStorageKey) {
+      toast.error('Voice-Lock benötigt ein gespeichertes Projekt');
       return;
     }
-    setIsGenerating(true);
-    try {
-      const selectedVoice = voices.find((v) => v.id === settings.voiceId);
+    if (lockedVoiceId) {
+      localStorage.removeItem(lockStorageKey);
+      setLockedVoiceId(null);
+      toast.success('Voice-Lock entfernt');
+    } else {
+      const payload = {
+        voiceId: settings.voiceId,
+        language: settings.language,
+        emotionalTone: settings.emotionalTone,
+      };
+      localStorage.setItem(lockStorageKey, JSON.stringify(payload));
+      setLockedVoiceId(settings.voiceId);
+      const voice = voices.find((v) => v.id === settings.voiceId);
+      toast.success(`Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`);
+    }
+  };
       const { data, error } = await supabase.functions.invoke('director-cut-voice-over', {
         body: {
           script_text: settings.scriptText,
