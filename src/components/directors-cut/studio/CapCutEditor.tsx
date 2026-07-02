@@ -437,7 +437,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, [audioTracks, onBackgroundMusicUrlChange]);
 
   // Audio playback for timeline clips
+  const audioSyncRef = useRef<{ t: number; playing: boolean; tracks: AudioTrack[] }>({ t: -1, playing: false, tracks: [] });
   useEffect(() => {
+    // Skip micro-updates during scrubbing/playback to avoid iterating every RAF tick.
+    // We always re-sync when playing state or audioTracks identity changes.
+    const prev = audioSyncRef.current;
+    if (
+      prev.tracks === audioTracks &&
+      prev.playing === isPlaying &&
+      Math.abs(prev.t - currentTime) < 0.05
+    ) {
+      return;
+    }
+    audioSyncRef.current = { t: currentTime, playing: isPlaying, tracks: audioTracks };
     audioTracks.forEach(track => {
       // Skip original track - it's handled by video element
       if (track.id === 'track-original') return;
