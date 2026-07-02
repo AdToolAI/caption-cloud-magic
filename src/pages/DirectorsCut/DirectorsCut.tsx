@@ -5,6 +5,7 @@ import { probeMediaDuration } from '@/lib/probeMp4Duration';
 
 import { useTranslation } from '@/hooks/useTranslation';
 import { CapCutEditor } from '@/components/directors-cut/studio';
+import { UDCWelcomeDialog } from '@/components/directors-cut/UDCWelcomeDialog';
 import { VideoImportDialog } from '@/components/directors-cut/studio/VideoImportDialog';
 import { AICoPilot } from '@/components/directors-cut/ui/AICoPilot';
 import { useAICoPilot } from '@/hooks/useAICoPilot';
