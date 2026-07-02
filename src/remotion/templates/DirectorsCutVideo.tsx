@@ -659,6 +659,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   voiceoverVolume = 100,
   backgroundMusicUrl,
   backgroundMusicVolume = 30,
+  audioTracks,
   soundDesign,
   textOverlays = [],
   subtitleTrack,
