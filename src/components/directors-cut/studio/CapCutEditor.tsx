@@ -412,25 +412,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     return hasActiveVoiceover || hasActiveMusic;
   }, [audioTracks]);
 
-  // Auto-mute original audio when music or voiceover is present
-  useEffect(() => {
-    const voiceoverTrack = audioTracks.find(t => t.name === 'Voiceover');
-    const musicTrack = audioTracks.find(t => t.name === 'Music');
-    
-    const hasVoiceoverOrMusic = 
-      (voiceoverTrack && voiceoverTrack.clips.length > 0) ||
-      (musicTrack && musicTrack.clips.length > 0);
-    
-    if (hasVoiceoverOrMusic) {
-      const originalTrack = audioTracks.find(t => t.name === 'Original');
-      // Only update if original is not already muted
-      if (originalTrack && !originalTrack.muted) {
-        setAudioTracks(prev => prev.map(track => 
-          track.name === 'Original' ? { ...track, muted: true } : track
-        ));
-      }
-    }
-  }, [audioTracks]);
+  // NOTE: Auto-mute of the Original track was removed (it made the track
+  // unmutable once voiceover/music existed — the effect re-fired every render
+  // and forced muted: true even after the user un-muted it manually).
+  // The audio init effect below already reduces Original volume to 30% when
+  // voiceover is present, which is a softer, user-overridable default.
 
   // Propagate audioTracks changes to parent
   useEffect(() => {
