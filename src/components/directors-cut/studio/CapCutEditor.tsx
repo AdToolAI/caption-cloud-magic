@@ -1120,15 +1120,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Rename scene handler
   const handleSceneRename = useCallback((sceneId: string, newName: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const updatedScenes = scenes.map(s =>
       s.id === sceneId ? { ...s, description: newName } : s
     );
     onScenesUpdate(updatedScenes);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, commitHistory]);
 
   // Scene playback rate change handler
   const handleScenePlaybackRateChange = useCallback((sceneId: string, rate: number) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const updatedScenes = scenes.map(s => {
       if (s.id !== sceneId) return s;
       const origStart = s.original_start_time ?? s.start_time;
