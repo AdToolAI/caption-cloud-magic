@@ -1965,7 +1965,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       };
     }));
     setSelectedClipId(null);
-  }, [commitHistory]);
+    toast.success(t('dc.clipDeleted'));
+  }, [commitHistory, t]);
 
   // Welle 6 — Pro-Editing keyboard handler (Delete/Ripple, ?, arrows, Ctrl+D, Ctrl+A, Home/End)
   useEffect(() => {
