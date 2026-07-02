@@ -1623,7 +1623,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, [startProgressInterpolation, stopProgressInterpolation]);
 
   // Export video - trigger render via Edge Function
-  const handleExportVideo = useCallback(async () => {
+  const runExportInternal = useCallback(async () => {
     try {
       // Show overlay immediately
       setIsRendering(true);
