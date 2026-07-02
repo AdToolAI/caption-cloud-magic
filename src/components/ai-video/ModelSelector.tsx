@@ -88,14 +88,18 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
               {models.map((m) => {
                 const isMaintenance = m.status === 'maintenance';
                 const isComingSoon = m.status === 'coming_soon';
-                const locked = isMaintenance || isComingSoon;
+                const isPlacementLocked = !!lockedModelIds?.includes(m.id);
+                const locked = isMaintenance || isComingSoon || isPlacementLocked;
+                const lockTitle = isPlacementLocked
+                  ? lockedReason
+                  : (locked ? m.statusReason : undefined);
                 return (
                   <SelectItem
                     key={m.id}
                     value={m.id}
                     disabled={locked}
                     className="py-2.5"
-                    title={locked ? m.statusReason : undefined}
+                    title={lockTitle}
                   >
                     <div className="flex items-center gap-3 w-full">
                       <m.icon className="h-4 w-4 text-muted-foreground shrink-0" />
