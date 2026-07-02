@@ -421,10 +421,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     // next Play starts from scene 1, not from wherever Slot B ended.
     const firstScene = sortedScenes[0];
     const firstSource = firstScene?.original_start_time ?? firstScene?.start_time ?? 0;
-    resetToPrimaryVideoSlot(firstSource);
+    resetToPrimaryVideoSlotRef.current?.(firstSource);
 
     onPlayingChange?.(false);
-  }, [onPlayingChange, sortedScenes, getActiveVideo, resetToPrimaryVideoSlot]);
+  }, [onPlayingChange, sortedScenes, getActiveVideo]);
 
   // ==================== FRAME CAPTURE & TRANSITION RENDERER ====================
   const frameCache = useFrameCapture(videoUrl, sortedScenes);
