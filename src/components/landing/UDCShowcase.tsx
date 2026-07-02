@@ -68,13 +68,13 @@ export function UDCShowcase() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link to="/directors-cut">
+          <Link to="/directors-cut" onClick={() => trackUDC('udc_showcase_cta_clicked', { target: 'directors-cut' })}>
             <Button size="lg" className="gap-2">
               Open Directors Cut
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
-          <Link to="/pricing">
+          <Link to="/pricing" onClick={() => trackUDC('udc_showcase_cta_clicked', { target: 'pricing' })}>
             <Button size="lg" variant="outline">
               See pricing
             </Button>
