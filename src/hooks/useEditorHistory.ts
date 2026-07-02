@@ -163,6 +163,9 @@ export function useEditorHistory<T>({
   }, [flushPending]);
 
   const undo = useCallback(() => {
+    // H4: flush any debounced pending snapshot BEFORE popping so keyboard-driven
+    // undo bursts don't race with the 200ms debounce and skip steps.
+    flushPending();
     setPast((p) => {
       if (p.length === 0) return p;
       const previous = p[p.length - 1];
@@ -173,7 +176,7 @@ export function useEditorHistory<T>({
       onRestore(previous);
       return rest;
     });
-  }, [onRestore]);
+  }, [onRestore, flushPending]);
 
   const redo = useCallback(() => {
     setFuture((f) => {
