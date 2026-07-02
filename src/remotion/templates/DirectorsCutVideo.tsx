@@ -943,9 +943,12 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     );
   };
 
-  // Subtitle Safe Zone crop style
+  // Subtitle Safe Zone crop style — 'crop' hard-clips the bottom band, 'reframe' only scales/shifts
+  const safeZoneMode = subtitleSafeZone?.mode ?? 'reframe';
   const safeZoneCropStyle: React.CSSProperties = subtitleSafeZone?.enabled ? {
-    clipPath: `inset(0 0 ${subtitleSafeZone.bottomBandPercent}% 0)`,
+    ...(safeZoneMode === 'crop'
+      ? { clipPath: `inset(0 0 ${subtitleSafeZone.bottomBandPercent}% 0)` }
+      : {}),
     transform: `scale(${subtitleSafeZone.zoom}) translateY(${subtitleSafeZone.offsetY}%)`,
     transformOrigin: 'top center',
     width: '100%',
