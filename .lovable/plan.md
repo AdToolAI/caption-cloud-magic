@@ -1,53 +1,58 @@
-# Referenzbild-Platzierung im AI Video Toolkit
+# Fix v3: „Endframe" → automatisch Luma Ray 2
 
-## Problem
-Aktuell wird jedes hochgeladene Referenzbild automatisch als **i2v-Startframe** (`startImageUrl`) an den Provider geschickt. Wenn der Prompt sagt „Charakter/Location soll am **Ende** erscheinen", zeigt das Video den Referenzinhalt **doppelt**: einmal erzwungen als Frame 0 (aus i2v) und nochmal am Ende (aus dem Prompt).
+## Kernidee (nach User-Feedback)
+Statt „Endframe" bei manchen Modellen zu verstecken/deaktivieren, wird der **Toggle selbst die treibende Kraft**:
 
-Ursache in `src/components/ai-video/ToolkitGenerator.tsx` (Zeile ~385-391):
-```
-if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
-```
-Es gibt keine Möglichkeit zu sagen: „Bild NICHT als Startframe, sondern als Endframe oder nur als Identitäts-Referenz."
+- User klickt **„Endframe"** → **Warn-Dialog** erscheint: *„Endframe ist nur mit Luma Ray 2 möglich. Modell jetzt wechseln?"* [Abbrechen] [Zu Luma Ray 2 wechseln]
+- Bei Bestätigung → Modell wird automatisch auf `luma-ray-2` gesetzt, Placement bleibt `end`.
+- Solange Placement = `end` ist → **alle anderen Modelle im Modell-Picker sind ausgegraut** mit Tooltip *„Endframe wird nur von Luma Ray 2 unterstützt. Placement zurück auf ‚Startframe' setzen, um andere Modelle zu wählen."*
 
-## Lösung — Placement-Selector unter dem Referenzbild-Upload
-
-Neuer UI-Toggle (SegmentedControl / RadioGroup) direkt unter der Referenzbild-Card mit drei Optionen:
-
-1. **Startframe** _(Default, aktuelles Verhalten)_ — Bild wird als erster Frame verwendet (`startImageUrl`).
-2. **Endframe** — Bild wird als letzter Frame verwendet (`endImageUrl`), Modell interpoliert die Bewegung dorthin. Nur sichtbar wenn `model.capabilities.endFrame === true` (Kling 3 Pro/Std, Pika 2.2, Luma Ray 2).
-3. **Nur als Anker** — Bild wird nur als Subject/Identity-Reference genutzt (`referenceImages[]`), kein erzwungener Frame. Nur sichtbar wenn Provider Subject-Reference unterstützt (Vidu Q2, Kling omni). Bei nicht-unterstützten Providern wird das Bild nur an `compose-scene-anchor` als Identity-Hint übergeben, aber weder als start- noch als endImage gesendet.
+Damit gibt es keine ungültige Kombination mehr, und der User versteht sofort, warum die Auswahl eingeschränkt ist.
 
 ## Änderungen
 
 ### 1. `src/config/aiVideoModelRegistry.ts`
-- Neues Capability-Flag `endFrame: boolean` für Modelle: Kling 3 Std/Pro (✓), Pika 2.2 Std/Pro (✓), Luma Ray 2 (✓). Alle anderen `false`.
-- Bestehendes `subjectReference` bzw. Vidu-Multi-Ref bleibt Basis für „Nur Anker".
+- `endFrame: true` **nur** bei Luma Ray 2 behalten.
+- **Entfernen** bei: `kling-3-standard`, `kling-3-pro`, `pika-2-2-standard`, `pika-2-2-pro` (fälschlich gesetzt, verursacht `E006`-Fehler).
+- Neues Flag `anchorOnly: true` bei **Vidu Q2** und **Kling 3 Std/Pro** (echte Subject-Reference ohne erzwungenen First-Frame).
 
 ### 2. `src/components/ai-video/ToolkitGenerator.tsx`
-- Neuer State: `referencePlacement: 'start' | 'end' | 'anchor'` (Default `'start'`).
-- Reset auf `'start'`, wenn Modell gewechselt wird und die Option nicht mehr verfügbar ist.
-- Beim Absenden:
-  - `'start'` → `body.startImageUrl = referenceImage` (wie heute).
-  - `'end'` → `body.endImageUrl = referenceImage`, `startImageUrl` NICHT setzen, `compose-scene-anchor` überspringen (kein composed first-frame → verhindert Doppel-Auftritt).
-  - `'anchor'` → weder `startImageUrl` noch `endImageUrl`; falls Vidu → in `referenceImages[]` einreihen; sonst weiter über `compose-scene-anchor` als Identity-Guidance ohne startFrame-Override.
-- Klarer Hinweistext pro Option: „Startframe zeigt das Bild zu Beginn", „Endframe animiert zum Bild hin", „Anker nutzt nur Identität".
 
-### 3. `src/components/ai-video/ToolkitReferenceCard.tsx` (oder Sub-Komponente)
-- Neue `<ReferencePlacementToggle />` unter Bild-Preview.
-- Deaktivierte Optionen mit Tooltip: „Nicht unterstützt von {Modellname}".
+**a) Placement-Toggle-Klick auf „Endframe":**
+- Wenn aktuelles Modell ≠ Luma Ray 2 → `<AlertDialog>` öffnen:
+  - Titel: *„Endframe nur mit Luma Ray 2"*
+  - Text: *„Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu Luma Ray 2 wechseln?"*
+  - Buttons: [Abbrechen] / [Zu Luma Ray 2 wechseln]
+- Bei Bestätigung: `setModel(LUMA_RAY_2)` + `setReferencePlacement('end')`.
+- Bei Abbruch: Placement bleibt auf `'start'`.
 
-## Technische Hinweise
-- `generate-kling-video`, `generate-pika-video`, `generate-luma-video` akzeptieren bereits `endImageUrl` — keine Edge-Function-Änderung nötig.
-- Für „Nur Anker" bei Nicht-Vidu-Modellen: `compose-scene-anchor` liefert weiter einen komponierten Frame, der aber nur an ein subject-ref-fähiges Feld geht oder gänzlich gedroppt wird. Für reine i2v-only Provider (Hailuo, Seedance ohne subject-ref) wird die Option ausgeblendet, damit User nicht denken, es funktioniere.
-- Fallback: Wenn User „Endframe" wählt und `capabilities.endFrame === false`, wird das UI diese Option gar nicht erst anbieten.
+**b) Modell-Picker sperren, solange `placement === 'end'`:**
+- Alle Modelle außer Luma Ray 2 werden im Model-Selector visuell disabled (opacity + not-allowed) mit Tooltip.
+- Alternativ (falls ein User trotzdem klickt): Zweiter kleiner Toast *„Placement erst auf ‚Startframe' zurücksetzen"*.
+
+**c) `useEffect` beim Modellwechsel:**
+- Wenn User das Modell doch manuell wechselt und `placement === 'end'` && neues Modell hat `!capabilities.endFrame` → Placement automatisch auf `'start'` zurück + Info-Toast *„Placement wurde auf Startframe zurückgesetzt, da {Modellname} keinen Endframe unterstützt."*
+
+**d) Analog für „Nur als Anker":**
+- Klick auf „Anker" bei Modell ohne `anchorOnly` → analoger Dialog:
+  - *„Anker-Modus ist nur mit Vidu Q2 oder Kling 3 verfügbar. Möchtest du zu Vidu Q2 wechseln?"*
+  - Buttons: [Abbrechen] / [Zu Vidu Q2 wechseln] / [Zu Kling 3 Pro wechseln]
+
+**e) Submit-Guard (Safety-Net):**
+- Falls trotz UI-Sperre `placement='end'` && Modell ≠ Luma → hartes Abbrechen mit Toast, keine Anfrage senden.
+
+### 3. Body-Routing (bleibt wie v2)
+- `placement='start'` → `startImageUrl`
+- `placement='end'` (nur Luma) → `endImageUrl`, kein `startImageUrl`, `compose-scene-anchor` überspringen
+- `placement='anchor'` → `referenceImages[]` (Vidu/Kling)
 
 ## Betroffene Dateien
-- `src/config/aiVideoModelRegistry.ts` — `endFrame`-Flag ergänzen.
-- `src/components/ai-video/ToolkitGenerator.tsx` — Placement-State, Body-Routing, Bedingungen für `compose-scene-anchor`.
-- `src/components/ai-video/ToolkitGenerator.tsx` oder neue kleine Sub-Komponente — Placement-Toggle UI.
-- Ggf. `useToolkitTranslations` / i18n-Strings (DE/EN/ES) für Toggle-Labels.
+- `src/config/aiVideoModelRegistry.ts` — Capability-Flags korrigieren
+- `src/components/ai-video/ToolkitGenerator.tsx` — Warn-Dialog, Auto-Switch, Model-Picker-Sperre, useEffect-Guard, Submit-Safety-Net
 
 ## Verifikation
-- Toolkit öffnen, Kling 3 Pro wählen, Bild hochladen, „Endframe" auswählen, Prompt „Charakter erscheint am Ende".
-- Erwartetes Ergebnis: Video startet ohne den Charakter, Kamera fährt heran, letzter Frame = Referenzbild. Kein Doppel-Auftritt am Anfang.
-- Modell zu Hailuo wechseln → „Endframe" ist ausgegraut mit Tooltip.
+1. Beliebiges Modell (z.B. Kling 3 Pro) → Klick „Endframe" → Popup erscheint → „Zu Luma Ray 2 wechseln" → Modell wechselt, Placement = end.
+2. Placement = end aktiv → alle Modelle außer Luma Ray 2 im Picker sind ausgegraut.
+3. Placement zurück auf „Startframe" → alle Modelle wieder wählbar.
+4. Generieren mit Luma Ray 2 + Endframe → Video endet auf Referenzbild, kein Startframe-Duplikat, kein `E006`-Fehler mehr.
+5. Klick „Anker" bei Hailuo → Popup schlägt Vidu Q2 / Kling 3 vor.
