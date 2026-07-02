@@ -1217,7 +1217,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (!video) return;
 
     if (externalIsPlaying && !isPlaying) {
-      video.play().catch(() => {});
+      seekToTimelineTime(visualTimeRef.current, { resetGuards: true, forcePrimarySlot: true });
+      getActiveVideo()?.play().catch(() => {});
       setIsPlaying(true);
       if (!isMuted) {
         if (!originalAudioMuted) sourceAudioRef.current?.play().catch(() => {});
@@ -1233,12 +1234,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     }
-  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover, getActiveVideo]);
+  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover, seekToTimelineTime, getActiveVideo]);
 
   // ==================== EXTERNAL TIME SYNC ====================
   useEffect(() => {
     if (isPlaying) return;
-    if (currentTime === 0 && visualTimeRef.current > 0.5) return;
 
     if (Math.abs(currentTime - visualTimeRef.current) > 0.5) {
       seekToTimelineTime(currentTime, { resetGuards: true, forcePrimarySlot: true });
@@ -1292,7 +1292,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       } else {
         seekToTimelineTime(visualTimeRef.current, { resetGuards: true, forcePrimarySlot: true });
       }
-      video.play().catch(() => {});
+      getActiveVideo()?.play().catch(() => {});
       setIsPlaying(true);
       if (!isMuted) startAllAudio();
       onPlayingChange?.(true);
