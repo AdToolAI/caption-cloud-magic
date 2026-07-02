@@ -155,6 +155,11 @@ export function AutoCutDownDialog({
           <Button
             disabled={plan.scenes.length === 0}
             onClick={() => {
+              trackUDC('udc_autocut_generated', {
+                target,
+                scene_count: plan.scenes.length,
+                estimated_duration: plan.total,
+              });
               onApply(plan.scenes, target);
               onOpenChange(false);
             }}
