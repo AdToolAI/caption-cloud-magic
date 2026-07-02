@@ -158,7 +158,7 @@ export function AutoCutDownDialog({
               trackUDC('udc_autocut_generated', {
                 target,
                 scene_count: plan.scenes.length,
-                estimated_duration: plan.total,
+                estimated_duration: plan.target,
               });
               onApply(plan.scenes, target);
               onOpenChange(false);
