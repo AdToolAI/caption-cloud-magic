@@ -102,6 +102,9 @@ interface CapCutEditorProps {
   /** When set, scenes were deterministically imported from a Composer render — disables Auto-Cut UI. */
   composerLockSource?: 'edl' | 'edl-rebuilt' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
   composerLockSceneCount?: number;
+  /** Welle 3 · M3 — autosave badge state fed from the DirectorsCut container. */
+  autosaveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  autosaveLastSavedAt?: number | null;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -165,6 +168,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   initialAiCutMarkers,
   composerLockSource = null,
   composerLockSceneCount = 0,
+  autosaveStatus = 'idle',
+  autosaveLastSavedAt = null,
 }) => {
   const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
