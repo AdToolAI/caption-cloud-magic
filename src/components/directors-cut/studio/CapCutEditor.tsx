@@ -1442,13 +1442,33 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     let workingScenes: SceneAnalysis[] = scenes;
 
     if (insideIdx >= 0) {
-      // Split current scene at playhead first
-      const target = scenes[insideIdx];
+      // Split current scene at playhead first — mirror handleSplitAtPlayhead's
+      // source-mapping so the tail half plays from the split point of the source,
+      // not from the source in-point.
+      const target: any = scenes[insideIdx];
+      const offset = currentTime - target.start_time;
+      const srcInBase = target.original_start_time ?? 0;
+      const srcOutBase = target.original_end_time ?? (srcInBase + (target.end_time - target.start_time));
+      const srcSplit = srcInBase + offset;
       workingScenes = scenes.flatMap((s, i) => {
         if (i !== insideIdx) return [s];
+        const now = Date.now();
         return [
-          { ...s, end_time: currentTime },
-          { ...s, id: `scene-${Date.now()}-tail`, start_time: currentTime, description: `${s.description} ${t('dc.partSuffix') || '(2)'}` },
+          {
+            ...s,
+            id: `scene-${now}-a`,
+            end_time: currentTime,
+            original_start_time: srcInBase,
+            original_end_time: srcSplit,
+          },
+          {
+            ...s,
+            id: `scene-${now}-b`,
+            start_time: currentTime,
+            original_start_time: srcSplit,
+            original_end_time: srcOutBase,
+            description: `${s.description} ${t('dc.partSuffix') || '(2)'}`,
+          },
         ];
       });
       insertIdx = insideIdx + 1;
