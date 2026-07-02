@@ -39,6 +39,7 @@ export function useTransitionRenderer(
   activeSlotRef?: React.MutableRefObject<'A' | 'B'>,
   resetTransitionStateRef?: React.MutableRefObject<(() => void) | null>,
   isPlayingRef?: React.MutableRefObject<boolean>,
+  mediaOverlayRef?: React.RefObject<HTMLVideoElement | null>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
@@ -100,6 +101,27 @@ export function useTransitionRenderer(
 
     standby.currentTime = Math.max(0, targetTime + 0.02);
   }, [getStandby, getSceneSourceStart, getSceneSourceUrl]);
+
+  // Pre-arm the media overlay <video> for an incoming media-video scene so
+  // that when the transition ends and the media branch takes over there is
+  // no src rebind (which would drop the current frame → visible flash).
+  // Called during preparing / active phases.
+  const preArmMediaOverlay = useCallback((incomingScene: SceneAnalysis | undefined, targetSourceTime: number) => {
+    const overlay = mediaOverlayRef?.current;
+    if (!overlay || !incomingScene) return;
+    const isMediaVideo = incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video' && incomingScene.additionalMedia.url;
+    if (!isMediaVideo) return;
+    const url = incomingScene.additionalMedia!.url!;
+    if (overlay.getAttribute('src') !== url && overlay.currentSrc !== url) {
+      overlay.src = url;
+    }
+    // Only re-seek if we're drifted; avoids a stutter loop each rAF.
+    if (Math.abs(overlay.currentTime - targetSourceTime) > 0.08) {
+      try { overlay.currentTime = Math.max(0, targetSourceTime); } catch {}
+    }
+    // Keep paused during transition — visible A/B slots own the display.
+    if (!overlay.paused) overlay.pause();
+  }, [mediaOverlayRef]);
 
   const setPhase = useCallback((phase: 'idle' | 'preparing' | 'active' | 'handoff') => {
     phaseRef.current = phase;
@@ -193,6 +215,16 @@ export function useTransitionRenderer(
           : incomingSourceStart;
 
         seekStandby(rt.incomingSceneId, scenes, incomingTransitionStart);
+
+        // Pre-arm media overlay for incoming media-video scene so the media
+        // branch has zero rebind cost right after handoff. We seek it to the
+        // frame that matches where the timeline will be when handoff runs
+        // (incomingSourceStart + duration * incomingRate).
+        if (incomingScene && incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video') {
+          const incomingRate = (incomingScene as any).playbackRate ?? 1;
+          const overlayHandoffTime = getSceneSourceStart(incomingScene) + rt.duration * incomingRate;
+          preArmMediaOverlay(incomingScene, overlayHandoffTime);
+        }
 
         if (rt.placement === 'centered' && outgoingScene) {
           const outgoingSrc = getSceneSourceUrl(outgoingScene);
@@ -390,6 +422,14 @@ export function useTransitionRenderer(
               : getSceneSourceStart(incomingScene)
             : undefined;
           seekStandby(rt.incomingSceneId, scenes, preSeekTime);
+
+          // Pre-arm media overlay early so it is fully decoded and ready to
+          // paint the exact handoff frame with zero rebind delay.
+          if (incomingScene && incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video') {
+            const incomingRate = (incomingScene as any).playbackRate ?? 1;
+            const overlayHandoffTime = getSceneSourceStart(incomingScene) + rt.duration * incomingRate;
+            preArmMediaOverlay(incomingScene, overlayHandoffTime);
+          }
           standby.style.opacity = '0';
           standby.style.pointerEvents = 'none';
           // Also make sure standby is paused during pre-seek if the user paused.
@@ -437,5 +477,5 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl, isPlayingRef]);
+  }, [scenes, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl, isPlayingRef, preArmMediaOverlay]);
 }
