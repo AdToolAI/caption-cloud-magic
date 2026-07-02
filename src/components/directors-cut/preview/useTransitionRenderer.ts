@@ -143,10 +143,11 @@ export function useTransitionRenderer(
   // Reset only on structural changes (type or scene), not duration
   useEffect(() => {
     setPhase('idle');
+    if (postTransitionHoldFramesRef) postTransitionHoldFramesRef.current = 0;
     lastStandbySeekRef.current = '';
     lastActiveTransitionRef.current = null;
     pendingHideRef.current = null;
-  }, [scenes, structuralKey, setPhase]);
+  }, [scenes, structuralKey, setPhase, postTransitionHoldFramesRef]);
 
   // Expose a reset function so the outer player can wipe stale state on
   // replay / natural end. Without this the internal phase/seek markers can
@@ -156,6 +157,7 @@ export function useTransitionRenderer(
     resetTransitionStateRef.current = () => {
       phaseRef.current = 'idle';
       if (transitionPhaseRef) transitionPhaseRef.current = 'idle';
+      if (postTransitionHoldFramesRef) postTransitionHoldFramesRef.current = 0;
       lastStandbySeekRef.current = '';
       lastActiveTransitionRef.current = null;
       pendingHideRef.current = null;
@@ -163,7 +165,7 @@ export function useTransitionRenderer(
     return () => {
       if (resetTransitionStateRef) resetTransitionStateRef.current = null;
     };
-  }, [resetTransitionStateRef, transitionPhaseRef]);
+  }, [resetTransitionStateRef, transitionPhaseRef, postTransitionHoldFramesRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
