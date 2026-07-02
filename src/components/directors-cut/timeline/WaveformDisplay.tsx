@@ -17,52 +17,64 @@ export function WaveformDisplay({
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Generate waveform data from audio
+  // Generate waveform data from audio (leak-safe: cancel + always close AudioContext)
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    let audioContext: AudioContext | null = null;
+
     const generateWaveform = async () => {
       setIsLoading(true);
-      
+
       try {
-        // Create audio context
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        
-        // Fetch and decode audio
-        const response = await fetch(audioUrl);
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+        const response = await fetch(audioUrl, { signal: controller.signal });
         const arrayBuffer = await response.arrayBuffer();
+        if (cancelled) return;
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
-        // Get audio data
+        if (cancelled) return;
+
         const channelData = audioBuffer.getChannelData(0);
-        const samples = 100; // Number of bars to display
-        const blockSize = Math.floor(channelData.length / samples);
+        const samples = 100;
+        const blockSize = Math.max(1, Math.floor(channelData.length / samples));
         const data: number[] = [];
-        
+
         for (let i = 0; i < samples; i++) {
           let sum = 0;
           for (let j = 0; j < blockSize; j++) {
-            sum += Math.abs(channelData[i * blockSize + j]);
+            sum += Math.abs(channelData[i * blockSize + j] || 0);
           }
           data.push(sum / blockSize);
         }
-        
-        // Normalize
-        const max = Math.max(...data);
-        const normalized = data.map(d => d / max);
-        
-        setWaveformData(normalized);
-        audioContext.close();
+
+        const max = Math.max(...data) || 1;
+        const normalized = data.map((d) => d / max);
+
+        if (!cancelled) setWaveformData(normalized);
       } catch (error) {
-        // Generate mock waveform if audio can't be loaded
-        const mockData = Array.from({ length: 100 }, () => 
-          0.2 + Math.random() * 0.8
-        );
-        setWaveformData(mockData);
+        if (!cancelled) {
+          const mockData = Array.from({ length: 100 }, () => 0.2 + Math.random() * 0.8);
+          setWaveformData(mockData);
+        }
       } finally {
-        setIsLoading(false);
+        // Always release the AudioContext — browsers cap at ~6 open contexts.
+        if (audioContext && audioContext.state !== 'closed') {
+          try { await audioContext.close(); } catch { /* noop */ }
+        }
+        if (!cancelled) setIsLoading(false);
       }
     };
-    
+
     generateWaveform();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (audioContext && audioContext.state !== 'closed') {
+        try { audioContext.close(); } catch { /* noop */ }
+      }
+    };
   }, [audioUrl]);
 
   // Draw waveform on canvas
