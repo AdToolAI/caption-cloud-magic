@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getCachedPeaks, loadPeaks } from '@/lib/directors-cut/waveformCache';
 
 interface WaveformDisplayProps {
   audioUrl: string;
@@ -7,73 +8,52 @@ interface WaveformDisplayProps {
   height?: number;
 }
 
-export function WaveformDisplay({ 
-  audioUrl, 
-  duration, 
+export function WaveformDisplay({
+  audioUrl,
+  duration,
   color = 'rgba(255,255,255,0.6)',
-  height = 40 
+  height = 40,
 }: WaveformDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [waveformData, setWaveformData] = useState<number[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Warm-start from module-level cache so re-mounts are instant.
+  const cachedInitial = getCachedPeaks(audioUrl);
+  const [waveformData, setWaveformData] = useState<number[]>(cachedInitial ?? []);
+  const [isLoading, setIsLoading] = useState(!cachedInitial);
 
-  // Generate waveform data from audio (leak-safe: cancel + always close AudioContext)
+  // Generate waveform data from audio (cached + in-flight-deduped)
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    let audioContext: AudioContext | null = null;
 
-    const generateWaveform = async () => {
-      setIsLoading(true);
+    const cached = getCachedPeaks(audioUrl);
+    if (cached) {
+      setWaveformData(cached);
+      setIsLoading(false);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
 
-      try {
-        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-        const response = await fetch(audioUrl, { signal: controller.signal });
-        const arrayBuffer = await response.arrayBuffer();
-        if (cancelled) return;
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        if (cancelled) return;
-
-        const channelData = audioBuffer.getChannelData(0);
-        const samples = 100;
-        const blockSize = Math.max(1, Math.floor(channelData.length / samples));
-        const data: number[] = [];
-
-        for (let i = 0; i < samples; i++) {
-          let sum = 0;
-          for (let j = 0; j < blockSize; j++) {
-            sum += Math.abs(channelData[i * blockSize + j] || 0);
-          }
-          data.push(sum / blockSize);
+    setIsLoading(true);
+    loadPeaks(audioUrl, { signal: controller.signal })
+      .then((peaks) => {
+        if (!cancelled) {
+          setWaveformData(peaks);
+          setIsLoading(false);
         }
-
-        const max = Math.max(...data) || 1;
-        const normalized = data.map((d) => d / max);
-
-        if (!cancelled) setWaveformData(normalized);
-      } catch (error) {
+      })
+      .catch(() => {
         if (!cancelled) {
           const mockData = Array.from({ length: 100 }, () => 0.2 + Math.random() * 0.8);
           setWaveformData(mockData);
+          setIsLoading(false);
         }
-      } finally {
-        // Always release the AudioContext — browsers cap at ~6 open contexts.
-        if (audioContext && audioContext.state !== 'closed') {
-          try { await audioContext.close(); } catch { /* noop */ }
-        }
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    generateWaveform();
+      });
 
     return () => {
       cancelled = true;
       controller.abort();
-      if (audioContext && audioContext.state !== 'closed') {
-        try { audioContext.close(); } catch { /* noop */ }
-      }
     };
   }, [audioUrl]);
 
