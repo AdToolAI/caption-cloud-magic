@@ -1066,12 +1066,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
     const target = sorted[idx] as any;
     // Bei Original-Szenen ist die verfügbare Quelle das gesamte Ausgangsvideo
-    // [0, originalVideoDuration]. Bei additionalMedia bleibt die alte Range.
+    // [0, originalVideoDuration]. Bei additionalMedia die volle Media-Range —
+    // media_source_* (nie durch Trim überschrieben), sonst additionalMedia.duration
+    // als Fallback, sonst großzügig gegen aktuelles Trim-Fenster.
     const isAdditional = !!target.additionalMedia;
+    const mediaClipDur = typeof target.additionalMedia?.duration === 'number' ? target.additionalMedia.duration : undefined;
     const hardMax = isAdditional
-      ? (target.original_end_time ?? target.end_time)
+      ? (target.media_source_end ?? mediaClipDur ?? Math.max(target.original_end_time ?? 0, target.end_time - target.start_time))
       : (originalVideoDuration && originalVideoDuration > 0 ? originalVideoDuration : (target.original_end_time ?? target.end_time));
-    const hardMin = isAdditional ? (target.original_start_time ?? target.start_time) : 0;
+    const hardMin = isAdditional ? (target.media_source_start ?? 0) : 0;
 
     const newSrcIn = Math.max(hardMin, Math.min(srcIn, srcOut - 0.1));
     const newSrcOut = Math.min(hardMax, Math.max(srcOut, newSrcIn + 0.1));
