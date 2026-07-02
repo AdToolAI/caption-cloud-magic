@@ -1309,13 +1309,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     // re-split works AND the preview player force-rebinds the overlay video.
     setCurrentTime(Math.min(currentTime + 0.03, targetScene.end_time - 0.02));
     toast.success(t('dc.sceneSplitAtPlayhead'));
-  }, [scenes, currentTime, onScenesUpdate, t]);
+  }, [scenes, currentTime, onScenesUpdate, t, commitHistory]);
 
   // Trim-based split (CapCut-style): splits at the currently entered trim boundaries
   // srcIn/srcOut into up to 3 real timeline segments. Falls back to playhead split
   // if trim equals full source (no real trim set).
   const handleSplitAtTrim = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const targetIdx = scenes.findIndex(s => s.id === sceneId);
     if (targetIdx < 0) return;
     const target: any = scenes[targetIdx];
