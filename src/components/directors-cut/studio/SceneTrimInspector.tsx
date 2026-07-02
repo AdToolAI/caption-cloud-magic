@@ -24,6 +24,7 @@ interface SceneTrimInspectorProps {
   onTrim: (sceneId: string, srcIn: number, srcOut: number) => void;
   onSplitAtPlayhead?: () => void;
   onSplitAtTrim?: (sceneId: string) => void;
+  onSeek?: (timelineTime: number) => void;
   onDelete?: (sceneId: string) => void;
 }
 
@@ -39,6 +40,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
   onTrim,
   onSplitAtPlayhead,
   onSplitAtTrim,
+  onSeek,
   onDelete,
 }) => {
   const isAdditional = !!scene.additionalMedia;
@@ -278,17 +280,39 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
           Zurücksetzen
         </Button>
         {(() => {
+          const EDGE = 0.05;
           const trimHead = srcIn > hardMin + 0.001;
           const trimTail = srcOut < hardMax - 0.001;
-          const canSplitAtTrim = !!onSplitAtTrim && (trimHead || trimTail);
-          const canSplitAtPlayhead = !!onSplitAtPlayhead && playheadInSource !== null;
+          const hasTrim = trimHead || trimTail;
+          const playheadInside =
+            currentTime > scene.start_time + EDGE &&
+            currentTime < scene.end_time - EDGE;
+          const playheadAtEdge =
+            playheadInSource !== null && !playheadInside;
 
-          if (canSplitAtTrim) {
+          // Priority 1: Playhead is inside scene interior → offer clean playhead split.
+          if (onSplitAtPlayhead && playheadInside) {
             return (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onSplitAtTrim!(scene.id)}
+                onClick={onSplitAtPlayhead}
+                title={`Am Playhead teilen (${currentTime.toFixed(2)}s)`}
+                className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
+              >
+                <Scissors className="h-3.5 w-3.5 mr-1.5" />
+                Am Playhead teilen
+              </Button>
+            );
+          }
+
+          // Priority 2: Trim boundaries set → split at trim (head/middle/tail).
+          if (onSplitAtTrim && hasTrim) {
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onSplitAtTrim(scene.id)}
                 title={`An Trim-Grenzen teilen (${srcIn.toFixed(2)}s / ${srcOut.toFixed(2)}s)`}
                 className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
               >
@@ -297,22 +321,37 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               </Button>
             );
           }
-          if (onSplitAtPlayhead) {
+
+          // Priority 3: Playhead exactly at an edge → offer to jump inside.
+          if (onSplitAtPlayhead && playheadAtEdge && onSeek) {
+            const sceneMid = (scene.start_time + scene.end_time) / 2;
             return (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={onSplitAtPlayhead}
-                disabled={!canSplitAtPlayhead}
-                title="Am Playhead teilen"
-                className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
+                onClick={() => onSeek(sceneMid)}
+                title="Playhead an Szenengrenze — springt zur Szenenmitte, dann erneut teilen"
+                className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
               >
-                <Scissors className="h-3.5 w-3.5 mr-1.5" />
-                Am Playhead teilen
+                <MapPin className="h-3.5 w-3.5 mr-1.5" />
+                In Szene springen
               </Button>
             );
           }
-          return <div />;
+
+          // Fallback: disabled with hint.
+          return (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              title="Bewege den Playhead in die Szene oder setze Start/Ende im Inspector, um zu teilen."
+              className="border-white/10 text-white/40 disabled:opacity-40"
+            >
+              <Scissors className="h-3.5 w-3.5 mr-1.5" />
+              Teilen
+            </Button>
+          );
         })()}
       </div>
 

@@ -29,6 +29,7 @@ interface CapCutPropertiesPanelProps {
   currentTime?: number;
   onTrimScene?: (sceneId: string, srcIn: number, srcOut: number) => void;
   onSplitAtTrim?: (sceneId: string) => void;
+  onSeek?: (timelineTime: number) => void;
   onSceneDelete?: (sceneId: string) => void;
 }
 
@@ -51,6 +52,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   currentTime,
   onTrimScene,
   onSplitAtTrim,
+  onSeek,
   onSceneDelete,
 }) => {
   const { t } = useTranslation();
@@ -527,6 +529,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             onTrim={onTrimScene}
             onSplitAtPlayhead={onSplitAtPlayhead}
             onSplitAtTrim={onSplitAtTrim}
+            onSeek={onSeek}
             onDelete={onSceneDelete}
           />
         ) : (
