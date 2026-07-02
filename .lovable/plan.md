@@ -1,42 +1,28 @@
-## Problem
+# Fix: Neue Szene wird auf Original-Länge geklemmt statt Timeline zu verlängern
 
-Trotz des vorigen Fixes (Slots starten mit `opacity: 0`, werden erst nach `onSeeked` sichtbar) blitzt der Anfangsframe des Quellvideos für ~1 Frame auf, bevor die Szene ab dem getrimmten In-Point weiterläuft.
+## Root Cause
+`findBestInsertionCell` in `src/lib/directors-cut/timelineAnchors.ts` (Zeile 151–152) fällt zurück auf die **größte existierende Zelle** wenn keine freie Zelle gefunden wird. Bei voller Timeline (z. B. Scene 1 0→12.6s + Scene 2 12.6→15s) sind alle Zellen belegt, aber die Funktion gibt die größte belegte Zelle (0→12.6s) zurück statt `null`. `fitSceneToCell` platziert die neue Szene dann bei `start=0, end=5` — **überlappend** mit Scene 1, statt hinter Scene 2 angehängt.
 
-## Ursache
+Der Fallback in `pickInsertionFit` (`CapCutEditor.tsx:1187–1190`, "append after last scene") wird dadurch nie erreicht.
 
-`resetToPrimaryVideoSlot(sourceTime)` in `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` (Zeile 542–567) macht Folgendes:
+## Fix (1 Datei, 2 Zeilen)
+`src/lib/directors-cut/timelineAnchors.ts` Zeilen 151–152 ersetzen:
 
-1. Setzt `slotA.currentTime = sourceTime` (async — Browser muss erst seeken).
-2. Setzt **sofort** `slotA.style.opacity = '1'`.
+```ts
+// vorher
+// Fallback: largest cell
+return [...cells].sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
 
-Damit wird das `opacity: 0` aus dem vorigen Patch überschrieben, **bevor** der Seek gelandet ist. Der Browser rendert einen Frame lang die alte Position (Frame 0 des Quellvideos), dann kommt `seeked` und springt zum Trim-In-Point → sichtbarer „Anfangsframe-Flash".
+// nachher
+// No free cell → signal caller to append past the timeline end instead
+// of overlapping an occupied region.
+return null;
+```
 
-Dieser Reset läuft u. a. beim initialen Mount und bei jeder EDL-Änderung (Trim/Split/Delete) über den Effekt in Zeile 590–596.
+Damit greift `pickInsertionFit`'s Append-Fallback: neue Szene startet bei `lastScene.end_time`, Timeline wächst auf 15 + 5 = 20 s (bzw. 15 + Clip-Länge).
 
-## Fix (nur `DirectorsCutPreviewPlayer.tsx`, ~10 Zeilen)
-
-`resetToPrimaryVideoSlot` so umbauen, dass Slot A **erst nach dem tatsächlichen Seek** sichtbar wird:
-
-1. Vor dem Setzen der neuen `currentTime` prüfen, ob der aktuelle `slotA.currentTime` bereits nahe genug (`< 0.02 s`) am Ziel liegt.
-   - Ja → Opacity direkt auf `1` (kein Flash möglich, weil kein Seek nötig).
-   - Nein → Opacity auf `0` lassen; der bestehende `onSeeked`-Handler auf `<video ref={videoRefA}>` (bereits im vorigen Patch ergänzt) hebt sie an, sobald der Seek wirklich gelandet ist.
-
-2. Zusätzlich: wenn `slotA.readyState < 1` (Metadaten noch nicht geladen), Opacity ebenfalls auf `0` halten — dann übernimmt der bereits vorhandene `onLoadedMetadata` + `onSeeked`-Pfad das Reveal.
-
-## Warum das reicht
-
-- Das Slot-A-Video wird nie sichtbar, während `currentTime` noch auf einer alten (falschen) Position steht.
-- Der einzige Zeitpunkt, an dem Slot A auf `opacity: 1` gesetzt wird, ist entweder (a) sofort, wenn der Seek gar nicht nötig ist, oder (b) im `seeked`-Callback, d. h. nachdem der Browser den Trim-In-Point erreicht hat.
-- Kein zusätzlicher State, kein Timer, kein Poster-Trick — nur eine korrigierte Reveal-Reihenfolge.
-
-## Technische Details
-
-- Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- Funktion: `resetToPrimaryVideoSlot` (Zeile 542–567)
-- `onSeeked` auf Slot A existiert bereits und setzt `opacity = '1'`, wenn `activeSlotRef.current === 'A'`.
-- Kein anderer Codepfad setzt Slot A ohne Seek auf sichtbar — verifiziert per `grep` auf `videoRefA` / `slotA.style.opacity`.
-
-## Nicht Teil dieses Fixes
-
-- Keine Änderung an `handleTrimScene`, `timelineToSourceTime` oder am Remotion-Export-Template — die berechnen bereits korrekt mit `original_start_time`.
-- Keine Änderung an Slot B (der ist nur während Transitions aktiv und dort schon flash-sicher, weil Transitions ihre eigene Cross-Fade-Logik verwenden).
+## Auswirkung
+- Empty-Scene-Add (`handleSceneAdd`): 5 s werden ans Ende angehängt.
+- Video-Import als Szene (`handleAddVideoAsScene`): volle Clip-Länge wird ans Ende angehängt.
+- `actualTotalDuration = max(scene.end_time)` erweitert Preview-Player, Timeline und Export automatisch.
+- Kein Regress für Insert-am-Playhead-in-freie-Zelle-Cases (die laufen weiterhin über den Free-Cell-Pfad).
