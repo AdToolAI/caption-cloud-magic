@@ -316,8 +316,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const clipSource = toolkitModelToClipSource(model);
       const hasCastOrWorld =
         anchorChars.length > 0 || !!castLocation || !!castBuilding || castProps.length > 0;
+      // Skip the composed first-frame anchor whenever the user wants the
+      // reference at the END or only as an identity anchor — otherwise the
+      // reference motif would appear at frame 0 (composed) AND at the intended
+      // moment (prompt), producing a visible double-appearance.
+      const placementSkipsAnchor = referencePlacement !== 'start';
       const shouldCompose =
         !startImageUrl &&
+        !placementSkipsAnchor &&
         hasCastOrWorld &&
         !!clipSource &&
         !(model.capabilities.multiRef && viduReferences.length > 0);
