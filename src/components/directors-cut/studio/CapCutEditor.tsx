@@ -28,6 +28,8 @@ import { AddMediaDialog } from '../ui/AddMediaDialog';
 import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
 import { CIPreflightDialog } from './CIPreflightDialog';
 import { runCIPreflight, preflightBlocks, type PreflightFinding } from '@/lib/directors-cut/ciPreflight';
+import { AnchorRefreshDialog } from './AnchorRefreshDialog';
+import { analyzeAnchorDrift } from '@/lib/directors-cut/anchorRefresh';
 import {
   normalizeCutAnchors,
   buildAnchorCells,
