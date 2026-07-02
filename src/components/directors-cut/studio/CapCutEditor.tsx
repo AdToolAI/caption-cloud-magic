@@ -2223,6 +2223,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             variant="ghost"
             size="sm"
             className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setCutDownOpen(true)}
+            title="Auto Cut-Down — 15s / 6s Ad-Ableger erzeugen"
+          >
+            <Scissors className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
             onClick={() => setShortcutOverlayOpen(true)}
             title="Tastatur-Shortcuts (?)"
           >
