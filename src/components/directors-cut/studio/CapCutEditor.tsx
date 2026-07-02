@@ -15,7 +15,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useEditorHistory } from '@/hooks/useEditorHistory';
 import { ShortcutOverlay } from './ShortcutOverlay';
 import { AutosaveBadge } from './AutosaveBadge';
-import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard, Anchor } from 'lucide-react';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard, Anchor, Scissors } from 'lucide-react';
 import { PanelDivider } from './PanelDivider';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
