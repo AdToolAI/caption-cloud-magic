@@ -34,6 +34,7 @@ export interface TransitionInput {
   sceneId: string;
   transitionType: string;
   duration: number;
+  anchorTime?: number;
   offsetSeconds?: number;
   // Export format uses these instead:
   sceneIndex?: number;
@@ -90,21 +91,25 @@ export function resolveTransitions(
     const direction = parts[1] || 'left';
 
     const tDuration = Math.max(MIN_DURATION, transition.duration || DEFAULT_DURATION);
-    const leadIn = tDuration * 0.5;
-    const leadOut = tDuration * 0.5;
-    const offset = transition.offsetSeconds ?? 0;
+    // Legacy builds allowed negative offsets / custom anchors. Those make the
+    // transition start before the cut, which reads as "the transition is already
+    // over when the next scene appears". Keep only positive delay support and
+    // always anchor the default window to the actual timeline cut.
+    const offset = Math.max(0, transition.offsetSeconds ?? 0);
 
     // Get original boundary in source time domain
     const originalBoundary =
       scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime ?? 0;
     
-    // Use TIMELINE boundary (end_time) for transition window calculation
-    // This ensures the transition is centered around what the user sees on the timeline
+    // Use TIMELINE boundary (end_time) for transition window calculation.
+    // NLE-friendly default: the transition starts AT the cut, not half before it.
+    // Deprecated anchorTime is intentionally ignored to avoid stale early anchors.
     const timelineBoundary = scene.end_time ?? scene.endTime ?? originalBoundary;
-    const boundary = timelineBoundary + offset;
+    const anchor = timelineBoundary;
+    const boundary = anchor + offset;
 
-    const tStart = Math.max(boundary - leadIn, prevEnd);
-    const tEnd = boundary + leadOut;
+    const tStart = Math.max(boundary, prevEnd);
+    const tEnd = tStart + tDuration;
     prevEnd = tEnd;
 
     resolved.push({
@@ -152,7 +157,7 @@ export function findFreezePhase(
   resolvedTransitions: ResolvedTransition[],
 ): ResolvedTransition | null {
   for (const rt of resolvedTransitions) {
-    if (rt.offsetSeconds > 0 && time >= rt.originalBoundary && time < rt.tStart) {
+    if (rt.offsetSeconds > 0 && time >= rt.timelineBoundary && time < rt.tStart) {
       return rt;
     }
   }

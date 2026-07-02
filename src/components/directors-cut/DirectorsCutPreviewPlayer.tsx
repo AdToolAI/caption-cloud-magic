@@ -516,6 +516,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const lastHandoffBoundaryRef = useRef<{ outgoingSceneId: string; incomingSceneId: string; boundarySourceTime: number } | null>(null);
   // Shared transition phase ref — lets the player know when the renderer is in handoff
   const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
+  const transitionClockLastTsRef = useRef<number>(0);
 
   useTransitionRenderer(videoRefA, videoRefB, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef);
 
@@ -537,6 +538,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     gapLastTimestampRef.current = 0;
     gapCooldownRef.current = 0;
     swClockLastTsRef.current = 0;
+    transitionClockLastTsRef.current = 0;
     activeMediaSceneIdRef.current = null;
   }, []);
 
@@ -869,8 +871,58 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         return;
       }
 
+      // ===== TRANSITION BRANCH (timeline-led) =====
+      // During a transition the outgoing slot is intentionally held on the cut
+      // frame while the incoming slot plays underneath. Therefore the timeline
+      // must advance by wall-clock time instead of video.currentTime.
+      const transitionNow = findActiveTransition(visualTimeRef.current);
+      if (transitionNow && !transitionNow.isFreeze) {
+        const delta = transitionClockLastTsRef.current > 0
+          ? (gapNow - transitionClockLastTsRef.current) / 1000
+          : 0;
+        transitionClockLastTsRef.current = gapNow;
+
+        const nextTL = Math.min(transitionNow.tEnd, visualTimeRef.current + delta);
+        visualTimeRef.current = nextTL;
+
+        const outgoingIdx = sortedScenes.findIndex(s => s.id === transitionNow.outgoingScene.id);
+        if (outgoingIdx >= 0) lastSceneIndexRef.current = outgoingIdx;
+
+        setDisplayTime(nextTL);
+        onTimeUpdateRef.current?.(nextTL);
+
+        if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+          sourceAudioRef.current.pause();
+        }
+
+        rafIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      transitionClockLastTsRef.current = 0;
+
+      if (transitionPhaseRef.current === 'active') {
+        // Give the transition renderer one frame to perform its ping-pong slot
+        // handoff after visualTime reaches tEnd.
+        rafIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
       // VIDEO-LED: read video.currentTime as source of truth
       const videoSourceTime = video.currentTime;
+
+      if (
+        sourceAudioRef.current &&
+        sourceAudioRef.current.paused &&
+        isPlayingRef.current &&
+        !isMutedRef.current &&
+        !originalAudioMutedRef.current &&
+        transitionPhaseRef.current === 'idle'
+      ) {
+        if (Math.abs(sourceAudioRef.current.currentTime - videoSourceTime) > 0.2) {
+          sourceAudioRef.current.currentTime = videoSourceTime;
+        }
+        sourceAudioRef.current.play().catch(() => {});
+      }
 
       // Decrement transition cooldown counter each frame
       if (transitionCooldownRef.current > 0) {
@@ -964,11 +1016,36 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
           // Use source-time boundary for scene advancement (compare source vs source)
           const matchedRT = resolvedTransitions.find(rt => rt.outgoingSceneId === sceneInfo.scene.id);
+
+          // If this cut has a transition, NEVER perform the normal instant scene
+          // advance. That old -0.02s lookahead was causing the player to jump to
+          // the next scene just before the transition window, so the transition
+          // visually finished before the next clip actually appeared. Hand off to
+          // the timeline-led transition branch instead.
+          if (matchedRT) {
+            const transitionSourceBoundary = matchedRT.originalBoundary + matchedRT.offsetSeconds;
+            if (videoSourceTime >= transitionSourceBoundary - 0.005) {
+              const startAt = Math.max(matchedRT.tStart, visualTimeRef.current);
+              visualTimeRef.current = startAt;
+              timelineTime = startAt;
+              transitionClockLastTsRef.current = 0;
+              try {
+                video.currentTime = Math.max(0, matchedRT.originalBoundary - 1 / 60);
+              } catch {}
+              if (!video.paused) video.pause();
+
+              setDisplayTime(startAt);
+              onTimeUpdateRef.current?.(startAt);
+              rafIdRef.current = requestAnimationFrame(tick);
+              return;
+            }
+          }
+
           const effectiveBoundary = matchedRT 
             ? matchedRT.originalBoundary + matchedRT.offsetSeconds 
             : srcEnd;
 
-          if (videoSourceTime >= effectiveBoundary - 0.02) {
+          if (!matchedRT && videoSourceTime >= effectiveBoundary - 0.02) {
             // Check if this boundary was already consumed by a handoff (structured match)
             const handoffMarker = lastHandoffBoundaryRef.current;
             const nextScene = sortedScenes[sceneInfo.index + 1];
