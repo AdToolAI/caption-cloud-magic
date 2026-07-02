@@ -59,6 +59,18 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // W4.1 Voice-Lock: pin voice/language/tone across all UDC voiceovers for this project
+  const lockStorageKey = projectId ? `udc-voice-lock:${projectId}` : null;
+  const [lockedVoiceId, setLockedVoiceId] = useState<string | null>(() => {
+    if (!lockStorageKey) return null;
+    try {
+      const raw = localStorage.getItem(lockStorageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.voiceId ?? null;
+    } catch { return null; }
+  });
+
   // Load voices dynamically (premium + account + cloned)
   const loadVoices = async () => {
     setLoadingVoices(true);
