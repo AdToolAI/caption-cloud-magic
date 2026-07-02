@@ -1,31 +1,35 @@
-## Head-Trim für Library-/Zusatz-Szenen im Director's Cut
+## Warum die Meldung kam
 
-### Problem
-Bei Szene 2 (Library-Clip, 9s) lässt sich im Inspector zwar der **Start**-Wert setzen und der Handler `handleTrimScene` speichert `original_start_time` korrekt — aber im Preview-Player wird der Overlay-Video-Tag für Zusatz-Medien immer bei `currentTime = 0` gestartet und ignoriert `original_start_time`/`original_end_time`. Deshalb wirkt es so, als würde nur hinten geschnitten (dort funktioniert es, weil das Szenen-Ende die Timeline-Länge steuert).
+Im Inspector steht Szene 2: **Quelle 17.1s → 21.6s (Länge 4.50s)**, Timeline **12.60 → 17.10**. Der Playhead stand bei **0:12.60** — das ist **exakt der Anfang von Szene 2**. Der Split-Button im Inspector rief `handleSplitAtPlayhead` auf, der zusätzlich zur Nicht-in-Szene-Prüfung noch einen 0.05s-Rand-Guard hat (`currentTime - scene.start_time < 0.05`). Ergebnis: „Zu nah am Szenenrand zum Teilen".
 
-### Root Cause
-`src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` (Zeilen ~697–716): Beim Bind der Overlay-`<video>`-Quelle für `sourceMode === 'media'` wird hart `overlay.currentTime = 0` gesetzt, und der Wall-Clock-Advance stoppt erst am `scene.end_time` — nicht am `original_end_time` der Zusatz-Quelle.
+Die 4,5s aus dem Inspector-Feld (`Länge`) hatten mit dem Split nichts zu tun — der Button splittet immer nur an der aktuellen Playhead-Position, nicht am Inspector-Wert.
 
-### Fix
+## Fix
 
-**Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`**
+**Datei: `src/components/directors-cut/studio/SceneTrimInspector.tsx`**
 
-1. Beim (Re)bind der Overlay-Quelle für Media-Szenen:
-   - `overlay.currentTime = mediaScene.original_start_time ?? 0` (statt hart `0`).
-   - `overlay.playbackRate = mediaScene.playbackRate ?? 1`.
+Der Button-Auswahl-Block (Zeilen 280-316) soll sich anders verhalten:
 
-2. Wenn Overlay pausiert war und Szene gleich bleibt, aber die Trim-Grenzen wurden verändert: bei einem `overlay.currentTime < original_start_time − ε` oder `>= original_end_time` auf `original_start_time` snappen.
+1. **Priorität umkehren**: Wenn der Playhead innerhalb der Szene ist und **nicht an einem Rand** (≥ 0.05s Abstand zu Start und Ende), zeige „Am Playhead teilen" — auch wenn Trim gesetzt ist. Der Playhead-Split ist der intuitive Default.
 
-3. Szenen-Ende-Check erweitern: Zusätzlich zum Timeline-Ende auch prüfen, ob `overlay.currentTime >= (mediaScene.original_end_time ?? overlay.duration)` — dann handoff zur nächsten Szene auslösen.
+2. **Wenn Playhead am Rand oder außerhalb**, aber Trim ist gesetzt (`trimHead || trimTail`): zeige „An Trim teilen" (bleibt wie heute).
 
-4. Overlay-Rebind-Trigger: aktuell nur bei `activeMediaSceneIdRef !== mediaScene.id`. Zusätzlich rebind/seek, wenn sich `original_start_time` seit dem letzten Bind geändert hat (via zusätzlichem `activeMediaSrcInRef`).
+3. **Wenn beides nicht möglich**: Button disabled mit klarem Tooltip:  
+   - Playhead exakt am Szenenanfang/-ende → Tooltip „Playhead an Szenengrenze — verschiebe ihn oder setze Start/Ende im Inspector, um zu teilen."
 
-### Verifikation
-- Szene 2 (9s Library-Clip) → Start im Inspector von 0 auf 2s setzen → Preview springt beim Betreten von Szene 2 auf Sekunde 2 des Quell-Clips; sichtbare Länge = 7s; Timeline-Länge shrinkt via bestehendem Ripple in `handleTrimScene`.
-- End-Trim weiterhin funktional.
-- Original-Video-Szenen unverändert (der Fix betrifft nur den `isMediaMode`-Branch).
+4. **Neue Aktion „Jump into Scene"**: Kleiner Sekundär-Button (oder Klick-Handler auf „Am Playhead teilen" wenn disabled) der den Playhead automatisch auf `scene.start_time + 0.1s` setzt, damit ein Split sofort möglich ist. Dafür braucht der Inspector einen neuen optionalen Prop `onSeek?: (t: number) => void`.
 
-### Nicht betroffen
-- `handleTrimScene` in `CapCutEditor.tsx` — der Handler ist bereits korrekt.
-- `SceneTrimInspector.tsx` — UI ist bereits korrekt.
-- Render/Export-Pfad: liest `original_start_time` bereits (in `CapCutEditor` an Renderer übergeben).
+**Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`**
+
+- Neuen Prop `onSeek={setCurrentTime}` (bzw. der bestehende Seek-Handler, den der Preview-Player nutzt) an alle drei `SceneTrimInspector`-Instanzen (Zeilen 2273, 2406, 2459) durchreichen.
+
+## Verifikation
+
+- Szene 2 auswählen, Playhead bei 12.60 (Szenenanfang) → Button ist entweder disabled mit Erklärung oder klickt automatisch auf 12.70 und teilt dort.
+- Playhead per Timeline auf 15.00 ziehen → „Am Playhead teilen" splittet Szene 2 in 12.60→15.00 und 15.00→17.10.
+- Ohne Playhead-Bewegung: Start/Ende im Inspector auf z.B. 18.0 / 20.5 setzen → Button wechselt zu „An Trim teilen" und produziert Head/Middle/Tail wie schon implementiert.
+
+## Nicht betroffen
+
+- `handleSplitAtTrim` / `handleSplitAtPlayhead` bleiben unverändert.
+- Kein Render-/Export-Pfad, keine Backend-Logik.
