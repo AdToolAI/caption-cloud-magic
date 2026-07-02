@@ -306,12 +306,14 @@ export function useTransitionRenderer(
         // wrapper's black background as a visible flicker.
 
         // 1. Show the new active (was standby) FIRST so its pixels are on
-        //    screen before we touch the outgoing slot.
+        //    screen before we touch the outgoing slot. Raise its z-index above
+        //    the outgoing slot so nothing can occlude it during the overlap.
         standby.style.opacity = '1';
         standby.style.pointerEvents = 'auto';
         standby.style.transform = 'none';
         standby.style.clipPath = 'none';
         standby.style.filter = syncFilter || '';
+        standby.style.zIndex = '12';
 
         // 2. Pause the old active — it becomes the new standby.
         if (!active.paused) active.pause();
@@ -319,9 +321,9 @@ export function useTransitionRenderer(
         active.style.transform = 'none';
         active.style.clipPath = 'none';
         active.style.filter = 'none';
-        // Leave `opacity` at its current transition-end value (≈1) for ONE
-        // more RAF frame so both layers overlap while the incoming clip
-        // paints. The next tick fades it out via `pendingHideRef`.
+        // Drop its z-index BELOW the new active so it can't occlude anything
+        // even for the overlap frame. Opacity stays until pendingHideRef fades it.
+        active.style.zIndex = '9';
         pendingHideRef.current = active;
 
         // 3. Swap the slot reference
