@@ -21,11 +21,16 @@ export interface PreflightInput {
     isBlackscreen?: boolean;
     thumbnail_url?: string;
     sourceMode?: string;
+    aspect_ratio?: string | null;
+    width?: number | null;
+    height?: number | null;
   }>;
   voiceOverUrl?: string | null;
   voiceOverEnabled?: boolean;
   currentVoiceId?: string | null;
   backgroundMusicUrl?: string | null;
+  musicVolume?: number; // 0..100
+  voiceoverVolume?: number; // 0..100
   subtitleClips: Array<{
     id: string;
     text?: string;
@@ -36,6 +41,36 @@ export interface PreflightInput {
   showSubtitles?: boolean;
   exportAspectRatio?: string;
 }
+
+// Normalise aspect strings like "16:9", "9/16", "1080x1920" into a numeric ratio (w/h).
+const parseAspect = (s?: string | null, w?: number | null, h?: number | null): number | null => {
+  if (w && h && w > 0 && h > 0) return w / h;
+  if (!s) return null;
+  const cleaned = s.trim().toLowerCase();
+  const m = /^(\d+(?:\.\d+)?)\s*[:x/]\s*(\d+(?:\.\d+)?)$/.exec(cleaned);
+  if (!m) return null;
+  const a = parseFloat(m[1]);
+  const b = parseFloat(m[2]);
+  if (!a || !b) return null;
+  return a / b;
+};
+
+const aspectLabel = (r: number): string => {
+  const presets: Array<[string, number]> = [
+    ['16:9', 16 / 9],
+    ['9:16', 9 / 16],
+    ['1:1', 1],
+    ['4:5', 4 / 5],
+    ['21:9', 21 / 9],
+  ];
+  let best = presets[0];
+  let bestDiff = Math.abs(r - best[1]);
+  for (const p of presets) {
+    const d = Math.abs(r - p[1]);
+    if (d < bestDiff) { best = p; bestDiff = d; }
+  }
+  return best[0];
+};
 
 const readVoiceLock = (projectId?: string): { voiceId?: string } | null => {
   if (!projectId) return null;
