@@ -526,6 +526,75 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // for a few frames until the decoder settles into the new scene
   const pendingSceneAdvanceRef = useRef<{ targetIndex: number; framesLeft: number } | null>(null);
 
+  const resetPlaybackGuards = useCallback(() => {
+    lastSceneIndexRef.current = -1;
+    pendingSceneAdvanceRef.current = null;
+    transitionCooldownRef.current = 0;
+    lastHandoffBoundaryRef.current = null;
+    transitionPhaseRef.current = 'idle';
+    inGapRef.current = false;
+    gapLastTimestampRef.current = 0;
+    gapCooldownRef.current = 0;
+    swClockLastTsRef.current = 0;
+    activeMediaSceneIdRef.current = null;
+  }, []);
+
+  const resetToPrimaryVideoSlot = useCallback((sourceTime: number) => {
+    activeSlotRef.current = 'A';
+    const slotA = videoRefA.current;
+    const slotB = videoRefB.current;
+    if (slotB) {
+      slotB.pause();
+      slotB.style.opacity = '0';
+      slotB.style.pointerEvents = 'none';
+      slotB.style.transform = 'none';
+      slotB.style.clipPath = 'none';
+      slotB.style.filter = 'none';
+      slotB.style.position = '';
+      slotB.style.inset = '';
+      slotB.style.zIndex = '';
+    }
+    if (slotA) {
+      try { slotA.currentTime = sourceTime; } catch {}
+      slotA.style.opacity = '1';
+      slotA.style.pointerEvents = 'auto';
+    }
+    const overlay = mediaVideoRef.current;
+    if (overlay) {
+      overlay.pause();
+      overlay.removeAttribute('src');
+    }
+  }, []);
+
+  const seekToTimelineTime = useCallback((timelineTime: number, options?: { resetGuards?: boolean; forcePrimarySlot?: boolean }) => {
+    const safeTimelineTime = Math.max(0, Math.min(timelineTime, duration));
+    const sourceTime = timelineToSourceTime(safeTimelineTime);
+    const activeVideo = getActiveVideo();
+
+    if (options?.resetGuards) resetPlaybackGuards();
+    if (options?.forcePrimarySlot) resetToPrimaryVideoSlot(sourceTime);
+    else if (activeVideo) {
+      try { activeVideo.currentTime = sourceTime; } catch {}
+    }
+
+    visualTimeRef.current = safeTimelineTime;
+    setDisplayTime(safeTimelineTime);
+    onTimeUpdateRef.current?.(safeTimelineTime);
+    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = sourceTime;
+    if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = safeTimelineTime;
+    if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = safeTimelineTime;
+
+    return { timelineTime: safeTimelineTime, sourceTime };
+  }, [duration, getActiveVideo, resetPlaybackGuards, resetToPrimaryVideoSlot, timelineToSourceTime]);
+
+  useEffect(() => {
+    // Scene EDL changed (trim, split, delete). Re-map the current timeline
+    // position to its new source in/out immediately, otherwise the media
+    // element can continue from the stale full-video position.
+    const nextTime = Math.min(visualTimeRef.current, duration);
+    seekToTimelineTime(nextTime, { resetGuards: true, forcePrimarySlot: true });
+  }, [sortedScenes, duration, seekToTimelineTime]);
+
   useEffect(() => {
     if (!isPlaying) {
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
@@ -1148,7 +1217,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (!video) return;
 
     if (externalIsPlaying && !isPlaying) {
-      video.play().catch(() => {});
+      seekToTimelineTime(visualTimeRef.current, { resetGuards: true, forcePrimarySlot: true });
+      getActiveVideo()?.play().catch(() => {});
       setIsPlaying(true);
       if (!isMuted) {
         if (!originalAudioMuted) sourceAudioRef.current?.play().catch(() => {});
@@ -1164,25 +1234,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     }
-  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover, getActiveVideo]);
+  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted, playVoiceover, seekToTimelineTime, getActiveVideo]);
 
   // ==================== EXTERNAL TIME SYNC ====================
   useEffect(() => {
     if (isPlaying) return;
-    const video = getActiveVideo();
-    if (!video) return;
-    if (currentTime === 0 && visualTimeRef.current > 0.5) return;
 
     if (Math.abs(currentTime - visualTimeRef.current) > 0.5) {
-      const sourceTime = timelineToSourceTime(currentTime);
-      video.currentTime = sourceTime;
-      visualTimeRef.current = currentTime;
-      setDisplayTime(currentTime);
-      if (sourceAudioRef.current) sourceAudioRef.current.currentTime = sourceTime;
-      if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = currentTime;
-      if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = currentTime;
+      seekToTimelineTime(currentTime, { resetGuards: true, forcePrimarySlot: true });
     }
-  }, [currentTime, isPlaying, timelineToSourceTime]);
+  }, [currentTime, isPlaying, seekToTimelineTime]);
 
   // ==================== USER CONTROLS ====================
   const startAllAudio = useCallback(() => {
@@ -1226,20 +1287,17 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       stopAllAudio();
       onPlayingChange?.(false);
     } else {
-      if (video.ended || video.currentTime >= duration - 0.1) {
-        video.currentTime = 0;
-        visualTimeRef.current = 0;
-        setDisplayTime(0);
-        if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
-        if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
-        if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
+      if (video.ended || visualTimeRef.current >= duration - 0.1) {
+        seekToTimelineTime(0, { resetGuards: true, forcePrimarySlot: true });
+      } else {
+        seekToTimelineTime(visualTimeRef.current, { resetGuards: true, forcePrimarySlot: true });
       }
-      video.play().catch(() => {});
+      getActiveVideo()?.play().catch(() => {});
       setIsPlaying(true);
       if (!isMuted) startAllAudio();
       onPlayingChange?.(true);
     }
-  }, [isPlaying, isMuted, duration, onPlayingChange, startAllAudio, stopAllAudio, getActiveVideo]);
+  }, [isPlaying, isMuted, duration, onPlayingChange, seekToTimelineTime, startAllAudio, stopAllAudio, getActiveVideo]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     if (isMuted) {
@@ -1264,70 +1322,29 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [isMuted, isPlaying, audio.master_volume, startAllAudio, stopAllAudio]);
 
   const handleSeek = useCallback((value: number[]) => {
-    const video = getActiveVideo();
-    if (!video) return;
-
     const newTime = value[0]; // timeline time
-    const sourceTime = timelineToSourceTime(newTime);
-    video.currentTime = sourceTime;
-    visualTimeRef.current = newTime;
-    setDisplayTime(newTime);
-    onTimeUpdateRef.current?.(newTime);
-    // Reset scene tracking on manual seek
-    lastSceneIndexRef.current = -1;
-    pendingSceneAdvanceRef.current = null;
-    transitionCooldownRef.current = 0;
-    lastHandoffBoundaryRef.current = null;
-    // Reset active slot to A and hide B
-    activeSlotRef.current = 'A';
-    const slotA = videoRefA.current;
-    const slotB = videoRefB.current;
-    if (slotA && slotB) {
-      slotB.pause();
-      slotB.style.opacity = '0';
-      slotB.style.pointerEvents = 'none';
-      slotB.style.transform = 'none';
-      slotB.style.clipPath = 'none';
-      slotB.style.filter = 'none';
-      slotB.style.position = '';
-      slotB.style.inset = '';
-      slotB.style.zIndex = '';
-      // Make sure the seek targets slot A
-      slotA.currentTime = sourceTime;
-      slotA.style.opacity = '1';
-    }
+    seekToTimelineTime(newTime, { resetGuards: true, forcePrimarySlot: true });
 
-    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = sourceTime;
     if (voiceoverAudioRef.current) {
-      voiceoverAudioRef.current.currentTime = newTime;
       if (isPlayingRef.current && !isMutedRef.current) {
         voiceoverShouldRecoverRef.current = false;
         playVoiceover();
       }
     }
-    if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = newTime;
-  }, [playVoiceover, timelineToSourceTime, findActiveTransition]);
+  }, [playVoiceover, seekToTimelineTime]);
 
   const handleReset = useCallback(() => {
     const video = getActiveVideo();
     if (!video) return;
 
     video.pause();
-    video.currentTime = 0;
-    visualTimeRef.current = 0;
-    setDisplayTime(0);
+    const { sourceTime } = seekToTimelineTime(0, { resetGuards: true, forcePrimarySlot: true });
     setIsPlaying(false);
-    lastSceneIndexRef.current = -1;
-    pendingSceneAdvanceRef.current = null;
-    transitionCooldownRef.current = 0;
-    lastHandoffBoundaryRef.current = null;
-    // Reset to slot A
-    activeSlotRef.current = 'A';
     const slotA = videoRefA.current;
     const slotB = videoRefB.current;
     if (slotA) {
       slotA.pause();
-      slotA.currentTime = 0;
+      slotA.currentTime = sourceTime;
       slotA.style.opacity = '1';
     }
     if (slotB) {
@@ -1340,10 +1357,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       slotB.style.filter = 'none';
     }
     stopAllAudio();
-    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
+    if (sourceAudioRef.current) sourceAudioRef.current.currentTime = sourceTime;
     if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
     if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
-  }, [stopAllAudio]);
+  }, [seekToTimelineTime, stopAllAudio]);
 
   const handleFullscreen = useCallback(async () => {
     if (containerRef.current) {

@@ -302,11 +302,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   });
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  // Calculate actual total duration as max(videoDuration, max(scene.end_time)).
-  // Original video is always the base; scenes can extend the timeline beyond it.
+  // Calculate actual total duration from the edited EDL. The original source
+  // length is tracked separately via originalVideoDuration; using it here would
+  // make trimmed/deleted footage keep playing as the full source video.
   const actualTotalDuration = useMemo(() => {
     if (scenes.length === 0) return videoDuration;
-    return Math.max(videoDuration, ...scenes.map(s => s.end_time));
+    return Math.max(0.1, ...scenes.map(s => s.end_time));
   }, [scenes, videoDuration]);
 
   // ── One-shot migration of legacy/mis-flagged scenes ──
@@ -1036,14 +1037,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const handleSceneDelete = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
     const updatedScenes = scenes.filter(s => s.id !== sceneId);
+    const deletedScene = scenes.find(s => s.id === sceneId);
     // Recalculate times
-    let currentTime = 0;
+    let nextCursor = 0;
     const recalculatedScenes = updatedScenes.map(scene => {
       const duration = scene.end_time - scene.start_time;
-      const newScene = { ...scene, start_time: currentTime, end_time: currentTime + duration };
-      currentTime += duration;
+      const newScene = { ...scene, start_time: nextCursor, end_time: nextCursor + duration };
+      nextCursor += duration;
       return newScene;
     });
+    setSelectedSceneId(prev => prev === sceneId ? null : prev);
+    if (deletedScene) {
+      const safeTime = Math.min(deletedScene.start_time, Math.max(0, nextCursor - 0.01));
+      setCurrentTime(recalculatedScenes.length > 0 ? safeTime : 0);
+    }
     onScenesUpdate(recalculatedScenes);
   }, [scenes, onScenesUpdate]);
 
@@ -1576,6 +1583,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             start_time: s.start_time,
             end_time: s.end_time,
             description: s.description,
+            thumbnail_url: s.thumbnail_url,
+            content_description: s.content_description,
+            suggested_effects: s.suggested_effects || [],
+            original_start_time: s.original_start_time ?? s.start_time,
+            original_end_time: s.original_end_time ?? s.end_time,
+            playbackRate: s.playbackRate ?? 1,
+            isFromOriginalVideo: s.isFromOriginalVideo,
+            isBlackscreen: s.isBlackscreen,
+            sourceMode: s.sourceMode,
+            additionalMedia: s.additionalMedia,
           })),
           effects: appliedEffects?.global || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 },
           color_grading: colorGrading,
@@ -1602,7 +1619,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               })),
             visible: subtitleTrack.visible,
           } : undefined,
-          duration_seconds: videoDuration || scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0),
+          // Render exactly the edited EDL length. Using the original videoDuration
+          // here makes Remotion keep rendering the full source after trims/deletes.
+          duration_seconds: actualTotalDuration,
         },
       });
 
@@ -1637,7 +1656,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setRenderStatus('failed');
       setRenderError(t('dc.exportCouldNotStart'));
     }
-  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, videoDuration]);
+  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, actualTotalDuration]);
 
   const handleRenderDownload = useCallback(() => {
     if (renderedVideoUrl) {
