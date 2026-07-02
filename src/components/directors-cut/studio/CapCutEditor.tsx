@@ -1746,6 +1746,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     [scenes],
   );
 
+  // W4.4 Auto Cut-Down — 15s / 6s ad ableger
+  const [cutDownOpen, setCutDownOpen] = useState(false);
+
+
 
   const handleExportVideo = useCallback(async () => {
     const findings = runCIPreflight({
