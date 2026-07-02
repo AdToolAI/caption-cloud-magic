@@ -14,6 +14,7 @@ import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TR
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useEditorHistory } from '@/hooks/useEditorHistory';
 import { ShortcutOverlay } from './ShortcutOverlay';
+import { AutosaveBadge } from './AutosaveBadge';
 import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard } from 'lucide-react';
 import { PanelDivider } from './PanelDivider';
 import { Button } from '@/components/ui/button';
