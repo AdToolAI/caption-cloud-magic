@@ -172,9 +172,14 @@ export function fitSceneToCell(opts: {
   const fps = opts.fps ?? DEFAULT_FPS;
   const start = quantizeToFrame(opts.cell.start, fps);
   let end = quantizeToFrame(opts.cell.end, fps);
+  // If the cell's right edge is the open timeline end, do NOT clamp — the
+  // timeline is allowed to grow beyond the current end when appending a clip.
+  const openEnd = opts.cell.endSource === 'timeline';
   if (opts.naturalDuration && opts.naturalDuration > 0) {
     const cellDur = end - start;
-    if (opts.naturalDuration < cellDur - EPS) {
+    if (openEnd) {
+      end = quantizeToFrame(start + opts.naturalDuration, fps);
+    } else if (opts.naturalDuration < cellDur - EPS) {
       end = quantizeToFrame(start + opts.naturalDuration, fps);
     }
   }
