@@ -1003,6 +1003,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
     commitHistory();
+    // Release the HTMLAudioElement so we don't leak network connections + memory.
+    const existing = audioElementsRef.current.get(clipId);
+    if (existing) {
+      try { existing.pause(); } catch { /* noop */ }
+      try { existing.src = ''; existing.load?.(); } catch { /* noop */ }
+      audioElementsRef.current.delete(clipId);
+    }
     setAudioTracks(prev => prev.map(track => ({
       ...track,
       clips: track.clips.filter(c => c.id !== clipId)
