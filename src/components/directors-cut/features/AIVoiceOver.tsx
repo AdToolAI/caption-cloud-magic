@@ -193,6 +193,10 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   };
 
   const handleVoiceSelect = (voiceId: string) => {
+    if (lockedVoiceId && voiceId !== lockedVoiceId) {
+      toast.warning('Voice-Lock aktiv – entsperre zuerst, um die Stimme zu wechseln', { id: 'udc-voice-lock-warn' });
+      return;
+    }
     const voice = voices.find((v) => v.id === voiceId);
     const lang = voice?.language || selectedLanguageTab;
     const newLanguage = lang === 'de' ? 'de-DE' : lang === 'es' ? 'es-ES' : 'en-US';
@@ -201,6 +205,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   };
 
   const estimatedDuration = Math.ceil(settings.scriptText.length / 15 / settings.speed);
+  const lockedVoiceName = lockedVoiceId ? (voices.find((v) => v.id === lockedVoiceId)?.name ?? lockedVoiceId) : null;
 
   return (
     <Card className="p-4 space-y-4">
@@ -208,11 +213,29 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
         <div className="flex items-center gap-2">
           <Mic className="h-5 w-5 text-primary" />
           <h3 className="font-semibold">AI Voice-Over</h3>
+          {lockedVoiceName && (
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 gap-1 bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+              <Lock className="h-2.5 w-2.5" /> {lockedVoiceName}
+            </Badge>
+          )}
         </div>
-        <Switch
-          checked={settings.enabled}
-          onCheckedChange={(enabled) => onSettingsChange({ ...settings, enabled })}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={toggleVoiceLock}
+            className="h-7 px-2 text-xs gap-1"
+            title={lockedVoiceId ? 'Voice-Lock entfernen' : 'Aktuelle Stimme für dieses Projekt sperren'}
+          >
+            {lockedVoiceId ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+            {lockedVoiceId ? 'Entsperren' : 'Sperren'}
+          </Button>
+          <Switch
+            checked={settings.enabled}
+            onCheckedChange={(enabled) => onSettingsChange({ ...settings, enabled })}
+          />
+        </div>
       </div>
 
       {settings.enabled && (
