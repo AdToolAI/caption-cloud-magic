@@ -93,8 +93,9 @@ export function snapSceneToAnchor(scene: SceneAnalysis): SceneAnalysis {
 export function snapAllToAnchor(
   scenes: SceneAnalysis[],
   onlyDrifting = true,
+  options: AnchorAnalysisOptions = {},
 ): SceneAnalysis[] {
-  const drifts = new Map(analyzeAnchorDrift(scenes).map((d) => [d.sceneId, d]));
+  const drifts = new Map(analyzeAnchorDrift(scenes, options).map((d) => [d.sceneId, d]));
   return scenes.map((s) => {
     const d = drifts.get(s.id);
     if (!d || !d.canSnap) return s;
