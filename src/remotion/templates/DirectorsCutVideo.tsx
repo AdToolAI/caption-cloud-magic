@@ -117,7 +117,54 @@ const SubtitleClipSchema = z.object({
   source: z.string().optional(),
 }).passthrough();
 
-// ========== SHARED SUBTITLE RENDERER — single source of truth for all paths ==========
+// ========== TIMELINE AUDIO TRACKS — SFX + extra VO/music clips (audit C1) ==========
+// Renders every non-muted timeline clip as its own <Audio> so nothing that shows
+// up on the timeline is silently dropped by the render (previously the payload
+// only carried voiceover_url + background_music_url singletons).
+type TimelineAudioTrack = NonNullable<z.infer<typeof DirectorsCutVideoSchema>['audioTracks']>[number];
+const TimelineAudioTracksRenderer: React.FC<{
+  tracks: TimelineAudioTrack[] | undefined;
+  fps: number;
+  hasVoiceoverForDucking: boolean;
+}> = ({ tracks, fps, hasVoiceoverForDucking }) => {
+  if (!tracks || tracks.length === 0) return null;
+  const anySolo = tracks.some(t => t.solo);
+  return (
+    <>
+      {tracks.map(track => {
+        if (track.muted) return null;
+        if (anySolo && !track.solo) return null;
+        const trackVol = Math.max(0, Math.min(100, track.volume ?? 100)) / 100;
+        const isMusicTrack = track.type === 'background-music';
+        return (track.clips || []).map(clip => {
+          if (!clip.url) return null;
+          const clipVol = Math.max(0, Math.min(100, clip.volume ?? 100)) / 100;
+          const trimStart = Math.max(0, clip.trimStart ?? 0);
+          const trimEnd = Math.max(trimStart, clip.trimEnd ?? clip.duration);
+          const usable = Math.max(0.05, trimEnd - trimStart);
+          const startFrame = Math.max(0, Math.round((clip.startTime ?? 0) * fps));
+          const durationFrames = Math.max(1, Math.round(usable * fps));
+          // Duck background music under voiceovers to match preview mixer.
+          const duck = isMusicTrack && hasVoiceoverForDucking ? 0.35 : 1;
+          const finalVol = Math.max(0, Math.min(1, trackVol * clipVol * duck));
+          if (finalVol <= 0) return null;
+          return (
+            <Sequence key={clip.id} from={startFrame} durationInFrames={durationFrames} layout="none">
+              <Audio
+                src={clip.url}
+                volume={finalVol}
+                startFrom={Math.round(trimStart * fps)}
+                pauseWhenBuffering
+              />
+            </Sequence>
+          );
+        });
+      })}
+    </>
+  );
+};
+
+
 const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => {
   const strokeEnabled = clip.textStroke && (clip.textStrokeWidth ?? 0) > 0;
   const strokeColor = clip.textStrokeColor || '#000000';
