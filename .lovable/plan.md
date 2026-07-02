@@ -1,100 +1,57 @@
-## Universal Director's Cut — Vollständige Bug-Bereinigung
+# Universal Director's Cut — Verifizierungs-Ergebnis & Cleanup-Plan
 
-Ein tiefer Audit hat **13 Bugs** aufgedeckt. Sie werden in vier Prioritäts-Wellen behoben (nur Frontend / Preview / Undo — kein Edge-Function-, DB- oder Render-Engine-Umbau).
+## TL;DR
 
-### 🔴 Welle 1 — Kritisch (verursacht Freezes)
+Alle Welle-1–4-Fixes sind sauber verdrahtet. **Keine Critical- oder High-Bugs.** Das System ist voll funktionsfähig und kann in Produktion.
 
-**Bug 1 — Doppelter `requestAnimationFrame` im IDLE-Pfad**
-`src/components/directors-cut/preview/useTransitionRenderer.ts:433–435`
-Zwei RAF-Aufrufe hintereinander → `rafRef` speichert nur den zweiten → der erste wird nie gecancelt → Tick-Loop wächst exponentiell (2⁴→16, 2¹⁰→1024) → Tab friert nach ~0.3 s ein, sobald mindestens ein Übergang gesetzt ist.
-**Fix:** Zeile 435 löschen (verbatim-Duplikat).
+Der Audit hat aber 2 Medium- und 3 Low-Findings gefunden, die keine akuten Bugs sind, aber Ballast und latente Footguns darstellen. Ich empfehle einen kleinen "Welle 5 — Housekeeping"-Sweep, der in ~10 Minuten durch ist.
 
-### 🟠 Welle 2 — Hoch (Datenverlust / falsche Wiedergabe)
+---
 
-**Bug 2 — Trim-Slider spamt Undo-History**
-`SceneTrimInspector.tsx:158` + `CapCutEditor.tsx:1071`
-Slider committet pro Pixel → 60–200 Undo-Einträge pro Drag → History-Kapazität (50) läuft in einer Geste voll, älterer Zustand verloren.
-**Fix:** `commitHistory()` aus `handleTrimScene` entfernen; nur bei `onValueCommit` des Sliders und `onBlur` der Inputs feuern. Zusätzlich No-Op-Guard: wenn sich `original_start_time`/`original_end_time` nicht geändert haben → sofort return.
+## Ergebnis der 8 Prüf-Bereiche
 
-**Bug 3 — Auto-Mute macht Original-Spur unstummbar**
-`CapCutEditor.tsx:416–433`
-Effekt hört auf `audioTracks` und mutet die Original-Spur automatisch wieder, sobald Voiceover existiert → Nutzer kann sie nicht mehr entmuten.
-**Fix:** Auto-Mute-Effekt entfernen; stattdessen die bestehende Init-Logik (Zeile 583, 30 % Volume) einmalig laufen lassen. Falls Auto-Priorisierung erwünscht bleibt: `userOverrodeRef` setzen, sobald der Nutzer den Mute-Button klickt.
+| # | Bereich | Status |
+|---|---|---|
+| 1 | `useTransitionRenderer` (Single-RAF, isPlayingRef, Z-Index-Handoff) | ✅ PASS |
+| 2 | `SceneTrimInspector` (onValueCommit, kontrollierte Inputs, Draft-Sync) | ✅ PASS |
+| 3 | `CapCutEditor` (Idempotenz, Split-Mapping, Undo-Commits, Audio-Threshold) | ✅ PASS |
+| 4 | `DirectorsCutPreviewPlayer` (RAF-Slot-Watcher, Ended-Gate, Head-Trim) | ✅ PASS (2 Medium) |
+| 5 | `DirectorsCut.tsx` (Dep-Arrays) | ✅ PASS |
+| 6 | `useEditorHistory` (cheapEquals, Debounce, Sync-Flush) | ✅ PASS (1 Low) |
+| 7 | Transition-Resolver (Preview ↔ Remotion-Render Parität) | ✅ PASS |
+| 8 | `timelineAnchors` (Wachstum bei Append) | ✅ PASS |
 
-**Bug 4 — Insert-at-Playhead splittet ohne Source-Mapping**
-`CapCutEditor.tsx:1440–1446`
-Split beim Einfügen einer leeren Szene setzt `original_end_time`/`original_start_time` nicht neu → Tail-Hälfte spielt ab Source-Start statt ab dem Split-Punkt.
-**Fix:** Split-Logik aus `handleSplitAtPlayhead` (Zeile 1281–1310) übernehmen (`srcSplit = srcInBase + offset`).
+---
 
-### 🟡 Welle 3 — Mittel (UX-Verschlechterung / Perf)
+## Welle 5 — Housekeeping (optional, empfohlen)
 
-**Bug 5 — Rename / Playback-Rate / Reorder nicht undo-fähig**
-`CapCutEditor.tsx:1116, 1125, 1782`
-`commitHistory()` fehlt vor der Mutation → Ctrl+Z verliert den Vorher-Zustand innerhalb des 200 ms Debounce-Fensters.
-**Fix:** `commitHistory()` am Anfang jedes Handlers.
+### Medium 1: Toter Code im Preview-Player entfernen
+- **Datei:** `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx:937–959`
+- **Was:** Ein zweiter `findActiveTransition`-Zweig in der Tick-Loop, der niemals erreicht wird — der erste Zweig bei Zeile 701–722 fängt alle nicht-eingefrorenen Transitions ab und `return`t.
+- **Warum entfernen:** Wenn irgendwann jemand oberhalb eine `visualTimeRef`-Mutation einbaut, aktiviert sich der tote Code lautlos wieder und produziert Doppel-Handoffs.
+- **Aktion:** Zweig ersatzlos löschen, kurzer Kommentar warum.
 
-**Bug 6 — 100 ms Polling-Loop für Slot-Wechsel**
-`DirectorsCutPreviewPlayer.tsx:1626–1634`
-`setInterval(100ms)` prüft, ob der aktive Slot gewechselt hat → 10 State-Updates/s Idle-Cost.
-**Fix:** `onSlotSwap`-Callback aus `useTransitionRenderer` exportieren; genau dort `setActiveSlotTracker` aufrufen, Polling entfernen.
+### Medium 2: Slot-Watcher-RAF gaten
+- **Datei:** `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx:1630–1637`
+- **Was:** Der RAF-Slot-Watcher läuft permanent, auch wenn pausiert und keine Transition aktiv ist.
+- **Aktion:** RAF nur starten, wenn `isPlayingRef.current === true` **oder** eine Transition im Fenster liegt. Sonst per Event (`visibilitychange` + Slot-Flip) neu anstoßen. Spart CPU/Akku bei Hintergrund-Tabs.
 
-**Bug 7 — `findActiveTransition` doppelt pro RAF-Frame**
-`DirectorsCutPreviewPlayer.tsx:701, 937`
-Zwei identische Scans pro Frame.
-**Fix:** Result einmal oben in `tick` hoisten.
+### Low 1: `cheapEquals` Fast-Path für Szenen
+- **Datei:** `src/hooks/useEditorHistory.ts:59–62`
+- **Was:** Bei Referenz-Diff pro Array-Item wird volles `JSON.stringify` gemacht. Bei 30+ Szenen mit Thumbnails ist das immer noch teuer.
+- **Aktion:** Vor dem Stringify-Fallback ein Field-Whitelist-Check der performance-kritischen Keys (`id`, `start_time`, `end_time`, `original_start_time`, `original_end_time`, `duration`, `muted`, `volume`). Wenn diese identisch sind, als gleich behandeln.
 
-**Bug 8 — Trim-Inputs remounten bei jeder Commit**
-`SceneTrimInspector.tsx:189, 239`
-`key={`in-${scene.id}-${srcIn}`}` → jede Commit zerstört das Input-DOM-Node, Fokus verloren, `+/-` Stepping unbrauchbar.
-**Fix:** Auf kontrolliertes Input mit lokalem State umbauen (`value` + `onChange` lokal, Commit bei `onBlur`/Enter); dynamischen Key entfernen.
+### Low 2 & 3 (info, kein Fix nötig)
+- `reset()`-Closure über stale `state` in `useEditorHistory` — nur latenter Footgun, kein aktueller Aufrufer trifft es. **Keine Änderung nötig**, aber im Kommentar dokumentieren.
+- `handleTrimScene`-Guard bei 0.001s (spec sagte ~0.01s) — funktioniert korrekt, Slider liefert nie < 1ms Deltas. **Keine Änderung**.
+- Redundanter Dep `resolvedTransitions` + `transitions` in `useTransitionRenderer:440` — harmlos, aber sauberer wäre nur `transitions`. **Optional 1-Zeilen-Fix**.
 
-**Bug 9 — `JSON.stringify` Equality in `useEditorHistory`**
-`src/hooks/useEditorHistory.ts:39–44`
-30–100 KB JSON pro Render synchron serialisiert.
-**Fix:** Monotoner `editVersion`-Counter, den jeder Mutation-Handler inkrementiert; Vergleich nur auf Counter. Deep-Compare als Fallback.
+---
 
-### 🔵 Welle 4 — Niedrig (Latente / Randfälle)
+## Empfehlung
 
-**Bug 10 — Centered-Transitions greifen nie für Original-Szenen**
-`transitionResolver.ts:140–146`
-Handle-Detection liefert für Original-Modus immer 0 → immer `'start-at-cut'`. Dokumentiert, aber Parität zum Remotion-Export sicherstellen.
-**Fix:** Kurzer Kommentar + Verifikation, dass `DirectorsCutVideo.tsx` denselben Modus rendert (bereits ja — nur dokumentieren).
+Freigabe für **Welle 5 Housekeeping** (Medium 1 + Medium 2 + Low 1 + der 1-Zeilen-Dep-Cleanup). Danach ist der Director's Cut auf allen 8 Achsen sauber und produktionsreif — keine offenen Findings mehr.
 
-**Bug 11 — Beide Video-Slots feuern `handleVideoEnded`**
-`DirectorsCutPreviewPlayer.tsx:1688, 1717`
-Wenn der eingefrorene Slot während einer Centered-Transition „endet", wird die Transition abgebrochen.
-**Fix:** Handler gaten: `if (e.currentTarget !== getActiveVideo()) return;`.
+Alternativ: Alles so lassen, denn nichts davon ist ein User-facing Bug. In dem Fall gebe ich dir grünes Licht zum Launchen.
 
-**Bug 12 — `transitions` fehlt in Dep-Array**
-`DirectorsCut.tsx:46–58`
-Stale-Closure-Risiko beim Draft-Restore.
-**Fix:** `transitions` in Dep-Array aufnehmen; Guard bleibt (`transitions.length === 0`).
-
-**Bug 13 — Audio-Sync-Effekt läuft bei jedem `currentTime`-Change**
-`CapCutEditor.tsx:453–513`
-Beim Scrubben 10–30×/s volle Iteration über alle Tracks + DOM-Ops.
-**Fix:** Threshold-Guard per Ref: nur re-sync, wenn |Δ currentTime| > 0.05 s oder `isPlaying`/`audioTracks` sich geändert haben.
-
-## Rollout-Reihenfolge
-
-1. **Welle 1** zuerst deployen (Freeze-Killer, 1-Zeilen-Fix).
-2. **Welle 2** direkt danach (schützt Undo & Preview-Korrektheit).
-3. **Welle 3** in einem Batch (Perf + Editor-Feel).
-4. **Welle 4** als Housekeeping-Commit.
-
-## Nicht angefasst
-
-- Edge Functions, DB-Schema, Remotion-Templates (außer Doku-Kommentar in Bug 10)
-- Persistenz / Draft-Save-Logik
-- Sync.so / Lipsync-Pipeline
-- Provider-Registry
-
-## Verifikation
-
-- Bug 1: Browser-Devtools → mit ≥1 Übergang 5 s abspielen, Performance-Tab: RAF-Count bleibt konstant.
-- Bug 2: 3 s Trim-Drag → Undo genau einen Schritt zurück.
-- Bug 3: Original-Spur muten/entmuten während Voiceover aktiv → Zustand hält.
-- Bug 4: Blackscreen mitten in einer Original-Szene einfügen → Tail-Hälfte spielt ab Split-Punkt.
-- Bug 8: Trim-Zahlenfelder → Fokus bleibt beim +/- Stepping.
-
-Freigabe zum Umsetzen?
+Was möchtest du?
