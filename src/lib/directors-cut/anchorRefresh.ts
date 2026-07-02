@@ -26,10 +26,24 @@ export interface AnchorDrift {
   canSnap: boolean;
 }
 
-const WARN_THRESHOLD = 0.15;
-const DRIFT_THRESHOLD = 0.35;
+export const DEFAULT_WARN_THRESHOLD = 0.15;
+export const DEFAULT_DRIFT_THRESHOLD = 0.35;
 
-export function analyzeAnchorDrift(scenes: SceneAnalysis[]): AnchorDrift[] {
+export interface AnchorAnalysisOptions {
+  warnThreshold?: number;
+  driftThreshold?: number;
+}
+
+export function analyzeAnchorDrift(
+  scenes: SceneAnalysis[],
+  options: AnchorAnalysisOptions = {},
+): AnchorDrift[] {
+  const driftThreshold = options.driftThreshold ?? DEFAULT_DRIFT_THRESHOLD;
+  const warnThreshold = Math.min(
+    options.warnThreshold ?? DEFAULT_WARN_THRESHOLD,
+    driftThreshold * 0.6,
+  );
+
   return scenes.map((s, idx) => {
     const anchor = s.media_source_start ?? 0;
     const currentIn = s.original_start_time ?? s.start_time;
@@ -37,10 +51,10 @@ export function analyzeAnchorDrift(scenes: SceneAnalysis[]): AnchorDrift[] {
 
     let severity: AnchorDriftSeverity = 'ok';
     let reason = 'Anchor intakt — Szene startet am Identity-Frame.';
-    if (headTrim >= DRIFT_THRESHOLD) {
+    if (headTrim >= driftThreshold) {
       severity = 'drift';
       reason = `Head-Trim ${headTrim.toFixed(2)}s — Identity-Anchor abgeschnitten.`;
-    } else if (headTrim >= WARN_THRESHOLD) {
+    } else if (headTrim >= warnThreshold) {
       severity = 'warn';
       reason = `Head-Trim ${headTrim.toFixed(2)}s — Anchor knapp.`;
     }
