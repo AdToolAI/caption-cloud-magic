@@ -93,6 +93,7 @@ const SceneSchema = z.object({
   // Additional Media Support
   additionalMedia: AdditionalMediaSchema.optional(),
   isFromOriginalVideo: z.boolean().optional(),
+  sourceMode: z.enum(['original', 'blackscreen', 'media']).optional(),
 });
 
 // Subtitle Clip Schema
