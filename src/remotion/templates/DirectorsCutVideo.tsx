@@ -1,9 +1,5 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
-import { TransitionSeries, linearTiming } from '@remotion/transitions';
-import { fade } from '@remotion/transitions/fade';
-import { slide } from '@remotion/transitions/slide';
-import { wipe } from '@remotion/transitions/wipe';
+import { AbsoluteFill, Video, Audio, Sequence, Freeze, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
 import { resolveTransitions, findActiveTransition } from '../../utils/transitionResolver';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { safeFrame, safeDurationFrames, isValidRemoteMediaUrl } from '../utils/safeFrame';
