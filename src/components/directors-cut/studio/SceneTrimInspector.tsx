@@ -63,6 +63,19 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
   const srcOut = scene.original_end_time ?? scene.end_time;
   const length = Math.max(0, srcOut - srcIn);
 
+  // Local draft state for the dual-slider so live drags don't spam commitHistory.
+  // We commit only on onValueCommit (mouse-up). Reset when scene / committed values change.
+  const [draft, setDraft] = useState<[number, number]>([srcIn, srcOut]);
+  useEffect(() => {
+    setDraft([srcIn, srcOut]);
+  }, [srcIn, srcOut, scene.id]);
+
+  // Local controlled state for numeric inputs so the DOM element never remounts.
+  const [inText, setInText] = useState(srcIn.toFixed(2));
+  const [outText, setOutText] = useState(srcOut.toFixed(2));
+  useEffect(() => { setInText(srcIn.toFixed(2)); }, [srcIn, scene.id]);
+  useEffect(() => { setOutText(srcOut.toFixed(2)); }, [srcOut, scene.id]);
+
   // Playhead-Position relativ zur Quelle (nur nützlich wenn Playhead in der Szene ist)
   const playheadInSource = useMemo(() => {
     if (currentTime < scene.start_time || currentTime > scene.end_time) return null;
