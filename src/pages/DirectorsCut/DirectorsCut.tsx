@@ -54,8 +54,17 @@ export function DirectorsCut() {
           aiSuggested: false,
         }));
       setTransitions(defaultTransitions);
+      return;
     }
-  }, [scenes, transitions.length]);
+    // Prune orphan transitions whose sceneId no longer exists (M5).
+    if (transitions.length > 0) {
+      const sceneIds = new Set(scenes.map((s) => s.id));
+      const pruned = transitions.filter((t) => sceneIds.has(t.sceneId));
+      if (pruned.length !== transitions.length) {
+        setTransitions(pruned);
+      }
+    }
+  }, [scenes, transitions]);
   
   // Visual Effects
   const [appliedEffects, setAppliedEffects] = useState<AppliedEffects>({
@@ -135,6 +144,9 @@ export function DirectorsCut() {
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
+  const handleCleanedVideoUrlChange = useCallback((url: string | null) => {
+    setCleanedVideoUrl(url || undefined);
+  }, []);
 
   // Composer handoff fingerprint — declared early so the draft snapshot can include it.
   const [composerSourceProjectId, setComposerSourceProjectId] = useState<string | null>(null);
@@ -1103,7 +1115,7 @@ export function DirectorsCut() {
         onBackgroundMusicUrlChange={setBackgroundMusicUrl}
         initialSubtitleTrack={capCutSubtitleTrack}
         projectId={projectId}
-        onCleanedVideoUrlChange={(url) => setCleanedVideoUrl(url || undefined)}
+        onCleanedVideoUrlChange={handleCleanedVideoUrlChange}
         onSaveProject={saveProject}
         subtitleSafeZone={subtitleSafeZone}
         onSubtitleSafeZoneChange={setSubtitleSafeZone}

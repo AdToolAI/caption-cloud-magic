@@ -396,12 +396,24 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const remainingScenes = sortedScenes.filter(s => s.start_time > currentTime + 0.1);
     
     if (remainingScenes.length > 0 && video) {
-      // There are more scenes — seek to the next one instead of stopping
+      // There are more scenes — seek to the next one instead of stopping.
+      // For non-original sources (blackscreen, uploaded media, AI-generated
+      // media clips) the primary <video> element is not the render source,
+      // so a source-seek would either fail or scrub an unrelated media file.
       const nextScene = remainingScenes[0];
-      const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
-      video.currentTime = nextSourceStart + 0.05;
-      video.playbackRate = (nextScene as any).playbackRate ?? 1;
-      video.play().catch(() => {});
+      const nextSourceMode = (nextScene as any).sourceMode ?? 'original';
+      if (nextSourceMode === 'original') {
+        const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
+        video.currentTime = nextSourceStart + 0.05;
+        video.playbackRate = (nextScene as any).playbackRate ?? 1;
+        video.play().catch(() => {});
+      } else {
+        // Advance the visual timeline; the scene-media renderer will pick up
+        // the new scene on the next frame.
+        visualTimeRef.current = nextScene.start_time + 0.001;
+        setDisplayTime(nextScene.start_time + 0.001);
+        onTimeUpdateRef.current?.(nextScene.start_time + 0.001);
+      }
       return;
     }
     
