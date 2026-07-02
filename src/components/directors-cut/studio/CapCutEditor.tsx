@@ -1043,6 +1043,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Delete scene handler
   const handleSceneDelete = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const updatedScenes = scenes.filter(s => s.id !== sceneId);
     const deletedScene = scenes.find(s => s.id === sceneId);
     // Recalculate times
