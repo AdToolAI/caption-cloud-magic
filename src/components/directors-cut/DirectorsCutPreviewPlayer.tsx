@@ -163,6 +163,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const mediaVideoRef = useRef<HTMLVideoElement>(null);
   const swClockLastTsRef = useRef<number>(0);
   const activeMediaSceneIdRef = useRef<string | null>(null);
+  const activeMediaSrcInRef = useRef<number>(0);
 
   useEffect(() => { setIsMuted(initialMuted); }, [initialMuted]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
