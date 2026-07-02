@@ -118,35 +118,49 @@ const SubtitleClipSchema = z.object({
 }).passthrough();
 
 // ========== SHARED SUBTITLE RENDERER — single source of truth for all paths ==========
-const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => (
-  <div style={{
-    position: 'absolute',
-    left: 0, right: 0, top: 0, bottom: 0,
-    width: '100%', height: '100%',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
-    paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
-    paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
-    paddingLeft: '5%', paddingRight: '5%',
-    pointerEvents: 'none',
-    zIndex: SUBTITLE_Z_INDEX,
-  }}>
+const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => {
+  const strokeEnabled = clip.textStroke && (clip.textStrokeWidth ?? 0) > 0;
+  const strokeColor = clip.textStrokeColor || '#000000';
+  const strokeWidth = clip.textStrokeWidth ?? 2;
+  const maxLines = clip.maxLines && clip.maxLines > 0 ? clip.maxLines : undefined;
+
+  return (
     <div style={{
-      backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
-      color: clip.color || SUBTITLE_DEFAULT_COLOR,
-      padding: '14px 28px', borderRadius: '8px',
-      fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
-      fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY,
-      fontWeight: 'bold',
-      textAlign: 'center' as const,
-      maxWidth: '90%', lineHeight: 1.4,
-      textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+      position: 'absolute',
+      left: 0, right: 0, top: 0, bottom: 0,
+      width: '100%', height: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: clip.position === 'top' ? 'flex-start' : clip.position === 'center' ? 'center' : 'flex-end',
+      paddingTop: clip.position === 'top' ? SUBTITLE_TOP_PADDING : '5%',
+      paddingBottom: clip.position !== 'top' && clip.position !== 'center' ? SUBTITLE_BOTTOM_PADDING : '5%',
+      paddingLeft: '5%', paddingRight: '5%',
+      pointerEvents: 'none',
+      zIndex: SUBTITLE_Z_INDEX,
     }}>
-      {clip.text}
+      <div style={{
+        backgroundColor: clip.backgroundColor || SUBTITLE_DEFAULT_BG,
+        color: clip.color || SUBTITLE_DEFAULT_COLOR,
+        padding: '14px 28px', borderRadius: '8px',
+        fontSize: SUBTITLE_FONT_SIZE_MAP[clip.fontSize || SUBTITLE_DEFAULT_FONT_SIZE] || SUBTITLE_FONT_SIZE_MAP.medium,
+        fontFamily: clip.fontFamily || SUBTITLE_DEFAULT_FONT_FAMILY,
+        fontWeight: 'bold',
+        textAlign: 'center' as const,
+        maxWidth: '90%', lineHeight: 1.4,
+        textShadow: strokeEnabled
+          ? `${strokeWidth}px 0 0 ${strokeColor}, -${strokeWidth}px 0 0 ${strokeColor}, 0 ${strokeWidth}px 0 ${strokeColor}, 0 -${strokeWidth}px 0 ${strokeColor}, 0 2px 4px rgba(0,0,0,0.5)`
+          : '0 2px 4px rgba(0,0,0,0.5)',
+        WebkitTextStroke: strokeEnabled ? `${strokeWidth}px ${strokeColor}` : undefined,
+        display: maxLines ? '-webkit-box' : undefined,
+        WebkitLineClamp: maxLines,
+        WebkitBoxOrient: maxLines ? ('vertical' as const) : undefined,
+        overflow: maxLines ? 'hidden' : undefined,
+      }}>
+        {clip.text}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // SubtitleTrack Schema
 const SubtitleTrackSchema = z.object({
