@@ -823,7 +823,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const keepABVisible = isVideoOverlay && !overlayReadyForHandoff;
           video.style.opacity = keepABVisible ? '1' : '0';
           if (standby && standby !== video) standby.style.opacity = keepABVisible ? standby.style.opacity : '0';
-          if (postTransitionHoldFramesRef.current > 0 && overlayReadyForHandoff) {
+          if (postTransitionHoldFramesRef.current > 0) {
             postTransitionHoldFramesRef.current -= 1;
           }
 
