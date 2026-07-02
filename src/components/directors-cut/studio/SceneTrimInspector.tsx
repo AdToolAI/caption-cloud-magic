@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -63,6 +63,19 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
   const srcOut = scene.original_end_time ?? scene.end_time;
   const length = Math.max(0, srcOut - srcIn);
 
+  // Local draft state for the dual-slider so live drags don't spam commitHistory.
+  // We commit only on onValueCommit (mouse-up). Reset when scene / committed values change.
+  const [draft, setDraft] = useState<[number, number]>([srcIn, srcOut]);
+  useEffect(() => {
+    setDraft([srcIn, srcOut]);
+  }, [srcIn, srcOut, scene.id]);
+
+  // Local controlled state for numeric inputs so the DOM element never remounts.
+  const [inText, setInText] = useState(srcIn.toFixed(2));
+  const [outText, setOutText] = useState(srcOut.toFixed(2));
+  useEffect(() => { setInText(srcIn.toFixed(2)); }, [srcIn, scene.id]);
+  useEffect(() => { setOutText(srcOut.toFixed(2)); }, [srcOut, scene.id]);
+
   // Playhead-Position relativ zur Quelle (nur nützlich wenn Playhead in der Szene ist)
   const playheadInSource = useMemo(() => {
     if (currentTime < scene.start_time || currentTime > scene.end_time) return null;
@@ -118,27 +131,27 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               : undefined
           }
         >
-          {/* Dim outside area */}
+          {/* Dim outside area (uses draft for smooth live drag) */}
           <div
             className="absolute inset-y-0 bg-black/60"
             style={{
               left: 0,
-              width: `${(srcIn / Math.max(hardMax, 0.01)) * 100}%`,
+              width: `${(draft[0] / Math.max(hardMax, 0.01)) * 100}%`,
             }}
           />
           <div
             className="absolute inset-y-0 bg-black/60"
             style={{
               right: 0,
-              width: `${((hardMax - srcOut) / Math.max(hardMax, 0.01)) * 100}%`,
+              width: `${((hardMax - draft[1]) / Math.max(hardMax, 0.01)) * 100}%`,
             }}
           />
           {/* Selection border */}
           <div
             className="absolute inset-y-0 border-x-2 border-[#F5C76A] pointer-events-none"
             style={{
-              left: `${(srcIn / Math.max(hardMax, 0.01)) * 100}%`,
-              width: `${(length / Math.max(hardMax, 0.01)) * 100}%`,
+              left: `${(draft[0] / Math.max(hardMax, 0.01)) * 100}%`,
+              width: `${(Math.max(0, draft[1] - draft[0]) / Math.max(hardMax, 0.01)) * 100}%`,
             }}
           />
           {/* Playhead */}
@@ -152,7 +165,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
 
         <div className="pt-3 px-1">
           <Slider
-            value={[srcIn, srcOut]}
+            value={draft}
             min={hardMin}
             max={hardMax}
             step={STEP}
@@ -160,7 +173,16 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               const [a, b] = vals as [number, number];
               const ni = clamp(a, hardMin, b - STEP);
               const no = clamp(b, ni + STEP, hardMax);
-              onTrim(scene.id, round2(ni), round2(no));
+              setDraft([round2(ni), round2(no)]);
+            }}
+            onValueCommit={(vals) => {
+              const [a, b] = vals as [number, number];
+              const ni = clamp(a, hardMin, b - STEP);
+              const no = clamp(b, ni + STEP, hardMax);
+              const rni = round2(ni);
+              const rno = round2(no);
+              if (Math.abs(rni - srcIn) < 0.001 && Math.abs(rno - srcOut) < 0.001) return;
+              onTrim(scene.id, rni, rno);
             }}
           />
         </div>
@@ -186,8 +208,8 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               step={STEP}
               min={hardMin}
               max={hardMax}
-              key={`in-${scene.id}-${srcIn}`}
-              defaultValue={srcIn.toFixed(2)}
+              value={inText}
+              onChange={(e) => setInText(e.target.value)}
               onBlur={(e) => applyIn(parseFloat(e.target.value) || 0)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -236,8 +258,8 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               step={STEP}
               min={hardMin}
               max={hardMax}
-              key={`out-${scene.id}-${srcOut}`}
-              defaultValue={srcOut.toFixed(2)}
+              value={outText}
+              onChange={(e) => setOutText(e.target.value)}
               onBlur={(e) => applyOut(parseFloat(e.target.value) || 0)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();

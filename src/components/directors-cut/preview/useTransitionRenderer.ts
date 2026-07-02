@@ -431,8 +431,6 @@ export function useTransitionRenderer(
       }
 
       rafRef.current = requestAnimationFrame(tick);
-
-      rafRef.current = requestAnimationFrame(tick);
     };
 
     rafRef.current = requestAnimationFrame(tick);

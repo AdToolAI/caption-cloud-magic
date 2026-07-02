@@ -55,7 +55,7 @@ export function DirectorsCut() {
         }));
       setTransitions(defaultTransitions);
     }
-  }, [scenes]);
+  }, [scenes, transitions.length]);
   
   // Visual Effects
   const [appliedEffects, setAppliedEffects] = useState<AppliedEffects>({

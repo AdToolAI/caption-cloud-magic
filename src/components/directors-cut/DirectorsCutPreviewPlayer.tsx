@@ -1625,12 +1625,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Track active slot changes to reapply filter after ping-pong swap
   const [activeSlotTracker, setActiveSlotTracker] = useState(activeSlotRef.current);
   useEffect(() => {
-    const interval = setInterval(() => {
+    // RAF-based check (auto-pauses when tab is hidden, cheaper than a 10Hz interval).
+    let rafId = 0;
+    const tick = () => {
       if (activeSlotRef.current !== activeSlotTracker) {
         setActiveSlotTracker(activeSlotRef.current);
       }
-    }, 100);
-    return () => clearInterval(interval);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
   }, [activeSlotTracker]);
 
   useEffect(() => {
@@ -1685,7 +1689,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             muted
             playsInline
             preload="auto"
-            onEnded={handleVideoEnded}
+            onEnded={(e) => { if (e.currentTarget === getActiveVideo()) handleVideoEnded(); }}
             onLoadedMetadata={(e) => {
               // Re-apply the trim-aware source time as soon as metadata is ready,
               // otherwise the browser paints frame 0 for a beat before our seek lands.
@@ -1714,7 +1718,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             muted
             playsInline
             preload="auto"
-            onEnded={handleVideoEnded}
+            onEnded={(e) => { if (e.currentTarget === getActiveVideo()) handleVideoEnded(); }}
             onLoadedMetadata={(e) => {
               const el = e.currentTarget;
               try {

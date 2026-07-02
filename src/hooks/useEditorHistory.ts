@@ -36,13 +36,44 @@ export interface EditorHistoryApi {
   historySize: number;
 }
 
-const defaultEquals = <T>(a: T, b: T) => {
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch {
-    return a === b;
+// Cheap structural comparator: for the common shape { scenes: [...], audioTracks: [...] }
+// we compare identity, then array lengths, then per-item ids to short-circuit ~99% of
+// no-op renders without paying for a full JSON.stringify of 30–100 KB every render.
+const cheapEquals = <T>(a: T, b: T): boolean => {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const aa = a as any;
+  const bb = b as any;
+  const aKeys = Object.keys(aa);
+  const bKeys = Object.keys(bb);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    const av = aa[k];
+    const bv = bb[k];
+    if (av === bv) continue;
+    if (Array.isArray(av) && Array.isArray(bv)) {
+      if (av.length !== bv.length) return false;
+      for (let i = 0; i < av.length; i++) {
+        if (av[i] === bv[i]) continue;
+        // Different reference — fall back to deep compare for this array only.
+        try {
+          if (JSON.stringify(av[i]) !== JSON.stringify(bv[i])) return false;
+        } catch {
+          return false;
+        }
+      }
+    } else {
+      try {
+        if (JSON.stringify(av) !== JSON.stringify(bv)) return false;
+      } catch {
+        return false;
+      }
+    }
   }
+  return true;
 };
+
+const defaultEquals = <T>(a: T, b: T) => cheapEquals(a, b);
 
 export function useEditorHistory<T>({
   state,

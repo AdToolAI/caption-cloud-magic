@@ -412,25 +412,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     return hasActiveVoiceover || hasActiveMusic;
   }, [audioTracks]);
 
-  // Auto-mute original audio when music or voiceover is present
-  useEffect(() => {
-    const voiceoverTrack = audioTracks.find(t => t.name === 'Voiceover');
-    const musicTrack = audioTracks.find(t => t.name === 'Music');
-    
-    const hasVoiceoverOrMusic = 
-      (voiceoverTrack && voiceoverTrack.clips.length > 0) ||
-      (musicTrack && musicTrack.clips.length > 0);
-    
-    if (hasVoiceoverOrMusic) {
-      const originalTrack = audioTracks.find(t => t.name === 'Original');
-      // Only update if original is not already muted
-      if (originalTrack && !originalTrack.muted) {
-        setAudioTracks(prev => prev.map(track => 
-          track.name === 'Original' ? { ...track, muted: true } : track
-        ));
-      }
-    }
-  }, [audioTracks]);
+  // NOTE: Auto-mute of the Original track was removed (it made the track
+  // unmutable once voiceover/music existed — the effect re-fired every render
+  // and forced muted: true even after the user un-muted it manually).
+  // The audio init effect below already reduces Original volume to 30% when
+  // voiceover is present, which is a softer, user-overridable default.
 
   // Propagate audioTracks changes to parent
   useEffect(() => {
@@ -451,7 +437,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, [audioTracks, onBackgroundMusicUrlChange]);
 
   // Audio playback for timeline clips
+  const audioSyncRef = useRef<{ t: number; playing: boolean; tracks: AudioTrack[] }>({ t: -1, playing: false, tracks: [] });
   useEffect(() => {
+    // Skip micro-updates during scrubbing/playback to avoid iterating every RAF tick.
+    // We always re-sync when playing state or audioTracks identity changes.
+    const prev = audioSyncRef.current;
+    if (
+      prev.tracks === audioTracks &&
+      prev.playing === isPlaying &&
+      Math.abs(prev.t - currentTime) < 0.05
+    ) {
+      return;
+    }
+    audioSyncRef.current = { t: currentTime, playing: isPlaying, tracks: audioTracks };
     audioTracks.forEach(track => {
       // Skip original track - it's handled by video element
       if (track.id === 'track-original') return;
@@ -1068,16 +1066,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // tatsächlich, statt den Timeline-Block nur zu verschieben.
   const handleTrimScene = useCallback((sceneId: string, srcIn: number, srcOut: number) => {
     if (!onScenesUpdate) return;
-    commitHistory();
     const sorted = [...scenes].sort((a, b) => a.start_time - b.start_time);
     const idx = sorted.findIndex(s => s.id === sceneId);
     if (idx < 0) return;
 
     const target = sorted[idx] as any;
-    // Bei Original-Szenen ist die verfügbare Quelle das gesamte Ausgangsvideo
-    // [0, originalVideoDuration]. Bei additionalMedia die volle Media-Range —
-    // media_source_* (nie durch Trim überschrieben), sonst additionalMedia.duration
-    // als Fallback, sonst großzügig gegen aktuelles Trim-Fenster.
     const isAdditional = !!target.additionalMedia;
     const mediaClipDur = typeof target.additionalMedia?.duration === 'number' ? target.additionalMedia.duration : undefined;
     const hardMax = isAdditional
@@ -1088,6 +1081,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const newSrcIn = Math.max(hardMin, Math.min(srcIn, srcOut - 0.1));
     const newSrcOut = Math.min(hardMax, Math.max(srcOut, newSrcIn + 0.1));
     const newDur = Math.max(0.1, newSrcOut - newSrcIn);
+
+    // No-op guard — if the committed values match current source range, skip.
+    const currentIn = target.original_start_time ?? target.start_time;
+    const currentOut = target.original_end_time ?? target.end_time;
+    if (Math.abs(currentIn - newSrcIn) < 0.001 && Math.abs(currentOut - newSrcOut) < 0.001) {
+      return;
+    }
+
+    // Commit history only when the trim actually changes (called from onValueCommit / onBlur).
+    commitHistory();
 
     const timelineStart = target.start_time;
     sorted[idx] = {
@@ -1110,20 +1113,22 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
 
     onScenesUpdate(sorted);
-  }, [scenes, onScenesUpdate, originalVideoDuration]);
+  }, [scenes, onScenesUpdate, originalVideoDuration, commitHistory]);
 
   // Rename scene handler
   const handleSceneRename = useCallback((sceneId: string, newName: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const updatedScenes = scenes.map(s =>
       s.id === sceneId ? { ...s, description: newName } : s
     );
     onScenesUpdate(updatedScenes);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, commitHistory]);
 
   // Scene playback rate change handler
   const handleScenePlaybackRateChange = useCallback((sceneId: string, rate: number) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const updatedScenes = scenes.map(s => {
       if (s.id !== sceneId) return s;
       const origStart = s.original_start_time ?? s.start_time;
@@ -1154,7 +1159,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       };
     }
     onScenesUpdate(sorted);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, commitHistory]);
 
   // Effective source video duration — falls back to timeline duration when
   // the source duration is unknown (legacy callers). Used to decide whether
@@ -1435,13 +1440,33 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     let workingScenes: SceneAnalysis[] = scenes;
 
     if (insideIdx >= 0) {
-      // Split current scene at playhead first
-      const target = scenes[insideIdx];
+      // Split current scene at playhead first — mirror handleSplitAtPlayhead's
+      // source-mapping so the tail half plays from the split point of the source,
+      // not from the source in-point.
+      const target: any = scenes[insideIdx];
+      const offset = currentTime - target.start_time;
+      const srcInBase = target.original_start_time ?? 0;
+      const srcOutBase = target.original_end_time ?? (srcInBase + (target.end_time - target.start_time));
+      const srcSplit = srcInBase + offset;
       workingScenes = scenes.flatMap((s, i) => {
         if (i !== insideIdx) return [s];
+        const now = Date.now();
         return [
-          { ...s, end_time: currentTime },
-          { ...s, id: `scene-${Date.now()}-tail`, start_time: currentTime, description: `${s.description} ${t('dc.partSuffix') || '(2)'}` },
+          {
+            ...s,
+            id: `scene-${now}-a`,
+            end_time: currentTime,
+            original_start_time: srcInBase,
+            original_end_time: srcSplit,
+          },
+          {
+            ...s,
+            id: `scene-${now}-b`,
+            start_time: currentTime,
+            original_start_time: srcSplit,
+            original_end_time: srcOutBase,
+            description: `${s.description} ${t('dc.partSuffix') || '(2)'}`,
+          },
         ];
       });
       insertIdx = insideIdx + 1;
@@ -1780,6 +1805,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
     // Handle scene reordering
     if (activeData?.type === 'scene' && onScenesUpdate) {
+      commitHistory();
       const draggedIndex = activeData.index;
       const deltaX = event.delta.x;
       const timeDelta = deltaX / zoom;
