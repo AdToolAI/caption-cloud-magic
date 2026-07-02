@@ -517,8 +517,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Shared transition phase ref — lets the player know when the renderer is in handoff
   const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const transitionClockLastTsRef = useRef<number>(0);
+  // Reset hook exposed by useTransitionRenderer — cleared on natural end/replay
+  // so the internal phase/seek markers don't survive across playbacks.
+  const resetTransitionStateRef = useRef<(() => void) | null>(null);
 
-  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef);
+  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
