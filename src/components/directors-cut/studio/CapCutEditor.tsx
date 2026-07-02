@@ -1619,7 +1619,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               })),
             visible: subtitleTrack.visible,
           } : undefined,
-          duration_seconds: videoDuration || scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0),
+          // Render exactly the edited EDL length. Using the original videoDuration
+          // here makes Remotion keep rendering the full source after trims/deletes.
+          duration_seconds: actualTotalDuration,
         },
       });
 
