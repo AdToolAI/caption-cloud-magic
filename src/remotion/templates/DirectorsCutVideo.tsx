@@ -1307,7 +1307,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       {!previewMode && backgroundMusicUrl && frame >= 30 && (
         <Audio
           src={backgroundMusicUrl}
-          volume={(backgroundMusicVolume || 30) / 100}
+          volume={effectiveMusicVolume}
           loop
           pauseWhenBuffering
         />
