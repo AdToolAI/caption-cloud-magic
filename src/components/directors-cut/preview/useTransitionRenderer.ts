@@ -37,11 +37,17 @@ export function useTransitionRenderer(
   lastHandoffBoundaryRef?: React.MutableRefObject<HandoffBoundaryMarker | null>,
   transitionPhaseRef?: React.MutableRefObject<'idle' | 'preparing' | 'active' | 'handoff'>,
   activeSlotRef?: React.MutableRefObject<'A' | 'B'>,
+  resetTransitionStateRef?: React.MutableRefObject<(() => void) | null>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const lastStandbySeekRef = useRef<string>('');
-  
+  // After a handoff we want to hide the old outgoing slot ONE RAF frame later,
+  // so the incoming slot has definitely painted its first pixel. Without this
+  // overlap frame the browser briefly shows the wrapper's black background
+  // between "outgoing → opacity 0" and "incoming → first painted frame".
+  const pendingHideRef = useRef<HTMLVideoElement | null>(null);
+
   // Track last active transition for structured boundary marking
   const lastActiveTransitionRef = useRef<{ outgoingSceneId: string; incomingSceneId: string; tEnd: number; originalBoundary: number; offsetSeconds: number } | null>(null);
 
@@ -109,7 +115,25 @@ export function useTransitionRenderer(
     setPhase('idle');
     lastStandbySeekRef.current = '';
     lastActiveTransitionRef.current = null;
+    pendingHideRef.current = null;
   }, [scenes, structuralKey, setPhase]);
+
+  // Expose a reset function so the outer player can wipe stale state on
+  // replay / natural end. Without this the internal phase/seek markers can
+  // survive across playbacks and freeze the visible slot on scene 2.
+  useEffect(() => {
+    if (!resetTransitionStateRef) return;
+    resetTransitionStateRef.current = () => {
+      phaseRef.current = 'idle';
+      if (transitionPhaseRef) transitionPhaseRef.current = 'idle';
+      lastStandbySeekRef.current = '';
+      lastActiveTransitionRef.current = null;
+      pendingHideRef.current = null;
+    };
+    return () => {
+      if (resetTransitionStateRef) resetTransitionStateRef.current = null;
+    };
+  }, [resetTransitionStateRef, transitionPhaseRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -275,41 +299,40 @@ export function useTransitionRenderer(
 
       // === PRIORITY 3: Transition just ended → SWAP SLOTS (no seek on visible stream!) ===
       if (phaseRef.current === 'active') {
-        // The standby video is already playing at the correct position for the new scene.
-        // Simply swap roles: standby becomes active, active becomes standby.
-        
-        // 1. Pause the old active (outgoing) — it becomes the new standby
-        if (!active.paused) active.pause();
-        
-        // 2. Hide the old active
-        active.style.opacity = '0';
-        active.style.pointerEvents = 'none';
-        active.style.transform = 'none';
-        active.style.clipPath = 'none';
-        active.style.filter = 'none';
-        active.style.position = '';
-        active.style.inset = '';
-        active.style.width = '';
-        active.style.height = '';
-        active.style.objectFit = '';
-        active.style.zIndex = '';
+        // The standby video is already playing at the correct position for the
+        // new scene. Swap roles: standby becomes active, active becomes standby.
+        //
+        // IMPORTANT: We keep BOTH slots absolutely positioned (that comes from
+        // the JSX `absolute inset-0` class) — do NOT clear `position/inset/
+        // width/height/objectFit/zIndex` here. Clearing them triggers a reflow
+        // and for one frame no <video> fills the viewport, exposing the
+        // wrapper's black background as a visible flicker.
 
-        // 3. Show the new active (was standby) — it's already playing!
+        // 1. Show the new active (was standby) FIRST so its pixels are on
+        //    screen before we touch the outgoing slot.
         standby.style.opacity = '1';
         standby.style.pointerEvents = 'auto';
         standby.style.transform = 'none';
         standby.style.clipPath = 'none';
         standby.style.filter = syncFilter || '';
-        standby.style.position = '';
-        standby.style.inset = '';
-        standby.style.zIndex = '';
 
-        // 4. Swap the slot reference
+        // 2. Pause the old active — it becomes the new standby.
+        if (!active.paused) active.pause();
+        active.style.pointerEvents = 'none';
+        active.style.transform = 'none';
+        active.style.clipPath = 'none';
+        active.style.filter = 'none';
+        // Leave `opacity` at its current transition-end value (≈1) for ONE
+        // more RAF frame so both layers overlap while the incoming clip
+        // paints. The next tick fades it out via `pendingHideRef`.
+        pendingHideRef.current = active;
+
+        // 3. Swap the slot reference
         if (activeSlotRef) {
           activeSlotRef.current = activeSlotRef.current === 'A' ? 'B' : 'A';
         }
 
-        // 5. Mark boundary as consumed
+        // 4. Mark boundary as consumed
         lastStandbySeekRef.current = '';
         if (lastHandoffBoundaryRef && lastActiveTransitionRef.current) {
           lastHandoffBoundaryRef.current = {
@@ -328,6 +351,15 @@ export function useTransitionRenderer(
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
+
+      // === Deferred hide from previous handoff: fade the old outgoing slot
+      // out one frame AFTER the incoming slot became visible. This guarantees
+      // no black flicker between the transition end and the new scene paint.
+      if (pendingHideRef.current && pendingHideRef.current !== active) {
+        pendingHideRef.current.style.opacity = '0';
+        pendingHideRef.current = null;
+      }
+
 
       // === PRIORITY 4: PRE-SEEK (preparing) ===
       for (const rt of resolvedTransitions) {

@@ -380,6 +380,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [audio.master_volume]);
 
   // ==================== VIDEO EVENT HANDLERS ====================
+  // Forward ref for resetToPrimaryVideoSlot — declared here so `handleVideoEnded`
+  // can reach it without triggering TDZ (its concrete definition lives further down).
+  const resetToPrimaryVideoSlotRef = useRef<((sourceTime: number) => void) | null>(null);
+
   const handleVideoEnded = useCallback(() => {
     // Check if there are remaining scenes on the timeline after the current position
     const currentTime = visualTimeRef.current;
@@ -409,6 +413,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
     backgroundMusicAudioRef.current?.pause();
     if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
+
+    // Wipe transition state so replays don't reuse a stale handoff phase
+    // that would keep Slot B pinned as the visible layer on scene 2.
+    resetTransitionStateRef.current?.();
+    transitionPhaseRef.current = 'idle';
+    if (transitionCooldownRef.current) transitionCooldownRef.current = 0;
+    lastHandoffBoundaryRef.current = null;
+
+    // Re-seat the ping-pong to Slot A at the very first source frame so the
+    // next Play starts from scene 1, not from wherever Slot B ended.
+    const firstScene = sortedScenes[0];
+    const firstSource = firstScene?.original_start_time ?? firstScene?.start_time ?? 0;
+    resetToPrimaryVideoSlotRef.current?.(firstSource);
+
     onPlayingChange?.(false);
   }, [onPlayingChange, sortedScenes, getActiveVideo]);
 
@@ -517,8 +535,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Shared transition phase ref — lets the player know when the renderer is in handoff
   const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const transitionClockLastTsRef = useRef<number>(0);
+  // Reset hook exposed by useTransitionRenderer — cleared on natural end/replay
+  // so the internal phase/seek markers don't survive across playbacks.
+  const resetTransitionStateRef = useRef<(() => void) | null>(null);
 
-  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef);
+  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -575,6 +596,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       overlay.removeAttribute('src');
     }
   }, []);
+
+  // Publish the concrete implementation to the forward-ref used by handleVideoEnded.
+  useEffect(() => {
+    resetToPrimaryVideoSlotRef.current = resetToPrimaryVideoSlot;
+    return () => { resetToPrimaryVideoSlotRef.current = null; };
+  }, [resetToPrimaryVideoSlot]);
 
   const seekToTimelineTime = useCallback((timelineTime: number, options?: { resetGuards?: boolean; forcePrimarySlot?: boolean }) => {
     const safeTimelineTime = Math.max(0, Math.min(timelineTime, duration));
@@ -1690,6 +1717,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                 const src = timelineToSourceTime(visualTimeRef.current);
                 el.currentTime = src;
               } catch {}
+            }}
+            onSeeked={(e) => {
+              // Symmetric to Slot A: only reveal Slot B once its seek to the
+              // pre-handle in-point has actually landed. Prevents a one-frame
+              // flash of frame 0 while the transition ramps its opacity in.
+              if (activeSlotRef.current === 'B') {
+                e.currentTarget.style.opacity = '1';
+              }
             }}
           />
 

@@ -1,153 +1,35 @@
-## Analyse
+## Zwei Bugs identifiziert
 
-Das aktuelle Problem kommt nicht vom Slider selbst, sondern von der Architektur:
+**Bug 1 — 1-Frame Blackflash direkt nach dem Übergang**
+Am Ende der Transition macht die Handoff-Phase (`useTransitionRenderer.ts` Zeilen 277–330) drei Dinge im selben Frame:
+1. Slot A (outgoing) auf `opacity:0` + Reset von `position/inset/zIndex/width/height/objectFit` auf leer.
+2. Slot B (incoming, war Standby) auf `opacity:1` + gleicher Style-Reset.
+3. `activeSlotRef` flippt auf 'B'.
 
-- Die UI speichert eine Transition zwischen Szene 1 und Szene 2 korrekt.
-- Der Resolver legt das Zeitfenster inzwischen zwar an die Schnittkante, aber der Preview-Player mischt drei Zeitmodelle:
-  - Video-Clock vom aktiven `<video>`
-  - Timeline-Clock für künstlich verlängerte Szenen/Gaps
-  - separater Transition-Renderer mit eigenem Ping-Pong-Slot
-- Dadurch kann der Player am Cut schon zur nächsten Szene springen, bevor der Transition-Renderer sichtbar beide Layer mischt.
-- Zusätzlich ist das aktuell gewählte Modell „Transition startet erst am Cut und hält den letzten Frame der vorherigen Szene“ zwar eine Notlösung, aber nicht das Standardmodell von Top-NLEs.
+Das Zurücksetzen von `position:absolute` + `inset:0` löst einen Reflow aus, in dem für einen Frame kein `<video>` das Fenster füllt → der schwarze Hintergrund des Wrappers ist sichtbar. Zusätzlich hat **Slot B kein `onSeeked`-Reveal-Handler** wie Slot A (`DirectorsCutPreviewPlayer.tsx` Zeilen 1667–1674 vs. 1687–1693) — falls ein späterer Seek Slot B minimal repaintet, gibt es keinen Schutz gegen die Frame-0-Painting-Race.
 
-## Vergleich mit funktionierenden Modellen
+**Bug 2 — Replay zeigt nur Szene 2**
+Nach dem Übergang steht `activeSlotRef.current = 'B'`. Beim natürlichen Video-Ende (`handleVideoEnded`, Zeilen 383–413) wird zwar `visualTime=0` gesetzt, aber:
+- `activeSlotRef` bleibt auf 'B'
+- Slot A/B-Sichtbarkeit wird nicht zurückgesetzt
+- `useTransitionRenderer` interner State (`phaseRef`, `lastStandbySeekRef`, `lastActiveTransitionRef`) wird nicht geleert
 
-Professionelle Editoren wie Premiere, Final Cut, Resolve und CapCut behandeln Übergänge als Effekt auf der Schnittkante:
+Beim erneuten Play spielt der Player weiter aus Slot B (Szene-2-Quelle) und die interne Transition-State-Machine hat noch stale Marker → die Szene 1 wird nie wieder gezeigt.
 
-```text
-Standard Cross Dissolve:
-Scene A handle  | overlap/crossfade | Scene B handle
-            ----|-------------------|----
-                cut point in the middle
-```
+## Fix-Plan
 
-Wichtig dabei:
+### 1. `src/components/directors-cut/preview/useTransitionRenderer.ts`
+- **Style-Reflow vermeiden**: Im Handoff-Branch (Zeilen 285–305) NICHT mehr `position/inset/width/height/objectFit/zIndex` auf `''` setzen. Nur `opacity`, `transform`, `clipPath`, `filter` und `pointerEvents` anfassen. Die Slots bleiben durchgehend `absolute inset-0` (kommt eh aus dem JSX `className`).
+- **Overlap-Frame**: Bevor Slot A auf `opacity:0` geht, einen 1-RAF-Frame Delay einbauen (beide Slots kurz sichtbar), damit Slot B garantiert Pixel gerendert hat. Konkret: Handoff in zwei Ticks aufteilen — Tick 1 setzt neuen Slot auf opacity 1, Tick 2 setzt alten auf opacity 0.
+- **Reset-API**: Neue Ref `resetTransitionStateRef` exportieren, die von außen aufgerufen werden kann und `phaseRef`, `lastStandbySeekRef`, `lastActiveTransitionRef` cleart.
 
-1. Es gibt eine klare Schnittkante.
-2. Der Übergang besitzt ein eigenes Transition-Fenster.
-3. Für echte Crossfades braucht man „Handles“: also extra Material nach dem Out-Point von Szene A und vor dem In-Point von Szene B.
-4. Wenn keine Handles existieren, machen gute Tools eine verständliche Fallback-Variante:
-   - Übergang kürzen,
-   - Edge-Transition verwenden,
-   - oder einen held frame verwenden, aber sichtbar und kontrolliert.
+### 2. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- **Slot B `onSeeked`-Reveal** (Zeilen 1687–1693): Analoges Handler wie Slot A hinzufügen, das bei `activeSlotRef.current === 'B'` auf `opacity:'1'` flippt.
+- **`handleVideoEnded` erweitern** (Zeilen 383–413): Nach dem `visualTime=0` einen `resetToPrimaryVideoSlot(0)` aufrufen und die neue `resetTransitionStateRef` triggern, damit Slot A wieder sichtbar wird und der interne Transition-State clean ist.
+- **Loop-Fall absichern**: Falls der Loop-Toggle aktiv ist, gleicher Reset direkt vor dem Auto-Restart.
 
-Unsere Pipeline macht aktuell eine Mischung aus „held outgoing frame“ und „incoming scene starts after cut“. Das kann funktionieren, fühlt sich aber nicht wie ein sauberer NLE-Übergang an und ist anfällig für Sprünge.
+### Ergebnis
+- Kein Blackflash mehr, weil Slot B ununterbrochen fullscreen positioniert bleibt und Slot A erst einen Frame später ausgeblendet wird.
+- Replay startet immer sauber mit Slot A + Szene 1, egal wie oft der User "Play" drückt.
 
-## Zielbild
-
-Übergänge sollen sich so verhalten:
-
-```text
-Keine Transition:
-Scene 1 endet exakt am Cut -> Scene 2 startet exakt am Cut
-
-Mit Transition:
-Scene 1 bleibt sichtbar bis Transition-Ende
-Scene 2 beginnt sichtbar ab Transition-Start
-Beide Layer werden für die eingestellte Dauer gemischt
-```
-
-Und wenn genügend Source-Handles vorhanden sind:
-
-```text
-Centered NLE mode:
-Transition beginnt vor dem Cut und endet nach dem Cut.
-Der Cut liegt optisch in der Mitte.
-```
-
-Wenn keine Handles vorhanden sind:
-
-```text
-Safe Edge mode:
-Transition startet am Cut, nutzt den letzten Frame von Szene 1 + laufende Szene 2.
-Keine unsichtbare oder zu frühe Transition.
-```
-
-## Umsetzungsplan
-
-### 1. Transition-Resolver zu einem echten NLE-Resolver machen
-
-`src/utils/transitionResolver.ts` wird erweitert:
-
-- Transition-Placement wird explizit berechnet:
-  - `centered` wenn beide Szenen genug Handles haben.
-  - `start-at-cut` als sicherer Fallback.
-- Resolver gibt zusätzlich aus:
-  - `placement`
-  - `hasOutgoingHandle`
-  - `hasIncomingHandle`
-  - `effectiveDuration`
-  - `visualStart`
-  - `visualEnd`
-  - `cutTime`
-- Negative Legacy-Offsets bleiben deaktiviert, damit alte Projekte nicht wieder Früh-Transitions erzeugen.
-
-### 2. Preview-Player: Transition-Branch vor normale Szenenlogik ziehen
-
-`DirectorsCutPreviewPlayer.tsx` wird so umgebaut, dass Transition-Erkennung Priorität bekommt:
-
-- Vor Media/Gaps/normaler Boundary-Seek-Logik prüfen, ob `visualTimeRef.current` in einem Transition-Fenster liegt oder kurz davor ist.
-- Während einer Transition darf kein normaler Szenensprung ausgeführt werden.
-- Der Player läuft in dieser Phase timeline-led, nicht video-led.
-- Nach Transition-Ende gibt es genau einen kontrollierten Handoff auf Szene 2.
-
-### 3. Transition-Renderer als deterministic A/B-Mixer
-
-`useTransitionRenderer.ts` wird vereinfacht:
-
-- Slot A = outgoing layer.
-- Slot B = incoming layer.
-- Beide werden anhand der Resolver-Daten positioniert.
-- Crossfade/Fade/Slide/Wipe/Push/Zoom/Blur bekommen dieselbe Progress-Quelle.
-- Kein mehrfaches Seek/Pause/Play pro Frame.
-- Standby wird im Preload-Fenster vorbereitet und erst im Transition-Fenster sichtbar.
-
-### 4. Unterschiedliche Source-Arten berücksichtigen
-
-Übergänge müssen funktionieren zwischen:
-
-- Originalvideo -> Originalvideo
-- Originalvideo -> hinzugefügtes Video
-- hinzugefügtes Video -> Originalvideo
-- hinzugefügtes Video -> Bild/Blackscene
-- Bild/Blackscene -> Video
-
-Dafür wird die Source-Time-Berechnung zentralisiert, damit nicht jede Branch eigene Logik hat.
-
-### 5. Export-Parität wiederherstellen
-
-`src/remotion/templates/DirectorsCutVideo.tsx` wird an denselben Resolver angepasst:
-
-- Preview und Export verwenden dieselbe Transition-Geometrie.
-- Render-Mode rendert die zweite Szene unter der gehaltenen/überlappenden ersten Szene.
-- Falls Handles vorhanden sind, wird der Centered-NLE-Modus genutzt.
-- Falls keine Handles vorhanden sind, wird derselbe Safe-Edge-Fallback genutzt wie im Preview-Player.
-
-### 6. UI verständlicher machen
-
-`CutPanel.tsx` bekommt eine klare Anzeige:
-
-- „Standard“/„Pro“ Placement-Info je Transition:
-  - „Centered“ wenn echte Handles möglich sind.
-  - „Am Schnitt“ wenn nur Edge-Fallback möglich ist.
-- Der Mini-Balken zeigt nicht nur `Cut | +1.6s`, sondern:
-
-```text
-Centered:  -0.8s | CUT | +0.8s
-Edge:       CUT | +1.6s
-```
-
-Damit der Nutzer versteht, warum ein Übergang so läuft.
-
-### 7. Verifikation
-
-Nach Umsetzung:
-
-- Mit Playwright die vorhandene Szene-1/Szene-2-Konstellation abspielen.
-- Prüfen, dass bei 1.6s und 3.0s sichtbares Blending statt Instant-Cut passiert.
-- Prüfen, dass die Timeline weiterläuft und nach der Transition auf Szene 2 landet.
-- Spot-check Export-Logik auf denselben Resolver, damit Preview und fertiger Render gleich sind.
-
-## Ergebnis
-
-Das macht die Transition-Pipeline robuster und professioneller: nicht mehr „irgendwo ein CSS-Effekt beim Cut“, sondern ein echtes NLE-Modell mit A/B-Layern, klarer Schnittkante, Handle-Erkennung, Fallbacks und Preview/Export-Parität.
+Kein Verhalten am Export/Render ändert sich — betroffen ist ausschließlich die Preview-Pipeline.
