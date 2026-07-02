@@ -29,6 +29,7 @@ import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
 import { CIPreflightDialog } from './CIPreflightDialog';
 import { runCIPreflight, preflightBlocks, type PreflightFinding } from '@/lib/directors-cut/ciPreflight';
 import { AnchorRefreshDialog } from './AnchorRefreshDialog';
+import { AutoCutDownDialog } from './AutoCutDownDialog';
 import { analyzeAnchorDrift } from '@/lib/directors-cut/anchorRefresh';
 import {
   normalizeCutAnchors,
