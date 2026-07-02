@@ -539,7 +539,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // so the internal phase/seek markers don't survive across playbacks.
   const resetTransitionStateRef = useRef<(() => void) | null>(null);
 
-  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef);
+  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef, isPlayingRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
