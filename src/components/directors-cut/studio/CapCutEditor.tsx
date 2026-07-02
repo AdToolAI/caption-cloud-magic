@@ -1071,7 +1071,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setCurrentTime(recalculatedScenes.length > 0 ? safeTime : 0);
     }
     onScenesUpdate(recalculatedScenes);
-  }, [scenes, onScenesUpdate, commitHistory]);
+    toast.success(t('dc.sceneDeleted'));
+  }, [scenes, onScenesUpdate, commitHistory, t]);
 
   // Trim scene handler — adjust start/end without recalculating other scenes
   // Interpretiert die Sidebar-Inputs als Quellen-Range (source in/out) und
