@@ -90,6 +90,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * If the current model doesn't support the selected placement, it falls back to 'start'.
    */
   const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>('start');
+  /** Pending placement change awaiting user confirmation to auto-switch model. */
+  const [pendingPlacement, setPendingPlacement] = useState<{
+    placement: 'end' | 'anchor';
+    targetModelId: string;
+    targetModelName: string;
+  } | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
