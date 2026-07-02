@@ -2463,6 +2463,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     currentTime={currentTime}
                     onTrimScene={handleTrimScene}
                     onSplitAtTrim={handleSplitAtTrim}
+                    onSeek={handleSeek}
                     onSceneDelete={handleSceneDelete}
                   />
                 </div>
