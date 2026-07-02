@@ -659,6 +659,113 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return [...scenes].sort((a, b) => a.startTime - b.startTime);
   }, [scenes]);
 
+  const resolvedRenderTransitions = useMemo(() => resolveTransitions(
+    sortedScenes.map(s => ({
+      id: s.id,
+      originalStartTime: s.originalStartTime,
+      originalEndTime: s.originalEndTime,
+      startTime: s.startTime,
+      endTime: s.endTime,
+    })),
+    (transitions || []).map(t => ({
+      sceneId: (t as any).sceneId || '',
+      sceneIndex: t.sceneIndex,
+      transitionType: t.type || 'none',
+      type: t.type,
+      duration: t.duration || 0.8,
+      offsetSeconds: t.offsetSeconds,
+    })),
+  ), [sortedScenes, transitions]);
+
+  const renderTransitionLayer = (rt: ResolvedTransition) => {
+    const outgoing = sortedScenes.find(s => s.id === rt.outgoingSceneId);
+    if (!outgoing) return null;
+
+    const from = safeFrame(rt.tStart, fps, durationInFrames - 1);
+    const durationFrames = Math.max(1, Math.round(rt.duration * fps));
+    const localFrame = Math.max(0, frame - from);
+    const raw = Math.min(1, Math.max(0, localFrame / Math.max(1, durationFrames)));
+    const progress = Math.pow(0.5 - 0.5 * Math.cos(raw * Math.PI), 0.7);
+
+    const holdSourceTime = Math.max(0, rt.originalBoundary - 1 / fps);
+    const holdScene = {
+      ...outgoing,
+      startTime: rt.tStart,
+      endTime: rt.tEnd,
+      originalStartTime: holdSourceTime,
+      originalEndTime: holdSourceTime + rt.duration,
+      playbackRate: 1,
+    };
+
+    let outgoingStyle: React.CSSProperties = { opacity: 1 - progress };
+    let blackOpacity = 0;
+    switch (rt.baseType) {
+      case 'fade':
+        outgoingStyle = { opacity: progress < 0.5 ? 1 - progress * 2 : 0 };
+        blackOpacity = progress < 0.5 ? progress * 2 : (1 - progress) * 2;
+        break;
+      case 'wipe':
+        outgoingStyle = rt.direction === 'right'
+          ? { clipPath: `inset(0 0 0 ${progress * 100}%)` }
+          : rt.direction === 'up'
+            ? { clipPath: `inset(0 0 ${progress * 100}% 0)` }
+            : rt.direction === 'down'
+              ? { clipPath: `inset(${progress * 100}% 0 0 0)` }
+              : { clipPath: `inset(0 ${progress * 100}% 0 0)` };
+        break;
+      case 'slide':
+      case 'push':
+        outgoingStyle = rt.direction === 'right'
+          ? { transform: `translateX(${progress * 100}%)` }
+          : rt.direction === 'up'
+            ? { transform: `translateY(${-progress * 100}%)` }
+            : rt.direction === 'down'
+              ? { transform: `translateY(${progress * 100}%)` }
+              : { transform: `translateX(${-progress * 100}%)` };
+        break;
+      case 'blur':
+        outgoingStyle = { opacity: 1 - progress, filter: `blur(${progress * 10}px)` };
+        break;
+      case 'zoom':
+        outgoingStyle = { opacity: 1 - progress, transform: `scale(${1 + progress * 0.12})` };
+        break;
+    }
+
+    return (
+      <Sequence key={`transition-${rt.outgoingSceneId}-${rt.incomingSceneId}`} from={from} durationInFrames={durationFrames}>
+        <AbsoluteFill style={{ overflow: 'hidden', zIndex: 20, pointerEvents: 'none', ...outgoingStyle }}>
+          <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+            <Freeze frame={0}>
+              <SceneVideo
+                sourceVideoUrl={sourceVideoUrl}
+                scene={holdScene}
+                sceneIndex={rt.sceneIndex}
+                totalScenes={sortedScenes.length}
+                brightness={brightness}
+                contrast={contrast}
+                saturation={saturation}
+                sharpness={sharpness}
+                temperature={temperature}
+                vignette={vignette}
+                globalFilter={filter}
+                styleTransfer={styleTransfer}
+                colorGrading={colorGrading}
+                sceneColorGrading={sceneColorGrading}
+                sceneEffects={sceneEffects}
+                transitions={[]}
+                chromaKey={chromaKey}
+                kenBurns={kenBurns}
+                sceneDurationFrames={durationFrames}
+                previewMode={false}
+              />
+            </Freeze>
+          </div>
+        </AbsoluteFill>
+        {blackOpacity > 0 && <AbsoluteFill style={{ backgroundColor: `rgba(0,0,0,${blackOpacity})`, zIndex: 21 }} />}
+      </Sequence>
+    );
+  };
+
   // Subtitle Safe Zone crop style
   const safeZoneCropStyle: React.CSSProperties = subtitleSafeZone?.enabled ? {
     clipPath: `inset(0 0 ${subtitleSafeZone.bottomBandPercent}% 0)`,
