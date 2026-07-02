@@ -497,11 +497,18 @@ serve(async (req) => {
         scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime,
         0
       ),
+      mediaSourceStart: scene.media_source_start != null || scene.mediaSourceStart != null
+        ? safeNum(scene.media_source_start ?? scene.mediaSourceStart, 0)
+        : undefined,
+      mediaSourceEnd: scene.media_source_end != null || scene.mediaSourceEnd != null
+        ? safeNum(scene.media_source_end ?? scene.mediaSourceEnd, scene.additional_media?.duration ?? scene.additionalMedia?.duration ?? scene.end_time ?? scene.endTime ?? 0)
+        : undefined,
       playbackRate: safeNum(scene.playbackRate ?? scene.playback_rate, 1),
       description: scene.description,
       mood: scene.mood,
       effects: scene.effects,
       additionalMedia: scene.additional_media ?? scene.additionalMedia,
+      sourceMode: scene.source_mode ?? scene.sourceMode,
       isFromOriginalVideo: scene.is_from_original_video ?? scene.isFromOriginalVideo ?? true,
     }));
 
