@@ -78,6 +78,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  /**
+   * Placement of the uploaded reference image within the generated clip:
+   *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
+   *  - 'end'    → endImageUrl (image is the LAST frame; needs capabilities.endFrame)
+   *  - 'anchor' → identity-only reference; no forced start/end frame
+   * If the current model doesn't support the selected placement, it falls back to 'start'.
+   */
+  const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>('start');
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
