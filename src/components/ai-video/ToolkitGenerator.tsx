@@ -619,6 +619,60 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               />
             </label>
           )}
+
+          {/* ── Placement toggle: where does the reference image appear? ── */}
+          {startImageUrl && (
+            <div className="space-y-2 pt-2 border-t border-border/40">
+              <Label className="text-xs font-medium text-muted-foreground">
+                {language === 'de' ? 'Wo soll das Bild erscheinen?' : 'Where should the image appear?'}
+              </Label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  {
+                    key: 'start' as const,
+                    label: language === 'de' ? 'Am Anfang' : 'At start',
+                    hint: language === 'de' ? 'Bild ist der erste Frame' : 'Image is the first frame',
+                    disabled: false,
+                  },
+                  {
+                    key: 'end' as const,
+                    label: language === 'de' ? 'Am Ende' : 'At end',
+                    hint: model.capabilities.endFrame
+                      ? (language === 'de' ? 'Kamera fährt zum Bild hin' : 'Camera transitions to image')
+                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
+                    disabled: !model.capabilities.endFrame,
+                  },
+                  {
+                    key: 'anchor' as const,
+                    label: language === 'de' ? 'Nur Anker' : 'Anchor only',
+                    hint: model.capabilities.multiRef
+                      ? (language === 'de' ? 'Nur Identitäts-Referenz, kein fester Frame' : 'Identity reference only, no forced frame')
+                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
+                    disabled: !model.capabilities.multiRef,
+                  },
+                ]).map((opt) => {
+                  const active = referencePlacement === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      disabled={opt.disabled}
+                      title={opt.hint}
+                      onClick={() => setReferencePlacement(opt.key)}
+                      className={`text-[11px] px-2 py-2 rounded-md border transition-colors text-left leading-tight ${
+                        active
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                      } ${opt.disabled ? 'opacity-40 cursor-not-allowed hover:border-border/40 hover:text-muted-foreground' : ''}`}
+                    >
+                      <div className="font-medium">{opt.label}</div>
+                      <div className="text-[10px] opacity-80 mt-0.5">{opt.hint}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
