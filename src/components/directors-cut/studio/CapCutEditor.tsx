@@ -1898,6 +1898,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Welle 6 — Ripple Delete for clips (also shifts subsequent clips on same track left).
   const handleDeleteClipWithRipple = useCallback((clipId: string, ripple: boolean) => {
+    commitHistory();
     setAudioTracks(prev => prev.map(track => {
       const target = track.clips.find(c => c.id === clipId);
       if (!target) return track;
@@ -1914,7 +1915,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       };
     }));
     setSelectedClipId(null);
-  }, []);
+  }, [commitHistory]);
 
   // Welle 6 — Pro-Editing keyboard handler (Delete/Ripple, ?, arrows, Ctrl+D, Ctrl+A, Home/End)
   useEffect(() => {
