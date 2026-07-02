@@ -85,12 +85,15 @@ const SceneSchema = z.object({
   // Time Remapping fields
   originalStartTime: z.number().optional(),
   originalEndTime: z.number().optional(),
+  mediaSourceStart: z.number().optional(),
+  mediaSourceEnd: z.number().optional(),
   playbackRate: z.number().optional(), // 1.0 = normal, <1 = slow-mo, >1 = fast
   transition: TransitionSchema.optional(),
   effects: SceneEffectsSchema.optional(),
   // Additional Media Support
   additionalMedia: AdditionalMediaSchema.optional(),
   isFromOriginalVideo: z.boolean().optional(),
+  sourceMode: z.enum(['original', 'blackscreen', 'media']).optional(),
 });
 
 // Subtitle Clip Schema
@@ -534,7 +537,7 @@ const SceneVideo: React.FC<{
 
 
   // Determine if this scene uses additional media (video or image)
-  const hasAdditionalMedia = scene.additionalMedia && scene.isFromOriginalVideo === false;
+  const hasAdditionalMedia = !!scene.additionalMedia && (scene.sourceMode === 'media' || scene.isFromOriginalVideo === false);
   const isImage = hasAdditionalMedia && scene.additionalMedia?.type === 'image';
   const mediaUrl = hasAdditionalMedia && scene.additionalMedia?.url ? scene.additionalMedia.url : sourceVideoUrl;
 
@@ -560,7 +563,7 @@ const SceneVideo: React.FC<{
         // Render video (original source or additionalMedia video)
         <Video
           src={mediaUrl}
-          startFrom={hasAdditionalMedia ? 0 : sourceStartFrame}
+          startFrom={sourceStartFrame}
           playbackRate={playbackRate}
           pauseWhenBuffering={!previewMode}
           style={{
@@ -664,8 +667,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       id: s.id,
       originalStartTime: s.originalStartTime,
       originalEndTime: s.originalEndTime,
+      mediaSourceStart: s.mediaSourceStart,
+      mediaSourceEnd: s.mediaSourceEnd,
       startTime: s.startTime,
       endTime: s.endTime,
+      playbackRate: s.playbackRate,
     })),
     (transitions || []).map(t => ({
       sceneId: (t as any).sceneId || '',
@@ -679,7 +685,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
   const renderTransitionLayer = (rt: ResolvedTransition) => {
     const outgoing = sortedScenes.find(s => s.id === rt.outgoingSceneId);
-    if (!outgoing) return null;
+    const incoming = sortedScenes.find(s => s.id === rt.incomingSceneId);
+    if (!outgoing || !incoming) return null;
 
     const from = safeFrame(rt.tStart, fps, durationInFrames - 1);
     const durationFrames = Math.max(1, Math.round(rt.duration * fps));
@@ -687,78 +694,146 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     const raw = Math.min(1, Math.max(0, localFrame / Math.max(1, durationFrames)));
     const progress = Math.pow(0.5 - 0.5 * Math.cos(raw * Math.PI), 0.7);
 
-    const holdSourceTime = Math.max(0, rt.originalBoundary - 1 / fps);
-    const holdScene = {
+    const halfDuration = rt.duration / 2;
+    const outgoingSourceEnd = outgoing.originalEndTime ?? outgoing.endTime;
+    const outgoingSourceStart = rt.placement === 'centered'
+      ? Math.max(0, outgoingSourceEnd - halfDuration)
+      : Math.max(0, rt.originalBoundary - 1 / fps);
+    const incomingSourceStart = incoming.originalStartTime ?? incoming.startTime;
+    const incomingTransitionStart = rt.placement === 'centered'
+      ? Math.max(0, incomingSourceStart - halfDuration)
+      : incomingSourceStart;
+
+    const outgoingScene = {
       ...outgoing,
       startTime: rt.tStart,
       endTime: rt.tEnd,
-      originalStartTime: holdSourceTime,
-      originalEndTime: holdSourceTime + rt.duration,
-      playbackRate: 1,
+      originalStartTime: outgoingSourceStart,
+      originalEndTime: outgoingSourceStart + rt.duration,
+      playbackRate: rt.placement === 'centered' ? (outgoing.playbackRate ?? 1) : 1,
+    };
+
+    const incomingScene = {
+      ...incoming,
+      startTime: rt.tStart,
+      endTime: rt.tEnd,
+      originalStartTime: incomingTransitionStart,
+      originalEndTime: incomingTransitionStart + rt.duration,
+      playbackRate: incoming.playbackRate ?? 1,
     };
 
     let outgoingStyle: React.CSSProperties = { opacity: 1 - progress };
+    let incomingStyle: React.CSSProperties = { opacity: progress };
     let blackOpacity = 0;
     switch (rt.baseType) {
+      case 'crossfade':
+      case 'dissolve':
+        // Professional A/B dissolve: keep the outgoing clip solid underneath
+        // and reveal the incoming clip over it. Fading both layers can create a
+        // visible black dip or make the transition read like a hard cut.
+        outgoingStyle = { opacity: 1 };
+        incomingStyle = { opacity: progress };
+        break;
       case 'fade':
         outgoingStyle = { opacity: progress < 0.5 ? 1 - progress * 2 : 0 };
+        incomingStyle = { opacity: progress < 0.5 ? 0 : (progress - 0.5) * 2 };
         blackOpacity = progress < 0.5 ? progress * 2 : (1 - progress) * 2;
         break;
       case 'wipe':
-        outgoingStyle = rt.direction === 'right'
-          ? { clipPath: `inset(0 0 0 ${progress * 100}%)` }
+        outgoingStyle = { opacity: 1 };
+        incomingStyle = rt.direction === 'right'
+          ? { clipPath: `inset(0 0 0 ${(1 - progress) * 100}%)` }
           : rt.direction === 'up'
-            ? { clipPath: `inset(0 0 ${progress * 100}% 0)` }
+            ? { clipPath: `inset(0 0 ${(1 - progress) * 100}% 0)` }
             : rt.direction === 'down'
-              ? { clipPath: `inset(${progress * 100}% 0 0 0)` }
-              : { clipPath: `inset(0 ${progress * 100}% 0 0)` };
+              ? { clipPath: `inset(${(1 - progress) * 100}% 0 0 0)` }
+              : { clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)` };
         break;
       case 'slide':
       case 'push':
-        outgoingStyle = rt.direction === 'right'
-          ? { transform: `translateX(${progress * 100}%)` }
+        incomingStyle = rt.direction === 'right'
+          ? { transform: `translateX(${-(1 - progress) * 100}%)` }
           : rt.direction === 'up'
-            ? { transform: `translateY(${-progress * 100}%)` }
+            ? { transform: `translateY(${(1 - progress) * 100}%)` }
             : rt.direction === 'down'
-              ? { transform: `translateY(${progress * 100}%)` }
-              : { transform: `translateX(${-progress * 100}%)` };
+              ? { transform: `translateY(${-(1 - progress) * 100}%)` }
+              : { transform: `translateX(${(1 - progress) * 100}%)` };
+        outgoingStyle = rt.baseType === 'push'
+          ? rt.direction === 'right'
+            ? { transform: `translateX(${progress * 100}%)` }
+            : rt.direction === 'up'
+              ? { transform: `translateY(${-progress * 100}%)` }
+              : rt.direction === 'down'
+                ? { transform: `translateY(${progress * 100}%)` }
+                : { transform: `translateX(${-progress * 100}%)` }
+          : { opacity: 1 };
         break;
       case 'blur':
         outgoingStyle = { opacity: 1 - progress, filter: `blur(${progress * 10}px)` };
+        incomingStyle = { opacity: progress, filter: `blur(${(1 - progress) * 10}px)` };
         break;
       case 'zoom':
         outgoingStyle = { opacity: 1 - progress, transform: `scale(${1 + progress * 0.12})` };
+        incomingStyle = { opacity: progress, transform: `scale(${0.88 + progress * 0.12})` };
         break;
     }
 
+    const outgoingLayer = (
+      <SceneVideo
+        sourceVideoUrl={sourceVideoUrl}
+        scene={outgoingScene}
+        sceneIndex={rt.sceneIndex}
+        totalScenes={sortedScenes.length}
+        brightness={brightness}
+        contrast={contrast}
+        saturation={saturation}
+        sharpness={sharpness}
+        temperature={temperature}
+        vignette={vignette}
+        globalFilter={filter}
+        styleTransfer={styleTransfer}
+        colorGrading={colorGrading}
+        sceneColorGrading={sceneColorGrading}
+        sceneEffects={sceneEffects}
+        transitions={[]}
+        chromaKey={chromaKey}
+        kenBurns={kenBurns}
+        sceneDurationFrames={durationFrames}
+        previewMode={false}
+      />
+    );
+
     return (
       <Sequence key={`transition-${rt.outgoingSceneId}-${rt.incomingSceneId}`} from={from} durationInFrames={durationFrames}>
+        <AbsoluteFill style={{ overflow: 'hidden', zIndex: 18, pointerEvents: 'none', ...incomingStyle }}>
+          <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+            <SceneVideo
+              sourceVideoUrl={sourceVideoUrl}
+              scene={incomingScene}
+              sceneIndex={rt.sceneIndex + 1}
+              totalScenes={sortedScenes.length}
+              brightness={brightness}
+              contrast={contrast}
+              saturation={saturation}
+              sharpness={sharpness}
+              temperature={temperature}
+              vignette={vignette}
+              globalFilter={filter}
+              styleTransfer={styleTransfer}
+              colorGrading={colorGrading}
+              sceneColorGrading={sceneColorGrading}
+              sceneEffects={sceneEffects}
+              transitions={[]}
+              chromaKey={chromaKey}
+              kenBurns={kenBurns}
+              sceneDurationFrames={durationFrames}
+              previewMode={false}
+            />
+          </div>
+        </AbsoluteFill>
         <AbsoluteFill style={{ overflow: 'hidden', zIndex: 20, pointerEvents: 'none', ...outgoingStyle }}>
           <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
-            <Freeze frame={0}>
-              <SceneVideo
-                sourceVideoUrl={sourceVideoUrl}
-                scene={holdScene}
-                sceneIndex={rt.sceneIndex}
-                totalScenes={sortedScenes.length}
-                brightness={brightness}
-                contrast={contrast}
-                saturation={saturation}
-                sharpness={sharpness}
-                temperature={temperature}
-                vignette={vignette}
-                globalFilter={filter}
-                styleTransfer={styleTransfer}
-                colorGrading={colorGrading}
-                sceneColorGrading={sceneColorGrading}
-                sceneEffects={sceneEffects}
-                transitions={[]}
-                chromaKey={chromaKey}
-                kenBurns={kenBurns}
-                sceneDurationFrames={durationFrames}
-                previewMode={false}
-              />
-            </Freeze>
+            {rt.placement === 'centered' ? outgoingLayer : <Freeze frame={0}>{outgoingLayer}</Freeze>}
           </div>
         </AbsoluteFill>
         {blackOpacity > 0 && <AbsoluteFill style={{ backgroundColor: `rgba(0,0,0,${blackOpacity})`, zIndex: 21 }} />}
@@ -935,8 +1010,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         id: s.id,
         originalStartTime: s.originalStartTime,
         originalEndTime: s.originalEndTime,
+        mediaSourceStart: s.mediaSourceStart,
+        mediaSourceEnd: s.mediaSourceEnd,
         startTime: s.startTime,
         endTime: s.endTime,
+        playbackRate: s.playbackRate,
       })),
       (transitions || []).map(t => ({
         sceneId: (t as any).sceneId || '',

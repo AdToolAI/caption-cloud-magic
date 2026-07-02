@@ -33,6 +33,9 @@ export interface SceneAnalysis {
   // Time Remapping fields
   original_start_time?: number;
   original_end_time?: number;
+  /** Full available source range for added/library clips; lets trims be widened again and enables centered transition handles. */
+  media_source_start?: number;
+  media_source_end?: number;
   playbackRate?: number; // 1.0 = normal, <1 = slow-mo, >1 = fast
   // Additional media fields for extended scenes
   isFromOriginalVideo?: boolean; // false = neu hinzugefügt

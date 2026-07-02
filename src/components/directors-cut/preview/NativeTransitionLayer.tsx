@@ -102,7 +102,10 @@ export function getTransitionStyles(info: TransitionInfo | null): {
   switch (baseType) {
     case 'crossfade':
     case 'dissolve':
-      baseStyle = { opacity: 1 - progress };
+      // NLE-style A/B dissolve: keep outgoing fully opaque underneath and
+      // reveal incoming over it. Fading both layers creates a black dip and can
+      // look like there was no real transition.
+      baseStyle = { opacity: 1 };
       incomingStyle = { opacity: progress };
       break;
 

@@ -518,7 +518,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const transitionClockLastTsRef = useRef<number>(0);
 
-  useTransitionRenderer(videoRefA, videoRefB, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef);
+  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -666,6 +666,36 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       const gapNow = performance.now();
 
+      // ===== TRANSITION BRANCH (highest priority, timeline-led) =====
+      // Professional NLEs render transitions as an A/B overlap layer that wins
+      // over ordinary clip playback. This must run before media/blackscreen
+      // branches; otherwise an added clip can short-circuit the transition and
+      // the user sees a hard cut.
+      const earlyTransitionNow = findActiveTransition(visualTimeRef.current);
+      if (earlyTransitionNow && !earlyTransitionNow.isFreeze) {
+        const delta = transitionClockLastTsRef.current > 0
+          ? (gapNow - transitionClockLastTsRef.current) / 1000
+          : 0;
+        transitionClockLastTsRef.current = gapNow;
+
+        const nextTL = Math.min(earlyTransitionNow.tEnd, visualTimeRef.current + delta);
+        visualTimeRef.current = nextTL;
+
+        const outgoingIdx = sortedScenes.findIndex(s => s.id === earlyTransitionNow.outgoingScene.id);
+        if (outgoingIdx >= 0) lastSceneIndexRef.current = outgoingIdx;
+
+        setDisplayTime(nextTL);
+        onTimeUpdateRef.current?.(nextTL);
+
+        if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+          sourceAudioRef.current.pause();
+        }
+
+        rafIdRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      transitionClockLastTsRef.current = 0;
+
       // ===== MEDIA / BLACKSCREEN SCENE BRANCH (software clock) =====
       // If the scene at the current timeline position is NOT backed by the
       // original video, advance time independently. This is what allows
@@ -699,8 +729,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const overlay = mediaVideoRef.current;
           const isVideoOverlay = mediaScene.sourceMode === 'media' &&
             mediaScene.additionalMedia?.type === 'video';
+          const mediaRate = (mediaScene as any).playbackRate ?? 1;
           const mSrcIn = (mediaScene as any).original_start_time ?? 0;
           const mSrcOut = (mediaScene as any).original_end_time ?? Infinity;
+          const expectedOverlayTime = mSrcIn + Math.max(0, tlNow - mediaScene.start_time) * mediaRate;
           if (overlay && isVideoOverlay) {
             // (Re)bind src on scene change OR when head-trim changed OR when the
             // overlay's playhead has drifted outside the new [mSrcIn, mSrcOut] window
@@ -709,22 +741,22 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             const trimChanged = Math.abs((activeMediaSrcInRef.current ?? 0) - mSrcIn) > 0.01;
             const overlayOutOfRange =
               Number.isFinite(mSrcOut) &&
-              (overlay.currentTime < mSrcIn - 0.05 || overlay.currentTime > mSrcOut + 0.05);
+              (overlay.currentTime < expectedOverlayTime - 0.35 || overlay.currentTime > mSrcOut + 0.05);
             if (activeMediaSceneIdRef.current !== mediaScene.id || trimChanged || overlayOutOfRange) {
               activeMediaSceneIdRef.current = mediaScene.id;
               activeMediaSrcInRef.current = mSrcIn;
               if (overlay.src !== mediaScene.additionalMedia!.url) {
                 overlay.src = mediaScene.additionalMedia!.url;
               }
-              try { overlay.currentTime = mSrcIn; } catch {}
-              overlay.playbackRate = (mediaScene as any).playbackRate ?? 1;
+              try { overlay.currentTime = expectedOverlayTime; } catch {}
+              overlay.playbackRate = mediaRate;
               overlay.play().catch(() => {});
             } else if (overlay.paused) {
               overlay.play().catch(() => {});
             }
             // Guard: if overlay drifted before srcIn, snap back
-            if (overlay.currentTime < mSrcIn - 0.05) {
-              try { overlay.currentTime = mSrcIn; } catch {}
+            if (Math.abs(overlay.currentTime - expectedOverlayTime) > 0.35) {
+              try { overlay.currentTime = expectedOverlayTime; } catch {}
             }
           } else {
             // Image / blackscreen — make sure overlay <video> is idle
@@ -1025,7 +1057,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           if (matchedRT) {
             const transitionSourceBoundary = matchedRT.originalBoundary + matchedRT.offsetSeconds;
             if (videoSourceTime >= transitionSourceBoundary - 0.005) {
-              const startAt = Math.max(matchedRT.tStart, visualTimeRef.current);
+              // Enter the resolver-defined transition window exactly. Using
+              // Math.max(..., visualTimeRef.current) allowed decoder jumps to
+              // skip past tStart, so the active-transition branch never became
+              // visible and the cut looked instant.
+              const startAt = matchedRT.tStart;
               visualTimeRef.current = startAt;
               timelineTime = startAt;
               transitionClockLastTsRef.current = 0;
@@ -1498,6 +1534,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     return undefined;
   }, [sortedScenes, displayTime]);
 
+  const activeVisualTransition = useMemo(
+    () => resolverFindActiveTransition(displayTime, resolvedTransitions),
+    [displayTime, resolvedTransitions],
+  );
+
   const videoFilter = useMemo(() => {
     const filters: string[] = [];
 
@@ -1659,6 +1700,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             style={{
               zIndex: 4,
               opacity:
+                !activeVisualTransition &&
                 currentScene?.sourceMode === 'media' &&
                 currentScene?.additionalMedia?.type === 'video'
                   ? 1
@@ -1673,6 +1715,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
           {/* Image Overlay (for `media` scenes that hold an image) */}
           {currentScene?.sourceMode === 'media' &&
+            !activeVisualTransition &&
             currentScene?.additionalMedia?.type === 'image' && (
               <img
                 src={currentScene.additionalMedia.url}
@@ -1684,7 +1727,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
           {/* Blackscreen Overlay */}
           {(currentScene?.sourceMode === 'blackscreen' ||
-            (!currentScene?.sourceMode && currentScene?.isBlackscreen)) && (
+            (!currentScene?.sourceMode && currentScene?.isBlackscreen)) && !activeVisualTransition && (
             <div
               className="absolute inset-0 w-full h-full"
               style={{ zIndex: 4, backgroundColor: '#000', pointerEvents: 'none' }}
