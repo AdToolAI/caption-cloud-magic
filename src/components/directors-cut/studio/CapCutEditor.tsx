@@ -26,6 +26,8 @@ import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext
 import { supabase } from '@/integrations/supabase/client';
 import { AddMediaDialog } from '../ui/AddMediaDialog';
 import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
+import { CIPreflightDialog } from './CIPreflightDialog';
+import { runCIPreflight, preflightBlocks, type PreflightFinding } from '@/lib/directors-cut/ciPreflight';
 import {
   normalizeCutAnchors,
   buildAnchorCells,
