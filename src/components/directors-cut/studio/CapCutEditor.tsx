@@ -1499,7 +1499,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     });
     onScenesUpdate(recalculated);
     toast.success(t('dc.sceneDuplicated'));
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, t, commitHistory]);
 
   // Cleanup render polling + interpolation on unmount
   useEffect(() => {
