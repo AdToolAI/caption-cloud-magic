@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 
 const MAX_HISTORY = 50;
-const DEBOUNCE_MS = 350;
+const DEBOUNCE_MS = 200;
 
 export interface EditorHistoryOptions<T> {
   /** Current state to track. */
@@ -29,7 +29,7 @@ export interface EditorHistoryApi {
   canRedo: boolean;
   undo: () => void;
   redo: () => void;
-  /** Force a snapshot immediately (bypasses debounce). */
+  /** Flush any pending debounced snapshot into the history stack synchronously. */
   commit: () => void;
   /** Wipe history — useful when loading a new project. */
   reset: () => void;
@@ -54,9 +54,26 @@ export function useEditorHistory<T>({
   const [future, setFuture] = useState<T[]>([]);
   const currentRef = useRef<T>(state);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<T | null>(null); // snapshot waiting to be flushed
   const suppressRef = useRef(false); // true while we're applying an undo/redo
 
-  // Track state changes and push debounced snapshots.
+  const flushPending = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (pendingRef.current === null) return;
+    const snap = pendingRef.current;
+    pendingRef.current = null;
+    setPast((p) => {
+      const next = [...p, snap];
+      if (next.length > MAX_HISTORY) next.shift();
+      return next;
+    });
+    setFuture([]);
+  }, []);
+
+  // Track state changes and schedule a debounced snapshot of the PREVIOUS state.
   useEffect(() => {
     if (!enabled) return;
     if (suppressRef.current) {
@@ -67,30 +84,29 @@ export function useEditorHistory<T>({
     }
     if (equals(currentRef.current, state)) return;
 
-    const previous = currentRef.current;
+    // Preserve the earliest un-flushed "previous" so rapid bursts still commit
+    // the state that existed BEFORE the burst started.
+    if (pendingRef.current === null) {
+      pendingRef.current = currentRef.current;
+    }
     currentRef.current = state;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setPast((p) => {
-        const next = [...p, previous];
-        if (next.length > MAX_HISTORY) next.shift();
-        return next;
-      });
-      setFuture([]);
+      flushPending();
     }, DEBOUNCE_MS);
+    // NOTE: no cleanup — clearing the timer on every re-render would prevent
+    // the snapshot from ever landing in `past`.
+  }, [state, enabled, equals, flushPending]);
 
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [state, enabled, equals]);
+  // Clear timer on unmount only.
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
 
   const commit = useCallback(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-  }, []);
+    flushPending();
+  }, [flushPending]);
 
   const undo = useCallback(() => {
     setPast((p) => {

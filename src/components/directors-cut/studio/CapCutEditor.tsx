@@ -565,6 +565,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     enabled: !isRendering,
   });
 
+  // Stable ref to history.commit so mutation handlers (defined below) can flush
+  // the pending debounce synchronously without adding `history` to their deps.
+  const historyCommitRef = useRef<() => void>(() => {});
+  useEffect(() => { historyCommitRef.current = history.commit; }, [history.commit]);
+  const commitHistory = useCallback(() => historyCommitRef.current(), []);
+
   // Keyboard shortcuts (Ctrl+Z/Y/Space)
   useKeyboardShortcuts({
     onPlayPause: handlePlayPause,
@@ -998,12 +1004,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
+    commitHistory();
     setAudioTracks(prev => prev.map(track => ({
       ...track,
       clips: track.clips.filter(c => c.id !== clipId)
     })));
     setSelectedClipId(null);
-  }, []);
+  }, [commitHistory]);
 
   // Resize clip handler (for trimming from both sides)
   const handleClipResize = useCallback((clipId: string, side: 'left' | 'right', newStartTime: number, newDuration: number) => {
@@ -1036,6 +1043,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Delete scene handler
   const handleSceneDelete = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const updatedScenes = scenes.filter(s => s.id !== sceneId);
     const deletedScene = scenes.find(s => s.id === sceneId);
     // Recalculate times
@@ -1052,7 +1060,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setCurrentTime(recalculatedScenes.length > 0 ? safeTime : 0);
     }
     onScenesUpdate(recalculatedScenes);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, commitHistory]);
 
   // Trim scene handler — adjust start/end without recalculating other scenes
   // Interpretiert die Sidebar-Inputs als Quellen-Range (source in/out) und
@@ -1060,6 +1068,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // tatsächlich, statt den Timeline-Block nur zu verschieben.
   const handleTrimScene = useCallback((sceneId: string, srcIn: number, srcOut: number) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const sorted = [...scenes].sort((a, b) => a.start_time - b.start_time);
     const idx = sorted.findIndex(s => s.id === sceneId);
     if (idx < 0) return;
@@ -1263,6 +1272,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       toast.error(t('dc.playheadNotInScene'));
       return;
     }
+    commitHistory();
     // Relaxed guard: ~1.5 frames @ 30fps — only block true zero-length splits.
     if (currentTime - targetScene.start_time < 0.05 || targetScene.end_time - currentTime < 0.05) {
       toast.error(t('dc.tooCloseToEdge'));
@@ -1299,13 +1309,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     // re-split works AND the preview player force-rebinds the overlay video.
     setCurrentTime(Math.min(currentTime + 0.03, targetScene.end_time - 0.02));
     toast.success(t('dc.sceneSplitAtPlayhead'));
-  }, [scenes, currentTime, onScenesUpdate, t]);
+  }, [scenes, currentTime, onScenesUpdate, t, commitHistory]);
 
   // Trim-based split (CapCut-style): splits at the currently entered trim boundaries
   // srcIn/srcOut into up to 3 real timeline segments. Falls back to playhead split
   // if trim equals full source (no real trim set).
   const handleSplitAtTrim = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const targetIdx = scenes.findIndex(s => s.id === sceneId);
     if (targetIdx < 0) return;
     const target: any = scenes[targetIdx];
@@ -1395,12 +1406,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const midStart = segments.length >= 2 ? segments[1].start_time : segments[0].start_time;
     setCurrentTime(midStart + 0.03);
     toast.success(t('dc.sceneSplitAtPlayhead'));
-  }, [scenes, onScenesUpdate, originalVideoDuration, handleSplitAtPlayhead, t]);
+  }, [scenes, onScenesUpdate, originalVideoDuration, handleSplitAtPlayhead, t, commitHistory]);
 
   // Insert new blackscreen scene AT playhead — splits the surrounding scene if inside one,
   // otherwise appends after the scene closest to (but ending at/before) currentTime.
   const handleInsertAtPlayhead = useCallback(() => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const INSERT_DURATION = 3;
     // If empty timeline, just add a first scene
     if (scenes.length === 0) {
@@ -1462,11 +1474,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     });
     onScenesUpdate(recalculated);
     toast.success('Szene am Playhead eingefügt');
-  }, [scenes, currentTime, onScenesUpdate, t]);
+  }, [scenes, currentTime, onScenesUpdate, t, commitHistory]);
 
   // Duplicate scene
   const handleDuplicateScene = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const scene = scenes.find(s => s.id === sceneId);
     if (!scene) return;
     const idx = scenes.indexOf(scene);
@@ -1486,7 +1499,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     });
     onScenesUpdate(recalculated);
     toast.success(t('dc.sceneDuplicated'));
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, t, commitHistory]);
 
   // Cleanup render polling + interpolation on unmount
   useEffect(() => {
@@ -1885,6 +1898,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Welle 6 — Ripple Delete for clips (also shifts subsequent clips on same track left).
   const handleDeleteClipWithRipple = useCallback((clipId: string, ripple: boolean) => {
+    commitHistory();
     setAudioTracks(prev => prev.map(track => {
       const target = track.clips.find(c => c.id === clipId);
       if (!target) return track;
@@ -1901,7 +1915,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       };
     }));
     setSelectedClipId(null);
-  }, []);
+  }, [commitHistory]);
 
   // Welle 6 — Pro-Editing keyboard handler (Delete/Ripple, ?, arrows, Ctrl+D, Ctrl+A, Home/End)
   useEffect(() => {
