@@ -1066,12 +1066,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
     const target = sorted[idx] as any;
     // Bei Original-Szenen ist die verfügbare Quelle das gesamte Ausgangsvideo
-    // [0, originalVideoDuration]. Bei additionalMedia bleibt die alte Range.
+    // [0, originalVideoDuration]. Bei additionalMedia die volle Media-Range —
+    // media_source_* (nie durch Trim überschrieben), sonst additionalMedia.duration
+    // als Fallback, sonst großzügig gegen aktuelles Trim-Fenster.
     const isAdditional = !!target.additionalMedia;
+    const mediaClipDur = typeof target.additionalMedia?.duration === 'number' ? target.additionalMedia.duration : undefined;
     const hardMax = isAdditional
-      ? (target.original_end_time ?? target.end_time)
+      ? (target.media_source_end ?? mediaClipDur ?? Math.max(target.original_end_time ?? 0, target.end_time - target.start_time))
       : (originalVideoDuration && originalVideoDuration > 0 ? originalVideoDuration : (target.original_end_time ?? target.end_time));
-    const hardMin = isAdditional ? (target.original_start_time ?? target.start_time) : 0;
+    const hardMin = isAdditional ? (target.media_source_start ?? 0) : 0;
 
     const newSrcIn = Math.max(hardMin, Math.min(srcIn, srcOut - 0.1));
     const newSrcOut = Math.min(hardMax, Math.max(srcOut, newSrcIn + 0.1));
@@ -1236,7 +1239,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         url: videoUrl,
         duration: duration,
       },
-    };
+      // Trim domain — full media source. Never overwritten by trim.
+      media_source_start: 0,
+      media_source_end: duration,
+      // Initial trim window = full duration (or fit length if fit truncates).
+      original_start_time: 0,
+      original_end_time: Math.min(duration, fit.end_time - fit.start_time),
+    } as any;
     onScenesUpdate([...scenes, newScene]);
     if (fit.snapped) {
       toast.success(t('dc.snappedToCut', { time: formatSnapTime(fit.start_time) }));
@@ -1270,14 +1279,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       return [
         {
           ...sc,
-          id: sc.id,
+          id: `scene-${now}-a`,
           end_time: currentTime,
           original_start_time: srcInBase,
           original_end_time: srcSplit,
         },
         {
           ...sc,
-          id: `scene-${now}`,
+          id: `scene-${now}-b`,
           start_time: currentTime,
           original_start_time: srcSplit,
           original_end_time: srcOutBase,
@@ -1286,6 +1295,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       ];
     });
     onScenesUpdate(newScenes);
+    // Nudge the playhead 1 frame into the new second segment so an immediate
+    // re-split works AND the preview player force-rebinds the overlay video.
+    setCurrentTime(Math.min(currentTime + 0.03, targetScene.end_time - 0.02));
     toast.success(t('dc.sceneSplitAtPlayhead'));
   }, [scenes, currentTime, onScenesUpdate, t]);
 
@@ -1299,11 +1311,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const target: any = scenes[targetIdx];
 
     const isAdditional = !!target.additionalMedia;
+    const mediaClipDur = typeof target.additionalMedia?.duration === 'number' ? target.additionalMedia.duration : undefined;
     const hardMin = isAdditional
-      ? (target.original_start_time ?? target.start_time)
+      ? (target.media_source_start ?? 0)
       : 0;
     const hardMax = isAdditional
-      ? (target.original_end_time ?? target.end_time)
+      ? (target.media_source_end ?? mediaClipDur ?? (target.original_end_time ?? target.end_time))
       : (originalVideoDuration && originalVideoDuration > 0
           ? originalVideoDuration
           : (target.original_end_time ?? target.end_time));
@@ -1378,6 +1391,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }));
 
     onScenesUpdate([...before, ...segments, ...after]);
+    // Nudge playhead to the middle segment so preview rebinds cleanly.
+    const midStart = segments.length >= 2 ? segments[1].start_time : segments[0].start_time;
+    setCurrentTime(midStart + 0.03);
     toast.success(t('dc.sceneSplitAtPlayhead'));
   }, [scenes, onScenesUpdate, originalVideoDuration, handleSplitAtPlayhead, t]);
 

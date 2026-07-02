@@ -13,6 +13,8 @@ interface SceneLike {
   description?: string;
   original_start_time?: number;
   original_end_time?: number;
+  media_source_start?: number;
+  media_source_end?: number;
   additionalMedia?: any;
 }
 
@@ -44,9 +46,17 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
   onDelete,
 }) => {
   const isAdditional = !!scene.additionalMedia;
-  const hardMin = isAdditional ? (scene.original_start_time ?? scene.start_time) : 0;
+  // Use the FULL media source range (media_source_*), not the current trim window,
+  // so the user can always widen the trim back out again.
+  const mediaClipDur =
+    (scene.additionalMedia && typeof scene.additionalMedia.duration === 'number')
+      ? scene.additionalMedia.duration
+      : undefined;
+  const hardMin = isAdditional
+    ? (scene.media_source_start ?? 0)
+    : 0;
   const hardMax = isAdditional
-    ? (scene.original_end_time ?? scene.end_time)
+    ? (scene.media_source_end ?? mediaClipDur ?? (scene.original_end_time ?? scene.end_time))
     : (sourceDuration && sourceDuration > 0 ? sourceDuration : (scene.original_end_time ?? scene.end_time));
 
   const srcIn = scene.original_start_time ?? scene.start_time;

@@ -700,9 +700,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const mSrcIn = (mediaScene as any).original_start_time ?? 0;
           const mSrcOut = (mediaScene as any).original_end_time ?? Infinity;
           if (overlay && isVideoOverlay) {
-            // (Re)bind src on scene change OR when head-trim changed
+            // (Re)bind src on scene change OR when head-trim changed OR when the
+            // overlay's playhead has drifted outside the new [mSrcIn, mSrcOut] window
+            // (typical right after a split that keeps the same scene id + same mSrcIn
+            // but shrinks mSrcOut).
             const trimChanged = Math.abs((activeMediaSrcInRef.current ?? 0) - mSrcIn) > 0.01;
-            if (activeMediaSceneIdRef.current !== mediaScene.id || trimChanged) {
+            const overlayOutOfRange =
+              Number.isFinite(mSrcOut) &&
+              (overlay.currentTime < mSrcIn - 0.05 || overlay.currentTime > mSrcOut + 0.05);
+            if (activeMediaSceneIdRef.current !== mediaScene.id || trimChanged || overlayOutOfRange) {
               activeMediaSceneIdRef.current = mediaScene.id;
               activeMediaSrcInRef.current = mSrcIn;
               if (overlay.src !== mediaScene.additionalMedia!.url) {
@@ -714,7 +720,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             } else if (overlay.paused) {
               overlay.play().catch(() => {});
             }
-            // Guard: if overlay drifted before srcIn or past srcOut, snap back
+            // Guard: if overlay drifted before srcIn, snap back
             if (overlay.currentTime < mSrcIn - 0.05) {
               try { overlay.currentTime = mSrcIn; } catch {}
             }
