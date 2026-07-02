@@ -240,6 +240,28 @@ export const DirectorsCutVideoSchema = z.object({
   voiceoverVolume: z.number().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
+  // Full timeline audio (SFX + extra clips beyond the singletons above).
+  // Each clip is rendered as its own <Audio> at its timeline startTime,
+  // trimmed by [trimStart, trimEnd], scaled by track volume × clip volume.
+  audioTracks: z.array(z.object({
+    id: z.string(),
+    type: z.enum(['voiceover', 'background-music', 'sound-effect', 'original']).optional(),
+    volume: z.number().optional(),
+    muted: z.boolean().optional(),
+    solo: z.boolean().optional(),
+    clips: z.array(z.object({
+      id: z.string(),
+      url: z.string(),
+      startTime: z.number(),
+      duration: z.number(),
+      trimStart: z.number().optional(),
+      trimEnd: z.number().optional(),
+      volume: z.number().optional(),
+      fadeIn: z.number().optional(),
+      fadeOut: z.number().optional(),
+      source: z.string().optional(),
+    })).optional(),
+  })).optional(),
   // Sound Design
   soundDesign: z.object({
     enabled: z.boolean(),
