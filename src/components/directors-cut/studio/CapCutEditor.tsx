@@ -15,7 +15,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useEditorHistory } from '@/hooks/useEditorHistory';
 import { ShortcutOverlay } from './ShortcutOverlay';
 import { AutosaveBadge } from './AutosaveBadge';
-import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard } from 'lucide-react';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard, Anchor } from 'lucide-react';
 import { PanelDivider } from './PanelDivider';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -28,6 +28,8 @@ import { AddMediaDialog } from '../ui/AddMediaDialog';
 import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
 import { CIPreflightDialog } from './CIPreflightDialog';
 import { runCIPreflight, preflightBlocks, type PreflightFinding } from '@/lib/directors-cut/ciPreflight';
+import { AnchorRefreshDialog } from './AnchorRefreshDialog';
+import { analyzeAnchorDrift } from '@/lib/directors-cut/anchorRefresh';
 import {
   normalizeCutAnchors,
   buildAnchorCells,
@@ -1736,6 +1738,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [preflightOpen, setPreflightOpen] = useState(false);
   const [preflightFindings, setPreflightFindings] = useState<PreflightFinding[]>([]);
 
+  // W4.3 Anchor-Refresh — cross-scene identity anchor drift detection
+  const [anchorRefreshOpen, setAnchorRefreshOpen] = useState(false);
+  const anchorDriftCount = useMemo(
+    () => analyzeAnchorDrift(scenes).filter((d) => d.severity !== 'ok').length,
+    [scenes],
+  );
+
+
   const handleExportVideo = useCallback(async () => {
     const findings = runCIPreflight({
       projectId,
@@ -2183,6 +2193,27 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             Ripple
           </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'relative h-7 w-7 p-0 hover:bg-white/10',
+              anchorDriftCount > 0 ? 'text-amber-300 hover:text-amber-200' : 'text-white/60 hover:text-white',
+            )}
+            onClick={() => setAnchorRefreshOpen(true)}
+            title={
+              anchorDriftCount > 0
+                ? `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`
+                : 'Anchor-Refresh — Character Consistency prüfen'
+            }
+          >
+            <Anchor className="h-3.5 w-3.5" />
+            {anchorDriftCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-3.5 min-w-3.5 rounded-full bg-amber-400 text-[9px] font-bold text-black flex items-center justify-center px-1">
+                {anchorDriftCount}
+              </span>
+            )}
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -2662,6 +2693,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           void runExportInternal();
         }}
         onFixIssues={() => setPreflightOpen(false)}
+      />
+      <AnchorRefreshDialog
+        open={anchorRefreshOpen}
+        onOpenChange={setAnchorRefreshOpen}
+        scenes={scenes}
+        onScenesUpdate={(next) => {
+          commitHistory();
+          onScenesUpdate?.(next);
+          toast.success('Anchor-Refresh angewendet — Identity-Frames wiederhergestellt.');
+        }}
       />
     </div>
   );
