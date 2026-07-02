@@ -12,6 +12,7 @@ import { MissionFeatures } from "@/components/landing/MissionFeatures";
 import { FeatureGrid } from "@/components/landing/FeatureGrid";
 import { AIArsenalShowcase } from "@/components/landing/AIArsenalShowcase";
 import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
+import { UDCShowcase } from "@/components/landing/UDCShowcase";
 import { TestimonialSpotlight } from "@/components/landing/TestimonialSpotlight";
 
 import { TrialPromiseStrip } from "@/components/landing/TrialPromiseStrip";
