@@ -216,6 +216,16 @@ export function useTransitionRenderer(
 
         seekStandby(rt.incomingSceneId, scenes, incomingTransitionStart);
 
+        // Pre-arm media overlay for incoming media-video scene so the media
+        // branch has zero rebind cost right after handoff. We seek it to the
+        // frame that matches where the timeline will be when handoff runs
+        // (incomingSourceStart + duration * incomingRate).
+        if (incomingScene && incomingScene.sourceMode === 'media' && incomingScene.additionalMedia?.type === 'video') {
+          const incomingRate = (incomingScene as any).playbackRate ?? 1;
+          const overlayHandoffTime = getSceneSourceStart(incomingScene) + rt.duration * incomingRate;
+          preArmMediaOverlay(incomingScene, overlayHandoffTime);
+        }
+
         if (rt.placement === 'centered' && outgoingScene) {
           const outgoingSrc = getSceneSourceUrl(outgoingScene);
           if (outgoingSrc && active.getAttribute('src') !== outgoingSrc && active.currentSrc !== outgoingSrc) {
