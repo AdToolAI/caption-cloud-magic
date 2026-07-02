@@ -39,6 +39,7 @@ export function useTransitionRenderer(
   activeSlotRef?: React.MutableRefObject<'A' | 'B'>,
   resetTransitionStateRef?: React.MutableRefObject<(() => void) | null>,
   isPlayingRef?: React.MutableRefObject<boolean>,
+  mediaOverlayRef?: React.RefObject<HTMLVideoElement | null>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
