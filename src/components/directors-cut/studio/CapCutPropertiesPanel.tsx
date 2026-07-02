@@ -529,6 +529,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
             onTrim={onTrimScene}
             onSplitAtPlayhead={onSplitAtPlayhead}
             onSplitAtTrim={onSplitAtTrim}
+            onSeek={onSeek}
             onDelete={onSceneDelete}
           />
         ) : (
