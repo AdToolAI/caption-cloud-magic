@@ -1689,7 +1689,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             muted
             playsInline
             preload="auto"
-            onEnded={handleVideoEnded}
+            onEnded={(e) => { if (e.currentTarget === getActiveVideo()) handleVideoEnded(); }}
             onLoadedMetadata={(e) => {
               // Re-apply the trim-aware source time as soon as metadata is ready,
               // otherwise the browser paints frame 0 for a beat before our seek lands.
