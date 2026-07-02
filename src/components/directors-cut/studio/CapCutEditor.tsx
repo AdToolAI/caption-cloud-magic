@@ -2101,6 +2101,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C76A] to-[#FFE4A0] font-semibold text-sm drop-shadow-[0_0_8px_rgba(245,199,106,0.2)]">Director's Cut Studio</span>
+          <AutosaveBadge status={autosaveStatus} lastSavedAt={autosaveLastSavedAt} />
         </div>
         <div className="flex items-center gap-1.5">
           <Button
