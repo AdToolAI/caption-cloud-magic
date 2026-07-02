@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle, AlertTriangle, Info, CheckCircle2, ShieldCheck } from 'lucide-react';
 import type { PreflightFinding } from '@/lib/directors-cut/ciPreflight';
+import { trackUDC } from '@/lib/analytics';
 
 interface CIPreflightDialogProps {
   open: boolean;
@@ -28,6 +30,22 @@ export function CIPreflightDialog({
 }: CIPreflightDialogProps) {
   const hasBlockers = findings.some((f) => f.severity === 'fail');
   const allClean = findings.length === 0;
+
+  useEffect(() => {
+    if (!open) return;
+    trackUDC('udc_preflight_opened', {
+      total: findings.length,
+      fail: findings.filter((f) => f.severity === 'fail').length,
+      warn: findings.filter((f) => f.severity === 'warn').length,
+      info: findings.filter((f) => f.severity === 'info').length,
+    });
+    if (hasBlockers) {
+      trackUDC('udc_preflight_blocked_export', {
+        fail_ids: findings.filter((f) => f.severity === 'fail').map((f) => f.id),
+      });
+    }
+  }, [open, findings, hasBlockers]);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,7 +108,15 @@ export function CIPreflightDialog({
                 Zuerst beheben
               </Button>
               <Button
-                onClick={onIgnoreAndRender}
+                onClick={() => {
+                  if (!hasBlockers && findings.length > 0) {
+                    trackUDC('udc_preflight_bypassed', {
+                      warn: findings.filter((f) => f.severity === 'warn').length,
+                      info: findings.filter((f) => f.severity === 'info').length,
+                    });
+                  }
+                  onIgnoreAndRender();
+                }}
                 disabled={hasBlockers}
                 variant={hasBlockers ? 'secondary' : 'default'}
               >

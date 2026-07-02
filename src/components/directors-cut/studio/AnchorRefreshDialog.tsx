@@ -22,6 +22,7 @@ import {
   type AnchorDrift,
 } from '@/lib/directors-cut/anchorRefresh';
 import { extractVideoFrame } from '@/lib/directors-cut/videoFrameExtractor';
+import { trackUDC } from '@/lib/analytics';
 
 interface Props {
   open: boolean;
@@ -101,13 +102,25 @@ export function AnchorRefreshDialog({
     if (!open) setFrames({});
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    trackUDC('udc_anchor_refresh_opened', {
+      total_scenes: scenes.length,
+      drift_count: drifts.filter((d) => d.severity !== 'ok').length,
+      threshold,
+    });
+  }, [open, scenes.length, drifts, threshold]);
+
   const handleSnapOne = (sceneId: string) => {
     const next = scenes.map((s) => (s.id === sceneId ? snapSceneToAnchor(s) : s));
     onScenesUpdate(next);
+    trackUDC('udc_anchor_snap_applied', { mode: 'single', scene_id: sceneId });
   };
 
   const handleSnapAll = () => {
+    const affected = drifts.filter((d) => d.severity !== 'ok').length;
     onScenesUpdate(snapAllToAnchor(scenes, true, { driftThreshold: threshold }));
+    trackUDC('udc_anchor_snap_applied', { mode: 'all', affected, threshold });
   };
 
   return (

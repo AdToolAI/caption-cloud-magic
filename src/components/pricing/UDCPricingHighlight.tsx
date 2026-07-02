@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Mic, RefreshCw, Scissors, ArrowRight, Sparkles } from "lucide-react";
+import { trackUDC } from "@/lib/analytics";
 
 /**
  * UDC-specific pricing positioning card.
@@ -69,6 +70,7 @@ export const UDCPricingHighlight = () => {
             <div className="flex flex-wrap gap-3">
               <Link
                 to="/directors-cut"
+                onClick={() => trackUDC('udc_pricing_cta_clicked', { target: 'directors-cut' })}
                 className="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-gradient-to-r from-primary to-gold-dark text-primary-foreground font-semibold text-sm shadow-[var(--shadow-glow-gold)] hover:scale-[1.02] active:scale-[0.98] transition-transform"
               >
                 Open Directors Cut

@@ -19,6 +19,7 @@ import { CompetitorComparisonCard } from "@/components/landing/CompetitorCompari
 import { AI_VIDEO_CREDIT_PACKS } from "@/config/aiVideoCredits";
 import { FoundersSlotBadge } from "@/components/pricing/FoundersSlotBadge";
 import { UDCPricingHighlight } from "@/components/pricing/UDCPricingHighlight";
+import { UDCComparisonTable } from "@/components/pricing/UDCComparisonTable";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { useEffect } from "react";
 
@@ -351,6 +352,7 @@ const Pricing = () => {
 
           {/* UDC-specific positioning — the "Consistency-First" moat */}
           <UDCPricingHighlight />
+          <UDCComparisonTable />
 
           {/* Top-up Packs Section */}
           <section id="topups" className="scroll-mt-24">

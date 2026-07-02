@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { trackUDC } from '@/lib/analytics';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,11 @@ export function AutoCutDownDialog({
     () => scenes.reduce((acc, s) => acc + Math.max(0, s.end_time - s.start_time), 0),
     [scenes],
   );
+
+  useEffect(() => {
+    if (open) trackUDC('udc_autocut_opened', { current_total: currentTotal, target });
+  }, [open, currentTotal, target]);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -149,6 +155,11 @@ export function AutoCutDownDialog({
           <Button
             disabled={plan.scenes.length === 0}
             onClick={() => {
+              trackUDC('udc_autocut_generated', {
+                target,
+                scene_count: plan.scenes.length,
+                estimated_duration: plan.target,
+              });
               onApply(plan.scenes, target);
               onOpenChange(false);
             }}
