@@ -148,6 +148,15 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       toast.success(`Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`);
     }
   };
+
+  const handleGenerate = async () => {
+    if (!settings.scriptText.trim()) {
+      toast.error('Bitte gib einen Text für das Voice-Over ein');
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const selectedVoice = voices.find((v) => v.id === settings.voiceId);
       const { data, error } = await supabase.functions.invoke('director-cut-voice-over', {
         body: {
           script_text: settings.scriptText,
