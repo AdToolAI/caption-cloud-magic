@@ -48,6 +48,13 @@ const TRANSITION_TYPES: { id: TransitionId; name: string }[] = [
   { id: 'push', name: 'Push' },
 ];
 
+const DEFAULT_TRANSITION_DURATION = 1.2;
+const MIN_TRANSITION_DURATION = 0.2;
+const MAX_TRANSITION_DURATION = 3.0;
+
+const clampDuration = (v: number) =>
+  Math.min(MAX_TRANSITION_DURATION, Math.max(MIN_TRANSITION_DURATION, Math.round(v * 10) / 10));
+
 const TransitionBlock: React.FC<{
   t: (key: string, params?: Record<string, string | number>) => any;
   sceneId: string;
@@ -56,6 +63,19 @@ const TransitionBlock: React.FC<{
 }> = ({ t, sceneId, transition, onTransitionChange }) => {
   const [expanded, setExpanded] = useState(false);
   const hasTransition = transition && transition.transitionType !== 'none';
+  const activeDuration = hasTransition ? transition!.duration : DEFAULT_TRANSITION_DURATION;
+  const [durationInput, setDurationInput] = useState<string>(activeDuration.toFixed(1));
+
+  // Keep input in sync when parent state changes
+  React.useEffect(() => {
+    setDurationInput(activeDuration.toFixed(1));
+  }, [activeDuration]);
+
+  const applyDuration = (next: number) => {
+    if (!hasTransition) return;
+    const clamped = clampDuration(next);
+    onTransitionChange(sceneId, transition!.transitionType, clamped);
+  };
 
   return (
     <div className="my-1 mx-2">
@@ -83,7 +103,7 @@ const TransitionBlock: React.FC<{
           )}
         </button>
       ) : (
-        <div className="rounded-xl border border-cyan-500/20 bg-[#0a0a1a]/80 p-2.5 space-y-2.5 backdrop-blur-sm">
+        <div className="rounded-xl border border-cyan-500/20 bg-[#0a0a1a]/80 p-2.5 space-y-2.5 backdrop-blur-sm min-w-0">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-cyan-300 font-medium uppercase tracking-wider flex items-center gap-1">
               <ArrowRightLeft className="h-3 w-3" />
@@ -113,7 +133,10 @@ const TransitionBlock: React.FC<{
                     if (tr.id === 'none') {
                       onTransitionChange(sceneId, null);
                     } else {
-                      onTransitionChange(sceneId, tr.id, transition?.duration ?? 1.2);
+                      // Normalize: if existing duration is absurdly small (<0.3s), reset to default.
+                      const existing = transition?.duration ?? 0;
+                      const nextDur = existing >= 0.3 ? existing : DEFAULT_TRANSITION_DURATION;
+                      onTransitionChange(sceneId, tr.id, clampDuration(nextDur));
                     }
                   }}
                 />
@@ -121,24 +144,78 @@ const TransitionBlock: React.FC<{
             })}
           </div>
 
-          {/* Duration slider — only when a transition is active */}
+          {/* Duration controls — only when a transition is active */}
           {hasTransition && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[9px] text-white/40">{t('dc.duration')}</span>
-                <span className="text-[9px] text-cyan-300 font-mono">{transition!.duration.toFixed(1)}s</span>
+                <span className="text-[9px] text-white/40 uppercase tracking-wider">{t('dc.duration')}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => applyDuration(activeDuration - 0.1)}
+                    disabled={activeDuration <= MIN_TRANSITION_DURATION}
+                    className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-sm leading-none flex items-center justify-center"
+                    aria-label="Kürzer"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min={MIN_TRANSITION_DURATION}
+                    max={MAX_TRANSITION_DURATION}
+                    step={0.1}
+                    value={durationInput}
+                    onChange={(e) => setDurationInput(e.target.value)}
+                    onBlur={() => {
+                      const parsed = parseFloat(durationInput);
+                      if (Number.isFinite(parsed)) applyDuration(parsed);
+                      else setDurationInput(activeDuration.toFixed(1));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const parsed = parseFloat(durationInput);
+                        if (Number.isFinite(parsed)) applyDuration(parsed);
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    className="w-14 h-6 px-1.5 text-center text-[11px] font-mono bg-black/40 border border-cyan-500/20 rounded text-cyan-200 focus:border-cyan-400 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-white/40">s</span>
+                  <button
+                    onClick={() => applyDuration(activeDuration + 0.1)}
+                    disabled={activeDuration >= MAX_TRANSITION_DURATION}
+                    className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-sm leading-none flex items-center justify-center"
+                    aria-label="Länger"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
               <Slider
-                value={[transition!.duration * 10]}
-                min={1}
-                max={30}
+                value={[Math.round(activeDuration * 10)]}
+                min={Math.round(MIN_TRANSITION_DURATION * 10)}
+                max={Math.round(MAX_TRANSITION_DURATION * 10)}
                 step={1}
-                onValueChange={([v]) => onTransitionChange(sceneId, transition!.transitionType, v / 10)}
+                onValueChange={([v]) => applyDuration(v / 10)}
                 className="w-full"
               />
-              <div className="flex justify-between text-[8px] text-white/20">
-                <span>0.1s</span>
-                <span>3.0s</span>
+              <div className="flex justify-between text-[8px] text-white/30">
+                <span>{MIN_TRANSITION_DURATION.toFixed(1)}s</span>
+                <span>{((MIN_TRANSITION_DURATION + MAX_TRANSITION_DURATION) / 2).toFixed(1)}s</span>
+                <span>{MAX_TRANSITION_DURATION.toFixed(1)}s</span>
+              </div>
+
+              {/* Visual transition window preview */}
+              <div className="pt-1">
+                <div className="text-[8px] text-white/30 mb-1 uppercase tracking-wider">Übergangsfenster</div>
+                <div className="relative h-4 rounded overflow-hidden bg-black/40 border border-white/5">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-fuchsia-500/40 to-cyan-500/40"
+                    style={{ width: `${(activeDuration / MAX_TRANSITION_DURATION) * 100}%` }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-white/90">
+                    −{(activeDuration / 2).toFixed(2)}s | Cut | +{(activeDuration / 2).toFixed(2)}s
+                  </div>
+                </div>
               </div>
             </div>
           )}

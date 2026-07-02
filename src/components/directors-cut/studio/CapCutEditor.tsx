@@ -222,7 +222,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 384;
     const v = parseInt(window.localStorage.getItem('dc:sidebar-w') || '', 10);
-    return Number.isFinite(v) && v >= 260 && v <= 560 ? v : 384;
+    return Number.isFinite(v) && v >= 320 && v <= 560 ? v : 400;
   });
   const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 288;
@@ -2363,7 +2363,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
           {/* Welle 5 — Library ↔ Preview Divider */}
           {!sidebarCollapsed && (
-            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={280} max={560} />
+            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={320} max={560} />
           )}
 
           {/* Welle 5 — Preview + Timeline Panel */}
