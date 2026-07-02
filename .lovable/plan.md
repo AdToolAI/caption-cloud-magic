@@ -1,64 +1,63 @@
-# UDC Publish & Conversion — Plan
+## Wo wir stehen
 
-UDC ist funktional fertig, eingefroren und marketing-mäßig auf `/` (UDCShowcase) und `/pricing` (UDCPricingHighlight) positioniert. Jetzt geht es darum, den Moat sichtbar zu machen und Kaufabsicht zu messen — ohne UDC-Code anzufassen.
+UDC ist eingefroren, Analytics-Events + UDC-Vergleichstabelle sind gebaut. Vor dem Publish blockiert aktuell **ein kritischer Security-Fund**, der zwingend zuerst gefixt werden muss.
 
-## Was gebaut wurde (Kurz-Recap)
+## Empfohlene Reihenfolge
 
-**Editor-Kern (Waves 1–5):** Multi-Track-Export, Audio-Ducking, saubere Trim/Split-Domäne, Undo/Redo-History, Übergänge (A/B-Mix, absolute Timeline), Preview-Player mit External Mixer, Waveform-Cache, Autosave-Indikator, Snap-Feedback, Action-Log-Toasts.
+### 1. 🚨 Security-Hotfix (blockt Publish)
+- **`user_roles` Privilege-Escalation** (error-Level): Drei RLS-Policies (Admin INSERT/UPDATE/DELETE) benutzen den globalen `has_role(uid, role)`-Overload → jeder Workspace-Admin kann sich Plattform-weit zum Admin machen.
+- Fix: Policies auf `has_role(auth.uid(), workspace_id, 'admin')` umstellen (workspace-scoped Overload, wie schon bei der Create-Policy).
+- Zusätzlich (warn, empfohlen im gleichen Zug): `bug-screenshots` Bucket-SELECT auf `(storage.foldername(name))[1] = auth.uid()::text` einschränken.
 
-**Moat-Features (W4.1–W4.7):**
-- Voice-Lock (Projekt-persistente Stimme)
-- CI-Preflight (14 Regeln, jetzt final)
-- Anchor-Refresh mit Side-by-Side Frame-Vergleich + Drift-Slider
-- Auto Cut-Down (15s / 6s Varianten)
-- Master-Snapshot & Restore
-- Preflight-Erweiterung: Aspect-Konsistenz, Endcard-Länge, Loudness-Proxy, Missing-Thumbnails, Blackscreen-Runs, Social-Length-Guard
+### 2. Publish
+Nach dem Fix `preview_ui--publish` → Analytics + Vergleichstabelle + Preflight gehen live.
 
-**Positionierung:** `UDCShowcase` auf Landing, `UDCPricingHighlight` auf Pricing, `UDCWelcomeDialog` beim ersten Editor-Besuch, offizieller Feature-Freeze in `.lovable/UDC-FEATURE-FREEZE.md`.
+### 3. Conversion-Sprint (nach Publish)
+- **PostHog-Dashboard verdrahten**: Funnel „udc_showcase_cta_clicked → udc_pricing_cta_clicked → checkout_started → subscription_activated", plus Moat-Feature-Adoption (Preflight/Anchor/AutoCut).
+- **Landing-Proof**: Ein einziges 15s-UDC-Demo-Video (Voice-Lock → Anchor-Refresh → Preflight-OK → Export) in `UDCShowcase` einbetten statt der statischen Feature-Karten. Asset erstellst du im Motion Studio, ich verdrahte den Player.
+- **SEO-Feinschliff**: `<title>`/`meta description`/OG-Tags für `/pricing` und `/directors-cut` auf „Consistency-First AI Video Editor" ausrichten + JSON-LD `SoftwareApplication` mit den 5 Moat-Features.
+- **Trial-CTA im Preflight-Dialog**: Wenn Free-User Preflight öffnet und ≥1 error hat → sanfter Upgrade-Hint („Auto-Fix ist Pro"). Nutzt bestehendes Smart-Upgrade-Modal.
 
-## Nächste Schritte (Conversion-Fokus)
+### 4. Optionaler nächster Moat-Baustein (nach Conversion-Signalen)
+Erst wenn Analytics zeigt, *welche* Moat-Features Nutzer tatsächlich klicken, entscheiden wir, welches Feature den Freeze verlässt (z.B. Voice-Lock als eigene Route, oder Preflight-Auto-Fix).
 
-### 1. Analytics-Events auf die Moat-Features
-Ohne Daten wissen wir nicht, ob der Moat konvertiert. Wire minimale Tracking-Calls (bestehende Analytics-Utility, keine neue Infra) an:
-- `udc_voice_lock_set` / `udc_voice_lock_mismatch_shown`
-- `udc_anchor_refresh_opened` / `udc_anchor_snap_applied`
-- `udc_preflight_opened` / `udc_preflight_blocked_export` / `udc_preflight_bypassed`
-- `udc_autocut_generated` (mit Länge)
-- `udc_master_restored`
-- `udc_export_completed` (mit Dauer & Trigger-Quelle: Landing/Pricing/Direct)
+## Technische Details (Punkt 1)
 
-### 2. Onboarding-Tour für UDC (3 Steps)
-Nur beim ersten Editor-Besuch, nach dem WelcomeDialog. Zeigt in-place:
-1. Voice-Lock-Button (im VO-Tab)
-2. CI-Preflight-Button (in der Export-Bar)
-3. Anchor-Refresh-Button (in der Timeline-Toolbar)
-Persistiert in `localStorage` (`udc-tour-completed:v1`). Kein neuer UDC-Code — nur Overlay-Layer über bestehende Buttons.
+```sql
+-- user_roles: Admin-Policies auf workspace-scoped Overload umstellen
+DROP POLICY "Admins can insert roles" ON public.user_roles;
+DROP POLICY "Admins can update roles" ON public.user_roles;
+DROP POLICY "Admins can delete roles" ON public.user_roles;
 
-### 3. Landing-Video-Slot in UDCShowcase
-Aktuell nur Textkarten. Füge einen 15s Auto-Play-Loop (`muted`, `playsInline`) über den 4 Pillars ein — Platzhalter-URL, wir zeichnen später ein Sample-Render von UDC selbst auf. Sofort-Effekt: „Show, don't tell" für den Moat.
+CREATE POLICY "Admins can insert roles" ON public.user_roles
+  FOR INSERT TO authenticated
+  WITH CHECK (public.has_role(auth.uid(), workspace_id, 'admin'::app_role));
 
-### 4. Pricing-Vergleichstabelle „UDC vs CapCut vs Descript"
-Neuer Abschnitt unter `UDCPricingHighlight` mit einer knappen 4-Zeilen-Tabelle:
-- Voice-Lock: UDC ✓ / CapCut ✗ / Descript ✗
-- Character-Anchor: UDC ✓ / CapCut ✗ / Descript ✗
-- CI-Preflight: UDC ✓ / CapCut ✗ / Descript teilweise
-- Auto Cut-Down: UDC ✓ / CapCut manuell / Descript ✗
-Erhöht wahrgenommenen Wert direkt vor dem Checkout.
+CREATE POLICY "Admins can update roles" ON public.user_roles
+  FOR UPDATE TO authenticated
+  USING (public.has_role(auth.uid(), workspace_id, 'admin'::app_role))
+  WITH CHECK (public.has_role(auth.uid(), workspace_id, 'admin'::app_role));
 
-### 5. SEO-Sweep für die neuen UDC-Seiten
-Nach den obigen Änderungen: `list_findings` → fixen → `trigger_scan`. Ziel: `/` und `/pricing` haben saubere Titel/Descriptions/Canonicals mit UDC-Keywords („Consistency-First AI Video Editor").
+CREATE POLICY "Admins can delete roles" ON public.user_roles
+  FOR DELETE TO authenticated
+  USING (public.has_role(auth.uid(), workspace_id, 'admin'::app_role));
 
-### 6. Publish
-Nach 1–5: Security-Scan → `preview_ui--publish`. Danach QA-Runde auf der Live-Domain (`useadtool.ai`), Meta-Preview-Refresh triggern.
+-- bug-screenshots: Owner-Ordner erzwingen
+DROP POLICY IF EXISTS "<current select policy>" ON storage.objects;
+CREATE POLICY "bug_screenshots_owner_read" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'bug-screenshots'
+         AND (storage.foldername(name))[1] = auth.uid()::text);
+CREATE POLICY "bug_screenshots_admin_read" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'bug-screenshots'
+         AND public.has_role(auth.uid(), 'admin'::app_role));
+```
 
-## Technisches
+Supply-Chain-Warnings (`@huggingface/transformers`, `posthog-js`, `vitest`) sind `warn`-Level, blocken Publish nicht — separater Housekeeping-Sprint.
 
-- **Kein Eingriff in `src/components/directors-cut/**` oder `src/lib/directors-cut/**`** — Freeze bleibt.
-- Analytics: bestehendes Utility (z. B. `src/lib/analytics.ts`, falls vorhanden — sonst dünner Wrapper um `posthog`/`plausible`, was das Projekt bereits nutzt) prüfen und wiederverwenden.
-- Tour: neuer `UDCOnboardingTour.tsx` in `src/components/directors-cut/onboarding/` — Ausnahme vom Freeze, weil rein additiv & kein Editor-Verhalten (bitte explizit bestätigen, sonst als Wrapper außerhalb `directors-cut/`).
-- Vergleichstabelle & Video-Slot: rein in `UDCShowcase.tsx` / neue `UDCComparisonTable.tsx` unter `src/components/pricing/`.
-- SEO: `react-helmet-async` ist bereits Standard-Pattern im Repo — falls nicht, ergänzen wir Provider einmalig.
-
-## Reihenfolge & Umfang
-
-Empfehlung: **1 → 2 → 3 → 4 → 5 → 6** in dieser Sitzung. Wenn zu viel für einen Run, minimaler MVP-Path = **1 + 4 + 6** (Daten + Vergleich + Publish), Rest folgt.
+## Was ich nach Approve mache
+1. Migration schreiben & anwenden (Punkt 1).
+2. Security-Rescan zur Bestätigung.
+3. `preview_ui--publish` (Punkt 2).
+4. Danach im nächsten Turn Conversion-Sprint (Punkt 3) starten — mit dir abgestimmt, welches der drei Items zuerst.
