@@ -143,13 +143,15 @@ export function findBestInsertionCell(opts: {
 
   const free = cells.filter(isFree);
   if (free.length > 0) {
-    const sized = free.filter(c => c.end - c.start >= preferredMinDuration);
+    const sized = free.filter(c => c.end - c.start >= preferredMinDuration - EPS);
     if (sized.length > 0) return sized[0];
-    return free[0];
+    // No free cell is large enough for the clip's natural duration →
+    // signal caller to append past the timeline end so the timeline grows,
+    // instead of clamping the clip down to a tiny residual gap.
+    return null;
   }
 
-  // No free cell → signal caller to append past the timeline end instead
-  // of overlapping an occupied region.
+  // No free cell at all → append past the timeline end.
   return null;
 }
 
