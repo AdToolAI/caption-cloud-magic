@@ -2363,7 +2363,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
           {/* Welle 5 — Library ↔ Preview Divider */}
           {!sidebarCollapsed && (
-            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={280} max={560} />
+            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={320} max={560} />
           )}
 
           {/* Welle 5 — Preview + Timeline Panel */}
