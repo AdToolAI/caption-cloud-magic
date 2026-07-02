@@ -148,8 +148,9 @@ export function findBestInsertionCell(opts: {
     return free[0];
   }
 
-  // Fallback: largest cell
-  return [...cells].sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+  // No free cell → signal caller to append past the timeline end instead
+  // of overlapping an occupied region.
+  return null;
 }
 
 function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
