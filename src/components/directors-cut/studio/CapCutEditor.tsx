@@ -1272,6 +1272,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       toast.error(t('dc.playheadNotInScene'));
       return;
     }
+    commitHistory();
     // Relaxed guard: ~1.5 frames @ 30fps — only block true zero-length splits.
     if (currentTime - targetScene.start_time < 0.05 || targetScene.end_time - currentTime < 0.05) {
       toast.error(t('dc.tooCloseToEdge'));
