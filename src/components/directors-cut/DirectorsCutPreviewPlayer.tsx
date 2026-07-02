@@ -697,21 +697,33 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const overlay = mediaVideoRef.current;
           const isVideoOverlay = mediaScene.sourceMode === 'media' &&
             mediaScene.additionalMedia?.type === 'video';
+          const mSrcIn = (mediaScene as any).original_start_time ?? 0;
+          const mSrcOut = (mediaScene as any).original_end_time ?? Infinity;
           if (overlay && isVideoOverlay) {
-            // (Re)bind src on scene change
-            if (activeMediaSceneIdRef.current !== mediaScene.id) {
+            // (Re)bind src on scene change OR when head-trim changed
+            const trimChanged = Math.abs((activeMediaSrcInRef.current ?? 0) - mSrcIn) > 0.01;
+            if (activeMediaSceneIdRef.current !== mediaScene.id || trimChanged) {
               activeMediaSceneIdRef.current = mediaScene.id;
-              overlay.src = mediaScene.additionalMedia!.url;
-              overlay.currentTime = 0;
+              activeMediaSrcInRef.current = mSrcIn;
+              if (overlay.src !== mediaScene.additionalMedia!.url) {
+                overlay.src = mediaScene.additionalMedia!.url;
+              }
+              try { overlay.currentTime = mSrcIn; } catch {}
+              overlay.playbackRate = (mediaScene as any).playbackRate ?? 1;
               overlay.play().catch(() => {});
             } else if (overlay.paused) {
               overlay.play().catch(() => {});
+            }
+            // Guard: if overlay drifted before srcIn or past srcOut, snap back
+            if (overlay.currentTime < mSrcIn - 0.05) {
+              try { overlay.currentTime = mSrcIn; } catch {}
             }
           } else {
             // Image / blackscreen — make sure overlay <video> is idle
             if (overlay && !overlay.paused) overlay.pause();
             if (activeMediaSceneIdRef.current !== mediaScene.id) {
               activeMediaSceneIdRef.current = mediaScene.id;
+              activeMediaSrcInRef.current = mSrcIn;
               if (overlay) overlay.removeAttribute('src');
             }
           }
@@ -727,10 +739,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           setDisplayTime(nextTL);
           onTimeUpdateRef.current?.(nextTL);
 
-          // End of scene? Hand off to next scene cleanly.
-          if (nextTL >= mediaScene.end_time - 0.001) {
+          // End of scene? Either timeline end OR overlay reached srcOut.
+          const overlayPastOut = isVideoOverlay && overlay && overlay.currentTime >= mSrcOut - 0.03;
+          if (nextTL >= mediaScene.end_time - 0.001 || overlayPastOut) {
             const nextScene = sortedScenes[idx + 1];
             activeMediaSceneIdRef.current = null;
+            activeMediaSrcInRef.current = 0;
             if (overlay) {
               overlay.pause();
               overlay.removeAttribute('src');
@@ -751,6 +765,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               return;
             }
           }
+
 
           rafIdRef.current = requestAnimationFrame(tick);
           return;
