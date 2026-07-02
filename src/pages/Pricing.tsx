@@ -18,6 +18,7 @@ import { CouponBanner } from "@/components/pricing/CouponBanner";
 import { CompetitorComparisonCard } from "@/components/landing/CompetitorComparisonCard";
 import { AI_VIDEO_CREDIT_PACKS } from "@/config/aiVideoCredits";
 import { FoundersSlotBadge } from "@/components/pricing/FoundersSlotBadge";
+import { UDCPricingHighlight } from "@/components/pricing/UDCPricingHighlight";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { useEffect } from "react";
 
