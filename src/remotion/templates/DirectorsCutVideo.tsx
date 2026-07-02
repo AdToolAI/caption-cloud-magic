@@ -96,7 +96,9 @@ const SceneSchema = z.object({
   sourceMode: z.enum(['original', 'blackscreen', 'media']).optional(),
 });
 
-// Subtitle Clip Schema
+// Subtitle Clip Schema — .passthrough() so style extensions (textStroke, maxLines,
+// style presets, source flag) survive Zod validation and reach the renderer instead
+// of being silently stripped by strict parsing.
 const SubtitleClipSchema = z.object({
   id: z.string(),
   startTime: z.number(),
@@ -107,7 +109,13 @@ const SubtitleClipSchema = z.object({
   color: z.string().optional(),
   backgroundColor: z.string().optional(),
   fontFamily: z.string().optional(),
-});
+  textStroke: z.boolean().optional(),
+  textStrokeColor: z.string().optional(),
+  textStrokeWidth: z.number().optional(),
+  maxLines: z.number().optional(),
+  style: z.string().optional(),
+  source: z.string().optional(),
+}).passthrough();
 
 // ========== SHARED SUBTITLE RENDERER — single source of truth for all paths ==========
 const SubtitleClipRenderer: React.FC<{ clip: z.infer<typeof SubtitleClipSchema> }> = ({ clip }) => (
