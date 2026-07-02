@@ -31,7 +31,7 @@ export interface PreflightInput {
     text?: string;
     color?: string;
     backgroundColor?: string;
-    fontSize?: number;
+    fontSize?: number | string;
   }>;
   showSubtitles?: boolean;
   exportAspectRatio?: string;
