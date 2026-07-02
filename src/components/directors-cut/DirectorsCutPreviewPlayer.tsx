@@ -1604,17 +1604,39 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Track active slot changes to reapply filter after ping-pong swap
   const [activeSlotTracker, setActiveSlotTracker] = useState(activeSlotRef.current);
   useEffect(() => {
-    // RAF-based check (auto-pauses when tab is hidden, cheaper than a 10Hz interval).
+    // Slot-flips only ever happen mid-playback (transition handoff) or on explicit
+    // seek/replay. So we gate the RAF poll behind `isPlayingRef` and re-check once
+    // after any pause via a low-frequency safety tick. This keeps idle/background
+    // tabs at 0% CPU while still catching post-seek slot changes promptly.
     let rafId = 0;
-    const tick = () => {
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const check = () => {
       if (activeSlotRef.current !== activeSlotTracker) {
         setActiveSlotTracker(activeSlotRef.current);
       }
-      rafId = requestAnimationFrame(tick);
+    };
+
+    const tick = () => {
+      check();
+      if (isPlayingRef.current) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        // Paused: stop the RAF loop, but schedule one delayed re-check to catch
+        // slot changes that happen right after a seek/replay while paused.
+        safetyTimer = setTimeout(() => {
+          check();
+          rafId = requestAnimationFrame(tick);
+        }, 250);
+      }
     };
     rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (safetyTimer) clearTimeout(safetyTimer);
+    };
   }, [activeSlotTracker]);
+
 
   useEffect(() => {
     videoFilterRef.current = videoFilter ?? '';
