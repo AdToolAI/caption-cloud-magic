@@ -1128,7 +1128,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
 
     onScenesUpdate(sorted);
-  }, [scenes, onScenesUpdate, originalVideoDuration, commitHistory]);
+    toast.success(t('dc.sceneTrimmed'), { id: 'dc-scene-trimmed' });
+  }, [scenes, onScenesUpdate, originalVideoDuration, commitHistory, t]);
 
   // Rename scene handler
   const handleSceneRename = useCallback((sceneId: string, newName: string) => {
