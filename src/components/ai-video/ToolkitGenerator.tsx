@@ -688,23 +688,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     key: 'start' as const,
                     label: language === 'de' ? 'Am Anfang' : 'At start',
                     hint: language === 'de' ? 'Bild ist der erste Frame' : 'Image is the first frame',
-                    disabled: false,
+                    supportedByCurrent: true,
                   },
                   {
                     key: 'end' as const,
                     label: language === 'de' ? 'Am Ende' : 'At end',
                     hint: model.capabilities.endFrame
                       ? (language === 'de' ? 'Kamera fährt zum Bild hin' : 'Camera transitions to image')
-                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
-                    disabled: !model.capabilities.endFrame,
+                      : (language === 'de' ? 'Nur mit Luma Ray 2 möglich' : 'Only available with Luma Ray 2'),
+                    supportedByCurrent: !!model.capabilities.endFrame,
                   },
                   {
                     key: 'anchor' as const,
                     label: language === 'de' ? 'Nur Anker' : 'Anchor only',
-                    hint: model.capabilities.multiRef
+                    hint: model.capabilities.anchorOnly
                       ? (language === 'de' ? 'Nur Identitäts-Referenz, kein fester Frame' : 'Identity reference only, no forced frame')
-                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
-                    disabled: !model.capabilities.multiRef,
+                      : (language === 'de' ? 'Nur mit Vidu Q2 oder Kling 3 möglich' : 'Only available with Vidu Q2 or Kling 3'),
+                    supportedByCurrent: !!model.capabilities.anchorOnly,
                   },
                 ]).map((opt) => {
                   const active = referencePlacement === opt.key;
@@ -712,14 +712,44 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     <button
                       key={opt.key}
                       type="button"
-                      disabled={opt.disabled}
                       title={opt.hint}
-                      onClick={() => setReferencePlacement(opt.key)}
+                      onClick={() => {
+                        if (opt.key === 'start') {
+                          setReferencePlacement('start');
+                          return;
+                        }
+                        if (opt.supportedByCurrent) {
+                          setReferencePlacement(opt.key);
+                          return;
+                        }
+                        // Unsupported by current model → propose auto-switch via dialog.
+                        if (opt.key === 'end') {
+                          const luma = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.capabilities.endFrame);
+                          if (luma) {
+                            setPendingPlacement({
+                              placement: 'end',
+                              targetModelId: luma.id,
+                              targetModelName: luma.name,
+                            });
+                          }
+                        } else if (opt.key === 'anchor') {
+                          const target =
+                            AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === 'vidu-q2-reference') ??
+                            AI_VIDEO_TOOLKIT_MODELS.find((m) => m.capabilities.anchorOnly);
+                          if (target) {
+                            setPendingPlacement({
+                              placement: 'anchor',
+                              targetModelId: target.id,
+                              targetModelName: target.name,
+                            });
+                          }
+                        }
+                      }}
                       className={`text-[11px] px-2 py-2 rounded-md border transition-colors text-left leading-tight ${
                         active
                           ? 'border-primary bg-primary/10 text-primary'
                           : 'border-border/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                      } ${opt.disabled ? 'opacity-40 cursor-not-allowed hover:border-border/40 hover:text-muted-foreground' : ''}`}
+                      }`}
                     >
                       <div className="font-medium">{opt.label}</div>
                       <div className="text-[10px] opacity-80 mt-0.5">{opt.hint}</div>
