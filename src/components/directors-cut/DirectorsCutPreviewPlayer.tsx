@@ -13,6 +13,7 @@ import { useFrameCapture } from './preview/useFrameCapture';
 import { NativePreviewEffects } from './preview/NativePreviewEffects';
 import { NativeTextOverlayRenderer } from './preview/NativeTextOverlayRenderer';
 import { resolveTransitions, findActiveTransition as resolverFindActiveTransition, findFreezePhase } from '@/utils/transitionResolver';
+import { getEffectiveBackgroundMusicVolume } from '@/lib/audioVolume';
 
 const SUBTITLE_FONT_SIZES = {
   small: '16px',
