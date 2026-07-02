@@ -1004,12 +1004,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
+    commitHistory();
     setAudioTracks(prev => prev.map(track => ({
       ...track,
       clips: track.clips.filter(c => c.id !== clipId)
     })));
     setSelectedClipId(null);
-  }, []);
+  }, [commitHistory]);
 
   // Resize clip handler (for trimming from both sides)
   const handleClipResize = useCallback((clipId: string, side: 'left' | 'right', newStartTime: number, newDuration: number) => {
