@@ -1,70 +1,42 @@
-## Zwei Probleme
+## Ja — mit diesem Fix schneidet der Splitten-Button endlich genau da, wo du die Trim-Werte setzt.
 
-**1. 15s-Szene spielt nur 11s ab**
+### Was heute schiefläuft
 
-Die Seed-Szene bekommt `end_time = video.duration`. Wenn `measureVideoDuration()` nach dem Import einen anderen Wert liefert (z.B. echte MP4-Dauer 11s statt der aus Composer übernommenen 15s), wird die Seed-Szene zwar aktualisiert — bei manuell hochgeladenen Videos oder Composer-Handoffs mit Duration-Drift bleibt aber ein Mismatch: der Timeline-Block ist 15s, das HTML-`<video>` läuft nur 11s → Player pausiert am Ende der Quelle.
+Du gibst im Inspector **Start = 2.1s** ein → das ändert nur die **Crop-Range** der Szene (Quelle wird gekürzt, keine neue Szene entsteht). Klickst du dann **„Splitten"**, feuert der alte Handler am **Video-Playhead** (`0:00`) — nicht am Trim-Wert. Weil Playhead exakt am Rand steht, blockt der 0.5 s-Guard mit *„Zu nah am Szenenrand"*. Das ist die falsche Semantik: dein Trim-Wert wird ignoriert.
 
-Zusätzlich clampt `handleTrimScene` `srcOut` nur an `original_end_time` (die aus dem Seed 15s ist), nicht an die reale MP4-Länge. Der User kann also einen Bereich "wählen", der gar nicht existiert.
+### Fix
 
-**2. Trim-Eingabe ist eine Tortur**
+**A. Splitten-Button neu verdrahten (Trim → echte Schnitte)**
 
-- Inline-Inputs in `CutPanel` sind `w-14 h-5 text-[9px] step=0.01` — mikroskopisch, unmöglich präzise mit Maus/Touch zu bedienen.
-- Die Labels lauten "Start"/"End" und zeigen `scene.start_time`/`scene.end_time` (Timeline-Position), werden aber vom neuen `handleTrimScene` als **Quellen-Range** interpretiert → Anzeige ≠ Wirkung, verwirrend.
-- Es gibt keinen visuellen Slider, kein "Set to Playhead"-Shortcut, keine sichtbare Länge/Dauer live.
-- Der Inspector (`CapCutPropertiesPanel`) hat einen eigenen zweiten Trim-Block — Doppelung.
+`SceneTrimInspector.tsx` + `CapCutEditor.tsx` bekommen einen neuen Handler `onSplitAtTrim`. Semantik nach CapCut-Vorbild:
 
-## Fix-Plan
+- Splittet die Szene an den aktuell eingegebenen Trim-Grenzen `srcIn`/`srcOut` → produziert bis zu 3 echte Timeline-Segmente:
+  1. `[hardMin, srcIn)` falls `srcIn > hardMin` (Head-Cut)
+  2. `[srcIn, srcOut]` — dein getrimmter Bereich (bleibt selektiert)
+  3. `(srcOut, hardMax]` falls `srcOut < hardMax` (Tail-Cut)
+- Timeline-Positionen (`start_time` / `end_time`) werden fortlaufend gerippelt.
+- `additionalMedia`, Filter, Effekte, `video_url` werden per Spread auf alle Segmente vererbt; jedes bekommt eine neue Scene-ID.
+- Fallback: Wenn Trim = Full Source (nichts abgeschnitten), fällt der Button auf Playhead-Split zurück.
 
-### Fix 1 — Source-Duration korrekt tracken
+**B. Playhead-Split-Guard lockern**
 
-`src/pages/DirectorsCut/DirectorsCut.tsx`
-- Nach `measureVideoDuration()` immer `selectedVideo.duration` auf den gemessenen Wert setzen (auch wenn schon einer da war und abweicht > 0.3s).
-- Seed-Szene und alle Szenen ohne `additionalMedia` auf `min(end_time, measuredDuration)` clampen, gleiche Logik für `original_end_time`.
+`handleSplitAtPlayhead`: `0.5s`-Guard → `0.05s` (~1.5 Frames @ 30 fps). Zusätzlich splittet die Funktion jetzt auch die **Quellen-Range** (`original_start_time` / `original_end_time`), sodass beide Hälften wirklich unterschiedliche Video-Ausschnitte zeigen — nicht beide die ganze Quelle wie bisher.
 
-`src/components/directors-cut/studio/CapCutEditor.tsx` — `handleTrimScene`:
-- Neuen Parameter aus Props/Context ziehen: `sourceDuration` (via `originalVideoDuration` durchreichen).
-- `newSrcOut = Math.min(sourceDuration || Infinity, ...)` statt nur `origEnd`.
+**C. UX-Klarheit im Inspector**
 
-### Fix 2 — Neuer Trim-Editor "Cut Inspector"
+- Splitten-Button aktiviert, sobald `srcIn > hardMin` **oder** `srcOut < hardMax` (mind. eine echte Trim-Grenze existiert) — nicht mehr abhängig vom Playhead.
+- Tooltip: *„An Trim-Grenzen teilen (2.10s / 15.00s)"* mit deinen aktuellen Werten.
+- **S**-Shortcut & Timeline-Toolbar-„Am Playhead teilen" bleiben unverändert für den Playhead-basierten Cut.
 
-**Inline-Mini-Inputs in `CutPanel.tsx` (Zeile 435–463) komplett entfernen.** Sidebar-Szenenliste bleibt reine Übersicht.
+### Konkreter Workflow danach
 
-Stattdessen: **Ein einziger großzügiger Trim-Editor** im `CapCutPropertiesPanel` (Inspector rechts), sichtbar wenn eine Szene selektiert ist:
+1. Szene auswählen → Trim auf `2.1s` setzen → **Splitten** → Szene wird in `0-2.1s` + `2.1s-15s` aufgeteilt, beide bleiben auf der Timeline.
+2. Oder Playhead auf `x` fahren + **S** → sauberer Split an dieser Stelle, auch dicht am Rand.
 
-```text
-┌─ Szene 1 · Quelle 0.00s → 15.00s ─────────────┐
-│                                                │
-│  [Thumbnails-Filmstrip mit Dual-Range-Slider]  │
-│  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━●  │
-│                                                │
-│  Start                       Ende              │
-│  [  0.00 ]s [–][+][📍]    [ 15.00 ]s [–][+][📍]│
-│                                                │
-│  Länge: 15.00 s        [Auf Playhead schneiden]│
-│  [Zurücksetzen]        [Am Playhead splitten]  │
-└────────────────────────────────────────────────┘
-```
+### Betroffene Dateien
 
-Details:
-- **Dual-Range-Slider** (Radix `Slider` mit `value=[in,out]`) über dem Filmstrip → visuelles Trimmen per Drag, Ganzes-Fenster verschiebbar.
-- **Numerische Inputs** groß (`h-9 text-sm`), Steps `0.1` (nicht 0.01), mit `[–]/[+]`-Buttons für Feintuning.
-- **📍-Button** "Set to playhead" — schreibt aktuelle `currentTime` in Start bzw. Ende.
-- **Live-Länge** unter den Inputs.
-- **Zurücksetzen** = `original_start_time/end_time` löschen → Full Source.
-- **Splitten am Playhead** vorhandener Handler wiederverwendet.
-- Alles ist ein neues Sub-Modul `SceneTrimInspector.tsx` unter `src/components/directors-cut/studio/`.
+- `src/components/directors-cut/studio/SceneTrimInspector.tsx` — neuer `onSplitAtTrim`-Prop, Enable-Logik, Tooltip.
+- `src/components/directors-cut/studio/CapCutEditor.tsx` — `handleSplitAtTrim` implementieren, Guard lockern, Source-Range-Split in `handleSplitAtPlayhead`.
+- `src/components/directors-cut/studio/CapCutPropertiesPanel.tsx` — Prop durchreichen.
 
-### Fix 3 — Label & Datenfluss korrigieren
-
-- Trim-Aufrufe passen `srcIn/srcOut` (Quellen-Range) an — nicht Timeline. Werte fürs Anzeigen kommen aus `original_start_time ?? 0` bzw. `original_end_time ?? sourceDuration`.
-- Dauer der Szene (Timeline-Länge) = `srcOut - srcIn`, automatisch synchron.
-
-## Betroffene Dateien
-
-- `src/pages/DirectorsCut/DirectorsCut.tsx` — measure clamp, `sourceDuration` an Editor durchreichen.
-- `src/components/directors-cut/studio/CapCutEditor.tsx` — `handleTrimScene` mit Quellen-Clamp gegen `sourceDuration`, Prop-Weitergabe an Inspector.
-- `src/components/directors-cut/studio/sidebar/CutPanel.tsx` — Mini-Inputs Zeile 435–463 entfernen.
-- `src/components/directors-cut/studio/CapCutPropertiesPanel.tsx` — alten Trim-Block durch `<SceneTrimInspector/>` ersetzen.
-- **neu**: `src/components/directors-cut/studio/SceneTrimInspector.tsx` — Filmstrip + Dual-Slider + große Inputs + Playhead-Buttons.
-
-Keine Backend-/DB-/Edge-Function-Änderungen, keine neuen Dependencies (Radix Slider + shadcn Input schon vorhanden).
+Keine DB-, Edge-Function-, i18n- oder Dependency-Änderungen.

@@ -23,6 +23,7 @@ interface SceneTrimInspectorProps {
   currentTime: number;
   onTrim: (sceneId: string, srcIn: number, srcOut: number) => void;
   onSplitAtPlayhead?: () => void;
+  onSplitAtTrim?: (sceneId: string) => void;
   onDelete?: (sceneId: string) => void;
 }
 
@@ -37,6 +38,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
   currentTime,
   onTrim,
   onSplitAtPlayhead,
+  onSplitAtTrim,
   onDelete,
 }) => {
   const isAdditional = !!scene.additionalMedia;
@@ -275,20 +277,43 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
           <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
           Zurücksetzen
         </Button>
-        {onSplitAtPlayhead ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onSplitAtPlayhead}
-            disabled={playheadInSource === null}
-            className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
-          >
-            <Scissors className="h-3.5 w-3.5 mr-1.5" />
-            Splitten
-          </Button>
-        ) : (
-          <div />
-        )}
+        {(() => {
+          const trimHead = srcIn > hardMin + 0.001;
+          const trimTail = srcOut < hardMax - 0.001;
+          const canSplitAtTrim = !!onSplitAtTrim && (trimHead || trimTail);
+          const canSplitAtPlayhead = !!onSplitAtPlayhead && playheadInSource !== null;
+
+          if (canSplitAtTrim) {
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onSplitAtTrim!(scene.id)}
+                title={`An Trim-Grenzen teilen (${srcIn.toFixed(2)}s / ${srcOut.toFixed(2)}s)`}
+                className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
+              >
+                <Scissors className="h-3.5 w-3.5 mr-1.5" />
+                An Trim teilen
+              </Button>
+            );
+          }
+          if (onSplitAtPlayhead) {
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onSplitAtPlayhead}
+                disabled={!canSplitAtPlayhead}
+                title="Am Playhead teilen"
+                className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
+              >
+                <Scissors className="h-3.5 w-3.5 mr-1.5" />
+                Am Playhead teilen
+              </Button>
+            );
+          }
+          return <div />;
+        })()}
       </div>
 
       {onDelete && (
