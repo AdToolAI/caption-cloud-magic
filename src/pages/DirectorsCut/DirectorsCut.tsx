@@ -135,6 +135,9 @@ export function DirectorsCut() {
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
+  const handleCleanedVideoUrlChange = useCallback((url: string | null) => {
+    setCleanedVideoUrl(url || undefined);
+  }, []);
 
   // Composer handoff fingerprint — declared early so the draft snapshot can include it.
   const [composerSourceProjectId, setComposerSourceProjectId] = useState<string | null>(null);
