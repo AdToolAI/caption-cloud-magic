@@ -206,7 +206,11 @@ export function useTransitionRenderer(
             try { active.currentTime = expectedOutgoing; } catch {}
           }
           if (Math.abs(active.playbackRate - outgoingRate) > 0.01) active.playbackRate = outgoingRate;
-          if (active.paused) active.play().catch(() => {});
+          if (isPlayingRef?.current !== false) {
+            if (active.paused) active.play().catch(() => {});
+          } else if (!active.paused) {
+            active.pause();
+          }
         } else {
           // Safe edge fallback: hold outgoing clip on its cut frame while the
           // incoming clip plays from its own in-point for the full transition.
@@ -234,9 +238,13 @@ export function useTransitionRenderer(
           }
         }
 
-        // Start/keep playing incoming layer during the transition.
-        if (standby.paused) {
-          standby.play().catch(() => {});
+        // Start/keep playing incoming layer during the transition — but only if
+        // the user hasn't paused the player. Otherwise the RAF loop would keep
+        // resurrecting playback whenever pause is pressed mid-transition.
+        if (isPlayingRef?.current !== false) {
+          if (standby.paused) standby.play().catch(() => {});
+        } else if (!standby.paused) {
+          standby.pause();
         }
 
         const styles = getTransitionStyles({
@@ -247,15 +255,8 @@ export function useTransitionRenderer(
           transitionDuration: rt.duration,
         });
 
-        // Apply active (outgoing) styles
-        active.style.position = 'absolute';
-        active.style.inset = '0';
-        active.style.width = '100%';
-        active.style.height = '100%';
-        active.style.objectFit = 'contain';
-        // Keep the A/B transition layer above media/image/blackscreen overlays.
-        // Otherwise added clips can cover the prepared transition videos and the
-        // user only sees a hard cut at the boundary.
+        // Apply active (outgoing) styles — layout comes from className.
+        // Only manage visual/effect properties + z-index for stacking.
         active.style.zIndex = '10';
 
         const activeTransitionFilter = (styles.baseStyle as any).filter || '';
@@ -266,11 +267,6 @@ export function useTransitionRenderer(
 
         // Apply standby (incoming) styles
         standby.style.pointerEvents = 'auto';
-        standby.style.position = 'absolute';
-        standby.style.inset = '0';
-        standby.style.width = '100%';
-        standby.style.height = '100%';
-        standby.style.objectFit = 'contain';
         standby.style.zIndex = '11';
 
         const standbyTransitionFilter = (styles.incomingStyle as any).filter || '';
