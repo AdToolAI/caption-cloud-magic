@@ -42,7 +42,12 @@ export function useTransitionRenderer(
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const lastStandbySeekRef = useRef<string>('');
-  
+  // After a handoff we want to hide the old outgoing slot ONE RAF frame later,
+  // so the incoming slot has definitely painted its first pixel. Without this
+  // overlap frame the browser briefly shows the wrapper's black background
+  // between "outgoing → opacity 0" and "incoming → first painted frame".
+  const pendingHideRef = useRef<HTMLVideoElement | null>(null);
+
   // Track last active transition for structured boundary marking
   const lastActiveTransitionRef = useRef<{ outgoingSceneId: string; incomingSceneId: string; tEnd: number; originalBoundary: number; offsetSeconds: number } | null>(null);
 
