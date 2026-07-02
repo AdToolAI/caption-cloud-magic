@@ -1236,7 +1236,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         url: videoUrl,
         duration: duration,
       },
-    };
+      // Trim domain — full media source. Never overwritten by trim.
+      media_source_start: 0,
+      media_source_end: duration,
+      // Initial trim window = full duration (or fit length if fit truncates).
+      original_start_time: 0,
+      original_end_time: Math.min(duration, fit.end_time - fit.start_time),
+    } as any;
     onScenesUpdate([...scenes, newScene]);
     if (fit.snapped) {
       toast.success(t('dc.snappedToCut', { time: formatSnapTime(fit.start_time) }));
