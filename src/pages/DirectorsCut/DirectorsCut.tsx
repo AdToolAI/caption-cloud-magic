@@ -229,6 +229,26 @@ export function DirectorsCut() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestSnapshotRef = useRef<Parameters<typeof saveDraft>[0] | null>(null);
 
+  // Autosave status (Welle 3 · M3) — exposed to the editor as a small badge.
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [autosaveLastSavedAt, setAutosaveLastSavedAt] = useState<number | null>(null);
+  const savedResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runSave = useCallback((snapshot: Parameters<typeof saveDraft>[0]) => {
+    setAutosaveStatus('saving');
+    try {
+      saveDraft(snapshot);
+      setAutosaveStatus('saved');
+      setAutosaveLastSavedAt(Date.now());
+      if (savedResetTimerRef.current) clearTimeout(savedResetTimerRef.current);
+      // Fade the "Saved" chip back to "idle" after a short beat so it doesn't shout.
+      savedResetTimerRef.current = setTimeout(() => setAutosaveStatus('idle'), 2500);
+    } catch (err) {
+      console.warn('[DirectorsCut] autosave failed', err);
+      setAutosaveStatus('error');
+    }
+  }, []);
+
   // Keep a ref to the latest snapshot so we can flush it synchronously on unmount
   const currentSnapshot = useMemo(() => ({
     currentStep: selectedVideo ? 10 : 1,
@@ -264,17 +284,25 @@ export function DirectorsCut() {
   useEffect(() => {
     if (!draftLoadedRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    // Signal "pending" immediately so the badge feels responsive.
+    setAutosaveStatus((s) => (s === 'error' ? s : 'saving'));
     saveTimerRef.current = setTimeout(() => {
-      saveDraft(currentSnapshot);
+      runSave(currentSnapshot);
     }, 500);
     return () => {
       // On unmount (navigating away): flush the latest state immediately
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       if (latestSnapshotRef.current) {
-        saveDraft(latestSnapshotRef.current);
+        try {
+          saveDraft(latestSnapshotRef.current);
+        } catch { /* ignore on unmount */ }
       }
     };
-  }, [currentSnapshot]);
+  }, [currentSnapshot, runSave]);
+
+  useEffect(() => () => {
+    if (savedResetTimerRef.current) clearTimeout(savedResetTimerRef.current);
+  }, []);
 
   // Original (source) video duration — never changes based on scene edits.
   // Used to decide whether a new/empty scene should pass-through the source
@@ -1117,6 +1145,8 @@ export function DirectorsCut() {
         projectId={projectId}
         onCleanedVideoUrlChange={handleCleanedVideoUrlChange}
         onSaveProject={saveProject}
+        autosaveStatus={autosaveStatus}
+        autosaveLastSavedAt={autosaveLastSavedAt}
         subtitleSafeZone={subtitleSafeZone}
         onSubtitleSafeZoneChange={setSubtitleSafeZone}
         onResetProject={handleResetProject}

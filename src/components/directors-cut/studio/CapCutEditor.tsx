@@ -14,6 +14,7 @@ import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TR
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useEditorHistory } from '@/hooks/useEditorHistory';
 import { ShortcutOverlay } from './ShortcutOverlay';
+import { AutosaveBadge } from './AutosaveBadge';
 import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard } from 'lucide-react';
 import { PanelDivider } from './PanelDivider';
 import { Button } from '@/components/ui/button';
@@ -102,6 +103,9 @@ interface CapCutEditorProps {
   /** When set, scenes were deterministically imported from a Composer render — disables Auto-Cut UI. */
   composerLockSource?: 'edl' | 'edl-rebuilt' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
   composerLockSceneCount?: number;
+  /** Welle 3 · M3 — autosave badge state fed from the DirectorsCut container. */
+  autosaveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  autosaveLastSavedAt?: number | null;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -165,6 +169,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   initialAiCutMarkers,
   composerLockSource = null,
   composerLockSceneCount = 0,
+  autosaveStatus = 'idle',
+  autosaveLastSavedAt = null,
 }) => {
   const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -2096,6 +2102,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C76A] to-[#FFE4A0] font-semibold text-sm drop-shadow-[0_0_8px_rgba(245,199,106,0.2)]">Director's Cut Studio</span>
+          <AutosaveBadge status={autosaveStatus} lastSavedAt={autosaveLastSavedAt} />
         </div>
         <div className="flex items-center gap-1.5">
           <Button
