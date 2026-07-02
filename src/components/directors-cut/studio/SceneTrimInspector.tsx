@@ -131,27 +131,27 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               : undefined
           }
         >
-          {/* Dim outside area */}
+          {/* Dim outside area (uses draft for smooth live drag) */}
           <div
             className="absolute inset-y-0 bg-black/60"
             style={{
               left: 0,
-              width: `${(srcIn / Math.max(hardMax, 0.01)) * 100}%`,
+              width: `${(draft[0] / Math.max(hardMax, 0.01)) * 100}%`,
             }}
           />
           <div
             className="absolute inset-y-0 bg-black/60"
             style={{
               right: 0,
-              width: `${((hardMax - srcOut) / Math.max(hardMax, 0.01)) * 100}%`,
+              width: `${((hardMax - draft[1]) / Math.max(hardMax, 0.01)) * 100}%`,
             }}
           />
           {/* Selection border */}
           <div
             className="absolute inset-y-0 border-x-2 border-[#F5C76A] pointer-events-none"
             style={{
-              left: `${(srcIn / Math.max(hardMax, 0.01)) * 100}%`,
-              width: `${(length / Math.max(hardMax, 0.01)) * 100}%`,
+              left: `${(draft[0] / Math.max(hardMax, 0.01)) * 100}%`,
+              width: `${(Math.max(0, draft[1] - draft[0]) / Math.max(hardMax, 0.01)) * 100}%`,
             }}
           />
           {/* Playhead */}
@@ -165,7 +165,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
 
         <div className="pt-3 px-1">
           <Slider
-            value={[srcIn, srcOut]}
+            value={draft}
             min={hardMin}
             max={hardMax}
             step={STEP}
@@ -173,7 +173,16 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               const [a, b] = vals as [number, number];
               const ni = clamp(a, hardMin, b - STEP);
               const no = clamp(b, ni + STEP, hardMax);
-              onTrim(scene.id, round2(ni), round2(no));
+              setDraft([round2(ni), round2(no)]);
+            }}
+            onValueCommit={(vals) => {
+              const [a, b] = vals as [number, number];
+              const ni = clamp(a, hardMin, b - STEP);
+              const no = clamp(b, ni + STEP, hardMax);
+              const rni = round2(ni);
+              const rno = round2(no);
+              if (Math.abs(rni - srcIn) < 0.001 && Math.abs(rno - srcOut) < 0.001) return;
+              onTrim(scene.id, rni, rno);
             }}
           />
         </div>
