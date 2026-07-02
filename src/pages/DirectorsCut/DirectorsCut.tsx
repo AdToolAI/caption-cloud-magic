@@ -1096,6 +1096,7 @@ export function DirectorsCut() {
 
   return (
     <div className="min-h-screen bg-background">
+      <UDCWelcomeDialog />
       <CapCutEditor
         videoUrl={selectedVideo?.url || ''}
         videoDuration={actualTotalDuration}
