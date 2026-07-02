@@ -1787,6 +1787,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
     // Handle scene reordering
     if (activeData?.type === 'scene' && onScenesUpdate) {
+      commitHistory();
       const draggedIndex = activeData.index;
       const deltaX = event.delta.x;
       const timeDelta = deltaX / zoom;
