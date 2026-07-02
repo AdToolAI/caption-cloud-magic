@@ -62,11 +62,17 @@ export interface ToolkitModel {
      */
     nativeDialogue?: boolean;
     /**
-     * End-frame guidance: model accepts an `endImageUrl` so the reference
-     * image appears at the END of the clip instead of frame 0. Currently
-     * supported by Kling 3 Std/Pro, Pika 2.2 Std/Pro, Luma Ray 2.
+     * End-frame guidance: model accepts an `endImageUrl` WITHOUT requiring a
+     * matching start image. Only Luma Ray 2 satisfies this — Kling requires
+     * start+end together, Pika Pikaframes requires both frames.
      */
     endFrame?: boolean;
+    /**
+     * True identity/subject reference: model can use a reference image as
+     * character/style anchor without forcing it into frame 0. Currently
+     * Vidu Q2 (referenceImages[]) and Kling 3 Std/Pro (reference_images).
+     */
+    anchorOnly?: boolean;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
