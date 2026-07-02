@@ -1,58 +1,42 @@
-# Fix v3: „Endframe" → automatisch Luma Ray 2
+## Problem
 
-## Kernidee (nach User-Feedback)
-Statt „Endframe" bei manchen Modellen zu verstecken/deaktivieren, wird der **Toggle selbst die treibende Kraft**:
+Trotz des vorigen Fixes (Slots starten mit `opacity: 0`, werden erst nach `onSeeked` sichtbar) blitzt der Anfangsframe des Quellvideos für ~1 Frame auf, bevor die Szene ab dem getrimmten In-Point weiterläuft.
 
-- User klickt **„Endframe"** → **Warn-Dialog** erscheint: *„Endframe ist nur mit Luma Ray 2 möglich. Modell jetzt wechseln?"* [Abbrechen] [Zu Luma Ray 2 wechseln]
-- Bei Bestätigung → Modell wird automatisch auf `luma-ray-2` gesetzt, Placement bleibt `end`.
-- Solange Placement = `end` ist → **alle anderen Modelle im Modell-Picker sind ausgegraut** mit Tooltip *„Endframe wird nur von Luma Ray 2 unterstützt. Placement zurück auf ‚Startframe' setzen, um andere Modelle zu wählen."*
+## Ursache
 
-Damit gibt es keine ungültige Kombination mehr, und der User versteht sofort, warum die Auswahl eingeschränkt ist.
+`resetToPrimaryVideoSlot(sourceTime)` in `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` (Zeile 542–567) macht Folgendes:
 
-## Änderungen
+1. Setzt `slotA.currentTime = sourceTime` (async — Browser muss erst seeken).
+2. Setzt **sofort** `slotA.style.opacity = '1'`.
 
-### 1. `src/config/aiVideoModelRegistry.ts`
-- `endFrame: true` **nur** bei Luma Ray 2 behalten.
-- **Entfernen** bei: `kling-3-standard`, `kling-3-pro`, `pika-2-2-standard`, `pika-2-2-pro` (fälschlich gesetzt, verursacht `E006`-Fehler).
-- Neues Flag `anchorOnly: true` bei **Vidu Q2** und **Kling 3 Std/Pro** (echte Subject-Reference ohne erzwungenen First-Frame).
+Damit wird das `opacity: 0` aus dem vorigen Patch überschrieben, **bevor** der Seek gelandet ist. Der Browser rendert einen Frame lang die alte Position (Frame 0 des Quellvideos), dann kommt `seeked` und springt zum Trim-In-Point → sichtbarer „Anfangsframe-Flash".
 
-### 2. `src/components/ai-video/ToolkitGenerator.tsx`
+Dieser Reset läuft u. a. beim initialen Mount und bei jeder EDL-Änderung (Trim/Split/Delete) über den Effekt in Zeile 590–596.
 
-**a) Placement-Toggle-Klick auf „Endframe":**
-- Wenn aktuelles Modell ≠ Luma Ray 2 → `<AlertDialog>` öffnen:
-  - Titel: *„Endframe nur mit Luma Ray 2"*
-  - Text: *„Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu Luma Ray 2 wechseln?"*
-  - Buttons: [Abbrechen] / [Zu Luma Ray 2 wechseln]
-- Bei Bestätigung: `setModel(LUMA_RAY_2)` + `setReferencePlacement('end')`.
-- Bei Abbruch: Placement bleibt auf `'start'`.
+## Fix (nur `DirectorsCutPreviewPlayer.tsx`, ~10 Zeilen)
 
-**b) Modell-Picker sperren, solange `placement === 'end'`:**
-- Alle Modelle außer Luma Ray 2 werden im Model-Selector visuell disabled (opacity + not-allowed) mit Tooltip.
-- Alternativ (falls ein User trotzdem klickt): Zweiter kleiner Toast *„Placement erst auf ‚Startframe' zurücksetzen"*.
+`resetToPrimaryVideoSlot` so umbauen, dass Slot A **erst nach dem tatsächlichen Seek** sichtbar wird:
 
-**c) `useEffect` beim Modellwechsel:**
-- Wenn User das Modell doch manuell wechselt und `placement === 'end'` && neues Modell hat `!capabilities.endFrame` → Placement automatisch auf `'start'` zurück + Info-Toast *„Placement wurde auf Startframe zurückgesetzt, da {Modellname} keinen Endframe unterstützt."*
+1. Vor dem Setzen der neuen `currentTime` prüfen, ob der aktuelle `slotA.currentTime` bereits nahe genug (`< 0.02 s`) am Ziel liegt.
+   - Ja → Opacity direkt auf `1` (kein Flash möglich, weil kein Seek nötig).
+   - Nein → Opacity auf `0` lassen; der bestehende `onSeeked`-Handler auf `<video ref={videoRefA}>` (bereits im vorigen Patch ergänzt) hebt sie an, sobald der Seek wirklich gelandet ist.
 
-**d) Analog für „Nur als Anker":**
-- Klick auf „Anker" bei Modell ohne `anchorOnly` → analoger Dialog:
-  - *„Anker-Modus ist nur mit Vidu Q2 oder Kling 3 verfügbar. Möchtest du zu Vidu Q2 wechseln?"*
-  - Buttons: [Abbrechen] / [Zu Vidu Q2 wechseln] / [Zu Kling 3 Pro wechseln]
+2. Zusätzlich: wenn `slotA.readyState < 1` (Metadaten noch nicht geladen), Opacity ebenfalls auf `0` halten — dann übernimmt der bereits vorhandene `onLoadedMetadata` + `onSeeked`-Pfad das Reveal.
 
-**e) Submit-Guard (Safety-Net):**
-- Falls trotz UI-Sperre `placement='end'` && Modell ≠ Luma → hartes Abbrechen mit Toast, keine Anfrage senden.
+## Warum das reicht
 
-### 3. Body-Routing (bleibt wie v2)
-- `placement='start'` → `startImageUrl`
-- `placement='end'` (nur Luma) → `endImageUrl`, kein `startImageUrl`, `compose-scene-anchor` überspringen
-- `placement='anchor'` → `referenceImages[]` (Vidu/Kling)
+- Das Slot-A-Video wird nie sichtbar, während `currentTime` noch auf einer alten (falschen) Position steht.
+- Der einzige Zeitpunkt, an dem Slot A auf `opacity: 1` gesetzt wird, ist entweder (a) sofort, wenn der Seek gar nicht nötig ist, oder (b) im `seeked`-Callback, d. h. nachdem der Browser den Trim-In-Point erreicht hat.
+- Kein zusätzlicher State, kein Timer, kein Poster-Trick — nur eine korrigierte Reveal-Reihenfolge.
 
-## Betroffene Dateien
-- `src/config/aiVideoModelRegistry.ts` — Capability-Flags korrigieren
-- `src/components/ai-video/ToolkitGenerator.tsx` — Warn-Dialog, Auto-Switch, Model-Picker-Sperre, useEffect-Guard, Submit-Safety-Net
+## Technische Details
 
-## Verifikation
-1. Beliebiges Modell (z.B. Kling 3 Pro) → Klick „Endframe" → Popup erscheint → „Zu Luma Ray 2 wechseln" → Modell wechselt, Placement = end.
-2. Placement = end aktiv → alle Modelle außer Luma Ray 2 im Picker sind ausgegraut.
-3. Placement zurück auf „Startframe" → alle Modelle wieder wählbar.
-4. Generieren mit Luma Ray 2 + Endframe → Video endet auf Referenzbild, kein Startframe-Duplikat, kein `E006`-Fehler mehr.
-5. Klick „Anker" bei Hailuo → Popup schlägt Vidu Q2 / Kling 3 vor.
+- Datei: `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- Funktion: `resetToPrimaryVideoSlot` (Zeile 542–567)
+- `onSeeked` auf Slot A existiert bereits und setzt `opacity = '1'`, wenn `activeSlotRef.current === 'A'`.
+- Kein anderer Codepfad setzt Slot A ohne Seek auf sichtbar — verifiziert per `grep` auf `videoRefA` / `slotA.style.opacity`.
+
+## Nicht Teil dieses Fixes
+
+- Keine Änderung an `handleTrimScene`, `timelineToSourceTime` oder am Remotion-Export-Template — die berechnen bereits korrekt mit `original_start_time`.
+- Keine Änderung an Slot B (der ist nur während Transitions aktiv und dort schon flash-sicher, weil Transitions ihre eigene Cross-Fade-Logik verwenden).
