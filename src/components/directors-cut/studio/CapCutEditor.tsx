@@ -26,6 +26,8 @@ import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext
 import { supabase } from '@/integrations/supabase/client';
 import { AddMediaDialog } from '../ui/AddMediaDialog';
 import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
+import { CIPreflightDialog } from './CIPreflightDialog';
+import { runCIPreflight, preflightBlocks, type PreflightFinding } from '@/lib/directors-cut/ciPreflight';
 import {
   normalizeCutAnchors,
   buildAnchorCells,
@@ -1621,7 +1623,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, [startProgressInterpolation, stopProgressInterpolation]);
 
   // Export video - trigger render via Edge Function
-  const handleExportVideo = useCallback(async () => {
+  const runExportInternal = useCallback(async () => {
     try {
       // Show overlay immediately
       setIsRendering(true);
@@ -1729,6 +1731,45 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setRenderError(t('dc.exportCouldNotStart'));
     }
   }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, actualTotalDuration]);
+
+  // W4.2 CI-Preflight wrapper — runs consistency checks before invoking Lambda
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const [preflightFindings, setPreflightFindings] = useState<PreflightFinding[]>([]);
+
+  const handleExportVideo = useCallback(async () => {
+    const findings = runCIPreflight({
+      projectId,
+      totalDuration: actualTotalDuration,
+      scenes: scenes.map((s) => ({
+        id: s.id,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        isBlackscreen: s.isBlackscreen,
+        thumbnail_url: s.thumbnail_url,
+        sourceMode: s.sourceMode,
+      })),
+      voiceOverUrl,
+      voiceOverEnabled: !!voiceOverUrl,
+      currentVoiceId: null,
+      backgroundMusicUrl: audioTracks.find((t) => t.id === 'track-music')?.clips?.[0]?.url ?? null,
+      subtitleClips: (subtitleTrack?.clips ?? []).map((c) => ({
+        id: c.id,
+        text: c.text,
+        color: c.color,
+        backgroundColor: c.backgroundColor,
+        fontSize: c.fontSize,
+      })),
+      showSubtitles,
+      exportAspectRatio: exportSettings?.aspect_ratio,
+    });
+
+    if (findings.length === 0) {
+      await runExportInternal();
+      return;
+    }
+    setPreflightFindings(findings);
+    setPreflightOpen(true);
+  }, [projectId, actualTotalDuration, scenes, voiceOverUrl, audioTracks, subtitleTrack, showSubtitles, exportSettings, runExportInternal]);
 
   const handleRenderDownload = useCallback(() => {
     if (renderedVideoUrl) {
@@ -2612,6 +2653,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         }}
       />
       <ShortcutOverlay open={shortcutOverlayOpen} onOpenChange={setShortcutOverlayOpen} />
+      <CIPreflightDialog
+        open={preflightOpen}
+        onOpenChange={setPreflightOpen}
+        findings={preflightFindings}
+        onIgnoreAndRender={() => {
+          setPreflightOpen(false);
+          void runExportInternal();
+        }}
+        onFixIssues={() => setPreflightOpen(false)}
+      />
     </div>
   );
 };
