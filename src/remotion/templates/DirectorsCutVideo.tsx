@@ -342,6 +342,7 @@ export const DirectorsCutVideoSchema = z.object({
   // Subtitle Safe Zone (hard crop for burned-in subtitles)
   subtitleSafeZone: z.object({
     enabled: z.boolean(),
+    mode: z.enum(['reframe', 'crop', 'ai']).optional(),
     zoom: z.number(),
     offsetY: z.number(),
     bottomBandPercent: z.number(),
