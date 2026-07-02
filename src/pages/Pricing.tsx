@@ -352,6 +352,7 @@ const Pricing = () => {
 
           {/* UDC-specific positioning — the "Consistency-First" moat */}
           <UDCPricingHighlight />
+          <UDCComparisonTable />
 
           {/* Top-up Packs Section */}
           <section id="topups" className="scroll-mt-24">
