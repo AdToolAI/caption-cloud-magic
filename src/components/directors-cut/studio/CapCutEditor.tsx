@@ -1021,7 +1021,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       clips: track.clips.filter(c => c.id !== clipId)
     })));
     setSelectedClipId(null);
-  }, [commitHistory]);
+    toast.success(t('dc.clipDeleted'));
+  }, [commitHistory, t]);
 
   // Resize clip handler (for trimming from both sides)
   const handleClipResize = useCallback((clipId: string, side: 'left' | 'right', newStartTime: number, newDuration: number) => {
