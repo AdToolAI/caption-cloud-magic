@@ -1656,7 +1656,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setRenderStatus('failed');
       setRenderError(t('dc.exportCouldNotStart'));
     }
-  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, videoDuration]);
+  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, actualTotalDuration]);
 
   const handleRenderDownload = useCallback(() => {
     if (renderedVideoUrl) {
