@@ -1406,12 +1406,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const midStart = segments.length >= 2 ? segments[1].start_time : segments[0].start_time;
     setCurrentTime(midStart + 0.03);
     toast.success(t('dc.sceneSplitAtPlayhead'));
-  }, [scenes, onScenesUpdate, originalVideoDuration, handleSplitAtPlayhead, t]);
+  }, [scenes, onScenesUpdate, originalVideoDuration, handleSplitAtPlayhead, t, commitHistory]);
 
   // Insert new blackscreen scene AT playhead — splits the surrounding scene if inside one,
   // otherwise appends after the scene closest to (but ending at/before) currentTime.
   const handleInsertAtPlayhead = useCallback(() => {
     if (!onScenesUpdate) return;
+    commitHistory();
     const INSERT_DURATION = 3;
     // If empty timeline, just add a first scene
     if (scenes.length === 0) {
