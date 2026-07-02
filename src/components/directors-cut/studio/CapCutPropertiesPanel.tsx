@@ -29,6 +29,7 @@ interface CapCutPropertiesPanelProps {
   currentTime?: number;
   onTrimScene?: (sceneId: string, srcIn: number, srcOut: number) => void;
   onSplitAtTrim?: (sceneId: string) => void;
+  onSeek?: (timelineTime: number) => void;
   onSceneDelete?: (sceneId: string) => void;
 }
 
