@@ -38,6 +38,7 @@ export function useTransitionRenderer(
   transitionPhaseRef?: React.MutableRefObject<'idle' | 'preparing' | 'active' | 'handoff'>,
   activeSlotRef?: React.MutableRefObject<'A' | 'B'>,
   resetTransitionStateRef?: React.MutableRefObject<(() => void) | null>,
+  isPlayingRef?: React.MutableRefObject<boolean>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
