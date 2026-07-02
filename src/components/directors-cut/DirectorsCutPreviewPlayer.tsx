@@ -1625,12 +1625,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Track active slot changes to reapply filter after ping-pong swap
   const [activeSlotTracker, setActiveSlotTracker] = useState(activeSlotRef.current);
   useEffect(() => {
-    const interval = setInterval(() => {
+    // RAF-based check (auto-pauses when tab is hidden, cheaper than a 10Hz interval).
+    let rafId = 0;
+    const tick = () => {
       if (activeSlotRef.current !== activeSlotTracker) {
         setActiveSlotTracker(activeSlotRef.current);
       }
-    }, 100);
-    return () => clearInterval(interval);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
   }, [activeSlotTracker]);
 
   useEffect(() => {
