@@ -2709,6 +2709,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           toast.success('Anchor-Refresh angewendet — Identity-Frames wiederhergestellt.');
         }}
       />
+      <AutoCutDownDialog
+        open={cutDownOpen}
+        onOpenChange={setCutDownOpen}
+        scenes={scenes}
+        onApply={(next, target) => {
+          commitHistory();
+          onScenesUpdate?.(next);
+          toast.success(`Auto Cut-Down ${target}s angewendet — ${next.length} Szene(n) auf Timeline.`);
+        }}
+      />
+
     </div>
   );
 };
