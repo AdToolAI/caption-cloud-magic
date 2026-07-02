@@ -1617,6 +1617,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             suggested_effects: s.suggested_effects || [],
             original_start_time: s.original_start_time ?? s.start_time,
             original_end_time: s.original_end_time ?? s.end_time,
+            media_source_start: s.media_source_start,
+            media_source_end: s.media_source_end,
             playbackRate: s.playbackRate ?? 1,
             isFromOriginalVideo: s.isFromOriginalVideo,
             isBlackscreen: s.isBlackscreen,
