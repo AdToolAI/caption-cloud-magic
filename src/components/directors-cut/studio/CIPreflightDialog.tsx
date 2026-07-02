@@ -31,6 +31,22 @@ export function CIPreflightDialog({
   const hasBlockers = findings.some((f) => f.severity === 'fail');
   const allClean = findings.length === 0;
 
+  useEffect(() => {
+    if (!open) return;
+    trackUDC('udc_preflight_opened', {
+      total: findings.length,
+      fail: findings.filter((f) => f.severity === 'fail').length,
+      warn: findings.filter((f) => f.severity === 'warn').length,
+      info: findings.filter((f) => f.severity === 'info').length,
+    });
+    if (hasBlockers) {
+      trackUDC('udc_preflight_blocked_export', {
+        fail_ids: findings.filter((f) => f.severity === 'fail').map((f) => f.id),
+      });
+    }
+  }, [open, findings, hasBlockers]);
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
