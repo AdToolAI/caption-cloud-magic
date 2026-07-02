@@ -1115,7 +1115,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }
 
     onScenesUpdate(sorted);
-  }, [scenes, onScenesUpdate, originalVideoDuration]);
+  }, [scenes, onScenesUpdate, originalVideoDuration, commitHistory]);
 
   // Rename scene handler
   const handleSceneRename = useCallback((sceneId: string, newName: string) => {
