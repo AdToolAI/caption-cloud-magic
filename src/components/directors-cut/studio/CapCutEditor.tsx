@@ -634,9 +634,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 name: t('dc.aiVoiceOverClip'),
                 url: voiceOverUrl,
                 startTime: 0,
-                duration: 10, // Temporary duration until actual audio loads
+                duration: videoDuration || 60, // Placeholder = full video length, updated on loadedmetadata
                 trimStart: 0,
-                trimEnd: 10,
+                trimEnd: videoDuration || 60,
                 volume: 100,
                 fadeIn: 0.2,
                 fadeOut: 0.2,
