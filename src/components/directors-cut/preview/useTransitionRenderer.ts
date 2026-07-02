@@ -38,6 +38,7 @@ export function useTransitionRenderer(
   transitionPhaseRef?: React.MutableRefObject<'idle' | 'preparing' | 'active' | 'handoff'>,
   activeSlotRef?: React.MutableRefObject<'A' | 'B'>,
   resetTransitionStateRef?: React.MutableRefObject<(() => void) | null>,
+  isPlayingRef?: React.MutableRefObject<boolean>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
@@ -205,7 +206,11 @@ export function useTransitionRenderer(
             try { active.currentTime = expectedOutgoing; } catch {}
           }
           if (Math.abs(active.playbackRate - outgoingRate) > 0.01) active.playbackRate = outgoingRate;
-          if (active.paused) active.play().catch(() => {});
+          if (isPlayingRef?.current !== false) {
+            if (active.paused) active.play().catch(() => {});
+          } else if (!active.paused) {
+            active.pause();
+          }
         } else {
           // Safe edge fallback: hold outgoing clip on its cut frame while the
           // incoming clip plays from its own in-point for the full transition.
@@ -233,9 +238,13 @@ export function useTransitionRenderer(
           }
         }
 
-        // Start/keep playing incoming layer during the transition.
-        if (standby.paused) {
-          standby.play().catch(() => {});
+        // Start/keep playing incoming layer during the transition — but only if
+        // the user hasn't paused the player. Otherwise the RAF loop would keep
+        // resurrecting playback whenever pause is pressed mid-transition.
+        if (isPlayingRef?.current !== false) {
+          if (standby.paused) standby.play().catch(() => {});
+        } else if (!standby.paused) {
+          standby.pause();
         }
 
         const styles = getTransitionStyles({
@@ -246,15 +255,8 @@ export function useTransitionRenderer(
           transitionDuration: rt.duration,
         });
 
-        // Apply active (outgoing) styles
-        active.style.position = 'absolute';
-        active.style.inset = '0';
-        active.style.width = '100%';
-        active.style.height = '100%';
-        active.style.objectFit = 'contain';
-        // Keep the A/B transition layer above media/image/blackscreen overlays.
-        // Otherwise added clips can cover the prepared transition videos and the
-        // user only sees a hard cut at the boundary.
+        // Apply active (outgoing) styles — layout comes from className.
+        // Only manage visual/effect properties + z-index for stacking.
         active.style.zIndex = '10';
 
         const activeTransitionFilter = (styles.baseStyle as any).filter || '';
@@ -265,11 +267,6 @@ export function useTransitionRenderer(
 
         // Apply standby (incoming) styles
         standby.style.pointerEvents = 'auto';
-        standby.style.position = 'absolute';
-        standby.style.inset = '0';
-        standby.style.width = '100%';
-        standby.style.height = '100%';
-        standby.style.objectFit = 'contain';
         standby.style.zIndex = '11';
 
         const standbyTransitionFilter = (styles.incomingStyle as any).filter || '';
@@ -309,12 +306,14 @@ export function useTransitionRenderer(
         // wrapper's black background as a visible flicker.
 
         // 1. Show the new active (was standby) FIRST so its pixels are on
-        //    screen before we touch the outgoing slot.
+        //    screen before we touch the outgoing slot. Raise its z-index above
+        //    the outgoing slot so nothing can occlude it during the overlap.
         standby.style.opacity = '1';
         standby.style.pointerEvents = 'auto';
         standby.style.transform = 'none';
         standby.style.clipPath = 'none';
         standby.style.filter = syncFilter || '';
+        standby.style.zIndex = '12';
 
         // 2. Pause the old active — it becomes the new standby.
         if (!active.paused) active.pause();
@@ -322,9 +321,9 @@ export function useTransitionRenderer(
         active.style.transform = 'none';
         active.style.clipPath = 'none';
         active.style.filter = 'none';
-        // Leave `opacity` at its current transition-end value (≈1) for ONE
-        // more RAF frame so both layers overlap while the incoming clip
-        // paints. The next tick fades it out via `pendingHideRef`.
+        // Drop its z-index BELOW the new active so it can't occlude anything
+        // even for the overlap frame. Opacity stays until pendingHideRef fades it.
+        active.style.zIndex = '9';
         pendingHideRef.current = active;
 
         // 3. Swap the slot reference
@@ -393,13 +392,12 @@ export function useTransitionRenderer(
           seekStandby(rt.incomingSceneId, scenes, preSeekTime);
           standby.style.opacity = '0';
           standby.style.pointerEvents = 'none';
+          // Also make sure standby is paused during pre-seek if the user paused.
+          if (isPlayingRef?.current === false && !standby.paused) standby.pause();
           active.style.opacity = '1';
           active.style.transform = 'none';
           active.style.clipPath = 'none';
           active.style.filter = syncFilter || '';
-          active.style.position = '';
-          active.style.inset = '';
-          active.style.zIndex = '';
 
           rafRef.current = requestAnimationFrame(tick);
           return;
@@ -414,24 +412,25 @@ export function useTransitionRenderer(
         standby.style.transform = 'none';
         standby.style.clipPath = 'none';
         standby.style.filter = 'none';
-        standby.style.position = '';
-        standby.style.inset = '';
-        standby.style.width = '';
-        standby.style.height = '';
-        standby.style.objectFit = '';
         standby.style.zIndex = '';
         lastStandbySeekRef.current = '';
         setPhase('idle');
       }
 
-      // Active normal styles
+      // Active normal styles — layout is class-driven; only touch visuals.
       active.style.opacity = '1';
       active.style.transform = 'none';
       active.style.clipPath = 'none';
       active.style.filter = syncFilter || '';
-      active.style.position = '';
-      active.style.inset = '';
       active.style.zIndex = '';
+
+      // If the user paused mid-tick, make sure both slots really stay paused.
+      if (isPlayingRef?.current === false) {
+        if (!active.paused) active.pause();
+        if (!standby.paused) standby.pause();
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
 
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -440,5 +439,5 @@ export function useTransitionRenderer(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scenes, transitions, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl]);
+  }, [scenes, transitions, resolvedTransitions, visualTimeRef, videoRefA, videoRefB, baseVideoUrl, canvasRef, videoFilterRef, frameCacheRef, seekStandby, computeFilterForTimeRef, lastHandoffBoundaryRef, setPhase, getActive, getStandby, activeSlotRef, getSceneSourceStart, getSceneSourceEnd, getSceneSourceUrl, isPlayingRef]);
 }

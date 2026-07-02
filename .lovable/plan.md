@@ -1,35 +1,32 @@
-## Zwei Bugs identifiziert
+## Zwei verbleibende Bugs
 
-**Bug 1 — 1-Frame Blackflash direkt nach dem Übergang**
-Am Ende der Transition macht die Handoff-Phase (`useTransitionRenderer.ts` Zeilen 277–330) drei Dinge im selben Frame:
-1. Slot A (outgoing) auf `opacity:0` + Reset von `position/inset/zIndex/width/height/objectFit` auf leer.
-2. Slot B (incoming, war Standby) auf `opacity:1` + gleicher Style-Reset.
-3. `activeSlotRef` flippt auf 'B'.
+**Bug 1 — Blackflash direkt nach dem Übergang**
+Nach dem Handoff läuft im nächsten Idle-Tick von `useTransitionRenderer.ts` folgender Code:
+- Zeilen 400–402 (Pre-Seek-Fallback) und 432–434 (steady state) setzen `active.style.position/inset/zIndex = ''`.
+- Beim Übergang hatten wir aber `position:absolute; inset:0; zIndex:10/11` inline gesetzt. Das Zurücksetzen auf `''` triggert einen Style-Recomputation-Tick, in dem die JSX-className-Positionierung neu aufgelöst wird. Zusätzlich fällt Slot B von inline `zIndex:11` auf CSS-`zIndex:2` zurück, während Slot A noch inline `zIndex:10` hat, aber erst einen Frame später auf `opacity:0` gedimmt wird → für 1 Frame ist Slot A (leerer Frame) über Slot B sichtbar bzw. der Wrapper-Schwarzhintergrund blitzt durch.
 
-Das Zurücksetzen von `position:absolute` + `inset:0` löst einen Reflow aus, in dem für einen Frame kein `<video>` das Fenster füllt → der schwarze Hintergrund des Wrappers ist sichtbar. Zusätzlich hat **Slot B kein `onSeeked`-Reveal-Handler** wie Slot A (`DirectorsCutPreviewPlayer.tsx` Zeilen 1667–1674 vs. 1687–1693) — falls ein späterer Seek Slot B minimal repaintet, gibt es keinen Schutz gegen die Frame-0-Painting-Race.
-
-**Bug 2 — Replay zeigt nur Szene 2**
-Nach dem Übergang steht `activeSlotRef.current = 'B'`. Beim natürlichen Video-Ende (`handleVideoEnded`, Zeilen 383–413) wird zwar `visualTime=0` gesetzt, aber:
-- `activeSlotRef` bleibt auf 'B'
-- Slot A/B-Sichtbarkeit wird nicht zurückgesetzt
-- `useTransitionRenderer` interner State (`phaseRef`, `lastStandbySeekRef`, `lastActiveTransitionRef`) wird nicht geleert
-
-Beim erneuten Play spielt der Player weiter aus Slot B (Szene-2-Quelle) und die interne Transition-State-Machine hat noch stale Marker → die Szene 1 wird nie wieder gezeigt.
+**Bug 2 — Pause reagiert nicht sauber**
+- `handlePlayPause`, der externe `isPlaying`-Sync und `stopAllAudio` pausieren nur `getActiveVideo()` — Slot B bleibt weiterlaufen, wenn er im Moment aktiv war/Übergang lief.
+- Der Tick-Loop in `useTransitionRenderer.ts` ruft unabhängig vom Play/Pause-State `active.play()` (Zeile 208) und `standby.play()` (Zeile 238) auf. Sobald man während oder direkt nach einer Transition pausiert, spielt der RAF das Video sofort wieder an.
 
 ## Fix-Plan
 
 ### 1. `src/components/directors-cut/preview/useTransitionRenderer.ts`
-- **Style-Reflow vermeiden**: Im Handoff-Branch (Zeilen 285–305) NICHT mehr `position/inset/width/height/objectFit/zIndex` auf `''` setzen. Nur `opacity`, `transform`, `clipPath`, `filter` und `pointerEvents` anfassen. Die Slots bleiben durchgehend `absolute inset-0` (kommt eh aus dem JSX `className`).
-- **Overlap-Frame**: Bevor Slot A auf `opacity:0` geht, einen 1-RAF-Frame Delay einbauen (beide Slots kurz sichtbar), damit Slot B garantiert Pixel gerendert hat. Konkret: Handoff in zwei Ticks aufteilen — Tick 1 setzt neuen Slot auf opacity 1, Tick 2 setzt alten auf opacity 0.
-- **Reset-API**: Neue Ref `resetTransitionStateRef` exportieren, die von außen aufgerufen werden kann und `phaseRef`, `lastStandbySeekRef`, `lastActiveTransitionRef` cleart.
+- **Layout-Styles einfrieren**: Aus dem Renderer sämtliche inline-Setzungen und Löschungen von `position`, `inset`, `width`, `height`, `objectFit` entfernen (Zeilen 250–254, 268–272, 400–402, 417–421, 432–433). Positionierung kommt komplett aus der JSX-className `absolute inset-0 w-full h-full object-contain`.
+- **z-Index sauber managen**: Beim Handoff auch Slot A (jetzt Standby) `zIndex` explizit auf `''` zurücksetzen. Standby-Slot bekommt beim `getTransitionStyles`-Setup keinen zIndex=11 mehr, sondern wir nutzen ausschließlich die klassenbasierten z-Indizes; nur `pointerEvents` und Visual-Effect-Styles bleiben.
+- **isPlaying-Gate**: Neue Signatur-Erweiterung `isPlayingRef: React.MutableRefObject<boolean>`. `active.play()` und `standby.play()` nur aufrufen, wenn `isPlayingRef.current === true`. Wenn `false`, aktiv/standby beide `.pause()` innerhalb der Transition-Branch.
+- **Standby beim Pausieren stoppen**: Im Idle-Zweig `standby.paused` respektieren; auch wenn eine Transition-Vorbereitung läuft, aber der Player pausiert ist, nie `standby.play()` aufrufen.
 
 ### 2. `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- **Slot B `onSeeked`-Reveal** (Zeilen 1687–1693): Analoges Handler wie Slot A hinzufügen, das bei `activeSlotRef.current === 'B'` auf `opacity:'1'` flippt.
-- **`handleVideoEnded` erweitern** (Zeilen 383–413): Nach dem `visualTime=0` einen `resetToPrimaryVideoSlot(0)` aufrufen und die neue `resetTransitionStateRef` triggern, damit Slot A wieder sichtbar wird und der interne Transition-State clean ist.
-- **Loop-Fall absichern**: Falls der Loop-Toggle aktiv ist, gleicher Reset direkt vor dem Auto-Restart.
+- **`isPlayingRef` einführen** und synchron mit dem `isPlaying`-State halten (via `useEffect`); an `useTransitionRenderer` durchreichen.
+- **Beide Slots pausieren** in:
+  - `handlePlayPause` (Zeile 1454): `videoRefA.current?.pause()` **und** `videoRefB.current?.pause()`.
+  - Externer isPlaying-Sync (Zeile 1399): dito.
+  - `stopAllAudio` bleibt wie es ist (Audio-only), aber der Aufrufer pausiert zusätzlich beide Video-Slots.
+- **Beim Play**: nur `getActiveVideo()?.play()` (unverändert), da Standby-Play nur der Renderer während Transitionen macht — der jetzt selbst am `isPlayingRef` gated ist.
 
 ### Ergebnis
-- Kein Blackflash mehr, weil Slot B ununterbrochen fullscreen positioniert bleibt und Slot A erst einen Frame später ausgeblendet wird.
-- Replay startet immer sauber mit Slot A + Szene 1, egal wie oft der User "Play" drückt.
+- Kein Blackflash mehr, weil kein einziger Layout-Reset mehr auf dem Video-Element passiert; nur `opacity/transform/clipPath/filter/zIndex/pointerEvents` fluktuieren.
+- Pause reagiert sofort und bleibt stabil, weil der RAF-Loop nicht mehr gegen die Nutzer-Intention arbeitet und alle beteiligten Video-Elemente wirklich gestoppt werden.
 
-Kein Verhalten am Export/Render ändert sich — betroffen ist ausschließlich die Preview-Pipeline.
+Kein Export-Verhalten ändert sich — nur die Preview-Pipeline.

@@ -539,7 +539,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // so the internal phase/seek markers don't survive across playbacks.
   const resetTransitionStateRef = useRef<(() => void) | null>(null);
 
-  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef);
+  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef, isPlayingRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -1396,7 +1396,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         backgroundMusicAudioRef.current?.play().catch(() => {});
       }
     } else if (!externalIsPlaying && isPlaying) {
-      video.pause();
+      // Pause BOTH slots — Slot B may still be running from a transition.
+      videoRefA.current?.pause();
+      videoRefB.current?.pause();
       setIsPlaying(false);
       sourceAudioRef.current?.pause();
       voiceoverShouldRecoverRef.current = false;
@@ -1451,7 +1453,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (!video) return;
 
     if (isPlaying) {
-      video.pause();
+      // Pause BOTH slots — during a transition Slot B may be the one running.
+      videoRefA.current?.pause();
+      videoRefB.current?.pause();
       setIsPlaying(false);
       stopAllAudio();
       onPlayingChange?.(false);
