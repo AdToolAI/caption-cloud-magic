@@ -552,11 +552,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Shared transition phase ref — lets the player know when the renderer is in handoff
   const transitionPhaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
   const transitionClockLastTsRef = useRef<number>(0);
+  const postTransitionHoldFramesRef = useRef<number>(0);
   // Reset hook exposed by useTransitionRenderer — cleared on natural end/replay
   // so the internal phase/seek markers don't survive across playbacks.
   const resetTransitionStateRef = useRef<(() => void) | null>(null);
 
-  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef, isPlayingRef, mediaVideoRef);
+  useTransitionRenderer(videoRefA, videoRefB, videoUrl, transitionCanvasRef, visualTimeRef, sortedScenes, transitions, videoFilterRef, frameCacheRef, computeFilterForTimeRef, transitionCooldownRef, postTransitionHoldFramesRef, lastHandoffBoundaryRef, transitionPhaseRef, activeSlotRef, resetTransitionStateRef, isPlayingRef, mediaVideoRef);
 
 
   // ==================== rAF PLAYBACK LOOP (VIDEO-LED) ====================
@@ -570,6 +571,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     lastSceneIndexRef.current = -1;
     pendingSceneAdvanceRef.current = null;
     transitionCooldownRef.current = 0;
+    postTransitionHoldFramesRef.current = 0;
     lastHandoffBoundaryRef.current = null;
     transitionPhaseRef.current = 'idle';
     inGapRef.current = false;
@@ -760,11 +762,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             : 0;
           swClockLastTsRef.current = gapNow;
 
-          // Pause the original-video slot + its source audio
+          // Pause the original-video slot + its source audio. Visibility is
+          // gated below so A/B can hold the handoff frame until the media
+          // overlay has decoded the exact next frame.
           if (!video.paused) video.pause();
-          video.style.opacity = '0';
           const standby = getStandbyVideo();
-          if (standby) standby.style.opacity = '0';
           if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
             sourceAudioRef.current.pause();
           }
@@ -777,6 +779,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           const mSrcIn = (mediaScene as any).original_start_time ?? 0;
           const mSrcOut = (mediaScene as any).original_end_time ?? Infinity;
           const expectedOverlayTime = mSrcIn + Math.max(0, tlNow - mediaScene.start_time) * mediaRate;
+          let overlayReadyForHandoff = false;
           if (overlay && isVideoOverlay) {
             // (Re)bind src on scene change OR when head-trim changed OR when the
             // overlay's playhead has drifted outside the new [mSrcIn, mSrcOut] window
@@ -802,6 +805,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             if (Math.abs(overlay.currentTime - expectedOverlayTime) > 0.35) {
               try { overlay.currentTime = expectedOverlayTime; } catch {}
             }
+            const overlaySrcMatches = overlay.currentSrc === mediaScene.additionalMedia!.url || overlay.getAttribute('src') === mediaScene.additionalMedia!.url;
+            const overlayTimeMatches = Math.abs(overlay.currentTime - expectedOverlayTime) <= 0.18;
+            overlayReadyForHandoff = overlaySrcMatches && overlay.readyState >= 2 && overlayTimeMatches;
+            overlay.style.opacity = overlayReadyForHandoff ? '1' : '0';
           } else {
             // Image / blackscreen — make sure overlay <video> is idle
             if (overlay && !overlay.paused) overlay.pause();
@@ -810,6 +817,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               activeMediaSrcInRef.current = mSrcIn;
               if (overlay) overlay.removeAttribute('src');
             }
+            if (overlay) overlay.style.opacity = '0';
+          }
+
+          const keepABVisible = isVideoOverlay && !overlayReadyForHandoff;
+          video.style.opacity = keepABVisible ? '1' : '0';
+          if (standby && standby !== video) standby.style.opacity = keepABVisible ? standby.style.opacity : '0';
+          if (postTransitionHoldFramesRef.current > 0) {
+            postTransitionHoldFramesRef.current -= 1;
           }
 
           // Advance timeline by wall-clock delta
@@ -1562,7 +1577,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }, [sortedScenes, displayTime]);
 
   const activeVisualTransition = useMemo(
-    () => resolverFindActiveTransition(displayTime, resolvedTransitions),
+    () => Boolean(
+      resolverFindActiveTransition(displayTime, resolvedTransitions) ||
+      transitionPhaseRef.current !== 'idle' ||
+      postTransitionHoldFramesRef.current > 0
+    ),
     [displayTime, resolvedTransitions],
   );
 
@@ -1760,12 +1779,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             className="absolute inset-0 w-full h-full object-contain"
             style={{
               zIndex: 4,
-              opacity:
-                !activeVisualTransition &&
-                currentScene?.sourceMode === 'media' &&
-                currentScene?.additionalMedia?.type === 'video'
-                  ? 1
-                  : 0,
+              opacity: 0,
               pointerEvents: 'none',
               backgroundColor: '#000',
             }}
