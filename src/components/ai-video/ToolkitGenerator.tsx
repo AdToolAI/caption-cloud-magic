@@ -78,6 +78,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  /**
+   * Placement of the uploaded reference image within the generated clip:
+   *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
+   *  - 'end'    → endImageUrl (image is the LAST frame; needs capabilities.endFrame)
+   *  - 'anchor' → identity-only reference; no forced start/end frame
+   * If the current model doesn't support the selected placement, it falls back to 'start'.
+   */
+  const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>('start');
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
@@ -129,6 +137,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
     if (!model.capabilities.multiRef) setViduReferences([]);
+    // Reset placement to 'start' if the current one isn't available on this model
+    if (referencePlacement === 'end' && !model.capabilities.endFrame) setReferencePlacement('start');
+    if (referencePlacement === 'anchor' && !model.capabilities.multiRef) setReferencePlacement('start');
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
@@ -305,8 +316,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const clipSource = toolkitModelToClipSource(model);
       const hasCastOrWorld =
         anchorChars.length > 0 || !!castLocation || !!castBuilding || castProps.length > 0;
+      // Skip the composed first-frame anchor whenever the user wants the
+      // reference at the END or only as an identity anchor — otherwise the
+      // reference motif would appear at frame 0 (composed) AND at the intended
+      // moment (prompt), producing a visible double-appearance.
+      const placementSkipsAnchor = referencePlacement !== 'start';
       const shouldCompose =
         !startImageUrl &&
+        !placementSkipsAnchor &&
         hasCastOrWorld &&
         !!clipSource &&
         !(model.capabilities.multiRef && viduReferences.length > 0);
@@ -387,7 +404,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         startImageUrl ??
         mentionResolved.referenceImageUrl ??
         null;
-      if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
+      // Route the reference image according to the user-selected placement.
+      // 'end' needs capabilities.endFrame; 'anchor' routes into referenceImages[]
+      // when the provider supports subject-reference (Vidu multiRef).
+      const effectivePlacement: 'start' | 'end' | 'anchor' =
+        referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
+        : referencePlacement === 'anchor' && !model.capabilities.multiRef ? 'start'
+        : referencePlacement;
+
+      if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
+        body.startImageUrl = referenceImage;
+      } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
+        body.endImageUrl = referenceImage;
+      }
+      // 'anchor' → don't set start/end; if the provider supports multiRef, the
+      // uploaded image is merged into referenceImages[] below.
       // v2v: pass reference clip + reference type (Kling-3 omni)
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
@@ -587,6 +618,60 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
               />
             </label>
+          )}
+
+          {/* ── Placement toggle: where does the reference image appear? ── */}
+          {startImageUrl && (
+            <div className="space-y-2 pt-2 border-t border-border/40">
+              <Label className="text-xs font-medium text-muted-foreground">
+                {language === 'de' ? 'Wo soll das Bild erscheinen?' : 'Where should the image appear?'}
+              </Label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  {
+                    key: 'start' as const,
+                    label: language === 'de' ? 'Am Anfang' : 'At start',
+                    hint: language === 'de' ? 'Bild ist der erste Frame' : 'Image is the first frame',
+                    disabled: false,
+                  },
+                  {
+                    key: 'end' as const,
+                    label: language === 'de' ? 'Am Ende' : 'At end',
+                    hint: model.capabilities.endFrame
+                      ? (language === 'de' ? 'Kamera fährt zum Bild hin' : 'Camera transitions to image')
+                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
+                    disabled: !model.capabilities.endFrame,
+                  },
+                  {
+                    key: 'anchor' as const,
+                    label: language === 'de' ? 'Nur Anker' : 'Anchor only',
+                    hint: model.capabilities.multiRef
+                      ? (language === 'de' ? 'Nur Identitäts-Referenz, kein fester Frame' : 'Identity reference only, no forced frame')
+                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
+                    disabled: !model.capabilities.multiRef,
+                  },
+                ]).map((opt) => {
+                  const active = referencePlacement === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      disabled={opt.disabled}
+                      title={opt.hint}
+                      onClick={() => setReferencePlacement(opt.key)}
+                      className={`text-[11px] px-2 py-2 rounded-md border transition-colors text-left leading-tight ${
+                        active
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                      } ${opt.disabled ? 'opacity-40 cursor-not-allowed hover:border-border/40 hover:text-muted-foreground' : ''}`}
+                    >
+                      <div className="font-medium">{opt.label}</div>
+                      <div className="text-[10px] opacity-80 mt-0.5">{opt.hint}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </Card>
       )}
