@@ -55,9 +55,32 @@ const cheapEquals = <T>(a: T, b: T): boolean => {
       if (av.length !== bv.length) return false;
       for (let i = 0; i < av.length; i++) {
         if (av[i] === bv[i]) continue;
-        // Different reference — fall back to deep compare for this array only.
+        // Fast-path for the two hot arrays in the editor state (scenes, audioTracks).
+        // Both are lists of objects with a stable `id` and a small set of numeric
+        // fields that drive timeline math. If those match, the items are equal for
+        // history purposes — thumbnails / effect maps changing shouldn't create
+        // undo steps on their own.
+        const ai = av[i];
+        const bi = bv[i];
+        if (ai && bi && typeof ai === 'object' && typeof bi === 'object' && ai.id && ai.id === bi.id) {
+          const HOT_KEYS = [
+            'start_time', 'end_time',
+            'original_start_time', 'original_end_time',
+            'media_source_start', 'media_source_end',
+            'duration', 'playbackRate',
+            'muted', 'volume',
+            'name',
+          ] as const;
+          let hotDiff = false;
+          for (const k of HOT_KEYS) {
+            if ((ai as any)[k] !== (bi as any)[k]) { hotDiff = true; break; }
+          }
+          if (!hotDiff) continue;
+        }
+        // Different reference and hot-fields differ (or no stable id) — fall back
+        // to deep compare for this array item only.
         try {
-          if (JSON.stringify(av[i]) !== JSON.stringify(bv[i])) return false;
+          if (JSON.stringify(ai) !== JSON.stringify(bi)) return false;
         } catch {
           return false;
         }

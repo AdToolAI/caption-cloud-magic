@@ -930,34 +930,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         return;
       }
 
-      // ===== TRANSITION BRANCH (timeline-led) =====
-      // During a transition the outgoing slot is intentionally held on the cut
-      // frame while the incoming slot plays underneath. Therefore the timeline
-      // must advance by wall-clock time instead of video.currentTime.
-      const transitionNow = findActiveTransition(visualTimeRef.current);
-      if (transitionNow && !transitionNow.isFreeze) {
-        const delta = transitionClockLastTsRef.current > 0
-          ? (gapNow - transitionClockLastTsRef.current) / 1000
-          : 0;
-        transitionClockLastTsRef.current = gapNow;
-
-        const nextTL = Math.min(transitionNow.tEnd, visualTimeRef.current + delta);
-        visualTimeRef.current = nextTL;
-
-        const outgoingIdx = sortedScenes.findIndex(s => s.id === transitionNow.outgoingScene.id);
-        if (outgoingIdx >= 0) lastSceneIndexRef.current = outgoingIdx;
-
-        setDisplayTime(nextTL);
-        onTimeUpdateRef.current?.(nextTL);
-
-        if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
-          sourceAudioRef.current.pause();
-        }
-
-        rafIdRef.current = requestAnimationFrame(tick);
-        return;
-      }
+      // NOTE: Transitions are fully handled earlier in this tick (see lines ~701–722).
+      // A second `findActiveTransition` branch used to live here as a belt-and-suspenders
+      // safety net, but it was unreachable — the earlier branch always `return`s first —
+      // and it was a latent footgun if anyone later mutated `visualTimeRef` between the
+      // two checks. Removed intentionally; do not reintroduce.
       transitionClockLastTsRef.current = 0;
+
 
       if (transitionPhaseRef.current === 'active') {
         // Give the transition renderer one frame to perform its ping-pong slot
@@ -1625,17 +1604,39 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // Track active slot changes to reapply filter after ping-pong swap
   const [activeSlotTracker, setActiveSlotTracker] = useState(activeSlotRef.current);
   useEffect(() => {
-    // RAF-based check (auto-pauses when tab is hidden, cheaper than a 10Hz interval).
+    // Slot-flips only ever happen mid-playback (transition handoff) or on explicit
+    // seek/replay. So we gate the RAF poll behind `isPlayingRef` and re-check once
+    // after any pause via a low-frequency safety tick. This keeps idle/background
+    // tabs at 0% CPU while still catching post-seek slot changes promptly.
     let rafId = 0;
-    const tick = () => {
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const check = () => {
       if (activeSlotRef.current !== activeSlotTracker) {
         setActiveSlotTracker(activeSlotRef.current);
       }
-      rafId = requestAnimationFrame(tick);
+    };
+
+    const tick = () => {
+      check();
+      if (isPlayingRef.current) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        // Paused: stop the RAF loop, but schedule one delayed re-check to catch
+        // slot changes that happen right after a seek/replay while paused.
+        safetyTimer = setTimeout(() => {
+          check();
+          rafId = requestAnimationFrame(tick);
+        }, 250);
+      }
     };
     rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (safetyTimer) clearTimeout(safetyTimer);
+    };
   }, [activeSlotTracker]);
+
 
   useEffect(() => {
     videoFilterRef.current = videoFilter ?? '';
