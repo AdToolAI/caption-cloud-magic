@@ -21,11 +21,16 @@ export interface PreflightInput {
     isBlackscreen?: boolean;
     thumbnail_url?: string;
     sourceMode?: string;
+    aspect_ratio?: string | null;
+    width?: number | null;
+    height?: number | null;
   }>;
   voiceOverUrl?: string | null;
   voiceOverEnabled?: boolean;
   currentVoiceId?: string | null;
   backgroundMusicUrl?: string | null;
+  musicVolume?: number; // 0..100
+  voiceoverVolume?: number; // 0..100
   subtitleClips: Array<{
     id: string;
     text?: string;
@@ -36,6 +41,36 @@ export interface PreflightInput {
   showSubtitles?: boolean;
   exportAspectRatio?: string;
 }
+
+// Normalise aspect strings like "16:9", "9/16", "1080x1920" into a numeric ratio (w/h).
+const parseAspect = (s?: string | null, w?: number | null, h?: number | null): number | null => {
+  if (w && h && w > 0 && h > 0) return w / h;
+  if (!s) return null;
+  const cleaned = s.trim().toLowerCase();
+  const m = /^(\d+(?:\.\d+)?)\s*[:x/]\s*(\d+(?:\.\d+)?)$/.exec(cleaned);
+  if (!m) return null;
+  const a = parseFloat(m[1]);
+  const b = parseFloat(m[2]);
+  if (!a || !b) return null;
+  return a / b;
+};
+
+const aspectLabel = (r: number): string => {
+  const presets: Array<[string, number]> = [
+    ['16:9', 16 / 9],
+    ['9:16', 9 / 16],
+    ['1:1', 1],
+    ['4:5', 4 / 5],
+    ['21:9', 21 / 9],
+  ];
+  let best = presets[0];
+  let bestDiff = Math.abs(r - best[1]);
+  for (const p of presets) {
+    const d = Math.abs(r - p[1]);
+    if (d < bestDiff) { best = p; bestDiff = d; }
+  }
+  return best[0];
+};
 
 const readVoiceLock = (projectId?: string): { voiceId?: string } | null => {
   if (!projectId) return null;
@@ -174,6 +209,70 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       severity: 'info',
       title: 'Musik ohne Voice-Over',
       hint: 'Ducking wird nicht angewendet — Musik läuft auf voller (gedämpfter) Lautstärke.',
+    });
+  }
+
+  // 9. W4.6 Aspect-Ratio consistency across scenes
+  const targetRatio = parseAspect(input.exportAspectRatio) ?? 16 / 9;
+  const targetLabel = aspectLabel(targetRatio);
+  const mismatched = input.scenes.filter((s) => {
+    if (s.isBlackscreen) return false;
+    const r = parseAspect(s.aspect_ratio ?? null, s.width ?? null, s.height ?? null);
+    if (r === null) return false;
+    // Allow 3% tolerance to account for rounding
+    return Math.abs(r - targetRatio) / targetRatio > 0.03;
+  });
+  if (mismatched.length > 0) {
+    findings.push({
+      id: 'aspect-mismatch',
+      severity: 'warn',
+      title: `${mismatched.length} Szene${mismatched.length > 1 ? 'n' : ''} mit abweichendem Seitenverhältnis`,
+      detail: `Projekt rendert in ${targetLabel} — betroffene Szenen werden beschnitten oder mit Letterbox versehen.`,
+      hint: 'Ersetze Assets oder ändere das Export-Seitenverhältnis passend.',
+    });
+  }
+
+  // 10. W4.6 Endcard-Check — final scene should be long enough for logo/CTA
+  const realScenes = input.scenes.filter((s) => !s.isBlackscreen);
+  if (realScenes.length > 0) {
+    const last = realScenes[realScenes.length - 1];
+    const lastDur = (last.end_time ?? 0) - (last.start_time ?? 0);
+    if (lastDur > 0 && lastDur < 1.5) {
+      findings.push({
+        id: 'endcard-short',
+        severity: 'info',
+        title: 'Endcard sehr kurz',
+        detail: `Letzte Szene ${lastDur.toFixed(2)}s — für Logo, CTA oder Call-out werden 1.5–3s empfohlen.`,
+      });
+    }
+  }
+
+  // 11. W4.6 Loudness approximation — social platforms target ~-14 LUFS
+  // Approximation: normalised sum of active audio channels. Music at high vol
+  // combined with VO tends to clip perceived loudness on TikTok / Meta.
+  const musicVol = typeof input.musicVolume === 'number' ? input.musicVolume : 70;
+  const voVol = typeof input.voiceoverVolume === 'number' ? input.voiceoverVolume : 100;
+  const hasMusic = !!input.backgroundMusicUrl;
+  const hasVO = !!input.voiceOverUrl;
+  if (hasMusic && hasVO) {
+    // Rough loudness proxy: linearly combine normalised volumes weighted by presence.
+    // Values >1.4 (i.e. music >70% AND vo >70%) tend to push past -14 LUFS after mastering.
+    const proxy = (musicVol / 100) * 0.6 + (voVol / 100);
+    if (proxy > 1.4) {
+      findings.push({
+        id: 'loudness-hot',
+        severity: 'warn',
+        title: 'Mix wirkt zu laut',
+        detail: `Musik ${musicVol}% + Voice-Over ${voVol}% überschreiten voraussichtlich -14 LUFS (Social-Standard).`,
+        hint: 'Reduziere Musik auf ~40–50% oder aktiviere stärkeres Ducking.',
+      });
+    }
+  } else if (hasMusic && !hasVO && musicVol > 85) {
+    findings.push({
+      id: 'loudness-music',
+      severity: 'info',
+      title: 'Musik sehr laut',
+      detail: `Musik-Bett auf ${musicVol}% — ohne Ducking kann das im Feed unangenehm knallen.`,
     });
   }
 

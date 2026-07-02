@@ -1791,18 +1791,23 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const findings = runCIPreflight({
       projectId,
       totalDuration: actualTotalDuration,
-      scenes: scenes.map((s) => ({
+      scenes: scenes.map((s: any) => ({
         id: s.id,
         start_time: s.start_time,
         end_time: s.end_time,
         isBlackscreen: s.isBlackscreen,
         thumbnail_url: s.thumbnail_url,
         sourceMode: s.sourceMode,
+        aspect_ratio: s.aspect_ratio ?? s.aspectRatio ?? null,
+        width: s.width ?? s.video_width ?? null,
+        height: s.height ?? s.video_height ?? null,
       })),
       voiceOverUrl,
       voiceOverEnabled: !!voiceOverUrl,
       currentVoiceId: null,
       backgroundMusicUrl: audioTracks.find((t) => t.id === 'track-music')?.clips?.[0]?.url ?? null,
+      musicVolume: audioTracks.find((t) => t.id === 'track-music')?.volume ?? 70,
+      voiceoverVolume: audioTracks.find((t) => t.id === 'track-voiceover')?.volume ?? 100,
       subtitleClips: (subtitleTrack?.clips ?? []).map((c) => ({
         id: c.id,
         text: c.text,
