@@ -40,6 +40,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
   onTrim,
   onSplitAtPlayhead,
   onSplitAtTrim,
+  onSeek,
   onDelete,
 }) => {
   const isAdditional = !!scene.additionalMedia;
