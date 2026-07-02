@@ -1287,7 +1287,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       stopAllAudio();
       onPlayingChange?.(false);
     } else {
-      if (video.ended || video.currentTime >= duration - 0.1) {
+      if (video.ended || visualTimeRef.current >= duration - 0.1) {
         seekToTimelineTime(0, { resetGuards: true, forcePrimarySlot: true });
       } else {
         seekToTimelineTime(visualTimeRef.current, { resetGuards: true, forcePrimarySlot: true });
