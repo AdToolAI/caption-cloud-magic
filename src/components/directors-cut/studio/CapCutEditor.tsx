@@ -1247,20 +1247,132 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       toast.error(t('dc.playheadNotInScene'));
       return;
     }
-    if (currentTime - targetScene.start_time < 0.5 || targetScene.end_time - currentTime < 0.5) {
+    // Relaxed guard: ~1.5 frames @ 30fps — only block true zero-length splits.
+    if (currentTime - targetScene.start_time < 0.05 || targetScene.end_time - currentTime < 0.05) {
       toast.error(t('dc.tooCloseToEdge'));
       return;
     }
-    const newScenes = scenes.flatMap(s => {
-      if (s.id !== targetScene.id) return [s];
+    const s: any = targetScene;
+    const offset = currentTime - s.start_time;
+    const srcInBase = s.original_start_time ?? 0;
+    const srcOutBase = s.original_end_time ?? (srcInBase + (s.end_time - s.start_time));
+    const srcSplit = srcInBase + offset;
+    const newScenes = scenes.flatMap(sc => {
+      if (sc.id !== targetScene.id) return [sc];
+      const now = Date.now();
       return [
-        { ...s, id: s.id, end_time: currentTime },
-        { ...s, id: `scene-${Date.now()}`, start_time: currentTime, description: `${s.description} ${t('dc.partSuffix')}` },
+        {
+          ...sc,
+          id: sc.id,
+          end_time: currentTime,
+          original_start_time: srcInBase,
+          original_end_time: srcSplit,
+        },
+        {
+          ...sc,
+          id: `scene-${now}`,
+          start_time: currentTime,
+          original_start_time: srcSplit,
+          original_end_time: srcOutBase,
+          description: `${sc.description} ${t('dc.partSuffix')}`,
+        },
       ];
     });
     onScenesUpdate(newScenes);
     toast.success(t('dc.sceneSplitAtPlayhead'));
-  }, [scenes, currentTime, onScenesUpdate]);
+  }, [scenes, currentTime, onScenesUpdate, t]);
+
+  // Trim-based split (CapCut-style): splits at the currently entered trim boundaries
+  // srcIn/srcOut into up to 3 real timeline segments. Falls back to playhead split
+  // if trim equals full source (no real trim set).
+  const handleSplitAtTrim = useCallback((sceneId: string) => {
+    if (!onScenesUpdate) return;
+    const targetIdx = scenes.findIndex(s => s.id === sceneId);
+    if (targetIdx < 0) return;
+    const target: any = scenes[targetIdx];
+
+    const isAdditional = !!target.additionalMedia;
+    const hardMin = isAdditional
+      ? (target.original_start_time ?? target.start_time)
+      : 0;
+    const hardMax = isAdditional
+      ? (target.original_end_time ?? target.end_time)
+      : (originalVideoDuration && originalVideoDuration > 0
+          ? originalVideoDuration
+          : (target.original_end_time ?? target.end_time));
+
+    const srcIn = target.original_start_time ?? hardMin;
+    const srcOut = target.original_end_time ?? hardMax;
+
+    const headCut = srcIn > hardMin + 0.001;
+    const tailCut = srcOut < hardMax - 0.001;
+
+    // No real trim → fallback to playhead-based split.
+    if (!headCut && !tailCut) {
+      handleSplitAtPlayhead();
+      return;
+    }
+
+    const now = Date.now();
+    const timelineStart = target.start_time;
+    const segments: any[] = [];
+
+    let cursor = timelineStart;
+
+    if (headCut) {
+      const dur = srcIn - hardMin;
+      segments.push({
+        ...target,
+        id: `scene-${now}-h`,
+        start_time: cursor,
+        end_time: cursor + dur,
+        original_start_time: hardMin,
+        original_end_time: srcIn,
+      });
+      cursor += dur;
+    }
+
+    // Middle = trimmed range (keeps original scene id → selection persists)
+    const midDur = Math.max(0.05, srcOut - srcIn);
+    segments.push({
+      ...target,
+      id: target.id,
+      start_time: cursor,
+      end_time: cursor + midDur,
+      original_start_time: srcIn,
+      original_end_time: srcOut,
+    });
+    cursor += midDur;
+
+    if (tailCut) {
+      const dur = hardMax - srcOut;
+      segments.push({
+        ...target,
+        id: `scene-${now}-t`,
+        start_time: cursor,
+        end_time: cursor + dur,
+        original_start_time: srcOut,
+        original_end_time: hardMax,
+        description: `${target.description ?? ''} ${t('dc.partSuffix')}`.trim(),
+      });
+      cursor += dur;
+    }
+
+    // Ripple following scenes by delta between old target span and new total span.
+    const oldSpan = target.end_time - target.start_time;
+    const newSpan = cursor - timelineStart;
+    const delta = newSpan - oldSpan;
+
+    const before = scenes.slice(0, targetIdx);
+    const after = scenes.slice(targetIdx + 1).map(s => ({
+      ...s,
+      start_time: s.start_time + delta,
+      end_time: s.end_time + delta,
+    }));
+
+    onScenesUpdate([...before, ...segments, ...after]);
+    toast.success(t('dc.sceneSplitAtPlayhead'));
+  }, [scenes, onScenesUpdate, originalVideoDuration, handleSplitAtPlayhead, t]);
 
   // Insert new blackscreen scene AT playhead — splits the surrounding scene if inside one,
   // otherwise appends after the scene closest to (but ending at/before) currentTime.
