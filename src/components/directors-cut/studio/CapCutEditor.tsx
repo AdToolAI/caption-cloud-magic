@@ -2694,6 +2694,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         }}
         onFixIssues={() => setPreflightOpen(false)}
       />
+      <AnchorRefreshDialog
+        open={anchorRefreshOpen}
+        onOpenChange={setAnchorRefreshOpen}
+        scenes={scenes}
+        onScenesUpdate={(next) => {
+          commitHistory();
+          onScenesUpdate?.(next);
+          toast.success('Anchor-Refresh angewendet — Identity-Frames wiederhergestellt.');
+        }}
+      />
     </div>
   );
 };
