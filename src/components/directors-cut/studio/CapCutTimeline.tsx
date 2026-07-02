@@ -1043,12 +1043,20 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   />
                 );
               })}
-              {/* Snap line (visual feedback while dragging) */}
+              {/* Snap line + timestamp badge (visual feedback while dragging) */}
               {snapPreview !== null && (
-                <div
-                  className="absolute top-0 bottom-0 w-[2px] bg-[#F5C76A] z-40 pointer-events-none animate-pulse shadow-[0_0_8px_rgba(245,199,106,0.8)]"
-                  style={{ left: `${snapPreview * zoom}px` }}
-                />
+                <>
+                  <div
+                    className="absolute top-0 bottom-0 w-[2px] bg-[#F5C76A] z-40 pointer-events-none animate-pulse shadow-[0_0_8px_rgba(245,199,106,0.8)]"
+                    style={{ left: `${snapPreview * zoom}px` }}
+                  />
+                  <div
+                    className="absolute top-1 z-40 pointer-events-none px-1.5 py-0.5 rounded bg-[#F5C76A] text-black text-[10px] font-mono font-semibold shadow-lg -translate-x-1/2 whitespace-nowrap"
+                    style={{ left: `${snapPreview * zoom}px` }}
+                  >
+                    {`${Math.floor(snapPreview / 60)}:${Math.floor(snapPreview % 60).toString().padStart(2, '0')}.${Math.floor((snapPreview % 1) * 100).toString().padStart(2, '0')}`}
+                  </div>
+                </>
               )}
               {scenes.map((scene, i) => (
                 <DraggableScene
