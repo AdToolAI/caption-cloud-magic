@@ -2196,6 +2196,27 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <Button
             variant="ghost"
             size="sm"
+            className={cn(
+              'relative h-7 w-7 p-0 hover:bg-white/10',
+              anchorDriftCount > 0 ? 'text-amber-300 hover:text-amber-200' : 'text-white/60 hover:text-white',
+            )}
+            onClick={() => setAnchorRefreshOpen(true)}
+            title={
+              anchorDriftCount > 0
+                ? `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`
+                : 'Anchor-Refresh — Character Consistency prüfen'
+            }
+          >
+            <Anchor className="h-3.5 w-3.5" />
+            {anchorDriftCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-3.5 min-w-3.5 rounded-full bg-amber-400 text-[9px] font-bold text-black flex items-center justify-center px-1">
+                {anchorDriftCount}
+              </span>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
             onClick={() => setShortcutOverlayOpen(true)}
             title="Tastatur-Shortcuts (?)"
