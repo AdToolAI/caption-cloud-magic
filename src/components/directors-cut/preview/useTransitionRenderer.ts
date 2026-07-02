@@ -37,6 +37,7 @@ export function useTransitionRenderer(
   lastHandoffBoundaryRef?: React.MutableRefObject<HandoffBoundaryMarker | null>,
   transitionPhaseRef?: React.MutableRefObject<'idle' | 'preparing' | 'active' | 'handoff'>,
   activeSlotRef?: React.MutableRefObject<'A' | 'B'>,
+  resetTransitionStateRef?: React.MutableRefObject<(() => void) | null>,
 ) {
   const rafRef = useRef<number>();
   const phaseRef = useRef<'idle' | 'preparing' | 'active' | 'handoff'>('idle');
