@@ -1,57 +1,93 @@
-# Universal Director's Cut — Verifizierungs-Ergebnis & Cleanup-Plan
+# Universal Director's Cut — Audit-Ergebnis & priorisierte Roadmap
 
-## TL;DR
+Nach vollständigem Read-Only-Audit (Timeline, Trim, Transitions, Audio, Export, Persistenz, History) haben wir **23 Findings**. Architektur ist gesund — die meisten Probleme sind kleine, isolierte Wiring-Fehler. Ein Bug ist aber trust-breaking: **Multi-Track-Audio wird beim Export komplett verworfen.**
 
-Alle Welle-1–4-Fixes sind sauber verdrahtet. **Keine Critical- oder High-Bugs.** Das System ist voll funktionsfähig und kann in Produktion.
-
-Der Audit hat aber 2 Medium- und 3 Low-Findings gefunden, die keine akuten Bugs sind, aber Ballast und latente Footguns darstellen. Ich empfehle einen kleinen "Welle 5 — Housekeeping"-Sweep, der in ~10 Minuten durch ist.
+Ich schlage 4 Wellen vor. Du kannst danach entscheiden, ob wir alle 4 durchziehen oder nach Welle 1 stoppen.
 
 ---
 
-## Ergebnis der 8 Prüf-Bereiche
+## Welle 1 — Trust-Fixes (Export-brechende Bugs)
 
-| # | Bereich | Status |
-|---|---|---|
-| 1 | `useTransitionRenderer` (Single-RAF, isPlayingRef, Z-Index-Handoff) | ✅ PASS |
-| 2 | `SceneTrimInspector` (onValueCommit, kontrollierte Inputs, Draft-Sync) | ✅ PASS |
-| 3 | `CapCutEditor` (Idempotenz, Split-Mapping, Undo-Commits, Audio-Threshold) | ✅ PASS |
-| 4 | `DirectorsCutPreviewPlayer` (RAF-Slot-Watcher, Ended-Gate, Head-Trim) | ✅ PASS (2 Medium) |
-| 5 | `DirectorsCut.tsx` (Dep-Arrays) | ✅ PASS |
-| 6 | `useEditorHistory` (cheapEquals, Debounce, Sync-Flush) | ✅ PASS (1 Low) |
-| 7 | Transition-Resolver (Preview ↔ Remotion-Render Parität) | ✅ PASS |
-| 8 | `timelineAnchors` (Wachstum bei Append) | ✅ PASS |
+Ziel: was der User sieht/hört im Preview = was rausrendert wird.
 
----
+1. **C1 Audio-Export komplett verdrahten** — `audioTracks` (SFX, Extra-Musik, Custom-Clips) landet aktuell im Draft, aber NICHT im Render-Payload. Wir serialisieren `audioTracks` in `soundDesign.sfxTracks`, `render-directors-cut/index.ts` reicht sie durch, `DirectorsCutVideo.tsx` konsumiert sie (Schema existiert schon, wird nur nicht gefüllt).
+2. **C2 Voiceover-10-s-Truncation** — Placeholder-Duration von `10` auf `videoDuration` setzen, `AbortController` beim Unmount.
+3. **C3 AudioContext-Leak in WaveformDisplay** — Cleanup-Return, `cancelled`-Flag, damit Browser nicht bei 6 Contexts hart limitiert.
+4. **C4 audioElementsRef-Leak** — Beim Delete `pause()` + `src=''` + `Map.delete()`.
+5. **H1 Music-Volume Preview↔Export vereinheitlichen** — Preview nutzt hartkodiert `0.3`, Export nutzt Slider, Formel weicht ab. Alle drei Pfade auf `getEffectiveBackgroundMusicVolume()` konsolidieren.
+6. **H2 Subtitle-Style Zod-Strip** — `SubtitleClipSchema.passthrough()` bzw. `textStroke/maxLines/style/source` explizit ins Schema, damit User-Formatierung nicht stumm verloren geht.
 
-## Welle 5 — Housekeeping (optional, empfohlen)
-
-### Medium 1: Toter Code im Preview-Player entfernen
-- **Datei:** `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx:937–959`
-- **Was:** Ein zweiter `findActiveTransition`-Zweig in der Tick-Loop, der niemals erreicht wird — der erste Zweig bei Zeile 701–722 fängt alle nicht-eingefrorenen Transitions ab und `return`t.
-- **Warum entfernen:** Wenn irgendwann jemand oberhalb eine `visualTimeRef`-Mutation einbaut, aktiviert sich der tote Code lautlos wieder und produziert Doppel-Handoffs.
-- **Aktion:** Zweig ersatzlos löschen, kurzer Kommentar warum.
-
-### Medium 2: Slot-Watcher-RAF gaten
-- **Datei:** `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx:1630–1637`
-- **Was:** Der RAF-Slot-Watcher läuft permanent, auch wenn pausiert und keine Transition aktiv ist.
-- **Aktion:** RAF nur starten, wenn `isPlayingRef.current === true` **oder** eine Transition im Fenster liegt. Sonst per Event (`visibilitychange` + Slot-Flip) neu anstoßen. Spart CPU/Akku bei Hintergrund-Tabs.
-
-### Low 1: `cheapEquals` Fast-Path für Szenen
-- **Datei:** `src/hooks/useEditorHistory.ts:59–62`
-- **Was:** Bei Referenz-Diff pro Array-Item wird volles `JSON.stringify` gemacht. Bei 30+ Szenen mit Thumbnails ist das immer noch teuer.
-- **Aktion:** Vor dem Stringify-Fallback ein Field-Whitelist-Check der performance-kritischen Keys (`id`, `start_time`, `end_time`, `original_start_time`, `original_end_time`, `duration`, `muted`, `volume`). Wenn diese identisch sind, als gleich behandeln.
-
-### Low 2 & 3 (info, kein Fix nötig)
-- `reset()`-Closure über stale `state` in `useEditorHistory` — nur latenter Footgun, kein aktueller Aufrufer trifft es. **Keine Änderung nötig**, aber im Kommentar dokumentieren.
-- `handleTrimScene`-Guard bei 0.001s (spec sagte ~0.01s) — funktioniert korrekt, Slider liefert nie < 1ms Deltas. **Keine Änderung**.
-- Redundanter Dep `resolvedTransitions` + `transitions` in `useTransitionRenderer:440` — harmlos, aber sauberer wäre nur `transitions`. **Optional 1-Zeilen-Fix**.
+**Aufwand:** ~1 Session. Nach Welle 1 hat der User Vertrauen zurück, dass Preview = Export.
 
 ---
 
-## Empfehlung
+## Welle 2 — Preview/Export-Parität & Undo-Stabilität
 
-Freigabe für **Welle 5 Housekeeping** (Medium 1 + Medium 2 + Low 1 + der 1-Zeilen-Dep-Cleanup). Danach ist der Director's Cut auf allen 8 Achsen sauber und produktionsreif — keine offenen Findings mehr.
+7. **H3 Transition-Easing** — Shared Easing-Utility, Preview + Remotion nutzen dieselbe Kurve.
+8. **H4 Undo/Redo-Race** — `commit()`+`undo()` in Keyboard-Shortcut kann Ghost-Snapshot pushen. Guard über `pendingRef !== null`.
+9. **H5 Burned-Subs Polling-Restart pro Render** — `onCleanedVideoUrlChange` in DC.tsx in `useCallback` wrappen (aktuell wird alle 1s ein neuer Poll-Interval gestartet).
+10. **H6 handleVideoEnded für Blackscreen/Media-Scenes** — Skip Source-Seek wenn `sourceMode !== 'original'`.
+11. **M5 Orphan-Transitions** — Beim Scene-Delete zugehörige `TransitionAssignment` mitlöschen.
+12. **M6 SubtitleSafeZone `mode`** — `reframe`/`crop` durchs Schema und in Remotion honorieren.
+13. **M8 RAF-Leak in useTransitionRenderer** — Cleanup mit `cancelAnimationFrame`.
 
-Alternativ: Alles so lassen, denn nichts davon ist ein User-facing Bug. In dem Fall gebe ich dir grünes Licht zum Launchen.
+**Aufwand:** ~1 Session.
 
-Was möchtest du?
+---
+
+## Welle 3 — Performance & UX-Politur
+
+14. **M1 Draft-Autosave** — Von synchronem localStorage-JSON (50–150 KB alle 500 ms) auf IndexedDB + 2 s Debounce.
+15. **M2 Audio-Sync-Effect splitten** — Position-Sync und Volume-Sync trennen (keine Track-Iteration bei Volume-Change).
+16. **M3 AudioTrackRow-DOM-Explosion** — Grid-Lines von 1 200 `<div>`s auf CSS `repeating-linear-gradient`.
+17. **M4 SceneTrimInspector hardMax** — Immer volle Source-Range, damit Wiederaufweiten funktioniert.
+18. **M7 Waveform Sample-Count** — Aus Container-Width ableiten statt hart 100 Bars.
+19. **L2 Slide/Wipe-Directions** — `slide-right`, `slide-up` etc. in `TRANSITION_TYPES` (aktuell defaultet alles auf `left`).
+20. **L3 Color-Grading-Opacity-Hack** — Blend via Pseudo-Element statt `opacity()` Filter.
+21. **L5 cheapEquals** — `thumbnail_url` (data URIs!) aus Deep-Compare ausschließen.
+
+**Aufwand:** ~1 Session.
+
+---
+
+## Welle 4 — Pro-NLE-Features (differenzierend vs. CapCut)
+
+Nur wenn Welle 1–3 grün sind. Ziel: NLE-Score von 6.5 auf ~8.
+
+- **N1 JKL-Scrubbing** — Standard-Profi-Shortcut, 30 min.
+- **N2 Snap-Tick-Indikatoren** in der Timeline (Marker sind schon getrackt, nur nicht sichtbar).
+- **N3 Waveform im Video-Track** (Komponente existiert schon).
+- **N4 Echter Ripple-Trim** auf Handle-Drag.
+- **N5 Frame-Accurate Timecode** `HH:MM:SS:FF` im Preview.
+- **N6 Mobile Pinch-to-Zoom** auf Timeline.
+
+**Aufwand:** ~1–2 Sessions je nach Umfang.
+
+---
+
+## Technische Details (zum Nachlesen)
+
+Die vollständige Fundstellen-Liste mit `file:line`-Referenzen ist im Audit-Report enthalten. Wichtigste Dateien für Welle 1:
+- `supabase/functions/render-directors-cut/index.ts` — Render-Payload-Serialisierung
+- `src/pages/DirectorsCut/DirectorsCut.tsx` — Parent-State `capCutAudioTracks`
+- `src/components/directors-cut/studio/CapCutEditor.tsx` — Voiceover-Placeholder, audioElementsRef-Cleanup, Export-Handler
+- `src/components/directors-cut/timeline/WaveformDisplay.tsx` — AudioContext-Cleanup
+- `src/remotion/templates/DirectorsCutVideo.tsx` — `SubtitleClipSchema`, `soundDesign.sfxTracks`
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` — Music-Volume-Formel
+- `src/lib/audioVolume.ts` — Single-Source-of-Truth für Volume-Mapping
+
+---
+
+## Nicht enthalten
+
+- **Keine** Änderungen an AI-Pipelines (Composer, Toolkit, Talking-Head).
+- **Keine** DB-Migrationen nötig für Welle 1–2. Welle 3 (IndexedDB-Migration) evtl. mit sanfter Fallback-Auslesung aus altem localStorage.
+- **Keine** Änderungen an Auto-Director oder Ad-Director.
+
+---
+
+## Meine Empfehlung
+
+**Starten mit Welle 1** (Trust-Fixes) — die 6 Bugs kosten dich sonst zahlende Kunden, sobald jemand SFX arrangiert und einen tonlos-arrangierten Export zurückbekommt. Danach sehen wir, ob Welle 2 direkt folgen soll.
+
+Approve → ich baue Welle 1 in einem Rutsch.
