@@ -1934,6 +1934,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Welle 6 — Ripple Delete for clips (also shifts subsequent clips on same track left).
   const handleDeleteClipWithRipple = useCallback((clipId: string, ripple: boolean) => {
     commitHistory();
+    // Release the HTMLAudioElement (same cleanup path as handleDeleteClip).
+    const existing = audioElementsRef.current.get(clipId);
+    if (existing) {
+      try { existing.pause(); } catch { /* noop */ }
+      try { existing.src = ''; existing.load?.(); } catch { /* noop */ }
+      audioElementsRef.current.delete(clipId);
+    }
     setAudioTracks(prev => prev.map(track => {
       const target = track.clips.find(c => c.id === clipId);
       if (!target) return track;
