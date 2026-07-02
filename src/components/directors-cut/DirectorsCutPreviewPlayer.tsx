@@ -930,34 +930,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         return;
       }
 
-      // ===== TRANSITION BRANCH (timeline-led) =====
-      // During a transition the outgoing slot is intentionally held on the cut
-      // frame while the incoming slot plays underneath. Therefore the timeline
-      // must advance by wall-clock time instead of video.currentTime.
-      const transitionNow = findActiveTransition(visualTimeRef.current);
-      if (transitionNow && !transitionNow.isFreeze) {
-        const delta = transitionClockLastTsRef.current > 0
-          ? (gapNow - transitionClockLastTsRef.current) / 1000
-          : 0;
-        transitionClockLastTsRef.current = gapNow;
-
-        const nextTL = Math.min(transitionNow.tEnd, visualTimeRef.current + delta);
-        visualTimeRef.current = nextTL;
-
-        const outgoingIdx = sortedScenes.findIndex(s => s.id === transitionNow.outgoingScene.id);
-        if (outgoingIdx >= 0) lastSceneIndexRef.current = outgoingIdx;
-
-        setDisplayTime(nextTL);
-        onTimeUpdateRef.current?.(nextTL);
-
-        if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
-          sourceAudioRef.current.pause();
-        }
-
-        rafIdRef.current = requestAnimationFrame(tick);
-        return;
-      }
+      // NOTE: Transitions are fully handled earlier in this tick (see lines ~701–722).
+      // A second `findActiveTransition` branch used to live here as a belt-and-suspenders
+      // safety net, but it was unreachable — the earlier branch always `return`s first —
+      // and it was a latent footgun if anyone later mutated `visualTimeRef` between the
+      // two checks. Removed intentionally; do not reintroduce.
       transitionClockLastTsRef.current = 0;
+
 
       if (transitionPhaseRef.current === 'active') {
         // Give the transition renderer one frame to perform its ping-pong slot
