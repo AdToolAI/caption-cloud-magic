@@ -2264,6 +2264,23 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           >
             <Scissors className="h-3.5 w-3.5" />
           </Button>
+          {masterSnapshot && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1 text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10 border border-emerald-500/30"
+              onClick={() => {
+                commitHistory();
+                onScenesUpdate?.(masterSnapshot.scenes);
+                setMasterSnapshot(null);
+                toast.success('Master wiederhergestellt — Cut-Down verworfen.');
+              }}
+              title={`Master wiederherstellen (Cut-Down ${masterSnapshot.target}s aktiv)`}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide">Master</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
