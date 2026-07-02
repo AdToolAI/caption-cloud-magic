@@ -362,6 +362,31 @@ export function ExportRenderStep({
         filter: effects.filter || undefined,
       };
       
+      // Serialize timeline audio tracks so SFX / extra music / multiple VO clips
+      // survive into the render. Without this, everything except the legacy
+      // voiceover_url / background_music_url is silently dropped (audit C1).
+      const serializedAudioTracks = (audioTracks || [])
+        .filter(track => !track.muted && track.clips && track.clips.length > 0)
+        .map(track => ({
+          id: track.id,
+          type: track.type,
+          volume: track.volume,
+          muted: track.muted,
+          solo: track.solo,
+          clips: track.clips.map(c => ({
+            id: c.id,
+            url: c.originalUrl || c.url,
+            startTime: c.startTime,
+            duration: c.duration,
+            trimStart: c.trimStart,
+            trimEnd: c.trimEnd,
+            volume: c.volume,
+            fadeIn: c.fadeIn,
+            fadeOut: c.fadeOut,
+            source: c.source,
+          })),
+        }));
+
       const { data, error } = await supabase.functions.invoke('render-directors-cut', {
         body: {
           source_video_url: videoUrl,
@@ -376,6 +401,8 @@ export function ExportRenderStep({
           },
           voiceover_url: voiceOverUrl,
           background_music_url: backgroundMusicUrl,
+          audio_tracks: serializedAudioTracks,
+
           export_settings: exportSettings,
           duration_seconds: videoDuration,
           // Scenes and transitions
