@@ -54,8 +54,17 @@ export function DirectorsCut() {
           aiSuggested: false,
         }));
       setTransitions(defaultTransitions);
+      return;
     }
-  }, [scenes, transitions.length]);
+    // Prune orphan transitions whose sceneId no longer exists (M5).
+    if (transitions.length > 0) {
+      const sceneIds = new Set(scenes.map((s) => s.id));
+      const pruned = transitions.filter((t) => sceneIds.has(t.sceneId));
+      if (pruned.length !== transitions.length) {
+        setTransitions(pruned);
+      }
+    }
+  }, [scenes, transitions]);
   
   // Visual Effects
   const [appliedEffects, setAppliedEffects] = useState<AppliedEffects>({
