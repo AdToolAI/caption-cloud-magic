@@ -1391,6 +1391,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     }));
 
     onScenesUpdate([...before, ...segments, ...after]);
+    // Nudge playhead to the middle segment so preview rebinds cleanly.
+    const midStart = segments.length >= 2 ? segments[1].start_time : segments[0].start_time;
+    setCurrentTime(midStart + 0.03);
     toast.success(t('dc.sceneSplitAtPlayhead'));
   }, [scenes, onScenesUpdate, originalVideoDuration, handleSplitAtPlayhead, t]);
 
