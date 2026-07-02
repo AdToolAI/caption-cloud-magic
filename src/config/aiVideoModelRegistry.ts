@@ -62,11 +62,17 @@ export interface ToolkitModel {
      */
     nativeDialogue?: boolean;
     /**
-     * End-frame guidance: model accepts an `endImageUrl` so the reference
-     * image appears at the END of the clip instead of frame 0. Currently
-     * supported by Kling 3 Std/Pro, Pika 2.2 Std/Pro, Luma Ray 2.
+     * End-frame guidance: model accepts an `endImageUrl` WITHOUT requiring a
+     * matching start image. Only Luma Ray 2 satisfies this — Kling requires
+     * start+end together, Pika Pikaframes requires both frames.
      */
     endFrame?: boolean;
+    /**
+     * True identity/subject reference: model can use a reference image as
+     * character/style anchor without forcing it into frame 0. Currently
+     * Vidu Q2 (referenceImages[]) and Kling 3 Std/Pro (reference_images).
+     */
+    anchorOnly?: boolean;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
@@ -102,7 +108,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'recommended',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, endFrame: true },
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true },
     durations: [3, 5, 8, 10, 15],
     resolution: '720p',
     aspectRatios: sharedAspect,
@@ -119,7 +125,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'premium',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, endFrame: true },
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true },
     durations: [3, 5, 8, 10, 15],
     resolution: '1080p',
     aspectRatios: sharedAspect,
@@ -411,7 +417,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-pika-video',
     group: 'recommended',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1'],
@@ -430,7 +436,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-pika-video',
     group: 'premium',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     durations: [5, 10],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
@@ -451,7 +457,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'recommended',
     icon: Eye,
-    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7 },
+    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7, anchorOnly: true },
     durations: [5],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],

@@ -15,6 +15,10 @@ import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import { ModelSelector } from './ModelSelector';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
@@ -86,6 +90,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * If the current model doesn't support the selected placement, it falls back to 'start'.
    */
   const [referencePlacement, setReferencePlacement] = useState<'start' | 'end' | 'anchor'>('start');
+  /** Pending placement change awaiting user confirmation to auto-switch model. */
+  const [pendingPlacement, setPendingPlacement] = useState<{
+    placement: 'end' | 'anchor';
+    targetModelId: string;
+    targetModelName: string;
+  } | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
@@ -137,9 +147,24 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
     if (!model.capabilities.multiRef) setViduReferences([]);
-    // Reset placement to 'start' if the current one isn't available on this model
-    if (referencePlacement === 'end' && !model.capabilities.endFrame) setReferencePlacement('start');
-    if (referencePlacement === 'anchor' && !model.capabilities.multiRef) setReferencePlacement('start');
+    // Reset placement to 'start' if the current one isn't available on this model.
+    // 'end' → only Luma Ray 2 (capabilities.endFrame). 'anchor' → Vidu/Kling (capabilities.anchorOnly).
+    if (referencePlacement === 'end' && !model.capabilities.endFrame) {
+      setReferencePlacement('start');
+      toast.info(
+        language === 'de'
+          ? `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Endframe.`
+          : `Placement reset to "At start" — ${model.name} does not support end-frame.`,
+      );
+    }
+    if (referencePlacement === 'anchor' && !model.capabilities.anchorOnly) {
+      setReferencePlacement('start');
+      toast.info(
+        language === 'de'
+          ? `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`
+          : `Placement reset to "At start" — ${model.name} does not support anchor mode.`,
+      );
+    }
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
@@ -405,20 +430,35 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         mentionResolved.referenceImageUrl ??
         null;
       // Route the reference image according to the user-selected placement.
-      // 'end' needs capabilities.endFrame; 'anchor' routes into referenceImages[]
-      // when the provider supports subject-reference (Vidu multiRef).
+      // 'end'    → capabilities.endFrame (only Luma Ray 2 supports end-only)
+      // 'anchor' → capabilities.anchorOnly (Vidu Q2 / Kling 3 subject-reference)
       const effectivePlacement: 'start' | 'end' | 'anchor' =
         referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
-        : referencePlacement === 'anchor' && !model.capabilities.multiRef ? 'start'
+        : referencePlacement === 'anchor' && !model.capabilities.anchorOnly ? 'start'
         : referencePlacement;
+
+      // Safety-net: block invalid end-placement submissions (UI should already prevent this)
+      if (referencePlacement === 'end' && !model.capabilities.endFrame) {
+        toast.error(
+          language === 'de'
+            ? `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`
+            : `${model.name} does not support end-frame. Please switch to Luma Ray 2.`,
+        );
+        setGenerating(false);
+        return;
+      }
 
       if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
         body.startImageUrl = referenceImage;
       } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
         body.endImageUrl = referenceImage;
+      } else if (referenceImage && effectivePlacement === 'anchor' && model.capabilities.anchorOnly) {
+        // Anchor mode: pass image via referenceImages[] without forcing a frame.
+        // Kling 3 accepts up to 7 refs, Vidu Q2 handles this through its own multi-ref path.
+        if (!model.capabilities.multiRef) {
+          body.referenceImages = [referenceImage];
+        }
       }
-      // 'anchor' → don't set start/end; if the provider supports multiRef, the
-      // uploaded image is merged into referenceImages[] below.
       // v2v: pass reference clip + reference type (Kling-3 omni)
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
@@ -498,6 +538,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           value={model.id}
           onChange={setModelId}
           currency={currency}
+          lockedModelIds={
+            referencePlacement === 'end'
+              ? AI_VIDEO_TOOLKIT_MODELS.filter((m) => !m.capabilities.endFrame).map((m) => m.id)
+              : referencePlacement === 'anchor'
+              ? AI_VIDEO_TOOLKIT_MODELS.filter((m) => !m.capabilities.anchorOnly).map((m) => m.id)
+              : undefined
+          }
+          lockedReason={
+            referencePlacement === 'end'
+              ? (language === 'de'
+                  ? 'Endframe wird nur von Luma Ray 2 unterstützt. Placement zurück auf „Am Anfang" setzen, um andere Modelle zu wählen.'
+                  : 'End-frame is only supported by Luma Ray 2. Reset placement to "At start" to select other models.')
+              : (language === 'de'
+                  ? 'Anker-Modus wird nur von Vidu Q2 und Kling 3 unterstützt.'
+                  : 'Anchor mode is only supported by Vidu Q2 and Kling 3.')
+          }
         />
       </div>
 
@@ -632,23 +688,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     key: 'start' as const,
                     label: language === 'de' ? 'Am Anfang' : 'At start',
                     hint: language === 'de' ? 'Bild ist der erste Frame' : 'Image is the first frame',
-                    disabled: false,
+                    supportedByCurrent: true,
                   },
                   {
                     key: 'end' as const,
                     label: language === 'de' ? 'Am Ende' : 'At end',
                     hint: model.capabilities.endFrame
                       ? (language === 'de' ? 'Kamera fährt zum Bild hin' : 'Camera transitions to image')
-                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
-                    disabled: !model.capabilities.endFrame,
+                      : (language === 'de' ? 'Nur mit Luma Ray 2 möglich' : 'Only available with Luma Ray 2'),
+                    supportedByCurrent: !!model.capabilities.endFrame,
                   },
                   {
                     key: 'anchor' as const,
                     label: language === 'de' ? 'Nur Anker' : 'Anchor only',
-                    hint: model.capabilities.multiRef
+                    hint: model.capabilities.anchorOnly
                       ? (language === 'de' ? 'Nur Identitäts-Referenz, kein fester Frame' : 'Identity reference only, no forced frame')
-                      : (language === 'de' ? `Nicht unterstützt von ${model.name}` : `Not supported by ${model.name}`),
-                    disabled: !model.capabilities.multiRef,
+                      : (language === 'de' ? 'Nur mit Vidu Q2 oder Kling 3 möglich' : 'Only available with Vidu Q2 or Kling 3'),
+                    supportedByCurrent: !!model.capabilities.anchorOnly,
                   },
                 ]).map((opt) => {
                   const active = referencePlacement === opt.key;
@@ -656,14 +712,44 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     <button
                       key={opt.key}
                       type="button"
-                      disabled={opt.disabled}
                       title={opt.hint}
-                      onClick={() => setReferencePlacement(opt.key)}
+                      onClick={() => {
+                        if (opt.key === 'start') {
+                          setReferencePlacement('start');
+                          return;
+                        }
+                        if (opt.supportedByCurrent) {
+                          setReferencePlacement(opt.key);
+                          return;
+                        }
+                        // Unsupported by current model → propose auto-switch via dialog.
+                        if (opt.key === 'end') {
+                          const luma = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.capabilities.endFrame);
+                          if (luma) {
+                            setPendingPlacement({
+                              placement: 'end',
+                              targetModelId: luma.id,
+                              targetModelName: luma.name,
+                            });
+                          }
+                        } else if (opt.key === 'anchor') {
+                          const target =
+                            AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === 'vidu-q2-reference') ??
+                            AI_VIDEO_TOOLKIT_MODELS.find((m) => m.capabilities.anchorOnly);
+                          if (target) {
+                            setPendingPlacement({
+                              placement: 'anchor',
+                              targetModelId: target.id,
+                              targetModelName: target.name,
+                            });
+                          }
+                        }
+                      }}
                       className={`text-[11px] px-2 py-2 rounded-md border transition-colors text-left leading-tight ${
                         active
                           ? 'border-primary bg-primary/10 text-primary'
                           : 'border-border/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                      } ${opt.disabled ? 'opacity-40 cursor-not-allowed hover:border-border/40 hover:text-muted-foreground' : ''}`}
+                      }`}
                     >
                       <div className="font-medium">{opt.label}</div>
                       <div className="text-[10px] opacity-80 mt-0.5">{opt.hint}</div>
@@ -871,6 +957,48 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         onClose={() => setShowOptimizer(false)}
         onPromptGenerated={(p) => { setPrompt(p); setShowOptimizer(false); }}
       />
+
+      {/* Model auto-switch confirmation for end-frame / anchor placements */}
+      <AlertDialog
+        open={!!pendingPlacement}
+        onOpenChange={(open) => { if (!open) setPendingPlacement(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingPlacement?.placement === 'end'
+                ? (language === 'de' ? 'Endframe nur mit Luma Ray 2' : 'End-frame only with Luma Ray 2')
+                : (language === 'de' ? 'Anker-Modus benötigt Vidu Q2 oder Kling 3' : 'Anchor mode needs Vidu Q2 or Kling 3')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingPlacement?.placement === 'end'
+                ? (language === 'de'
+                    ? `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende" aktiv ist, sind andere Modelle im Picker ausgegraut.`
+                    : `The end-frame option is exclusive to Luma Ray 2. Switch to ${pendingPlacement?.targetModelName} now? While "At end" is active, other models will be greyed out.`)
+                : (language === 'de'
+                    ? `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`
+                    : `Anchor mode (reference image without a forced frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {language === 'de' ? 'Abbrechen' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingPlacement) return;
+                setModelId(pendingPlacement.targetModelId);
+                setReferencePlacement(pendingPlacement.placement);
+                setPendingPlacement(null);
+              }}
+            >
+              {language === 'de'
+                ? `Zu ${pendingPlacement?.targetModelName} wechseln`
+                : `Switch to ${pendingPlacement?.targetModelName}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">
