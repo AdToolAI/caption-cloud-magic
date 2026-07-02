@@ -102,7 +102,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'recommended',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true },
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, endFrame: true },
     durations: [3, 5, 8, 10, 15],
     resolution: '720p',
     aspectRatios: sharedAspect,
