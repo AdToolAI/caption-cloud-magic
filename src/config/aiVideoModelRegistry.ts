@@ -430,7 +430,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-pika-video',
     group: 'premium',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false },
+    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
     durations: [5, 10],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
