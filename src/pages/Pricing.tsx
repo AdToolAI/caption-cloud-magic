@@ -349,6 +349,9 @@ const Pricing = () => {
             </motion.div>
           </div>
 
+          {/* UDC-specific positioning — the "Consistency-First" moat */}
+          <UDCPricingHighlight />
+
           {/* Top-up Packs Section */}
           <section id="topups" className="scroll-mt-24">
             <motion.div
