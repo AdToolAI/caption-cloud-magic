@@ -1023,6 +1023,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         {!previewMode && voiceoverUrl && frame >= 15 && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
         {/* Background Music - skip in preview mode */}
         {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={effectiveMusicVolume} loop pauseWhenBuffering />}
+        {!previewMode && <TimelineAudioTracksRenderer tracks={audioTracks} fps={fps} hasVoiceoverForDucking={!!voiceoverUrl} />}
         {/* Text Overlays */}
         {textOverlays.map((overlay) => {
           const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
