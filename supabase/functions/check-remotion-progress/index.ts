@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +10,6 @@ const corsHeaders = {
 };
 
 const AWS_REGION = 'eu-central-1';
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 const RENDER_TIMEOUT_SECONDS = 720; // 12 min
 const UNIVERSAL_CREATOR_TIMEOUT_SECONDS = 600; // 10 min — accommodates AWS throttle backoff retries
 const MAX_RECONCILIATION_PAGES = 20; // max 20 pages × 200 keys = 4000 keys
