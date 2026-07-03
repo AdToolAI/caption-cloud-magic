@@ -1220,10 +1220,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                   // consumers (getActiveVideo/getStandbyVideo) see the new state.
                   activeSlotRef.current = activeSlotRef.current === 'A' ? 'B' : 'A';
                   standby.style.opacity = '1';
+                  standby.style.pointerEvents = 'auto';
                   // Hide + pause the outgoing slot next frame so the swap is atomic.
                   requestAnimationFrame(() => {
                     try {
                       oldActive.style.opacity = '0';
+                      oldActive.style.pointerEvents = 'none';
                       if (!oldActive.paused) oldActive.pause();
                     } catch {}
                   });
@@ -1240,6 +1242,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                   ) {
                     try { audioEl.currentTime = nextSourceStart; } catch {}
                   }
+
+                  pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
+                  visualTimeRef.current = nextScene.start_time;
+                  setDisplayTime(nextScene.start_time);
+                  onTimeUpdateRef.current?.(nextScene.start_time);
+                  // Return early — do NOT fall through to the post-branch
+                  // `video.style.opacity = '1'` which would reveal the just-hidden
+                  // outgoing slot. Next tick reads getActiveVideo() fresh.
+                  rafIdRef.current = requestAnimationFrame(tick);
+                  return;
                 } else {
                   // Fallback (standby not primed in time): legacy mini-seek path.
                   const seekDiff = Math.abs(video.currentTime - nextSourceStart);
@@ -1251,10 +1263,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                     video.currentTime = nextSourceStart + 0.05;
                   }
                   video.playbackRate = nextRate;
+                  pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
+                  timelineTime = nextScene.start_time;
                 }
-
-                pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
-                timelineTime = nextScene.start_time;
               }
             }
           }
