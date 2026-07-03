@@ -231,9 +231,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Welle 5 — Resizable Library / Inspector widths, persisted in localStorage
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 384;
-    const v = parseInt(window.localStorage.getItem('dc:sidebar-w') || '', 10);
-    return Number.isFinite(v) && v >= 320 && v <= 560 ? v : 400;
+    if (typeof window === 'undefined') return 288;
+    const stored = parseInt(window.localStorage.getItem('dc:sidebar-w') || '', 10);
+    if (Number.isFinite(stored) && stored >= 56 && stored <= 560) return stored;
+    // First-session default scales to viewport width
+    const vw = window.innerWidth;
+    if (vw < 1024) return 64;
+    if (vw < 1280) return 288;
+    return 400;
   });
   const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 288;
@@ -2320,7 +2325,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
       {/* Main Content with shared DndContext */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-w-0">
           {/* Welle 5 — Library Panel */}
            <div
             className={cn(
@@ -2560,7 +2565,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
           {/* Welle 5 — Library ↔ Preview Divider */}
           {!sidebarCollapsed && (
-            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={320} max={560} />
+            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={56} max={560} />
           )}
 
           {/* Welle 5 — Preview + Timeline Panel */}

@@ -22,6 +22,8 @@ import { LookPanel } from './sidebar/LookPanel';
 import { FXPanel } from './sidebar/FXPanel';
 import { ExportPanel } from './sidebar/ExportPanel';
 import { TextOverlayEditor2028 } from '../features/TextOverlayEditor2028';
+import { StudioSidebarTabs } from '@/components/studio-shell/StudioSidebarTabs';
+import { useContainerWidth } from '@/hooks/useContainerWidth';
 
 interface JamendoTrack {
   id: string;
@@ -894,10 +896,15 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     };
   }, []);
 
+  const [sidebarShellRef, sidebarShellWidth] = useContainerWidth<HTMLDivElement>();
+
   return (
-    <div className="w-full flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
-        {/* Library-first shell: icon + label + count badge — Wave 1 Shell */}
+    <div
+      ref={sidebarShellRef}
+      className="w-full min-w-0 flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full"
+    >
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full min-w-0">
+        {/* Responsive tab header — Rail / Compact / Expanded via StudioSidebarTabs */}
         {(() => {
           const totalTextCount = (captionCount || 0) + (textOverlayCount || 0);
           const libraryTabs = [
@@ -907,39 +914,13 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             { value: 'subtitle', icon: Type,     label: t('dc.tabSubtitle'), count: totalTextCount,    glow: 'data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-400 data-[state=active]:shadow-[0_0_12px_rgba(34,211,238,0.2)]' },
             { value: 'audio-fx', icon: Music,    label: t('dc.tabAudio'),    count: 0,                 glow: 'data-[state=active]:bg-pink-500/15 data-[state=active]:text-pink-400 data-[state=active]:shadow-[0_0_12px_rgba(236,72,153,0.2)]' },
             { value: 'export',   icon: Download, label: t('dc.tabExport'),   count: 0,                 glow: 'data-[state=active]:bg-[#F5C76A]/15 data-[state=active]:text-[#F5C76A] data-[state=active]:shadow-[0_0_12px_rgba(245,199,106,0.2)]' },
-          ] as const;
+          ];
           return (
-            <TabsList className="flex flex-col gap-1 p-1.5 bg-[#050816] border-b border-[#F5C76A]/10 h-auto rounded-none">
-              <div className="grid grid-cols-3 gap-1 w-full">
-                {libraryTabs.map(({ value, icon: Icon, label, count, glow }) => (
-                  <TabsTrigger
-                    key={value}
-                    value={value}
-                    title={label}
-                    className={cn(
-                      "relative flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg text-white/50 hover:text-white/80 hover:bg-white/5 transition-all",
-                      glow
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-[10px] font-medium leading-none tracking-wide uppercase">{label}</span>
-                    {count > 0 && (
-                      <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#F5C76A]/20 text-[#F5C76A] text-[9px] font-semibold flex items-center justify-center">
-                        {count > 99 ? '99+' : count}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                ))}
-              </div>
-              <TabsTrigger
-                value="settings"
-                title={t('dc.tabSettings')}
-                className="flex items-center justify-center gap-1.5 py-1 rounded-lg data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-[0_0_8px_rgba(255,255,255,0.1)] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
-              >
-                <Settings className="h-3 w-3" />
-                <span className="text-[10px] tracking-wide uppercase">{t('dc.tabSettings')}</span>
-              </TabsTrigger>
-            </TabsList>
+            <StudioSidebarTabs
+              tabs={libraryTabs}
+              settingsTab={{ value: 'settings', icon: Settings, label: t('dc.tabSettings') }}
+              containerWidth={sidebarShellWidth}
+            />
           );
         })()}
 
