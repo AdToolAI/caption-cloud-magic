@@ -566,26 +566,44 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           {/* Videos Tab */}
           <TabsContent value="videos" className="space-y-4">
             <div className="space-y-4">
-              <Card className="p-6 border-dashed">
-                <Label htmlFor="video-upload" className="cursor-pointer">
-                  <div className="flex flex-col items-center gap-2 py-8">
-                    <Upload className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm font-medium">{t('uc.uploadVideo')}</p>
-                    <p className="text-xs text-muted-foreground">{t('uc.videoFormats')}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Card className="p-6 border-dashed">
+                  <Label htmlFor="video-upload" className="cursor-pointer">
+                    <div className="flex flex-col items-center gap-2 py-6">
+                      <Upload className="h-10 w-10 text-muted-foreground" />
+                      <p className="text-sm font-medium">{t('uc.uploadVideo')}</p>
+                      <p className="text-xs text-muted-foreground text-center">{t('uc.videoFormats')}</p>
+                    </div>
+                  </Label>
+                  <Input
+                    id="video-upload"
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, 'video');
+                    }}
+                    disabled={uploading}
+                  />
+                </Card>
+
+                <Card
+                  className="p-6 border-dashed cursor-pointer hover:border-primary/60 transition-colors"
+                  onClick={() => setLibraryPickerOpen(true)}
+                >
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    <Library className="h-10 w-10 text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      {t('uc.chooseFromLibrary') || 'Aus Mediathek wählen'}
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {t('uc.chooseFromLibraryDesc') || 'Bereits erstellte Videos wiederverwenden'}
+                    </p>
                   </div>
-                </Label>
-                <Input
-                  id="video-upload"
-                  type="file"
-                  accept="video/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file, 'video');
-                  }}
-                  disabled={uploading}
-                />
-              </Card>
+                </Card>
+              </div>
+
 
               <div className="space-y-2">
                 <Label>{t('uc.myVideos')}</Label>
