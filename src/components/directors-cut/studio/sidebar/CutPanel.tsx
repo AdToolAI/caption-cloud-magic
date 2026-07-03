@@ -275,6 +275,28 @@ const TransitionBlock: React.FC<{
   );
 };
 
+/** Sortable wrapper for a scene row — exposes drag-handle props via render-prop. */
+const SortableScene: React.FC<{
+  id: string;
+  children: (args: {
+    dragHandleProps: React.HTMLAttributes<HTMLElement>;
+    isDragging: boolean;
+  }) => React.ReactNode;
+}> = ({ id, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 20 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ dragHandleProps: { ...attributes, ...listeners }, isDragging })}
+    </div>
+  );
+};
+
 export const CutPanel: React.FC<CutPanelProps> = ({
   scenes,
   transitions,
