@@ -1152,6 +1152,31 @@ serve(async (req) => {
       // required. If HappyHorse multi-cast plates fail face-detection in
       // Sync.so the user now sees the real error and credits are refunded
       // idempotently — no silent provider switch.
+      const __clientWantsComposerLipSync =
+        (scene as any).lipSyncWithVoiceover === true ||
+        (scene as any).dialogMode === true;
+      if (__clientWantsComposerLipSync && (scene.engineOverride ?? "auto") === "auto") {
+        scene.engineOverride = "cinematic-sync";
+        try {
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({
+              engine_override: "cinematic-sync",
+              lip_sync_with_voiceover: true,
+              lip_sync_status: "pending",
+              twoshot_stage: "audio",
+              clip_error: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene.id);
+        } catch (normalizeErr) {
+          console.warn(
+            `[compose-video-clips] scene ${scene.id}: failed to persist cinematic-sync normalization`,
+            normalizeErr,
+          );
+        }
+      }
+
       const __engineForHHGuard = scene.engineOverride ?? "auto";
       if (
         (scene.clipSource as string) === "ai-happyhorse" &&
