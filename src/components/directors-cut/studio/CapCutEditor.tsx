@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
 import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext';
 import { supabase } from '@/integrations/supabase/client';
+import { extractFunctionsError } from '@/lib/functionsError';
 import { AddMediaDialog } from '../ui/AddMediaDialog';
 import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
 import { CIPreflightDialog } from './CIPreflightDialog';
@@ -1729,7 +1730,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       if (error) {
         console.error('[Export] Error:', error);
         setRenderStatus('failed');
-        setRenderError(error.message);
+        setRenderError(await extractFunctionsError(error));
         return;
       }
 
