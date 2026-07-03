@@ -2157,10 +2157,11 @@ serve(async (req) => {
 
       // ── HeyGen routing branch ─────────────────────────────────────────────
       // Triggered when:
-      //   • engineOverride === 'heygen'  OR
-      //   • engineOverride === 'auto' AND scene has dialog text AND a cast character
-      // Multi-speaker MVP: renders the FIRST speaker's portion (full text in
-      // their voice). Per-speaker stitching is future work.
+      //   • engineOverride === 'heygen' only.
+      // Composer dialog/lip-sync scenes MUST NOT auto-route here: they need a
+      // real HappyHorse/Hailuo master plate followed by Sync.so. The old
+      // `auto + dialog + cast` rule produced talking-head-renders URLs and
+      // left `dialog_shots` empty, which looked like a black/infinite lipsync.
       try {
         const override = scene.engineOverride ?? "auto";
         const hasDialog = sceneHasDialogText(scene.dialogScript);
