@@ -40,8 +40,7 @@ export type AsdMode =
   | "preclip_coord_strict"
   | "single_face_auto"
   | "single_face_bbox_strict"
-  | "last_resort_auto"
-  | "deterministic_required_missing_inputs";
+  | "last_resort_auto";
 
 export type AsdCoord = [number, number];
 
@@ -465,22 +464,10 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
     }
     // Out-of-bounds. Multi-speaker must fail deterministically, never auto-detect.
     if (isMultiSpeaker) {
-      return {
-        mode: "deterministic_required_missing_inputs",
-        asd: { auto_detect: false, frame_number: geometry.asdFrameNumber, coordinates: [0, 0] },
-        frameNumber: geometry.asdFrameNumber,
-        coordSpace: "preclip",
-        source: "default",
-        diagnostics: {
-          retry_variant: retryVariant,
-          reason: "multi_speaker_preclip_coord_out_of_bounds",
-          plate_coord: geometry.plateCoord,
-          attempted_preclip_coord: t.coord,
-          crop: geometry.preclipCrop,
-          deterministic_required: true,
-          should_fail_preflight: true,
-        },
-      };
+      throw new Error(
+        `multi_speaker_preclip_coord_out_of_bounds: plate=${JSON.stringify(geometry.plateCoord)} ` +
+        `preclip=${JSON.stringify(t.coord)} crop=${JSON.stringify(geometry.preclipCrop)}`,
+      );
     }
     // Single-speaker out-of-bounds → fall through to auto_detect with diagnostics.
     return {
@@ -610,25 +597,11 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
   }
 
   if (isMultiSpeaker) {
-    return {
-      mode: "deterministic_required_missing_inputs",
-      asd: { auto_detect: false, frame_number: geometry.asdFrameNumber, coordinates: [0, 0] },
-      frameNumber: geometry.asdFrameNumber,
-      coordSpace: usePreclip ? "preclip" : "plate",
-      source: "default",
-      diagnostics: {
-        retry_variant: retryVariant,
-        is_multi_speaker_scene: true,
-        face_count_in_crop: geometry.preclipFaceCount,
-        ambiguity_risk: geometry.preclipAmbiguityRisk,
-        has_plate_coord: !!geometry.plateCoord,
-        has_preclip_crop: !!geometry.preclipCrop,
-        use_preclip: usePreclip,
-        deterministic_required: true,
-        should_fail_preflight: true,
-        reason: "multi_speaker_no_deterministic_asd_available",
-      },
-    };
+    throw new Error(
+      `multi_speaker_no_deterministic_asd_available: usePreclip=${usePreclip} ` +
+      `hasPlateCoord=${!!geometry.plateCoord} hasPreclipCrop=${!!geometry.preclipCrop} ` +
+      `faceCount=${geometry.preclipFaceCount} ambiguity=${geometry.preclipAmbiguityRisk}`,
+    );
   }
 
   // ── Rule 5: Last resort — auto_detect with explicit diagnostic.
