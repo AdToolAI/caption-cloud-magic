@@ -120,6 +120,9 @@ interface ClipScene {
     | "cinematic-sync";
   /** When false → request muted output (Veo/Kling generate_audio=false; Sora muted at stitch). Default true. */
   withAudio?: boolean;
+  /** Client-side Composer dialog/lip-sync switches. Used to prevent auto-HeyGen routing. */
+  lipSyncWithVoiceover?: boolean;
+  dialogMode?: boolean;
 }
 
 interface ClipRequest {
@@ -2173,12 +2176,15 @@ serve(async (req) => {
         // as voiceover overlay over the regular AI clip; explicit
         // shot-reverse-shot split scenes (each with 1 speaker) handle real
         // per-person lip-sync.
+        const isComposerLipSyncScene =
+          override === "cinematic-sync" ||
+          override === "sync-segments" ||
+          (scene as any).lipSyncWithVoiceover === true ||
+          (scene as any).dialogMode === true;
         const wantsHeygen =
-          (override === "heygen" && dialogSpeakers <= 1) ||
-          (override === "auto" &&
-            hasDialog &&
-            !!primaryShot &&
-            dialogSpeakers <= 1);
+          override === "heygen" &&
+          !isComposerLipSyncScene &&
+          dialogSpeakers <= 1;
 
         if (wantsHeygen) {
           if (!hasDialog) {

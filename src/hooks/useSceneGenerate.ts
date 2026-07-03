@@ -40,6 +40,23 @@ interface UseSceneGenerateOpts {
 export function useSceneGenerate(opts: UseSceneGenerateOpts) {
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
 
+  const shouldForceCinematicSync = (scene: ComposerScene) => {
+    const hasDialog = typeof scene.dialogScript === 'string' && scene.dialogScript.trim().length > 0;
+    const hasCast =
+      (scene.characterShots ?? []).some((shot) => shot?.shotType !== 'absent') ||
+      !!(scene.characterShot && scene.characterShot.shotType !== 'absent');
+    const providerSupportsSceneLipsync = scene.clipSource === 'ai-happyhorse' || scene.clipSource === 'ai-hailuo';
+
+    return (
+      scene.engineOverride === 'cinematic-sync' ||
+      scene.engineOverride === 'sync-segments' ||
+      scene.engineOverride === 'native-dialogue' ||
+      scene.lipSyncWithVoiceover === true ||
+      scene.dialogMode === true ||
+      (hasDialog && hasCast && providerSupportsSceneLipsync && scene.engineOverride !== 'heygen')
+    );
+  };
+
   const generate = useCallback(
     async (scene: ComposerScene) => {
       if (!scene) return;
@@ -106,6 +123,8 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
           if (dbScene) workingScene = { ...dbScene, ...scene, id: dbScene.id };
         }
 
+        const forceCinematicSync = shouldForceCinematicSync(workingScene);
+
         // Stage 7: clear any stale `auto-reset:` marker BEFORE the invoke so
         // the row visibly flips to `generating` even if realtime races the
         // edge function's own pre-mark. Without this, an old
@@ -113,10 +132,35 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         // UI on "Wartet" forever for 1-speaker cinematic-sync scenes.
         if (/^[0-9a-f-]{36}$/i.test(workingScene.id) && workingScene.clipSource?.startsWith('ai-')) {
           try {
-            await supabase
-              .from('composer_scenes')
-              .update({ clip_status: 'generating', clip_error: null })
-              .eq('id', workingScene.id);
+            const preMark: Record<string, unknown> = {
+              clip_status: 'generating',
+              clip_error: null,
+            };
+            if (forceCinematicSync) {
+              Object.assign(preMark, {
+                engine_override: 'cinematic-sync',
+                lip_sync_with_voiceover: true,
+                lip_sync_status: 'pending',
+                twoshot_stage: 'audio',
+                dialog_shots: null,
+                lip_sync_source_clip_url: null,
+              });
+              workingScene = {
+                ...workingScene,
+                engineOverride: 'cinematic-sync',
+                lipSyncWithVoiceover: true,
+                lipSyncStatus: 'pending',
+                twoshotStage: 'audio',
+              };
+              opts.onOptimisticPatch?.(workingScene.id, {
+                clipStatus: 'generating',
+                engineOverride: 'cinematic-sync',
+                lipSyncWithVoiceover: true,
+                lipSyncStatus: 'pending',
+                twoshotStage: 'audio',
+              });
+            }
+            await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
           } catch (preErr) {
             console.warn('[useSceneGenerate] pre-mark failed', preErr);
           }
@@ -147,7 +191,9 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 characterShots: workingScene.characterShots,
                 dialogScript: workingScene.dialogScript,
                 dialogVoices: workingScene.dialogVoices,
-                engineOverride: workingScene.engineOverride ?? 'auto',
+                engineOverride: forceCinematicSync ? 'cinematic-sync' : (workingScene.engineOverride ?? 'auto'),
+                lipSyncWithVoiceover: forceCinematicSync || workingScene.lipSyncWithVoiceover === true,
+                dialogMode: workingScene.dialogMode === true,
                 withAudio: workingScene.withAudio !== false,
                 shotDirector: workingScene.shotDirector,
                 directorModifiers: workingScene.directorModifiers,
