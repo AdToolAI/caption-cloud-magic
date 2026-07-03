@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { resolveTransitions, findActiveTransition } from '@/utils/transitionResolver';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
+import { easeTransition } from '@/lib/directors-cut/transitionEasing';
 
 interface TransitionInfo {
   progress: number;
@@ -50,7 +51,9 @@ export function useTransitionInfo(
       let found: TransitionInfo | null = null;
 
       if (active) {
-        const { transition: rt, progress } = active;
+        const { transition: rt, progress: rawProgress } = active;
+        // Eased progress for buttery CapCut-style blending (non-linear curve).
+        const progress = easeTransition(rawProgress);
         found = {
           progress,
           baseType: rt.baseType,
