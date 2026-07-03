@@ -46,6 +46,7 @@ serve(async (req) => {
     const tableName = isDirectorsCut ? 'director_cut_renders' : 'video_renders';
     const renderIdColumn = isDirectorsCut ? 'remotion_render_id' : 'render_id';
     const outputColumn = isDirectorsCut ? 'output_url' : 'video_url';
+    const configColumn = isDirectorsCut ? 'render_config' : 'content_config';
 
     const { data: renderData, error: renderError } = await supabaseAdmin
       .from(tableName)
@@ -61,7 +62,7 @@ serve(async (req) => {
     }
 
     // Extract tracking data from content_config
-    const cc = (renderData?.content_config as any) || {};
+    const cc = (renderData?.[configColumn] as any) || {};
     const realRenderId = cc.real_remotion_render_id || cc.webhook_render_id || null;
     const outName = cc.out_name || null;
     const trackingMode = cc.tracking_mode || 'unknown';
@@ -108,7 +109,7 @@ serve(async (req) => {
       }
 
       // Truly timed out — r28: persist errorCategory in both tables
-      const existingCfgTimeout = (renderData?.content_config as any) || {};
+      const existingCfgTimeout = (renderData?.[configColumn] as any) || {};
       const timeoutCategory = !realRenderId && !sawProgressArtifact ? 'start_failed' : 'timeout';
       const timeoutStage = !realRenderId && !sawProgressArtifact ? 'lambda_start' : 'lambda-runtime';
       const timeoutMessage = timeoutCategory === 'start_failed'
@@ -117,7 +118,7 @@ serve(async (req) => {
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
         error_message: `${timeoutMessage} tracking_mode=${trackingMode}, real_id=${realRenderId || 'none'}`,
-        content_config: { ...existingCfgTimeout, error_category: timeoutCategory, failure_stage: timeoutStage },
+        [configColumn]: { ...existingCfgTimeout, error_category: timeoutCategory, failure_stage: timeoutStage },
       }).eq(renderIdColumn, effectiveRenderId);
 
       if (renderData?.user_id) {
@@ -217,10 +218,10 @@ serve(async (req) => {
           else if (/the operation was aborted|aborterror|createasynciterator|node:internal\/streams/i.test(combinedMsg)) errorCategory = 'lambda_crash';
           else if (/codec|preset|framerange|invalid|schema|zod/i.test(combinedMsg)) errorCategory = 'validation';
 
-          const existingCfg = (renderData?.content_config as any) || {};
+      const existingCfg = (renderData?.[configColumn] as any) || {};
           await supabaseAdmin.from(tableName).update({
             status: 'failed', error_message: errorMessages[0],
-            content_config: { ...existingCfg, error_category: errorCategory },
+            [configColumn]: { ...existingCfg, error_category: errorCategory },
           }).eq(renderIdColumn, effectiveRenderId);
 
           await refundRenderCreditsOnce(supabaseAdmin, tableName, renderIdColumn, effectiveRenderId, renderData, cc);
@@ -256,13 +257,13 @@ serve(async (req) => {
     }
 
     if (!isDirectorsCut && elapsedSeconds > effectiveTimeoutSeconds && !realRenderId && !sawProgressArtifact) {
-      const existingCfg = (renderData?.content_config as any) || {};
+      const existingCfg = (renderData?.[configColumn] as any) || {};
       const message = 'Render konnte nicht gestartet werden: Es kam kein Lambda-Status und kein Webhook zurück.';
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
         error_message: message,
         completed_at: new Date().toISOString(),
-        content_config: { ...existingCfg, error_category: 'start_failed' },
+        [configColumn]: { ...existingCfg, error_category: 'start_failed' },
       }).eq(renderIdColumn, effectiveRenderId);
       await refundRenderCreditsOnce(supabaseAdmin, tableName, renderIdColumn, effectiveRenderId, renderData, existingCfg);
       return jsonResponse({
