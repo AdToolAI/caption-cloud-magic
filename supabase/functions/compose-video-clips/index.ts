@@ -2182,39 +2182,23 @@ serve(async (req) => {
         );
       }
 
-      // ── HeyGen routing branch ─────────────────────────────────────────────
-      // Triggered when:
-      //   • engineOverride === 'heygen' only.
-      // Composer dialog/lip-sync scenes MUST NOT auto-route here: they need a
-      // real HappyHorse/Hailuo master plate followed by Sync.so. The old
-      // `auto + dialog + cast` rule produced talking-head-renders URLs and
-      // left `dialog_shots` empty, which looked like a black/infinite lipsync.
-      try {
-        const override = scene.engineOverride ?? "auto";
-        const hasDialog = sceneHasDialogText(scene.dialogScript);
-        const primaryShot =
-          scene.characterShots?.find((s) => s && s.shotType !== "absent") ??
-          (scene.characterShot && scene.characterShot.shotType !== "absent"
-            ? scene.characterShot
-            : undefined);
-        const dialogSpeakers = countDialogSpeakers(scene.dialogScript);
-        // Multi-speaker scenes must NEVER auto-route to HeyGen — that would
-        // make the first speaker's portrait lip-sync the FULL dialog text
-        // (i.e. "one character speaks for both"). Multi-speaker dialog plays
-        // as voiceover overlay over the regular AI clip; explicit
-        // shot-reverse-shot split scenes (each with 1 speaker) handle real
-        // per-person lip-sync.
-        const isComposerLipSyncScene =
-          override === "cinematic-sync" ||
-          override === "sync-segments" ||
-          (scene as any).lipSyncWithVoiceover === true ||
-          (scene as any).dialogMode === true;
-        const wantsHeygen =
-          override === "heygen" &&
-          !isComposerLipSyncScene &&
-          dialogSpeakers <= 1;
+      // ── LEGACY HEYGEN / TALKING-HEAD ROUTE — REMOVED ─────────────────────
+      // Previously `engineOverride === 'heygen'` (or a soft `auto + dialog +
+      // cast` heuristic) routed Composer scenes to `generate-talking-head`,
+      // which produced isolated portrait busts in the `talking-head-renders`
+      // bucket instead of a real master plate + Sync.so lip-sync. That path
+      // is gone.
+      //
+      // Any scene that carries `engineOverride === 'heygen'` is now silently
+      // upgraded to the Cinematic-Sync pipeline (HappyHorse/Hailuo → Sync.so)
+      // BEFORE this point. See the guard around L1157–1180. The block below
+      // is intentionally kept as a NO-OP hard fail so anyone re-adding a
+      // client override discovers the removal immediately instead of getting
+      // silent black clips again.
+      if (false as boolean) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _legacyHeygenRouteRemoved = true;
 
-        if (wantsHeygen) {
           if (!hasDialog) {
             console.warn(
               `[compose-video-clips] Scene ${scene.id} forced HeyGen but has no dialogScript — falling back to ${scene.clipSource}.`,
