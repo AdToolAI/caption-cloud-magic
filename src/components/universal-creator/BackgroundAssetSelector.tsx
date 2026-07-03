@@ -300,7 +300,54 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     },
   });
 
-  const renderAssetCard = (asset: BackgroundAsset) => {
+  // Fetch user's own videos from central media library (video_creations)
+  const { data: libraryVideos = [], isLoading: loadingLibrary } = useQuery({
+    queryKey: ['uc-library-videos', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('video_creations')
+        .select('id, output_url, thumbnail_url, created_at, customizations, metadata, status')
+        .eq('user_id', user!.id)
+        .eq('status', 'completed')
+        .not('output_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []).filter((v: any) => !!v.output_url);
+    },
+    enabled: !!user && libraryPickerOpen,
+  });
+
+  const importFromLibrary = async (video: any) => {
+    if (!user) return;
+    try {
+      const title =
+        video?.customizations?.title ||
+        video?.metadata?.title ||
+        `Video ${new Date(video.created_at).toLocaleDateString()}`;
+      const { data: assetData, error } = await supabase
+        .from('universal_background_assets')
+        .insert({
+          user_id: user.id,
+          type: 'video',
+          url: video.output_url,
+          thumbnail_url: video.thumbnail_url ?? null,
+          title,
+          source: 'media_library',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['background-assets'] });
+      onSelectAsset(assetData as BackgroundAsset);
+      toast.success(t('uc.videoImportedFromLibrary') || 'Video aus Mediathek übernommen');
+      setLibraryPickerOpen(false);
+    } catch (err: any) {
+      console.error('Library import error:', err);
+      toast.error(err.message || 'Import fehlgeschlagen');
+    }
+  };
+
     const isSelected = selectedAsset?.id === asset.id;
 
     return (
