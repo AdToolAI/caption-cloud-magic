@@ -443,21 +443,21 @@ export function TextOverlayEditor2028({
         }
       `}</style>
       
-      <CardHeader className="pb-3 border-b border-white/10 px-3">
-        <CardTitle className="flex items-center gap-2 text-lg min-w-0">
+      <CardHeader className="pb-3 border-b border-white/10 px-3 min-w-0 max-w-full overflow-hidden">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-lg min-w-0 max-w-full overflow-hidden">
           <div className="p-2 rounded-lg bg-primary/20">
             <Type className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="truncate">Text & Overlays</span>
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">Text & Overlays</span>
               {overlays.length > 0 && (
                 <Badge className="bg-primary/20 text-primary border-primary/30">
                   {overlays.length}
                 </Badge>
               )}
             </div>
-            <div className="text-xs font-normal text-muted-foreground mt-0.5">
+            <div className="text-xs font-normal text-muted-foreground mt-0.5 break-words [overflow-wrap:anywhere]">
               Professionelle Text-Animationen
             </div>
           </div>
@@ -467,8 +467,8 @@ export function TextOverlayEditor2028({
             onClick={() => setShowTemplates(!showTemplates)}
             className="ml-auto flex-shrink-0 px-2"
           >
-            <Sparkles className="h-4 w-4 mr-1" />
-            Vorlagen
+            <Sparkles className="h-4 w-4 mr-1 flex-shrink-0" />
+            <span className="break-words [overflow-wrap:anywhere]">Vorlagen</span>
           </Button>
         </CardTitle>
       </CardHeader>
@@ -520,10 +520,10 @@ export function TextOverlayEditor2028({
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           onClick={() => addOverlay()}
-          className="w-full min-w-0 p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-primary/50 hover:bg-white/5 transition-all flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
+          className="w-full min-w-0 p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-primary/50 hover:bg-white/5 transition-all flex flex-wrap items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
         >
           <Plus className="h-4 w-4" />
-          <span className="text-sm font-medium">Neues Text-Overlay</span>
+          <span className="text-sm font-medium break-words text-center [overflow-wrap:anywhere]">Neues Text-Overlay</span>
         </motion.button>
 
         {/* Overlay List */}
@@ -591,7 +591,7 @@ export function TextOverlayEditor2028({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-5 pt-4 border-t border-white/10"
+              className="space-y-5 pt-4 border-t border-white/10 min-w-0 max-w-full overflow-hidden"
             >
               {/* Text Input */}
               <div className="space-y-2">
@@ -630,18 +630,18 @@ export function TextOverlayEditor2028({
               />
 
               {/* Style Controls */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 min-w-0">
                 {/* Font Size */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Größe</Label>
-                  <div className="flex gap-1">
+                  <div className="grid grid-cols-4 gap-1 min-w-0">
                     {FONT_SIZES.map((size) => (
                       <motion.button
                         key={size.id}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => updateOverlayStyle(selectedOverlay.id, { fontSize: size.id as TextOverlay['style']['fontSize'] })}
-                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                        className={`min-w-0 py-2 rounded-lg text-sm font-medium transition-all ${
                           selectedOverlay.style.fontSize === size.id
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-white/5 hover:bg-white/10'
@@ -657,12 +657,12 @@ export function TextOverlayEditor2028({
                 {/* Shadow Toggle */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Schatten</Label>
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                  <div className="flex flex-wrap items-center gap-3 p-2 rounded-lg bg-white/5 min-w-0">
                     <Switch
                       checked={selectedOverlay.style.shadow}
                       onCheckedChange={(v) => updateOverlayStyle(selectedOverlay.id, { shadow: v })}
                     />
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground break-words [overflow-wrap:anywhere]">
                       {selectedOverlay.style.shadow ? 'Aktiv' : 'Aus'}
                     </span>
                   </div>
@@ -670,7 +670,7 @@ export function TextOverlayEditor2028({
               </div>
 
               {/* Colors */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 min-w-0">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Textfarbe</Label>
                   <div className="flex flex-wrap gap-1.5">
@@ -732,8 +732,8 @@ export function TextOverlayEditor2028({
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 mx-auto mb-4 flex items-center justify-center">
               <Type className="h-8 w-8 text-primary/60" />
             </div>
-            <p className="font-medium">Keine Text-Overlays</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="font-medium break-words [overflow-wrap:anywhere]">Keine Text-Overlays</p>
+            <p className="text-sm text-muted-foreground mt-1 break-words [overflow-wrap:anywhere]">
               Füge CTAs, Hashtags oder Titel hinzu
             </p>
             <Button

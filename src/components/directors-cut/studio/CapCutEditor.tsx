@@ -121,7 +121,7 @@ const DEFAULT_TRACKS: AudioTrack[] = [
   { id: 'track-sfx', type: 'sound-effect', name: 'SFX', clips: [], volume: 100, muted: false, locked: false, solo: false, color: '#ec4899', icon: '🔊' },
 ];
 
-const FIXED_LIBRARY_PANEL_WIDTH = 380;
+const FIXED_LIBRARY_PANEL_WIDTH = 520;
 
 export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   videoUrl,
@@ -2327,7 +2327,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       {/* Main Content with shared DndContext */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex overflow-hidden min-w-0">
-          {/* Library Panel: fixed 10 cm studio width, never user-resizable */}
+          {/* Library Panel: fixed 13–14 cm studio width, never user-resizable */}
           <div
             className={cn(
               "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg flex-none min-w-0 overflow-hidden"
