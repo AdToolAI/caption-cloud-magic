@@ -899,9 +899,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
   return (
     <div
-      className="w-full min-w-0 flex flex-row border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full"
+      className="w-full max-w-full min-w-0 overflow-hidden flex flex-row border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full"
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-row h-full min-w-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-row h-full min-w-0 max-w-full overflow-hidden">
         {/* Vertical icon-rail — CapCut/Premiere pattern, grows downward */}
         {(() => {
           const totalTextCount = (captionCount || 0) + (textOverlayCount || 0);
@@ -921,7 +921,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           );
         })()}
 
-        <ScrollArea className="flex-1 min-w-0 overflow-hidden">
+        <ScrollArea className="flex-1 min-w-0 max-w-full overflow-hidden">
           {/* TAB: Cut (Schnitt) */}
           <TabsContent value="cut" className="mt-0">
             <CutPanel
@@ -1064,6 +1064,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             )}
 
             {/* Text-Overlays Editor */}
+            <div className="min-w-0 max-w-full overflow-hidden">
             <TextOverlayEditor2028
               overlays={textOverlays}
               onOverlaysChange={onTextOverlaysChange || (() => {})}
@@ -1071,6 +1072,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               currentTime={currentTime}
               videoUrl={videoUrl}
             />
+            </div>
 
             {/* Preview Layer Toggles */}
             <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
@@ -1625,7 +1627,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         className={cn(
-                          "p-2 rounded text-xs whitespace-normal break-words cursor-pointer transition-colors select-none w-full min-w-0",
+                          "p-2 rounded text-xs whitespace-normal break-words [overflow-wrap:anywhere] cursor-pointer transition-colors select-none w-full min-w-0 max-w-full overflow-hidden",
                           selectedSubtitleId === caption.id 
                             ? "bg-[#00d4ff]/20 border border-[#00d4ff]" 
                             : "bg-[#2a2a2a] hover:bg-[#3a3a3a]"
@@ -1634,7 +1636,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                         <span className="block text-white/40">
                           {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
                         </span>
-                        <p className="text-white/80 mt-0.5 line-clamp-2 break-words">
+                        <p className="text-white/80 mt-0.5 line-clamp-2 break-words [overflow-wrap:anywhere]">
                           {caption.text || '(Klicke zum Bearbeiten)'}
                         </p>
                       </div>
