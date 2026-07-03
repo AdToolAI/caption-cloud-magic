@@ -244,11 +244,10 @@ export function buildAsdStrategy(input: BuildAsdInput): AsdStrategyResult {
   // while `auto_detect:true` and `bounding_boxes_url` both succeed on
   // the SAME asset.
   //
-  // The per-speaker preclip is by construction a single-face square
-  // crop (v69 face-center pipeline) — regardless of how many speakers
-  // the scene has overall. Multi-speaker scenes still produce a SINGLE
-  // face per preclip. Therefore Rule 0 fires for EVERY preclip
-  // dispatch except:
+  // The per-speaker preclip is by construction a single-face square crop
+  // (v69 face-center pipeline). v169 keeps auto_detect ONLY for true
+  // single-speaker scenes; multi-speaker must use deterministic ASD even
+  // when each pass has a tight preclip. Therefore Rule 0 fires except:
   //
   //   - Explicit coords-pro / bbox-url retry variants (admin intent)
   //   - Ambiguity risk "neighbor_inside_crop" (second face actually

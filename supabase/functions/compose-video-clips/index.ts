@@ -117,7 +117,9 @@ interface ClipScene {
     | "heygen"
     | "broll"
     | "sync-polish"
-    | "cinematic-sync";
+    | "cinematic-sync"
+    | "sync-segments"
+    | "native-dialogue";
   /** When false → request muted output (Veo/Kling generate_audio=false; Sora muted at stitch). Default true. */
   withAudio?: boolean;
   /** Client-side Composer dialog/lip-sync switches. Used to prevent auto-HeyGen routing. */
