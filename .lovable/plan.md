@@ -1,66 +1,48 @@
 ## Problem
 
-Bei 1175 px Viewport bleibt die Sidebar-Tab-Leiste horizontal (3-Spalten-Grid + Settings-Zeile). Selbst mit `StudioSidebarTabs` sitzen `SCHNITT / LOOK & FARBE / EFFEKTE` bzw. `UNTERTITEL / AUDIO / EXPORT` in zwei Reihen à 3 Spalten und werden bei schmalen Panels rechts abgeschnitten. Die Sidebar wird nie **nach unten** länger, weil das Grid horizontal skaliert.
-
-## Wie es seriöse Plattformen lösen
-
-CapCut, Descript, Adobe Premiere, DaVinci Resolve, Figma, VS Code — alle nutzen dasselbe Muster:
-
-```text
-┌──┬─────────────────────┐
-│⚙ │                     │
-│✂ │   Panel-Inhalt      │
-│🎨│                     │
-│✨│                     │
-│💬│                     │
-│🎵│                     │
-│⬇ │                     │
-└──┴─────────────────────┘
-```
-
-Eine **fixe, schmale Icon-Rail (48–56 px)** links am äußeren Rand mit **vertikal gestapelten** Tabs. Icon + optional Mini-Label darunter. Tooltip beim Hover zeigt den vollen Namen. Der Content daneben füllt den Rest. Das Feature-Set wächst **nach unten** statt in die Breite — genau was der User fordert.
+`GripVertical` in der Szenen-Liste ist rein dekorativ — kein Drag-Handler hängt daran. Auch die Timeline-Blöcke lassen sich zwar innerhalb ihrer Zeit-Position schieben (Trim), aber nicht **untereinander vertauschen**. Der User erwartet CapCut-Verhalten: Szene 3 vor Szene 1 ziehen → Reihenfolge wechselt.
 
 ## Umsetzung
 
-### 1. `StudioSidebarTabs` komplett auf vertikale Rail umbauen
-
-`src/components/studio-shell/StudioSidebarTabs.tsx` — nur noch **ein** Layout, keine Breakpoints mehr:
-
-- `<TabsList>` wird zu einer schmalen vertikalen Spalte (`w-14`, `flex-col`), an der **linken Kante** der Sidebar fixiert.
-- Jeder Tab: 48×48 px Button, Icon 18px zentriert, darunter ein 9px-Label in 2 Zeilen erlaubt (`text-[9px] leading-tight text-center line-clamp-2`), Badge als goldener Dot oben rechts.
-- Aktiver Tab: goldener Left-Border (`border-l-2 border-[#F5C76A]`) + weicher Glow, kein volles Hintergrund-Rechteck.
-- Tooltip via `title` mit vollem Label + Count.
-- Settings-Tab ganz unten mit `mt-auto`, getrennt durch dünnen Divider.
-- Die Rail scrollt niemals horizontal — bei sehr kleinen Viewports mit `overflow-y-auto` scrollbar (kommt aber praktisch nie vor).
-
-### 2. `CapCutSidebar` — Rail links, Content rechts
-
-`src/components/directors-cut/studio/CapCutSidebar.tsx`:
-
-- Wrapper wird zu `flex flex-row` mit zwei Kindern:
-  - **Links**: `StudioSidebarTabs` in fixer 56px-Spalte
-  - **Rechts**: `flex-1 min-w-0` für `TabsContent` (Panel-Inhalt)
-- `useContainerWidth` und die 3-Modus-Logik entfallen — nicht mehr benötigt.
-
-### 3. `CapCutEditor` — neue Panel-Breiten
+### 1. Reorder-Handler im Editor
 
 `src/components/directors-cut/studio/CapCutEditor.tsx`:
 
-- Sidebar-Default zurück auf **320 px** (56 Rail + 264 Content). Auf `< 1280 px` Viewports **288 px** (56 + 232). Kollabiert (nur Rail sichtbar) bei `sidebarCollapsed`: **56 px**.
-- `PanelDivider` min = 56 (nur Rail), max = 560.
-- Preview-Mittelspalte bleibt `flex-1 min-w-0` — bekommt bei 1175 px Viewport jetzt **~615 px** statt gequetschten Raum.
+- Neuer Callback `handleReorderScenes(fromIndex, toIndex)`:
+  - Baut neue Szenen-Array via Array-Move.
+  - Rechnet `start_time` / `end_time` **sequentiell** neu: jede Szene behält ihre `duration = end_time - start_time`, wird ab `start_time = prev.end_time` (oder 0 für die erste) neu positioniert. So bleibt die Länge jeder Szene identisch, nur die Position auf der Master-Timeline verschiebt sich — analog CapCut / Premiere Track-Reorder.
+  - Ruft `commitHistory` (Undo-Support) auf und propagiert via `onScenesUpdate`.
+  - Passt `transitions` (Between-Scene-Übergänge) mit an: Transitions sind an `beforeSceneId`/`afterSceneId` gebunden — die Referenzen bleiben gültig, nur ihre effektive Position verschiebt sich mit.
+
+- Callback via Prop `onReorderScenes` an `CapCutSidebar` durchreichen, dort weiter an `CutPanel`.
+
+### 2. Drag-and-Drop in der Szenen-Liste (`CutPanel`)
+
+`src/components/directors-cut/studio/sidebar/CutPanel.tsx`:
+
+Nutzt bereits `@dnd-kit/core` (siehe DraggableMusicItem). Für Sortierbarkeit stattdessen `@dnd-kit/sortable` (bereits im Projekt via package.json vorhanden — falls nicht, standardmäßig bei dnd-kit installiert).
+
+- Umschließen der Szenen-Liste mit `DndContext` + `SortableContext` (vertical strategy).
+- Neue Sub-Component `SortableSceneCard` nutzt `useSortable({ id: scene.id })` — bindet `attributes` / `listeners` an das `GripVertical`-Handle (nur dieses, damit Klicks auf die Karte weiterhin die Szene auswählen).
+- Cursor am Grip auf `cursor-grab` / `active:cursor-grabbing`; Karte bekommt `opacity-50` während `isDragging`.
+- `onDragEnd`: findet `oldIndex` / `newIndex` und ruft `onReorderScenes(oldIndex, newIndex)`.
+
+### 3. Timeline-Block-Reorder (optional, im gleichen Schritt)
+
+Timeline-Video-Blöcke (`CapCutEditor` Timeline-Row) haben bereits Drag-Logic für Zeitverschiebung. Zusätzlich wird beim **horizontalen Drop-Over eines anderen Blocks** (Mitte-Überlappung > 50 %) statt Trim ein Reorder ausgelöst — ruft denselben `handleReorderScenes` auf.
+
+Erkennungslogik: Wenn `dragMode === 'move'` und der aktuelle Center-X mitten in einer Nachbar-Szene liegt → visueller Insertion-Marker (goldene vertikale Linie zwischen den zwei Szenen), bei Release: Reorder.
+
+Wenn das Timeline-Refactoring hier zu invasiv wird, liefern wir **Schritt 3 in einem Folge-Turn** und schließen diesen Turn mit funktionierendem Drag-Reorder in der Sidebar-Liste ab.
 
 ### 4. Verifikation via Playwright
 
-Screenshots bei 1175×758, 1280×800, 1440×900:
-
-- Keine abgeschnittenen Tabs, alle 7 Tabs (Schnitt, Look, FX, Untertitel, Audio, Export, Settings) vertikal sichtbar.
-- Kein horizontaler Scroll.
-- Preview-Fläche breiter als bisher.
-- Kollaps-Modus zeigt nur die 56 px Rail.
+- Öffne Director's Cut mit 3 vorhandenen Szenen.
+- Ziehe Szene 3 per Grip über Szene 1.
+- Screenshot: Reihenfolge in der Liste jetzt `3, 1, 2`; Timeline-Blöcke ebenfalls in neuer Reihenfolge; Preview spielt Szene 3 zuerst.
 
 ## Nicht enthalten
 
-- Keine Änderungen an Panel-Inhalten, Timeline, Preview, Inspector.
-- Keine Business-Logik / i18n-Keys angefasst.
-- `useContainerWidth` bleibt bestehen (wird ggf. später wiederverwendet), aber nicht mehr im Studio-Pfad importiert.
+- Kein DB-Persist neuer Feld-Struktur — `scenes` wird weiterhin als geordnetes Array serialisiert.
+- Keine Änderung an Transition-Auswahl-UI.
+- Keine i18n-Key-Änderungen (Grip-Tooltip nutzt existierendes `dc.reorder` falls vorhanden, sonst inline literal `Ziehen zum Vertauschen` / `Drag to reorder`, hinzugefügt zu i18n).

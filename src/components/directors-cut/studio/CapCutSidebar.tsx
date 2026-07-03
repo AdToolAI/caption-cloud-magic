@@ -84,6 +84,7 @@ interface CapCutSidebarProps {
   onSplitAtPlayhead?: () => void;
   onDeleteScene?: (sceneId: string) => void;
   onDuplicateScene?: (sceneId: string) => void;
+  onReorderScenes?: (fromIndex: number, toIndex: number) => void;
   onSceneSelect?: (sceneId: string | null) => void;
   onAutocut?: () => void;
   isAnalyzing?: boolean;
@@ -606,6 +607,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onSplitAtPlayhead,
   onDeleteScene,
   onDuplicateScene,
+  onReorderScenes,
   onSceneSelect,
   onAutocut,
   isAnalyzing = false,
@@ -932,6 +934,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onSplitAtPlayhead={onSplitAtPlayhead || (() => {})}
               onDeleteScene={onDeleteScene || (() => {})}
               onDuplicateScene={onDuplicateScene || (() => {})}
+              onReorderScenes={onReorderScenes}
               onSceneSelect={onSceneSelect || (() => {})}
               onAutocut={onAutocut}
               isAnalyzing={isAnalyzing}

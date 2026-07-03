@@ -8,6 +8,23 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from '@/hooks/useTranslation';
 import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
 import { resolveTransitions, type ResolvedTransition } from '@/utils/transitionResolver';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface CutPanelProps {
   scenes: SceneAnalysis[];
@@ -27,6 +44,7 @@ interface CutPanelProps {
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
   onAddVideoAsScene?: (file: File) => void;
   onAddFromLibrary?: () => void;
+  onReorderScenes?: (fromIndex: number, toIndex: number) => void;
   /** When set, scenes were imported from a Composer render's EDL — auto-cut is locked. */
   composerLockSource?: 'edl' | 'edl-rebuilt' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
   composerLockSceneCount?: number;
@@ -257,6 +275,28 @@ const TransitionBlock: React.FC<{
   );
 };
 
+/** Sortable wrapper for a scene row — exposes drag-handle props via render-prop. */
+const SortableScene: React.FC<{
+  id: string;
+  children: (args: {
+    dragHandleProps: React.HTMLAttributes<HTMLElement>;
+    isDragging: boolean;
+  }) => React.ReactNode;
+}> = ({ id, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 20 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ dragHandleProps: { ...attributes, ...listeners }, isDragging })}
+    </div>
+  );
+};
+
 export const CutPanel: React.FC<CutPanelProps> = ({
   scenes,
   transitions,
@@ -275,6 +315,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   onTrimScene,
   onAddVideoAsScene,
   onAddFromLibrary,
+  onReorderScenes,
   composerLockSource = null,
   composerLockSceneCount = 0,
 }) => {
@@ -287,6 +328,22 @@ export const CutPanel: React.FC<CutPanelProps> = ({
     () => resolveTransitions([...scenes].sort((a, b) => a.start_time - b.start_time), transitions),
     [scenes, transitions],
   );
+
+  const sortableEnabled = !!onReorderScenes && !composerLockSource;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const sceneIds = useMemo(() => scenes.map(s => s.id), [scenes]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onReorderScenes) return;
+    const oldIndex = sceneIds.indexOf(String(active.id));
+    const newIndex = sceneIds.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorderScenes(oldIndex, newIndex);
+  };
 
   const startEditing = (scene: SceneAnalysis) => {
     setEditingSceneId(scene.id);
@@ -455,9 +512,13 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             </p>
           </div>
         ) : (
-          <div className="pr-1 pb-4">
-            {scenes.map((scene, i) => (
-                <React.Fragment key={scene.id}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sceneIds} strategy={verticalListSortingStrategy}>
+              <div className="pr-1 pb-4">
+                {scenes.map((scene, i) => (
+                  <SortableScene key={scene.id} id={scene.id}>
+                    {({ dragHandleProps, isDragging }) => (
+                      <React.Fragment>
                   {/* Scene Card */}
                   <div
                     onClick={() => onSceneSelect(scene.id)}
@@ -469,7 +530,22 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <GripVertical className="h-3 w-3 text-white/20 flex-shrink-0" />
+                      <button
+                        type="button"
+                        {...(sortableEnabled ? dragHandleProps : {})}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={t('dc.reorderScene') || 'Ziehen zum Vertauschen'}
+                        title={sortableEnabled ? (t('dc.reorderScene') || 'Ziehen zum Vertauschen') : undefined}
+                        className={cn(
+                          'flex items-center justify-center flex-shrink-0 p-0.5 rounded',
+                          sortableEnabled
+                            ? 'cursor-grab active:cursor-grabbing text-white/40 hover:text-white/80 hover:bg-white/5 touch-none'
+                            : 'text-white/20 cursor-not-allowed',
+                        )}
+                        disabled={!sortableEnabled}
+                      >
+                        <GripVertical className="h-3 w-3" />
+                      </button>
                       
                       <div className={cn(
                         "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0",
@@ -547,9 +623,13 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       onTransitionChange={handleTransitionChange}
                     />
                   )}
-              </React.Fragment>
-            ))}
-          </div>
+                </React.Fragment>
+                    )}
+                  </SortableScene>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>
