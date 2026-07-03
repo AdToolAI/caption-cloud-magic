@@ -887,6 +887,88 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           </TabsContent>
         </Tabs>
       </Card>
+
+      <Dialog open={libraryPickerOpen} onOpenChange={setLibraryPickerOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t('uc.libraryPickerTitle') || 'Video aus Mediathek wählen'}</DialogTitle>
+            <DialogDescription>
+              {t('uc.libraryPickerDesc') || 'Wähle ein bereits erstelltes Video, um es als Hintergrund zu übernehmen.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={t('uc.libraryPickerSearch') || 'Videos durchsuchen…'}
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {loadingLibrary ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                {t('uc.loading') || 'Lädt…'}
+              </div>
+            ) : libraryVideos.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                {t('uc.libraryEmpty') || 'Noch keine fertigen Videos in deiner Mediathek.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {libraryVideos
+                  .filter((v: any) => {
+                    if (!librarySearch) return true;
+                    const title =
+                      v?.customizations?.title ||
+                      v?.metadata?.title ||
+                      '';
+                    return String(title).toLowerCase().includes(librarySearch.toLowerCase());
+                  })
+                  .map((v: any) => {
+                    const title =
+                      v?.customizations?.title ||
+                      v?.metadata?.title ||
+                      new Date(v.created_at).toLocaleDateString();
+                    return (
+                      <Card
+                        key={v.id}
+                        className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition"
+                        onClick={() => importFromLibrary(v)}
+                      >
+                        <div className="aspect-video bg-muted overflow-hidden">
+                          {v.thumbnail_url ? (
+                            <img
+                              src={v.thumbnail_url}
+                              alt={title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <video
+                              src={v.output_url}
+                              className="w-full h-full object-cover"
+                              muted
+                              preload="metadata"
+                            />
+                          )}
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs font-medium truncate">{title}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(v.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </Card>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
