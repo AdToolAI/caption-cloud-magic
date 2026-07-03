@@ -140,7 +140,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         .eq('id', scene.id);
       if (error) throw error;
 
-      const { error: invokeError } = await supabase.functions.invoke('compose-video-clips', {
+      const { data: invokeData, error: invokeError } = await supabase.functions.invoke('compose-video-clips', {
         body: {
           projectId: scene.projectId,
           scenes: [
@@ -168,6 +168,9 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         },
       });
       if (invokeError) throw invokeError;
+      if (invokeData && (invokeData as any).ok === false) {
+        throw new Error((invokeData as any).error || (invokeData as any).message || 'Render konnte nicht gestartet werden.');
+      }
       toast({
         title: 'Renderpfad neu gestartet',
         description: 'Die Szene läuft jetzt über HappyHorse/Hailuo + Sync.so.',
