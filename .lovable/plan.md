@@ -1,68 +1,42 @@
 ## Ziel
-
-Den alten HeyGen-/Talking-Head-Pfad im **Video Composer** endgültig entfernen, damit Dialog-/Voiceover-Szenen ausschließlich über die **v169 Cinematic-Sync Pipeline** (HappyHorse/Hailuo Master-Plate → Sync.so Lipsync) laufen. Keine Möglichkeit mehr, dass eine Szene versehentlich als statischer Portrait-Talking-Head „ready" markiert wird.
-
-Der Talking-Head bleibt als eigenständiges Modul (`/talking-head`) bestehen — er wird nur aus dem Composer-Routing entfernt.
+HeyGen/Talking-Head-Pfad komplett aus dem Video Composer entfernen. `/talking-head` Standalone-Modul bleibt unberührt. Composer nutzt ausschließlich die v169/v183 Sync.so-Pipeline.
 
 ## Änderungen
 
-### 1. Composer-Server: HeyGen-Branch komplett entfernen
-`supabase/functions/compose-video-clips/index.ts`
-- Den kompletten `wantsHeygen`-Block (~L2185–2530) löschen inklusive:
-  - Hume-Voice-Pre-Synth speziell für HeyGen
-  - `fetch(...generate-talking-head)`-Aufruf
-  - HeyGen-spezifische Fehlerbehandlung/Refund
-- `engineOverride === 'heygen'` als Wert entfernen. Wenn der Wert reinkommt, wird er auf `'cinematic-sync'` normalisiert (bei Dialog) oder auf `'auto'` (ohne Dialog).
-- Der bestehende Cinematic-Sync-Guard (L1157–1180) bleibt und wird zur einzigen Route für Dialog/Voiceover.
-
-### 2. Composer-Client: HeyGen-Option aus Engine-Wahl entfernen
-- Engine-Override-Werte `'heygen'` aus TypeScript-Typen entfernen (`ComposerScene`, `useSceneGenerate`, `SceneDialogStudio`, Router-Helper).
-- Alle UI-Elemente/Buttons, die „HeyGen" oder „Talking-Head" im Composer-Kontext anbieten, ausblenden bzw. auf Cinematic-Sync umstellen.
-- Der eigenständige Talking-Head Modus-Tab in `SceneDialogStudio` (falls vorhanden) bleibt nur als Info-Hinweis „für Portraits nutze das eigene Talking-Head-Modul".
-
-### 3. Legacy Talking-Head URLs erkennen und blockieren
-`compose-clip-webhook` und `compose-video-clips`:
-- Wenn eine Cinematic-Sync-Szene doch eine `talking-head-renders/...`-URL als `clip_url` bekommt, wird sie NICHT `ready` gesetzt, sondern:
-  - `clip_status='failed'`
-  - `clip_error='legacy_talking_head_route_blocked'`
-  - `lip_sync_status`, `twoshot_stage`, `dialog_shots` gecleart
-- Idempotenter Credit-Refund über bestehende Refund-Utility.
-
-### 4. Datenmigration für bereits „ready" markierte Fehlläufer
-Einmalige Migration:
-- Alle `composer_scenes` mit `clip_url LIKE '%/talking-head-renders/%'` UND `lip_sync_with_voiceover=true` OR `engine_override IN ('cinematic-sync','sync-segments')`:
-  - `clip_status='failed'`, `clip_error='legacy_talking_head_route_removed'`, `clip_url=null`
-  - Damit erscheinen die betroffenen Szenen im UI als „Neu generieren" statt fälschlich als fertig.
-
-### 5. `useSceneGenerate` / `SceneDialogStudio` vereinfachen
-- `shouldForceCinematicSync` wird zum Default: Jede Szene mit `dialogScript` + Cast + Provider ∈ {ai-happyhorse, ai-hailuo} bekommt zwingend `engine_override='cinematic-sync'`.
-- Die Fallback-Rewrite-Logik, die HeyGen für 1-Sprecher-Szenen erlaubte, wird gelöscht.
-- Die „Sauber neu starten"-Warnung in `SceneClipProgress` bleibt als Sicherheitsnetz für Alt-Szenen.
-
-### 6. Verifikation
-- Testszene aus dem Screenshot (Samuel Dusatko, 5s HappyHorse, Voiceover) neu triggern → DB muss:
+### 1. Client — SceneDialogStudio.tsx
+- `useTalkingHead()` Import und `handleGenerateInline()` HeyGen-Aufruf entfernen
+- `useHeygenLipSync` / Auto-Upgrade-Block entfernen
+- Inline "Generate" für Dialog/Voiceover-Szenen persistiert stattdessen:
   - `engine_override='cinematic-sync'`
   - `lip_sync_with_voiceover=true`
-  - `clip_status='generating'` → `ready`
-  - `clip_url` unter `composer-renders/…` (nicht `talking-head-renders/…`)
-- `compose-video-clips` Edge Logs zeigen keinen `fetch(.../generate-talking-head)`-Call mehr für Composer-Szenen.
+  - `lip_sync_status='pending'`
+  - `twoshot_stage='audio'` (nach Audio-Erzeugung)
+- Danach übernimmt `compose-video-clips` den Master-Plate-Render + Sync.so Lip-Sync
 
-## Nicht Teil dieses Plans
+### 2. Client — SceneCard.tsx / ClipsTab / sceneEngineRouter.ts / lib/video-composer.ts
+- Alle verbleibenden `heygen` / `heygen-talking-head` Referenzen entfernen bzw. auf `cinematic-sync` normalisieren
+- Engine-Typ `heygen-talking-head` aus dem Composer-TypeScript raus (Standalone `/talking-head` betroffen? Nein, das nutzt eigenen Typ)
 
-- Das eigenständige Talking-Head-Modul (`/talking-head`, `useTalkingHead`, `generate-talking-head` Edge Function) bleibt unverändert und weiter nutzbar für dediziertes Portrait-Lipsync außerhalb des Composers.
-- v169 Sync.so-Pipeline-Interna (per-pass locks, ASD, preclip) — bleiben wie im letzten Fix.
+### 3. Briefing / Manifest
+- `heygen` Enum-Werte in Composer-Briefings entfernen oder beim Load auf `cinematic-sync` normalisieren
 
-## Technische Dateien
+### 4. Server — compose-video-clips/index.ts
+- Hard-Guard am Anfang: `engineOverride==='heygen'` → auf `'cinematic-sync'` normalisieren + Log
+- Jede eingehende `clip_url` mit `talking-head-renders/` → sofort `failed` mit `legacy_talking_head_route_blocked`
 
-- `supabase/functions/compose-video-clips/index.ts` (HeyGen-Branch löschen)
-- `supabase/functions/compose-clip-webhook/index.ts` (Legacy-URL-Guard)
-- `src/hooks/useSceneGenerate.ts`
-- `src/components/video-composer/SceneDialogStudio.tsx`
-- `src/components/video-composer/SceneClipProgress.tsx`
-- `src/lib/video-composer/sceneEngineRouter.ts` (falls vorhanden)
-- `src/types/video-composer.ts`
-- Neue Migration: `remove_legacy_talking_head_composer_rows.sql`
+### 5. Datenbank-Migration
+- Alle `composer_scenes` mit `clip_url LIKE '%talking-head-renders%'` und `clip_status='ready'` → `failed` + Reset (`lip_sync_status=null`, `twoshot_stage=null`, `dialog_shots=null`, `lip_sync_source_clip_url=null`)
+- Alle `engine_override='heygen'` → `'cinematic-sync'`
+
+### 6. Verifikation
+- `rg` nach `generate-talking-head`, `useTalkingHead`, `heygen-talking-head`, `talking-head-renders` außerhalb von `src/pages/talking-head/**` und `supabase/functions/generate-talking-head/**` → 0 Treffer erwartet
+- DB-Query: 0 aktive `ready`-Composer-Szenen mit `talking-head-renders`
+- Deno-Parse für Edge Functions, Deploy `compose-video-clips`
+
+## Nicht betroffen
+- `/talking-head` Standalone-Route inkl. `generate-talking-head` Edge Function
+- Sync.so v169/v183 Pipeline (`compose-dialog-segments`, `render-sync-segments-audio-mux`)
+- Bestehende, bereits fertige HeyGen-Clips außerhalb des Composers
 
 ## Ergebnis
-
-Nach Umsetzung gibt es im Composer nur noch **einen** Weg für Dialog/Voiceover — Cinematic-Sync. Ein „schwarzer Clip, der eigentlich ein alter Portrait-Talking-Head war" ist damit strukturell unmöglich.
+Composer kann keine `talking-head-renders`-URLs mehr erzeugen oder anzeigen. Dialog-Szenen mit Cast laufen durchgängig über HappyHorse/Hailuo → Sync.so → composer-renders.
