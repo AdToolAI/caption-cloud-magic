@@ -451,7 +451,6 @@ export function TextOverlayEditor2028({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
               <span className="truncate">Text & Overlays</span>
-              Text & Overlays
               {overlays.length > 0 && (
                 <Badge className="bg-primary/20 text-primary border-primary/30">
                   {overlays.length}
