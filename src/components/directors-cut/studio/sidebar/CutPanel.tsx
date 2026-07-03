@@ -573,7 +573,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                             </button>
                           </div>
                         ) : (
-                          <p className="text-[11px] text-white/80 truncate">
+                          <p className="text-[11px] text-white/80 line-clamp-2 break-words">
                             {scene.description || t('dc.scene', { n: i + 1 })}
                           </p>
                         )}

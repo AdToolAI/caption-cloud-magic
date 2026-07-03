@@ -205,8 +205,8 @@ const DraggableMusicItem: React.FC<{
         )}
       </Button>
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-white truncate">{track.name}</div>
-        <div className="text-[10px] text-white/40 truncate">
+        <div className="text-xs text-white line-clamp-2 break-words">{track.name}</div>
+        <div className="text-[10px] text-white/40 break-words">
           {track.artist} · {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
         </div>
       </div>
@@ -497,7 +497,7 @@ const SubtitleVoiceoverSection: React.FC<{
                 <span className="text-amber-300/80 text-sm leading-none mt-0.5">{genderIcon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] font-medium text-white truncate">{v.name}</span>
+                    <span className="text-[11px] font-medium text-white break-words">{v.name}</span>
                     {isPremium && (
                       <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-amber-400/40 text-amber-300 bg-amber-500/10">
                         Premium
@@ -1683,7 +1683,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   {uploadedAudioFiles.map((file, i) => (
                     <div key={i} className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded group">
                       <FileAudio className="h-4 w-4 text-pink-400" />
-                      <span className="text-xs text-white/80 flex-1 truncate">{file.name}</span>
+                      <span className="text-xs text-white/80 flex-1 min-w-0 break-words">{file.name}</span>
                       <Button 
                         size="sm" 
                         variant="ghost"
