@@ -1,91 +1,62 @@
-## Was gefixt wird
+## Was das Problem wirklich ist
 
-1. **Studio-Sidebar schneidet Text ab** (Screenshot: „chladen", „bliothek", „the Magic")
-2. **Preview-Player ruckelt am Szenen-Übergang** — Bild UND Musik pausieren kurz, obwohl der Export inzwischen sauber ist
+Zwei separate Overflow-Bugs, die zusammen den Eindruck "die Spalte zieht in die Breite und schneidet Text ab" erzeugen:
 
-Beide sind reine Frontend/Preview-Fixes. Render-Pipeline und Export bleiben unangetastet.
+### Bug A — Icon-Rail (die schmale 56 px Spalte ganz links)
 
----
+`src/components/studio-shell/StudioSidebarTabs.tsx` rendert unter jedem Icon ein Text-Label (`SCHNITT`, `LOOK & FARBE`, `EFFEKTE`, `UNTERTITEL`, `AUDIO`, `EXPORT`, `EINSTELLUNGEN`). Bei 56 px Spaltenbreite mit 9 px `uppercase tracking-wide` passen nur ~6 Zeichen pro Zeile — `line-clamp-2 break-words` bricht bei Leerzeichen, findet aber bei „UNTERTITEL", „EINSTELLUNGEN" und „EFFEKTE" keine sinnvolle Bruchstelle. Ergebnis: horizontal abgeschnitten, wie im Screenshot sichtbar (`UNTERT`, `LOOK &`, `EFFEKT`).
 
-## Fix 1 — Sidebar-Spalte
+Der professionelle Standard (CapCut, Premiere, DaVinci Resolve, Figma, VS Code) ist an dieser Stelle: **Icon-only Rail mit Tooltip on Hover** — keine Textlabels unter dem Icon. Das ist keine Kompromisslösung, das ist die Referenz-Lösung.
 
-**Ursache:** `PanelDivider` erlaubt aktuell `min={56}` für die linke Library-Spalte (`CapCutEditor.tsx:2589`). Bei ~140 px Breite reicht der Platz nicht mehr für die Inhalte, und die Panels (`CutPanel`, `LookPanel`, `FXPanel`, `ExportPanel`, `CapCutSidebar` selbst) verwenden an mehreren Stellen `truncate` / `whitespace-nowrap`, wodurch Text hart abgeschnitten wird statt umzubrechen.
+### Bug B — Untertitel-Liste zwingt die ganze Sidebar in die Breite
 
-Der User will explizit: **„lieber in die Länge ziehen als zu breit werden"** — d. h. Text soll umbrechen und die Liste soll vertikal weiterlaufen (Scrollbar), nicht horizontal abgeschnitten werden.
+`src/components/directors-cut/studio/CapCutSidebar.tsx` Zeilen 1616-1644 (Tab „Untertitel" → „Generated Captions Preview"):
 
-**Änderungen:**
+- Der ScrollArea steht auf `overflow-x-auto` und der innere Container auf `min-w-[260px]`.
+- Jede Caption-Zeile hat `whitespace-nowrap` — der eingegebene Text bleibt zwingend einzeilig.
+- Das darunter liegende `<p className="line-clamp-2">` erbt `white-space: nowrap`, `line-clamp` greift nicht.
 
-- `src/components/directors-cut/studio/CapCutEditor.tsx` (Zeile 2589)
-  - `min={56}` → `min={280}` für die Library-Sidebar. `56` bleibt nur der Wert für den *collapsed*-Rail (der separat über `sidebarCollapsed` mit `width: 56` gerendert wird, siehe Zeile 2354). Der Resize-Griff soll den User nie unter eine lesbare Breite ziehen lassen.
-  - Default-Width in `useState`-Initializer (Zeile 234) auf min. 320 clampen, falls localStorage einen kleineren Wert enthält.
+Effekt: Sobald der User einen langen Untertitel eingibt, dehnt die Zeile den inneren Container aus, der horizontale Scrollbalken erscheint, und optisch wirkt es, als würde die ganze linke Spalte in die Breite schießen und Text abschneiden — genau der Screenshot-Zustand.
 
-- `src/components/directors-cut/studio/CapCutSidebar.tsx`
-  - Zeilen 208, 209, 500, 1686: `truncate` → `break-words` (bzw. `line-clamp-2` bei Track-Namen), damit lange Namen (Songs, Voiceovers, Datei-Uploads) umbrechen statt abgeschnitten zu werden.
-  - Zeile 1616: `overflow-x-auto` bleibt (Timeline-Marker) — nicht ändern.
+Der Preview-Player-Fix aus dem letzten Turn ist davon nicht betroffen und bleibt bestehen.
 
-- `src/components/directors-cut/studio/sidebar/CutPanel.tsx` (Zeile 576)
-  - `truncate` → `line-clamp-2 break-words` für Szenen-Labels.
+## Fix — 2 Dateien
 
-- `src/components/directors-cut/studio/sidebar/LookPanel.tsx`, `FXPanel.tsx`, `ExportPanel.tsx`
-  - Kurzer Pass: alle `truncate` / `whitespace-nowrap` innerhalb schmaler Listenzeilen durch `break-words` ersetzen; `min-w-0` auf umschließenden Flex-Kindern erhalten, damit die Zeilen sich vertikal ausdehnen dürfen.
+### 1. `src/components/studio-shell/StudioSidebarTabs.tsx` — Icon-only Rail
 
-Ergebnis: Text bricht sauber um, die Liste wird länger (die Sidebar hat bereits eine `ScrollArea` in `CapCutSidebar.tsx:924` — vertikales Scrollen funktioniert dann out-of-the-box).
+- Text-Label `<span>` unter dem Icon **entfernen** (sowohl für die normalen Tabs als auch für den Settings-Tab).
+- Icon-Größe von `h-[18px] w-[18px]` → `h-5 w-5` (mehr Präsenz, wenn kein Label mehr da ist).
+- Vertikales Padding auf `py-3` erhöhen und `min-h-[48px]` — ergibt gleichmäßige, quadratisch wirkende Buttons.
+- Jedes `<TabsTrigger>` in einen Radix-`<Tooltip>` (`side="right"`) einwickeln, der das Label anzeigt — dieselben Tooltip-Primitives, die schon in `AppSidebar.tsx` verwendet werden.
+- Count-Badge bleibt unverändert oben rechts.
+- Active-State (gold left-border + Glow) bleibt exakt wie bisher.
 
----
+### 2. `src/components/directors-cut/studio/CapCutSidebar.tsx` — Untertitel-Liste
 
-## Fix 2 — Preview-Player Rucker (Bild + Musik) am Szenen-Übergang
+Zeilen 1616-1644:
 
-**Ursache:** In `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` bei Szenen-Ende (Zeilen 1131–1166) wird ein *Mini-Seek* auf dem aktiven Video ausgeführt (`video.currentTime = nextSourceStart + 0.05`). Damit muss der Browser dekodierten Buffer verwerfen und neu suchen → 100–400 ms Video-Freeze. Die Audio-Elemente (source / VO / Musik) laufen dabei linear weiter, aber:
+- `<ScrollArea>`: `max-h-48 overflow-x-auto` → `max-h-48` (nur vertikal). `<ScrollBar orientation="horizontal" />` entfernen.
+- Inner `<div>`: `min-w-[260px]` **entfernen**, stattdessen `w-full min-w-0`.
+- Caption-Zeile `className`: `whitespace-nowrap` → `whitespace-normal break-words`.
+- `<span>` mit Zeitstempel bekommt `block` (statt inline), damit der Text darunter sauber umbricht.
+- `<p className="line-clamp-2">` bleibt — greift dann korrekt, weil `white-space: normal` gilt.
 
-- Es gibt für „normal advance" keinen Ping-Pong-Slot-Swap wie in der Composer-Preview (siehe Memory `preview-triple-buffer-and-prewarm`), obwohl `videoRefA` / `videoRefB` existieren.
-- Bei Gap-Fällen (Zeile 1141–1144, 1200–1203) werden `sourceAudioRef` / `voiceoverAudioRef` / `backgroundMusicAudioRef` **hart pausiert**. Beim Übergang ohne Gap sollen sie das explizit NICHT — der User berichtet aber trotzdem einen Musik-Rucker. Das lässt sich mit zwei kleinen Anpassungen beheben:
+Als Defense-in-Depth: auf der ScrollArea in Zeile 924 (`<ScrollArea className="flex-1 min-w-0">`) zusätzlich `overflow-hidden` gegen künftige Kindkomponenten, die versuchen zu expandieren.
 
-**Änderungen (DirectorsCutPreviewPlayer.tsx):**
+## Nicht angefasst
 
-1. **Standby-Slot vorwärmen und atomar swappen** (Zeilen 1131–1166):
-   Statt `video.currentTime = nextSourceStart + 0.05` auf dem aktiven Slot:
-   - Standby-Slot (`getStandbyVideo()`) bekommt `src` (falls verschieden), `currentTime = nextSourceStart`, `playbackRate = nextRate`, `play()` bereits ~250 ms *vor* dem Cut (basierend auf `sceneInfo.scene.end_time - visualTimeRef.current`).
-   - Am Cut: nur `activeSlotRef.current = otherSlot`, alter Slot wird `.pause()` + `opacity=0` **nach** einem RAF-Frame Delay (damit kein sichtbarer Sprung entsteht).
-   - Fällt in dieselbe Architektur wie die bereits produktive Composer-Preview (Memory `preview-triple-buffer-and-prewarm`) — nur ohne HTTP-Prewarm, weil Director's Cut mit einer einzelnen `videoUrl` arbeitet.
-
-2. **Kein Audio-Touch beim Non-Gap-Advance:**
-   Sicherstellen, dass im `if (gapDuration > 0.2)` Zweig (Zeile 1136) und nur dort Audio pausiert wird. Der Non-Gap-Pfad (Zeile 1152–1165) darf `sourceAudioRef` / `voiceoverAudioRef` / `backgroundMusicAudioRef` **nicht** anfassen — bereits so, aber wir fügen einen expliziten Kommentar + Guard ein („audio stays continuous across cut").
-
-3. **Kleine A/V-Drift-Korrektur nach Slot-Swap:**
-   Direkt nach dem Swap: `sourceAudioRef.current.currentTime` an `activeVideo.currentTime` angleichen, aber **nur** wenn die Drift > 60 ms ist (sonst hörbarer Click). Das verhindert langsames Auseinanderlaufen über viele Szenen.
-
-Kein Eingriff in:
-- `useTransitionRenderer` / `NativeTransitionLayer` / `NativeTransitionOverlay` (aktive Transition-Animation läuft bereits sauber).
-- Timeline, Waveforms, Timing des exportierten Videos.
-- `render-directors-cut`, `check-remotion-progress`, `remotion-webhook`, `DirectorsCutVideo.tsx` (Export ist laut User jetzt korrekt).
-
----
+- Preview-Player / Ping-Pong-Slot-Swap (letzter Fix bleibt aktiv).
+- Render-Pipeline, Remotion-Templates, Edge Functions.
+- Timeline-Component, Waveforms, Transitions.
+- Andere Tabs (Cut / Look / FX / Audio / Export) — dort gibt es kein `whitespace-nowrap` mehr.
 
 ## Verifikation
 
-**Sidebar:**
-1. Sidebar auf 280 px verkleinern (Minimum) → Songtitel „Time to leave the Magic" bricht auf 2 Zeilen um statt abgeschnitten zu werden. Kein „chladen"/„bliothek" mehr.
-2. Weiter ziehen unmöglich unter 280 px.
-
-**Preview-Player:**
-1. Fresh Projekt mit 2 Szenen + Musik-Track laden, im Preview durchlaufen lassen.
-2. Erwartet: Bild läuft flüssig durch den Cut, keine sichtbare Pause am Übergang. Musik läuft linear weiter, kein Klick / kein Pause-Artefakt.
-3. Regression: Gap-Szenario (> 0.2 s Lücke zwischen Szenen) zeigt weiterhin Blackscreen + pausiert Audio wie zuvor.
-4. Export-Regression-Check: Ein Test-Render bestätigt, dass die Änderungen keinen Preview-only-Code betreffen und der Export unverändert korrekt bleibt.
-
----
+1. Untertitel-Tab öffnen, einen sehr langen Text (>100 Zeichen) in eine Caption eingeben → Text bricht auf 2 Zeilen um, danach `…` via `line-clamp-2`. Die Sidebar bleibt exakt so breit wie vor der Eingabe. Kein horizontaler Scrollbalken mehr.
+2. Icon-Rail: alle 7 Tabs zeigen nur noch das Icon. Hover auf jedem Tab → Radix-Tooltip rechts mit vollem Label („Schnitt", „Look & Farbe", „Effekte", „Untertitel", „Audio", „Export", „Einstellungen"). Count-Badge bleibt sichtbar.
+3. Regression: `AppSidebar` (Hub-Sidebar) unverändert. Andere Studio-Tabs (Cut, Look, FX, Audio, Export) unverändert. Preview-Player-Übergänge weiterhin ohne Ruckler.
 
 ## Betroffene Dateien
 
-- `src/components/directors-cut/studio/CapCutEditor.tsx` (2 Zeilen: Divider-min + Width-Clamp)
-- `src/components/directors-cut/studio/CapCutSidebar.tsx` (4 truncate → break-words)
-- `src/components/directors-cut/studio/sidebar/CutPanel.tsx` (1 truncate → line-clamp)
-- `src/components/directors-cut/studio/sidebar/LookPanel.tsx`, `FXPanel.tsx`, `ExportPanel.tsx` (Cleanup)
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` (Ping-Pong-Advance + Audio-Guard + Drift-Korrektur, ~40 Zeilen)
-
-## Nicht geändert
-
-- Render-Pipeline / Remotion-Templates / Lambda-Bundle
-- Edge Functions
-- Transition-Resolver / Easing / Timing-Model
-- Timeline-Component / Waveforms
+- `src/components/studio-shell/StudioSidebarTabs.tsx` (~30 Zeilen Umbau)
+- `src/components/directors-cut/studio/CapCutSidebar.tsx` (5 Zeilen: 924, 1616, 1617, 1628, 1644)
