@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
@@ -45,15 +46,31 @@ function validateScenes(scenes: unknown): { ok: true } | { ok: false; reason: st
   return { ok: true };
 }
 
-// AWS Lambda configuration — read from secret for version consistency
-const AWS_REGION = 'eu-central-1';
-function getLambdaFunctionName(): string {
-  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
-  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
-}
+// AWS Lambda configuration — shared constants prevent bundle/output bucket drift.
 const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
 const LAMBDA_START_TIMEOUT_MS = 25_000;
+
+function normalizeRemotionServeUrl(rawServeUrl: string): string {
+  try {
+    const url = new URL(rawServeUrl);
+    const bucketMatch = url.hostname.match(/^(remotionlambda-eucentral1-[^.]+)\.s3[.-]/i);
+    const secretBucketName = bucketMatch?.[1];
+
+    if (secretBucketName && secretBucketName !== REMOTION_BUNDLE_BUCKET_NAME) {
+      const normalized = new URL(rawServeUrl);
+      normalized.hostname = `${REMOTION_BUNDLE_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com`;
+      console.warn('[RenderDirectorsCut] Outdated REMOTION_SERVE_URL bucket detected — normalizing', {
+        secretBucketName,
+        canonicalBundleBucket: REMOTION_BUNDLE_BUCKET_NAME,
+      });
+      return normalized.toString();
+    }
+  } catch (error) {
+    console.warn('[RenderDirectorsCut] Could not parse REMOTION_SERVE_URL, using raw value', error);
+  }
+
+  return rawServeUrl;
+}
 
 function isAbortLikeError(error: unknown): boolean {
   const anyErr = error as any;
