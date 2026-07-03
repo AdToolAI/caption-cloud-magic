@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors } from 'lucide-react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors, RotateCcw } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,7 +108,51 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   // Cinematic-Sync state — Dialog-Shot pipeline (1..N speakers).
   // Each speaker turn becomes its own Hailuo plate + Sync.so lipsync.
   const isCinematic = scene.engineOverride === 'cinematic-sync';
+  const shouldBeSceneLipsync =
+    isCinematic ||
+    scene.dialogMode === true ||
+    scene.lipSyncWithVoiceover === true;
+  const wrongTalkingHeadReady =
+    shouldBeSceneLipsync &&
+    scene.clipStatus === 'ready' &&
+    typeof scene.clipUrl === 'string' &&
+    scene.clipUrl.includes('/talking-head-renders/');
   const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
+
+  const resetWrongRenderPath = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from('composer_scenes')
+        .update({
+          clip_url: null,
+          clip_status: 'pending',
+          clip_error: null,
+          engine_override: 'cinematic-sync',
+          lip_sync_with_voiceover: true,
+          lip_sync_status: null,
+          twoshot_stage: null,
+          dialog_shots: null,
+          lip_sync_source_clip_url: null,
+          replicate_prediction_id: null,
+        })
+        .eq('id', scene.id);
+      if (error) throw error;
+      toast({
+        title: 'Renderpfad zurückgesetzt',
+        description: 'Bitte die Szene erneut generieren — sie startet jetzt über HappyHorse/Hailuo + Sync.so.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Reset fehlgeschlagen',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // ── Dialog-Shot pipeline progress (per-shot status) ──────────────────────
   // `dialog_shots` is written by `compose-dialog-scene` and updated by
@@ -138,6 +182,27 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
   const dialogTotal = dialogShots.length;
   const showDialogOverlay = isDialog && !hqReady && dialogShotsState?.status !== 'done';
+
+  if (wrongTalkingHeadReady) {
+    return (
+      <div className="relative w-full h-full bg-destructive/10 border border-destructive/40 flex flex-col items-center justify-center gap-1 p-2 text-center">
+        <XCircle className="h-5 w-5 text-destructive" />
+        <span className="text-[9px] text-destructive font-semibold">Falscher Renderpfad</span>
+        <span className="text-[8px] text-muted-foreground leading-tight">
+          Talking-Head statt Szene + Sync.so
+        </span>
+        <button
+          type="button"
+          onClick={resetWrongRenderPath}
+          disabled={busy}
+          className="mt-1 bg-amber-500/90 hover:bg-amber-500 text-black rounded px-2 py-1 text-[9px] flex items-center gap-1 font-semibold disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RotateCcw className="h-2.5 w-2.5" />}
+          Sauber neu starten
+        </button>
+      </div>
+    );
+  }
 
   // READY → show video / image (with optional Fast-Preview swap badge if both exist)
   if (hqReady) {
