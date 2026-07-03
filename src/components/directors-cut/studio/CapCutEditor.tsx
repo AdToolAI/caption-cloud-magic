@@ -1552,6 +1552,25 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     toast.success(t('dc.sceneDuplicated'));
   }, [scenes, onScenesUpdate, t, commitHistory]);
 
+  /** Reorder scenes by index — durations preserved, master timeline is recompacted sequentially. */
+  const handleReorderScenes = useCallback((fromIndex: number, toIndex: number) => {
+    if (!onScenesUpdate) return;
+    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= scenes.length || toIndex >= scenes.length) return;
+    commitHistory();
+    const next = [...scenes];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    let cursor = 0;
+    const recalculated = next.map(s => {
+      const d = Math.max(0, s.end_time - s.start_time);
+      const updated = { ...s, start_time: cursor, end_time: cursor + d };
+      cursor += d;
+      return updated;
+    });
+    onScenesUpdate(recalculated);
+  }, [scenes, onScenesUpdate, commitHistory]);
+
   // Cleanup render polling + interpolation on unmount
   useEffect(() => {
     return () => {
