@@ -15,7 +15,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useEditorHistory } from '@/hooks/useEditorHistory';
 import { ShortcutOverlay } from './ShortcutOverlay';
 import { AutosaveBadge } from './AutosaveBadge';
-import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard, Anchor, Scissors } from 'lucide-react';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelRightClose, PanelRightOpen, Download, Film, Library, MonitorPlay, SlidersHorizontal, Keyboard, Anchor, Scissors } from 'lucide-react';
 import { PanelDivider } from './PanelDivider';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -120,6 +120,8 @@ const DEFAULT_TRACKS: AudioTrack[] = [
   { id: 'track-music', type: 'background-music', name: 'Music', clips: [], volume: 70, muted: false, locked: false, solo: false, color: '#10b981', icon: '🎵' },
   { id: 'track-sfx', type: 'sound-effect', name: 'SFX', clips: [], volume: 100, muted: false, locked: false, solo: false, color: '#ec4899', icon: '🔊' },
 ];
+
+const FIXED_LIBRARY_PANEL_WIDTH = 280;
 
 export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   videoUrl,
@@ -227,27 +229,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   }, [currentTime, t]);
   
   // Collapsible panels
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
 
-  // Welle 5 — Resizable Library / Inspector widths, persisted in localStorage
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 340;
-    const stored = parseInt(window.localStorage.getItem('dc:sidebar-w') || '', 10);
-    // Clamp to safe range — 280 is the minimum readable width for library content
-    if (Number.isFinite(stored) && stored >= 280 && stored <= 560) return stored;
-    // First-session default: content panel scales to viewport, always readable
-    const vw = window.innerWidth;
-    if (vw < 1024) return 300;
-    if (vw < 1280) return 320;
-    return 340;
-  });
+  // Welle 5 — Inspector width remains resizable. Library width is fixed by design.
   const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 288;
     const v = parseInt(window.localStorage.getItem('dc:inspector-w') || '', 10);
     return Number.isFinite(v) && v >= 240 && v <= 480 ? v : 288;
   });
-  useEffect(() => { try { window.localStorage.setItem('dc:sidebar-w', String(sidebarWidth)); } catch {} }, [sidebarWidth]);
   useEffect(() => { try { window.localStorage.setItem('dc:inspector-w', String(inspectorWidth)); } catch {} }, [inspectorWidth]);
   
   // Audio Effects State (lifted from sidebar for Web Audio API integration)
@@ -2219,15 +2208,6 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             </Button>
           )}
           <div className="w-px h-5 bg-[#F5C76A]/15" />
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? t('dc.openSidebar') : t('dc.closeSidebar')}
-          >
-            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </Button>
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C76A] to-[#FFE4A0] font-semibold text-sm drop-shadow-[0_0_8px_rgba(245,199,106,0.2)]">Director's Cut Studio</span>
           <AutosaveBadge status={autosaveStatus} lastSavedAt={autosaveLastSavedAt} />
         </div>
@@ -2347,46 +2327,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       {/* Main Content with shared DndContext */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex overflow-hidden min-w-0">
-          {/* Welle 5 — Library Panel */}
+          {/* Welle 5 — Library Panel: fixed width, never user-resizable */}
            <div
             className={cn(
-             "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-[width] duration-150 flex-shrink-0"
+             "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg flex-none min-w-0 overflow-hidden"
            )}
-           style={{ width: sidebarCollapsed ? 56 : sidebarWidth }}
+           style={{ width: FIXED_LIBRARY_PANEL_WIDTH, minWidth: FIXED_LIBRARY_PANEL_WIDTH, maxWidth: FIXED_LIBRARY_PANEL_WIDTH }}
            >
             {/* Column header */}
-            {!sidebarCollapsed && (
-              <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60">
+              <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60 min-w-0 flex-shrink-0">
                 <Library className="h-3.5 w-3.5 text-[#F5C76A]" />
-                <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">Bibliothek</span>
-                <span className="ml-auto text-[10px] text-white/40">{scenes.length} Szenen</span>
+                <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold min-w-0 truncate">Bibliothek</span>
+                <span className="ml-auto text-[10px] text-white/40 flex-shrink-0">{scenes.length} Szenen</span>
               </div>
-            )}
-            {sidebarCollapsed ? (
-              <div className="flex flex-col items-center gap-3 py-4">
-                <button
-                  onClick={() => setSidebarCollapsed(false)}
-                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                  title="Voiceover"
-                >
-                  <Mic className="h-5 w-5" />
-                </button>
-                <button 
-                  onClick={() => setSidebarCollapsed(false)}
-                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                  title="Musik"
-                >
-                  <Music className="h-5 w-5" />
-                </button>
-                <button 
-                  onClick={() => setSidebarCollapsed(false)}
-                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                  title="Sound Effects"
-                >
-                  <Volume2 className="h-5 w-5" />
-                </button>
-              </div>
-            ) : (
             <CapCutSidebar 
               onAddFromLibrary={() => setShowAddMediaDialog(true)}
               videoUrl={videoUrl}
@@ -2582,13 +2535,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               }}
               voiceoverVolume={audioTracks.find(t => t.id === 'track-voiceover')?.volume ?? 100}
             />
-            )}
           </div>
-
-          {/* Welle 5 — Library ↔ Preview Divider */}
-          {!sidebarCollapsed && (
-            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={280} max={560} />
-          )}
 
           {/* Welle 5 — Preview + Timeline Panel */}
           <div className="flex-1 flex flex-col min-w-0">
