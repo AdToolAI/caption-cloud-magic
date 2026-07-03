@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { resolveTransitions, findActiveTransition } from '@/utils/transitionResolver';
 import type { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
+import { easeTransition } from '@/lib/directors-cut/transitionEasing';
 
 interface TransitionInfo {
   progress: number;
