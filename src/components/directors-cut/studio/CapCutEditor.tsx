@@ -2524,6 +2524,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onSplitAtPlayhead={handleSplitAtPlayhead}
               onDeleteScene={handleSceneDelete}
               onDuplicateScene={handleDuplicateScene}
+              onReorderScenes={handleReorderScenes}
               onSceneSelect={setSelectedSceneId}
               onAutocut={onStartAnalysis}
               isAnalyzing={isAnalyzing}
