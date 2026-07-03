@@ -1,35 +1,26 @@
 ## Ziel
-Die linke Director's-Cut-Studio-Leiste wird professionell stabilisiert: feste Breite, kein Drag-Resize, kein horizontales Aufziehen durch lange Texte.
+Die linke Director's-Cut-Seitenleiste wird endgültig stabil: nicht ziehbar, ca. 10 cm breit statt 7 cm, keine abgeschnittenen Buttons/Texte, keine verschobene Preview durch Inhalt.
 
 ## Umsetzung
-1. **Feste Breite statt verstellbarer Breite**
-   - Die linke Studio-/Bibliotheksspalte bekommt eine feste Breite von ca. 7 cm Bildschirmmaß, technisch ca. `280px`.
-   - `minWidth`, `maxWidth` und `width` werden identisch gesetzt, damit die Spalte nie breiter wird.
+1. **Feste professionelle Breite erhöhen**
+   - `FIXED_LIBRARY_PANEL_WIDTH` von `280px` auf einen festen Wert um ca. `380px` setzen.
+   - `width`, `minWidth` und `maxWidth` bleiben identisch, damit die Leiste nie verstellbar ist.
 
-2. **Linken Drag-Handle entfernen**
-   - Der Trenner zwischen linker Leiste und Preview wird entfernt.
-   - Nutzer können die linke Leiste nicht mehr nach rechts ziehen.
-   - Der rechte Inspector-Trenner bleibt unverändert, weil das nicht das gemeldete Problem betrifft.
+2. **Keinen linken Cut/Resize zurückbringen**
+   - Der linke `PanelDivider` bleibt entfernt.
+   - Es gibt keine Drag-Logik, keine gespeicherte linke Breite und keinen Collapse für die linke Leiste.
+   - Nur der rechte Inspector darf weiterhin resizebar bleiben.
 
-3. **Keine wechselnde linke Spaltenbreite mehr**
-   - Die bisherige gespeicherte `sidebarWidth`-Logik und `localStorage`-Breite für die linke Leiste wird entfernt oder nicht mehr genutzt.
-   - Die linke Leiste bleibt im Studio konstant breit, statt je nach Session/Viewport anders zu starten.
+3. **Sidebar-Inhalt an feste 10-cm-Spalte anpassen**
+   - Die innere Icon-Leiste bleibt fix.
+   - Der Inhaltsbereich bekommt klare Breiten-/Overflow-Regeln (`min-w-0`, `max-w-full`, `overflow-hidden`).
+   - Buttons und Reihen im Schnitt-Panel werden so angepasst, dass sie innerhalb der 380px sauber umbrechen oder in zwei Zeilen laufen statt abgeschnitten zu wirken.
 
-4. **Overflow hart absichern**
-   - Die linke Spalte und ihr Inhalt bekommen `overflow-hidden`, `min-w-0` und feste Containergrenzen.
-   - Lange Texte innerhalb von Text-Overlay-, Untertitel- und Bibliothekslisten dürfen nur umbrechen oder vertikal wachsen, aber nie die Spalte verbreitern.
+4. **Konkretes Verschiebungsproblem im Screenshot beheben**
+   - Der große Button „Am Playhead teilen“ und die danebenliegenden Aktionsbuttons werden nicht mehr über die Spalte hinausgedrückt.
+   - Action-Zeilen im `CutPanel` werden responsive innerhalb der linken Leiste angeordnet, nicht horizontal aus der Leiste heraus.
 
-5. **Konkreter Screenshot-Fall**
-   - Der lange Text im Text-/Untertitelbereich darf die Zeile nicht horizontal ausdehnen.
-   - Wo Text editiert oder angezeigt wird, wird `whitespace-normal`, `break-words`/`overflow-wrap:anywhere` und bei Preview-Zeilen ggf. `line-clamp` genutzt.
-
-## Betroffene Dateien
-- `src/components/directors-cut/studio/CapCutEditor.tsx`
-- `src/components/directors-cut/studio/CapCutSidebar.tsx`
-- ggf. betroffene Sidebar-Unterpanels, falls dort noch `whitespace-nowrap`, `truncate` oder horizontale Mindestbreiten die Spalte aufziehen.
-
-## Verifikation
-- In der linken Studio-Leiste sehr langen Text eingeben.
-- Die Leiste bleibt konstant ca. 280px breit.
-- Kein horizontaler Scrollbalken, kein Abschneiden über die Spaltengrenze, keine Drag-Möglichkeit nach rechts.
-- Preview-/Timeline-Bereich verschiebt sich nicht durch Texteingabe.
+5. **Verifikation**
+   - Director's Cut öffnen.
+   - Prüfen: linke Leiste bleibt konstant breit, nicht ziehbar, kein abgeschnittener Button, Preview beginnt sauber rechts daneben.
+   - Langer Text/Untertitel darf nur vertikal wachsen oder umbrechen, aber die Leiste nie verbreitern.

@@ -121,7 +121,7 @@ const DEFAULT_TRACKS: AudioTrack[] = [
   { id: 'track-sfx', type: 'sound-effect', name: 'SFX', clips: [], volume: 100, muted: false, locked: false, solo: false, color: '#ec4899', icon: '🔊' },
 ];
 
-const FIXED_LIBRARY_PANEL_WIDTH = 280;
+const FIXED_LIBRARY_PANEL_WIDTH = 380;
 
 export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   videoUrl,
@@ -2327,19 +2327,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       {/* Main Content with shared DndContext */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex overflow-hidden min-w-0">
-          {/* Welle 5 — Library Panel: fixed width, never user-resizable */}
-           <div
+          {/* Library Panel: fixed 10 cm studio width, never user-resizable */}
+          <div
             className={cn(
-             "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg flex-none min-w-0 overflow-hidden"
+              "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg flex-none min-w-0 overflow-hidden"
            )}
-           style={{ width: FIXED_LIBRARY_PANEL_WIDTH, minWidth: FIXED_LIBRARY_PANEL_WIDTH, maxWidth: FIXED_LIBRARY_PANEL_WIDTH }}
-           >
+            style={{ width: FIXED_LIBRARY_PANEL_WIDTH, minWidth: FIXED_LIBRARY_PANEL_WIDTH, maxWidth: FIXED_LIBRARY_PANEL_WIDTH }}
+          >
             {/* Column header */}
-              <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60 min-w-0 flex-shrink-0">
-                <Library className="h-3.5 w-3.5 text-[#F5C76A]" />
-                <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold min-w-0 truncate">Bibliothek</span>
-                <span className="ml-auto text-[10px] text-white/40 flex-shrink-0">{scenes.length} Szenen</span>
-              </div>
+            <div className="h-8 flex items-center gap-2 px-3 border-b border-[#F5C76A]/10 bg-[#050816]/60 min-w-0 flex-shrink-0 overflow-hidden">
+              <Library className="h-3.5 w-3.5 text-[#F5C76A] flex-shrink-0" />
+              <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold min-w-0 truncate">Bibliothek</span>
+              <span className="ml-auto text-[10px] text-white/40 flex-shrink-0">{scenes.length} Szenen</span>
+            </div>
             <CapCutSidebar 
               onAddFromLibrary={() => setShowAddMediaDialog(true)}
               videoUrl={videoUrl}
