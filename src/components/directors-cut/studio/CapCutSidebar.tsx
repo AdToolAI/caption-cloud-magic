@@ -921,7 +921,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           );
         })()}
 
-        <ScrollArea className="flex-1 min-w-0">
+        <ScrollArea className="flex-1 min-w-0 overflow-hidden">
           {/* TAB: Cut (Schnitt) */}
           <TabsContent value="cut" className="mt-0">
             <CutPanel
