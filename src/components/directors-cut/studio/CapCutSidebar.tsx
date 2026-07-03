@@ -84,6 +84,7 @@ interface CapCutSidebarProps {
   onSplitAtPlayhead?: () => void;
   onDeleteScene?: (sceneId: string) => void;
   onDuplicateScene?: (sceneId: string) => void;
+  onReorderScenes?: (fromIndex: number, toIndex: number) => void;
   onSceneSelect?: (sceneId: string | null) => void;
   onAutocut?: () => void;
   isAnalyzing?: boolean;
