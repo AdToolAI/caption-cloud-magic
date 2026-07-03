@@ -234,9 +234,10 @@ serve(async (req) => {
   let activeRenderJob: any = null;
   let activeCreditsNeeded = 0;
   let creditsDeducted = false;
+  let supabaseClient: any = null;
 
   try {
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
