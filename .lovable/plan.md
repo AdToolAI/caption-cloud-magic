@@ -1,34 +1,67 @@
-## Ziel
-Der Registrierungslink aus der E-Mail soll zuverlässig funktionieren. Aktuell zeigt die App „Kein Verifizierungstoken gefunden“, obwohl der Link aus der Auth-Mail kommt.
+# Warum Übergänge im Preview noch „ruckeln"
 
-## Ursache
-Es gibt zwei konkurrierende Verifizierungswege:
+**Was CapCut / Premiere / DaVinci machen:**
+Sie halten während eines Übergangs **zwei echte Videostreams gleichzeitig aktiv** (outgoing A + incoming B, beide dekodiert und synchron laufend) und blenden diese pro Frame auf der GPU — Crossfade = Alpha-Blend, Wipe = Mask, Slide = Transform. So sind beide Seiten des Übergangs **echte bewegte Bilder**, und das Ganze läuft mit 60 fps im Compositor des Betriebssystems.
 
-1. Die normale Auth-Verifizierung erzeugt Links mit Parametern wie `token_hash` und `type=signup` bzw. Fehlerparametern in der URL.
-2. Die App-Seite `/verify-email` erwartet aber nur einen eigenen Parameter `?token=...` und ruft dafür eine eigene `verify-email` Funktion auf.
+**Was unser Preview aktuell macht (`NativeTransitionOverlay.tsx`):**
+- Es gibt **nur ein `<video>`-Element**, das die Timeline abspielt.
+- Für den Übergang wird das erste Frame der nächsten Szene **einmalig als JPEG (640×360, quality 0.6)** gecaptured und als CSS-Background über das Video gelegt.
+- Beim Übergang blendet also ein **eingefrorenes Standbild** ins bewegte Bild — das ist der Grund, warum es „nicht 100% flüssig" wirkt: Die eingehende Seite bewegt sich schlicht nicht.
+- Zusätzlich: JPEG-Kompression + `backgroundSize: contain` erzeugen sichtbares Pumpen an der Kante.
 
-Wenn ein Nutzer den normalen Auth-Mail-Link klickt, kommt er auf `/verify-email` ohne `token`. Deshalb erscheint fälschlich „Kein Verifizierungstoken gefunden“.
+Der bessere Layer `NativeTransitionLayer.tsx` (dual video, GPU-Blend) existiert **schon**, wird aber im aktuellen `SceneAnalysisStep` **nicht verwendet** — dort läuft weiterhin der Standbild-Overlay.
 
-## Umsetzung
-1. `/verify-email` so erweitern, dass sie beide Link-Typen unterstützt:
-   - eigener App-Link: `?token=...` bleibt unverändert funktionsfähig
-   - normaler Auth-Link: `?token_hash=...&type=signup` wird direkt über die Auth-Verifizierung verarbeitet
-   - Hash-/Fragment-Parameter werden ebenfalls berücksichtigt, falls der Anbieter sie so übergibt
+---
 
-2. Fehlerfälle professionell behandeln:
-   - `otp_expired`, `access_denied`, ungültiger/abgelaufener Link werden mit einer klaren deutschen Meldung angezeigt
-   - Button „Neue E-Mail senden“ bleibt verfügbar
-   - keine irreführende Meldung „Kein Token“, wenn tatsächlich ein abgelaufener Auth-Link vorliegt
+# Plan: Preview auf echten Dual-Stream-Blend umstellen
 
-3. Registrierung robuster machen:
-   - `signUp()` soll nicht zusätzlich einen zweiten, eigenen Verifizierungslink senden, wenn die normale Auth-Mail bereits aktiv ist
-   - falls der eigene Versand beibehalten wird, wird sichergestellt, dass nur ein Link-Typ beim Nutzer landet oder beide korrekt verarbeitet werden
+## 1. Umschalten auf `NativeTransitionLayer` (Dual-Video Ping-Pong)
 
-4. Optional Backend prüfen/anpassen:
-   - Auth-E-Mail-Template `signup` muss auf den vom Auth-System gelieferten `confirmationUrl` zeigen
-   - eigene `send-verification-email` Funktion nur noch als Resend-/Fallback-Pfad nutzen, nicht als konkurrierender Erstversand
+- In `SceneAnalysisStep.tsx` und `DirectorsCutPreviewPlayer.tsx` den `NativeTransitionOverlay` durch die bereits existierende Ping-Pong-Architektur (zwei `<video>`-Slots: `active` + `standby`) ersetzen.
+- **~1 s vor** einem geplanten Übergang wird der Standby-Slot auf die kommende Szene vorgespult (`preload='auto'`, `currentTime` gesetzt, `pause()`), damit der Decoder warm ist.
+- Beim Übergangsstart: Standby `play()`, `useTransitionInfo` liefert `progress` per rAF, `getTransitionStyles` mappt auf `opacity` / `transform` / `clip-path` / `filter` — **beides sind echte laufende Videos**, kein Standbild mehr.
+- Nach dem Übergang: Slots tauschen (der Standby wird zum Aktiven), alter Aktiver wird der neue Standby.
 
-5. Verifikation
-   - E-Mail-Link-URL mit `token_hash/type` lokal gegen `/verify-email` testen
-   - bestehenden `?token=` Fallback prüfen
-   - sicherstellen, dass Nutzer nach erfolgreicher Verifizierung zur App weiterkommen und nicht in der Fehlermeldung hängen
+## 2. GPU-Fähige CSS-Properties erzwingen
+
+- Nur `opacity`, `transform`, `filter: blur()`, `clip-path` verwenden (schon der Fall) — plus `will-change: opacity, transform` auf beiden Video-Layern, damit Chrome sie auf eigene Compositor-Layer hebt.
+- **Kein `backdrop-filter`** (Sandbox-Regel, verursacht CPU-Fallback).
+- Video-Elemente auf `object-fit: cover` mit fester Bildgröße, damit während der Transition keine Layout-Neuberechnung passiert.
+
+## 3. Sub-Frame-glatte Progress-Kurve
+
+- Aktuell wird `progress` linear aus der Zeit interpoliert. Für den „butterweichen" Look eine **easing curve** (z.B. `easeInOutCubic`) auf `progress` anwenden, bevor sie in Style-Werte fließt — genau das macht CapCut („Smooth" preset).
+- rAF-Loop bereits vorhanden in `useTransitionInfo` (60 fps), keine Änderung nötig.
+
+## 4. Cache-Warmup für sofortigen Play-Start
+
+- Beim Laden der Timeline für **jede Szene außer der ersten** einen versteckten Standby-Videoclip preloaden (nur Metadata + erstes GOP), damit auch bei manuellem Scrubbing der Übergang sofort läuft und nicht erst decodiert werden muss.
+- Bei Scrubbing über einen Übergangs-Punkt Progress direkt setzen, kein „Aufholen" per rAF.
+
+## 5. Render-Seite (Lambda / Remotion) prüfen
+
+Die **fertig gerenderte MP4** ist bereits butterweich, weil Remotion beide Szenen Frame-für-Frame komponiert. Der Ruckler existiert **nur im Live-Preview**. Trotzdem kurzer Cross-Check:
+- `src/remotion/components/transitions/*` verwenden bereits `safeInterpolate` — keine Änderung nötig.
+- Optional: dieselbe Easing-Kurve (Punkt 3) auch in Remotion-Transitions einbauen, damit Preview und Export **exakt identisch** aussehen (WYSIWYG).
+
+---
+
+# Nicht Teil dieses Plans
+
+- Keine neuen Übergangstypen (nur Glättung der vorhandenen).
+- Kein Umbau des Lambda-Renderers.
+- Kein Ersatz von `<video>` durch WebCodecs / WebGL — wäre ein zweiter Schritt und für die aktuelle Qualität nicht nötig.
+
+---
+
+# Technische Details
+
+| Punkt | Datei | Änderung |
+|---|---|---|
+| Dual-Slot Preview | `src/components/directors-cut/steps/SceneAnalysisStep.tsx` (Zeile 650) | `NativeTransitionOverlay` → `NativeTransitionLayer` + zwei `<video>`-Elemente |
+| Dual-Slot Preview | `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx` | dito, falls dort noch der alte Overlay aktiv ist |
+| Easing | neue Utility `src/lib/directors-cut/transitionEasing.ts` | `easeInOutCubic(progress)`, importiert in `NativeTransitionLayer` und optional in Remotion-Transitions |
+| Preload | `useFrameCapture.ts` oder neuer `useStandbyVideoPreload.ts` | Metadata-Preload für alle kommenden Szenen |
+| GPU-Hints | `NativeTransitionLayer.tsx` | `willChange: 'opacity, transform'` auf beiden Video-Layern |
+
+**Ergebnis:** Übergänge im Preview verhalten sich wie in CapCut — beide Seiten sind bewegte Videos, weich per GPU geblendet, mit einer Easing-Kurve statt linearer Interpolation.
