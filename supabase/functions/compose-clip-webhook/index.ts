@@ -408,10 +408,35 @@ serve(async (req) => {
           lipScene?.engine_override === 'cinematic-sync' &&
           isTalkingHeadClip
         ) {
+          // Hard block: a cinematic-sync scene must never end up with a
+          // talking-head-renders URL. That means the legacy portrait path
+          // slipped through somehow. Mark the scene failed with a clear
+          // error so the "Sauber neu starten" UI in SceneClipProgress can
+          // reset it back to the correct HappyHorse/Hailuo → Sync.so path.
           console.warn(
-            `[compose-clip-webhook] scene ${sceneId}: cinematic-sync clip_url is talking-head — skipping auto-lipsync fallback`,
+            `[compose-clip-webhook] scene ${sceneId}: cinematic-sync clip_url is talking-head — marking failed (legacy route blocked)`,
           );
+          try {
+            await supabase
+              .from('composer_scenes')
+              .update({
+                clip_status: 'failed',
+                clip_error: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.',
+                lip_sync_status: null,
+                twoshot_stage: null,
+                dialog_shots: null,
+                lip_sync_source_clip_url: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sceneId);
+          } catch (blockErr) {
+            console.error(
+              '[compose-clip-webhook] legacy-route fail-mark error:',
+              blockErr,
+            );
+          }
         }
+
       } catch (lipErr) {
         console.error('[compose-clip-webhook] auto-lipsync fallback error:', lipErr);
       }
