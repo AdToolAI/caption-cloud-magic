@@ -1,41 +1,48 @@
-# Kurzantwort
+## Befund
 
-Nein — die Preflight-Warnung „**2 Szenen ohne geladenes Asset**" ist **nicht** die Ursache des Render-Fehlers. Sie ist rein kosmetisch und meldet nur, dass die **Thumbnails** im Editor-UI nicht geladen sind. Der Renderer selbst benutzt die `source_video_url` (das Original-Video), nicht die Thumbnails — und diese URL ist in deinem Fall korrekt gesetzt.
+Der Fehler ist jetzt klarer eingegrenzt:
 
-## Beweis aus den Edge-Function-Logs
+- Der Export-Call `render-directors-cut` endet im Browser mit `504` / `Edge Function returned a non-2xx status code`.
+- In den Funktionslogs stoppt der Ablauf direkt nach `Invoking Remotion Lambda...`; es kommt kein `Lambda response` zurück.
+- In `director_cut_renders` wurde ein neuer Job angelegt, aber er steckt auf `status = processing` mit `remotion_render_id = null`.
+- Ältere Versuche endeten nachträglich mit `Access Denied`, ebenfalls ohne echte Remotion-Render-ID.
 
-Der letzte Render-Aufruf um 18:21 UTC wurde **erfolgreich** an AWS Lambda übergeben:
-- 2 Szenen, `sourceMode: "original"`, `isFromOriginalVideo: true`
-- `sourceVideoUrl` → gültige public Storage-URL
-- Lambda-Payload valide (Frames 381, 12.7s, 1920x1080)
-- Status in `director_cut_renders` = `processing` (kein Fehler gespeichert)
+Das bedeutet: Das Problem liegt nicht mehr an der Preflight-Warnung oder an den Szenen/Transitions. Der Start der AWS/Remotion-Lambda-Antwort blockiert so lange, dass unsere Backend-Funktion vom Gateway abgebrochen wird. Dadurch bekommt die UI nur den generischen Edge-Function-Fehler und der Renderjob bleibt in einem halbfertigen Zustand hängen.
 
-Der ältere Fehlversuch um **15:11 UTC** hat `Access Denied` als error_message — das ist ein **AWS/S3-Permissions-Fehler** von Lambda, nicht die Preflight-Warnung.
+## Plan
 
-Frühere Fehler (Mai) waren `AWS Concurrency limit reached (Rate Exceeded)` — dagegen half die eben beschlossene Reduktion von `TARGET_MAX_LAMBDAS = 5`.
+1. **Render-Start robust gegen Lambda-Hänger machen**
+   - In `supabase/functions/render-directors-cut/index.ts` den AWS-Lambda-Start mit einem festen Start-Timeout absichern.
+   - Wenn Lambda innerhalb dieses Zeitfensters keine `renderId` zurückgibt, wird der Job sauber als `failed` markiert, statt als `processing` hängen zu bleiben.
+   - Credits werden automatisch zurückerstattet.
+   - Die Funktion antwortet dann mit einer klaren Fehlermeldung statt 504.
 
-# Was wir jetzt tun
+2. **Tracking-Daten direkt beim Start speichern**
+   - Beim Anlegen/Starten des Jobs `tracking_mode`, `out_name`, `lambda_invoked_at`, `failure_stage` in `render_config` sichern.
+   - Dadurch kann `check-remotion-progress` später unterscheiden zwischen:
+     - Lambda nie gestartet
+     - Lambda gestartet, aber kein Fortschritt
+     - Render fertig, Webhook fehlt
 
-## 1. CI-Preflight-Warnung präzisieren (kosmetisch)
-Der Text „Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video" ist irreführend. Bei `sourceMode === 'original'` ist das Video **garantiert** vorhanden — die Warnung entsteht nur, wenn das UI das Preview-Thumbnail noch nicht generiert hat. Fix in `src/lib/directors-cut/ciPreflight.ts` (Check #12): Szenen mit `sourceMode === 'original'` oder gültiger `source`-URL vom Missing-Thumbnails-Check ausschließen.
+3. **Frontend-Fehlermeldung lesbar machen**
+   - In `src/components/directors-cut/studio/CapCutEditor.tsx` den bereits vorhandenen Error-Extractor nutzen.
+   - Statt `Edge Function returned a non-2xx status code` soll die echte Backend-Meldung angezeigt werden, z. B. `Render konnte nicht gestartet werden...` oder `Access Denied...`.
 
-## 2. Echten Render-Fehler weiter beobachten
-Der 18:21-Render steht seit ~2h auf `processing`. Zwei Möglichkeiten:
-- **a)** Lambda läuft noch / Webhook hat den Success nicht zurückgeschrieben.
-- **b)** Lambda hat still gefailt (Access Denied auf S3-Bucket / neuen Bundle-Version 403).
+4. **Stale processing Jobs entschärfen**
+   - Eine kleine Datenkorrektur für die aktuell hängenden Director's-Cut-Jobs ohne `remotion_render_id` einplanen.
+   - Diese Jobs werden auf `failed` gesetzt und als `lambda_start_timeout` markiert, damit sie nicht weiter als aktive Render gelten.
+   - Falls bei diesen Jobs Credits abgezogen wurden, wird idempotent/refund-sicher zurückerstattet.
 
-Bevor Code geändert wird: **einen frischen Render triggern** und über die Netzwerk-Konsole beobachten, welcher Call genau non-2xx zurückgibt (render-directors-cut vs. check-remotion-progress vs. save-project). Dann gezielt fixen.
-
-## 3. Bundle-Version.json 403 (Nebenbefund)
-Log zeigt `⚠️ Could not fetch bundle-version.json: 403`. Nicht fatal (Verify-Check wird übersprungen), aber wir sollten die Datei public-lesbar machen, damit die Lambda-Bundle-Verifikation wieder greift. Fix in Bundle-Deploy-Script — separater kleiner Change.
+5. **Validierung nach Umsetzung**
+   - `render-directors-cut` deployen.
+   - Einen frischen Export starten.
+   - Erwartung: entweder sofort erfolgreiche Antwort mit `remotion_render_id`, oder eine klare 4xx/5xx JSON-Meldung mit sauberem Refund und ohne hängenden `processing`-Job.
 
 ## Technische Details
 
-Betroffene Dateien:
-- `src/lib/directors-cut/ciPreflight.ts` — Check #12 (Zeilen 279–291) einschränken auf Szenen ohne bekannte Quelle
-- `src/components/directors-cut/studio/CIPreflightDialog.tsx` — kein Change (Anzeige-Layer)
-- `supabase/functions/render-directors-cut/index.ts` — kein Change (Payload ist ok)
+- Hauptdatei: `supabase/functions/render-directors-cut/index.ts`
+- UI-Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`
+- Bestehender Helper: `src/lib/functionsError.ts`
+- Betroffene Tabelle: `director_cut_renders`
 
-Nach Punkt 1 verschwindet die Warnung für Original-Video-Szenen; der Preflight bleibt aber aktiv für Szenen ohne gültige Quelle.
-
-**Freigeben, dann setze ich Schritt 1 (Warnungs-Präzisierung) direkt um. Für Schritt 2 brauche ich einen frischen Render-Versuch von dir mit offener Browser-Konsole.**
+Wichtig: Dieser Plan behebt zuerst die kaputte Fehler-/Timeout-Behandlung und macht den echten AWS/Remotion-Fehler sichtbar. Falls danach weiterhin `Access Denied` von AWS kommt, ist das der nächste gezielte Fix: Lambda-Bundle/S3-Bucket-Berechtigungen bzw. Serve-URL-Zugriff.

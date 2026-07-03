@@ -543,8 +543,9 @@ serve(async (req) => {
       const lambdaErrorFull = JSON.stringify(errors, null, 2)?.substring(0, 4000) || null;
 
       // ✅ STRUCTURED ERROR CATEGORY — replaces fragile frontend string-matching
-      const classifyError = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'audio_corruption' | 'unknown' => {
+      const classifyError = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'audio_corruption' | 'access_denied' | 'unknown' => {
         const lower = msg.toLowerCase();
+        if (/access denied|accessdenied|forbidden|\b403\b/i.test(lower)) return 'access_denied';
         if (/rate exceeded|concurrency limit|throttl/i.test(lower)) return 'rate_limit';
         if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(lower)) return 'audio_corruption';
         if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
@@ -661,12 +662,47 @@ serve(async (req) => {
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} failed: ${errorMessage.slice(0, 120)}`);
         }
       } else if (isDirectorsCut && renderJobId) {
-        const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
-        await supabaseAdmin.from('director_cut_renders').update({
-          status: 'failed', error_message: errorMessage, completed_at: new Date().toISOString(),
-        }).eq('id', renderJobId);
-        if (renderJob?.credits_used > 0) {
+        const { data: renderJob } = await supabaseAdmin
+          .from('director_cut_renders')
+          .select('user_id, credits_used, render_config, status')
+          .eq('id', renderJobId)
+          .single();
+        const existingCfg = (renderJob?.render_config as any) || {};
+        const alreadyRefunded = existingCfg.credit_refund_done === true;
+        const alreadyCompleted = renderJob?.status === 'completed';
+        const shouldRefund = !alreadyCompleted && !alreadyRefunded && Number(renderJob?.credits_used || 0) > 0 && renderJob?.user_id;
+
+        const directorCutFailureUpdate: any = {
+          status: alreadyCompleted ? 'completed' : 'failed',
+          error_message: alreadyCompleted ? null : errorMessage,
+          remotion_render_id: renderId || null,
+          bucket_name: bucketName || null,
+          render_config: {
+            ...existingCfg,
+            lambda_error_full: lambdaErrorFull,
+            error_fingerprint: errorFingerprint,
+            error_category: errorCategory,
+            webhook_error_type: type,
+            webhook_received_at: new Date().toISOString(),
+            webhook_render_id: renderId,
+            bucket_name: bucketName,
+            failure_stage: 'lambda-runtime',
+            credit_refund_done: shouldRefund ? true : alreadyRefunded,
+            credit_refunded_at: shouldRefund ? new Date().toISOString() : existingCfg.credit_refunded_at,
+            credit_refund_reason: shouldRefund ? 'director_cut_lambda_failed' : existingCfg.credit_refund_reason,
+          },
+        };
+        if (!alreadyCompleted) {
+          directorCutFailureUpdate.completed_at = new Date().toISOString();
+        }
+
+        await supabaseAdmin.from('director_cut_renders').update(directorCutFailureUpdate).eq('id', renderJobId);
+
+        if (shouldRefund) {
           await supabaseAdmin.rpc('increment_balance', { p_user_id: renderJob.user_id, p_amount: renderJob.credits_used });
+          console.log(`💰 Refunded ${renderJob.credits_used} credits for failed Director's Cut render ${renderJobId}`);
+        } else if (alreadyRefunded) {
+          console.log(`💰 Skip Director's Cut refund — already refunded for ${renderJobId}`);
         }
       } else {
         // Use same 3-way matching for failure

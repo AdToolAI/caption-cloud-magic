@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
@@ -45,14 +46,83 @@ function validateScenes(scenes: unknown): { ok: true } | { ok: false; reason: st
   return { ok: true };
 }
 
-// AWS Lambda configuration — read from secret for version consistency
-const AWS_REGION = 'eu-central-1';
-function getLambdaFunctionName(): string {
-  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
-  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
-}
+// AWS Lambda configuration — shared constants prevent bundle/output bucket drift.
 const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
+const LAMBDA_START_TIMEOUT_MS = 25_000;
+
+function normalizeRemotionServeUrl(rawServeUrl: string): string {
+  try {
+    const url = new URL(rawServeUrl);
+    const bucketMatch = url.hostname.match(/^(remotionlambda-eucentral1-[^.]+)\.s3[.-]/i);
+    const secretBucketName = bucketMatch?.[1];
+
+    if (secretBucketName && secretBucketName !== REMOTION_BUNDLE_BUCKET_NAME) {
+      const normalized = new URL(rawServeUrl);
+      normalized.hostname = `${REMOTION_BUNDLE_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com`;
+      console.warn('[RenderDirectorsCut] Outdated REMOTION_SERVE_URL bucket detected — normalizing', {
+        secretBucketName,
+        canonicalBundleBucket: REMOTION_BUNDLE_BUCKET_NAME,
+      });
+      return normalized.toString();
+    }
+  } catch (error) {
+    console.warn('[RenderDirectorsCut] Could not parse REMOTION_SERVE_URL, using raw value', error);
+  }
+
+  return rawServeUrl;
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  const anyErr = error as any;
+  const message = String(anyErr?.message || error || '');
+  return anyErr?.name === 'AbortError' || message.includes('aborted') || message.includes('signal timed out');
+}
+
+function mergeRenderConfig(existing: any, patch: Record<string, unknown>) {
+  return {
+    ...(existing && typeof existing === 'object' ? existing : {}),
+    ...patch,
+  };
+}
+
+async function refundRenderCreditsOnce(
+  supabaseClient: any,
+  renderJob: any,
+  reason: string,
+) {
+  const creditsUsed = Number(renderJob?.credits_used || 0);
+  if (!renderJob?.id || !renderJob?.user_id || !creditsUsed) return false;
+
+  const { data: latest } = await supabaseClient
+    .from('director_cut_renders')
+    .select('render_config')
+    .eq('id', renderJob.id)
+    .maybeSingle();
+
+  const latestConfig = (latest?.render_config as any) || renderJob.render_config || {};
+  if (latestConfig?.credit_refund_done === true) return false;
+
+  await supabaseClient.rpc('increment_balance', {
+    p_user_id: renderJob.user_id,
+    p_amount: creditsUsed,
+  });
+
+  await supabaseClient
+    .from('director_cut_renders')
+    .update({
+      render_config: mergeRenderConfig(latestConfig, {
+        credit_refund_done: true,
+        credit_refunded_at: new Date().toISOString(),
+        credit_refund_reason: reason,
+        credits_used: creditsUsed,
+      }),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', renderJob.id);
+
+  console.log(`[RenderDirectorsCut] Refunded ${creditsUsed} credits for render ${renderJob.id}: ${reason}`);
+  return true;
+}
 
 // Invoke Remotion Lambda directly via AWS API
 async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; bucketName: string }> {
@@ -73,6 +143,7 @@ async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; b
       'X-Amz-Invocation-Type': 'RequestResponse',
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(LAMBDA_START_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -177,8 +248,13 @@ serve(async (req) => {
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "render-directors-cut" });
 
 
+  let activeRenderJob: any = null;
+  let activeCreditsNeeded = 0;
+  let creditsDeducted = false;
+  let supabaseClient: any = null;
+
   try {
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
@@ -336,6 +412,7 @@ serve(async (req) => {
 
     // Calculate credits with premium features
     const creditsNeeded = calculateCredits(duration, quality, premiumFeatures);
+    activeCreditsNeeded = creditsNeeded;
 
     // Check user credits
     const { data: wallet, error: walletError } = await supabaseClient
@@ -407,6 +484,8 @@ serve(async (req) => {
       console.error('[RenderDirectorsCut] Error creating render job:', renderError);
       throw new Error('Failed to create render job');
     }
+    activeRenderJob = renderJob;
+    const renderOutName = `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`;
 
     // Deduct credits
     const { error: deductError } = await supabaseClient.rpc('deduct_credits', {
@@ -420,6 +499,7 @@ serve(async (req) => {
       await supabaseClient.from('director_cut_renders').delete().eq('id', renderJob.id);
       throw new Error('Failed to deduct credits');
     }
+    creditsDeducted = true;
 
     // Calculate dimensions based on aspect ratio and quality
     let width: number, height: number;
@@ -446,15 +526,28 @@ serve(async (req) => {
     // Update render job to processing
     await supabaseClient
       .from('director_cut_renders')
-      .update({ status: 'processing', started_at: new Date().toISOString() })
+      .update({
+        status: 'processing',
+        started_at: new Date().toISOString(),
+        render_config: mergeRenderConfig(renderJob.render_config, {
+          ...(renderJob.render_config || {}),
+          credits_used: creditsNeeded,
+          tracking_mode: 'lambda-start',
+          out_name: renderOutName,
+          lambda_function_name: LAMBDA_FUNCTION_NAME,
+          lambda_invoked_at: new Date().toISOString(),
+          failure_stage: null,
+        }),
+      })
       .eq('id', renderJob.id);
 
     // Get Remotion configuration
-    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
-    if (!REMOTION_SERVE_URL) {
+    const rawRemotionServeUrl = Deno.env.get('REMOTION_SERVE_URL');
+    if (!rawRemotionServeUrl) {
       console.error('[RenderDirectorsCut] REMOTION_SERVE_URL not configured');
       throw new Error('REMOTION_SERVE_URL not configured');
     }
+    const REMOTION_SERVE_URL = normalizeRemotionServeUrl(rawRemotionServeUrl);
 
     // ✅ BUNDLE VERSION CHECK — fetch bundle-version.json to verify freshness
     const EXPECTED_BUNDLE_VERSION = 'v2026-04-13e-unified-subtitle-renderer';
@@ -649,7 +742,7 @@ serve(async (req) => {
           maxRetries: 1,
           ...(stabilityFpl ? { framesPerLambda: stabilityFpl } : {}),
           privacy: 'public',
-          bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
+          bucketName: DEFAULT_BUCKET_NAME,
           durationInFrames,
           fps,
           width,
@@ -664,7 +757,7 @@ serve(async (req) => {
             },
           },
           overwrite: true,
-          outName: `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`,
+          outName: renderOutName,
         });
 
         console.log('🔧 Normalized payload diagnostics:', JSON.stringify(payloadDiagnostics(lambdaPayload)));
@@ -702,10 +795,7 @@ serve(async (req) => {
     // If we exited the loop without a response, throw the last error
     if (!response) {
       // Refund credits before failing
-      await supabaseClient.rpc('increment_balance', {
-        p_user_id: user.id,
-        p_amount: creditsNeeded,
-      });
+      await refundRenderCreditsOnce(supabaseClient, renderJob, 'rate_limit_exhausted');
       console.log(`[RenderDirectorsCut] Credits refunded due to rate limit exhaustion`);
       
       // Update render status to failed
@@ -714,6 +804,15 @@ serve(async (req) => {
         .update({ 
           status: 'failed',
           error_message: 'AWS Render-Kapazität vorübergehend erschöpft. Bitte versuche es in 1-2 Minuten erneut.',
+          completed_at: new Date().toISOString(),
+          render_config: mergeRenderConfig(renderJob.render_config, {
+            ...(renderJob.render_config || {}),
+            credits_used: creditsNeeded,
+            credit_refund_done: true,
+            credit_refund_reason: 'rate_limit_exhausted',
+            failure_stage: 'lambda_start',
+            error_category: 'rate_limit',
+          }),
         })
         .eq('id', renderJob.id);
       
@@ -739,6 +838,17 @@ serve(async (req) => {
         remotion_render_id: renderId,
         bucket_name: bucketName,
         status: 'rendering',
+        render_config: mergeRenderConfig(renderJob.render_config, {
+          ...(renderJob.render_config || {}),
+          credits_used: creditsNeeded,
+          tracking_mode: 'remotion_render_id',
+          out_name: renderOutName,
+          bucket_name: bucketName,
+          lambda_function_name: LAMBDA_FUNCTION_NAME,
+          lambda_invoked_at: new Date().toISOString(),
+          remotion_render_id: renderId,
+          failure_stage: null,
+        }),
       })
       .eq('id', renderJob.id);
 
@@ -757,8 +867,49 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[RenderDirectorsCut] Error:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
+    const rawMessage = (error as Error)?.message || 'Unknown render error';
+    const startTimedOut = isAbortLikeError(error);
+    const message = startTimedOut
+      ? 'Render konnte nicht gestartet werden: AWS Lambda hat innerhalb der Start-Frist keine Render-ID zurückgegeben. Credits wurden automatisch zurückerstattet.'
+      : rawMessage;
+
+    if (activeRenderJob?.id) {
+      try {
+        if (creditsDeducted) {
+          await refundRenderCreditsOnce(supabaseClient, activeRenderJob, startTimedOut ? 'lambda_start_timeout' : 'lambda_start_failed');
+        }
+        const { data: latest } = await supabaseClient
+          .from('director_cut_renders')
+          .select('render_config')
+          .eq('id', activeRenderJob.id)
+          .maybeSingle();
+        const latestConfig = (latest?.render_config as any) || activeRenderJob.render_config || {};
+        await supabaseClient
+          .from('director_cut_renders')
+          .update({
+            status: 'failed',
+            error_message: message,
+            completed_at: new Date().toISOString(),
+            render_config: mergeRenderConfig(latestConfig, {
+              credits_used: activeCreditsNeeded,
+              failure_stage: 'lambda_start',
+              error_category: startTimedOut ? 'start_timeout' : 'start_failed',
+              raw_error_message: rawMessage,
+              lambda_function_name: LAMBDA_FUNCTION_NAME,
+            }),
+          })
+          .eq('id', activeRenderJob.id);
+      } catch (updateError) {
+        console.error('[RenderDirectorsCut] Failed to mark render as failed/refunded:', updateError);
+      }
+    }
+
+    return new Response(JSON.stringify({
+      error: message,
+      code: startTimedOut ? 'LAMBDA_START_TIMEOUT' : 'RENDER_START_FAILED',
+      stage: 'lambda_start',
+    }), {
+      status: startTimedOut ? 504 : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

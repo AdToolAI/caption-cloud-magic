@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +10,6 @@ const corsHeaders = {
 };
 
 const AWS_REGION = 'eu-central-1';
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 const RENDER_TIMEOUT_SECONDS = 720; // 12 min
 const UNIVERSAL_CREATOR_TIMEOUT_SECONDS = 600; // 10 min — accommodates AWS throttle backoff retries
 const MAX_RECONCILIATION_PAGES = 20; // max 20 pages × 200 keys = 4000 keys
@@ -46,6 +46,7 @@ serve(async (req) => {
     const tableName = isDirectorsCut ? 'director_cut_renders' : 'video_renders';
     const renderIdColumn = isDirectorsCut ? 'remotion_render_id' : 'render_id';
     const outputColumn = isDirectorsCut ? 'output_url' : 'video_url';
+    const configColumn = isDirectorsCut ? 'render_config' : 'content_config';
 
     const { data: renderData, error: renderError } = await supabaseAdmin
       .from(tableName)
@@ -60,9 +61,9 @@ serve(async (req) => {
       return jsonResponse({ render_id: effectiveRenderId, progress: { done: true, outputFile: renderData[outputColumn], overallProgress: 1 }, status: 'completed' });
     }
 
-    // Extract tracking data from content_config
-    const cc = (renderData?.content_config as any) || {};
-    const realRenderId = cc.real_remotion_render_id || cc.webhook_render_id || null;
+    // Extract tracking data from the table-specific render config
+    const cc = (renderData?.[configColumn] as any) || {};
+    const realRenderId = cc.real_remotion_render_id || cc.webhook_render_id || renderData?.remotion_render_id || null;
     const outName = cc.out_name || null;
     const trackingMode = cc.tracking_mode || 'unknown';
     const bucketName = renderData?.bucket_name || cc.bucket_name || DEFAULT_BUCKET_NAME;
@@ -108,7 +109,7 @@ serve(async (req) => {
       }
 
       // Truly timed out — r28: persist errorCategory in both tables
-      const existingCfgTimeout = (renderData?.content_config as any) || {};
+      const existingCfgTimeout = (renderData?.[configColumn] as any) || {};
       const timeoutCategory = !realRenderId && !sawProgressArtifact ? 'start_failed' : 'timeout';
       const timeoutStage = !realRenderId && !sawProgressArtifact ? 'lambda_start' : 'lambda-runtime';
       const timeoutMessage = timeoutCategory === 'start_failed'
@@ -117,7 +118,7 @@ serve(async (req) => {
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
         error_message: `${timeoutMessage} tracking_mode=${trackingMode}, real_id=${realRenderId || 'none'}`,
-        content_config: { ...existingCfgTimeout, error_category: timeoutCategory, failure_stage: timeoutStage },
+        [configColumn]: { ...existingCfgTimeout, error_category: timeoutCategory, failure_stage: timeoutStage },
       }).eq(renderIdColumn, effectiveRenderId);
 
       if (renderData?.user_id) {
@@ -217,10 +218,10 @@ serve(async (req) => {
           else if (/the operation was aborted|aborterror|createasynciterator|node:internal\/streams/i.test(combinedMsg)) errorCategory = 'lambda_crash';
           else if (/codec|preset|framerange|invalid|schema|zod/i.test(combinedMsg)) errorCategory = 'validation';
 
-          const existingCfg = (renderData?.content_config as any) || {};
+      const existingCfg = (renderData?.[configColumn] as any) || {};
           await supabaseAdmin.from(tableName).update({
             status: 'failed', error_message: errorMessages[0],
-            content_config: { ...existingCfg, error_category: errorCategory },
+            [configColumn]: { ...existingCfg, error_category: errorCategory },
           }).eq(renderIdColumn, effectiveRenderId);
 
           await refundRenderCreditsOnce(supabaseAdmin, tableName, renderIdColumn, effectiveRenderId, renderData, cc);
@@ -256,13 +257,13 @@ serve(async (req) => {
     }
 
     if (!isDirectorsCut && elapsedSeconds > effectiveTimeoutSeconds && !realRenderId && !sawProgressArtifact) {
-      const existingCfg = (renderData?.content_config as any) || {};
+      const existingCfg = (renderData?.[configColumn] as any) || {};
       const message = 'Render konnte nicht gestartet werden: Es kam kein Lambda-Status und kein Webhook zurück.';
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
         error_message: message,
         completed_at: new Date().toISOString(),
-        content_config: { ...existingCfg, error_category: 'start_failed' },
+        [configColumn]: { ...existingCfg, error_category: 'start_failed' },
       }).eq(renderIdColumn, effectiveRenderId);
       await refundRenderCreditsOnce(supabaseAdmin, tableName, renderIdColumn, effectiveRenderId, renderData, existingCfg);
       return jsonResponse({
@@ -311,6 +312,10 @@ function jsonResponse(data: any) {
   );
 }
 
+function getConfigColumn(tableName: string) {
+  return tableName === 'director_cut_renders' ? 'render_config' : 'content_config';
+}
+
 // ============================================
 // HELPER: Find video on S3 using multiple strategies
 // 1. renders/{realRenderId}/{outName}
@@ -324,6 +329,7 @@ async function findVideoOnS3(
   pendingRenderId: string, supabaseAdmin: any, tableName: string, renderIdColumn: string,
   outputColumn: string, renderData: any,
 ): Promise<string | null> {
+  const configColumn = getConfigColumn(tableName);
   // Build candidate keys in priority order
   const keysToCheck: string[] = [];
 
@@ -394,9 +400,9 @@ async function findVideoOnS3(
             const headResp = await aws.fetch(videoUrl, { method: 'HEAD' });
             if (headResp.ok) {
               // Update with discovered real render ID
-              if (discoveredRealId && renderData?.content_config) {
-                renderData.content_config = {
-                  ...(renderData.content_config as any),
+              if (discoveredRealId && renderData?.[configColumn]) {
+                renderData[configColumn] = {
+                  ...(renderData[configColumn] as any),
                   real_remotion_render_id: discoveredRealId,
                   reconciled_via: 'paginated-s3-list',
                   reconciled_at: new Date().toISOString(),
@@ -434,20 +440,22 @@ async function refundRenderCreditsOnce(
   renderData: any,
   contentConfig: any,
 ) {
-  const creditsUsed = Number(contentConfig?.credits_used || 0);
-  const alreadyRefunded = contentConfig?.credit_refund_done === true;
-  if (!creditsUsed || !renderData?.user_id || alreadyRefunded) return;
+  const configColumn = getConfigColumn(tableName);
+  const creditsUsed = Number(contentConfig?.credits_used || renderData?.credits_used || 0);
+  if (!creditsUsed || !renderData?.user_id) return;
 
   try {
-    await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: creditsUsed });
     const { data: latest } = await supabaseAdmin
       .from(tableName)
-      .select('content_config')
+      .select(configColumn)
       .eq(renderIdColumn, renderId)
       .maybeSingle();
-    const latestConfig = (latest?.content_config as any) || contentConfig || {};
+    const latestConfig = (latest?.[configColumn] as any) || contentConfig || {};
+    if (latestConfig?.credit_refund_done === true) return;
+
+    await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: creditsUsed });
     await supabaseAdmin.from(tableName).update({
-      content_config: {
+      [configColumn]: {
         ...latestConfig,
         credit_refund_done: true,
         credit_refunded_at: new Date().toISOString(),
@@ -466,14 +474,15 @@ async function markCompleted(
   supabaseAdmin: any, tableName: string, renderIdColumn: string,
   outputColumn: string, renderId: string, videoUrl: string, renderData: any,
 ) {
+  const configColumn = getConfigColumn(tableName);
   const updateData: any = {
     status: 'completed',
     [outputColumn]: videoUrl,
     completed_at: new Date().toISOString(),
     error_message: null,
   };
-  if (renderData?.content_config) {
-    updateData.content_config = renderData.content_config;
+  if (renderData?.[configColumn]) {
+    updateData[configColumn] = renderData[configColumn];
   }
 
   await supabaseAdmin.from(tableName).update(updateData).eq(renderIdColumn, renderId);
