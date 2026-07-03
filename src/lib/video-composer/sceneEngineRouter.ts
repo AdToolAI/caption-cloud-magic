@@ -105,14 +105,11 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
   const isStatic = motion === 'static';
 
   // ── User override wins ─────────────────────────────────────────────
-  if (override === 'heygen') {
-    return {
-      engine: 'heygen-talking-head',
-      label: '🎙️ HeyGen Lip-Sync (manuell)',
-      reason: 'Vom Nutzer erzwungen — HeyGen Photo-Avatar rendert frame-genauen Lip-Sync.',
-      extraCostEur: estimateHeygenCostEur(speakers),
-    };
-  }
+  // Legacy `heygen` override is silently rerouted to Cinematic-Sync
+  // (Sync.so segments) — the Composer's HeyGen/Talking-Head portrait path
+  // was removed. Standalone Talking-Head module (`/talking-head`) is
+  // unaffected.
+
   if (override === 'broll') {
     return {
       engine: 'broll',
@@ -141,25 +138,20 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
 
   // ── Auto routing — Action-First (June 2026) ────────────────────────
   if (hasDialog && hasCast) {
-    // Truly static direct-address beats → HeyGen (its strength).
-    // Any motion → cinematic-sync / sync-segments on a real action plate.
-    if (isStatic && speakers === 1) {
-      return {
-        engine: 'heygen-talking-head',
-        label: '🎙️ HeyGen Direct-Address (Auto)',
-        reason:
-          'Statische Sprecher-Szene ohne Action-Beat — HeyGen Photo-Avatar liefert hier den saubersten Lip-Sync.',
-        extraCostEur: estimateHeygenCostEur(1),
-      };
-    }
+    // Composer dialog scenes ALWAYS route to Cinematic-Sync (sync-segments)
+    // on a real Hailuo/HappyHorse action plate + Sync.so lip-sync. The
+    // static-single-speaker HeyGen shortcut was removed together with the
+    // legacy Talking-Head/Portrait Composer path.
+    void isStatic;
     return {
       engine: 'sync-segments',
       label: speakers >= 2 ? `🎬 Action + Lip-Sync · ${speakers} Sprecher (Auto)` : '🎬 Action + Lip-Sync (Auto)',
       reason:
-        'Action-First: echte Hailuo/Kling-Plate mit physischer Bewegung, Sync.so legt präzisen Lip-Sync drauf — kein starrer Talking-Head-Bust.',
+        'Action-First: echte Hailuo/HappyHorse-Plate mit physischer Bewegung, Sync.so legt präzisen Lip-Sync drauf — kein starrer Talking-Head-Bust.',
       extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
     };
   }
+
 
   if (scene.lipSyncWithVoiceover && hasCast) {
     return {
