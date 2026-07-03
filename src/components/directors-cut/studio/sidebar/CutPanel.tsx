@@ -293,6 +293,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   onTrimScene,
   onAddVideoAsScene,
   onAddFromLibrary,
+  onReorderScenes,
   composerLockSource = null,
   composerLockSceneCount = 0,
 }) => {
