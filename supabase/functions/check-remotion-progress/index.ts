@@ -61,9 +61,9 @@ serve(async (req) => {
       return jsonResponse({ render_id: effectiveRenderId, progress: { done: true, outputFile: renderData[outputColumn], overallProgress: 1 }, status: 'completed' });
     }
 
-    // Extract tracking data from content_config
+    // Extract tracking data from the table-specific render config
     const cc = (renderData?.[configColumn] as any) || {};
-    const realRenderId = cc.real_remotion_render_id || cc.webhook_render_id || null;
+    const realRenderId = cc.real_remotion_render_id || cc.webhook_render_id || renderData?.remotion_render_id || null;
     const outName = cc.out_name || null;
     const trackingMode = cc.tracking_mode || 'unknown';
     const bucketName = renderData?.bucket_name || cc.bucket_name || DEFAULT_BUCKET_NAME;
@@ -442,17 +442,18 @@ async function refundRenderCreditsOnce(
 ) {
   const configColumn = getConfigColumn(tableName);
   const creditsUsed = Number(contentConfig?.credits_used || renderData?.credits_used || 0);
-  const alreadyRefunded = contentConfig?.credit_refund_done === true;
-  if (!creditsUsed || !renderData?.user_id || alreadyRefunded) return;
+  if (!creditsUsed || !renderData?.user_id) return;
 
   try {
-    await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: creditsUsed });
     const { data: latest } = await supabaseAdmin
       .from(tableName)
       .select(configColumn)
       .eq(renderIdColumn, renderId)
       .maybeSingle();
     const latestConfig = (latest?.[configColumn] as any) || contentConfig || {};
+    if (latestConfig?.credit_refund_done === true) return;
+
+    await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: creditsUsed });
     await supabaseAdmin.from(tableName).update({
       [configColumn]: {
         ...latestConfig,
