@@ -1,48 +1,60 @@
-## Befund
+## Ursache
 
-Der Fehler ist jetzt klarer eingegrenzt:
+In `src/remotion/templates/DirectorsCutVideo.tsx`, Funktion `renderTransitionLayer` (Zeile 788 ff.), rendert der Übergang zwei Layer übereinander:
 
-- Der Export-Call `render-directors-cut` endet im Browser mit `504` / `Edge Function returned a non-2xx status code`.
-- In den Funktionslogs stoppt der Ablauf direkt nach `Invoking Remotion Lambda...`; es kommt kein `Lambda response` zurück.
-- In `director_cut_renders` wurde ein neuer Job angelegt, aber er steckt auf `status = processing` mit `remotion_render_id = null`.
-- Ältere Versuche endeten nachträglich mit `Access Denied`, ebenfalls ohne echte Remotion-Render-ID.
+- **zIndex 18 (unten):** eingehende Szene, `opacity = progress`
+- **zIndex 20 (oben):** ausgehende Szene. Bei `placement !== 'centered'` als `<Freeze frame={0}>`, also der letzte Frame vor dem Cut, eingefroren.
 
-Das bedeutet: Das Problem liegt nicht mehr an der Preflight-Warnung oder an den Szenen/Transitions. Der Start der AWS/Remotion-Lambda-Antwort blockiert so lange, dass unsere Backend-Funktion vom Gateway abgebrochen wird. Dadurch bekommt die UI nur den generischen Edge-Function-Fehler und der Renderjob bleibt in einem halbfertigen Zustand hängen.
+Für `crossfade` / `dissolve` steht dort:
+```ts
+outgoingStyle = { opacity: 1 };
+incomingStyle = { opacity: progress };
+```
+Der Kommentar begründet das damit, dass die ausgehende Szene "solide darunter weiterläuft". Das gilt aber **nur** für `placement === 'centered'`. Der Resolver in `src/utils/transitionResolver.ts` wählt `centered` nur, wenn beide Clips echte Source-Handles um den Cut haben — bei getrimmten AI-Clips (Standardfall im Director's Cut) fällt er auf `start-at-cut` zurück.
 
-## Plan
+Bei `start-at-cut`:
+- Haupt-Sequence der ausgehenden Szene ist am Cut **beendet**.
+- Der eingefrorene Outgoing-Overlay mit `opacity: 1` liegt oben und **verdeckt** den eingehenden Layer die volle Transition-Dauer (~0.8 s).
+- Nach Transition-Ende springt Szene 2 hart in Bild.
 
-1. **Render-Start robust gegen Lambda-Hänger machen**
-   - In `supabase/functions/render-directors-cut/index.ts` den AWS-Lambda-Start mit einem festen Start-Timeout absichern.
-   - Wenn Lambda innerhalb dieses Zeitfensters keine `renderId` zurückgibt, wird der Job sauber als `failed` markiert, statt als `processing` hängen zu bleiben.
-   - Credits werden automatisch zurückerstattet.
-   - Die Funktion antwortet dann mit einer klaren Fehlermeldung statt 504.
+→ Genau das gemeldete Symptom: „Video hängt eine Sekunde am letzten Frame, dann läuft Szene 2 weiter, kein sichtbarer Übergang."
 
-2. **Tracking-Daten direkt beim Start speichern**
-   - Beim Anlegen/Starten des Jobs `tracking_mode`, `out_name`, `lambda_invoked_at`, `failure_stage` in `render_config` sichern.
-   - Dadurch kann `check-remotion-progress` später unterscheiden zwischen:
-     - Lambda nie gestartet
-     - Lambda gestartet, aber kein Fortschritt
-     - Render fertig, Webhook fehlt
+## Fix
 
-3. **Frontend-Fehlermeldung lesbar machen**
-   - In `src/components/directors-cut/studio/CapCutEditor.tsx` den bereits vorhandenen Error-Extractor nutzen.
-   - Statt `Edge Function returned a non-2xx status code` soll die echte Backend-Meldung angezeigt werden, z. B. `Render konnte nicht gestartet werden...` oder `Access Denied...`.
+**1. Kern-Fix** — `DirectorsCutVideo.tsx`, `renderTransitionLayer`, im `case 'crossfade' / 'dissolve'`:
 
-4. **Stale processing Jobs entschärfen**
-   - Eine kleine Datenkorrektur für die aktuell hängenden Director's-Cut-Jobs ohne `remotion_render_id` einplanen.
-   - Diese Jobs werden auf `failed` gesetzt und als `lambda_start_timeout` markiert, damit sie nicht weiter als aktive Render gelten.
-   - Falls bei diesen Jobs Credits abgezogen wurden, wird idempotent/refund-sicher zurückerstattet.
+```ts
+case 'crossfade':
+case 'dissolve':
+  // Bei 'centered' läuft die ausgehende Haupt-Sequence noch darunter weiter,
+  // Overlay bleibt solide. Bei 'start-at-cut' ist sie beendet — der eingefrorene
+  // Overlay MUSS ausblenden, sonst hängt der letzte Frame sichtbar drüber.
+  outgoingStyle = { opacity: rt.placement === 'centered' ? 1 : 1 - progress };
+  incomingStyle = { opacity: progress };
+  break;
+```
 
-5. **Validierung nach Umsetzung**
-   - `render-directors-cut` deployen.
-   - Einen frischen Export starten.
-   - Erwartung: entweder sofort erfolgreiche Antwort mit `remotion_render_id`, oder eine klare 4xx/5xx JSON-Meldung mit sauberem Refund und ohne hängenden `processing`-Job.
+Alle anderen Typen bleiben unangetastet:
+- `fade` / `blur` / `zoom` blenden outgoing schon 1→0 (korrekt).
+- `wipe` / `slide` / `push` brauchen die solide Outgoing-Fläche als Untergrund für Wipe/Slide (korrekt).
 
-## Technische Details
+**2. Zweiter Codepfad geprüft** — Der `transitionOverlayOpacity`/`transitionVideoOpacity`-Block ab Zeile ~1113 sitzt **innerhalb von `SceneVideo`** und wird nur aktiv, wenn `transitions` an `SceneVideo` durchgereicht werden. Im Haupt-Renderpfad (`SceneRenderer`) und in `renderTransitionLayer` werden dort aber immer `transitions={[]}` übergeben (Zeilen 900 & 928) — dieser Block ist im Director's-Cut-Renderpfad tot und braucht keinen Fix. Keine Änderung nötig.
 
-- Hauptdatei: `supabase/functions/render-directors-cut/index.ts`
-- UI-Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`
-- Bestehender Helper: `src/lib/functionsError.ts`
-- Betroffene Tabelle: `director_cut_renders`
+**3. Lambda-Bundle neu deployen** — Nach dem Code-Fix muss das Remotion-Bundle auf S3 gepusht werden, sonst rendert Lambda weiter das alte Bundle (siehe Memory `Lambda Bundle Deployment`). Ausführen:
+```bash
+./scripts/deploy-remotion-bundle.sh
+```
 
-Wichtig: Dieser Plan behebt zuerst die kaputte Fehler-/Timeout-Behandlung und macht den echten AWS/Remotion-Fehler sichtbar. Falls danach weiterhin `Access Denied` von AWS kommt, ist das der nächste gezielte Fix: Lambda-Bundle/S3-Bucket-Berechtigungen bzw. Serve-URL-Zugriff.
+## Verifikation
+
+1. Fresh Render eines Director's-Cut-Projekts mit crossfade oder dissolve zwischen zwei getrimmten Clips.
+2. Erwartet: echte Blende zwischen den Szenen statt eingefrorenem letzten Frame.
+3. Regression-Check: eine Szene mit slide/wipe/push → Übergang muss weiterhin sauber laufen.
+
+## Betroffene Datei
+
+- `src/remotion/templates/DirectorsCutVideo.tsx` — 2 Zeilen im `case 'crossfade'` / `case 'dissolve'` Block.
+
+## Nicht geändert
+
+- Edge Functions, Resolver, Preview-Layer, Audio-Timing, Frame-Sequenz, andere Transition-Typen.

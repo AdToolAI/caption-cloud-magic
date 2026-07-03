@@ -830,10 +830,17 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     switch (rt.baseType) {
       case 'crossfade':
       case 'dissolve':
-        // Professional A/B dissolve: keep the outgoing clip solid underneath
-        // and reveal the incoming clip over it. Fading both layers can create a
-        // visible black dip or make the transition read like a hard cut.
-        outgoingStyle = { opacity: 1 };
+        // Professional A/B dissolve. When placement is 'centered', the outgoing
+        // scene's main Sequence keeps playing UNDER the overlay, so the frozen
+        // overlay must stay solid at opacity 1 and we only reveal the incoming
+        // clip on top. When placement is 'start-at-cut' (no source handles —
+        // the common case for trimmed AI clips), the outgoing main Sequence
+        // has already ended at the cut and the ONLY thing on screen would be
+        // the frozen last frame at opacity 1, which hides the incoming layer
+        // for the full transition duration (visible as a ~1s freeze). In that
+        // case fade the frozen outgoing 1 → 0 so the incoming clip below is
+        // actually revealed.
+        outgoingStyle = { opacity: rt.placement === 'centered' ? 1 : 1 - progress };
         incomingStyle = { opacity: progress };
         break;
       case 'fade':
