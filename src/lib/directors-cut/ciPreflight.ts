@@ -277,9 +277,22 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
   }
 
   // 12. Missing thumbnails on real scenes (asset not fully loaded / broken URL)
-  const missingThumbs = input.scenes.filter(
-    (s) => !s.isBlackscreen && !s.thumbnail_url,
-  );
+  // Skip scenes sourced from the original video — those always render from
+  // source_video_url regardless of whether the UI thumbnail has been rendered.
+  const KNOWN_SOURCE_MODES = new Set([
+    'original',
+    'from-original',
+    'trim',
+    'ai-generated',
+    'uploaded',
+    'stock',
+  ]);
+  const missingThumbs = input.scenes.filter((s) => {
+    if (s.isBlackscreen) return false;
+    if (s.thumbnail_url) return false;
+    if (s.sourceMode && KNOWN_SOURCE_MODES.has(s.sourceMode)) return false;
+    return true;
+  });
   if (missingThumbs.length > 0) {
     findings.push({
       id: 'missing-thumbnails',
