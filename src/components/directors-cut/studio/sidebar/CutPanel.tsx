@@ -623,9 +623,13 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       onTransitionChange={handleTransitionChange}
                     />
                   )}
-              </React.Fragment>
-            ))}
-          </div>
+                </React.Fragment>
+                    )}
+                  </SortableScene>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>
