@@ -607,6 +607,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onSplitAtPlayhead,
   onDeleteScene,
   onDuplicateScene,
+  onReorderScenes,
   onSceneSelect,
   onAutocut,
   isAnalyzing = false,
