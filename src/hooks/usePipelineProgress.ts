@@ -739,6 +739,7 @@ export function usePipelineProgress({
   // weighted progress bar hasn't moved (Sync.so passes are long).
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
     if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
+    if (s.engineOverride === 'cinematic-sync' && s.clipStatus === 'generating') return true;
     const stage = s.twoshotStage;
     if (stage && !['done', 'complete', 'failed', 'audio_mux_failed'].includes(String(stage))) return true;
     const ds = s.dialogShots ?? s.dialog_shots ?? null;

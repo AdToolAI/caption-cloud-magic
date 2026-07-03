@@ -117,9 +117,14 @@ interface ClipScene {
     | "heygen"
     | "broll"
     | "sync-polish"
-    | "cinematic-sync";
+    | "cinematic-sync"
+    | "sync-segments"
+    | "native-dialogue";
   /** When false → request muted output (Veo/Kling generate_audio=false; Sora muted at stitch). Default true. */
   withAudio?: boolean;
+  /** Client-side Composer dialog/lip-sync switches. Used to prevent auto-HeyGen routing. */
+  lipSyncWithVoiceover?: boolean;
+  dialogMode?: boolean;
 }
 
 interface ClipRequest {
@@ -1149,6 +1154,31 @@ serve(async (req) => {
       // required. If HappyHorse multi-cast plates fail face-detection in
       // Sync.so the user now sees the real error and credits are refunded
       // idempotently — no silent provider switch.
+      const __clientWantsComposerLipSync =
+        (scene as any).lipSyncWithVoiceover === true ||
+        (scene as any).dialogMode === true;
+      if (__clientWantsComposerLipSync && (scene.engineOverride ?? "auto") === "auto") {
+        scene.engineOverride = "cinematic-sync";
+        try {
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({
+              engine_override: "cinematic-sync",
+              lip_sync_with_voiceover: true,
+              lip_sync_status: "pending",
+              twoshot_stage: "audio",
+              clip_error: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene.id);
+        } catch (normalizeErr) {
+          console.warn(
+            `[compose-video-clips] scene ${scene.id}: failed to persist cinematic-sync normalization`,
+            normalizeErr,
+          );
+        }
+      }
+
       const __engineForHHGuard = scene.engineOverride ?? "auto";
       if (
         (scene.clipSource as string) === "ai-happyhorse" &&
@@ -2154,10 +2184,11 @@ serve(async (req) => {
 
       // ── HeyGen routing branch ─────────────────────────────────────────────
       // Triggered when:
-      //   • engineOverride === 'heygen'  OR
-      //   • engineOverride === 'auto' AND scene has dialog text AND a cast character
-      // Multi-speaker MVP: renders the FIRST speaker's portion (full text in
-      // their voice). Per-speaker stitching is future work.
+      //   • engineOverride === 'heygen' only.
+      // Composer dialog/lip-sync scenes MUST NOT auto-route here: they need a
+      // real HappyHorse/Hailuo master plate followed by Sync.so. The old
+      // `auto + dialog + cast` rule produced talking-head-renders URLs and
+      // left `dialog_shots` empty, which looked like a black/infinite lipsync.
       try {
         const override = scene.engineOverride ?? "auto";
         const hasDialog = sceneHasDialogText(scene.dialogScript);
@@ -2173,12 +2204,15 @@ serve(async (req) => {
         // as voiceover overlay over the regular AI clip; explicit
         // shot-reverse-shot split scenes (each with 1 speaker) handle real
         // per-person lip-sync.
+        const isComposerLipSyncScene =
+          override === "cinematic-sync" ||
+          override === "sync-segments" ||
+          (scene as any).lipSyncWithVoiceover === true ||
+          (scene as any).dialogMode === true;
         const wantsHeygen =
-          (override === "heygen" && dialogSpeakers <= 1) ||
-          (override === "auto" &&
-            hasDialog &&
-            !!primaryShot &&
-            dialogSpeakers <= 1);
+          override === "heygen" &&
+          !isComposerLipSyncScene &&
+          dialogSpeakers <= 1;
 
         if (wantsHeygen) {
           if (!hasDialog) {
