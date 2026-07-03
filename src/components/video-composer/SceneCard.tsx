@@ -969,9 +969,8 @@ export default function SceneCard({
                             >
                               ⚡ Fast Dialog · 1-Call (Sync.so Segments) — Default
                             </SelectItem>
-                            <SelectItem value="heygen" className="text-xs">
-                              🎙️ HeyGen Talking-Head
-                            </SelectItem>
+                            {/* HeyGen Talking-Head option removed — Composer scenes always use Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Portrait lip-sync lives in the standalone /talking-head module. */}
+
                             <SelectItem value="broll" className="text-xs">
                               📺 B-Roll (Off-Screen-VO)
                             </SelectItem>
