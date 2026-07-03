@@ -1123,6 +1123,44 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             ? matchedRT.originalBoundary + matchedRT.offsetSeconds 
             : srcEnd;
 
+          // ------------------------------------------------------------------
+          // Ping-pong PREWARM for the non-transition, non-gap scene advance.
+          // When we get close to a scene boundary that has no transition and no
+          // significant gap, prime the standby <video> slot at the next scene's
+          // in-point and let it start decoding. At the boundary we swap slots
+          // instead of seeking the active <video>, which used to stall the
+          // decoder for 100–400 ms — the freeze the user reported. Audio tracks
+          // (source / VO / music) are NEVER touched here so they stay linear.
+          // ------------------------------------------------------------------
+          if (!matchedRT && standbyPrimedForRef.current !== sceneInfo.index + 1) {
+            const remaining = effectiveBoundary - videoSourceTime;
+            if (remaining > 0 && remaining < 0.4) {
+              const nextSceneP = sortedScenes[sceneInfo.index + 1];
+              if (nextSceneP) {
+                const gapDurationP = nextSceneP.start_time - sceneInfo.scene.end_time;
+                if (gapDurationP <= 0.2) {
+                  const standby = getStandbyVideo();
+                  if (standby) {
+                    const nextSourceStartP = nextSceneP.original_start_time ?? nextSceneP.start_time;
+                    const nextRateP = (nextSceneP as any).playbackRate ?? 1;
+                    try {
+                      if (Math.abs(standby.currentTime - nextSourceStartP) > 0.05) {
+                        standby.currentTime = nextSourceStartP;
+                      }
+                      standby.playbackRate = nextRateP;
+                      // Keep hidden until the swap — but start decoding now.
+                      standby.style.opacity = '0';
+                      if (isPlayingRef.current) {
+                        standby.play().catch(() => {});
+                      }
+                      standbyPrimedForRef.current = sceneInfo.index + 1;
+                    } catch {}
+                  }
+                }
+              }
+            }
+          }
+
           if (!matchedRT && videoSourceTime >= effectiveBoundary - 0.02) {
             // Check if this boundary was already consumed by a handoff (structured match)
             const handoffMarker = lastHandoffBoundaryRef.current;
@@ -1138,7 +1176,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
               if (nextScene) {
                 const gapDuration = nextScene.start_time - sceneInfo.scene.end_time;
                  if (gapDuration > 0.2) {
-                  // Large gap detected — enter gap mode (black screen)
+                  // Large gap detected — enter gap mode (black screen).
+                  // Audio pause is intentional ONLY on gaps.
                   inGapRef.current = true;
                   gapLastTimestampRef.current = performance.now();
                   visualTimeRef.current = sceneInfo.scene.end_time;
@@ -1149,22 +1188,67 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
                   video.style.opacity = '0';
                   const standby = getStandbyVideo();
                   if (standby) standby.style.opacity = '0';
+                  standbyPrimedForRef.current = null;
                   rafIdRef.current = requestAnimationFrame(tick);
                   return;
                 }
-                // No significant gap — normal scene advance
+                // No significant gap — normal scene advance.
+                // AUDIO STAYS CONTINUOUS across this cut. Do not pause / seek
+                // sourceAudio, voiceover, or background music here — they run
+                // on the linear timeline and their scene rate is handled in
+                // the SPEED RAMPING block further down.
                 const nextSourceStart = nextScene.original_start_time ?? nextScene.start_time;
-                const seekDiff = Math.abs(video.currentTime - nextSourceStart);
-                // Always force a mini-seek to ensure findSceneBySourceTime picks up the new scene
-                if (seekDiff > 0.3) {
-                  video.currentTime = nextSourceStart;
-                } else {
-                  // Scenes are adjacent in source — nudge forward so tolerance doesn't keep matching previous scene
-                  video.currentTime = nextSourceStart + 0.05;
-                }
-                // Set playbackRate immediately for the new scene
                 const nextRate = (nextScene as any).playbackRate ?? 1;
-                video.playbackRate = nextRate;
+
+                // Prefer PING-PONG SLOT SWAP over a mini-seek on the active
+                // <video>. A seek forces the decoder to flush and re-fill its
+                // buffer (~100–400 ms freeze). A slot swap is instant because
+                // the standby has been decoding at nextSourceStart already.
+                const standby = getStandbyVideo();
+                const canSwap =
+                  standby &&
+                  standbyPrimedForRef.current === sceneInfo.index + 1 &&
+                  standby.readyState >= 2 /* HAVE_CURRENT_DATA */;
+
+                if (canSwap && standby) {
+                  const oldActive = video;
+                  // Flip active slot BEFORE mutating visibility so downstream
+                  // consumers (getActiveVideo/getStandbyVideo) see the new state.
+                  activeSlotRef.current = activeSlotRef.current === 'A' ? 'B' : 'A';
+                  standby.style.opacity = '1';
+                  // Hide + pause the outgoing slot next frame so the swap is atomic.
+                  requestAnimationFrame(() => {
+                    try {
+                      oldActive.style.opacity = '0';
+                      if (!oldActive.paused) oldActive.pause();
+                    } catch {}
+                  });
+                  standbyPrimedForRef.current = null;
+
+                  // Source-audio drift correction: only nudge if drift > 60 ms
+                  // to avoid an audible click on every cut.
+                  const audioEl = sourceAudioRef.current;
+                  if (
+                    audioEl &&
+                    !audioEl.paused &&
+                    !originalAudioMutedRef.current &&
+                    Math.abs(audioEl.currentTime - nextSourceStart) > 0.06
+                  ) {
+                    try { audioEl.currentTime = nextSourceStart; } catch {}
+                  }
+                } else {
+                  // Fallback (standby not primed in time): legacy mini-seek path.
+                  const seekDiff = Math.abs(video.currentTime - nextSourceStart);
+                  if (seekDiff > 0.3) {
+                    video.currentTime = nextSourceStart;
+                  } else {
+                    // Scenes are adjacent in source — nudge forward so tolerance
+                    // doesn't keep matching previous scene
+                    video.currentTime = nextSourceStart + 0.05;
+                  }
+                  video.playbackRate = nextRate;
+                }
+
                 pendingSceneAdvanceRef.current = { targetIndex: sceneInfo.index + 1, framesLeft: 15 };
                 timelineTime = nextScene.start_time;
               }
