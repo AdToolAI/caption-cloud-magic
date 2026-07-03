@@ -512,9 +512,13 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             </p>
           </div>
         ) : (
-          <div className="pr-1 pb-4">
-            {scenes.map((scene, i) => (
-                <React.Fragment key={scene.id}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sceneIds} strategy={verticalListSortingStrategy}>
+              <div className="pr-1 pb-4">
+                {scenes.map((scene, i) => (
+                  <SortableScene key={scene.id} id={scene.id}>
+                    {({ dragHandleProps, isDragging }) => (
+                      <React.Fragment>
                   {/* Scene Card */}
                   <div
                     onClick={() => onSceneSelect(scene.id)}
