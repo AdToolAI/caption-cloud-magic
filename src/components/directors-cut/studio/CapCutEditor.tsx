@@ -232,14 +232,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Welle 5 — Resizable Library / Inspector widths, persisted in localStorage
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 320;
+    if (typeof window === 'undefined') return 340;
     const stored = parseInt(window.localStorage.getItem('dc:sidebar-w') || '', 10);
-    if (Number.isFinite(stored) && stored >= 56 && stored <= 560) return stored;
-    // First-session default: 56px rail + content panel, scales to viewport
+    // Clamp to safe range — 280 is the minimum readable width for library content
+    if (Number.isFinite(stored) && stored >= 280 && stored <= 560) return stored;
+    // First-session default: content panel scales to viewport, always readable
     const vw = window.innerWidth;
-    if (vw < 1024) return 56;   // rail only
-    if (vw < 1280) return 288;  // 56 rail + 232 content
-    return 320;                 // 56 rail + 264 content
+    if (vw < 1024) return 300;
+    if (vw < 1280) return 320;
+    return 340;
   });
   const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 288;
@@ -2586,7 +2587,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
           {/* Welle 5 — Library ↔ Preview Divider */}
           {!sidebarCollapsed && (
-            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={56} max={560} />
+            <PanelDivider width={sidebarWidth} onWidthChange={setSidebarWidth} side="left" min={280} max={560} />
           )}
 
           {/* Welle 5 — Preview + Timeline Panel */}
