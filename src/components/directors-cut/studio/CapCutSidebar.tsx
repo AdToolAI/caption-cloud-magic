@@ -1613,8 +1613,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     Untertitel ({existingCaptions.length})
                   </h4>
                 </div>
-                <ScrollArea className="max-h-48 overflow-x-auto">
-                  <div className="space-y-1.5 pr-2 min-w-[260px]">
+                <ScrollArea className="max-h-48">
+                  <div className="space-y-1.5 pr-2 w-full min-w-0">
                     {existingCaptions.map((caption) => (
                       <div 
                         key={caption.id} 
@@ -1625,24 +1625,24 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         className={cn(
-                          "p-2 rounded text-xs whitespace-nowrap cursor-pointer transition-colors select-none",
+                          "p-2 rounded text-xs whitespace-normal break-words cursor-pointer transition-colors select-none w-full min-w-0",
                           selectedSubtitleId === caption.id 
                             ? "bg-[#00d4ff]/20 border border-[#00d4ff]" 
                             : "bg-[#2a2a2a] hover:bg-[#3a3a3a]"
                         )}
                       >
-                        <span className="text-white/40">
+                        <span className="block text-white/40">
                           {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
                         </span>
-                        <p className="text-white/80 mt-0.5 line-clamp-2">
+                        <p className="text-white/80 mt-0.5 line-clamp-2 break-words">
                           {caption.text || '(Klicke zum Bearbeiten)'}
                         </p>
                       </div>
                     ))}
                   </div>
                   <ScrollBar orientation="vertical" />
-                  <ScrollBar orientation="horizontal" />
                 </ScrollArea>
+
               </div>
             )}
           </TabsContent>
