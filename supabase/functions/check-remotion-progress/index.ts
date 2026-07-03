@@ -312,6 +312,10 @@ function jsonResponse(data: any) {
   );
 }
 
+function getConfigColumn(tableName: string) {
+  return tableName === 'director_cut_renders' ? 'render_config' : 'content_config';
+}
+
 // ============================================
 // HELPER: Find video on S3 using multiple strategies
 // 1. renders/{realRenderId}/{outName}
@@ -325,6 +329,7 @@ async function findVideoOnS3(
   pendingRenderId: string, supabaseAdmin: any, tableName: string, renderIdColumn: string,
   outputColumn: string, renderData: any,
 ): Promise<string | null> {
+  const configColumn = getConfigColumn(tableName);
   // Build candidate keys in priority order
   const keysToCheck: string[] = [];
 
@@ -395,9 +400,9 @@ async function findVideoOnS3(
             const headResp = await aws.fetch(videoUrl, { method: 'HEAD' });
             if (headResp.ok) {
               // Update with discovered real render ID
-              if (discoveredRealId && renderData?.content_config) {
-                renderData.content_config = {
-                  ...(renderData.content_config as any),
+              if (discoveredRealId && renderData?.[configColumn]) {
+                renderData[configColumn] = {
+                  ...(renderData[configColumn] as any),
                   real_remotion_render_id: discoveredRealId,
                   reconciled_via: 'paginated-s3-list',
                   reconciled_at: new Date().toISOString(),
@@ -435,6 +440,7 @@ async function refundRenderCreditsOnce(
   renderData: any,
   contentConfig: any,
 ) {
+  const configColumn = getConfigColumn(tableName);
   const creditsUsed = Number(contentConfig?.credits_used || 0);
   const alreadyRefunded = contentConfig?.credit_refund_done === true;
   if (!creditsUsed || !renderData?.user_id || alreadyRefunded) return;
@@ -443,12 +449,12 @@ async function refundRenderCreditsOnce(
     await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: creditsUsed });
     const { data: latest } = await supabaseAdmin
       .from(tableName)
-      .select('content_config')
+      .select(configColumn)
       .eq(renderIdColumn, renderId)
       .maybeSingle();
-    const latestConfig = (latest?.content_config as any) || contentConfig || {};
+    const latestConfig = (latest?.[configColumn] as any) || contentConfig || {};
     await supabaseAdmin.from(tableName).update({
-      content_config: {
+      [configColumn]: {
         ...latestConfig,
         credit_refund_done: true,
         credit_refunded_at: new Date().toISOString(),
@@ -467,14 +473,15 @@ async function markCompleted(
   supabaseAdmin: any, tableName: string, renderIdColumn: string,
   outputColumn: string, renderId: string, videoUrl: string, renderData: any,
 ) {
+  const configColumn = getConfigColumn(tableName);
   const updateData: any = {
     status: 'completed',
     [outputColumn]: videoUrl,
     completed_at: new Date().toISOString(),
     error_message: null,
   };
-  if (renderData?.content_config) {
-    updateData.content_config = renderData.content_config;
+  if (renderData?.[configColumn]) {
+    updateData[configColumn] = renderData[configColumn];
   }
 
   await supabaseAdmin.from(tableName).update(updateData).eq(renderIdColumn, renderId);
