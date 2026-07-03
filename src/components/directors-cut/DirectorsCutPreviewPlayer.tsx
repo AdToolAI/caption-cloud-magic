@@ -1098,6 +1098,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           // visually finished before the next clip actually appeared. Hand off to
           // the timeline-led transition branch instead.
           if (matchedRT) {
+            // A transition on this cut owns both slots (via useTransitionRenderer).
+            // Drop any prewarmed standby so we don't fight the transition renderer.
+            standbyPrimedForRef.current = null;
             const transitionSourceBoundary = matchedRT.originalBoundary + matchedRT.offsetSeconds;
             if (videoSourceTime >= transitionSourceBoundary - 0.005) {
               // Enter the resolver-defined transition window exactly. Using
