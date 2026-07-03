@@ -329,6 +329,22 @@ export const CutPanel: React.FC<CutPanelProps> = ({
     [scenes, transitions],
   );
 
+  const sortableEnabled = !!onReorderScenes && !composerLockSource;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const sceneIds = useMemo(() => scenes.map(s => s.id), [scenes]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onReorderScenes) return;
+    const oldIndex = sceneIds.indexOf(String(active.id));
+    const newIndex = sceneIds.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorderScenes(oldIndex, newIndex);
+  };
+
   const startEditing = (scene: SceneAnalysis) => {
     setEditingSceneId(scene.id);
     setEditName(scene.description || '');
