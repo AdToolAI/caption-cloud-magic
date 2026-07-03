@@ -45,6 +45,8 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
   const [videoSearchTriggered, setVideoSearchTriggered] = useState(false);
   const [stockImageQuery, setStockImageQuery] = useState('');
   const [imageSearchTriggered, setImageSearchTriggered] = useState(false);
+  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
 
   // Fetch user's background assets
   const { data: assets = [] } = useQuery({
