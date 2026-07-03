@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Palette, Sparkles, Video, Image as ImageIcon, Upload, Trash2, Check, Search, Play, ExternalLink, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Palette, Sparkles, Video, Image as ImageIcon, Upload, Trash2, Check, Search, Play, ExternalLink, Loader2, Library } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -44,6 +45,8 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
   const [videoSearchTriggered, setVideoSearchTriggered] = useState(false);
   const [stockImageQuery, setStockImageQuery] = useState('');
   const [imageSearchTriggered, setImageSearchTriggered] = useState(false);
+  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
 
   // Fetch user's background assets
   const { data: assets = [] } = useQuery({
@@ -297,8 +300,57 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     },
   });
 
+  // Fetch user's own videos from central media library (video_creations)
+  const { data: libraryVideos = [], isLoading: loadingLibrary } = useQuery({
+    queryKey: ['uc-library-videos', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('video_creations')
+        .select('id, output_url, thumbnail_url, created_at, customizations, metadata, status')
+        .eq('user_id', user!.id)
+        .eq('status', 'completed')
+        .not('output_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []).filter((v: any) => !!v.output_url);
+    },
+    enabled: !!user && libraryPickerOpen,
+  });
+
+  const importFromLibrary = async (video: any) => {
+    if (!user) return;
+    try {
+      const title =
+        video?.customizations?.title ||
+        video?.metadata?.title ||
+        `Video ${new Date(video.created_at).toLocaleDateString()}`;
+      const { data: assetData, error } = await supabase
+        .from('universal_background_assets')
+        .insert({
+          user_id: user.id,
+          type: 'video',
+          url: video.output_url,
+          thumbnail_url: video.thumbnail_url ?? null,
+          title,
+          source: 'media_library',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['background-assets'] });
+      onSelectAsset(assetData as BackgroundAsset);
+      toast.success(t('uc.videoImportedFromLibrary') || 'Video aus Mediathek übernommen');
+      setLibraryPickerOpen(false);
+    } catch (err: any) {
+      console.error('Library import error:', err);
+      toast.error(err.message || 'Import fehlgeschlagen');
+    }
+  };
+
   const renderAssetCard = (asset: BackgroundAsset) => {
     const isSelected = selectedAsset?.id === asset.id;
+
 
     return (
       <Card
@@ -514,26 +566,44 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           {/* Videos Tab */}
           <TabsContent value="videos" className="space-y-4">
             <div className="space-y-4">
-              <Card className="p-6 border-dashed">
-                <Label htmlFor="video-upload" className="cursor-pointer">
-                  <div className="flex flex-col items-center gap-2 py-8">
-                    <Upload className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm font-medium">{t('uc.uploadVideo')}</p>
-                    <p className="text-xs text-muted-foreground">{t('uc.videoFormats')}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Card className="p-6 border-dashed">
+                  <Label htmlFor="video-upload" className="cursor-pointer">
+                    <div className="flex flex-col items-center gap-2 py-6">
+                      <Upload className="h-10 w-10 text-muted-foreground" />
+                      <p className="text-sm font-medium">{t('uc.uploadVideo')}</p>
+                      <p className="text-xs text-muted-foreground text-center">{t('uc.videoFormats')}</p>
+                    </div>
+                  </Label>
+                  <Input
+                    id="video-upload"
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, 'video');
+                    }}
+                    disabled={uploading}
+                  />
+                </Card>
+
+                <Card
+                  className="p-6 border-dashed cursor-pointer hover:border-primary/60 transition-colors"
+                  onClick={() => setLibraryPickerOpen(true)}
+                >
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    <Library className="h-10 w-10 text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      {t('uc.chooseFromLibrary') || 'Aus Mediathek wählen'}
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {t('uc.chooseFromLibraryDesc') || 'Bereits erstellte Videos wiederverwenden'}
+                    </p>
                   </div>
-                </Label>
-                <Input
-                  id="video-upload"
-                  type="file"
-                  accept="video/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file, 'video');
-                  }}
-                  disabled={uploading}
-                />
-              </Card>
+                </Card>
+              </div>
+
 
               <div className="space-y-2">
                 <Label>{t('uc.myVideos')}</Label>
@@ -817,6 +887,88 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           </TabsContent>
         </Tabs>
       </Card>
+
+      <Dialog open={libraryPickerOpen} onOpenChange={setLibraryPickerOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t('uc.libraryPickerTitle') || 'Video aus Mediathek wählen'}</DialogTitle>
+            <DialogDescription>
+              {t('uc.libraryPickerDesc') || 'Wähle ein bereits erstelltes Video, um es als Hintergrund zu übernehmen.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={t('uc.libraryPickerSearch') || 'Videos durchsuchen…'}
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {loadingLibrary ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                {t('uc.loading') || 'Lädt…'}
+              </div>
+            ) : libraryVideos.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                {t('uc.libraryEmpty') || 'Noch keine fertigen Videos in deiner Mediathek.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {libraryVideos
+                  .filter((v: any) => {
+                    if (!librarySearch) return true;
+                    const title =
+                      v?.customizations?.title ||
+                      v?.metadata?.title ||
+                      '';
+                    return String(title).toLowerCase().includes(librarySearch.toLowerCase());
+                  })
+                  .map((v: any) => {
+                    const title =
+                      v?.customizations?.title ||
+                      v?.metadata?.title ||
+                      new Date(v.created_at).toLocaleDateString();
+                    return (
+                      <Card
+                        key={v.id}
+                        className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition"
+                        onClick={() => importFromLibrary(v)}
+                      >
+                        <div className="aspect-video bg-muted overflow-hidden">
+                          {v.thumbnail_url ? (
+                            <img
+                              src={v.thumbnail_url}
+                              alt={title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <video
+                              src={v.output_url}
+                              className="w-full h-full object-cover"
+                              muted
+                              preload="metadata"
+                            />
+                          )}
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs font-medium truncate">{title}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(v.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </Card>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
