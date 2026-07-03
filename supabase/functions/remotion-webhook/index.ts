@@ -672,10 +672,9 @@ serve(async (req) => {
         const alreadyCompleted = renderJob?.status === 'completed';
         const shouldRefund = !alreadyCompleted && !alreadyRefunded && Number(renderJob?.credits_used || 0) > 0 && renderJob?.user_id;
 
-        await supabaseAdmin.from('director_cut_renders').update({
+        const directorCutFailureUpdate: any = {
           status: alreadyCompleted ? 'completed' : 'failed',
           error_message: alreadyCompleted ? null : errorMessage,
-          completed_at: alreadyCompleted ? undefined : new Date().toISOString(),
           remotion_render_id: renderId || null,
           bucket_name: bucketName || null,
           render_config: {
@@ -692,7 +691,12 @@ serve(async (req) => {
             credit_refunded_at: shouldRefund ? new Date().toISOString() : existingCfg.credit_refunded_at,
             credit_refund_reason: shouldRefund ? 'director_cut_lambda_failed' : existingCfg.credit_refund_reason,
           },
-        }).eq('id', renderJobId);
+        };
+        if (!alreadyCompleted) {
+          directorCutFailureUpdate.completed_at = new Date().toISOString();
+        }
+
+        await supabaseAdmin.from('director_cut_renders').update(directorCutFailureUpdate).eq('id', renderJobId);
 
         if (shouldRefund) {
           await supabaseAdmin.rpc('increment_balance', { p_user_id: renderJob.user_id, p_amount: renderJob.credits_used });
