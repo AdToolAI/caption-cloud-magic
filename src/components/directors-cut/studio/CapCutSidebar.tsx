@@ -922,6 +922,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
         })()}
 
         <ScrollArea className="flex-1 min-w-0 max-w-full overflow-hidden">
+          <div className="w-full min-w-0 max-w-full overflow-x-hidden">
           {/* TAB: Cut (Schnitt) */}
           <TabsContent value="cut" className="mt-0 min-w-0 max-w-full overflow-hidden">
             <CutPanel
@@ -949,7 +950,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           </TabsContent>
 
           {/* TAB: Look (Style + Farbe) */}
-          <TabsContent value="look" className="mt-0">
+          <TabsContent value="look" className="mt-0 min-w-0 max-w-full overflow-hidden">
             <LookPanel
               effects={appliedEffects || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
               onEffectsChange={onEffectsChange || (() => {})}
@@ -964,7 +965,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           </TabsContent>
 
           {/* TAB: FX (Effekte) */}
-          <TabsContent value="fx" className="mt-0">
+          <TabsContent value="fx" className="mt-0 min-w-0 max-w-full overflow-hidden">
             <FXPanel
               chromaKey={chromaKey || { enabled: false, color: '#00ff00', tolerance: 40 }}
               onChromaKeyChange={onChromaKeyChange || (() => {})}
@@ -983,7 +984,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           </TabsContent>
 
           {/* TAB: Export */}
-          <TabsContent value="export" className="mt-0">
+          <TabsContent value="export" className="mt-0 min-w-0 max-w-full overflow-hidden">
             <ExportPanel
               exportSettings={exportSettings as any || { quality: 'hd' as const, format: 'mp4' as const, fps: 30, aspect_ratio: '16:9' }}
               onExportSettingsChange={onExportSettingsChange || (() => {})}
@@ -995,11 +996,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
 
           {/* TAB 2: Subtitles (COMPLETE) */}
-          <TabsContent value="subtitle" className="p-3 space-y-4 mt-0">
+          <TabsContent value="subtitle" className="p-4 space-y-4 mt-0 min-w-0 max-w-full overflow-hidden">
             {/* Header */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0 overflow-hidden">
               <Type className="h-4 w-4 text-[#00d4ff]" />
-              <span className="text-sm font-medium text-white">{t('dc.subtitles')}</span>
+              <span className="text-sm font-medium text-white min-w-0 break-words [overflow-wrap:anywhere]">{t('dc.subtitles')}</span>
             </div>
 
             {/* Original Subtitles Detection Banner */}
@@ -1015,12 +1016,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <p className="text-[11px] text-indigo-300 flex items-center gap-1.5">
                   🎬 {t('dc.originalSubsDetected')}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 min-w-0">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={onRemoveOriginalSubtitles}
-                    className="h-6 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 px-2"
+                    className="h-auto min-h-6 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 px-2 whitespace-normal leading-tight"
                   >
                     Entfernen
                   </Button>
@@ -1029,7 +1030,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     variant="outline"
                     onClick={handleGenerateCaptions}
                     disabled={isGeneratingCaptions}
-                    className="h-6 text-[10px] border-[#00d4ff]/30 text-[#00d4ff] hover:bg-[#00d4ff]/10 px-2"
+                    className="h-auto min-h-6 text-[10px] border-[#00d4ff]/30 text-[#00d4ff] hover:bg-[#00d4ff]/10 px-2 whitespace-normal leading-tight"
                   >
                     <Sparkles className="h-2.5 w-2.5 mr-1" />
                     Neu generieren
@@ -1044,7 +1045,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={onRetryDetection}
-                className="w-full h-7 text-[10px] border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
+                className="w-full h-auto min-h-7 text-[10px] border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 whitespace-normal leading-tight"
               >
                 <RotateCcw className="h-2.5 w-2.5 mr-1" />
                 {t('dc.retryDetection')}
@@ -1057,7 +1058,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={onRemoveAllSubtitles}
-                className="w-full h-7 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                className="w-full h-auto min-h-7 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 whitespace-normal leading-tight"
               >
                 {t('dc.removeAllSubtitles', { count: existingCaptions.length })}
               </Button>
@@ -1075,7 +1076,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             </div>
 
             {/* Preview Layer Toggles */}
-            <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+            <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a] min-w-0 max-w-full overflow-hidden">
               <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">{t('dc.previewVisibility')}</p>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-white/70">💬 Untertitel</span>
@@ -1103,7 +1104,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             </div>
 
             {/* Burned-in Subtitle Removal */}
-            <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a]">
+            <div className="space-y-2 p-2.5 rounded bg-[#2a2a2a] border border-[#3a3a3a] min-w-0 max-w-full overflow-hidden">
               <p className="text-[11px] text-white/50 font-medium uppercase tracking-wider">{t('dc.burnedInText')}</p>
               <p className="text-[9px] text-white/30">
                 {t('dc.burnedInTextDesc')}
@@ -1115,7 +1116,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 variant="outline"
                 onClick={onDetectSubtitleBand}
                 disabled={isDetectingBand || (subtitleSafeZone.enabled && subtitleSafeZone.mode === 'reframe')}
-                className="w-full h-8 text-[11px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 font-medium"
+                className="w-full h-auto min-h-8 text-[11px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 font-medium whitespace-normal leading-tight"
               >
                 {isDetectingBand ? (
                   <>
@@ -1271,7 +1272,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onRestoreOriginalVideo}
-                    className="w-full h-7 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                    className="w-full h-auto min-h-7 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10 whitespace-normal leading-tight"
                   >
                     <RotateCcw className="h-2.5 w-2.5 mr-1" />
                     {t('dc.restoreOriginal')}
@@ -1294,7 +1295,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={() => onRemoveBurnedSubtitles?.()}
-                    className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                    className="w-full h-auto min-h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10 whitespace-normal leading-tight"
                   >
                     <RotateCcw className="h-2.5 w-2.5 mr-1" /> {t('dc.retryRender')}
                   </Button>
@@ -1305,7 +1306,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   variant="outline"
                   onClick={() => onRemoveBurnedSubtitles?.()}
                   disabled={isRemovingBurnedSubs}
-                  className="w-full h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                  className="w-full h-auto min-h-7 text-[10px] border-purple-500/30 text-purple-400 hover:bg-purple-500/10 whitespace-normal leading-tight"
                 >
                   <Sparkles className="h-2.5 w-2.5 mr-1" /> {t('dc.startAiRemoval')}
                 </Button>
@@ -1318,7 +1319,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="space-y-2">
               <label className="text-xs text-white/70">{t('dc.language')}</label>
               <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
-                <SelectTrigger className="w-full h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white">
+                <SelectTrigger className="w-full min-w-0 h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white">
                   <SelectValue placeholder={t('dc.chooseLanguage')} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
@@ -1344,7 +1345,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 }}
                 placeholder={selectedSubtitleId ? t('dc.enterText') : t('dc.clickSubtitleHint')}
                 disabled={!selectedSubtitleId}
-                className="bg-[#2a2a2a] border-[#3a3a3a] text-white placeholder:text-white/40 resize-none text-sm min-h-[60px]"
+                className="bg-[#2a2a2a] border-[#3a3a3a] text-white placeholder:text-white/40 resize-none text-sm min-h-[60px] min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
                 rows={2}
               />
             </div>
@@ -1352,20 +1353,20 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Caption Style */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">Caption Style</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 min-w-0">
                 {CAPTION_STYLES.map(style => (
                   <button
                     key={style.id}
                     onClick={() => setCaptionStyle(style.id)}
                     className={cn(
-                      "p-2 rounded text-left transition-all",
+                      "p-2 rounded text-left transition-all min-w-0 overflow-hidden",
                       captionStyle === style.id 
                         ? "bg-[#00d4ff]/20 border border-[#00d4ff] text-white"
                         : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/70 hover:bg-[#3a3a3a]"
                     )}
                   >
-                    <p className="text-xs font-medium">{style.name}</p>
-                    <p className="text-[10px] text-white/40">{style.description}</p>
+                    <p className="text-xs font-medium break-words [overflow-wrap:anywhere]">{style.name}</p>
+                    <p className="text-[10px] text-white/40 break-words [overflow-wrap:anywhere]">{style.description}</p>
                   </button>
                 ))}
               </div>
@@ -1379,7 +1380,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Position */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">{t('dc.position')}</label>
-              <div className="flex gap-1">
+              <div className="grid grid-cols-3 gap-1 min-w-0">
                 {[
                   { value: 'top', icon: AlignVerticalJustifyStart, label: t('dc.posTop') },
                   { value: 'center', icon: AlignVerticalJustifyCenter, label: t('dc.posCenter') },
@@ -1389,14 +1390,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     key={value}
                     onClick={() => updateStyle({ position: value as 'top' | 'center' | 'bottom' })}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 p-2 rounded text-xs transition-colors",
+                      "min-w-0 flex flex-col items-center gap-1 p-2 rounded text-xs transition-colors",
                       localStyle.position === value 
                         ? "bg-[#00d4ff]/20 border border-[#00d4ff] text-white" 
                         : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/60 hover:bg-[#3a3a3a]"
                     )}
                   >
                     <Icon className="h-4 w-4" />
-                    <span>{label}</span>
+                    <span className="max-w-full break-words text-center leading-tight [overflow-wrap:anywhere]">{label}</span>
                   </button>
                 ))}
               </div>
@@ -1405,13 +1406,13 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Font Size */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">{t('dc.fontSize')}</label>
-              <div className="flex gap-1">
+              <div className="grid grid-cols-4 gap-1 min-w-0">
                 {['small', 'medium', 'large', 'xl'].map((size) => (
                   <button
                     key={size}
                     onClick={() => updateStyle({ fontSize: size as SubtitleClip['fontSize'] })}
                     className={cn(
-                      "flex-1 px-2 py-1.5 rounded text-xs transition-colors",
+                      "min-w-0 px-2 py-1.5 rounded text-xs transition-colors",
                       localStyle.fontSize === size 
                         ? "bg-[#00d4ff]/20 border border-[#00d4ff] text-white" 
                         : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/60 hover:bg-[#3a3a3a]"
@@ -1424,17 +1425,17 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             </div>
 
             {/* Colors */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 min-w-0">
               <div className="space-y-2">
                 <label className="text-xs text-white/70">{t('dc.textColor')}</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                   <input 
                     type="color" 
                     value={localStyle.color || '#FFFFFF'}
                     onChange={(e) => updateStyle({ color: e.target.value })}
                     className="w-8 h-8 rounded cursor-pointer bg-[#2a2a2a] border border-[#3a3a3a]"
                   />
-                  <span className="text-[10px] text-white/40">{localStyle.color}</span>
+                  <span className="min-w-0 text-[10px] text-white/40 break-words [overflow-wrap:anywhere]">{localStyle.color}</span>
                 </div>
               </div>
               <div className="space-y-2">
@@ -1454,7 +1455,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="space-y-2">
               <label className="text-xs text-white/70">{t('dc.fontFamily')}</label>
               <Select value={localStyle.fontFamily || 'Inter'} onValueChange={(v) => updateStyle({ fontFamily: v })}>
-                <SelectTrigger className="w-full h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white">
+                <SelectTrigger className="w-full min-w-0 h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
@@ -1470,13 +1471,13 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Max Lines */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">{t('dc.maxLines')}</label>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 min-w-0">
                 {[2, 3].map((lines) => (
                   <button
                     key={lines}
                     onClick={() => updateStyle({ maxLines: lines as 2 | 3 })}
                     className={cn(
-                      "flex-1 px-3 py-1.5 rounded text-xs transition-colors",
+                      "min-w-0 px-3 py-1.5 rounded text-xs transition-colors whitespace-normal leading-tight",
                       localStyle.maxLines === lines 
                         ? "bg-[#00d4ff]/20 border border-[#00d4ff] text-white" 
                         : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/60 hover:bg-[#3a3a3a]"
@@ -1491,11 +1492,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             {/* Text Stroke / Outline */}
             <div className="space-y-2">
               <label className="text-xs text-white/70">{t('dc.outline')}</label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <button
                   onClick={() => updateStyle({ textStroke: !localStyle.textStroke })}
                   className={cn(
-                    "px-3 py-1.5 rounded text-xs transition-colors",
+                    "px-3 py-1.5 rounded text-xs transition-colors whitespace-normal leading-tight",
                     localStyle.textStroke 
                       ? "bg-[#00d4ff]/20 border border-[#00d4ff] text-white" 
                       : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/60 hover:bg-[#3a3a3a]"
@@ -1528,14 +1529,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="border-t border-[#3a3a3a] pt-4" />
 
             {/* Mode Explanation */}
-            <div className="p-2.5 rounded bg-[#2a2a2a]/50 border border-[#3a3a3a]">
+            <div className="p-2.5 rounded bg-[#2a2a2a]/50 border border-[#3a3a3a] min-w-0 max-w-full overflow-hidden">
               {voiceOverUrl ? (
-                <p className="text-[10px] text-emerald-400/80 flex items-center gap-1.5">
+                <p className="text-[10px] text-emerald-400/80 flex items-center gap-1.5 min-w-0 break-words [overflow-wrap:anywhere]">
                   <Mic className="h-3 w-3" />
                   {t('dc.voiceoverDetected')}
                 </p>
               ) : (
-                <p className="text-[10px] text-white/50">
+                <p className="text-[10px] text-white/50 break-words [overflow-wrap:anywhere]">
                   {t('dc.noVoiceover')}
                 </p>
               )}
@@ -1545,7 +1546,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <Button
               onClick={handleGenerateCaptions}
               disabled={isGeneratingCaptions}
-              className="w-full bg-[#00d4ff] hover:bg-[#00b8e0] text-black"
+              className="w-full h-auto min-h-10 bg-[#00d4ff] hover:bg-[#00b8e0] text-black whitespace-normal leading-tight"
             >
               {isGeneratingCaptions ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('dc.generating')}</>
@@ -1577,7 +1578,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 onCaptionsGenerated?.([...existingCaptions, newSubtitle]);
                 toast.success(t('dc.newSubtitleAdded'));
               }}
-              className="w-full border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70 hover:text-white"
+              className="w-full h-auto min-h-10 border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70 hover:text-white whitespace-normal leading-tight"
             >
               <Plus className="h-4 w-4 mr-2" />
               {t('dc.addNewSubtitle')}
@@ -1615,7 +1616,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                     Untertitel ({existingCaptions.length})
                   </h4>
                 </div>
-                <ScrollArea className="max-h-48">
+                <ScrollArea className="max-h-48 min-w-0 max-w-full overflow-hidden">
                   <div className="space-y-1.5 pr-2 w-full min-w-0">
                     {existingCaptions.map((caption) => (
                       <div 
@@ -1650,7 +1651,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           </TabsContent>
 
           {/* TAB 3: Audio Effects AI */}
-          <TabsContent value="audio-fx" className="p-3 space-y-4 mt-0">
+          <TabsContent value="audio-fx" className="p-4 space-y-4 mt-0 min-w-0 max-w-full overflow-hidden">
             {/* Audio Upload Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -1895,7 +1896,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           </TabsContent>
 
           {/* TAB 4: Settings */}
-          <TabsContent value="settings" className="p-3 space-y-4 mt-0">
+          <TabsContent value="settings" className="p-4 space-y-4 mt-0 min-w-0 max-w-full overflow-hidden">
             {/* Header */}
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-white/70" />
@@ -2018,8 +2019,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             </div>
           </TabsContent>
 
+          </div>
           <ScrollBar orientation="vertical" />
-          <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </Tabs>
     </div>
