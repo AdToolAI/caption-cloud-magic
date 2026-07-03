@@ -44,6 +44,12 @@ const VerifyEmail = () => {
       const { token, tokenHash, type, code, errorCode, errorDescription } = getVerificationParams(searchParams);
 
       try {
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        if (existingSession?.user?.email_confirmed_at) {
+          setStatus("success");
+          return;
+        }
+
         if (errorCode) {
           setStatus("error");
           setErrorMessage(
