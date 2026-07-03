@@ -133,7 +133,7 @@ function QueueRowCard({
 
 export default function RenderQueue() {
   const navigate = useNavigate();
-  const { rows, recent, loading, refresh } = useRenderQueueLive();
+  const { rows, recent, zombieCount, loading, refresh } = useRenderQueueLive();
   const [busy, setBusy] = useState<string | null>(null); // "row:<id>" | "status:<s>" | "all"
   const [confirm, setConfirm] = useState<null | { kind: 'row' | 'status' | 'all'; ids: string[]; label: string }>(null);
 
