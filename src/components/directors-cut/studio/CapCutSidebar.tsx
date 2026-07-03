@@ -22,6 +22,8 @@ import { LookPanel } from './sidebar/LookPanel';
 import { FXPanel } from './sidebar/FXPanel';
 import { ExportPanel } from './sidebar/ExportPanel';
 import { TextOverlayEditor2028 } from '../features/TextOverlayEditor2028';
+import { StudioSidebarTabs } from '@/components/studio-shell/StudioSidebarTabs';
+import { useContainerWidth } from '@/hooks/useContainerWidth';
 
 interface JamendoTrack {
   id: string;
