@@ -584,6 +584,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     swClockLastTsRef.current = 0;
     transitionClockLastTsRef.current = 0;
     activeMediaSceneIdRef.current = null;
+    standbyPrimedForRef.current = null;
   }, []);
 
   const resetToPrimaryVideoSlot = useCallback((sourceTime: number) => {
