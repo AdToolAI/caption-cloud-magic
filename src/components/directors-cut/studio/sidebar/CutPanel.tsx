@@ -530,7 +530,22 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <GripVertical className="h-3 w-3 text-white/20 flex-shrink-0" />
+                      <button
+                        type="button"
+                        {...(sortableEnabled ? dragHandleProps : {})}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={t('dc.reorderScene') || 'Ziehen zum Vertauschen'}
+                        title={sortableEnabled ? (t('dc.reorderScene') || 'Ziehen zum Vertauschen') : undefined}
+                        className={cn(
+                          'flex items-center justify-center flex-shrink-0 p-0.5 rounded',
+                          sortableEnabled
+                            ? 'cursor-grab active:cursor-grabbing text-white/40 hover:text-white/80 hover:bg-white/5 touch-none'
+                            : 'text-white/20 cursor-not-allowed',
+                        )}
+                        disabled={!sortableEnabled}
+                      >
+                        <GripVertical className="h-3 w-3" />
+                      </button>
                       
                       <div className={cn(
                         "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0",
