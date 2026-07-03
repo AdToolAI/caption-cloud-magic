@@ -2331,7 +2331,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             className={cn(
              "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-[width] duration-150 flex-shrink-0"
            )}
-           style={{ width: sidebarCollapsed ? 48 : sidebarWidth }}
+           style={{ width: sidebarCollapsed ? 56 : sidebarWidth }}
            >
             {/* Column header */}
             {!sidebarCollapsed && (
