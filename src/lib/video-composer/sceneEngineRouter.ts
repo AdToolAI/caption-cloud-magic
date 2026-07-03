@@ -105,14 +105,11 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
   const isStatic = motion === 'static';
 
   // ── User override wins ─────────────────────────────────────────────
-  if (override === 'heygen') {
-    return {
-      engine: 'heygen-talking-head',
-      label: '🎙️ HeyGen Lip-Sync (manuell)',
-      reason: 'Vom Nutzer erzwungen — HeyGen Photo-Avatar rendert frame-genauen Lip-Sync.',
-      extraCostEur: estimateHeygenCostEur(speakers),
-    };
-  }
+  // Legacy `heygen` override is silently rerouted to Cinematic-Sync
+  // (Sync.so segments) — the Composer's HeyGen/Talking-Head portrait path
+  // was removed. Standalone Talking-Head module (`/talking-head`) is
+  // unaffected.
+
   if (override === 'broll') {
     return {
       engine: 'broll',
