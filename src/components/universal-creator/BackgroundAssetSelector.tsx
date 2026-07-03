@@ -348,7 +348,9 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     }
   };
 
+  const renderAssetCard = (asset: BackgroundAsset) => {
     const isSelected = selectedAsset?.id === asset.id;
+
 
     return (
       <Card
