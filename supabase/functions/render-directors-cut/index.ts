@@ -53,6 +53,59 @@ function getLambdaFunctionName(): string {
   return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
 }
 const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
+const LAMBDA_START_TIMEOUT_MS = 25_000;
+
+function isAbortLikeError(error: unknown): boolean {
+  const anyErr = error as any;
+  const message = String(anyErr?.message || error || '');
+  return anyErr?.name === 'AbortError' || message.includes('aborted') || message.includes('signal timed out');
+}
+
+function mergeRenderConfig(existing: any, patch: Record<string, unknown>) {
+  return {
+    ...(existing && typeof existing === 'object' ? existing : {}),
+    ...patch,
+  };
+}
+
+async function refundRenderCreditsOnce(
+  supabaseClient: any,
+  renderJob: any,
+  reason: string,
+) {
+  const creditsUsed = Number(renderJob?.credits_used || 0);
+  if (!renderJob?.id || !renderJob?.user_id || !creditsUsed) return false;
+
+  const { data: latest } = await supabaseClient
+    .from('director_cut_renders')
+    .select('render_config')
+    .eq('id', renderJob.id)
+    .maybeSingle();
+
+  const latestConfig = (latest?.render_config as any) || renderJob.render_config || {};
+  if (latestConfig?.credit_refund_done === true) return false;
+
+  await supabaseClient.rpc('increment_balance', {
+    p_user_id: renderJob.user_id,
+    p_amount: creditsUsed,
+  });
+
+  await supabaseClient
+    .from('director_cut_renders')
+    .update({
+      render_config: mergeRenderConfig(latestConfig, {
+        credit_refund_done: true,
+        credit_refunded_at: new Date().toISOString(),
+        credit_refund_reason: reason,
+        credits_used: creditsUsed,
+      }),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', renderJob.id);
+
+  console.log(`[RenderDirectorsCut] Refunded ${creditsUsed} credits for render ${renderJob.id}: ${reason}`);
+  return true;
+}
 
 // Invoke Remotion Lambda directly via AWS API
 async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; bucketName: string }> {
@@ -73,6 +126,7 @@ async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; b
       'X-Amz-Invocation-Type': 'RequestResponse',
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(LAMBDA_START_TIMEOUT_MS),
   });
 
   if (!response.ok) {
