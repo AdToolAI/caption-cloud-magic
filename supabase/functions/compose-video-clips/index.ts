@@ -2193,10 +2193,9 @@ serve(async (req) => {
       // to Cinematic-Sync BEFORE this point (see the guard around L1157).
       // The standalone Talking-Head module (`/talking-head`) is unaffected —
       // only the Composer's auto-portrait dispatch was removed.
-
-
-
+      try {
         if (scene.clipSource === "upload" && scene.uploadUrl) {
+
           // Upload: just mark as ready
           await supabaseAdmin
             .from("composer_scenes")
