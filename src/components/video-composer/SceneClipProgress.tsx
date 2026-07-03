@@ -127,21 +127,50 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         .from('composer_scenes')
         .update({
           clip_url: null,
-          clip_status: 'pending',
+          clip_status: 'generating',
           clip_error: null,
           engine_override: 'cinematic-sync',
           lip_sync_with_voiceover: true,
-          lip_sync_status: null,
-          twoshot_stage: null,
+          lip_sync_status: 'pending',
+          twoshot_stage: 'audio',
           dialog_shots: null,
           lip_sync_source_clip_url: null,
           replicate_prediction_id: null,
         })
         .eq('id', scene.id);
       if (error) throw error;
+
+      const { error: invokeError } = await supabase.functions.invoke('compose-video-clips', {
+        body: {
+          projectId: scene.projectId,
+          scenes: [
+            {
+              id: scene.id,
+              projectId: scene.projectId,
+              sceneType: scene.sceneType,
+              clipSource: scene.clipSource,
+              clipQuality: scene.clipQuality || 'standard',
+              aiPrompt: scene.aiPrompt || '',
+              negativePrompt: (scene as any).negativePrompt || undefined,
+              uploadUrl: scene.uploadUrl,
+              referenceImageUrl: scene.referenceImageUrl,
+              durationSeconds: scene.durationSeconds,
+              characterShot: scene.characterShot,
+              characterShots: scene.characterShots,
+              dialogScript: scene.dialogScript,
+              dialogVoices: scene.dialogVoices,
+              engineOverride: 'cinematic-sync',
+              lipSyncWithVoiceover: true,
+              dialogMode: scene.dialogMode === true,
+              withAudio: scene.withAudio !== false,
+            },
+          ],
+        },
+      });
+      if (invokeError) throw invokeError;
       toast({
-        title: 'Renderpfad zurückgesetzt',
-        description: 'Bitte die Szene erneut generieren — sie startet jetzt über HappyHorse/Hailuo + Sync.so.',
+        title: 'Renderpfad neu gestartet',
+        description: 'Die Szene läuft jetzt über HappyHorse/Hailuo + Sync.so.',
       });
     } catch (err) {
       toast({
