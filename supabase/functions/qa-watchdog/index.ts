@@ -24,6 +24,19 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Auto-cleanup TTLs for composer_scenes zombies.
+// A job that never left `pending`/`queued` for 60 min is stuck in dispatch
+// (provider concurrency exhausted, orchestrator crash, …) and will not
+// recover on its own — cancel it so the user can retry.
+const NEVER_DISPATCHED_TTL_MIN = 60;
+// Absolute hard ceiling: no active job may live longer than this, regardless
+// of status. Catches every exotic state the specialised watchdogs miss.
+const HARD_ACTIVE_TTL_HOURS = 6;
+// Flat refund per scene killed by the hard-TTL sweep. Mirrors the lipsync
+// block's convention (block 4). Never-dispatched scenes get no refund because
+// no provider call was ever billed.
+const HARD_TTL_REFUND_PER_SCENE = 28;
+
 interface Anomaly {
   kind: string;
   severity: "high" | "medium" | "low";
