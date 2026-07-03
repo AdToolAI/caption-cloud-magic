@@ -381,40 +381,40 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   };
 
   return (
-    <div className="p-3 pb-32 space-y-4">
+    <div className="p-3 pb-32 space-y-4 w-full min-w-0 max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
-        <Scissors className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
-        <span className="text-sm font-medium text-white">{t('dc.cutTitle')}</span>
+      <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+        <div className="w-1 h-4 rounded-full bg-[#F5C76A] flex-shrink-0" />
+        <Scissors className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.4)] flex-shrink-0" />
+        <span className="text-sm font-medium text-white min-w-0 break-words [overflow-wrap:anywhere]">{t('dc.cutTitle')}</span>
       </div>
 
       {/* Split at Playhead */}
       <Button
         onClick={onSplitAtPlayhead}
         disabled={scenes.length === 0}
-        className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-black font-medium shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+        className="w-full min-w-0 h-auto min-h-10 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-black font-medium shadow-[0_0_15px_rgba(34,211,238,0.2)] whitespace-normal text-center leading-tight"
         size="sm"
       >
-        <Scissors className="h-3.5 w-3.5 mr-2" />
-        {t('dc.splitAtPlayhead')}
+        <Scissors className="h-3.5 w-3.5 mr-2 flex-shrink-0" />
+        <span className="min-w-0 break-words [overflow-wrap:anywhere]">{t('dc.splitAtPlayhead')}</span>
       </Button>
 
-      <p className="text-[10px] text-white/40">
+      <p className="text-[10px] text-white/40 break-words [overflow-wrap:anywhere]">
         {t('dc.playheadInfo', { time: formatTime(currentTime) })}
       </p>
 
       {/* Add new scene */}
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2 min-w-0">
         {onSceneAdd && (
           <Button
             onClick={onSceneAdd}
             variant="outline"
             size="sm"
-            className="flex-1 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30"
+            className="min-w-0 h-auto min-h-9 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30 whitespace-normal text-center leading-tight px-2"
           >
-            <Plus className="h-3.5 w-3.5 mr-2" />
-            Leere Szene
+            <Plus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">Leere Szene</span>
           </Button>
         )}
         {(onAddVideoAsScene || onAddFromLibrary) && (
@@ -440,10 +440,10 @@ export const CutPanel: React.FC<CutPanelProps> = ({
               }}
               variant="outline"
               size="sm"
-              className="flex-1 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30"
+              className="min-w-0 h-auto min-h-9 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30 whitespace-normal text-center leading-tight px-2"
             >
-              <FileVideo className="h-3.5 w-3.5 mr-2" />
-              Video hinzufügen
+              <FileVideo className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">Video hinzufügen</span>
             </Button>
           </>
         )}
@@ -483,15 +483,15 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             disabled={isAnalyzing}
             variant="outline"
             size="sm"
-            className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+            className="w-full min-w-0 h-auto min-h-9 border-purple-500/30 text-purple-400 hover:bg-purple-500/10 whitespace-normal text-center leading-tight"
           >
             {isAnalyzing ? (
-              <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> {t('dc.analyzing')}</>
+              <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin flex-shrink-0" /> <span className="min-w-0 break-words [overflow-wrap:anywhere]">{t('dc.analyzing')}</span></>
             ) : (
-              <><Sparkles className="h-3.5 w-3.5 mr-2" /> {t('dc.autoCutAI')}</>
+              <><Sparkles className="h-3.5 w-3.5 mr-2 flex-shrink-0" /> <span className="min-w-0 break-words [overflow-wrap:anywhere]">{t('dc.autoCutAI')}</span></>
             )}
           </Button>
-          <p className="text-[10px] text-white/30">
+          <p className="text-[10px] text-white/30 break-words [overflow-wrap:anywhere]">
             {t('dc.autoCutDesc')}
           </p>
         </>
@@ -514,7 +514,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={sceneIds} strategy={verticalListSortingStrategy}>
-              <div className="pr-1 pb-4">
+              <div className="pr-1 pb-4 min-w-0 max-w-full overflow-hidden">
                 {scenes.map((scene, i) => (
                   <SortableScene key={scene.id} id={scene.id}>
                     {({ dragHandleProps, isDragging }) => (
