@@ -1,76 +1,66 @@
-# Problem
+## Problem
 
-Im Director's Cut ist die linke Spalte (CapCutSidebar) in der aktuellen Viewport-Breite (1175 CSS px) so breit, dass das Gesamt-Layout **Sidebar (400px) + Preview + rechter Inspector (288px)** horizontal überläuft. Sichtbar wird das an den 6 Tab-Buttons `SCHNITT / LOOK & FARBE / EFFEKTE / UNTERTITEL / AUDIO / EXPORT` plus `EINSTELLUNGEN`, die zwar in einem `grid-cols-3` sitzen, aber das ganze Panel nach rechts drücken und rechts vom Rand abgeschnitten werden.
+Bei 1175 px Viewport bleibt die Sidebar-Tab-Leiste horizontal (3-Spalten-Grid + Settings-Zeile). Selbst mit `StudioSidebarTabs` sitzen `SCHNITT / LOOK & FARBE / EFFEKTE` bzw. `UNTERTITEL / AUDIO / EXPORT` in zwei Reihen à 3 Spalten und werden bei schmalen Panels rechts abgeschnitten. Die Sidebar wird nie **nach unten** länger, weil das Grid horizontal skaliert.
 
-Zusätzlich sehen die Tabs bei enger Breite „übergroß" aus, weil sie 2-zeilig mit Icon + UPPERCASE-Label + Badge in einem 400-px-Panel gezwungen sind — es gibt keinen Icon-Only-Fallback.
+## Wie es seriöse Plattformen lösen
 
-# Ziel
+CapCut, Descript, Adobe Premiere, DaVinci Resolve, Figma, VS Code — alle nutzen dasselbe Muster:
 
-Eine **professionelle, responsive Lösung** für die linke Sidebar, die
-- bei engen Viewports (≤ ~1280 px) automatisch in einen **Icon-only Rail-Modus** (48–56 px) wechselt,
-- bei mittleren Breiten das aktuelle 2-Zeilen-Grid mit gekürzten Labels behält,
-- bei breiten Viewports das gewohnte volle Layout zeigt,
-- kein horizontales Überlaufen des 3-Spalten-Editors mehr verursacht,
-- und als **wiederverwendbares Muster** für andere Feature-Sidebars (Video Composer, Picture Studio, Universal Creator) verwendbar ist.
+```text
+┌──┬─────────────────────┐
+│⚙ │                     │
+│✂ │   Panel-Inhalt      │
+│🎨│                     │
+│✨│                     │
+│💬│                     │
+│🎵│                     │
+│⬇ │                     │
+└──┴─────────────────────┘
+```
 
-# Umsetzung
+Eine **fixe, schmale Icon-Rail (48–56 px)** links am äußeren Rand mit **vertikal gestapelten** Tabs. Icon + optional Mini-Label darunter. Tooltip beim Hover zeigt den vollen Namen. Der Content daneben füllt den Rest. Das Feature-Set wächst **nach unten** statt in die Breite — genau was der User fordert.
 
-## 1. Neuer wiederverwendbarer Baustein `StudioSidebarTabs`
-Datei: `src/components/studio-shell/StudioSidebarTabs.tsx` (neu)
+## Umsetzung
 
-- Props: `tabs: { value, icon, label, count?, glow? }[]`, `value`, `onValueChange`, `settingsTab?`, `containerWidth: number`.
-- Rendert je nach `containerWidth` **drei Layouts**:
-  - `< 200 px` → **Rail**: 1 Spalte, nur Icons, `title`-Tooltip, Badge als Punkt.
-  - `200–360 px` → **Compact**: 3 Spalten, Icon + kleines Label (`text-[10px]`, `truncate`), Badge oben rechts.
-  - `≥ 360 px` → **Expanded**: aktuelles 3-Spalten-Layout mit vollen Labels.
-- Settings-Tab immer in eigener Zeile (im Rail-Modus als Icon unten fixiert).
-- Nutzt vorhandene shadcn `Tabs`/`TabsTrigger`, damit Radix-Semantik erhalten bleibt.
-- Alle Farbtokens (Cyan/Purple/Pink/Gold-Glow) bleiben unverändert.
+### 1. `StudioSidebarTabs` komplett auf vertikale Rail umbauen
 
-## 2. CapCutSidebar auf `StudioSidebarTabs` umstellen
-Datei: `src/components/directors-cut/studio/CapCutSidebar.tsx`
+`src/components/studio-shell/StudioSidebarTabs.tsx` — nur noch **ein** Layout, keine Breakpoints mehr:
 
-- Sidebar bekommt eine `ResizeObserver`-basierte Breitenmessung (`useContainerWidth`) statt hart „grid-cols-3".
-- Die 6 Library-Tabs + Settings werden an `StudioSidebarTabs` durchgereicht.
-- Kein sonstiger Panel-Content wird geändert (CutPanel, LookPanel, FXPanel, ExportPanel bleiben identisch).
+- `<TabsList>` wird zu einer schmalen vertikalen Spalte (`w-14`, `flex-col`), an der **linken Kante** der Sidebar fixiert.
+- Jeder Tab: 48×48 px Button, Icon 18px zentriert, darunter ein 9px-Label in 2 Zeilen erlaubt (`text-[9px] leading-tight text-center line-clamp-2`), Badge als goldener Dot oben rechts.
+- Aktiver Tab: goldener Left-Border (`border-l-2 border-[#F5C76A]`) + weicher Glow, kein volles Hintergrund-Rechteck.
+- Tooltip via `title` mit vollem Label + Count.
+- Settings-Tab ganz unten mit `mt-auto`, getrennt durch dünnen Divider.
+- Die Rail scrollt niemals horizontal — bei sehr kleinen Viewports mit `overflow-y-auto` scrollbar (kommt aber praktisch nie vor).
 
-## 3. Sidebar-Breite realistischer takten
-Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`
+### 2. `CapCutSidebar` — Rail links, Content rechts
 
-- `min={320}` → `min={56}` (erlaubt Rail-Kollaps per Drag).
-- Default 400 bleibt, aber bei **erster Sitzung** wird `sidebarWidth` gegen `window.innerWidth` gedeckelt:
-  - Wenn `innerWidth < 1280` → Default 288 (Compact).
-  - Wenn `innerWidth < 1024` → Default 64 (Rail).
-- `sidebarCollapsed`-Button bleibt und schaltet weiterhin auf 48 px hart.
-- Persistenz in `localStorage` bleibt, aber wird gegen die neuen Min-Werte validiert.
+`src/components/directors-cut/studio/CapCutSidebar.tsx`:
 
-## 4. Kein Horizontal-Overflow mehr
-Datei: `src/components/directors-cut/studio/CapCutEditor.tsx`
+- Wrapper wird zu `flex flex-row` mit zwei Kindern:
+  - **Links**: `StudioSidebarTabs` in fixer 56px-Spalte
+  - **Rechts**: `flex-1 min-w-0` für `TabsContent` (Panel-Inhalt)
+- `useContainerWidth` und die 3-Modus-Logik entfallen — nicht mehr benötigt.
 
-- Am äußersten Editor-Container `min-w-0 overflow-hidden` sicherstellen und Preview-Mittelspalte auf `flex-1 min-w-0` setzen, damit die Sidebar-/Inspector-Breiten den Preview-Bereich schrumpfen können statt nach rechts zu drängen.
+### 3. `CapCutEditor` — neue Panel-Breiten
 
-## 5. Wiederverwendung für weitere Features (nur Vorbereitung, keine Migration in diesem Schritt)
-- `StudioSidebarTabs` wird generisch geschrieben, damit es später im Video Composer (`SceneCard`-Umgebung), Picture Studio (`PictureStudio.tsx` Tabs) und Universal Creator ohne Änderung eingesetzt werden kann.
-- In diesem Plan wird nur der Baustein bereitgestellt + Director's Cut umgestellt. Weitere Feature-Pages folgen separat, sobald das Muster hier verifiziert ist.
+`src/components/directors-cut/studio/CapCutEditor.tsx`:
 
-# Verifikation
+- Sidebar-Default zurück auf **320 px** (56 Rail + 264 Content). Auf `< 1280 px` Viewports **288 px** (56 + 232). Kollabiert (nur Rail sichtbar) bei `sidebarCollapsed`: **56 px**.
+- `PanelDivider` min = 56 (nur Rail), max = 560.
+- Preview-Mittelspalte bleibt `flex-1 min-w-0` — bekommt bei 1175 px Viewport jetzt **~615 px** statt gequetschten Raum.
 
-- Playwright-Screenshot bei 1175×758, 1280×800 und 1440×900:
-  - keine horizontale Scrollbar am Editor-Root,
-  - Sidebar-Tabs komplett sichtbar (Rail bei 1175, Compact bei 1280, Expanded bei 1440),
-  - Preview + Inspector nicht abgeschnitten.
-- Tabs weiterhin klickbar (Radix-Behavior), aktive Farbe/Glow korrekt.
-- Kein Regressions-Impact auf CutPanel/LookPanel/FXPanel/ExportPanel-Inhalte.
+### 4. Verifikation via Playwright
 
-# Geänderte / Neue Dateien
+Screenshots bei 1175×758, 1280×800, 1440×900:
 
-- neu: `src/components/studio-shell/StudioSidebarTabs.tsx`
-- neu: `src/hooks/useContainerWidth.ts`
-- geändert: `src/components/directors-cut/studio/CapCutSidebar.tsx` (nur Tab-Header-Block)
-- geändert: `src/components/directors-cut/studio/CapCutEditor.tsx` (Default-Breite, min, overflow-Guards)
+- Keine abgeschnittenen Tabs, alle 7 Tabs (Schnitt, Look, FX, Untertitel, Audio, Export, Settings) vertikal sichtbar.
+- Kein horizontaler Scroll.
+- Preview-Fläche breiter als bisher.
+- Kollaps-Modus zeigt nur die 56 px Rail.
 
-# Explizit **nicht** Teil dieses Plans
+## Nicht enthalten
 
-- Keine Änderung an Panel-Inhalten, Timeline, Preview oder Inspector.
-- Keine Migration von Composer/Picture Studio/Universal Creator in diesem Schritt.
-- Keine Änderung an Business-Logik, Backend oder i18n-Keys.
+- Keine Änderungen an Panel-Inhalten, Timeline, Preview, Inspector.
+- Keine Business-Logik / i18n-Keys angefasst.
+- `useContainerWidth` bleibt bestehen (wird ggf. später wiederverwendet), aber nicht mehr im Studio-Pfad importiert.

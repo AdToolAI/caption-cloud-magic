@@ -231,14 +231,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Welle 5 — Resizable Library / Inspector widths, persisted in localStorage
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 288;
+    if (typeof window === 'undefined') return 320;
     const stored = parseInt(window.localStorage.getItem('dc:sidebar-w') || '', 10);
     if (Number.isFinite(stored) && stored >= 56 && stored <= 560) return stored;
-    // First-session default scales to viewport width
+    // First-session default: 56px rail + content panel, scales to viewport
     const vw = window.innerWidth;
-    if (vw < 1024) return 64;
-    if (vw < 1280) return 288;
-    return 400;
+    if (vw < 1024) return 56;   // rail only
+    if (vw < 1280) return 288;  // 56 rail + 232 content
+    return 320;                 // 56 rail + 264 content
   });
   const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 288;
@@ -2331,7 +2331,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             className={cn(
              "flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg transition-[width] duration-150 flex-shrink-0"
            )}
-           style={{ width: sidebarCollapsed ? 48 : sidebarWidth }}
+           style={{ width: sidebarCollapsed ? 56 : sidebarWidth }}
            >
             {/* Column header */}
             {!sidebarCollapsed && (
