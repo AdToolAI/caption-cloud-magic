@@ -123,6 +123,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const getStandbyVideo = useCallback(() => {
     return activeSlotRef.current === 'A' ? videoRefB.current : videoRefA.current;
   }, []);
+  // Ping-pong prewarm: which upcoming scene index the standby slot is primed for
+  // (null = not primed). Used to swap slots on scene boundaries without a
+  // decoder-stalling seek on the active <video>.
+  const standbyPrimedForRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
 
