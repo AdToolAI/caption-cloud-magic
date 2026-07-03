@@ -9,6 +9,29 @@ import { Loader2, CheckCircle2, XCircle, ArrowRight, RefreshCw } from "lucide-re
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 
+type VerificationParams = {
+  token: string | null;
+  tokenHash: string | null;
+  type: string | null;
+  code: string | null;
+  errorCode: string | null;
+  errorDescription: string | null;
+};
+
+const getVerificationParams = (searchParams: URLSearchParams): VerificationParams => {
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const get = (key: string) => searchParams.get(key) || hashParams.get(key);
+
+  return {
+    token: get("token"),
+    tokenHash: get("token_hash"),
+    type: get("type"),
+    code: get("code"),
+    errorCode: get("error_code") || get("error"),
+    errorDescription: get("error_description"),
+  };
+};
+
 const VerifyEmail = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -18,34 +41,79 @@ const VerifyEmail = () => {
 
   useEffect(() => {
     const verifyEmail = async () => {
-      const token = searchParams.get("token");
-
-      if (!token) {
-        setStatus("error");
-        setErrorMessage(t("verifyEmail.noToken"));
-        return;
-      }
+      const { token, tokenHash, type, code, errorCode, errorDescription } = getVerificationParams(searchParams);
 
       try {
-        const { data, error } = await supabase.functions.invoke("verify-email", {
-          body: { token }
-        });
+        if (errorCode) {
+          setStatus("error");
+          setErrorMessage(
+            errorCode === "otp_expired" || errorCode === "access_denied"
+              ? t("verifyEmail.expired")
+              : errorDescription || t("verifyEmail.generic")
+          );
+          return;
+        }
 
-        if (error) throw error;
-
-        if (data?.success) {
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
           setStatus("success");
           toast.success(t("verifyEmail.success"), {
             description: t("verifyEmail.successDesc")
           });
-          await supabase.auth.refreshSession();
-        } else {
-          throw new Error(data?.error || "Verification failed");
+          return;
         }
+
+        if (tokenHash) {
+          const otpType = (type || "signup") as "signup" | "email" | "email_change" | "recovery" | "invite" | "magiclink";
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: otpType,
+          });
+          if (error) throw error;
+          setStatus("success");
+          toast.success(t("verifyEmail.success"), {
+            description: t("verifyEmail.successDesc")
+          });
+          return;
+        }
+
+        if (token) {
+          const { data, error } = await supabase.functions.invoke("verify-email", {
+            body: { token }
+          });
+
+          if (error) throw error;
+
+          if (data?.success) {
+            setStatus("success");
+            toast.success(t("verifyEmail.success"), {
+              description: t("verifyEmail.successDesc")
+            });
+            await supabase.auth.refreshSession();
+            return;
+          }
+
+          throw new Error(data?.error || t("verifyEmail.generic"));
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email_confirmed_at) {
+          setStatus("success");
+          return;
+        }
+
+        setStatus("error");
+        setErrorMessage(t("verifyEmail.noToken"));
       } catch (err: any) {
         console.error("Verification error:", err);
         setStatus("error");
-        setErrorMessage(err.message || t("verifyEmail.generic"));
+        const message = String(err?.message || "");
+        setErrorMessage(
+          /expired|invalid|otp|token/i.test(message)
+            ? t("verifyEmail.expired")
+            : message || t("verifyEmail.generic")
+        );
       }
     };
 
