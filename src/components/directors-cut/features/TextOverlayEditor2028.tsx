@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -96,7 +96,7 @@ function AnimationCard({
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       onClick={onSelect}
-      className={`relative p-4 rounded-xl backdrop-blur-xl border transition-all duration-300 overflow-hidden group ${
+      className={`relative min-w-0 p-3 rounded-xl backdrop-blur-xl border transition-all duration-300 overflow-hidden group ${
         isSelected 
           ? 'bg-primary/20 border-primary shadow-[0_0_30px_rgba(var(--primary),0.3)]' 
           : 'bg-white/5 border-white/10 hover:border-primary/50 hover:bg-white/10'
@@ -117,8 +117,8 @@ function AnimationCard({
       
       {/* Label */}
       <div className="relative z-10">
-        <div className="font-medium text-sm">{animation.name}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{animation.description}</div>
+        <div className="font-medium text-sm break-words [overflow-wrap:anywhere]">{animation.name}</div>
+        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words [overflow-wrap:anywhere]">{animation.description}</div>
       </div>
       
       {/* Selected indicator */}
@@ -413,7 +413,7 @@ export function TextOverlayEditor2028({
   };
 
   return (
-    <Card className="backdrop-blur-xl bg-white/5 border-white/10 overflow-hidden">
+    <Card className="w-full max-w-full min-w-0 backdrop-blur-xl bg-white/5 border-white/10 overflow-hidden">
       {/* CSS for animation demos */}
       <style>{`
         @keyframes fadeInDemo {
@@ -443,13 +443,14 @@ export function TextOverlayEditor2028({
         }
       `}</style>
       
-      <CardHeader className="pb-3 border-b border-white/10">
-        <CardTitle className="flex items-center gap-2 text-lg">
+      <CardHeader className="pb-3 border-b border-white/10 px-3">
+        <CardTitle className="flex items-center gap-2 text-lg min-w-0">
           <div className="p-2 rounded-lg bg-primary/20">
             <Type className="h-5 w-5 text-primary" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="truncate">Text & Overlays</span>
               Text & Overlays
               {overlays.length > 0 && (
                 <Badge className="bg-primary/20 text-primary border-primary/30">
@@ -465,7 +466,7 @@ export function TextOverlayEditor2028({
             variant="ghost"
             size="sm"
             onClick={() => setShowTemplates(!showTemplates)}
-            className="ml-auto"
+            className="ml-auto flex-shrink-0 px-2"
           >
             <Sparkles className="h-4 w-4 mr-1" />
             Vorlagen
@@ -473,7 +474,7 @@ export function TextOverlayEditor2028({
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="p-4 space-y-5">
+      <CardContent className="p-3 space-y-5 min-w-0 max-w-full overflow-hidden">
         {/* Quick Templates Panel */}
         <AnimatePresence>
           {showTemplates && (
@@ -483,19 +484,19 @@ export function TextOverlayEditor2028({
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="grid grid-cols-3 gap-2 pb-4 border-b border-white/10">
+              <div className="grid grid-cols-2 gap-2 pb-4 border-b border-white/10 min-w-0">
                 {TEXT_OVERLAY_TEMPLATES.map((template) => (
                   <motion.button
                     key={template.id}
                     whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => addOverlay(template)}
-                    className="p-3 rounded-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/10 hover:border-primary/50 transition-all text-left group"
+                    className="min-w-0 p-2.5 rounded-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/10 hover:border-primary/50 transition-all text-left group overflow-hidden"
                   >
-                    <div className="font-medium text-sm group-hover:text-primary transition-colors">
+                    <div className="font-medium text-sm group-hover:text-primary transition-colors line-clamp-2 break-words [overflow-wrap:anywhere]">
                       {template.name}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words [overflow-wrap:anywhere]">
                       {template.text}
                     </div>
                   </motion.button>
@@ -520,7 +521,7 @@ export function TextOverlayEditor2028({
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           onClick={() => addOverlay()}
-          className="w-full p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-primary/50 hover:bg-white/5 transition-all flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
+          className="w-full min-w-0 p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-primary/50 hover:bg-white/5 transition-all flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
         >
           <Plus className="h-4 w-4" />
           <span className="text-sm font-medium">Neues Text-Overlay</span>
@@ -528,33 +529,33 @@ export function TextOverlayEditor2028({
 
         {/* Overlay List */}
         {overlays.length > 0 && (
-          <ScrollArea className="h-[120px]">
-            <div className="space-y-2">
+            <ScrollArea className="h-[120px] max-w-full overflow-hidden">
+              <div className="space-y-2 min-w-0 max-w-full pr-2">
               {overlays.map((overlay, index) => (
                 <motion.div
                   key={overlay.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                  className={`p-3 rounded-xl border transition-all cursor-pointer min-w-0 max-w-full overflow-hidden ${
                     selectedOverlayId === overlay.id
                       ? 'bg-primary/10 border-primary shadow-[0_0_20px_rgba(var(--primary),0.2)]'
                       : 'bg-white/5 border-white/10 hover:border-white/30'
                   }`}
                   onClick={() => setSelectedOverlayId(overlay.id)}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${
                       ['from-blue-500 to-blue-600', 'from-purple-500 to-purple-600', 'from-green-500 to-green-600'][index % 3]
                     } flex items-center justify-center text-white text-xs font-bold`}>
                       {index + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{overlay.text}</div>
+                      <div className="font-medium text-sm line-clamp-2 break-words [overflow-wrap:anywhere]">{overlay.text}</div>
                       <div className="text-xs text-muted-foreground">
                         {overlay.startTime.toFixed(1)}s - {overlay.endTime?.toFixed(1) ?? 'Ende'}s
                       </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-shrink-0">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -596,18 +597,19 @@ export function TextOverlayEditor2028({
               {/* Text Input */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Text</Label>
-                <Input
+                <Textarea
                   value={selectedOverlay.text}
                   onChange={(e) => updateOverlay(selectedOverlay.id, { text: e.target.value })}
                   placeholder="Text eingeben..."
-                  className="bg-white/5 border-white/20 focus:border-primary"
+                  rows={3}
+                  className="min-h-20 resize-y bg-white/5 border-white/20 focus:border-primary whitespace-normal break-words [overflow-wrap:anywhere]"
                 />
               </div>
 
               {/* Animation Cards */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Animation</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 min-w-0">
                   {ANIMATIONS.map((anim) => (
                     <AnimationCard
                       key={anim.id}
