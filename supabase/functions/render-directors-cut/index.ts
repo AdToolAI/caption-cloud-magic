@@ -542,11 +542,12 @@ serve(async (req) => {
       .eq('id', renderJob.id);
 
     // Get Remotion configuration
-    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
-    if (!REMOTION_SERVE_URL) {
+    const rawRemotionServeUrl = Deno.env.get('REMOTION_SERVE_URL');
+    if (!rawRemotionServeUrl) {
       console.error('[RenderDirectorsCut] REMOTION_SERVE_URL not configured');
       throw new Error('REMOTION_SERVE_URL not configured');
     }
+    const REMOTION_SERVE_URL = normalizeRemotionServeUrl(rawRemotionServeUrl);
 
     // ✅ BUNDLE VERSION CHECK — fetch bundle-version.json to verify freshness
     const EXPECTED_BUNDLE_VERSION = 'v2026-04-13e-unified-subtitle-renderer';
@@ -741,7 +742,7 @@ serve(async (req) => {
           maxRetries: 1,
           ...(stabilityFpl ? { framesPerLambda: stabilityFpl } : {}),
           privacy: 'public',
-          bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
+          bucketName: DEFAULT_BUCKET_NAME,
           durationInFrames,
           fps,
           width,
