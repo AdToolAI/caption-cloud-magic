@@ -210,6 +210,18 @@ export default function RenderQueue() {
           </h2>
         </div>
 
+        {zombieCount > 0 && (
+          <Card className="p-3 flex items-center gap-3 border-amber-500/30 bg-amber-500/5">
+            <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
+            <div className="text-xs text-amber-200/90">
+              <span className="font-medium">{zombieCount}</span> ältere Jobs (&gt; 24 h) werden vom System
+              automatisch bereinigt. Du musst nichts tun — der Watchdog bricht sie ab und erstattet
+              verbrauchte Credits zurück.
+            </div>
+          </Card>
+        )}
+
+
         {loading && rows.length === 0 ? (
           <Card className="p-8 text-center text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
