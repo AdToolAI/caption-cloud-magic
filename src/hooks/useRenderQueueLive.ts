@@ -30,9 +30,15 @@ export interface QueueRow {
 
 const LIVE_STATUSES = ['pending', 'queued', 'generating', 'composing', 'lipsync'];
 
+// Active scenes older than this are treated as "system-cleanup in flight"
+// (watchdog auto-cancels every 2 min). We hide them from the per-row list so
+// the queue never shows 188h zombies, and surface the count separately.
+const ZOMBIE_THRESHOLD_HOURS = 24;
+
 export function useRenderQueueLive(pollMs = 5000) {
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [recent, setRecent] = useState<QueueRow[]>([]);
+  const [zombieCount, setZombieCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const fetchRows = useCallback(async () => {
@@ -42,7 +48,7 @@ export function useRenderQueueLive(pollMs = 5000) {
         .select('id, project_id, scene_type, clip_source, clip_status, duration_seconds, clip_url, updated_at, created_at')
         .in('clip_status', LIVE_STATUSES)
         .order('updated_at', { ascending: false })
-        .limit(50),
+        .limit(200),
       supabase
         .from('composer_scenes')
         .select('id, project_id, scene_type, clip_source, clip_status, duration_seconds, clip_url, updated_at, created_at')
@@ -51,7 +57,18 @@ export function useRenderQueueLive(pollMs = 5000) {
         .limit(20),
     ]);
 
-    if (!live.error) setRows((live.data as QueueRow[]) ?? []);
+    if (!live.error) {
+      const cutoff = Date.now() - ZOMBIE_THRESHOLD_HOURS * 60 * 60 * 1000;
+      const all = (live.data as QueueRow[]) ?? [];
+      const fresh: QueueRow[] = [];
+      let zombies = 0;
+      for (const r of all) {
+        if (new Date(r.updated_at).getTime() < cutoff) zombies += 1;
+        else fresh.push(r);
+      }
+      setRows(fresh.slice(0, 50));
+      setZombieCount(zombies);
+    }
     if (!done.error) setRecent((done.data as QueueRow[]) ?? []);
     setLoading(false);
   }, []);
@@ -62,5 +79,5 @@ export function useRenderQueueLive(pollMs = 5000) {
     return () => clearInterval(id);
   }, [fetchRows, pollMs]);
 
-  return { rows, recent, loading, refresh: fetchRows };
+  return { rows, recent, zombieCount, loading, refresh: fetchRows };
 }

@@ -24,6 +24,19 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Auto-cleanup TTLs for composer_scenes zombies.
+// A job that never left `pending`/`queued` for 60 min is stuck in dispatch
+// (provider concurrency exhausted, orchestrator crash, …) and will not
+// recover on its own — cancel it so the user can retry.
+const NEVER_DISPATCHED_TTL_MIN = 60;
+// Absolute hard ceiling: no active job may live longer than this, regardless
+// of status. Catches every exotic state the specialised watchdogs miss.
+const HARD_ACTIVE_TTL_HOURS = 6;
+// Flat refund per scene killed by the hard-TTL sweep. Mirrors the lipsync
+// block's convention (block 4). Never-dispatched scenes get no refund because
+// no provider call was ever billed.
+const HARD_TTL_REFUND_PER_SCENE = 28;
+
 interface Anomaly {
   kind: string;
   severity: "high" | "medium" | "low";
@@ -267,6 +280,139 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       });
     }
 
+    // ─── 4c. Never-dispatched composer scenes (pending/queued >60min) ───
+    // Root cause of the July 2026 zombie backlog: 2.6k scenes stuck in
+    // `pending` because Replicate concurrency was exhausted and dispatch
+    // never fired. No provider call was ever billed, so we cancel without
+    // refund — the user can just retry from the composer.
+    const neverDispatchedCutoff = new Date(
+      Date.now() - NEVER_DISPATCHED_TTL_MIN * 60 * 1000,
+    ).toISOString();
+    const { data: neverDispatched } = await sb
+      .from("composer_scenes")
+      .select("id, project_id, clip_status, clip_source, updated_at")
+      .in("clip_status", ["pending", "queued"])
+      .is("clip_url", null)
+      .lt("updated_at", neverDispatchedCutoff)
+      .limit(500);
+
+    if (neverDispatched && neverDispatched.length > 0) {
+      const ids = neverDispatched.map((s: any) => s.id);
+      // Update in chunks of 200 to stay well inside statement limits.
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200);
+        await sb
+          .from("composer_scenes")
+          .update({
+            clip_status: "canceled",
+            clip_error: "watchdog_never_dispatched",
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", chunk);
+      }
+      rowsAutoFailed += ids.length;
+      anomalies.push({
+        kind: "workflow",
+        severity: "medium",
+        title: `Watchdog: ${ids.length} composer scenes never dispatched >${NEVER_DISPATCHED_TTL_MIN}min`,
+        description: `Auto-canceled stuck pending/queued scenes (no provider call billed, no refund needed). Sample:\n${neverDispatched
+          .slice(0, 20)
+          .map(
+            (s: any) =>
+              `- ${s.id} status=${s.clip_status} src=${s.clip_source} updated=${s.updated_at}`,
+          )
+          .join("\n")}`,
+        fingerprint: "composer-never-dispatched",
+      });
+    }
+
+    // ─── 4d. Hard TTL: no active scene may live longer than N hours ───
+    // Backstop for any exotic status the specialised blocks above miss.
+    // Refunds a flat amount per scene, mirroring the lipsync convention.
+    const hardTtlCutoff = new Date(
+      Date.now() - HARD_ACTIVE_TTL_HOURS * 60 * 60 * 1000,
+    ).toISOString();
+    const { data: hardTtlScenes } = await sb
+      .from("composer_scenes")
+      .select("id, project_id, clip_status, clip_source, updated_at")
+      .in("clip_status", [
+        "pending",
+        "queued",
+        "generating",
+        "composing",
+        "lipsync",
+      ])
+      .lt("updated_at", hardTtlCutoff)
+      .limit(500);
+
+    if (hardTtlScenes && hardTtlScenes.length > 0) {
+      const ids = hardTtlScenes.map((s: any) => s.id);
+      // Aggregate refund per owner, then one wallet update per user.
+      const projectIds = [
+        ...new Set(hardTtlScenes.map((s: any) => s.project_id).filter(Boolean)),
+      ];
+      const { data: projects } = projectIds.length
+        ? await sb
+            .from("composer_projects")
+            .select("id, user_id")
+            .in("id", projectIds)
+        : { data: [] as any[] };
+      const userByProject = new Map(
+        (projects ?? []).map((p: any) => [p.id, p.user_id]),
+      );
+      const refundByUser = new Map<string, number>();
+      for (const scene of hardTtlScenes as any[]) {
+        const uid = userByProject.get(scene.project_id);
+        if (!uid) continue;
+        refundByUser.set(
+          uid,
+          (refundByUser.get(uid) ?? 0) + HARD_TTL_REFUND_PER_SCENE,
+        );
+      }
+      for (const [userId, amount] of refundByUser.entries()) {
+        const { data: wallet } = await sb
+          .from("wallets")
+          .select("balance")
+          .eq("user_id", userId)
+          .single();
+        if (wallet) {
+          await sb
+            .from("wallets")
+            .update({
+              balance: (Number(wallet.balance) || 0) + amount,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
+      }
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200);
+        await sb
+          .from("composer_scenes")
+          .update({
+            clip_status: "canceled",
+            clip_error: "watchdog_hard_ttl_expired",
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", chunk);
+      }
+      rowsAutoFailed += ids.length;
+      anomalies.push({
+        kind: "workflow",
+        severity: "high",
+        title: `Watchdog: ${ids.length} composer scenes exceeded hard TTL (${HARD_ACTIVE_TTL_HOURS}h)`,
+        description: `Auto-canceled + refunded ${refundByUser.size} user(s), total ${
+          ids.length * HARD_TTL_REFUND_PER_SCENE
+        } credits. Sample:\n${hardTtlScenes
+          .slice(0, 20)
+          .map(
+            (s: any) =>
+              `- ${s.id} status=${s.clip_status} src=${s.clip_source} updated=${s.updated_at}`,
+          )
+          .join("\n")}`,
+        fingerprint: "composer-hard-ttl-expired",
+      });
+    }
 
 
     // ─── 5. Provider quota outage (>50% fail rate, ≥10 calls in last 10min) ───

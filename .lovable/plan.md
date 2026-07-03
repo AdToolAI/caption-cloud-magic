@@ -1,52 +1,48 @@
 ## Ziel
-Den kurzen Flash nach Crossfade-/Media-zu-Media-Übergängen endgültig entfernen, ohne die bestehende Timeline-, Audio- oder Export-Logik umzubauen.
+Zombie-Jobs (wie die 2.620 alten `pending`-Szenen) sollen sich künftig **selbst aufräumen**, damit weder Kunden noch Admin manuell abbrechen müssen.
 
-## Diagnose
-Der bisherige Fix pre-armt zwar das Media-Overlay, aber drei Dinge bleiben problematisch:
+## Ursache heute
+Der bestehende `qa-watchdog` (läuft alle 2 min via pg_cron) fängt schon Folgendes ab:
+- Lipsync-Jobs, die >10 min in `running` festhängen → auto-fail + Refund
+- Master-Clips, die >10 min in `generating` ohne Webhook stehen → Recovery
+- Lambda-Renders >20 min ohne Status
+- Autopilot-Slots >15 min in `generating`
 
-1. Die Media-Branch blendet direkt nach dem Übergang beide A/B-Video-Slots aus, bevor sicher ist, dass das Media-Overlay wirklich denselben Frame dekodiert hat.
-2. Das JSX-Style des `mediaVideoRef` schaltet bei `!activeVisualTransition` sofort auf Opacity 1. Dieser React-Style kann gegen die imperativ gesteuerte Handoff-Logik arbeiten.
-3. Nach dem Handoff gibt es keinen echten „sealed handoff“-Zustand: A/B und Overlay werden nicht für 1–2 Frames kontrolliert überlappt.
+**Aber:** Szenen, die im Frontstatus `pending` oder `queued` liegen, weil das Dispatch (Replicate/Provider-Kapazität) nie startet, laufen aktuell **unbegrenzt** weiter. Genau die haben sich zu 2.620 alten Zombies aufgebaut.
 
-## Plan
+## Vorschlag: 3 zusätzliche Schutzschichten
 
-### 1. Handoff nicht über React-Opacity steuern
-- Das Media-Overlay bekommt im JSX eine neutrale Start-Opacity (`0`).
-- Sichtbarkeit wird in der Playback-/Transition-RAF-Logik imperativ gesetzt.
-- Dadurch kann React nicht mehr genau im kritischen Frame das Overlay sichtbar machen, bevor `src/currentTime/readyState` stimmen.
+### 1. Watchdog-Regel für nie gestartete Jobs
+Neuer Block in `qa-watchdog`:
+- Alle `composer_scenes` mit `clip_status IN ('pending','queued')` und `updated_at < now() - 60 min` und `clip_url IS NULL`
+- → `clip_status = 'canceled'`, `clip_error = 'watchdog_never_dispatched'`
+- Idempotenter Credit-Refund pro User (wie bei Lipsync)
+- In Batches à 200 Zeilen updaten
+- Anomaly ins `ai_superuser_anomalies` mit `fingerprint: composer-never-dispatched`, damit man Trends sieht
 
-### 2. Media-Branch bekommt eine Ready-Gate-Logik
-Beim Eintritt in eine Media-Video-Szene:
-- Overlay-URL prüfen.
-- Overlay-Zeit auf erwarteten Timeline-Frame prüfen.
-- `readyState >= 2` verlangen.
-- Erst dann `mediaVideoRef.opacity = 1` setzen.
-- Bis dahin bleibt der aktuelle A/B-Slot sichtbar (`opacity = 1`) und der Standby wird nicht blind ausgeblendet.
+### 2. Harte Max-Lebensdauer pro Job (TTL)
+Eine zweite Regel für alle nicht-terminalen Statuswerte zusammen:
+- `clip_status IN ('pending','queued','generating','composing','lipsync')` und `updated_at < now() - 6 h`
+- → `canceled` + Refund + Anomaly `composer-hard-ttl-expired`
+- Verhindert, dass irgendein exotischer Status jemals länger als 6 h aktiv bleibt.
 
-### 3. Nach dem Transition-Handoff 2 Frames Schutzfenster setzen
-- Neuer `postTransitionHoldFramesRef` im Player.
-- `useTransitionRenderer` setzt ihn nach Handoff auf 2 Frames.
-- Während dieses Fensters:
-  - A/B-Slot bleibt sichtbar.
-  - Media-Overlay darf nur übernehmen, wenn es ready ist.
-  - `activeVisualTransition` wird logisch als noch aktiv betrachtet, damit Image/Blackscreen/Media-Overlays nicht zu früh durch React auftauchen.
+### 3. Sichtbarkeits-Filter im Queue-UI
+Solange die Watchdog-Runs alte Zombies noch nicht durchgekehrt haben, blendet `/queue` alles aus, was älter als 24 h und noch aktiv ist — mit einer sichtbaren Info „N sehr alte Jobs werden vom System bereinigt". So sieht der Kunde nie wieder eine Liste voller 188 h-Karten.
 
-### 4. Handoff-Frame exakt korrigieren
-- Der Overlay-Handoff-Timecode wird nicht pauschal `sourceStart + duration`, sondern aus Timeline-Zeit berechnet:
-  - `sourceStart + (handoffTimelineTime - scene.start_time) * playbackRate`
-- Das verhindert, dass das Overlay nach dem Crossfade minimal an einer anderen Frame-Position steht.
+## Wirkung
+- **Ohne Nutzeraktion**: Jobs, die im Dispatch hängen, sterben spätestens nach 60 min mit Refund.
+- **Backstop**: Kein Job überlebt jemals länger als 6 h aktiv, egal in welchem Status.
+- **Transparent**: Anomalien im Superuser-Dashboard zeigen, ob wir wiederholt Provider-Kapazität verlieren — dann wissen wir früh, dass AWS/Replicate-Concurrency erhöht werden muss.
+- **UI**: Kunden sehen ab sofort eine saubere Queue, auch wenn im Backend gerade aufgeräumt wird.
 
-### 5. A/B-Slots nicht mehr in der Media-Branch hart ausblenden
-- `video.style.opacity = '0'` und `standby.style.opacity = '0'` werden nur noch ausgeführt, wenn das Overlay ready und sichtbar ist.
-- Bei nicht-ready Overlay bleibt der aktive Slot als visuelle Fallback-Schicht stehen.
+## Technische Details
+- Datei: `supabase/functions/qa-watchdog/index.ts` erweitern (kein neuer Cron nötig, läuft schon alle 2 min).
+- Refund-Logik: analog zu Block 4 (Lipsync) — `wallets` lesen, pro User aufaddieren, ein Update pro User.
+- Konstanten oben in die Datei: `NEVER_DISPATCHED_TTL_MIN = 60`, `HARD_ACTIVE_TTL_HOURS = 6`.
+- UI: kleiner Filter in `useRenderQueueLive` (>24 h + aktiv wird als „bereinigung läuft"-Chip aggregiert, nicht als Einzelzeilen).
+- Keine Migration nötig, keine neuen Tabellen.
 
-### 6. Validierung
-- TypeScript-Check nur für betroffene Dateien/Projektcheck.
-- Übergang Media → Media prüfen:
-  - Kein schwarzer Frame.
-  - Kein alter Frame aus Szene 1.
-  - Kein kurzer React-Opacity-Sprung.
-- Regression: Original-Video → Original-Video und Video → Media bleiben unverändert.
-
-## Erwartetes Ergebnis
-Der Übergang verhält sich wie in einem NLE: Crossfade läuft auf A/B-Slots, danach übernimmt das Media-Overlay erst, wenn es dekodiert und exakt auf dem richtigen Frame steht. Kein Flash, kein schwarzer Frame, kein sichtbarer Rebind.
+## Verifikation
+- Nach Deploy erneut `SELECT clip_status, count(*), max(age(now(), updated_at))` prüfen — nach spätestens 2 Watchdog-Läufen dürfen keine `pending`-Jobs älter 60 min mehr existieren.
+- Anomalies-Log zeigt den ersten Sweep mit der Bereinigungsmenge.
+- Neue Testszene, absichtlich in `pending` gelassen → nach 60 min automatisch `canceled` + Credits zurück.
