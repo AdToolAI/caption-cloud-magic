@@ -31,7 +31,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
-import { useTalkingHead } from '@/hooks/useTalkingHead';
+// useTalkingHead removed — Composer no longer routes to generate-talking-head.
+// The standalone /talking-head module still owns that hook.
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
