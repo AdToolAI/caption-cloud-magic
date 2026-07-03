@@ -441,7 +441,7 @@ async function refundRenderCreditsOnce(
   contentConfig: any,
 ) {
   const configColumn = getConfigColumn(tableName);
-  const creditsUsed = Number(contentConfig?.credits_used || 0);
+  const creditsUsed = Number(contentConfig?.credits_used || renderData?.credits_used || 0);
   const alreadyRefunded = contentConfig?.credit_refund_done === true;
   if (!creditsUsed || !renderData?.user_id || alreadyRefunded) return;
 
