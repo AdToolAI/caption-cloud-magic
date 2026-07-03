@@ -218,18 +218,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (data.user) {
         localStorage.setItem('signup_date', new Date().toISOString());
         
-        // Read user's preferred language for localized verification email
-        const language = getLang();
-
-        // Send custom verification email via Edge Function
-        try {
-          await supabase.functions.invoke('send-verification-email', {
-            body: { email, userId: data.user.id, language, appUrl: window.location.origin }
-          });
-        } catch (emailError) {
-          console.error('Failed to send verification email:', emailError);
-        }
-        
         trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, {
           email: data.user.email,
           signup_method: 'email',
