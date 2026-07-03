@@ -51,7 +51,9 @@ export function useTransitionInfo(
       let found: TransitionInfo | null = null;
 
       if (active) {
-        const { transition: rt, progress } = active;
+        const { transition: rt, progress: rawProgress } = active;
+        // Eased progress for buttery CapCut-style blending (non-linear curve).
+        const progress = easeTransition(rawProgress);
         found = {
           progress,
           baseType: rt.baseType,
