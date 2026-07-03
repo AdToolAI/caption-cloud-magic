@@ -261,7 +261,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 }, ref) {
   const t = T[language];
   const { toast } = useToast();
-  const { generate, estimateCost } = useTalkingHead();
+  // HeyGen Talking-Head hook removed from Composer.
   const { voices: customVoices } = useCustomVoices();
   const { voices: humeVoices } = useHumeVoices();
   const { data: accessibleChars = [] } = useAccessibleCharacters();
