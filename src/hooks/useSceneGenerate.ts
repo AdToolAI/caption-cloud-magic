@@ -37,25 +37,25 @@ interface UseSceneGenerateOpts {
   confirmRender?: (scene: ComposerScene) => Promise<boolean>;
 }
 
+const shouldForceCinematicSync = (scene: ComposerScene) => {
+  const hasDialog = typeof scene.dialogScript === 'string' && scene.dialogScript.trim().length > 0;
+  const hasCast =
+    (scene.characterShots ?? []).some((shot) => shot?.shotType !== 'absent') ||
+    !!(scene.characterShot && scene.characterShot.shotType !== 'absent');
+  const providerSupportsSceneLipsync = scene.clipSource === 'ai-happyhorse' || scene.clipSource === 'ai-hailuo';
+
+  return (
+    scene.engineOverride === 'cinematic-sync' ||
+    scene.engineOverride === 'sync-segments' ||
+    scene.engineOverride === 'native-dialogue' ||
+    scene.lipSyncWithVoiceover === true ||
+    scene.dialogMode === true ||
+    (hasDialog && hasCast && providerSupportsSceneLipsync && scene.engineOverride !== 'heygen')
+  );
+};
+
 export function useSceneGenerate(opts: UseSceneGenerateOpts) {
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
-
-  const shouldForceCinematicSync = (scene: ComposerScene) => {
-    const hasDialog = typeof scene.dialogScript === 'string' && scene.dialogScript.trim().length > 0;
-    const hasCast =
-      (scene.characterShots ?? []).some((shot) => shot?.shotType !== 'absent') ||
-      !!(scene.characterShot && scene.characterShot.shotType !== 'absent');
-    const providerSupportsSceneLipsync = scene.clipSource === 'ai-happyhorse' || scene.clipSource === 'ai-hailuo';
-
-    return (
-      scene.engineOverride === 'cinematic-sync' ||
-      scene.engineOverride === 'sync-segments' ||
-      scene.engineOverride === 'native-dialogue' ||
-      scene.lipSyncWithVoiceover === true ||
-      scene.dialogMode === true ||
-      (hasDialog && hasCast && providerSupportsSceneLipsync && scene.engineOverride !== 'heygen')
-    );
-  };
 
   const generate = useCallback(
     async (scene: ComposerScene) => {
