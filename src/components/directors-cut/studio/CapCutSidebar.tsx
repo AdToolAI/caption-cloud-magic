@@ -896,15 +896,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     };
   }, []);
 
-  const [sidebarShellRef, sidebarShellWidth] = useContainerWidth<HTMLDivElement>();
-
   return (
     <div
-      ref={sidebarShellRef}
-      className="w-full min-w-0 flex flex-col border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full"
+      className="w-full min-w-0 flex flex-row border-r border-[#F5C76A]/10 bg-[#0a0a1a]/90 backdrop-blur-lg h-full"
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full min-w-0">
-        {/* Responsive tab header — Rail / Compact / Expanded via StudioSidebarTabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-row h-full min-w-0">
+        {/* Vertical icon-rail — CapCut/Premiere pattern, grows downward */}
         {(() => {
           const totalTextCount = (captionCount || 0) + (textOverlayCount || 0);
           const libraryTabs = [
@@ -919,12 +916,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <StudioSidebarTabs
               tabs={libraryTabs}
               settingsTab={{ value: 'settings', icon: Settings, label: t('dc.tabSettings') }}
-              containerWidth={sidebarShellWidth}
             />
           );
         })()}
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-w-0">
           {/* TAB: Cut (Schnitt) */}
           <TabsContent value="cut" className="mt-0">
             <CutPanel
