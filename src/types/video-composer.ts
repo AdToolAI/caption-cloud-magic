@@ -282,7 +282,7 @@ export interface ComposerScene {
    * classic Hailuo/etc. clip without lip-sync. `sync-polish` runs Hailuo +
    * Sync.so polish pass after generation. Persisted as `engine_override`.
    */
-  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish' | 'cinematic-sync' | 'sync-segments' | 'native-dialogue';
+  engineOverride?: 'auto' | 'broll' | 'sync-polish' | 'cinematic-sync' | 'sync-segments' | 'native-dialogue';
   /**
    * Master switch for dialog & lip-sync UI in the composer.
    * When true: script editor + speaker picker are shown, model picker
