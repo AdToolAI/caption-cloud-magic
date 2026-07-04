@@ -831,8 +831,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // (HeyGen auto-upgrade removed — Composer no longer routes to
     // generate-talking-head. Real lip-sync happens via compose-video-clips
     // + Sync.so on the Hailuo/HappyHorse master plate.)
-    void portraitsAvailableUnused;
-    const portraitsAvailableUnused = sceneCast.some((c) => Boolean(c.referenceImageUrl));
 
     try {
       // ── Idempotency: wipe previous voiceover clips for this scene so a
