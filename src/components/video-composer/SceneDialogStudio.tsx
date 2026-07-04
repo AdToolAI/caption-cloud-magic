@@ -1492,6 +1492,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             dialogScript: dialogScriptText,
             dialogVoices: dialogVoicesMap,
             engineOverride: 'cinematic-sync' as const,
+            lipSyncWithVoiceover: true,
+            dialogMode: true,
             withAudio: scene.withAudio !== false,
           };
           // Persist the engine + audio-embed flag so the player auto-unmutes
