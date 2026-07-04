@@ -2501,7 +2501,7 @@ export default function SceneCard({
                         // the user opt out of the auto-retry loop entirely.
                         scene.lipSyncStatus === "failed" ||
                         (!!(scene as any).twoshotStage &&
-                          !["failed", "done", "complete"].includes(
+                          !["failed", "done", "complete", "canceled"].includes(
                             String((scene as any).twoshotStage),
                           ))) && (
                         <div className="flex flex-wrap items-center gap-2 self-end">
