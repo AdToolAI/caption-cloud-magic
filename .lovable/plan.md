@@ -1,106 +1,88 @@
+## Befund
+
+Der Button **„Lipsync komplett zurücksetzen"** hat aktuell zwei Probleme:
+
+1. Er löscht zu viel Szenen-Rendering-State (`clip_url`, `clip_status`, `reference_image_url`), dadurch wirkt die Szene/Preview gelöscht.
+2. Er löscht nicht sauber die Lip-Sync-Absicht. `engine_override='cinematic-sync'` und/oder `lip_sync_with_voiceover=true` bleiben aktiv. Der globale Auto-Trigger (`useTwoShotAutoTrigger`) erkennt die Szene deshalb wenige Sekunden später wieder als gültigen Lip-Sync-Kandidaten und startet Sync.so erneut.
+
 ## Ziel
-Lip-Sync/Cinematic-Sync läuft **ausschließlich** wenn der User explizit opt-in gemacht hat. Ein einziger Helfer entscheidet — Client, Server, Auto-Trigger und Router konsumieren nur diesen einen Wert.
 
-## Kernprinzip: Single Source of Truth
+Der rote Button bedeutet künftig: **Lip-Sync stoppen und für diese Szene deaktivieren**, ohne das Basis-Video der Szene zu löschen.
 
-Neue Datei `src/lib/video-composer/lipSyncIntent.ts`:
+## Umsetzung
+
+### 1. Button-Handler in `SceneCard.tsx` korrigieren
+
+Beim Klick auf **„Lipsync komplett zurücksetzen"**:
+
+- `cancel-dialog-lipsync` weiter aufrufen, damit laufende Sync.so-Jobs serverseitig beendet werden.
+- Danach DB-Update nur auf Lip-Sync- und Opt-out-Felder anwenden:
 
 ```ts
-// Die EINZIGE Stelle im gesamten Codebase, die entscheidet ob eine Szene
-// Sync.so-Lip-Sync bekommt. Alles andere ist Ableitung.
-export function isLipSyncIntentional(scene: {
-  lipSyncWithVoiceover?: boolean | null;
-  engineOverride?: string | null;
-  dialogMode?: boolean | null;
-}): boolean {
-  if (scene.lipSyncWithVoiceover === true) return true;
-  if (scene.dialogMode === true) return true;
-  const eo = String(scene.engineOverride ?? '');
-  return eo === 'cinematic-sync' || eo === 'sync-segments' || eo === 'native-dialogue';
+{
+  lip_sync_status: 'canceled',
+  lip_sync_applied_at: null,
+  lip_sync_source_clip_url: null,
+  twoshot_stage: null,
+  dialog_shots: null,
+  lip_sync_with_voiceover: false,
+  dialog_mode: false,
+  engine_override: 'auto',
+  updated_at: now,
 }
-
-// snake_case-Pendant für Edge Functions / DB rows
-export function isLipSyncIntentionalRow(row: {
-  lip_sync_with_voiceover?: boolean | null;
-  engine_override?: string | null;
-  dialog_mode?: boolean | null;
-}): boolean { /* dieselbe Logik auf DB-Feldern */ }
 ```
 
-Merke: `engineOverride='cinematic-sync'` allein ist Opt-in (User hat Engine manuell gewählt). Aber nirgendwo im Client darf `engineOverride` implizit auf `cinematic-sync` gesetzt werden, ohne dass der User es aktiv angeklickt hat.
+Wichtig: Diese Felder werden **nicht mehr** gelöscht/geändert:
 
-## Änderungen (alle konsumieren `isLipSyncIntentional`)
-
-### 1. `src/hooks/useSceneGenerate.ts`
-- `shouldForceCinematicSync()` **löschen**, ersetzen durch `isLipSyncIntentional(scene)`.
-- Der Heuristik-Zweig „hasDialog && hasCast && provider∈{happyhorse,hailuo}" entfällt komplett.
-- Pre-Mark (`engine_override='cinematic-sync'`, `lip_sync_status='pending'`, `twoshot_stage='audio'`) läuft **nur** wenn `isLipSyncIntentional(scene)===true`.
-
-### 2. `src/lib/video-composer/sceneEngineRouter.ts` — Semantik-Split
-- Datei wird **rein informativ** (UI-Hinweis unter dem Prompt-Feld, keine Routing-Entscheidung mehr).
-- Auto-Zweig `hasDialog && hasCast → sync-segments` **entfernen**. Ohne User-Opt-in empfehlen wir `broll` und zeigen einen Hinweis „Lip-Sync-Toggle aktivieren für echte Mundbewegung".
-- Wenn `isLipSyncIntentional(scene)===true` → Empfehlung `sync-segments` (Multi-Sprecher) bzw. `sync-polish` (Solo).
-- Kommentar-Header dokumentiert klar: **„Diese Funktion darf niemals Persistenz oder Kosten auslösen — sie ist eine Textempfehlung."**
-
-### 3. `src/components/video-composer/ClipsTab.tsx`
-- `lipSyncTargets`-Check ersetzt durch `isLipSyncIntentionalRow(dbScene) && !lip_sync_applied_at && lip_sync_status ∉ {running,no_voiceover}`.
-- Line 940–950 „Cinematic-Sync Re-Run"-Persist bleibt (das ist ja explizites User-Reklick).
-
-### 4. `src/hooks/useTwoShotAutoTrigger.ts`
-- Trigger-Selektor bekommt zusätzlich `isLipSyncIntentionalRow(row)`-Filter. Alt-Zeilen mit `engine_override='cinematic-sync'` aber `lip_sync_with_voiceover=false` und leerem `dialog_shots` werden ignoriert.
-
-### 5. `src/hooks/useApplyProductionPlan.ts`
-- Persistierter Wert für `lip_sync_with_voiceover` bleibt genau das was der Plan liefert (nichts implizit hochsetzen).
-
-### 6. Server — `supabase/functions/compose-video-clips/index.ts`
-- Am Anfang: identischer Guard mit `isLipSyncIntentionalRow(payloadScene)`. Wenn `engineOverride='cinematic-sync'` **und** kein Opt-in-Flag → auf `broll` downgraden und `console.warn('[compose-video-clips] cinematic-sync without opt-in → broll')`. Kein `lip_sync_status='pending'`-Write, keine Sync.so-Kosten.
-- Der Helfer wird als Kopie in `supabase/functions/_shared/lipSyncIntent.ts` gespiegelt (Edge Functions können keine `src/`-Imports).
-
-### 7. Datenbank-Backfill (Migration)
-Legacy-Zeilen aus der HeyGen→cinematic-sync Migration bereinigen — nur solche die nachweislich nie echten Lip-Sync gelaufen sind:
-
-```sql
-UPDATE public.composer_scenes
-SET
-  engine_override = 'auto',
-  lip_sync_with_voiceover = false,
-  lip_sync_status = NULL,
-  twoshot_stage = NULL,
-  dialog_shots = NULL,
-  updated_at = now()
-WHERE engine_override IN ('cinematic-sync','sync-segments')
-  AND lip_sync_with_voiceover IS DISTINCT FROM true
-  AND dialog_mode IS DISTINCT FROM true
-  AND lip_sync_applied_at IS NULL
-  AND (dialog_shots IS NULL OR dialog_shots = '{}'::jsonb);
+```ts
+clip_url
+clip_status
+clip_error
+reference_image_url
+replicate_prediction_id
 ```
 
-Bereits erfolgreich gesyncte Szenen (`lip_sync_applied_at IS NOT NULL`) und aktive Runs bleiben unberührt.
+Damit bleibt das gerenderte Basis-Video sichtbar.
 
-### 8. Tests (leichtgewichtig)
-Neue Datei `src/lib/video-composer/__tests__/lipSyncIntent.test.ts` mit 6 Fällen:
-- `{}` → false
-- `{lipSyncWithVoiceover:true}` → true
-- `{engineOverride:'cinematic-sync'}` → true
-- `{engineOverride:'auto', dialogMode:true}` → true
-- `{engineOverride:'broll', lipSyncWithVoiceover:true}` → true (Toggle gewinnt)
-- Cast+Dialog+Hailuo ohne Flags → false (Regressionstest gegen genau diesen Bug)
+### 2. Lokalen UI-State analog aktualisieren
 
-## Warum das sauberer ist
-- **Ein Ort** entscheidet über eine Zustandsfrage — nie wieder Drift zwischen 4 Modulen.
-- **Router = Empfehlung**, Persistenz = Absicht. Klare Trennung.
-- **Server hat harten Guard** — selbst wenn ein zukünftiger Client-Bug wieder implizit `cinematic-sync` setzt, kostet es nichts.
-- **Backfill ist konservativ** — nur eindeutige Legacy-Zeilen, nichts mit `lip_sync_applied_at` oder aktiven Runs.
-- **Test** friert die Regel gegen Regressionen ein.
+Das `onUpdate(...)` nach dem DB-Update wird ebenfalls nur auf Lip-Sync/Opt-out-Felder reduziert:
 
-## Nicht betroffen
-- `/talking-head` Standalone-Route.
-- Bereits fertig lip-synchronisierte Szenen.
-- Manuell aktivierte Lip-Sync-Szenen (Toggle AN oder Engine explizit auf Cinematic-Sync).
-- Sync.so v169/v183-Pipeline.
+```ts
+{
+  lipSyncStatus: 'canceled',
+  lipSyncAppliedAt: null,
+  lipSyncSourceClipUrl: null,
+  twoshotStage: null,
+  dialogShots: null,
+  lipSyncWithVoiceover: false,
+  dialogMode: false,
+  engineOverride: 'auto',
+}
+```
 
-## Verifikation
-1. Neue Szene, Cast + Aktion + Hailuo, Toggle AUS → B-Roll-Render, `lip_sync_status=NULL`, keine Sync.so-Kosten.
-2. Selbe Szene, Toggle AN → v169-Pipeline wie bisher.
-3. `select count(*) from composer_scenes where engine_override='cinematic-sync' and lip_sync_with_voiceover is not true and lip_sync_applied_at is null` → 0.
-4. Test-Suite grün.
+`clipUrl`, `clipStatus`, `referenceImageUrl` bleiben unverändert.
+
+### 3. Texte anpassen
+
+Der Confirm-Dialog wird eindeutig:
+
+„Lip-Sync für diese Szene wirklich stoppen und deaktivieren? Laufende Sync.so-Jobs werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten."
+
+Der Toast wird eindeutig:
+
+- Titel: `Lip-Sync gestoppt`
+- Beschreibung: `Sync.so wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.`
+
+### 4. Kein Server-Refactor nötig
+
+`cancel-dialog-lipsync` ist als Cancel-Endpunkt schon passend: Es setzt `lip_sync_status='canceled'`. Der Fehler liegt im nachfolgenden Client-Update, das Status/Opt-in wieder so setzt, dass der Auto-Trigger erneut losläuft.
+
+`reset-lipsync-scene` bleibt unverändert, weil der separate Button **„Lip-Sync neu rendern"** genau für einen expliziten Neustart gedacht ist.
+
+## Erwartetes Verhalten nach Fix
+
+- Klick auf roten Button stoppt laufenden Lip-Sync.
+- Die Szene bleibt mit ihrem Basis-Clip sichtbar.
+- Der globale Auto-Trigger startet Sync.so nicht erneut, weil `lip_sync_with_voiceover=false`, `dialog_mode=false` und `engine_override='auto'` gesetzt sind.
+- Nur ein expliziter Klick auf **„Lip-Sync neu rendern"** oder erneutes Aktivieren der Lip-Sync-Option startet wieder Kosten/Sync.so.
