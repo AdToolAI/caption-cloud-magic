@@ -2025,7 +2025,7 @@ export default function SceneCard({
                         await supabase
                           .from("composer_scenes")
                           .update({
-                            lip_sync_status: null,
+                            lip_sync_status: "canceled",
                             lip_sync_applied_at: null,
                             lip_sync_source_clip_url: null,
                             twoshot_stage: null,
