@@ -1069,31 +1069,93 @@ serve(async (req) => {
     const processScenes = async () => {
     // Process each scene
     for (const scene of scenes) {
-      // ── HARD-GUARD: legacy `heygen` override → `cinematic-sync` ────────
+      // ── HARD-GUARD: legacy `heygen` override → `auto` ───────────────────
       // The Composer's HeyGen/Talking-Head portrait route was removed. Any
       // scene still carrying `engineOverride='heygen'` (stale UI state,
-      // older briefings, cached plans) is silently rerouted to the Sync.so
-      // pipeline BEFORE any downstream branching sees it.
+      // older briefings, cached plans) is normalised to `auto`. It is
+      // deliberately NOT rerouted to `cinematic-sync` — that would silently
+      // opt the user into Sync.so lip-sync costs they never asked for.
+      // If the user really wants lip-sync on this scene they toggle it and
+      // the `__clientWantsComposerLipSync` block below picks it up.
       if ((scene.engineOverride as string) === "heygen") {
         console.warn(
-          `[compose-video-clips] scene ${scene.id}: legacy engineOverride='heygen' → normalising to 'cinematic-sync'`,
+          `[compose-video-clips] scene ${scene.id}: legacy engineOverride='heygen' → normalising to 'auto' (no implicit lip-sync opt-in)`,
         );
-        scene.engineOverride = "cinematic-sync";
+        scene.engineOverride = "auto";
         try {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              engine_override: "cinematic-sync",
+              engine_override: "auto",
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
         } catch (heygenNormalizeErr) {
           console.warn(
-            `[compose-video-clips] scene ${scene.id}: heygen→cinematic-sync persist failed`,
+            `[compose-video-clips] scene ${scene.id}: heygen→auto persist failed`,
             heygenNormalizeErr,
           );
         }
       }
+
+      // ── HARD-GUARD: cinematic-sync ohne User-Opt-in → auto ─────────────
+      // Single Source of Truth: Lip-Sync läuft nur wenn der User explizit
+      // via Toggle (`lipSyncWithVoiceover`), `dialogMode`, oder manuellem
+      // Engine-Override opt-in gemacht hat. Alt-Zeilen aus der HeyGen-
+      // Migration können weiter mit `engine_override='cinematic-sync'` in
+      // der DB stehen — hier fangen wir sie ab bevor irgendwelche
+      // Sync.so-Kosten entstehen. `dialog_shots` != null bedeutet: es
+      // läuft bereits eine Pipeline (Retry, Reset) → nicht anfassen.
+      {
+        const eo = (scene.engineOverride ?? "auto") as string;
+        const isLipSyncEngine =
+          eo === "cinematic-sync" || eo === "sync-segments" || eo === "native-dialogue";
+        const hasOptIn =
+          (scene as any).lipSyncWithVoiceover === true ||
+          (scene as any).dialogMode === true;
+        if (isLipSyncEngine && !hasOptIn) {
+          try {
+            const { data: dbRow } = await supabaseAdmin
+              .from("composer_scenes")
+              .select("lip_sync_applied_at, dialog_shots")
+              .eq("id", scene.id)
+              .maybeSingle();
+            const alreadyApplied = !!(dbRow as any)?.lip_sync_applied_at;
+            const hasActiveRun =
+              !!(dbRow as any)?.dialog_shots &&
+              Object.keys((dbRow as any).dialog_shots).length > 0;
+            if (!alreadyApplied && !hasActiveRun) {
+              console.warn(
+                `[compose-video-clips] scene ${scene.id}: cinematic_sync_without_opt_in_downgraded_to_broll (engine=${eo})`,
+              );
+              scene.engineOverride = "auto";
+              try {
+                await supabaseAdmin
+                  .from("composer_scenes")
+                  .update({
+                    engine_override: "auto",
+                    lip_sync_with_voiceover: false,
+                    lip_sync_status: null,
+                    twoshot_stage: null,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", scene.id);
+              } catch (downgradeErr) {
+                console.warn(
+                  `[compose-video-clips] scene ${scene.id}: downgrade persist failed`,
+                  downgradeErr,
+                );
+              }
+            }
+          } catch (guardErr) {
+            console.warn(
+              `[compose-video-clips] scene ${scene.id}: lip-sync intent guard read failed`,
+              guardErr,
+            );
+          }
+        }
+      }
+
 
       // ── HARD-GUARD: legacy `/talking-head-renders/` clip_url ───────────
       // Composer scenes must never carry a raw talking-head-renders URL as

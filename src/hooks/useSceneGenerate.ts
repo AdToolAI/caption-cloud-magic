@@ -17,6 +17,7 @@ import { toast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import type {
   ComposerScene,
   ComposerCharacter,
@@ -37,22 +38,14 @@ interface UseSceneGenerateOpts {
   confirmRender?: (scene: ComposerScene) => Promise<boolean>;
 }
 
-const shouldForceCinematicSync = (scene: ComposerScene) => {
-  const hasDialog = typeof scene.dialogScript === 'string' && scene.dialogScript.trim().length > 0;
-  const hasCast =
-    (scene.characterShots ?? []).some((shot) => shot?.shotType !== 'absent') ||
-    !!(scene.characterShot && scene.characterShot.shotType !== 'absent');
-  const providerSupportsSceneLipsync = scene.clipSource === 'ai-happyhorse' || scene.clipSource === 'ai-hailuo';
-
-  return (
-    scene.engineOverride === 'cinematic-sync' ||
-    scene.engineOverride === 'sync-segments' ||
-    scene.engineOverride === 'native-dialogue' ||
-    scene.lipSyncWithVoiceover === true ||
-    scene.dialogMode === true ||
-    (hasDialog && hasCast && providerSupportsSceneLipsync)
-  );
-};
+/**
+ * Whether to route this scene through the Cinematic-Sync (Sync.so) pipeline.
+ *
+ * Delegates to the single-source-of-truth helper `isLipSyncIntentional`.
+ * NO implicit heuristics — the user must have explicitly opted in via the
+ * Lip-Sync toggle, dialogMode, or an engine override.
+ */
+const shouldForceCinematicSync = (scene: ComposerScene) => isLipSyncIntentional(scene);
 
 export function useSceneGenerate(opts: UseSceneGenerateOpts) {
   const [generating, setGenerating] = useState<Record<string, boolean>>({});

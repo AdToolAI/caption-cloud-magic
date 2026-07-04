@@ -23,6 +23,7 @@ import {
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { recommendEngineForScene, countSpeakers } from '@/lib/video-composer/sceneEngineRouter';
+import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { composeFinalPrompt, type DirectorLanguage } from "@/lib/motion-studio/composeFinalPrompt";
@@ -343,9 +344,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             dbTwoshotSpeakers,
             dbDialogSpeakers.size,
           );
-          const isCinematicSync = (dbScene as any).engine_override === 'cinematic-sync';
+          // Lip-Sync-Trigger nur bei explizitem User-Opt-in (Single Source
+          // of Truth: isLipSyncIntentionalRow). engine_override allein reicht
+          // NICHT — sonst würden Legacy-heygen→cinematic-sync-Rewrites
+          // ungewollt Sync.so-Kosten auslösen.
           if (
-            ((dbScene as any).lip_sync_with_voiceover === true || isCinematicSync) &&
+            isLipSyncIntentionalRow(dbScene as any) &&
             !(dbScene as any).lip_sync_applied_at &&
             (dbScene as any).lip_sync_status !== 'running' &&
             (dbScene as any).lip_sync_status !== 'no_voiceover' &&

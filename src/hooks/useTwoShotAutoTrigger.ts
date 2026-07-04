@@ -22,6 +22,7 @@ import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { isRealizedScene } from '@/lib/composer/isRealizedScene';
+import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
 
 // v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
 // per scene). DB select is filtered by project_id + indexed, load negligible.
@@ -38,6 +39,16 @@ const POLL_INTERVAL_MS = 2_500;
  */
 const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
 const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
+
+/**
+ * v-clean-1: Zusätzlicher Filter neben `isDialogEngine`. Selbst wenn eine
+ * Alt-Zeile noch mit `engine_override='cinematic-sync'` in der DB steht,
+ * feuern wir Sync.so nur wenn der User explizit opt-in gemacht hat.
+ * Verhindert dass HeyGen-Migration-Reste oder ein zukünftiger UI-Bug
+ * ungewollt Sync.so-Kosten auslösen.
+ */
+const isLipSyncCandidate = (d: any) =>
+  isDialogEngine(d.engine_override) && isLipSyncIntentionalRow(d);
 
 function detectSpeakerCount(dialogScript: string): number {
   const set = new Set<string>();
@@ -73,7 +84,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
+          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, lip_sync_with_voiceover, dialog_mode, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
           .eq('project_id', projectId);
         if (error || !data) return;
 
@@ -276,7 +287,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
         const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
           if (!isRealizedScene(d)) return false;
-          if (!isDialogEngine(d.engine_override)) return false;
+          if (!isLipSyncCandidate(d)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
@@ -300,7 +311,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const needsAudioPrep = (data as any[]).filter((d) => {
           if (!isRealizedScene(d)) return false;
-          if (!isDialogEngine(d.engine_override)) return false;
+          if (!isLipSyncCandidate(d)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
@@ -380,7 +391,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const candidates = (data as any[]).filter((d) => {
           if (!isRealizedScene(d)) return false;
-          if (!isDialogEngine(d.engine_override)) return false;
+          if (!isLipSyncCandidate(d)) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           // Master clip must be READY — never try lip-sync on a failed/generating master.
           if (d.clip_status && d.clip_status !== 'ready') return false;
@@ -417,7 +428,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         if (candidates.length === 0) {
           const anyVisibleLipsyncWork = (data as any[]).some(
             (d) =>
-              isDialogEngine(d.engine_override) &&
+              isLipSyncCandidate(d) &&
               !d.lip_sync_applied_at &&
               (d.lip_sync_status === 'running' ||
                 (d.twoshot_stage && !['done', 'complete', 'failed'].includes(String(d.twoshot_stage)))),

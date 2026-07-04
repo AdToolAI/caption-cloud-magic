@@ -1,23 +1,18 @@
 /**
- * sceneEngineRouter — Pure routing logic that decides which generation engine
- * a Composer scene should use for *truly film-grade* output.
+ * sceneEngineRouter — Pure, side-effect-free UI *recommendation*.
  *
- * Three engines (matched to the plan):
+ * ⚠️  Diese Funktion darf NIEMALS Persistenz, Kosten oder Renders auslösen.
+ *     Sie liefert eine Textempfehlung fürs Prompt-UI. Die tatsächliche
+ *     Routing-Entscheidung (Cinematic-Sync ja/nein) trifft ausschließlich
+ *     `isLipSyncIntentional()` in `lipSyncIntent.ts`.
  *
- *  1. **heygen-talking-head** — frame-perfect lip-sync via HeyGen Photo Avatar.
- *     Used when a scene has dialog text AND a Brand-Character cast.
- *
- *  2. **sync-polish** — Hailuo/Seedance B-roll + sync.so/lipsync-2 polish.
- *     Used when the user explicitly enables `lipSyncWithVoiceover` on a non-
- *     dialog character close-up. Quality on AI faces is unreliable, so this
- *     is opt-in only.
- *
- *  3. **broll** — Hailuo/Seedance/etc. without lip-sync; VO plays as
- *     off-screen narration. The default for landscape, product, drone shots.
- *
- * The router is a *suggestion* — the SceneCard always lets the user override.
+ * Ohne explizites User-Opt-in (Toggle "Lip-Sync AN", `dialogMode`, oder
+ * manueller Engine-Override) empfehlen wir immer B-Roll. Auto-Heuristiken
+ * (Dialog + Cast + Provider = Lip-Sync) sind bewusst entfernt — sie waren
+ * die Ursache für unbeabsichtigt getriggerten Sync.so.
  */
 import type { ComposerScene } from '@/types/video-composer';
+import { isLipSyncIntentional } from './lipSyncIntent';
 
 export type SceneEngine = 'sync-polish' | 'cinematic-sync' | 'sync-segments' | 'broll';
 
@@ -27,7 +22,7 @@ export interface EngineRecommendation {
   label: string;
   /** Short tooltip explaining *why* this engine. */
   reason: string;
-  /** Estimated extra cost in EUR over the base AI clip cost (HeyGen ≈ 0.30, sync ≈ 0.05). */
+  /** Estimated extra cost in EUR over the base AI clip cost (sync ≈ 0.05, segments ≈ 0.20+). */
   extraCostEur: number;
 }
 
@@ -136,37 +131,37 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     };
   }
 
-  // ── Auto routing — Action-First (June 2026) ────────────────────────
-  if (hasDialog && hasCast) {
-    // Composer dialog scenes ALWAYS route to Cinematic-Sync (sync-segments)
-    // on a real Hailuo/HappyHorse action plate + Sync.so lip-sync. The
-    // static-single-speaker HeyGen shortcut was removed together with the
-    // legacy Talking-Head/Portrait Composer path.
-    void isStatic;
-    return {
-      engine: 'sync-segments',
-      label: speakers >= 2 ? `🎬 Action + Lip-Sync · ${speakers} Sprecher (Auto)` : '🎬 Action + Lip-Sync (Auto)',
-      reason:
-        'Action-First: echte Hailuo/HappyHorse-Plate mit physischer Bewegung, Sync.so legt präzisen Lip-Sync drauf — kein starrer Talking-Head-Bust.',
-      extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
-    };
-  }
-
-
-  if (scene.lipSyncWithVoiceover && hasCast) {
+  // ── Auto routing — Opt-in only (June 2026 clean rewrite) ───────────
+  // Kein impliziter Sync.so-Trigger mehr. Nur wenn der User explizit
+  // opt-in gemacht hat (Toggle / dialogMode / expliziter Override),
+  // schlagen wir eine Lip-Sync-Engine vor. Sonst immer B-Roll.
+  if (isLipSyncIntentional(scene) && hasCast) {
+    if (speakers >= 2) {
+      return {
+        engine: 'sync-segments',
+        label: `🎬 Action + Lip-Sync · ${speakers} Sprecher`,
+        reason:
+          'Sync.so Segments API auf einer Hailuo/HappyHorse-Action-Plate — ein Lipsync-Call mit segments[] pro Sprecher-Turn.',
+        extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
+      };
+    }
     return {
       engine: 'sync-polish',
       label: '✨ Sync.so Polish',
       reason:
-        'B-Roll mit Sync.so-Polish-Pass — Qualität auf KI-Gesichtern variiert, nutze HeyGen für sichere Sprecher-Inserts.',
+        'Hailuo/HappyHorse-Plate mit Sync.so Polish-Pass — echte Mundbewegung auf KI-Gesicht.',
       extraCostEur: 0.05,
     };
   }
 
+  void isStatic;
   return {
     engine: 'broll',
     label: '🎬 B-Roll',
-    reason: 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.',
+    reason:
+      hasDialog && hasCast
+        ? 'Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.'
+        : 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.',
     extraCostEur: 0,
   };
 }
