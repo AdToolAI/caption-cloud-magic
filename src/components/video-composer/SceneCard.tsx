@@ -914,8 +914,7 @@ export default function SceneCard({
                       )
                       .filter(Boolean) as string[];
                     const speakerCount = new Set(speakerLines).size;
-                    const showSplitHint =
-                      rec.engine === "heygen-talking-head" && speakerCount >= 2;
+                    const showSplitHint = false; // HeyGen split-hint removed.
                     return (
                       <>
                         {showSplitHint && (
