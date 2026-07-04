@@ -2036,7 +2036,7 @@ export default function SceneCard({
                             updated_at: new Date().toISOString(),
                           })
                           .eq("id", scene.id);
-                        onUpdate({
+                        (onUpdate as (updates: any) => void)({
                           lipSyncStatus: "canceled" as any,
                           lipSyncAppliedAt: null as any,
                           lipSyncSourceClipUrl: null as any,
