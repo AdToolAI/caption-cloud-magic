@@ -48,7 +48,9 @@ const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
  * ungewollt Sync.so-Kosten auslösen.
  */
 const isLipSyncCandidate = (d: any) =>
-  isDialogEngine(d.engine_override) && isLipSyncIntentionalRow(d);
+  d.lip_sync_status !== 'canceled' &&
+  isDialogEngine(d.engine_override) &&
+  isLipSyncIntentionalRow(d);
 
 function detectSpeakerCount(dialogScript: string): number {
   const set = new Set<string>();
@@ -188,6 +190,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
+            d.lip_sync_status !== 'canceled' &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasRecordedProviderJob(d),
@@ -256,6 +259,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const stalePrep = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
+            d.lip_sync_status !== 'canceled' &&
             d.twoshot_stage === 'audio' &&
             !d.audio_plan?.twoshot?.url &&
             d.updated_at &&
