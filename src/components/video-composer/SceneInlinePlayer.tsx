@@ -73,7 +73,11 @@ export default function SceneInlinePlayer({
   const lipSyncStatus = (scene as any).lipSyncStatus as string | null | undefined;
   const twoshotStage = (scene as any).twoshotStage as string | null | undefined;
   const lipSyncAppliedAt = (scene as any).lipSyncAppliedAt as string | null | undefined;
+  const dialogShots: any =
+    (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
+  const lipsyncCanceled = lipSyncStatus === 'canceled' || dialogShots?.status === 'canceled';
   const lipsyncDone =
+    lipsyncCanceled ||
     !needsLipsync ||
     (lipSyncStatus === 'done' && !!lipSyncAppliedAt) ||
     twoshotStage === 'done' ||
@@ -83,10 +87,11 @@ export default function SceneInlinePlayer({
     needsLipsync &&
     !lipsyncDone &&
     !lipsyncFailed &&
+    !lipsyncCanceled &&
     (lipSyncStatus === 'running' ||
       lipSyncStatus === 'stitching' ||
       lipSyncStatus === 'audio_muxing' ||
-      (twoshotStage && twoshotStage !== 'failed') ||
+      (twoshotStage && !['failed', 'done', 'complete', 'canceled'].includes(twoshotStage)) ||
       status === 'ready'); // clip ready, lip-sync still pending
 
   // v131.7 — Stale-Lipsync-Detection (Realtime-Backstop).
@@ -113,9 +118,10 @@ export default function SceneInlinePlayer({
   // previous session — show "Wartet" + Generieren-CTA instead of a fake
   // "Baut…" overlay that never resolves.
   const hasActiveBackendJob =
-    !!(scene as any).replicatePredictionId ||
-    lipSyncStatus === 'running' ||
-    (twoshotStage && twoshotStage !== 'failed' && twoshotStage !== 'done' && twoshotStage !== 'complete');
+    !lipsyncCanceled &&
+    (!!(scene as any).replicatePredictionId ||
+      lipSyncStatus === 'running' ||
+      (twoshotStage && !['failed', 'done', 'complete', 'canceled'].includes(twoshotStage)));
   const isWorking =
     !isFailed && (
       isGenerating ||
@@ -128,8 +134,6 @@ export default function SceneInlinePlayer({
   // dispatcher never reached Sync.so. The server watchdog auto-recovers, but
   // we also surface an honest "Start hängt" banner + manual reset button so
   // the user is never staring at a silent spinner.
-  const dialogShots: any =
-    (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
   const replicatePredId =
     (scene as any).replicatePredictionId ?? (scene as any).replicate_prediction_id;
   const hasProviderJobForLimbo =
