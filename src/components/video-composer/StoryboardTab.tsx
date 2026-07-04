@@ -5,7 +5,7 @@ import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image
 import SceneCard from './SceneCard';
 import SceneCutDriftIndicator from './SceneCutDriftIndicator';
 import HybridExtendDialog from './HybridExtendDialog';
-import TalkingHeadDialog from './TalkingHeadDialog';
+// TalkingHeadDialog removed from Composer — standalone /talking-head module owns that flow.
 import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
 import type { SceneSnippet } from '@/types/motion-studio';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
