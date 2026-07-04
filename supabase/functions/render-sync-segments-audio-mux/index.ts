@@ -100,7 +100,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, clip_url",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, lip_sync_status, clip_url",
       )
       .eq("id", sceneId)
       .single();
@@ -109,6 +109,9 @@ serve(async (req) => {
     }
 
     const state = ((scene as any).dialog_shots ?? null) as DialogShotsState | null;
+    if ((scene as any).lip_sync_status === "canceled" || (state as any)?.status === "canceled") {
+      return json({ ok: true, skipped: "canceled", scene_id: sceneId });
+    }
     if (!state || state.engine !== "sync-segments") {
       return json(
         { error: "not_sync_segments", message: "scene is not a sync-segments scene" },
