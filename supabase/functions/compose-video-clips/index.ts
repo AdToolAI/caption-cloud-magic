@@ -2045,7 +2045,7 @@ serve(async (req) => {
         const engine = scene.engineOverride ?? "auto";
         const src = String(scene.clipSource ?? "");
         const isI2V = src.startsWith("ai-") && src !== "ai-vidu";
-        const isHeygenRoute = engine === "heygen";
+        const isHeygenRoute = false; // legacy HeyGen route removed; retained for readability.
         const isCinematicSync = engine === "cinematic-sync"; // already handled above
         const refUrl = String(scene.referenceImageUrl ?? "");
         const looksComposed =
