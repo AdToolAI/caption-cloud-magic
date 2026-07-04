@@ -1098,11 +1098,21 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // running in parallel). Route through the same compose-video-clips
     // dispatch as the multi-speaker path so there is exactly ONE master clip
     // + ONE lip-sync pass + ONE audio source per scene.
+    // July 2026 — the "Clip mit Lip-Sync generieren" button itself counts as
+    // explicit opt-in. Previously the routing required scene-level
+    // engineOverride/lipSyncWithVoiceover to already be set, which meant a
+    // single-speaker Kling/Wan/… scene clicking the lip-sync button silently
+    // fell through to the inline VO path and never triggered Sync.so.
+    const buttonIntendsLipSync =
+      (blocks.length === 1 && renderAsSeparateScenes) ||
+      (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes);
+
     const forceCinematicSync =
       blocks.length === 1 &&
       allHavePortraits &&
       ((scene as any).engineOverride === 'cinematic-sync' ||
-        (scene as any).lipSyncWithVoiceover === true);
+        (scene as any).lipSyncWithVoiceover === true ||
+        buttonIntendsLipSync);
 
     if (!forceCinematicSync && (blocks.length < 2 || !useProfessionalSrs)) {
       await handleGenerateInline();
