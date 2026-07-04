@@ -2510,7 +2510,7 @@ export default function SceneCard({
                             onClick={async () => {
                               try {
                                 // Optimistic local update so the spinner stops immediately.
-                                onUpdate({
+                                (onUpdate as (updates: any) => void)({
                                   lipSyncStatus: "canceled" as any,
                                   twoshotStage: null as any,
                                   dialogShots: null as any,
