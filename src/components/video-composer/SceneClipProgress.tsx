@@ -112,9 +112,9 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const lipSyncCanceled = scene.lipSyncStatus === 'canceled' || dialogShotsState?.status === 'canceled';
   const shouldBeSceneLipsync =
     !lipSyncCanceled &&
-    isCinematic ||
-    scene.dialogMode === true ||
-    scene.lipSyncWithVoiceover === true;
+    (isCinematic ||
+      scene.dialogMode === true ||
+      scene.lipSyncWithVoiceover === true);
   const wrongTalkingHeadReady =
     shouldBeSceneLipsync &&
     scene.clipStatus === 'ready' &&
