@@ -5,7 +5,7 @@ import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image
 import SceneCard from './SceneCard';
 import SceneCutDriftIndicator from './SceneCutDriftIndicator';
 import HybridExtendDialog from './HybridExtendDialog';
-import TalkingHeadDialog from './TalkingHeadDialog';
+// TalkingHeadDialog removed from Composer — standalone /talking-head module owns that flow.
 import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
 import type { SceneSnippet } from '@/types/motion-studio';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
@@ -183,7 +183,7 @@ export default function StoryboardTab({
   }>({ open: false, scene: null, mode: 'forward' });
 
   // Block Q — Talking-Head dialog state
-  const [talkingHeadOpen, setTalkingHeadOpen] = useState(false);
+  // talkingHeadOpen state removed with the Composer TalkingHead button.
 
   // Scene Library (snippets)
   const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
@@ -567,14 +567,7 @@ export default function StoryboardTab({
           >
             <Library className="h-3.5 w-3.5" /> Scene Library
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setTalkingHeadOpen(true)}
-            className="gap-1 text-xs border-primary/40 text-primary hover:bg-primary/10"
-          >
-            <Mic className="h-3.5 w-3.5" /> Talking-Head
-          </Button>
+          {/* Talking-Head button REMOVED — standalone /talking-head module. */}
           {/* Status-Chip + Master-Generate-Button (ersetzt den alten "→ Clips" Tab-Wechsel) */}
           {scenes.length > 0 && (
             <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
@@ -817,27 +810,7 @@ export default function StoryboardTab({
         />
       )}
 
-      {/* Block Q — Talking-Head dialog */}
-      <TalkingHeadDialog
-        open={talkingHeadOpen}
-        onOpenChange={setTalkingHeadOpen}
-        projectId={projectId}
-        briefingCharacters={safeCharacters}
-        onAddBriefingCharacter={onAddCharacter}
-        availableScenes={scenes.map((s, i) => ({
-          id: s.id,
-          label: `S${i + 1} — ${s.sceneType}`,
-        }))}
-        onSuccess={(res) => {
-          void onRefetchScenes?.();
-          if (res.sceneId) {
-            setTimeout(() => {
-              const el = document.querySelector(`[data-scene-id="${res.sceneId}"]`);
-              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 250);
-          }
-        }}
-      />
+      {/* Block Q — Talking-Head dialog REMOVED from Composer (standalone /talking-head only). */}
 
       {/* Scene Snippet Library */}
       <SceneSnippetPicker

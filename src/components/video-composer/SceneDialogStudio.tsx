@@ -31,7 +31,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
-import { useTalkingHead } from '@/hooks/useTalkingHead';
+// useTalkingHead removed — Composer no longer routes to generate-talking-head.
+// The standalone /talking-head module still owns that hook.
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
@@ -260,7 +261,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 }, ref) {
   const t = T[language];
   const { toast } = useToast();
-  const { generate, estimateCost } = useTalkingHead();
+  // HeyGen Talking-Head hook removed from Composer.
   const { voices: customVoices } = useCustomVoices();
   const { voices: humeVoices } = useHumeVoices();
   const { data: accessibleChars = [] } = useAccessibleCharacters();
@@ -705,7 +706,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
   const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
   const estimatedDurationSec = Math.max(3, Math.ceil(totalChars / 18));
-  const totalCost = blocks.length * estimateCost(4, true);
+  // Legacy HeyGen cost estimation dropped — Cinematic-Sync cost is shown per scene in ClipsTab.
+  const totalCost = 0;
 
   const handleAiScript = async () => {
     if (sceneCast.length < 2) return;
@@ -826,14 +828,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Stays in script order so `startSec`/`endSec` map directly to playback.
     const planSpeakers: import('@/types/video-composer').AudioPlanSpeaker[] = [];
 
-    // Determine if we should auto-upgrade to HeyGen lip-sync.
-    // Trigger: at least one speaker in this dialog has a portrait. If not, we
-    // fall back to plain audio overlay (no face animation).
-    const portraitsAvailable = sceneCast.some((c) => Boolean(c.referenceImageUrl));
-    const useHeygenLipSync =
-      portraitsAvailable && blocks.length === 1; // single-speaker scene → replace clip with HeyGen
-    // (Multi-speaker single-scene HeyGen would require stitching multiple
-    // talking-head clips into one; that path lives in SRS mode.)
+    // (HeyGen auto-upgrade removed — Composer no longer routes to
+    // generate-talking-head. Real lip-sync happens via compose-video-clips
+    // + Sync.so on the Hailuo/HappyHorse master plate.)
 
     try {
       // ── Idempotency: wipe previous voiceover clips for this scene so a
@@ -922,24 +919,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           });
         if (insErr) throw insErr;
 
-        // Auto-upgrade single-speaker scenes to HeyGen lip-sync when we have
-        // a portrait. The HeyGen render REPLACES `clip_url` so the on-screen
-        // mouth actually matches the audio (Artlist/Synthesia-style flow).
-        if (useHeygenLipSync && c.referenceImageUrl) {
-          try {
-            await generate({
-              sceneId,
-              projectId: pid,
-              imageUrl: c.referenceImageUrl,
-              audioUrl: finalAudioUrl,
-              aspectRatio: '9:16',
-              resolution: '720p',
-              composerCharacterId: c.id,
-            });
-          } catch (heygenErr) {
-            console.warn('[SceneDialogStudio] HeyGen auto-upgrade failed, audio-only fallback in place', heygenErr);
-          }
-        }
+        // HeyGen auto-upgrade REMOVED — Composer no longer produces
+        // isolated portrait busts. The scene's real lip-sync happens via
+        // compose-video-clips → Sync.so on the Hailuo/HappyHorse master
+        // plate. `useHeygenLipSync` is dead code below.
+
 
         timedBlocks.push({ ...block, startSec: cumulativeOffset, durationSec: duration });
         planSpeakers.push({
@@ -2034,7 +2018,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           engineOv === 'sync-segments' ||
           engineOv === 'cinematic-sync' ||
           (!engineOv || engineOv === 'auto');
-        const isHeygenSrs = engineOv === 'heygen-talking-head' || (isMulti && renderAsSeparateScenes);
+        const isSrsSplit = isMulti && renderAsSeparateScenes;
         let label: string;
         let tone: 'primary' | 'amber' | 'muted' = 'muted';
         if (isMulti && missing) {
@@ -2044,14 +2028,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : language === 'es'
             ? `⚠️ ${missing.name} no tiene retrato — asigna un Brand-Character, si no, no hay lip-sync real.`
             : `⚠️ ${missing.name} has no portrait — assign a cast character or real lip-sync is impossible.`;
-        } else if (isHeygenSrs && portraitsAll) {
+        } else if (isSrsSplit && portraitsAll) {
           tone = 'primary';
-          const cost = (Math.max(1, speakers.length) * 0.30).toFixed(2);
           label = language === 'de'
-            ? `🎙️ Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 HeyGen-Clip pro Sprecher) — ~€${cost}`
+            ? `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Hailuo-Plate + Sync.so pro Sprecher)`
             : language === 'es'
-            ? `🎙️ Se renderizará como ${speakers.length} escena(s) (Shot-Reverse-Shot, 1 clip HeyGen por hablante) — ~€${cost}`
-            : `🎙️ Will render as ${speakers.length} scene(s) (Shot-Reverse-Shot, 1 HeyGen clip per speaker) — ~€${cost}`;
+            ? `🎬 Se renderizará como ${speakers.length} escena(s) (Shot-Reverse-Shot, 1 plate Hailuo + Sync.so por hablante)`
+            : `🎬 Will render as ${speakers.length} scene(s) (Shot-Reverse-Shot, 1 Hailuo plate + Sync.so per speaker)`;
         } else if (isSyncSegments && portraitsAll) {
           tone = 'primary';
           // sync-segments pricing ≈ €0.20/s; show flat cost note instead of per-speaker.

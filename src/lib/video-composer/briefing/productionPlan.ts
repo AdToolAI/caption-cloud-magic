@@ -77,7 +77,7 @@ export const PlanScene = z.object({
 
   /** Composer engineOverride — kept narrow to existing union. Fremdwerte fallen auf 'auto' zurück. */
   engine: z.enum([
-    'auto', 'broll', 'heygen', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue',
+    'auto', 'broll', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue',
   ]).default('auto').catch('auto'),
 
   /** Whether this scene needs lip-sync. Only sets `dialogMode` on NEW scenes; existing rows untouched. */

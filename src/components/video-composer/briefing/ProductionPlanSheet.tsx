@@ -1303,7 +1303,7 @@ export default function ProductionPlanSheet({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {['auto','broll','heygen','sync-polish','cinematic-sync','sync-segments','native-dialogue'].map((e) => (
+                              {['auto','broll','sync-polish','cinematic-sync','sync-segments','native-dialogue'].map((e) => (
                                 <SelectItem key={e} value={e}>{e}</SelectItem>
                               ))}
                             </SelectContent>

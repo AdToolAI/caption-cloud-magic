@@ -47,7 +47,7 @@ function newSceneId() {
 }
 
 const LIPSYNC_ENGINES = new Set([
-  'cinematic-sync', 'sync-polish', 'sync-segments', 'native-dialogue', 'heygen',
+  'cinematic-sync', 'sync-polish', 'sync-segments', 'native-dialogue',
 ]);
 
 const isUuid = (val?: string | null): val is string =>

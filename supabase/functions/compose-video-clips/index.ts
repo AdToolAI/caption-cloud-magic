@@ -111,7 +111,7 @@ interface ClipScene {
   dialogScript?: string;
   /** Map of characterId → voice (string voiceId or { voiceId }). */
   dialogVoices?: Record<string, string | DialogVoiceCfg>;
-  /** Render-engine override: 'auto' | 'heygen' | 'broll' | 'sync-polish'. */
+  /** Render-engine override. 'heygen' is a legacy value that is silently normalised to 'cinematic-sync'. */
   engineOverride?:
     | "auto"
     | "heygen"
@@ -1069,6 +1069,59 @@ serve(async (req) => {
     const processScenes = async () => {
     // Process each scene
     for (const scene of scenes) {
+      // ── HARD-GUARD: legacy `heygen` override → `cinematic-sync` ────────
+      // The Composer's HeyGen/Talking-Head portrait route was removed. Any
+      // scene still carrying `engineOverride='heygen'` (stale UI state,
+      // older briefings, cached plans) is silently rerouted to the Sync.so
+      // pipeline BEFORE any downstream branching sees it.
+      if ((scene.engineOverride as string) === "heygen") {
+        console.warn(
+          `[compose-video-clips] scene ${scene.id}: legacy engineOverride='heygen' → normalising to 'cinematic-sync'`,
+        );
+        scene.engineOverride = "cinematic-sync";
+        try {
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({
+              engine_override: "cinematic-sync",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene.id);
+        } catch (heygenNormalizeErr) {
+          console.warn(
+            `[compose-video-clips] scene ${scene.id}: heygen→cinematic-sync persist failed`,
+            heygenNormalizeErr,
+          );
+        }
+      }
+
+      // ── HARD-GUARD: legacy `/talking-head-renders/` clip_url ───────────
+      // Composer scenes must never carry a raw talking-head-renders URL as
+      // their master output. Mark them failed so the UI can re-render via
+      // the current Cinematic-Sync pipeline.
+      if (
+        typeof (scene as any).uploadUrl === "string" &&
+        ((scene as any).uploadUrl as string).includes("/talking-head-renders/")
+      ) {
+        console.warn(
+          `[compose-video-clips] scene ${scene.id}: blocked legacy talking-head-renders upload URL`,
+        );
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            clip_status: "failed",
+            clip_error: "legacy_talking_head_route_blocked",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", scene.id);
+        results.push({
+          sceneId: scene.id,
+          status: "failed",
+          error: "legacy_talking_head_route_blocked",
+        });
+        continue;
+      }
+
       // Sora 2 sunset: silently migrate any legacy 'ai-sora' scene to Veo 3.1
       // ── SRS Lip-Sync Guard ─────────────────────────────────────────────
       // Sub-scenes spawned by SceneDialogStudio's "split" flow are already
@@ -1992,7 +2045,7 @@ serve(async (req) => {
         const engine = scene.engineOverride ?? "auto";
         const src = String(scene.clipSource ?? "");
         const isI2V = src.startsWith("ai-") && src !== "ai-vidu";
-        const isHeygenRoute = engine === "heygen";
+        const isHeygenRoute = false; // legacy HeyGen route removed; retained for readability.
         const isCinematicSync = engine === "cinematic-sync"; // already handled above
         const refUrl = String(scene.referenceImageUrl ?? "");
         const looksComposed =

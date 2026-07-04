@@ -1263,37 +1263,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         onRepairScene={(s) => handleGenerateSingle(s)}
       />
 
-      {/* Cinematic-Sync Hint — only when ≥1 ready HeyGen scene exists and not dismissed */}
-      {!hintDismissed && scenes.some((s) => s.clipStatus === 'ready' && recommendEngineForScene(s).engine === 'heygen-talking-head') && (
-        <div className="relative rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 pr-10 text-xs text-emerald-100/90">
-          <button
-            type="button"
-            onClick={() => {
-              setHintDismissed(true);
-              try { localStorage.setItem('composer:cinematic-sync-hint-dismissed', '1'); } catch {}
-            }}
-            className="absolute top-2 right-2 p-1 rounded hover:bg-emerald-500/20 text-emerald-300/70 hover:text-emerald-200"
-            aria-label="Hinweis schließen"
-          >
-            <X className="h-3 w-3" />
-          </button>
-          <div className="flex items-start gap-2">
-            <Clapperboard className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
-            <div className="space-y-1.5">
-              <div>
-                <strong className="text-emerald-300">Tipp – Artlist-Pipeline:</strong> Deine HeyGen-Szenen zeigen den Avatar vor neutralem Hintergrund.
-                Klicke bei einer fertigen HeyGen-Szene rechts auf <span className="inline-flex items-center gap-1 px-1 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 font-medium"><Clapperboard className="h-2.5 w-2.5" />In echte Szene einbauen</span>,
-                um die Person stattdessen in deine Wunsch-Szene mit Hailuo zu rendern und automatisch lip-syncen zu lassen. <span className="text-amber-300">+€0.65 / Szene.</span>
-              </div>
-              <div className="text-[11px] text-muted-foreground/90 border-t border-emerald-500/20 pt-1.5">
-                <span className="font-semibold text-emerald-300/90">ℹ️ Multi-Charakter-Szenen:</span> Sync.so kann nur einen Charakter pro Clip lip-syncen.
-                Zerlege Multi-Speaker-Dialoge zuerst in <span className="font-medium">eine Szene pro Sprecher (Shot-Reverse-Shot)</span> — pro Cut läuft dann eine eigene Cinematic-Sync-Pipeline.
-                Es gibt <span className="italic">kein Layering</span> mehrerer Sprecher in einen Clip.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Cinematic-Sync Hint removed — HeyGen path no longer exists in Composer. */}
 
       {/* Clip Cards */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -1306,15 +1276,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
             : 0;
           const engineRec = recommendEngineForScene(scene);
-          const isHeygen = engineRec.engine === 'heygen-talking-head';
-          // For HeyGen, the actual render cost = HeyGen extra cost (no Hailuo).
-          // For sync-polish, base + extra. For broll, just base.
-          const costPerClip = isHeygen
-            ? engineRec.extraCostEur
-            : baseCost + (engineRec.engine === 'sync-polish' ? engineRec.extraCostEur : 0);
+          const isHeygen = false as const; // HeyGen route removed from Composer.
+          // sync-polish adds extra; broll/base flat.
+          const costPerClip =
+            baseCost + (engineRec.engine === 'sync-polish' ? engineRec.extraCostEur : 0);
           const isUpload = scene.clipSource === 'upload';
           const hasUpload = !!scene.uploadUrl;
-          const isAi = scene.clipSource.startsWith('ai-') || isHeygen;
+          const isAi = scene.clipSource.startsWith('ai-');
           const isStock = scene.clipSource === 'stock';
           const isThisGenerating = singleGenerating[scene.id] || scene.clipStatus === 'generating';
 
