@@ -428,7 +428,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         if (candidates.length === 0) {
           const anyVisibleLipsyncWork = (data as any[]).some(
             (d) =>
-              isDialogEngine(d.engine_override) &&
+              isLipSyncCandidate(d) &&
               !d.lip_sync_applied_at &&
               (d.lip_sync_status === 'running' ||
                 (d.twoshot_stage && !['done', 'complete', 'failed'].includes(String(d.twoshot_stage)))),
