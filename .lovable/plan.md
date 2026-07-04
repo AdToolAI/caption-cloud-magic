@@ -1,122 +1,74 @@
-## Ziel
+# Root Cause
 
-Kling, Wan, Seedance und Luma neben Hailuo/HappyHorse als vollwertige Master-Plate-Provider für die Sync.so Lip-Sync-Pipeline freischalten. Gleichzeitig den bestehenden Bug fixen, dass "Clip mit Lip-Sync generieren" auf Single-Speaker-Szenen still nur einen Voiceover-Block anhängt.
+Der Edge-Function-Log der fehlgeschlagenen Kling-Szene zeigt:
 
-Ergebnis nach dem Fix: Kling-Szene → „Lip-Sync generieren" klicken → Kling rendert die Master-Plate → Sync.so legt Lip-Sync sauber drauf. Kein stiller Provider-Swap mehr, keine Toast-Sackgasse.
+```
+[compose-video-clips] scene 18e80faf…: cinematic_sync_without_opt_in_downgraded_to_broll (engine=cinematic-sync)
+```
 
-## Warum das mit den bestehenden Modellen funktioniert
+Der Hard-Guard in `compose-video-clips/index.ts` (Zeile 1109–1157) verlangt, dass das **Request-Payload-Objekt** (nicht der DB-Row) `lipSyncWithVoiceover === true` ODER `dialogMode === true` gesetzt hat. Fehlt beides, wird der Engine-Override auf `auto` degradiert, `lip_sync_with_voiceover` in der DB wieder auf `false` gesetzt und die Szene läuft als normales B-Roll durch — **kein Sync.so, kein Dialog-Shots-Dispatch**.
 
-Sync.so operiert auf einem fertigen Video (`clip_url` + Audio). Die Pipeline in `compose-dialog-segments` ist bereits provider-agnostisch — sie liest die generierte Plate und liefert sie an Sync.so `lipsync-3`. Der einzige provider-spezifische Baustein pro Renderer ist:
+In `SceneDialogStudio.tsx` (Single-Speaker-Cinematic-Sync-Pfad, Zeile 1479–1496) wird der `scenePayload` an `compose-video-clips` gesendet:
 
-- **Duration-Regeln** (Kling 3–15 s, Wan 3–10 s, Seedance 3–12 s, Luma 5/9 s, HappyHorse 3–15 s, Hailuo 6/10 s) — schon per Provider in `compose-video-clips` implementiert.
-- **Lead-in-Trim** (`computeLeadInTrim`) — bereits pro Provider gepflegt.
+```ts
+const scenePayload = {
+  id, projectId, sceneType, clipSource, clipQuality,
+  aiPrompt, negativePrompt, uploadUrl, referenceImageUrl,
+  durationSeconds, characterShot, characterShots,
+  dialogScript, dialogVoices,
+  engineOverride: 'cinematic-sync' as const,
+  withAudio: scene.withAudio !== false,
+};
+```
 
-Es gibt daher keinen Grund, warum Sync.so nur auf HappyHorse/Hailuo laufen sollte. Die Allowlist ist eine Altlast vom 26. Juni 2026.
+Kein `lipSyncWithVoiceover` und kein `dialogMode` im Payload. Der unmittelbar davor ausgeführte DB-Write (`lip_sync_with_voiceover: true`) hilft nicht, weil der Guard nur das Payload prüft — und der eigene Downgrade-Zweig anschließend `lip_sync_with_voiceover: false` in der DB überschreibt.
 
-## Umfang
+Folge in der UI: Der optimistische `twoshotStage: 'audio'` bleibt lokal stehen ("Audio wird vorbereitet…"), aber der Backend-Autotrigger (`useTwoShotAutoTrigger`) filtert die Szene nach dem Downgrade via `isLipSyncCandidate` heraus — es startet weder `compose-twoshot-audio` noch `compose-dialog-segments`. Deshalb hängt es bei "Audio wird vorbereitet…" ewig und Sync.so wird nie aufgerufen.
 
-### 1. Backend — Allowlist auf 6 Provider erweitern
+# Fix
 
-`supabase/functions/compose-video-clips/index.ts`
+**Eine Datei, zwei Zeilen** — Payload-Opt-in explizit mitschicken, damit der Guard nicht mehr degradiert:
 
-- **Zeile ~1308–1330** (`invalid_provider_for_lipsync`-Guard): Allowlist von `["ai-happyhorse", "ai-hailuo"]` auf
-  ```ts
-  const LIPSYNC_PROVIDERS = new Set([
-    "ai-happyhorse", "ai-hailuo",
-    "ai-kling", "ai-wan", "ai-seedance", "ai-luma",
-  ]);
-  ```
-  Neuer Fehlertext + `allowed`-Array beim 400-Response entsprechend.
-- **Zeile ~1332–1364** (duration guard): Analoge `invalid_duration_for_provider`-Checks pro neuem Provider ergänzen:
-  - Kling: `3 ≤ d ≤ 15`
-  - Wan: `3 ≤ d ≤ 10`
-  - Seedance: `3 ≤ d ≤ 12`
-  - Luma: `d === 5 || d === 9`
-- **Zeile ~1297–1306** (HH-Guard-Log): sprachlich generalisieren, damit Log für alle Provider konsistent bleibt („Scene X: {provider} + {engine} — keeping as master plate").
-- **`SUPPORTED_AI_SOURCES`**-Fallback (Zeile ~1367–1384) bleibt unverändert; die neuen Provider sind bereits Teil dieser Menge.
+## `src/components/video-composer/SceneDialogStudio.tsx` (~Zeile 1494)
 
-Kein Änderungsbedarf in `compose-dialog-segments/index.ts` — die Datei liest die Master-Plate agnostisch als Video-URL.
+`scenePayload` erweitern:
 
-### 2. Frontend — Master-Provider-Whitelist + Single-Speaker-Intent
+```ts
+const scenePayload = {
+  // …bestehende Felder…
+  engineOverride: 'cinematic-sync' as const,
+  lipSyncWithVoiceover: true,   // NEU — matcht den Backend-Guard
+  dialogMode: true,             // NEU — zweiter akzeptierter Opt-in-Weg
+  withAudio: scene.withAudio !== false,
+};
+```
 
-`src/components/video-composer/SceneDialogStudio.tsx`
+# Belt-and-Suspenders (Backend Hardening)
 
-- **Zeile ~1101–1110** — `forceCinematicSync` erweitern, damit der Button-Klick selbst als Opt-in zählt (aktuell führt der Klick auf Single-Speaker-Szenen still zu `handleGenerateInline`):
+Zusätzlich in `supabase/functions/compose-video-clips/index.ts` im Guard-Block (Zeile 1113–1115) den Opt-in-Check leicht erweitern, damit dieselbe Klasse Bug (fehlendes Flag im Payload, obwohl User explizit auf "Lip-Sync generieren" geklickt hat) nicht mehr silent degradiert. Wenn `engine_override === 'cinematic-sync'` UND ein `dialogScript` mit `dialogVoices` im Payload steht, gilt das als impliziter Opt-in:
 
-  ```ts
-  const buttonIntendsLipSync =
-    (blocks.length === 1 && renderAsSeparateScenes) ||
-    (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes);
+```ts
+const hasOptIn =
+  (scene as any).lipSyncWithVoiceover === true ||
+  (scene as any).dialogMode === true ||
+  (typeof scene.dialogScript === 'string' &&
+    scene.dialogScript.trim().length > 0 &&
+    scene.dialogVoices &&
+    Object.keys(scene.dialogVoices).length > 0);
+```
 
-  const forceCinematicSync =
-    blocks.length === 1 &&
-    allHavePortraits &&
-    (
-      (scene as any).engineOverride === 'cinematic-sync' ||
-      (scene as any).lipSyncWithVoiceover === true ||
-      buttonIntendsLipSync
-    );
-  ```
+Damit ist der Pfad zweifach abgesichert: Frontend setzt das Flag explizit, Backend akzeptiert auch die dialogScript-Signatur als gültigen Opt-in.
 
-- **Zeile ~1373–1385** — `masterProvider` respektiert jetzt die User-Wahl:
+# Verification
 
-  ```ts
-  const LIPSYNC_PROVIDERS = new Set([
-    'ai-hailuo', 'ai-happyhorse', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma',
-  ] as const);
-  type LipsyncProvider = typeof LIPSYNC_PROVIDERS extends Set<infer T> ? T : never;
+1. Kling-Szene mit einem Sprecher, Portrait, Voice → Button "Clip mit Lip-Sync generieren" klicken.
+2. Edge-Function-Log darf **keine** `cinematic_sync_without_opt_in_downgraded_to_broll`-Warnung mehr enthalten.
+3. Nach Master-Clip-Fertigstellung muss `useTwoShotAutoTrigger` `compose-twoshot-audio` starten (Log: `self-heal: invoking compose-twoshot-audio for …`), danach `compose-dialog-segments`.
+4. `dialog_shots` in `composer_scenes` füllt sich; Sync.so-Slot-Anzeige geht von 0/3 auf 1/3.
 
-  const userPickedProvider = (scene.clipSource as string) || 'ai-happyhorse';
-  const masterProvider: LipsyncProvider = LIPSYNC_PROVIDERS.has(userPickedProvider as any)
-    ? (userPickedProvider as LipsyncProvider)
-    : 'ai-happyhorse';
-  ```
+# Affected Files
 
-- **`masterDuration`** — provider-aware statt hart `hailuo | happyhorse`:
+- `src/components/video-composer/SceneDialogStudio.tsx` (2 neue Felder im `scenePayload`)
+- `supabase/functions/compose-video-clips/index.ts` (Guard-`hasOptIn` erweitern, dann Deploy)
 
-  ```ts
-  const clamp = (min: number, max: number) => Math.min(max, Math.max(min, Math.ceil(userPick)));
-  const masterDuration =
-    masterProvider === 'ai-hailuo'      ? (userPick === 10 ? 10 : 6)
-    : masterProvider === 'ai-happyhorse' ? clamp(3, 15)
-    : masterProvider === 'ai-kling'      ? clamp(3, 15)
-    : masterProvider === 'ai-wan'        ? clamp(3, 10)
-    : masterProvider === 'ai-seedance'   ? clamp(3, 12)
-    : /* ai-luma */                        (userPick >= 8 ? 9 : 5);
-  ```
-
-- Die vorhandene „Dialog länger als Szene"-Warnung analog auf `audioRequired > masterDuration` mit jedem Provider triggern (bereits generisch formuliert — nur Providername im Toast einsetzen).
-
-### 3. UI — Provider-Picker signalisiert Lip-Sync-Fähigkeit
-
-`src/components/video-composer/SceneCard.tsx` (bzw. dort, wo der Clip-Source-Picker sitzt): Am Sync/Lip-Sync-Toggle keine Provider-spezifische Sperre mehr — der bisherige Hinweis „nur HappyHorse/Hailuo" wird durch die neue Liste (Hailuo, HappyHorse, Kling, Wan, Seedance, Luma) ersetzt. Provider außerhalb dieser Liste (Runway/Vidu/Pika/Veo/Sora/Grok) bekommen weiterhin einen Disabled-Zustand mit klarem Tooltip („Lip-Sync via Sync.so aktuell nicht auf {provider} zertifiziert").
-
-Kein Redesign, nur Text/Disabled-Logik anpassen. Die genaue Datei-Position wird im Build-Modus mit `rg` gesucht (Prompt-Text der bestehenden Warnung).
-
-### 4. Verifikation
-
-- **Kling-Szene, 1 Sprecher, „Erweitert"-Toggle an → „Clip mit Lip-Sync generieren":**
-  - Toast „Dialog-Shots werden gerendert" (nicht mehr „1 Voiceover-Block angehängt").
-  - `compose-video-clips` wird mit `clipSource: 'ai-kling'` + `engineOverride: 'cinematic-sync'` aufgerufen, gibt 2xx zurück.
-  - Kling rendert die Plate → Sync.so-Dispatch läuft → finaler Clip mit Lip-Sync.
-- **Wan / Seedance / Luma:** gleiche Verifikation mit provider-typischen Dauern (Wan 8 s, Seedance 10 s, Luma 5 s).
-- **Hailuo/HappyHorse:** unverändertes Verhalten (Regressionscheck).
-- **Provider außerhalb Allowlist (Runway/Vidu/Pika/…):** Backend antwortet weiterhin mit sauberem 400 `invalid_provider_for_lipsync`; UI hat ihn schon disabled.
-- **Bestehender Unit-Test** `src/lib/video-composer/__tests__/lipSyncIntent.test.ts` bleibt grün — er testet `isLipSyncIntentional()`, das nicht angefasst wird.
-
-## Was NICHT Teil dieser Änderung ist
-
-- Keine neuen Sync.so-Modi/Retry-Strategien — nur Provider-Freigabe.
-- Keine neuen Master-Plate-Provider (Vidu/Runway/Pika/Veo/Sora/Grok) — bleiben ausdrücklich außen vor.
-- Keine Änderung an `compose-dialog-segments`, `poll-dialog-shots`, `sync-so-webhook` — die sind provider-agnostisch.
-- Keine Änderung an Preisen/Margen — die per-Provider-Kalkulation in `videoProviderMargins.ts` gilt bereits.
-
-## Betroffene Dateien
-
-- `supabase/functions/compose-video-clips/index.ts` (Allowlist + Duration-Guards)
-- `src/components/video-composer/SceneDialogStudio.tsx` (Single-Speaker-Intent + masterProvider-Whitelist + masterDuration)
-- `src/components/video-composer/SceneCard.tsx` (nur Text/Disabled-Logik des Lip-Sync-Toggles, ~10 Zeilen)
-
-## Rollback
-
-Falls Kling/Wan/Seedance/Luma in Sync.so unerwartet häufig `provider_unknown_error` liefern (unwahrscheinlich, weil Sync.so blind auf dem MP4 arbeitet), reicht ein einzeiliger Revert des `LIPSYNC_PROVIDERS`-Sets in `compose-video-clips`. Die Frontend-Änderungen bleiben in dem Fall weiter valide.
+Kein anderer Provider (Hailuo/HappyHorse/Wan/Seedance/Luma) und kein Multi-Speaker-Pfad wird berührt — die kannten den Bug nur nicht, weil ihre Codepfade den Guard entweder nie triggerten (Hailuo/HappyHorse Default) oder das Flag anderweitig setzten.
