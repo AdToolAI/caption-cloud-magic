@@ -676,7 +676,7 @@ serve(async (req) => {
       // requires it) but keeps body / head / gesture motion free so the
       // scene performance still surfaces.
       if (n === 1) {
-        return `${subject}${named}, ${visibility}. Lips soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can drive the mouth cleanly in post). Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression. The character is speaking naturally with subtle, continuous idle mouth and jaw motion throughout the clip (small, natural openings — sync-3 needs an animatable mouth to drive the lipsync). LOCKED static camera on a fixed tripod for the entire clip — no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no shot change; the focal length, framing and the subject's position and size in the frame stay identical from the first frame to the last frame. Natural body motion, gestures and head motion driven by the scene performance are allowed, but the camera itself never moves. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+        return `${subject}${named}, ${visibility}. Lips soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can drive the mouth cleanly in post), but the mouth stays softly closed in a natural neutral resting position on the raw plate — no idle mouth motion, no jaw motion, no lip-flap, no muttering, no chewing. Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression. LOCKED static camera on a fixed tripod for the entire clip — no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no shot change; the focal length, framing and the subject's position and size in the frame stay identical from the first frame to the last frame. Natural body motion, gestures and head motion driven by the scene performance are allowed, but the camera itself never moves. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
       }
 
       return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. BUT mouths and jaws stay still and softly closed — no idle mouth motion, no jaw motion, no chewing, no muttering, no lip-flap, no listener mouth movement. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
@@ -852,7 +852,7 @@ serve(async (req) => {
         // Sync-3 animates closed-mouth plates fine (built-in obstruction +
         // face-open). We therefore force the plate mouth to stay softly
         // closed; sync-3 opens it during the speech window only.
-        console.log(`[compose-video-clips] v175_n1_closed_mouth enabled=true scene=${scene.id ?? "?"}`);
+        console.log(`[compose-video-clips] v182_n1_closed_mouth_prompt scene=${scene.id ?? "?"} enabled=true`);
         return `Lip-ready single-subject plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep the facial expression natural and animatable, with the mouth area soft, clearly visible and unobstructed. The character keeps the mouth softly closed in a natural neutral resting position throughout the plate — NO idle mouth motion, NO jaw motion, NO lip-flap, NO muttering, NO chewing; the downstream sync-3 lipsync model opens the mouth in post only during the actual speech window. Eyes stay open and alert throughout. LOCKED static camera on a fixed tripod for the entire clip — the focal length, framing and the speaker's position and size in the frame stay identical from the first frame to the last frame: no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no second camera. The camera does not move closer to or further from the subject. Body posture, gestures, facial performance and any on-set action follow the scene description faithfully, but the camera itself never moves.`;
       }
 
@@ -2528,11 +2528,20 @@ serve(async (req) => {
         } else if (scene.clipSource === "ai-kling") {
           // Kling 3.0 Omni via Replicate — supports T2V, I2V, 3-15s
           const isI2V = !!scene.referenceImageUrl;
+          const isCinematicSyncScene =
+            (scene.engineOverride ?? "auto") === "cinematic-sync";
           await supabaseAdmin
             .from("composer_scenes")
             .update({
               clip_status: "generating",
               clip_quality: quality,
+              ...(isCinematicSyncScene
+                ? {
+                    lip_sync_source_clip_url: null,
+                    lip_sync_status: "pending",
+                    twoshot_stage: "master_clip",
+                  }
+                : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-kling", isI2V),
               updated_at: new Date().toISOString(),
             })
@@ -2543,8 +2552,22 @@ serve(async (req) => {
             15,
             Math.max(3, Math.round(scene.durationSeconds)),
           );
+          const klingSpeakerCount = uniqueSpeakerSlugsFromScript(scene.dialogScript).length;
+          const klingAntiCloneSuffix =
+            "Exactly one instance of the selected character in one continuous frame. Single unbroken shot. No clones, no duplicate person, no triptych, no split-screen, no side-by-side variations, no mirror duplicate, no poster/photo/screen showing the same face as a second person.";
+          const masterPrompt = isCinematicSyncScene
+            ? buildCinematicSyncMasterPrompt(scene)
+            : scene.aiPrompt;
+          const klingPrompt = klingSpeakerCount === 1
+            ? `${masterPrompt || scene.aiPrompt || "cinematic footage"}. ${klingAntiCloneSuffix}`
+            : (masterPrompt || scene.aiPrompt);
+          if (klingSpeakerCount === 1) {
+            console.log(
+              `[compose-video-clips] v182_kling_n1_anticlone scene=${scene.id} cinematic=${isCinematicSyncScene} i2v=${isI2V}`,
+            );
+          }
           const klingInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+            prompt: enrichPrompt(klingPrompt, undefined, isI2V),
             duration: klingDuration,
             aspect_ratio: "16:9",
             mode: quality === "pro" ? "pro" : "standard",
@@ -2574,7 +2597,10 @@ serve(async (req) => {
 
           await supabaseAdmin
             .from("composer_scenes")
-            .update({ replicate_prediction_id: prediction.id })
+            .update({
+              replicate_prediction_id: prediction.id,
+              ...(isCinematicSyncScene ? { twoshot_stage: "master_clip" } : {}),
+            })
             .eq("id", scene.id);
 
           results.push({

@@ -96,6 +96,10 @@ export const DialogStitchVideoSchema = z.object({
   targetHeight: z.number().positive().optional(),
   srcWidth: z.number().positive().optional(),
   srcHeight: z.number().positive().optional(),
+  /** v182: for N=1 tight-overlay scenes, hold the final post-dialog frame
+   *  through scene end so the raw AI plate cannot keep idly moving lips after
+   *  the Sync.so speech window has ended. */
+  tailFreezeFromSec: z.number().min(0).optional().nullable(),
   shots: z.array(ShotSchema),
 });
 
@@ -338,6 +342,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   targetHeight,
   srcWidth,
   srcHeight,
+  tailFreezeFromSec,
   shots,
 }) => {
   const { fps, durationInFrames, width: compW, height: compH } = useVideoConfig();
@@ -349,6 +354,12 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   const sH = Number(srcHeight) > 0 ? Number(srcHeight) : (Number(targetHeight) > 0 ? Number(targetHeight) : compH);
   const scaleX = compW / sW;
   const scaleY = compH / sH;
+  const tailStartFrame = Number.isFinite(Number(tailFreezeFromSec))
+    ? Math.max(0, Math.min(durationInFrames, Math.round(Number(tailFreezeFromSec) * fps)))
+    : null;
+  const tailHoldDuration = tailStartFrame !== null
+    ? Math.max(0, durationInFrames - tailStartFrame)
+    : 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
@@ -369,6 +380,23 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
           />
         ) : null}
       </AbsoluteFill>
+
+      {tailStartFrame !== null && tailHoldDuration > 0 && !masterImageUrl && masterVideoUrl ? (
+        <Sequence
+          from={tailStartFrame}
+          durationInFrames={tailHoldDuration}
+          layout="none"
+        >
+          <Freeze frame={Math.max(0, tailStartFrame - 1)}>
+            <Video
+              src={masterVideoUrl}
+              muted
+              playbackRate={1}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </Freeze>
+        </Sequence>
+      ) : null}
 
       {/* Per-turn Sync.so outputs overlay only their own window. */}
       {sortedShots.map((shot, idx) => {
