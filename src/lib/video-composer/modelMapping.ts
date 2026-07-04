@@ -48,12 +48,12 @@ export const COMPOSER_AVAILABLE_MODELS: ToolkitModel[] = [
 /**
  * Clip sources whose underlying provider family is certified for the
  * Cinematic-Sync / Lip-Sync pipeline (Sync.so lipsync-2-pro overlay on top
- * of an i2v master plate). Per June 2026 policy this list is intentionally
- * minimal — only HappyHorse (primary, 3–15s native) and Hailuo (fallback,
- * 6/10s native) have proven stable as Sync.so master plates. All other
- * providers (Kling, Veo, Wan, Seedance, Luma, Sora, Pika, Runway, Vidu)
- * remain fully usable for B-roll / non-lipsync scenes but are hidden from
- * the picker the moment the user enables Dialog & Lip-Sync.
+ * of an i2v master plate). Per July 2026 expansion the allowlist covers
+ * six providers — HappyHorse (primary, 3–15s), Hailuo (fallback, 6/10s),
+ * Kling (3–15s), Wan (3–10s), Seedance (3–12s) and Luma Ray 2 (5/9s).
+ * All other providers (Veo, Sora, Pika, Runway, Vidu, Grok) remain fully
+ * usable for B-roll / non-lipsync scenes but are hidden from the picker
+ * the moment the user enables Dialog & Lip-Sync.
  */
 export const LIPSYNC_PRIMARY_CLIP_SOURCE: ClipSource = 'ai-happyhorse';
 export const LIPSYNC_FALLBACK_CLIP_SOURCE: ClipSource = 'ai-hailuo';
@@ -61,8 +61,9 @@ export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
   LIPSYNC_PRIMARY_CLIP_SOURCE,
   LIPSYNC_FALLBACK_CLIP_SOURCE,
   'ai-kling',
-  'ai-seedance',
   'ai-wan',
+  'ai-seedance',
+  'ai-luma',
 ];
 
 /**
@@ -71,7 +72,7 @@ export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
  */
 export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = LIPSYNC_CLIP_SOURCES;
 
-const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'seedance', 'wan']);
+const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seedance', 'luma']);
 
 /**
  * Composer dropdown models filtered to the Lip-Sync-certified subset

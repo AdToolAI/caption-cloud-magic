@@ -1098,11 +1098,21 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // running in parallel). Route through the same compose-video-clips
     // dispatch as the multi-speaker path so there is exactly ONE master clip
     // + ONE lip-sync pass + ONE audio source per scene.
+    // July 2026 — the "Clip mit Lip-Sync generieren" button itself counts as
+    // explicit opt-in. Previously the routing required scene-level
+    // engineOverride/lipSyncWithVoiceover to already be set, which meant a
+    // single-speaker Kling/Wan/… scene clicking the lip-sync button silently
+    // fell through to the inline VO path and never triggered Sync.so.
+    const buttonIntendsLipSync =
+      (blocks.length === 1 && renderAsSeparateScenes) ||
+      (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes);
+
     const forceCinematicSync =
       blocks.length === 1 &&
       allHavePortraits &&
       ((scene as any).engineOverride === 'cinematic-sync' ||
-        (scene as any).lipSyncWithVoiceover === true);
+        (scene as any).lipSyncWithVoiceover === true ||
+        buttonIntendsLipSync);
 
     if (!forceCinematicSync && (blocks.length < 2 || !useProfessionalSrs)) {
       await handleGenerateInline();
@@ -1366,28 +1376,50 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         );
         const userPick = Number(scene.durationSeconds || 6);
 
-        // Honour the user's chosen provider — never silent-switch to Hailuo.
-        // June 2026 Lip-Sync policy: HappyHorse is the primary master plate
-        // (3–15s native, honours user-picked durations), Hailuo only kicks in
-        // when the user explicitly switched to it as the 6/10s fallback.
+        // Honour the user's chosen provider — never silent-switch anymore.
+        // July 2026 Lip-Sync policy: certified master-plate providers are
+        // HappyHorse, Hailuo, Kling, Wan, Seedance and Luma. Anything else
+        // falls back to HappyHorse (safe 3–15s default). Backend enforces
+        // the same allowlist with a 400 response.
+        const LIPSYNC_PROVIDERS = [
+          'ai-hailuo', 'ai-happyhorse', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma',
+        ] as const;
+        type LipsyncProvider = typeof LIPSYNC_PROVIDERS[number];
         const userPickedProvider = (scene.clipSource as string) || 'ai-happyhorse';
-        const masterProvider: 'ai-hailuo' | 'ai-happyhorse' =
-          userPickedProvider === 'ai-hailuo' ? 'ai-hailuo' : 'ai-happyhorse';
+        const masterProvider: LipsyncProvider =
+          (LIPSYNC_PROVIDERS as readonly string[]).includes(userPickedProvider)
+            ? (userPickedProvider as LipsyncProvider)
+            : 'ai-happyhorse';
 
-
+        const clamp = (min: number, max: number) =>
+          Math.min(max, Math.max(min, Math.ceil(userPick)));
         const masterDuration =
-          masterProvider === 'ai-happyhorse'
-            ? Math.min(15, Math.max(3, Math.ceil(userPick)))
-            // Hailuo: STRICT — only honour exactly 10s as 10s, otherwise 6s.
-            // Never bump 6s/7s/8s/9s up to 10s based on audio length.
-            : userPick === 10
-              ? 10
-              : 6;
+          masterProvider === 'ai-hailuo'
+            // Hailuo STRICT — only 10 stays 10, everything else snaps to 6.
+            ? (userPick === 10 ? 10 : 6)
+            : masterProvider === 'ai-happyhorse'
+              ? clamp(3, 15)
+              : masterProvider === 'ai-kling'
+                ? clamp(3, 15)
+                : masterProvider === 'ai-wan'
+                  ? clamp(3, 10)
+                  : masterProvider === 'ai-seedance'
+                    ? clamp(3, 12)
+                    // Luma Ray 2 — only 5s or 9s.
+                    : (userPick >= 8 ? 9 : 5);
 
-        if (masterProvider === 'ai-hailuo' && audioRequired > masterDuration) {
+        if (audioRequired > masterDuration) {
+          const providerLabel: Record<LipsyncProvider, string> = {
+            'ai-hailuo': 'Hailuo',
+            'ai-happyhorse': 'HappyHorse',
+            'ai-kling': 'Kling',
+            'ai-wan': 'Wan',
+            'ai-seedance': 'Seedance',
+            'ai-luma': 'Luma Ray 2',
+          };
           toast({
             title: 'Dialog länger als Szene',
-            description: `Audio braucht ~${audioRequired}s, Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Hailuo auf 10s setzen oder HappyHorse nutzen.`,
+            description: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`,
           });
         }
 

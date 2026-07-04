@@ -1295,49 +1295,66 @@ serve(async (req) => {
       }
 
       const __engineForHHGuard = scene.engineOverride ?? "auto";
+
+      // Lip-Sync master-plate allowlist (July 2026 expansion).
+      // Sync.so operates on a finished MP4, so any provider whose output is a
+      // standard video URL can act as a master plate. Certified providers:
+      //   - ai-happyhorse (primary, 3–15s)
+      //   - ai-hailuo (fallback, 6/10s)
+      //   - ai-kling (3–15s)
+      //   - ai-wan (3–10s)
+      //   - ai-seedance (3–12s)
+      //   - ai-luma (5s or 9s)
+      // Other providers (Runway/Vidu/Pika/Veo/Sora/Grok) remain excluded until
+      // individually validated.
+      const LIPSYNC_PROVIDERS = new Set([
+        "ai-happyhorse",
+        "ai-hailuo",
+        "ai-kling",
+        "ai-wan",
+        "ai-seedance",
+        "ai-luma",
+      ]);
+
       if (
-        (scene.clipSource as string) === "ai-happyhorse" &&
+        LIPSYNC_PROVIDERS.has(scene.clipSource as string) &&
         (__engineForHHGuard === "cinematic-sync" ||
           __engineForHHGuard === "sync-segments")
       ) {
         console.log(
-          `[compose-video-clips] Scene ${scene.id}: HappyHorse + ${__engineForHHGuard} — keeping HappyHorse as master plate (silent Hailuo migration removed June 2026). Duration ${scene.durationSeconds}s preserved.`,
+          `[compose-video-clips] Scene ${scene.id}: ${scene.clipSource} + ${__engineForHHGuard} — keeping as master plate. Duration ${scene.durationSeconds}s preserved.`,
         );
       }
 
-      // June 26 2026 — LIP-SYNC PROVIDER ALLOWLIST.
-      // Only ai-happyhorse (primary) and ai-hailuo (fallback) are certified
-      // as Sync.so master plates. Reject any other clip source in the
-      // cinematic-sync / sync-segments pipeline with a clear 400 so the
-      // frontend can route the user back to the picker. Defense-in-depth
-      // against UI bypass / legacy scenes / stale optimistic state.
+      // Defense-in-depth: reject non-certified providers in the lip-sync
+      // pipeline with a clear 400 so the frontend can route the user back
+      // to the provider picker.
       if (
         (__engineForHHGuard === "cinematic-sync" ||
           __engineForHHGuard === "sync-segments") &&
-        (scene.clipSource as string) !== "ai-happyhorse" &&
-        (scene.clipSource as string) !== "ai-hailuo"
+        !LIPSYNC_PROVIDERS.has(scene.clipSource as string)
       ) {
         return new Response(
           JSON.stringify({
             error: "invalid_provider_for_lipsync",
-            message: `Lip-Sync ist nur mit HappyHorse (empfohlen · 3–15s) oder Hailuo (Fallback · 6/10s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`,
+            message:
+              `Lip-Sync ist aktuell nur mit HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) oder Luma (5/9s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`,
             scene_id: scene.id,
             picked: scene.clipSource,
-            allowed: ["ai-happyhorse", "ai-hailuo"],
+            allowed: Array.from(LIPSYNC_PROVIDERS),
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
       // Duration guard — surface mismatches instead of silently snapping.
-      // Hailuo: only 6s or 10s. HappyHorse: 3–15s.
       if (scene.clipSource === "ai-hailuo") {
         const d = Number(scene.durationSeconds);
         if (d !== 6 && d !== 10) {
           return new Response(
             JSON.stringify({
               error: "invalid_duration_for_provider",
-              message: `Hailuo unterstützt nur 6s oder 10s. Gewählt: ${d}s. Bitte Szenenlänge auf 6 oder 10 setzen oder Provider auf HappyHorse (3–15s) wechseln.`,
+              message: `Hailuo unterstützt nur 6s oder 10s. Gewählt: ${d}s. Bitte Szenenlänge auf 6 oder 10 setzen oder Provider wechseln.`,
               scene_id: scene.id,
               provider: "ai-hailuo",
               picked: d,
@@ -1357,6 +1374,66 @@ serve(async (req) => {
               provider: "ai-happyhorse",
               picked: d,
               allowed: { min: 3, max: 15 },
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      } else if (scene.clipSource === "ai-kling") {
+        const d = Number(scene.durationSeconds);
+        if (!Number.isFinite(d) || d < 3 || d > 15) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: `Kling unterstützt 3–15 Sekunden. Gewählt: ${d}s.`,
+              scene_id: scene.id,
+              provider: "ai-kling",
+              picked: d,
+              allowed: { min: 3, max: 15 },
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      } else if (scene.clipSource === "ai-wan") {
+        const d = Number(scene.durationSeconds);
+        if (!Number.isFinite(d) || d < 3 || d > 10) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: `Wan unterstützt 3–10 Sekunden. Gewählt: ${d}s.`,
+              scene_id: scene.id,
+              provider: "ai-wan",
+              picked: d,
+              allowed: { min: 3, max: 10 },
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      } else if (scene.clipSource === "ai-seedance") {
+        const d = Number(scene.durationSeconds);
+        if (!Number.isFinite(d) || d < 3 || d > 12) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: `Seedance unterstützt 3–12 Sekunden. Gewählt: ${d}s.`,
+              scene_id: scene.id,
+              provider: "ai-seedance",
+              picked: d,
+              allowed: { min: 3, max: 12 },
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      } else if (scene.clipSource === "ai-luma") {
+        const d = Number(scene.durationSeconds);
+        if (d !== 5 && d !== 9) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_duration_for_provider",
+              message: `Luma Ray 2 unterstützt nur 5s oder 9s. Gewählt: ${d}s.`,
+              scene_id: scene.id,
+              provider: "ai-luma",
+              picked: d,
+              allowed: [5, 9],
             }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
