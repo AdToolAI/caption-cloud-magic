@@ -159,7 +159,7 @@ export const BRIEFING_TOOL_PARAMETERS = {
           durationSec: { type: 'number' },
           engine: {
             type: 'string',
-            enum: ['auto', 'broll', 'heygen', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue'],
+            enum: ['auto', 'broll', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue'],
           },
           voiceover: {
             type: 'object',
