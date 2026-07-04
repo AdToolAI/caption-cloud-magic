@@ -22,6 +22,7 @@ import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { isRealizedScene } from '@/lib/composer/isRealizedScene';
+import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
 
 // v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
 // per scene). DB select is filtered by project_id + indexed, load negligible.
@@ -38,6 +39,16 @@ const POLL_INTERVAL_MS = 2_500;
  */
 const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
 const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
+
+/**
+ * v-clean-1: Zusätzlicher Filter neben `isDialogEngine`. Selbst wenn eine
+ * Alt-Zeile noch mit `engine_override='cinematic-sync'` in der DB steht,
+ * feuern wir Sync.so nur wenn der User explizit opt-in gemacht hat.
+ * Verhindert dass HeyGen-Migration-Reste oder ein zukünftiger UI-Bug
+ * ungewollt Sync.so-Kosten auslösen.
+ */
+const isLipSyncCandidate = (d: any) =>
+  isDialogEngine(d.engine_override) && isLipSyncIntentionalRow(d);
 
 function detectSpeakerCount(dialogScript: string): number {
   const set = new Set<string>();
