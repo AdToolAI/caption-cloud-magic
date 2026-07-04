@@ -131,37 +131,37 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     };
   }
 
-  // ── Auto routing — Action-First (June 2026) ────────────────────────
-  if (hasDialog && hasCast) {
-    // Composer dialog scenes ALWAYS route to Cinematic-Sync (sync-segments)
-    // on a real Hailuo/HappyHorse action plate + Sync.so lip-sync. The
-    // static-single-speaker HeyGen shortcut was removed together with the
-    // legacy Talking-Head/Portrait Composer path.
-    void isStatic;
-    return {
-      engine: 'sync-segments',
-      label: speakers >= 2 ? `🎬 Action + Lip-Sync · ${speakers} Sprecher (Auto)` : '🎬 Action + Lip-Sync (Auto)',
-      reason:
-        'Action-First: echte Hailuo/HappyHorse-Plate mit physischer Bewegung, Sync.so legt präzisen Lip-Sync drauf — kein starrer Talking-Head-Bust.',
-      extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
-    };
-  }
-
-
-  if (scene.lipSyncWithVoiceover && hasCast) {
+  // ── Auto routing — Opt-in only (June 2026 clean rewrite) ───────────
+  // Kein impliziter Sync.so-Trigger mehr. Nur wenn der User explizit
+  // opt-in gemacht hat (Toggle / dialogMode / expliziter Override),
+  // schlagen wir eine Lip-Sync-Engine vor. Sonst immer B-Roll.
+  if (isLipSyncIntentional(scene) && hasCast) {
+    if (speakers >= 2) {
+      return {
+        engine: 'sync-segments',
+        label: `🎬 Action + Lip-Sync · ${speakers} Sprecher`,
+        reason:
+          'Sync.so Segments API auf einer Hailuo/HappyHorse-Action-Plate — ein Lipsync-Call mit segments[] pro Sprecher-Turn.',
+        extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
+      };
+    }
     return {
       engine: 'sync-polish',
       label: '✨ Sync.so Polish',
       reason:
-        'B-Roll mit Sync.so-Polish-Pass — Qualität auf KI-Gesichtern variiert, nutze HeyGen für sichere Sprecher-Inserts.',
+        'Hailuo/HappyHorse-Plate mit Sync.so Polish-Pass — echte Mundbewegung auf KI-Gesicht.',
       extraCostEur: 0.05,
     };
   }
 
+  void isStatic;
   return {
     engine: 'broll',
     label: '🎬 B-Roll',
-    reason: 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.',
+    reason:
+      hasDialog && hasCast
+        ? 'Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.'
+        : 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.',
     extraCostEur: 0,
   };
 }
