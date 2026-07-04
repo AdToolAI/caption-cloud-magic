@@ -72,7 +72,7 @@ export const LIPSYNC_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
  */
 export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = LIPSYNC_CLIP_SOURCES;
 
-const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'seedance', 'wan']);
+const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seedance', 'luma']);
 
 /**
  * Composer dropdown models filtered to the Lip-Sync-certified subset
