@@ -111,7 +111,7 @@ interface ClipScene {
   dialogScript?: string;
   /** Map of characterId → voice (string voiceId or { voiceId }). */
   dialogVoices?: Record<string, string | DialogVoiceCfg>;
-  /** Render-engine override: 'auto' | 'heygen' | 'broll' | 'sync-polish'. */
+  /** Render-engine override. 'heygen' is a legacy value that is silently normalised to 'cinematic-sync'. */
   engineOverride?:
     | "auto"
     | "heygen"
