@@ -1,88 +1,28 @@
-## Befund
-
-Der Button **„Lipsync komplett zurücksetzen"** hat aktuell zwei Probleme:
-
-1. Er löscht zu viel Szenen-Rendering-State (`clip_url`, `clip_status`, `reference_image_url`), dadurch wirkt die Szene/Preview gelöscht.
-2. Er löscht nicht sauber die Lip-Sync-Absicht. `engine_override='cinematic-sync'` und/oder `lip_sync_with_voiceover=true` bleiben aktiv. Der globale Auto-Trigger (`useTwoShotAutoTrigger`) erkennt die Szene deshalb wenige Sekunden später wieder als gültigen Lip-Sync-Kandidaten und startet Sync.so erneut.
-
 ## Ziel
-
-Der rote Button bedeutet künftig: **Lip-Sync stoppen und für diese Szene deaktivieren**, ohne das Basis-Video der Szene zu löschen.
+Der Button „Lipsync komplett zurücksetzen“ soll nicht nur den Backend-Job abbrechen, sondern sofort und dauerhaft im UI als gestoppt erscheinen. Keine Szene und kein Basis-Video wird gelöscht.
 
 ## Umsetzung
+1. **UI-Progress nach Cancel beenden**
+   - Nach erfolgreichem `cancel-dialog-lipsync` zusätzlich ein `lipsync:end` Pipeline-Event senden.
+   - Dadurch verschwindet der globale Lip-Sync-Fortschrittsbalken sofort statt weiterzulaufen.
 
-### 1. Button-Handler in `SceneCard.tsx` korrigieren
+2. **Lokale Szene vollständig als deaktiviert markieren**
+   - Im `onUpdate`-Patch neben `lipSyncStatus: 'canceled'` auch alle sichtbaren Lip-Sync-Aktivitätsfelder neutralisieren.
+   - Wichtig: `clipUrl`, `clipStatus`, `referenceImageUrl`, `replicatePredictionId` des Basis-Videos bleiben unangetastet.
 
-Beim Klick auf **„Lipsync komplett zurücksetzen"**:
+3. **Progress-/Badge-Logik korrigieren**
+   - Stellen, die `twoshotStage`, `lipSyncStatus` oder Dialog-Shots als aktive Arbeit zählen, sollen `canceled` explizit als terminalen Zustand behandeln.
+   - Ergebnis: keine Anzeige „Lip-Sync startet…“ oder laufender Balken mehr, wenn der Status `canceled` ist.
 
-- `cancel-dialog-lipsync` weiter aufrufen, damit laufende Sync.so-Jobs serverseitig beendet werden.
-- Danach DB-Update nur auf Lip-Sync- und Opt-out-Felder anwenden:
+4. **Auto-Trigger gegen Cancel absichern**
+   - Bestehende Kandidatenfilter lassen `lip_sync_status='canceled'` bereits nicht erneut starten.
+   - Ich ergänze nur dort eine Absicherung, wo Prep-/Self-Heal-Logik vor dem Kandidatenfilter noch alte Stages wie `audio`/`master_clip` sehen könnte.
 
-```ts
-{
-  lip_sync_status: 'canceled',
-  lip_sync_applied_at: null,
-  lip_sync_source_clip_url: null,
-  twoshot_stage: null,
-  dialog_shots: null,
-  lip_sync_with_voiceover: false,
-  dialog_mode: false,
-  engine_override: 'auto',
-  updated_at: now,
-}
-```
+5. **Server-Race absichern**
+   - Prüfen, ob `cancel-dialog-lipsync` alle bekannten Job-IDs erwischt und den Row-Status eindeutig terminal setzt.
+   - Falls nötig: bei `reset: true` zusätzlich die sichtbaren Dispatch-Marker so setzen, dass spätere Webhooks/alte Polls den UI-Zustand nicht wiederbeleben.
 
-Wichtig: Diese Felder werden **nicht mehr** gelöscht/geändert:
-
-```ts
-clip_url
-clip_status
-clip_error
-reference_image_url
-replicate_prediction_id
-```
-
-Damit bleibt das gerenderte Basis-Video sichtbar.
-
-### 2. Lokalen UI-State analog aktualisieren
-
-Das `onUpdate(...)` nach dem DB-Update wird ebenfalls nur auf Lip-Sync/Opt-out-Felder reduziert:
-
-```ts
-{
-  lipSyncStatus: 'canceled',
-  lipSyncAppliedAt: null,
-  lipSyncSourceClipUrl: null,
-  twoshotStage: null,
-  dialogShots: null,
-  lipSyncWithVoiceover: false,
-  dialogMode: false,
-  engineOverride: 'auto',
-}
-```
-
-`clipUrl`, `clipStatus`, `referenceImageUrl` bleiben unverändert.
-
-### 3. Texte anpassen
-
-Der Confirm-Dialog wird eindeutig:
-
-„Lip-Sync für diese Szene wirklich stoppen und deaktivieren? Laufende Sync.so-Jobs werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten."
-
-Der Toast wird eindeutig:
-
-- Titel: `Lip-Sync gestoppt`
-- Beschreibung: `Sync.so wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.`
-
-### 4. Kein Server-Refactor nötig
-
-`cancel-dialog-lipsync` ist als Cancel-Endpunkt schon passend: Es setzt `lip_sync_status='canceled'`. Der Fehler liegt im nachfolgenden Client-Update, das Status/Opt-in wieder so setzt, dass der Auto-Trigger erneut losläuft.
-
-`reset-lipsync-scene` bleibt unverändert, weil der separate Button **„Lip-Sync neu rendern"** genau für einen expliziten Neustart gedacht ist.
-
-## Erwartetes Verhalten nach Fix
-
-- Klick auf roten Button stoppt laufenden Lip-Sync.
-- Die Szene bleibt mit ihrem Basis-Clip sichtbar.
-- Der globale Auto-Trigger startet Sync.so nicht erneut, weil `lip_sync_with_voiceover=false`, `dialog_mode=false` und `engine_override='auto'` gesetzt sind.
-- Nur ein expliziter Klick auf **„Lip-Sync neu rendern"** oder erneutes Aktivieren der Lip-Sync-Option startet wieder Kosten/Sync.so.
+## Verifikation
+- Szene mit laufendem Lip-Sync abbrechen.
+- Erwartung: Toast erscheint, Scene-Overlay hört sofort auf, globaler Lip-Sync-Balken endet, Button bleibt verfügbar/terminal, Basis-Video bleibt sichtbar.
+- Nach dem nächsten Poll/Realtime-Update darf Lip-Sync nicht erneut starten.

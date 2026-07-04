@@ -710,7 +710,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url, lock_reference_url",
+        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url",
       )
       .eq("id", sceneId)
       .single();
@@ -725,6 +725,13 @@ serve(async (req) => {
       .single();
     const userId = project?.user_id;
     if (!userId) return json({ error: "missing_user" }, 403);
+
+    if (
+      (scene as any).lip_sync_status === "canceled" ||
+      (scene as any).dialog_shots?.status === "canceled"
+    ) {
+      return json({ ok: true, skipped: "canceled", scene_id: sceneId });
+    }
 
     // v100 — register sceneId/userId/supabase/syncApiKey for the crash-safe
     // outer catch (line ~3107). From this point on, any uncaught throw will

@@ -112,6 +112,26 @@ const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
   export: 90,
 };
 
+const TERMINAL_TWOSHOT_STAGES = new Set(['done', 'complete', 'failed', 'audio_mux_failed', 'canceled']);
+const TERMINAL_DIALOG_SHOT_STATUSES = new Set(['done', 'failed', 'canceled']);
+
+function isCanceledLipsyncScene(scene: any) {
+  return (
+    scene?.lipSyncStatus === 'canceled' ||
+    scene?.lip_sync_status === 'canceled' ||
+    scene?.dialogShots?.status === 'canceled' ||
+    scene?.dialog_shots?.status === 'canceled'
+  );
+}
+
+function isActiveTwoshotStage(stage: unknown) {
+  return !!stage && !TERMINAL_TWOSHOT_STAGES.has(String(stage));
+}
+
+function isActiveDialogShots(dialogShots: any) {
+  return !!dialogShots?.status && !TERMINAL_DIALOG_SHOT_STATUSES.has(String(dialogShots.status));
+}
+
 // Customer-facing Composer generation should feel like one stable 7–8 minute
 // process, not like separate phases racing each other to 70% after 2 minutes.
 const RUN_NOMINAL_SECONDS = 480;
@@ -202,9 +222,10 @@ export function usePipelineProgress({
         const ai = ss.filter((s) => s.clipSource?.startsWith('ai-'));
         const lipTargets = ss.filter(
           (s) =>
-            (s as any).twoshotStage ||
-            s.engineOverride === 'cinematic-sync' ||
-            (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+            !isCanceledLipsyncScene(s) &&
+            ((s as any).twoshotStage ||
+              s.engineOverride === 'cinematic-sync' ||
+              (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
         );
         const dsTotals = lipTargets.reduce(
           (acc, s) => {
@@ -256,22 +277,24 @@ export function usePipelineProgress({
     const ac = assemblyConfig;
     const hasActiveBackend = ss.some((s) => {
       const sa = s as any;
+      if (isCanceledLipsyncScene(sa)) return false;
       if (sa.clipStatus === 'generating') return true;
       if (sa.lipSyncStatus === 'running') return true;
       if (sa.replicatePredictionId) return true;
       const stage = sa.twoshotStage;
-      if (stage && !['done', 'complete', 'failed'].includes(stage)) return true;
+      if (isActiveTwoshotStage(stage)) return true;
       const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
-      if (!!ds && ds.status && !['done', 'failed'].includes(ds.status)) return true;
+      if (isActiveDialogShots(ds)) return true;
       return false;
     });
     if (!hasActiveBackend) return;
     const ai = ss.filter((s) => s.clipSource?.startsWith('ai-'));
     const lipTargets = ss.filter(
       (s) =>
-        (s as any).twoshotStage ||
-        s.engineOverride === 'cinematic-sync' ||
-        (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+        !isCanceledLipsyncScene(s) &&
+        ((s as any).twoshotStage ||
+          s.engineOverride === 'cinematic-sync' ||
+          (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
     );
     const dsTotals = lipTargets.reduce(
       (acc, s) => {
@@ -315,9 +338,10 @@ export function usePipelineProgress({
     () =>
       scenes.some(
         (s) =>
-          (s as any).twoshotStage ||
-          s.engineOverride === 'cinematic-sync' ||
-          dialogVoiceCount(s) > 1,
+          !isCanceledLipsyncScene(s) &&
+          ((s as any).twoshotStage ||
+            s.engineOverride === 'cinematic-sync' ||
+            dialogVoiceCount(s) > 1),
       ),
     [scenes],
   );
@@ -353,15 +377,16 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
+      if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
       const stage = sa.twoshotStage;
       const lip = sa.lipSyncStatus;
       const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
-      const dsActive = !!ds && ds.status && !['done', 'failed'].includes(ds.status);
+      const dsActive = isActiveDialogShots(ds);
       return (
         !!sa.replicatePredictionId ||
         lip === 'running' ||
-        (stage && !['done', 'complete', 'failed'].includes(stage)) ||
+        isActiveTwoshotStage(stage) ||
         dsActive
       );
     }).length;
@@ -418,8 +443,9 @@ export function usePipelineProgress({
         const ts = (s as any).twoshotStage ?? (s as any).twoshot_stage;
         const ls = (s as any).lipSyncStatus ?? (s as any).lip_sync_status;
         if (cs === 'failed') return false;
-        if (ts === 'failed' || ts === 'audio_mux_failed') return false;
+        if (TERMINAL_TWOSHOT_STAGES.has(String(ts))) return false;
         if (ls === 'canceled') return false;
+        if (isCanceledLipsyncScene(s)) return false;
         return (
           (s as any).twoshotStage ||
           s.engineOverride === 'cinematic-sync' ||
@@ -440,13 +466,10 @@ export function usePipelineProgress({
      */
     const isTerminalScene = (s: any) =>
       s.lipSyncStatus === 'applied' ||
+      s.lipSyncStatus === 'canceled' ||
       s.lipSyncStatus === 'failed' ||
-      s.twoshotStage === 'complete' ||
-      s.twoshotStage === 'done' ||
-      s.twoshotStage === 'failed' ||
-      s.twoshotStage === 'audio_mux_failed' ||
-      getDialogShots(s)?.status === 'done' ||
-      getDialogShots(s)?.status === 'failed';
+      TERMINAL_TWOSHOT_STAGES.has(String(s.twoshotStage ?? '')) ||
+      TERMINAL_DIALOG_SHOT_STATUSES.has(String(getDialogShots(s)?.status ?? ''));
 
     const done = targets.filter((s) => {
       const ds = getDialogShots(s);
@@ -470,7 +493,7 @@ export function usePipelineProgress({
       if (Array.isArray(jobs) && jobs.length > 0) return true;
       if (plan?.twoshot?.heartbeat?.syncJobId) return true;
       const ds = getDialogShots(s);
-      if (ds && ds.status && !['done', 'failed'].includes(ds.status)) return true;
+      if (isActiveDialogShots(ds)) return true;
       if (Array.isArray(ds?.shots) && ds!.shots.some((sh) =>
         ['pending', 'generating', 'generated', 'lipsyncing'].includes(sh.status),
       )) return true;
@@ -485,7 +508,7 @@ export function usePipelineProgress({
       (s) => {
         if (isTerminalScene(s)) return false;
         const stage = (s as any).twoshotStage;
-        if (!stage || ['complete', 'done', 'failed', 'audio_mux_failed'].includes(stage)) return false;
+        if (!isActiveTwoshotStage(stage)) return false;
         // Frühe v5-Stages (Audio-Prep, Anchor-Bau, Master-Plate, Sync.so-Queue,
         // Audio-Mux, Circuit Breaker) zählen als laufend — auch wenn
         // lipSyncStatus noch null/pending/audio_muxing ist. Sonst verschwindet
@@ -506,7 +529,7 @@ export function usePipelineProgress({
     ) || targets.some((s) => {
       if (isTerminalScene(s)) return false;
       const ds = getDialogShots(s);
-      return !!ds && ds.status !== 'done' && ds.status !== 'failed';
+      return isActiveDialogShots(ds);
     });
 
     const failed = targets.some((s) => {
@@ -712,8 +735,10 @@ export function usePipelineProgress({
   // v73 — Multi-speaker fan-out (3–4 Sprecher) braucht legitim mehr als 4
   // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
   const lipTargetCount = (scenes ?? []).filter((s: any) =>
-    s.twoshotStage || s.engineOverride === 'cinematic-sync' ||
-    (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+    !isCanceledLipsyncScene(s) &&
+    (s.twoshotStage ||
+      s.engineOverride === 'cinematic-sync' ||
+      (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
     const n = s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
@@ -738,12 +763,13 @@ export function usePipelineProgress({
   // visible in the scene state, the run is NOT stalled even if the
   // weighted progress bar hasn't moved (Sync.so passes are long).
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
+    if (isCanceledLipsyncScene(s)) return false;
     if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
     if (s.engineOverride === 'cinematic-sync' && s.clipStatus === 'generating') return true;
     const stage = s.twoshotStage;
-    if (stage && !['done', 'complete', 'failed', 'audio_mux_failed'].includes(String(stage))) return true;
+    if (isActiveTwoshotStage(stage)) return true;
     const ds = s.dialogShots ?? s.dialog_shots ?? null;
-    if (ds && ds.status && !['done', 'failed'].includes(ds.status)) return true;
+    if (isActiveDialogShots(ds)) return true;
     if (ds?.audio_mux?.render_id) return true;
     const predId = s.replicatePredictionId;
     if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
