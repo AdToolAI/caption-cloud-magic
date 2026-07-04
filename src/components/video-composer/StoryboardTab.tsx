@@ -567,14 +567,7 @@ export default function StoryboardTab({
           >
             <Library className="h-3.5 w-3.5" /> Scene Library
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setTalkingHeadOpen(true)}
-            className="gap-1 text-xs border-primary/40 text-primary hover:bg-primary/10"
-          >
-            <Mic className="h-3.5 w-3.5" /> Talking-Head
-          </Button>
+          {/* Talking-Head button REMOVED — standalone /talking-head module. */}
           {/* Status-Chip + Master-Generate-Button (ersetzt den alten "→ Clips" Tab-Wechsel) */}
           {scenes.length > 0 && (
             <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
