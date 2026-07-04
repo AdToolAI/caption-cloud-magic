@@ -1,23 +1,18 @@
 /**
- * sceneEngineRouter — Pure routing logic that decides which generation engine
- * a Composer scene should use for *truly film-grade* output.
+ * sceneEngineRouter — Pure, side-effect-free UI *recommendation*.
  *
- * Three engines (matched to the plan):
+ * ⚠️  Diese Funktion darf NIEMALS Persistenz, Kosten oder Renders auslösen.
+ *     Sie liefert eine Textempfehlung fürs Prompt-UI. Die tatsächliche
+ *     Routing-Entscheidung (Cinematic-Sync ja/nein) trifft ausschließlich
+ *     `isLipSyncIntentional()` in `lipSyncIntent.ts`.
  *
- *  1. **heygen-talking-head** — frame-perfect lip-sync via HeyGen Photo Avatar.
- *     Used when a scene has dialog text AND a Brand-Character cast.
- *
- *  2. **sync-polish** — Hailuo/Seedance B-roll + sync.so/lipsync-2 polish.
- *     Used when the user explicitly enables `lipSyncWithVoiceover` on a non-
- *     dialog character close-up. Quality on AI faces is unreliable, so this
- *     is opt-in only.
- *
- *  3. **broll** — Hailuo/Seedance/etc. without lip-sync; VO plays as
- *     off-screen narration. The default for landscape, product, drone shots.
- *
- * The router is a *suggestion* — the SceneCard always lets the user override.
+ * Ohne explizites User-Opt-in (Toggle "Lip-Sync AN", `dialogMode`, oder
+ * manueller Engine-Override) empfehlen wir immer B-Roll. Auto-Heuristiken
+ * (Dialog + Cast + Provider = Lip-Sync) sind bewusst entfernt — sie waren
+ * die Ursache für unbeabsichtigt getriggerten Sync.so.
  */
 import type { ComposerScene } from '@/types/video-composer';
+import { isLipSyncIntentional } from './lipSyncIntent';
 
 export type SceneEngine = 'sync-polish' | 'cinematic-sync' | 'sync-segments' | 'broll';
 
@@ -27,7 +22,7 @@ export interface EngineRecommendation {
   label: string;
   /** Short tooltip explaining *why* this engine. */
   reason: string;
-  /** Estimated extra cost in EUR over the base AI clip cost (HeyGen ≈ 0.30, sync ≈ 0.05). */
+  /** Estimated extra cost in EUR over the base AI clip cost (sync ≈ 0.05, segments ≈ 0.20+). */
   extraCostEur: number;
 }
 
