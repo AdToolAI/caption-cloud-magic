@@ -183,7 +183,7 @@ export default function StoryboardTab({
   }>({ open: false, scene: null, mode: 'forward' });
 
   // Block Q — Talking-Head dialog state
-  const [talkingHeadOpen, setTalkingHeadOpen] = useState(false);
+  // talkingHeadOpen state removed with the Composer TalkingHead button.
 
   // Scene Library (snippets)
   const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
