@@ -287,7 +287,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
         const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
           if (!isRealizedScene(d)) return false;
-          if (!isDialogEngine(d.engine_override)) return false;
+          if (!isLipSyncCandidate(d)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
