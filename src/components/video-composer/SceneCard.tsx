@@ -2018,6 +2018,9 @@ export default function SceneCard({
                       )
                         return;
                       try {
+                        markLipSyncPending(scene.id, false);
+                        markDialogModePending(scene.id, false);
+                        markEngineOverridePending(scene.id, "auto");
                         (onUpdate as (updates: any) => void)({
                           lipSyncStatus: "canceled" as any,
                           lipSyncAppliedAt: null as any,
@@ -2509,6 +2512,9 @@ export default function SceneCard({
                             type="button"
                             onClick={async () => {
                               try {
+                                markLipSyncPending(scene.id, false);
+                                markDialogModePending(scene.id, false);
+                                markEngineOverridePending(scene.id, "auto");
                                 // Optimistic local update so the spinner stops immediately.
                                 (onUpdate as (updates: any) => void)({
                                   lipSyncStatus: "canceled" as any,
