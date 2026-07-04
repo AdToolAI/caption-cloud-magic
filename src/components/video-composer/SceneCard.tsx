@@ -162,6 +162,7 @@ import {
   estimateHeygenCostEur,
 } from "@/lib/video-composer/sceneEngineRouter";
 import { validateSceneForCinematicSync } from "@/lib/video-composer/validateSceneForCinematicSync";
+import { emitPipelineEvent } from "@/lib/pipelineEvents";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2017,12 +2018,25 @@ export default function SceneCard({
                       )
                         return;
                       try {
+                        (onUpdate as (updates: any) => void)({
+                          lipSyncStatus: "canceled" as any,
+                          lipSyncAppliedAt: null as any,
+                          lipSyncSourceClipUrl: null as any,
+                          twoshotStage: null as any,
+                          dialogShots: null as any,
+                          lipSyncWithVoiceover: false,
+                          dialogMode: false,
+                          engineOverride: "auto",
+                          clipError: "lipsync_canceled_by_user" as any,
+                          replicatePredictionId: null as any,
+                        });
+                        emitPipelineEvent({ type: "lipsync:end" });
                         await supabase.functions
                           .invoke("cancel-dialog-lipsync", {
                             body: { scene_id: scene.id, reset: true },
                           })
                           .catch(() => {});
-                        await supabase
+                        const { error: updateError } = await supabase
                           .from("composer_scenes")
                           .update({
                             lip_sync_status: "canceled",
@@ -2033,19 +2047,13 @@ export default function SceneCard({
                             lip_sync_with_voiceover: false,
                             dialog_mode: false,
                             engine_override: "auto",
+                            clip_error: "lipsync_canceled_by_user",
+                            replicate_prediction_id: null,
                             updated_at: new Date().toISOString(),
                           })
                           .eq("id", scene.id);
-                        (onUpdate as (updates: any) => void)({
-                          lipSyncStatus: "canceled" as any,
-                          lipSyncAppliedAt: null as any,
-                          lipSyncSourceClipUrl: null as any,
-                          twoshotStage: null as any,
-                          dialogShots: null as any,
-                          lipSyncWithVoiceover: false,
-                          dialogMode: false,
-                          engineOverride: "auto",
-                        });
+                        if (updateError) throw updateError;
+                        emitPipelineEvent({ type: "lipsync:end" });
                         toast({
                           title: "Lip-Sync gestoppt",
                           description:
@@ -2505,12 +2513,20 @@ export default function SceneCard({
                                 onUpdate({
                                   lipSyncStatus: "canceled" as any,
                                   twoshotStage: null as any,
+                                  dialogShots: null as any,
+                                  lipSyncWithVoiceover: false,
+                                  dialogMode: false,
+                                  engineOverride: "auto",
+                                  clipError: "lipsync_canceled_by_user" as any,
+                                  replicatePredictionId: null as any,
                                 });
+                                emitPipelineEvent({ type: "lipsync:end" });
                                 const { error } = await supabase.functions.invoke(
                                   "cancel-dialog-lipsync",
                                   { body: { scene_id: scene.id, reset: true } },
                                 );
                                 if (error) throw error;
+                                emitPipelineEvent({ type: "lipsync:end" });
                                 toast({
                                   title: "Lip-Sync abgebrochen",
                                   description:
