@@ -17,6 +17,7 @@ import { toast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import type {
   ComposerScene,
   ComposerCharacter,
