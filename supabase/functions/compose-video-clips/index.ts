@@ -1112,7 +1112,12 @@ serve(async (req) => {
           eo === "cinematic-sync" || eo === "sync-segments" || eo === "native-dialogue";
         const hasOptIn =
           (scene as any).lipSyncWithVoiceover === true ||
-          (scene as any).dialogMode === true;
+          (scene as any).dialogMode === true ||
+          (typeof (scene as any).dialogScript === 'string' &&
+            (scene as any).dialogScript.trim().length > 0 &&
+            (scene as any).dialogVoices &&
+            typeof (scene as any).dialogVoices === 'object' &&
+            Object.keys((scene as any).dialogVoices).length > 0);
         if (isLipSyncEngine && !hasOptIn) {
           try {
             const { data: dbRow } = await supabaseAdmin
