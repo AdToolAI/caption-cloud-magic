@@ -23,6 +23,7 @@ import {
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { recommendEngineForScene, countSpeakers } from '@/lib/video-composer/sceneEngineRouter';
+import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { composeFinalPrompt, type DirectorLanguage } from "@/lib/motion-studio/composeFinalPrompt";
