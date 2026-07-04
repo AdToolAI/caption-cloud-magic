@@ -1276,15 +1276,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
             : 0;
           const engineRec = recommendEngineForScene(scene);
-          const isHeygen = engineRec.engine === 'heygen-talking-head';
-          // For HeyGen, the actual render cost = HeyGen extra cost (no Hailuo).
-          // For sync-polish, base + extra. For broll, just base.
-          const costPerClip = isHeygen
-            ? engineRec.extraCostEur
-            : baseCost + (engineRec.engine === 'sync-polish' ? engineRec.extraCostEur : 0);
+          const isHeygen = false as const; // HeyGen route removed from Composer.
+          // sync-polish adds extra; broll/base flat.
+          const costPerClip =
+            baseCost + (engineRec.engine === 'sync-polish' ? engineRec.extraCostEur : 0);
           const isUpload = scene.clipSource === 'upload';
           const hasUpload = !!scene.uploadUrl;
-          const isAi = scene.clipSource.startsWith('ai-') || isHeygen;
+          const isAi = scene.clipSource.startsWith('ai-');
           const isStock = scene.clipSource === 'stock';
           const isThisGenerating = singleGenerating[scene.id] || scene.clipStatus === 'generating';
 
