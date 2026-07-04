@@ -108,7 +108,10 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   // Cinematic-Sync state — Dialog-Shot pipeline (1..N speakers).
   // Each speaker turn becomes its own Hailuo plate + Sync.so lipsync.
   const isCinematic = scene.engineOverride === 'cinematic-sync';
+  const dialogShotsState = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
+  const lipSyncCanceled = scene.lipSyncStatus === 'canceled' || dialogShotsState?.status === 'canceled';
   const shouldBeSceneLipsync =
+    !lipSyncCanceled &&
     isCinematic ||
     scene.dialogMode === true ||
     scene.lipSyncWithVoiceover === true;
@@ -117,7 +120,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     scene.clipStatus === 'ready' &&
     typeof scene.clipUrl === 'string' &&
     scene.clipUrl.includes('/talking-head-renders/');
-  const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
+  const lipSyncRunning = isCinematic && !lipSyncCanceled && scene.lipSyncStatus === 'running';
 
   const resetWrongRenderPath = async () => {
     if (busy) return;
@@ -190,7 +193,6 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   // `dialog_shots` is written by `compose-dialog-scene` and updated by
   // `poll-dialog-shots`. Each shot has its own lifecycle: pending →
   // generating → generated → lipsyncing → ready (or failed).
-  const dialogShotsState = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
   const dialogShots: Array<{
     idx: number;
     speaker_name?: string;
@@ -210,10 +212,10 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           error: p?.error ?? p?.last_error,
         }))
       : [];
-  const isDialog = isCinematic && (dialogShots.length > 0 || lipSyncRunning);
+  const isDialog = isCinematic && !lipSyncCanceled && (dialogShots.length > 0 || lipSyncRunning);
   const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
   const dialogTotal = dialogShots.length;
-  const showDialogOverlay = isDialog && !hqReady && dialogShotsState?.status !== 'done';
+  const showDialogOverlay = isDialog && !hqReady && !['done', 'canceled'].includes(String(dialogShotsState?.status ?? ''));
 
   if (wrongTalkingHeadReady) {
     return (
@@ -281,7 +283,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             </div>
           )}
           {/* Per-shot progress bar while dialog pipeline is finishing on top of a ready master clip */}
-          {isDialog && dialogShotsState?.status !== 'done' && (
+          {isDialog && !['done', 'canceled'].includes(String(dialogShotsState?.status ?? '')) && (
             <DialogShotsBar shots={dialogShots} ready={dialogReady} total={dialogTotal} />
           )}
           {showTrimButton && !lipSyncRunning && (
