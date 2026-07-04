@@ -2466,7 +2466,8 @@ serve(async (req) => {
           }
           const isI2V = !!scene.referenceImageUrl;
           const isCinematicSyncScene =
-            (scene.engineOverride ?? "auto") === "cinematic-sync";
+            (scene.engineOverride ?? "auto") === "cinematic-sync" ||
+            (scene.engineOverride ?? "auto") === "sync-segments";
 
           await supabaseAdmin
             .from("composer_scenes")
