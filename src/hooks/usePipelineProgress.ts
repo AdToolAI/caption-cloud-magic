@@ -278,13 +278,14 @@ export function usePipelineProgress({
     const ac = assemblyConfig;
     const hasActiveBackend = ss.some((s) => {
       const sa = s as any;
+      if (isCanceledLipsyncScene(sa)) return false;
       if (sa.clipStatus === 'generating') return true;
       if (sa.lipSyncStatus === 'running') return true;
       if (sa.replicatePredictionId) return true;
       const stage = sa.twoshotStage;
-      if (!isCanceledLipsyncScene(sa) && isActiveTwoshotStage(stage)) return true;
+      if (isActiveTwoshotStage(stage)) return true;
       const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
-      if (!isCanceledLipsyncScene(sa) && isActiveDialogShots(ds)) return true;
+      if (isActiveDialogShots(ds)) return true;
       return false;
     });
     if (!hasActiveBackend) return;
@@ -377,15 +378,16 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
+      if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
       const stage = sa.twoshotStage;
       const lip = sa.lipSyncStatus;
       const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
-      const dsActive = !isCanceledLipsyncScene(sa) && isActiveDialogShots(ds);
+      const dsActive = isActiveDialogShots(ds);
       return (
         !!sa.replicatePredictionId ||
         lip === 'running' ||
-        (!isCanceledLipsyncScene(sa) && isActiveTwoshotStage(stage)) ||
+        isActiveTwoshotStage(stage) ||
         dsActive
       );
     }).length;
