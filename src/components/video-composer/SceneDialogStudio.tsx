@@ -828,14 +828,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Stays in script order so `startSec`/`endSec` map directly to playback.
     const planSpeakers: import('@/types/video-composer').AudioPlanSpeaker[] = [];
 
-    // Determine if we should auto-upgrade to HeyGen lip-sync.
-    // Trigger: at least one speaker in this dialog has a portrait. If not, we
-    // fall back to plain audio overlay (no face animation).
-    const portraitsAvailable = sceneCast.some((c) => Boolean(c.referenceImageUrl));
-    const useHeygenLipSync =
-      portraitsAvailable && blocks.length === 1; // single-speaker scene → replace clip with HeyGen
-    // (Multi-speaker single-scene HeyGen would require stitching multiple
-    // talking-head clips into one; that path lives in SRS mode.)
+    // (HeyGen auto-upgrade removed — Composer no longer routes to
+    // generate-talking-head. Real lip-sync happens via compose-video-clips
+    // + Sync.so on the Hailuo/HappyHorse master plate.)
+    void portraitsAvailableUnused;
+    const portraitsAvailableUnused = sceneCast.some((c) => Boolean(c.referenceImageUrl));
 
     try {
       // ── Idempotency: wipe previous voiceover clips for this scene so a
