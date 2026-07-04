@@ -946,13 +946,11 @@ export default function SceneCard({
                         >
                           <SelectTrigger
                             className={`h-5 w-auto gap-1 px-1.5 border-none p-0 text-[9px] [&_svg]:h-2.5 [&_svg]:w-2.5 ${
-                              rec.engine === "heygen-talking-head"
-                                ? "text-primary bg-primary/10 border border-primary/60"
-                                : rec.engine === "cinematic-sync"
-                                  ? "text-emerald-300 bg-emerald-500/10 border border-emerald-500/50"
-                                  : rec.engine === "sync-polish"
-                                    ? "text-amber-300 bg-amber-500/10 border border-amber-500/40"
-                                    : "text-muted-foreground bg-transparent border border-border/50"
+                              rec.engine === "cinematic-sync"
+                                ? "text-emerald-300 bg-emerald-500/10 border border-emerald-500/50"
+                                : rec.engine === "sync-polish"
+                                  ? "text-amber-300 bg-amber-500/10 border border-amber-500/40"
+                                  : "text-muted-foreground bg-transparent border border-border/50"
                             } rounded-md`}
                             title={rec.reason}
                           >
