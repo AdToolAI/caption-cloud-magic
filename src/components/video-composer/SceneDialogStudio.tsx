@@ -706,7 +706,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
   const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
   const estimatedDurationSec = Math.max(3, Math.ceil(totalChars / 18));
-  const totalCost = blocks.length * estimateCost(4, true);
+  // Legacy HeyGen cost estimation dropped — Cinematic-Sync cost is shown per scene in ClipsTab.
+  const totalCost = 0;
 
   const handleAiScript = async () => {
     if (sceneCast.length < 2) return;
