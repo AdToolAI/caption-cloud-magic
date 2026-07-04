@@ -197,6 +197,11 @@ serve(async (req) => {
 
       const patch: Record<string, unknown> = {
         lip_sync_status: "canceled",
+        lip_sync_with_voiceover: false,
+        dialog_mode: false,
+        engine_override: "auto",
+        lip_sync_applied_at: null,
+        lip_sync_source_clip_url: null,
         twoshot_stage: null,
         clip_error: "lipsync_canceled_by_user",
         replicate_prediction_id: null,
