@@ -112,7 +112,6 @@ const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
   export: 90,
 };
 
-const TERMINAL_LIPSYNC_STATUSES = new Set(['applied', 'done', 'failed', 'canceled', 'no_voiceover']);
 const TERMINAL_TWOSHOT_STAGES = new Set(['done', 'complete', 'failed', 'audio_mux_failed', 'canceled']);
 const TERMINAL_DIALOG_SHOT_STATUSES = new Set(['done', 'failed', 'canceled']);
 
