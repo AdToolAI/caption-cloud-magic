@@ -817,27 +817,7 @@ export default function StoryboardTab({
         />
       )}
 
-      {/* Block Q — Talking-Head dialog */}
-      <TalkingHeadDialog
-        open={talkingHeadOpen}
-        onOpenChange={setTalkingHeadOpen}
-        projectId={projectId}
-        briefingCharacters={safeCharacters}
-        onAddBriefingCharacter={onAddCharacter}
-        availableScenes={scenes.map((s, i) => ({
-          id: s.id,
-          label: `S${i + 1} — ${s.sceneType}`,
-        }))}
-        onSuccess={(res) => {
-          void onRefetchScenes?.();
-          if (res.sceneId) {
-            setTimeout(() => {
-              const el = document.querySelector(`[data-scene-id="${res.sceneId}"]`);
-              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 250);
-          }
-        }}
-      />
+      {/* Block Q — Talking-Head dialog REMOVED from Composer (standalone /talking-head only). */}
 
       {/* Scene Snippet Library */}
       <SceneSnippetPicker
