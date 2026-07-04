@@ -2459,17 +2459,46 @@ export default function SceneCard({
                         type="button"
                         onClick={async () => {
                           const next = !scene.lipSyncWithVoiceover;
+                          const prevEngine = scene.engineOverride ?? "auto";
+                          const prevDialogMode = scene.dialogMode === true;
+                          // Symmetric intent: flipping AN/AUS must clear ALL
+                          // three intent signals together, otherwise
+                          // isLipSyncIntentionalRow (dialog_mode OR
+                          // engine_override='cinematic-sync' OR
+                          // lip_sync_with_voiceover) keeps the auto-trigger
+                          // firing and Sync.so gets re-dispatched.
+                          const nextEngine: ComposerScene["engineOverride"] = next
+                            ? "cinematic-sync"
+                            : "auto";
+                          const nextDialogMode = next;
+                          const engineChanged = nextEngine !== prevEngine;
+                          const dialogModeChanged = nextDialogMode !== prevDialogMode;
+
                           // Optimistic local update so the toggle flips immediately.
-                          onUpdate({ lipSyncWithVoiceover: next });
+                          const updates: Partial<ComposerScene> = {
+                            lipSyncWithVoiceover: next,
+                          };
+                          if (engineChanged) updates.engineOverride = nextEngine;
+                          if (dialogModeChanged) updates.dialogMode = nextDialogMode;
+                          onUpdate(updates);
+
                           // Record the intent so a racing realtime refetch
                           // (triggered by an unrelated column update) can't
                           // revert the toggle before the DB commit lands.
                           markLipSyncPending(scene.id, next);
+                          if (engineChanged) markEngineOverridePending(scene.id, nextEngine);
+                          if (dialogModeChanged) markDialogModePending(scene.id, nextDialogMode);
+
                           if (isUuid(scene.id)) {
                             try {
+                              const payload: Record<string, unknown> = {
+                                lip_sync_with_voiceover: next,
+                              };
+                              if (engineChanged) payload.engine_override = nextEngine;
+                              if (dialogModeChanged) payload.dialog_mode = nextDialogMode;
                               const { error } = await supabase
                                 .from("composer_scenes")
-                                .update({ lip_sync_with_voiceover: next })
+                                .update(payload)
                                 .eq("id", scene.id);
                               if (error) throw error;
                             } catch (e) {
@@ -2478,7 +2507,14 @@ export default function SceneCard({
                                 e,
                               );
                               clearLipSyncPending(scene.id);
-                              onUpdate({ lipSyncWithVoiceover: !next });
+                              if (engineChanged) clearEngineOverridePending(scene.id);
+                              if (dialogModeChanged) clearDialogModePending(scene.id);
+                              const rollback: Partial<ComposerScene> = {
+                                lipSyncWithVoiceover: !next,
+                              };
+                              if (engineChanged) rollback.engineOverride = prevEngine;
+                              if (dialogModeChanged) rollback.dialogMode = prevDialogMode;
+                              onUpdate(rollback);
                             }
                           }
                         }}
