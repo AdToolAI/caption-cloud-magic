@@ -924,24 +924,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           });
         if (insErr) throw insErr;
 
-        // Auto-upgrade single-speaker scenes to HeyGen lip-sync when we have
-        // a portrait. The HeyGen render REPLACES `clip_url` so the on-screen
-        // mouth actually matches the audio (Artlist/Synthesia-style flow).
-        if (useHeygenLipSync && c.referenceImageUrl) {
-          try {
-            await generate({
-              sceneId,
-              projectId: pid,
-              imageUrl: c.referenceImageUrl,
-              audioUrl: finalAudioUrl,
-              aspectRatio: '9:16',
-              resolution: '720p',
-              composerCharacterId: c.id,
-            });
-          } catch (heygenErr) {
-            console.warn('[SceneDialogStudio] HeyGen auto-upgrade failed, audio-only fallback in place', heygenErr);
-          }
-        }
+        // HeyGen auto-upgrade REMOVED — Composer no longer produces
+        // isolated portrait busts. The scene's real lip-sync happens via
+        // compose-video-clips → Sync.so on the Hailuo/HappyHorse master
+        // plate. `useHeygenLipSync` is dead code below.
+
 
         timedBlocks.push({ ...block, startSec: cumulativeOffset, durationSec: duration });
         planSpeakers.push({
