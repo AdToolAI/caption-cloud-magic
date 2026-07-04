@@ -2530,7 +2530,8 @@ serve(async (req) => {
           // Kling 3.0 Omni via Replicate — supports T2V, I2V, 3-15s
           const isI2V = !!scene.referenceImageUrl;
           const isCinematicSyncScene =
-            (scene.engineOverride ?? "auto") === "cinematic-sync";
+            (scene.engineOverride ?? "auto") === "cinematic-sync" ||
+            (scene.engineOverride ?? "auto") === "sync-segments";
           await supabaseAdmin
             .from("composer_scenes")
             .update({
