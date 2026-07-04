@@ -2008,11 +2008,11 @@ export default function SceneCard({
                   </button>
                   <button
                     type="button"
-                    title="Setzt den Lipsync-Eintrag komplett zurück (löscht dialog_shots, clip_url, alle Status-Flags). Beendet auch laufende Sync.so-Jobs und stoppt Auto-Retry-Loops. Keine neuen Credits."
+                    title="Stoppt Lip-Sync für diese Szene, leert Sync-Daten und behält das gerenderte Basis-Video. Keine neuen Credits."
                     onClick={async () => {
                       if (
                         !confirm(
-                          "Lipsync-Eintrag wirklich komplett löschen?\n\nDas stoppt laufende Sync.so-Jobs, entfernt alle Dialog-Shots und setzt die Szene zurück auf 'pending'. Du kannst danach sauber von vorne anfangen.",
+                          "Lip-Sync für diese Szene wirklich stoppen und deaktivieren?\n\nLaufende Sync.so-Jobs werden abgebrochen und Dialog-Shots geleert. Das gerenderte Basis-Video bleibt erhalten.",
                         )
                       )
                         return;
@@ -2025,30 +2025,31 @@ export default function SceneCard({
                         await supabase
                           .from("composer_scenes")
                           .update({
-                            lip_sync_status: null,
+                            lip_sync_status: "canceled",
                             lip_sync_applied_at: null,
                             lip_sync_source_clip_url: null,
                             twoshot_stage: null,
-                            clip_error: null,
                             dialog_shots: null,
-                            clip_url: null,
-                            clip_status: "pending",
-                            reference_image_url: null,
-                            replicate_prediction_id: null,
+                            lip_sync_with_voiceover: false,
+                            dialog_mode: false,
+                            engine_override: "auto",
                             updated_at: new Date().toISOString(),
                           })
                           .eq("id", scene.id);
-                        onUpdate({
-                          lipSyncStatus: null as any,
+                        (onUpdate as (updates: any) => void)({
+                          lipSyncStatus: "canceled" as any,
                           lipSyncAppliedAt: null as any,
-                          clipUrl: undefined,
-                          clipStatus: "pending",
-                          referenceImageUrl: undefined,
+                          lipSyncSourceClipUrl: null as any,
+                          twoshotStage: null as any,
+                          dialogShots: null as any,
+                          lipSyncWithVoiceover: false,
+                          dialogMode: false,
+                          engineOverride: "auto",
                         });
                         toast({
-                          title: "Lipsync-Eintrag gelöscht",
+                          title: "Lip-Sync gestoppt",
                           description:
-                            "Szene ist sauber zurückgesetzt — keine alten Daten oder Loops mehr aktiv.",
+                            "Sync.so wurde abgebrochen und Lip-Sync für diese Szene deaktiviert. Das Basis-Video bleibt erhalten.",
                         });
                       } catch (e) {
                         console.warn("[SceneCard] hard reset failed", e);
