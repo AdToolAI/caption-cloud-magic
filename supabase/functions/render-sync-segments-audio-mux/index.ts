@@ -345,6 +345,26 @@ serve(async (req) => {
         })
       : [];
 
+    // v182 — N=1 Tail-Hold. Single-speaker tight-overlay scenes reveal the
+    // raw provider plate again immediately after the final voiced window.
+    // Kling can occasionally render subtle idle mouth movement despite the
+    // closed-mouth prompt, so hold the full frame from the last lipsynced
+    // window through scene end. This is deliberately a global full-frame hold,
+    // not the old v164 per-face freeze tiles that caused ghost/morph artefacts.
+    const isSingleSpeakerTight = donePasses.length === 1 && anyTight;
+    const lastShotEndSec = fanoutShots.reduce((max: number, shot: any) => {
+      const e = Number(shot?.endSec);
+      return Number.isFinite(e) ? Math.max(max, e) : max;
+    }, 0);
+    const tailFreezeFromSec = isSingleSpeakerTight && lastShotEndSec > 0 && lastShotEndSec < totalSec - 0.05
+      ? Number(lastShotEndSec.toFixed(3))
+      : null;
+    if (tailFreezeFromSec !== null) {
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v182_n1_tail_hold from=${tailFreezeFromSec.toFixed(3)} to=${totalSec.toFixed(3)}`,
+      );
+    }
+
 
     const inputProps: Record<string, unknown> = {
       masterVideoUrl: masterVideoUrlForMux,
@@ -355,6 +375,7 @@ serve(async (req) => {
       srcWidth: width,
       srcHeight: height,
       shots: fanoutShots,
+      ...(tailFreezeFromSec !== null ? { tailFreezeFromSec } : {}),
     };
 
     const shotSummary = fanoutShots.map((shot: any, idx: number) => ({
