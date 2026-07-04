@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 export const AspectRatioEnum = z.enum(['16:9', '9:16', '1:1', '4:5']);
 export const EngineEnum = z.enum([
-  'auto', 'broll', 'heygen', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue',
+  'auto', 'broll', 'sync-polish', 'cinematic-sync', 'sync-segments', 'native-dialogue',
 ]);
 
 export const FramingEnum = z.enum([
