@@ -387,11 +387,12 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
           durationInFrames={tailHoldDuration}
           layout="none"
         >
-          <Freeze frame={Math.max(0, tailStartFrame - 1)}>
+          <Freeze frame={0}>
             <Video
               src={masterVideoUrl}
               muted
               playbackRate={1}
+              startFrom={Math.max(0, tailStartFrame - 1)}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </Freeze>
