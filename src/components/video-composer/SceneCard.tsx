@@ -1422,10 +1422,10 @@ export default function SceneCard({
                             : "Dialog & Lip-Sync";
                       const toggleHint =
                         lang === "de"
-                          ? "HappyHorse, Hailuo, Kling, Seedance und Wan sind für Sync.so Lip-Sync zertifiziert."
+                          ? "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert."
                           : lang === "es"
-                            ? "HappyHorse, Hailuo, Kling, Seedance y Wan están certificados para Sync.so lip-sync."
-                            : "HappyHorse, Hailuo, Kling, Seedance and Wan are certified for Sync.so lip-sync.";
+                            ? "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so lip-sync."
+                            : "HappyHorse, Hailuo, Kling, Wan, Seedance and Luma are certified for Sync.so lip-sync.";
 
                       return (
                         <div className="space-y-2">
@@ -1458,15 +1458,16 @@ export default function SceneCard({
                                 <span className="text-[9px] text-muted-foreground leading-tight truncate">
                                   {dialogMode
                                     ? lang === "de"
-                                    ? "5 Modelle · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
+                                    ? "6 Modelle · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
                                     : lang === "es"
-                                      ? "5 modelos · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
-                                      : "5 models · HappyHorse · Hailuo · Kling · Seedance · Wan (Sync.so)"
+                                      ? "6 modelos · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
+                                      : "6 models · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
                                   : lang === "de"
                                     ? "B-Roll-Modus · 11 Modelle verfügbar"
                                     : lang === "es"
                                       ? "Modo B-roll · 11 modelos disponibles"
                                       : "B-roll mode · 11 models available"}
+
 
                                 </span>
                               </div>
