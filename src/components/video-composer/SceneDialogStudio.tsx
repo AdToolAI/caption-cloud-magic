@@ -2018,7 +2018,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           engineOv === 'sync-segments' ||
           engineOv === 'cinematic-sync' ||
           (!engineOv || engineOv === 'auto');
-        const isHeygenSrs = engineOv === 'heygen-talking-head' || (isMulti && renderAsSeparateScenes);
+        const isSrsSplit = isMulti && renderAsSeparateScenes;
         let label: string;
         let tone: 'primary' | 'amber' | 'muted' = 'muted';
         if (isMulti && missing) {
@@ -2028,14 +2028,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : language === 'es'
             ? `⚠️ ${missing.name} no tiene retrato — asigna un Brand-Character, si no, no hay lip-sync real.`
             : `⚠️ ${missing.name} has no portrait — assign a cast character or real lip-sync is impossible.`;
-        } else if (isHeygenSrs && portraitsAll) {
+        } else if (isSrsSplit && portraitsAll) {
           tone = 'primary';
-          const cost = (Math.max(1, speakers.length) * 0.30).toFixed(2);
           label = language === 'de'
-            ? `🎙️ Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 HeyGen-Clip pro Sprecher) — ~€${cost}`
+            ? `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Hailuo-Plate + Sync.so pro Sprecher)`
             : language === 'es'
-            ? `🎙️ Se renderizará como ${speakers.length} escena(s) (Shot-Reverse-Shot, 1 clip HeyGen por hablante) — ~€${cost}`
-            : `🎙️ Will render as ${speakers.length} scene(s) (Shot-Reverse-Shot, 1 HeyGen clip per speaker) — ~€${cost}`;
+            ? `🎬 Se renderizará como ${speakers.length} escena(s) (Shot-Reverse-Shot, 1 plate Hailuo + Sync.so por hablante)`
+            : `🎬 Will render as ${speakers.length} scene(s) (Shot-Reverse-Shot, 1 Hailuo plate + Sync.so per speaker)`;
         } else if (isSyncSegments && portraitsAll) {
           tone = 'primary';
           // sync-segments pricing ≈ €0.20/s; show flat cost note instead of per-speaker.
