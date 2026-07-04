@@ -224,9 +224,9 @@ export function usePipelineProgress({
         const lipTargets = ss.filter(
           (s) =>
             !isCanceledLipsyncScene(s) &&
-            (s as any).twoshotStage ||
-            s.engineOverride === 'cinematic-sync' ||
-            (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+            ((s as any).twoshotStage ||
+              s.engineOverride === 'cinematic-sync' ||
+              (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
         );
         const dsTotals = lipTargets.reduce(
           (acc, s) => {
@@ -292,9 +292,9 @@ export function usePipelineProgress({
     const lipTargets = ss.filter(
       (s) =>
         !isCanceledLipsyncScene(s) &&
-        (s as any).twoshotStage ||
-        s.engineOverride === 'cinematic-sync' ||
-        (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+        ((s as any).twoshotStage ||
+          s.engineOverride === 'cinematic-sync' ||
+          (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
     );
     const dsTotals = lipTargets.reduce(
       (acc, s) => {
@@ -339,9 +339,9 @@ export function usePipelineProgress({
       scenes.some(
         (s) =>
           !isCanceledLipsyncScene(s) &&
-          (s as any).twoshotStage ||
-          s.engineOverride === 'cinematic-sync' ||
-          dialogVoiceCount(s) > 1,
+          ((s as any).twoshotStage ||
+            s.engineOverride === 'cinematic-sync' ||
+            dialogVoiceCount(s) > 1),
       ),
     [scenes],
   );
@@ -735,8 +735,9 @@ export function usePipelineProgress({
   // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
   const lipTargetCount = (scenes ?? []).filter((s: any) =>
     !isCanceledLipsyncScene(s) &&
-    s.twoshotStage || s.engineOverride === 'cinematic-sync' ||
-    (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+    (s.twoshotStage ||
+      s.engineOverride === 'cinematic-sync' ||
+      (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
     const n = s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
