@@ -50,7 +50,7 @@ const shouldForceCinematicSync = (scene: ComposerScene) => {
     scene.engineOverride === 'native-dialogue' ||
     scene.lipSyncWithVoiceover === true ||
     scene.dialogMode === true ||
-    (hasDialog && hasCast && providerSupportsSceneLipsync && scene.engineOverride !== 'heygen')
+    (hasDialog && hasCast && providerSupportsSceneLipsync)
   );
 };
 
