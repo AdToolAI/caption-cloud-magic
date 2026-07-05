@@ -128,7 +128,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v169";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v183";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -1512,16 +1512,24 @@ serve(async (req) => {
       const anchorHasIdentities =
         anchorFaces.length > 0 &&
         anchorFaces.every((f) => typeof f?.characterId === "string" && (f.characterId as string).length > 0);
+      // v183 — Bridge auch bei Ungleichheit: greift solange der Anchor mindestens
+      // so viele identifizierte Faces hat wie er Plate-Faces sieht. Damit greift
+      // die Bridge auch wenn die HH/Hailuo-Plate mehr Gesichter zeigt als der
+      // Anchor kannte (Statisten, Reflexionen). Zuweisung bleibt Visual-L→R,
+      // begrenzt auf die Anzahl der Anchor-Slots — der Rest bleibt `unlabeled`.
       if (
         anchorHasIdentities &&
-        anchorFaces.length === plateIdentityMap.faces.length &&
+        anchorFaces.length >= 1 &&
+        anchorFaces.length <= plateIdentityMap.faces.length &&
         plateIdentityMap.faces.some((f) => !f.characterId)
       ) {
         const platesByVisual = [...plateIdentityMap.faces].sort((a, b) => a.slot - b.slot);
         const anchorByVisual = [...anchorFaces].sort(
           (a, b) => Number(a.slotIndex ?? 0) - Number(b.slotIndex ?? 0),
         );
-        platesByVisual.forEach((pf, visualIdx) => {
+        const bridgeLimit = Math.min(anchorByVisual.length, platesByVisual.length);
+        for (let visualIdx = 0; visualIdx < bridgeLimit; visualIdx++) {
+          const pf = platesByVisual[visualIdx];
           if (!pf.characterId) {
             const cid = anchorByVisual[visualIdx]?.characterId ?? null;
             if (cid) {
@@ -1529,9 +1537,10 @@ serve(async (req) => {
               (pf as any).matchConfidence = 0.85;
             }
           }
-        });
+        }
+        const partial = anchorByVisual.length < platesByVisual.length ? "_partial" : "";
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v166_anchor_identity_slot_bridge bridged=${plateIdentityMap.faces.filter((f) => f.characterId).length}/${plateIdentityMap.faces.length} anchor_ids=${anchorByVisual.map((f) => f.characterId).join(",")}`,
+          `[compose-dialog-segments] scene=${sceneId} v183_anchor_identity_slot_bridge${partial} bridged=${plateIdentityMap.faces.filter((f) => f.characterId).length}/${plateIdentityMap.faces.length} anchor_ids=${anchorByVisual.map((f) => f.characterId).join(",")}`,
         );
       }
 
@@ -1546,56 +1555,147 @@ serve(async (req) => {
           .toLowerCase()
           .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
 
-      const byId = new Map<string, PlateIdentityFace>();
+      // v183 — Character-ID-First mit Confidence-Ranking.
+      // Statt einer flachen Map<cid, PlateFace> (die Duplikate stillschweigend
+      // überschreibt) sammeln wir pro stripped-cid ALLE Kandidaten-Faces,
+      // absteigend sortiert nach matchConfidence. So kann bei einer Rekognition-
+      // Kollision (zwei Faces mit demselben Char-Label — Reflexion, Statist)
+      // der zweite Speaker auf den nächstbesten Kandidaten fallen statt auf
+      // dieselbe Box wie Speaker 0.
+      const byIdRanked = new Map<string, PlateIdentityFace[]>();
       for (const f of plateIdentityMap.faces) {
-        if (f.characterId) byId.set(stripIdPrefix(f.characterId), f);
+        if (!f.characterId) continue;
+        const key = stripIdPrefix(f.characterId);
+        if (!byIdRanked.has(key)) byIdRanked.set(key, []);
+        byIdRanked.get(key)!.push(f);
       }
+      for (const arr of byIdRanked.values()) {
+        arr.sort((a, b) => {
+          const ca = Number((a as any).matchConfidence ?? 0);
+          const cb = Number((b as any).matchConfidence ?? 0);
+          return cb - ca;
+        });
+      }
+
       // Slot-fallback for any face the identity step couldn't label.
       // v129.20: for single-speaker scenes sort unlabeled faces by bbox
       // area (largest first) so spurious detections (mirror, background
       // person) lose to the actual subject.
-      const unlabeled = plateIdentityMap.faces.filter((f) => !f.characterId);
-      if (speakers.length === 1 && unlabeled.length > 1) {
-        unlabeled.sort((a, b) => {
+      const unlabeledPool = plateIdentityMap.faces.filter((f) => !f.characterId);
+      if (speakers.length === 1 && unlabeledPool.length > 1) {
+        unlabeledPool.sort((a, b) => {
           const areaA = (a.bbox[2] - a.bbox[0]) * (a.bbox[3] - a.bbox[1]);
           const areaB = (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1]);
           return areaB - areaA;
         });
+      } else if (speakers.length >= 2 && unlabeledPool.length > 1) {
+        // Multi-speaker unlabeled fallback läuft Visual-L→R (nach f.slot).
+        unlabeledPool.sort((a, b) => a.slot - b.slot);
       }
+
+      // v183 — Cast-Konfig-Guard: mehrere Speaker mit derselben stripped
+      // character_id sind ein echter Konfig-Fehler (nicht auto-fixbar).
+      // Wir loggen es hier laut; der Preflight-Block weiter unten refunded
+      // dann mit der v183_cast_duplicate-Meldung.
+      const cidToSpeakerIdxs = new Map<string, number[]>();
       speakers.forEach((sp, idx) => {
         const cid = stripIdPrefix(sp.character_id);
-        let plateFace: PlateIdentityFace | undefined = cid ? byId.get(cid) : undefined;
-        let source = cid && plateFace ? "plate-identity+v166-anchor-bridge" : "plate-identity";
-        if (!plateFace && unlabeled.length > 0) {
-          // v170 — Single-speaker safety net (restored from pre-v166 behaviour).
-          // For N=1 there is no "wrong speaker" risk — the v166 multi-speaker
-          // bug (script-order ≠ visual-order) cannot occur. Pick the largest
-          // unlabeled face (already sorted by area above) so a saved-outfit
-          // mismatch or a Gemini identity miss doesn't refund a valid plate.
-          if (speakers.length === 1) {
-            plateFace = unlabeled[0];
-            source = "single-speaker-largest-face";
-            console.log(
-              `[compose-dialog-segments] scene=${sceneId} v170_single_speaker_largest_face ` +
-              `character_id=${cid || "?"} unlabeled_plate_faces=${unlabeled.length}`,
-            );
-          } else {
-            // v166 — DO NOT fall back to `unlabeled.find(f => f.slot === idx)`
-            // for N≥2: script order and visual position don't correlate.
+        if (!cid) return;
+        if (!cidToSpeakerIdxs.has(cid)) cidToSpeakerIdxs.set(cid, []);
+        cidToSpeakerIdxs.get(cid)!.push(idx);
+      });
+      const castDupCids: string[] = [];
+      for (const [cid, idxs] of cidToSpeakerIdxs.entries()) {
+        if (idxs.length >= 2) castDupCids.push(`${cid}=[${idxs.join(",")}]`);
+      }
+      if (castDupCids.length > 0) {
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v183_cast_duplicate_character_id ${castDupCids.join(" ")} — ` +
+          `two or more speakers share the same base character; this cannot resolve to distinct plate faces`,
+        );
+      }
+
+      // Uniqueness-Enforcement: dieselbe Plate-Face darf nie zwei Sprechern
+      // zugewiesen werden. Wir tracken pro (Plate-Face) einen stabilen Key.
+      const faceKey = (f: PlateIdentityFace): string =>
+        `${f.slot}|${f.bbox[0]},${f.bbox[1]},${f.bbox[2]},${f.bbox[3]}`;
+      const assignedFaceKeys = new Set<string>();
+      const canFallbackUnlabeled =
+        plateIdentityMap.faces.length >= speakers.length;
+
+      speakers.forEach((sp, idx) => {
+        const cid = stripIdPrefix(sp.character_id);
+        let plateFace: PlateIdentityFace | undefined;
+        let source = "plate-identity";
+
+        // 1) Top-Ranked Face für cid nehmen, das noch nicht vergeben ist.
+        if (cid) {
+          const ranked = byIdRanked.get(cid);
+          if (ranked && ranked.length > 0) {
+            for (const cand of ranked) {
+              const k = faceKey(cand);
+              if (!assignedFaceKeys.has(k)) {
+                plateFace = cand;
+                source = ranked.indexOf(cand) === 0
+                  ? "plate-identity-cid-primary"
+                  : "plate-identity-cid-secondary";
+                break;
+              }
+            }
+            if (!plateFace) {
+              console.warn(
+                `[compose-dialog-segments] scene=${sceneId} v183_identity_collision ` +
+                `speaker=${sp.speaker ?? `idx${idx}`} cid=${cid} ranked=${ranked.length} ` +
+                `reason=all_ranked_already_assigned`,
+              );
+            }
+          }
+        }
+
+        // 2) Unlabeled-Fallback per Visual-L→R (nur wenn genug Faces vorhanden).
+        if (!plateFace) {
+          if (speakers.length === 1 && unlabeledPool.length > 0) {
+            for (const cand of unlabeledPool) {
+              const k = faceKey(cand);
+              if (!assignedFaceKeys.has(k)) {
+                plateFace = cand;
+                source = "single-speaker-largest-face";
+                console.log(
+                  `[compose-dialog-segments] scene=${sceneId} v170_single_speaker_largest_face ` +
+                  `character_id=${cid || "?"} unlabeled_plate_faces=${unlabeledPool.length}`,
+                );
+                break;
+              }
+            }
+          } else if (canFallbackUnlabeled && unlabeledPool.length > 0) {
+            for (const cand of unlabeledPool) {
+              const k = faceKey(cand);
+              if (!assignedFaceKeys.has(k)) {
+                plateFace = cand;
+                source = "v183-unlabeled-fallback";
+                console.log(
+                  `[compose-dialog-segments] scene=${sceneId} v183_unlabeled_fallback ` +
+                  `speaker=${sp.speaker ?? `idx${idx}`} cid=${cid || "?"} ` +
+                  `plate_face_slot=${cand.slot}`,
+                );
+                break;
+              }
+            }
+          }
+          if (!plateFace) {
             console.warn(
-              `[compose-dialog-segments] scene=${sceneId} v166_no_identity_for_speaker ` +
-              `speaker=${sp.speaker ?? `idx${idx}`} character_id=${cid || "?"} ` +
-              `unlabeled_plate_faces=${unlabeled.length} — refusing slot-index fallback`,
+              `[compose-dialog-segments] scene=${sceneId} v183_identity_collision ` +
+              `speaker=${sp.speaker ?? `idx${idx}`} cid=${cid || "?"} ` +
+              `plate_face_count=${plateIdentityMap.faces.length} speakers=${speakers.length} ` +
+              `reason=exhausted — slot bleibt leer`,
             );
           }
         }
 
         if (plateFace) {
+          assignedFaceKeys.add(faceKey(plateFace));
           // v155 — Prefer the Rekognition-derived mouth landmark over the
-          // bbox center. For tight-crop faces the bbox center sits on the
-          // nose/forehead, ~60–120px above the actual lips, which makes
-          // Sync.so's faceMask miss the mouth entirely (root cause of
-          // "char talks silently" in the 4-speaker repro).
+          // bbox center.
           const mouth = (plateFace as any).mouth as [number, number] | undefined;
           if (Array.isArray(mouth) && Number.isFinite(mouth[0]) && Number.isFinite(mouth[1])) {
             speakerCoords[idx] = [mouth[0], mouth[1]];
@@ -1619,9 +1719,97 @@ serve(async (req) => {
       });
       plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "live" : "missing";
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} plate-identity faces=${plateIdentityMap.faces.length} ` +
-        `resolved=${plateIdentityMap.resolvedCount}/${speakers.length} cached=${plateIdentityMap.cached}`,
+        `[compose-dialog-segments] scene=${sceneId} v183_plate_identity_mapping faces=${plateIdentityMap.faces.length} ` +
+        `resolved=${plateIdentityMap.resolvedCount}/${speakers.length} assigned=${assignedFaceKeys.size}/${speakers.length} cast_dup=${castDupCids.length} cached=${plateIdentityMap.cached}`,
       );
+      // v183 — Cast-Duplicate früh-refund. Wenn zwei Sprecher denselben
+      // stripped character_id verwenden, kann die Pipeline das nicht auflösen.
+      // Wir refunden hier bevor der generische Preflight-Block feuert, mit
+      // einer klaren Meldung.
+      if (
+        castDupCids.length > 0 &&
+        !isAdvance &&
+        !isRetry &&
+        speakers.length >= 2
+      ) {
+        const firstDup = castDupCids[0];
+        const dupSpeakerIdxs = firstDup
+          .split("=")[1]
+          .replace(/[\[\]]/g, "")
+          .split(",")
+          .map((s) => Number(s.trim()));
+        const nameA =
+          speakers[dupSpeakerIdxs[0]]?.speaker_name ??
+          speakers[dupSpeakerIdxs[0]]?.speaker ??
+          `Speaker ${dupSpeakerIdxs[0] + 1}`;
+        const nameB =
+          speakers[dupSpeakerIdxs[1]]?.speaker_name ??
+          speakers[dupSpeakerIdxs[1]]?.speaker ??
+          `Speaker ${dupSpeakerIdxs[1] + 1}`;
+        const msg =
+          `Lip-Sync abgebrochen: ${nameA} und ${nameB} verweisen auf denselben Basis-Charakter. ` +
+          `Bitte einem der beiden einen anderen Character zuweisen (oder die Rollen zusammenfassen). ` +
+          `Credits wurden zurückerstattet.`;
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} v183_cast_duplicate_character_id_refund ${firstDup} — refunding ${totalCost} credits`,
+        );
+        const alreadyRefundedCD = !!(existing as any)?.refunded;
+        if (!alreadyRefundedCD) {
+          try {
+            const { data: wCD } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wCD?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (e) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v183 cast-dup refund failed: ${(e as Error)?.message}`,
+            );
+          }
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...(existing ?? {}),
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+              refunded: true,
+              error: "v183_cast_duplicate_character_id",
+              finished_at: new Date().toISOString(),
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: msg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-segments",
+          sync_status: "PREFLIGHT_BLOCKED", error_class: "v183_cast_duplicate_character_id",
+          error_message: firstDup,
+          meta: {
+            speakers: speakers.length,
+            duplicate_cids: castDupCids,
+            refunded_credits: alreadyRefundedCD ? 0 : totalCost,
+            compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+          },
+        });
+        return json(
+          {
+            error: "v183_cast_duplicate_character_id",
+            duplicates: castDupCids,
+            refunded: alreadyRefundedCD ? 0 : totalCost,
+          },
+          422,
+        );
+      }
     } else if (speakers.length >= 2 && !isAdvance) {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} plate-identity unavailable — using anchor-rescale coords (may drift)`,
@@ -1757,12 +1945,48 @@ serve(async (req) => {
             },
             lip_sync_status: "failed",
             twoshot_stage: "failed",
-            clip_error: speakers.length === 1
-              ? "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
-                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist."
-              : "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
+            clip_error: (() => {
+              if (speakers.length === 1) {
+                return "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
+                  "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist.";
+              }
+              // v183 — Sprecher-Namen einsetzen wenn Dup-Kollision.
+              if (dupeIdx.length >= 1) {
+                const primaryIdx = boxes.find((_, a) =>
+                  boxes.some((__, c) =>
+                    c > a &&
+                    Math.hypot(
+                      (boxes[a].b[0] + boxes[a].b[2]) / 2 - (boxes[c].b[0] + boxes[c].b[2]) / 2,
+                      (boxes[a].b[1] + boxes[a].b[3]) / 2 - (boxes[c].b[1] + boxes[c].b[3]) / 2,
+                    ) < 8,
+                  ),
+                )?.i ?? dupeIdx[0];
+                const nameA =
+                  (speakers[primaryIdx] as any)?.speaker_name ??
+                  speakers[primaryIdx]?.speaker ??
+                  `Speaker ${primaryIdx + 1}`;
+                const nameB =
+                  (speakers[dupeIdx[0]] as any)?.speaker_name ??
+                  speakers[dupeIdx[0]]?.speaker ??
+                  `Speaker ${dupeIdx[0] + 1}`;
+                return `Lip-Sync abgebrochen: ${nameA} und ${nameB} wurden auf dasselbe Gesicht in der Szene gemappt. ` +
+                  `Bitte prüfen, ob im Cast identische Basis-Charaktere oder Saved-Outfit-Look-Varianten desselben Chars mehrfach vertreten sind — ` +
+                  `oder die Szene neu rendern, sodass alle Sprecher visuell klar getrennt und frontal sichtbar sind. Credits wurden zurückerstattet.`;
+              }
+              if (missingBoxIdx.length >= 1) {
+                const names = missingBoxIdx.map(
+                  (i) =>
+                    (speakers[i] as any)?.speaker_name ??
+                    speakers[i]?.speaker ??
+                    `Speaker ${i + 1}`,
+                );
+                return `Lip-Sync abgebrochen: für ${names.join(", ")} konnte kein eindeutiges Gesicht in der Szene gefunden werden. ` +
+                  `Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und unverdeckt sichtbar sind.`;
+              }
+              return "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
                 "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
-                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
+                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.";
+            })(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
