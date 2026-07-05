@@ -2534,10 +2534,10 @@ serve(async (req) => {
             })
             .eq("id", scene.id);
 
-          // Kling 3 Omni accepts 3..15 seconds (integer)
-          const klingDuration = Math.min(
-            15,
-            Math.max(3, Math.round(scene.durationSeconds)),
+          // Kling 3 Omni: snap to real API buckets [5, 10] for deterministic renders
+          const klingDuration = snapDuration(scene.durationSeconds, [5, 10]);
+          console.log(
+            `[compose-video-clips] Kling scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${klingDuration}s`,
           );
           const klingSpeakerCount = uniqueSpeakerSlugsFromScript(scene.dialogScript).length;
           const klingAntiCloneSuffix =
