@@ -233,17 +233,90 @@ serve(async (req) => {
     const SHOT_PAD_END_SHORT = 0.08;
     const SHORT_TURN_THRESHOLD_SEC = 0.6;
 
-    // v166 — Silent-faces overlay (v164/v165) is DISABLED.
-    // The freeze overlays produced visible ghost/morph artefacts and added
-    // 4-12 extra <Video> nodes per scene, blowing up Lambda render time.
-    // The underlying problem (non-speaking faces animating on the AI plate)
-    // is already handled correctly upstream by Sync.so via the per-frame
-    // bounding_boxes JSON (null outside voiced windows). Keep the live
-    // master plate playing underneath without freeze tiles.
+    // v183 — Silent-Faces via static anchor portraits. Feature-flagged via
+    // `system_config.composer.silent_faces_v183` (default OFF). When ON we
+    // fetch each done pass's character portrait_url and attach `silentSlots`
+    // to every fanout shot: the slot rect is that speaker's `preclip_crop`
+    // and the anchorUrl is the closed-mouth portrait. The Remotion template
+    // renders an <Img> per slot (behind the active overlay) so the pristine
+    // plate's baked-in mouth motion for non-speaking characters is masked
+    // with a static image. No <Freeze>/<Video>, no morph, no ghost.
+    let silentFacesV183Enabled = false;
+    try {
+      const { data: v183Row } = await supabase
+        .from("system_config")
+        .select("value")
+        .eq("key", "composer.silent_faces_v183")
+        .maybeSingle();
+      silentFacesV183Enabled = String((v183Row as any)?.value ?? "false").toLowerCase() === "true";
+    } catch {
+      silentFacesV183Enabled = false;
+    }
+
+    // characterId → portrait_url, only fetched when the flag is on.
+    const charPortraitByCharId = new Map<string, string>();
+    if (silentFacesV183Enabled && isFanout) {
+      const uniqueCharIds = Array.from(
+        new Set(
+          donePasses
+            .map((p: any) => (typeof p?.character_id === "string" ? p.character_id : null))
+            .filter((x: any): x is string => !!x),
+        ),
+      );
+      if (uniqueCharIds.length > 0) {
+        const { data: chars } = await supabase
+          .from("brand_characters")
+          .select("id, portrait_url")
+          .in("id", uniqueCharIds);
+        for (const row of (chars ?? []) as any[]) {
+          if (row?.id && typeof row?.portrait_url === "string" && row.portrait_url.length > 0) {
+            charPortraitByCharId.set(String(row.id), String(row.portrait_url));
+          }
+        }
+      }
+    }
+
+    // Per-speaker slot rects (preclip_crop). Speakers without a valid crop
+    // are simply skipped for silence overlay purposes.
+    type SilentSlot = { x: number; y: number; size: number; anchorUrl: string | null };
+    const silentSlotBySpeakerIdx = new Map<number, SilentSlot>();
+    if (silentFacesV183Enabled && isFanout) {
+      for (const p of donePasses as any[]) {
+        const sIdx = Number(p?.speaker_idx);
+        const pc = p?.preclip_crop;
+        if (
+          !Number.isFinite(sIdx) ||
+          !pc ||
+          !Number.isFinite(Number(pc.x)) ||
+          !Number.isFinite(Number(pc.y)) ||
+          !Number.isFinite(Number(pc.size)) ||
+          Number(pc.size) <= 0
+        ) {
+          continue;
+        }
+        const charId = typeof p?.character_id === "string" ? p.character_id : null;
+        const anchorUrl = charId ? charPortraitByCharId.get(charId) ?? null : null;
+        silentSlotBySpeakerIdx.set(sIdx, {
+          x: Number(pc.x),
+          y: Number(pc.y),
+          size: Number(pc.size),
+          anchorUrl,
+        });
+      }
+      const totalSlots = silentSlotBySpeakerIdx.size;
+      const withAnchor = Array.from(silentSlotBySpeakerIdx.values()).filter((s) => !!s.anchorUrl).length;
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v183_silent_slots ENABLED speakers=${donePasses.length} crops=${totalSlots} anchors=${withAnchor} fallback=${totalSlots - withAnchor}`,
+      );
+    } else {
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v183_silent_slots DISABLED donePasses=${donePasses.length} (flag=${silentFacesV183Enabled} isFanout=${isFanout})`,
+      );
+    }
+
+    // Legacy v164 map kept as a lint anchor for the freeze-tile path (no-op).
     const v164SilentSlotsByExcludedIdx = new Map<number, Array<{ x: number; y: number; size: number }>>();
-    console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} v166_silent_slots_disabled donePasses=${donePasses.length}`,
-    );
+    void v164SilentSlotsByExcludedIdx;
 
 
     const fanoutShots = useOverlay
@@ -285,9 +358,16 @@ serve(async (req) => {
               `coords=[${Number(p.coords?.[0])},${Number(p.coords?.[1])}] crop={x:${preclipCrop.x},y:${preclipCrop.y},size:${preclipCrop.size}} — using faceMask fallback`,
             );
           }
-          const silentSlots: Array<{ x: number; y: number; size: number }> = [];
-          void silentSlots;
-          void v164SilentSlotsByExcludedIdx;
+          // v183 — per-shot silent slots. All done passes EXCEPT this one.
+          // Each slot carries the non-speaking character's closed-mouth
+          // portrait so the template can render a static <Img> behind the
+          // active overlay. When the flag is OFF this stays an empty array.
+          const thisSpeakerIdx = Number((p as any)?.speaker_idx);
+          const silentSlots: Array<SilentSlot> = silentFacesV183Enabled
+            ? Array.from(silentSlotBySpeakerIdx.entries())
+                .filter(([sIdx]) => sIdx !== thisSpeakerIdx)
+                .map(([, slot]) => slot)
+            : [];
           const overlayPayload: Record<string, unknown> = hasPreclipCrop
             ? {
                 crop: {
@@ -295,6 +375,7 @@ serve(async (req) => {
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
                 },
+                ...(silentSlots.length > 0 ? { silentSlots } : {}),
               }
             : {
                 faceMask: {
@@ -302,6 +383,7 @@ serve(async (req) => {
                   cy: Number(p.coords[1]),
                   radius: radiusForCount,
                 },
+                ...(silentSlots.length > 0 ? { silentSlots } : {}),
               };
 
 

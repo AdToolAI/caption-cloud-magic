@@ -72,10 +72,23 @@ const ShotSchema = z.object({
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
   faceMask: FaceMaskSchema.optional().nullable(),
-  /** v164: bounding boxes of all OTHER speakers in this scene. Rendered as
-   *  frozen master-plate crops underneath the active overlay so non-speaking
-   *  faces do not "talk along" with the AI plate during this turn. */
-  silentSlots: z.array(CropSchema).optional().nullable(),
+  /** v164/v183: bounding boxes of all OTHER speakers in this scene.
+   *  v164 used <Freeze frame={0}> of the master plate → ghost/morph artefacts.
+   *  v183 renders a static <Img src=anchorUrl> per slot (closed-mouth anchor
+   *  portrait of the non-speaking character) → no motion, no morph. When
+   *  anchorUrl is missing the slot falls back to a semi-opaque dark tile
+   *  (still guarantees zero mouth motion). */
+  silentSlots: z
+    .array(
+      z.object({
+        x: z.number(),
+        y: z.number(),
+        size: z.number(),
+        anchorUrl: z.string().optional().nullable(),
+      }),
+    )
+    .optional()
+    .nullable(),
   /** Legacy compatibility only. Normal multi-speaker muxes keep overlays
    *  windowed to speaker turns and do not use hold-to-end. */
   holdToEnd: z.boolean().optional(),
@@ -331,6 +344,76 @@ const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
   );
 };
 
+/** v183: SilentFaceAnchor — renders a static closed-mouth anchor portrait
+ *  cropped to the non-speaking face slot. No <Video>, no <Freeze>, so no
+ *  morph/ghost artefacts and near-zero Lambda render overhead. Feathered
+ *  radial mask blends the seam with the live master plate underneath.
+ *  Fallback: when anchorUrl is missing, render a semi-opaque dark tile that
+ *  still guarantees zero mouth motion. */
+interface SilentFaceAnchorProps {
+  anchorUrl?: string | null;
+  /** Slot rect on the source-master pixel grid (matches preclip_crop). */
+  srcX: number;
+  srcY: number;
+  srcSize: number;
+  /** Composition-space scale factors derived from src→comp mapping. */
+  scaleX: number;
+  scaleY: number;
+}
+const SilentFaceAnchor: React.FC<SilentFaceAnchorProps> = ({
+  anchorUrl,
+  srcX,
+  srcY,
+  srcSize,
+  scaleX,
+  scaleY,
+}) => {
+  // Feathered radial mask (12–16px equivalent softness at the edge).
+  const mask =
+    'radial-gradient(circle at center, #000 0%, #000 58%, rgba(0,0,0,0.85) 72%, rgba(0,0,0,0) 96%)';
+  const left = srcX * scaleX;
+  const top = srcY * scaleY;
+  const w = srcSize * scaleX;
+  const h = srcSize * scaleY;
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          width: w,
+          height: h,
+          WebkitMaskImage: mask,
+          maskImage: mask,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          overflow: 'hidden',
+        }}
+      >
+        {anchorUrl ? (
+          <Img
+            src={anchorUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(12,12,14,0.92)',
+            }}
+          />
+        )}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 
 
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
@@ -418,12 +501,36 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         const startFromForRelative =
           shot.sourceTiming === 'relative' ? relativeStartFrame : startFrame;
 
-        // v166 — Silent-face freeze tiles disabled. Sync.so already leaves
-        // non-speaking faces still via per-frame null bounding boxes; the
-        // freeze overlay produced visible ghost/morph artefacts and ballooned
-        // Lambda render time. Empty list keeps the Sequence layout unchanged.
-        const silentSlotEls: React.ReactNode[] = [];
-        void shot.silentSlots;
+        // v183 — Silent-face anchor tiles. When the muxer supplies
+        // `silentSlots` per shot (each slot pointing at the closed-mouth
+        // portrait of a non-speaking character), render them behind the
+        // active overlay so the pristine plate's baked-in mouth motion for
+        // listeners is masked with a static anchor image. No <Video>, no
+        // <Freeze> → no morph/ghost artefacts. Feature-gated by the edge
+        // function: if `silentSlots` is absent or empty we behave exactly
+        // like v166 (plate plays through underneath, only active overlay).
+        const rawSilentSlots = Array.isArray(shot.silentSlots) ? shot.silentSlots : [];
+        const silentSlotEls: React.ReactNode[] = rawSilentSlots
+          .map((slot, sIdx) => {
+            const sx = Number(slot?.x);
+            const sy = Number(slot?.y);
+            const ss = Number(slot?.size);
+            if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(ss) || ss <= 0) {
+              return null;
+            }
+            return (
+              <SilentFaceAnchor
+                key={`silent-${idx}-${sIdx}`}
+                anchorUrl={slot?.anchorUrl ?? null}
+                srcX={sx}
+                srcY={sy}
+                srcSize={ss}
+                scaleX={scaleX}
+                scaleY={scaleY}
+              />
+            );
+          })
+          .filter(Boolean);
         void SilentFaceFreeze;
 
         // v25 fan-out face-mask path (highest priority): full Sync.so output

@@ -1,62 +1,68 @@
-# Face-Visibility Failure: von "hart failen" zu "smart recovern"
+# v183 Multi-Speaker Silent-Faces — Umgesetzt (Fix A) + Fix B Diagnose
 
-## Befund (verifiziert in DB)
+## Fix A — Silent-Faces v183 (fertig implementiert)
 
-Szene `cbfe0e84-520a-42ee-a0de-a3679946ec6c`:
-- `syncso_dispatch_log`: `PREFLIGHT_BLOCKED` / `v132_turn_visibility` / `Sarah Dusatko@7.51s(faces=0)`
-- Kling hat einen Plate gerendert, in dem Sarah zum exakten Turn-Zeitpunkt (7.51s) nicht im Bild ist (Cut, Kameraschwenk, oder angeschnitten).
-- Der v132-Preflight blockt korrekt und refundet — der letzte Deadlock-Fix greift, aber das Kernproblem bleibt: **jeder Re-Render bei Kling ist ein Glücksspiel**.
+**Was gemacht wurde:**
 
-## Ziel
+1. `src/remotion/templates/DialogStitchVideo.tsx`
+   - `ShotSchema.silentSlots` erweitert: pro Slot jetzt `{x, y, size, anchorUrl?}` (statt reines Crop-Rect).
+   - Neue Komponente `SilentFaceAnchor`: rendert `<Img src={anchorUrl}>` in einem feathered radial-masked Div (58% solid → 96% transparent). Fallback ohne anchorUrl: semi-opaque `rgba(12,12,14,0.92)` Kachel. Kein `<Freeze>`, kein `<Video>` → keine Morph-/Ghost-Artefakte, keine Lambda-Renderkosten.
+   - Render-Loop rendert die silent slots als Layer **vor** dem aktiven Overlay in jeder Sequence (silent slots liegen also unter dem aktiven Sprecher-Overlay).
 
-Wenn die Face-Detection den Sprecher im exakten Turn-Frame nicht findet, aber **innerhalb eines nahen Zeitfensters** frontal sichtbar ist, soll Sync.so mit diesem Fenster als Anchor arbeiten — statt hart zu failen. Nur wenn der Sprecher **im gesamten Turn** unsichtbar ist, wird auf Cinematic-Sync (per-Sprecher i2v + lipsync-2-pro) umgeschaltet.
+2. `supabase/functions/render-sync-segments-audio-mux/index.ts`
+   - Feature-Flag `composer.silent_faces_v183` (default OFF, jsonb bool).
+   - Bei Flag ON + Multi-Speaker: `brand_characters.portrait_url` für alle beteiligten `character_id`s in einem einzigen Query holen.
+   - Pro Fanout-Shot: `silentSlots = alle done-Passes AUßER dem eigenen Speaker`, jeder Slot mit `preclip_crop`-Rect + `anchorUrl`.
+   - Neuer Log-Tag `v183_silent_slots ENABLED|DISABLED speakers=N crops=K anchors=M fallback=F`.
+   - Bestehende Overlay-Pfade (`crop` und `faceMask`) tragen `silentSlots` optional als zusätzlichen Payload-Key.
 
-## Änderungen
+3. DB: `system_config` Row `composer.silent_faces_v183 = false` per Insert angelegt.
 
-### 1. Nearest-Window Snap im Turn-Visibility Preflight
-**Datei:** `supabase/functions/compose-dialog-segments/index.ts` (v132-Block)
+**Deployment-Status:**
+- Edge Function `render-sync-segments-audio-mux` deployed ✅
+- tsgo clean ✅
+- Remotion Bundle: **NOCH NICHT** neu deployed. Benötigt manuelles `scripts/deploy-remotion-bundle.sh` + `system_config.remotion.deployed_bundle_id` Update.
 
-Statt bei `faces=0 @ turnCenter` sofort zu blocken:
-- Sample die Face-Map in einem Fenster `[turnStart − 0.5s, turnEnd + 0.5s]` in ~10-Frame-Schritten.
-- Wenn mindestens 1 Frame mit sichtbarem Zielsprecher gefunden wird → dieser Frame wird zum neuen `frame_number` + `coordinates` Anchor (Sync.so animiert dann ab diesem Punkt).
-- Nur wenn **kein** Frame im Fenster den Sprecher zeigt → weiter zum Fallback.
+**Aktivierungs-Sequenz (in dieser Reihenfolge):**
+1. `bash scripts/deploy-remotion-bundle.sh` → neue Bundle-ID notieren
+2. `UPDATE system_config SET value = to_jsonb('<neue-bundle-id>'::text) WHERE key = 'remotion.deployed_bundle_id';` (oder wie auch immer der Key heißt — siehe Memory `lambda-bundle-deployment-and-verification`)
+3. `UPDATE system_config SET value = 'true'::jsonb WHERE key = 'composer.silent_faces_v183';`
+4. Neue Multi-Speaker-Szene rendern. Log-Grep: `v183_silent_slots ENABLED`.
 
-Log-Tag: `v188_turn_visibility_snap` mit `snapped_from_sec`, `snapped_to_sec`, `snap_offset_ms`.
+**Solange Bundle nicht neu ist, bleibt der Flag auf false.** Bei aktiviertem Flag mit alter Bundle würde Lambda `silentSlots` im Payload einfach ignorieren (Feld ist optional im Schema) — kein Absturz, aber auch kein Silent-Faces-Effekt.
 
-### 2. Automatischer Cinematic-Sync Fallback
-**Datei:** `supabase/functions/compose-dialog-segments/index.ts` (nach v188-Snap)
+**Rollback:** `UPDATE system_config SET value = 'false'::jsonb WHERE key = 'composer.silent_faces_v183';` — instant, kein Redeploy nötig.
 
-Wenn v188 keinen sichtbaren Frame findet:
-- `twoshot_stage` wird auf `cinematic_sync_fallback` gesetzt (statt `needs_clip_rerender`).
-- Trigger `compose-dialog-scene` (bestehende Cinematic-Sync-Pipeline: pro Sprecher ein Hailuo i2v Plate + lipsync-2-pro, ffmpeg concat).
-- User-Feedback: "Multi-Speaker Plate hat Sarah nicht sichtbar gerendert — schalte auf Cinematic-Sync (garantiert sichtbare Sprecher, +~€0.65)."
+## Fix B — Turn-2 Retry Diagnose
 
-### 3. UI-Anpassung
-**Datei:** `src/components/video-composer/SceneInlinePlayer.tsx`
+Analyse der DB für Szene `1de5510b-9bc8-4ba3-b466-b2df31f1bbff`:
 
-Neue Failure-Overlay-Variante bei `clip_error` mit `v132_turn_visibility`:
-- Zwei Buttons: "Neu rendern (Kling)" + "Auf Cinematic-Sync wechseln (empfohlen)".
-- Kurze Erklärung: "Der Kling-Plate zeigt Sarah zu ihrem Sprech-Moment nicht — Cinematic-Sync rendert jeden Sprecher einzeln und garantiert Sichtbarkeit."
+**Dispatch-Timeline für Turn 2:**
+| t | Event |
+|---|---|
+| 22:38:36 | DISPATCH_ATTEMPT_STARTED (turn=2) |
+| 22:41:02 | DISPATCH_ATTEMPT_STARTED (turn=2, zweites Mal, +2:26) |
+| 22:41:10 | DISPATCHED http_status=201 |
+| 22:43:26 | DISPATCHED http_status=201 (drittes Mal, +2:16) |
 
-### 4. Sofort-Fix für die aktuelle Szene
-DB-Update: Szene `cbfe0e84` bekommt einen "Auf Cinematic-Sync wechseln"-CTA, User entscheidet.
+**Beobachtung:**
+Die erste `DISPATCH_ATTEMPT_STARTED` um 22:38:36 hatte KEINEN zugehörigen `DISPATCHED`-Eintrag. Das heißt: der Preclip-Render oder die HEAD-Probes vor dem Sync.so-POST sind fehlgeschlagen und der Dispatcher hat 2:26 später neu angesetzt. Dann kam eine erfolgreiche Sync.so-Antwort um 22:41:10 — und trotzdem ein weiterer Dispatch um 22:43:26. Das zweite Redispatch riecht nach `sync-so-webhook` Transient-Retry (Retry-Ladder), aber Edge-Logs sind bereits rotiert und `retry_history` wird auf dem Pass-Slot nicht persistiert.
+
+**Kosten dieses Retry-Musters:** ~4:30 min extra Wallclock (2:26 vor Dispatch 1, 2:16 zwischen Dispatch 1 und 2). Das erklärt fast exakt den Delta 16:31 vs. ~12 min erwartet.
+
+**Empfehlung — kein Blind-Fix:**
+Ohne reproduzierbaren Trigger oder Edge-Log-Snapshot kein sicherer Patch möglich. Als niedrig-hängende Frucht: **`retry_history` auf dem Pass-Slot persistieren** (in `sync-so-webhook` bei jedem Retry-Ladder-Wechsel append). Dann ist beim nächsten 16-min-Run sofort sichtbar, welcher Variant (`bbox-url-pro`, `coords-pro`, `sync3-coords`, …) welchen Fehler geworfen hat. Dieser Patch ist eigenständig, nicht Teil dieser PR.
+
+## Validierung Fix A
+
+Nach Bundle-Deploy + Flag ON:
+- Edge-Log: `v183_silent_slots ENABLED speakers=3 crops=3 anchors=3 fallback=0`
+- Finales MP4 einer Multi-Speaker-Szene: während des aktiven Sprecher-Fensters zeigen die anderen Gesichter das statische Portrait; **kein** Lip-Flap, **kein** Morph-Übergang.
+- Wenn ein Portrait fehlt: die betroffene Slot-Region wird durch eine dunkle Kachel bedeckt (immer noch besser als ein sprechender Nicht-Sprecher).
 
 ## Nicht angefasst
 
-- v129.x doc-strict payload contract
-- v126 unified preclip pipeline
-- Sync.so Modell / Optionen
-- Watchdog, Retry-Ladder, Locking
-- Bestehender v132-Refund-Pfad (bleibt der finale Fallback)
-
-## Validierung
-
-Nach Deploy:
-- Neue Row in `syncso_dispatch_log` mit `sync_status='DISPATCH_ATTEMPT_STARTED'` und `meta->>'v188_snap_offset_ms'` gesetzt (wenn Snap greift), ODER
-- `twoshot_stage='cinematic_sync_fallback'` und neue Dispatch-Row aus `compose-dialog-scene` (wenn Fallback greift).
-
-## Technische Details (verifiziert)
-
-- v132-Preflight ist in `compose-dialog-segments/index.ts`; nutzt bereits `frame_face_cache` (Tabelle existiert, 13 Spalten).
-- Cinematic-Sync Pipeline ist deployed als `compose-dialog-scene` + `poll-dialog-shots` (siehe Memory: Dialog-Shot Pipeline).
-- `SceneInlinePlayer.tsx` hat bereits die v124-Failure-Overlay-Infrastruktur (siehe Memory v124-sync3-doc-strict-end-to-end).
+- v141 State-Machine, v166 Anchor-ID Bridge, v167 Preclip Pre-Fanout, v168 Per-Pass Lock, v169-A Stale Reconcile, v188 Turn-Visibility Snap
+- Sync.so Payload-Contract, Retry-Ladder, Pricing, Refund-Logik
+- `COMPOSE_DIALOG_SEGMENTS_VERSION="v164"` String-Konstante
+- Fix C (Preclip parallel beschleunigen) — deferred bis Fix B Root Cause klar ist
