@@ -2524,21 +2524,11 @@ serve(async (req) => {
         } else if (scene.clipSource === "ai-kling") {
           // Kling 3.0 Omni via Replicate — supports T2V, I2V, 3-15s
           const isI2V = !!scene.referenceImageUrl;
-          const isCinematicSyncScene =
-            (scene.engineOverride ?? "auto") === "cinematic-sync" ||
-            (scene.engineOverride ?? "auto") === "sync-segments";
           await supabaseAdmin
             .from("composer_scenes")
             .update({
               clip_status: "generating",
               clip_quality: quality,
-              ...(isCinematicSyncScene
-                ? {
-                    lip_sync_source_clip_url: null,
-                    lip_sync_status: "pending",
-                    twoshot_stage: "master_clip",
-                  }
-                : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-kling", isI2V),
               updated_at: new Date().toISOString(),
             })
@@ -2552,15 +2542,12 @@ serve(async (req) => {
           const klingSpeakerCount = uniqueSpeakerSlugsFromScript(scene.dialogScript).length;
           const klingAntiCloneSuffix =
             "Exactly one instance of the selected character in one continuous frame. Single unbroken shot. No clones, no duplicate person, no triptych, no split-screen, no side-by-side variations, no mirror duplicate, no poster/photo/screen showing the same face as a second person.";
-          const masterPrompt = isCinematicSyncScene
-            ? buildCinematicSyncMasterPrompt(scene)
-            : scene.aiPrompt;
           const klingPrompt = klingSpeakerCount === 1
-            ? `${masterPrompt || scene.aiPrompt || "cinematic footage"}. ${klingAntiCloneSuffix}`
-            : (masterPrompt || scene.aiPrompt);
+            ? `${scene.aiPrompt || "cinematic footage"}. ${klingAntiCloneSuffix}`
+            : scene.aiPrompt;
           if (klingSpeakerCount === 1) {
             console.log(
-              `[compose-video-clips] v182_kling_n1_anticlone scene=${scene.id} cinematic=${isCinematicSyncScene} i2v=${isI2V}`,
+              `[compose-video-clips] v182_kling_n1_anticlone scene=${scene.id} i2v=${isI2V}`,
             );
           }
           const klingInput: Record<string, unknown> = {
@@ -2596,7 +2583,6 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               replicate_prediction_id: prediction.id,
-              ...(isCinematicSyncScene ? { twoshot_stage: "master_clip" } : {}),
             })
             .eq("id", scene.id);
 
