@@ -1,86 +1,79 @@
-## Korrektur: Es ist eine N=1-Szene
+## Was ist passiert
 
-Du hast recht: Für **einen Sprecher** ist mein vorheriger Multi-Speaker-Tail-Freeze-Plan falsch. Der aktuelle Code zeigt bereits den N=1-Pfad:
+Deine Beobachtung stimmt — mit 4 Sprechern hat es früher problemlos funktioniert, weil Kling-Szenen damals **gar nicht** durch die Sync.so-Multi-Speaker-Preflight liefen. Im letzten Turn habe ich zwei Änderungen an `supabase/functions/compose-video-clips/index.ts` gemacht, die genau das kaputt gemacht haben:
 
-- `compose-dialog-segments`: `allowTightSlice = passes.length >= 1` → auch N=1 wird tight gesliced.
-- `render-sync-segments-audio-mux`: `useOverlay = ... donePasses.length >= 1 && anyTight` → N=1 nutzt wieder Overlay.
-- `compose-video-clips`: N=1 Plate-Prompt ist seit v175 auf **closed mouth** gestellt, damit außerhalb des Sprachfensters kein Tail-Talk sichtbar sein soll.
+### Regression 1 — Implizites Lip-Sync Opt-in (Zeilen 1113–1120)
 
-Wenn trotzdem gelegentlich nach dem Dialog Lippenbewegung sichtbar bleibt, ist der wahrscheinlichste Fehler nicht Multi-Speaker-Ghosting, sondern **N=1 Overlay-Ende/Plate-Fallback**: Nach `turnEnd + 0.02s` zeigt der Mux wieder die originale Kling-Plate. Falls Kling trotz closed-mouth Prompt Idle-Mouth erzeugt, sieht man danach wieder Lippenbewegung.
+Der Hard-Guard `hasOptIn` wurde erweitert:
 
-## Plan
-
-### 1. N=1 Tail-Talk hart absichern
-
-**Datei:** `supabase/functions/render-sync-segments-audio-mux/index.ts`
-
-Für N=1 + Tight-Audio wird nach dem letzten Sprachfenster nicht mehr auf die rohe Kling/Hailuo-Plate zurückgefallen.
-
-Implementierung:
-
-- `isSingleSpeakerTight = donePasses.length === 1 && anyTight`
-- `lastShotEndSec = max(fanoutShots[].endSec)`
-- Wenn `isSingleSpeakerTight` und `lastShotEndSec < totalSec - 0.05`:
-  - ab `lastShotEndSec` bis `totalSec` die letzte Frame-Position der Szene als **Full-Frame-Freeze/Hold** rendern
-  - Ziel: kein Rückfall auf eine Plate, in der der Mund noch idle wackelt
-
-Falls der vorhandene Remotion-Stitcher dafür keinen Prop hat, ergänze ich minimal einen `freezeTailFromSec`-Prop in der Dialog-Stitch-Komposition. Kein per-face freeze, kein v164-Reaktivieren.
-
-### 2. N=1 Prompt-Konflikt bereinigen
-
-**Datei:** `supabase/functions/compose-video-clips/index.ts`
-
-Der N=1 Prompt hat aktuell einen internen Widerspruch:
-
-- `neutralTwoShotPrompt(n=1)` sagt noch: `subtle, continuous idle mouth and jaw motion`
-- danach überschreibt v175 zwar mit `mouth softly closed`, aber beide Aussagen landen im finalen Prompt.
-
-Fix:
-
-- `neutralTwoShotPrompt(n=1)` wird auf v175 angepasst:
-  - lip-ready, clearly visible, unobstructed
-  - softly closed resting mouth
-  - **no idle jaw/mouth motion**
-- Der finale v175 Closing Clause bleibt bestehen.
-
-Damit bekommt Kling nicht mehr gleichzeitig “idle mouth motion” und “closed mouth”.
-
-### 3. Kling N=1 Clone verhindern
-
-**Datei:** `supabase/functions/compose-video-clips/index.ts`
-
-Bei Kling wird vor `replicate.predictions.create` ein Anti-Clone-Suffix in den Prompt geschrieben, weil Kling kein separates `negative_prompt` nutzt:
-
-```text
-Exactly one instance of the selected character in one continuous frame. No clones, no duplicate person, no triptych, no split-screen, no side-by-side variations, no mirror duplicate, no poster/photo/screen showing the same face as a second person.
+```ts
+const hasOptIn =
+  scene.lipSyncWithVoiceover === true ||
+  scene.dialogMode === true ||
+  (dialogScript.length > 0 && Object.keys(dialogVoices).length > 0);  // NEU
 ```
 
-Zusätzlich:
+Das verletzt die Single-Source-of-Truth in `src/lib/video-composer/lipSyncIntent.ts`, die ausdrücklich sagt: *"NO implicit heuristic (dialog+cast+provider, etc.) may trigger lip-sync."* Genau der Bug den du zwei Turns davor gemeldet hattest ("obwohl Lip-Sync Toggle aus ist, retriggert es automatisch") ist damit wieder da.
 
-- Für `clipSource === 'ai-kling'` und N=1 Cinematic-Sync bleibt der vorhandene Anchor-Audit-Pfad maßgeblich.
-- Falls ein auditierter Anchor schon existiert und ok ist, wird er weiterverwendet.
-- Falls kein geprüfter Anchor existiert, wird der bestehende Anchor-Compose+Audit-Pfad genutzt, bevor Kling `start_image` bekommt.
+### Regression 2 — Kling wird in die Sync-Segments-Pipeline gezogen (Zeilen 2529–2606)
 
-### 4. Logs/Forensik
+Ich habe Kling-Szenen für `engineOverride ∈ {cinematic-sync, sync-segments}` in die Two-Shot-Pipeline eingehängt:
+- setzt `twoshot_stage: "master_clip"` + `lip_sync_status: "pending"`
+- benutzt `buildCinematicSyncMasterPrompt` statt `scene.aiPrompt`
 
-Neue eindeutige Logs:
+Kling produziert aber häufig Klone / Spiegelungen / doppelte Gesichter (genau das Problem, das der v182 N=1 Anti-Clone-Suffix eigentlich mildern soll). Sobald der Multi-Speaker-Preflight in `compose-dialog-segments` (`v153.2_preflight_BLOCK`, Zeile 1718 ff.) auf der Kling-Plate zwei zu nahe beieinander liegende oder duplizierte Face-Boxen findet, blockt er hart:
 
-- `v182_n1_tail_hold scene=... from=... to=...`
-- `v182_n1_closed_mouth_prompt scene=...`
-- `v182_kling_n1_anticlone scene=...`
+> "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden…"
 
-### 5. Nicht anfassen
+Genau die Meldung aus dem Screenshot (S01, kling, 2 Sprecher, PROBLEM).
 
-- Kein Multi-Speaker-Freeze.
-- Kein Reaktivieren von v164 Silent-Faces.
-- Kein Deaktivieren von N=1 Tight-Slice.
-- Kein Wechsel weg von Kling/Sync.so.
+Vorher lief Kling einfach als B-Roll-Provider und die Two-Shot/Sync.so-Pipeline war Hailuo-only — deswegen 4 Sprecher problemlos.
 
-## Erwartetes Ergebnis
+## Fix (nur zurückrollen, sonst nichts)
 
-Bei einer N=1 Kling-Cinematic-Sync-Szene:
+### 1. `supabase/functions/compose-video-clips/index.ts` — implizites Opt-in entfernen
 
-- während des Dialogs bewegt Sync.so den Mund
-- direkt nach dem letzten Sprachfenster bleibt der Mund sichtbar ruhig
-- Kling bekommt keinen widersprüchlichen “idle mouth” Prompt mehr
-- die Chance auf einen zweiten/gekloonten gleichen Charakter wird stark reduziert
+Zurück auf den ursprünglichen Hard-Guard (Zeile 1113–1120):
+
+```ts
+const hasOptIn =
+  (scene as any).lipSyncWithVoiceover === true ||
+  (scene as any).dialogMode === true;
+```
+
+### 2. `supabase/functions/compose-video-clips/index.ts` — Kling-Pfad zurückrollen
+
+Im `else if (scene.clipSource === "ai-kling")` Block (~Zeile 2529):
+- `isCinematicSyncScene`-Ableitung + zusätzliches `composer_scenes`-Update mit `lip_sync_source_clip_url/lip_sync_status/twoshot_stage` **entfernen**.
+- `masterPrompt = isCinematicSyncScene ? buildCinematicSyncMasterPrompt(scene) : scene.aiPrompt` durch reines `scene.aiPrompt` ersetzen.
+- Das zweite `composer_scenes`-Update nach `prediction.id` verliert das `twoshot_stage: "master_clip"` Suffix.
+- **Behalten**: den `klingAntiCloneSuffix` und den N=1-Log — die adressieren dein zweites Problem (Klon bei 1 Sprecher) und laufen ohne Sync.so-Preflight-Kopplung.
+
+### 3. Änderung bei `ai-hailuo` (Zeile ~2466) bewusst behalten
+
+Dort ist die Erweiterung `isCinematicSyncScene` um `sync-segments` **korrekt** und war das ursprüngliche Ziel des Turns. Hailuo geht sauber durch die Preflight-Pipeline.
+
+### 4. Redeploy nur der einen Edge Function
+
+```
+compose-video-clips
+```
+
+`render-sync-segments-audio-mux` und `DialogStitchVideo.tsx` (v182 N=1 Tail-Hold) bleiben unverändert — die betreffen nur den finalen Mux und sind orthogonal.
+
+### 5. Memory
+
+`mem/architecture/video-composer/v182-kling-n1-anticlone.md` bleibt bestehen, aber die Beschreibung wird um einen Absatz ergänzt: *Kling-Szenen laufen NICHT durch die Sync.so Multi-Speaker-Preflight. Anti-Clone-Suffix bleibt auf N=1 Kling beschränkt, keine `twoshot_stage`-Kopplung.*
+
+## Verifikation
+
+Nach Deploy:
+1. Kling-Szene mit 2 Sprechern re-rendern → kein `v153_plate_box_duplicate` mehr, kein "Preflight blocked"; Szene läuft als reine Kling-Ausgabe ohne Sync.so.
+2. Szene mit Lip-Sync-Toggle AUS + Dialog-Skript + Voices → keine Lip-Sync-Dispatch (Logs: kein `sync-segments` Eintrag).
+3. Kling-Szene mit 1 Sprecher → weiterhin `v182_kling_n1_anticlone` Log, weiterhin Anti-Clone-Suffix im Prompt.
+
+## Nicht Teil dieses Plans
+
+- Keine Änderung an Hailuo Cinematic-Sync-Pipeline.
+- Keine Änderung am v182 N=1 Tail-Hold (`render-sync-segments-audio-mux` + `DialogStitchVideo.tsx`) — der Fix für "Sprecher bewegen weiter Lippen" bleibt aktiv.
+- Kein Ausbau von Kling zu einem echten Lip-Sync-Provider (Kling unterstützt keine `negative_prompt`, kein `start_image`-basiertes Two-Shot-Framing wie Hailuo — daher ist die Preflight-Kopplung strukturell falsch).
