@@ -72,10 +72,23 @@ const ShotSchema = z.object({
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
   faceMask: FaceMaskSchema.optional().nullable(),
-  /** v164: bounding boxes of all OTHER speakers in this scene. Rendered as
-   *  frozen master-plate crops underneath the active overlay so non-speaking
-   *  faces do not "talk along" with the AI plate during this turn. */
-  silentSlots: z.array(CropSchema).optional().nullable(),
+  /** v164/v183: bounding boxes of all OTHER speakers in this scene.
+   *  v164 used <Freeze frame={0}> of the master plate → ghost/morph artefacts.
+   *  v183 renders a static <Img src=anchorUrl> per slot (closed-mouth anchor
+   *  portrait of the non-speaking character) → no motion, no morph. When
+   *  anchorUrl is missing the slot falls back to a semi-opaque dark tile
+   *  (still guarantees zero mouth motion). */
+  silentSlots: z
+    .array(
+      z.object({
+        x: z.number(),
+        y: z.number(),
+        size: z.number(),
+        anchorUrl: z.string().optional().nullable(),
+      }),
+    )
+    .optional()
+    .nullable(),
   /** Legacy compatibility only. Normal multi-speaker muxes keep overlays
    *  windowed to speaker turns and do not use hold-to-end. */
   holdToEnd: z.boolean().optional(),
