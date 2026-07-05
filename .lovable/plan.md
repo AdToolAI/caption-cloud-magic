@@ -1,75 +1,58 @@
-# Root Cause bestätigt — kein v183/Mapping-Bug, sondern v124 `buildPerFrameBoxes` in Kombination mit später Turn-Position
+## Kurze Antwort
 
-Deine Theorie war goldrichtig: die **Pipeline funktioniert grundsätzlich**, Sync.so's Face-Detector rejected nur den 3. Pass. Ich habe die tatsächlich hochgeladenen `bounding_boxes_url` JSONs der fehlgeschlagenen Szene inspiziert:
+Ja — nach den aktuellen Logs behebt dieser Ansatz sehr wahrscheinlich das eigentliche Problem.
 
-## Beweis aus den Bbox-Dateien (Scene `3d5298b3…`)
+Der Fehler ist nicht mehr plausibel „Sarah/3. Speaker ist nicht sichtbar“. Die Logs zeigen das Gegenteil: Die Face-Box für Sarah wurde sauber gefunden und mit Mouth-Anchor bestätigt.
 
-| Pass | Speaker | Bbox-Datei-Inhalt | Sync.so |
-|------|---------|-------------------|---------|
-| 0 (P1) | Samuel | `[236,206,485,510]` auf **allen** Frames (Full-Fill) | ✅ DISPATCHED |
-| 1 (P2) | Matthew | `[234,169,485,483]` auf **allen** Frames (Full-Fill) | ✅ DISPATCHED |
-| 2 (P3) | Sarah | **null für die ersten ~120 Frames**, danach `[1256,177,1449,417]` | ❌ REJECTED `face_detection` |
+Der eigentliche Bruch ist:
 
-Damit ist die Sache eindeutig:
-- **Kein v183-Identity-Bridge-Bug**: die Boxen sind auf drei verschiedenen Positionen, kein Mapping-Swap.
-- **Kein Auto-Detect-Problem**: alle drei Passes senden `auto_detect: false` + `bounding_boxes_url` (v169-konform).
-- **Kein Rekognition-Off-by-frame**: Sarahs Box (`x=1256`) sitzt rechts im Bild, plausibel für den rechten Speaker.
-- **Der Fehler ist**: Sync.so's Face-Selection-Validator schaut auf den **ersten Frame** des Videos, um die Speaker-Face zu verifizieren. Bei Sarah ist dort `null` (sie spricht erst ab ~Frame 120 = ~5 s in 24 fps). Sync.so kann kein Gesicht in einem null-Frame validieren → `generation_input_face_selection_invalid`.
-
-Warum P1/P2 durchgehen: sie kriegen den **Full-Fill-Pfad** (Zeile 366 in `compose-dialog-segments/index.ts`) — entweder weil ihre `voicedWindowsSec` leer war oder weil ihre erste Turn schon bei t≈0 beginnt. Sarah bekommt den v124-Windowed-Pfad mit führenden Nulls.
-
-## v169-Kompatibilität
-
-Das ist **kein** Regressionsbug seit v169. Der v124-Code existiert seit vor v169 und wurde durch v169's Anchor-Bridge nur überdeckt, weil damals der Face-Anchor-Frame bei einem non-null Frame lag. Heute schickt Sync.so implizit Frame 0 als Validation-Frame und der ist null → Reject.
-
-**v169-Invarianten bleiben unangetastet**: kein `auto_detect`, keine neue Retry-Ladder, keine Model-Swaps, keine Segmente ohne bbox_url, keine Mapping-Änderung.
-
-## Der Fix (surgical, ein Block in `compose-dialog-segments/index.ts`)
-
-### Option 1 (bevorzugt, minimal) — führende Nulls in `buildPerFrameBoxes` mit der Speaker-Box füllen
-
-In `buildPerFrameBoxes` nach dem Zusammenbau des `out`-Arrays:
-
-```ts
-// v186 — Sync.so's face-selection validator inspects the head of the
-// bounding_boxes array to confirm the selected face exists. A leading run
-// of `null` (speaker's first turn starts mid-clip) trips
-// `generation_input_face_selection_invalid`. Backfill leading nulls up to
-// the first voiced window with the same static box — the speaker is
-// still visually present on the plate, they're just silent.
-const firstVoicedFrame = windows[0][0];
-for (let i = 0; i < firstVoicedFrame; i++) out[i] = params.box;
+```text
+Pass 1 → Preclip → OK
+Pass 2 → Preclip → OK
+Pass 3 / Sarah → Preclip poll_timeout_120s → Fallback auf Full-Plate → Sync.so rejected
 ```
 
-Wichtig: **nur führende Nulls** werden gefüllt. Zwischen-Nulls (Speaker A spricht, dann pausiert, dann Speaker B, dann wieder A) bleiben `null` — genau wie v124 vorgesehen hat, damit Sync.so nicht die falschen Münder animiert.
+Damit ist der wiederkehrende Fehler sehr wahrscheinlich kein Face-Detect-Grundproblem, sondern ein Pipeline-Fallback-Problem: Sobald der stabile Single-Face-Preclip-Pfad wegen Timeout nicht fertig wird, fällt die Funktion zurück auf Full-Plate + bbox-url-pro. Genau dieser Ersatzpfad produziert wieder `generation_input_face_selection_invalid`.
 
-### Option 2 (Fallback wenn Option 1 nicht reicht) — Trailing Nulls symmetrisch behandeln
+## Warum das der richtige Fix ist
 
-Falls Sync.so auch am Videoende validiert: gleiches Backfill vom letzten voiced frame bis `frameCount-1`. Standardmäßig NICHT machen — nur wenn Option 1 nicht reicht.
+- Alle 3 Speaker können sichtbar sein und trotzdem kann Sync.so Full-Plate ablehnen.
+- Pass 3 hatte eine valide Box: `[882,209,1060,431]`.
+- `mouth_used=true` zeigt: Der Speaker wurde nicht nur grob erkannt, sondern mit Mouth-Anchor bestätigt.
+- `auto_detect:false` wurde eingehalten.
+- Der Unterschied zwischen Erfolg und Fehler ist der Dispatch-Typ:
+  - Erfolgreiche Passes: `dispatch_video_kind: preclip`
+  - Fehlgeschlagener Pass: `dispatch_video_kind: full_plate`
 
-## Verifikation
+## Plan
 
-1. Nur die eine fehlgeschlagene Szene neu rendern (`3d5298b3…` Pass 2 / Sarah).
-2. Erwartetes Log:
-   - Neue `syncso_dispatch_log`-Zeile für Pass 2 mit `sync_status=DISPATCHED`.
-   - Die neu hochgeladene bbox_url enthält Sarahs Box `[1256,177,1449,417]` auf **allen 200+ Frames**, keine führenden Nulls.
-   - Sync.so-Webhook → `COMPLETED`, `final_url` wird geschrieben.
-3. Wenn P1/P2/P3 alle drei durchlaufen und im Preview die richtigen Münder synchen → done.
-4. Wenn nach dem Fix erneut REJECTED → dann ist es doch die Sarah-Face-Position selbst (Klasse A: Rekognition-Off). Aber der aktuelle Beweis zeigt: die Box sitzt rechts, wo Sarah steht. Sehr unwahrscheinlich.
+1. **Full-Plate-Fallback für Multi-Speaker entfernen**
+   - Bei `speakers.length >= 2` darf ein fehlgeschlagener Preclip nicht mehr automatisch als Full-Plate an Sync.so geschickt werden.
+   - Kein Autodetect, kein stiller Ersatzpfad, kein Morphing-Risiko.
 
-## Was NICHT angefasst wird
+2. **Preclip-Timeout als eigenes Problem behandeln**
+   - `poll_timeout_120s` soll nicht mehr zu einem Sync.so Face-Selection-Fehler werden.
+   - Stattdessen: kontrollierter Retry-/Fail-Closed-Zustand mit klarer Meldung.
 
-- `asd-strategy.ts` (schon v169-konform)
-- `plate-face-identity.ts` (v183 Bridge)
-- `plate-face-detect.ts` (AWS Rekognition)
-- Preclip-Erzeugung, Face-Gate, Watchdog, Refund-Pfad, Sync.so-Webhook
-- N=1 Pfad (v181/v182), N=2 anti-clone (v168), Kling-Anti-Clone (v182)
-- Kein Auto-Detect. Nirgends. Punkt.
+3. **Preclip robuster machen**
+   - Timeout/Polling für `renderPassFacePreclip(...)` konservativ erhöhen oder einen gezielten zweiten Versuch erlauben.
+   - Ziel: Pass 3 bleibt im stabilen Single-Face-Pfad.
 
-## Betroffene Datei
+4. **Logs eindeutig machen**
+   - Neuer Marker: `v187_preclip_required_no_fullplate_fallback`.
+   - Loggt Speaker, Pass, Timeout-Klasse, Preclip-Fenster und ob ein Retry/Refund ausgelöst wurde.
 
-- `supabase/functions/compose-dialog-segments/index.ts` — genau eine Funktion (`buildPerFrameBoxes`), 3 Zeilen hinzu.
+5. **Validierung**
+   - Dieselbe Scene neu rendern.
+   - Erwartung:
+     - Entweder Pass 3 läuft als Preclip durch,
+     - oder er stoppt kontrolliert als Preclip-Timeout.
+   - Wichtig: Kein erneuter Full-Plate-Dispatch und damit kein erneutes `generation_input_face_selection_invalid` aus diesem Fallback.
 
-## Empfehlung nach Approval
+## Was unverändert bleibt
 
-Ich baue Option 1, deploye `compose-dialog-segments`, und du drückst auf einer der drei fehlgeschlagenen Szenen (`3d5298b3…`, `d838e0fd…`, oder eine dritte) auf **Neu rendern**. Danach schaue ich in `syncso_dispatch_log` ob P3 jetzt `DISPATCHED → COMPLETED` durchläuft.
+- Kein `auto_detect`.
+- Keine Sync.so Model-Swaps.
+- Keine neue Retry-Ladder über Provider-Varianten.
+- Keine Änderung an der Speaker-Mapping-Logik.
+- Der v186 `buildPerFrameBoxes`-Fix bleibt drin, ist aber nicht die Hauptursache dieses aktuellen Fehlers.

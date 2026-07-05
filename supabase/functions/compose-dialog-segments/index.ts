@@ -92,8 +92,8 @@ import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 // v161 — renderPassFacePreclip re-enabled for the unified single-face
-// bbox-url-pro pipeline (1..N speakers). The full-plate dispatch path is
-// now strictly the fallback when preclip rendering fails.
+// bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
+// multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
@@ -128,7 +128,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v186";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v187";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -4224,7 +4224,7 @@ serve(async (req) => {
             startSec: unionStart,
             endSec: unionEnd,
           },
-          120_000,
+          180_000,
         );
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
@@ -4257,12 +4257,97 @@ serve(async (req) => {
 
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
+          if (speakers.length >= 2) {
+            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
+            );
+            await logSyncDispatch(supabase, {
+              scene_id: sceneId,
+              user_id: userId,
+              engine: "sync-segments",
+              sync_status: "PREFLIGHT_BLOCKED",
+              error_class: "v187_preclip_required_no_fullplate_fallback",
+              error_message: preclipResult.error ?? "preclip_unknown",
+              meta: {
+                compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+                pass_idx: currentPassIdx,
+                speaker: pass.speaker_name ?? null,
+                character_id: pass.character_id ?? null,
+                preclip_error: preclipResult.error ?? null,
+                preclip_error_class: preclipResult.errorClass ?? null,
+                preclip_window_sec: [Number(unionStart.toFixed(3)), Number(unionEnd.toFixed(3))],
+                speakers: speakers.length,
+                full_plate_fallback_blocked: true,
+                refunded_credits: Number(totalCost ?? 0),
+              },
+            });
+            await failLipSync({
+              supabase,
+              sceneId,
+              reason,
+              userId,
+              refundCredits: totalCost,
+              syncApiKey,
+            });
+            return json(
+              {
+                error: "v187_preclip_required_no_fullplate_fallback",
+                reason,
+                refunded: totalCost,
+              },
+              422,
+            );
+          }
           console.warn(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render FAILED err=${preclipResult.error} class=${preclipResult.errorClass} — falling back to full-plate dispatch`,
           );
         }
       } catch (preclipErr) {
         (pass as any).preclip_error = (preclipErr as Error)?.message ?? String(preclipErr);
+        if (speakers.length >= 2) {
+          const preclipErrorMessage = (preclipErr as Error)?.message ?? String(preclipErr);
+          const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" ist fehlgeschlagen (${preclipErrorMessage}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} threw=${preclipErrorMessage} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
+          );
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId,
+            engine: "sync-segments",
+            sync_status: "PREFLIGHT_BLOCKED",
+            error_class: "v187_preclip_required_no_fullplate_fallback",
+            error_message: preclipErrorMessage,
+            meta: {
+              compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+              pass_idx: currentPassIdx,
+              speaker: pass.speaker_name ?? null,
+              character_id: pass.character_id ?? null,
+              preclip_error: preclipErrorMessage,
+              preclip_error_class: "throw",
+              preclip_window_sec: [Number(unionStart.toFixed(3)), Number(unionEnd.toFixed(3))],
+              speakers: speakers.length,
+              full_plate_fallback_blocked: true,
+              refunded_credits: Number(totalCost ?? 0),
+            },
+          });
+          await failLipSync({
+            supabase,
+            sceneId,
+            reason,
+            userId,
+            refundCredits: totalCost,
+            syncApiKey,
+          });
+          return json(
+            {
+              error: "v187_preclip_required_no_fullplate_fallback",
+              reason,
+              refunded: totalCost,
+            },
+            422,
+          );
+        }
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render THREW: ${(preclipErr as Error)?.message} — falling back to full-plate dispatch`,
         );
