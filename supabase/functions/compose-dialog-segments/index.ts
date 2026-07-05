@@ -128,7 +128,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v184";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v185";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -1358,6 +1358,22 @@ serve(async (req) => {
       coordSources.push(picked?.source ?? "none");
       return picked?.coords ?? null;
     });
+    // v185 — Anchor-First Truth Snapshot.
+    // Freeze the anchor-derived speaker coordinates BEFORE the v183 plate-
+    // identity mapping overwrites `speakerCoords`. Used at the end of the
+    // mapping block to sanity-check that each assigned plate bbox actually
+    // sits on the same face the anchor pipeline identified. If the plate
+    // detector (AWS Rekognition on the Hailuo plate) returned a bogus box
+    // (e.g. whiteboard scribbles false-positived as a face) and v183
+    // Confidence-Ranking still labeled it with the speaker's character_id,
+    // the resulting bbox is off-face and Sync.so rejects the dispatch with
+    // `generation_input_face_selection_invalid`. Anchor coords never drift
+    // more than 5–15 % vs the rendered plate (Hailuo i2v preserves the
+    // anchor composition), so an anchor coord that lies OUTSIDE the assigned
+    // plate bbox is a deterministic signal that the plate face is wrong.
+    const anchorSpeakerCoords: Array<[number, number] | null> = speakerCoords.map(
+      (c) => (Array.isArray(c) ? [c[0], c[1]] as [number, number] : null),
+    );
 
     // ── Plate-native identity override (v77, v129.20) ────────────────────
     // Anchor coords drift 5–15 % vs the rendered Hailuo plate. For multi-
@@ -1723,6 +1739,112 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} v183_plate_identity_mapping faces=${plateIdentityMap.faces.length} ` +
         `resolved=${plateIdentityMap.resolvedCount}/${speakers.length} assigned=${assignedFaceKeys.size}/${speakers.length} cast_dup=${castDupCids.length} cached=${plateIdentityMap.cached}`,
       );
+
+      // ── v185 — Anchor-First Plate-Bbox Sanity Gate ──────────────────────
+      // For each speaker: the assigned plate bbox MUST contain that
+      // speaker's anchor coord (with a small in-frame tolerance). If the
+      // anchor coord lies outside the bbox, the plate detector produced a
+      // false-positive (spurious detection on background / non-face pixels)
+      // that v183 confidence-ranking then confidently mislabeled as this
+      // speaker. Repairing this here avoids sending Sync.so a bbox that
+      // targets a whiteboard / hand / prop, which is what triggered the
+      // `generation_input_face_selection_invalid` REJECTED responses on
+      // real 3-speaker Hailuo plates.
+      //
+      // Repair strategy (no auto-detect, deterministic per v169 §5):
+      //   1) Compute the median face bbox size (w, h) from the OTHER
+      //      speakers whose plate bbox validly contains their anchor coord.
+      //      Fallback to 8% width × 15% height of the plate when no valid
+      //      sibling exists.
+      //   2) Center that median box on the anchor coord for the bad slot.
+      //   3) Rewrite `speakerPlateBboxes[i]`, `speakerCoords[i]`, and
+      //      `speakerPlateMouths[i]` from the anchor. Log a clear repair.
+      // The repaired bbox is anchor-native so it will always overlap the
+      // real face in the Hailuo plate (i2v preserves anchor composition
+      // within ±10 % drift). Sync.so's own detector will accept it.
+      if (plateDims && speakers.length >= 1) {
+        const contains = (
+          box: [number, number, number, number],
+          pt: [number, number],
+          padPx: number,
+        ) => {
+          const [bx1, by1, bx2, by2] = box;
+          const [px, py] = pt;
+          return (
+            px >= bx1 - padPx &&
+            px <= bx2 + padPx &&
+            py >= by1 - padPx &&
+            py <= by2 + padPx
+          );
+        };
+        // A generous 8% padding of the smaller plate dim keeps mouth-vs-
+        // bbox-center drift from being flagged as a mismatch (Rekognition
+        // sometimes crops tightly around the eyes/nose only).
+        const padPx = Math.round(Math.min(plateDims.width, plateDims.height) * 0.08);
+
+        // Identify slots where anchor coord agrees with the plate bbox.
+        const goodSlots: number[] = [];
+        const badSlots: number[] = [];
+        speakers.forEach((_sp, i) => {
+          const box = speakerPlateBboxes[i];
+          const anchor = anchorSpeakerCoords[i];
+          if (!box || !anchor) return;
+          if (contains(box, anchor, padPx)) goodSlots.push(i);
+          else badSlots.push(i);
+        });
+
+        if (badSlots.length > 0) {
+          const goodBoxes = goodSlots
+            .map((i) => speakerPlateBboxes[i]!)
+            .filter(Boolean);
+          const median = (arr: number[]) => {
+            const s = [...arr].sort((a, b) => a - b);
+            const m = Math.floor(s.length / 2);
+            return s.length === 0
+              ? 0
+              : s.length % 2
+                ? s[m]
+                : Math.round((s[m - 1] + s[m]) / 2);
+          };
+          const medW = goodBoxes.length > 0
+            ? median(goodBoxes.map((b) => b[2] - b[0]))
+            : Math.round(plateDims.width * 0.08);
+          const medH = goodBoxes.length > 0
+            ? median(goodBoxes.map((b) => b[3] - b[1]))
+            : Math.round(plateDims.height * 0.15);
+          const halfW = Math.max(24, Math.round(medW / 2));
+          const halfH = Math.max(24, Math.round(medH / 2));
+
+          for (const i of badSlots) {
+            const anchor = anchorSpeakerCoords[i]!;
+            const before = speakerPlateBboxes[i];
+            const cx = Math.max(halfW, Math.min(plateDims.width - halfW, anchor[0]));
+            const cy = Math.max(halfH, Math.min(plateDims.height - halfH, anchor[1]));
+            const repaired: [number, number, number, number] = [
+              cx - halfW,
+              cy - halfH,
+              cx + halfW,
+              cy + halfH,
+            ];
+            speakerPlateBboxes[i] = repaired;
+            speakerCoords[i] = [cx, cy];
+            speakerPlateMouths[i] = [cx, cy];
+            coordSources[i] = "v185-anchor-repair";
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v185_anchor_plate_bbox_repair ` +
+              `speaker=${speakers[i]?.speaker_name ?? `idx${i}`} anchor=[${anchor[0]},${anchor[1]}] ` +
+              `bad_bbox=${JSON.stringify(before)} repaired=${JSON.stringify(repaired)} ` +
+              `median_face=${medW}x${medH} good_slots=${goodSlots.length}/${speakers.length}`,
+            );
+          }
+        } else {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v185_anchor_plate_bbox_gate ok=${goodSlots.length}/${speakers.length} — all plate bboxes contain their anchor coord`,
+          );
+        }
+      }
+
+
       // v183 — Cast-Duplicate früh-refund. Wenn zwei Sprecher denselben
       // stripped character_id verwenden, kann die Pipeline das nicht auflösen.
       // Wir refunden hier bevor der generische Preflight-Block feuert, mit
