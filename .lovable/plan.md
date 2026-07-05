@@ -1,69 +1,75 @@
-## Ausgangslage — was in v169 stimmte und was seither dazukam
+# Root Cause bestätigt — kein v183/Mapping-Bug, sondern v124 `buildPerFrameBoxes` in Kombination mit später Turn-Position
 
-**v169-Invarianten (aus deinem Rebuild-Guide, §5 + §10):**
-- `active_speaker_detection` ist **entweder** `{ frame_number, coordinates }` **oder** `{ bounding_boxes_url }`.
-- **Niemals** `auto_detect: true` für N ≥ 2.
-- ASD-Werte kommen aus **einer** Speaker→Face-Quelle, deterministisch, einmal pro Szene berechnet.
+Deine Theorie war goldrichtig: die **Pipeline funktioniert grundsätzlich**, Sync.so's Face-Detector rejected nur den 3. Pass. Ich habe die tatsächlich hochgeladenen `bounding_boxes_url` JSONs der fehlgeschlagenen Szene inspiziert:
 
-**Aktueller Code-Stand (`_shared/asd-strategy.ts`) — v169-konform für Multi-Speaker:**
-- Rule 2 → `bounding_boxes_url` (bevorzugt)
-- Rule 3 → `frame_number + coordinates` (transformiert oder plate-space)
-- Fallback bei fehlenden Daten: `throw "multi_speaker_no_deterministic_asd_available"` → **kein** Auto-Detect. Passt.
+## Beweis aus den Bbox-Dateien (Scene `3d5298b3…`)
 
-**Was seit v169 dazukam und potenziell verhält (v170 – v184):**
-- **v183** Anchor-Identity Slot Bridge Rewrites: `plate-face-identity.ts` mit Confidence-Ranking + `v183_unlabeled_fallback` + `v183_identity_collision`.
-- **v184** `expectedFaceCount = speakers.length` (entkoppelt vom Portrait-Resolver).
-- **v181** N=1 Depicted-Face-Lock (nur N=1 relevant).
-- **v170** Variant-ID-Stripping (`outfit:/pose:/wardrobe:/vibe:/prop:/look:`) im Character-ID-Match.
+| Pass | Speaker | Bbox-Datei-Inhalt | Sync.so |
+|------|---------|-------------------|---------|
+| 0 (P1) | Samuel | `[236,206,485,510]` auf **allen** Frames (Full-Fill) | ✅ DISPATCHED |
+| 1 (P2) | Matthew | `[234,169,485,483]` auf **allen** Frames (Full-Fill) | ✅ DISPATCHED |
+| 2 (P3) | Sarah | **null für die ersten ~120 Frames**, danach `[1256,177,1449,417]` | ❌ REJECTED `face_detection` |
 
-Die 3-Sprecher-Szene aus dem Screenshot (Samuel + Matthew + Sarah) läuft zwingend auf den Multi-Speaker-Pfad. Sync.so hat mit `generation_input_face_selection_invalid` abgelehnt — Sync.so's Detector konnte an der von uns geschickten bbox/coord **kein** Gesicht bestätigen. In v169 hat genau dieselbe Payload-Struktur funktioniert → die Regression liegt **nicht** in der ASD-Strategie, sondern in den **Daten**, die vor der Strategie berechnet werden (Speaker→Face-Mapping oder die AWS-Rekognition-BBox selbst).
+Damit ist die Sache eindeutig:
+- **Kein v183-Identity-Bridge-Bug**: die Boxen sind auf drei verschiedenen Positionen, kein Mapping-Swap.
+- **Kein Auto-Detect-Problem**: alle drei Passes senden `auto_detect: false` + `bounding_boxes_url` (v169-konform).
+- **Kein Rekognition-Off-by-frame**: Sarahs Box (`x=1256`) sitzt rechts im Bild, plausibel für den rechten Speaker.
+- **Der Fehler ist**: Sync.so's Face-Selection-Validator schaut auf den **ersten Frame** des Videos, um die Speaker-Face zu verifizieren. Bei Sarah ist dort `null` (sie spricht erst ab ~Frame 120 = ~5 s in 24 fps). Sync.so kann kein Gesicht in einem null-Frame validieren → `generation_input_face_selection_invalid`.
 
-Kein Fallback, kein Auto-Detect. Nur Root-Cause.
+Warum P1/P2 durchgehen: sie kriegen den **Full-Fill-Pfad** (Zeile 366 in `compose-dialog-segments/index.ts`) — entweder weil ihre `voicedWindowsSec` leer war oder weil ihre erste Turn schon bei t≈0 beginnt. Sarah bekommt den v124-Windowed-Pfad mit führenden Nulls.
 
-## Plan — Diagnose zuerst, dann gezielter Fix
+## v169-Kompatibilität
 
-### Phase 1 — Forensik (kein Code-Change)
+Das ist **kein** Regressionsbug seit v169. Der v124-Code existiert seit vor v169 und wurde durch v169's Anchor-Bridge nur überdeckt, weil damals der Face-Anchor-Frame bei einem non-null Frame lag. Heute schickt Sync.so implizit Frame 0 als Validation-Frame und der ist null → Reject.
 
-1. **Edge-Function-Logs ziehen** für `compose-dialog-segments` + `sync-so-webhook` der fehlgeschlagenen Szenen (aus dem Screenshot: die drei Szenen im Composer). Suchbegriffe:
-   - `v183_plate_identity_mapping`, `v183_identity_collision`, `v183_unlabeled_fallback`
-   - `WIRE_PAYLOAD version=v184` → tatsächlich gesendete ASD-Struktur
-   - `syncso_dispatch_log` Eintrag für den fehlgeschlagenen Job → `final_asd`, `retry_variant`, `plate_coord`, `crop`
-   - Rohantwort im `sync-so-webhook`-Log mit `error_code=generation_input_face_selection_invalid` inkl. `error_message`
-2. **DB-Query** auf `syncso_dispatch_log` + `composer_scenes.dialog_shots` für die betroffene(n) `scene_id`(s):
-   - Welche `asd_strategy` (`frame_number` vs. `bounding_boxes_url`)?
-   - Welche `plate_coord` / `castSpeakerPlateBox`?
-   - Welcher `character_id` wurde welchem Face zugeordnet?
-3. **Ergebnis-Klassifikation:**
-   - **A)** Rekognition-BBox zeigt daneben (Off-by-Frame, Motion, Face-Turn) → Detection-Layer.
-   - **B)** Speaker→Face-Bridge hat vertauscht (Samuel-Audio zu Matthews Face) → v183 Identity-Layer.
-   - **C)** Frame-Number liegt außerhalb der von Sync.so geparsten Range → Payload-Layer.
-   - **D)** Format der `bounding_boxes` weicht von Sync.so-Spec ab (Reihenfolge, normiert vs. pixel) → Payload-Layer.
+**v169-Invarianten bleiben unangetastet**: kein `auto_detect`, keine neue Retry-Ladder, keine Model-Swaps, keine Segmente ohne bbox_url, keine Mapping-Änderung.
 
-Ohne Phase 1 kein Code-Change. Ich präsentiere dir das Log-Ergebnis, dann folgt Phase 2 als konkreter, kleiner Patch.
+## Der Fix (surgical, ein Block in `compose-dialog-segments/index.ts`)
 
-### Phase 2 — Root-Cause-Fix (skizziert je nach Ergebnis)
+### Option 1 (bevorzugt, minimal) — führende Nulls in `buildPerFrameBoxes` mit der Speaker-Box füllen
 
-- **Wenn A (Rekognition off):** deterministische Frame-Wahl auf den in `plate-face-detect.ts` gefundenen Best-Confidence-Frame verlagern (nicht Anchor-Frame 0), plus Multi-Frame-Bbox-URL statt Single-Frame-Coord — genau wie im v169-Guide §5 als bevorzugte Variante empfohlen. **Keine** Format-Änderung an Sync.so-Payload.
-- **Wenn B (v183 Bridge falsch):** genau den v183-Confidence-Fallback identifizieren, der eine falsche Zuordnung schrieb, und auf das v166-Verhalten zurücksetzen (Bridge nur wenn 1:1-Identity-Match sicher, sonst `throw` → keine stille Zuordnung).
-- **Wenn C (Frame-Range):** `asdFrameNumber`-Clamp gegen die tatsächlich rehostete Plate-Dauer statt `plate_dims.fps`-Annahme.
-- **Wenn D (BBox-Format):** an Sync.so-Doku angleichen; hier reicht ein Payload-Renderer-Fix in `compose-dialog-segments`.
+In `buildPerFrameBoxes` nach dem Zusammenbau des `out`-Arrays:
 
-### Phase 3 — Verifikation
+```ts
+// v186 — Sync.so's face-selection validator inspects the head of the
+// bounding_boxes array to confirm the selected face exists. A leading run
+// of `null` (speaker's first turn starts mid-clip) trips
+// `generation_input_face_selection_invalid`. Backfill leading nulls up to
+// the first voiced window with the same static box — the speaker is
+// still visually present on the plate, they're just silent.
+const firstVoicedFrame = windows[0][0];
+for (let i = 0; i < firstVoicedFrame; i++) out[i] = params.box;
+```
 
-- Genau die **Neu-rendern**-Aktion auf den drei betroffenen Szenen. Kein neuer Dispatch außerhalb dieser Szenen.
-- Erwartetes Log: `syncso_dispatch_log` mit `sync_status=COMPLETED`, Payload-Struktur exakt wie v169 §5.
-- Wenn erneut REJECTED → Phase 1 wiederholen, kein blindes Re-Deploy.
+Wichtig: **nur führende Nulls** werden gefüllt. Zwischen-Nulls (Speaker A spricht, dann pausiert, dann Speaker B, dann wieder A) bleiben `null` — genau wie v124 vorgesehen hat, damit Sync.so nicht die falschen Münder animiert.
 
-## Was NICHT passiert
+### Option 2 (Fallback wenn Option 1 nicht reicht) — Trailing Nulls symmetrisch behandeln
 
-- **Kein** Auto-Detect. Nirgendwo, weder als Recovery noch als Fallback. Der v169-Invariant „N ≥ 2 → deterministic ASD only" bleibt hart durchgesetzt (der bestehende `throw multi_speaker_no_deterministic_asd_available` bleibt).
-- **Keine** neue Retry-Ladder. v128 „terminal means terminal" bleibt.
-- **Kein** Rewrite der ASD-Strategie. Sie ist bereits v169-kompatibel für Multi-Speaker.
-- **Keine** DB-Migration, keine neuen Tabellen, keine neuen Buckets.
-- **Kein** Anfassen von `compose-scene-anchor`, `sync-so-webhook`-Retry-Logic, Refund-Pfad, Watchdog, `finalize-dialog-scene`, oder N=1-Pfad (v181/v182).
+Falls Sync.so auch am Videoende validiert: gleiches Backfill vom letzten voiced frame bis `frameCount-1`. Standardmäßig NICHT machen — nur wenn Option 1 nicht reicht.
 
-## Nächster Schritt
+## Verifikation
 
-Ich starte Phase 1 (Log-Pull + DB-Query) sobald der Plan approved ist. Melde zurück, welche der vier Klassen (A/B/C/D) es tatsächlich ist, und lege dann exakt einen zielgerichteten Patch nach — inklusive Vorher/Nachher-Beweis für die drei Szenen.
+1. Nur die eine fehlgeschlagene Szene neu rendern (`3d5298b3…` Pass 2 / Sarah).
+2. Erwartetes Log:
+   - Neue `syncso_dispatch_log`-Zeile für Pass 2 mit `sync_status=DISPATCHED`.
+   - Die neu hochgeladene bbox_url enthält Sarahs Box `[1256,177,1449,417]` auf **allen 200+ Frames**, keine führenden Nulls.
+   - Sync.so-Webhook → `COMPLETED`, `final_url` wird geschrieben.
+3. Wenn P1/P2/P3 alle drei durchlaufen und im Preview die richtigen Münder synchen → done.
+4. Wenn nach dem Fix erneut REJECTED → dann ist es doch die Sarah-Face-Position selbst (Klasse A: Rekognition-Off). Aber der aktuelle Beweis zeigt: die Box sitzt rechts, wo Sarah steht. Sehr unwahrscheinlich.
 
-Wenn du direkt eine Vermutung hast, welche Klasse (A/B/C/D) das war, sag Bescheid — dann überspringen wir Phase 1 und ich baue sofort den entsprechenden Patch.
+## Was NICHT angefasst wird
+
+- `asd-strategy.ts` (schon v169-konform)
+- `plate-face-identity.ts` (v183 Bridge)
+- `plate-face-detect.ts` (AWS Rekognition)
+- Preclip-Erzeugung, Face-Gate, Watchdog, Refund-Pfad, Sync.so-Webhook
+- N=1 Pfad (v181/v182), N=2 anti-clone (v168), Kling-Anti-Clone (v182)
+- Kein Auto-Detect. Nirgends. Punkt.
+
+## Betroffene Datei
+
+- `supabase/functions/compose-dialog-segments/index.ts` — genau eine Funktion (`buildPerFrameBoxes`), 3 Zeilen hinzu.
+
+## Empfehlung nach Approval
+
+Ich baue Option 1, deploye `compose-dialog-segments`, und du drückst auf einer der drei fehlgeschlagenen Szenen (`3d5298b3…`, `d838e0fd…`, oder eine dritte) auf **Neu rendern**. Danach schaue ich in `syncso_dispatch_log` ob P3 jetzt `DISPATCHED → COMPLETED` durchläuft.

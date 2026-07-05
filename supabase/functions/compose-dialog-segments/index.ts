@@ -324,6 +324,18 @@ function buildPerFrameBoxes(params: {
   for (const [fs, fe] of windows) {
     for (let i = fs; i <= fe; i++) out[i] = params.box;
   }
+  // v186 — Sync.so's face-selection validator inspects the head (and tail) of
+  // the bounding_boxes array to confirm the selected face exists on the plate.
+  // A leading run of `null` (speaker's first turn starts mid-clip) trips
+  // `generation_input_face_selection_invalid` even though the speaker is
+  // visually present the whole time — they're just silent. Backfill leading
+  // and trailing nulls with the same static box; interior nulls (between
+  // turns) stay null so Sync.so doesn't animate this speaker during someone
+  // else's turn.
+  const firstVoicedFrame = windows[0][0];
+  for (let i = 0; i < firstVoicedFrame; i++) out[i] = params.box;
+  const lastVoicedFrame = windows[windows.length - 1][1];
+  for (let i = lastVoicedFrame + 1; i < out.length; i++) out[i] = params.box;
   return out;
 }
 
