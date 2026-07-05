@@ -1358,6 +1358,22 @@ serve(async (req) => {
       coordSources.push(picked?.source ?? "none");
       return picked?.coords ?? null;
     });
+    // v185 — Anchor-First Truth Snapshot.
+    // Freeze the anchor-derived speaker coordinates BEFORE the v183 plate-
+    // identity mapping overwrites `speakerCoords`. Used at the end of the
+    // mapping block to sanity-check that each assigned plate bbox actually
+    // sits on the same face the anchor pipeline identified. If the plate
+    // detector (AWS Rekognition on the Hailuo plate) returned a bogus box
+    // (e.g. whiteboard scribbles false-positived as a face) and v183
+    // Confidence-Ranking still labeled it with the speaker's character_id,
+    // the resulting bbox is off-face and Sync.so rejects the dispatch with
+    // `generation_input_face_selection_invalid`. Anchor coords never drift
+    // more than 5–15 % vs the rendered plate (Hailuo i2v preserves the
+    // anchor composition), so an anchor coord that lies OUTSIDE the assigned
+    // plate bbox is a deterministic signal that the plate face is wrong.
+    const anchorSpeakerCoords: Array<[number, number] | null> = speakerCoords.map(
+      (c) => (Array.isArray(c) ? [c[0], c[1]] as [number, number] : null),
+    );
 
     // ── Plate-native identity override (v77, v129.20) ────────────────────
     // Anchor coords drift 5–15 % vs the rendered Hailuo plate. For multi-
