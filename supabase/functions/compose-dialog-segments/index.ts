@@ -1512,16 +1512,24 @@ serve(async (req) => {
       const anchorHasIdentities =
         anchorFaces.length > 0 &&
         anchorFaces.every((f) => typeof f?.characterId === "string" && (f.characterId as string).length > 0);
+      // v183 — Bridge auch bei Ungleichheit: greift solange der Anchor mindestens
+      // so viele identifizierte Faces hat wie er Plate-Faces sieht. Damit greift
+      // die Bridge auch wenn die HH/Hailuo-Plate mehr Gesichter zeigt als der
+      // Anchor kannte (Statisten, Reflexionen). Zuweisung bleibt Visual-L→R,
+      // begrenzt auf die Anzahl der Anchor-Slots — der Rest bleibt `unlabeled`.
       if (
         anchorHasIdentities &&
-        anchorFaces.length === plateIdentityMap.faces.length &&
+        anchorFaces.length >= 1 &&
+        anchorFaces.length <= plateIdentityMap.faces.length &&
         plateIdentityMap.faces.some((f) => !f.characterId)
       ) {
         const platesByVisual = [...plateIdentityMap.faces].sort((a, b) => a.slot - b.slot);
         const anchorByVisual = [...anchorFaces].sort(
           (a, b) => Number(a.slotIndex ?? 0) - Number(b.slotIndex ?? 0),
         );
-        platesByVisual.forEach((pf, visualIdx) => {
+        const bridgeLimit = Math.min(anchorByVisual.length, platesByVisual.length);
+        for (let visualIdx = 0; visualIdx < bridgeLimit; visualIdx++) {
+          const pf = platesByVisual[visualIdx];
           if (!pf.characterId) {
             const cid = anchorByVisual[visualIdx]?.characterId ?? null;
             if (cid) {
@@ -1529,9 +1537,10 @@ serve(async (req) => {
               (pf as any).matchConfidence = 0.85;
             }
           }
-        });
+        }
+        const partial = anchorByVisual.length < platesByVisual.length ? "_partial" : "";
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v166_anchor_identity_slot_bridge bridged=${plateIdentityMap.faces.filter((f) => f.characterId).length}/${plateIdentityMap.faces.length} anchor_ids=${anchorByVisual.map((f) => f.characterId).join(",")}`,
+          `[compose-dialog-segments] scene=${sceneId} v183_anchor_identity_slot_bridge${partial} bridged=${plateIdentityMap.faces.filter((f) => f.characterId).length}/${plateIdentityMap.faces.length} anchor_ids=${anchorByVisual.map((f) => f.characterId).join(",")}`,
         );
       }
 
