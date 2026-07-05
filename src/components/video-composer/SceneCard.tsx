@@ -102,6 +102,11 @@ import {
   type PromptSlots,
 } from "@/lib/motion-studio/structuredPromptStitcher";
 import { clipSourceToModelKey } from "@/lib/motion-studio/promptTokenLimits";
+import {
+  getProviderDurations,
+  getProviderLabel,
+  snapDurationToProvider,
+} from "@/lib/video-composer/providerCapabilities";
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
