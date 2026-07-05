@@ -60,7 +60,7 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     label: 'Kling',
   },
   'ai-veo': {
-    durations: [5, 8],
+    durations: [4, 6, 8],
     lipsync: false,
     multiSpeaker: false,
     label: 'Veo',
@@ -72,7 +72,7 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     label: 'Wan',
   },
   'ai-seedance': {
-    durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    durations: [5, 10],
     lipsync: true,
     multiSpeaker: false,
     label: 'Seedance',
@@ -82,6 +82,12 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     lipsync: false,
     multiSpeaker: false,
     label: 'Luma',
+  },
+  'ai-grok': {
+    durations: [6, 12],
+    lipsync: false,
+    multiSpeaker: false,
+    label: 'Grok',
   },
   'ai-sora': {
     durations: [4, 8, 12],
