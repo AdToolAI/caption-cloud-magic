@@ -1613,13 +1613,20 @@ export default function SceneCard({
                                   clipSource: next.clipSource,
                                   clipQuality: next.clipQuality,
                                 };
-                                // Hailuo only supports 6s or 10s. When switching TO Hailuo
-                                // from a free-duration provider (HappyHorse 3-15s), default
-                                // to 6s unless the user already had exactly 10s picked.
-                                // Never silently bump 7/8/9/15s → 10s.
-                                if (next.clipSource === 'ai-hailuo') {
-                                  const cur = Number(scene.durationSeconds || 0);
-                                  if (cur !== 10) updates.durationSeconds = 6;
+                                // Auto-snap duration to the new provider's supported buckets
+                                // (from PROVIDER_CAPS, Toolkit ground-truth). Prevents leftover
+                                // 15s from Kling ending up on Wan's [5,10], etc.
+                                const cur = Number(scene.durationSeconds || 0);
+                                const snapped = snapDurationToProvider(cur, next.clipSource);
+                                if (snapped.changed) {
+                                  updates.durationSeconds = snapped.duration;
+                                }
+                                // Hailuo special case: 6s/10s are the only real values; when
+                                // arriving from a wider picker with something like 7/8/9s the
+                                // snap above yields 10s. Prefer the safer 6s unless the user
+                                // explicitly had 10s already.
+                                if (next.clipSource === 'ai-hailuo' && cur !== 10 && cur !== 6) {
+                                  updates.durationSeconds = 6;
                                 }
                                 onUpdate(updates);
                               }}
