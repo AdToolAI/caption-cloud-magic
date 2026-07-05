@@ -2464,36 +2464,88 @@ serve(async (req) => {
         const endSec = Math.max(startSec + 0.2, Number(t0?.endSec) || startSec + 0.5);
         const midSec = (startSec + endSec) / 2;
         const frameNum = Math.max(1, Math.round(midSec * FPS));
-        try {
-          const v = await validateFrameFace({
-            supabaseUrl,
-            serviceKey,
-            videoUrl: sourceClipUrl,
-            frameNumber: frameNum,
-            fps: FPS,
-            targetCoords: null,
-          });
-          const faceCount = Number(v.faceCount ?? 0);
-          probes.push({
-            speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
-            turn_sec: Math.round(midSec * 100) / 100,
-            face_count: v.ok ? faceCount : null,
-            ok: !!v.ok,
-          });
-          if (v.ok && faceCount < 1) {
-            failures.push({
-              speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
-              character_id: sp?.character_id ?? null,
-              turn_sec: Math.round(midSec * 100) / 100,
-              frame: frameNum,
-              face_count: faceCount,
+
+        // v188 — Nearest-Window Snap: sample the turn window at up to 5
+        // timestamps (mid, ±25%, ±50% incl. ±0.5s padding beyond turn edges).
+        // If ANY frame in the window shows ≥1 face, treat the turn as
+        // recoverable (Sync.so can lock onto the visible frame downstream).
+        // Only hard-block when the speaker is truly invisible across the
+        // whole turn window. Solves the Kling non-determinism where a single
+        // cut/pan at turn-mid tanks an otherwise valid multi-speaker plate.
+        const turnDur = Math.max(0.2, endSec - startSec);
+        const padSec = 0.5;
+        const sampleOffsets = [
+          0,                              // mid
+          -turnDur * 0.25,
+          +turnDur * 0.25,
+          -(turnDur * 0.5 + padSec),      // startSec − pad
+          +(turnDur * 0.5 + padSec),      // endSec + pad
+        ];
+        let bestFaceCount = 0;
+        let bestSampleSec = midSec;
+        let bestOk = false;
+        let anyProbeSucceeded = false;
+        const sampleTrail: Array<{ sec: number; frame: number; faces: number | null; ok: boolean }> = [];
+        for (const off of sampleOffsets) {
+          const sampleSec = Math.max(0, midSec + off);
+          const sampleFrame = Math.max(1, Math.round(sampleSec * FPS));
+          try {
+            const v = await validateFrameFace({
+              supabaseUrl,
+              serviceKey,
+              videoUrl: sourceClipUrl,
+              frameNumber: sampleFrame,
+              fps: FPS,
+              targetCoords: null,
             });
+            const faceCount = Number(v.faceCount ?? 0);
+            sampleTrail.push({
+              sec: Math.round(sampleSec * 100) / 100,
+              frame: sampleFrame,
+              faces: v.ok ? faceCount : null,
+              ok: !!v.ok,
+            });
+            if (v.ok) {
+              anyProbeSucceeded = true;
+              if (faceCount > bestFaceCount) {
+                bestFaceCount = faceCount;
+                bestSampleSec = sampleSec;
+                bestOk = true;
+              }
+              // Early exit — one visible frame is enough to unblock the turn.
+              if (faceCount >= 1) break;
+            }
+          } catch (e) {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v188_snap probe threw speaker=${i} off=${off}: ${(e as Error)?.message}`,
+            );
           }
-        } catch (e) {
-          // Probe exception — permissive (do not block on detector outage).
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v132_turn_gate probe threw for speaker=${i}: ${(e as Error)?.message}`,
-          );
+        }
+
+        probes.push({
+          speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
+          turn_sec: Math.round(midSec * 100) / 100,
+          face_count: bestOk ? bestFaceCount : null,
+          ok: anyProbeSucceeded,
+        });
+
+        if (anyProbeSucceeded && bestFaceCount < 1) {
+          // Every probe in the window succeeded AND every one saw 0 faces →
+          // real terminal visibility failure. Block and refund.
+          failures.push({
+            speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
+            character_id: sp?.character_id ?? null,
+            turn_sec: Math.round(midSec * 100) / 100,
+            frame: frameNum,
+            face_count: 0,
+          });
+        } else if (anyProbeSucceeded && bestFaceCount >= 1) {
+          const snapOffsetMs = Math.round((bestSampleSec - midSec) * 1000);
+          if (Math.abs(snapOffsetMs) > 5) {
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} v188_turn_visibility_snap speaker=${i} snapped_from=${midSec.toFixed(2)}s snapped_to=${bestSampleSec.toFixed(2)}s offset=${snapOffsetMs}ms faces=${bestFaceCount} trail=${JSON.stringify(sampleTrail)}`,
+            );
+          }
         }
       }
       if (failures.length > 0) {
