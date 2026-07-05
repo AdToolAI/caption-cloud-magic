@@ -1061,7 +1061,7 @@ export default function VideoComposerDashboard() {
           applied_style_preset_id: s.appliedStylePresetId ?? null,
           cinematic_preset_slug: s.cinematicPresetSlug ?? null,
           continuity_locked: s.continuityLocked === true,
-          lock_reference_url: s.lockReferenceUrl ?? null,
+          lock_reference_url: (s as any).lockSource === 'inherited' ? null : (s.lockReferenceUrl ?? null),
           continuity_source_scene_id: s.continuationSourceSceneId ?? null,
           frame_pick_seconds: s.framePickSeconds ?? null,
           // v175: denormalised mention IDs + first-speaker voice (Apply-Plan path).
