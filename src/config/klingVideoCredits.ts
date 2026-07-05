@@ -10,8 +10,9 @@ export const KLING_VIDEO_MODELS = {
       EUR: 0.18,
       USD: 0.18,
     },
-    minDuration: 3,
-    maxDuration: 15,
+    minDuration: 5,
+    maxDuration: 10,
+    allowedDurations: [5, 10] as const,
     description: {
       EUR: 'Hochwertige AI-Videos ab 0,90€ pro 5 Sekunden',
       USD: 'High-quality AI videos from $0.90 per 5 seconds',
