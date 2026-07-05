@@ -465,32 +465,115 @@ async function askGeminiForIdentityMatch(
   }
 }
 
-/** Resolve brand_characters.portrait_url for each character_id (slug). */
+/**
+ * Resolve brand_characters.portrait_url for each character_id.
+ *
+ * v184 — accepts every id shape the composer uses:
+ *   - `brand_characters.id` (UUID)
+ *   - `lib:<uuid>` / `catalog:<uuid>` / `preset:<uuid>` prefixed UUIDs
+ *   - `outfit:<lookId>` (resolved via `avatar_outfit_looks.avatar_id`)
+ *   - legacy lowercase name-slug (kept for back-compat with older scenes)
+ *
+ * The returned `characterId` is always the CANONICAL id we received (so the
+ * caller can look it up again), while `portraitUrl` is the resolved image.
+ */
 export async function resolveCharacterPortraits(
   supabase: any,
   userId: string,
   characterIds: Array<string | null | undefined>,
 ): Promise<Array<{ characterId: string; portraitUrl: string }>> {
-  const uniq = Array.from(
-    new Set(characterIds.map((s) => String(s ?? "").toLowerCase().trim()).filter(Boolean)),
+  const uniqRaw = Array.from(
+    new Set(
+      characterIds
+        .map((s) => String(s ?? "").trim())
+        .filter(Boolean),
+    ),
   );
-  if (!uniq.length) return [];
+  if (!uniqRaw.length) return [];
+
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const stripPrefix = (id: string): string => id.replace(/^(lib|catalog|preset):/i, "").trim();
+
+  // Classify each id.
+  type Entry = {
+    raw: string;
+    kind: "uuid" | "outfit" | "slug";
+    key: string; // uuid for uuid/outfit, slug for slug
+  };
+  const entries: Entry[] = uniqRaw.map((raw) => {
+    if (/^outfit:/i.test(raw)) {
+      return { raw, kind: "outfit", key: raw.slice("outfit:".length).trim() };
+    }
+    const stripped = stripPrefix(raw);
+    if (uuidRe.test(stripped)) {
+      return { raw, kind: "uuid", key: stripped.toLowerCase() };
+    }
+    return { raw, kind: "slug", key: raw.toLowerCase().replace(/\s+/g, "-") };
+  });
+
+  const uuidTargets = new Set<string>();
+  entries.forEach((e) => {
+    if (e.kind === "uuid") uuidTargets.add(e.key);
+  });
+
+  // Resolve outfit lookIds → avatar UUIDs first, so we can query by uuid.
+  const outfitEntries = entries.filter((e) => e.kind === "outfit");
+  const outfitLookToAvatar = new Map<string, string>();
+  if (outfitEntries.length > 0) {
+    try {
+      const lookIds = outfitEntries.map((e) => e.key);
+      const { data: looks } = await supabase
+        .from("avatar_outfit_looks")
+        .select("id, avatar_id")
+        .in("id", lookIds);
+      if (Array.isArray(looks)) {
+        for (const row of looks) {
+          const lookId = String((row as any)?.id ?? "").toLowerCase();
+          const avatarId = String((row as any)?.avatar_id ?? "").toLowerCase();
+          if (lookId && avatarId && uuidRe.test(avatarId)) {
+            outfitLookToAvatar.set(lookId, avatarId);
+            uuidTargets.add(avatarId);
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   try {
+    // Load all candidate rows in a single query. We fetch by id (uuid) AND
+    // by user_id so slug-fallback still works for legacy scenes.
     const { data, error } = await supabase
       .from("brand_characters")
-      .select("name, portrait_url, reference_image_url, user_id, updated_at")
+      .select("id, name, portrait_url, reference_image_url, user_id, updated_at")
       .eq("user_id", userId)
       .order("updated_at", { ascending: false });
     if (error || !Array.isArray(data)) return [];
+
+    const byUuid = new Map<string, any>();
+    const bySlug = new Map<string, any>();
+    for (const row of data) {
+      const rid = String((row as any)?.id ?? "").toLowerCase();
+      if (rid) byUuid.set(rid, row);
+      const slug = String((row as any)?.name ?? "").toLowerCase().trim().replace(/\s+/g, "-");
+      if (slug && !bySlug.has(slug)) bySlug.set(slug, row);
+    }
+
     const out: Array<{ characterId: string; portraitUrl: string }> = [];
-    for (const id of uniq) {
-      const row = data.find((r: any) => {
-        const slug = String(r?.name ?? "").toLowerCase().trim().replace(/\s+/g, "-");
-        return slug === id;
-      });
+    for (const e of entries) {
+      let row: any | undefined;
+      if (e.kind === "uuid") {
+        row = byUuid.get(e.key);
+      } else if (e.kind === "outfit") {
+        const avatarUuid = outfitLookToAvatar.get(e.key);
+        if (avatarUuid) row = byUuid.get(avatarUuid);
+      } else {
+        row = bySlug.get(e.key);
+      }
       if (!row) continue;
       const url = String(row.portrait_url || row.reference_image_url || "").trim();
-      if (url) out.push({ characterId: id, portraitUrl: url });
+      if (url) out.push({ characterId: e.raw, portraitUrl: url });
     }
     return out;
   } catch {

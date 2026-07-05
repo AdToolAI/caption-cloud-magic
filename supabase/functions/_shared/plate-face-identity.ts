@@ -338,13 +338,25 @@ export async function resolvePlateFaceIdentities(params: {
   characters: Array<{ characterId: string; portraitUrl: string }>;
   /** v156 — Anchor frame for AWS Rekognition (anchor-first detection). */
   anchorUrl?: string | null;
+  /**
+   * v184 — Hard hint for the detector, decoupled from `characters.length`.
+   * Portraits may fail to resolve (id-format mismatch, deleted character) but
+   * the scene still has N speakers and the plate still has N faces. Pass the
+   * real speaker count so AWS Rekognition keeps every face instead of pruning
+   * to `max(1, characters.length)`.
+   */
+  expectedFaceCount?: number;
 }): Promise<PlateIdentityMap | null> {
+  const expected = Math.max(
+    1,
+    params.expectedFaceCount ?? params.characters.length ?? 1,
+  );
   const plateMap: PlateFaceMap | null = await detectPlateFaces({
     supabase: params.supabase,
     plateUrl: params.plateUrl,
     plateWidth: params.plateWidth,
     plateHeight: params.plateHeight,
-    expectedCount: Math.max(1, params.characters.length),
+    expectedCount: expected,
     sceneId: params.sceneId,
     projectId: params.projectId,
     midDurationSec: params.midDurationSec,

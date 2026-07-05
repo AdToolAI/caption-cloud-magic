@@ -1061,7 +1061,7 @@ export default function VideoComposerDashboard() {
           applied_style_preset_id: s.appliedStylePresetId ?? null,
           cinematic_preset_slug: s.cinematicPresetSlug ?? null,
           continuity_locked: s.continuityLocked === true,
-          lock_reference_url: s.lockReferenceUrl ?? null,
+          lock_reference_url: (s as any).lockSource === 'inherited' ? null : (s.lockReferenceUrl ?? null),
           continuity_source_scene_id: s.continuationSourceSceneId ?? null,
           frame_pick_seconds: s.framePickSeconds ?? null,
           // v175: denormalised mention IDs + first-speaker voice (Apply-Plan path).
@@ -1362,7 +1362,7 @@ export default function VideoComposerDashboard() {
       engine_override: p.engineOverride ?? 'auto',
       character_shots: (p.characterShots ?? null) as any,
       continuity_locked: (p as any).continuityLocked === true,
-      lock_reference_url: (p as any).lockReferenceUrl ?? null,
+      lock_reference_url: (p as any).lockSource === 'inherited' ? null : ((p as any).lockReferenceUrl ?? null),
     }));
 
     // Atomic: shift tail → delete parent → insert children → shift back, all
