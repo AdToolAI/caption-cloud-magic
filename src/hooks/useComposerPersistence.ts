@@ -279,7 +279,7 @@ export function useComposerPersistence() {
               hybrid_target_scene_id: scene.hybridTargetSceneId ?? null,
               audio_plan: (scene.audioPlan ?? null) as any,
               dialog_locked_at: scene.dialogLockedAt ?? null,
-              lock_reference_url: scene.lockReferenceUrl ?? null,
+              lock_reference_url: (scene as any).lockSource === 'inherited' ? null : (scene.lockReferenceUrl ?? null),
               continuity_locked: scene.continuityLocked === true,
               action_beat: (scene.actionBeat ?? null) as any,
               realism_preset: scene.realismPreset ?? null,
