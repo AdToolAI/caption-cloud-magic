@@ -1,92 +1,69 @@
-# Provider-Duration-Audit — Composer an Toolkit-Ground-Truth angleichen
+## Ausgangslage — was in v169 stimmte und was seither dazukam
 
-## Ausgangslage
+**v169-Invarianten (aus deinem Rebuild-Guide, §5 + §10):**
+- `active_speaker_detection` ist **entweder** `{ frame_number, coordinates }` **oder** `{ bounding_boxes_url }`.
+- **Niemals** `auto_detect: true` für N ≥ 2.
+- ASD-Werte kommen aus **einer** Speaker→Face-Quelle, deterministisch, einmal pro Szene berechnet.
 
-Der Toolkit (`AI_VIDEO_TOOLKIT_MODELS` in `src/config/aiVideoModelRegistry.ts`) ist die Ground-Truth: seine `durations`-Arrays entsprechen exakt dem, was die Provider-Edge-Functions gegen Replicate erfolgreich rendern (DB bestätigt für Kling 15s, Luma 9s, Seedance 12s alle mit `status: completed`). Der Composer-Layer (`PROVIDER_CAPS` in `src/lib/video-composer/providerCapabilities.ts` + Snap-Guards in `supabase/functions/compose-video-clips/index.ts`) schränkt zwei Provider künstlich stärker ein.
+**Aktueller Code-Stand (`_shared/asd-strategy.ts`) — v169-konform für Multi-Speaker:**
+- Rule 2 → `bounding_boxes_url` (bevorzugt)
+- Rule 3 → `frame_number + coordinates` (transformiert oder plate-space)
+- Fallback bei fehlenden Daten: `throw "multi_speaker_no_deterministic_asd_available"` → **kein** Auto-Detect. Passt.
 
-## Audit-Tabelle (Toolkit = ✅ akzeptiert von Replicate)
+**Was seit v169 dazukam und potenziell verhält (v170 – v184):**
+- **v183** Anchor-Identity Slot Bridge Rewrites: `plate-face-identity.ts` mit Confidence-Ranking + `v183_unlabeled_fallback` + `v183_identity_collision`.
+- **v184** `expectedFaceCount = speakers.length` (entkoppelt vom Portrait-Resolver).
+- **v181** N=1 Depicted-Face-Lock (nur N=1 relevant).
+- **v170** Variant-ID-Stripping (`outfit:/pose:/wardrobe:/vibe:/prop:/look:`) im Character-ID-Match.
 
-| Provider     | Edge-Function          | Toolkit-Ground-Truth       | Composer `PROVIDER_CAPS`     | Backend-Snap in `compose-video-clips`      | Status         |
-|--------------|------------------------|----------------------------|------------------------------|--------------------------------------------|----------------|
-| **kling**    | `generate-kling-video` (kein Clamp, Replicate akzeptiert frei) | `[3, 5, 8, 10, 15]`        | `[5, 10]` ⚠️                 | `snapDuration(…, [5, 10])` (Z. 2537) ⚠️    | **Zu eng**     |
-| **seedance** | `generate-seedance-video` (`Math.min(duration, 12)` Z. 171)   | `[5, 8, 10, 12]`           | `[5, 10]` ⚠️                 | `snapDuration(…, [5, 10])` (Z. 2746) ⚠️    | **Zu eng**     |
-| veo          | `generate-veo-video` (`[4,6,8]` Whitelist Z. 101) | `[4, 6, 8]`                | `[4, 6, 8]` ✅                | `snapDuration(…, [4, 6, 8])` (Z. 2853) ✅   | ✅ konsistent   |
-| grok         | `generate-grok-video`  | `[6, 12]`                  | `[6, 12]` ✅                  | keine Kling-Sync-Route derzeit             | ✅ konsistent   |
-| ltx          | `generate-ltx-video`   | `[4, 6, 8]`                | **fehlt** ⚠️                 | keine Composer-Route ⚠️                    | Composer-Support fehlt |
-| wan          | `generate-wan-video`   | `[5, 10]`                  | `[5, 10]` ✅                  | `snapDuration(…, [5, 10])` (Z. 2695) ✅     | ✅ konsistent   |
-| hailuo       | `generate-hailuo-video`| `[6, 10]`                  | `[6, 10]` ✅                  | fix 6/10-Auswahl (Z. 2505) ✅               | ✅ konsistent   |
-| luma         | `generate-luma-video`  | `[5, 9]`                   | `[5, 9]` ✅                   | `snapDuration(…, [5, 9])` (Z. 2799) ✅      | ✅ konsistent   |
-| runway       | `generate-runway-video`| `[5, 10]`                  | `[5, 10]` ✅                  | (V2V-Path)                                 | ✅ konsistent   |
-| pika         | `generate-pika-video`  | `[5, 10]` (Wartung)        | `[5, 10]` ✅                  | Migration → hailuo (Z. 1247)               | ✅ konsistent   |
-| vidu         | `generate-vidu-video`  | `[5]`                      | `[5]` ✅                      | (Multi-Ref-Path)                           | ✅ konsistent   |
-| happyhorse   | `generate-happyhorse-video` | `[3, 5, 8, 10, 12, 15]` | Free-Range 3–15 ✅            | delegiert an Edge-Function                 | ✅ konsistent   |
-| sora         | (OpenAI Sunset 2026)   | (entfernt)                 | `[4, 8, 12]` (Legacy)        | Auto-Migration → veo (Z. 1231)              | ✅ Migration ok |
+Die 3-Sprecher-Szene aus dem Screenshot (Samuel + Matthew + Sarah) läuft zwingend auf den Multi-Speaker-Pfad. Sync.so hat mit `generation_input_face_selection_invalid` abgelehnt — Sync.so's Detector konnte an der von uns geschickten bbox/coord **kein** Gesicht bestätigen. In v169 hat genau dieselbe Payload-Struktur funktioniert → die Regression liegt **nicht** in der ASD-Strategie, sondern in den **Daten**, die vor der Strategie berechnet werden (Speaker→Face-Mapping oder die AWS-Rekognition-BBox selbst).
 
-## Root Cause der Composer-Beschränkung
+Kein Fallback, kein Auto-Detect. Nur Root-Cause.
 
-Kling und Seedance wurden im Composer bewusst auf `[5, 10]` gesnappt, weil die frühere Cinematic-Sync/Sync.so-Pipeline (v128/v129) Timing-Drift bei „ungeraden" Master-Plate-Längen hatte. Seit v183/v184 arbeitet `compose-dialog-segments` provider-agnostisch (siehe expliziter Kommentar Z. 1261-1271 in `compose-video-clips`: „SILENT MIGRATION REMOVED … dialog-segments pipeline is provider-agnostic"). Die Beschränkung ist damit obsolet — die reale Constraint sitzt nur noch beim Provider selbst.
+## Plan — Diagnose zuerst, dann gezielter Fix
 
-## Fix — 3 Dateien, keine DB-Migration
+### Phase 1 — Forensik (kein Code-Change)
 
-### 1. `src/lib/video-composer/providerCapabilities.ts`
+1. **Edge-Function-Logs ziehen** für `compose-dialog-segments` + `sync-so-webhook` der fehlgeschlagenen Szenen (aus dem Screenshot: die drei Szenen im Composer). Suchbegriffe:
+   - `v183_plate_identity_mapping`, `v183_identity_collision`, `v183_unlabeled_fallback`
+   - `WIRE_PAYLOAD version=v184` → tatsächlich gesendete ASD-Struktur
+   - `syncso_dispatch_log` Eintrag für den fehlgeschlagenen Job → `final_asd`, `retry_variant`, `plate_coord`, `crop`
+   - Rohantwort im `sync-so-webhook`-Log mit `error_code=generation_input_face_selection_invalid` inkl. `error_message`
+2. **DB-Query** auf `syncso_dispatch_log` + `composer_scenes.dialog_shots` für die betroffene(n) `scene_id`(s):
+   - Welche `asd_strategy` (`frame_number` vs. `bounding_boxes_url`)?
+   - Welche `plate_coord` / `castSpeakerPlateBox`?
+   - Welcher `character_id` wurde welchem Face zugeordnet?
+3. **Ergebnis-Klassifikation:**
+   - **A)** Rekognition-BBox zeigt daneben (Off-by-Frame, Motion, Face-Turn) → Detection-Layer.
+   - **B)** Speaker→Face-Bridge hat vertauscht (Samuel-Audio zu Matthews Face) → v183 Identity-Layer.
+   - **C)** Frame-Number liegt außerhalb der von Sync.so geparsten Range → Payload-Layer.
+   - **D)** Format der `bounding_boxes` weicht von Sync.so-Spec ab (Reihenfolge, normiert vs. pixel) → Payload-Layer.
 
-Kling und Seedance an Toolkit angleichen; LTX ergänzen; alles andere bleibt:
+Ohne Phase 1 kein Code-Change. Ich präsentiere dir das Log-Ergebnis, dann folgt Phase 2 als konkreter, kleiner Patch.
 
-```ts
-'ai-kling':    { durations: [3, 5, 8, 10, 15], lipsync: true,  multiSpeaker: false, label: 'Kling' },
-'ai-seedance': { durations: [5, 8, 10, 12],    lipsync: true,  multiSpeaker: false, label: 'Seedance' },
-'ai-ltx':      { durations: [4, 6, 8],         lipsync: false, multiSpeaker: false, label: 'LTX' }, // neu
-```
+### Phase 2 — Root-Cause-Fix (skizziert je nach Ergebnis)
 
-Rest (Hailuo, Veo, Wan, Luma, Grok, Sora, Pika, Runway, Vidu, Kling-Omni, HappyHorse) unverändert.
+- **Wenn A (Rekognition off):** deterministische Frame-Wahl auf den in `plate-face-detect.ts` gefundenen Best-Confidence-Frame verlagern (nicht Anchor-Frame 0), plus Multi-Frame-Bbox-URL statt Single-Frame-Coord — genau wie im v169-Guide §5 als bevorzugte Variante empfohlen. **Keine** Format-Änderung an Sync.so-Payload.
+- **Wenn B (v183 Bridge falsch):** genau den v183-Confidence-Fallback identifizieren, der eine falsche Zuordnung schrieb, und auf das v166-Verhalten zurücksetzen (Bridge nur wenn 1:1-Identity-Match sicher, sonst `throw` → keine stille Zuordnung).
+- **Wenn C (Frame-Range):** `asdFrameNumber`-Clamp gegen die tatsächlich rehostete Plate-Dauer statt `plate_dims.fps`-Annahme.
+- **Wenn D (BBox-Format):** an Sync.so-Doku angleichen; hier reicht ein Payload-Renderer-Fix in `compose-dialog-segments`.
 
-### 2. `supabase/functions/compose-video-clips/index.ts` — Snap-Buckets weiten
+### Phase 3 — Verifikation
 
-- Z. ~2537 (Kling-Branch): `snapDuration(scene.durationSeconds, [5, 10])` → `snapDuration(scene.durationSeconds, [3, 5, 8, 10, 15])`
-- Z. ~2746 (Seedance-Branch): `snapDuration(scene.durationSeconds, [5, 10])` → `snapDuration(scene.durationSeconds, [5, 8, 10, 12])`
-- Alle anderen Snap-Aufrufe bleiben unverändert (Wan/Luma/Veo/Hailuo bereits konsistent).
+- Genau die **Neu-rendern**-Aktion auf den drei betroffenen Szenen. Kein neuer Dispatch außerhalb dieser Szenen.
+- Erwartetes Log: `syncso_dispatch_log` mit `sync_status=COMPLETED`, Payload-Struktur exakt wie v169 §5.
+- Wenn erneut REJECTED → Phase 1 wiederholen, kein blindes Re-Deploy.
 
-Ergebnis: eine Kling-Szene mit 15s im Composer rendert **wirklich 15s** statt still auf 10s zu kürzen, exakt wie im Toolkit.
+## Was NICHT passiert
 
-### 3. `src/config/klingVideoCredits.ts` — Toolkit-Range wiederherstellen
+- **Kein** Auto-Detect. Nirgendwo, weder als Recovery noch als Fallback. Der v169-Invariant „N ≥ 2 → deterministic ASD only" bleibt hart durchgesetzt (der bestehende `throw multi_speaker_no_deterministic_asd_available` bleibt).
+- **Keine** neue Retry-Ladder. v128 „terminal means terminal" bleibt.
+- **Kein** Rewrite der ASD-Strategie. Sie ist bereits v169-kompatibel für Multi-Speaker.
+- **Keine** DB-Migration, keine neuen Tabellen, keine neuen Buckets.
+- **Kein** Anfassen von `compose-scene-anchor`, `sync-so-webhook`-Retry-Logic, Refund-Pfad, Watchdog, `finalize-dialog-scene`, oder N=1-Pfad (v181/v182).
 
-Nach dem vorherigen Fix wurde `KLING_VIDEO_MODELS` auf `min 5 / max 10 / allowed [5, 10]` gedrosselt. Das war überzogen, weil die Toolkit-Studio-Route diese Werte teilt und dort tatsächlich 3–15s laufen. Zurück auf:
+## Nächster Schritt
 
-```ts
-'kling-3-standard': { …, minDuration: 3, maxDuration: 15, allowedDurations: [3, 5, 8, 10, 15] },
-'kling-3-pro':      { …, minDuration: 3, maxDuration: 15, allowedDurations: [3, 5, 8, 10, 15] },
-```
+Ich starte Phase 1 (Log-Pull + DB-Query) sobald der Plan approved ist. Melde zurück, welche der vier Klassen (A/B/C/D) es tatsächlich ist, und lege dann exakt einen zielgerichteten Patch nach — inklusive Vorher/Nachher-Beweis für die drei Szenen.
 
-### 4. (bereits im vorherigen Plan) `SceneCard.tsx` — Provider-aware Duration-Picker
-
-Der im letzten Plan skizzierte generische Button-Row-Picker greift diese neuen Buckets automatisch. Kling zeigt dann **[3s] [5s] [8s] [10s] [15s]** statt einer 5/10-2-Button-Row — matched Toolkit 1:1.
-
-### 5. `SceneCard.tsx`+`useComposerPersistence.ts` — Auto-Snap beim Provider-Wechsel & Load
-
-Bleibt wie vorher geplant: bei Provider-Wechsel und beim initialen Laden `snapDurationToProvider()` anwenden, damit alte Rows automatisch auf gültige Buckets fallen (z. B. eine alte 7s-Seedance-Szene → 8s statt 5s nach dem Widening).
-
-## Was NICHT geändert wird
-
-- **Toolkit-Registry** (`aiVideoModelRegistry.ts`) — ist die Ground-Truth, bleibt unangetastet.
-- **Provider-Edge-Functions** (`generate-*-video`) — Replicate-Aufrufe funktionieren bereits, keine Änderung nötig.
-- **Backend-Snap für Veo / Wan / Luma / Hailuo** — bereits deckungsgleich mit Toolkit.
-- **HappyHorse Free-Range-Slider** — bleibt (Provider unterstützt echt jede Sekunde 3–15).
-- **Sync.so Lipsync-Path** — provider-agnostisch, keine Sonderregelung nötig (v183/v184-Kommentar bestätigt).
-- **DB-Migration** — nicht nötig. Alte gespeicherte 15s-Kling-Szenen werden beim Load-Time-Snap automatisch respektiert (15 ist jetzt gültig), alte 7s-Seedance-Szenen snappen client-seitig auf 8s beim ersten Öffnen.
-- **Credit-/Refund-Logik** — cost = `durationSeconds × costPerSecond`, bleibt korrekt.
-
-## Verifikation
-
-- Kling-Szene im Composer öffnen: 5-Button-Row `[3s] [5s] [8s] [10s] [15s]`, 15s wählbar ohne Warnbanner.
-- Kling-15s-Szene rendern: Backend-Log `Kling scene requested 15s → snapped to 15s`, Replicate-Response mit korrekter Länge.
-- Seedance auf 12s stellen: 4-Button-Row `[5s] [8s] [10s] [12s]`, keine Warnung, Backend rendert 12s.
-- Provider-Wechsel Kling(15s) → Wan: Duration snappt automatisch auf 10s (nächster ≤15 in `[5,10]`).
-- Alte 7s-Seedance-Szene laden: erscheint sofort als 8s (Load-Time-Snap).
-- HappyHorse-Szene: Free-Range-Slider bleibt.
-
-## Aufwand
-
-- 3 Config-Edits (`providerCapabilities.ts`, `klingVideoCredits.ts`, `compose-video-clips/index.ts`)
-- 2 UI-Edits (`SceneCard.tsx` Picker + `useComposerPersistence.ts` Load-Snap) — bereits im vorigen Plan enthalten, hier nur konsistent gehalten
-- 1 Edge-Function-Deployment (`compose-video-clips`)
-- Keine DB-Migration, keine neuen Deps, kein Refund-Code-Touch, keine Auswirkung auf v183/v184-Face-Map-Pipeline.
+Wenn du direkt eine Vermutung hast, welche Klasse (A/B/C/D) das war, sag Bescheid — dann überspringen wir Phase 1 und ich baue sofort den entsprechenden Patch.
