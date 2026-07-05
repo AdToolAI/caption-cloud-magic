@@ -305,9 +305,22 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           await Promise.all(
             audioReadyButNotAdvanced.map((d) => {
               d.twoshot_stage = 'master_clip';
+              // Clear transient recovery marker written by the v172 self-heal
+              // branch in compose-dialog-segments — otherwise isRealizedScene
+              // would keep rejecting the row and the auto-trigger would never
+              // re-dispatch, deadlocking the UI on "Lip-Sync wird gestartet…".
+              const clearRecoveryErr =
+                typeof d.clip_error === 'string' &&
+                (d.clip_error === 'audio_plan_not_ready_self_heal' ||
+                  d.clip_error.startsWith('auto-reset:'));
+              if (clearRecoveryErr) d.clip_error = null;
               return supabase
                 .from('composer_scenes')
-                .update({ twoshot_stage: 'master_clip', updated_at: new Date().toISOString() })
+                .update({
+                  twoshot_stage: 'master_clip',
+                  ...(clearRecoveryErr ? { clip_error: null } : {}),
+                  updated_at: new Date().toISOString(),
+                })
                 .eq('id', d.id);
             }),
           );
