@@ -21,6 +21,7 @@ export type ClipSource =
   | 'ai-wan'
   | 'ai-seedance'
   | 'ai-luma'
+  | 'ai-ltx'
   | 'ai-sora'
   | 'ai-pika'
   | 'ai-runway'
@@ -54,7 +55,8 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     label: 'HappyHorse',
   },
   'ai-kling': {
-    durations: [5, 10],
+    // Toolkit ground-truth: Replicate accepts 3–15s freely (see aiVideoModelRegistry).
+    durations: [3, 5, 8, 10, 15],
     lipsync: true,
     multiSpeaker: false,
     label: 'Kling',
@@ -72,7 +74,8 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     label: 'Wan',
   },
   'ai-seedance': {
-    durations: [5, 10],
+    // Toolkit ground-truth: seedance-1-lite supports 5/8/10/12s (backend caps ≤12).
+    durations: [5, 8, 10, 12],
     lipsync: true,
     multiSpeaker: false,
     label: 'Seedance',
@@ -82,6 +85,12 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     lipsync: false,
     multiSpeaker: false,
     label: 'Luma',
+  },
+  'ai-ltx': {
+    durations: [4, 6, 8],
+    lipsync: false,
+    multiSpeaker: false,
+    label: 'LTX',
   },
   'ai-grok': {
     durations: [6, 12],
