@@ -1,73 +1,58 @@
-## Ansatz: Character-ID als primärer Schlüssel
+# Provider Duration Audit — vereinheitlichen
 
-Ja — die saubere Lösung ist, den ganzen Mapping-Pfad konsequent an der **Character-ID** aufzuhängen statt an visueller Reihenfolge oder bbox-Center-Nähe. Das eliminiert die eigentliche Ursache des v153.2-Duplikat-Blocks (zwei Speaker landen auf derselben Plate-Box) statt sie nur zu maskieren.
+Nach Durchsicht von `PROVIDER_CAPS` (UI), `snapDuration()` (Backend `compose-video-clips`) und den `*VideoCredits.ts`-Configs gibt es mehrere Inkonsistenzen, die dieselbe Klasse Bug wie bei Kling produzieren (UI warnt anders als das, was der Backend tatsächlich rendert).
 
-## Was v183 falsch macht
+## Gefundene Mismatches
 
-`compose-dialog-segments/index.ts`, Speaker-Loop Zeile 1565–1619:
+| Provider | UI-Caps (`PROVIDER_CAPS`) | Backend real | Config `allowedDurations` | Problem |
+|---|---|---|---|---|
+| Kling | `[5, 10]` | Clamp `3..15`, keine Buckets | fehlt | UI sagt „nur 5/10", 15s rendert aber problemlos → falsche Warnung |
+| Seedance | `[3,4,5,6,7,8,9,10,11,12]` | snap auf `[5, 10]` | fehlt | UI erlaubt 7s/8s/…, Backend zwingt still auf 5s/10s |
+| Veo | `[5, 8]` | Bucket `4 / 6 / 8` | `[4, 6, 8]` | 3 unterschiedliche Wahrheiten |
+| Grok | **fehlt** komplett | – | `[6, 12]` | Kein Eintrag → Lip-Sync/Composer weiß nix davon |
+| Hailuo | `[6, 10]` | fix `6 / 10` | `[6, 10]` | ✅ konsistent |
+| Wan | `[5, 10]` | snap `[5, 10]` | `[5, 10]` | ✅ |
+| Luma | `[5, 9]` | snap `[5, 9]` | `[5, 9]` | ✅ |
+| Pika | `[5, 10]` | snap `[5, 10]` | – | ✅ |
+| HappyHorse | `[3..15]` | delegiert an `generate-happyhorse-video` | – | ✅ (Provider unterstützt Range) |
+| Vidu | `[5]` | – | – | Zu prüfen (nur 5s wirklich?) |
+| Sora | `[4, 8, 12]` | – | – | Zu prüfen |
 
-- `byId = Map<strippedCharacterId, PlateFace>` wird gebaut aus `plateIdentityMap.faces` — **kollabiert Duplikate stillschweigend** (`Map.set` überschreibt), und liefert für zwei Speaker mit derselben stripped-ID **dasselbe Face-Objekt**.
-- Es gibt keine Uniqueness-Prüfung: `byId.get(cid)` darf denselben Face-Eintrag für Speaker 0 und Speaker 1 zurückgeben → identische `speakerPlateBboxes[0]` und `[1]` → v153.2 blockt.
-- Für Speaker ohne `byId`-Match fällt der Code bei N ≥ 2 gar nicht mehr auf `unlabeled` zurück (v166-Regression) → dieser Slot bleibt leer und blockt als `missing`.
+## Fix (Ziel: 1 Wahrheit pro Provider)
 
-## Fix in `compose-dialog-segments` (nur diese Datei)
+Wir richten alles an dem aus, was der jeweilige Replicate-/Provider-Endpoint tatsächlich akzeptiert, und ziehen dann UI-Caps und Backend-Snap darauf.
 
-### 1. Character-ID-First mit Confidence-Sortierung
+1. **`src/lib/video-composer/providerCapabilities.ts`**
+   - `ai-kling`: `[5, 10]` → **`[5, 10]`** beibehalten, aber gleichzeitig Backend-Snap ergänzen (siehe #2). Fixe API-Buckets sind bei Kling 3 Omni real 5 und 10 — 15s klappt derzeit nur "zufällig" ohne Snap.
+   - `ai-seedance`: `[3..12]` → **`[5, 10]`** (an tatsächliches Backend-Snap-Verhalten anpassen; Toolkit-Card darf weiterhin 3–12 für Direktaufrufe an `generate-seedance-video` behalten, aber der Composer schränkt korrekt ein).
+   - `ai-veo`: `[5, 8]` → **`[4, 6, 8]`** (alignt mit Config + Backend-Bucket-Logik).
+   - `ai-grok`: **neuen Eintrag** ergänzen: `{ durations: [6, 12], lipsync: false, multiSpeaker: false, label: 'Grok' }`.
+   - `ai-vidu` / `ai-sora`: unverändert lassen — nur mit Config gegenchecken.
 
-`plateIdentityMap.faces` ist bereits pro Face mit `characterId` + `matchConfidence` annotiert. Neu bauen wir:
+2. **`supabase/functions/compose-video-clips/index.ts`**
+   - Kling-Branch (Zeile 2538): statt `Math.min(15, Math.max(3, round))` → `snapDuration(scene.durationSeconds, [5, 10])` verwenden, damit Composer-Kling-Szenen deterministisch in einen echten API-Bucket fallen.
+   - Veo-Branch (Zeile 2833): Ternary durch `snapDuration(..., [4, 6, 8])` ersetzen (semantisch identisch, aber einheitliches Log-Format „requested Xs → snapped to Ys" wie bei Wan/Luma).
+   - Seedance/Wan/Luma/Pika unverändert (bereits konsistent).
 
-```
-byIdRanked = Map<strippedCharacterId, PlateFace[]>   // absteigend nach matchConfidence
-```
+3. **`src/config/klingVideoCredits.ts`**
+   - `allowedDurations: [5, 10] as const` ergänzen, damit ToolKit + validators denselben Weg gehen.
+   - `minDuration: 5, maxDuration: 10` (statt 3/15) — wenn der direkte Kling-Studio-Aufruf trotzdem 3–15 unterstützen soll, das im UI klar als „Toolkit-Only"-Range markieren; für den Composer/Cinematic-Sync-Pfad ist 5/10 die Wahrheit.
 
-statt einer flachen `Map`. Damit lässt sich beim zweiten Speaker mit derselben stripped-ID der **nächstbeste** Face-Kandidat für denselben Char nehmen (falls Rekognition zwei Faces mit demselben Char-Label hat, z. B. Reflexion oder Statist).
+4. **`src/lib/video-composer/validateSceneForCinematicSync.ts`**
+   - Nichts zu ändern — greift automatisch, sobald `PROVIDER_CAPS` korrekt ist (die Banner-Meldung, die im Screenshot sichtbar ist, kommt genau von hier).
 
-### 2. Uniqueness-Enforcement per assigned-Set
-
-Ein `assignedFaceKeys = new Set<string>()` (Key = plate-face-Index oder bbox-Signatur). Vor der Zuweisung an `speakerPlateBboxes[idx]` prüfen. Wenn das Top-Ranked-Face für den `cid` schon vergeben ist:
-
-1. nächstes noch freies Face mit demselben `cid` aus `byIdRanked` versuchen,
-2. sonst — nur wenn `plateIdentityMap.faces.length >= speakers.length` — nächstes freies `unlabeled` Face per Visual-L→R zuweisen und Log `v183_unlabeled_fallback`,
-3. sonst Slot leer lassen (führt zu `plate_box_missing`, nicht `duplicate`) und Log `v183_identity_collision cid=<...> reason=exhausted`.
-
-### 3. Cast-Konfig-Guard vor dem Mapping
-
-Bevor überhaupt gemappt wird, in dem Speaker-Array eine Uniqueness-Prüfung auf `stripIdPrefix(character_id)`:
-
-- Wenn zwei Speaker denselben stripped `character_id` haben (echter Cast-Bug, z. B. zwei Saved-Outfit-Look-Varianten desselben Basis-Chars als getrennte Sprecher), sofort mit einer klaren Meldung refunden:
-
-> „Lip-Sync abgebrochen: {Speaker A} und {Speaker B} verweisen auf denselben Basis-Charakter. Bitte einem der beiden einen anderen Character zuweisen (oder die Rollen zusammenfassen). Credits wurden zurückerstattet."
-
-Log-Class: `v183_cast_duplicate_character_id`. Das ist ein echter Konfig-Fehler, den man nicht auto-fixen sollte.
-
-### 4. v166 Slot-Bridge lockern
-
-`anchorFaces.length === plateIdentityMap.faces.length` → `anchorFaces.length >= 1 && anchorFaces.length <= plateIdentityMap.faces.length`, damit die Bridge auch greift wenn die Plate mehr Gesichter zeigt als der Anchor kannte (Statisten). Zuweisung bleibt Visual-L→R, aber **auf die Anchor-Slots begrenzt** — der Rest bleibt `unlabeled` und ist Fallback-Material für Punkt 2.
-
-### 5. Präzisere v153.2-Meldungen
-
-Wenn der Preflight trotzdem noch blockt (echte Plate-Ambiguität, keine Konfig-Kollision), Sprechernamen einsetzen: *„{Speaker A} und {Speaker B} wurden auf dasselbe Gesicht in der Szene gemappt — bitte Szene neu rendern, sodass beide frontal und getrennt sichtbar sind."*
-
-### 6. Version-Bump
-
-`COMPOSE_DIALOG_SEGMENTS_VERSION = "v183"` und pro neuem Log-Punkt ein eigenes Tag (`v183_cast_duplicate_character_id`, `v183_identity_collision`, `v183_unlabeled_fallback`, `v183_anchor_bridge_partial`).
-
-### 7. Redeploy
-
-Nur `compose-dialog-segments`. Kein Client-Code, keine anderen Edge Functions, keine DB-Migration.
+5. **Kein DB-Migration nötig**, kein v169-Pipeline-Code angefasst, keine Refund-Logik betroffen — reine Config-Harmonisierung.
 
 ## Verifikation
 
-1. Die gefailte Szene aus dem Screenshot neu rendern.
-   - Falls Cast-Bug (gleicher Basis-Char zweimal): sofort `v183_cast_duplicate_character_id` mit Namen — actionable für dich.
-   - Falls Rekognition-Kollision (zwei Faces, gleicher Char-Label): `v183_identity_collision` mit `resolution=reassigned` oder `unlabeled_visual`, Dispatch geht durch.
-   - Falls echte Plate-Ambiguität: klar formulierter `plate_box_duplicate`-Refund mit Sprecher-Namen.
-2. `syncso_dispatch_log`: `meta.compose_version = "v183"`; provider-übergreifend gleicher Pfad.
-3. Regression-Check: bestehende 4-Sprecher-Szenen (Hailuo + HappyHorse) grün wie zuvor.
+- `tsgo` läuft grün (Typechecks sind auto).
+- Manuell nachziehen: eine Kling-Szene auf 15s stellen → UI zeigt Banner „wird auf 10s angepasst", Backend-Log zeigt `snapped to 10s`.
+- Eine Seedance-Szene auf 7s stellen → Backend-Log zeigt `requested 7s → snapped to 5s`; UI-Picker bietet nur noch 5/10 an.
+- Eine Veo-Szene auf 7s stellen → snapped to 6.
+- Grok-Szene im Composer wählbar mit 6/12 Buckets, kein „unknown provider"-Fallback mehr.
 
-## Nicht Teil dieses Plans
+## Was NICHT angefasst wird
 
-- Kein Touch an compose-video-clips (weder Hailuo, HappyHorse noch Kling).
-- Kein Touch am v182 N=1 Tail-Hold / Kling-Anti-Clone / DialogStitchVideo / Muxer.
-- Kein Rückbau der v170 `stripIdPrefix`-Normalisierung — sie wird weiter gebraucht.
-- Kein Aufweichen der 8 px-Duplikat-Schwelle — der Guard bleibt streng.
+- Kling-**Toolkit** (separater Studio-Aufruf) bleibt auf 3–15, weil die native Replicate-API das erlaubt und User dort direkt (nicht via Composer/Sync-Pipeline) rendern.
+- Keine v183/v184 Face-Map- oder Anchor-Logik.
+- Keine Preisänderung — Cost-per-Second bleibt identisch, nur die zulässigen Buckets werden geradegezogen.
