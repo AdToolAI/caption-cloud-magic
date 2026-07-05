@@ -27,8 +27,9 @@ export const KLING_VIDEO_MODELS = {
       EUR: 0.28,
       USD: 0.28,
     },
-    minDuration: 3,
-    maxDuration: 15,
+    minDuration: 5,
+    maxDuration: 10,
+    allowedDurations: [5, 10] as const,
     description: {
       EUR: 'Premium 1080p-Qualität ab 1,40€ pro 5 Sekunden',
       USD: 'Premium 1080p quality from $1.40 per 5 seconds',
