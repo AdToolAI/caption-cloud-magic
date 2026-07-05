@@ -1487,6 +1487,7 @@ serve(async (req) => {
           midDurationSec: totalSec,
           characters,
           anchorUrl, // v156 — Anchor-First: AWS Rekognition runs on this image
+          expectedFaceCount: speakers.length, // v184 — decouple from portrait resolver
         });
       } catch (err) {
         console.warn(
