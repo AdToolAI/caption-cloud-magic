@@ -102,6 +102,11 @@ import {
   type PromptSlots,
 } from "@/lib/motion-studio/structuredPromptStitcher";
 import { clipSourceToModelKey } from "@/lib/motion-studio/promptTokenLimits";
+import {
+  getProviderDurations,
+  getProviderLabel,
+  snapDurationToProvider,
+} from "@/lib/video-composer/providerCapabilities";
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
@@ -1077,7 +1082,9 @@ export default function SceneCard({
                 </div>
               </div>
 
-              {/* Duration picker — provider-aware (Hailuo: 6/10 buttons, HappyHorse: 3-15 slider) */}
+              {/* Duration picker — provider-aware: buckets from PROVIDER_CAPS (Toolkit ground-truth).
+                  HappyHorse keeps the free 3–15s slider; every other AI provider gets a button row of its
+                  natively-supported values. Values that exceed the remaining project budget are disabled. */}
               {(() => {
                 const MAX_PROJECT_SEC = 600;
                 const MIN_SCENE = 3;
@@ -1086,82 +1093,82 @@ export default function SceneCard({
                 const sliderMax = Math.max(MIN_SCENE, Math.min(PROVIDER_MAX, remaining));
                 const budgetCapped = sliderMax < PROVIDER_MAX;
                 const effectiveMax = Math.max(sliderMax, scene.durationSeconds);
-                const isHailuo = scene.clipSource === 'ai-hailuo';
+                const isHappyHorse = scene.clipSource === 'ai-happyhorse';
+                const isAi = scene.clipSource.startsWith('ai-');
+                const buckets = getProviderDurations(scene.clipSource);
+                const providerLabel = getProviderLabel(scene.clipSource);
+                const current = scene.durationSeconds;
 
-                if (isHailuo) {
-                  // Hailuo only supports 6s or 10s — show explicit buttons.
-                  const can10 = 10 <= effectiveMax;
-                  const current = scene.durationSeconds;
+                // Free-range slider for HappyHorse (native 3–15s / 1s steps) and for non-AI sources.
+                if (isHappyHorse || !isAi) {
                   return (
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          Dauer
-                        </span>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant={current === 6 ? 'default' : 'outline'}
-                            className="h-6 px-3 text-[10px]"
-                            onClick={() => onUpdate({ durationSeconds: 6 })}
-                          >
-                            6s
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={current === 10 ? 'default' : 'outline'}
-                            className="h-6 px-3 text-[10px]"
-                            disabled={!can10}
-                            onClick={() => onUpdate({ durationSeconds: 10 })}
-                          >
-                            10s
-                          </Button>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">
-                          · Hailuo nativ
-                        </span>
-                      </div>
+                      <Slider
+                        value={[current]}
+                        onValueChange={([v]) =>
+                          onUpdate({ durationSeconds: Math.min(v, sliderMax) })
+                        }
+                        min={MIN_SCENE}
+                        max={effectiveMax}
+                        step={1}
+                        className="w-full"
+                      />
                       {budgetCapped && (
                         <p className="text-[10px] text-amber-300/80 leading-snug">
                           Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
                         </p>
                       )}
-                      {current !== 6 && current !== 10 && (
-                        <p className="text-[10px] text-amber-300/80 leading-snug">
-                          ⚠ Aktuell {current}s — Hailuo rendert nur 6s oder 10s. Beim Render wird auf 6s gerundet (10s nur, wenn explizit gewählt).
-                          Für freie Längen (3–15s) Provider auf HappyHorse wechseln.
-                        </p>
-                      )}
-                      {scene.clipQuality === 'pro' && current === 10 && (
-                        <p className="text-[10px] text-amber-300/80 leading-snug">
-                          10s bei Hailuo nur in 768p verfügbar — Pro wird auf Standard-Auflösung reduziert.
+                      {isHappyHorse && (
+                        <p className="text-[10px] text-emerald-300/70 leading-snug">
+                          HappyHorse · {current}s (nativ 3–15s, jede Sekunde wählbar)
                         </p>
                       )}
                     </div>
                   );
                 }
 
-                // HappyHorse (or default) — free 3–15s slider
+                // Bucket button row for every other AI provider.
+                const isHailuoPro10 =
+                  scene.clipSource === 'ai-hailuo' &&
+                  scene.clipQuality === 'pro' &&
+                  current === 10;
+
                 return (
                   <div className="space-y-1">
-                    <Slider
-                      value={[scene.durationSeconds]}
-                      onValueChange={([v]) =>
-                        onUpdate({ durationSeconds: Math.min(v, sliderMax) })
-                      }
-                      min={MIN_SCENE}
-                      max={effectiveMax}
-                      step={1}
-                      className="w-full"
-                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Dauer
+                      </span>
+                      <div className="flex gap-1 flex-wrap">
+                        {buckets.map((sec) => {
+                          const overBudget = sec > effectiveMax;
+                          return (
+                            <Button
+                              key={sec}
+                              size="sm"
+                              variant={current === sec ? 'default' : 'outline'}
+                              className="h-6 px-3 text-[10px]"
+                              disabled={overBudget}
+                              onClick={() => onUpdate({ durationSeconds: sec })}
+                              title={overBudget ? 'Projekt-Budget überschritten' : `${sec}s nativ`}
+                            >
+                              {sec}s
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        · {providerLabel} nativ
+                      </span>
+                    </div>
                     {budgetCapped && (
                       <p className="text-[10px] text-amber-300/80 leading-snug">
                         Projekt-Budget fast voll · max. {sliderMax}s für diese Szene.
                       </p>
                     )}
-                    {scene.clipSource === 'ai-happyhorse' && (
-                      <p className="text-[10px] text-emerald-300/70 leading-snug">
-                        HappyHorse · {scene.durationSeconds}s (nativ 3–15s, jede Sekunde wählbar)
+                    {isHailuoPro10 && (
+                      <p className="text-[10px] text-amber-300/80 leading-snug">
+                        10s bei Hailuo nur in 768p verfügbar — Pro wird auf Standard-Auflösung reduziert.
                       </p>
                     )}
                   </div>
@@ -1606,13 +1613,20 @@ export default function SceneCard({
                                   clipSource: next.clipSource,
                                   clipQuality: next.clipQuality,
                                 };
-                                // Hailuo only supports 6s or 10s. When switching TO Hailuo
-                                // from a free-duration provider (HappyHorse 3-15s), default
-                                // to 6s unless the user already had exactly 10s picked.
-                                // Never silently bump 7/8/9/15s → 10s.
-                                if (next.clipSource === 'ai-hailuo') {
-                                  const cur = Number(scene.durationSeconds || 0);
-                                  if (cur !== 10) updates.durationSeconds = 6;
+                                // Auto-snap duration to the new provider's supported buckets
+                                // (from PROVIDER_CAPS, Toolkit ground-truth). Prevents leftover
+                                // 15s from Kling ending up on Wan's [5,10], etc.
+                                const cur = Number(scene.durationSeconds || 0);
+                                const snapped = snapDurationToProvider(cur, next.clipSource);
+                                if (snapped.changed) {
+                                  updates.durationSeconds = snapped.duration;
+                                }
+                                // Hailuo special case: 6s/10s are the only real values; when
+                                // arriving from a wider picker with something like 7/8/9s the
+                                // snap above yields 10s. Prefer the safer 6s unless the user
+                                // explicitly had 10s already.
+                                if (next.clipSource === 'ai-hailuo' && cur !== 10 && cur !== 6) {
+                                  updates.durationSeconds = 6;
                                 }
                                 onUpdate(updates);
                               }}

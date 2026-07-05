@@ -2534,8 +2534,8 @@ serve(async (req) => {
             })
             .eq("id", scene.id);
 
-          // Kling 3 Omni: snap to real API buckets [5, 10] for deterministic renders
-          const klingDuration = snapDuration(scene.durationSeconds, [5, 10]);
+          // Kling 3 Omni: Replicate accepts 3–15s. Snap to Toolkit-aligned buckets.
+          const klingDuration = snapDuration(scene.durationSeconds, [3, 5, 8, 10, 15]);
           console.log(
             `[compose-video-clips] Kling scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${klingDuration}s`,
           );
@@ -2724,8 +2724,8 @@ serve(async (req) => {
             })
             .eq("id", scene.id);
 
-          // Seedance Lite supports 5 or 10 seconds — snap to nearest allowed value
-          const seedDuration = snapDuration(scene.durationSeconds, [5, 10]);
+          // Seedance Lite supports 5/8/10/12s (Toolkit ground-truth) — snap to nearest.
+          const seedDuration = snapDuration(scene.durationSeconds, [5, 8, 10, 12]);
           const seedInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
             duration: seedDuration,
