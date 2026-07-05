@@ -344,6 +344,76 @@ const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
   );
 };
 
+/** v183: SilentFaceAnchor — renders a static closed-mouth anchor portrait
+ *  cropped to the non-speaking face slot. No <Video>, no <Freeze>, so no
+ *  morph/ghost artefacts and near-zero Lambda render overhead. Feathered
+ *  radial mask blends the seam with the live master plate underneath.
+ *  Fallback: when anchorUrl is missing, render a semi-opaque dark tile that
+ *  still guarantees zero mouth motion. */
+interface SilentFaceAnchorProps {
+  anchorUrl?: string | null;
+  /** Slot rect on the source-master pixel grid (matches preclip_crop). */
+  srcX: number;
+  srcY: number;
+  srcSize: number;
+  /** Composition-space scale factors derived from src→comp mapping. */
+  scaleX: number;
+  scaleY: number;
+}
+const SilentFaceAnchor: React.FC<SilentFaceAnchorProps> = ({
+  anchorUrl,
+  srcX,
+  srcY,
+  srcSize,
+  scaleX,
+  scaleY,
+}) => {
+  // Feathered radial mask (12–16px equivalent softness at the edge).
+  const mask =
+    'radial-gradient(circle at center, #000 0%, #000 58%, rgba(0,0,0,0.85) 72%, rgba(0,0,0,0) 96%)';
+  const left = srcX * scaleX;
+  const top = srcY * scaleY;
+  const w = srcSize * scaleX;
+  const h = srcSize * scaleY;
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          width: w,
+          height: h,
+          WebkitMaskImage: mask,
+          maskImage: mask,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          overflow: 'hidden',
+        }}
+      >
+        {anchorUrl ? (
+          <Img
+            src={anchorUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(12,12,14,0.92)',
+            }}
+          />
+        )}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 
 
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
