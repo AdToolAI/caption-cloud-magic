@@ -1,101 +1,68 @@
-# Diagnose (verifiziert an DB + Code, kein Rätselraten)
+# v183 Multi-Speaker Silent-Faces — Umgesetzt (Fix A) + Fix B Diagnose
 
-## Ursache 1 — „Alle Sprecher bewegen den Mund"
+## Fix A — Silent-Faces v183 (fertig implementiert)
 
-`supabase/functions/render-sync-segments-audio-mux/index.ts` Zeile 288–290:
+**Was gemacht wurde:**
 
-```ts
-const silentSlots: Array<{ x: number; y: number; size: number }> = [];
-void silentSlots;
-void v164SilentSlotsByExcludedIdx;
-```
+1. `src/remotion/templates/DialogStitchVideo.tsx`
+   - `ShotSchema.silentSlots` erweitert: pro Slot jetzt `{x, y, size, anchorUrl?}` (statt reines Crop-Rect).
+   - Neue Komponente `SilentFaceAnchor`: rendert `<Img src={anchorUrl}>` in einem feathered radial-masked Div (58% solid → 96% transparent). Fallback ohne anchorUrl: semi-opaque `rgba(12,12,14,0.92)` Kachel. Kein `<Freeze>`, kein `<Video>` → keine Morph-/Ghost-Artefakte, keine Lambda-Renderkosten.
+   - Render-Loop rendert die silent slots als Layer **vor** dem aktiven Overlay in jeder Sequence (silent slots liegen also unter dem aktiven Sprecher-Overlay).
 
-v164 Silent-Faces wurde **bewusst tot-gestellt** (nicht gelöscht, aber `void`-referenced), weil die alten Freeze-Tiles laut Kommentar Zeile 348–353 „ghost/morph artefacts" verursacht haben. Der Ersatz v182 (`tailFreezeFromSec`) hält jedoch **nur bei N=1** (`isSingleSpeakerTight = donePasses.length === 1 && anyTight`) den letzten Frame.
+2. `supabase/functions/render-sync-segments-audio-mux/index.ts`
+   - Feature-Flag `composer.silent_faces_v183` (default OFF, jsonb bool).
+   - Bei Flag ON + Multi-Speaker: `brand_characters.portrait_url` für alle beteiligten `character_id`s in einem einzigen Query holen.
+   - Pro Fanout-Shot: `silentSlots = alle done-Passes AUßER dem eigenen Speaker`, jeder Slot mit `preclip_crop`-Rect + `anchorUrl`.
+   - Neuer Log-Tag `v183_silent_slots ENABLED|DISABLED speakers=N crops=K anchors=M fallback=F`.
+   - Bestehende Overlay-Pfade (`crop` und `faceMask`) tragen `silentSlots` optional als zusätzlichen Payload-Key.
 
-**Für Multi-Speaker existiert derzeit gar kein Listener-Mute** — deshalb bewegen im finalen Mux zwischen den aktiven Turn-Fenstern alle Gesichter des Plate ihren baked-in Mund.
+3. DB: `system_config` Row `composer.silent_faces_v183 = false` per Insert angelegt.
 
-## Ursache 2 — „16:31 statt ~10 min"
+**Deployment-Status:**
+- Edge Function `render-sync-segments-audio-mux` deployed ✅
+- tsgo clean ✅
+- Remotion Bundle: **NOCH NICHT** neu deployed. Benötigt manuelles `scripts/deploy-remotion-bundle.sh` + `system_config.remotion.deployed_bundle_id` Update.
 
-Szene `1de5510b` (3 Sprecher, `lip_sync_status=done`, `duration=16:31`), `syncso_dispatch_log` Zeitstempel:
+**Aktivierungs-Sequenz (in dieser Reihenfolge):**
+1. `bash scripts/deploy-remotion-bundle.sh` → neue Bundle-ID notieren
+2. `UPDATE system_config SET value = to_jsonb('<neue-bundle-id>'::text) WHERE key = 'remotion.deployed_bundle_id';` (oder wie auch immer der Key heißt — siehe Memory `lambda-bundle-deployment-and-verification`)
+3. `UPDATE system_config SET value = 'true'::jsonb WHERE key = 'composer.silent_faces_v183';`
+4. Neue Multi-Speaker-Szene rendern. Log-Grep: `v183_silent_slots ENABLED`.
 
-| t+ (min:s) | Event |
+**Solange Bundle nicht neu ist, bleibt der Flag auf false.** Bei aktiviertem Flag mit alter Bundle würde Lambda `silentSlots` im Payload einfach ignorieren (Feld ist optional im Schema) — kein Absturz, aber auch kein Silent-Faces-Effekt.
+
+**Rollback:** `UPDATE system_config SET value = 'false'::jsonb WHERE key = 'composer.silent_faces_v183';` — instant, kein Redeploy nötig.
+
+## Fix B — Turn-2 Retry Diagnose
+
+Analyse der DB für Szene `1de5510b-9bc8-4ba3-b466-b2df31f1bbff`:
+
+**Dispatch-Timeline für Turn 2:**
+| t | Event |
 |---|---|
-| 0:00 | Dispatcher Start |
-| 1:27 | Turn 0 → Sync.so 201 |
-| 1:31 | Turn 1 & Turn 2 parallel `DISPATCH_ATTEMPT_STARTED` |
-| 3:05 | Turn 1 → Sync.so 201 |
-| 4:05 | Turn 2 → Sync.so 201 |
-| 6:19 | Turn 2 **Retry** → Sync.so 201 (2. Mal) |
-| ~16:31 | Fertig |
+| 22:38:36 | DISPATCH_ATTEMPT_STARTED (turn=2) |
+| 22:41:02 | DISPATCH_ATTEMPT_STARTED (turn=2, zweites Mal, +2:26) |
+| 22:41:10 | DISPATCHED http_status=201 |
+| 22:43:26 | DISPATCHED http_status=201 (drittes Mal, +2:16) |
 
-Feststellungen:
-- **Fan-out ist aktiv** (`composer.parallel_sync_so_passes=true`, `sync_so_concurrency_cap=4`, `plan_d_fanout_force_enable=true`, `FEATURE_PER_PASS_LOCK`/`FEATURE_PLAN_D_FANOUT` im Code aktiv).
-- Turn 1 und Turn 2 wurden **gleichzeitig gestartet** (22:38:36) — Fanout greift.
-- Aber die Sync.so-201-Bestätigungen kamen 1 Min versetzt. Ursache liegt vor Sync.so-Enqueue: entweder Remotion-Lambda-Cold-Start pro Preclip oder serielle HEAD-Probes.
-- Turn 2 hatte einen **transient Retry** ~2:14 nach dem ersten Dispatch. Dieser Retry allein kostet ~2 min Wallclock.
-- Der finale Audio-Mux + Concat kann erst starten, wenn Turn 2 (nach Retry) fertig ist. Sync.so-Verarbeitung selbst = ~4–6 min pro Pass → Kritischer Pfad = Turn 2 + Retry.
+**Beobachtung:**
+Die erste `DISPATCH_ATTEMPT_STARTED` um 22:38:36 hatte KEINEN zugehörigen `DISPATCHED`-Eintrag. Das heißt: der Preclip-Render oder die HEAD-Probes vor dem Sync.so-POST sind fehlgeschlagen und der Dispatcher hat 2:26 später neu angesetzt. Dann kam eine erfolgreiche Sync.so-Antwort um 22:41:10 — und trotzdem ein weiterer Dispatch um 22:43:26. Das zweite Redispatch riecht nach `sync-so-webhook` Transient-Retry (Retry-Ladder), aber Edge-Logs sind bereits rotiert und `retry_history` wird auf dem Pass-Slot nicht persistiert.
 
-# Fix
+**Kosten dieses Retry-Musters:** ~4:30 min extra Wallclock (2:26 vor Dispatch 1, 2:16 zwischen Dispatch 1 und 2). Das erklärt fast exakt den Delta 16:31 vs. ~12 min erwartet.
 
-## Fix A — Multi-Speaker Listener-Mute (Silent-Faces v183)
+**Empfehlung — kein Blind-Fix:**
+Ohne reproduzierbaren Trigger oder Edge-Log-Snapshot kein sicherer Patch möglich. Als niedrig-hängende Frucht: **`retry_history` auf dem Pass-Slot persistieren** (in `sync-so-webhook` bei jedem Retry-Ladder-Wechsel append). Dann ist beim nächsten 16-min-Run sofort sichtbar, welcher Variant (`bbox-url-pro`, `coords-pro`, `sync3-coords`, …) welchen Fehler geworfen hat. Dieser Patch ist eigenständig, nicht Teil dieser PR.
 
-Wiederbelebung der v164-Idee, **aber diesmal mit v182-Erkenntnissen** um Morph-Artefakte zu vermeiden.
+## Validierung Fix A
 
-**Datei:** `supabase/functions/render-sync-segments-audio-mux/index.ts` und `src/remotion/templates/DialogTurnFaceCropVideo.tsx` (falls das die aktive Template ist — sonst `DialogStitchVideo`).
+Nach Bundle-Deploy + Flag ON:
+- Edge-Log: `v183_silent_slots ENABLED speakers=3 crops=3 anchors=3 fallback=0`
+- Finales MP4 einer Multi-Speaker-Szene: während des aktiven Sprecher-Fensters zeigen die anderen Gesichter das statische Portrait; **kein** Lip-Flap, **kein** Morph-Übergang.
+- Wenn ein Portrait fehlt: die betroffene Slot-Region wird durch eine dunkle Kachel bedeckt (immer noch besser als ein sprechender Nicht-Sprecher).
 
-1. Aktivieren des `silentSlots`-Payloads pro Shot: für jeden Fanout-Shot alle `preclip_crop`-Boxen der **anderen** Sprecher (aus `donePasses[i].preclip_crop`) sammeln und in `shot.silentSlots` schreiben. `void` entfernen.
+## Nicht angefasst
 
-2. Remotion-Template `SilentFaceFreeze`-Komponente: **kein `<Freeze frame={0}>` mehr** (das war die Morph-Ursache — Frame 0 hat oft noch Mund-Anfangs-Motion und beim Übergang zurück knallte es). Stattdessen: pro silent-slot ein `<Img>` mit einer **statischen Neutral-Portrait-Crop** aus dem Anchor-Frame des jeweiligen Sprechers (aus `passes[i].character_id` → brand_characters.anchor_portrait_url). Das Anchor-Portrait ist per Definition mund-geschlossen und liegt bereits in der DB.
-
-3. Fallback wenn kein Anchor: harte Deckungs-Kachel (semi-opaque Rechteck in Plate-Hintergrundfarbe) — akzeptable minimale Störung, garantiert keine Mund-Motion.
-
-4. Feathering des Silent-Slot-Div bewusst weit (feather-radius 12–16px), damit der Übergang zum Plate-Hintergrund weich bleibt.
-
-**Bundle-Deploy** via `scripts/deploy-remotion-bundle.sh` und Bundle-ID in `system_config.remotion` aktualisieren — sonst rendert Lambda mit altem Bundle ohne die neue Logik.
-
-Log-Tag: `v183_silent_slots speakers=N crops=K anchors=M fallback=F`.
-
-## Fix B — Turn 2 Retry-Muster verstehen und reduzieren
-
-**Nur Diagnose, kein Code-Change im ersten Schritt** — der Retry ist ein Symptom, nicht die Root Cause.
-
-1. `syncso_dispatch_log` für Turn 2 der Szene `1de5510b` mit voller Payload lesen: `error_class`, `error_message`, `variant`, um zu sehen ob es `provider_unknown_error`, `face_detection` oder Timeout war.
-
-2. `sync-so-webhook` Logs für Turn 2 der Szene ausfiltern: welcher Retry-Ladder-Variant war fällig (`bbox-url-pro` → `coords-pro` → …)?
-
-3. Wenn Retry-Muster reproduzierbar bei bestimmten Konstellationen auftritt (z.B. bei Turn N wenn der Sprecher im Plate teilweise verdeckt ist): entweder v188-Snap (bereits deployed) greifen lassen ODER Preclip-Crop enger auf Face-BBox schneiden.
-
-4. **Kein Blind-Fix** — erst wenn Ursache identifiziert, gezielter Patch. Sonst Risiko den v141 State-Machine-Hardening zu brechen.
-
-## Fix C — Preclip-Render parallel beschleunigen (optional, nach Fix B)
-
-Aktuell dauern Preclip-Renders 1:00–2:30 obwohl parallel dispatched. Ursache-Verdacht: Remotion-Lambda-Cold-Start oder `pass-face-preclip.ts` interne Serialisierung.
-
-- `_shared/pass-face-preclip.ts` prüfen: gibt es dort ein Mutex/Await das Passes serialisiert?
-- Falls ja: Preclips wirklich parallel rendern (Promise.allSettled).
-- Erwarteter Gain: ~1 min Wallclock bei 3–4 Sprechern.
-
-# Was NICHT angefasst wird
-
-- v141 State-Machine (per-pass Locks, RPC writes)
-- v166 Anchor-Identity Slot Bridge
-- v167 Preclip Pre-Fanout
-- v168 Per-Pass Lock
-- v169-A Stale Reconcile
-- v188 Turn-Visibility Snap (frisch deployed)
+- v141 State-Machine, v166 Anchor-ID Bridge, v167 Preclip Pre-Fanout, v168 Per-Pass Lock, v169-A Stale Reconcile, v188 Turn-Visibility Snap
 - Sync.so Payload-Contract, Retry-Ladder, Pricing, Refund-Logik
-- `COMPOSE_DIALOG_SEGMENTS_VERSION="v164"` String-Konstante (log-grep continuity)
-
-# Validierung
-
-Nach Fix A Bundle-Deploy und einer neuen Multi-Speaker-Szene:
-- Edge-Log: `v183_silent_slots speakers=3 crops=3 anchors=3 fallback=0`
-- Finales MP4: pro aktivem Sprecher-Fenster stehen die anderen Gesichter still (Anchor-Portrait sichtbar), nur der aktive Sprecher animiert.
-- Keine Morph-Übergänge beim Turn-Wechsel (Feathering-Test).
-
-Nach Fix B Analyse:
-- Bekannt: was löste den Turn-2-Retry aus. Entscheidung ob Fix nötig.
-
-# Rollback
-
-- Fix A: Feature-Flag `composer.silent_faces_v183` (default OFF beim Deploy, dann in Migration einschalten). Ausschalten via einzelnem SQL-Update, ohne Bundle-Redeploy — dann fallen die `silentSlots` im Payload auf `[]` zurück und das Template ignoriert sie.
+- `COMPOSE_DIALOG_SEGMENTS_VERSION="v164"` String-Konstante
+- Fix C (Preclip parallel beschleunigen) — deferred bis Fix B Root Cause klar ist
