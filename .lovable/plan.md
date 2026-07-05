@@ -1,58 +1,37 @@
-## Kurze Antwort
+## Befund
 
-Ja — nach den aktuellen Logs behebt dieser Ansatz sehr wahrscheinlich das eigentliche Problem.
+Der aktuelle Stillstand ist **kein Sync.so-/Face-Detect-Problem**, sondern ein neuer **Client-Status-Deadlock**:
 
-Der Fehler ist nicht mehr plausibel „Sarah/3. Speaker ist nicht sichtbar“. Die Logs zeigen das Gegenteil: Die Face-Box für Sarah wurde sauber gefunden und mit Mouth-Anchor bestätigt.
-
-Der eigentliche Bruch ist:
-
-```text
-Pass 1 → Preclip → OK
-Pass 2 → Preclip → OK
-Pass 3 / Sarah → Preclip poll_timeout_120s → Fallback auf Full-Plate → Sync.so rejected
-```
-
-Damit ist der wiederkehrende Fehler sehr wahrscheinlich kein Face-Detect-Grundproblem, sondern ein Pipeline-Fallback-Problem: Sobald der stabile Single-Face-Preclip-Pfad wegen Timeout nicht fertig wird, fällt die Funktion zurück auf Full-Plate + bbox-url-pro. Genau dieser Ersatzpfad produziert wieder `generation_input_face_selection_invalid`.
-
-## Warum das der richtige Fix ist
-
-- Alle 3 Speaker können sichtbar sein und trotzdem kann Sync.so Full-Plate ablehnen.
-- Pass 3 hatte eine valide Box: `[882,209,1060,431]`.
-- `mouth_used=true` zeigt: Der Speaker wurde nicht nur grob erkannt, sondern mit Mouth-Anchor bestätigt.
-- `auto_detect:false` wurde eingehalten.
-- Der Unterschied zwischen Erfolg und Fehler ist der Dispatch-Typ:
-  - Erfolgreiche Passes: `dispatch_video_kind: preclip`
-  - Fehlgeschlagener Pass: `dispatch_video_kind: full_plate`
+- Szene `cbfe0e84-520a-42ee-a0de-a3679946ec6c` hat einen fertigen Audio-Plan (`audio_plan.twoshot.url` existiert, 3 Speaker-Tracks gemerged).
+- Status steht auf `lip_sync_status='pending'`, `twoshot_stage=null`.
+- Gleichzeitig steht `clip_error='audio_plan_not_ready_self_heal'` — geschrieben vom v172-Self-Heal-Zweig in `compose-dialog-segments`, gedacht als reiner Recovery-Marker.
+- Der Client-Filter `isRealizedScene()` lehnt aber **jede** Zeile mit irgendeinem `clip_error` ab.
+- Ergebnis: Die Szene sieht für die UI aus wie „Lip-Sync wird gestartet…", wird aber vom Auto-Trigger nie wieder an `compose-dialog-segments` übergeben — endlose Warteschleife ohne echten Job.
 
 ## Plan
 
-1. **Full-Plate-Fallback für Multi-Speaker entfernen**
-   - Bei `speakers.length >= 2` darf ein fehlgeschlagener Preclip nicht mehr automatisch als Full-Plate an Sync.so geschickt werden.
-   - Kein Autodetect, kein stiller Ersatzpfad, kein Morphing-Risiko.
+1. **Self-Heal-Marker nicht als harte Fehler behandeln**
+   - `isRealizedScene()` so anpassen, dass reine Recovery-/Info-Marker wie `audio_plan_not_ready_self_heal` und `auto-reset: stale audio prep` die Lip-Sync-Pipeline nicht blockieren.
+   - Harte Fehler (echte Terminal-Reasons) bleiben weiterhin blockierend.
 
-2. **Preclip-Timeout als eigenes Problem behandeln**
-   - `poll_timeout_120s` soll nicht mehr zu einem Sync.so Face-Selection-Fehler werden.
-   - Stattdessen: kontrollierter Retry-/Fail-Closed-Zustand mit klarer Meldung.
+2. **Audio-Done-Bridge absichern**
+   - In `useTwoShotAutoTrigger` beim Übergang `audio_plan.twoshot.url vorhanden → twoshot_stage='master_clip'` gleichzeitig den temporären `clip_error` löschen.
+   - Dadurch kann der nächste Tick die Szene sauber als Kandidat erkennen.
 
-3. **Preclip robuster machen**
-   - Timeout/Polling für `renderPassFacePreclip(...)` konservativ erhöhen oder einen gezielten zweiten Versuch erlauben.
-   - Ziel: Pass 3 bleibt im stabilen Single-Face-Pfad.
+3. **Candidate-Start robuster machen**
+   - Wenn `audio_plan.twoshot.url` bereits existiert und `twoshot_stage=null` ist, direkt auf `master_clip` promoten.
+   - Keine Änderung an failed/running/canceled-Szenen; die Server-owned-State-Machine (v23) bleibt erhalten.
 
-4. **Logs eindeutig machen**
-   - Neuer Marker: `v187_preclip_required_no_fullplate_fallback`.
-   - Loggt Speaker, Pass, Timeout-Klasse, Preclip-Fenster und ob ein Retry/Refund ausgelöst wurde.
+4. **Bestehende hängende Szene einmalig lösen**
+   - Für Szene `cbfe0e84-...` den temporären `clip_error` entfernen und `twoshot_stage='master_clip'` setzen, damit der Auto-Trigger sofort fortsetzt.
 
 5. **Validierung**
-   - Dieselbe Scene neu rendern.
-   - Erwartung:
-     - Entweder Pass 3 läuft als Preclip durch,
-     - oder er stoppt kontrolliert als Preclip-Timeout.
-   - Wichtig: Kein erneuter Full-Plate-Dispatch und damit kein erneutes `generation_input_face_selection_invalid` aus diesem Fallback.
+   - Nach Deploy: prüfen, dass die Szene von `compose-dialog-segments` erneut aufgerufen wird (Log: `DISPATCH_ATTEMPT_STARTED`).
+   - Erwartung: Weg von „Lip-Sync wird gestartet…" hin zu echtem Running/Dispatch oder sauberem Terminalfehler; kein stiller Pending-Zustand mehr.
 
-## Was unverändert bleibt
+## Technische Details
 
-- Kein `auto_detect`.
-- Keine Sync.so Model-Swaps.
-- Keine neue Retry-Ladder über Provider-Varianten.
-- Keine Änderung an der Speaker-Mapping-Logik.
-- Der v186 `buildPerFrameBoxes`-Fix bleibt drin, ist aber nicht die Hauptursache dieses aktuellen Fehlers.
+- Datei 1: `src/lib/composer/isRealizedScene.ts` — `clip_error`-Check auf harte Fehler einschränken (Whitelist der Recovery-Marker).
+- Datei 2: `src/hooks/useTwoShotAutoTrigger.ts` — im `audioReadyButNotAdvanced`-Zweig zusätzlich `clip_error: null` mit-updaten.
+- DB-Nachpflege: einmaliges `UPDATE composer_scenes SET clip_error=null, twoshot_stage='master_clip' WHERE id='cbfe0e84-520a-42ee-a0de-a3679946ec6c'`.
+- Kein Anfassen von `compose-dialog-segments`, kein Sync.so-Modellwechsel, keine Änderung am v187-Preclip-Pfad.
