@@ -501,12 +501,36 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         const startFromForRelative =
           shot.sourceTiming === 'relative' ? relativeStartFrame : startFrame;
 
-        // v166 — Silent-face freeze tiles disabled. Sync.so already leaves
-        // non-speaking faces still via per-frame null bounding boxes; the
-        // freeze overlay produced visible ghost/morph artefacts and ballooned
-        // Lambda render time. Empty list keeps the Sequence layout unchanged.
-        const silentSlotEls: React.ReactNode[] = [];
-        void shot.silentSlots;
+        // v183 — Silent-face anchor tiles. When the muxer supplies
+        // `silentSlots` per shot (each slot pointing at the closed-mouth
+        // portrait of a non-speaking character), render them behind the
+        // active overlay so the pristine plate's baked-in mouth motion for
+        // listeners is masked with a static anchor image. No <Video>, no
+        // <Freeze> → no morph/ghost artefacts. Feature-gated by the edge
+        // function: if `silentSlots` is absent or empty we behave exactly
+        // like v166 (plate plays through underneath, only active overlay).
+        const rawSilentSlots = Array.isArray(shot.silentSlots) ? shot.silentSlots : [];
+        const silentSlotEls: React.ReactNode[] = rawSilentSlots
+          .map((slot, sIdx) => {
+            const sx = Number(slot?.x);
+            const sy = Number(slot?.y);
+            const ss = Number(slot?.size);
+            if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(ss) || ss <= 0) {
+              return null;
+            }
+            return (
+              <SilentFaceAnchor
+                key={`silent-${idx}-${sIdx}`}
+                anchorUrl={slot?.anchorUrl ?? null}
+                srcX={sx}
+                srcY={sy}
+                srcSize={ss}
+                scaleX={scaleX}
+                scaleY={scaleY}
+              />
+            );
+          })
+          .filter(Boolean);
         void SilentFaceFreeze;
 
         // v25 fan-out face-mask path (highest priority): full Sync.so output
