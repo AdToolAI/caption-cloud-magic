@@ -1945,12 +1945,48 @@ serve(async (req) => {
             },
             lip_sync_status: "failed",
             twoshot_stage: "failed",
-            clip_error: speakers.length === 1
-              ? "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
-                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist."
-              : "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
+            clip_error: (() => {
+              if (speakers.length === 1) {
+                return "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
+                  "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass der Sprecher frontal und unverdeckt sichtbar ist.";
+              }
+              // v183 — Sprecher-Namen einsetzen wenn Dup-Kollision.
+              if (dupeIdx.length >= 1) {
+                const primaryIdx = boxes.find((_, a) =>
+                  boxes.some((__, c) =>
+                    c > a &&
+                    Math.hypot(
+                      (boxes[a].b[0] + boxes[a].b[2]) / 2 - (boxes[c].b[0] + boxes[c].b[2]) / 2,
+                      (boxes[a].b[1] + boxes[a].b[3]) / 2 - (boxes[c].b[1] + boxes[c].b[3]) / 2,
+                    ) < 8,
+                  ),
+                )?.i ?? dupeIdx[0];
+                const nameA =
+                  (speakers[primaryIdx] as any)?.speaker_name ??
+                  speakers[primaryIdx]?.speaker ??
+                  `Speaker ${primaryIdx + 1}`;
+                const nameB =
+                  (speakers[dupeIdx[0]] as any)?.speaker_name ??
+                  speakers[dupeIdx[0]]?.speaker ??
+                  `Speaker ${dupeIdx[0] + 1}`;
+                return `Lip-Sync abgebrochen: ${nameA} und ${nameB} wurden auf dasselbe Gesicht in der Szene gemappt. ` +
+                  `Bitte prüfen, ob im Cast identische Basis-Charaktere oder Saved-Outfit-Look-Varianten desselben Chars mehrfach vertreten sind — ` +
+                  `oder die Szene neu rendern, sodass alle Sprecher visuell klar getrennt und frontal sichtbar sind. Credits wurden zurückerstattet.`;
+              }
+              if (missingBoxIdx.length >= 1) {
+                const names = missingBoxIdx.map(
+                  (i) =>
+                    (speakers[i] as any)?.speaker_name ??
+                    speakers[i]?.speaker ??
+                    `Speaker ${i + 1}`,
+                );
+                return `Lip-Sync abgebrochen: für ${names.join(", ")} konnte kein eindeutiges Gesicht in der Szene gefunden werden. ` +
+                  `Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und unverdeckt sichtbar sind.`;
+              }
+              return "Lip-Sync abgebrochen: die einzelnen Sprecher konnten auf dem Video nicht eindeutig unterschieden werden " +
                 "(jeder Sprecher braucht ein klar getrenntes Gesicht in der Szene). " +
-                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.",
+                "Credits wurden zurückerstattet. Bitte die Szene neu rendern, sodass alle Sprecher frontal und getrennt sichtbar sind.";
+            })(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
