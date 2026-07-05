@@ -2829,9 +2829,11 @@ serve(async (req) => {
           const veoModel =
             quality === "pro" ? "google/veo-3.1" : "google/veo-3.1-fast";
           const veoResolution = quality === "pro" ? "1080p" : "720p";
-          // Veo accepts 4 / 6 / 8 second clips
-          const veoDuration =
-            scene.durationSeconds >= 7 ? 8 : scene.durationSeconds >= 5 ? 6 : 4;
+          // Veo accepts 4 / 6 / 8 second clips — snap to nearest allowed bucket
+          const veoDuration = snapDuration(scene.durationSeconds, [4, 6, 8]);
+          console.log(
+            `[compose-video-clips] Veo scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${veoDuration}s`,
+          );
 
           const veoInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
