@@ -6607,7 +6607,7 @@ serve(async (req) => {
                       startSec: wpUnionStart,
                       endSec: wpUnionEnd,
                     },
-                    120_000,
+                    300_000,
                   );
                   if (wpPreclip.ok && wpPreclip.preclipUrl && wpPreclip.crop) {
                     const patch = {
