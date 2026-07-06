@@ -88,7 +88,9 @@ export interface PassPreclipResult {
 
 
 const FPS = 30;
-const POLL_INTERVAL_MS = 2_000;
+// v188 (Phase 1.3) — halved from 2000ms to shave ~1s detection latency on
+// short renders. No cost impact; DB read only.
+const POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_MS = 90_000;
 
 function evenDimension(value: number, fallback: number): number {
