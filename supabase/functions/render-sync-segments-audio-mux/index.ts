@@ -481,7 +481,6 @@ serve(async (req) => {
       sourceStartSec: shot.sourceStartSec ?? 0,
       crop: shot.crop ?? null,
       faceMask: shot.faceMask ?? null,
-      silentSlots: Array.isArray(shot.silentSlots) ? shot.silentSlots.length : 0,
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
     }));
 
