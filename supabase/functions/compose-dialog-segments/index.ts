@@ -4285,7 +4285,7 @@ serve(async (req) => {
             startSec: unionStart,
             endSec: unionEnd,
           },
-          180_000,
+          300_000,
         );
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
