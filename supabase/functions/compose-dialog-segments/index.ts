@@ -5431,6 +5431,14 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v143_rehost FAILED — falling back to raw URL: ${(e as Error)?.message}`,
       );
     }
+    // v189 (Fix E) — Persistence honesty. `pass.input_url` was set to the
+    // master plate at the top of the dispatch, but Sync.so actually receives
+    // `dispatchVideoUrl` (the per-speaker preclip when `usePassPreclip`).
+    // Overwrite so forensics (`dialog_shots.passes[].input_url`) matches
+    // what Sync.so was told, per v169 §3 data-model contract.
+    try {
+      (pass as any).input_url = dispatchVideoUrl;
+    } catch { /* noop */ }
     const videoInput: Record<string, unknown> = { type: "video", url: dispatchVideoUrl };
     // v124 — Hard whitelist sanitizer + ASD mutex. Supersedes the partial
     // v106 blacklist scrub. For `model: "sync-3"` ONLY `sync_mode` and
