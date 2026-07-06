@@ -304,6 +304,11 @@ export async function renderPassFacePreclip(
     chromiumOptions: {},
     timeoutInMilliseconds: 180_000,
     concurrencyPerLambda: 1,
+    // v188 (Phase 2.1) — split frames across parallel Lambdas. 60 frames per
+    // worker gives up to 3 parallel workers on a 6s @30fps preclip (180
+    // frames), matching the project's Lambda concurrency policy (max 3
+    // parallel per render). Shorter preclips naturally fall back to 1 worker.
+    framesPerLambda: 60,
     downloadBehavior: { type: "play-in-browser" },
 
     webhook: {
