@@ -1,121 +1,153 @@
-# Fix + Optimierung: Preclip-Pipeline für Multi-Sprecher
 
-Zwei Phasen, sauber getrennt. **Phase 1** stoppt sofort das Bluten (deploybar in 5 min, ~20 Zeilen). **Phase 2** halbiert die durchschnittliche Wall-Clock strukturell (~80 Zeilen, ein Refactor in `pass-face-preclip.ts`).
+# Analyse + Fix: Verschobene Lip-Syncs bei Multi-Sprecher-Szenen (N=2..4)
+
+**TL;DR:** Die v169-Architektur (Parallel-Passes + Per-Preclip + `bounding_boxes_url` + sync-3 + kein `auto_detect`) läuft korrekt. Die Fehlerursache liegt eine Ebene tiefer: die per-Sprecher-Preclips werden auf den **falschen Bildausschnitt** gerendert, weil Face-Coords in einem anderen Koordinatenraum als das reale Plate leben. Fix skaliert deterministisch von N=2 bis N=4.
+
+Analyse basiert auf Scene `11df951d-054c-4c13-b955-c50a5b16ec0e` (3 Sprecher: Samuel/Matthew/Sarah).
 
 ---
 
-## Phase 1 — Sofortfix (Symptom)
+## Forensik: Was v169 tatsächlich getan hat
 
-Behebt den akuten `v187_preclip_required_no_fullplate_fallback`-Abbruch. Alles minimal, kein Architektur-Umbau.
+Aus `syncso_dispatch_log` + `dialog_shots`:
 
-### 1.1 Poll-Timeout auf 300 s
+| Pass | Sprecher | ASD | Model | Preclip | Coords |
+|---|---|---|---|---|---|
+| 0 | Samuel | `bounding_boxes_url` | sync-3 | p1 720×720 | (461, 329) |
+| 1 | Matthew | `bounding_boxes_url` | sync-3 | p2 720×720 | (979, 343) |
+| 2 | Sarah | `bounding_boxes_url` | sync-3 | p3 720×720 | (1292, 343) |
 
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
+Alle 12 v169-Invarianten eingehalten. Die Regeln stimmen — die zugelieferten Pixel nicht.
 
-- Zeile **4288**: `180_000` → `300_000`
-- Zeile **6610**: `120_000` → `300_000`
+---
 
-Deckt P99 der aktuell gemessenen Preclip-Dauern (max 191 s) mit ~50 % Marge, bleibt weit unter dem 600 s-Edge-Function-Timeout.
+## Root Cause 1 (primär): Plate-Koordinatenraum ≠ Face-Coord-Raum
 
-### 1.2 Reuse-Guard für fertige Renders
+- Reales Hailuo-Plate: **1924×1076**
+- Gespeicherte Coords: max x=1292 → passt in 1280-Raum, nicht 1924
+- Preclip p1 zeigt Samuel am **rechten Rand** statt zentriert; p2 zeigt **3 Gesichter**; p3 zeigt 2 Gesichter
 
-Datei: `supabase/functions/_shared/pass-face-preclip.ts`
+**Warum:** `probeMp4Dims(plateUrl)` liefert bei Hailuo-MP4s (zero-tkhd) gerne `null` → Fallback auf `anchor_facemap_fallback` mit 1280×720. Gemini normalisierte Coords werden × 1280 gerechnet → Coords in 1280-Raum. Remotion lädt beim Preclip-Render die echte 1924×1076-MP4 und wendet Crop-Pixel ohne Rescale an → Fenster sitzt am falschen Ort.
 
-Vor dem `INSERT INTO video_renders` (Zeile 200) einfügen: Look-up auf einen bereits `completed` Render für dieselbe `composer_scene_id` + `pass_idx` innerhalb der letzten 15 Min. Wenn gefunden → sofort zurückgeben, kein zweiter Lambda-Call.
+**Folge für Sync.so:** Zielgesicht liegt außerhalb der `bounding_boxes_url`-Box. Sync-3 klebt den Ton auf den in der Box tatsächlich sichtbaren Mund (meist Matthew, weil er auf allen Preclips zufällig zentral steht) → „alle Münder bewegen sich, Sprecher 2 spricht für alle, Sprecher 3 out-of-sync".
 
-```ts
-const { data: prior } = await supabase
-  .from("video_renders")
-  .select("render_id, video_url, content_config")
-  .eq("source", "dialog-pass-preclip")
-  .eq("status", "completed")
-  .contains("content_config", { composer_scene_id: sceneId, pass_idx: passIdx })
-  .gte("started_at", new Date(Date.now() - 15 * 60_000).toISOString())
-  .order("started_at", { ascending: false })
-  .limit(1)
-  .maybeSingle();
-if (prior?.video_url) {
-  return { ok: true, preclipUrl: prior.video_url, preclipRenderId: prior.render_id,
-           crop, durationSec: dur, fps: FPS, frameCount: durationInFrames };
-}
+## Root Cause 2 (sekundär): Preclip-Crop-Size zu groß für N≥3
+
+`computeFaceCrop` erzeugt 592px Crops. Auf 1924-Plate mit Sprecher-Abstand ~330–450px zieht das immer Nachbar-Gesichter mit rein. Selbst mit korrekten Coords blieben mehrere Gesichter im Preclip. v116-Expansion-Loop bis 2.5× verstärkt das.
+
+## Root Cause 3 (tertiär): Persistenz-Drift
+
+`passes[].input_url` speichert das Master-Plate, obwohl der Sync.so-POST den Preclip sendet. Kein Live-Bug, aber Forensik-Falle.
+
+## Warum der v169-Guide das nicht abfängt
+
+Der Guide beschreibt Regeln, aber keine **Datentyp-Assertion**: „Face-Coords und Plate-Video-Datei müssen im selben Koordinatenraum leben." Der `anchor_facemap_fallback` bricht diese Annahme stumm.
+
+---
+
+## Fix-Plan (additiv, keine Architektur-Änderung, N=2..4-tauglich)
+
+### Fix A — Plate-Dim-Assertion + Coord-Rescale (P0, ~50 Zeilen)
+
+Datei: `supabase/functions/compose-dialog-segments/index.ts` (~L1264-1350)
+
+1. Nach `probeMp4Dims`: zusätzlicher **HEAD + Content-Length + ffprobe-Fallback** (letzter ist bereits vorhanden, aber unter-genutzt). Wenn nach 3 Fallbacks immer noch `null`: **hard fail** statt `anchor_facemap_fallback`.
+2. Wenn Face-Coord-Raum ≠ Plate-Raum (z.B. Cache-Load mit 1280×720, echtes Plate 1924×1076): **alle** Face-Coords und BBoxes rescale via `x_plate = x_cached × plateW/cachedW`. Rescale-Utility neu in `_shared/plate-face-detect.ts`.
+3. Log-Zeile `plate_dim_mismatch anchor=1280x720 plate=1924x1076 rescale=1.503x` in `syncso_dispatch_log.meta` — Grep-Alert-tauglich.
+
+**N-Skalierung:** dimensions-agnostisch, keine N-Verzweigung nötig.
+
+### Fix B — N-adaptive Preclip-Crop-Size (P0-P1, ~30 Zeilen)
+
+Datei: `supabase/functions/_shared/pass-face-preclip.ts` (`computeFaceCrop`)
+
+1. Neuer Parameter: `siblingCoords[]` wird schon durchgereicht — jetzt echt genutzt.
+2. Neue Regel:
+   ```
+   maxSafeSize = 0.9 × nearestSiblingDistance(coord, siblings)
+   size = clamp(minFaceCropSize, maxSafeSize, defaultCropSize)
+   ```
+3. **N=4-Spezial:** wenn `siblings.length ≥ 3` (also N=4): zusätzlich `size ≤ 0.22 × plateWidth` cappen — verhindert, dass bei asymmetrischer 4-Gruppe der äußerste Sprecher zu breit croppt.
+4. Sync.so-480p-Floor: wenn `size < 480` → auf 480 upscalen, `flag: forced_upscale` loggen.
+5. v116-Expansion-Loop: `cropExpansionFactor` bei N≥3 hart auf **1.2** kappen (bisher 2.5).
+
+**N-Tabelle (bei 1924-Plate):**
+- N=2: Abstand ~950px → Crop 592px ✅ default bleibt
+- N=3: Abstand ~440px → Crop 396px (statt 592)
+- N=4: Abstand ~330px + 22%-Cap ~420px → Crop 297px, upscale auf 480 (`forced_upscale`)
+
+### Fix C — Preclip-Face-Count-Sanity-Gate (P0, ~30 Zeilen; Modul existiert)
+
+Datei: `_shared/syncso-face-gate.ts` (bereits vorhanden), einbinden in `pass-face-preclip.ts` **vor** `renderPassFacePreclip`-Return.
+
+1. Preclip erstes Middle-Frame extrahieren, Gemini Vision → `face_count` erwartet: exakt **1**, Zentrum ±20% Bildbreite.
+2. Miss → 1 Retry mit engerem Crop (Fix B `size × 0.75`).
+3. Zweiter Miss → `failLipSync("preclip_face_isolation_failed")` + idempotenter Refund.
+
+**N-Skalierung:** N-agnostisch (immer „exakt 1"). Für N=4 kritischer weil enger — Fix B stellt die kleineren Crops bereit, Fix C validiert.
+
+### Fix D — N=4-Anchor-Prompt-Guard (P1, ~20 Zeilen) — NEU auf Wunsch
+
+Datei: `supabase/functions/compose-video-clips/index.ts` — `neutralTwoShotPrompt` N≥3-Branch (`syncso-n-slot-face-map` v87)
+
+Aktuell: `"single horizontal line, equal screen share, no overlap"`
+
+Neu für N=4:
+```
+"exactly four people in a single horizontal line, equal screen share,
+ each head occupies at least 18% of frame width, clear vertical gap
+ between heads, identical lighting, no overlap, no depth stacking,
+ waist-up framing, camera locked, no dolly, no zoom"
 ```
 
-**Sicherheit:** die Cache-Bedingung enthält `pass_idx` — ein Retry mit anderer `preclip_crop`-Geometrie (z. B. v116 Face-Gate-Repair mit `cropExpansionFactor > 1`) legt ohnehin einen neuen Datensatz an. Wir hängen den `cropExpansionFactor` zusätzlich in den Match ein:
+Zusätzlich `ANCHOR_AUDIT_VERSION` 7→8 → alte 4-Sprecher-Plates werden neu komponiert.
 
-```ts
-.contains("content_config", { composer_scene_id: sceneId, pass_idx: passIdx,
-                              face_crop: { size: crop.size } })
-```
+**Warum das entscheidend ist für N=4:** ohne Prompt-Guard rendert Hailuo bei 4 Personen gerne eng geclusterte Group-Shots mit Depth-Stacking. Damit bleibt der Sprecher-Abstand unter 300px, Fix B kann nicht mehr sauber isolieren, Fix C schlägt zu oft an → viele Refunds. Der Guard löst das an der Ursache (Bildkomposition).
 
-Damit trifft der Cache nur bei geometrisch identischem Preclip.
+### Fix E — Persistenz-Aufräumen (P2, ~10 Zeilen)
 
-### 1.3 Poll-Intervall halbieren
+`sync-so-webhook`: beim ersten erfolgreichen Dispatch `pass.input_url = preclip_url` via `update_dialog_shot_pass` RPC schreiben. Rein kosmetisch für Forensik-Klarheit.
 
-Datei: `supabase/functions/_shared/pass-face-preclip.ts`
+### Fix F — Observability (P2, ~30 Zeilen)
 
-- Zeile **91**: `POLL_INTERVAL_MS = 2_000` → `1_000`
-
-Spart im Mittel ~1 s pro Preclip Detection-Latenz. Trivial, kein Kosten-Impact.
-
-**Was Phase 1 nicht anfasst:** Sync.so-Payload, Retry-Ladder, v183 Silent-Faces, v187 Hard-Fail-Policy, Refund-Logik, `finalize-dialog-scene`, Master-Plate-Rendering.
+- `qa-watchdog`: Grep-Alert auf `plate_dim_mismatch`, `forced_upscale`, `preclip_face_isolation_failed` (24h-Fenster) → Sentry.
+- Neuer Deep-Sweep-Flow „4-Sprecher End-to-End" (Cast=4, erwartet: 4 valide Preclips mit face_count=1, Sync.so-Success auf allen 4).
 
 ---
 
-## Phase 2 — Strukturelle Beschleunigung (Ursache)
+## Aufwand & Reihenfolge
 
-Reduziert P50 Preclip-Dauer von ~70 s auf **~30–40 s** und P99 von ~200 s auf **~90 s**. Getrennt deploybar nach Phase 1.
+| Fix | Zeilen | Risiko | N-Tauglichkeit | Priorität |
+|---|---|---|---|---|
+| A — Plate-Dim + Rescale | ~50 | niedrig | N=2..4 identisch | P0 |
+| C — Face-Count-Gate | ~30 | niedrig | N=2..4 identisch | P0 |
+| B — N-adaptive Crop | ~30 | mittel | primär N=3,4 | P0/P1 |
+| D — N=4-Prompt-Guard | ~20 | niedrig | N=4-spezifisch | P1 |
+| E — Persistenz | ~10 | trivial | – | P2 |
+| F — Observability | ~30 | trivial | – | P2 |
 
-### Root Cause Recap
-
-Aktuell rendert jedes Preclip auf **1 Lambda-Instanz** mit **`concurrencyPerLambda: 1`** → serielle Frame-Berechnung. Bei einem 6 s-Fenster @ 30 fps = 180 Frames, die einzeln durch Chromium laufen. Plus voller Download der Masterplate pro Lambda.
-
-### 2.1 Native Lambda-Parallelisierung aktivieren
-
-Datei: `supabase/functions/_shared/pass-face-preclip.ts`, `lambdaPayload` (ab Zeile 228)
-
-Zwei zusätzliche Felder in den Payload:
-
-```ts
-framesPerLambda: 60,     // splittet 180 Frames → 3 Lambdas parallel
-concurrencyPerLambda: 1, // bleibt, wegen Speicher-Safety
-```
-
-Remotion Lambda spinnt automatisch mehrere Renderer parallel und stitcht am Ende. Der Master-Plate-Download passiert einmal pro Lambda, aber die Frame-Arbeit läuft echt parallel. Erwartete P50-Halbierung.
-
-**Concurrency-Policy-Check:** aktuelle Policy ([Lambda Concurrency Policy](mem://infrastructure/aws-lambda/rendering-concurrency-stability-policy)) sagt "max 3 parallele Worker pro Render, framesPerLambda 270". Preclips sind aber ≤ 180 Frames — `framesPerLambda: 60` gibt max 3 Worker → passt in die Policy.
-
-### 2.2 Preclip-Cache auf Content-Key normalisieren
-
-Neue Cache-Schicht in `pass-face-preclip.ts`: identische `(masterVideoUrl, coords, startSec, endSec, expandFactor)` treffen einen 24 h-Cache. Nutzt bestehende Tabelle `render_asset_cache` (existiert bereits, siehe Table-List) oder legt einen einfachen Deno-Memo-Cache pro Request an.
-
-Vorteil: v129 Retry-Ladder rendert oft denselben Preclip mit denselben Coords erneut — heute → neuer Lambda-Call, mit Cache → 0 s.
-
-### 2.3 Diagnose-Log für Phasen-Aufteilung
-
-Ein einziger `console.log` mit `dispatch_ms / poll_wait_ms / total_ms` pro Preclip, damit wir nach Phase 2 messen können, welcher Anteil (Cold-Start vs. Rendering vs. Poll-Latenz) noch dominiert. Kein Verhalten, nur Sichtbarkeit.
+**Deploy-Reihenfolge:** A + C zuerst (heilt das Symptom bei jeder N). Dann B (verhindert Rezidiv bei N≥3). Dann D (Bildkomposition-Guard für N=4). E + F über die Woche.
 
 ---
 
-## Was bewusst NICHT in diesem Plan ist
+## Was der Fix NICHT anfasst
 
-- **Server-seitiges ffmpeg-Pre-Trim** (Deno-Edge hat kein natives ffmpeg; WASM ist bei 720p langsamer als Lambda selbst; eine separate Trim-Lambda wäre ein neues Deploy-Ziel — Overkill für den Nutzen).
-- **Preclip-Auflösung senken** (720p-Floor ist von Sync.so [Docs](https://sync.so/docs) vorgegeben, siehe Kommentar bei Zeile 168).
-- **Sync.so-Payload-Änderungen** — orthogonal zum Timeout-Problem.
-- **v183 Silent-Faces / Remotion-Bundle-Redeploy** — bleibt separater Track (AWS-Credentials nötig).
+- v169-Payload-Regeln (§5)
+- Sync-3-Model-Wahl, Retry-Ladder, MAX_SPEAKERS=4, PARALLEL_CAP_HARD_MAX=4
+- v166 Anchor-Identity Bridge, v167 Preclip Pre-Fanout, v168 Per-Pass Lock, v169 Stale Reconcile
+- Refund-Logik (bleibt idempotent über deterministische UUID)
+- DB-Schema, Sync.so-API-Contract, Storage-Buckets
 
----
+Rein additiv, jederzeit per Feature-Flag rollbar.
 
-## Rollout-Reihenfolge
+## Betroffene Dateien (final)
 
-1. Phase 1 committen + deployen → User startet die fehlgeschlagene S01-Szene neu → sollte durchlaufen.
-2. 1–2 Tage Preclip-Dauern beobachten (`syncso_dispatch_log` + `video_renders`).
-3. Wenn stabil: Phase 2 nachschieben. Optional Rollback: `framesPerLambda`-Zeile entfernen, alles andere bleibt.
-
-## Betroffene Dateien
-
-| Datei | Phase 1 | Phase 2 |
-|---|---|---|
-| `supabase/functions/compose-dialog-segments/index.ts` | 2 Zahlen | — |
-| `supabase/functions/_shared/pass-face-preclip.ts` | ~15 Zeilen Reuse-Guard + 1 Konstante | +2 Payload-Felder, +Cache-Lookup (~40 Zeilen), +1 Log |
-
-Beide Phasen sind rein additiv / parametrisch — keine Schema-Änderung, keine API-Contract-Änderung, kein Sync.so-Impact, kein Refund-Logik-Impact.
+| Datei | Fix |
+|---|---|
+| `supabase/functions/compose-dialog-segments/index.ts` | A |
+| `supabase/functions/_shared/pass-face-preclip.ts` | B + C-Integration |
+| `supabase/functions/_shared/plate-face-detect.ts` | A (Rescale-Utility) |
+| `supabase/functions/_shared/syncso-face-gate.ts` | C (schon vorhanden, wird verdrahtet) |
+| `supabase/functions/compose-video-clips/index.ts` | D |
+| `supabase/functions/sync-so-webhook/index.ts` | E |
+| `supabase/functions/qa-watchdog/index.ts` | F |
