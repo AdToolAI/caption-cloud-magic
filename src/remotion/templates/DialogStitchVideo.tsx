@@ -186,7 +186,9 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   // Soft circular mask — fully opaque in the center, feathered to fully
   // transparent at the edge so the cropped face blends into the master
   // plate underneath without a visible square seam.
-  const mask = 'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,0) 95%)';
+  // v184: softer falloff (45→60→98) — halves the visible seam ring on 720p
+  // plates. Pure visual, no geometry change.
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 45%, rgba(0,0,0,0.75) 62%, rgba(0,0,0,0) 98%)';
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
