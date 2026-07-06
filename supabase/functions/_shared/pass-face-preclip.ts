@@ -88,7 +88,9 @@ export interface PassPreclipResult {
 
 
 const FPS = 30;
-const POLL_INTERVAL_MS = 2_000;
+// v188 (Phase 1.3) — halved from 2000ms to shave ~1s detection latency on
+// short renders. No cost impact; DB read only.
+const POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_MS = 90_000;
 
 function evenDimension(value: number, fallback: number): number {
@@ -182,6 +184,52 @@ export async function renderPassFacePreclip(
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
+  const t0 = Date.now();
+
+  // v188 (Phase 1.2) — Reuse-Guard. If an earlier Lambda run for THIS exact
+  // scene+pass with the SAME crop geometry finished within the last 15 min
+  // (typical case: previous compose-dialog-segments hit its 180s poll timeout
+  // but the Lambda kept rendering and completed at ~190s), reuse that
+  // rendered mp4 instead of paying for a duplicate Lambda render. The
+  // `face_crop.size` match keeps v116 face-gate expansion retries (which
+  // change `size`) properly cache-missing.
+  try {
+    const cutoffIso = new Date(Date.now() - 15 * 60_000).toISOString();
+    const { data: prior } = await supabase
+      .from("video_renders")
+      .select("render_id, video_url, content_config, started_at")
+      .eq("source", "dialog-pass-preclip")
+      .eq("status", "completed")
+      .contains("content_config", {
+        composer_scene_id: sceneId,
+        pass_idx: passIdx,
+        face_crop: { size: crop.size },
+      })
+      .gte("started_at", cutoffIso)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prior?.video_url) {
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_reuse_hit render=${prior.render_id} url=…${String(prior.video_url).slice(-60)} dispatch_ms=0 poll_wait_ms=0 total_ms=${Date.now() - t0}`,
+      );
+      return {
+        ok: true,
+        preclipUrl: prior.video_url,
+        preclipRenderId: prior.render_id,
+        crop,
+        durationSec: dur,
+        fps: FPS,
+        frameCount: durationInFrames,
+      };
+    }
+  } catch (reuseErr) {
+    // Non-fatal — cache miss falls through to normal dispatch.
+    console.warn(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_reuse_lookup_failed: ${(reuseErr as Error)?.message ?? String(reuseErr)}`,
+    );
+  }
+
   const renderId = crypto.randomUUID();
   const outName = `dialog-pass-preclip-${sceneId}-p${passIdx}-${Date.now()}.mp4`;
 
@@ -256,6 +304,11 @@ export async function renderPassFacePreclip(
     chromiumOptions: {},
     timeoutInMilliseconds: 180_000,
     concurrencyPerLambda: 1,
+    // v188 (Phase 2.1) — split frames across parallel Lambdas. 60 frames per
+    // worker gives up to 3 parallel workers on a 6s @30fps preclip (180
+    // frames), matching the project's Lambda concurrency policy (max 3
+    // parallel per render). Shorter preclips naturally fall back to 1 worker.
+    framesPerLambda: 60,
     downloadBehavior: { type: "play-in-browser" },
 
     webhook: {
@@ -276,11 +329,13 @@ export async function renderPassFacePreclip(
     },
   };
 
+  const dispatchStart = Date.now();
   const invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
     body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
   });
+  const dispatchMs = Date.now() - dispatchStart;
   if (!invokeResp.ok) {
     const t = await invokeResp.text().catch(() => "");
     await supabase
@@ -291,6 +346,9 @@ export async function renderPassFacePreclip(
         completed_at: new Date().toISOString(),
       })
       .eq("render_id", renderId);
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing invoke_failed status=${invokeResp.status} dispatch_ms=${dispatchMs} total_ms=${Date.now() - t0}`,
+    );
     return {
       ok: false,
       error: `invoke_${invokeResp.status}:${t.slice(0, 200)}`,
@@ -304,6 +362,7 @@ export async function renderPassFacePreclip(
   }
 
   // ── Poll for completion ──────────────────────────────────────────────
+  const pollStart = Date.now();
   const deadline = Date.now() + pollTimeoutMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
@@ -315,6 +374,9 @@ export async function renderPassFacePreclip(
     const status = String((row as any)?.status ?? "");
     const url = String((row as any)?.video_url ?? "");
     if (status === "completed" && url) {
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing completed dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0} frames=${durationInFrames} out=${outW}x${outH}`,
+      );
       return {
         ok: true,
         preclipUrl: url,
@@ -326,6 +388,9 @@ export async function renderPassFacePreclip(
       };
     }
     if (status === "failed") {
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing lambda_failed dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0}`,
+      );
       return {
         ok: false,
         error: `lambda:${(row as any)?.error_message ?? "unknown"}`.slice(0, 300),
@@ -339,6 +404,9 @@ export async function renderPassFacePreclip(
     }
   }
 
+  console.log(
+    `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing poll_timeout dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0} budget_ms=${pollTimeoutMs}`,
+  );
   return {
     ok: false,
     error: `poll_timeout_${Math.round(pollTimeoutMs / 1000)}s`,

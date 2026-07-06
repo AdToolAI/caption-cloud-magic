@@ -4285,7 +4285,7 @@ serve(async (req) => {
             startSec: unionStart,
             endSec: unionEnd,
           },
-          180_000,
+          300_000,
         );
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
@@ -6607,7 +6607,7 @@ serve(async (req) => {
                       startSec: wpUnionStart,
                       endSec: wpUnionEnd,
                     },
-                    120_000,
+                    300_000,
                   );
                   if (wpPreclip.ok && wpPreclip.preclipUrl && wpPreclip.crop) {
                     const patch = {
