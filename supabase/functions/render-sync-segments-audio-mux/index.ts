@@ -363,16 +363,9 @@ serve(async (req) => {
               `coords=[${Number(p.coords?.[0])},${Number(p.coords?.[1])}] crop={x:${preclipCrop.x},y:${preclipCrop.y},size:${preclipCrop.size}} — using faceMask fallback`,
             );
           }
-          // v183 — per-shot silent slots. All done passes EXCEPT this one.
-          // Each slot carries the non-speaking character's closed-mouth
-          // portrait so the template can render a static <Img> behind the
-          // active overlay. When the flag is OFF this stays an empty array.
-          const thisSpeakerIdx = Number((p as any)?.speaker_idx);
-          const silentSlots: Array<SilentSlot> = silentFacesV183Enabled
-            ? Array.from(silentSlotBySpeakerIdx.entries())
-                .filter(([sIdx]) => sIdx !== thisSpeakerIdx)
-                .map(([, slot]) => slot)
-            : [];
+          // v190 — per-shot silent slots removed. Silent-face anchors are
+          // now rendered globally (see `globalSilentSlots` on inputProps),
+          // so the active overlay only needs to carry its own crop/mask.
           const overlayPayload: Record<string, unknown> = hasPreclipCrop
             ? {
                 crop: {
@@ -380,7 +373,6 @@ serve(async (req) => {
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
                 },
-                ...(silentSlots.length > 0 ? { silentSlots } : {}),
               }
             : {
                 faceMask: {
@@ -388,7 +380,6 @@ serve(async (req) => {
                   cy: Number(p.coords[1]),
                   radius: radiusForCount,
                 },
-                ...(silentSlots.length > 0 ? { silentSlots } : {}),
               };
 
 
