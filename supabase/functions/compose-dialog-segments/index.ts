@@ -1798,10 +1798,55 @@ serve(async (req) => {
             py <= by2 + padPx
           );
         };
-        // A generous 8% padding of the smaller plate dim keeps mouth-vs-
-        // bbox-center drift from being flagged as a mismatch (Rekognition
-        // sometimes crops tightly around the eyes/nose only).
-        const padPx = Math.round(Math.min(plateDims.width, plateDims.height) * 0.08);
+        // v189 — Widened default pad from 8% → 20% of min plate dim.
+        // Hailuo i2v routinely drifts anchor composition by 10-15% vs the
+        // rendered plate (DB-confirmed scene 11df951d: Samuel anchor
+        // x=461, real plate x=652, drift 9.9% of 1924-wide plate). At
+        // 8% pad the anchor coord fell OUTSIDE the correct plate bbox and
+        // v185 repaired to the WRONG (anchor-space) coord, destroying
+        // the correctly-detected plate-native mouth. 20% pad accepts
+        // that natural drift while still catching truly bogus plate
+        // detections (whiteboard/hand false-positives sit >30% off).
+        const padPx = Math.round(Math.min(plateDims.width, plateDims.height) * 0.20);
+
+        // v189 — Identity-Trust Gate. When AWS Rekognition matched the
+        // plate face against the character portrait with matchConfidence
+        // ≥ 0.60, the identity is authoritative. Skip v185 repair for
+        // those slots — the plate bbox is the ground truth, anchor
+        // coords are only a fallback signal. This is exactly the
+        // scenario the v169 guide §7.2 describes as "identity resolve"
+        // and it MUST win over anchor-derived positions.
+        const IDENTITY_TRUST_THRESHOLD = 0.60;
+        const plateIdentityFaces = plateIdentityMap?.faces ?? [];
+        const trustedSlots: number[] = [];
+        speakers.forEach((_sp, i) => {
+          const sourceTag = coordSources[i] ?? "";
+          // Only trust slots that were assigned via identity match paths.
+          const identityAssigned =
+            sourceTag === "identity" ||
+            sourceTag.startsWith("v183-") ||
+            sourceTag === "single-speaker-largest-face" ||
+            sourceTag === "plate-persisted-mouth" ||
+            sourceTag === "plate-persisted";
+          if (!identityAssigned) return;
+          const box = speakerPlateBboxes[i];
+          if (!box) return;
+          // Find the matching plate face and check confidence.
+          const bx1 = box[0], by1 = box[1], bx2 = box[2], by2 = box[3];
+          const match = plateIdentityFaces.find((f) => {
+            if (!Array.isArray(f.bbox) || f.bbox.length !== 4) return false;
+            return (
+              Math.abs(f.bbox[0] - bx1) < 4 &&
+              Math.abs(f.bbox[1] - by1) < 4 &&
+              Math.abs(f.bbox[2] - bx2) < 4 &&
+              Math.abs(f.bbox[3] - by2) < 4
+            );
+          });
+          const conf = Number((match as any)?.matchConfidence);
+          if (Number.isFinite(conf) && conf >= IDENTITY_TRUST_THRESHOLD) {
+            trustedSlots.push(i);
+          }
+        });
 
         // Identify slots where anchor coord agrees with the plate bbox.
         const goodSlots: number[] = [];
@@ -1810,9 +1855,20 @@ serve(async (req) => {
           const box = speakerPlateBboxes[i];
           const anchor = anchorSpeakerCoords[i];
           if (!box || !anchor) return;
+          if (trustedSlots.includes(i)) {
+            // Identity-trusted — never repair, always count as good.
+            goodSlots.push(i);
+            return;
+          }
           if (contains(box, anchor, padPx)) goodSlots.push(i);
           else badSlots.push(i);
         });
+
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v189_identity_trust_gate ` +
+          `trusted=${trustedSlots.length}/${speakers.length} good=${goodSlots.length} bad=${badSlots.length} ` +
+          `pad_pct=20 threshold=${IDENTITY_TRUST_THRESHOLD}`,
+        );
 
         if (badSlots.length > 0) {
           const goodBoxes = goodSlots
@@ -1860,7 +1916,7 @@ serve(async (req) => {
           }
         } else {
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v185_anchor_plate_bbox_gate ok=${goodSlots.length}/${speakers.length} — all plate bboxes contain their anchor coord`,
+            `[compose-dialog-segments] scene=${sceneId} v185_anchor_plate_bbox_gate ok=${goodSlots.length}/${speakers.length} — all plate bboxes trusted or contain anchor`,
           );
         }
       }
@@ -5375,6 +5431,14 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v143_rehost FAILED — falling back to raw URL: ${(e as Error)?.message}`,
       );
     }
+    // v189 (Fix E) — Persistence honesty. `pass.input_url` was set to the
+    // master plate at the top of the dispatch, but Sync.so actually receives
+    // `dispatchVideoUrl` (the per-speaker preclip when `usePassPreclip`).
+    // Overwrite so forensics (`dialog_shots.passes[].input_url`) matches
+    // what Sync.so was told, per v169 §3 data-model contract.
+    try {
+      (pass as any).input_url = dispatchVideoUrl;
+    } catch { /* noop */ }
     const videoInput: Record<string, unknown> = { type: "video", url: dispatchVideoUrl };
     // v124 — Hard whitelist sanitizer + ASD mutex. Supersedes the partial
     // v106 blacklist scrub. For `model: "sync-3"` ONLY `sync_mode` and
