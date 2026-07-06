@@ -784,6 +784,20 @@ serve(async (req) => {
           : syncOutputUnchanged
             ? "sync_output_unchanged"
             : "sync_output_reencoded_passthrough_suspect";
+        // v184 retry-forensics: append a FIFO entry (max 8) to
+        // pass.retry_history so we can reconstruct why a run took 15 min.
+        const _prevHistory = Array.isArray((freshDonePasses[currentPass] as any)?.retry_history)
+          ? ((freshDonePasses[currentPass] as any).retry_history as any[]).slice(-7)
+          : [];
+        const _newRetryEntry = {
+          ts: nowIso,
+          reason: "noop_ladder_escalation",
+          from_variant: passBeforeDone?.retry_variant ?? null,
+          to_variant: nextRung.variant,
+          step: nextStep,
+          noop_reason: noopReason,
+          size_ratio: sizeRatio,
+        };
         const escalationPatch = {
           ...freshDonePasses[currentPass],
           status: "pending",
@@ -797,6 +811,7 @@ serve(async (req) => {
           noop_retry_reason: noopReason,
           previous_noop_output_url: rehostedUrl ?? outputUrl,
           previous_noop_size_ratio: sizeRatio,
+          retry_history: [..._prevHistory, _newRetryEntry],
         };
         freshDonePasses[currentPass] = escalationPatch;
         try {
