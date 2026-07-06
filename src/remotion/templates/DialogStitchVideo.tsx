@@ -513,6 +513,14 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         ) : null}
       </AbsoluteFill>
 
+      {/* v190 — scene-wide silent-face anchor tiles. Sit above the raw
+          master plate and below all fanout shots; each active Sync.so
+          overlay draws on top of its matching slot inside its own turn
+          window, so anchor tiles only show where a face is silent. */}
+      {globalSilentSlotEls.length > 0 ? globalSilentSlotEls : null}
+
+
+
       {tailStartFrame !== null && tailHoldDuration > 0 && !masterImageUrl && masterVideoUrl ? (
         <Sequence
           from={tailStartFrame}
