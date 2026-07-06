@@ -184,6 +184,52 @@ export async function renderPassFacePreclip(
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
+  const t0 = Date.now();
+
+  // v188 (Phase 1.2) — Reuse-Guard. If an earlier Lambda run for THIS exact
+  // scene+pass with the SAME crop geometry finished within the last 15 min
+  // (typical case: previous compose-dialog-segments hit its 180s poll timeout
+  // but the Lambda kept rendering and completed at ~190s), reuse that
+  // rendered mp4 instead of paying for a duplicate Lambda render. The
+  // `face_crop.size` match keeps v116 face-gate expansion retries (which
+  // change `size`) properly cache-missing.
+  try {
+    const cutoffIso = new Date(Date.now() - 15 * 60_000).toISOString();
+    const { data: prior } = await supabase
+      .from("video_renders")
+      .select("render_id, video_url, content_config, started_at")
+      .eq("source", "dialog-pass-preclip")
+      .eq("status", "completed")
+      .contains("content_config", {
+        composer_scene_id: sceneId,
+        pass_idx: passIdx,
+        face_crop: { size: crop.size },
+      })
+      .gte("started_at", cutoffIso)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prior?.video_url) {
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_reuse_hit render=${prior.render_id} url=…${String(prior.video_url).slice(-60)} dispatch_ms=0 poll_wait_ms=0 total_ms=${Date.now() - t0}`,
+      );
+      return {
+        ok: true,
+        preclipUrl: prior.video_url,
+        preclipRenderId: prior.render_id,
+        crop,
+        durationSec: dur,
+        fps: FPS,
+        frameCount: durationInFrames,
+      };
+    }
+  } catch (reuseErr) {
+    // Non-fatal — cache miss falls through to normal dispatch.
+    console.warn(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_reuse_lookup_failed: ${(reuseErr as Error)?.message ?? String(reuseErr)}`,
+    );
+  }
+
   const renderId = crypto.randomUUID();
   const outName = `dialog-pass-preclip-${sceneId}-p${passIdx}-${Date.now()}.mp4`;
 
