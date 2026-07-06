@@ -446,10 +446,50 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   srcWidth,
   srcHeight,
   tailFreezeFromSec,
+  globalSilentSlots,
   shots,
 }) => {
   const { fps, durationInFrames, width: compW, height: compH } = useVideoConfig();
   const sortedShots = React.useMemo(
+    () => [...(shots ?? [])].sort((a, b) => a.startSec - b.startSec),
+    [shots],
+  );
+  const sW = Number(srcWidth) > 0 ? Number(srcWidth) : (Number(targetWidth) > 0 ? Number(targetWidth) : compW);
+  const sH = Number(srcHeight) > 0 ? Number(srcHeight) : (Number(targetHeight) > 0 ? Number(targetHeight) : compH);
+  const scaleX = compW / sW;
+  const scaleY = compH / sH;
+  const tailStartFrame = Number.isFinite(Number(tailFreezeFromSec))
+    ? Math.max(0, Math.min(durationInFrames, Math.round(Number(tailFreezeFromSec) * fps)))
+    : null;
+  const tailHoldDuration = tailStartFrame !== null
+    ? Math.max(0, durationInFrames - tailStartFrame)
+    : 0;
+
+  // v190 — global silent-anchor tiles per non-speaking face slot.
+  const globalSilentSlotEls = React.useMemo<React.ReactNode[]>(() => {
+    const slots = Array.isArray(globalSilentSlots) ? globalSilentSlots : [];
+    return slots
+      .map((slot, sIdx) => {
+        const sx = Number(slot?.x);
+        const sy = Number(slot?.y);
+        const ss = Number(slot?.size);
+        if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(ss) || ss <= 0) {
+          return null;
+        }
+        return (
+          <SilentFaceAnchor
+            key={`global-silent-${sIdx}`}
+            anchorUrl={slot?.anchorUrl ?? null}
+            srcX={sx}
+            srcY={sy}
+            srcSize={ss}
+            scaleX={scaleX}
+            scaleY={scaleY}
+          />
+        );
+      })
+      .filter(Boolean) as React.ReactNode[];
+  }, [globalSilentSlots, scaleX, scaleY]);
     () => [...(shots ?? [])].sort((a, b) => a.startSec - b.startSec),
     [shots],
   );
