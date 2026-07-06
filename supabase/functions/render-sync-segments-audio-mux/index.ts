@@ -241,16 +241,21 @@ serve(async (req) => {
     // renders an <Img> per slot (behind the active overlay) so the pristine
     // plate's baked-in mouth motion for non-speaking characters is masked
     // with a static image. No <Freeze>/<Video>, no morph, no ghost.
-    let silentFacesV183Enabled = false;
+    // v190 — default ON. Existing explicit `false` rows in system_config
+    // still act as kill-switch for rollback to v189.
+    let silentFacesV183Enabled = true;
     try {
       const { data: v183Row } = await supabase
         .from("system_config")
         .select("value")
         .eq("key", "composer.silent_faces_v183")
         .maybeSingle();
-      silentFacesV183Enabled = String((v183Row as any)?.value ?? "false").toLowerCase() === "true";
+      const raw = (v183Row as any)?.value;
+      if (raw !== undefined && raw !== null) {
+        silentFacesV183Enabled = String(raw).toLowerCase() !== "false";
+      }
     } catch {
-      silentFacesV183Enabled = false;
+      silentFacesV183Enabled = true;
     }
 
     // characterId → portrait_url, only fetched when the flag is on.
@@ -358,16 +363,9 @@ serve(async (req) => {
               `coords=[${Number(p.coords?.[0])},${Number(p.coords?.[1])}] crop={x:${preclipCrop.x},y:${preclipCrop.y},size:${preclipCrop.size}} — using faceMask fallback`,
             );
           }
-          // v183 — per-shot silent slots. All done passes EXCEPT this one.
-          // Each slot carries the non-speaking character's closed-mouth
-          // portrait so the template can render a static <Img> behind the
-          // active overlay. When the flag is OFF this stays an empty array.
-          const thisSpeakerIdx = Number((p as any)?.speaker_idx);
-          const silentSlots: Array<SilentSlot> = silentFacesV183Enabled
-            ? Array.from(silentSlotBySpeakerIdx.entries())
-                .filter(([sIdx]) => sIdx !== thisSpeakerIdx)
-                .map(([, slot]) => slot)
-            : [];
+          // v190 — per-shot silent slots removed. Silent-face anchors are
+          // now rendered globally (see `globalSilentSlots` on inputProps),
+          // so the active overlay only needs to carry its own crop/mask.
           const overlayPayload: Record<string, unknown> = hasPreclipCrop
             ? {
                 crop: {
@@ -375,7 +373,6 @@ serve(async (req) => {
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
                 },
-                ...(silentSlots.length > 0 ? { silentSlots } : {}),
               }
             : {
                 faceMask: {
@@ -383,7 +380,6 @@ serve(async (req) => {
                   cy: Number(p.coords[1]),
                   radius: radiusForCount,
                 },
-                ...(silentSlots.length > 0 ? { silentSlots } : {}),
               };
 
 
@@ -448,6 +444,22 @@ serve(async (req) => {
     }
 
 
+    // v190 — scene-wide silent-face anchor tiles (all speakers with a valid
+    // preclip_crop). Rendered once by the Remotion template above the raw
+    // master plate and below all fanout shots; active Sync.so overlays
+    // cover the matching slot inside their own turn window, so anchor tiles
+    // only ever show for a silent face. N=1 (no fanout) → empty array.
+    const globalSilentSlots =
+      silentFacesV183Enabled && isFanout && donePasses.length >= 2
+        ? Array.from(silentSlotBySpeakerIdx.values())
+        : [];
+    if (globalSilentSlots.length > 0) {
+      const anchors = globalSilentSlots.filter((s) => !!s.anchorUrl).length;
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v190_global_silent_slots=${globalSilentSlots.length} anchors=${anchors} fallback=${globalSilentSlots.length - anchors}`,
+      );
+    }
+
     const inputProps: Record<string, unknown> = {
       masterVideoUrl: masterVideoUrlForMux,
       masterAudioUrl,
@@ -458,6 +470,7 @@ serve(async (req) => {
       srcHeight: height,
       shots: fanoutShots,
       ...(tailFreezeFromSec !== null ? { tailFreezeFromSec } : {}),
+      ...(globalSilentSlots.length > 0 ? { globalSilentSlots } : {}),
     };
 
     const shotSummary = fanoutShots.map((shot: any, idx: number) => ({
@@ -468,7 +481,6 @@ serve(async (req) => {
       sourceStartSec: shot.sourceStartSec ?? 0,
       crop: shot.crop ?? null,
       faceMask: shot.faceMask ?? null,
-      silentSlots: Array.isArray(shot.silentSlots) ? shot.silentSlots.length : 0,
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
     }));
 

@@ -113,6 +113,23 @@ export const DialogStitchVideoSchema = z.object({
    *  through scene end so the raw AI plate cannot keep idly moving lips after
    *  the Sync.so speech window has ended. */
   tailFreezeFromSec: z.number().min(0).optional().nullable(),
+  /** v190: scene-wide static closed-mouth anchor tiles per non-speaking
+   *  face slot. Rendered ONCE above the master plate and BELOW all fanout
+   *  shots, spanning the entire scene duration. Active Sync.so overlays
+   *  (in their own turn windows) draw on top of the matching slot; outside
+   *  those windows the anchor tile masks any residual mouth motion on the
+   *  raw AI plate. Empty/undefined = disabled (legacy v189 behaviour). */
+  globalSilentSlots: z
+    .array(
+      z.object({
+        x: z.number(),
+        y: z.number(),
+        size: z.number(),
+        anchorUrl: z.string().optional().nullable(),
+      }),
+    )
+    .optional()
+    .nullable(),
   shots: z.array(ShotSchema),
 });
 
@@ -429,6 +446,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   srcWidth,
   srcHeight,
   tailFreezeFromSec,
+  globalSilentSlots,
   shots,
 }) => {
   const { fps, durationInFrames, width: compW, height: compH } = useVideoConfig();
@@ -446,6 +464,34 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   const tailHoldDuration = tailStartFrame !== null
     ? Math.max(0, durationInFrames - tailStartFrame)
     : 0;
+
+  // v190 — global silent-anchor tiles per non-speaking face slot.
+  const globalSilentSlotEls = React.useMemo<React.ReactNode[]>(() => {
+    const slots = Array.isArray(globalSilentSlots) ? globalSilentSlots : [];
+    return slots
+      .map((slot, sIdx) => {
+        const sx = Number(slot?.x);
+        const sy = Number(slot?.y);
+        const ss = Number(slot?.size);
+        if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(ss) || ss <= 0) {
+          return null;
+        }
+        return (
+          <SilentFaceAnchor
+            key={`global-silent-${sIdx}`}
+            anchorUrl={slot?.anchorUrl ?? null}
+            srcX={sx}
+            srcY={sy}
+            srcSize={ss}
+            scaleX={scaleX}
+            scaleY={scaleY}
+          />
+        );
+      })
+      .filter(Boolean) as React.ReactNode[];
+  }, [globalSilentSlots, scaleX, scaleY]);
+
+
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
@@ -466,6 +512,14 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
           />
         ) : null}
       </AbsoluteFill>
+
+      {/* v190 — scene-wide silent-face anchor tiles. Sit above the raw
+          master plate and below all fanout shots; each active Sync.so
+          overlay draws on top of its matching slot inside its own turn
+          window, so anchor tiles only show where a face is silent. */}
+      {globalSilentSlotEls.length > 0 ? globalSilentSlotEls : null}
+
+
 
       {tailStartFrame !== null && tailHoldDuration > 0 && !masterImageUrl && masterVideoUrl ? (
         <Sequence
