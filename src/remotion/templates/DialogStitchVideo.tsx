@@ -113,6 +113,23 @@ export const DialogStitchVideoSchema = z.object({
    *  through scene end so the raw AI plate cannot keep idly moving lips after
    *  the Sync.so speech window has ended. */
   tailFreezeFromSec: z.number().min(0).optional().nullable(),
+  /** v190: scene-wide static closed-mouth anchor tiles per non-speaking
+   *  face slot. Rendered ONCE above the master plate and BELOW all fanout
+   *  shots, spanning the entire scene duration. Active Sync.so overlays
+   *  (in their own turn windows) draw on top of the matching slot; outside
+   *  those windows the anchor tile masks any residual mouth motion on the
+   *  raw AI plate. Empty/undefined = disabled (legacy v189 behaviour). */
+  globalSilentSlots: z
+    .array(
+      z.object({
+        x: z.number(),
+        y: z.number(),
+        size: z.number(),
+        anchorUrl: z.string().optional().nullable(),
+      }),
+    )
+    .optional()
+    .nullable(),
   shots: z.array(ShotSchema),
 });
 
