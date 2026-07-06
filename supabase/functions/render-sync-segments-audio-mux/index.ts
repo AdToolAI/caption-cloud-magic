@@ -444,6 +444,22 @@ serve(async (req) => {
     }
 
 
+    // v190 — scene-wide silent-face anchor tiles (all speakers with a valid
+    // preclip_crop). Rendered once by the Remotion template above the raw
+    // master plate and below all fanout shots; active Sync.so overlays
+    // cover the matching slot inside their own turn window, so anchor tiles
+    // only ever show for a silent face. N=1 (no fanout) → empty array.
+    const globalSilentSlots =
+      silentFacesV183Enabled && isFanout && donePasses.length >= 2
+        ? Array.from(silentSlotBySpeakerIdx.values())
+        : [];
+    if (globalSilentSlots.length > 0) {
+      const anchors = globalSilentSlots.filter((s) => !!s.anchorUrl).length;
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v190_global_silent_slots=${globalSilentSlots.length} anchors=${anchors} fallback=${globalSilentSlots.length - anchors}`,
+      );
+    }
+
     const inputProps: Record<string, unknown> = {
       masterVideoUrl: masterVideoUrlForMux,
       masterAudioUrl,
@@ -454,6 +470,7 @@ serve(async (req) => {
       srcHeight: height,
       shots: fanoutShots,
       ...(tailFreezeFromSec !== null ? { tailFreezeFromSec } : {}),
+      ...(globalSilentSlots.length > 0 ? { globalSilentSlots } : {}),
     };
 
     const shotSummary = fanoutShots.map((shot: any, idx: number) => ({
