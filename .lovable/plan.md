@@ -1,48 +1,121 @@
-# Warum die Szene aktuell schlecht wirkt
+# Fix + Optimierung: Preclip-Pipeline für Multi-Sprecher
 
-Zwei getrennte Ursachen, beide nachweisbar im aktuellen Code:
+Zwei Phasen, sauber getrennt. **Phase 1** stoppt sofort das Bluten (deploybar in 5 min, ~20 Zeilen). **Phase 2** halbiert die durchschnittliche Wall-Clock strukturell (~80 Zeilen, ein Refactor in `pass-face-preclip.ts`).
 
-## 1) „Alle Sprecher bewegen den Mund"
+---
 
-- `system_config.composer.silent_faces_v183 = false` (per SQL bestätigt).
-- Damit rendert `render-sync-segments-audio-mux` **keine** statischen Anchor-Portraits über die stummen Gesichter, und alle Preclips der Fan-Out-Passes zeigen animierte Münder gleichzeitig.
-- Der Code für v183 (Silent-Faces-Overlay in `DialogStitchVideo.tsx` + Edge-Function-Populate) ist deployed, aber der Remotion-Bundle wurde noch nicht neu deployed und der Flag steht auf `false`.
+## Phase 1 — Sofortfix (Symptom)
 
-## 2) „Video wirkt matschig / niedrige Auflösung"
+Behebt den akuten `v187_preclip_required_no_fullplate_fallback`-Abbruch. Alles minimal, kein Architektur-Umbau.
 
-- Der Fan-Out-Composite läuft auf **Plate-Dimensionen** (`videoDims = plateDims ?? 1280x720`). Ist das Master-Video ein Hailuo-720p-Plate, ist das finale MP4 zwangsläufig 720p und wird im Preview auf ~1500 CSS-px hochskaliert → „matschig".
-- Kein CRF-/Bitrate-Regress in Remotion Lambda (Defaults sind CRF 18). Ursache ist die **Quell-Plate-Auflösung**, nicht das Encoding.
-- Neben der Plate-Auflösung gibt es zusätzlich einen sichtbaren Qualitätsverlust an Naht-Stellen der Preclip-Crops (Sync.so gibt den Face-Crop 1:1 zurück, aber die Feathered-Ränder werden auf 720p besonders sichtbar).
+### 1.1 Poll-Timeout auf 300 s
 
-## Was ich vorschlage
+Datei: `supabase/functions/compose-dialog-segments/index.ts`
 
-**Kein Rewrite** — zwei kleine, isolierte Änderungen + eine Diagnose-Bestätigung.
+- Zeile **4288**: `180_000` → `300_000`
+- Zeile **6610**: `120_000` → `300_000`
 
-### Schritt A — Silent-Faces v183 aktivieren
-1. `scripts/deploy-remotion-bundle.sh` ausführen und die neue Bundle-URL in `REMOTION_SERVE_URL` (Edge-Secret) hinterlegen. Grund: v183 verwendet die neue `SilentFaceAnchor`-Komponente im Bundle.
-2. `system_config.composer.silent_faces_v183` in DB via Migration auf `true` setzen.
-3. Verifikation: eine neue Multi-Speaker-Szene rendern; Edge-Log muss `v183_silent_slots ENABLED speakers=N crops=K anchors=M` zeigen; im finalen MP4 bewegt nur der aktive Speaker den Mund.
-4. Rollback (falls Regression): eine SQL-Zeile — Flag auf `false`, kein Code-Revert nötig.
+Deckt P99 der aktuell gemessenen Preclip-Dauern (max 191 s) mit ~50 % Marge, bleibt weit unter dem 600 s-Edge-Function-Timeout.
 
-### Schritt B — Plate-Auflösung protokollieren & anheben
-1. In `compose-dialog-segments` beim Log-Marker `plateDims source=…` zusätzlich das genutzte Provider-Modell (Hailuo/Kling/Vidu) mit-loggen, damit wir für die konkrete matschige Szene den Provider bestätigen können.
-2. Wenn Ursache bestätigt Hailuo-720p ist: im Composer-Master-Clip-Rendering (nicht in dieser PR) den Default auf **1080p-Variante** heben oder pro Szene per Flag anheben. Reine Provider-Config-Änderung, kein neuer Code-Pfad in der Lipsync-Pipeline. **Diesen Teil erst nach Bestätigung durch Log der aktuell schlechten Szene umsetzen** — daher hier nur die Log-Erweiterung planen.
-3. Optional (kleine Verbesserung, unabhängig): Feather-Radius der Silent- und Active-Face-Overlays in `DialogStitchVideo.tsx` von aktuell radial-hart auf einen weicheren Falloff (z. B. `radial-gradient(… 65%, transparent 100%)`) — reduziert sichtbare Naht auf 720p um ~50 %, ohne die Pipeline zu ändern.
+### 1.2 Reuse-Guard für fertige Renders
 
-### Schritt C — Forensik-Persistenz (aus letzter Runde, weiter offen)
-`retry_history[]` je Pass-Slot in `dialog_shots` schreiben (max. 8 FIFO-Einträge, geschrieben von `sync-so-webhook` bei Redispatch/Retry-Ladder-Wechsel). Keine Verhaltensänderung, nur Debug-Persistenz, damit wir künftige „warum 15 min" Fälle rekonstruieren können.
+Datei: `supabase/functions/_shared/pass-face-preclip.ts`
 
-## Nicht angefasst
-- Sync.so-Payload-Contract, Retry-Ladder, Pricing, Refund-Logik.
-- v166 Anchor-Identity-Bridge, v168 Per-Pass-Locks, v169-A Stale-Reconcile.
-- v129.x Doc-Strict / sync-3 Forbidden-Fields.
-- `finalize-dialog-scene` Concat, pg_cron Watchdogs.
-- Hailuo Master-Plate Dauer / Anchor-Frame-Logik.
+Vor dem `INSERT INTO video_renders` (Zeile 200) einfügen: Look-up auf einen bereits `completed` Render für dieselbe `composer_scene_id` + `pass_idx` innerhalb der letzten 15 Min. Wenn gefunden → sofort zurückgeben, kein zweiter Lambda-Call.
 
-## Erfolgskriterien
-- **Neuer 4-Sprecher-Run**: im finalen MP4 bewegt nur der aktuell sprechende Speaker den Mund; Edge-Log zeigt `v183_silent_slots ENABLED`.
-- Preview-Bildqualität: `plateDims`-Log zeigt Provider + Auflösung; wenn 720p, entscheiden wir in einem Folgeschritt über 1080p-Provider-Default.
-- Wallclock unverändert (v183 ist reine Overlay-Änderung, keine zusätzlichen Provider-Calls).
+```ts
+const { data: prior } = await supabase
+  .from("video_renders")
+  .select("render_id, video_url, content_config")
+  .eq("source", "dialog-pass-preclip")
+  .eq("status", "completed")
+  .contains("content_config", { composer_scene_id: sceneId, pass_idx: passIdx })
+  .gte("started_at", new Date(Date.now() - 15 * 60_000).toISOString())
+  .order("started_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
+if (prior?.video_url) {
+  return { ok: true, preclipUrl: prior.video_url, preclipRenderId: prior.render_id,
+           crop, durationSec: dur, fps: FPS, frameCount: durationInFrames };
+}
+```
 
-## Reihenfolge
-Schritt A zuerst (löst sichtbar „alle reden") → dann eine Test-Szene rendern → mit dem Log aus Schritt B entscheiden, ob Provider-Auflösung angehoben wird → Schritt C parallel als reine DB/Log-Erweiterung.
+**Sicherheit:** die Cache-Bedingung enthält `pass_idx` — ein Retry mit anderer `preclip_crop`-Geometrie (z. B. v116 Face-Gate-Repair mit `cropExpansionFactor > 1`) legt ohnehin einen neuen Datensatz an. Wir hängen den `cropExpansionFactor` zusätzlich in den Match ein:
+
+```ts
+.contains("content_config", { composer_scene_id: sceneId, pass_idx: passIdx,
+                              face_crop: { size: crop.size } })
+```
+
+Damit trifft der Cache nur bei geometrisch identischem Preclip.
+
+### 1.3 Poll-Intervall halbieren
+
+Datei: `supabase/functions/_shared/pass-face-preclip.ts`
+
+- Zeile **91**: `POLL_INTERVAL_MS = 2_000` → `1_000`
+
+Spart im Mittel ~1 s pro Preclip Detection-Latenz. Trivial, kein Kosten-Impact.
+
+**Was Phase 1 nicht anfasst:** Sync.so-Payload, Retry-Ladder, v183 Silent-Faces, v187 Hard-Fail-Policy, Refund-Logik, `finalize-dialog-scene`, Master-Plate-Rendering.
+
+---
+
+## Phase 2 — Strukturelle Beschleunigung (Ursache)
+
+Reduziert P50 Preclip-Dauer von ~70 s auf **~30–40 s** und P99 von ~200 s auf **~90 s**. Getrennt deploybar nach Phase 1.
+
+### Root Cause Recap
+
+Aktuell rendert jedes Preclip auf **1 Lambda-Instanz** mit **`concurrencyPerLambda: 1`** → serielle Frame-Berechnung. Bei einem 6 s-Fenster @ 30 fps = 180 Frames, die einzeln durch Chromium laufen. Plus voller Download der Masterplate pro Lambda.
+
+### 2.1 Native Lambda-Parallelisierung aktivieren
+
+Datei: `supabase/functions/_shared/pass-face-preclip.ts`, `lambdaPayload` (ab Zeile 228)
+
+Zwei zusätzliche Felder in den Payload:
+
+```ts
+framesPerLambda: 60,     // splittet 180 Frames → 3 Lambdas parallel
+concurrencyPerLambda: 1, // bleibt, wegen Speicher-Safety
+```
+
+Remotion Lambda spinnt automatisch mehrere Renderer parallel und stitcht am Ende. Der Master-Plate-Download passiert einmal pro Lambda, aber die Frame-Arbeit läuft echt parallel. Erwartete P50-Halbierung.
+
+**Concurrency-Policy-Check:** aktuelle Policy ([Lambda Concurrency Policy](mem://infrastructure/aws-lambda/rendering-concurrency-stability-policy)) sagt "max 3 parallele Worker pro Render, framesPerLambda 270". Preclips sind aber ≤ 180 Frames — `framesPerLambda: 60` gibt max 3 Worker → passt in die Policy.
+
+### 2.2 Preclip-Cache auf Content-Key normalisieren
+
+Neue Cache-Schicht in `pass-face-preclip.ts`: identische `(masterVideoUrl, coords, startSec, endSec, expandFactor)` treffen einen 24 h-Cache. Nutzt bestehende Tabelle `render_asset_cache` (existiert bereits, siehe Table-List) oder legt einen einfachen Deno-Memo-Cache pro Request an.
+
+Vorteil: v129 Retry-Ladder rendert oft denselben Preclip mit denselben Coords erneut — heute → neuer Lambda-Call, mit Cache → 0 s.
+
+### 2.3 Diagnose-Log für Phasen-Aufteilung
+
+Ein einziger `console.log` mit `dispatch_ms / poll_wait_ms / total_ms` pro Preclip, damit wir nach Phase 2 messen können, welcher Anteil (Cold-Start vs. Rendering vs. Poll-Latenz) noch dominiert. Kein Verhalten, nur Sichtbarkeit.
+
+---
+
+## Was bewusst NICHT in diesem Plan ist
+
+- **Server-seitiges ffmpeg-Pre-Trim** (Deno-Edge hat kein natives ffmpeg; WASM ist bei 720p langsamer als Lambda selbst; eine separate Trim-Lambda wäre ein neues Deploy-Ziel — Overkill für den Nutzen).
+- **Preclip-Auflösung senken** (720p-Floor ist von Sync.so [Docs](https://sync.so/docs) vorgegeben, siehe Kommentar bei Zeile 168).
+- **Sync.so-Payload-Änderungen** — orthogonal zum Timeout-Problem.
+- **v183 Silent-Faces / Remotion-Bundle-Redeploy** — bleibt separater Track (AWS-Credentials nötig).
+
+---
+
+## Rollout-Reihenfolge
+
+1. Phase 1 committen + deployen → User startet die fehlgeschlagene S01-Szene neu → sollte durchlaufen.
+2. 1–2 Tage Preclip-Dauern beobachten (`syncso_dispatch_log` + `video_renders`).
+3. Wenn stabil: Phase 2 nachschieben. Optional Rollback: `framesPerLambda`-Zeile entfernen, alles andere bleibt.
+
+## Betroffene Dateien
+
+| Datei | Phase 1 | Phase 2 |
+|---|---|---|
+| `supabase/functions/compose-dialog-segments/index.ts` | 2 Zahlen | — |
+| `supabase/functions/_shared/pass-face-preclip.ts` | ~15 Zeilen Reuse-Guard + 1 Konstante | +2 Payload-Felder, +Cache-Lookup (~40 Zeilen), +1 Log |
+
+Beide Phasen sind rein additiv / parametrisch — keine Schema-Änderung, keine API-Contract-Änderung, kein Sync.so-Impact, kein Refund-Logik-Impact.
