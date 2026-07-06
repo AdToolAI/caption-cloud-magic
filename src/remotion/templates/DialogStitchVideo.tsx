@@ -490,19 +490,8 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
       })
       .filter(Boolean) as React.ReactNode[];
   }, [globalSilentSlots, scaleX, scaleY]);
-    () => [...(shots ?? [])].sort((a, b) => a.startSec - b.startSec),
-    [shots],
-  );
-  const sW = Number(srcWidth) > 0 ? Number(srcWidth) : (Number(targetWidth) > 0 ? Number(targetWidth) : compW);
-  const sH = Number(srcHeight) > 0 ? Number(srcHeight) : (Number(targetHeight) > 0 ? Number(targetHeight) : compH);
-  const scaleX = compW / sW;
-  const scaleY = compH / sH;
-  const tailStartFrame = Number.isFinite(Number(tailFreezeFromSec))
-    ? Math.max(0, Math.min(durationInFrames, Math.round(Number(tailFreezeFromSec) * fps)))
-    : null;
-  const tailHoldDuration = tailStartFrame !== null
-    ? Math.max(0, durationInFrames - tailStartFrame)
-    : 0;
+
+
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
