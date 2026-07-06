@@ -241,16 +241,21 @@ serve(async (req) => {
     // renders an <Img> per slot (behind the active overlay) so the pristine
     // plate's baked-in mouth motion for non-speaking characters is masked
     // with a static image. No <Freeze>/<Video>, no morph, no ghost.
-    let silentFacesV183Enabled = false;
+    // v190 — default ON. Existing explicit `false` rows in system_config
+    // still act as kill-switch for rollback to v189.
+    let silentFacesV183Enabled = true;
     try {
       const { data: v183Row } = await supabase
         .from("system_config")
         .select("value")
         .eq("key", "composer.silent_faces_v183")
         .maybeSingle();
-      silentFacesV183Enabled = String((v183Row as any)?.value ?? "false").toLowerCase() === "true";
+      const raw = (v183Row as any)?.value;
+      if (raw !== undefined && raw !== null) {
+        silentFacesV183Enabled = String(raw).toLowerCase() !== "false";
+      }
     } catch {
-      silentFacesV183Enabled = false;
+      silentFacesV183Enabled = true;
     }
 
     // characterId → portrait_url, only fetched when the flag is on.
