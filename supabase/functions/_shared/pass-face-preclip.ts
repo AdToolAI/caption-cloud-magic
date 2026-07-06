@@ -329,11 +329,13 @@ export async function renderPassFacePreclip(
     },
   };
 
+  const dispatchStart = Date.now();
   const invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
     body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
   });
+  const dispatchMs = Date.now() - dispatchStart;
   if (!invokeResp.ok) {
     const t = await invokeResp.text().catch(() => "");
     await supabase
@@ -344,6 +346,9 @@ export async function renderPassFacePreclip(
         completed_at: new Date().toISOString(),
       })
       .eq("render_id", renderId);
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing invoke_failed status=${invokeResp.status} dispatch_ms=${dispatchMs} total_ms=${Date.now() - t0}`,
+    );
     return {
       ok: false,
       error: `invoke_${invokeResp.status}:${t.slice(0, 200)}`,
@@ -357,6 +362,7 @@ export async function renderPassFacePreclip(
   }
 
   // ── Poll for completion ──────────────────────────────────────────────
+  const pollStart = Date.now();
   const deadline = Date.now() + pollTimeoutMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
@@ -368,6 +374,9 @@ export async function renderPassFacePreclip(
     const status = String((row as any)?.status ?? "");
     const url = String((row as any)?.video_url ?? "");
     if (status === "completed" && url) {
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing completed dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0} frames=${durationInFrames} out=${outW}x${outH}`,
+      );
       return {
         ok: true,
         preclipUrl: url,
@@ -379,6 +388,9 @@ export async function renderPassFacePreclip(
       };
     }
     if (status === "failed") {
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing lambda_failed dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0}`,
+      );
       return {
         ok: false,
         error: `lambda:${(row as any)?.error_message ?? "unknown"}`.slice(0, 300),
@@ -392,6 +404,9 @@ export async function renderPassFacePreclip(
     }
   }
 
+  console.log(
+    `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing poll_timeout dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0} budget_ms=${pollTimeoutMs}`,
+  );
   return {
     ok: false,
     error: `poll_timeout_${Math.round(pollTimeoutMs / 1000)}s`,
