@@ -1354,9 +1354,18 @@ serve(async (req) => {
       width: Number((existing as any)?.video_width) || 1280,
       height: Number((existing as any)?.video_height) || 720,
     };
+    const _clipSource = (scene as any)?.clip_source ?? "unknown";
+    const _engineOverride = (scene as any)?.engine_override ?? "auto";
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} plateDims source=${plateDimsSource} dims=${videoDims.width}x${videoDims.height}`,
+      `[compose-dialog-segments] scene=${sceneId} plateDims source=${plateDimsSource} dims=${videoDims.width}x${videoDims.height} clip_source=${_clipSource} engine=${_engineOverride} plate_url=${platePrimaryUrl ? platePrimaryUrl.slice(-60) : "null"}`,
     );
+    // v184 quality-forensics: flag likely-720p sub-HD plates so we can decide
+    // to bump provider resolution later. Pure logging — no behavior change.
+    if (videoDims.width * videoDims.height < 1280 * 720) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v184_low_res_plate dims=${videoDims.width}x${videoDims.height} clip_source=${_clipSource} — final MP4 will look soft when scaled to preview`,
+      );
+    }
 
     const coordSources: string[] = [];
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
