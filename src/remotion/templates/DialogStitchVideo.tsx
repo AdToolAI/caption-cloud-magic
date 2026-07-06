@@ -305,7 +305,8 @@ const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
   compW,
   compH,
 }) => {
-  const mask = 'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,0) 95%)';
+  // v184: softer falloff for 720p plates (see v184 note above).
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 45%, rgba(0,0,0,0.75) 62%, rgba(0,0,0,0) 98%)';
   const left = srcX * scaleX;
   const top = srcY * scaleY;
   const wOuter = srcSize * scaleX;
