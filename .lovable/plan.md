@@ -1,68 +1,48 @@
-# v183 Multi-Speaker Silent-Faces — Umgesetzt (Fix A) + Fix B Diagnose
+# Warum die Szene aktuell schlecht wirkt
 
-## Fix A — Silent-Faces v183 (fertig implementiert)
+Zwei getrennte Ursachen, beide nachweisbar im aktuellen Code:
 
-**Was gemacht wurde:**
+## 1) „Alle Sprecher bewegen den Mund"
 
-1. `src/remotion/templates/DialogStitchVideo.tsx`
-   - `ShotSchema.silentSlots` erweitert: pro Slot jetzt `{x, y, size, anchorUrl?}` (statt reines Crop-Rect).
-   - Neue Komponente `SilentFaceAnchor`: rendert `<Img src={anchorUrl}>` in einem feathered radial-masked Div (58% solid → 96% transparent). Fallback ohne anchorUrl: semi-opaque `rgba(12,12,14,0.92)` Kachel. Kein `<Freeze>`, kein `<Video>` → keine Morph-/Ghost-Artefakte, keine Lambda-Renderkosten.
-   - Render-Loop rendert die silent slots als Layer **vor** dem aktiven Overlay in jeder Sequence (silent slots liegen also unter dem aktiven Sprecher-Overlay).
+- `system_config.composer.silent_faces_v183 = false` (per SQL bestätigt).
+- Damit rendert `render-sync-segments-audio-mux` **keine** statischen Anchor-Portraits über die stummen Gesichter, und alle Preclips der Fan-Out-Passes zeigen animierte Münder gleichzeitig.
+- Der Code für v183 (Silent-Faces-Overlay in `DialogStitchVideo.tsx` + Edge-Function-Populate) ist deployed, aber der Remotion-Bundle wurde noch nicht neu deployed und der Flag steht auf `false`.
 
-2. `supabase/functions/render-sync-segments-audio-mux/index.ts`
-   - Feature-Flag `composer.silent_faces_v183` (default OFF, jsonb bool).
-   - Bei Flag ON + Multi-Speaker: `brand_characters.portrait_url` für alle beteiligten `character_id`s in einem einzigen Query holen.
-   - Pro Fanout-Shot: `silentSlots = alle done-Passes AUßER dem eigenen Speaker`, jeder Slot mit `preclip_crop`-Rect + `anchorUrl`.
-   - Neuer Log-Tag `v183_silent_slots ENABLED|DISABLED speakers=N crops=K anchors=M fallback=F`.
-   - Bestehende Overlay-Pfade (`crop` und `faceMask`) tragen `silentSlots` optional als zusätzlichen Payload-Key.
+## 2) „Video wirkt matschig / niedrige Auflösung"
 
-3. DB: `system_config` Row `composer.silent_faces_v183 = false` per Insert angelegt.
+- Der Fan-Out-Composite läuft auf **Plate-Dimensionen** (`videoDims = plateDims ?? 1280x720`). Ist das Master-Video ein Hailuo-720p-Plate, ist das finale MP4 zwangsläufig 720p und wird im Preview auf ~1500 CSS-px hochskaliert → „matschig".
+- Kein CRF-/Bitrate-Regress in Remotion Lambda (Defaults sind CRF 18). Ursache ist die **Quell-Plate-Auflösung**, nicht das Encoding.
+- Neben der Plate-Auflösung gibt es zusätzlich einen sichtbaren Qualitätsverlust an Naht-Stellen der Preclip-Crops (Sync.so gibt den Face-Crop 1:1 zurück, aber die Feathered-Ränder werden auf 720p besonders sichtbar).
 
-**Deployment-Status:**
-- Edge Function `render-sync-segments-audio-mux` deployed ✅
-- tsgo clean ✅
-- Remotion Bundle: **NOCH NICHT** neu deployed. Benötigt manuelles `scripts/deploy-remotion-bundle.sh` + `system_config.remotion.deployed_bundle_id` Update.
+## Was ich vorschlage
 
-**Aktivierungs-Sequenz (in dieser Reihenfolge):**
-1. `bash scripts/deploy-remotion-bundle.sh` → neue Bundle-ID notieren
-2. `UPDATE system_config SET value = to_jsonb('<neue-bundle-id>'::text) WHERE key = 'remotion.deployed_bundle_id';` (oder wie auch immer der Key heißt — siehe Memory `lambda-bundle-deployment-and-verification`)
-3. `UPDATE system_config SET value = 'true'::jsonb WHERE key = 'composer.silent_faces_v183';`
-4. Neue Multi-Speaker-Szene rendern. Log-Grep: `v183_silent_slots ENABLED`.
+**Kein Rewrite** — zwei kleine, isolierte Änderungen + eine Diagnose-Bestätigung.
 
-**Solange Bundle nicht neu ist, bleibt der Flag auf false.** Bei aktiviertem Flag mit alter Bundle würde Lambda `silentSlots` im Payload einfach ignorieren (Feld ist optional im Schema) — kein Absturz, aber auch kein Silent-Faces-Effekt.
+### Schritt A — Silent-Faces v183 aktivieren
+1. `scripts/deploy-remotion-bundle.sh` ausführen und die neue Bundle-URL in `REMOTION_SERVE_URL` (Edge-Secret) hinterlegen. Grund: v183 verwendet die neue `SilentFaceAnchor`-Komponente im Bundle.
+2. `system_config.composer.silent_faces_v183` in DB via Migration auf `true` setzen.
+3. Verifikation: eine neue Multi-Speaker-Szene rendern; Edge-Log muss `v183_silent_slots ENABLED speakers=N crops=K anchors=M` zeigen; im finalen MP4 bewegt nur der aktive Speaker den Mund.
+4. Rollback (falls Regression): eine SQL-Zeile — Flag auf `false`, kein Code-Revert nötig.
 
-**Rollback:** `UPDATE system_config SET value = 'false'::jsonb WHERE key = 'composer.silent_faces_v183';` — instant, kein Redeploy nötig.
+### Schritt B — Plate-Auflösung protokollieren & anheben
+1. In `compose-dialog-segments` beim Log-Marker `plateDims source=…` zusätzlich das genutzte Provider-Modell (Hailuo/Kling/Vidu) mit-loggen, damit wir für die konkrete matschige Szene den Provider bestätigen können.
+2. Wenn Ursache bestätigt Hailuo-720p ist: im Composer-Master-Clip-Rendering (nicht in dieser PR) den Default auf **1080p-Variante** heben oder pro Szene per Flag anheben. Reine Provider-Config-Änderung, kein neuer Code-Pfad in der Lipsync-Pipeline. **Diesen Teil erst nach Bestätigung durch Log der aktuell schlechten Szene umsetzen** — daher hier nur die Log-Erweiterung planen.
+3. Optional (kleine Verbesserung, unabhängig): Feather-Radius der Silent- und Active-Face-Overlays in `DialogStitchVideo.tsx` von aktuell radial-hart auf einen weicheren Falloff (z. B. `radial-gradient(… 65%, transparent 100%)`) — reduziert sichtbare Naht auf 720p um ~50 %, ohne die Pipeline zu ändern.
 
-## Fix B — Turn-2 Retry Diagnose
-
-Analyse der DB für Szene `1de5510b-9bc8-4ba3-b466-b2df31f1bbff`:
-
-**Dispatch-Timeline für Turn 2:**
-| t | Event |
-|---|---|
-| 22:38:36 | DISPATCH_ATTEMPT_STARTED (turn=2) |
-| 22:41:02 | DISPATCH_ATTEMPT_STARTED (turn=2, zweites Mal, +2:26) |
-| 22:41:10 | DISPATCHED http_status=201 |
-| 22:43:26 | DISPATCHED http_status=201 (drittes Mal, +2:16) |
-
-**Beobachtung:**
-Die erste `DISPATCH_ATTEMPT_STARTED` um 22:38:36 hatte KEINEN zugehörigen `DISPATCHED`-Eintrag. Das heißt: der Preclip-Render oder die HEAD-Probes vor dem Sync.so-POST sind fehlgeschlagen und der Dispatcher hat 2:26 später neu angesetzt. Dann kam eine erfolgreiche Sync.so-Antwort um 22:41:10 — und trotzdem ein weiterer Dispatch um 22:43:26. Das zweite Redispatch riecht nach `sync-so-webhook` Transient-Retry (Retry-Ladder), aber Edge-Logs sind bereits rotiert und `retry_history` wird auf dem Pass-Slot nicht persistiert.
-
-**Kosten dieses Retry-Musters:** ~4:30 min extra Wallclock (2:26 vor Dispatch 1, 2:16 zwischen Dispatch 1 und 2). Das erklärt fast exakt den Delta 16:31 vs. ~12 min erwartet.
-
-**Empfehlung — kein Blind-Fix:**
-Ohne reproduzierbaren Trigger oder Edge-Log-Snapshot kein sicherer Patch möglich. Als niedrig-hängende Frucht: **`retry_history` auf dem Pass-Slot persistieren** (in `sync-so-webhook` bei jedem Retry-Ladder-Wechsel append). Dann ist beim nächsten 16-min-Run sofort sichtbar, welcher Variant (`bbox-url-pro`, `coords-pro`, `sync3-coords`, …) welchen Fehler geworfen hat. Dieser Patch ist eigenständig, nicht Teil dieser PR.
-
-## Validierung Fix A
-
-Nach Bundle-Deploy + Flag ON:
-- Edge-Log: `v183_silent_slots ENABLED speakers=3 crops=3 anchors=3 fallback=0`
-- Finales MP4 einer Multi-Speaker-Szene: während des aktiven Sprecher-Fensters zeigen die anderen Gesichter das statische Portrait; **kein** Lip-Flap, **kein** Morph-Übergang.
-- Wenn ein Portrait fehlt: die betroffene Slot-Region wird durch eine dunkle Kachel bedeckt (immer noch besser als ein sprechender Nicht-Sprecher).
+### Schritt C — Forensik-Persistenz (aus letzter Runde, weiter offen)
+`retry_history[]` je Pass-Slot in `dialog_shots` schreiben (max. 8 FIFO-Einträge, geschrieben von `sync-so-webhook` bei Redispatch/Retry-Ladder-Wechsel). Keine Verhaltensänderung, nur Debug-Persistenz, damit wir künftige „warum 15 min" Fälle rekonstruieren können.
 
 ## Nicht angefasst
+- Sync.so-Payload-Contract, Retry-Ladder, Pricing, Refund-Logik.
+- v166 Anchor-Identity-Bridge, v168 Per-Pass-Locks, v169-A Stale-Reconcile.
+- v129.x Doc-Strict / sync-3 Forbidden-Fields.
+- `finalize-dialog-scene` Concat, pg_cron Watchdogs.
+- Hailuo Master-Plate Dauer / Anchor-Frame-Logik.
 
-- v141 State-Machine, v166 Anchor-ID Bridge, v167 Preclip Pre-Fanout, v168 Per-Pass Lock, v169-A Stale Reconcile, v188 Turn-Visibility Snap
-- Sync.so Payload-Contract, Retry-Ladder, Pricing, Refund-Logik
-- `COMPOSE_DIALOG_SEGMENTS_VERSION="v164"` String-Konstante
-- Fix C (Preclip parallel beschleunigen) — deferred bis Fix B Root Cause klar ist
+## Erfolgskriterien
+- **Neuer 4-Sprecher-Run**: im finalen MP4 bewegt nur der aktuell sprechende Speaker den Mund; Edge-Log zeigt `v183_silent_slots ENABLED`.
+- Preview-Bildqualität: `plateDims`-Log zeigt Provider + Auflösung; wenn 720p, entscheiden wir in einem Folgeschritt über 1080p-Provider-Default.
+- Wallclock unverändert (v183 ist reine Overlay-Änderung, keine zusätzlichen Provider-Calls).
+
+## Reihenfolge
+Schritt A zuerst (löst sichtbar „alle reden") → dann eine Test-Szene rendern → mit dem Log aus Schritt B entscheiden, ob Provider-Auflösung angehoben wird → Schritt C parallel als reine DB/Log-Erweiterung.
