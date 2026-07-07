@@ -1506,9 +1506,54 @@ This overrides any English wording in the briefing's scaffolding
         samples: passCStats.unresolvedSamples,
         version: CATALOG_VERSION,
       });
-    } catch (e: any) {
-      console.warn('[briefing-deep-parse] pass-C catalog resolver failed (non-fatal):', e?.message);
     }
+
+    // ── v202 — Cast & World ID-Registry: emit sceneAssets per scene ───────
+    // Derived from the already-resolved cast[].characterId +
+    // location.locationId. Enables the client applier to write
+    // composer_scenes.scene_assets at INSERT time (no JIT-backfill).
+    const UUID_ONLY = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+    const v202Stats = { total: 0, characters: 0, locations: 0, pending: 0 };
+    try {
+      for (const sc of plan.scenes ?? []) {
+        const refs: Array<{ type: string; id: string; variantId?: string | null; role?: string | null; displayName?: string | null }> = [];
+        const seenChar = new Set<string>();
+        for (const c of sc.cast ?? []) {
+          const raw = typeof c?.characterId === 'string' ? c.characterId : null;
+          if (!raw) { v202Stats.pending += 1; continue; }
+          const m = raw.match(UUID_ONLY);
+          const id = m ? m[0] : null;
+          if (!id || seenChar.has(id)) continue;
+          seenChar.add(id);
+          refs.push({
+            type: 'character',
+            id,
+            variantId: c?.outfitLookId ?? null,
+            displayName: c?.characterName ?? null,
+          });
+          v202Stats.characters += 1;
+        }
+        const rawLoc = typeof sc?.location?.locationId === 'string' ? sc.location.locationId : null;
+        if (rawLoc) {
+          const m = rawLoc.match(UUID_ONLY);
+          if (m) {
+            refs.push({ type: 'location', id: m[0], role: 'backdrop', displayName: sc.location.locationName ?? null });
+            v202Stats.locations += 1;
+          } else {
+            v202Stats.pending += 1;
+          }
+        }
+        (sc as any).sceneAssets = refs;
+        v202Stats.total += refs.length;
+      }
+      console.log('[briefing-deep-parse] v202_asset_registry_bound', {
+        scenes: plan.scenes?.length ?? 0,
+        ...v202Stats,
+      });
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] v202 sceneAssets emit failed (non-fatal):', e?.message);
+    }
+
 
     try {
       console.log('[briefing-deep-parse] plan summary', {
