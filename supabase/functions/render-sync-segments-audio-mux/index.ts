@@ -233,12 +233,12 @@ serve(async (req) => {
     const SHOT_PAD_END_SHORT = 0.08;
     const SHORT_TURN_THRESHOLD_SEC = 0.6;
 
-    // v193 — Listener mouth matte. This replaces the removed ghost-avatar
-    // overlay with a tiny plate-native freeze patch over ONLY non-speaking
-    // mouths. It never uses character portraits, so no avatar/face can appear
-    // over the plate; it only stops the raw AI plate mouths from visibly
-    // talking underneath the active Sync.so crop.
-    let listenerMouthMatteEnabled = isFanout;
+    // v197 — Listener mouth mattes are disabled by default. v193 patched
+    // non-speaking mouths inside active speaker windows, but that violates
+    // the v169 single-face-layer invariant and can read as a second face
+    // state over the plate. Keep the code only as an explicit diagnostic
+    // rollback path.
+    let listenerMouthMatteEnabled = false;
     try {
       const { data: matteRow } = await supabase
         .from("system_config")
@@ -247,10 +247,10 @@ serve(async (req) => {
         .maybeSingle();
       const raw = (matteRow as any)?.value;
       if (raw !== undefined && raw !== null) {
-        listenerMouthMatteEnabled = String(raw).toLowerCase() !== "false";
+        listenerMouthMatteEnabled = String(raw).toLowerCase() === "true";
       }
     } catch {
-      listenerMouthMatteEnabled = isFanout;
+      listenerMouthMatteEnabled = false;
     }
 
     // v195 — Silent-Face Freeze (professional). For every done pass we emit a
@@ -298,8 +298,12 @@ serve(async (req) => {
       silentFacesV183Enabled = false;
     }
 
-    // v195 silent-face freeze tiles — geometry-matched to the master plate.
-    type SilentFreeze = { x: number; y: number; size: number; speakerIdx: number };
+    // v197 silent-face freeze tiles — geometry-matched to the master plate,
+    // but rendered ONLY during this speaker's silent windows. v195 rendered
+    // tiles for the whole scene and relied on active Sync.so overlays covering
+    // them; any bbox mismatch resurrected face-layer competition/morphs.
+    type SilentFreezeWindow = { fromSec: number; toSec: number };
+    type SilentFreeze = { x: number; y: number; size: number; speakerIdx: number; windows: SilentFreezeWindow[] };
     const silentFaceFreezes: SilentFreeze[] = [];
     if (silentAnchorV195Enabled && useOverlay) {
       for (const p of donePasses as any[]) {
@@ -315,15 +319,42 @@ serve(async (req) => {
         ) {
           continue;
         }
+        const rawSegments = Array.isArray(p?.segments) ? p.segments : [];
+        const voicedWindows = rawSegments
+          .map((t: any) => {
+            const rawDur = Math.max(0, Number(t?.endTime) - Number(t?.startTime));
+            const tailPad = rawDur < SHORT_TURN_THRESHOLD_SEC ? SHOT_PAD_END_SHORT : SHOT_PAD_END_TIGHT;
+            const fromSec = Math.max(0, Number(t?.startTime) - SHOT_PAD_START);
+            const toSec = Math.min(totalSec, Number(t?.endTime) + tailPad);
+            return { fromSec, toSec };
+          })
+          .filter((w: SilentFreezeWindow) => Number.isFinite(w.fromSec) && Number.isFinite(w.toSec) && w.toSec > w.fromSec + 0.05)
+          .sort((a: SilentFreezeWindow, b: SilentFreezeWindow) => a.fromSec - b.fromSec);
+        const windows: SilentFreezeWindow[] = [];
+        let cursor = 0;
+        for (const w of voicedWindows) {
+          const fromSec = Math.max(0, Math.min(totalSec, Number(w.fromSec)));
+          const toSec = Math.max(fromSec, Math.min(totalSec, Number(w.toSec)));
+          if (fromSec > cursor + 0.08) {
+            windows.push({ fromSec: Number(cursor.toFixed(3)), toSec: Number(fromSec.toFixed(3)) });
+          }
+          cursor = Math.max(cursor, toSec);
+        }
+        if (cursor < totalSec - 0.08) {
+          windows.push({ fromSec: Number(cursor.toFixed(3)), toSec: Number(totalSec.toFixed(3)) });
+        }
+        if (windows.length === 0) continue;
         silentFaceFreezes.push({
           x: Number(pc.x),
           y: Number(pc.y),
           size: Number(pc.size),
           speakerIdx: sIdx,
+          windows,
         });
       }
+      const windowsTotal = silentFaceFreezes.reduce((sum, slot) => sum + slot.windows.length, 0);
       console.log(
-        `[render-sync-segments-audio-mux] scene=${sceneId} v195_silent_anchor slots=${silentFaceFreezes.length}/${donePasses.length} enabled=${silentAnchorV195Enabled} isFanout=${isFanout}`,
+        `[render-sync-segments-audio-mux] scene=${sceneId} v197_silent_windows slots=${silentFaceFreezes.length}/${donePasses.length} windows_total=${windowsTotal} enabled=${silentAnchorV195Enabled} isFanout=${isFanout}`,
       );
     }
 
