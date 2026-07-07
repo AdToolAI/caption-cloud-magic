@@ -320,6 +320,7 @@ serve(async (req) => {
           continue;
         }
         const rawSegments = Array.isArray(p?.segments) ? p.segments : [];
+        if (rawSegments.length === 0) continue;
         const voicedWindows = rawSegments
           .map((t: any) => {
             const rawDur = Math.max(0, Number(t?.endTime) - Number(t?.startTime));
