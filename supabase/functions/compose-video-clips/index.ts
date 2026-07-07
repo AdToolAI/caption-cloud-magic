@@ -37,6 +37,7 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 import {
+  ensureDialogTurnsForScene,
   fetchDialogTurnsForScenes,
   readIdOnlyEnabled,
   effectiveShotsFromTurns,
@@ -489,8 +490,10 @@ serve(async (req) => {
     // Fetch canonical dialog_turns for every scene up-front. When present,
     // the two speaker-resolution sites below skip name-based fuzzy matching
     // entirely and derive the visual cast from turn.characterId directly.
-    // Legacy scenes (empty dialog_turns) fall through to the old resolver.
-    // Feature-flag gated via `composer.feature.id_only_cast_resolution`.
+    // Legacy scenes with dialog + Cast IDs are now just-in-time backfilled;
+    // unresolved ID scenes fail before provider dispatch instead of falling
+    // back to name matching. Feature-flag gated via
+    // `composer.feature.id_only_cast_resolution`.
     const idOnlyEnabled = await readIdOnlyEnabled(supabaseAdmin);
     const dialogTurnsByScene: Map<string, DialogTurn[]> = idOnlyEnabled
       ? await fetchDialogTurnsForScenes(
@@ -498,6 +501,48 @@ serve(async (req) => {
           scenes.map((s) => s.id).filter(Boolean),
         )
       : new Map();
+    const hasDialogLinesForIdOnly = (scene: ClipScene) =>
+      String(scene.dialogScript ?? "")
+        .split(/\r?\n/)
+        .some((line) => /^\s*\[?[\p{L}][\p{L}\p{N}\s.'-]{0,60}?\]?\s*(?:[\u2014\u2013-]\s*[\p{L}\s]{1,32})?\s*(?:\[[^\]]{1,32}\])?\s*[:：]/u.test(line));
+    const hasUuidCastForIdOnly = (scene: ClipScene) => {
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const shots = [...(scene.characterShots ?? []), ...(scene.characterShot ? [scene.characterShot] : [])];
+      return shots.some((shot) => uuidRe.test(String((shot as any)?.characterId ?? "")));
+    };
+    if (idOnlyEnabled) {
+      for (const scene of scenes) {
+        if (!scene.id || dialogTurnsByScene.has(scene.id) || !hasDialogLinesForIdOnly(scene)) continue;
+        const result = await ensureDialogTurnsForScene(supabaseAdmin, {
+          id: scene.id,
+          dialog_script: scene.dialogScript,
+          character_shots: scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []),
+        });
+        if (result.ok) {
+          dialogTurnsByScene.set(scene.id, result.turns);
+          console.log(
+            `[compose-video-clips] v201_dialog_turns_jit_backfill scene=${scene.id} source=${result.source} turns=${result.turns.length}`,
+          );
+        } else if (hasUuidCastForIdOnly(scene)) {
+          console.error(
+            `[compose-video-clips] v201_id_only_required_block scene=${scene.id} reason=${result.reason} details=${JSON.stringify(result.details ?? {})}`,
+          );
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update(failedClipUpdate(true, `id_only_dialog_turns_required:${result.reason}`))
+            .eq("id", scene.id);
+          return new Response(
+            JSON.stringify({
+              error: "id_only_dialog_turns_required",
+              scene_id: scene.id,
+              reason: result.reason,
+              details: result.details ?? null,
+            }),
+            { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+    }
     if (idOnlyEnabled && dialogTurnsByScene.size > 0) {
       console.log(
         `[compose-video-clips] id-only cast resolution active for ${dialogTurnsByScene.size}/${scenes.length} scene(s) (canonical dialog_turns)`,

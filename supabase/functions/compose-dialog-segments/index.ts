@@ -102,6 +102,11 @@ import {
   buildAsdStrategy,
   type PreflightFaceResult,
 } from "../_shared/asd-strategy.ts";
+import {
+  ensureDialogTurnsForScene,
+  orderedSpeakerIdsFromTurns,
+  readIdOnlyEnabled,
+} from "../_shared/scene-dialog-turns.ts";
 import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 
@@ -128,7 +133,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v193";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v201-id-bbox";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -324,18 +329,11 @@ function buildPerFrameBoxes(params: {
   for (const [fs, fe] of windows) {
     for (let i = fs; i <= fe; i++) out[i] = params.box;
   }
-  // v186 — Sync.so's face-selection validator inspects the head (and tail) of
-  // the bounding_boxes array to confirm the selected face exists on the plate.
-  // A leading run of `null` (speaker's first turn starts mid-clip) trips
-  // `generation_input_face_selection_invalid` even though the speaker is
-  // visually present the whole time — they're just silent. Backfill leading
-  // and trailing nulls with the same static box; interior nulls (between
-  // turns) stay null so Sync.so doesn't animate this speaker during someone
-  // else's turn.
-  const firstVoicedFrame = windows[0][0];
-  for (let i = 0; i < firstVoicedFrame; i++) out[i] = params.box;
-  const lastVoicedFrame = windows[windows.length - 1][1];
-  for (let i = lastVoicedFrame + 1; i < out.length; i++) out[i] = params.box;
+  // v201 — strict turn-scoped boxes. Older builds backfilled leading/trailing
+  // silence with the target box to satisfy Sync.so's validator, but that let
+  // the provider reproject inactive faces outside the spoken turn. Keep every
+  // frame outside the voiced windows null; preclips shift most speaker windows
+  // to t=0 so this remains provider-safe while eliminating morph bleed.
   return out;
 }
 
@@ -729,7 +727,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url",
       )
       .eq("id", sceneId)
       .single();
@@ -846,6 +844,44 @@ serve(async (req) => {
     const speakers = (Array.isArray(twoshot.speakers) ? twoshot.speakers : []) as TwoshotSpeaker[];
     const masterAudioUrl = String(twoshot.url ?? "");
     const totalSec = Number(twoshot.totalSec ?? 0);
+    let canonicalDialogTurnsCount = 0;
+    let canonicalSpeakerIds: string[] = [];
+    let speakersSource = "audio_plan";
+
+    if (await readIdOnlyEnabled(supabase)) {
+      const ensuredTurns = await ensureDialogTurnsForScene(supabase, scene as any);
+      if (ensuredTurns.ok) {
+        canonicalDialogTurnsCount = ensuredTurns.turns.length;
+        canonicalSpeakerIds = orderedSpeakerIdsFromTurns(ensuredTurns.turns);
+        speakersSource = "dialog_turns";
+        console.log(
+          `[compose-dialog-segments] v201_id_only_cast scene=${sceneId} source=${ensuredTurns.source} turns=${canonicalDialogTurnsCount} cast=[${canonicalSpeakerIds.join(",")}]`,
+        );
+      } else if (ensuredTurns.reason !== "no_dialog_lines") {
+        const hasUuidSpeaker = speakers.some((sp: any) =>
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(sp?.character_id ?? "")),
+        );
+        const hasUuidShot = Array.isArray((scene as any).character_shots) &&
+          (scene as any).character_shots.some((shot: any) =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(shot?.characterId ?? shot?.character_id ?? "")),
+          );
+        if (hasUuidSpeaker || hasUuidShot) {
+          console.error(
+            `[compose-dialog-segments] v201_id_only_required_block scene=${sceneId} reason=${ensuredTurns.reason} details=${JSON.stringify(ensuredTurns.details ?? {})}`,
+          );
+          await supabase
+            .from("composer_scenes")
+            .update({
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
+              clip_error: `id_only_dialog_turns_required:${ensuredTurns.reason}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", sceneId);
+          return json({ error: "id_only_dialog_turns_required", reason: ensuredTurns.reason, details: ensuredTurns.details ?? null }, 422);
+        }
+      }
+    }
 
     if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {
       // v172 self-heal: NICHT als hartes failed markieren — der Audio-Prep
@@ -4129,30 +4165,14 @@ serve(async (req) => {
     const v153HasPlateBox =
       Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
       (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4;
-    // v199 — restore v169 per-speaker-preclip as PRIMARY path. The v153.2
-    // full-plate bbox-url-pro path caused (a) wrong-speaker lipsync when the
-    // bounding_boxes ordering didn't align 1:1 with pass.speaker_idx, and
-    // (b) residual full-frame face reprojection morphs on inactive speakers.
-    // Gate the entire v153 unified-bbox activation behind an env flag that
-    // defaults OFF. When OFF (v199 default), `_v153BboxPrimary` never gets
-    // set, `freshDefaultVariant` falls to `coords-pro`, and the existing
-    // per-speaker preclip pipeline (Rule 0, v131.2) handles dispatch — which
-    // is the v169-guide-canonical behaviour. Emergency rollback:
-    // FEATURE_V153_BBOX_PRIMARY=true env var flips back to legacy path.
-    const v199PreclipPrimaryEnabled =
-      (Deno.env.get("FEATURE_V153_BBOX_PRIMARY") ?? "false").toLowerCase() !== "true";
-    const v153UnifiedBboxEligible =
-      !v199PreclipPrimaryEnabled &&
-      body?.noop_auto_escalation !== true &&
-      speakers.length >= 1 &&
-      !!plateDims &&
-      Array.isArray(pass.coords) &&
-      Number.isFinite(Number(pass.coords?.[0])) &&
-      Number.isFinite(Number(pass.coords?.[1])) &&
-      v153HasPlateBox;
-    if (v199PreclipPrimaryEnabled && !isRetry) {
+    // v201 — block the historical v153 env backdoor completely. Bounding boxes
+    // remain canonical, but through the current per-pass bbox-url builder below
+    // (preferably clip-space on a single-speaker preclip), never via the old
+    // `_v153BboxPrimary` full-plate override toggled by FEATURE_V153_BBOX_PRIMARY.
+    const v153UnifiedBboxEligible = false;
+    if (!isRetry) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v199_preclip_coords_primary_active speakers=${speakers.length} — per-speaker preclip path (v169 §7.3 canonical), v153.2 bbox-primary DISABLED`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v201_legacy_v153_env_blocked speakers=${speakers.length} plate_box=${v153HasPlateBox} — canonical path is ID + sync-3 + bounding_boxes_url`,
       );
     }
     if (v153UnifiedBboxEligible) {
@@ -4331,15 +4351,9 @@ serve(async (req) => {
     // Speaker single-face Crop ist sicher und well-understood). Nur der
     // Full-Plate Multi-Speaker Pfad bekommt bbox-url-pro.
     void v120ForcePreclip;
-    // v199 — read same flag used above (env is idempotent). When v199
-    // preclip-primary is enabled (default), the v147 bbox-eligibility path
-    // is also disabled so freshDefaultVariant naturally falls to coords-pro,
-    // which combined with the preclip Rule 0 downstream produces a
-    // single-face preclip + frame_number+coords dispatch per the v169 guide.
-    const v199GateForFresh =
-      (Deno.env.get("FEATURE_V153_BBOX_PRIMARY") ?? "false").toLowerCase() !== "true";
+    // v201 — no env-controlled fallback. Fresh and retry dispatches use the
+    // bbox branch so the wire ASD is always bounding_boxes_url / bounding_boxes.
     const v147BboxEligible =
-      !v199GateForFresh &&
       speakers.length >= 2 &&
       havePlateIdentityForDispatch &&
       !!plateDims &&
@@ -4347,12 +4361,10 @@ serve(async (req) => {
     // v153 — Wenn der unified-bbox-Pfad aktiv ist, IMMER bbox-url-pro.
     // Kein Fallback auf coords-pro mehr im Live-Pfad.
     const v153Active = !!(pass as any)._v153BboxPrimary;
-    const freshDefaultVariant: RetryVariant = (v153Active || v147BboxEligible)
-      ? "bbox-url-pro"
-      : "coords-pro";
+    const freshDefaultVariant: RetryVariant = "bbox-url-pro";
     const noopAutoEscalation = body?.noop_auto_escalation === true;
     let retryVariant: RetryVariant = isRetry
-      ? (requestedRetryVariant ?? (prevState?.passes?.[currentPassIdx]?.retry_variant as RetryVariant | undefined) ?? "coords-pro")
+      ? ((requestedRetryVariant === "coords-pro-box" ? "coords-pro-box" : "bbox-url-pro") as RetryVariant)
       : freshDefaultVariant;
     // v153.2 — Bei aktivem unified-Pfad auch Advance/Retry auf bbox-url-pro zwingen.
     // Die NOOP-Ladder darf weiterhin explizite Diagnose-Varianten wählen.
@@ -4364,9 +4376,9 @@ serve(async (req) => {
       !noopAutoEscalation &&
       !isFreshBboxPrimary &&
       !v153Active &&
-      (retryVariant === "bbox-url-pro" || retryVariant === "coords-pro-box" || retryVariant === "auto-pro" || retryVariant === "auto-standard")
+      (retryVariant === "auto-pro" || retryVariant === "auto-standard" || retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro")
     ) {
-      retryVariant = "coords-pro";
+      retryVariant = "bbox-url-pro";
     }
     if (noopAutoEscalation) {
       console.log(
@@ -4883,13 +4895,7 @@ serve(async (req) => {
     // v153 setzt `_v153BboxPrimary` nur wenn `speakerPlateBboxes[idx]`
     // valide ist. Fehlt der Plate-Bbox UND wir haben tightAudio + coords,
     // muss die Szene neu gerendert werden — kein Silent-Fallback.
-    const v153BboxRequired =
-      speakers.length >= 1 &&
-      !!plateDims &&
-      Array.isArray(pass.coords) &&
-      Number.isFinite(Number(pass.coords?.[0])) &&
-      Number.isFinite(Number(pass.coords?.[1])) &&
-      !!tightAudioInfo;
+    const v153BboxRequired = false;
     if (v153BboxRequired && !(pass as any)._v153BboxPrimary) {
       const failReason = "v153_plate_bbox_required";
       console.error(
@@ -5296,7 +5302,7 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}`,
         );
-      } else if ((pass as any)._v152BboxPrimary) {
+      } else {
         // v152 — Hard-Fail statt Silent-Downgrade. Lieber sofort transparent
         // abbrechen + refunden + klare User-Message als 30 min später mit
         // einem stillen Pseudo-Lipsync zu enden.
@@ -5331,18 +5337,6 @@ serve(async (req) => {
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes_url: "deferred-v152-hard-fail",
-        };
-      } else {
-        // Legacy (non-v152) Pfad: bestehender silent downgrade auf coords-pro.
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_DOWNGRADE_TO_COORDS_PRO reason=${!usedUrl ? "upload_failed" : !v152BboxSane ? `geometry_insane_area=${(boxAreaPct * 100).toFixed(2)}` : "zero_voiced_frames"} non_null=${nonNullFrames}`,
-        );
-        retryVariant = "coords-pro";
-        pass.retry_variant = "coords-pro";
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          frame_number: referenceFrameNumber,
-          coordinates: clampSyncCoords(pass.coords),
         };
       }
 
@@ -5461,6 +5455,26 @@ serve(async (req) => {
       });
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
+
+    if (canonicalDialogTurnsCount > 0) {
+      const passCharacterId = String(pass.character_id ?? "").trim();
+      if (!passCharacterId || !canonicalSpeakerIds.includes(passCharacterId)) {
+        return await failBeforeProviderDispatch(
+          "id_only_character_id_missing_or_mismatched",
+          "id_only_cast_violation",
+          "Dialog lip-sync requires every Sync.so pass to carry a brand character UUID from dialog_turns; legacy name/slot fallback is blocked.",
+          422,
+          {
+            canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+            speakers_source: speakersSource,
+            dialog_turns_count: canonicalDialogTurnsCount,
+            canonical_speaker_ids: canonicalSpeakerIds,
+            pass_character_id: pass.character_id ?? null,
+            pass_idx: currentPassIdx,
+          },
+        );
+      }
+    }
 
     // ── v152 — Deferred Hard-Fail für bbox-url-pro Pre-Dispatch Errors ──
     // Die bbox-Construction oben setzt `_v152HardFail` wenn upload/geometry
@@ -6270,6 +6284,24 @@ serve(async (req) => {
           },
         );
       }
+      if ((canonicalAsd as any)?.auto_detect === false) {
+        const hasBoxes = !!(canonicalAsd as any)?.bounding_boxes_url || Array.isArray((canonicalAsd as any)?.bounding_boxes);
+        if (!hasBoxes) {
+          return await failBeforeProviderDispatch(
+            "v201_bbox_required",
+            "bbox_required",
+            "Dialog lip-sync dispatch is locked to sync-3 + bounding_boxes_url/bounding_boxes. Coordinate-only ASD is blocked to prevent speaker drift.",
+            500,
+            {
+              canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+              speakers_source: speakersSource,
+              dialog_turns_count: canonicalDialogTurnsCount,
+              final_asd: canonicalAsd,
+              retry_variant: retryVariant,
+            },
+          );
+        }
+      }
     } catch (canonErr) {
       return await failBeforeProviderDispatch(
         "DISPATCH_BLOCKED_V140_CANONICAL_ASD",
@@ -6662,6 +6694,19 @@ serve(async (req) => {
       meta: {
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+        canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+        speakers_source: speakersSource,
+        dialog_turns_count: canonicalDialogTurnsCount,
+        canonical_speaker_ids: canonicalSpeakerIds,
+        asd_mode: (payload.options as any)?.active_speaker_detection?.bounding_boxes_url
+          ? "bounding_boxes_url"
+          : Array.isArray((payload.options as any)?.active_speaker_detection?.bounding_boxes)
+            ? "bounding_boxes"
+            : (payload.options as any)?.active_speaker_detection?.coordinates
+              ? "coordinates"
+              : (payload.options as any)?.active_speaker_detection?.auto_detect
+                ? "auto_detect"
+                : "unknown",
         v131_5_final_override: (pass as any)._v131_5_final_override ?? null,
         diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,

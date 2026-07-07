@@ -1,6 +1,6 @@
 # Memory: index.md
 Updated: today
-- [v200 ID-Only Cast Resolution](mem://architecture/lipsync/v200-id-only-cast-resolution) — Backend uses composer_scenes.dialog_turns[].characterId as single source of truth; compose-video-clips + compose-twoshot-audio bypass name-based fuzzy matching; feature flag `composer.feature.id_only_cast_resolution` in system_config for rollback; scene_face_tracks table exists as Teil-B (face-lock) foundation but not yet consumed
+- [v201 Canonical ID + Bounding-Boxes Lipsync](mem://architecture/lipsync/v200-id-only-cast-resolution) — Backend JIT-backfills composer_scenes.dialog_turns[].characterId, blocks name fallback, pins Sync.so sync-3 to bounding_boxes_url/inline boxes, and ignores the old FEATURE_V153_BBOX_PRIMARY rollback path
 
 # Project Memory
 

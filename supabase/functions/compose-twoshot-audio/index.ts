@@ -23,6 +23,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import {
+  ensureDialogTurnsForScene,
   normalizeTurns,
   readIdOnlyEnabled,
   type DialogTurn,
@@ -562,7 +563,7 @@ serve(async (req) => {
     // Load scene + ownership
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, dialog_script, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status")
+      .select("id, project_id, dialog_script, dialog_turns, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status")
       .eq("id", scene_id)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
@@ -618,7 +619,36 @@ serve(async (req) => {
     // entirely — no fuzzy matching, no ambiguity between characters with
     // similar first names, no generic "SPRECHER 1" collision.
     const idOnlyOn = await readIdOnlyEnabled(supabase);
-    const rawTurns = normalizeTurns((scene as any).dialog_turns);
+    let rawTurns = normalizeTurns((scene as any).dialog_turns);
+    if (idOnlyOn && rawTurns.length === 0 && dialogScript.trim()) {
+      const ensured = await ensureDialogTurnsForScene(supabase, scene as any);
+      if (ensured.ok) {
+        rawTurns = ensured.turns;
+        console.log(
+          `[compose-twoshot-audio] v201_dialog_turns_jit_backfill scene=${scene_id} source=${ensured.source} turns=${rawTurns.length}`,
+        );
+      } else {
+        const hasUuidCast = Array.isArray((scene as any).character_shots) &&
+          (scene as any).character_shots.some((shot: any) =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(shot?.characterId ?? shot?.character_id ?? "")),
+          );
+        if (hasUuidCast) {
+          console.error(
+            `[compose-twoshot-audio] v201_id_only_required_block scene=${scene_id} reason=${ensured.reason} details=${JSON.stringify(ensured.details ?? {})}`,
+          );
+          await supabase
+            .from("composer_scenes")
+            .update({
+              twoshot_stage: "failed",
+              lip_sync_status: "failed",
+              clip_error: `id_only_dialog_turns_required:${ensured.reason}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene_id);
+          return json({ error: "id_only_dialog_turns_required", reason: ensured.reason, details: ensured.details ?? null }, 422);
+        }
+      }
+    }
     let idOnlyActive = false;
     let idOnlyNameById = new Map<string, string>();
     if (idOnlyOn && rawTurns.length > 0) {
@@ -634,12 +664,11 @@ serve(async (req) => {
       } catch (e) {
         console.warn("[compose-twoshot-audio] v200 turn name fetch failed:", (e as any)?.message);
       }
-      idOnlyActive = idOnlyNameById.size > 0;
+      idOnlyActive = rawTurns.length > 0;
     }
 
-    const blocks = idOnlyActive
-      ? (blocksFromDialogTurns(rawTurns, idOnlyNameById) ?? parseDialogScript(dialogScript))
-      : parseDialogScript(dialogScript);
+    const blocksFromTurns = idOnlyActive ? blocksFromDialogTurns(rawTurns, idOnlyNameById) : null;
+    const blocks = blocksFromTurns ?? parseDialogScript(dialogScript);
 
     if (idOnlyActive) {
       console.log(
