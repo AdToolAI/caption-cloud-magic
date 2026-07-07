@@ -5900,7 +5900,7 @@ serve(async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    const rawDispatchVideoUrl = usePassPreclip ? (passPreclipUrl as string) : passInputUrl;
+    const rawDispatchVideoUrl = speakers.length >= 2 ? passInputUrl : (usePassPreclip ? (passPreclipUrl as string) : passInputUrl);
     // v143 — Rehost the plate into our own bucket before sending to Sync.so.
     // Presigned Replicate/S3 URLs expire after ~60 min; multi-pass dialogs
     // routinely exceed that window, causing Sync.so to silently return 422
@@ -5912,7 +5912,7 @@ serve(async (req) => {
       const rh = await rehostPlate(supabase, rawDispatchVideoUrl, {
         sceneId,
         passIdx: currentPassIdx,
-        kind: usePassPreclip ? "preclip" : "fullplate",
+        kind: speakers.length >= 2 ? "fullplate" : (usePassPreclip ? "preclip" : "fullplate"),
         ownerId: (scene as any)?.user_id ?? (scene as any)?.owner_id ?? null,
       });
       dispatchVideoUrl = rh.url;
@@ -5963,12 +5963,17 @@ serve(async (req) => {
     // is OFF for N>=2 and the ASD shape is the one Sync.so docs require.
     const asdForProbe = (syncOptions as any).active_speaker_detection ?? null;
     const v105Probe = {
-      stage: usePassPreclip
-        ? "preclip-sync3-autodetect-v105"
-        : "fullplate-sync3-deterministic-v105",
+      stage: speakers.length >= 2
+        ? "v203-fullplate-sync3-bbox-only"
+        : usePassPreclip
+          ? "preclip-sync3-autodetect-v105"
+          : "fullplate-sync3-deterministic-v105",
       model_intent: "sync-3",
       payload_model: payloadModel,
-      dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+      dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
+      canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+      input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
+      preclip_used: speakers.length >= 2 ? false : usePassPreclip,
       retry_variant: retryVariant,
       asd_mode: asdForProbe?.auto_detect === true
         ? "auto_detect"
