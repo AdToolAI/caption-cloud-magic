@@ -28,14 +28,61 @@
 
 export type CastRef = {
   /** Base brand_characters.id. Never prefixed. */
-  characterId: string;
+  characterId: BaseCharacterId;
   /** Optional avatar_outfit_looks.id selection. */
-  outfitLookId?: string | null;
+  outfitLookId?: OutfitLookId | null;
   /** Human-facing label, e.g. "Samuel — Casual". */
   displayName: string;
   /** Optional ElevenLabs voice id. */
   voiceId?: string | null;
 };
+
+/**
+ * Branded ID types — pure TypeScript compile-time guards. No runtime cost.
+ * The compiler refuses to widen a plain `string` (which could still contain
+ * a legacy `"outfit:xxx"` prefix) into these types; the only sanctioned
+ * constructors are `asBaseCharacterId` / `asOutfitLookId` below, which
+ * validate before branding.
+ */
+export type BaseCharacterId = string & { readonly __brand: 'BaseCharacterId' };
+export type OutfitLookId = string & { readonly __brand: 'OutfitLookId' };
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Runtime-checked constructor for BaseCharacterId. Throws on prefixed input. */
+export function asBaseCharacterId(raw: string): BaseCharacterId {
+  if (typeof raw !== 'string' || raw.length === 0) {
+    throw new Error(`asBaseCharacterId: empty input`);
+  }
+  if (/^(outfit|catalog|lib):/.test(raw)) {
+    throw new Error(
+      `asBaseCharacterId: prefixed id "${raw}" is not a base brand_characters.id. ` +
+        `Use mentionToCastRef() or resolveCharacterId(map) to normalize first.`,
+    );
+  }
+  if (!UUID_RE.test(raw)) {
+    throw new Error(`asBaseCharacterId: "${raw}" is not a UUID`);
+  }
+  return raw as BaseCharacterId;
+}
+
+/** Non-throwing variant; returns null when input is invalid. */
+export function tryAsBaseCharacterId(raw: string | null | undefined): BaseCharacterId | null {
+  if (!raw || typeof raw !== 'string') return null;
+  if (/^(outfit|catalog|lib):/.test(raw)) return null;
+  if (!UUID_RE.test(raw)) return null;
+  return raw as BaseCharacterId;
+}
+
+/** Runtime-checked constructor for OutfitLookId. */
+export function asOutfitLookId(raw: string): OutfitLookId {
+  if (typeof raw !== 'string' || !UUID_RE.test(raw)) {
+    throw new Error(`asOutfitLookId: "${raw}" is not a UUID`);
+  }
+  return raw as OutfitLookId;
+}
+
 
 /** Type guard. */
 export function isCastRef(v: unknown): v is CastRef {
