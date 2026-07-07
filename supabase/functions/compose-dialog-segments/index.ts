@@ -5524,7 +5524,7 @@ serve(async (req) => {
           "Dialog lip-sync requires every Sync.so pass to carry a brand character UUID from dialog_turns; legacy name/slot fallback is blocked.",
           422,
           {
-            canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
             speakers_source: speakersSource,
             dialog_turns_count: canonicalDialogTurnsCount,
             canonical_speaker_ids: canonicalSpeakerIds,
@@ -6367,7 +6367,7 @@ serve(async (req) => {
             "Dialog lip-sync dispatch is locked to sync-3 + bounding_boxes_url/bounding_boxes. Coordinate-only ASD is blocked to prevent speaker drift.",
             500,
             {
-              canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+              canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
               speakers_source: speakersSource,
               dialog_turns_count: canonicalDialogTurnsCount,
               final_asd: canonicalAsd,
