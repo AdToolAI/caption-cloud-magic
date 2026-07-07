@@ -296,10 +296,10 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // v196: hard face-disc mask — solid disc with a 1px AA band. No feather
-  // ring, so no alpha-blend of Sync.so lipsynced face + live plate face
-  // (root cause of "morph while speaking").
-  const outer = Math.max(4, Math.round(radiusPx));
+  // v198: enlarged hard disc (×1.6 radius) so the mask edge lands in hair/
+  // background where Sync.so output and live plate match, not on cheek/jaw
+  // skin where they differ slightly (residual seam-morph fix).
+  const outer = Math.max(4, Math.round(radiusPx * 1.6));
   const inner = Math.max(2, outer - 1);
   const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0) ${outer}px)`;
   return (
