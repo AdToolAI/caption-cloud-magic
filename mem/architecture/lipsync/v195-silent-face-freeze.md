@@ -53,3 +53,20 @@ Every face overlay in `DialogStitchVideo.tsx` (`FaceCropShot`, `FaceMaskOverlay`
 Fix: hardened every overlay mask to a solid disc/ellipse with only a 1% anti-alias band (e.g. `#000 0% → #000 47% → transparent 48%`). Pixels are either fully Sync.so or fully live plate — no cross-fade zone can exist. Geometry, positioning, ordering, timing, and the entire compose/dispatch pipeline are unchanged.
 
 Grep tag: `v196` in `DialogStitchVideo.tsx`.
+
+---
+
+## v197 addendum — silent windows + v169 layer invariant (July 7 2026)
+
+Symptom after v196: morphs could still appear even with hard masks. The screenshot showed visible rectangular/face zones, especially on the right speaker. Root cause: v195 rendered every `silentFaceFreezes[]` tile for the full scene and v193 inserted listener `mouthMattes` inside active speaker windows. That violates the clean v169 compositor invariant: while a speaker is talking, only one face-state layer should cover that face — the Sync.so lipsync output.
+
+Why v169 did not show these morphs: v169 had no silent-speaker stabilizer passes in the render path and no full-scene freeze/portrait tiles. It therefore avoided layer competition, at the cost of allowing raw AI plate idle mouth motion before/after scripts.
+
+Fix in v197:
+- `render-sync-segments-audio-mux` computes `silentFaceFreezes[].windows` from each speaker's own voiced segments: head silence, inter-turn gaps, and tail silence only.
+- `DialogStitchVideo` wraps each `SilentFaceFreeze` in per-window `<Sequence>` blocks. Freeze tiles are never mounted during voiced speaker windows.
+- `composer.listener_mouth_matte_v193` is now opt-in only (`true`). Default is off because mouth mattes inside active windows can introduce a second face/mouth state.
+
+Grep tag: `v197_silent_windows` in `render-sync-segments-audio-mux`.
+
+Invariant (FROZEN): active speech windows must contain only the Sync.so lipsync face layer over the master plate; silent-freeze layers may exist only outside that speaker's voiced windows.
