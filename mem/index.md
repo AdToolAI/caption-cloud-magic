@@ -1,6 +1,7 @@
 # Memory: index.md
 Updated: today
 - [v201 Canonical ID + Bounding-Boxes Lipsync](mem://architecture/lipsync/v200-id-only-cast-resolution) — Backend JIT-backfills composer_scenes.dialog_turns[].characterId, blocks name fallback, pins Sync.so sync-3 to bounding_boxes_url/inline boxes, and ignores the old FEATURE_V153_BBOX_PRIMARY rollback path
+- [v202 Cast & World ID Registry](mem://architecture/video-composer/v202-asset-registry) — composer_scenes.scene_assets jsonb (AssetRef[]) as canonical ID bridge across Composer/Motion Studio/Briefing; JIT backfill in compose-video-clips, feature flag `composer.feature.scene_assets_required`
 
 # Project Memory
 
