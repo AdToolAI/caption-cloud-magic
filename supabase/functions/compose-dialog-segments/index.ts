@@ -5187,21 +5187,7 @@ serve(async (req) => {
         | { x: number; y: number; size: number; outputSize: number }
         | undefined : undefined;
       const v161UsingPreclipForBbox = usePassPreclip && !!passPreclipUrl && !!v161PreclipCrop;
-      if (speakers.length >= 2 && v161UsingPreclipForBbox) {
-        (pass as any)._v152HardFail = {
-          reason: "v203_preclip_forbidden_multi_speaker",
-          errorClass: "v203_preclip_forbidden",
-          message:
-            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
-            "Multi-Speaker darf nur noch über Full-Plate bounding_boxes_url laufen. Credits wurden zurückerstattet.",
-          meta: {
-            canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only",
-            preclip_used: true,
-            input_space: "preclip",
-            speakers: speakers.length,
-          },
-        };
-      }
+      // v204 — Preclip is the canonical multi-speaker path again. No hard-fail here.
       const probeUrlForBbox = v161UsingPreclipForBbox ? (passPreclipUrl as string) : passInputUrl;
       const v161PreclipStartSec = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_start_sec ?? 0)
