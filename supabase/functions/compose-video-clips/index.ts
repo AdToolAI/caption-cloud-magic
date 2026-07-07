@@ -485,6 +485,60 @@ serve(async (req) => {
       );
     }
 
+    // ID-Only Cast Resolution ------------------------------------------------
+    // Fetch canonical dialog_turns for every scene up-front. When present,
+    // the two speaker-resolution sites below skip name-based fuzzy matching
+    // entirely and derive the visual cast from turn.characterId directly.
+    // Legacy scenes (empty dialog_turns) fall through to the old resolver.
+    // Feature-flag gated via `composer.feature.id_only_cast_resolution`.
+    const idOnlyEnabled = await readIdOnlyEnabled(supabaseAdmin);
+    const dialogTurnsByScene: Map<string, DialogTurn[]> = idOnlyEnabled
+      ? await fetchDialogTurnsForScenes(
+          supabaseAdmin,
+          scenes.map((s) => s.id).filter(Boolean),
+        )
+      : new Map();
+    if (idOnlyEnabled && dialogTurnsByScene.size > 0) {
+      console.log(
+        `[compose-video-clips] id-only cast resolution active for ${dialogTurnsByScene.size}/${scenes.length} scene(s) (canonical dialog_turns)`,
+      );
+      // Hydrate any character referenced by turns that isn't yet in charById
+      // (e.g. legacy scene where the frontend didn't include the character in
+      // the request payload but the turns row already carries the UUID).
+      const missingFromTurns = new Set<string>();
+      for (const turns of dialogTurnsByScene.values()) {
+        for (const t of turns) {
+          if (t.characterId && !charById.has(t.characterId)) {
+            missingFromTurns.add(t.characterId);
+          }
+        }
+      }
+      if (missingFromTurns.size > 0) {
+        try {
+          const { data: rows } = await supabaseAdmin
+            .from("brand_characters")
+            .select("id, name, reference_image_url")
+            .in("id", Array.from(missingFromTurns));
+          for (const row of rows ?? []) {
+            const id = String((row as any).id);
+            if (id && !charById.has(id)) {
+              charById.set(id, {
+                id,
+                name: String((row as any).name ?? ""),
+                referenceImageUrl: (row as any).reference_image_url ?? undefined,
+              } as ComposerCharacter);
+            }
+          }
+        } catch (turnHydrateErr) {
+          console.warn(
+            "[compose-video-clips] dialog_turns character hydration failed:",
+            turnHydrateErr,
+          );
+        }
+      }
+    }
+
+
     /**
      * Strip spoken-dialog patterns from a scene prompt BEFORE handing it to
      * the image anchor renderer. Mirrors `compose-scene-anchor`'s server-side
