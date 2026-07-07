@@ -4129,7 +4129,20 @@ serve(async (req) => {
     const v153HasPlateBox =
       Array.isArray(speakerPlateBboxes?.[pass.speaker_idx]) &&
       (speakerPlateBboxes![pass.speaker_idx] as any[]).length === 4;
+    // v199 — restore v169 per-speaker-preclip as PRIMARY path. The v153.2
+    // full-plate bbox-url-pro path caused (a) wrong-speaker lipsync when the
+    // bounding_boxes ordering didn't align 1:1 with pass.speaker_idx, and
+    // (b) residual full-frame face reprojection morphs on inactive speakers.
+    // Gate the entire v153 unified-bbox activation behind an env flag that
+    // defaults OFF. When OFF (v199 default), `_v153BboxPrimary` never gets
+    // set, `freshDefaultVariant` falls to `coords-pro`, and the existing
+    // per-speaker preclip pipeline (Rule 0, v131.2) handles dispatch — which
+    // is the v169-guide-canonical behaviour. Emergency rollback:
+    // FEATURE_V153_BBOX_PRIMARY=true env var flips back to legacy path.
+    const v199PreclipPrimaryEnabled =
+      (Deno.env.get("FEATURE_V153_BBOX_PRIMARY") ?? "false").toLowerCase() !== "true";
     const v153UnifiedBboxEligible =
+      !v199PreclipPrimaryEnabled &&
       body?.noop_auto_escalation !== true &&
       speakers.length >= 1 &&
       !!plateDims &&
@@ -4137,6 +4150,11 @@ serve(async (req) => {
       Number.isFinite(Number(pass.coords?.[0])) &&
       Number.isFinite(Number(pass.coords?.[1])) &&
       v153HasPlateBox;
+    if (v199PreclipPrimaryEnabled && !isRetry) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v199_preclip_coords_primary_active speakers=${speakers.length} — per-speaker preclip path (v169 §7.3 canonical), v153.2 bbox-primary DISABLED`,
+      );
+    }
     if (v153UnifiedBboxEligible) {
       (pass as any).preclip_url = null;
       (pass as any).preclip_render_id = null;
@@ -4313,7 +4331,15 @@ serve(async (req) => {
     // Speaker single-face Crop ist sicher und well-understood). Nur der
     // Full-Plate Multi-Speaker Pfad bekommt bbox-url-pro.
     void v120ForcePreclip;
+    // v199 — read same flag used above (env is idempotent). When v199
+    // preclip-primary is enabled (default), the v147 bbox-eligibility path
+    // is also disabled so freshDefaultVariant naturally falls to coords-pro,
+    // which combined with the preclip Rule 0 downstream produces a
+    // single-face preclip + frame_number+coords dispatch per the v169 guide.
+    const v199GateForFresh =
+      (Deno.env.get("FEATURE_V153_BBOX_PRIMARY") ?? "false").toLowerCase() !== "true";
     const v147BboxEligible =
+      !v199GateForFresh &&
       speakers.length >= 2 &&
       havePlateIdentityForDispatch &&
       !!plateDims &&
