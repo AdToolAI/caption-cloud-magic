@@ -44,6 +44,14 @@ as authoritative. NO name parsing, NO fuzzy match.
   before Sync.so dispatch for dialog passes. Dispatch metadata includes
   `canonical_lipsync_pipeline='v201_id_bbox_sync3'`, `speakers_source`,
   `dialog_turns_count`, `canonical_speaker_ids`, and `asd_mode`.
+- **DONE (v203)**: Multi-speaker dispatch is now **full-plate only**. Cached
+  or freshly rendered per-pass preclips are ignored for N≥2; Sync.so receives
+  the master plate, `model='sync-3'`, and `active_speaker_detection` with
+  `bounding_boxes_url` built from plate-native boxes. Crop-space bbox,
+  preclip overlay dispatch, NOOP escalation, coordinate ASD, auto-detect, and
+  lipsync-2/lipsync-2-pro fallbacks are blocked for N≥2. Dispatch metadata uses
+  `canonical_lipsync_pipeline='v203_fullplate_sync3_bbox_only'`,
+  `input_space='plate'`, and `preclip_used=false`.
 - **NOT DONE (Teil B — Face-Lock)**: `track-scene-faces` edge function,
   `pass-face-preclip` trajectory-aware crop, DialogStitchVideo track-aware
   mask center. Feature flag `composer.feature.face_track_preclip=false`
@@ -57,7 +65,9 @@ instead of silently using names.
 ## Validation
 - 3-speaker test scene: `syncso_dispatch_log` should show correct
   `character_id` per pass, `speakers_source=dialog_turns`,
-  `asd_mode=bounding_boxes_url`, and `model=sync-3`.
+  `canonical_lipsync_pipeline=v203_fullplate_sync3_bbox_only`,
+  `input_space=plate`, `preclip_used=false`, `asd_mode=bounding_boxes_url`,
+  and `model=sync-3`.
 - The old v153 env rollback is intentionally blocked; do not re-enable
   `FEATURE_V153_BBOX_PRIMARY`.
 
