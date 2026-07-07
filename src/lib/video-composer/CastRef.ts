@@ -27,15 +27,19 @@
  */
 
 export type CastRef = {
-  /** Base brand_characters.id. Never prefixed. */
-  characterId: BaseCharacterId;
+  /** Base brand_characters.id. Never prefixed. Kept as `string` for
+   *  compatibility with the many existing call sites; use
+   *  `asBaseCharacterId()` / `tryAsBaseCharacterId()` at trust boundaries
+   *  (DB reads, external inputs) to enforce the invariant. */
+  characterId: string;
   /** Optional avatar_outfit_looks.id selection. */
-  outfitLookId?: OutfitLookId | null;
+  outfitLookId?: string | null;
   /** Human-facing label, e.g. "Samuel — Casual". */
   displayName: string;
   /** Optional ElevenLabs voice id. */
   voiceId?: string | null;
 };
+
 
 /**
  * Branded ID types — pure TypeScript compile-time guards. No runtime cost.
