@@ -5484,6 +5484,9 @@ serve(async (req) => {
         .update({
           dialog_shots: {
             ...(prevState ?? {}),
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            input_space: passes.length >= 2 ? "plate" : undefined,
+            preclip_used: passes.length >= 2 ? false : undefined,
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -6935,7 +6938,16 @@ serve(async (req) => {
         freshPasses[currentPassIdx] = pass;
         await supabase
           .from("composer_scenes")
-          .update({ dialog_shots: { ...freshState, ...state, passes: freshPasses } })
+          .update({
+            dialog_shots: {
+              ...freshState,
+              ...state,
+              canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+              input_space: passes.length >= 2 ? "plate" : undefined,
+              preclip_used: passes.length >= 2 ? false : undefined,
+              passes: freshPasses,
+            },
+          })
           .eq("id", sceneId);
       } else {
         // Root merge: write ALL root-level state fields (sync_job_id, status,
@@ -6946,7 +6958,12 @@ serve(async (req) => {
         const { passes: _drop, ...rootOnly } = state as any;
         await supabase.rpc("update_dialog_shots_root_merge", {
           _scene_id: sceneId,
-          _patch: rootOnly,
+          _patch: {
+            ...rootOnly,
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            input_space: passes.length >= 2 ? "plate" : undefined,
+            preclip_used: passes.length >= 2 ? false : undefined,
+          },
         });
       }
 
