@@ -354,9 +354,9 @@ const SilentFaceAnchor: React.FC<SilentFaceAnchorProps> = ({
   scaleX,
   scaleY,
 }) => {
-  // v196: hard face-disc mask (no feather blend zone).
+  // v198: enlarged hard disc so seam lands beyond skin.
   const mask =
-    'radial-gradient(circle at center, #000 0%, #000 47%, rgba(0,0,0,0) 48%)';
+    'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0) 56%)';
   const left = srcX * scaleX;
   const top = srcY * scaleY;
   const w = srcSize * scaleX;
