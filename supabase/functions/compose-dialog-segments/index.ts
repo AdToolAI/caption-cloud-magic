@@ -5997,15 +5997,7 @@ serve(async (req) => {
       );
     }
 
-    if (speakers.length >= 2 && usePassPreclip) {
-      return await failBeforeProviderDispatch(
-        "v203_preclip_wire_blocked",
-        "v203_preclip_forbidden",
-        "Refusing to dispatch a multi-speaker dialog pass through a preclip; v203 requires full-plate sync-3 + bounding_boxes_url.",
-        500,
-        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only", input_space: "preclip" },
-      );
-    }
+    // v204 — Preclip wire is the canonical multi-speaker path (rolled back v203 block).
 
     // v129.1 — Payload-Contract Preflight (DISPATCH_BLOCKED_PAYLOAD_PRECHECK).
     // Refuses to call Sync.so when a Multi-Speaker preclip pass would either:
