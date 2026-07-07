@@ -128,7 +128,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v192";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v193";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -523,7 +523,7 @@ interface PassState {
   reference_frame_number?: number;
   face_repair?: Record<string, unknown>;
   output_url?: string;
-  status: "pending" | "rendering" | "done" | "failed";
+  status: "pending" | "rendering_preflight" | "rendering" | "done" | "failed";
   started_at?: string;
   finished_at?: string;
   error?: string;
@@ -702,7 +702,11 @@ serve(async (req) => {
       const holder = `compose-dialog-segments-${crypto.randomUUID()}`;
       const { data: acquired, error: lockErr } = await supabase.rpc(
         "try_acquire_dialog_lock",
-        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 120, _pass_idx: earlyPassIdx },
+        // v193 — preclip + provider preflight can legitimately exceed the old
+        // 120s TTL. When it expired mid-flight, a webhook advance could acquire
+        // the same pass lock and dispatch a duplicate Sync.so job. Keep stale
+        // recovery possible, but long enough for one pass preflight.
+        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 420, _pass_idx: earlyPassIdx },
       );
       if (lockErr) {
         console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${earlyPassIdx} lock rpc error: ${lockErr.message} — proceeding without lock`);
@@ -3052,6 +3056,7 @@ serve(async (req) => {
         v137_mapping: {
           coord_source: coordSources[originalIdx] ?? "unknown",
           plate_bbox: speakerPlateBboxes[originalIdx] ?? null,
+            plate_mouth: speakerPlateMouths[originalIdx] ?? null,
           plate_face_count: plateIdentityMap?.faces?.length ?? null,
           plate_identity_resolved: plateIdentityMap?.resolvedCount ?? null,
           plate_identity_method: (plateIdentityMap as any)?.identityMethod ?? null,
@@ -3548,7 +3553,20 @@ serve(async (req) => {
         } catch { /* best-effort */ }
         return json({ ok: true, skipped: "no_pass_at_cursor", pass_idx: currentPassIdx, have: passes.length }, 200);
       }
-      if (passes[currentPassIdx].status === "done" || passes[currentPassIdx].status === "rendering") {
+      const candidatePass: any = passes[currentPassIdx];
+      const candidateStatus = String(candidatePass?.status ?? "");
+      const candidateHasJob = typeof candidatePass?.job_id === "string" && candidatePass.job_id.length > 0;
+      const candidatePreflightStarted = candidatePass?.preflight_started_at
+        ? Date.parse(String(candidatePass.preflight_started_at))
+        : NaN;
+      const candidatePreflightFresh = Number.isFinite(candidatePreflightStarted)
+        ? Date.now() - candidatePreflightStarted < 10 * 60_000
+        : true;
+      if (
+        candidateStatus === "done" ||
+        (candidateStatus === "rendering" && candidateHasJob) ||
+        (candidateStatus === "rendering_preflight" && candidatePreflightFresh)
+      ) {
         return json({ ok: true, skipped: `pass_${currentPassIdx}_already_${passes[currentPassIdx].status}` }, 200);
       }
     } else if (isRetry && prevState?.passes && typeof prevState.current_pass === "number") {
@@ -3699,6 +3717,198 @@ serve(async (req) => {
 
 
     const pass = passes[currentPassIdx];
+
+    // ── v193 — Pass-level dedupe/claim before expensive preflight ────────
+    // The Plan-D fanout and webhook advance can race when a sibling pass is
+    // still rendering its preclip and has no provider job_id yet. Persist a
+    // lightweight `rendering_preflight` claim before Lambda/Sync.so work; any
+    // second invocation for the same pass now short-circuits instead of
+    // dispatching a duplicate provider job.
+    {
+      const { data: freshClaimRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const freshClaimState: any = (freshClaimRow as any)?.dialog_shots ?? null;
+      const freshClaimPasses: any[] = Array.isArray(freshClaimState?.passes) ? freshClaimState.passes : [];
+      const livePass = freshClaimPasses[currentPassIdx] ?? null;
+      const liveStatus = String(livePass?.status ?? "");
+      const liveHasJob = typeof livePass?.job_id === "string" && livePass.job_id.length > 0;
+      const preflightStartedMs = livePass?.preflight_started_at
+        ? Date.parse(String(livePass.preflight_started_at))
+        : NaN;
+      const preflightAgeMs = Number.isFinite(preflightStartedMs)
+        ? Date.now() - preflightStartedMs
+        : Number.POSITIVE_INFINITY;
+      const freshUserRetry = body?.user_retry_flag === true || body?.noop_auto_escalation === true;
+      const duplicateActivePass =
+        !freshUserRetry &&
+        (
+          liveStatus === "done" ||
+          (liveStatus === "rendering" && liveHasJob) ||
+          (liveStatus === "rendering_preflight" && preflightAgeMs < 10 * 60_000)
+        );
+      if (duplicateActivePass) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v193_pass_claim_skip_existing status=${liveStatus} job=${livePass?.job_id ?? "none"} age_ms=${Number.isFinite(preflightAgeMs) ? Math.round(preflightAgeMs) : "n/a"}`,
+        );
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId,
+            engine: "sync-segments",
+            sync_status: "PASS_DEDUPE_SKIPPED",
+            error_class: "v193_pass_already_active",
+            meta: {
+              compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+              pass_idx: currentPassIdx,
+              live_status: liveStatus,
+              live_job_id: livePass?.job_id ?? null,
+              preflight_age_ms: Number.isFinite(preflightAgeMs) ? Math.round(preflightAgeMs) : null,
+              is_advance: isAdvance,
+              is_retry: isRetry,
+            },
+          });
+        } catch { /* best-effort */ }
+        return json({ ok: true, skipped: "v193_pass_already_active", pass_idx: currentPassIdx, status: liveStatus }, 202);
+      }
+      try {
+        await supabase.rpc("update_dialog_pass_slot", {
+          _scene_id: sceneId,
+          _pass_idx: currentPassIdx,
+          _patch: {
+            status: "rendering_preflight",
+            preflight_started_at: new Date().toISOString(),
+            preflight_claim_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+          },
+        });
+      } catch (claimErr) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v193_pass_claim_failed: ${(claimErr as Error)?.message ?? claimErr}`,
+        );
+      }
+      (pass as any).preflight_started_at = new Date().toISOString();
+      pass.status = "rendering_preflight";
+    }
+
+    // ── v193 — Batch preclip all sibling passes immediately ──────────────
+    // v192 only prefetched passes beyond the Sync.so concurrency cap. With cap=4
+    // that meant no prefetch at all for normal 4-speaker scenes; each fanout
+    // invocation still spent ~60–120s rendering its own preclip. Start sibling
+    // preclips as a background task as soon as pass 0 has claimed the scene,
+    // while pass 0 continues its own preclip + Sync.so dispatch.
+    if (!isAdvance && !isRetry && currentPassIdx === 0 && passes.length > 1 && plateDims && sourceClipUrl) {
+      let batchPreclipEnabled = true;
+      try {
+        const { data: batchFlag } = await supabase
+          .from("system_config")
+          .select("value")
+          .eq("key", "composer.batch_preclip_render")
+          .maybeSingle();
+        const raw = (batchFlag as any)?.value;
+        if (raw !== undefined && raw !== null) {
+          batchPreclipEnabled = String(raw).toLowerCase() !== "false";
+        }
+      } catch {
+        batchPreclipEnabled = true;
+      }
+
+      if (batchPreclipEnabled) {
+        const siblingIdxs = passes
+          .map((p, i) => ({ p, i }))
+          .filter(({ p, i }) =>
+            i > 0 &&
+            !(p as any)?.preclip_url &&
+            Array.isArray(p?.coords) &&
+            Number.isFinite(Number(p.coords?.[0])) &&
+            Number.isFinite(Number(p.coords?.[1])) &&
+            Array.isArray(p?.segments) &&
+            p.segments.length > 0,
+          )
+          .map(({ i }) => i);
+
+        if (siblingIdxs.length > 0) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v193_batch_preclip_all_start passes=${siblingIdxs.map((i) => i + 1).join(",")} total=${passes.length}`,
+          );
+          try {
+            EdgeRuntime.waitUntil((async () => {
+              const results = await Promise.allSettled(siblingIdxs.map(async (idx) => {
+                const bp = passes[idx] as any;
+                const bpWindows: Array<[number, number]> = (Array.isArray(bp.segments) ? bp.segments : [])
+                  .map((s: any) => [Number(s.startTime), Number(s.endTime)] as [number, number])
+                  .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && e > s);
+                if (bpWindows.length === 0) return { idx, status: "skip_no_windows" };
+                const unionStart = Math.max(0, Math.min(...bpWindows.map(([s]) => s)));
+                const unionEnd = Math.min(totalSec, Math.max(...bpWindows.map(([, e]) => e)));
+                const siblingCoords: Array<[number, number]> = passes
+                  .filter((other: any) => other?.speaker_idx !== bp.speaker_idx && Array.isArray(other?.coords))
+                  .map((other: any) => [Number(other.coords[0]), Number(other.coords[1])] as [number, number])
+                  .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+                const result = await renderPassFacePreclip(
+                  supabase,
+                  serviceKey,
+                  supabaseUrl,
+                  {
+                    sceneId,
+                    projectId: String((scene as any).project_id ?? ""),
+                    userId,
+                    passIdx: idx,
+                    masterVideoUrl: sourceClipUrl,
+                    srcWidth: plateDims.width,
+                    srcHeight: plateDims.height,
+                    coords: [Number(bp.coords[0]), Number(bp.coords[1])],
+                    bbox: speakerPlateBboxes?.[bp.speaker_idx] ?? null,
+                    siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
+                    startSec: unionStart,
+                    endSec: unionEnd,
+                  },
+                  300_000,
+                );
+                if (!result.ok || !result.preclipUrl || !result.crop) {
+                  return { idx, status: "failed", error: result.error ?? "preclip_unknown" };
+                }
+                await supabase.rpc("update_dialog_pass_slot", {
+                  _scene_id: sceneId,
+                  _pass_idx: idx,
+                  _patch: {
+                    preclip_url: result.preclipUrl,
+                    preclip_render_id: result.preclipRenderId ?? null,
+                    preclip_crop: {
+                      x: result.crop.x,
+                      y: result.crop.y,
+                      size: result.crop.size,
+                      outputSize: result.crop.outputSize,
+                    },
+                    preclip_start_sec: Number(unionStart.toFixed(3)),
+                    preclip_end_sec: Number(unionEnd.toFixed(3)),
+                    preclip_fps: Number(result.fps ?? 30),
+                    preclip_frame_count: Number.isFinite(Number(result.frameCount)) && Number(result.frameCount) > 0
+                      ? Math.max(1, Math.round(Number(result.frameCount)))
+                      : Math.max(1, Math.ceil((result.durationSec ?? Math.max(0.2, unionEnd - unionStart)) * Number(result.fps ?? 30))),
+                    preclip_duration_sec: Number((result.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3)),
+                    preclip_error: null,
+                    preclip_prefetched_at: new Date().toISOString(),
+                  },
+                });
+                return { idx, status: "ok" };
+              }));
+              const summary = results.map((r, n) => {
+                const idx = siblingIdxs[n] + 1;
+                return r.status === "fulfilled"
+                  ? `${idx}:${(r.value as any).status}`
+                  : `${idx}:threw`;
+              });
+              console.log(`[compose-dialog-segments] scene=${sceneId} v193_batch_preclip_all_done results=${summary.join(",")}`);
+            })());
+          } catch (err) {
+            console.warn(`[compose-dialog-segments] scene=${sceneId} v193_batch_preclip_all_setup_failed: ${(err as Error)?.message ?? err}`);
+          }
+        }
+      }
+    }
+
     pass.input_url = passInputUrl;
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
@@ -6602,24 +6812,34 @@ serve(async (req) => {
     if (!isAdvance && !isRetry && fanOutAllowed) {
       // Pass 0 was just dispatched above. Fan out passes [1 .. cap-1] now;
       // any beyond cap remain `pending` and get kicked by the webhook.
+      // v193: use EdgeRuntime.waitUntil instead of bare setTimeout. Bare timers
+      // can be dropped when the Edge Function returns, which silently collapses
+      // a supposed one-wave fanout back into webhook-chained serial dispatch.
       const fanOutEnd = Math.min(passes.length, concurrencyCap);
-      for (let i = 1; i < fanOutEnd; i++) {
-        const delayMs = i * 250; // small jitter prevents Sync.so burst spike
-        setTimeout(() => {
-          fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${serviceKey}`,
-            },
-            body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: i }),
-          }).catch((err) =>
-            console.warn(`[compose-dialog-segments] plan_d fan-out pass=${i} dispatch threw: ${(err as Error).message}`),
-          );
-        }, delayMs);
+      try {
+        EdgeRuntime.waitUntil(Promise.allSettled(
+          Array.from({ length: Math.max(0, fanOutEnd - 1) }, async (_, offset) => {
+            const i = offset + 1;
+            const delayMs = i * 250; // small jitter prevents Sync.so burst spike
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            const resp = await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: i }),
+            });
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} v193_fanout_self_invoke pass=${i + 1}/${passes.length} status=${resp.status}`,
+            );
+          }),
+        ));
+      } catch (err) {
+        console.warn(`[compose-dialog-segments] plan_d waitUntil fan-out setup threw: ${(err as Error)?.message ?? err}`);
       }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} v139_fanout_active cap=${concurrencyCap} fanout_size=${fanOutEnd} N_passes=${passes.length} env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}`,
+        `[compose-dialog-segments] scene=${sceneId} v193_parallel_pass_fanout_start cap=${concurrencyCap} fanout_size=${fanOutEnd} N_passes=${passes.length} env=${Deno.env.get("FEATURE_PLAN_D_FANOUT") ?? "<unset>"} db_force=${fanoutForceEnableDb}`,
       );
 
       // ── v167 Speedup Schritt 2 — Preclip Pre-Fanout für Passes jenseits des Caps ──

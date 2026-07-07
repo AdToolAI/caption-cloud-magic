@@ -37,6 +37,13 @@ const CropSchema = z.object({
   size: z.number().positive(),
 });
 
+const MouthMatteSchema = z.object({
+  x: z.number().min(0),
+  y: z.number().min(0),
+  width: z.number().positive(),
+  height: z.number().positive(),
+});
+
 /** v25 (Fan-Out): masked full-frame overlay. The Sync.so output covers the
  *  whole plate (only THIS speaker's lips moving on the original scene); we
  *  composite it on top of the master plate but ONLY through a feathered
@@ -89,6 +96,11 @@ const ShotSchema = z.object({
     )
     .optional()
     .nullable(),
+  /** v193: tiny plate-native freeze patches over non-speaking mouths only.
+   *  Unlike v183/global slots this never uses avatar portraits and never
+   *  covers a full face, so it suppresses raw plate mouth motion without
+   *  resurrecting ghost faces. */
+  mouthMattes: z.array(MouthMatteSchema).optional().nullable(),
   /** Legacy compatibility only. Normal multi-speaker muxes keep overlays
    *  windowed to speaker turns and do not use hold-to-end. */
   holdToEnd: z.boolean().optional(),
@@ -366,6 +378,71 @@ const SilentFaceAnchor: React.FC<SilentFaceAnchorProps> = ({
   );
 };
 
+interface MouthMatteFreezeProps {
+  src: string;
+  srcX: number;
+  srcY: number;
+  srcWidth: number;
+  srcHeight: number;
+  scaleX: number;
+  scaleY: number;
+  compW: number;
+  compH: number;
+}
+
+const MouthMatteFreeze: React.FC<MouthMatteFreezeProps> = ({
+  src,
+  srcX,
+  srcY,
+  srcWidth,
+  srcHeight,
+  scaleX,
+  scaleY,
+  compW,
+  compH,
+}) => {
+  const left = srcX * scaleX;
+  const top = srcY * scaleY;
+  const w = srcWidth * scaleX;
+  const h = srcHeight * scaleY;
+  const mask = 'radial-gradient(ellipse at center, #000 0%, #000 52%, rgba(0,0,0,0.72) 72%, rgba(0,0,0,0) 100%)';
+
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          width: w,
+          height: h,
+          overflow: 'hidden',
+          WebkitMaskImage: mask,
+          maskImage: mask,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+        }}
+      >
+        <Freeze frame={0}>
+          <Video
+            src={src}
+            muted
+            playbackRate={1}
+            style={{
+              position: 'absolute',
+              left: -left,
+              top: -top,
+              width: compW,
+              height: compH,
+              objectFit: 'cover',
+            }}
+          />
+        </Freeze>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 
 
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
@@ -401,8 +478,6 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   // the template level so cached render payloads can't resurrect the overlay.
   // Schema field kept for backward-compat with existing payloads.
   void globalSilentSlots;
-  void scaleX;
-  void scaleY;
   const globalSilentSlotEls: React.ReactNode[] = React.useMemo(() => [], []);
 
 
@@ -502,6 +577,34 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             );
           })
           .filter(Boolean);
+        const rawMouthMattes = Array.isArray(shot.mouthMattes) ? shot.mouthMattes : [];
+        const mouthMatteEls: React.ReactNode[] = masterVideoUrl
+          ? rawMouthMattes
+              .map((slot, mIdx) => {
+                const sx = Number(slot?.x);
+                const sy = Number(slot?.y);
+                const sw = Number(slot?.width);
+                const sh = Number(slot?.height);
+                if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(sw) || !Number.isFinite(sh) || sw <= 0 || sh <= 0) {
+                  return null;
+                }
+                return (
+                  <MouthMatteFreeze
+                    key={`mouth-matte-${idx}-${mIdx}`}
+                    src={masterVideoUrl}
+                    srcX={sx}
+                    srcY={sy}
+                    srcWidth={sw}
+                    srcHeight={sh}
+                    scaleX={scaleX}
+                    scaleY={scaleY}
+                    compW={compW}
+                    compH={compH}
+                  />
+                );
+              })
+              .filter(Boolean)
+          : [];
         
 
         // v25 fan-out face-mask path (highest priority): full Sync.so output
@@ -527,6 +630,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               layout="none"
             >
               {silentSlotEls}
+              {mouthMatteEls}
               <FaceMaskOverlay
                 src={shot.outputUrl}
                 cxPx={cxPx}
@@ -559,6 +663,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               layout="none"
             >
               {silentSlotEls}
+              {mouthMatteEls}
               <CroppedOverlay
                 src={shot.outputUrl}
                 segDuration={segDuration}
@@ -580,6 +685,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             layout="none"
           >
             {silentSlotEls}
+            {mouthMatteEls}
             <FullFrameOverlay
               src={shot.outputUrl}
               segDuration={segDuration}

@@ -233,6 +233,26 @@ serve(async (req) => {
     const SHOT_PAD_END_SHORT = 0.08;
     const SHORT_TURN_THRESHOLD_SEC = 0.6;
 
+    // v193 — Listener mouth matte. This replaces the removed ghost-avatar
+    // overlay with a tiny plate-native freeze patch over ONLY non-speaking
+    // mouths. It never uses character portraits, so no avatar/face can appear
+    // over the plate; it only stops the raw AI plate mouths from visibly
+    // talking underneath the active Sync.so crop.
+    let listenerMouthMatteEnabled = isFanout;
+    try {
+      const { data: matteRow } = await supabase
+        .from("system_config")
+        .select("value")
+        .eq("key", "composer.listener_mouth_matte_v193")
+        .maybeSingle();
+      const raw = (matteRow as any)?.value;
+      if (raw !== undefined && raw !== null) {
+        listenerMouthMatteEnabled = String(raw).toLowerCase() !== "false";
+      }
+    } catch {
+      listenerMouthMatteEnabled = isFanout;
+    }
+
     // v183 — Silent-Faces via static anchor portraits. Feature-flagged via
     // `system_config.composer.silent_faces_v183` (default OFF). When ON we
     // fetch each done pass's character portrait_url and attach `silentSlots`
@@ -284,7 +304,9 @@ serve(async (req) => {
     // Per-speaker slot rects (preclip_crop). Speakers without a valid crop
     // are simply skipped for silence overlay purposes.
     type SilentSlot = { x: number; y: number; size: number; anchorUrl: string | null };
+    type MouthMatteSlot = { x: number; y: number; width: number; height: number };
     const silentSlotBySpeakerIdx = new Map<number, SilentSlot>();
+    const mouthMatteBySpeakerIdx = new Map<number, MouthMatteSlot>();
     if (silentFacesV183Enabled && isFanout) {
       for (const p of donePasses as any[]) {
         const sIdx = Number(p?.speaker_idx);
@@ -316,6 +338,51 @@ serve(async (req) => {
     } else {
       console.log(
         `[render-sync-segments-audio-mux] scene=${sceneId} v183_silent_slots DISABLED donePasses=${donePasses.length} (flag=${silentFacesV183Enabled} isFanout=${isFanout})`,
+      );
+    }
+
+    if (listenerMouthMatteEnabled && isFanout) {
+      const persistedMouths: any[] = Array.isArray((state as any)?.plate_identity?.mouths)
+        ? ((state as any).plate_identity.mouths as any[])
+        : [];
+      for (const p of donePasses as any[]) {
+        const sIdx = Number(p?.speaker_idx);
+        const pc = p?.preclip_crop;
+        if (
+          !Number.isFinite(sIdx) ||
+          !pc ||
+          !Number.isFinite(Number(pc.x)) ||
+          !Number.isFinite(Number(pc.y)) ||
+          !Number.isFinite(Number(pc.size)) ||
+          Number(pc.size) <= 0
+        ) {
+          continue;
+        }
+        const cropX = Number(pc.x);
+        const cropY = Number(pc.y);
+        const cropSize = Number(pc.size);
+        const mappedMouth = Array.isArray(p?.v137_mapping?.plate_mouth)
+          ? p.v137_mapping.plate_mouth
+          : (Array.isArray(persistedMouths[sIdx]) ? persistedMouths[sIdx] : null);
+        const mouthX = mappedMouth && Number.isFinite(Number(mappedMouth[0]))
+          ? Number(mappedMouth[0])
+          : cropX + cropSize * 0.5;
+        const mouthY = mappedMouth && Number.isFinite(Number(mappedMouth[1]))
+          ? Number(mappedMouth[1])
+          : cropY + cropSize * 0.66;
+        const matteW = Math.max(18, Math.min(cropSize * 0.42, width * 0.16));
+        const matteH = Math.max(10, Math.min(cropSize * 0.24, height * 0.10));
+        const x = Math.max(cropX, Math.min(cropX + cropSize - matteW, mouthX - matteW / 2));
+        const y = Math.max(cropY, Math.min(cropY + cropSize - matteH, mouthY - matteH * 0.45));
+        mouthMatteBySpeakerIdx.set(sIdx, {
+          x: Number(x.toFixed(2)),
+          y: Number(y.toFixed(2)),
+          width: Number(matteW.toFixed(2)),
+          height: Number(matteH.toFixed(2)),
+        });
+      }
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v193_listener_matte_slots=${mouthMatteBySpeakerIdx.size}/${donePasses.length} enabled=${listenerMouthMatteEnabled}`,
       );
     }
 
@@ -381,6 +448,12 @@ serve(async (req) => {
                 },
               };
 
+          const mouthMattes = listenerMouthMatteEnabled && isFanout
+            ? Array.from(mouthMatteBySpeakerIdx.entries())
+                .filter(([speakerIdx]) => speakerIdx !== Number((p as any).speaker_idx))
+                .map(([, slot]) => slot)
+            : [];
+
 
 
           if (passSegs.length === 0) {
@@ -390,6 +463,7 @@ serve(async (req) => {
               outputUrl: String(p.output_url),
               sourceTiming,
               sourceStartSec: 0,
+              ...(mouthMattes.length > 0 ? { mouthMattes } : {}),
               ...overlayPayload,
             }];
           }
@@ -415,6 +489,7 @@ serve(async (req) => {
                 outputUrl: String(p.output_url),
                 sourceTiming,
                 sourceStartSec,
+                ...(mouthMattes.length > 0 ? { mouthMattes } : {}),
                 ...overlayPayload,
               };
             })
@@ -480,6 +555,7 @@ serve(async (req) => {
       sourceStartSec: shot.sourceStartSec ?? 0,
       crop: shot.crop ?? null,
       faceMask: shot.faceMask ?? null,
+      mouthMattes: Array.isArray((shot as any).mouthMattes) ? (shot as any).mouthMattes.length : 0,
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
     }));
 
@@ -489,6 +565,7 @@ serve(async (req) => {
 
     const renderId = crypto.randomUUID();
     const outName = `dialog-stitch-muxed-${sceneId}-${Date.now()}.mp4`;
+    const muxFramesPerLambda = Math.max(45, Math.ceil(durationInFrames / 5));
 
     const { error: insertErr } = await supabase
       .from("video_renders")
@@ -548,6 +625,7 @@ serve(async (req) => {
       height,
       fps,
       durationInFrames,
+      framesPerLambda: muxFramesPerLambda,
       frameRange: [0, durationInFrames - 1],
       muted: false,
       audioCodec: "aac",
@@ -573,6 +651,10 @@ serve(async (req) => {
         },
       },
     };
+
+    console.log(
+      `[render-sync-segments-audio-mux] scene=${sceneId} v193_mux_timing frames=${durationInFrames} framesPerLambda=${muxFramesPerLambda} estimated_lambdas=${Math.ceil(durationInFrames / muxFramesPerLambda)}`,
+    );
 
     // Persist the dispatch on the scene BEFORE invoking, so a duplicate
     // call can short-circuit even if the Lambda invoke is in flight.

@@ -164,7 +164,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
           // v5 sync-segments multi-pass passes[]
           const passesArr = Array.isArray(ds?.passes) ? ds.passes : [];
-          const passJobs = passesArr.some((p: any) => p?.job_id || p?.status === 'rendering');
+          const passJobs = passesArr.some(
+            (p: any) => p?.job_id || p?.status === 'rendering' || p?.status === 'rendering_preflight',
+          );
           const v5SegmentsJob =
             ds?.version === 5 && ds?.engine === 'sync-segments' && !!ds?.sync_job_id;
           return (
