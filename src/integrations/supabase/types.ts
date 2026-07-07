@@ -5845,6 +5845,7 @@ export type Database = {
           retry_count: number
           scene_action_en: string | null
           scene_action_user: string | null
+          scene_assets: Json
           scene_type: string
           seed: number | null
           seed_variations: Json
@@ -5931,6 +5932,7 @@ export type Database = {
           retry_count?: number
           scene_action_en?: string | null
           scene_action_user?: string | null
+          scene_assets?: Json
           scene_type?: string
           seed?: number | null
           seed_variations?: Json
@@ -6017,6 +6019,7 @@ export type Database = {
           retry_count?: number
           scene_action_en?: string | null
           scene_action_user?: string | null
+          scene_assets?: Json
           scene_type?: string
           seed?: number | null
           seed_variations?: Json
