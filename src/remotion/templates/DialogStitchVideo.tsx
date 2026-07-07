@@ -290,79 +290,11 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
   );
 };
 
-/** v165: SilentFaceFreeze — renders the master plate video frozen at frame 0,
- *  cropped to a non-speaking face slot. The crop coords (`srcX`, `srcY`,
- *  `srcSize`) live in source-master pixel space; the inner <Video> is sized
- *  to the full composition extent and translated so that only the slot region
- *  is visible inside the (already-scaled) outer viewport. v164's previous
- *  implementation used objectFit:cover on the full master plate, which
- *  produced a fully zoomed copy of the entire scene at every slot (ghost
- *  speakers). Soft circular mask blends the seam with the live plate. */
-interface SilentFaceFreezeProps {
-  src: string;
-  /** Slot rect on the source-master pixel grid (matches preclip_crop). */
-  srcX: number;
-  srcY: number;
-  srcSize: number;
-  /** Composition-space scale factors derived from src→comp mapping. */
-  scaleX: number;
-  scaleY: number;
-  /** Full composition pixel dims so the inner <Video> matches the live plate
-   *  underneath exactly. */
-  compW: number;
-  compH: number;
-}
-const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
-  src,
-  srcX,
-  srcY,
-  srcSize,
-  scaleX,
-  scaleY,
-  compW,
-  compH,
-}) => {
-  // v184: softer falloff for 720p plates (see v184 note above).
-  const mask = 'radial-gradient(circle at center, #000 0%, #000 45%, rgba(0,0,0,0.75) 62%, rgba(0,0,0,0) 98%)';
-  const left = srcX * scaleX;
-  const top = srcY * scaleY;
-  const wOuter = srcSize * scaleX;
-  const hOuter = srcSize * scaleY;
-  return (
-    <AbsoluteFill style={{ pointerEvents: 'none' }}>
-      <div
-        style={{
-          position: 'absolute',
-          left,
-          top,
-          width: wOuter,
-          height: hOuter,
-          WebkitMaskImage: mask,
-          maskImage: mask,
-          WebkitMaskRepeat: 'no-repeat',
-          maskRepeat: 'no-repeat',
-          overflow: 'hidden',
-        }}
-      >
-        <Freeze frame={0}>
-          <Video
-            src={src}
-            muted
-            playbackRate={1}
-            style={{
-              position: 'absolute',
-              left: -left,
-              top: -top,
-              width: compW,
-              height: compH,
-              objectFit: 'fill',
-            }}
-          />
-        </Freeze>
-      </div>
-    </AbsoluteFill>
-  );
-};
+/* v165 SilentFaceFreeze component removed in v192 — superseded by
+ * SilentFaceAnchor (v183/v190) which uses a static <Img> instead of
+ * <Freeze><Video>. Kept as a comment marker for log/history continuity. */
+
+
 
 /** v183: SilentFaceAnchor — renders a static closed-mouth anchor portrait
  *  cropped to the non-speaking face slot. No <Video>, no <Freeze>, so no
@@ -588,7 +520,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             );
           })
           .filter(Boolean);
-        void SilentFaceFreeze;
+        
 
         // v25 fan-out face-mask path (highest priority): full Sync.so output
         // for this speaker, masked to a soft circle around their face. Spans

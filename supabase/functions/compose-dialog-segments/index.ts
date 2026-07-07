@@ -128,7 +128,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v187";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v192";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -690,7 +690,10 @@ serve(async (req) => {
     // Initial dispatch from the client has no body.pass_idx → 0.
     // Self-invoke / webhook advance calls carry pass_idx in body.
     {
-      const perPassLockEnabled = (Deno.env.get("FEATURE_PER_PASS_LOCK") ?? "false")
+      // v192 — Default flipped ON. Per-pass lock avoids scene-wide advance-webhook
+      // collisions when two Sync.so passes finish nearly simultaneously. Set the
+      // env var to "false" explicitly for emergency rollback to legacy scene-lock.
+      const perPassLockEnabled = (Deno.env.get("FEATURE_PER_PASS_LOCK") ?? "true")
         .toLowerCase() === "true";
       const bodyPassIdx = Number(body?.pass_idx);
       const earlyPassIdx = perPassLockEnabled && Number.isFinite(bodyPassIdx) && bodyPassIdx >= 0
@@ -2518,75 +2521,92 @@ serve(async (req) => {
         face_count: number | null;
         ok: boolean;
       }> = [];
-      for (let i = 0; i < speakers.length; i++) {
-        const sp = speakers[i] as any;
-        const turns = Array.isArray(sp?.voicedRange?.turns) ? sp.voicedRange.turns : [];
-        if (turns.length === 0) continue;
-        // First turn mid — most stable; speaker is unlikely to have walked
-        // out of frame yet and the plate is freshest at this point.
-        const t0 = turns[0];
-        const startSec = Math.max(0, Number(t0?.startSec) || 0);
-        const endSec = Math.max(startSec + 0.2, Number(t0?.endSec) || startSec + 0.5);
-        const midSec = (startSec + endSec) / 2;
-        const frameNum = Math.max(1, Math.round(midSec * FPS));
+      // v192 — Parallelisiert. Vorher: serielle for-Schleife über N Sprecher,
+      // jede mit bis zu 5 Gemini-Vision-Probes (cold cache 1–5s each) →
+      // ~4–20s Preflight-Overhead bei 4 Sprechern. Jetzt läuft der Gate pro
+      // Sprecher parallel via Promise.all; die inneren Sample-Offset-Probes
+      // bleiben seriell, weil sie via early-exit auf face_count>=1 optimieren.
+      const speakerResults = await Promise.all(
+        speakers.map(async (spRaw: any, i: number) => {
+          const sp = spRaw as any;
+          const turns = Array.isArray(sp?.voicedRange?.turns) ? sp.voicedRange.turns : [];
+          if (turns.length === 0) return null;
+          const t0 = turns[0];
+          const startSec = Math.max(0, Number(t0?.startSec) || 0);
+          const endSec = Math.max(startSec + 0.2, Number(t0?.endSec) || startSec + 0.5);
+          const midSec = (startSec + endSec) / 2;
+          const frameNum = Math.max(1, Math.round(midSec * FPS));
 
-        // v188 — Nearest-Window Snap: sample the turn window at up to 5
-        // timestamps (mid, ±25%, ±50% incl. ±0.5s padding beyond turn edges).
-        // If ANY frame in the window shows ≥1 face, treat the turn as
-        // recoverable (Sync.so can lock onto the visible frame downstream).
-        // Only hard-block when the speaker is truly invisible across the
-        // whole turn window. Solves the Kling non-determinism where a single
-        // cut/pan at turn-mid tanks an otherwise valid multi-speaker plate.
-        const turnDur = Math.max(0.2, endSec - startSec);
-        const padSec = 0.5;
-        const sampleOffsets = [
-          0,                              // mid
-          -turnDur * 0.25,
-          +turnDur * 0.25,
-          -(turnDur * 0.5 + padSec),      // startSec − pad
-          +(turnDur * 0.5 + padSec),      // endSec + pad
-        ];
-        let bestFaceCount = 0;
-        let bestSampleSec = midSec;
-        let bestOk = false;
-        let anyProbeSucceeded = false;
-        const sampleTrail: Array<{ sec: number; frame: number; faces: number | null; ok: boolean }> = [];
-        for (const off of sampleOffsets) {
-          const sampleSec = Math.max(0, midSec + off);
-          const sampleFrame = Math.max(1, Math.round(sampleSec * FPS));
-          try {
-            const v = await validateFrameFace({
-              supabaseUrl,
-              serviceKey,
-              videoUrl: sourceClipUrl,
-              frameNumber: sampleFrame,
-              fps: FPS,
-              targetCoords: null,
-            });
-            const faceCount = Number(v.faceCount ?? 0);
-            sampleTrail.push({
-              sec: Math.round(sampleSec * 100) / 100,
-              frame: sampleFrame,
-              faces: v.ok ? faceCount : null,
-              ok: !!v.ok,
-            });
-            if (v.ok) {
-              anyProbeSucceeded = true;
-              if (faceCount > bestFaceCount) {
-                bestFaceCount = faceCount;
-                bestSampleSec = sampleSec;
-                bestOk = true;
+          // v188 — Nearest-Window Snap (siehe Original-Kommentar): sample the
+          // turn window at up to 5 timestamps (mid, ±25%, ±50% incl. ±0.5s
+          // padding beyond turn edges). If ANY frame in the window shows ≥1
+          // face, treat the turn as recoverable.
+          const turnDur = Math.max(0.2, endSec - startSec);
+          const padSec = 0.5;
+          const sampleOffsets = [
+            0,
+            -turnDur * 0.25,
+            +turnDur * 0.25,
+            -(turnDur * 0.5 + padSec),
+            +(turnDur * 0.5 + padSec),
+          ];
+          let bestFaceCount = 0;
+          let bestSampleSec = midSec;
+          let bestOk = false;
+          let anyProbeSucceeded = false;
+          const sampleTrail: Array<{ sec: number; frame: number; faces: number | null; ok: boolean }> = [];
+          for (const off of sampleOffsets) {
+            const sampleSec = Math.max(0, midSec + off);
+            const sampleFrame = Math.max(1, Math.round(sampleSec * FPS));
+            try {
+              const v = await validateFrameFace({
+                supabaseUrl,
+                serviceKey,
+                videoUrl: sourceClipUrl,
+                frameNumber: sampleFrame,
+                fps: FPS,
+                targetCoords: null,
+              });
+              const faceCount = Number(v.faceCount ?? 0);
+              sampleTrail.push({
+                sec: Math.round(sampleSec * 100) / 100,
+                frame: sampleFrame,
+                faces: v.ok ? faceCount : null,
+                ok: !!v.ok,
+              });
+              if (v.ok) {
+                anyProbeSucceeded = true;
+                if (faceCount > bestFaceCount) {
+                  bestFaceCount = faceCount;
+                  bestSampleSec = sampleSec;
+                  bestOk = true;
+                }
+                if (faceCount >= 1) break;
               }
-              // Early exit — one visible frame is enough to unblock the turn.
-              if (faceCount >= 1) break;
+            } catch (e) {
+              console.warn(
+                `[compose-dialog-segments] scene=${sceneId} v188_snap probe threw speaker=${i} off=${off}: ${(e as Error)?.message}`,
+              );
             }
-          } catch (e) {
-            console.warn(
-              `[compose-dialog-segments] scene=${sceneId} v188_snap probe threw speaker=${i} off=${off}: ${(e as Error)?.message}`,
-            );
           }
-        }
 
+          return {
+            i,
+            sp,
+            midSec,
+            frameNum,
+            bestFaceCount,
+            bestSampleSec,
+            bestOk,
+            anyProbeSucceeded,
+            sampleTrail,
+          };
+        }),
+      );
+
+      for (const res of speakerResults) {
+        if (!res) continue;
+        const { i, sp, midSec, frameNum, bestFaceCount, bestSampleSec, bestOk, anyProbeSucceeded, sampleTrail } = res;
         probes.push({
           speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
           turn_sec: Math.round(midSec * 100) / 100,
@@ -2595,8 +2615,6 @@ serve(async (req) => {
         });
 
         if (anyProbeSucceeded && bestFaceCount < 1) {
-          // Every probe in the window succeeded AND every one saw 0 faces →
-          // real terminal visibility failure. Block and refund.
           failures.push({
             speaker: String(sp?.speaker ?? `Speaker ${i + 1}`),
             character_id: sp?.character_id ?? null,
@@ -6439,7 +6457,10 @@ serve(async (req) => {
     // defaults true. Previously all three defaulted false → 17-23 min
     // serial runs even when ops set DB flags to true (deploy lag).
     let parallelFlagOn = true;
-    let concurrencyCap = 2;
+    // v192 — Default cap raised from 2 → 4. For 4-speaker scenes this collapses
+    // two serial Sync.so waves back into one parallel wave (v169 tempo). DB row
+    // `composer.sync_so_concurrency_cap` still acts as the down-ward kill-switch.
+    let concurrencyCap = 4;
     let fanoutForceEnableDb = true;
     try {
       const { data: pFlag } = await supabase
@@ -6614,7 +6635,10 @@ serve(async (req) => {
       // mit `FEATURE_PRECLIP_PREFANOUT=true` in den Edge-Secrets.
       // Fallback: bei Failure greift der bestehende Per-Pass-Render in der
       // späteren `advance`-Invocation → keine Regression möglich.
-      const preFanoutEnabled = (Deno.env.get("FEATURE_PRECLIP_PREFANOUT") ?? "false")
+      // v192 — Default flipped ON. Preclip pre-fanout is retry-path insurance;
+      // no cost on the v153.2 bbox-url-pro happy path. Set to "false" explicitly
+      // to disable.
+      const preFanoutEnabled = (Deno.env.get("FEATURE_PRECLIP_PREFANOUT") ?? "true")
         .toLowerCase() === "true";
       if (preFanoutEnabled && passes.length > concurrencyCap && plateDims && sourceClipUrl) {
         const waitingIdxs: number[] = [];
