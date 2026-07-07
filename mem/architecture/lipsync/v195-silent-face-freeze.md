@@ -41,3 +41,15 @@ Because the tile is a crop of the **same** master plate at frame 0:
 - v195 tiles use **only** `preclip_crop` (already validated by Sync.so pipeline).
 - v195 slots are emitted for **every** done pass regardless of N.
 - Full-frame `tailFreezeFromSec` is emitted only when v195 emitted zero slots.
+
+---
+
+## v196 addendum — hard face-disc masks (July 7 2026)
+
+Symptom after v195 shipped: all speakers showed a visible face morph **while speaking**, not only during silence. Root cause was orthogonal to v195:
+
+Every face overlay in `DialogStitchVideo.tsx` (`FaceCropShot`, `FaceMaskOverlay`, `SilentFaceAnchor`, `MouthMatteFreeze`, `SilentFaceFreeze`) used a wide feathered radial mask (roughly `#000 45% → transparent 98%`). Inside that feather ring the compositor alpha-blends the Sync.so lipsynced face with the live master-plate face underneath. Sync.so output is reprojected/upscaled and never pixel-aligned with the source plate — the blend of two slightly different mouth/head poses is exactly what read on screen as "morph".
+
+Fix: hardened every overlay mask to a solid disc/ellipse with only a 1% anti-alias band (e.g. `#000 0% → #000 47% → transparent 48%`). Pixels are either fully Sync.so or fully live plate — no cross-fade zone can exist. Geometry, positioning, ordering, timing, and the entire compose/dispatch pipeline are unchanged.
+
+Grep tag: `v196` in `DialogStitchVideo.tsx`.
