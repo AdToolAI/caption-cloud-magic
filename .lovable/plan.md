@@ -1,64 +1,50 @@
-## Diagnose
+## Status: v193-Pipeline Deployment-Check
 
-- Die Ghost-Face-Overlays sind wirklich aus: `composer.silent_faces_v183=false`, Mux-Log zeigt `v183_silent_slots DISABLED`, und das Remotion-Template ignoriert `globalSilentSlots`.
-- Das neue Problem „Leute reden quer durcheinander“ ist deshalb sehr wahrscheinlich der rohe Master-Plate unter den aktiven Sync.so-Crops: außerhalb des aktiven Sprecher-Crops laufen die ungesyncten Mundbewegungen aller anderen Figuren weiter. Genau das hatte v164/v183 maskiert; nach dem Abschalten sieht man den ursprünglichen Plate-Talk wieder.
-- Die aktuelle Laufzeit ist nicht v169-tempo: im letzten Job dauerte es ca. 11:23 ab erstem Dialog-Dispatch bis finalem Clip, plus vorgelagerte Plate/TTS-Zeit kann subjektiv ~15 Minuten ergeben.
-- Größte Zeitblöcke im letzten Job:
-  - pro Pass ca. 65–125s Preclip/Preflight vor Sync.so-Dispatch
-  - Sync.so pro Pass ca. 77–115s
-  - finaler Remotion-Mux ca. 4 Minuten
-- Auffällig: Pass 3 wurde doppelt dispatched (`b288...` und `6a60...`). Das ist ein Race zwischen Fanout/Webhook-Advance und kostet Zeit, Credits und kann falsche/stale Outputs in den finalen Mux bringen.
+Die drei v193-Fixes (Race-Dedup, Batch-Preclip, Listener-Mouth-Matte) sind im Code + Edge Functions + Remotion-Bundle drin. Bevor die nächste 1–4-Sprecher-Szene sauber und schnell durchläuft, sollten wir noch **vier kleine Dinge** verifizieren/erledigen — sonst greifen Teile der Optimierung nicht.
 
-## Warum v169 einfacher/schneller wirkte
+### 1. Feature-Flags in `system_config` prüfen/setzen
+Die neuen Codepfade sind flag-gated. Ohne die richtigen Werte fällt die Pipeline still auf den alten v190-Serial-Pfad zurück.
 
-v169 war wesentlich schlanker: weniger Listener-Mute-/Ghost-Layer, weniger harte Gates, weniger Retry-/NOOP-/BBox-Forensik und weniger Race-Schutz drumherum. Danach kamen viele Stabilitätsfixes gegen falsche Sprecher, Noops, Edge-Faces, Ghost-Mouths und Provider-Fehler dazu. Einige davon sind sinnvoll, aber aktuell haben wir zwei Regressionen:
+Soll-Zustand:
+- `composer.silent_faces_v183` = **false** (Ghost-Faces aus)
+- `composer.listener_mouth_matte_v193` = **true** (neuer plate-native Mund-Matte)
+- `composer.parallel_sync_so_passes` = **true**
+- `composer.sync_so_concurrency_cap` = **4**
+- `composer.batch_preclip_render` = **true** (bzw. neuer v193-Block aktiv)
 
-1. Der „Nicht-Sprecher-Mund ruhigstellen“-Fix wurde wegen Ghost-Faces deaktiviert, ohne einen sauberen Ersatz einzubauen.
-2. Der Parallel-Fanout ist zwar eingeschaltet, aber Preclip-Preflight + Advance-Races verhindern wieder echte One-Wave-Performance.
+Aktion: Ein `read_query` auf `system_config` und ggf. eine Migration, die fehlende Keys ergänzt / falsche Werte korrigiert.
 
-## Umsetzungsplan
+### 2. Sanity-Check der Deployments
+- `compose-dialog-segments` Version enthält `v193_pass_claim_skip_existing` und `v193_batch_preclip_all_start` Log-Marker.
+- `render-sync-segments-audio-mux` liest `silent_faces_v183` mit `=== "true"` (nicht `!== "false"`).
+- Remotion-Bundle-Version im `system_config.lambda.bundle_serve_url` zeigt auf den frisch deployten Build (mit hard-blocked `globalSilentSlots`).
 
-### 1. Race-Fix: ein Pass darf nie doppelt dispatchen
-- In `compose-dialog-segments` vor jedem Sync.so-Dispatch den aktuellen Pass aus der DB frisch lesen.
-- Wenn der Pass bereits `rendering` mit `job_id` oder `done` ist, sofort `202` zurückgeben statt erneut zu dispatchen.
-- Für Advance/Webhook-Fanout den Pass-Zustand atomar auf `rendering_preflight` claimen, bevor Preclip/Gate startet.
-- Ziel: kein zweiter Sync.so-Job für denselben `pass_idx`; kein stale Output im Mux.
+Aktion: 1 Edge-Function-Log-Grep + 1 DB-Read auf die Bundle-URL. Kein Deploy nötig, nur Verifikation.
 
-### 2. Echte Parallelität zurückholen
-- Fanout nicht erst nach langem Pass-0-Preflight wirksam machen: Skeletons und Preclip-Tasks müssen vor bzw. parallel zum ersten Sync.so-Dispatch gestartet werden.
-- Batch-Preclip für alle Sprecher beim ersten Dispatch aktivieren/vereinheitlichen, nicht nur für Passes jenseits des Concurrency-Caps.
-- Bestehende `composer.batch_preclip_render=true`-Flag wirklich im Codepfad nutzen oder die tote/alte Flag entfernen und durch einen klaren `v193_batch_preclip_all_passes`-Block ersetzen.
-- Ziel: bei 4 Sprechern alle Preclips parallel, danach alle Sync.so-Jobs in einer Welle bis Cap 4.
+### 3. Zombie-Szenen aus letztem 15-Min-Lauf aufräumen
+Der letzte Test hatte einen doppelt dispatchen Pass (`b288…` + `6a60…`). Wenn diese Scene noch in `pending`/`rendering_preflight` hängt, blockiert sie ggf. den nächsten Testlauf (Watchdog scannt sie sonst dauerhaft).
 
-### 3. „Quer durcheinander reden“ ohne Ghost-Avatare lösen
-- Kein Portrait-/Avatar-Overlay zurückbringen.
-- Stattdessen Listener-Mute als kleiner, plate-eigener Mouth-Matte:
-  - pro nicht aktivem Sprecher nur eine kleine Mund-/Kiefer-Region maskieren, nicht das ganze Gesicht
-  - Quelle ist ein frame-/plate-basierter neutraler Crop oder ein inpainted closed-mouth patch aus derselben Szene, nicht das Avatar-Portrait
-  - der aktive Sprecher-Crop liegt weiterhin darüber
-- Feature-flagged ausrollen, z. B. `composer.listener_mouth_matte_v193`, default zunächst aus oder nur für neue Remux-Tests.
-- Ziel: Nicht-Sprecher bewegen den Mund nicht, ohne sichtbare Ghost-Faces/Avatar-Köpfe über dem Plate.
+Aktion: `lipsync-watchdog` einmal manuell triggern **oder** die eine Test-Szene per `read_query` finden und auf `failed` setzen, damit sie aus dem aktiven Set fällt.
 
-### 4. Mux-Zeit senken
-- Mux-Render-Parameter prüfen: aktuell kostet der finale Dialog-Stitch ca. 4 Minuten für 8.7s Video.
-- Für `DialogStitchVideo` eine schnellere Lambda-Konfiguration verwenden: mehr Frames pro Lambda / scene-aligned chunks / unnötige Full-HD Re-encodes vermeiden, solange Qualität stabil bleibt.
-- Idempotenten `force_remux` beibehalten, damit betroffene Szenen nach Fix ohne vollständige Neugenerierung neu gestitcht werden können.
+### 4. Ein bewusster End-to-End-Testlauf mit Telemetrie
+Erst danach wissen wir, ob das Ziel (~9–10 min für 4 Sprecher, deutlich schneller für 1 Sprecher) erreicht ist.
 
-### 5. Forensik/Validierung
-- Neue Logmarker:
-  - `v193_pass_claim_skip_existing`
-  - `v193_batch_preclip_all_start/done`
-  - `v193_listener_matte_slots`
-  - `v193_mux_timing`
-- Nach Implementierung einen neuen 3–4-Sprecher-Test auswerten:
-  - keine doppelten `DISPATCHED` rows pro `pass_idx`
-  - alle Passes starten innerhalb kurzer Zeit
-  - finale Szene: nur aktiver Sprecher bewegt den Mund
-  - Zielzeit: wieder näher an ~9–10 Minuten für 4 Sprecher, abhängig von Sync.so/Lambda-Queue
+Zu messen im Log:
+- `v193_pass_claim_skip_existing` erscheint = Race-Fix greift
+- `v193_batch_preclip_all_start` **einmal** pro Scene, nicht pro Pass = echte Parallelität
+- Genau **N** `plan_d_parallel_dispatch_start` Einträge, **kein** doppelter Sync.so-Job pro `pass_idx`
+- `v193_mux_timing` < 2 min für ~10s Video
+- Player: Nur aktiver Sprecher bewegt den Mund, keine Ghost-Overlays
 
-## Erwartetes Ergebnis
+### Was NICHT mehr gemacht werden muss
+- Kein weiterer Codeedit an `compose-dialog-segments`, `render-sync-segments-audio-mux`, `DialogStitchVideo.tsx` nötig.
+- Keine Lambda-Bundle-Neu-Deployment nötig, sofern Punkt 2 grün ist.
+- Keine Migration für neue Tabellen nötig.
 
-- Ghost-Faces bleiben weg.
-- Nicht-Sprecher reden nicht mehr sichtbar mit.
-- Doppelte Sync.so-Pass-Dispatches werden verhindert.
-- 4-Sprecher-Laufzeit sollte wieder deutlich unter die aktuellen 11–15 Minuten fallen.
+### Reihenfolge im Build-Mode
+1. `system_config` lesen → fehlende Flags via Migration setzen (Punkt 1)
+2. Edge-Function-Logs + Bundle-URL prüfen (Punkt 2)
+3. Zombie-Szene(n) killen (Punkt 3)
+4. User macht Testlauf, wir werten Telemetrie aus (Punkt 4)
+
+Danach sollte 1-Sprecher in ~2–3 min und 4-Sprecher in ~9–10 min durchlaufen — ghost-free und ohne „quer durcheinander reden".
