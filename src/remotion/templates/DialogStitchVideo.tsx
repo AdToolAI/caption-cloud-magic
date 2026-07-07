@@ -229,12 +229,13 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // Soft circular mask — fully opaque in the center, feathered to fully
-  // transparent at the edge so the cropped face blends into the master
-  // plate underneath without a visible square seam.
-  // v184: softer falloff (45→60→98) — halves the visible seam ring on 720p
-  // plates. Pure visual, no geometry change.
-  const mask = 'radial-gradient(circle at center, #000 0%, #000 45%, rgba(0,0,0,0.75) 62%, rgba(0,0,0,0) 98%)';
+  // v196: hard face-disc mask (no feather band). A wide radial feather
+  // caused the compositor to alpha-blend the Sync.so lipsynced face with
+  // the live master plate face underneath. Sync.so output is never
+  // pixel-aligned with the source plate, so blending two slightly
+  // different mouth/head poses read on screen as a face morph. Solid
+  // inner disc + 1% AA band eliminates the blend zone entirely.
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 47%, rgba(0,0,0,0) 48%)';
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
@@ -292,11 +293,12 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // Feathered radial mask: solid in the inner 70% of radius, fading to 0
-  // at radius edge so the lipsynced face blends seamlessly into the base.
-  const inner = Math.max(2, Math.round(radiusPx * 0.68));
-  const outer = Math.max(inner + 8, Math.round(radiusPx));
-  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0.85) ${Math.round((inner + outer) / 2)}px, rgba(0,0,0,0) ${outer}px)`;
+  // v196: hard face-disc mask — solid disc with a 1px AA band. No feather
+  // ring, so no alpha-blend of Sync.so lipsynced face + live plate face
+  // (root cause of "morph while speaking").
+  const outer = Math.max(4, Math.round(radiusPx));
+  const inner = Math.max(2, outer - 1);
+  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0) ${outer}px)`;
   return (
     <AbsoluteFill
       style={{
@@ -349,9 +351,9 @@ const SilentFaceAnchor: React.FC<SilentFaceAnchorProps> = ({
   scaleX,
   scaleY,
 }) => {
-  // v184: softer falloff to match fanout crop masks (45→62→98).
+  // v196: hard face-disc mask (no feather blend zone).
   const mask =
-    'radial-gradient(circle at center, #000 0%, #000 45%, rgba(0,0,0,0.75) 62%, rgba(0,0,0,0) 98%)';
+    'radial-gradient(circle at center, #000 0%, #000 47%, rgba(0,0,0,0) 48%)';
   const left = srcX * scaleX;
   const top = srcY * scaleY;
   const w = srcSize * scaleX;
@@ -422,7 +424,8 @@ const MouthMatteFreeze: React.FC<MouthMatteFreezeProps> = ({
   const top = srcY * scaleY;
   const w = srcWidth * scaleX;
   const h = srcHeight * scaleY;
-  const mask = 'radial-gradient(ellipse at center, #000 0%, #000 52%, rgba(0,0,0,0.72) 72%, rgba(0,0,0,0) 100%)';
+  // v196: hard ellipse mask (no feather blend zone).
+  const mask = 'radial-gradient(ellipse at center, #000 0%, #000 54%, rgba(0,0,0,0) 55%)';
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -495,8 +498,9 @@ const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
   const top = srcY * scaleY;
   const w = srcSize * scaleX;
   const h = srcSize * scaleY;
+  // v196: hard face-disc mask (no feather blend zone).
   const mask =
-    'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0.85) 72%, rgba(0,0,0,0) 100%)';
+    'radial-gradient(circle at center, #000 0%, #000 47%, rgba(0,0,0,0) 48%)';
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
