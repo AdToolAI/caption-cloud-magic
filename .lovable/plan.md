@@ -1,45 +1,79 @@
-## Problem
+## Kurzfassung
 
-Der Screenshot zeigt drei geisterhafte, halbtransparente Porträts, die dauerhaft über den Plate-Gesichtern kleben. Ursache ist die **v190 Global-Silent-Slots-Schicht**, die ich im letzten Turn durch Setzen von `system_config.composer.silent_faces_v183 = true` scharf gestellt habe.
+Die Pipeline ist von ~10 Min (v169) auf 11–13 Min (v187) gestiegen, weil zwei Konfig-Defaults sich seit v169 verschlechtert haben, plus eine kleine Kette an neuen Sicherheits-Gates die seriell laufen. Es gibt keinen einzelnen Bug — der Fix ist eine Kombination aus **3 Config-Schaltern + 1 Parallelisierung + Dead-Code-Aufräumen**.
 
-Im `render-sync-segments-audio-mux` wird pro Sprecher-Slot ein `anchorUrl = brand_characters.portrait_url` an das Remotion-Template durchgereicht. `SilentFaceAnchor` rendert diese URL als `<Img>` in das `preclip_crop`-Rechteck mit einem weichen Radial-Mask darüber.
+## Regressions-Budget (4 Sprecher)
 
-Das Problem an dieser Quelle:
+| Stage | v169 | v187 | Delta |
+|---|---|---|---|
+| Preflight + Visibility-Gate | ~20s | ~30–50s | +10–30s |
+| Sync.so Fan-Out (Wall-Clock) | ~3 Min (alle 4 parallel) | ~5–6 Min (2 Wellen à 2) | **+2–3 Min** |
+| Advance-Lock-Kollisionen | ~0 | 0–120s | **+0–2 Min** |
+| Audio-Mux DB-Reads (v183/v190) | 3 RTs | 5 RTs | +100–500ms |
+| Remotion-Stitch Lambda | 3–4 Min | 3–4 Min | ~0 |
+| **Gesamt** | **~10 Min** | **11–13 Min** | **+1–3 Min** |
 
-- `brand_characters.portrait_url` ist ein **generisches Charakter-Porträtfoto** (Kopf + Schultern, teilweise Oberkörper, komplett andere Beleuchtung/Framing/Pose als das Plate).
-- Es wird mit `objectFit: cover` in eine Face-Slot-Box gezwängt, die auf dem Plate-Gesicht sitzt.
-- Es liegt **szenenweit** (nicht nur während der Silent-Windows) über allen Slots — auch während der eigentliche Speaker gerade spricht, weil die aktive Sync.so-Overlay ihren Slot in ihrem Turn zwar überdeckt, aber die beiden anderen Slots dauerhaft Porträts zeigen.
-- Zusätzlich kann `character_id → portrait_url` in Slot 2/3 vertauscht sein, was die vom User genannte Verwechslung von Sprecher 2 und 3 erklärt.
+Haupttreiber: **`concurrencyCap=2`** und **`FEATURE_PER_PASS_LOCK=false`**.
 
-Ergebnis genau wie im Screenshot: drei ghost-artige Avatare, permanent über dem Plate, teils vertauscht.
+## Fix-Plan
 
-## Wichtig: Keine Korrektur der Bildquelle — reiner Rollback
+### Schritt 1 — Quick Wins (Config, sofort wirksam)
 
-v190 wurde als Anti-Idle-Motion-Layer gedacht: geschlossener Mund pro Silent-Slot. Als Bildquelle taugt aber nur ein **plate-eigener** Still (z. B. Freeze des Master-Plates bei Frame 0, gecroppt auf den Slot). Ein externes Porträtfoto passt niemals in Beleuchtung, Framing oder Identität zum Plate. Diese richtige Umsetzung ist ein separates Feature (v190.1), kein Hotfix.
+1. **`composer.sync_so_concurrency_cap = 4`** in `system_config` schreiben (Migration).
+   - `compose-dialog-segments` fanned dann alle 4 Sprecher gleichzeitig zu Sync.so aus, statt sie in 2 seriellen Wellen abzuarbeiten. Größter Einzelgewinn: −2 bis −3 Min.
 
-Für den Hotfix ziehen wir die im letzten Turn eingeführte Aktivierung **exakt zurück** und lassen den rohen Plate durchscheinen. Kling wird via v175-Closed-Mouth-Prompt bereits so instruiert, dass Listener-Gesichter überwiegend still bleiben — das ist besser als geisterhafte Porträts.
+2. **`FEATURE_PER_PASS_LOCK = true`** in den Edge-Function-Env-Vars.
+   - Jeder Sync.so-Pass hält seinen eigenen Advance-Lock. Wenn zwei Passes fast zeitgleich fertig werden, kollidieren die Webhooks nicht mehr, keine 2-Min-Watchdog-Wartezeit. −0 bis −2 Min.
 
-## Fix
+3. **`FEATURE_PRECLIP_PREFANOUT = true`** in den Edge-Function-Env-Vars.
+   - Reine Retry-Absicherung, kein Impact auf den Happy Path, aber −90s auf Fallback-Pfaden.
 
-**Einziger Schritt:** Neue Migration schreibt `composer.silent_faces_v183 = false` in `system_config`.
+### Schritt 2 — Code-Änderungen (kleiner Turn)
 
-Damit:
+4. **Turn-Visibility-Gate parallelisieren** in `compose-dialog-segments/index.ts` (Zeilen 2521–2614): die serielle `for`-Schleife über die Sprecher durch `Promise.all(speakers.map(...))` ersetzen. −0 bis −20s Preflight bei Cold-Cache.
 
-- `render-sync-segments-audio-mux` überspringt beim nächsten Render den `globalSilentSlots`-Zweig komplett (`silentFacesV183Enabled` → `false`).
-- Der Remotion-Player rendert nur noch die Fanout-Overlays (Sync.so-Outputs pro Turn) über dem rohen Plate.
-- Die drei Ghost-Porträts verschwinden sofort.
+5. **Default `concurrencyCap` von 2 auf 4 hardcoden** (Zeile 6442). Absicherung, damit ein fehlender DB-Row nie wieder zurück auf seriell fällt. DB-Row bleibt Kill-Switch nach unten.
 
-Keine Code-Änderungen an `render-sync-segments-audio-mux`, `DialogStitchVideo` oder `compose-dialog-segments` — reine Config-Umschaltung, in einer Zeile umkehrbar.
+6. **Audio-Mux `system_config`-Read entfernen** (`render-sync-segments-audio-mux/index.ts:248–258`). Flag ist seit v190 default ON — `silentFacesV183Enabled = true` fest verdrahten. −1 DB-RT pro Mux.
 
-## Was nachher noch zu tun ist (nicht Teil dieses Plans)
+### Schritt 3 — Cleanup (kein Perf-Effekt, aber Hygiene)
 
-- Beobachten, ob mit reinem Plate + v175-Closed-Mouth-Prompt die Restlippen-Bewegung der Nicht-Sprecher akzeptabel gering ist.
-- Falls nicht: separater Plan v190.1, der als `anchorUrl` einen aus dem Master-Plate gerenderten Face-Still verwendet (Freeze-Crop statt `brand_characters.portrait_url`) und die Slot-Sichtbarkeit strikt auf die Silent-Windows begrenzt.
-- `COMPOSE_DIALOG_SEGMENTS_VERSION` von `"v187"` auf `"v191"` bumpen (log-grep-Kosmetik, kein Verhalten).
+7. `SilentFaceFreeze`-Komponente in `DialogStitchVideo.tsx` (Zeilen 315–365) löschen — seit v190 tot.
+8. Per-Shot `silentSlots` aus `ShotSchema` (Zeilen 81–91) entfernen — seit v190 tot.
+9. `v164SilentSlotsByExcludedIdx` (`render-sync-segments-audio-mux/index.ts:323–324`) löschen — dead code mit `void`-Marker.
+10. `COMPOSE_DIALOG_SEGMENTS_VERSION` auf `"v192"` bumpen (Log-Grep-Hygiene).
+
+## Erwartetes Ergebnis
+
+Nach Schritt 1–2 sollte eine 4-Sprecher-Szene wieder in **~9–10 Min** durchlaufen (Ziel v169-Niveau, ggf. leicht darunter, weil v153.2 bbox-url-pro Preclip-Round-Trips im Happy Path spart, die v169 noch hatte).
+
+## Nicht Teil dieses Plans
+
+- Der v190 Ghost-Avatar-Rollback (`composer.silent_faces_v183 = false`) bleibt eigenständig; er ist parallel gültig und Config-Schalter #1 (`sync_so_concurrency_cap`) schließt ihn nicht aus.
+- Ein späterer Plan v190.1 (Plate-Freeze-Crop als Anchor statt `portrait_url`) wird separat aufgesetzt.
 
 ## Technische Details
 
-- Migration: `UPDATE public.system_config SET value = 'false'::jsonb WHERE key = 'composer.silent_faces_v183';` (bzw. Upsert mit `INSERT … ON CONFLICT`).
-- Betroffene Runtime-Zweige: `render-sync-segments-audio-mux/index.ts` Lines 253–320 (Slot-Bau) und 452–461 (Attach) — beide gated durch `silentFacesV183Enabled`.
-- Kein Redeploy nötig, wirkt beim nächsten Scene-Render sofort.
-- Rollback dieses Rollbacks: 1 SQL-Zeile.
+- **Migrationen:**
+  - `INSERT INTO public.system_config (key, value) VALUES ('composer.sync_so_concurrency_cap', '4'::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();`
+  - (Ghost-Avatar-Rollback-Row `composer.silent_faces_v183 = false` bleibt wie im Vor-Plan.)
+- **Env-Vars** (Edge Function Secrets) für `compose-dialog-segments`:
+  - `FEATURE_PER_PASS_LOCK=true`
+  - `FEATURE_PRECLIP_PREFANOUT=true`
+- **Code-Edits:**
+  - `supabase/functions/compose-dialog-segments/index.ts`
+    - Zeile 6442: `let concurrencyCap = 4;`
+    - Zeilen 2521–2614: `for … await validateFrameFace` → `Promise.all(speakers.map(async …))` mit demselben Cache-Verhalten
+  - `supabase/functions/render-sync-segments-audio-mux/index.ts`
+    - Zeilen 248–258: `system_config`-Read entfernen, `const silentFacesV183Enabled = true;`
+    - Zeilen 323–324: dead map löschen
+  - `src/remotion/templates/DialogStitchVideo.tsx`
+    - Zeilen 81–91: `silentSlots` aus `ShotSchema` streichen
+    - Zeilen 315–365: `SilentFaceFreeze` löschen
+  - `COMPOSE_DIALOG_SEGMENTS_VERSION = "v192"`
+- **Kein Remotion-Bundle-Rebuild nötig**, solange `DialogStitchVideo`-Cleanup mit dem nächsten regulären Bundle-Deploy geht. Wenn `SilentFaceFreeze` gelöscht wird, muss neu deployt werden — bereits im Standard-Deploy-Flow enthalten.
+- **Kein Risiko für laufende Renders:** alle Änderungen wirken erst beim nächsten `compose-dialog-segments`-Aufruf bzw. nächsten Mux-Dispatch.
+
+## Rollback
+
+Jede der drei Config-Änderungen ist eine 1-Zeilen-Umkehr (Migration überschreiben bzw. Env-Var zurücksetzen). Code-Edits sind isoliert; einzelne Reverts möglich ohne Wechselwirkung.
