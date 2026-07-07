@@ -3792,6 +3792,123 @@ serve(async (req) => {
       pass.status = "rendering_preflight";
     }
 
+    // ── v193 — Batch preclip all sibling passes immediately ──────────────
+    // v192 only prefetched passes beyond the Sync.so concurrency cap. With cap=4
+    // that meant no prefetch at all for normal 4-speaker scenes; each fanout
+    // invocation still spent ~60–120s rendering its own preclip. Start sibling
+    // preclips as a background task as soon as pass 0 has claimed the scene,
+    // while pass 0 continues its own preclip + Sync.so dispatch.
+    if (!isAdvance && !isRetry && currentPassIdx === 0 && passes.length > 1 && plateDims && sourceClipUrl) {
+      let batchPreclipEnabled = true;
+      try {
+        const { data: batchFlag } = await supabase
+          .from("system_config")
+          .select("value")
+          .eq("key", "composer.batch_preclip_render")
+          .maybeSingle();
+        const raw = (batchFlag as any)?.value;
+        if (raw !== undefined && raw !== null) {
+          batchPreclipEnabled = String(raw).toLowerCase() !== "false";
+        }
+      } catch {
+        batchPreclipEnabled = true;
+      }
+
+      if (batchPreclipEnabled) {
+        const siblingIdxs = passes
+          .map((p, i) => ({ p, i }))
+          .filter(({ p, i }) =>
+            i > 0 &&
+            !(p as any)?.preclip_url &&
+            Array.isArray(p?.coords) &&
+            Number.isFinite(Number(p.coords?.[0])) &&
+            Number.isFinite(Number(p.coords?.[1])) &&
+            Array.isArray(p?.segments) &&
+            p.segments.length > 0,
+          )
+          .map(({ i }) => i);
+
+        if (siblingIdxs.length > 0) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v193_batch_preclip_all_start passes=${siblingIdxs.map((i) => i + 1).join(",")} total=${passes.length}`,
+          );
+          try {
+            EdgeRuntime.waitUntil((async () => {
+              const results = await Promise.allSettled(siblingIdxs.map(async (idx) => {
+                const bp = passes[idx] as any;
+                const bpWindows: Array<[number, number]> = (Array.isArray(bp.segments) ? bp.segments : [])
+                  .map((s: any) => [Number(s.startTime), Number(s.endTime)] as [number, number])
+                  .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && e > s);
+                if (bpWindows.length === 0) return { idx, status: "skip_no_windows" };
+                const unionStart = Math.max(0, Math.min(...bpWindows.map(([s]) => s)));
+                const unionEnd = Math.min(totalSec, Math.max(...bpWindows.map(([, e]) => e)));
+                const siblingCoords: Array<[number, number]> = passes
+                  .filter((other: any) => other?.speaker_idx !== bp.speaker_idx && Array.isArray(other?.coords))
+                  .map((other: any) => [Number(other.coords[0]), Number(other.coords[1])] as [number, number])
+                  .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+                const result = await renderPassFacePreclip(
+                  supabase,
+                  serviceKey,
+                  supabaseUrl,
+                  {
+                    sceneId,
+                    projectId: String((scene as any).project_id ?? ""),
+                    userId,
+                    passIdx: idx,
+                    masterVideoUrl: sourceClipUrl,
+                    srcWidth: plateDims.width,
+                    srcHeight: plateDims.height,
+                    coords: [Number(bp.coords[0]), Number(bp.coords[1])],
+                    bbox: speakerPlateBboxes?.[bp.speaker_idx] ?? null,
+                    siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
+                    startSec: unionStart,
+                    endSec: unionEnd,
+                  },
+                  300_000,
+                );
+                if (!result.ok || !result.preclipUrl || !result.crop) {
+                  return { idx, status: "failed", error: result.error ?? "preclip_unknown" };
+                }
+                await supabase.rpc("update_dialog_pass_slot", {
+                  _scene_id: sceneId,
+                  _pass_idx: idx,
+                  _patch: {
+                    preclip_url: result.preclipUrl,
+                    preclip_render_id: result.preclipRenderId ?? null,
+                    preclip_crop: {
+                      x: result.crop.x,
+                      y: result.crop.y,
+                      size: result.crop.size,
+                      outputSize: result.crop.outputSize,
+                    },
+                    preclip_start_sec: Number(unionStart.toFixed(3)),
+                    preclip_end_sec: Number(unionEnd.toFixed(3)),
+                    preclip_fps: Number(result.fps ?? 30),
+                    preclip_frame_count: Number.isFinite(Number(result.frameCount)) && Number(result.frameCount) > 0
+                      ? Math.max(1, Math.round(Number(result.frameCount)))
+                      : Math.max(1, Math.ceil((result.durationSec ?? Math.max(0.2, unionEnd - unionStart)) * Number(result.fps ?? 30))),
+                    preclip_duration_sec: Number((result.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3)),
+                    preclip_error: null,
+                    preclip_prefetched_at: new Date().toISOString(),
+                  },
+                });
+                return { idx, status: "ok" };
+              }));
+              const summary = results.map((r, n) => {
+                const idx = siblingIdxs[n] + 1;
+                return r.status === "fulfilled"
+                  ? `${idx}:${(r.value as any).status}`
+                  : `${idx}:threw`;
+              });
+              console.log(`[compose-dialog-segments] scene=${sceneId} v193_batch_preclip_all_done results=${summary.join(",")}`);
+            })());
+          } catch (err) {
+            console.warn(`[compose-dialog-segments] scene=${sceneId} v193_batch_preclip_all_setup_failed: ${(err as Error)?.message ?? err}`);
+          }
+        }
+      }
+    }
+
     pass.input_url = passInputUrl;
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
