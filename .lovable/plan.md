@@ -1,66 +1,122 @@
-## Problem
+## Was wir haben (Bestandsaufnahme)
 
-Zwei sichtbare Symptome, ein gemeinsamer Root-Cause:
+- `brand_characters.id` (UUID) existiert.
+- `CastRef` + `asBaseCharacterId` + `resolveCharacterId` + `mentionToCastRef` normalisieren Prefixe (`outfit:`, `catalog:`, `lib:`) auf die Base-UUID.
+- `composer_scenes.characterShots[]` speichert bereits `{ characterId, shotType, portraitUrl }`.
 
-1. **„Sprecher 3 sagt etwas, was nicht im Skript stand"** — Sync.so lippt den falschen Mund, weil der aktuelle Dispatch die **volle Multi-Face-Plate** an Sync.so schickt (`v153.2_unified_bbox_primary` — "bbox-url-pro SINGLE PATH, no preclip"). ASD ordnet die bounding_boxes aus der URL potenziell nicht 1:1 zu `pass.speaker_idx` → falscher Sprecher animiert.
-2. **Leichte Morphs bei jedem Sprecher** — Sync.so reprojiziert bei Full-Frame-Dispatch das gesamte Gesicht (nicht nur Lippen) minimal; DialogStitchVideo-Masken v198 kaschieren das nur teilweise, weil unter der Maske eben doch ein leicht abweichender Sync.so-Frame liegt.
+**Das eigentliche Problem**: Zwei Pfade in den Edge-Functions parsen zusätzlich noch Namen aus dem Freitext-Skript und matchen fuzzy — genau da entsteht die Verwechslung.
 
-Der v169-Guide beschreibt explizit den **Per-Speaker-Preclip-Pfad** (§7.3): jeder Pass bekommt einen eigenen, tight-cropped Single-Face-Preclip als `input_url`, ASD ist deterministisch (`frame_number + coords` oder `bounding_boxes_url` auf **einem** Gesicht). v148/v153 haben diesen Pfad zugunsten eines Full-Plate-Shortcuts deaktiviert — das ist die Regression.
+## Ziel
 
-## Fix — v169-Preclip-Pfad reaktivieren
+1. **Cast & World = Single Source of Truth via ID.** Alles, was in `compose-video-clips` und `compose-dialog-segments` ankommt, referenziert eine `brand_characters.id`. Freitext-Speaker-Labels sind reine Anzeige und werden aus IDs gerendert, nicht umgekehrt geparst.
+2. **Unbegrenzte Aktionen mit stabilem Lipsync**: Ein "Face-Lock"-Layer trackt pro Character-ID die Gesichts-Region über die gesamte Szene (auch beim Autofahren, Kämpfen), sodass Sync.so immer auf einen ID-verankerten Face-Crop dispatcht — egal was der Körper macht.
 
-Ziel: `compose-dialog-segments` schickt pro Pass wieder einen Per-Speaker-Preclip an Sync.so, nicht die Full-Plate.
+## Teil A — Speaker-Resolution rein ID-basiert (Backend-only)
 
-### Änderungen in `supabase/functions/compose-dialog-segments/index.ts`
+### A1. `composer_scenes.dialog_turns` als kanonische Turn-Liste (jsonb, additiv)
 
-1. **v153.2-Bypass abschalten** (~Zeile 4090–4170)
-   - Das `v153.2_unified_bbox_primary` "SINGLE PATH"-Guardrail wird deaktiviert: kein automatisches `bbox-url-pro` auf Full-Plate als First-Dispatch mehr.
-   - `firstDispatchVariant` wird auf `preclip_coords_doc_strict` (Preclip + `auto_detect:false, frame_number+coordinates`) gesetzt — der v169 §5/§7.3-Pfad.
+Neue Spalte `dialog_turns jsonb DEFAULT '[]'::jsonb`. Format:
 
-2. **Preclip-Rendering wieder als Default aktivieren** (~Zeile 4489–4590, `usePassPreclip`-Gate)
-   - `usePassPreclip = true` für **alle** N ≥ 1 (nicht mehr an `retry_variant` gebunden).
-   - `pass-face-preclip.ts` läuft für Pass 0..cap synchron vor Dispatch, Pass cap..N via v167 Pre-Fanout im Hintergrund (`EdgeRuntime.waitUntil`).
-   - Preclip-Bucket bleibt `dialog-plates/preclips/<scene>/sp<idx>.mp4`.
+```ts
+DialogTurn = {
+  turnId: string;         // uuid
+  characterId: string;    // brand_characters.id — Pflicht
+  text: string;           // ohne "NAME:"-Prefix
+  mood?: string;
+  order: number;
+};
+```
 
-3. **ASD-Payload pro Preclip** (~Zeile 4570–4600 + `_shared/asd-strategy.ts`)
-   - Auf dem Single-Face-Preclip: `{ auto_detect: false, frame_number: <plate-frame>, coordinates: [cx, cy] }` (zentriert auf das eine Gesicht im Crop).
-   - `bounding_boxes_url` fällt für den Preclip-Pfad weg — dort gibt es nur ein Gesicht.
-   - Multi-Speaker-Guard (Zeile 5909) bleibt scharf: `auto_detect:true` weiter verboten für N ≥ 2.
+Backfill-Migration füllt `dialog_turns` einmalig aus dem bestehenden `dialogScript` + `characterShots[]` mittels des vorhandenen Fuzzy-Matchers. Ab dann ist `dialog_turns` die Wahrheit.
 
-4. **v153-Wire-Overwrite-Assert entschärfen** (~Zeile 6224–6231)
-   - Der Assert "v153 set bbox-url-pro but ASD was rewritten to auto_detect before wire" bleibt aktiv, aber der Trigger wird umgedreht: Wir *wollen* jetzt Preclip + Coords, nicht bbox-url-pro. Log-Message auf "v199_preclip_coords_primary_active" umbenennen.
+### A2. `compose-video-clips/index.ts` — Namens-Resolver deaktivieren
 
-5. **Retry-Ladder unverändert** (§6 im Guide)
-   - Slot 0 wird nur umbenannt: `bbox-url-pro` bleibt als Retry-Escape für pathologische Preclip-Failures, aber ist nicht mehr First-Dispatch.
-   - `MAX_SHOT_RETRIES=4`, `RETRY_TEMPERATURES=[0.5, 0.35, 0.7, 0.4]` bleiben.
+- Neuer Gate `FEATURE_ID_ONLY_CAST_RESOLUTION` (default `true`).
+- Wenn `scene.dialog_turns.length > 0`: **STAGE 4/5 Namens-Fuzzy komplett übersprungen**. `effectiveShots` = Deduped `dialog_turns.map(t => resolveByCharacterId(t.characterId))`.
+- `resolveByCharacterId()` läuft strikt: `brand_characters` SELECT by `id`. Kein Portrait → Guard-Error `character_without_portrait: <id>` (mit ID, nicht Name, für eindeutiges Debugging).
+- Legacy-Pfad (dialog_turns leer) bleibt für alte Szenen, wird aber pro Run in `syncso_dispatch_log.meta.speakers_source = 'legacy_name_match'` markiert — messbare Migration.
 
-### Erwartete Nebenwirkung auf DialogStitchVideo
+### A3. `compose-dialog-segments/index.ts` — Pass-Zuordnung via ID
 
-Sobald Sync.so nur noch ein Gesicht sieht, verschwindet die Full-Frame-Reprojection auf den anderen Sprechern → die aktuellen v198-Masken (55/56% Radius) haben genug Puffer und die Rest-Morphs sind weg, **ohne** weitere Composer-Änderungen. Kein Touch an `DialogStitchVideo.tsx` in diesem Plan.
+- `speakerIdxForTurn(turn, orderedCastIds)` gibt Slot-Index aus der ID-Position in der de-duplizierten Cast-Liste zurück — **nie mehr aus geparstem Namen**.
+- v166 anchor-identity-bridge, v167 preclip-pre-fanout, v168 per-pass-lock nutzen weiterhin die gleiche Slot-Nummer — jetzt aber deterministisch aus ID abgeleitet.
+- Log-Marker `speaker_idx_source='dialog_turn.characterId'`.
 
-### Log-Marker
+### A4. Anti-Regression Guards
 
-Neuer Grep-Tag: `v199_preclip_coords_primary` in compose-dialog-segments, sync-so-webhook, syncso_dispatch_log (`meta.dispatch_video_kind='preclip'`, `meta.payload_summary.options.active_speaker_detection.frame_number` gesetzt, `bounding_boxes_url` **nicht** gesetzt).
+- Runtime-Assert in beiden Edge-Functions: Jeder Speaker/Turn, der in die Sync.so-Dispatch-Queue geht, muss ein valides `brand_characters.id` (UUID-regex + DB-Hit) haben. Sonst harter Reject mit `id_only_enforcement_violation` — kein Silent-Fallback auf Namen.
+- Unit-Test in `supabase/functions/_shared/*.test.ts`: künstliches Skript mit `SPRECHER 1:` + populierte `dialog_turns` → Ergebnis nutzt IDs, nicht "Sprecher 1".
 
-### Memory-Update
+## Teil B — Face-Lock für unbegrenzte Aktionen
 
-- Neue Memory-Datei `mem/architecture/lipsync/v199-preclip-primary-restoration.md` mit dem Rationale, warum v148/v153 zurückgerollt wurde.
-- Update von `mem://architecture/lipsync/v126-unified-preclip-pipeline.md` — der v126-Kontrakt wird explizit wieder Default.
+Aktueller Ablauf: Preclip = statischer Crop um die Bounding-Box aus **einem** Anchor-Frame. Wenn der Charakter im Auto sitzt und sich bewegt oder kämpft, wandert das Gesicht aus dem Crop → Sync.so verliert den Face-Lock.
+
+### B1. Face-Track pro Character-ID (neue Tabelle)
+
+```
+scene_face_tracks (
+  scene_id uuid, character_id uuid, pass_idx int,
+  track_kind text,           -- 'anchor' | 'motion'
+  frames jsonb,              -- [{ t_ms, bbox:[x,y,w,h], confidence }]
+  face_embedding vector(512),-- Gemini Vision face-descriptor der ID
+  created_at timestamptz,
+  primary key (scene_id, character_id, pass_idx)
+)
+```
+
+RLS: owner via `scene_id → composer_scenes.user_id`. GRANT `authenticated` + `service_role`.
+
+### B2. Neue Edge-Function `track-scene-faces`
+
+- Input: `sceneId`, `characterIds[]`, `plateUrl`.
+- Läuft nach Plate-Generation, vor v167 Preclip-Fanout.
+- Extrahiert Face-Embedding pro `character_id` aus dessen `brand_characters.reference_image_url` (bereits vorhanden — der Portrait-Anchor).
+- Trackt Face-Detektionen im Plate über die gesamte Dauer (Sampling 5–10 fps reicht für Preclip-Cropping), matcht gegen das Embedding der ID.
+- Schreibt `frames[]` in `scene_face_tracks`. Kein zweiter Charakter kann "übernehmen", weil pro ID separater Track.
+- Kosten-Guard: Wenn `plateUrl` schon in `frame_face_cache` liegt, reuse.
+
+### B3. `pass-face-preclip` wird trajectory-aware
+
+Aktuell: statischer Crop-Rect für die ganze Preclip-Dauer.
+
+Neu: Preclip-Renderer (ffmpeg oder Remotion-Template `DialogTurnFaceCropVideo.tsx`) liest den `scene_face_tracks.frames[]` für `(scene, characterId, pass)` und cropt **per Frame** entlang der Track-Trajektorie, mit sanftem Kalman-Smoothing (Jitter-Filter). Ausgabe bleibt ein Single-Face-Preclip, aber das Gesicht bleibt im Frame egal wie stark sich der Body bewegt.
+
+Wenn Track-Confidence zwischen Frames dropt (< 0.5): Fallback auf letzte verlässliche BBox + Padding-Boost, keine harten Sprünge.
+
+### B4. ASD-Payload bleibt v199 (frame_number + coordinates)
+
+Die Koordinaten werden jetzt aus dem **stabilisierten** Preclip-Center genommen (immer Bildmitte, weil der Track dorthin gecroppt hat) → ASD hat es leicht, Sync.so kann nicht mehr auf den falschen Speaker springen weil im Preclip nur ein Face existiert und dieses Face nachweislich die richtige `character_id` ist (Embedding-Verified).
+
+### B5. Stitch-Layer
+
+`DialogStitchVideo.tsx` v198 Masken kaschieren bereits leichte Morphs. Neu: Wenn `scene_face_tracks` vorhanden, wird die Maske **auf den Face-Track zentriert**, nicht auf einen statischen Punkt. Dadurch bleibt die Maske über einem bewegten Kopf, statt am Startpunkt zu kleben.
 
 ## Was NICHT geändert wird
 
-- `sync-so-webhook` (Retry-Ladder + Idempotenz bleibt intakt).
-- `render-sync-segments-audio-mux` (v197 Silent-Windows bleiben).
-- `DialogStitchVideo.tsx` v198-Masken (bleiben als Sicherheitsnetz).
-- Preisformel `ceil(durSec) × 9 × N_passes` (unverändert).
-- v168 Per-Pass-Lock, v167 Preclip-Pre-Fanout, v166 Anchor-Identity-Bridge (alle bleiben aktiv — sie sind Voraussetzung für den Preclip-Pfad).
-
-## Validierung nach Deploy
-
-- Neue 3-Sprecher-Testszene rendern.
-- `syncso_dispatch_log` prüfen: jede Row muss `meta.dispatch_video_kind='preclip'` haben, Payload muss `frame_number + coordinates` enthalten, **keine** `bounding_boxes_url`, **kein** `auto_detect:true`.
-- Visuell: kein Wrong-Speaker mehr, keine sichtbaren Morphs auf inaktiven Sprechern.
+- **Kein Frontend-Change**. Der bestehende Editor schreibt bereits `characterShots[]` mit IDs; `dialog_turns` wird per Backfill/Trigger aus vorhandenen Daten abgeleitet, User merkt nichts.
+- Preisformel `ceil(durSec) × 9 × N_passes` unverändert.
+- v199 Preclip-Coords-Primary bleibt aktiv.
+- v198 Stitch-Masken bleiben, nur ihr Center-Point wird track-aware.
+- `sync-so-webhook`, Retry-Ladder, Idempotenz-Kontrakt unangetastet.
 
 ## Rollback
 
-Ein Feature-Flag `composer.force_v153_bbox_primary=true` in `system_config` schaltet den v153.2-Pfad in einer Row-Sekunde zurück, kein Deploy nötig.
+- `FEATURE_ID_ONLY_CAST_RESOLUTION=false` in `system_config` → Legacy-Namens-Resolver reaktiviert.
+- `FEATURE_FACE_TRACK_PRECLIP=false` → statischer Crop wie heute, `scene_face_tracks` wird ignoriert.
+- Beides ohne Deploy per DB-Toggle.
+
+## Validierung
+
+1. **ID-Enforcement**: Test-Szene mit 3 Sprechern, im Skript-Text alle Namen absichtlich verwechselt (`SAMUEL:` sagt Sarahs Text). `dialog_turns.characterId` bleibt korrekt → Sync.so lippt korrekt am richtigen Face. `syncso_dispatch_log.meta.speakers_source='dialog_turns'`.
+2. **Face-Lock**: Test-Szene mit einem Charakter der während des Dialogs den Kopf stark bewegt (z.B. "schaut sich im Auto um"). Preclip-MP4 aus `dialog-plates/preclips/…` visuell prüfen → Gesicht bleibt zentriert. Sync.so-Output zeigt keinen Morph-Drift.
+3. **Unbegrenzte Aktion**: Kampf-Szene, zwei Charaktere, viel Bewegung, mit Dialog. Erwartet: beide Preclips halten je ein Face zentriert, Lipsync sitzt auf beiden korrekt, keine Verwechslung.
+
+## Rollout-Reihenfolge
+
+1. Migration `dialog_turns` + Backfill.
+2. `scene_face_tracks` Tabelle + `track-scene-faces` Edge-Function.
+3. `compose-video-clips` und `compose-dialog-segments` auf ID-Only umstellen (Feature-Flag on).
+4. `pass-face-preclip` trajectory-aware machen (Feature-Flag on).
+5. `DialogStitchVideo.tsx` Masken-Center track-aware (nur wenn `scene_face_tracks` vorhanden — sonst wie heute).
+
+Jeder Schritt einzeln deploybar & einzeln rollback-fähig.
