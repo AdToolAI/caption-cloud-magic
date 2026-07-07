@@ -544,23 +544,25 @@ serve(async (req) => {
       const e = Number(shot?.endSec);
       return Number.isFinite(e) ? Math.max(max, e) : max;
     }, 0);
-    const tailFreezeFromSec = isSingleSpeakerTight && lastShotEndSec > 0 && lastShotEndSec < totalSec - 0.05
-      ? Number(lastShotEndSec.toFixed(3))
-      : null;
+    // v195 supersedes v182: the per-pass silent-face freeze covers head +
+    // tail + gap silence on the SAME crop the plate uses, so a scene-wide
+    // freeze is no longer needed and produced the "everything frozen" look.
+    // We keep v182 as an emergency fallback only when v195 emitted no slots
+    // (e.g. no valid preclip_crop on the single pass).
+    const tailFreezeFromSec =
+      silentFaceFreezes.length === 0 && isSingleSpeakerTight && lastShotEndSec > 0 && lastShotEndSec < totalSec - 0.05
+        ? Number(lastShotEndSec.toFixed(3))
+        : null;
     if (tailFreezeFromSec !== null) {
       console.log(
-        `[render-sync-segments-audio-mux] scene=${sceneId} v182_n1_tail_hold from=${tailFreezeFromSec.toFixed(3)} to=${totalSec.toFixed(3)}`,
+        `[render-sync-segments-audio-mux] scene=${sceneId} v182_n1_tail_hold_fallback from=${tailFreezeFromSec.toFixed(3)} to=${totalSec.toFixed(3)} (v195 emitted 0 slots)`,
       );
     }
 
 
-    // v190 — scene-wide silent-face anchor tiles (all speakers with a valid
-    // preclip_crop). Rendered once by the Remotion template above the raw
-    // master plate and below all fanout shots; active Sync.so overlays
-    // cover the matching slot inside their own turn window, so anchor tiles
-    // only ever show for a silent face. N=1 (no fanout) → empty array.
+    // v190 legacy portrait tiles — only when v183 flag ON and v195 OFF.
     const globalSilentSlots =
-      silentFacesV183Enabled && isFanout && donePasses.length >= 2
+      silentFacesV183Enabled && !silentAnchorV195Enabled && isFanout && donePasses.length >= 2
         ? Array.from(silentSlotBySpeakerIdx.values())
         : [];
     if (globalSilentSlots.length > 0) {
@@ -581,6 +583,7 @@ serve(async (req) => {
       shots: fanoutShots,
       ...(tailFreezeFromSec !== null ? { tailFreezeFromSec } : {}),
       ...(globalSilentSlots.length > 0 ? { globalSilentSlots } : {}),
+      ...(silentFaceFreezes.length > 0 ? { silentFaceFreezes } : {}),
     };
 
     const shotSummary = fanoutShots.map((shot: any, idx: number) => ({
