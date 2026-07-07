@@ -46,17 +46,25 @@ as an `AssetRef(type=character)` on the scene.
   `referenceImageUrl`, `canonicalName`, `voiceId`, joining
   `brand_characters` / `brand_locations` / `brand_buildings` / `brand_props`.
 - **Log marker**: `v202_asset_registry_bound` emitted by
-  `compose-video-clips` on every request with per-scene breakdown.
+  `compose-video-clips` on every request with per-scene breakdown, and by
+  `compose-dialog-segments` right after canonical dialog_turns resolve
+  (assets_total / characters / locations / missing[]).
+- **Briefing → apply write-path (Teil B)**: `briefing-deep-parse` computes
+  `plan.scenes[i].sceneAssets` from resolved cast/location IDs and returns
+  it inside the ProductionPlan. `useApplyProductionPlan` includes
+  `scene_assets` in the `composer_scenes` INSERT payload, so freshly
+  plan-applied scenes never need JIT-backfill.
 
 ## Boundaries (intentional)
-- No frontend change. Editor keeps writing `character_shots` and legacy
-  columns; backend derives `scene_assets` on the fly.
-- Briefing-deep-parse output shape is untouched here. Follow-up work will
-  wire it to emit `AssetRef`s directly.
+- No frontend UI change. Editor keeps writing `character_shots` and legacy
+  columns; backend derives `scene_assets` on the fly. Only the
+  plan-applier now writes `scene_assets` directly.
 - Motion Studio snippets keep their own reference columns for now. They will
   gain a `scene_assets` layer once Composer path is verified.
 - Face-Track preclip (v201 Teil B) is still gated by
   `composer.feature.face_track_preclip=false`.
+- `render-directors-cut` does not consume `scene_assets` yet — it operates
+  on rendered clip URLs and doesn't need character/location resolution.
 
 ## Files
 - `supabase/migrations/…_v202_scene_assets.sql` — column, index, backfill,
@@ -65,3 +73,14 @@ as an `AssetRef(type=character)` on the scene.
 - `supabase/functions/compose-video-clips/index.ts` — imports + stage
   `v202_scene_assets_ensure` + `v202_asset_registry_bound` log +
   optional hard-fail gate.
+- `supabase/functions/compose-dialog-segments/index.ts` — reads
+  `scene_assets` column + emits `v202_asset_registry_bound` log with
+  speaker↔registry cross-check.
+- `supabase/functions/briefing-deep-parse/index.ts` — post-Pass-C emitter
+  that writes `plan.scenes[i].sceneAssets` from resolved cast/location IDs.
+- `src/lib/video-composer/briefing/productionPlan.ts` — `PlanScene.sceneAssets`
+  zod field.
+- `src/hooks/useApplyProductionPlan.ts` — builds `sceneAssets` per scene
+  (uses plan-provided array when present, else derives from cast+location)
+  and includes it in the `composer_scenes` INSERT.
+

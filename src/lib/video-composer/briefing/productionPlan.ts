@@ -174,6 +174,20 @@ export const PlanScene = z.object({
    * so reroll / continuity is reproducible.
    */
   seed: z.number().int().min(0).max(2_147_483_647).optional(),
+
+  /**
+   * v202 — Canonical Cast & World asset references produced by the resolver.
+   * Mirrors `composer_scenes.scene_assets`. When present, the applier writes
+   * this straight into the DB so no JIT-backfill is needed on first
+   * compose-video-clips dispatch. Empty array is valid (broll-only scene).
+   */
+  sceneAssets: z.array(z.object({
+    type: z.enum(['character', 'location', 'building', 'prop', 'style']),
+    id: z.string(),
+    variantId: z.string().nullable().optional(),
+    role: z.string().nullable().optional(),
+    displayName: z.string().nullable().optional(),
+  })).optional(),
 });
 
 export const PlanVoice = z.object({
