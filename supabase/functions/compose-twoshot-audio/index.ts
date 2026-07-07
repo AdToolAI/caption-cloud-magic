@@ -205,6 +205,12 @@ interface DialogBlock {
   speakerName: string; // normalized lower-case key for matching dialog_voices
   rawSpeaker: string; // original casing
   text: string;
+  /** Canonical brand_characters.id when the block was built from
+   *  `dialog_turns` (ID-Only Cast Resolution v200). When set, the segments
+   *  loop skips name-based ambiguity checks and uses this ID directly for
+   *  per-speaker grouping — the fix for the "SARAH says SAMUEL's line"
+   *  and "SPRECHER 1: collapses onto wrong slot" failure modes. */
+  characterId?: string;
 }
 
 /** Split "Matthew Dusatko: hi\nSarah: hello" into ordered blocks. */
@@ -227,6 +233,33 @@ function parseDialogScript(script: string): DialogBlock[] {
     });
   }
   return blocks;
+}
+
+/**
+ * ID-Only block builder (v200). Consumes canonical `dialog_turns` +
+ * pre-loaded brand_characters name map and returns DialogBlocks whose
+ * `characterId` is set explicitly. NO free-text name parsing.
+ *
+ * Returns null when turns are empty so the caller falls back to
+ * `parseDialogScript` (legacy scene).
+ */
+function blocksFromDialogTurns(
+  turns: DialogTurn[],
+  nameById: Map<string, string>,
+): DialogBlock[] | null {
+  if (!turns.length) return null;
+  const out: DialogBlock[] = [];
+  for (const t of turns) {
+    if (!t.characterId || !t.text) continue;
+    const rawSpeaker = nameById.get(t.characterId) || `Character ${t.characterId.slice(0, 8)}`;
+    out.push({
+      speakerName: rawSpeaker.toLowerCase().trim().replace(/\s+/g, "-"),
+      rawSpeaker,
+      text: t.text,
+      characterId: t.characterId,
+    });
+  }
+  return out.length > 0 ? out : null;
 }
 
 interface ResolvedVoice {
