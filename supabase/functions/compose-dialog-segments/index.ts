@@ -6023,7 +6023,17 @@ serve(async (req) => {
           : "asd_auto_detect_on_multi_speaker_fullplate",
         "Refusing to dispatch Sync.so with auto_detect=true on a multi-speaker scene; deterministic ASD is required.",
         500,
-        { v105_probe: v105Probe },
+        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only" },
+      );
+    }
+
+    if (speakers.length >= 2 && usePassPreclip) {
+      return await failBeforeProviderDispatch(
+        "v203_preclip_wire_blocked",
+        "v203_preclip_forbidden",
+        "Refusing to dispatch a multi-speaker dialog pass through a preclip; v203 requires full-plate sync-3 + bounding_boxes_url.",
+        500,
+        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only", input_space: "preclip" },
       );
     }
 
