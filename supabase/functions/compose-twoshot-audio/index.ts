@@ -294,6 +294,16 @@ function resolveVoice(
     };
   };
 
+  // v200 — ID-first voice resolution. When the block carries a canonical
+  // characterId, try dialog_voices[characterId] first before any name
+  // matching. Falls through to the legacy slug logic only when nothing
+  // is keyed by ID (backwards-compatible with old scenes).
+  if (block.characterId) {
+    const dvHit = (dialogVoices as any)[block.characterId];
+    const v = cfgToVoice(dvHit);
+    if (v) return v;
+  }
+
   const fullSlug = block.speakerName; // "matthew-dusatko"
   const firstName = fullSlug.split("-")[0]; // "matthew"
 
