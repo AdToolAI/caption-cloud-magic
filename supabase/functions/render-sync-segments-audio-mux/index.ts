@@ -559,9 +559,19 @@ serve(async (req) => {
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
     }));
 
+    // v194 diagnostic: how many done passes came from silent-stabilizers vs
+    // active speakers. Silent stabilizers carry `is_silent_stabilizer=true`
+    // on the pass row (written by compose-dialog-segments).
+    const stabilizerPasses = donePasses.filter((p: any) => p?.is_silent_stabilizer === true || p?.stabilizer_pass === true);
+    const activePasses = donePasses.filter((p: any) => !(p?.is_silent_stabilizer === true || p?.stabilizer_pass === true));
     console.log(
       `[render-sync-segments-audio-mux] scene=${sceneId} v164_mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length} summary=${JSON.stringify(shotSummary)}`,
     );
+    if (stabilizerPasses.length > 0) {
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v194_silent_speaker_pass_composited passes=${donePasses.length} active=${activePasses.length} stabilizers=${stabilizerPasses.length} shots=${fanoutShots.length}`,
+      );
+    }
 
     const renderId = crypto.randomUUID();
     const outName = `dialog-stitch-muxed-${sceneId}-${Date.now()}.mp4`;
