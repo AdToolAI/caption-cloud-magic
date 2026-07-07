@@ -1506,6 +1506,8 @@ This overrides any English wording in the briefing's scaffolding
         samples: passCStats.unresolvedSamples,
         version: CATALOG_VERSION,
       });
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] pass-C catalog resolver failed (non-fatal):', e?.message);
     }
 
     // ── v202 — Cast & World ID-Registry: emit sceneAssets per scene ───────
