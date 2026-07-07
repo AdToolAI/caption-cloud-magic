@@ -64,8 +64,8 @@ instead of silently using names.
 ## Validation
 - 3-speaker test scene: `syncso_dispatch_log` should show correct
   `character_id` per pass, `speakers_source=dialog_turns`,
-  `canonical_lipsync_pipeline=v203_fullplate_sync3_bbox_only`,
-  `input_space=plate`, `preclip_used=false`, `asd_mode=bounding_boxes_url`,
+  `canonical_lipsync_pipeline=v204_preclip_bbox_clipspace`,
+  `input_space=clip`, `preclip_used=true`, `asd_mode=bounding_boxes_url`,
   and `model=sync-3`.
 - The old v153 env rollback is intentionally blocked; do not re-enable
   `FEATURE_V153_BBOX_PRIMARY`.
