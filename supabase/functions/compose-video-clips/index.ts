@@ -36,6 +36,13 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
+import {
+  fetchDialogTurnsForScenes,
+  readIdOnlyEnabled,
+  effectiveShotsFromTurns,
+  orderedSpeakerIdsFromTurns,
+  type DialogTurn,
+} from "../_shared/scene-dialog-turns.ts";
 const ANCHOR_AUDIT_VERSION = 12;
 
 const corsHeaders = {
@@ -477,6 +484,60 @@ serve(async (req) => {
         hydrationErr,
       );
     }
+
+    // ID-Only Cast Resolution ------------------------------------------------
+    // Fetch canonical dialog_turns for every scene up-front. When present,
+    // the two speaker-resolution sites below skip name-based fuzzy matching
+    // entirely and derive the visual cast from turn.characterId directly.
+    // Legacy scenes (empty dialog_turns) fall through to the old resolver.
+    // Feature-flag gated via `composer.feature.id_only_cast_resolution`.
+    const idOnlyEnabled = await readIdOnlyEnabled(supabaseAdmin);
+    const dialogTurnsByScene: Map<string, DialogTurn[]> = idOnlyEnabled
+      ? await fetchDialogTurnsForScenes(
+          supabaseAdmin,
+          scenes.map((s) => s.id).filter(Boolean),
+        )
+      : new Map();
+    if (idOnlyEnabled && dialogTurnsByScene.size > 0) {
+      console.log(
+        `[compose-video-clips] id-only cast resolution active for ${dialogTurnsByScene.size}/${scenes.length} scene(s) (canonical dialog_turns)`,
+      );
+      // Hydrate any character referenced by turns that isn't yet in charById
+      // (e.g. legacy scene where the frontend didn't include the character in
+      // the request payload but the turns row already carries the UUID).
+      const missingFromTurns = new Set<string>();
+      for (const turns of dialogTurnsByScene.values()) {
+        for (const t of turns) {
+          if (t.characterId && !charById.has(t.characterId)) {
+            missingFromTurns.add(t.characterId);
+          }
+        }
+      }
+      if (missingFromTurns.size > 0) {
+        try {
+          const { data: rows } = await supabaseAdmin
+            .from("brand_characters")
+            .select("id, name, reference_image_url")
+            .in("id", Array.from(missingFromTurns));
+          for (const row of rows ?? []) {
+            const id = String((row as any).id);
+            if (id && !charById.has(id)) {
+              charById.set(id, {
+                id,
+                name: String((row as any).name ?? ""),
+                referenceImageUrl: (row as any).reference_image_url ?? undefined,
+              } as ComposerCharacter);
+            }
+          }
+        } catch (turnHydrateErr) {
+          console.warn(
+            "[compose-video-clips] dialog_turns character hydration failed:",
+            turnHydrateErr,
+          );
+        }
+      }
+    }
+
 
     /**
      * Strip spoken-dialog patterns from a scene prompt BEFORE handing it to
@@ -1632,17 +1693,27 @@ serve(async (req) => {
               castShots.push(shot);
             }
 
-            // Speaker-list override: when a dialog script is present, the
-            // visual cast MUST equal the deduplicated set of actual speakers,
-            // in script order. This prevents the "Samuel speaks twice → 3
-            // people in frame" failure mode by only sending portraits of
-            // people who actually speak.
+            // ID-Only Cast Resolution (v200) --------------------------------
+            // When `dialog_turns` is populated for this scene, use it as the
+            // single source of truth: the visual cast = deduped characterIds
+            // in first-appearance order. NO name parsing, NO fuzzy match.
+            // Falls back to the legacy script-slug resolver only for scenes
+            // whose dialog_turns row is empty (legacy scenes pre-migration).
+            const turnsForScene = dialogTurnsByScene.get(scene.id);
             const scriptSpeakers = uniqueSpeakerSlugsFromScript(
               scene.dialogScript,
             );
             let effectiveShots = castShots;
 
-            if (scriptSpeakers.length > 0) {
+            if (turnsForScene && turnsForScene.length > 0) {
+              const fromTurns = effectiveShotsFromTurns(turnsForScene, castShots);
+              if (fromTurns && fromTurns.length >= 1) {
+                effectiveShots = fromTurns as typeof castShots;
+                console.log(
+                  `[compose-video-clips] v200_id_only_cast scene=${scene.id} cast=[${effectiveShots.map((s) => s.characterId).join(",")}] source=dialog_turns`,
+                );
+              }
+            } else if (scriptSpeakers.length > 0) {
               const remapped = scriptSpeakers
                 .map((slug) => resolveSpeakerToShot(slug, castShots))
                 .filter(
@@ -1655,6 +1726,7 @@ serve(async (req) => {
                 );
               if (remapped.length >= 1) effectiveShots = remapped;
             }
+
 
             // STAGE 5 (May 30 2026): when the script declares speakers but
             // the cast is empty (single-speaker quick-flows often skip the
@@ -1674,6 +1746,7 @@ serve(async (req) => {
               return !!(c && (c as any).referenceImageUrl);
             });
             if (
+              !(turnsForScene && turnsForScene.length > 0) &&
               scriptSpeakers.length > 0 &&
               (effectiveShots.length === 0 || !effectiveHasPortrait)
             ) {
@@ -2230,14 +2303,26 @@ serve(async (req) => {
           ) {
             castShotsRaw.push(scene.characterShot);
           }
-          // Speaker-list override (same logic as cinematic-sync above): when
-          // a dialog script is present, only the people who actually speak
-          // get a portrait slot in the anchor.
+          // ID-Only Cast Resolution (v200) — same logic as cinematic-sync
+          // above: if dialog_turns are canonical for this scene, use IDs
+          // directly. Otherwise fall back to script-slug fuzzy matching.
+          const turnsForSceneUni = dialogTurnsByScene.get(scene.id);
           const scriptSpeakers = uniqueSpeakerSlugsFromScript(
             scene.dialogScript,
           );
           let castShots = castShotsRaw;
-          if (scriptSpeakers.length > 0) {
+          if (turnsForSceneUni && turnsForSceneUni.length > 0) {
+            const fromTurns = effectiveShotsFromTurns(
+              turnsForSceneUni,
+              castShotsRaw,
+            );
+            if (fromTurns && fromTurns.length >= 1) {
+              castShots = fromTurns as typeof castShotsRaw;
+              console.log(
+                `[compose-video-clips] v200_id_only_cast (universal) scene=${scene.id} cast=[${castShots.map((s) => s.characterId).join(",")}] source=dialog_turns`,
+              );
+            }
+          } else if (scriptSpeakers.length > 0) {
             const remapped = scriptSpeakers
               .map((slug) => resolveSpeakerToShot(slug, castShotsRaw))
               .filter(
@@ -2248,6 +2333,7 @@ serve(async (req) => {
               );
             if (remapped.length >= 1) castShots = remapped;
           }
+
           if (castShots.length >= 1 && !looksComposed) {
             // Outfit lookup — mirrors cinematic-sync (line 1232–1266).
             // Without this, a user-picked saved outfit (e.g. Roman armor)

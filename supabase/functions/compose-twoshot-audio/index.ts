@@ -22,6 +22,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import {
+  normalizeTurns,
+  readIdOnlyEnabled,
+  type DialogTurn,
+} from "../_shared/scene-dialog-turns.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -200,6 +205,12 @@ interface DialogBlock {
   speakerName: string; // normalized lower-case key for matching dialog_voices
   rawSpeaker: string; // original casing
   text: string;
+  /** Canonical brand_characters.id when the block was built from
+   *  `dialog_turns` (ID-Only Cast Resolution v200). When set, the segments
+   *  loop skips name-based ambiguity checks and uses this ID directly for
+   *  per-speaker grouping — the fix for the "SARAH says SAMUEL's line"
+   *  and "SPRECHER 1: collapses onto wrong slot" failure modes. */
+  characterId?: string;
 }
 
 /** Split "Matthew Dusatko: hi\nSarah: hello" into ordered blocks. */
@@ -222,6 +233,33 @@ function parseDialogScript(script: string): DialogBlock[] {
     });
   }
   return blocks;
+}
+
+/**
+ * ID-Only block builder (v200). Consumes canonical `dialog_turns` +
+ * pre-loaded brand_characters name map and returns DialogBlocks whose
+ * `characterId` is set explicitly. NO free-text name parsing.
+ *
+ * Returns null when turns are empty so the caller falls back to
+ * `parseDialogScript` (legacy scene).
+ */
+function blocksFromDialogTurns(
+  turns: DialogTurn[],
+  nameById: Map<string, string>,
+): DialogBlock[] | null {
+  if (!turns.length) return null;
+  const out: DialogBlock[] = [];
+  for (const t of turns) {
+    if (!t.characterId || !t.text) continue;
+    const rawSpeaker = nameById.get(t.characterId) || `Character ${t.characterId.slice(0, 8)}`;
+    out.push({
+      speakerName: rawSpeaker.toLowerCase().trim().replace(/\s+/g, "-"),
+      rawSpeaker,
+      text: t.text,
+      characterId: t.characterId,
+    });
+  }
+  return out.length > 0 ? out : null;
 }
 
 interface ResolvedVoice {
@@ -255,6 +293,16 @@ function resolveVoice(
       provider: engine === "hume" ? (cfg.provider === "CUSTOM_VOICE" ? "CUSTOM_VOICE" : "HUME_AI") : undefined,
     };
   };
+
+  // v200 — ID-first voice resolution. When the block carries a canonical
+  // characterId, try dialog_voices[characterId] first before any name
+  // matching. Falls through to the legacy slug logic only when nothing
+  // is keyed by ID (backwards-compatible with old scenes).
+  if (block.characterId) {
+    const dvHit = (dialogVoices as any)[block.characterId];
+    const v = cfgToVoice(dvHit);
+    if (v) return v;
+  }
 
   const fullSlug = block.speakerName; // "matthew-dusatko"
   const firstName = fullSlug.split("-")[0]; // "matthew"
@@ -562,10 +610,47 @@ serve(async (req) => {
     if (isServiceCall) userId = project.user_id;
 
     const dialogScript: string = (scene as any).dialog_script ?? "";
-    const blocks = parseDialogScript(dialogScript);
+
+    // ID-Only Cast Resolution (v200) --------------------------------------
+    // If `dialog_turns` is populated for this scene, build blocks directly
+    // from turn.characterId (each turn already carries the canonical
+    // brand_characters.id). This bypasses the free-text "NAME:" parser
+    // entirely — no fuzzy matching, no ambiguity between characters with
+    // similar first names, no generic "SPRECHER 1" collision.
+    const idOnlyOn = await readIdOnlyEnabled(supabase);
+    const rawTurns = normalizeTurns((scene as any).dialog_turns);
+    let idOnlyActive = false;
+    let idOnlyNameById = new Map<string, string>();
+    if (idOnlyOn && rawTurns.length > 0) {
+      const turnCharIds = Array.from(new Set(rawTurns.map((t) => t.characterId)));
+      try {
+        const { data: turnChars } = await supabase
+          .from("brand_characters")
+          .select("id, name")
+          .in("id", turnCharIds);
+        for (const c of turnChars ?? []) {
+          idOnlyNameById.set(String((c as any).id), String((c as any).name ?? ""));
+        }
+      } catch (e) {
+        console.warn("[compose-twoshot-audio] v200 turn name fetch failed:", (e as any)?.message);
+      }
+      idOnlyActive = idOnlyNameById.size > 0;
+    }
+
+    const blocks = idOnlyActive
+      ? (blocksFromDialogTurns(rawTurns, idOnlyNameById) ?? parseDialogScript(dialogScript))
+      : parseDialogScript(dialogScript);
+
+    if (idOnlyActive) {
+      console.log(
+        `[compose-twoshot-audio] v200_id_only_cast scene=${scene_id} blocks=${blocks.length} speakers=[${Array.from(new Set(blocks.map((b) => b.characterId).filter(Boolean))).join(",")}]`,
+      );
+    }
+
     if (blocks.length < 1) {
       return json({ error: "empty_dialog_script", blocks: 0 }, 400);
     }
+
 
     // Build name → character lookup so we can resolve voices.
     // We index by first name AND full slugified name (e.g. "matthew-dusatko")
@@ -863,25 +948,40 @@ serve(async (req) => {
       const endSample = cursorSamples + pcm.length;
       const slug = block.speakerName;
       const firstName = slug.split("-")[0];
-      // v86 — Detect ambiguous speaker name. If the user's cast contains 2+
-      // characters whose first names / slugs collide with this block's name
-      // AND the block doesn't carry a unique full-slug match, refuse rather
-      // than silently merge two speakers' lines onto one Sync.so pass.
-      const slugAmbiguous = ambiguousNameKeys.has(slug);
-      const firstNameAmbiguous = ambiguousNameKeys.has(firstName);
-      const fullSlugHit = charByName.get(slug);
-      if (!fullSlugHit && (slugAmbiguous || firstNameAmbiguous)) {
-        return json({
-          error: "ambiguous_speaker_name",
-          speaker: block.rawSpeaker,
-          message: `Sprecher "${block.rawSpeaker}" ist mehrdeutig — mehrere Cast-Mitglieder teilen diesen Namen. Bitte verwende den vollen Namen (z. B. "Vorname Nachname:") oder weise dem Skript-Block eine eindeutige Character-ID zu.`,
-        }, 400);
+
+      // ID-Only Cast Resolution (v200): when the block was built from
+      // `dialog_turns`, its characterId is authoritative. Skip the
+      // name-based ambiguity check — turns cannot be ambiguous because
+      // they reference brand_characters.id directly. This is the fix for
+      // "SPRECHER 1: collapses onto wrong slot" and for two characters
+      // sharing a first name.
+      let resolvedCharId: string | null = null;
+      if (block.characterId) {
+        resolvedCharId = block.characterId;
+      } else {
+        // v86 legacy path — Detect ambiguous speaker name. If the user's
+        // cast contains 2+ characters whose first names / slugs collide
+        // with this block's name AND the block doesn't carry a unique
+        // full-slug match, refuse rather than silently merge two
+        // speakers' lines onto one Sync.so pass.
+        const slugAmbiguous = ambiguousNameKeys.has(slug);
+        const firstNameAmbiguous = ambiguousNameKeys.has(firstName);
+        const fullSlugHit = charByName.get(slug);
+        if (!fullSlugHit && (slugAmbiguous || firstNameAmbiguous)) {
+          return json({
+            error: "ambiguous_speaker_name",
+            speaker: block.rawSpeaker,
+            message: `Sprecher "${block.rawSpeaker}" ist mehrdeutig — mehrere Cast-Mitglieder teilen diesen Namen. Bitte verwende den vollen Namen (z. B. "Vorname Nachname:") oder weise dem Skript-Block eine eindeutige Character-ID zu.`,
+          }, 400);
+        }
+        const charEntry = fullSlugHit ?? charByName.get(firstName);
+        resolvedCharId = charEntry?.id ?? null;
       }
-      const charEntry = fullSlugHit ?? charByName.get(firstName);
+
       segments.push({
         speaker: block.rawSpeaker,
         speaker_slug: slug,
-        character_id: charEntry?.id ?? null,
+        character_id: resolvedCharId,
         engine: voice!.engine,
         voice: voice!.voiceId,
         // Public timestamps in seconds (3-decimal precision = ~1 ms).

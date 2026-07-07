@@ -5810,6 +5810,7 @@ export type Database = {
           dialog_script: string | null
           dialog_shots: Json | null
           dialog_takes: Json
+          dialog_turns: Json
           dialog_voices: Json
           director_modifiers: Json | null
           duration_seconds: number
@@ -5895,6 +5896,7 @@ export type Database = {
           dialog_script?: string | null
           dialog_shots?: Json | null
           dialog_takes?: Json
+          dialog_turns?: Json
           dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
@@ -5980,6 +5982,7 @@ export type Database = {
           dialog_script?: string | null
           dialog_shots?: Json | null
           dialog_takes?: Json
+          dialog_turns?: Json
           dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
@@ -12552,6 +12555,63 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      scene_face_tracks: {
+        Row: {
+          character_id: string
+          created_at: string
+          face_embedding: string | null
+          frames: Json
+          id: string
+          meta: Json
+          pass_idx: number
+          plate_url: string | null
+          scene_id: string
+          track_kind: string
+          updated_at: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          face_embedding?: string | null
+          frames?: Json
+          id?: string
+          meta?: Json
+          pass_idx?: number
+          plate_url?: string | null
+          scene_id: string
+          track_kind?: string
+          updated_at?: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          face_embedding?: string | null
+          frames?: Json
+          id?: string
+          meta?: Json
+          pass_idx?: number
+          plate_url?: string | null
+          scene_id?: string
+          track_kind?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_face_tracks_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scene_face_tracks_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scene_still_frames: {
         Row: {
