@@ -241,9 +241,9 @@ serve(async (req) => {
     // renders an <Img> per slot (behind the active overlay) so the pristine
     // plate's baked-in mouth motion for non-speaking characters is masked
     // with a static image. No <Freeze>/<Video>, no morph, no ghost.
-    // v190 — default ON. Existing explicit `false` rows in system_config
-    // still act as kill-switch for rollback to v189.
-    let silentFacesV183Enabled = true;
+    // v192 — default OFF. Ghost-avatar overlays disabled globally. An
+    // explicit `true` row in system_config can re-enable for rollback tests.
+    let silentFacesV183Enabled = false;
     try {
       const { data: v183Row } = await supabase
         .from("system_config")
@@ -252,10 +252,10 @@ serve(async (req) => {
         .maybeSingle();
       const raw = (v183Row as any)?.value;
       if (raw !== undefined && raw !== null) {
-        silentFacesV183Enabled = String(raw).toLowerCase() !== "false";
+        silentFacesV183Enabled = String(raw).toLowerCase() === "true";
       }
     } catch {
-      silentFacesV183Enabled = true;
+      silentFacesV183Enabled = false;
     }
 
     // characterId → portrait_url, only fetched when the flag is on.
