@@ -2303,14 +2303,26 @@ serve(async (req) => {
           ) {
             castShotsRaw.push(scene.characterShot);
           }
-          // Speaker-list override (same logic as cinematic-sync above): when
-          // a dialog script is present, only the people who actually speak
-          // get a portrait slot in the anchor.
+          // ID-Only Cast Resolution (v200) — same logic as cinematic-sync
+          // above: if dialog_turns are canonical for this scene, use IDs
+          // directly. Otherwise fall back to script-slug fuzzy matching.
+          const turnsForSceneUni = dialogTurnsByScene.get(scene.id);
           const scriptSpeakers = uniqueSpeakerSlugsFromScript(
             scene.dialogScript,
           );
           let castShots = castShotsRaw;
-          if (scriptSpeakers.length > 0) {
+          if (turnsForSceneUni && turnsForSceneUni.length > 0) {
+            const fromTurns = effectiveShotsFromTurns(
+              turnsForSceneUni,
+              castShotsRaw,
+            );
+            if (fromTurns && fromTurns.length >= 1) {
+              castShots = fromTurns as typeof castShotsRaw;
+              console.log(
+                `[compose-video-clips] v200_id_only_cast (universal) scene=${scene.id} cast=[${castShots.map((s) => s.characterId).join(",")}] source=dialog_turns`,
+              );
+            }
+          } else if (scriptSpeakers.length > 0) {
             const remapped = scriptSpeakers
               .map((slug) => resolveSpeakerToShot(slug, castShotsRaw))
               .filter(
@@ -2321,6 +2333,7 @@ serve(async (req) => {
               );
             if (remapped.length >= 1) castShots = remapped;
           }
+
           if (castShots.length >= 1 && !looksComposed) {
             // Outfit lookup — mirrors cinematic-sync (line 1232–1266).
             // Without this, a user-picked saved outfit (e.g. Roman armor)
