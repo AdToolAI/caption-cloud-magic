@@ -4331,7 +4331,15 @@ serve(async (req) => {
     // Speaker single-face Crop ist sicher und well-understood). Nur der
     // Full-Plate Multi-Speaker Pfad bekommt bbox-url-pro.
     void v120ForcePreclip;
+    // v199 — read same flag used above (env is idempotent). When v199
+    // preclip-primary is enabled (default), the v147 bbox-eligibility path
+    // is also disabled so freshDefaultVariant naturally falls to coords-pro,
+    // which combined with the preclip Rule 0 downstream produces a
+    // single-face preclip + frame_number+coords dispatch per the v169 guide.
+    const v199GateForFresh =
+      (Deno.env.get("FEATURE_V153_BBOX_PRIMARY") ?? "false").toLowerCase() !== "true";
     const v147BboxEligible =
+      !v199GateForFresh &&
       speakers.length >= 2 &&
       havePlateIdentityForDispatch &&
       !!plateDims &&
