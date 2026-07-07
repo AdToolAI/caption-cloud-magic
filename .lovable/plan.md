@@ -1,122 +1,230 @@
-## Was wir haben (Bestandsaufnahme)
-
-- `brand_characters.id` (UUID) existiert.
-- `CastRef` + `asBaseCharacterId` + `resolveCharacterId` + `mentionToCastRef` normalisieren Prefixe (`outfit:`, `catalog:`, `lib:`) auf die Base-UUID.
-- `composer_scenes.characterShots[]` speichert bereits `{ characterId, shotType, portraitUrl }`.
-
-**Das eigentliche Problem**: Zwei Pfade in den Edge-Functions parsen zusätzlich noch Namen aus dem Freitext-Skript und matchen fuzzy — genau da entsteht die Verwechslung.
+# Ordnungs- und Fixplan: Cast & World + Lipsync Pipeline stabilisieren
 
 ## Ziel
 
-1. **Cast & World = Single Source of Truth via ID.** Alles, was in `compose-video-clips` und `compose-dialog-segments` ankommt, referenziert eine `brand_characters.id`. Freitext-Speaker-Labels sind reine Anzeige und werden aus IDs gerendert, nicht umgekehrt geparst.
-2. **Unbegrenzte Aktionen mit stabilem Lipsync**: Ein "Face-Lock"-Layer trackt pro Character-ID die Gesichts-Region über die gesamte Szene (auch beim Autofahren, Kämpfen), sodass Sync.so immer auf einen ID-verankerten Face-Crop dispatcht — egal was der Körper macht.
+Wir stoppen das historische Hin-und-her zwischen Preclip, Coordinates, alten bbox-Pfaden und Name-Matching. Es soll wieder eine klare Architektur geben:
 
-## Teil A — Speaker-Resolution rein ID-basiert (Backend-only)
+1. **Cast & World ist die Single Source of Truth**: Alles hat stabile IDs.
+2. **Briefing Analyse erzeugt/linked Cast & World Assets mit IDs**.
+3. **Motion Studio / AI Video Studio verwenden nur IDs als Referenzen**.
+4. **Lipsync nutzt genau einen offiziellen Multi-Speaker-Pfad**: Sync.so `sync-3` + `active_speaker_detection.bounding_boxes_url` / `bounding_boxes`, aber sauber pro Sprecher/Turn und nicht als chaotischer Legacy-Fallback.
+5. **Keine Morphs durch Pfad-Drift**: alte Full-Plate-Varianten werden entfernt oder hart blockiert, statt zufällig durch Env/Retry wieder aktiv zu werden.
 
-### A1. `composer_scenes.dialog_turns` als kanonische Turn-Liste (jsonb, additiv)
+## Aktueller Befund
 
-Neue Spalte `dialog_turns jsonb DEFAULT '[]'::jsonb`. Format:
+Die letzte Szene zeigt:
+
+- `dialog_turns = []` → v200 ID-only Resolver greift nicht.
+- `_v153BboxPrimary = true` auf allen Pässen → ein alter v153/bbox-primary Pfad lief weiterhin.
+- Damit ist nicht v169/v200 aktiv, sondern ein historischer Full-Plate-Pfad.
+
+Dein Bauchgefühl ist richtig: Wir sind nicht sauber auf einer geordneten Pipeline, sondern haben zu viele Versionen nebeneinander.
+
+## Neue Zielarchitektur
+
+```text
+Briefing / User Input
+        ↓
+Cast & World Registry
+brand_characters / brand_locations / brand_props / brand_buildings
+        ↓
+Scene Plan mit IDs
+scene_assets + characterShots + dialog_turns(characterId)
+        ↓
+Plate Generation
+Video enthält gewünschte Cast/World-IDs
+        ↓
+Face / Speaker Map
+characterId → bounding box track / frame boxes
+        ↓
+Sync.so sync-3
+bounding_boxes_url pro Sprecher/Turn
+        ↓
+Final Stitch / Render
+nur Zielsprecher wird animiert
+```
+
+## Phase 1 — Sofort Ordnung in die aktuelle Lipsync-Pipeline bringen
+
+### 1. Alte Pfade blockieren
+
+In `compose-dialog-segments`:
+
+- v153/v82/v43/v69/v126/v169/v199 Varianten werden nicht weiter als konkurrierende Routen behandelt.
+- Der aktuelle Produktpfad wird explizit:
+  - `model = sync-3`
+  - `active_speaker_detection.bounding_boxes_url` bevorzugt
+  - `bounding_boxes` inline nur als technischer Fallback, wenn Upload der JSON fehlschlägt
+  - keine `temperature`, keine `occlusion_detection_enabled`, keine Sync.so-unsupported Options
+- `FEATURE_V153_BBOX_PRIMARY` wird nicht mehr als stiller Runtime-Rollback akzeptiert. Alte Full-Plate-Primary-Flags dürfen nicht mehr unbemerkt übernehmen.
+
+### 2. ID-only Resolver erzwingen
+
+Vor jedem Compose:
+
+- Wenn `dialog_turns` vorhanden und nicht leer: ausschließlich `dialog_turns[].characterId` verwenden.
+- Wenn `dialog_turns=[]`, aber `dialog_script` + `character_shots` existieren: Just-in-time Backfill erzeugen und speichern.
+- Wenn Backfill nicht eindeutig ist: Szene failt mit klarer Fehlermeldung, statt Name-Fuzzy-Lipsync zu starten.
+
+Wichtig: Kein stilles Zurückfallen auf Namen, wenn Cast & World IDs vorhanden sein müssten.
+
+### 3. Bounding Boxes korrekt modellieren
+
+Bounding Boxes bleiben der zentrale Weg, aber sauber:
+
+- Pro `characterId` wird eine Box/Track-Quelle bestimmt:
+  - bevorzugt aus `scene_face_tracks` / Face Map
+  - sonst aus `characterShots[].coords` + vorhandener Plate Identity Map
+  - letzter Fallback: deterministische Box um den Speaker Point
+- Pro Turn wird eine `bounding_boxes_url` erzeugt:
+  - Frames außerhalb des Sprecher-Zeitfensters = `null`
+  - Frames im Sprecher-Zeitfenster = Box/Track des Zielsprechers
+- Dadurch bekommt Sync.so nicht mehr das Signal, mehrere Gesichter durchgehend zu verändern.
+
+### 4. Fehlerhafte aktuelle Szene zurücksetzen
+
+Für die letzte betroffene Szene:
+
+- `dialog_turns` aus Cast + Script befüllen, wenn eindeutig.
+- alte `dialog_shots` / `_v153BboxPrimary` Zustände entfernen.
+- Szene auf regenerierbar setzen.
+
+## Phase 2 — Cast & World als Registry aufräumen
+
+### 1. Einheitliches Asset-Referenzmodell
+
+Alle Studio-Prompts und Szenen sollen Referenzen als strukturierte IDs halten:
 
 ```ts
-DialogTurn = {
-  turnId: string;         // uuid
-  characterId: string;    // brand_characters.id — Pflicht
-  text: string;           // ohne "NAME:"-Prefix
-  mood?: string;
-  order: number;
-};
+{
+  type: "character" | "location" | "prop" | "building" | "style",
+  id: "uuid",
+  role: "speaker" | "background" | "vehicle_driver" | "fighter" | "product" | "setting",
+  required: boolean
+}
 ```
 
-Backfill-Migration füllt `dialog_turns` einmalig aus dem bestehenden `dialogScript` + `characterShots[]` mittels des vorhandenen Fuzzy-Matchers. Ab dann ist `dialog_turns` die Wahrheit.
+Das verhindert, dass dieselbe Figur einmal per Name, einmal per Mention und einmal per Prompttext verwendet wird.
 
-### A2. `compose-video-clips/index.ts` — Namens-Resolver deaktivieren
+### 2. Cross-Studio-Verwendung
 
-- Neuer Gate `FEATURE_ID_ONLY_CAST_RESOLUTION` (default `true`).
-- Wenn `scene.dialog_turns.length > 0`: **STAGE 4/5 Namens-Fuzzy komplett übersprungen**. `effectiveShots` = Deduped `dialog_turns.map(t => resolveByCharacterId(t.characterId))`.
-- `resolveByCharacterId()` läuft strikt: `brand_characters` SELECT by `id`. Kein Portrait → Guard-Error `character_without_portrait: <id>` (mit ID, nicht Name, für eindeutiges Debugging).
-- Legacy-Pfad (dialog_turns leer) bleibt für alte Szenen, wird aber pro Run in `syncso_dispatch_log.meta.speakers_source = 'legacy_name_match'` markiert — messbare Migration.
+Motion Studio und AI Video Studio lesen dieselben Cast & World IDs:
 
-### A3. `compose-dialog-segments/index.ts` — Pass-Zuordnung via ID
+- Charaktere: `brand_characters.id`
+- Locations: `brand_locations.id`
+- Props: `brand_props.id`
+- Buildings: `brand_buildings.id`
+- Outfits / Varianten: eigene Variant-IDs, aber immer parented an Character-ID
 
-- `speakerIdxForTurn(turn, orderedCastIds)` gibt Slot-Index aus der ID-Position in der de-duplizierten Cast-Liste zurück — **nie mehr aus geparstem Namen**.
-- v166 anchor-identity-bridge, v167 preclip-pre-fanout, v168 per-pass-lock nutzen weiterhin die gleiche Slot-Nummer — jetzt aber deterministisch aus ID abgeleitet.
-- Log-Marker `speaker_idx_source='dialog_turn.characterId'`.
+### 3. Keine Name-only Prompts mehr intern
 
-### A4. Anti-Regression Guards
+Namen dürfen weiterhin sichtbar sein, aber intern wird alles mit IDs gespeichert. Prompttext wird erst beim Provider-Call aus IDs gerendert.
 
-- Runtime-Assert in beiden Edge-Functions: Jeder Speaker/Turn, der in die Sync.so-Dispatch-Queue geht, muss ein valides `brand_characters.id` (UUID-regex + DB-Hit) haben. Sonst harter Reject mit `id_only_enforcement_violation` — kein Silent-Fallback auf Namen.
-- Unit-Test in `supabase/functions/_shared/*.test.ts`: künstliches Skript mit `SPRECHER 1:` + populierte `dialog_turns` → Ergebnis nutzt IDs, nicht "Sprecher 1".
+## Phase 3 — Briefing Analyse stabil machen
 
-## Teil B — Face-Lock für unbegrenzte Aktionen
+Die Briefing Analyse soll nicht nur Text ausspucken, sondern Assets strukturieren:
 
-Aktueller Ablauf: Preclip = statischer Crop um die Bounding-Box aus **einem** Anchor-Frame. Wenn der Charakter im Auto sitzt und sich bewegt oder kämpft, wandert das Gesicht aus dem Crop → Sync.so verliert den Face-Lock.
+1. Briefing analysieren.
+2. Erkannte Personen, Orte, Produkte, Requisiten extrahieren.
+3. Gegen Cast & World matchen:
+   - exakte ID, wenn vorhanden
+   - semantischer Match, wenn wahrscheinlich
+   - sonst neues Asset vorschlagen/erstellen
+4. Ergebnis als `scene_assets` / Campaign Plan mit IDs speichern.
+5. Composer-Szenen übernehmen diese IDs direkt.
 
-### B1. Face-Track pro Character-ID (neue Tabelle)
+Damit wird aus Briefing → Cast & World → Video eine kontrollierte Kette.
 
-```
-scene_face_tracks (
-  scene_id uuid, character_id uuid, pass_idx int,
-  track_kind text,           -- 'anchor' | 'motion'
-  frames jsonb,              -- [{ t_ms, bbox:[x,y,w,h], confidence }]
-  face_embedding vector(512),-- Gemini Vision face-descriptor der ID
-  created_at timestamptz,
-  primary key (scene_id, character_id, pass_idx)
-)
-```
+## Phase 4 — Bewegungsszenen: Auto, Kampf, komplexe Action
 
-RLS: owner via `scene_id → composer_scenes.user_id`. GRANT `authenticated` + `service_role`.
+Für Autofahren, Kämpfen, Drehen, Weglaufen reicht eine statische Box nicht dauerhaft.
 
-### B2. Neue Edge-Function `track-scene-faces`
+Dafür wird `scene_face_tracks` aktiviert:
 
-- Input: `sceneId`, `characterIds[]`, `plateUrl`.
-- Läuft nach Plate-Generation, vor v167 Preclip-Fanout.
-- Extrahiert Face-Embedding pro `character_id` aus dessen `brand_characters.reference_image_url` (bereits vorhanden — der Portrait-Anchor).
-- Trackt Face-Detektionen im Plate über die gesamte Dauer (Sampling 5–10 fps reicht für Preclip-Cropping), matcht gegen das Embedding der ID.
-- Schreibt `frames[]` in `scene_face_tracks`. Kein zweiter Charakter kann "übernehmen", weil pro ID separater Track.
-- Kosten-Guard: Wenn `plateUrl` schon in `frame_face_cache` liegt, reuse.
+- Nach Plate/Clip-Generation werden Frames gesampled.
+- Pro `characterId` wird ein Track erstellt:
+  - Frame → Face Box
+  - Confidence
+  - optional Face Embedding Match gegen Character Reference
+- Bounding Boxes für Sync.so kommen dann nicht mehr statisch aus einem Punkt, sondern aus dem Track.
 
-### B3. `pass-face-preclip` wird trajectory-aware
+Das ist die Brücke zu „unendlichen Möglichkeiten“, ohne Lipsync zu verlieren.
 
-Aktuell: statischer Crop-Rect für die ganze Preclip-Dauer.
+## Phase 5 — Pipeline-Cleanup und Guardrails
 
-Neu: Preclip-Renderer (ffmpeg oder Remotion-Template `DialogTurnFaceCropVideo.tsx`) liest den `scene_face_tracks.frames[]` für `(scene, characterId, pass)` und cropt **per Frame** entlang der Track-Trajektorie, mit sanftem Kalman-Smoothing (Jitter-Filter). Ausgabe bleibt ein Single-Face-Preclip, aber das Gesicht bleibt im Frame egal wie stark sich der Body bewegt.
+### Entfernen / deaktivieren
 
-Wenn Track-Confidence zwischen Frames dropt (< 0.5): Fallback auf letzte verlässliche BBox + Padding-Boost, keine harten Sprünge.
+- alte retry variants, die Full-Plate ohne saubere Bounding Boxes dispatchen
+- Name-Fuzzy Resolver als normaler Pfad
+- Env-Rollbacks, die still alte Pfade aktivieren
+- doppelte Memories / widersprüchliche Regeln, soweit sie nicht mehr gültig sind
 
-### B4. ASD-Payload bleibt v199 (frame_number + coordinates)
+### Hinzufügen
 
-Die Koordinaten werden jetzt aus dem **stabilisierten** Preclip-Center genommen (immer Bildmitte, weil der Track dorthin gecroppt hat) → ASD hat es leicht, Sync.so kann nicht mehr auf den falschen Speaker springen weil im Preclip nur ein Face existiert und dieses Face nachweislich die richtige `character_id` ist (Embedding-Verified).
+- Dispatch-Log Assertions:
+  - `speakers_source = dialog_turns`
+  - `model = sync-3`
+  - `asd_mode = bounding_boxes_url`
+  - `character_id` pro Pass gesetzt
+- Hard Fail wenn:
+  - Speaker ohne `characterId`
+  - kein eindeutiges Cast Asset
+  - Bounding Box nicht erzeugbar
+  - Sync.so Options nicht doc-strict sind
 
-### B5. Stitch-Layer
+## Technische Änderungspunkte
 
-`DialogStitchVideo.tsx` v198 Masken kaschieren bereits leichte Morphs. Neu: Wenn `scene_face_tracks` vorhanden, wird die Maske **auf den Face-Track zentriert**, nicht auf einen statischen Punkt. Dadurch bleibt die Maske über einem bewegten Kopf, statt am Startpunkt zu kleben.
+### Edge Functions
 
-## Was NICHT geändert wird
+- `supabase/functions/compose-dialog-segments/index.ts`
+  - alte Pfad-Gates entfernen/blockieren
+  - sync-3 + bounding_boxes_url als Single Path
+  - JIT `dialog_turns` Backfill
+  - Hard Fail bei unsicherem Speaker Mapping
 
-- **Kein Frontend-Change**. Der bestehende Editor schreibt bereits `characterShots[]` mit IDs; `dialog_turns` wird per Backfill/Trigger aus vorhandenen Daten abgeleitet, User merkt nichts.
-- Preisformel `ceil(durSec) × 9 × N_passes` unverändert.
-- v199 Preclip-Coords-Primary bleibt aktiv.
-- v198 Stitch-Masken bleiben, nur ihr Center-Point wird track-aware.
-- `sync-so-webhook`, Retry-Ladder, Idempotenz-Kontrakt unangetastet.
+- `supabase/functions/compose-video-clips/index.ts`
+  - ID-only scene asset handoff
+  - keine name-only effectiveShots mehr, wenn IDs verfügbar sind
 
-## Rollback
+- `supabase/functions/compose-twoshot-audio/index.ts`
+  - Dialog Audio ausschließlich aus `dialog_turns.characterId`, wenn vorhanden
 
-- `FEATURE_ID_ONLY_CAST_RESOLUTION=false` in `system_config` → Legacy-Namens-Resolver reaktiviert.
-- `FEATURE_FACE_TRACK_PRECLIP=false` → statischer Crop wie heute, `scene_face_tracks` wird ignoriert.
-- Beides ohne Deploy per DB-Toggle.
+- `supabase/functions/_shared/scene-dialog-turns.ts`
+  - Backfill/validation utility zentralisieren
 
-## Validierung
+### Database
 
-1. **ID-Enforcement**: Test-Szene mit 3 Sprechern, im Skript-Text alle Namen absichtlich verwechselt (`SAMUEL:` sagt Sarahs Text). `dialog_turns.characterId` bleibt korrekt → Sync.so lippt korrekt am richtigen Face. `syncso_dispatch_log.meta.speakers_source='dialog_turns'`.
-2. **Face-Lock**: Test-Szene mit einem Charakter der während des Dialogs den Kopf stark bewegt (z.B. "schaut sich im Auto um"). Preclip-MP4 aus `dialog-plates/preclips/…` visuell prüfen → Gesicht bleibt zentriert. Sync.so-Output zeigt keinen Morph-Drift.
-3. **Unbegrenzte Aktion**: Kampf-Szene, zwei Charaktere, viel Bewegung, mit Dialog. Erwartet: beide Preclips halten je ein Face zentriert, Lipsync sitzt auf beiden korrekt, keine Verwechslung.
+- Backfill-Migration für Szenen mit leerem `dialog_turns` und vorhandenen `character_shots`.
+- Optional: `scene_asset_refs` oder vorhandene JSON-Felder normalisieren, damit Cast & World IDs einheitlich gespeichert werden.
+- `scene_face_tracks` bleibt Grundlage für Phase 4.
 
-## Rollout-Reihenfolge
+### Memory / Dokumentation
 
-1. Migration `dialog_turns` + Backfill.
-2. `scene_face_tracks` Tabelle + `track-scene-faces` Edge-Function.
-3. `compose-video-clips` und `compose-dialog-segments` auf ID-Only umstellen (Feature-Flag on).
-4. `pass-face-preclip` trajectory-aware machen (Feature-Flag on).
-5. `DialogStitchVideo.tsx` Masken-Center track-aware (nur wenn `scene_face_tracks` vorhanden — sonst wie heute).
+- Neue Architektur-Memory: „Canonical Lipsync Pipeline — ID + Bounding Boxes“.
+- Alte widersprüchliche Lipsync-Memories werden nicht gelöscht, aber als legacy markiert, damit neue Sessions nicht wieder alte Pfade reaktivieren.
 
-Jeder Schritt einzeln deploybar & einzeln rollback-fähig.
+## Verifikation
+
+### Kurzer Test
+
+- Bestehende 3-Sprecher-Szene neu rendern.
+- Prüfen:
+  - `dialog_turns` nicht leer
+  - kein `_v153BboxPrimary`
+  - Dispatch Log: `sync-3`, `bounding_boxes_url`, `character_id` pro Pass
+  - keine Morphs auf inaktiven Gesichtern
+
+### Regression Tests
+
+- 1 Sprecher, 2 Sprecher, 3 Sprecher, 4 Sprecher
+- zwei Charaktere mit ähnlichem Namen
+- Szene mit Person im Hintergrund
+- Szene mit Autofahren / Bewegung als Phase-4-Test
+
+## Ergebnis
+
+Nach Phase 1 ist die aktuelle Morph-/Wrong-Speaker-Schleife beendet.
+Nach Phase 2–3 ist Cast & World wieder die zentrale Ordnung.
+Nach Phase 4 kann die Pipeline komplexe Action-Szenen tragen, ohne Lipsync zu verlieren.
+
+Das ist kein kosmetischer Patch, sondern ein Cleanup auf eine einzige kontrollierte Produktionspipeline.
