@@ -133,7 +133,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v201-id-bbox";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v203-fullplate-bbox-only";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -3997,7 +3997,7 @@ serve(async (req) => {
     // invocation still spent ~60–120s rendering its own preclip. Start sibling
     // preclips as a background task as soon as pass 0 has claimed the scene,
     // while pass 0 continues its own preclip + Sync.so dispatch.
-    if (!isAdvance && !isRetry && currentPassIdx === 0 && passes.length > 1 && plateDims && sourceClipUrl) {
+    if (false && !isAdvance && !isRetry && currentPassIdx === 0 && passes.length > 1 && plateDims && sourceClipUrl) {
       let batchPreclipEnabled = true;
       try {
         const { data: batchFlag } = await supabase
@@ -4128,7 +4128,7 @@ serve(async (req) => {
         .eq("error_class", "provider_unknown_error")
         .filter("meta->>pass_idx", "eq", String(currentPassIdx))
         .filter("meta->>retry_variant", "eq", "bbox-url-pro");
-      if ((silentBboxFails ?? 0) >= 2) {
+      if (passes.length < 2 && (silentBboxFails ?? 0) >= 2) {
         v120ForcePreclip = true;
         // Drop any cached preclip so the renderer rebuilds fresh below
         // (also dodges expired-signed-URL traps).
@@ -4385,6 +4385,13 @@ serve(async (req) => {
     let retryVariant: RetryVariant = isRetry
       ? ((requestedRetryVariant === "coords-pro-box" ? "coords-pro-box" : "bbox-url-pro") as RetryVariant)
       : freshDefaultVariant;
+    // v203 — Multi-speaker has exactly one live provider path: full-plate
+    // sync-3 with active_speaker_detection.bounding_boxes_url. Explicit
+    // retry/noop variants must not re-enter coords, inline bbox, auto, or
+    // lipsync-2-era fallbacks.
+    if (speakers.length >= 2) {
+      retryVariant = "bbox-url-pro";
+    }
     // v153.2 — Bei aktivem unified-Pfad auch Advance/Retry auf bbox-url-pro zwingen.
     // Die NOOP-Ladder darf weiterhin explizite Diagnose-Varianten wählen.
     if (v153Active && !noopAutoEscalation) {
@@ -4728,10 +4735,28 @@ serve(async (req) => {
     // Idempotent: ein bereits gerenderter Preclip wird wiederverwendet.
     // Fail-Closed: wenn der Preclip nicht rendert UND keine Plate-Box
     // existiert, greift der v153.5 Hard-Fail unten (Refund + abort).
-    let passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
-    let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
+    if (speakers.length >= 2) {
+      const hadCachedPreclip = !!(pass as any).preclip_url || !!(pass as any).preclip_crop;
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_render_id = null;
+      (pass as any).preclip_crop = null;
+      (pass as any).preclip_start_sec = null;
+      (pass as any).preclip_end_sec = null;
+      (pass as any).preclip_fps = null;
+      (pass as any).preclip_frame_count = null;
+      (pass as any).preclip_duration_sec = null;
+      (pass as any).preclip_dims = null;
+      if (hadCachedPreclip) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v203_drop_cached_preclip speakers=${speakers.length} — forcing full-plate bbox-only dispatch`,
+        );
+      }
+    }
+    let passPreclipUrl: string | null = speakers.length >= 2 ? null : ((pass as any).preclip_url ?? null);
+    let usePassPreclip: boolean = speakers.length < 2 && !!passPreclipUrl && !!(pass as any).preclip_crop;
 
     const v161PreclipEligible =
+      speakers.length < 2 &&
       !usePassPreclip &&
       !!tightAudioInfo &&
       !!plateDims &&
@@ -5121,7 +5146,7 @@ serve(async (req) => {
 
 
       // Sekundär: anchor faceMap (kann bei N=1 helfen oder wenn plate-native fehlt).
-      if (!box) {
+      if (!box && speakers.length < 2) {
         const fmFaces: any[] = Array.isArray((faceMap as any)?.faces)
           ? (faceMap as any).faces
           : [];
@@ -5161,7 +5186,7 @@ serve(async (req) => {
       // Pre-Flight (Z. ~1326) bereits hart gefailt + refunded. Hier kein
       // stiller Box-aus-coords-Mittelpunkt mehr — das hat in N=1 Szenen
       // dazu geführt, dass Sync.so im Zweifel die falsche Person animiert.
-      if (!box && !(pass as any)._v153BboxPrimary) {
+      if (!box && speakers.length < 2 && !(pass as any)._v153BboxPrimary) {
         const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
         const boxW = Math.round(dims.width * 0.18);
         const boxH = Math.round(dims.height * 0.28);
@@ -5181,6 +5206,21 @@ serve(async (req) => {
         | { x: number; y: number; size: number; outputSize: number }
         | undefined : undefined;
       const v161UsingPreclipForBbox = usePassPreclip && !!passPreclipUrl && !!v161PreclipCrop;
+      if (speakers.length >= 2 && v161UsingPreclipForBbox) {
+        (pass as any)._v152HardFail = {
+          reason: "v203_preclip_forbidden_multi_speaker",
+          errorClass: "v203_preclip_forbidden",
+          message:
+            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+            "Multi-Speaker darf nur noch über Full-Plate bounding_boxes_url laufen. Credits wurden zurückerstattet.",
+          meta: {
+            canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only",
+            preclip_used: true,
+            input_space: "preclip",
+            speakers: speakers.length,
+          },
+        };
+      }
       const probeUrlForBbox = v161UsingPreclipForBbox ? (passPreclipUrl as string) : passInputUrl;
       const v161PreclipStartSec = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_start_sec ?? 0)
@@ -5444,6 +5484,9 @@ serve(async (req) => {
         .update({
           dialog_shots: {
             ...(prevState ?? {}),
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            input_space: passes.length >= 2 ? "plate" : undefined,
+            preclip_used: passes.length >= 2 ? false : undefined,
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -5484,7 +5527,7 @@ serve(async (req) => {
           "Dialog lip-sync requires every Sync.so pass to carry a brand character UUID from dialog_turns; legacy name/slot fallback is blocked.",
           422,
           {
-            canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
             speakers_source: speakersSource,
             dialog_turns_count: canonicalDialogTurnsCount,
             canonical_speaker_ids: canonicalSpeakerIds,
@@ -5860,7 +5903,7 @@ serve(async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    const rawDispatchVideoUrl = usePassPreclip ? (passPreclipUrl as string) : passInputUrl;
+    const rawDispatchVideoUrl = speakers.length >= 2 ? passInputUrl : (usePassPreclip ? (passPreclipUrl as string) : passInputUrl);
     // v143 — Rehost the plate into our own bucket before sending to Sync.so.
     // Presigned Replicate/S3 URLs expire after ~60 min; multi-pass dialogs
     // routinely exceed that window, causing Sync.so to silently return 422
@@ -5872,7 +5915,7 @@ serve(async (req) => {
       const rh = await rehostPlate(supabase, rawDispatchVideoUrl, {
         sceneId,
         passIdx: currentPassIdx,
-        kind: usePassPreclip ? "preclip" : "fullplate",
+        kind: speakers.length >= 2 ? "fullplate" : (usePassPreclip ? "preclip" : "fullplate"),
         ownerId: (scene as any)?.user_id ?? (scene as any)?.owner_id ?? null,
       });
       dispatchVideoUrl = rh.url;
@@ -5923,12 +5966,17 @@ serve(async (req) => {
     // is OFF for N>=2 and the ASD shape is the one Sync.so docs require.
     const asdForProbe = (syncOptions as any).active_speaker_detection ?? null;
     const v105Probe = {
-      stage: usePassPreclip
-        ? "preclip-sync3-autodetect-v105"
-        : "fullplate-sync3-deterministic-v105",
+      stage: speakers.length >= 2
+        ? "v203-fullplate-sync3-bbox-only"
+        : usePassPreclip
+          ? "preclip-sync3-autodetect-v105"
+          : "fullplate-sync3-deterministic-v105",
       model_intent: "sync-3",
       payload_model: payloadModel,
-      dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+      dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
+      canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+      input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
+      preclip_used: speakers.length >= 2 ? false : usePassPreclip,
       retry_variant: retryVariant,
       asd_mode: asdForProbe?.auto_detect === true
         ? "auto_detect"
@@ -5978,7 +6026,17 @@ serve(async (req) => {
           : "asd_auto_detect_on_multi_speaker_fullplate",
         "Refusing to dispatch Sync.so with auto_detect=true on a multi-speaker scene; deterministic ASD is required.",
         500,
-        { v105_probe: v105Probe },
+        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only" },
+      );
+    }
+
+    if (speakers.length >= 2 && usePassPreclip) {
+      return await failBeforeProviderDispatch(
+        "v203_preclip_wire_blocked",
+        "v203_preclip_forbidden",
+        "Refusing to dispatch a multi-speaker dialog pass through a preclip; v203 requires full-plate sync-3 + bounding_boxes_url.",
+        500,
+        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only", input_space: "preclip" },
       );
     }
 
@@ -6312,7 +6370,7 @@ serve(async (req) => {
             "Dialog lip-sync dispatch is locked to sync-3 + bounding_boxes_url/bounding_boxes. Coordinate-only ASD is blocked to prevent speaker drift.",
             500,
             {
-              canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+              canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
               speakers_source: speakersSource,
               dialog_turns_count: canonicalDialogTurnsCount,
               final_asd: canonicalAsd,
@@ -6713,7 +6771,7 @@ serve(async (req) => {
       meta: {
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
-        canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+        canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
         speakers_source: speakersSource,
         dialog_turns_count: canonicalDialogTurnsCount,
         canonical_speaker_ids: canonicalSpeakerIds,
@@ -6727,6 +6785,9 @@ serve(async (req) => {
                 ? "auto_detect"
                 : "unknown",
         v131_5_final_override: (pass as any)._v131_5_final_override ?? null,
+        input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
+        preclip_used: speakers.length >= 2 ? false : usePassPreclip,
+        fullplate_bbox_only: speakers.length >= 2,
         diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,
         total_passes: passes.length,
@@ -6824,7 +6885,7 @@ serve(async (req) => {
         preclip_fps: (pass as any).preclip_fps ?? null,
         preclip_dims: (pass as any).preclip_dims ?? null,
         preclip_crop: (pass as any).preclip_crop ?? null,
-        dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+        dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
 
         payload_summary: {
           model: payload.model,
@@ -6877,7 +6938,16 @@ serve(async (req) => {
         freshPasses[currentPassIdx] = pass;
         await supabase
           .from("composer_scenes")
-          .update({ dialog_shots: { ...freshState, ...state, passes: freshPasses } })
+          .update({
+            dialog_shots: {
+              ...freshState,
+              ...state,
+              canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+              input_space: passes.length >= 2 ? "plate" : undefined,
+              preclip_used: passes.length >= 2 ? false : undefined,
+              passes: freshPasses,
+            },
+          })
           .eq("id", sceneId);
       } else {
         // Root merge: write ALL root-level state fields (sync_job_id, status,
@@ -6888,7 +6958,12 @@ serve(async (req) => {
         const { passes: _drop, ...rootOnly } = state as any;
         await supabase.rpc("update_dialog_shots_root_merge", {
           _scene_id: sceneId,
-          _patch: rootOnly,
+          _patch: {
+            ...rootOnly,
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            input_space: passes.length >= 2 ? "plate" : undefined,
+            preclip_used: passes.length >= 2 ? false : undefined,
+          },
         });
       }
 
