@@ -4732,28 +4732,12 @@ serve(async (req) => {
     // Idempotent: ein bereits gerenderter Preclip wird wiederverwendet.
     // Fail-Closed: wenn der Preclip nicht rendert UND keine Plate-Box
     // existiert, greift der v153.5 Hard-Fail unten (Refund + abort).
-    if (speakers.length >= 2) {
-      const hadCachedPreclip = !!(pass as any).preclip_url || !!(pass as any).preclip_crop;
-      (pass as any).preclip_url = null;
-      (pass as any).preclip_render_id = null;
-      (pass as any).preclip_crop = null;
-      (pass as any).preclip_start_sec = null;
-      (pass as any).preclip_end_sec = null;
-      (pass as any).preclip_fps = null;
-      (pass as any).preclip_frame_count = null;
-      (pass as any).preclip_duration_sec = null;
-      (pass as any).preclip_dims = null;
-      if (hadCachedPreclip) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v203_drop_cached_preclip speakers=${speakers.length} — forcing full-plate bbox-only dispatch`,
-        );
-      }
-    }
-    let passPreclipUrl: string | null = speakers.length >= 2 ? null : ((pass as any).preclip_url ?? null);
-    let usePassPreclip: boolean = speakers.length < 2 && !!passPreclipUrl && !!(pass as any).preclip_crop;
+    // v204 — Preclip cache is honored again for N>=2 (rollback of v203's
+    // drop-cached-preclip block). Renderers use idempotent preclips.
+    let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
+    let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
     const v161PreclipEligible =
-      speakers.length < 2 &&
       !usePassPreclip &&
       !!tightAudioInfo &&
       !!plateDims &&
