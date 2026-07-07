@@ -1,41 +1,66 @@
-## Diagnose
+## Problem
 
-Nach v196 (harte Masken) + v197 (Silent-Windows) sind die großen Morphs weg, aber im Screenshot ist bei der rechten Sprecherin noch ein leichter Rand-Morph im Kiefer-/Wangenbereich sichtbar. Ursache:
+Zwei sichtbare Symptome, ein gemeinsamer Root-Cause:
 
-Die harten Face-Disc-Masken (`#000 47% → transparent 48%`) sind zwar hart, aber der **Radius selbst ist zu klein**. Die Maskenkante liegt bei den meisten Preclip-Crops mitten auf der Haut (Kinn/Wange/Hals). Genau an dieser Kante trifft der Sync.so-Face-Layer (leicht reprojiziert/skaliert) auf das Live-Plate-Gesicht darunter — zwei minimal verschobene Hautflächen an derselben Stelle lesen sich als Morph, obwohl gar kein Alpha-Blend mehr stattfindet.
+1. **„Sprecher 3 sagt etwas, was nicht im Skript stand"** — Sync.so lippt den falschen Mund, weil der aktuelle Dispatch die **volle Multi-Face-Plate** an Sync.so schickt (`v153.2_unified_bbox_primary` — "bbox-url-pro SINGLE PATH, no preclip"). ASD ordnet die bounding_boxes aus der URL potenziell nicht 1:1 zu `pass.speaker_idx` → falscher Sprecher animiert.
+2. **Leichte Morphs bei jedem Sprecher** — Sync.so reprojiziert bei Full-Frame-Dispatch das gesamte Gesicht (nicht nur Lippen) minimal; DialogStitchVideo-Masken v198 kaschieren das nur teilweise, weil unter der Maske eben doch ein leicht abweichender Sync.so-Frame liegt.
 
-Bei den Fan-Out-Passes ist der Sync.so-Output ein **Full-Frame-Render** derselben Szene, in dem nur die Lippen des Zielsprechers bewegt sind. Wir dürfen die Maske also deutlich größer machen — bis in Haare/Hintergrund — ohne visuelle Nachteile, weil der Rest des Frames sowieso identisch zur Master-Plate ist.
+Der v169-Guide beschreibt explizit den **Per-Speaker-Preclip-Pfad** (§7.3): jeder Pass bekommt einen eigenen, tight-cropped Single-Face-Preclip als `input_url`, ASD ist deterministisch (`frame_number + coords` oder `bounding_boxes_url` auf **einem** Gesicht). v148/v153 haben diesen Pfad zugunsten eines Full-Plate-Shortcuts deaktiviert — das ist die Regression.
 
-## Fix (v198 — Mask Enlargement)
+## Fix — v169-Preclip-Pfad reaktivieren
 
-1. **`FaceMaskOverlay` (Fan-Out, Zeile 290–328)**
-   - Radius intern auf `radiusPx * 1.6` skalieren (Kopf + Kiefer + etwas Umgebung).
-   - Kante bleibt hart (1 px AA-Band).
-   - Kommentar aktualisieren: „v198: enlarged disc so the seam falls in hair/background, not on skin."
+Ziel: `compose-dialog-segments` schickt pro Pass wieder einen Per-Speaker-Preclip an Sync.so, nicht die Full-Plate.
 
-2. **`CroppedOverlay` (Face-Crop, Zeile 218–272)**
-   - Statt `radial-gradient` mit 47/48% jetzt einen deutlich größeren Disc: `#000 62% → transparent 63%`.
-   - Alternativ: gar keine Maske mehr wenn `holdToEnd`/Fan-Out-Pfad — dann ist die Kante = Crop-Rechteck-Kante im ohnehin identischen Hintergrund.
+### Änderungen in `supabase/functions/compose-dialog-segments/index.ts`
 
-3. **`SilentFaceAnchor` (v183, Zeile 352–404)**
-   - Nur kosmetisch: Radius von 47/48% auf 55/56% erhöhen, damit statisches Anker-Portrait bei Silent-Windows nicht mitten auf der Haut endet.
+1. **v153.2-Bypass abschalten** (~Zeile 4090–4170)
+   - Das `v153.2_unified_bbox_primary` "SINGLE PATH"-Guardrail wird deaktiviert: kein automatisches `bbox-url-pro` auf Full-Plate als First-Dispatch mehr.
+   - `firstDispatchVariant` wird auf `preclip_coords_doc_strict` (Preclip + `auto_detect:false, frame_number+coordinates`) gesetzt — der v169 §5/§7.3-Pfad.
 
-4. **`SilentFaceFreeze` (v197, Zeile 487–525)**
-   - Radius von 47/48% auf 55/56% erhöhen (analog zu Anchor).
+2. **Preclip-Rendering wieder als Default aktivieren** (~Zeile 4489–4590, `usePassPreclip`-Gate)
+   - `usePassPreclip = true` für **alle** N ≥ 1 (nicht mehr an `retry_variant` gebunden).
+   - `pass-face-preclip.ts` läuft für Pass 0..cap synchron vor Dispatch, Pass cap..N via v167 Pre-Fanout im Hintergrund (`EdgeRuntime.waitUntil`).
+   - Preclip-Bucket bleibt `dialog-plates/preclips/<scene>/sp<idx>.mp4`.
 
-5. **`MouthMatteFreeze` (v193, Zeile 418–470)**
-   - Ellipse-Radius von 54/55% auf 60/61% erhöhen.
-   - Bleibt sowieso opt-in-off (siehe v197).
+3. **ASD-Payload pro Preclip** (~Zeile 4570–4600 + `_shared/asd-strategy.ts`)
+   - Auf dem Single-Face-Preclip: `{ auto_detect: false, frame_number: <plate-frame>, coordinates: [cx, cy] }` (zentriert auf das eine Gesicht im Crop).
+   - `bounding_boxes_url` fällt für den Preclip-Pfad weg — dort gibt es nur ein Gesicht.
+   - Multi-Speaker-Guard (Zeile 5909) bleibt scharf: `auto_detect:true` weiter verboten für N ≥ 2.
 
-## Erwartetes Ergebnis
+4. **v153-Wire-Overwrite-Assert entschärfen** (~Zeile 6224–6231)
+   - Der Assert "v153 set bbox-url-pro but ASD was rewritten to auto_detect before wire" bleibt aktiv, aber der Trigger wird umgedreht: Wir *wollen* jetzt Preclip + Coords, nicht bbox-url-pro. Log-Message auf "v199_preclip_coords_primary_active" umbenennen.
 
-- Kein Rand-Morph mehr, weil die Maskenkante in Bereichen liegt, in denen Sync.so-Output und Live-Plate praktisch pixelgleich sind (Haare, Hintergrund).
-- Kein neuer Alpha-Blend eingeführt — Kanten bleiben hart (1 px AA).
-- Silent-Windows-Verhalten (v197) und v169-Single-Face-Layer-Invariante unverändert.
+5. **Retry-Ladder unverändert** (§6 im Guide)
+   - Slot 0 wird nur umbenannt: `bbox-url-pro` bleibt als Retry-Escape für pathologische Preclip-Failures, aber ist nicht mehr First-Dispatch.
+   - `MAX_SHOT_RETRIES=4`, `RETRY_TEMPERATURES=[0.5, 0.35, 0.7, 0.4]` bleiben.
 
-## Betroffene Dateien
+### Erwartete Nebenwirkung auf DialogStitchVideo
 
-- `src/remotion/templates/DialogStitchVideo.tsx` (5 Mask-Konstanten in 5 Komponenten)
-- `mem/architecture/lipsync/v195-silent-face-freeze.md` (v198-Addendum)
+Sobald Sync.so nur noch ein Gesicht sieht, verschwindet die Full-Frame-Reprojection auf den anderen Sprechern → die aktuellen v198-Masken (55/56% Radius) haben genug Puffer und die Rest-Morphs sind weg, **ohne** weitere Composer-Änderungen. Kein Touch an `DialogStitchVideo.tsx` in diesem Plan.
 
-Kein Backend-, Payload- oder Pipeline-Change. Rein visueller CSS-Mask-Tune.
+### Log-Marker
+
+Neuer Grep-Tag: `v199_preclip_coords_primary` in compose-dialog-segments, sync-so-webhook, syncso_dispatch_log (`meta.dispatch_video_kind='preclip'`, `meta.payload_summary.options.active_speaker_detection.frame_number` gesetzt, `bounding_boxes_url` **nicht** gesetzt).
+
+### Memory-Update
+
+- Neue Memory-Datei `mem/architecture/lipsync/v199-preclip-primary-restoration.md` mit dem Rationale, warum v148/v153 zurückgerollt wurde.
+- Update von `mem://architecture/lipsync/v126-unified-preclip-pipeline.md` — der v126-Kontrakt wird explizit wieder Default.
+
+## Was NICHT geändert wird
+
+- `sync-so-webhook` (Retry-Ladder + Idempotenz bleibt intakt).
+- `render-sync-segments-audio-mux` (v197 Silent-Windows bleiben).
+- `DialogStitchVideo.tsx` v198-Masken (bleiben als Sicherheitsnetz).
+- Preisformel `ceil(durSec) × 9 × N_passes` (unverändert).
+- v168 Per-Pass-Lock, v167 Preclip-Pre-Fanout, v166 Anchor-Identity-Bridge (alle bleiben aktiv — sie sind Voraussetzung für den Preclip-Pfad).
+
+## Validierung nach Deploy
+
+- Neue 3-Sprecher-Testszene rendern.
+- `syncso_dispatch_log` prüfen: jede Row muss `meta.dispatch_video_kind='preclip'` haben, Payload muss `frame_number + coordinates` enthalten, **keine** `bounding_boxes_url`, **kein** `auto_detect:true`.
+- Visuell: kein Wrong-Speaker mehr, keine sichtbaren Morphs auf inaktiven Sprechern.
+
+## Rollback
+
+Ein Feature-Flag `composer.force_v153_bbox_primary=true` in `system_config` schaltet den v153.2-Pfad in einer Row-Sekunde zurück, kein Deploy nötig.
