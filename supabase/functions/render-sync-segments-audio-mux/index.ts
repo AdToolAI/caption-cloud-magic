@@ -319,9 +319,8 @@ serve(async (req) => {
       );
     }
 
-    // Legacy v164 map kept as a lint anchor for the freeze-tile path (no-op).
-    const v164SilentSlotsByExcludedIdx = new Map<number, Array<{ x: number; y: number; size: number }>>();
-    void v164SilentSlotsByExcludedIdx;
+
+
 
 
     const fanoutShots = useOverlay
