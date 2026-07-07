@@ -397,31 +397,13 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
     ? Math.max(0, durationInFrames - tailStartFrame)
     : 0;
 
-  // v190 — global silent-anchor tiles per non-speaking face slot.
-  const globalSilentSlotEls = React.useMemo<React.ReactNode[]>(() => {
-    const slots = Array.isArray(globalSilentSlots) ? globalSilentSlots : [];
-    return slots
-      .map((slot, sIdx) => {
-        const sx = Number(slot?.x);
-        const sy = Number(slot?.y);
-        const ss = Number(slot?.size);
-        if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(ss) || ss <= 0) {
-          return null;
-        }
-        return (
-          <SilentFaceAnchor
-            key={`global-silent-${sIdx}`}
-            anchorUrl={slot?.anchorUrl ?? null}
-            srcX={sx}
-            srcY={sy}
-            srcSize={ss}
-            scaleX={scaleX}
-            scaleY={scaleY}
-          />
-        );
-      })
-      .filter(Boolean) as React.ReactNode[];
-  }, [globalSilentSlots, scaleX, scaleY]);
+  // v192 — Ghost-avatar overlays disabled. `globalSilentSlots` is ignored at
+  // the template level so cached render payloads can't resurrect the overlay.
+  // Schema field kept for backward-compat with existing payloads.
+  void globalSilentSlots;
+  void scaleX;
+  void scaleY;
+  const globalSilentSlotEls: React.ReactNode[] = React.useMemo(() => [], []);
 
 
 
