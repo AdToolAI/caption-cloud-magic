@@ -1,6 +1,7 @@
 # Memory: index.md
 Updated: today
-- [v201/v203 Canonical ID + Full-Plate Bounding-Boxes Lipsync](mem://architecture/lipsync/v200-id-only-cast-resolution) — Backend JIT-backfills dialog_turns[].characterId; N≥2 dispatch is full-plate sync-3 + bounding_boxes_url only, no preclip/crop/coords/auto/lipsync-2 fallback
+- [v204 Preclip-BBox Clip-Space Rollback](mem://architecture/lipsync/v204-preclip-bbox-clipspace-rollback) — Rollback of v203; multi-speaker N≥2 dispatches use per-pass single-face preclips + `bounding_boxes_url` in clip-space + `sync-3` + `cut_off`. Full-plate bbox path is forbidden (produced `generation_input_face_selection_invalid`). No `auto_detect:true` for N≥2.
+- [v201 Canonical ID Lipsync (v203 REVERTED)](mem://architecture/lipsync/v200-id-only-cast-resolution) — Backend JIT-backfills dialog_turns[].characterId. v203 full-plate zwang has been rolled back to v204 preclip-bbox-clipspace.
 - [v202 Cast & World ID Registry](mem://architecture/video-composer/v202-asset-registry) — composer_scenes.scene_assets jsonb (AssetRef[]) as canonical ID bridge across Composer/Motion Studio/Briefing; JIT backfill in compose-video-clips, feature flag `composer.feature.scene_assets_required`
 
 # Project Memory

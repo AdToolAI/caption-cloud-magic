@@ -133,7 +133,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v203-fullplate-bbox-only";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v204-preclip-bbox-clipspace";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -4385,13 +4385,10 @@ serve(async (req) => {
     let retryVariant: RetryVariant = isRetry
       ? ((requestedRetryVariant === "coords-pro-box" ? "coords-pro-box" : "bbox-url-pro") as RetryVariant)
       : freshDefaultVariant;
-    // v203 — Multi-speaker has exactly one live provider path: full-plate
-    // sync-3 with active_speaker_detection.bounding_boxes_url. Explicit
-    // retry/noop variants must not re-enter coords, inline bbox, auto, or
-    // lipsync-2-era fallbacks.
-    if (speakers.length >= 2) {
-      retryVariant = "bbox-url-pro";
-    }
+    // v204 — Multi-speaker rolled back to v169 preclip path. Retry variants
+    // (coords-pro-box, sync3-coords, etc.) are honored again. The forbidden
+    // legacy variants (auto-pro/auto-standard/coords-pro/coords-pro-lp2pro)
+    // remain blocked further down for N>=2.
     // v153.2 — Bei aktivem unified-Pfad auch Advance/Retry auf bbox-url-pro zwingen.
     // Die NOOP-Ladder darf weiterhin explizite Diagnose-Varianten wählen.
     if (v153Active && !noopAutoEscalation) {
@@ -4735,28 +4732,12 @@ serve(async (req) => {
     // Idempotent: ein bereits gerenderter Preclip wird wiederverwendet.
     // Fail-Closed: wenn der Preclip nicht rendert UND keine Plate-Box
     // existiert, greift der v153.5 Hard-Fail unten (Refund + abort).
-    if (speakers.length >= 2) {
-      const hadCachedPreclip = !!(pass as any).preclip_url || !!(pass as any).preclip_crop;
-      (pass as any).preclip_url = null;
-      (pass as any).preclip_render_id = null;
-      (pass as any).preclip_crop = null;
-      (pass as any).preclip_start_sec = null;
-      (pass as any).preclip_end_sec = null;
-      (pass as any).preclip_fps = null;
-      (pass as any).preclip_frame_count = null;
-      (pass as any).preclip_duration_sec = null;
-      (pass as any).preclip_dims = null;
-      if (hadCachedPreclip) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v203_drop_cached_preclip speakers=${speakers.length} — forcing full-plate bbox-only dispatch`,
-        );
-      }
-    }
-    let passPreclipUrl: string | null = speakers.length >= 2 ? null : ((pass as any).preclip_url ?? null);
-    let usePassPreclip: boolean = speakers.length < 2 && !!passPreclipUrl && !!(pass as any).preclip_crop;
+    // v204 — Preclip cache is honored again for N>=2 (rollback of v203's
+    // drop-cached-preclip block). Renderers use idempotent preclips.
+    let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
+    let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
     const v161PreclipEligible =
-      speakers.length < 2 &&
       !usePassPreclip &&
       !!tightAudioInfo &&
       !!plateDims &&
@@ -5206,21 +5187,7 @@ serve(async (req) => {
         | { x: number; y: number; size: number; outputSize: number }
         | undefined : undefined;
       const v161UsingPreclipForBbox = usePassPreclip && !!passPreclipUrl && !!v161PreclipCrop;
-      if (speakers.length >= 2 && v161UsingPreclipForBbox) {
-        (pass as any)._v152HardFail = {
-          reason: "v203_preclip_forbidden_multi_speaker",
-          errorClass: "v203_preclip_forbidden",
-          message:
-            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
-            "Multi-Speaker darf nur noch über Full-Plate bounding_boxes_url laufen. Credits wurden zurückerstattet.",
-          meta: {
-            canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only",
-            preclip_used: true,
-            input_space: "preclip",
-            speakers: speakers.length,
-          },
-        };
-      }
+      // v204 — Preclip is the canonical multi-speaker path again. No hard-fail here.
       const probeUrlForBbox = v161UsingPreclipForBbox ? (passPreclipUrl as string) : passInputUrl;
       const v161PreclipStartSec = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_start_sec ?? 0)
@@ -5484,7 +5451,7 @@ serve(async (req) => {
         .update({
           dialog_shots: {
             ...(prevState ?? {}),
-            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             input_space: passes.length >= 2 ? "plate" : undefined,
             preclip_used: passes.length >= 2 ? false : undefined,
             version: 5,
@@ -5527,7 +5494,7 @@ serve(async (req) => {
           "Dialog lip-sync requires every Sync.so pass to carry a brand character UUID from dialog_turns; legacy name/slot fallback is blocked.",
           422,
           {
-            canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             speakers_source: speakersSource,
             dialog_turns_count: canonicalDialogTurnsCount,
             canonical_speaker_ids: canonicalSpeakerIds,
@@ -5967,14 +5934,14 @@ serve(async (req) => {
     const asdForProbe = (syncOptions as any).active_speaker_detection ?? null;
     const v105Probe = {
       stage: speakers.length >= 2
-        ? "v203-fullplate-sync3-bbox-only"
+        ? "v204-preclip-bbox-clipspace"
         : usePassPreclip
           ? "preclip-sync3-autodetect-v105"
           : "fullplate-sync3-deterministic-v105",
       model_intent: "sync-3",
       payload_model: payloadModel,
       dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
-      canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+      canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
       input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
       preclip_used: speakers.length >= 2 ? false : usePassPreclip,
       retry_variant: retryVariant,
@@ -6026,19 +5993,11 @@ serve(async (req) => {
           : "asd_auto_detect_on_multi_speaker_fullplate",
         "Refusing to dispatch Sync.so with auto_detect=true on a multi-speaker scene; deterministic ASD is required.",
         500,
-        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only" },
+        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v204_preclip_bbox_clipspace" },
       );
     }
 
-    if (speakers.length >= 2 && usePassPreclip) {
-      return await failBeforeProviderDispatch(
-        "v203_preclip_wire_blocked",
-        "v203_preclip_forbidden",
-        "Refusing to dispatch a multi-speaker dialog pass through a preclip; v203 requires full-plate sync-3 + bounding_boxes_url.",
-        500,
-        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only", input_space: "preclip" },
-      );
-    }
+    // v204 — Preclip wire is the canonical multi-speaker path (rolled back v203 block).
 
     // v129.1 — Payload-Contract Preflight (DISPATCH_BLOCKED_PAYLOAD_PRECHECK).
     // Refuses to call Sync.so when a Multi-Speaker preclip pass would either:
@@ -6370,7 +6329,7 @@ serve(async (req) => {
             "Dialog lip-sync dispatch is locked to sync-3 + bounding_boxes_url/bounding_boxes. Coordinate-only ASD is blocked to prevent speaker drift.",
             500,
             {
-              canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+              canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
               speakers_source: speakersSource,
               dialog_turns_count: canonicalDialogTurnsCount,
               final_asd: canonicalAsd,
@@ -6771,7 +6730,7 @@ serve(async (req) => {
       meta: {
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
-        canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+        canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
         speakers_source: speakersSource,
         dialog_turns_count: canonicalDialogTurnsCount,
         canonical_speaker_ids: canonicalSpeakerIds,
@@ -6942,7 +6901,7 @@ serve(async (req) => {
             dialog_shots: {
               ...freshState,
               ...state,
-              canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+              canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
               input_space: passes.length >= 2 ? "plate" : undefined,
               preclip_used: passes.length >= 2 ? false : undefined,
               passes: freshPasses,
@@ -6960,7 +6919,7 @@ serve(async (req) => {
           _scene_id: sceneId,
           _patch: {
             ...rootOnly,
-            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             input_space: passes.length >= 2 ? "plate" : undefined,
             preclip_used: passes.length >= 2 ? false : undefined,
           },

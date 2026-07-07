@@ -684,7 +684,7 @@ serve(async (req) => {
         { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
       ];
       const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
-      const canEscalate = speakerCount < 2 && noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
+      const canEscalate = noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
         Number.isFinite(Number(passBeforeDone?.reference_frame_number));
 
       if (noopSuspect && !canEscalate) {
@@ -757,8 +757,7 @@ serve(async (req) => {
             noop_escalation_step: noopEscalationStep,
             noop_reason: noopReasonHard,
             ladder_size: NOOP_LADDER.length,
-            canonical_lipsync_pipeline: speakerCount >= 2 ? "v203_fullplate_sync3_bbox_only" : null,
-            noop_escalation_blocked_by_v203: speakerCount >= 2,
+            canonical_lipsync_pipeline: speakerCount >= 2 ? "v204_preclip_bbox_clipspace" : null,
             previous_noop_output_url: rehostedUrl ?? outputUrl,
             size_ratio: sizeRatio,
           },
