@@ -133,7 +133,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v201-id-bbox";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v203-fullplate-bbox-only";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -3997,7 +3997,7 @@ serve(async (req) => {
     // invocation still spent ~60–120s rendering its own preclip. Start sibling
     // preclips as a background task as soon as pass 0 has claimed the scene,
     // while pass 0 continues its own preclip + Sync.so dispatch.
-    if (!isAdvance && !isRetry && currentPassIdx === 0 && passes.length > 1 && plateDims && sourceClipUrl) {
+    if (false && !isAdvance && !isRetry && currentPassIdx === 0 && passes.length > 1 && plateDims && sourceClipUrl) {
       let batchPreclipEnabled = true;
       try {
         const { data: batchFlag } = await supabase
@@ -4128,7 +4128,7 @@ serve(async (req) => {
         .eq("error_class", "provider_unknown_error")
         .filter("meta->>pass_idx", "eq", String(currentPassIdx))
         .filter("meta->>retry_variant", "eq", "bbox-url-pro");
-      if ((silentBboxFails ?? 0) >= 2) {
+      if (passes.length < 2 && (silentBboxFails ?? 0) >= 2) {
         v120ForcePreclip = true;
         // Drop any cached preclip so the renderer rebuilds fresh below
         // (also dodges expired-signed-URL traps).
