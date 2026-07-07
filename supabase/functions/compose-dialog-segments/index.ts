@@ -5146,7 +5146,7 @@ serve(async (req) => {
 
 
       // Sekundär: anchor faceMap (kann bei N=1 helfen oder wenn plate-native fehlt).
-      if (!box) {
+      if (!box && speakers.length < 2) {
         const fmFaces: any[] = Array.isArray((faceMap as any)?.faces)
           ? (faceMap as any).faces
           : [];
@@ -5186,7 +5186,7 @@ serve(async (req) => {
       // Pre-Flight (Z. ~1326) bereits hart gefailt + refunded. Hier kein
       // stiller Box-aus-coords-Mittelpunkt mehr — das hat in N=1 Szenen
       // dazu geführt, dass Sync.so im Zweifel die falsche Person animiert.
-      if (!box && !(pass as any)._v153BboxPrimary) {
+      if (!box && speakers.length < 2 && !(pass as any)._v153BboxPrimary) {
         const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
         const boxW = Math.round(dims.width * 0.18);
         const boxH = Math.round(dims.height * 0.28);
@@ -5206,6 +5206,21 @@ serve(async (req) => {
         | { x: number; y: number; size: number; outputSize: number }
         | undefined : undefined;
       const v161UsingPreclipForBbox = usePassPreclip && !!passPreclipUrl && !!v161PreclipCrop;
+      if (speakers.length >= 2 && v161UsingPreclipForBbox) {
+        (pass as any)._v152HardFail = {
+          reason: "v203_preclip_forbidden_multi_speaker",
+          errorClass: "v203_preclip_forbidden",
+          message:
+            `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
+            "Multi-Speaker darf nur noch über Full-Plate bounding_boxes_url laufen. Credits wurden zurückerstattet.",
+          meta: {
+            canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only",
+            preclip_used: true,
+            input_space: "preclip",
+            speakers: speakers.length,
+          },
+        };
+      }
       const probeUrlForBbox = v161UsingPreclipForBbox ? (passPreclipUrl as string) : passInputUrl;
       const v161PreclipStartSec = v161UsingPreclipForBbox
         ? Number((pass as any).preclip_start_sec ?? 0)
