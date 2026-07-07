@@ -495,9 +495,9 @@ const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
   const top = srcY * scaleY;
   const w = srcSize * scaleX;
   const h = srcSize * scaleY;
-  // v196: hard face-disc mask (no feather blend zone).
+  // v198: enlarged hard disc so seam lands beyond skin.
   const mask =
-    'radial-gradient(circle at center, #000 0%, #000 47%, rgba(0,0,0,0) 48%)';
+    'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0) 56%)';
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
