@@ -1,0 +1,1 @@
+UPDATE public.system_config SET value = 'false'::jsonb WHERE key = 'composer.silent_faces_v183';
