@@ -938,25 +938,40 @@ serve(async (req) => {
       const endSample = cursorSamples + pcm.length;
       const slug = block.speakerName;
       const firstName = slug.split("-")[0];
-      // v86 — Detect ambiguous speaker name. If the user's cast contains 2+
-      // characters whose first names / slugs collide with this block's name
-      // AND the block doesn't carry a unique full-slug match, refuse rather
-      // than silently merge two speakers' lines onto one Sync.so pass.
-      const slugAmbiguous = ambiguousNameKeys.has(slug);
-      const firstNameAmbiguous = ambiguousNameKeys.has(firstName);
-      const fullSlugHit = charByName.get(slug);
-      if (!fullSlugHit && (slugAmbiguous || firstNameAmbiguous)) {
-        return json({
-          error: "ambiguous_speaker_name",
-          speaker: block.rawSpeaker,
-          message: `Sprecher "${block.rawSpeaker}" ist mehrdeutig — mehrere Cast-Mitglieder teilen diesen Namen. Bitte verwende den vollen Namen (z. B. "Vorname Nachname:") oder weise dem Skript-Block eine eindeutige Character-ID zu.`,
-        }, 400);
+
+      // ID-Only Cast Resolution (v200): when the block was built from
+      // `dialog_turns`, its characterId is authoritative. Skip the
+      // name-based ambiguity check — turns cannot be ambiguous because
+      // they reference brand_characters.id directly. This is the fix for
+      // "SPRECHER 1: collapses onto wrong slot" and for two characters
+      // sharing a first name.
+      let resolvedCharId: string | null = null;
+      if (block.characterId) {
+        resolvedCharId = block.characterId;
+      } else {
+        // v86 legacy path — Detect ambiguous speaker name. If the user's
+        // cast contains 2+ characters whose first names / slugs collide
+        // with this block's name AND the block doesn't carry a unique
+        // full-slug match, refuse rather than silently merge two
+        // speakers' lines onto one Sync.so pass.
+        const slugAmbiguous = ambiguousNameKeys.has(slug);
+        const firstNameAmbiguous = ambiguousNameKeys.has(firstName);
+        const fullSlugHit = charByName.get(slug);
+        if (!fullSlugHit && (slugAmbiguous || firstNameAmbiguous)) {
+          return json({
+            error: "ambiguous_speaker_name",
+            speaker: block.rawSpeaker,
+            message: `Sprecher "${block.rawSpeaker}" ist mehrdeutig — mehrere Cast-Mitglieder teilen diesen Namen. Bitte verwende den vollen Namen (z. B. "Vorname Nachname:") oder weise dem Skript-Block eine eindeutige Character-ID zu.`,
+          }, 400);
+        }
+        const charEntry = fullSlugHit ?? charByName.get(firstName);
+        resolvedCharId = charEntry?.id ?? null;
       }
-      const charEntry = fullSlugHit ?? charByName.get(firstName);
+
       segments.push({
         speaker: block.rawSpeaker,
         speaker_slug: slug,
-        character_id: charEntry?.id ?? null,
+        character_id: resolvedCharId,
         engine: voice!.engine,
         voice: voice!.voiceId,
         // Public timestamps in seconds (3-decimal precision = ~1 ms).
