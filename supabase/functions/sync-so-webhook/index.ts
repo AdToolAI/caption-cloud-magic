@@ -684,7 +684,7 @@ serve(async (req) => {
         { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
       ];
       const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
-      const canEscalate = speakerCount < 2 && noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
+      const canEscalate = noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
         Number.isFinite(Number(passBeforeDone?.reference_frame_number));
 
       if (noopSuspect && !canEscalate) {
