@@ -140,14 +140,11 @@ export const DialogStitchVideoSchema = z.object({
     )
     .optional()
     .nullable(),
-  /** v195: per-speaker silent-face freeze tiles. Each entry is a
-   *  `preclip_crop` bbox in source-master pixel space. Rendered as
-   *  <Freeze frame={0}><Video src={masterVideoUrl}/></Freeze> at the bbox
-   *  for the FULL scene duration; active Sync.so shot overlays for that
-   *  speaker cover on top during voiced windows. Because the tile is a
-   *  crop of the SAME master plate at frame 0, geometry/identity/lighting
-   *  match perfectly — no ghost, no morph. Body/background outside each
-   *  bbox continues to animate from the live plate underneath. */
+  /** v197: per-speaker silent-face freeze tiles. Each entry is a
+   *  `preclip_crop` bbox in source-master pixel space plus true silent
+   *  windows. The freeze tile is rendered only outside that speaker's voiced
+   *  turns, restoring the v169 invariant that active speech has only one
+   *  face layer: the Sync.so lipsync output. */
   silentFaceFreezes: z
     .array(
       z.object({
@@ -155,6 +152,15 @@ export const DialogStitchVideoSchema = z.object({
         y: z.number(),
         size: z.number(),
         speakerIdx: z.number().optional().nullable(),
+        windows: z
+          .array(
+            z.object({
+              fromSec: z.number().min(0),
+              toSec: z.number().min(0),
+            }),
+          )
+          .optional()
+          .nullable(),
       }),
     )
     .optional()
@@ -464,15 +470,9 @@ const MouthMatteFreeze: React.FC<MouthMatteFreezeProps> = ({
 };
 
 /**
- * v195 — SilentFaceFreeze. Renders `<Freeze frame={0}><Video/></Freeze>` of
- * the master plate positioned at a `preclip_crop` bbox, spanning the entire
- * scene duration. Because the tile is a crop of the SAME plate at frame 0,
- * the identity, pose, lighting and edge exactly match the live plate
- * underneath. Active Sync.so shot overlays draw on top during voiced
- * windows, so this tile only visibly shows during silence.
- *
- * A soft radial mask feathers the seam so the transition to/from an active
- * overlay never shows a hard rectangular edge.
+ * v197 — SilentFaceFreeze. Renders `<Freeze frame={0}><Video/></Freeze>` of
+ * the master plate positioned at a `preclip_crop` bbox. Parent Sequences
+ * mount it only during true silent windows, never underneath active speech.
  */
 interface SilentFaceFreezeProps {
   src: string;
@@ -574,39 +574,54 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   // backward-compat with existing payloads.
   void globalSilentSlots;
 
-  // v195 — per-speaker silent-face freeze tiles from `preclip_crop`. Each
-  // tile is a <Freeze frame={0}><Video src=masterVideo/></Freeze> cropped to
-  // the bbox and rendered for the ENTIRE scene. Active Sync.so shot overlays
-  // (for that speaker's voiced windows) draw ON TOP, so the frozen tile only
-  // shows during silence — head, gaps, tail. Body & background outside the
-  // bbox keep animating from the live master plate underneath.
+  // v197 — per-speaker silent-face freeze tiles from `preclip_crop`, rendered
+  // only in true silent windows. This avoids the v195 layer competition where
+  // a full-scene freeze tile could remain visible below an active Sync.so
+  // overlay if the bboxes did not perfectly match.
   const silentFaceFreezeEls: React.ReactNode[] = React.useMemo(() => {
     if (!masterVideoUrl || masterImageUrl) return [];
     const arr = Array.isArray(silentFaceFreezes) ? silentFaceFreezes : [];
     return arr
-      .map((slot, i) => {
+      .flatMap((slot, i) => {
         const sx = Number(slot?.x);
         const sy = Number(slot?.y);
         const ss = Number(slot?.size);
         if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(ss) || ss <= 0) {
-          return null;
+          return [];
         }
-        return (
-          <SilentFaceFreeze
-            key={`silent-freeze-${i}`}
-            src={masterVideoUrl}
-            srcX={sx}
-            srcY={sy}
-            srcSize={ss}
-            scaleX={scaleX}
-            scaleY={scaleY}
-            compW={compW}
-            compH={compH}
-          />
-        );
+        const windows = Array.isArray(slot?.windows) ? slot.windows : [];
+        return windows
+          .map((window, wIdx) => {
+            const fromSec = Math.max(0, Math.min(totalSec, Number(window?.fromSec)));
+            const toSec = Math.max(fromSec, Math.min(totalSec, Number(window?.toSec)));
+            const from = Math.max(0, Math.floor(fromSec * fps));
+            const to = Math.min(durationInFrames, Math.ceil(toSec * fps));
+            const duration = Math.max(0, to - from);
+            if (!Number.isFinite(from) || !Number.isFinite(duration) || duration <= 0) return null;
+            return (
+              <Sequence
+                key={`silent-freeze-${i}-${wIdx}-${from}`}
+                from={from}
+                durationInFrames={duration}
+                layout="none"
+              >
+                <SilentFaceFreeze
+                  src={masterVideoUrl}
+                  srcX={sx}
+                  srcY={sy}
+                  srcSize={ss}
+                  scaleX={scaleX}
+                  scaleY={scaleY}
+                  compW={compW}
+                  compH={compH}
+                />
+              </Sequence>
+            );
+          })
+          .filter(Boolean);
       })
       .filter(Boolean);
-  }, [silentFaceFreezes, masterVideoUrl, masterImageUrl, scaleX, scaleY, compW, compH]);
+  }, [silentFaceFreezes, masterVideoUrl, masterImageUrl, scaleX, scaleY, compW, compH, totalSec, fps, durationInFrames]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
@@ -628,8 +643,8 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         ) : null}
       </AbsoluteFill>
 
-      {/* v195 — per-speaker silent-face freeze tiles. Rendered above the
-          live master plate and BELOW all fanout shot overlays. */}
+      {/* v197 — per-speaker silent-face freeze tiles. Rendered above the
+          live master plate only during true silent windows. */}
       {silentFaceFreezeEls.length > 0 ? silentFaceFreezeEls : null}
 
 
