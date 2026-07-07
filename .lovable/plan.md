@@ -1,121 +1,91 @@
-## Diagnose
+# Ehrliche Antwort
 
-Der aktuelle Fehler beginnt nicht bei Sync.so, sondern eine Stufe davor:
+Der vorherige Plan (Head/Tail-Freeze der ganzen Master-Plate) **funktioniert**, ist aber **nicht** der sauberste Weg. Er friert bei Kopf-/Schwanz-Bereich auch Hintergrund + Body-Motion ein — das widerspricht deinem Kernwunsch „Bewegungen im Hintergrund zu jeder Zeit möglich". Das ist ein Mux-Hack, keine Architektur.
 
-- Aktueller Run (`edb…`): `engine_override=cinematic-sync`, `twoshot_stage=master_clip`, aber `reference_image_url = null`.
-- Logs zeigen `v156_anchor_missing → aws_on_mp4_fallback`.
-- Heißt: Master-Clip wurde ohne komponierten Character-Anchor erzeugt → Provider rendert generische Personen statt Samuel/Matthew/Sarah → Face Recognition findet danach keine Brand-Character-Gesichter → Sync.so-Passes laufen ins Leere.
-- Zusätzlich ist `composer.silent_speaker_pass_v194 = true` (v194 stabilizer-Pässe erhöhen Komplexität und kollidieren mit dem Silent-Audio-Gate).
-- `auto_detect` ist zwar überall zurückgedrängt, aber noch nicht als harte Invariante verboten.
-- ID-Prefix-System (`outfit:`, `catalog:`, `lib:`, `preset:`, `pose:`, `wardrobe:`, `vibe:`, `prop:`, `look:`) ist parallel client- und serverseitig implementiert und wird nicht konsistent genutzt.
+Hier ist die professionellere Variante.
 
-## Zielzustand
+---
 
-Wieder sauberer v169-artiger Ablauf:
+## Teil A — Silent-Window Face-Overlay (statt Full-Frame Freeze)
 
-```text
-Cast (CastRef mit BASE characterId + outfitLookId)
-  → compose-scene-anchor (auditiert)
-  → reference_image_url gepinnt
-  → i2v Master-Clip mit exakt diesen Charakteren
-  → Plate face identity mapping (bbox)
-  → Sync.so pro Sprecher mit bounding_boxes_url (kein auto_detect)
-  → Mux
-```
+### Prinzip
+Body & Hintergrund kommen **immer** aus der Live-Plate (Hailuo/Kling). Nur der **Mund-/Gesichtsbereich** wird während stiller Fenster durch ein *geschlossener-Mund Standbild-Crop* desselben Sprechers ersetzt. Während voiced-windows: Sync.so-Face-Crop wie heute. Zwischen den Windows: statischer Closed-Mouth Crop desselben Sprechers, an derselben Bbox — nicht die ganze Plate.
 
-## Umsetzung
+Das ist der Ansatz, den professionelle VFX-Pipelines (Facelab, Rope, Wav2Lip-Compositor) fahren: *lipsync = face patch, nichts anderes*.
 
-### 1. Master-Anchor vor Provider-Render hart erzwingen
-- `compose-video-clips`: jede Cinematic-Sync-Szene mit Cast/Dialog braucht vor dem Provider-Call einen `reference_image_url`.
-- Fehlt er, muss `compose-scene-anchor` synchron laufen mit `portraitUrls[]`, `identityPortraitUrls[]`, Outfit-Looks, Sprecher-Reihenfolge aus `dialog_script`.
-- Anchor-Compose/Audit fehlgeschlagen → hart abbrechen, keine Provider-Kosten, klare Meldung.
-- Kein stiller Text-to-Video-Fallback für Cinematic-Sync.
+### Umsetzung
 
-### 2. Frontend-Invoke-Pfad reparieren
-- `useSceneGenerate`: die alte Kommentar-Regel "Anchor pre-composition nur im ClipsTab" ist für Cinematic-Sync ungültig.
-- Storyboard-Generate schickt `characterShots`, `dialogScript`, `dialogVoices`, ggf. `referenceImageUrl`/`lockReferenceUrl` vollständig ans Backend.
-- Cinematic-Sync ohne Anchor → Backend-Safety-Net erzeugt ihn zuerst, statt Provider blind zu starten.
+1. **Neuer Preclip-Frame `closed_mouth_still`** pro Pass:
+   - `compose-dialog-segments` produziert je Sprecher einen 1-Frame Preclip mit fixem Mund-geschlossen Referenzbild (bereits vorhanden via Anchor-Portrait) oder extrahiert Frame-0 des existierenden Preclips (Anfang = neutraler Mund).
+   - Speichern als `dialog_shots.closed_mouth_still_url` + Bbox in Plate-Space.
 
-### 3. v194 Silent-Speaker-Pass abschalten
-- `composer.silent_speaker_pass_v194 = false` und die Injection in `compose-dialog-segments` entfernen.
-- `render-sync-segments-audio-mux` verwendet nur noch aktive Sprecher-Pässe.
-- Reduziert Provider-Traffic, Gate-Kollisionen (silent WAV vs. `audio_too_silent_post_trim`) und Ghost-/Freeze-Overlays.
+2. **Mux-Erweiterung** `render-sync-segments-audio-mux`:
+   - Für **jeden** Pass wird die Face-Overlay-Timeline erweitert:
+     - `[0 .. startSec)` → `closed_mouth_still` Overlay auf Sprecher-Bbox
+     - `[startSec .. endSec)` → Sync.so-Output (heute)
+     - `[endSec .. sceneEnd)` → `closed_mouth_still` Overlay
+   - Master-Plate-Layer läuft **ungestört** durch → Body-Motion + Hintergrund komplett erhalten.
+   - Kein Full-Frame-Freeze. `tailFreezeFromSec` / `headFreezeUntilSec` werden **entfernt** (bzw. sind nach dieser Änderung obsolet).
 
-### 4. bbox-only Sync.so-Invariante hart durchsetzen
-- `_shared/asd-strategy.ts` + `compose-dialog-segments` + `sync-so-webhook`: kein `auto_detect` mehr im Dialog-Pfad.
-- Retry-Varianten `auto-pro` / `auto-standard` aus dem Dialog-Retry-Ladder entfernen.
-- Kein bbox baubar → fail fast + Refund statt Provider-Call.
-- Fokus: `bounding_boxes_url`, notfalls inline `bounding_boxes`, `frame_number+coordinates` nur als eng gefasster Ausnahmefall.
+3. **`DialogStitchVideo.tsx`**:
+   - `fanoutShots[]` bekommt zusätzliches Feld `silenceOverlay: { url, bbox, from, to }[]`. Renderer legt jedes Silence-Overlay als `<Img>` mit korrekter `crop` + `transform` auf die entsprechende Bbox — mit demselben Post-Processing (feather, color-match) wie der Sync-Output.
+   - Kein Freeze mehr.
 
-### 5. v169 Parallelismus stabilisieren
-- Per-pass-Lock beibehalten, TTL/Release sauber, kein Endlos-BUSY.
-- Jeder Pass nutzt Master-Plate/eigenen Preclip, nie das Output eines Vorgänger-Passes.
-- Stale-job reconcile + 429 Backoff bleiben.
+4. **Fallback**: wenn `closed_mouth_still_url` fehlt (Legacy-Szenen), 1x Log `v183_missing_closed_mouth_still` + Verhalten wie heute (rohe Plate durchreichen). Kein Crash.
 
-### 6. ID-Prefix-System sauber verdrahten (Character/Props/Locations/Buildings/Outfits)
+### Warum das sauberer ist
+- Erfüllt beide Contracts gleichzeitig: „Bewegungen im Hintergrund immer möglich" + „keine Idle-Lippenbewegung außerhalb Skript".
+- Kein Provider-Retrain, keine Prompt-Wette. Deterministisch pro Frame.
+- Kein zusätzlicher Sync.so-Call (das war der Fehler von v194).
 
-Bestehende Bausteine (bereits im Repo, aber inkonsequent genutzt):
-- `CastRef` (typed value object mit separatem `characterId` + `outfitLookId`)
-- `stripLegacyCastIdPrefix`, `resolveCharacterId`, `useCharacterIdResolver`
-- `mentionToCastRef` als offizieller Boundary-Layer
-- Serverseitige Strips (`v170 stripIdPrefix` in `compose-dialog-segments`, `outfit:` Resolver in `compose-video-clips`, prefix-aware `twoshot-face-map`)
+---
 
-Was fehlt oder inkonsistent ist:
-- `character_shots` in der DB enthält teils noch `outfit:<lookId>`, teils saubere UUIDs. Die Compose-Funktion papieren das mit einer Ad-hoc-Lookup-Migration.
-- Scene Director (LLM) + ProductionPlan + Auto-Director schreiben teils gemischte Formen.
-- Server-Vergleiche gegen `brand_characters.id` funktionieren nur, weil sie überall lokal Prefix strippen — jeder neue Consumer kann den Bug wieder einführen.
-- Props/Locations/Buildings kommen aus `*_catalog_previews` als eigene UUIDs; im Composer werden sie aber in `@-Mentions` als `catalog:<id>` referenziert und müssen jedes Mal separat aufgelöst werden.
+## Teil B — Sync.so ASD: bbox-only garantieren
 
-Maßnahmen:
+Voraussetzung damit Teil A überhaupt greift (sonst falsche Bbox → Overlay am falschen Ort):
 
-a. Single boundary durchsetzen
-- Jede Konvertierung aus der Mention-Library läuft ausschließlich über `mentionToCastRef` bzw. das äquivalente Prop/Location/Building-Pendant.
-- Alle Stellen, die direkt `mention.id` in DB-Felder oder Prompts schreiben, umbauen: nur noch `CastRef` bzw. resolved base UUID + optional `outfitLookId`/`variantId`.
+1. `_shared/asd-strategy.ts` → alle `auto_detect:true` Rückgaben löschen (auch N=1).
+2. `compose-dialog-segments` Preclip-Branch: wenn crop-local Bbox nicht rechenbar → **hard fail + refund**, statt v99-Downgrade auf `auto_detect`.
+3. `sanitizeSync3Options`: Runtime-Guard — Payload mit `auto_detect:true` wird geblockt, `syncso_dispatch_log.blocked_auto_detect=true`, kein `fetch`.
+4. `sync-so-webhook` Retry: `retry_variant ∈ {coords-pro, bbox-url-pro}` fix.
 
-b. DB-Schema/Storage klarziehen
-- `character_shots[].characterId` speichert IMMER die base `brand_characters.id`; Outfits liegen in `outfitLookId` daneben. Für Legacy-Zeilen einmalig eine Read-Migration/Repair im Backend beim nächsten Zugriff (`compose-video-clips` macht das schon punktuell — konsolidieren, nicht wieder-erfinden).
-- Analog Props/Locations/Buildings: separates Feld `variantId` / `catalogId`, nicht Prefix-in-string.
+---
 
-c. Server-Strips zentralisieren
-- `stripIdPrefix`-artige Helper aus `compose-dialog-segments`, `compose-video-clips`, `twoshot-face-map`, `plate-face-identity` in ein einziges `_shared/cast-id.ts` mit einer Funktion `resolveCastRef(rawId, ctx)`.
-- Alle Vergleiche gegen `brand_characters.id` gehen nur noch über diese Funktion. Kein lokaler Regex mehr in einzelnen Modulen.
+## Teil C — Cast-ID System: Compile-Time Boundary
 
-d. Runtime-Guard
-- Wenn eine Szene beim Dispatch noch prefixed IDs enthält, wird sie beim Start einmalig migriert und persistiert; anschließend Standard-Pfad.
-- Neuer Client-Code darf keine prefixed IDs mehr in `character_shots`, `mentioned_character_ids`, `dialog_voices` schreiben — TS-Types (`CastRef`) machen das compiler-enforced.
+Kein Runtime-Assert-Flickenteppich. Eine echte Grenze:
 
-e. Props/Locations/Buildings
-- Scene Director / Prompt-Composer nutzen die base UUID aus `world_catalog` / `brand_locations` / `brand_buildings` / `brand_props` und speichern separate Referenzfelder (`sceneLocations[]`, `sceneProps[]`) statt Prompt-Mentions.
-- Anchor- und Scene-Director-Aufrufe bekommen konsistent `locationUrls`, `buildingUrls`, `propUrls` (schon vorgesehen in `compose-scene-anchor`), müssen aber überall aus den echten Objekten gefüllt werden, nicht aus Prompt-Regex.
+1. **Branded Types** in `src/lib/video-composer/CastRef.ts`:
+   ```ts
+   export type BaseCharacterId = string & { readonly __brand: 'BaseCharacterId' };
+   export type OutfitLookId    = string & { readonly __brand: 'OutfitLookId' };
+   ```
+   `CastRef.characterId: BaseCharacterId`. TypeScript verhindert dass ein `outfit:xxx`-String jemals hineinläuft.
 
-Erwarteter Effekt: viele "Charakter nicht auflösbar / plate identity 0 / anchor missing single speaker"-Fehler verschwinden, weil die Base-UUIDs deterministisch identisch sind zwischen Client, Anchor-Renderer, Identity-Audit und Sync.so-Slot-Bridging.
+2. **Einziger legaler Konstruktor** `mentionToCastRef()` — alle anderen Pfade (Scene Director, ProductionPlan, useSceneGenerate, Storyboard) rufen ihn auf oder erhalten `BaseCharacterId` bereits aus DB. Alte `stripPrefix` Funktionen in `useApplyProductionPlan.ts` (Z.62) werden gelöscht.
 
-### 7. Recovery für kaputte Szenen
-- Erkennen: Cinematic-Sync + `reference_image_url = null` + master ready.
-- Nicht weiter lipsyncen; als "needs_clip_rerender" markieren mit klarer Meldung.
-- Optional: automatisch Anchor + Master neu erzeugen, wenn alle Cast-Portraits vorhanden sind.
+3. **Server-seitig** `supabase/functions/_shared/cast-id.ts`:
+   ```ts
+   assertBaseUuid(id, ctx): asserts id is BaseCharacterId
+   ```
+   In `compose-video-clips`, `compose-dialog-segments`, `compose-scene-anchor`, `twoshot-face-map`, `plate-face-identity`, `sync-so-webhook`, `render-sync-segments-audio-mux`: **eine** Import-Stelle, keine ad-hoc Regexes mehr. Assertion beim DB-Read von `character_shots[].characterId`. Wenn verletzt → Scene `needs_clip_rerender` markieren, kein Ghost-Face-Render.
 
-### 8. Verifikation
-- Neuer 3-Speaker-Run: `anchor pinned` erscheint VOR `master_clip`.
-- Master-Clip zeigt die gewählten Charaktere.
-- Keine v194-Stabilizer-Passes in `syncso_dispatch_log`.
-- Alle Dispatches führen `bounding_boxes_url` (kein `auto_detect`).
-- `character_shots` in der DB enthält nach dem Run nur base UUIDs + separates `outfitLookId`.
-- Bei fehlendem Anchor sofortiger, verständlicher Abbruch statt Endlos-Lip-sync.
+4. **Backfill-Migration** einmalig: `video_scenes.character_shots[]` durchgehen, `outfit:` / `catalog:` in `characterId` gegen `avatar_outfit_looks` auflösen, in `characterId` (Avatar-UUID) + `outfitLookId` splitten.
 
-## Betroffene Dateien
-- `supabase/functions/compose-video-clips/index.ts`
-- `supabase/functions/compose-dialog-segments/index.ts`
-- `supabase/functions/_shared/asd-strategy.ts`
-- `supabase/functions/_shared/twoshot-face-map.ts`
-- `supabase/functions/_shared/plate-face-identity.ts`
-- neu: `supabase/functions/_shared/cast-id.ts` (single-source cast/prop/location resolver)
-- `supabase/functions/sync-so-webhook/index.ts`
-- `supabase/functions/render-sync-segments-audio-mux/index.ts`
-- `src/hooks/useSceneGenerate.ts`, `useApplyProductionPlan.ts`, `useUnifiedMentionLibrary.ts`, `useCharacterIdResolver.ts`
-- `src/lib/video-composer/CastRef.ts`, `mentionToCastRef.ts`, `resolveCharacterId.ts`
-- Backend-Config: `composer.silent_speaker_pass_v194 = false`
-- Projekt-Memory: neue harte Regeln
-  - Dialog Lip-sync = bbox-only, kein `auto_detect`
-  - Cinematic-Sync ohne komponierten Anchor darf keinen Provider-Render starten
-  - Cast/Prop/Location IDs immer als CastRef (base UUID + optionaler Variant-Slot), nie als Prefix-String
+5. **Analog Props / Locations / Buildings**: `world_catalog` / `brand_locations` / `brand_buildings` / `brand_props`. Statt `catalog:xxx` im Prompt-String separates `scene.assetRefs: { props, locations, buildings }` Feld (Base-UUIDs). `applySceneAssetsToPrompt` befüllt Namen aus DB.
+
+---
+
+## Verifikation
+
+- Neue 1-Speaker-Szene: Log `v183_silence_overlay speaker=0 windows=2 mode=closed-mouth-still`. Player: Body/Auto/Hintergrund bewegen sich durchgehend, Mund still außerhalb VO.
+- Neue 3-Speaker-Fanout-Szene: alle drei Sprecher zeigen jeweils Silence-Overlay in eigenen Bboxes; Hintergrund läuft.
+- `syncso_dispatch_log` 24h: 0 Einträge mit `auto_detect:true`; 0 `blocked_auto_detect`.
+- `character_shots[*].characterId` in DB: 100% UUID, 0% Prefix (SQL-Check `~ ':'`).
+- Anchor-Missing Fehler: 0.
+- Alt-Szenen ohne `closed_mouth_still_url` rendern weiter, Log-Zähler `v183_missing_closed_mouth_still` sichtbar für spätere Backfill-Entscheidung.
+
+## Nicht in Scope
+- Provider-Prompt (v175 bleibt).
+- Sync.so ASD DTO Whitelist (v124 bleibt).
+- Preview-Player-Umbau, v194 (bleibt off).

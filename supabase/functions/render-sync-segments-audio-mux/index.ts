@@ -253,16 +253,36 @@ serve(async (req) => {
       listenerMouthMatteEnabled = isFanout;
     }
 
-    // v183 — Silent-Faces via static anchor portraits. Feature-flagged via
-    // `system_config.composer.silent_faces_v183` (default OFF). When ON we
-    // fetch each done pass's character portrait_url and attach `silentSlots`
-    // to every fanout shot: the slot rect is that speaker's `preclip_crop`
-    // and the anchorUrl is the closed-mouth portrait. The Remotion template
-    // renders an <Img> per slot (behind the active overlay) so the pristine
-    // plate's baked-in mouth motion for non-speaking characters is masked
-    // with a static image. No <Freeze>/<Video>, no morph, no ghost.
-    // v192 — default OFF. Ghost-avatar overlays disabled globally. An
-    // explicit `true` row in system_config can re-enable for rollback tests.
+    // v195 — Silent-Face Freeze (professional). For every done pass we emit a
+    // FULL-SCENE freeze tile on the master plate at that speaker's
+    // `preclip_crop` bbox, frame 0. Active Sync.so overlays for that speaker
+    // draw ON TOP during voiced windows, so the frozen tile only shows during
+    // silence (head + gaps + tail). Because the tile is a crop of the SAME
+    // master plate at frame 0, the geometry, identity, color, and lighting
+    // match perfectly — no ghost, no morph (root cause of v183/v190
+    // portrait-based overlays that were disabled in v192).
+    //
+    // Body, hands, hair, and background outside each face bbox continue to
+    // animate from the live plate → "Bewegungen im Hintergrund zu jeder Zeit"
+    // stays satisfied while pre/post-script lip motion is eliminated.
+    //
+    // Flag: system_config.composer.silent_anchor_v195 (default TRUE).
+    let silentAnchorV195Enabled = true;
+    try {
+      const { data: v195Row } = await supabase
+        .from("system_config")
+        .select("value")
+        .eq("key", "composer.silent_anchor_v195")
+        .maybeSingle();
+      const raw = (v195Row as any)?.value;
+      if (raw !== undefined && raw !== null) {
+        silentAnchorV195Enabled = String(raw).toLowerCase() !== "false";
+      }
+    } catch {
+      silentAnchorV195Enabled = true;
+    }
+
+    // Legacy v183 portrait-based ghost overlay path — kept OFF by default.
     let silentFacesV183Enabled = false;
     try {
       const { data: v183Row } = await supabase
@@ -278,9 +298,43 @@ serve(async (req) => {
       silentFacesV183Enabled = false;
     }
 
-    // characterId → portrait_url, only fetched when the flag is on.
+    // v195 silent-face freeze tiles — geometry-matched to the master plate.
+    type SilentFreeze = { x: number; y: number; size: number; speakerIdx: number };
+    const silentFaceFreezes: SilentFreeze[] = [];
+    if (silentAnchorV195Enabled && useOverlay) {
+      for (const p of donePasses as any[]) {
+        const sIdx = Number(p?.speaker_idx);
+        const pc = p?.preclip_crop;
+        if (
+          !Number.isFinite(sIdx) ||
+          !pc ||
+          !Number.isFinite(Number(pc.x)) ||
+          !Number.isFinite(Number(pc.y)) ||
+          !Number.isFinite(Number(pc.size)) ||
+          Number(pc.size) <= 0
+        ) {
+          continue;
+        }
+        silentFaceFreezes.push({
+          x: Number(pc.x),
+          y: Number(pc.y),
+          size: Number(pc.size),
+          speakerIdx: sIdx,
+        });
+      }
+      console.log(
+        `[render-sync-segments-audio-mux] scene=${sceneId} v195_silent_anchor slots=${silentFaceFreezes.length}/${donePasses.length} enabled=${silentAnchorV195Enabled} isFanout=${isFanout}`,
+      );
+    }
+
+    // Legacy v183 portrait-based path — only active when the old flag is on
+    // AND v195 is off. Retained for emergency rollback.
+    type SilentSlot = { x: number; y: number; size: number; anchorUrl: string | null };
+    type MouthMatteSlot = { x: number; y: number; width: number; height: number };
+    const silentSlotBySpeakerIdx = new Map<number, SilentSlot>();
+    const mouthMatteBySpeakerIdx = new Map<number, MouthMatteSlot>();
     const charPortraitByCharId = new Map<string, string>();
-    if (silentFacesV183Enabled && isFanout) {
+    if (silentFacesV183Enabled && !silentAnchorV195Enabled && isFanout) {
       const uniqueCharIds = Array.from(
         new Set(
           donePasses
@@ -299,15 +353,6 @@ serve(async (req) => {
           }
         }
       }
-    }
-
-    // Per-speaker slot rects (preclip_crop). Speakers without a valid crop
-    // are simply skipped for silence overlay purposes.
-    type SilentSlot = { x: number; y: number; size: number; anchorUrl: string | null };
-    type MouthMatteSlot = { x: number; y: number; width: number; height: number };
-    const silentSlotBySpeakerIdx = new Map<number, SilentSlot>();
-    const mouthMatteBySpeakerIdx = new Map<number, MouthMatteSlot>();
-    if (silentFacesV183Enabled && isFanout) {
       for (const p of donePasses as any[]) {
         const sIdx = Number(p?.speaker_idx);
         const pc = p?.preclip_crop;
@@ -330,15 +375,6 @@ serve(async (req) => {
           anchorUrl,
         });
       }
-      const totalSlots = silentSlotBySpeakerIdx.size;
-      const withAnchor = Array.from(silentSlotBySpeakerIdx.values()).filter((s) => !!s.anchorUrl).length;
-      console.log(
-        `[render-sync-segments-audio-mux] scene=${sceneId} v183_silent_slots ENABLED speakers=${donePasses.length} crops=${totalSlots} anchors=${withAnchor} fallback=${totalSlots - withAnchor}`,
-      );
-    } else {
-      console.log(
-        `[render-sync-segments-audio-mux] scene=${sceneId} v183_silent_slots DISABLED donePasses=${donePasses.length} (flag=${silentFacesV183Enabled} isFanout=${isFanout})`,
-      );
     }
 
     if (listenerMouthMatteEnabled && isFanout) {
@@ -508,23 +544,25 @@ serve(async (req) => {
       const e = Number(shot?.endSec);
       return Number.isFinite(e) ? Math.max(max, e) : max;
     }, 0);
-    const tailFreezeFromSec = isSingleSpeakerTight && lastShotEndSec > 0 && lastShotEndSec < totalSec - 0.05
-      ? Number(lastShotEndSec.toFixed(3))
-      : null;
+    // v195 supersedes v182: the per-pass silent-face freeze covers head +
+    // tail + gap silence on the SAME crop the plate uses, so a scene-wide
+    // freeze is no longer needed and produced the "everything frozen" look.
+    // We keep v182 as an emergency fallback only when v195 emitted no slots
+    // (e.g. no valid preclip_crop on the single pass).
+    const tailFreezeFromSec =
+      silentFaceFreezes.length === 0 && isSingleSpeakerTight && lastShotEndSec > 0 && lastShotEndSec < totalSec - 0.05
+        ? Number(lastShotEndSec.toFixed(3))
+        : null;
     if (tailFreezeFromSec !== null) {
       console.log(
-        `[render-sync-segments-audio-mux] scene=${sceneId} v182_n1_tail_hold from=${tailFreezeFromSec.toFixed(3)} to=${totalSec.toFixed(3)}`,
+        `[render-sync-segments-audio-mux] scene=${sceneId} v182_n1_tail_hold_fallback from=${tailFreezeFromSec.toFixed(3)} to=${totalSec.toFixed(3)} (v195 emitted 0 slots)`,
       );
     }
 
 
-    // v190 — scene-wide silent-face anchor tiles (all speakers with a valid
-    // preclip_crop). Rendered once by the Remotion template above the raw
-    // master plate and below all fanout shots; active Sync.so overlays
-    // cover the matching slot inside their own turn window, so anchor tiles
-    // only ever show for a silent face. N=1 (no fanout) → empty array.
+    // v190 legacy portrait tiles — only when v183 flag ON and v195 OFF.
     const globalSilentSlots =
-      silentFacesV183Enabled && isFanout && donePasses.length >= 2
+      silentFacesV183Enabled && !silentAnchorV195Enabled && isFanout && donePasses.length >= 2
         ? Array.from(silentSlotBySpeakerIdx.values())
         : [];
     if (globalSilentSlots.length > 0) {
@@ -545,6 +583,7 @@ serve(async (req) => {
       shots: fanoutShots,
       ...(tailFreezeFromSec !== null ? { tailFreezeFromSec } : {}),
       ...(globalSilentSlots.length > 0 ? { globalSilentSlots } : {}),
+      ...(silentFaceFreezes.length > 0 ? { silentFaceFreezes } : {}),
     };
 
     const shotSummary = fanoutShots.map((shot: any, idx: number) => ({
