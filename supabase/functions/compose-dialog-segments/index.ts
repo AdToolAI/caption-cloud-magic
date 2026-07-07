@@ -4385,13 +4385,10 @@ serve(async (req) => {
     let retryVariant: RetryVariant = isRetry
       ? ((requestedRetryVariant === "coords-pro-box" ? "coords-pro-box" : "bbox-url-pro") as RetryVariant)
       : freshDefaultVariant;
-    // v203 — Multi-speaker has exactly one live provider path: full-plate
-    // sync-3 with active_speaker_detection.bounding_boxes_url. Explicit
-    // retry/noop variants must not re-enter coords, inline bbox, auto, or
-    // lipsync-2-era fallbacks.
-    if (speakers.length >= 2) {
-      retryVariant = "bbox-url-pro";
-    }
+    // v204 — Multi-speaker rolled back to v169 preclip path. Retry variants
+    // (coords-pro-box, sync3-coords, etc.) are honored again. The forbidden
+    // legacy variants (auto-pro/auto-standard/coords-pro/coords-pro-lp2pro)
+    // remain blocked further down for N>=2.
     // v153.2 — Bei aktivem unified-Pfad auch Advance/Retry auf bbox-url-pro zwingen.
     // Die NOOP-Ladder darf weiterhin explizite Diagnose-Varianten wählen.
     if (v153Active && !noopAutoEscalation) {
