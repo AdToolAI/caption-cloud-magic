@@ -1,133 +1,121 @@
-# v194 — Silent-Speaker-Pass (Multi-Face-Lipsync, Hintergrund bleibt lebendig)
+## Diagnose
 
-## Kern-Constraint (hart)
+Der aktuelle Fehler beginnt nicht bei Sync.so, sondern eine Stufe davor:
 
-**Kein `auto_detect: true` oder `active_speaker_detection: auto` — NIE.**
-Jeder einzelne Sync.so-Pass (aktiv wie silent-stabilizer) bekommt eine explizite `bounding_boxes_url` mit dem präzisen Face-Rect dieser einen Face-Region. Deterministisch, reproduzierbar, doc-compliant zu sync-3 (siehe Memory `sync-3-doc-strict-options-v106`).
+- Aktueller Run (`edb…`): `engine_override=cinematic-sync`, `twoshot_stage=master_clip`, aber `reference_image_url = null`.
+- Logs zeigen `v156_anchor_missing → aws_on_mp4_fallback`.
+- Heißt: Master-Clip wurde ohne komponierten Character-Anchor erzeugt → Provider rendert generische Personen statt Samuel/Matthew/Sarah → Face Recognition findet danach keine Brand-Character-Gesichter → Sync.so-Passes laufen ins Leere.
+- Zusätzlich ist `composer.silent_speaker_pass_v194 = true` (v194 stabilizer-Pässe erhöhen Komplexität und kollidieren mit dem Silent-Audio-Gate).
+- `auto_detect` ist zwar überall zurückgedrängt, aber noch nicht als harte Invariante verboten.
+- ID-Prefix-System (`outfit:`, `catalog:`, `lib:`, `preset:`, `pose:`, `wardrobe:`, `vibe:`, `prop:`, `look:`) ist parallel client- und serverseitig implementiert und wird nicht konsistent genutzt.
 
-## Warum die bisherigen Lösungen scheitern
+## Zielzustand
 
-| Version | Ansatz | Warum es nicht sauber ist |
-|---|---|---|
-| v183 | Ghost-Portrait über Listener kleben | Fremdes Gesicht, "Morph"-Effekt sichtbar |
-| v193 | Kleiner Freeze-Patch (Frame 0) über Listener-Mund | Kopf/Licht bewegen sich weiter → Patch "atmet" am weichen Rand → dezenter Morph (deine Screenshots) |
-| v194-A (Full-Plate-Freeze) | Ganzen Frame einfrieren, nur aktiver Sprecher lebt | Hintergrund + andere Personen komplett tot → sieht wie Standbild aus, unprofessionell |
+Wieder sauberer v169-artiger Ablauf:
 
-Gemeinsames Problem: Die AI-Plate (Hailuo/Kling i2v) generiert **alle** Personen mit natürlicher Mund-Mikro-Bewegung. Sync.so ersetzt aber nur **einen** Mund. Die anderen bleiben "am reden".
+```text
+Cast (CastRef mit BASE characterId + outfitLookId)
+  → compose-scene-anchor (auditiert)
+  → reference_image_url gepinnt
+  → i2v Master-Clip mit exakt diesen Charakteren
+  → Plate face identity mapping (bbox)
+  → Sync.so pro Sprecher mit bounding_boxes_url (kein auto_detect)
+  → Mux
+```
 
-## Der professionelle Weg — Silent-Speaker-Pass
+## Umsetzung
 
-**Sync.so selbst als Listener-Stiller einsetzen.** Für jeden Turn:
+### 1. Master-Anchor vor Provider-Render hart erzwingen
+- `compose-video-clips`: jede Cinematic-Sync-Szene mit Cast/Dialog braucht vor dem Provider-Call einen `reference_image_url`.
+- Fehlt er, muss `compose-scene-anchor` synchron laufen mit `portraitUrls[]`, `identityPortraitUrls[]`, Outfit-Looks, Sprecher-Reihenfolge aus `dialog_script`.
+- Anchor-Compose/Audit fehlgeschlagen → hart abbrechen, keine Provider-Kosten, klare Meldung.
+- Kein stiller Text-to-Video-Fallback für Cinematic-Sync.
 
-1. **1 aktiver Sync.so-Pass** — bbox der aktiven Face-Region, echte VO-Audio.
-2. **M-1 stille Sync.so-Passes** — je ein Pass pro Listener, je mit eigener bbox, gefüttert mit einem deterministischen `silence_<dur>.wav` (Room-Tone ~−55 dBFS).
-3. **Compositing** wie heute: jeder Pass überlagert nur seine bbox-Region.
+### 2. Frontend-Invoke-Pfad reparieren
+- `useSceneGenerate`: die alte Kommentar-Regel "Anchor pre-composition nur im ClipsTab" ist für Cinematic-Sync ungültig.
+- Storyboard-Generate schickt `characterShots`, `dialogScript`, `dialogVoices`, ggf. `referenceImageUrl`/`lockReferenceUrl` vollständig ans Backend.
+- Cinematic-Sync ohne Anchor → Backend-Safety-Net erzeugt ihn zuerst, statt Provider blind zu starten.
 
-Ergebnis:
-- Aktiver Sprecher: korrekt gelipsynct.
-- Listener: geschlossene Münder, aber **Kopf/Blick/Körper/Haare/Hintergrund bewegen sich frei** (Plate läuft normal weiter, Sync.so ändert nur den Lippenbereich head-tracked).
-- Keine Ränder, keine Freeze-Patches, keine Ghost-Portraits, keine `auto_detect`-Nichtdeterminismus.
+### 3. v194 Silent-Speaker-Pass abschalten
+- `composer.silent_speaker_pass_v194 = false` und die Injection in `compose-dialog-segments` entfernen.
+- `render-sync-segments-audio-mux` verwendet nur noch aktive Sprecher-Pässe.
+- Reduziert Provider-Traffic, Gate-Kollisionen (silent WAV vs. `audio_too_silent_post_trim`) und Ghost-/Freeze-Overlays.
 
-## Konkrete BBox-Regeln (nicht verhandelbar)
+### 4. bbox-only Sync.so-Invariante hart durchsetzen
+- `_shared/asd-strategy.ts` + `compose-dialog-segments` + `sync-so-webhook`: kein `auto_detect` mehr im Dialog-Pfad.
+- Retry-Varianten `auto-pro` / `auto-standard` aus dem Dialog-Retry-Ladder entfernen.
+- Kein bbox baubar → fail fast + Refund statt Provider-Call.
+- Fokus: `bounding_boxes_url`, notfalls inline `bounding_boxes`, `frame_number+coordinates` nur als eng gefasster Ausnahmefall.
 
-- Für **jeden** Sync.so-Dispatch (aktiv + silent) wird eine `bounding_boxes_url` gebaut und übergeben.
-- BBox-Quelle pro Pass = `preclip_crop` dieses Passes (identisch zur bestehenden aktiven-Pass-Logik).
-- Payload verwendet **ausschließlich** `sync_mode` und `active_speaker_detection` als Optionen (v106-Doc-Strict) — kein `temperature`, kein `occlusion_detection_enabled`, kein `auto_detect`.
-- Falls für einen Listener keine deterministische bbox verfügbar ist (z.B. Face-Extraktion fehlgeschlagen) → dieser eine Listener fällt auf v193-Freeze-Matte zurück (**nicht** die ganze Szene, **nicht** auto_detect als Fallback).
+### 5. v169 Parallelismus stabilisieren
+- Per-pass-Lock beibehalten, TTL/Release sauber, kein Endlos-BUSY.
+- Jeder Pass nutzt Master-Plate/eigenen Preclip, nie das Output eines Vorgänger-Passes.
+- Stale-job reconcile + 429 Backoff bleiben.
 
-## Technische Änderungen
+### 6. ID-Prefix-System sauber verdrahten (Character/Props/Locations/Buildings/Outfits)
 
-### 1. `compose-dialog-segments` (Edge Function)
-- Beim Fan-out eines Turns pro Face: `M-1` zusätzliche `dialog_shots`-Rows mit
-  - `is_silent_stabilizer = true`
-  - `silent_for_turn_of = <active_pass_idx>`
-  - eigene `preclip_crop` (bbox der Listener-Face)
-- Silent-Passes teilen sich das gleiche `silence_<duration>.wav` (deterministisch, on-demand via `generate-silence-track`).
-- Payload-Builder für Silent-Passes = identisch zum aktiven Pass, **inkl. `bounding_boxes_url`**. Nur die Audio-URL zeigt auf silence-track statt VO.
-- Feature-Flag: `composer.silent_speaker_pass_v194 = true` gate.
+Bestehende Bausteine (bereits im Repo, aber inkonsequent genutzt):
+- `CastRef` (typed value object mit separatem `characterId` + `outfitLookId`)
+- `stripLegacyCastIdPrefix`, `resolveCharacterId`, `useCharacterIdResolver`
+- `mentionToCastRef` als offizieller Boundary-Layer
+- Serverseitige Strips (`v170 stripIdPrefix` in `compose-dialog-segments`, `outfit:` Resolver in `compose-video-clips`, prefix-aware `twoshot-face-map`)
 
-### 2. `render-sync-segments-audio-mux`
-- Pro Sprecher-Fenster jetzt `M` Overlays (1 aktiv + `M-1` silent-stabilized).
-- Existing `silent_faces_v183` und `listener_mouth_matte_v193` Codepfade deaktiviert wenn v194 an.
-- Log-Marker: `v194_silent_speaker_pass_composited passes=M shot=i`.
-- Per-Face Fallback-Marker: `v194_fallback_v193_face=<idx> reason=<sync_so_error>` — nur für die betroffene Face-Region.
+Was fehlt oder inkonsistent ist:
+- `character_shots` in der DB enthält teils noch `outfit:<lookId>`, teils saubere UUIDs. Die Compose-Funktion papieren das mit einer Ad-hoc-Lookup-Migration.
+- Scene Director (LLM) + ProductionPlan + Auto-Director schreiben teils gemischte Formen.
+- Server-Vergleiche gegen `brand_characters.id` funktionieren nur, weil sie überall lokal Prefix strippen — jeder neue Consumer kann den Bug wieder einführen.
+- Props/Locations/Buildings kommen aus `*_catalog_previews` als eigene UUIDs; im Composer werden sie aber in `@-Mentions` als `catalog:<id>` referenziert und müssen jedes Mal separat aufgelöst werden.
 
-### 3. `DialogStitchVideo.tsx`
-- Wenn `silent_speaker_pass_v194 = true`:
-  - Rendert `M` Sync.so-Overlays parallel pro `Sequence` (identische Overlay-Logik wie aktiver Pass: `faceMask` / `crop`).
-  - Keine `SilentFaceFreeze` / `FullPlateFreezeWithHole` mehr → Hintergrund + Listener-Körperbewegung kommen komplett aus dem lebenden Master-Plate.
-- Fallback-Pfad: einzelne Face fällt auf v193-Matte zurück (nur diese eine Face).
+Maßnahmen:
 
-### 4. Neue Edge-Function `generate-silence-track`
-- Input: `duration_sec`.
-- Output: signed URL zu `silence_<dur>.wav` (Bucket `composer-silence-tracks`, 24h Cache).
-- ffmpeg: `-f lavfi -i "anoisesrc=color=brown:amplitude=0.0005" -t <dur> -ar 24000 -ac 1` (~−55 dBFS).
-- Deterministisch — gleiche Dauer → gleiche Datei.
+a. Single boundary durchsetzen
+- Jede Konvertierung aus der Mention-Library läuft ausschließlich über `mentionToCastRef` bzw. das äquivalente Prop/Location/Building-Pendant.
+- Alle Stellen, die direkt `mention.id` in DB-Felder oder Prompts schreiben, umbauen: nur noch `CastRef` bzw. resolved base UUID + optional `outfitLookId`/`variantId`.
 
-### 5. Silent-Audio-Gate Bypass für Stabilizer-Passes
-- `mem/architecture/lipsync/v53-doc-compliance-fixes.md` erzwingt `peak_dbfs > -50` sonst pre-dispatch-fail. Das ist korrekt für User-Audio, würde aber unsere Silent-Passes killen.
-- Neuer Payload-Flag `stabilizer_pass: true` in `dialog_shots` → Gate übersprungen **nur** für diese Rows, die zwingend `is_silent_stabilizer = true` sein müssen.
-- Alle anderen v53-Compliance-Regeln bleiben aktiv (kein `segments_secs`, `cut_off`, korrekte per-turn WAVs).
+b. DB-Schema/Storage klarziehen
+- `character_shots[].characterId` speichert IMMER die base `brand_characters.id`; Outfits liegen in `outfitLookId` daneben. Für Legacy-Zeilen einmalig eine Read-Migration/Repair im Backend beim nächsten Zugriff (`compose-video-clips` macht das schon punktuell — konsolidieren, nicht wieder-erfinden).
+- Analog Props/Locations/Buildings: separates Feld `variantId` / `catalogId`, nicht Prefix-in-string.
 
-### 6. `system_config`-Migration
-- `composer.silent_speaker_pass_v194 = true`
-- `composer.silent_speaker_pass_charge_user = false`
-- `composer.silent_speaker_pass_require_bbox = true` (harter Gate — kein Pass ohne bbox)
-- `composer.listener_mouth_matte_v193 = false`
-- `composer.silent_faces_v183 = false`
+c. Server-Strips zentralisieren
+- `stripIdPrefix`-artige Helper aus `compose-dialog-segments`, `compose-video-clips`, `twoshot-face-map`, `plate-face-identity` in ein einziges `_shared/cast-id.ts` mit einer Funktion `resolveCastRef(rawId, ctx)`.
+- Alle Vergleiche gegen `brand_characters.id` gehen nur noch über diese Funktion. Kein lokaler Regex mehr in einzelnen Modulen.
 
-### 7. `dialog_shots`-Schema-Migration
-- `is_silent_stabilizer boolean NOT NULL DEFAULT false`
-- `silent_for_turn_of uuid NULL` (FK auf aktiven Pass, ON DELETE CASCADE)
-- `stabilizer_pass boolean NOT NULL DEFAULT false`
-- Index auf `(scene_id, silent_for_turn_of)` für Batch-Preclip-Sammlung.
+d. Runtime-Guard
+- Wenn eine Szene beim Dispatch noch prefixed IDs enthält, wird sie beim Start einmalig migriert und persistiert; anschließend Standard-Pfad.
+- Neuer Client-Code darf keine prefixed IDs mehr in `character_shots`, `mentioned_character_ids`, `dialog_voices` schreiben — TS-Types (`CastRef`) machen das compiler-enforced.
 
-### 8. Refund-Semantik
-- Silent-Stabilizer-Passes: **kein User-Refund** bei Sync.so-Fail (User hat nie bezahlt).
-- Bei Fail: Fallback auf v193-Matte für diese eine Face-Region, Warnung in `qa_live_runs`.
-- Bei fehlender bbox für einen Listener: **kein Silent-Pass dispatched**, direkt v193-Matte für diese Face (nie `auto_detect` als Rescue).
+e. Props/Locations/Buildings
+- Scene Director / Prompt-Composer nutzen die base UUID aus `world_catalog` / `brand_locations` / `brand_buildings` / `brand_props` und speichern separate Referenzfelder (`sceneLocations[]`, `sceneProps[]`) statt Prompt-Mentions.
+- Anchor- und Scene-Director-Aufrufe bekommen konsistent `locationUrls`, `buildingUrls`, `propUrls` (schon vorgesehen in `compose-scene-anchor`), müssen aber überall aus den echten Objekten gefüllt werden, nicht aus Prompt-Regex.
 
-### 9. Kosten & Business-Modell
-- +M-1 Sync.so-Calls pro Turn (bei 4 Sprechern: +3 Calls × ceil(vo_dur) × 9 Credits).
-- User-Wallet: unverändert (`silent_speaker_pass_charge_user = false`).
-- Kosten laufen gegen Composer-Marge — marketing-tauglicher Move ("saubere Multi-Speaker-Szenen ohne Aufpreis").
-- Admin kann per Flag umschalten wenn Marge zu dünn wird.
+Erwarteter Effekt: viele "Charakter nicht auflösbar / plate identity 0 / anchor missing single speaker"-Fehler verschwinden, weil die Base-UUIDs deterministisch identisch sind zwischen Client, Anchor-Renderer, Identity-Audit und Sync.so-Slot-Bridging.
 
-### 10. Remotion-Bundle-Deploy
-- `scripts/deploy-remotion-bundle.sh` nach DialogStitchVideo-Änderung.
+### 7. Recovery für kaputte Szenen
+- Erkennen: Cinematic-Sync + `reference_image_url = null` + master ready.
+- Nicht weiter lipsyncen; als "needs_clip_rerender" markieren mit klarer Meldung.
+- Optional: automatisch Anchor + Master neu erzeugen, wenn alle Cast-Portraits vorhanden sind.
 
-## Verworfene Alternativen (und warum)
+### 8. Verifikation
+- Neuer 3-Speaker-Run: `anchor pinned` erscheint VOR `master_clip`.
+- Master-Clip zeigt die gewählten Charaktere.
+- Keine v194-Stabilizer-Passes in `syncso_dispatch_log`.
+- Alle Dispatches führen `bounding_boxes_url` (kein `auto_detect`).
+- `character_shots` in der DB enthält nach dem Run nur base UUIDs + separates `outfitLookId`.
+- Bei fehlendem Anchor sofortiger, verständlicher Abbruch statt Endlos-Lip-sync.
 
-| Option | Warum verworfen |
-|---|---|
-| Face-Tracking (MediaPipe) + motion-kompensiertes Freeze-Overlay | Neuer Preprocessing-Server-Step, Landmark-Extraktion pro Frame, Warp-Compositing. Fragil bei schnellen Kopfdrehungen, kein deterministischer Fallback. |
-| i2v-Prompt "Nur Speaker A spricht, andere schweigen" | AI-Modelle ignorieren das inkonsistent. Kein Fallback. |
-| Multi-Pass i2v (jede Person isoliert generieren + compositen) | 4× i2v-Kosten, Green-Screen-Compositing, Character-Consistency-Hell. |
-| `sync-3` Multi-Speaker-Single-Call mit per-Speaker-Audio | v106-Doc-Strict verbietet mehrere Audio-Tracks pro Call. |
-| `active_speaker_detection: "auto"` oder `auto_detect: true` | **Explizit verboten** — reproducibly `provider_unknown_error` in v106, und nicht deterministisch. |
-
-## Akzeptanzkriterien
-
-- 4-Sprecher-Szene: Alle 4 Köpfe bewegen sich natürlich (Blick, Nicken, leichtes Schwanken), Hintergrund läuft, nur der jeweils aktive Sprecher öffnet den Mund.
-- Keine sichtbaren Ränder, Patches, oder Ghost-Portraits.
-- 1-Sprecher-Szene: unverändert schnell (~2–3 min), M-1 = 0 Silent-Passes.
-- 4-Sprecher-Szene: ~9–10 min (Silent-Passes laufen parallel zum aktiven Pass unter `sync_so_concurrency_cap = 4`).
-- Log-Marker `v194_silent_speaker_pass_composited passes=4 shot=i` erscheint.
-- **In sämtlichen `syncso_dispatch_log`-Zeilen: `bounding_boxes_url IS NOT NULL` und kein `auto_detect` / `active_speaker_detection: "auto"`.** Assertion in Watchdog.
-- User-Wallet nur für aktive Passes belastet.
-- Bei Sync.so-Fail auf Silent-Pass: v193-Matte-Fallback für genau diese Face, Rest der Szene läuft durch.
-
-## Out of Scope
-
-- Keine Änderung an i2v-Generation, Anchor-Pipeline, Preclip-Extraktion.
-- Keine Änderung an Audio-Mux-Logik außer dem Overlay-Loop.
-- Keine neuen DB-Tabellen (nur 3 Spalten + 1 Index in `dialog_shots`).
-
-## Warum das der professionellste Ansatz ist
-
-- **Same-engine consistency**: Listener werden von derselben Lipsync-AI stabilisiert wie der aktive Sprecher — kein Stilbruch, keine Freeze-Ränder, keine Portrait-Match-Fehler.
-- **Head-tracked**: Sync.so folgt der Kopfbewegung nativ. Keine externe Face-Tracking-Pipeline.
-- **Deterministisch**: bbox-only, kein `auto_detect`, reproduzierbar über Re-Runs.
-- **Graceful degradation**: einzelne Face fällt auf v193 zurück, nicht die ganze Szene.
-- **Kein User-Cost-Impact**: Composer-Marge trägt Silent-Passes.
-- **Skaliert**: 5, 6, 7 Sprecher — identische Codepfade.
+## Betroffene Dateien
+- `supabase/functions/compose-video-clips/index.ts`
+- `supabase/functions/compose-dialog-segments/index.ts`
+- `supabase/functions/_shared/asd-strategy.ts`
+- `supabase/functions/_shared/twoshot-face-map.ts`
+- `supabase/functions/_shared/plate-face-identity.ts`
+- neu: `supabase/functions/_shared/cast-id.ts` (single-source cast/prop/location resolver)
+- `supabase/functions/sync-so-webhook/index.ts`
+- `supabase/functions/render-sync-segments-audio-mux/index.ts`
+- `src/hooks/useSceneGenerate.ts`, `useApplyProductionPlan.ts`, `useUnifiedMentionLibrary.ts`, `useCharacterIdResolver.ts`
+- `src/lib/video-composer/CastRef.ts`, `mentionToCastRef.ts`, `resolveCharacterId.ts`
+- Backend-Config: `composer.silent_speaker_pass_v194 = false`
+- Projekt-Memory: neue harte Regeln
+  - Dialog Lip-sync = bbox-only, kein `auto_detect`
+  - Cinematic-Sync ohne komponierten Anchor darf keinen Provider-Render starten
+  - Cast/Prop/Location IDs immer als CastRef (base UUID + optionaler Variant-Slot), nie als Prefix-String
