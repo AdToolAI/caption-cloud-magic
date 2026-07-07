@@ -5736,21 +5736,38 @@ serve(async (req) => {
       };
     }
 
-    const finalAudioDiag = await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
-      );
-      return null;
-    });
+    // v194 — Silent-Speaker-Pass stabilizer bypass. These passes intentionally
+    // ship a near-silent WAV (room tone) so Sync.so produces a closed-mouth
+    // lipsync that follows head motion for a non-speaking listener face. The
+    // regular silent-audio gate would (correctly, for user audio) reject
+    // them. We bypass ONLY when the pass is explicitly flagged as a
+    // stabilizer AND the audio_url is our deterministic silence-track.
+    const isStabilizerPass = (pass as any).stabilizer_pass === true &&
+      (pass as any).is_silent_stabilizer === true;
+
+    const finalAudioDiag = isStabilizerPass
+      ? null
+      : await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
+          );
+          return null;
+        });
     const finalPeakDbFs = Number(finalAudioDiag?.wav?.peakDbFs);
     const finalVoicedSec = Number(finalAudioDiag?.vad?.voicedSec ?? 0);
     const finalLongestRun = Number(finalAudioDiag?.vad?.longestVoicedRun ?? 0);
-    const audioSilentOrInvalid =
+    const audioSilentOrInvalid = !isStabilizerPass && (
       !finalAudioDiag ||
       !Number.isFinite(finalPeakDbFs) ||
       finalPeakDbFs <= -50 ||
       finalVoicedSec <= 0.04 ||
-      finalLongestRun <= 0.04;
+      finalLongestRun <= 0.04
+    );
+    if (isStabilizerPass) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v194_stabilizer_bypass_silent_gate speaker_idx=${(pass as any).speaker_idx}`,
+      );
+    }
     if (audioSilentOrInvalid) {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE peak_dbfs=${Number.isFinite(finalPeakDbFs) ? finalPeakDbFs.toFixed(2) : "invalid"} voiced=${finalVoicedSec.toFixed(3)}s longest=${finalLongestRun.toFixed(3)}s url=${pass.audio_url.slice(0, 120)}`,
