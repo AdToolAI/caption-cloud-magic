@@ -351,9 +351,9 @@ const SilentFaceAnchor: React.FC<SilentFaceAnchorProps> = ({
   scaleX,
   scaleY,
 }) => {
-  // v184: softer falloff to match fanout crop masks (45→62→98).
+  // v196: hard face-disc mask (no feather blend zone).
   const mask =
-    'radial-gradient(circle at center, #000 0%, #000 45%, rgba(0,0,0,0.75) 62%, rgba(0,0,0,0) 98%)';
+    'radial-gradient(circle at center, #000 0%, #000 47%, rgba(0,0,0,0) 48%)';
   const left = srcX * scaleX;
   const top = srcY * scaleY;
   const w = srcSize * scaleX;
