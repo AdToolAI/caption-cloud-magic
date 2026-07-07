@@ -600,10 +600,47 @@ serve(async (req) => {
     if (isServiceCall) userId = project.user_id;
 
     const dialogScript: string = (scene as any).dialog_script ?? "";
-    const blocks = parseDialogScript(dialogScript);
+
+    // ID-Only Cast Resolution (v200) --------------------------------------
+    // If `dialog_turns` is populated for this scene, build blocks directly
+    // from turn.characterId (each turn already carries the canonical
+    // brand_characters.id). This bypasses the free-text "NAME:" parser
+    // entirely — no fuzzy matching, no ambiguity between characters with
+    // similar first names, no generic "SPRECHER 1" collision.
+    const idOnlyOn = await readIdOnlyEnabled(supabase);
+    const rawTurns = normalizeTurns((scene as any).dialog_turns);
+    let idOnlyActive = false;
+    let idOnlyNameById = new Map<string, string>();
+    if (idOnlyOn && rawTurns.length > 0) {
+      const turnCharIds = Array.from(new Set(rawTurns.map((t) => t.characterId)));
+      try {
+        const { data: turnChars } = await supabase
+          .from("brand_characters")
+          .select("id, name")
+          .in("id", turnCharIds);
+        for (const c of turnChars ?? []) {
+          idOnlyNameById.set(String((c as any).id), String((c as any).name ?? ""));
+        }
+      } catch (e) {
+        console.warn("[compose-twoshot-audio] v200 turn name fetch failed:", (e as any)?.message);
+      }
+      idOnlyActive = idOnlyNameById.size > 0;
+    }
+
+    const blocks = idOnlyActive
+      ? (blocksFromDialogTurns(rawTurns, idOnlyNameById) ?? parseDialogScript(dialogScript))
+      : parseDialogScript(dialogScript);
+
+    if (idOnlyActive) {
+      console.log(
+        `[compose-twoshot-audio] v200_id_only_cast scene=${scene_id} blocks=${blocks.length} speakers=[${Array.from(new Set(blocks.map((b) => b.characterId).filter(Boolean))).join(",")}]`,
+      );
+    }
+
     if (blocks.length < 1) {
       return json({ error: "empty_dialog_script", blocks: 0 }, 400);
     }
+
 
     // Build name → character lookup so we can resolve voices.
     // We index by first name AND full slugified name (e.g. "matthew-dusatko")
