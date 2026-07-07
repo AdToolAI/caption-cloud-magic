@@ -36,6 +36,13 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
+import {
+  fetchDialogTurnsForScenes,
+  readIdOnlyEnabled,
+  effectiveShotsFromTurns,
+  orderedSpeakerIdsFromTurns,
+  type DialogTurn,
+} from "../_shared/scene-dialog-turns.ts";
 const ANCHOR_AUDIT_VERSION = 12;
 
 const corsHeaders = {
