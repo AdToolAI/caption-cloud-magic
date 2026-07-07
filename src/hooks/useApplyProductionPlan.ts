@@ -827,6 +827,10 @@ export function useApplyProductionPlan() {
           action_beat: ((s as any).actionBeat ?? null) as any,
           realism_preset: (s as any).realismPreset ?? null,
           seed: (s as any).seed ?? null,
+          // v202 — canonical Cast & World scene_assets, written at INSERT
+          // time so compose-video-clips never has to JIT-backfill for
+          // freshly plan-applied scenes.
+          scene_assets: ((s as any).sceneAssets ?? []) as any,
         }));
         const { data, error } = await supabase
           .from('composer_scenes')
