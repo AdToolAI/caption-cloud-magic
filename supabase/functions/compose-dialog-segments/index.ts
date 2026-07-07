@@ -4385,6 +4385,13 @@ serve(async (req) => {
     let retryVariant: RetryVariant = isRetry
       ? ((requestedRetryVariant === "coords-pro-box" ? "coords-pro-box" : "bbox-url-pro") as RetryVariant)
       : freshDefaultVariant;
+    // v203 — Multi-speaker has exactly one live provider path: full-plate
+    // sync-3 with active_speaker_detection.bounding_boxes_url. Explicit
+    // retry/noop variants must not re-enter coords, inline bbox, auto, or
+    // lipsync-2-era fallbacks.
+    if (speakers.length >= 2) {
+      retryVariant = "bbox-url-pro";
+    }
     // v153.2 — Bei aktivem unified-Pfad auch Advance/Retry auf bbox-url-pro zwingen.
     // Die NOOP-Ladder darf weiterhin explizite Diagnose-Varianten wählen.
     if (v153Active && !noopAutoEscalation) {
@@ -4728,10 +4735,28 @@ serve(async (req) => {
     // Idempotent: ein bereits gerenderter Preclip wird wiederverwendet.
     // Fail-Closed: wenn der Preclip nicht rendert UND keine Plate-Box
     // existiert, greift der v153.5 Hard-Fail unten (Refund + abort).
-    let passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
-    let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
+    if (speakers.length >= 2) {
+      const hadCachedPreclip = !!(pass as any).preclip_url || !!(pass as any).preclip_crop;
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_render_id = null;
+      (pass as any).preclip_crop = null;
+      (pass as any).preclip_start_sec = null;
+      (pass as any).preclip_end_sec = null;
+      (pass as any).preclip_fps = null;
+      (pass as any).preclip_frame_count = null;
+      (pass as any).preclip_duration_sec = null;
+      (pass as any).preclip_dims = null;
+      if (hadCachedPreclip) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v203_drop_cached_preclip speakers=${speakers.length} — forcing full-plate bbox-only dispatch`,
+        );
+      }
+    }
+    let passPreclipUrl: string | null = speakers.length >= 2 ? null : ((pass as any).preclip_url ?? null);
+    let usePassPreclip: boolean = speakers.length < 2 && !!passPreclipUrl && !!(pass as any).preclip_crop;
 
     const v161PreclipEligible =
+      speakers.length < 2 &&
       !usePassPreclip &&
       !!tightAudioInfo &&
       !!plateDims &&
