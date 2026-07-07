@@ -473,6 +473,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   srcHeight,
   tailFreezeFromSec,
   globalSilentSlots,
+  silentFaceFreezes,
   shots,
 }) => {
   const { fps, durationInFrames, width: compW, height: compH } = useVideoConfig();
@@ -491,13 +492,43 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
     ? Math.max(0, durationInFrames - tailStartFrame)
     : 0;
 
-  // v192 — Ghost-avatar overlays disabled. `globalSilentSlots` is ignored at
-  // the template level so cached render payloads can't resurrect the overlay.
-  // Schema field kept for backward-compat with existing payloads.
+  // v192 — Ghost-avatar portrait overlays disabled. Schema field kept for
+  // backward-compat with existing payloads.
   void globalSilentSlots;
-  const globalSilentSlotEls: React.ReactNode[] = React.useMemo(() => [], []);
 
-
+  // v195 — per-speaker silent-face freeze tiles from `preclip_crop`. Each
+  // tile is a <Freeze frame={0}><Video src=masterVideo/></Freeze> cropped to
+  // the bbox and rendered for the ENTIRE scene. Active Sync.so shot overlays
+  // (for that speaker's voiced windows) draw ON TOP, so the frozen tile only
+  // shows during silence — head, gaps, tail. Body & background outside the
+  // bbox keep animating from the live master plate underneath.
+  const silentFaceFreezeEls: React.ReactNode[] = React.useMemo(() => {
+    if (!masterVideoUrl || masterImageUrl) return [];
+    const arr = Array.isArray(silentFaceFreezes) ? silentFaceFreezes : [];
+    return arr
+      .map((slot, i) => {
+        const sx = Number(slot?.x);
+        const sy = Number(slot?.y);
+        const ss = Number(slot?.size);
+        if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(ss) || ss <= 0) {
+          return null;
+        }
+        return (
+          <SilentFaceFreeze
+            key={`silent-freeze-${i}`}
+            src={masterVideoUrl}
+            srcX={sx}
+            srcY={sy}
+            srcSize={ss}
+            scaleX={scaleX}
+            scaleY={scaleY}
+            compW={compW}
+            compH={compH}
+          />
+        );
+      })
+      .filter(Boolean);
+  }, [silentFaceFreezes, masterVideoUrl, masterImageUrl, scaleX, scaleY, compW, compH]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
@@ -519,11 +550,10 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         ) : null}
       </AbsoluteFill>
 
-      {/* v190 — scene-wide silent-face anchor tiles. Sit above the raw
-          master plate and below all fanout shots; each active Sync.so
-          overlay draws on top of its matching slot inside its own turn
-          window, so anchor tiles only show where a face is silent. */}
-      {globalSilentSlotEls.length > 0 ? globalSilentSlotEls : null}
+      {/* v195 — per-speaker silent-face freeze tiles. Rendered above the
+          live master plate and BELOW all fanout shot overlays. */}
+      {silentFaceFreezeEls.length > 0 ? silentFaceFreezeEls : null}
+
 
 
 
