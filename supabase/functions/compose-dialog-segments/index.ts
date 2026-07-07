@@ -6768,7 +6768,7 @@ serve(async (req) => {
       meta: {
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
-        canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+        canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
         speakers_source: speakersSource,
         dialog_turns_count: canonicalDialogTurnsCount,
         canonical_speaker_ids: canonicalSpeakerIds,
@@ -6782,6 +6782,9 @@ serve(async (req) => {
                 ? "auto_detect"
                 : "unknown",
         v131_5_final_override: (pass as any)._v131_5_final_override ?? null,
+        input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
+        preclip_used: speakers.length >= 2 ? false : usePassPreclip,
+        fullplate_bbox_only: speakers.length >= 2,
         diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,
         total_passes: passes.length,
@@ -6879,7 +6882,7 @@ serve(async (req) => {
         preclip_fps: (pass as any).preclip_fps ?? null,
         preclip_dims: (pass as any).preclip_dims ?? null,
         preclip_crop: (pass as any).preclip_crop ?? null,
-        dispatch_video_kind: usePassPreclip ? "preclip" : "full_plate",
+        dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
 
         payload_summary: {
           model: payload.model,
