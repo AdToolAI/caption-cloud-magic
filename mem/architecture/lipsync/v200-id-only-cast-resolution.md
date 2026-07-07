@@ -44,14 +44,13 @@ as authoritative. NO name parsing, NO fuzzy match.
   before Sync.so dispatch for dialog passes. Dispatch metadata includes
   `canonical_lipsync_pipeline='v201_id_bbox_sync3'`, `speakers_source`,
   `dialog_turns_count`, `canonical_speaker_ids`, and `asd_mode`.
-- **DONE (v203)**: Multi-speaker dispatch is now **full-plate only**. Cached
-  or freshly rendered per-pass preclips are ignored for N≥2; Sync.so receives
-  the master plate, `model='sync-3'`, and `active_speaker_detection` with
-  `bounding_boxes_url` built from plate-native boxes. Crop-space bbox,
-  preclip overlay dispatch, NOOP escalation, coordinate ASD, auto-detect, and
-  lipsync-2/lipsync-2-pro fallbacks are blocked for N≥2. Dispatch metadata uses
-  `canonical_lipsync_pipeline='v203_fullplate_sync3_bbox_only'`,
-  `input_space='plate'`, and `preclip_used=false`.
+- **REVERTED (v203 → v204)**: The v203 full-plate-only zwang was rolled back
+  because Sync.so systematically rejected multi-face plates with
+  `generation_input_face_selection_invalid`. The canonical path is now v204:
+  per-pass single-face preclip + `bounding_boxes_url` in clip-space + `sync-3`
+  + `cut_off`. See `mem://architecture/lipsync/v204-preclip-bbox-clipspace-rollback`.
+  Dispatch metadata uses `canonical_lipsync_pipeline='v204_preclip_bbox_clipspace'`,
+  `input_space='clip'`, and `preclip_used=true` for N≥2.
 - **NOT DONE (Teil B — Face-Lock)**: `track-scene-faces` edge function,
   `pass-face-preclip` trajectory-aware crop, DialogStitchVideo track-aware
   mask center. Feature flag `composer.feature.face_track_preclip=false`
