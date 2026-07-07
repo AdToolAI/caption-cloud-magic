@@ -4895,13 +4895,7 @@ serve(async (req) => {
     // v153 setzt `_v153BboxPrimary` nur wenn `speakerPlateBboxes[idx]`
     // valide ist. Fehlt der Plate-Bbox UND wir haben tightAudio + coords,
     // muss die Szene neu gerendert werden — kein Silent-Fallback.
-    const v153BboxRequired =
-      speakers.length >= 1 &&
-      !!plateDims &&
-      Array.isArray(pass.coords) &&
-      Number.isFinite(Number(pass.coords?.[0])) &&
-      Number.isFinite(Number(pass.coords?.[1])) &&
-      !!tightAudioInfo;
+    const v153BboxRequired = false;
     if (v153BboxRequired && !(pass as any)._v153BboxPrimary) {
       const failReason = "v153_plate_bbox_required";
       console.error(
@@ -5308,7 +5302,7 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}`,
         );
-      } else if ((pass as any)._v152BboxPrimary) {
+      } else {
         // v152 — Hard-Fail statt Silent-Downgrade. Lieber sofort transparent
         // abbrechen + refunden + klare User-Message als 30 min später mit
         // einem stillen Pseudo-Lipsync zu enden.
@@ -5343,18 +5337,6 @@ serve(async (req) => {
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes_url: "deferred-v152-hard-fail",
-        };
-      } else {
-        // Legacy (non-v152) Pfad: bestehender silent downgrade auf coords-pro.
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v147_BBOX_DOWNGRADE_TO_COORDS_PRO reason=${!usedUrl ? "upload_failed" : !v152BboxSane ? `geometry_insane_area=${(boxAreaPct * 100).toFixed(2)}` : "zero_voiced_frames"} non_null=${nonNullFrames}`,
-        );
-        retryVariant = "coords-pro";
-        pass.retry_variant = "coords-pro";
-        syncOptions.active_speaker_detection = {
-          auto_detect: false,
-          frame_number: referenceFrameNumber,
-          coordinates: clampSyncCoords(pass.coords),
         };
       }
 
