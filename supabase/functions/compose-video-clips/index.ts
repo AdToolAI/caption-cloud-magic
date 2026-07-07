@@ -2171,6 +2171,32 @@ serve(async (req) => {
             extErr,
           );
         }
+
+        // ── v195 HARD-GUARD: cinematic-sync must have a composed anchor ────
+        // Regressions kept slipping through when the anchor safety net threw
+        // or when portraits were absent — the provider then rendered generic
+        // strangers and the whole Sync.so pipeline chewed cycles on faces
+        // that don't belong to any brand character. Fail loud here BEFORE
+        // any provider credits are spent, so the user sees a clear error
+        // instead of an "endless lip-sync".
+        if (!scene.referenceImageUrl) {
+          const msg =
+            "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.";
+          console.warn(
+            `[compose-video-clips] scene ${scene.id}: v195_cinematic_sync_anchor_missing → hard-fail before provider dispatch`,
+          );
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({
+              clip_status: "failed",
+              clip_error: msg,
+              twoshot_stage: "failed",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene.id);
+          results.push({ sceneId: scene.id, status: "failed", error: msg });
+          continue;
+        }
       }
 
       // ── Universal cast-anchor safety net (all i2v engines) ───────────────
