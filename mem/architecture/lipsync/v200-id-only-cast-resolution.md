@@ -1,10 +1,10 @@
 ---
-name: v200 ID-Only Cast Resolution
-description: Backend enforces brand_characters.id as single source of truth for dialog speakers via composer_scenes.dialog_turns; no more name-based fuzzy matching in compose-video-clips / compose-twoshot-audio
+name: v201 Canonical ID + Bounding-Boxes Lipsync
+description: Backend enforces composer_scenes.dialog_turns[].characterId plus sync-3 bounding_boxes_url; legacy name matching and v153 env rollback are blocked
 type: feature
 ---
 
-# v200 — ID-Only Cast Resolution
+# v201 — Canonical ID + Bounding-Boxes Lipsync
 
 ## Motivation
 Speaker mismatch ("Sprecher 3 sagt was, was nicht im Skript stand") was caused
@@ -28,32 +28,38 @@ as authoritative. NO name parsing, NO fuzzy match.
 - **DONE**: Feature flag `composer.feature.id_only_cast_resolution` in
   `system_config` (default true). Toggle to `false` for emergency rollback
   without redeploy.
-- **DONE**: `compose-video-clips` — both cast-resolution sites
-  (cinematic-sync ~L1696 and universal anchor ~L2306) prefer turns and skip
-  legacy STAGE 5 fuzzy synthesis when turns are present. Log marker
-  `v200_id_only_cast`.
-- **DONE**: `compose-twoshot-audio` — new `blocksFromDialogTurns()` builds
-  segments directly from turn.characterId, bypassing `parseDialogScript()`;
-  `resolveVoice()` tries `dialog_voices[characterId]` first; segments loop
-  skips ambiguity check when block.characterId is set. Log marker
-  `v200_id_only_cast`.
+- **DONE (v201)**: `_shared/scene-dialog-turns.ts` has
+  `ensureDialogTurnsForScene()` for just-in-time backfill from
+  `dialog_script + character_shots + brand_characters`. It returns no partial
+  mappings; unmatched/ambiguous speakers hard-block provider dispatch.
+- **DONE (v201)**: `compose-video-clips`, `compose-twoshot-audio`, and
+  `compose-dialog-segments` call the JIT backfill before falling back to any
+  legacy parser. Log markers: `v201_dialog_turns_jit_backfill`,
+  `v201_id_only_required_block`, `v201_id_only_cast`.
+- **DONE (v201)**: `compose-dialog-segments` ignores the historical
+  `FEATURE_V153_BBOX_PRIMARY` rollback path. The v153 full-plate primary path
+  cannot be reactivated by env. Dispatch is pinned to `sync-3` with
+  `active_speaker_detection.bounding_boxes_url` / inline `bounding_boxes`.
+- **DONE (v201)**: Coordinate-only or `auto_detect:true` wire ASD is blocked
+  before Sync.so dispatch for dialog passes. Dispatch metadata includes
+  `canonical_lipsync_pipeline='v201_id_bbox_sync3'`, `speakers_source`,
+  `dialog_turns_count`, `canonical_speaker_ids`, and `asd_mode`.
 - **NOT DONE (Teil B — Face-Lock)**: `track-scene-faces` edge function,
   `pass-face-preclip` trajectory-aware crop, DialogStitchVideo track-aware
   mask center. Feature flag `composer.feature.face_track_preclip=false`
   gates the future rollout — table exists, no producer/consumer yet.
 
 ## Frontend impact
-None. Editor already writes `characterShots[]` with UUIDs; `dialog_turns`
-is populated server-side via migration backfill for existing scenes. New
-scenes without turns fall through to the legacy name resolver (behavior
-identical to pre-v200).
+None. Editor already writes `characterShots[]` with UUIDs. Backend now fills
+`dialog_turns` just-in-time for legacy scenes and blocks ambiguous ID mapping
+instead of silently using names.
 
 ## Validation
 - 3-speaker test scene: `syncso_dispatch_log` should show correct
-  character_id per pass; `speakers_source=dialog_turns` in metadata.
-- Rollback: `UPDATE system_config SET value='false'::jsonb WHERE
-  key='composer.feature.id_only_cast_resolution'` restores legacy fuzzy
-  matching without redeploy.
+  `character_id` per pass, `speakers_source=dialog_turns`,
+  `asd_mode=bounding_boxes_url`, and `model=sync-3`.
+- The old v153 env rollback is intentionally blocked; do not re-enable
+  `FEATURE_V153_BBOX_PRIMARY`.
 
 ## Files touched
 - `supabase/functions/_shared/scene-dialog-turns.ts` (new)

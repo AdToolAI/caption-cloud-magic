@@ -490,8 +490,10 @@ serve(async (req) => {
     // Fetch canonical dialog_turns for every scene up-front. When present,
     // the two speaker-resolution sites below skip name-based fuzzy matching
     // entirely and derive the visual cast from turn.characterId directly.
-    // Legacy scenes (empty dialog_turns) fall through to the old resolver.
-    // Feature-flag gated via `composer.feature.id_only_cast_resolution`.
+    // Legacy scenes with dialog + Cast IDs are now just-in-time backfilled;
+    // unresolved ID scenes fail before provider dispatch instead of falling
+    // back to name matching. Feature-flag gated via
+    // `composer.feature.id_only_cast_resolution`.
     const idOnlyEnabled = await readIdOnlyEnabled(supabaseAdmin);
     const dialogTurnsByScene: Map<string, DialogTurn[]> = idOnlyEnabled
       ? await fetchDialogTurnsForScenes(
