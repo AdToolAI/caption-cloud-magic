@@ -5456,6 +5456,26 @@ serve(async (req) => {
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
 
+    if (canonicalDialogTurnsCount > 0) {
+      const passCharacterId = String(pass.character_id ?? "").trim();
+      if (!passCharacterId || !canonicalSpeakerIds.includes(passCharacterId)) {
+        return await failBeforeProviderDispatch(
+          "id_only_character_id_missing_or_mismatched",
+          "id_only_cast_violation",
+          "Dialog lip-sync requires every Sync.so pass to carry a brand character UUID from dialog_turns; legacy name/slot fallback is blocked.",
+          422,
+          {
+            canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+            speakers_source: speakersSource,
+            dialog_turns_count: canonicalDialogTurnsCount,
+            canonical_speaker_ids: canonicalSpeakerIds,
+            pass_character_id: pass.character_id ?? null,
+            pass_idx: currentPassIdx,
+          },
+        );
+      }
+    }
+
     // ── v152 — Deferred Hard-Fail für bbox-url-pro Pre-Dispatch Errors ──
     // Die bbox-Construction oben setzt `_v152HardFail` wenn upload/geometry
     // versagt. Wir können dort noch nicht refunden weil failBeforeProviderDispatch
@@ -6264,6 +6284,24 @@ serve(async (req) => {
           },
         );
       }
+      if ((canonicalAsd as any)?.auto_detect === false) {
+        const hasBoxes = !!(canonicalAsd as any)?.bounding_boxes_url || Array.isArray((canonicalAsd as any)?.bounding_boxes);
+        if (!hasBoxes) {
+          return await failBeforeProviderDispatch(
+            "v201_bbox_required",
+            "bbox_required",
+            "Dialog lip-sync dispatch is locked to sync-3 + bounding_boxes_url/bounding_boxes. Coordinate-only ASD is blocked to prevent speaker drift.",
+            500,
+            {
+              canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+              speakers_source: speakersSource,
+              dialog_turns_count: canonicalDialogTurnsCount,
+              final_asd: canonicalAsd,
+              retry_variant: retryVariant,
+            },
+          );
+        }
+      }
     } catch (canonErr) {
       return await failBeforeProviderDispatch(
         "DISPATCH_BLOCKED_V140_CANONICAL_ASD",
@@ -6656,6 +6694,19 @@ serve(async (req) => {
       meta: {
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+        canonical_lipsync_pipeline: "v201_id_bbox_sync3",
+        speakers_source: speakersSource,
+        dialog_turns_count: canonicalDialogTurnsCount,
+        canonical_speaker_ids: canonicalSpeakerIds,
+        asd_mode: (payload.options as any)?.active_speaker_detection?.bounding_boxes_url
+          ? "bounding_boxes_url"
+          : Array.isArray((payload.options as any)?.active_speaker_detection?.bounding_boxes)
+            ? "bounding_boxes"
+            : (payload.options as any)?.active_speaker_detection?.coordinates
+              ? "coordinates"
+              : (payload.options as any)?.active_speaker_detection?.auto_detect
+                ? "auto_detect"
+                : "unknown",
         v131_5_final_override: (pass as any)._v131_5_final_override ?? null,
         diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,
