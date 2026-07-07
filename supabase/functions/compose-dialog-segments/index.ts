@@ -3553,10 +3553,19 @@ serve(async (req) => {
         } catch { /* best-effort */ }
         return json({ ok: true, skipped: "no_pass_at_cursor", pass_idx: currentPassIdx, have: passes.length }, 200);
       }
+      const candidatePass: any = passes[currentPassIdx];
+      const candidateStatus = String(candidatePass?.status ?? "");
+      const candidateHasJob = typeof candidatePass?.job_id === "string" && candidatePass.job_id.length > 0;
+      const candidatePreflightStarted = candidatePass?.preflight_started_at
+        ? Date.parse(String(candidatePass.preflight_started_at))
+        : NaN;
+      const candidatePreflightFresh = Number.isFinite(candidatePreflightStarted)
+        ? Date.now() - candidatePreflightStarted < 10 * 60_000
+        : true;
       if (
-        passes[currentPassIdx].status === "done" ||
-        passes[currentPassIdx].status === "rendering" ||
-        passes[currentPassIdx].status === "rendering_preflight"
+        candidateStatus === "done" ||
+        (candidateStatus === "rendering" && candidateHasJob) ||
+        (candidateStatus === "rendering_preflight" && candidatePreflightFresh)
       ) {
         return json({ ok: true, skipped: `pass_${currentPassIdx}_already_${passes[currentPassIdx].status}` }, 200);
       }
