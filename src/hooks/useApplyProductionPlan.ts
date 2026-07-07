@@ -456,6 +456,36 @@ function planSceneToComposerScene(
     : [];
   const rawLocationId = ps.location?.locationId ? String(ps.location.locationId) : undefined;
 
+  // v202 — Cast & World ID-Registry: build canonical scene_assets from the
+  // resolved cast + location. Prefer the plan-provided array (server-side
+  // resolver) when present; otherwise derive locally.
+  type SceneAssetRef = { type: 'character' | 'location' | 'building' | 'prop' | 'style'; id: string; variantId?: string | null; role?: string | null; displayName?: string | null };
+  let sceneAssets: SceneAssetRef[] = [];
+  if (Array.isArray((ps as any).sceneAssets) && (ps as any).sceneAssets.length > 0) {
+    for (const r of (ps as any).sceneAssets as SceneAssetRef[]) {
+      if (!r?.id || !PLAN_UUID_RE.test(String(r.id))) continue;
+      sceneAssets.push({ ...r, id: String(r.id).match(PLAN_UUID_RE)![0] });
+    }
+  } else {
+    const seenChar = new Set<string>();
+    for (const c of ps.cast ?? []) {
+      if (!c.characterId) continue;
+      const cid = stripPrefix(c.characterId as string);
+      if (!PLAN_UUID_RE.test(cid) || seenChar.has(cid)) continue;
+      seenChar.add(cid);
+      sceneAssets.push({
+        type: 'character',
+        id: cid,
+        variantId: c.outfitLookId ?? null,
+        displayName: c.characterName ?? null,
+      });
+    }
+    if (mentionedLocationIds[0]) {
+      sceneAssets.push({ type: 'location', id: mentionedLocationIds[0], role: 'backdrop' });
+    }
+  }
+
+
   return {
     id: newSceneId(),
     projectId,
