@@ -243,6 +243,74 @@ serve(async (req) => {
       );
     }
 
+    // ── v202: Cast & World ID-Registry — JIT scene_assets backfill ────────
+    // Ensure every scene in this request carries a canonical AssetRef list.
+    // Best-effort: legacy scenes get backfilled from character_shots /
+    // mentioned_location_ids / applied_style_preset_id. Feature flag
+    // `composer.feature.scene_assets_required` (default false) can later
+    // turn this into a hard-fail gate.
+    __stage = "v202_scene_assets_ensure";
+    try {
+      const sceneAssetsRequired = await readSceneAssetsRequired();
+      const registryReport: Array<{
+        sceneId: string;
+        source: string;
+        total: number;
+        byType: Record<string, number>;
+        characterIds: string[];
+      }> = [];
+      let mismatchCount = 0;
+      for (const s of scenes) {
+        if (!s?.id) continue;
+        const ensured = await ensureSceneAssetsForScene(s.id);
+        const summary = summarizeSceneAssets(ensured.refs);
+        registryReport.push({
+          sceneId: s.id,
+          source: ensured.source,
+          total: summary.total,
+          byType: summary.byType,
+          characterIds: summary.characterIds,
+        });
+        // Cross-check: every characterId used in dialog_turns must exist as
+        // an AssetRef(character). Otherwise flag mismatch.
+        const shotIds: string[] = Array.isArray((s as any).characterShots)
+          ? ((s as any).characterShots as any[])
+              .map((cs) => cs?.characterId)
+              .filter((x): x is string => typeof x === "string")
+          : [];
+        const registryCharIds = new Set(summary.characterIds);
+        const missing = shotIds.filter((id) => !registryCharIds.has(id));
+        if (missing.length > 0) mismatchCount += missing.length;
+      }
+      console.log("[compose-video-clips] v202_asset_registry_bound", {
+        projectId,
+        sceneCount: scenes.length,
+        mismatchCount,
+        required: sceneAssetsRequired,
+        report: registryReport,
+      });
+      if (sceneAssetsRequired && mismatchCount > 0) {
+        return new Response(
+          JSON.stringify({
+            error: "v202_asset_registry_mismatch",
+            message:
+              "Scene(s) reference character IDs that are not present in scene_assets. Populate Cast & World first.",
+            mismatchCount,
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    } catch (e) {
+      // Never block dispatch on registry infra errors while flag is off.
+      console.warn(
+        "[compose-video-clips] v202 scene_assets ensure failed (non-fatal):",
+        e,
+      );
+    }
+
     // Calculate total cost for AI scenes (quality-tier aware)
     __stage = "cost_calc";
     const aiScenes = scenes.filter((s) => s.clipSource.startsWith("ai-"));
