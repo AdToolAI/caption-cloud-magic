@@ -5451,7 +5451,7 @@ serve(async (req) => {
         .update({
           dialog_shots: {
             ...(prevState ?? {}),
-            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             input_space: passes.length >= 2 ? "plate" : undefined,
             preclip_used: passes.length >= 2 ? false : undefined,
             version: 5,
@@ -5494,7 +5494,7 @@ serve(async (req) => {
           "Dialog lip-sync requires every Sync.so pass to carry a brand character UUID from dialog_turns; legacy name/slot fallback is blocked.",
           422,
           {
-            canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             speakers_source: speakersSource,
             dialog_turns_count: canonicalDialogTurnsCount,
             canonical_speaker_ids: canonicalSpeakerIds,
@@ -5934,14 +5934,14 @@ serve(async (req) => {
     const asdForProbe = (syncOptions as any).active_speaker_detection ?? null;
     const v105Probe = {
       stage: speakers.length >= 2
-        ? "v203-fullplate-sync3-bbox-only"
+        ? "v204-preclip-bbox-clipspace"
         : usePassPreclip
           ? "preclip-sync3-autodetect-v105"
           : "fullplate-sync3-deterministic-v105",
       model_intent: "sync-3",
       payload_model: payloadModel,
       dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
-      canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+      canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
       input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
       preclip_used: speakers.length >= 2 ? false : usePassPreclip,
       retry_variant: retryVariant,
@@ -5993,7 +5993,7 @@ serve(async (req) => {
           : "asd_auto_detect_on_multi_speaker_fullplate",
         "Refusing to dispatch Sync.so with auto_detect=true on a multi-speaker scene; deterministic ASD is required.",
         500,
-        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v203_fullplate_sync3_bbox_only" },
+        { v105_probe: v105Probe, canonical_lipsync_pipeline: "v204_preclip_bbox_clipspace" },
       );
     }
 
@@ -6329,7 +6329,7 @@ serve(async (req) => {
             "Dialog lip-sync dispatch is locked to sync-3 + bounding_boxes_url/bounding_boxes. Coordinate-only ASD is blocked to prevent speaker drift.",
             500,
             {
-              canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+              canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
               speakers_source: speakersSource,
               dialog_turns_count: canonicalDialogTurnsCount,
               final_asd: canonicalAsd,
@@ -6730,7 +6730,7 @@ serve(async (req) => {
       meta: {
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
-        canonical_lipsync_pipeline: speakers.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+        canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
         speakers_source: speakersSource,
         dialog_turns_count: canonicalDialogTurnsCount,
         canonical_speaker_ids: canonicalSpeakerIds,
@@ -6901,7 +6901,7 @@ serve(async (req) => {
             dialog_shots: {
               ...freshState,
               ...state,
-              canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+              canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
               input_space: passes.length >= 2 ? "plate" : undefined,
               preclip_used: passes.length >= 2 ? false : undefined,
               passes: freshPasses,
@@ -6919,7 +6919,7 @@ serve(async (req) => {
           _scene_id: sceneId,
           _patch: {
             ...rootOnly,
-            canonical_lipsync_pipeline: passes.length >= 2 ? "v203_fullplate_sync3_bbox_only" : "v201_id_bbox_sync3",
+            canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             input_space: passes.length >= 2 ? "plate" : undefined,
             preclip_used: passes.length >= 2 ? false : undefined,
           },
