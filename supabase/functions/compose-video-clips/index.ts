@@ -44,6 +44,12 @@ import {
   orderedSpeakerIdsFromTurns,
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
+import {
+  ensureSceneAssetsForScene,
+  readSceneAssetsRequired,
+  summarizeSceneAssets,
+  type AssetRef,
+} from "../_shared/asset-ref.ts";
 const ANCHOR_AUDIT_VERSION = 12;
 
 const corsHeaders = {
