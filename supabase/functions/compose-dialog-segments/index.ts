@@ -857,6 +857,25 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] v201_id_only_cast scene=${sceneId} source=${ensuredTurns.source} turns=${canonicalDialogTurnsCount} cast=[${canonicalSpeakerIds.join(",")}]`,
         );
+
+        // v202 — Cast & World ID-registry log marker. Verifies that every
+        // canonical dialog speaker is present as an AssetRef(character)
+        // in scene_assets. Observability only — never blocks dispatch here.
+        try {
+          const rawAssets = Array.isArray((scene as any).scene_assets)
+            ? ((scene as any).scene_assets as Array<{ type?: string; id?: string }>)
+            : [];
+          const charSet = new Set(
+            rawAssets.filter((a) => a?.type === "character" && typeof a.id === "string").map((a) => a.id as string),
+          );
+          const locCount = rawAssets.filter((a) => a?.type === "location").length;
+          const missing = canonicalSpeakerIds.filter((id) => !charSet.has(id));
+          console.log(
+            `[compose-dialog-segments] v202_asset_registry_bound scene=${sceneId} assets_total=${rawAssets.length} characters=${charSet.size} locations=${locCount} missing=[${missing.join(",")}]`,
+          );
+        } catch (e) {
+          console.warn(`[compose-dialog-segments] v202 log marker failed: ${(e as Error)?.message ?? e}`);
+        }
       } else if (ensuredTurns.reason !== "no_dialog_lines") {
         const hasUuidSpeaker = speakers.some((sp: any) =>
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(sp?.character_id ?? "")),
