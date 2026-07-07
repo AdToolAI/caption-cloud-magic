@@ -125,12 +125,10 @@ export const DialogStitchVideoSchema = z.object({
    *  through scene end so the raw AI plate cannot keep idly moving lips after
    *  the Sync.so speech window has ended. */
   tailFreezeFromSec: z.number().min(0).optional().nullable(),
-  /** v190: scene-wide static closed-mouth anchor tiles per non-speaking
-   *  face slot. Rendered ONCE above the master plate and BELOW all fanout
-   *  shots, spanning the entire scene duration. Active Sync.so overlays
-   *  (in their own turn windows) draw on top of the matching slot; outside
-   *  those windows the anchor tile masks any residual mouth motion on the
-   *  raw AI plate. Empty/undefined = disabled (legacy v189 behaviour). */
+  /** v190 (legacy): scene-wide static closed-mouth anchor tiles using
+   *  brand_characters.portrait_url. Kept for rollback via
+   *  system_config.composer.silent_faces_v183=true. Ignored when v195
+   *  slots are present. */
   globalSilentSlots: z
     .array(
       z.object({
@@ -138,6 +136,25 @@ export const DialogStitchVideoSchema = z.object({
         y: z.number(),
         size: z.number(),
         anchorUrl: z.string().optional().nullable(),
+      }),
+    )
+    .optional()
+    .nullable(),
+  /** v195: per-speaker silent-face freeze tiles. Each entry is a
+   *  `preclip_crop` bbox in source-master pixel space. Rendered as
+   *  <Freeze frame={0}><Video src={masterVideoUrl}/></Freeze> at the bbox
+   *  for the FULL scene duration; active Sync.so shot overlays for that
+   *  speaker cover on top during voiced windows. Because the tile is a
+   *  crop of the SAME master plate at frame 0, geometry/identity/lighting
+   *  match perfectly — no ghost, no morph. Body/background outside each
+   *  bbox continues to animate from the live plate underneath. */
+  silentFaceFreezes: z
+    .array(
+      z.object({
+        x: z.number(),
+        y: z.number(),
+        size: z.number(),
+        speakerIdx: z.number().optional().nullable(),
       }),
     )
     .optional()
