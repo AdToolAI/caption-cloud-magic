@@ -1746,6 +1746,7 @@ serve(async (req) => {
               return !!(c && (c as any).referenceImageUrl);
             });
             if (
+              !(turnsForScene && turnsForScene.length > 0) &&
               scriptSpeakers.length > 0 &&
               (effectiveShots.length === 0 || !effectiveHasPortrait)
             ) {
