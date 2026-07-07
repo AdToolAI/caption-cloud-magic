@@ -460,6 +460,80 @@ const MouthMatteFreeze: React.FC<MouthMatteFreezeProps> = ({
   );
 };
 
+/**
+ * v195 — SilentFaceFreeze. Renders `<Freeze frame={0}><Video/></Freeze>` of
+ * the master plate positioned at a `preclip_crop` bbox, spanning the entire
+ * scene duration. Because the tile is a crop of the SAME plate at frame 0,
+ * the identity, pose, lighting and edge exactly match the live plate
+ * underneath. Active Sync.so shot overlays draw on top during voiced
+ * windows, so this tile only visibly shows during silence.
+ *
+ * A soft radial mask feathers the seam so the transition to/from an active
+ * overlay never shows a hard rectangular edge.
+ */
+interface SilentFaceFreezeProps {
+  src: string;
+  srcX: number;
+  srcY: number;
+  srcSize: number;
+  scaleX: number;
+  scaleY: number;
+  compW: number;
+  compH: number;
+}
+const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
+  src,
+  srcX,
+  srcY,
+  srcSize,
+  scaleX,
+  scaleY,
+  compW,
+  compH,
+}) => {
+  const left = srcX * scaleX;
+  const top = srcY * scaleY;
+  const w = srcSize * scaleX;
+  const h = srcSize * scaleY;
+  const mask =
+    'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0.85) 72%, rgba(0,0,0,0) 100%)';
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          width: w,
+          height: h,
+          overflow: 'hidden',
+          WebkitMaskImage: mask,
+          maskImage: mask,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+        }}
+      >
+        <Freeze frame={0}>
+          <Video
+            src={src}
+            muted
+            playbackRate={1}
+            style={{
+              position: 'absolute',
+              left: -left,
+              top: -top,
+              width: compW,
+              height: compH,
+              objectFit: 'cover',
+            }}
+          />
+        </Freeze>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+
 
 
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
