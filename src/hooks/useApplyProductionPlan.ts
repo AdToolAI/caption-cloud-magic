@@ -553,6 +553,8 @@ function planSceneToComposerScene(
     // v175: denormalised mention IDs for downstream analytics / Brand-Scan.
     mentionedCharacterIds,
     mentionedLocationIds,
+    // v202: canonical Cast & World ID-registry for this scene.
+    sceneAssets,
     // v175: per-cast voiceId on the scene root so the upcoming insert path
     // can drop the first speaker into character_voice_id (single-speaker fast-path).
     characterVoiceId: (() => {
