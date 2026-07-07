@@ -1693,17 +1693,27 @@ serve(async (req) => {
               castShots.push(shot);
             }
 
-            // Speaker-list override: when a dialog script is present, the
-            // visual cast MUST equal the deduplicated set of actual speakers,
-            // in script order. This prevents the "Samuel speaks twice → 3
-            // people in frame" failure mode by only sending portraits of
-            // people who actually speak.
+            // ID-Only Cast Resolution (v200) --------------------------------
+            // When `dialog_turns` is populated for this scene, use it as the
+            // single source of truth: the visual cast = deduped characterIds
+            // in first-appearance order. NO name parsing, NO fuzzy match.
+            // Falls back to the legacy script-slug resolver only for scenes
+            // whose dialog_turns row is empty (legacy scenes pre-migration).
+            const turnsForScene = dialogTurnsByScene.get(scene.id);
             const scriptSpeakers = uniqueSpeakerSlugsFromScript(
               scene.dialogScript,
             );
             let effectiveShots = castShots;
 
-            if (scriptSpeakers.length > 0) {
+            if (turnsForScene && turnsForScene.length > 0) {
+              const fromTurns = effectiveShotsFromTurns(turnsForScene, castShots);
+              if (fromTurns && fromTurns.length >= 1) {
+                effectiveShots = fromTurns as typeof castShots;
+                console.log(
+                  `[compose-video-clips] v200_id_only_cast scene=${scene.id} cast=[${effectiveShots.map((s) => s.characterId).join(",")}] source=dialog_turns`,
+                );
+              }
+            } else if (scriptSpeakers.length > 0) {
               const remapped = scriptSpeakers
                 .map((slug) => resolveSpeakerToShot(slug, castShots))
                 .filter(
@@ -1716,6 +1726,7 @@ serve(async (req) => {
                 );
               if (remapped.length >= 1) effectiveShots = remapped;
             }
+
 
             // STAGE 5 (May 30 2026): when the script declares speakers but
             // the cast is empty (single-speaker quick-flows often skip the
