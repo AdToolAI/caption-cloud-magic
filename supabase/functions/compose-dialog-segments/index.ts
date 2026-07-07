@@ -3086,6 +3086,150 @@ serve(async (req) => {
       );
     }
 
+    // ── v194 Silent-Speaker-Pass fan-out ────────────────────────────────
+    // For each listener speaker (M ≥ 2), append one "silent stabilizer"
+    // pass that dispatches Sync.so with a deterministic silence WAV against
+    // that listener's own bbox. The Sync.so output lipsyncs a CLOSED mouth
+    // that follows head motion → composites over the plate ONLY during
+    // OTHER speakers' turn windows (segments = complement of this
+    // listener's own turns). Result: no ghost faces, no freeze patches, no
+    // static-plate look — background and all faces stay alive, only the
+    // mouths of non-speakers are stilled by the same lipsync engine that
+    // moves the active speaker's mouth.
+    //
+    // Hard constraint: every stabilizer pass uses `bounding_boxes_url`
+    // (bbox-only, no `auto_detect`), same code path as active passes.
+    try {
+      const { data: v194Row } = await supabase
+        .from("system_config")
+        .select("value")
+        .eq("key", "composer.silent_speaker_pass_v194")
+        .maybeSingle();
+      const rawV194 = (v194Row as any)?.value;
+      const v194Enabled = rawV194 === true || rawV194 === "true" || String(rawV194).toLowerCase() === "true";
+
+      // Collect unique speaker indices that appear as an active pass.
+      const activeSpeakerIdxs = Array.from(
+        new Set(builtPasses.map((p) => Number(p.speaker_idx))),
+      ).filter((i) => Number.isFinite(i));
+
+      if (v194Enabled && activeSpeakerIdxs.length >= 2) {
+        // Fetch a scene-length silence track. Deterministic per duration →
+        // idempotent across retries and other scenes of the same length.
+        let silenceUrl: string | null = null;
+        try {
+          const silResp = await fetch(
+            `${supabaseUrl}/functions/v1/generate-silence-track`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({ duration_sec: Math.max(0.5, Math.min(60, totalSec + 0.2)) }),
+            },
+          );
+          if (silResp.ok) {
+            const j = await silResp.json();
+            silenceUrl = typeof j?.url === "string" ? j.url : null;
+          }
+        } catch (silErr) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v194_silence_track_fetch_failed: ${(silErr as Error)?.message ?? silErr}`,
+          );
+        }
+
+        if (!silenceUrl) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v194_silent_speaker_pass_SKIPPED reason=no_silence_url speakers=${activeSpeakerIdxs.length}`,
+          );
+        } else {
+          // For each listener, its silent-stabilizer covers all turns
+          // where SOMEONE ELSE is speaking (union of other-speaker
+          // segments). Turns where the listener speaks are excluded
+          // (their active-pass overlay wins in those windows anyway).
+          const stabilizers: PassState[] = [];
+          for (const listenerIdx of activeSpeakerIdxs) {
+            const bbox = (speakerPlateBboxes as any)?.[listenerIdx] ?? null;
+            const coord = speakerCoords[listenerIdx];
+            const bboxOk =
+              Array.isArray(bbox) &&
+              bbox.length === 4 &&
+              bbox.every((n: number) => Number.isFinite(Number(n)));
+            const coordOk =
+              Array.isArray(coord) &&
+              coord.length === 2 &&
+              Number.isFinite(Number(coord[0])) &&
+              Number.isFinite(Number(coord[1]));
+            if (!bboxOk || !coordOk) {
+              console.warn(
+                `[compose-dialog-segments] scene=${sceneId} v194_stabilizer_SKIP listener=${listenerIdx} reason=no_bbox_or_coord — that listener will fall back to raw plate motion`,
+              );
+              continue;
+            }
+            const otherSegs: SegmentItem[] = builtPasses
+              .filter((p) => Number(p.speaker_idx) !== listenerIdx)
+              .flatMap((p) => (Array.isArray(p.segments) ? p.segments : []))
+              .map((s) => ({
+                startTime: Number(s.startTime),
+                endTime: Number(s.endTime),
+                speakerIdx: listenerIdx,
+                speakerName: `stabilizer_${listenerIdx}`,
+                refId: "silence",
+              }))
+              .filter((s) => Number.isFinite(s.startTime) && Number.isFinite(s.endTime) && s.endTime > s.startTime);
+            if (otherSegs.length === 0) continue;
+            const listenerSpeaker = speakers[listenerIdx] as any;
+            stabilizers.push({
+              idx: builtPasses.length + stabilizers.length,
+              speaker_idx: listenerIdx,
+              character_id: listenerSpeaker?.character_id ?? null,
+              speaker_name: `stabilizer_${listenerSpeaker?.speaker ?? listenerIdx}`,
+              audio_url: silenceUrl,
+              coords: [Number(coord[0]), Number(coord[1])] as [number, number],
+              segments: otherSegs,
+              input_url: "",
+              status: "pending",
+              v137_mapping: {
+                coord_source: `v194_stabilizer_${(coordSources as any)?.[listenerIdx] ?? "unknown"}`,
+                plate_bbox: bbox,
+                plate_mouth: (speakerPlateMouths as any)?.[listenerIdx] ?? null,
+                plate_face_count: plateIdentityMap?.faces?.length ?? null,
+                plate_identity_resolved: plateIdentityMap?.resolvedCount ?? null,
+                plate_identity_method: (plateIdentityMap as any)?.identityMethod ?? null,
+                plate_identity_min_conf: (plateIdentityMap as any)?.minConfidence ?? null,
+                plate_identity_min_margin: (plateIdentityMap as any)?.minMargin ?? null,
+                plate_dims: plateDims ?? null,
+              },
+              // v194 markers — read by SILENT_AUDIO_GATE bypass and by the
+              // mux logger. Non-charging, non-refunding.
+              is_silent_stabilizer: true,
+              silent_for_turn_of_pass_idx: null,
+              stabilizer_pass: true,
+            } as unknown as PassState);
+          }
+          if (stabilizers.length > 0) {
+            builtPasses.push(...stabilizers);
+            console.log(
+              `[compose-dialog-segments] scene=${sceneId} v194_silent_speaker_pass_INJECTED active=${activeSpeakerIdxs.length} stabilizers=${stabilizers.length} total_passes=${builtPasses.length} silence_url=${silenceUrl.slice(0, 80)}`,
+            );
+          } else {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v194_silent_speaker_pass_NO_STABILIZERS speakers=${activeSpeakerIdxs.length} (all listeners lacked bbox/coord)`,
+            );
+          }
+        }
+      } else if (v194Enabled) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v194_silent_speaker_pass_SKIPPED reason=single_speaker speakers=${activeSpeakerIdxs.length}`,
+        );
+      }
+    } catch (v194Err) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v194_silent_speaker_pass_ERROR ${(v194Err as Error)?.message ?? v194Err} — falling back to plain active-only passes`,
+      );
+    }
+
     // ── Stufe B: HEAD-probe inputs once before paying Sync.so ────────────
     const audioUrls = builtPasses.map((p) => p.audio_url);
     const probes = await Promise.all([
@@ -4349,7 +4493,13 @@ serve(async (req) => {
     // closed-mouth Plate-Prompt in compose-video-clips verhindert (v167 idle
     // mouth motion entfernt). Overlay-Mode N=1 ist in render-sync-segments-
     // audio-mux ebenfalls wieder aktiv.
-    const allowTightSlice = passes.length >= 1;
+    // v194 — Stabilizer passes carry a scene-length near-silence WAV. Tight-
+    // slicing/re-uploading that per stabilizer is wasteful and would emit a
+    // near-empty audio window that Sync.so has historically rejected. Keep
+    // the full silence WAV → mux uses absolute timing on segments.
+    const isStabilizerForTight = (pass as any).stabilizer_pass === true &&
+      (pass as any).is_silent_stabilizer === true;
+    const allowTightSlice = passes.length >= 1 && !isStabilizerForTight;
     if (allowTightSlice && speakerWindowsSecs.length > 0) {
 
 
@@ -5592,21 +5742,38 @@ serve(async (req) => {
       };
     }
 
-    const finalAudioDiag = await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
-      );
-      return null;
-    });
+    // v194 — Silent-Speaker-Pass stabilizer bypass. These passes intentionally
+    // ship a near-silent WAV (room tone) so Sync.so produces a closed-mouth
+    // lipsync that follows head motion for a non-speaking listener face. The
+    // regular silent-audio gate would (correctly, for user audio) reject
+    // them. We bypass ONLY when the pass is explicitly flagged as a
+    // stabilizer AND the audio_url is our deterministic silence-track.
+    const isStabilizerPass = (pass as any).stabilizer_pass === true &&
+      (pass as any).is_silent_stabilizer === true;
+
+    const finalAudioDiag = isStabilizerPass
+      ? null
+      : await inspectSpeakerAudioWithRetry(pass.audio_url, 3).catch((audioErr) => {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
+          );
+          return null;
+        });
     const finalPeakDbFs = Number(finalAudioDiag?.wav?.peakDbFs);
     const finalVoicedSec = Number(finalAudioDiag?.vad?.voicedSec ?? 0);
     const finalLongestRun = Number(finalAudioDiag?.vad?.longestVoicedRun ?? 0);
-    const audioSilentOrInvalid =
+    const audioSilentOrInvalid = !isStabilizerPass && (
       !finalAudioDiag ||
       !Number.isFinite(finalPeakDbFs) ||
       finalPeakDbFs <= -50 ||
       finalVoicedSec <= 0.04 ||
-      finalLongestRun <= 0.04;
+      finalLongestRun <= 0.04
+    );
+    if (isStabilizerPass) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v194_stabilizer_bypass_silent_gate speaker_idx=${(pass as any).speaker_idx}`,
+      );
+    }
     if (audioSilentOrInvalid) {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE peak_dbfs=${Number.isFinite(finalPeakDbFs) ? finalPeakDbFs.toFixed(2) : "invalid"} voiced=${finalVoicedSec.toFixed(3)}s longest=${finalLongestRun.toFixed(3)}s url=${pass.audio_url.slice(0, 120)}`,
