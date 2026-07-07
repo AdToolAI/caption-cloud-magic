@@ -1,47 +1,41 @@
 ## Diagnose
 
-Ja, die Morphs können trotz harter Masken weiter bestehen, weil das eigentliche Problem inzwischen nicht mehr nur der Feather-Rand ist.
+Nach v196 (harte Masken) + v197 (Silent-Windows) sind die großen Morphs weg, aber im Screenshot ist bei der rechten Sprecherin noch ein leichter Rand-Morph im Kiefer-/Wangenbereich sichtbar. Ursache:
 
-Bei v169 gab es laut Projekt-Historie wieder nur aktive Sprecher-Passes: keine Silent-Speaker-Passes und keine permanenten Face-Freeze-/Portrait-Kacheln über der ganzen Szene. Dadurch wurde während eines Sprecherfensters im Wesentlichen nur die echte Sync-Lipsync-Ausgabe dieses Sprechers über die Master-Plate gelegt.
+Die harten Face-Disc-Masken (`#000 47% → transparent 48%`) sind zwar hart, aber der **Radius selbst ist zu klein**. Die Maskenkante liegt bei den meisten Preclip-Crops mitten auf der Haut (Kinn/Wange/Hals). Genau an dieser Kante trifft der Sync.so-Face-Layer (leicht reprojiziert/skaliert) auf das Live-Plate-Gesicht darunter — zwei minimal verschobene Hautflächen an derselben Stelle lesen sich als Morph, obwohl gar kein Alpha-Blend mehr stattfindet.
 
-Aktuell sind gegenüber v169 zusätzliche Stabilizer aktiv:
+Bei den Fan-Out-Passes ist der Sync.so-Output ein **Full-Frame-Render** derselben Szene, in dem nur die Lippen des Zielsprechers bewegt sind. Wir dürfen die Maske also deutlich größer machen — bis in Haare/Hintergrund — ohne visuelle Nachteile, weil der Rest des Frames sowieso identisch zur Master-Plate ist.
 
-1. `silentFaceFreezes[]` v195 rendert pro Sprecher eine eingefrorene Face-Kachel über die komplette Szene.
-2. `mouthMattes` v193 rendert während jedes Sprecherfensters gefrorene Mund-Patches für die anderen Sprecher.
-3. Die aktiven Sync.so-Ausgaben werden weiterhin als Crop/Mask über dieselbe Live-Plate gelegt.
+## Fix (v198 — Mask Enlargement)
 
-Das erzeugt in den Screenshots sichtbare Überlagerungen: besonders bei der rechten Sprecherin sieht man eine rechteckige/halbtransparente Face-Zone. Das ist typisch für Layer-Konkurrenz: Freeze/Matte/Live-Plate/Sync-Crop liegen nicht pixelidentisch übereinander. Harte Masken entfernen nur den weichen Crossfade, aber nicht die Tatsache, dass zwei Face-Zustände gleichzeitig sichtbar werden können.
+1. **`FaceMaskOverlay` (Fan-Out, Zeile 290–328)**
+   - Radius intern auf `radiusPx * 1.6` skalieren (Kopf + Kiefer + etwas Umgebung).
+   - Kante bleibt hart (1 px AA-Band).
+   - Kommentar aktualisieren: „v198: enlarged disc so the seam falls in hair/background, not on skin."
 
-## Warum v169 keine Morphs hatte
+2. **`CroppedOverlay` (Face-Crop, Zeile 218–272)**
+   - Statt `radial-gradient` mit 47/48% jetzt einen deutlich größeren Disc: `#000 62% → transparent 63%`.
+   - Alternativ: gar keine Maske mehr wenn `holdToEnd`/Fan-Out-Pfad — dann ist die Kante = Crop-Rechteck-Kante im ohnehin identischen Hintergrund.
 
-v169 war sauberer, weil es die zusätzlichen Silent-Stabilizer nicht im Renderpfad hatte. Es akzeptierte dafür das alte Problem: vor/nach dem Skript konnten die AI-Plate-Münder weiter idle bewegen. Die späteren Versionen haben dieses Idle-Mouth-Problem bekämpft, aber dabei wieder zusätzliche Face-Layer eingeführt — und genau diese Layer erzeugen jetzt die Morph-/Ghost-Artefakte.
+3. **`SilentFaceAnchor` (v183, Zeile 352–404)**
+   - Nur kosmetisch: Radius von 47/48% auf 55/56% erhöhen, damit statisches Anker-Portrait bei Silent-Windows nicht mitten auf der Haut endet.
 
-## Umsetzungsplan
+4. **`SilentFaceFreeze` (v197, Zeile 487–525)**
+   - Radius von 47/48% auf 55/56% erhöhen (analog zu Anchor).
 
-1. **v169-Render-Invariant wiederherstellen**
-   - Während ein Sprecher aktiv spricht, darf für dessen Gesicht nur ein Face-Layer sichtbar sein: die Sync.so-Ausgabe.
-   - Keine globalen `silentFaceFreezes` dürfen während aktiver Sprecherfenster sichtbar bleiben.
-   - Keine Listener-`mouthMattes` innerhalb aktiver Sprecher-Sequenzen, solange sie sichtbar Layer-Artefakte verursachen.
-
-2. **v195 auf echte Silent-Windows begrenzen**
-   - `silentFaceFreezes` um `windows: [{ fromSec, toSec }]` erweitern.
-   - Diese Windows werden aus den Sprechersegmenten berechnet: nur vor dem ersten Turn, zwischen Turns und nach dem letzten Turn.
-   - In Remotion werden Freeze-Kacheln nur in diesen Silence-Sequenzen gerendert, nicht über die komplette Szene.
-
-3. **v193 MouthMattes standardmäßig aus dem Mux entfernen**
-   - `listener_mouth_matte_v193` für Fanout standardmäßig deaktivieren bzw. nicht mehr in aktive Shots einbetten.
-   - Begründung: Der Screenshot zeigt, dass diese Patches/Face-Zonen als zweite Gesichtsschicht wahrnehmbar werden können.
-
-4. **Masken beibehalten, aber nicht als Hauptfix betrachten**
-   - Die harten v196-Masken bleiben, weil sie den alten Feather-Morph verhindern.
-   - Der Hauptfix ist Layer-Timing: Freeze nur in Silent-Windows, aktiver Sprecher nur Sync-Layer.
-
-5. **Logs und Doku aktualisieren**
-   - Log-Tag auf `v197_silent_windows` ändern: Slots, Window-Anzahl, aktiv/deaktiviert.
-   - Architektur-Memory ergänzen: v169 hatte keine Morphs wegen Single-Face-Layer-Invariant; v197 stellt diese Invariant wieder her.
+5. **`MouthMatteFreeze` (v193, Zeile 418–470)**
+   - Ellipse-Radius von 54/55% auf 60/61% erhöhen.
+   - Bleibt sowieso opt-in-off (siehe v197).
 
 ## Erwartetes Ergebnis
 
-- Während Sprache: kein Face-Morph, weil nur der Sync.so-Lipsync-Layer über der Plate liegt.
-- Vor/nach Skript und in Pausen: Mund bleibt still, weil v195 nur dort als Freeze greift.
-- Hintergrund/Körper bleiben beweglich, weil nur Face-Bereiche in Silent-Windows eingefroren werden.
+- Kein Rand-Morph mehr, weil die Maskenkante in Bereichen liegt, in denen Sync.so-Output und Live-Plate praktisch pixelgleich sind (Haare, Hintergrund).
+- Kein neuer Alpha-Blend eingeführt — Kanten bleiben hart (1 px AA).
+- Silent-Windows-Verhalten (v197) und v169-Single-Face-Layer-Invariante unverändert.
+
+## Betroffene Dateien
+
+- `src/remotion/templates/DialogStitchVideo.tsx` (5 Mask-Konstanten in 5 Komponenten)
+- `mem/architecture/lipsync/v195-silent-face-freeze.md` (v198-Addendum)
+
+Kein Backend-, Payload- oder Pipeline-Change. Rein visueller CSS-Mask-Tune.

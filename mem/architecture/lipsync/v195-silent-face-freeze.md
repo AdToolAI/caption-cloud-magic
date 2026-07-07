@@ -70,3 +70,20 @@ Fix in v197:
 Grep tag: `v197_silent_windows` in `render-sync-segments-audio-mux`.
 
 Invariant (FROZEN): active speech windows must contain only the Sync.so lipsync face layer over the master plate; silent-freeze layers may exist only outside that speaker's voiced windows.
+
+---
+
+## v198 addendum — mask enlargement (July 7 2026)
+
+Symptom after v196+v197: large morphs gone, but a residual seam-morph remained on cheek/jaw during speech. Root cause: the hard disc masks (47/48%) were geometrically too small — the mask edge cut through skin. At that edge Sync.so output (slightly reprojected/scaled) met the live plate face; two minimally offset skin surfaces at the same pixel read as a morph even without any alpha-blend.
+
+Fix in `DialogStitchVideo.tsx`:
+- `FaceMaskOverlay` (fan-out): outer radius multiplied by 1.6 so the edge falls in hair/background where Sync.so and live plate are effectively pixel-identical.
+- `CroppedOverlay` (face-crop): disc enlarged from 47/48% to 62/63%.
+- `SilentFaceAnchor`, `SilentFaceFreeze`: disc enlarged from 47/48% to 55/56%.
+- `MouthMatteFreeze`: ellipse enlarged from 54/55% to 60/61%.
+
+Edges remain hard (1% AA band) — no new alpha-blend introduced. No payload, no pipeline, no timing change.
+
+Grep tag: `v198` in `DialogStitchVideo.tsx`.
+
