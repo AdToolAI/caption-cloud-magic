@@ -1,0 +1,2 @@
+UPDATE public.system_config SET value='true'::jsonb, updated_at=now() WHERE key='composer.silent_faces_v183';
+INSERT INTO public.system_config(key, value) SELECT 'composer.silent_faces_v183','true'::jsonb WHERE NOT EXISTS (SELECT 1 FROM public.system_config WHERE key='composer.silent_faces_v183');
