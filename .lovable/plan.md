@@ -1,57 +1,82 @@
-## Kontext / Ist-Zustand
+# v191 — Lipsync-Amplitude & Silent-Faces Hardening
 
-Nach v189 sind alle Lipsyncs korrekt zugeordnet (richtiger Sprecher, richtige Mund-Koordinaten). Einziger sichtbarer Rest-Bug in der 3-Sprecher-Szene: **Sprecher 1 bewegt die Lippen nach Ende seines Dialogs weiter**, während Sprecher 2/3 sprechen.
+Drei chirurgische Fixes für die drei beobachteten Symptome. Keine Änderungen an v169-Invarianten (Parallel-Fanout, per-Pass-Lock, per-Slot-RPC, ASD-Deterministik, verify_jwt=false, Watchdog).
 
-## Root Cause
+## Symptom → Fix Mapping
 
-Der v90-Overlay-Mux legt pro Sprecher-Turn einen `<Sequence>` mit einem Face-Mask/Crop-Overlay des Sync.so-Outputs **nur im Turn-Fenster** [start, end] auf die Master-Plate. Außerhalb dieses Fensters wird die rohe Hailuo-Master-Plate durchgereicht. Obwohl der Plate-Prompt „mouths stay softly closed" fordert, produziert Hailuo bei N≥2 sichtbar oft leichte Idle-Mund-Bewegung für nicht-sprechende Charaktere — sichtbar sobald deren Turn vorbei ist.
+| Symptom | Ursache | Fix |
+|---|---|---|
+| Mehrere Sprecher bewegen gleichzeitig Lippen | v190 Kill-Switch aktiv (`silent_faces_v183=false`) | Fix 1 + Fix 2 |
+| Lippen bewegen sich vor/nach dem Skript | Silent-Anchor-Ebene fehlt | Fix 1 + Fix 2 |
+| Sprecher 1 zu wenig, Sprecher 2/3 „schreien" | LP2-Pro Temperatur 0.5 auf 1-Face-Preclips | Fix 3 |
+| Anchor-Tiles würden off-face landen | `plate_dims` = null in `dialog_shots` | Fix 2 |
 
-Es existiert bereits das v183-System `SilentFaceAnchor` (statisches Closed-Mouth-Portrait pro Face-Slot) inklusive Component in `DialogStitchVideo.tsx` und Mux-Logik in `render-sync-segments-audio-mux/index.ts`. Zwei Probleme:
+## Fix 1 — Kill-Switch entfernen (P0, 1 Zeile SQL)
 
-1. **Feature-Flag `composer.silent_faces_v183` ist standardmäßig OFF** → v183 wird nie aktiv.
-2. **Silent-Slots hängen an einzelnen Shots** (nur innerhalb der `<Sequence>` eines aktiven Overlays sichtbar). In den Lücken zwischen Turns und nach dem letzten Turn eines Sprechers fehlt jegliche Silent-Cover → rohe Plate leakt durch.
-
-## v190 Fix (2 chirurgische Änderungen, keine neuen Konzepte)
-
-### Fix 1 — Globale Silent-Anchor-Basis-Ebene (P0)
-
-**Datei:** `src/remotion/templates/DialogStitchVideo.tsx`
-
-Neues optionales Prop `globalSilentSlots?: SilentSlot[]` an `DialogStitchVideoProps`. Wird **einmal** direkt über der Master-Plate und **unter** allen Fanout-Shots gerendert — spannt die volle Szenendauer:
-
-```
-[master plate (video/img)]
-  → [globalSilentSlots × <SilentFaceAnchor>] ← NEU, spannt gesamte Szene
-  → [tail-freeze (v182, unverändert)]
-  → [fanout shots × <Sequence>] (aktive Sync.so-Overlays, ihre Fenster überdecken die Anchor-Tiles)
+```sql
+UPDATE system_config SET value = 'true'::jsonb
+WHERE key = 'composer.silent_faces_v183';
 ```
 
-Da `SilentFaceAnchor` maskierte Standbilder rendert (keine `<Video>`, kein `<Freeze>` mit Motion) und die aktiven Sync.so-Overlays denselben Face-Slot mit voller Deckkraft überschreiben, gibt es keinen Konflikt: im Turn-Fenster gewinnt die animierte Overlay, außerhalb bleibt das Standbild.
+Aktiviert v190 `globalSilentSlots`-Ebene für alle neuen Dispatches. Kein Deploy.
 
-### Fix 2 — Mux liefert `globalSilentSlots` + Feature-Flag defaults ON (P0)
+## Fix 2 — `plate_dims` persistieren + Remotion-Bundle-Refresh (P0)
 
-**Datei:** `supabase/functions/render-sync-segments-audio-mux/index.ts`
+**Problem:** `plateDims` wird in `compose-dialog-segments` bereits ermittelt (`plate-face-detect` liefert `{width,height,fps}`), aber nicht in `dialog_shots.plate_dims` geschrieben. Ohne diese Dims skaliert `DialogStitchVideo.globalSilentSlots` die Anchor-Tiles über die Fallback-`targetWidth/Height`, was bei 720p-Plates → 1080p-Render zu ~1.5× versetzten Tiles führt.
 
-- Wenn `isFanout && donePasses.length ≥ 2`: das bereits berechnete `silentSlotBySpeakerIdx` (Zeilen 282–305) einmal als flaches Array `globalSilentSlots` in den Render-Payload einhängen — **alle Speaker**, nicht wie bei per-shot `silentSlots` „alle außer der aktuelle".
-- Per-shot `silentSlots` **entfernen** (redundant, sobald die globale Ebene existiert). Reduziert Payload-Größe und vermeidet Doppel-Rendering.
-- Default des Flags `composer.silent_faces_v183` auf `true` setzen (Fallback bleibt: fehlt der DB-Row, gilt `true`). Bestehende explizite `false`-Zeilen im `system_config` bleiben respektiert (Kill-Switch für Rollback).
+**Änderung 1:** `supabase/functions/compose-dialog-segments/index.ts` — Beim Init nach `plate-face-detect`, das Ergebnis in den `dialog_shots` JSONB per `update_dialog_shot_pass` bzw. dediziertem RPC persistieren:
+```ts
+await supabase.rpc("update_dialog_shot_meta", {
+  _scene_id: sceneId,
+  _patch: { plate_dims: { w: plateDims.width, h: plateDims.height, fps: plateDims.fps ?? 24 } }
+});
+```
+(Falls kein RPC existiert: gezielter JSONB-Merge über bestehenden Update-Pfad — v169-Kontrakt §3 sieht `plate_dims` explizit vor.)
 
-### Nicht angefasst
+**Änderung 2:** `scripts/deploy-remotion-bundle.sh` einmalig ausführen (durch die Nutzer-Aktion) — v190 `DialogStitchVideo` mit `globalSilentSlots`-Prop muss im deployten Bundle liegen. Ist im vorherigen Turn empfohlen worden; jetzt hart in die Verifikationsschritte.
 
-- v90 Overlay-Mux-Fenster (SHOT_PAD_START/END), Sync.so-Payload, sync_mode=loop, v169 Tight-Slice, v182 Tail-Hold, v189 Identity-Trust-Gate, Preclip-Pipeline, Coordinate-Space-Logik. Der Fix ist rein additiv auf der Compositing-Ebene.
+## Fix 3 — LP2-Pro Temperatur-Kalibrierung (P0)
 
-### N-Skalierung
+**Problem:** `RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4]`. Erster Versuch (bbox-url-pro + lipsync-2-pro) läuft bei 0.5 — das ist bei getighteten Single-Face-Preclips zu heiß und produziert das Aufreißen/Nicht-Bewegen-Muster.
 
-- N=1: kein Fanout → globalSilentSlots leer, kein Effekt (v182 Tail-Hold bleibt zuständig).
-- N=2, 3, 4: greift identisch; jeder nicht-sprechende Face-Slot ist zu jedem Zeitpunkt durch ein statisches Closed-Mouth-Portrait abgedeckt, sofern nicht gerade sein eigener Sync.so-Overlay aktiv ist.
+**Änderung:** `supabase/functions/compose-dialog-segments/index.ts`
+```ts
+// v191 — LP2-Pro amplitude calibration on tight 1-face preclips.
+// 0.5 was overshooting on close-cropped faces (mouth-open artefacts on
+// speakers 2/3, underdriven on speaker 1). 0.3 gives consistent phoneme
+// amplitude across face-crop sizes. Later retries stay hotter to escape
+// specific stuck-mouth failure modes.
+const RETRY_TEMPERATURES = [0.3, 0.4, 0.55, 0.5];
+```
 
-### Fallback / Sicherheit
+Kein Änderung am Retry-Ladder-Order (bbox-url-pro → coords-pro → coords-pro-box → sync3-coords → coords-pro-lp2pro → auto-pro → auto-standard). Nur die Temperatur-Kurve wird gedämpft und behält das „nach oben eskalieren"-Muster für Retry-Fälle.
 
-- Speaker ohne gültiges `preclip_crop` oder ohne `portrait_url` (Fallback: dunkles Halbtransparenz-Tile aus dem bestehenden `SilentFaceAnchor`-Fallback-Zweig) werden weiterhin geschützt.
-- Kill-Switch: `UPDATE system_config SET value='false' WHERE key='composer.silent_faces_v183'` → Verhalten fällt exakt auf v189 zurück.
+## Was NICHT angefasst wird
 
-### Verifikation
+- v169 Kern: Parallel-Fanout, per-Pass-Lock, per-Slot-RPC, ASD-Deterministik, verify_jwt=false, Watchdog, idempotenter Refund.
+- v187 Preclip-Pflicht, v188 Nearest-Window-Snap, v189 Identity-Trust-Gate.
+- Sync.so-Payload-Kontrakt §5 (sync_mode=cut_off, keine temperature auf sync-3, keine occlusion_detection_enabled).
+- v90 Overlay-Fenster, v182 Tail-Hold, v175 Tight-Slice.
 
-1. 3-Sprecher-Szene neu rendern; Sprecher 1's Face-Region visuell prüfen zwischen Turn-Ende und Sprecher 2/3-Turns → statisches Portrait, keine Idle-Mund-Bewegung.
-2. Edge-Log muss zeigen: `v183_silent_slots ENABLED speakers=3 crops=3 anchors=3 fallback=0` (bzw. entsprechende Zahlen für N=4).
-3. Aktive Turns unverändert korrekt lipsynct (Regression-Check gegen v189-Referenz).
+## Verifikation
+
+1. SQL aus Fix 1 ausführen → Silent-Faces global aktiv.
+2. `deploy-remotion-bundle.sh` ausführen → v190-Template im Lambda-Bundle.
+3. Edit + Deploy `compose-dialog-segments` (Fix 2 Persistenz, Fix 3 Temperatur).
+4. 3-Sprecher-Szene neu rendern.
+5. **Edge-Log-Assertions:**
+   - `v190_global_silent_slots=3 anchors=3 fallback=0`
+   - `plate_dims={w:…,h:…,fps:…}` in `dialog_shots` (SQL: `SELECT dialog_shots->'plate_dims' FROM composer_scenes …`)
+   - Sync.so-Payloads (via `syncso_dispatch_log`): erster Versuch `temperature=0.3`.
+6. **Visuelle Assertions:**
+   - Nur der aktuell sprechende Sprecher bewegt Lippen.
+   - Mund-Amplitude bei allen 3 Sprechern konsistent (kein „Schreien", kein „Standbild").
+   - Vor/nach Turn: statisches Anchor-Portrait, keine Idle-Bewegung.
+
+## Rollback
+
+- Fix 1: `UPDATE system_config SET value='false'::jsonb WHERE key='composer.silent_faces_v183';`
+- Fix 2: rein additiv (plate_dims-Feld ignorierbar).
+- Fix 3: `RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4]` zurücksetzen.
+
+Alle drei sind unabhängig reversibel.
