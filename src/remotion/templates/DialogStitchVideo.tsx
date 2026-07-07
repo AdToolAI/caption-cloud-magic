@@ -235,13 +235,10 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // v196: hard face-disc mask (no feather band). A wide radial feather
-  // caused the compositor to alpha-blend the Sync.so lipsynced face with
-  // the live master plate face underneath. Sync.so output is never
-  // pixel-aligned with the source plate, so blending two slightly
-  // different mouth/head poses read on screen as a face morph. Solid
-  // inner disc + 1% AA band eliminates the blend zone entirely.
-  const mask = 'radial-gradient(circle at center, #000 0%, #000 47%, rgba(0,0,0,0) 48%)';
+  // v198: enlarged hard disc — edge falls in hair/background, not on skin,
+  // where Sync.so output and live plate are effectively pixel-identical.
+  // Kills the residual seam-morph left after v196.
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 62%, rgba(0,0,0,0) 63%)';
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
