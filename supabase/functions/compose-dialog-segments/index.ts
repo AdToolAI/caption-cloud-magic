@@ -4493,7 +4493,13 @@ serve(async (req) => {
     // closed-mouth Plate-Prompt in compose-video-clips verhindert (v167 idle
     // mouth motion entfernt). Overlay-Mode N=1 ist in render-sync-segments-
     // audio-mux ebenfalls wieder aktiv.
-    const allowTightSlice = passes.length >= 1;
+    // v194 — Stabilizer passes carry a scene-length near-silence WAV. Tight-
+    // slicing/re-uploading that per stabilizer is wasteful and would emit a
+    // near-empty audio window that Sync.so has historically rejected. Keep
+    // the full silence WAV → mux uses absolute timing on segments.
+    const isStabilizerForTight = (pass as any).stabilizer_pass === true &&
+      (pass as any).is_silent_stabilizer === true;
+    const allowTightSlice = passes.length >= 1 && !isStabilizerForTight;
     if (allowTightSlice && speakerWindowsSecs.length > 0) {
 
 
