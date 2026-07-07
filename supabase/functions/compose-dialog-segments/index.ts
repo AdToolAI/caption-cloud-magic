@@ -128,7 +128,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v187";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v192";
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -690,7 +690,10 @@ serve(async (req) => {
     // Initial dispatch from the client has no body.pass_idx → 0.
     // Self-invoke / webhook advance calls carry pass_idx in body.
     {
-      const perPassLockEnabled = (Deno.env.get("FEATURE_PER_PASS_LOCK") ?? "false")
+      // v192 — Default flipped ON. Per-pass lock avoids scene-wide advance-webhook
+      // collisions when two Sync.so passes finish nearly simultaneously. Set the
+      // env var to "false" explicitly for emergency rollback to legacy scene-lock.
+      const perPassLockEnabled = (Deno.env.get("FEATURE_PER_PASS_LOCK") ?? "true")
         .toLowerCase() === "true";
       const bodyPassIdx = Number(body?.pass_idx);
       const earlyPassIdx = perPassLockEnabled && Number.isFinite(bodyPassIdx) && bodyPassIdx >= 0
@@ -6439,7 +6442,10 @@ serve(async (req) => {
     // defaults true. Previously all three defaulted false → 17-23 min
     // serial runs even when ops set DB flags to true (deploy lag).
     let parallelFlagOn = true;
-    let concurrencyCap = 2;
+    // v192 — Default cap raised from 2 → 4. For 4-speaker scenes this collapses
+    // two serial Sync.so waves back into one parallel wave (v169 tempo). DB row
+    // `composer.sync_so_concurrency_cap` still acts as the down-ward kill-switch.
+    let concurrencyCap = 4;
     let fanoutForceEnableDb = true;
     try {
       const { data: pFlag } = await supabase
@@ -6614,7 +6620,10 @@ serve(async (req) => {
       // mit `FEATURE_PRECLIP_PREFANOUT=true` in den Edge-Secrets.
       // Fallback: bei Failure greift der bestehende Per-Pass-Render in der
       // späteren `advance`-Invocation → keine Regression möglich.
-      const preFanoutEnabled = (Deno.env.get("FEATURE_PRECLIP_PREFANOUT") ?? "false")
+      // v192 — Default flipped ON. Preclip pre-fanout is retry-path insurance;
+      // no cost on the v153.2 bbox-url-pro happy path. Set to "false" explicitly
+      // to disable.
+      const preFanoutEnabled = (Deno.env.get("FEATURE_PRECLIP_PREFANOUT") ?? "true")
         .toLowerCase() === "true";
       if (preFanoutEnabled && passes.length > concurrencyCap && plateDims && sourceClipUrl) {
         const waitingIdxs: number[] = [];
