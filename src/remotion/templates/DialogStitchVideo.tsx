@@ -293,11 +293,12 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // Feathered radial mask: solid in the inner 70% of radius, fading to 0
-  // at radius edge so the lipsynced face blends seamlessly into the base.
-  const inner = Math.max(2, Math.round(radiusPx * 0.68));
-  const outer = Math.max(inner + 8, Math.round(radiusPx));
-  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0.85) ${Math.round((inner + outer) / 2)}px, rgba(0,0,0,0) ${outer}px)`;
+  // v196: hard face-disc mask — solid disc with a 1px AA band. No feather
+  // ring, so no alpha-blend of Sync.so lipsynced face + live plate face
+  // (root cause of "morph while speaking").
+  const outer = Math.max(4, Math.round(radiusPx));
+  const inner = Math.max(2, outer - 1);
+  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0) ${outer}px)`;
   return (
     <AbsoluteFill
       style={{
