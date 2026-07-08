@@ -299,12 +299,12 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // v198: enlarged hard disc (×1.6 radius) so the mask edge lands in hair/
-  // background where Sync.so output and live plate match, not on cheek/jaw
-  // skin where they differ slightly (residual seam-morph fix).
-  const outer = Math.max(4, Math.round(radiusPx * 1.6));
-  const inner = Math.max(2, outer - 1);
-  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0) ${outer}px)`;
+  // v205 mux/v169 parity: wide soft radial feather in pixel space so the
+  // seam lands well beyond the face and blends symmetrically into the
+  // master plate. No hard cutoff.
+  const outerPx = Math.max(6, Math.round(radiusPx * 2.2));
+  const corePx = Math.max(2, Math.round(radiusPx * 0.6));
+  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${corePx}px, rgba(0,0,0,0) ${outerPx}px)`;
   return (
     <AbsoluteFill
       style={{
