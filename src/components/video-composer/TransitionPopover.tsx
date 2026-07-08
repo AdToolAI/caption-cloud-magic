@@ -99,7 +99,7 @@ export function TransitionPopover({
           className="w-full text-[11px] text-muted-foreground hover:text-foreground"
           onClick={() => setShowMore((v) => !v)}
         >
-          {showMore ? 'Weniger Übergänge' : 'Mehr Übergänge'}
+          {showMore ? l.less : l.more}
         </Button>
       </PopoverContent>
     </Popover>
