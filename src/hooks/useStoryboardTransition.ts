@@ -208,7 +208,8 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
       ? h.shot
       : `${beatLabel} beat for ${briefing.productName ?? 'the brand'}: cinematic ${framing} shot, ${movement}, ${lighting} lighting.`;
     const voiceover = h?.dialog ? { text: h.dialog } : undefined;
-    const sceneCast = h?.dialog ? cast : (i === 0 ? cast : cast); // keep cast on every scene if available
+    const isRequiredEnsemble = cast.length >= 2 && (i === 0 || (sceneCount >= 6 && i === sceneCount - 1));
+    const sceneCast = isRequiredEnsemble ? cast : cast.slice(0, 1);
     return {
       index: i + 1,
       label: beatLabel,
