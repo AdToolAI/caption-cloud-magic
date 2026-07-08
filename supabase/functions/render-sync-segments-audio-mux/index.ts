@@ -662,7 +662,7 @@ serve(async (req) => {
     console.log(
       `[render-sync-segments-audio-mux] scene=${sceneId} overlay_mask_version=${OVERLAY_MASK_VERSION} ` +
       `crops_used=${cropsUsed} facemasks_used=${facemasksUsed} silent_slots_used=${silentSlotsUsed} ` +
-      `color_match_enabled=${COLOR_MATCH_ENABLED}`,
+      `color_match_enabled=${COLOR_MATCH_ENABLED} silent_layers_disabled=${SILENT_LAYERS_DISABLED}`,
     );
     // Multi-speaker fanout MUST use preclip_crop overlays. A faceMask
     // fallback on N≥2 means one of the passes lost its preclip_crop — that
