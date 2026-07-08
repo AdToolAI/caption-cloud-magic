@@ -75,6 +75,8 @@ function pickThumbnail(scene: ComposerScene): { kind: 'image' | 'video' | 'none'
 }
 
 function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: SceneStripTileProps) {
+  const { language } = useTranslation();
+  const notRendered = NOT_RENDERED_L10N[(language as 'de' | 'en' | 'es') ?? 'de'] ?? NOT_RENDERED_L10N.de;
   const thumb = pickThumbnail(scene);
   const status = STATUS_STYLE[scene.clipStatus] ?? STATUS_STYLE.pending;
   const StatusIcon = status.icon;
