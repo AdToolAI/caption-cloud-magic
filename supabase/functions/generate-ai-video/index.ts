@@ -220,12 +220,16 @@ serve(async (req) => {
 
     // Start video generation on Replicate with webhook - wrapped in try-catch
     try {
-      const prediction = await replicate.predictions.create({
-        version: modelVersion,
-        input: replicateInput,
-        webhook: webhookUrl,
-        webhook_events_filter: ['start', 'completed']
-      });
+      const prediction = await withTimeout(
+        replicate.predictions.create({
+          version: modelVersion,
+          input: replicateInput,
+          webhook: webhookUrl,
+          webhook_events_filter: ['start', 'completed']
+        }),
+        30_000,
+        'replicate.predictions.create',
+      );
 
       console.log(`[generate-ai-video] ✅ Replicate prediction created: ${prediction.id}`);
       console.log(`[generate-ai-video] Webhook configured: ${webhookUrl}`);
