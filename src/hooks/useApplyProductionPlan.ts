@@ -381,8 +381,9 @@ function planSceneToComposerScene(
           (c) => (c.mentionKey ?? '').replace(/^@/, '').toLowerCase() === rawKey.toLowerCase(),
         );
         const name = (match?.characterName ?? rawKey ?? 'NARRATOR').toUpperCase();
-        const moodSuffix = t.mood?.trim() ? ` — ${t.mood.trim().toUpperCase()}` : '';
-        return `${name}${moodSuffix}: ${t.text.trim()}`;
+        // Only the spoken line goes into dialog_script. Mood/delivery
+        // stay on dialogTurns as performance metadata — never spoken.
+        return `${name}: ${t.text.trim()}`;
       })
       .join('\n');
   } else if (ps.voiceover?.text) {
