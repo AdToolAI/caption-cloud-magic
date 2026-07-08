@@ -35,7 +35,9 @@ export function TransitionHandle({
   onChange,
   disabled,
 }: TransitionHandleProps) {
-  const label = LABEL[value] ?? 'Cut';
+  const { language } = useTranslation();
+  const lang = (language as 'de' | 'en' | 'es') ?? 'de';
+  const label = L10N[lang][value] ?? L10N[lang].none;
   const isCut = value === 'none';
   const Icon = isCut ? Scissors : Waves;
 
