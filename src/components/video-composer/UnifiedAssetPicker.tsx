@@ -144,6 +144,7 @@ export function UnifiedAssetPicker({
 }: UnifiedAssetPickerProps) {
   const lang: Lang = language;
   const pools = { locations, buildings, props: propsList };
+  const [refineKind, setRefineKind] = useState<RefineKind | null>(null);
 
   // Slugs currently injected at the head of the prompt.
   const activeSlugs = useMemo(() => readSceneAssetSlugs(prompt), [prompt]);
