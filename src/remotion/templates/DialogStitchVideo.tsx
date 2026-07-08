@@ -430,8 +430,8 @@ const MouthMatteFreeze: React.FC<MouthMatteFreezeProps> = ({
   const top = srcY * scaleY;
   const w = srcWidth * scaleX;
   const h = srcHeight * scaleY;
-  // v198: enlarged hard ellipse so seam lands beyond skin.
-  const mask = 'radial-gradient(ellipse at center, #000 0%, #000 60%, rgba(0,0,0,0) 61%)';
+  // v205 mux/v169 parity: wide soft radial feather.
+  const mask = 'radial-gradient(ellipse at center, #000 0%, #000 30%, rgba(0,0,0,0) 78%)';
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
