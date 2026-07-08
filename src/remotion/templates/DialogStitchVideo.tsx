@@ -557,6 +557,16 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   shots,
 }) => {
   const { fps, durationInFrames, width: compW, height: compH } = useVideoConfig();
+  // v206 — true v169 parity: silent overlay layers (SilentFaceFreeze,
+  // SilentFaceAnchor, MouthMatteFreeze) are gated to empty arrays by the mux
+  // edge function. Non-speakers show the raw master plate — that is the
+  // intended v169 behaviour. Do NOT reintroduce static per-speaker freeze
+  // tiles here without solving the plate-vs-freeze drift problem first.
+  React.useEffect(() => {
+    const silentCount = Array.isArray(silentFaceFreezes) ? silentFaceFreezes.length : 0;
+    // eslint-disable-next-line no-console
+    console.log(`[DialogStitch] overlay_mask_version=v169_parity silent_layers_expected=empty silent_freezes_received=${silentCount}`);
+  }, [silentFaceFreezes]);
   const sortedShots = React.useMemo(
     () => [...(shots ?? [])].sort((a, b) => a.startSec - b.startSec),
     [shots],
