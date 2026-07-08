@@ -18,6 +18,7 @@
 //   3. Favourite Brand Character whose name is in the prompt
 
 import type { ComposerCharacter, ComposerScene } from '@/types/video-composer';
+import { MOTION_STUDIO_STRICT_IDS } from './featureFlags';
 
 export type AnchorStrategy =
   | 'first-frame-direct'
