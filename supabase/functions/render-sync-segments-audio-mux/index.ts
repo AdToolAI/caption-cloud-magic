@@ -622,6 +622,7 @@ serve(async (req) => {
       ...(tailFreezeFromSec !== null ? { tailFreezeFromSec } : {}),
       ...(globalSilentSlots.length > 0 ? { globalSilentSlots } : {}),
       ...(silentFaceFreezes.length > 0 ? { silentFaceFreezes } : {}),
+      overlayMaskVersion: OVERLAY_MASK_VERSION,
     };
 
     const shotSummary = fanoutShots.map((shot: any, idx: number) => ({
