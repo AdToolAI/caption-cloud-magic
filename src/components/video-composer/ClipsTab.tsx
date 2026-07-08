@@ -670,6 +670,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           durationSeconds: s.durationSeconds,
           characterShot: s.characterShot,
           characterShots: s.characterShots,
+          // v211 — canonical UUID array (Cast + World) mirroring
+          // composer_scenes.scene_assets so compose-video-clips can look up
+          // reference images without fuzzy slug-matching.
+          scene_assets: buildSceneAssetsForRender(s, libLocations),
           dialogScript: s.dialogScript,
           dialogVoices: s.dialogVoices,
           engineOverride: s.engineOverride ?? 'auto',
