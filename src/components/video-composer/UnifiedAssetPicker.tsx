@@ -310,25 +310,65 @@ export function UnifiedAssetPicker({
                     ))}
                   </div>
                   <div className="border-t border-border/40 my-1" />
-                  <a
-                    href="/library"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => setRefineKind(fam.key as RefineKind)}
                     className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left text-xs text-primary"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     {lang === 'de'
-                      ? 'In der Library erstellen…'
+                      ? 'Aus Foto erstellen (KI)…'
                       : lang === 'es'
-                      ? 'Crear en la librería…'
-                      : 'Create in Library…'}
+                      ? 'Crear desde foto (IA)…'
+                      : 'Create from photo (AI)…'}
+                  </button>
+                  <a
+                    href="/library"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left text-xs text-muted-foreground"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {lang === 'de'
+                      ? 'In der Library öffnen…'
+                      : lang === 'es'
+                      ? 'Abrir en librería…'
+                      : 'Open in Library…'}
                   </a>
                 </PopoverContent>
               </Popover>
             )}
+
+            {!canAddMore && selected.length === 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setRefineKind(fam.key as RefineKind)}
+                className="h-6 px-2 text-[10px] gap-1 text-primary hover:bg-primary/10"
+              >
+                <Sparkles className="h-3 w-3" />
+                {lang === 'de'
+                  ? 'Aus Foto (KI)'
+                  : lang === 'es'
+                  ? 'Desde foto (IA)'
+                  : 'From photo (AI)'}
+              </Button>
+            )}
           </div>
         );
       })}
+
+      {refineKind && (
+        <AssetPhotoUploadSheet
+          kind={refineKind}
+          open={!!refineKind}
+          onOpenChange={(o) => {
+            if (!o) setRefineKind(null);
+          }}
+        />
+      )}
     </div>
   );
 }
+
