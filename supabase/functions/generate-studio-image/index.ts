@@ -18,14 +18,31 @@ async function tryGenerate(
   let response: Response | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ model, messages, modalities: ['image', 'text'] }),
-    });
+    try {
+      response = await fetchWithTimeout(
+        'https://ai.gateway.lovable.dev/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ model, messages, modalities: ['image', 'text'] }),
+        },
+        90_000,
+        `ai-gateway ${model}`,
+      );
+    } catch (e) {
+      if (isTimeoutError(e)) {
+        console.log(`[Studio] Timeout on ${model} attempt ${attempt}/${maxRetries}`);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+        return null;
+      }
+      throw e;
+    }
 
     if (response.ok) return response;
 
