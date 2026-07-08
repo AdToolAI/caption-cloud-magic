@@ -1545,6 +1545,8 @@ This overrides any English wording in the briefing's scaffolding
       const FEMALE_POOL = ['EXAVITQu4vr4xnSDxMaL','FGY2WhTYpPnrIDTdsKH5','Xb7hH8MSUJpSbSDYk0k2','XrExE9yKIg1WjnnlVkGX','pFZP5JQG7iQjIQuC4Bku'];
       const voiceByCharacterId = new Map<string, string>();
       const usedGlobal = new Set<string>();
+      const voicePoolStats = { autoAssigned: 0, reusedForCharacter: 0, uniqueVoices: 0 };
+      (plan as any)._voicePoolStats = voicePoolStats;
       // Seed with already-resolved (character → voice) mappings so auto-pick
       // does not steal a voice that a resolved character already owns.
       for (const sc of plan.scenes ?? []) {
