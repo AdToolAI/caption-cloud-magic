@@ -24,11 +24,3 @@ Case-by-Case den externen Fetch mit `fetchWithTimeout` umhüllen.
 ### Phase 4.4 – Picture Studio UnifiedAssetPicker
 UI-Refactor auf globalen Picker inkl. `brand-uploads`-Bucket.
 
-### Phase 5.2 – Auth Fail Audit
-Fehlerpfade durchspielen (Passwort, Token, Paused Account), einheitliche
-Toasts + Redirects nach `/auth`.
-
-
-### Phase 5.4 – Beta-Beobachtbarkeit
-PostHog-Events (`beta_signup`, `founders_slot_claimed`, `feature_gate_hit`,
-`credit_refund_triggered`) und Admin-Dashboard-Kachel "Beta Health".
