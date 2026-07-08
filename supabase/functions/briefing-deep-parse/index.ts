@@ -1335,18 +1335,29 @@ This overrides any English wording in the briefing's scaffolding
               [...manifest.scenes].reverse().find((x: any) => Array.isArray(x?.cast) && x.cast.length > 0)
               ?? manifest.scenes[0]
               ?? {};
+            // SC-1: preserve characterId + outfitLookId on padded scenes so
+            // ensemble-repair does not append duplicates and outfits survive.
             const cloneCast = (cast: any[] | undefined) =>
               Array.isArray(cast)
-                ? cast.map((c: any) => ({
-                    mentionKey: c?.mentionKey,
-                    outfit: c?.outfit,
-                    // strip per-turn fields so the padded scene is editable
-                  }))
+                ? cast.map((c: any) => {
+                    const out: any = { mentionKey: c?.mentionKey };
+                    if (c?.characterId) out.characterId = c.characterId;
+                    if (c?.characterName) out.characterName = c.characterName;
+                    if (c?.outfit) out.outfit = c.outfit;
+                    if (c?.outfitLookId) out.outfitLookId = c.outfitLookId;
+                    if (c?.referenceImageUrl) out.referenceImageUrl = c.referenceImageUrl;
+                    return out;
+                    // per-turn fields (voiceover text etc.) are intentionally stripped
+                  })
                 : undefined;
-            const cloneLocation = (loc: any) =>
-              loc && typeof loc === 'object' && loc.mentionKey
-                ? { mentionKey: loc.mentionKey }
-                : undefined;
+            const cloneLocation = (loc: any) => {
+              if (!loc || typeof loc !== 'object') return undefined;
+              const out: any = {};
+              if (loc.mentionKey) out.mentionKey = loc.mentionKey;
+              if (loc.locationId) out.locationId = loc.locationId;
+              if (loc.locationName) out.locationName = loc.locationName;
+              return out.mentionKey || out.locationId ? out : undefined;
+            };
             while (manifest.scenes.length < detected) {
               const i = manifest.scenes.length;
               const padded: any = {
