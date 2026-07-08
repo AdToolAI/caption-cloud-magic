@@ -49,7 +49,11 @@ export default function SceneInlinePlayer({
   onSelect,
   onGenerate,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const notRenderedLabel =
+    language === 'en' ? 'Not rendered yet'
+      : language === 'es' ? 'Aún no renderizado'
+        : 'Noch nicht gerendert';
   const { reset: resetLipSync, resettingId } = useResetLipSync();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
