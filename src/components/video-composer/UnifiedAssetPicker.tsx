@@ -214,8 +214,8 @@ export function UnifiedAssetPicker({
       {/* World-asset rows */}
       {FAMILIES.map((fam) => {
         const pool = pickByFamily(fam.key, pools);
-        // Hide the row entirely when there's nothing to pick AND nothing chosen.
-        if (pool.length === 0 && selectedByFamily[fam.key].length === 0) return null;
+        // Always render the row so users can access "AI from photo",
+        // even when their library is empty.
 
         const selected = selectedByFamily[fam.key];
         const available = pool.filter(
