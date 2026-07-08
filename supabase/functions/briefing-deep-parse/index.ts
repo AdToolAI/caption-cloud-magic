@@ -1550,8 +1550,8 @@ This overrides any English wording in the briefing's scaffolding
       if (ensemble.repaired > 0) {
         (plan as any)._meta = {
           ...((plan as any)._meta ?? {}),
-          aiFilled: Array.from(new Set([...
-            (((plan as any)._meta?.aiFilled ?? []) as string[]),
+          aiFilled: Array.from(new Set([
+            ...(((plan as any)._meta?.aiFilled ?? []) as string[]),
             'scenes.cast.ensembleGuarantee',
           ])),
         };
