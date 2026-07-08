@@ -717,7 +717,10 @@ export function useApplyProductionPlan() {
     // 3) Resolve default voices for cast characters that the parser matched but
     // did not attach a voiceId to. This never touches the lipsync pipeline; it
     // only fills composer_scenes.dialog_voices / character_voice_id for new rows.
-    const hydratedScenes = hydratePlanScenesForApply(plan.scenes ?? []);
+    const hydratedScenes = hydratePlanScenesForApply(plan.scenes ?? []).map((s) => {
+      const d = dedupePlanSceneCast(s.cast as any);
+      return d.removed > 0 ? ({ ...s, cast: d.cast } as typeof s) : s;
+    });
 
     const characterIds = Array.from(new Set(
       hydratedScenes
