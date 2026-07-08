@@ -72,7 +72,20 @@ export function ensureProductionPlanEnsemble(
   plan: TProductionPlan,
   briefing?: ComposerBriefing,
 ): TProductionPlan {
-  const required = briefingCast(briefing);
+  const resolvedPlanCast = new Map<string, TResolvedCast>();
+  for (const scene of plan?.scenes ?? []) {
+    for (const c of scene.cast ?? []) {
+      if (!c.characterId) continue;
+      const keys = [c.mentionKey, c.characterName].map(normalizeAssetKey).filter(Boolean);
+      for (const key of keys) if (!resolvedPlanCast.has(key)) resolvedPlanCast.set(key, c);
+    }
+  }
+  const required = briefingCast(briefing).map((c) => {
+    if (c.characterId) return c;
+    const hit = resolvedPlanCast.get(normalizeAssetKey(c.mentionKey))
+      ?? resolvedPlanCast.get(normalizeAssetKey(c.characterName));
+    return hit?.characterId ? { ...c, characterId: hit.characterId, voiceId: c.voiceId ?? hit.voiceId ?? null } : c;
+  });
   if (!plan?.scenes?.length || required.length < 2) return plan;
 
   const requiredCount = plan.scenes.length >= 6 ? 2 : 1;
