@@ -51,6 +51,13 @@ function json(body: unknown, status = 200) {
 // operators can grep for the active mask profile.
 const OVERLAY_MASK_VERSION = "v169_parity";
 const COLOR_MATCH_ENABLED = false;
+// v206 — Silent overlay layers (v195/v197 SilentFaceFreeze, v183 SilentFaceAnchor,
+// v193 MouthMatteFreeze) are hard-disabled to restore true v169 behaviour:
+// only CroppedOverlay (Sync.so output) is composited over the master plate.
+// Non-speakers show the raw master plate. This eliminates morph/wobble seen
+// after v205 which came from static freeze tiles drifting against the animating
+// master plate under the wide v169 alpha-feather mask.
+const SILENT_LAYERS_DISABLED = true;
 
 function evenDimension(value: unknown, fallback: number): number {
   const n = Number(value);
