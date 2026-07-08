@@ -51,6 +51,13 @@ function json(body: unknown, status = 200) {
 // operators can grep for the active mask profile.
 const OVERLAY_MASK_VERSION = "v169_parity";
 const COLOR_MATCH_ENABLED = false;
+// v206 — Silent overlay layers (v195/v197 SilentFaceFreeze, v183 SilentFaceAnchor,
+// v193 MouthMatteFreeze) are hard-disabled to restore true v169 behaviour:
+// only CroppedOverlay (Sync.so output) is composited over the master plate.
+// Non-speakers show the raw master plate. This eliminates morph/wobble seen
+// after v205 which came from static freeze tiles drifting against the animating
+// master plate under the wide v169 alpha-feather mask.
+const SILENT_LAYERS_DISABLED = true;
 
 function evenDimension(value: unknown, fallback: number): number {
   const n = Number(value);
@@ -302,6 +309,15 @@ serve(async (req) => {
       }
     } catch {
       silentFacesV183Enabled = false;
+    }
+
+    // v206 — hard override: silent overlay layers are disabled to restore
+    // true v169 behaviour. Only CroppedOverlay is composited over the master
+    // plate. See SILENT_LAYERS_DISABLED constant at top of file.
+    if (SILENT_LAYERS_DISABLED) {
+      silentAnchorV195Enabled = false;
+      silentFacesV183Enabled = false;
+      listenerMouthMatteEnabled = false;
     }
 
     // v197 silent-face freeze tiles — geometry-matched to the master plate,
@@ -646,7 +662,7 @@ serve(async (req) => {
     console.log(
       `[render-sync-segments-audio-mux] scene=${sceneId} overlay_mask_version=${OVERLAY_MASK_VERSION} ` +
       `crops_used=${cropsUsed} facemasks_used=${facemasksUsed} silent_slots_used=${silentSlotsUsed} ` +
-      `color_match_enabled=${COLOR_MATCH_ENABLED}`,
+      `color_match_enabled=${COLOR_MATCH_ENABLED} silent_layers_disabled=${SILENT_LAYERS_DISABLED}`,
     );
     // Multi-speaker fanout MUST use preclip_crop overlays. A faceMask
     // fallback on N≥2 means one of the passes lost its preclip_crop — that
