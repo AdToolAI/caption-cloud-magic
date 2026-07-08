@@ -119,11 +119,12 @@ export function ensureProductionPlanEnsemble(
       cast.push({ ...c, shotType: 'full' });
       present.add(key);
     }
+    const dedupCast = dedupePlanSceneCast(cast).cast;
 
     const names = required.map((c) => c.characterName || c.mentionKey.replace(/^@/, ''));
     nextScenes[idx] = {
       ...scene,
-      cast,
+      cast: dedupCast,
       engine: 'cinematic-sync',
       lipSync: true,
       shotDirector: {
