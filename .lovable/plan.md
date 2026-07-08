@@ -1,45 +1,53 @@
-# Cast/Outfit/Location ID-Verdrahtung — Audit & Fix
+# Briefing/Storyboard-Audit — Vorschlag
 
-## Befund
+Kurze Antwort: **Nein, nicht garantiert fehlerfrei.** Die letzten Fixes (Cast-Dedup, Outfit-Merge, Ensemble-Guarantee, Location-Resolver) adressieren bekannte Symptome, aber es gibt weiterhin Ecken, die ich noch nicht end-to-end verifiziert habe. Bevor ich weitere Änderungen mache, schlage ich ein systematisches Audit mit klar definierten Prüfpunkten vor.
 
-**Location-IDs: OK.**
-- `briefing-deep-parse` resolved Slug / Catalog-UUID / Substring → schreibt `scene.location.locationId` (UUID).
-- `useApplyProductionPlan` strippt `outfit:`/`catalog:`/`lib:` Prefixe, validiert UUID (`PLAN_UUID_RE`), reicht `locationId` an Composer weiter. Kein Dedup nötig (max. 1 Location pro Szene).
+## Was ich prüfen will
 
-**Character-IDs: OK.**
-- Nach v211 UUID-first; Pass-B + Local-Fill + Ensemble-Repair setzen `characterId`. Der neue `dedupePlanSceneCast` verhindert Doppel-Rows pro `characterId`.
+### 1. ID-Kanonisierung (End-to-End)
+- `characterId`, `outfitLookId`, `locationId`, `voiceId` durch alle 6 Stufen: Pass A → Pass B → Local-Fill → Scene-Count-Guard → Ensemble-Repair → `useApplyProductionPlan` → Composer-Scene.
+- Testfälle: (a) reine Slug-Mentions, (b) Catalog-UUIDs, (c) Freitext-Namen, (d) Mixed.
 
-**Outfit-IDs (`outfitLookId`): 2 Lücken.**
+### 2. Scene-Count-Guard vs. Ensemble-Repair Interaktion
+- Padded Szenen erben Template-Cast → dedupePlanSceneCast greift → Ensemble-Repair prüft Coverage → mögliche Race, wenn Padding schon alle 3 Avatare enthält aber ohne `outfitLookId`.
+- Verify: durationSec-Neuverteilung überschreibt keine benutzerdefinierten Dauern.
 
-### Lücke A — Dedup verwirft `outfitLookId`
-`src/lib/video-composer/briefing/planCastDedup.ts` deklariert im `PlanCastSlot`-Interface nur ein Legacy-`outfit: string` Feld. `mergeInto` merged nur `outfit`, nie `outfitLookId`. Wenn zwei Slots denselben `characterId` haben und nur der *zweite* ein `outfitLookId` trägt (typisch: erster Slot aus Pass-B ohne Look, zweiter Slot aus Local-Fill/Manuell mit Look), wird `outfitLookId` beim Dedup verworfen. `useApplyProductionPlan` (Zeile 292/320) findet dann kein Outfit → falscher Portrait-Anchor.
+### 3. Lip-Sync-Schutzfilter (Apply-Hook)
+- Bestätigen, dass `dedupePlanSceneCast` NICHT auf bereits gerenderte Szenen angewendet wird (sonst Datenverlust).
+- 6-Kriterien-Filter greift vor Dedup-Aufruf.
 
-### Lücke B — Ensemble-Injection erbt kein Outfit
-`ensureProductionPlanEnsemble` (`ensurePlanEnsemble.ts`) baut `required[]` aus `briefingCast()`, das nur `{characterId, characterName, mentionKey, referenceImageUrl, voiceId}` liefert — **kein `outfitLookId`**. Wenn Szene 1 für „Sarah" bereits `outfitLookId=<uuid>` gewählt hat und die Ensemble-Szene Sarah nachträglich einfügt, bekommt sie kein Outfit → Anchor rendert Sarah im Default-Portrait statt im gewählten Look.
+### 4. Outfit-Fallback-Kette
+- Wenn `outfitLookId` fehlt: nutzt `prepareSceneAnchor` Default-Portrait oder erste verfügbare Look?
+- `avatar_outfit_looks`-DB-Fallback in ProductionPlanSheet: greift bei quick-create, aber was bei Löschung?
 
-## Fix
+### 5. Nicht-Determinismus des Parsers
+- Gemini-Pass-A ist stochastisch — gleicher Input, unterschiedliche Outputs. Schutz durch Scene-Count-Guard + Local-Fill + Ensemble-Repair, aber Performance-Auto-Fill und Anchor-Prompt-Text bleiben variabel.
+- Kein server-seitiges Seeding/Temperature-Locking.
 
-### 1. `src/lib/video-composer/briefing/planCastDedup.ts`
-- `PlanCastSlot`: `outfitLookId?: string | null` ergänzen.
-- `mergeInto`: `if (!merged.outfitLookId && extra.outfitLookId) merged.outfitLookId = extra.outfitLookId;`
-- Analog defensiv `locationId` nicht anfassen (nicht Teil des Slots).
+### 6. Persistenz & Versionierung
+- `composer_production_plans` (versioniert) vs. flüchtiger Client-State: Race beim Speichern während Apply?
 
-### 2. `src/lib/video-composer/briefing/ensurePlanEnsemble.ts`
-- `resolvedPlanCast`-Map zusätzlich `outfitLookId` je `characterId` sammeln (erster Fund gewinnt, über alle Szenen hinweg).
-- Beim Injizieren in `cast.push({ ...c, shotType: 'full', outfitLookId: resolvedOutfit.get(c.characterId) ?? null })` das Outfit aus der Map übernehmen.
+### 7. Telemetrie-Blindspots
+- `parser_meta.location_resolution` existiert, aber kein `cast_resolution` / `outfit_resolution` / `dedup_stats` — schwer zu debuggen wenn User „manchmal falsch" meldet.
 
-### 3. `supabase/functions/briefing-deep-parse/index.ts`
-- Serverseitiges `dedupeSceneCast`-Helper analog erweitern: `outfitLookId`-Merge (identische Regel wie Client) — Server-Dedup läuft an drei Stellen (nach Pass-B, nach Local-Fill, in Ensemble-Repair).
+## Vorgehen
 
-## Nicht angefasst
+**Phase 1 — Read-Only Audit** (kein Code-Change):
+- Trace alle 4 ID-Typen durch die 6 Stufen anhand der aktuellen Files.
+- Report: Liste konkreter Bugs mit File:Line + Reproduktionsbedingung + Severity (blocker / edge-case / cosmetic).
 
-- Lip-Sync / Render-Payload / `compose-video-clips` / `scene_assets` UUID-Kanon (v211).
-- `resolveCharacterId` (Prefix-Normalisierung) — greift downstream weiterhin.
-- Location-Pfad, Voice-ID-Pfad — bereits korrekt.
+**Phase 2 — Fix-Batch** (nach deiner Freigabe):
+- Nur Bugs mit Severity blocker/edge-case fixen.
+- Zusätzlich: `parser_meta`-Telemetrie erweitern (`cast_resolution`, `outfit_resolution`, `dedup_stats`) damit „manchmal fehlerhaft"-Reports diagnostizierbar werden.
+- Optional: Gemini-Temperatur auf 0.2 senken für deterministischere Outputs.
 
-## Validierung
+**Phase 3 — Validierung**:
+- Manueller Test-Durchlauf mit dem 3-Avatar-Briefing das du zuletzt genutzt hast.
+- Screenshot-Vergleich Production Plan Sheet vs. Storyboard-Szenen.
 
-Briefing mit 3 Avataren, je einem gewählten Outfit-Look, 5 Szenen:
-- Nach Deep-Parse: jede `cast[]` Zeile trägt `characterId` **und** `outfitLookId` durch alle drei Dedup-Stufen.
-- Ensemble-Szene enthält alle 3 Avatare, jeder mit seinem `outfitLookId` aus einer anderen Szene übernommen.
-- `useApplyProductionPlan` → `characterShots[]` propagiert `outfitLookId`; `prepareSceneAnchor` nutzt Outfit-Cover statt Default-Portrait.
+## Was nicht angefasst wird
+Lip-Sync-Pipeline (v190-v211), Render-Payload, `compose-video-clips`, `scene_assets`, `dialog_shots`.
+
+## Frage vor Start
+
+Soll ich mit **Phase 1 (Read-Only Audit)** beginnen und dir einen Bug-Report liefern, bevor irgendetwas geändert wird? Oder willst du direkt Telemetrie + Determinismus-Fixes ohne vorheriges Audit?
