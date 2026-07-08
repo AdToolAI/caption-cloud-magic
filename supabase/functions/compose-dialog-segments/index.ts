@@ -5870,7 +5870,30 @@ serve(async (req) => {
     // instead of the full multi-face plate. Sync.so sees one face only →
     // no `provider_unknown_error` ambiguity. The audio-mux Lambda overlays
     // the lipsynced crop back at preclip_crop on the original plate.
-    const rawDispatchVideoUrl = speakers.length >= 2 ? passInputUrl : (usePassPreclip ? (passPreclipUrl as string) : passInputUrl);
+    const v204MultiSpeakerPreclipDispatch = speakers.length >= 2;
+    if (v204MultiSpeakerPreclipDispatch && (!usePassPreclip || !passPreclipUrl)) {
+      return await failBeforeProviderDispatch(
+        "v204_preclip_required",
+        "v204_preclip_missing_before_wire",
+        "Refusing to dispatch multi-speaker Sync.so job without a single-face preclip; v204 forbids Full-Plate fallback.",
+        422,
+        {
+          canonical_lipsync_pipeline: "v204_preclip_bbox_clipspace",
+          input_space: "clip",
+          preclip_used: false,
+          full_plate_fallback_blocked: true,
+          pass_idx: currentPassIdx,
+          speaker: pass.speaker_name ?? null,
+          character_id: pass.character_id ?? null,
+          retry_variant: retryVariant,
+        },
+      );
+    }
+    const dispatchVideoKind = usePassPreclip ? "preclip" : "full_plate";
+    const dispatchInputSpace = usePassPreclip ? "clip" : "plate";
+    const rawDispatchVideoUrl = v204MultiSpeakerPreclipDispatch
+      ? (passPreclipUrl as string)
+      : (usePassPreclip ? (passPreclipUrl as string) : passInputUrl);
     // v143 — Rehost the plate into our own bucket before sending to Sync.so.
     // Presigned Replicate/S3 URLs expire after ~60 min; multi-pass dialogs
     // routinely exceed that window, causing Sync.so to silently return 422
@@ -5882,7 +5905,7 @@ serve(async (req) => {
       const rh = await rehostPlate(supabase, rawDispatchVideoUrl, {
         sceneId,
         passIdx: currentPassIdx,
-        kind: speakers.length >= 2 ? "fullplate" : (usePassPreclip ? "preclip" : "fullplate"),
+          kind: usePassPreclip ? "preclip" : "fullplate",
         ownerId: (scene as any)?.user_id ?? (scene as any)?.owner_id ?? null,
       });
       dispatchVideoUrl = rh.url;
@@ -5940,10 +5963,10 @@ serve(async (req) => {
           : "fullplate-sync3-deterministic-v105",
       model_intent: "sync-3",
       payload_model: payloadModel,
-      dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
+      dispatch_video_kind: dispatchVideoKind,
       canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
-      input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
-      preclip_used: speakers.length >= 2 ? false : usePassPreclip,
+      input_space: dispatchInputSpace,
+      preclip_used: usePassPreclip,
       retry_variant: retryVariant,
       asd_mode: asdForProbe?.auto_detect === true
         ? "auto_detect"
@@ -6744,9 +6767,9 @@ serve(async (req) => {
                 ? "auto_detect"
                 : "unknown",
         v131_5_final_override: (pass as any)._v131_5_final_override ?? null,
-        input_space: speakers.length >= 2 ? "plate" : (usePassPreclip ? "preclip" : "plate"),
-        preclip_used: speakers.length >= 2 ? false : usePassPreclip,
-        fullplate_bbox_only: speakers.length >= 2,
+        input_space: dispatchInputSpace,
+        preclip_used: usePassPreclip,
+        fullplate_bbox_only: false,
         diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,
         total_passes: passes.length,
@@ -6844,7 +6867,7 @@ serve(async (req) => {
         preclip_fps: (pass as any).preclip_fps ?? null,
         preclip_dims: (pass as any).preclip_dims ?? null,
         preclip_crop: (pass as any).preclip_crop ?? null,
-        dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
+        dispatch_video_kind: dispatchVideoKind,
 
         payload_summary: {
           model: payload.model,
