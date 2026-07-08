@@ -739,6 +739,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
         outfit: c.outfit ?? rCast?.outfit,
         characterId: typeof rCast?.characterId === 'string' ? rCast.characterId : null,
         characterName: rCast?.characterName ?? String(c.mentionKey ?? '').replace(/^@/, ''),
+        shotType: c.shotType,
         voiceId: typeof rCast?.voiceId === 'string' ? rCast.voiceId : null,
         voiceName: rCast?.voiceName,
         voiceAutoAssigned: rCast?.voiceAutoAssigned === true ? true : undefined,
