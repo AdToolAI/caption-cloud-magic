@@ -176,7 +176,7 @@ export default function ProductionPlanSheet({
       setPlan(ensureProductionPlanEnsemble(initialPlan, currentBriefing));
       setStep('review');
     }
-  }, [initialPlan, currentBriefing]);
+  }, [initialPlan]);
 
   // Char options: split into Base avatars (no `outfit:` prefix) vs Outfit
   // looks. The cast picker shows base avatars in the Charakter dropdown
