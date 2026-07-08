@@ -55,6 +55,7 @@ const Library = () => {
   const navigate = useNavigate();
   const tab = (params.get('tab') as TabKey) || 'people';
   const [addAvatarOpen, setAddAvatarOpen] = useState(false);
+  const [refineCharacterOpen, setRefineCharacterOpen] = useState(false);
 
   const setTab = (next: TabKey) => {
     setParams((p) => {
