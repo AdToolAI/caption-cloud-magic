@@ -9,6 +9,7 @@ import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { hubDefinitions } from "@/config/hubConfig";
+import { showBetaSurface } from "@/config/betaFlags";
 import {
   Sidebar,
   SidebarMenu,
@@ -31,7 +32,12 @@ export function AppSidebar() {
     return hub.items.some((item) => location.pathname === item.route) || location.pathname === `/hub/${hubKey}`;
   };
 
-  const visibleHubs = hubDefinitions.filter((h) => !h.adminOnly || isAdmin);
+  const visibleHubs = hubDefinitions.filter((h) => {
+    if (h.adminOnly && !isAdmin) return false;
+    // Hide half-finished hubs during Beta unless the user is admin
+    if (h.comingSoon && !showBetaSurface(isAdmin)) return false;
+    return true;
+  });
 
   return (
     <>
