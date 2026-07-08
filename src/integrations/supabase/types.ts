@@ -18155,6 +18155,15 @@ export type Database = {
         Returns: boolean
       }
       try_claim_mux_dispatch: { Args: { _scene_id: string }; Returns: boolean }
+      update_asset_reference_image: {
+        Args: {
+          p_asset_id: string
+          p_kind: string
+          p_storage_path?: string
+          p_url: string
+        }
+        Returns: undefined
+      }
       update_dialog_pass_slot: {
         Args: { _pass_idx: number; _patch: Json; _scene_id: string }
         Returns: Json
