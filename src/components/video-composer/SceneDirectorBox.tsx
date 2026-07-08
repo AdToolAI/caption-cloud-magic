@@ -112,11 +112,13 @@ export function SceneDirectorBox({
 
       // Build the @-mention block from matched assets so the existing
       // mention-resolver pipeline forwards reference images to the renderers.
-      const mentionAssets: { name: string }[] = [];
+      // v211 — mentions carry {id, type, name} so downstream resolvers lock
+      // to the canonical brand-table UUID instead of fuzzy-matching by slug.
+      const mentionAssets: Array<{ name: string; id?: string; type?: 'location' | 'building' | 'prop' }> = [];
       const pickName = (id: string, pool: AssetEntry[]) => pool.find((a) => a.id === id)?.name;
-      data.matchedAssets.locationIds?.forEach((id: string) => { const n = pickName(id, locations); if (n) mentionAssets.push({ name: n }); });
-      data.matchedAssets.buildingIds?.forEach((id: string) => { const n = pickName(id, buildings); if (n) mentionAssets.push({ name: n }); });
-      data.matchedAssets.propIds?.forEach((id: string) => { const n = pickName(id, props); if (n) mentionAssets.push({ name: n }); });
+      data.matchedAssets.locationIds?.forEach((id: string) => { const n = pickName(id, locations); if (n) mentionAssets.push({ name: n, id, type: 'location' }); });
+      data.matchedAssets.buildingIds?.forEach((id: string) => { const n = pickName(id, buildings); if (n) mentionAssets.push({ name: n, id, type: 'building' }); });
+      data.matchedAssets.propIds?.forEach((id: string) => { const n = pickName(id, props); if (n) mentionAssets.push({ name: n, id, type: 'prop' }); });
       // Characters: use names too so @mentions resolve in PromptMentionEditor
       data.matchedAssets.characterIds?.forEach((id: string) => { const n = pickName(id, allCharacters); if (n) mentionAssets.push({ name: n }); });
 

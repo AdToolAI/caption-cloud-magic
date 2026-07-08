@@ -146,24 +146,41 @@ export function useUnifiedMentionLibrary(): {
   // Cast Catalog rows surfaced as virtual mentionable characters with reference
   // image — picked items inject the portrait into Vidu/Hailuo i2v / Nano Banana
   // scene-anchor exactly like saved Brand Characters.
-  const catalogChars: MotionStudioCharacter[] = useMemo(
-    () => catalogCharacters.map((r: any) => ({
-      id: `catalog:character:${r.id}`,
-      user_id: null as any,
-      name: r.name,
-      description: r.theme_pack ? r.theme_pack.replace(':', ' / ') : '',
-      signature_items: '',
-      reference_image_url: r.reference_image_url,
-      reference_image_seed: null,
-      voice_id: null,
-      tags: ['catalog'],
-      usage_count: 0,
-      workspace_id: null,
-      created_at: '',
-      updated_at: '',
-    })),
-    [catalogCharacters],
-  );
+  const catalogChars: MotionStudioCharacter[] = useMemo(() => {
+    // v211 — try to bridge catalog rows to a real brand_characters.id so
+    // mentionToCastRef never emits a bare "catalog:character:..." string as
+    // a CastRef.characterId. Match by lowercased name against loaded brand
+    // characters; if the user has never adopted the catalog character into
+    // their own library, meta.baseCharacterId stays null and downstream
+    // callers must handle the "catalog-only" case explicitly.
+    const brandByName = new Map<string, string>();
+    for (const c of brandChars as any[]) {
+      const key = (c?.name || '').toLowerCase().trim();
+      if (key && !brandByName.has(key)) brandByName.set(key, c.id);
+    }
+    return catalogCharacters.map((r: any) => {
+      const key = (r?.name || '').toLowerCase().trim();
+      const adoptedId = brandByName.get(key) ?? null;
+      return {
+        id: `catalog:character:${r.id}`,
+        user_id: null as any,
+        name: r.name,
+        description: r.theme_pack ? r.theme_pack.replace(':', ' / ') : '',
+        signature_items: '',
+        reference_image_url: r.reference_image_url,
+        reference_image_seed: null,
+        voice_id: null,
+        tags: ['catalog'],
+        usage_count: 0,
+        workspace_id: null,
+        created_at: '',
+        updated_at: '',
+        meta: adoptedId
+          ? { kind: 'catalog' as const, baseCharacterId: adoptedId }
+          : undefined,
+      } as MotionStudioCharacter;
+    });
+  }, [catalogCharacters, brandChars]);
 
   const characters = useMemo(
     () => [...outfitChars, ...dedupe(dedupe(brandChars.map(adaptCharacter), msChars), catalogChars)],

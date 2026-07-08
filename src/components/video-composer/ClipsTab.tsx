@@ -31,6 +31,7 @@ import { derivePerformanceEntries } from "@/lib/motion-studio/buildPerformanceBl
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
+import { buildSceneAssetsForRender } from '@/lib/motion-studio/buildSceneAssetsForRender';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
@@ -669,6 +670,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           durationSeconds: s.durationSeconds,
           characterShot: s.characterShot,
           characterShots: s.characterShots,
+          // v211 — canonical UUID array (Cast + World) mirroring
+          // composer_scenes.scene_assets so compose-video-clips can look up
+          // reference images without fuzzy slug-matching.
+          scene_assets: buildSceneAssetsForRender(s, libLocations),
           dialogScript: s.dialogScript,
           dialogVoices: s.dialogVoices,
           engineOverride: s.engineOverride ?? 'auto',

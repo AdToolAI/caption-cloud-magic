@@ -270,13 +270,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // resolveSceneWorldRefs liest den Block und reicht die Referenz-Bilder an
       // Nano Banana / Vidu weiter — dieselben IDs wie im Motion Studio.
       const worldMentions = [
-        castLocation ? { name: castLocation.name } : null,
-        castBuilding ? { name: castBuilding.name } : null,
-        ...castProps.map((p) => ({ name: p.name })),
+        castLocation ? { name: castLocation.name, id: (castLocation as any).id, type: 'location' as const } : null,
+        castBuilding ? { name: castBuilding.name, id: (castBuilding as any).id, type: 'building' as const } : null,
+        ...castProps.map((p) => ({ name: p.name, id: (p as any).id, type: 'prop' as const })),
         ...(mentionResolved as any).locations
-          ? (mentionResolved as any).locations.map((l: { name: string }) => ({ name: l.name }))
+          ? (mentionResolved as any).locations.map((l: { name: string; id?: string }) => ({ name: l.name, id: l.id }))
           : [],
-      ].filter((x): x is { name: string } => !!x);
+      ].filter((x): x is { name: string; id?: string; type?: 'location' | 'building' | 'prop' } => !!x);
       const finalPrompt = applySceneAssetsToPrompt(proseFinalPrompt, worldMentions);
 
       const body: Record<string, unknown> = {

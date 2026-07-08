@@ -98,6 +98,9 @@ export function resolveSceneWorldRefs(
   const matches = findMentions(prompt, [], worldLib);
 
   // (b) Slugs from the UnifiedAssetPicker block at the head of the prompt.
+  //     v211: the block itself is slug-only for LLM readability, but callers
+  //     that also emit a canonical `scene_assets` array pass through here via
+  //     `scene.scene_assets` (below). Slug-fallback stays for legacy scenes.
   const slugs = readSceneAssetSlugs(prompt);
 
   // Merge: collect unique ids.
@@ -105,6 +108,18 @@ export function resolveSceneWorldRefs(
   for (const m of matches) {
     if (m.kind !== 'location') continue;
     const l = worldLib.find((x) => x.id === m.id);
+    if (l && l.reference_image_url && !picked.has(l.id)) picked.set(l.id, l);
+  }
+  // v211 — canonical UUID scene_assets (from composer_scenes.scene_assets column
+  // or explicit picker state) win over slug-matching. Slugs are only used as a
+  // fallback for legacy scenes that never had UUID persistence.
+  const canonicalRefs = ((scene as any).scene_assets ?? []) as Array<{
+    type?: string; id?: string;
+  }>;
+  for (const ref of canonicalRefs) {
+    if (!ref?.id) continue;
+    if (ref.type && !['location', 'building', 'prop'].includes(ref.type)) continue;
+    const l = worldLib.find((x) => x.id === ref.id);
     if (l && l.reference_image_url && !picked.has(l.id)) picked.set(l.id, l);
   }
   for (const slug of slugs) {

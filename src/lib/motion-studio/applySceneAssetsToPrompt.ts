@@ -32,14 +32,26 @@ function stripBlock(prompt: string): string {
   return (prompt || '').replace(BLOCK_RE, '');
 }
 
+export type SceneAssetKind = 'location' | 'building' | 'prop';
+
 export interface SceneAssetMention {
   /** human name as stored in brand_locations / brand_buildings / brand_props */
   name: string;
+  /** v211 — canonical UUID from brand_locations / brand_buildings / brand_props.
+   *  When present the world-anchor resolver matches by UUID, not by slug. */
+  id?: string;
+  /** v211 — which brand table this UUID belongs to. Optional; only used to
+   *  disambiguate the resolver when two families share a name. */
+  type?: SceneAssetKind;
 }
 
 /**
  * Replace the leading auto-injected scene-asset block with a fresh one.
  * Pass an empty array to remove the block entirely.
+ *
+ * v211: The prompt-marker stays slug-based (LLMs read prose, not UUIDs), but
+ * callers should pass `{ name, id, type }` so downstream resolvers can lock
+ * to canonical brand-table UUIDs rather than fuzzy-matching by slug.
  */
 export function applySceneAssetsToPrompt(
   prompt: string,

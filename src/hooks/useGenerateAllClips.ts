@@ -24,6 +24,7 @@ import { derivePerformanceEntries } from '@/lib/motion-studio/buildPerformanceBl
 
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
+import { buildSceneAssetsForRender } from '@/lib/motion-studio/buildSceneAssetsForRender';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
@@ -263,6 +264,10 @@ export function useGenerateAllClips({
           durationSeconds: s.durationSeconds,
           characterShot: s.characterShot,
           characterShots: s.characterShots,
+          // v211 — canonical UUID array (Cast + World). Mirrors
+          // `composer_scenes.scene_assets` v202 shape so the edge function
+          // can look up reference images without slug-matching.
+          scene_assets: buildSceneAssetsForRender(s, libLocations),
           dialogScript: s.dialogScript,
           dialogVoices: s.dialogVoices,
           engineOverride: s.engineOverride ?? 'auto',
