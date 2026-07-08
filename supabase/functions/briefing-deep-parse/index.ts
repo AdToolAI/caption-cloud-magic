@@ -1863,7 +1863,9 @@ This overrides any English wording in the briefing's scaffolding
         if (prev?.version) version = (prev.version as number) + 1;
       }
       const locResolutionForMeta = (plan as any)._locationResolution ?? null;
+      const voicePoolForMeta = (plan as any)._voicePoolStats ?? null;
       try { delete (plan as any)._locationResolution; } catch { /* noop */ }
+      try { delete (plan as any)._voicePoolStats; } catch { /* noop */ }
       const { error: insErr } = await supabase
         .from('composer_production_plans')
         .insert({
@@ -1878,7 +1880,10 @@ This overrides any English wording in the briefing's scaffolding
             passB_ms: tB - tA,
             total_ms: Date.now() - t0,
             model: passAModelUsed,
+            passA_model: passAModelUsed,
+            passB_model: passBModelUsed,
             passA_error: passAError,
+            passB_error: passBError,
             passA_diagnostics: passADiagnostics,
             passB_diagnostics: passBDiagnostics,
             scene_count_corrected: sceneCountCorrection,
@@ -1887,6 +1892,8 @@ This overrides any English wording in the briefing's scaffolding
             catalog_unresolved: passCStats.unresolved,
             catalog_unresolved_samples: passCStats.unresolvedSamples,
             location_resolution: locResolutionForMeta,
+            ensemble_repair: ensembleStats,
+            voice_pool_assignments: voicePoolForMeta,
           },
         });
       if (insErr) {
@@ -1900,7 +1907,7 @@ This overrides any English wording in the briefing's scaffolding
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passA_model: passAModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
