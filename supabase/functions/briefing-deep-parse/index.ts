@@ -1031,7 +1031,11 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
       cast.push({ ...c, shotType: 'full' });
       present.add(key);
     }
-    sc.cast = cast;
+    const dedup = dedupeSceneCast(cast);
+    if (dedup.removed > 0) {
+      console.log('[briefing-deep-parse] plan_cast_dedup', { stage: 'ensemble', scene: sc?.index, removed: dedup.removed });
+    }
+    sc.cast = dedup.cast;
     sc.engine = 'cinematic-sync';
     sc.lipSync = true;
     sc.shotDirector = { ...(sc.shotDirector ?? {}), framing: 'wide', angle: sc.shotDirector?.angle ?? 'eye-level', movement: sc.shotDirector?.movement ?? 'static' };
