@@ -31,6 +31,7 @@ import { derivePerformanceEntries } from "@/lib/motion-studio/buildPerformanceBl
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
+import { buildSceneAssetsForRender } from '@/lib/motion-studio/buildSceneAssetsForRender';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
