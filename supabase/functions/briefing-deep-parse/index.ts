@@ -1425,6 +1425,8 @@ This overrides any English wording in the briefing's scaffolding
     // ── Pass B — resolution + validation ──────────────────────────────────
     let resolution: any = { scenes: [], unresolved: [] };
     let passBDiagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> = [];
+    let passBModelUsed: string | null = null;
+    let passBError: string | null = null;
     try {
       const passBOut = await callGatewayChain(
         {
@@ -1448,9 +1450,11 @@ This overrides any English wording in the briefing's scaffolding
       );
       resolution = passBOut.result;
       passBDiagnostics = passBOut.diagnostics;
+      passBModelUsed = passBDiagnostics.find((d) => d.ok)?.model ?? null;
     } catch (e: any) {
       console.warn('[briefing-deep-parse] Pass B failed, falling back to local resolution:', e?.message);
       passBDiagnostics = (e as any)?.diagnostics ?? [];
+      passBError = e?.message ?? String(e);
       // Local fallback resolution
 
       const resolvedScenes = (manifest?.scenes ?? []).map((s: any) => {
