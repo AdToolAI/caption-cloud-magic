@@ -1,74 +1,40 @@
-# v204 — Rollback zur v169-Preclip-Pipeline
+## Befund
 
-## Warum
+Das Problem besteht tatsächlich weiterhin, und der Screenshot passt zu den Live-Daten:
 
-Der v203-Full-Plate-Zwang produziert `generation_input_face_selection_invalid` bei Sync.so. Historische Memory (v68, v107, v126, v163) und der v169-Guide belegen: Multi-Face-Plates werden von Sync.so systematisch abgelehnt. Der stabile Pfad ist **Single-Face-Preclip pro Pass**.
+- Der letzte fehlgeschlagene Run (`scene_id=7a6c9417...`) wurde mit `generation_input_face_selection_invalid` abgelehnt.
+- Die Dispatch-Logs zeigen weiterhin `canonical_lipsync_pipeline=v203_fullplate_sync3_bbox_only` und `video=.../p*-fullplate-...mp4`.
+- Im aktuellen Code ist die v204-Markierung zwar gesetzt, aber zwei zentrale Stellen sind noch falsch:
+  - `rawDispatchVideoUrl` nutzt für `speakers.length >= 2` weiterhin `passInputUrl` = Full-Plate.
+  - Telemetrie setzt für N≥2 weiterhin `input_space='plate'`, `preclip_used=false`, `dispatch_video_kind='full_plate'`, `fullplate_bbox_only=true`.
 
-## Zielarchitektur (nach Rollback)
+Damit war der Rollback nur teilweise umgesetzt: BBox wird berechnet, aber Sync.so bekommt weiterhin die Full-Plate.
 
-Pro Dialog-Pass (1 Speaker pro Pass, egal wie viele Speaker in der Szene):
+## Plan
 
-```text
-Master-Plate ──► Preclip-Renderer ──► Single-Face-Crop-MP4
-                       │                       │
-                       ▼                       ▼
-              exakte frame_count         Sync.so Payload:
-              + Mund-BBox in             - video_url = preclip_url
-              Clip-Koordinaten          - bounding_boxes_url (Clip-Space)
-                                        - sync_mode = "cut_off"
-                                        - model = sync-3
-                                        - KEIN auto_detect für N≥2
-                       │
-                       ▼
-              Sync.so Output (Crop) ──► Audio-Mux zurück auf Master-Plate
-```
+1. **Dispatch-URL wirklich auf Preclip umstellen**
+   - In `compose-dialog-segments/index.ts` `rawDispatchVideoUrl` so ändern, dass N≥2 nur noch `passPreclipUrl` verwendet.
+   - Wenn bei N≥2 kein Preclip verfügbar ist, vor Sync.so hard-fail + Refund statt Full-Plate-Fallback.
 
-## Änderungen
+2. **Rehost-Kind und Persistenz korrigieren**
+   - `rehostPlate(... kind ...)` für N≥2 auf `preclip` setzen, wenn `usePassPreclip=true`.
+   - `pass.input_url` bleibt danach der tatsächlich an Sync.so gesendete Preclip.
 
-### 1. `supabase/functions/compose-dialog-segments/index.ts`
+3. **Telemetrie korrigieren**
+   - `dispatch_video_kind='preclip'` für N≥2.
+   - `input_space='clip'` für N≥2.
+   - `preclip_used=true` für N≥2.
+   - `fullplate_bbox_only=false` bzw. entfernen/neutralisieren für v204.
+   - `canonical_lipsync_pipeline='v204_preclip_bbox_clipspace'` beibehalten.
 
-Alle v203-Guards entfernen bzw. invertieren:
+4. **Vor-Dispatch Guard ergänzen**
+   - Direkt vor Payload-Build: Wenn `speakers.length >= 2` und `!usePassPreclip || !passPreclipUrl`, abbrechen.
+   - Damit kann kein alter Full-Plate-Pfad mehr unbemerkt durchrutschen.
 
-- **`v161PreclipEligible`**: für `speakers.length >= 2` wieder `true` setzen (v203 hatte auf `false` gezwungen).
-- **Preclip-Cache-Reuse**: `preclip_url` / `preclip_crop` / `frame_count` aus Cache wieder verwenden statt zu droppen.
-- **v203-Fail-Closed-Block** entfernen: der `v203_preclip_forbidden` Hard-Fail (inkl. Refund-Trigger) wird ersatzlos gestrichen.
-- **Dispatch-Payload für N≥2**:
-  - `video_url` = `preclip_url` (nicht Master-Plate)
-  - `asd_mode` = `"bounding_boxes_url"` mit BBox in **Clip-Space** (nicht Plate-Space)
-  - `bounding_boxes_url` referenziert eine JSON mit `frame_count === preclip_frame_count` (Fail-Closed wenn ungleich)
-  - `model` = `"sync-3"`, `sync_mode` = `"cut_off"`
-  - `auto_detect` wird für N≥2 nie gesetzt
-- **Legacy-Retry-Varianten** wieder erlauben: `coords-pro`, `sync3-coords`, `sync3-bbox-preclip` — aber nur wenn sie Preclip-basiert sind. `auto-detect`-Varianten für N≥2 bleiben blockiert (v169-Regel).
-- **Telemetry-Marker** aktualisieren: `canonical_lipsync_pipeline = "v204_preclip_bbox_clipspace"`, `input_space = "clip"`, `preclip_used = true`.
+5. **Deploy + Verifikation**
+   - `compose-dialog-segments` und `sync-so-webhook` deployen.
+   - Danach Logs/DB prüfen: neue Dispatches müssen `video_url/preflight payload` mit `preclip`, `input_space='clip'`, `preclip_used=true`, `model='sync-3'`, `asd_mode='bounding_boxes_url'` zeigen.
 
-### 2. `supabase/functions/sync-so-webhook/index.ts`
+## Erwartetes Ergebnis
 
-- **NOOP-Escalation für N≥2 wieder erlauben** (v203 hatte das blockiert), aber nur innerhalb der Preclip-basierten Retry-Ladder.
-- Neue Marker (`v204_preclip_bbox_clipspace`) beim Persistieren des Ergebnisses.
-
-### 3. Memory-Update
-
-- `mem/architecture/lipsync/v200-id-only-cast-resolution.md`: v203-Sektion als "reverted" markieren, Verweis auf v204.
-- Neue Datei `mem/architecture/lipsync/v204-preclip-bbox-clipspace-rollback.md`:
-  - Regel: N≥2 = Preclip pro Pass + `bounding_boxes_url` in Clip-Space + `sync-3` + `cut_off`.
-  - Fail-Closed wenn `bbox.frame_count !== preclip.frame_count`.
-  - v203-Full-Plate-Weg ist **verboten** (dokumentierte Regression).
-- `mem/index.md`: Core-Bullet aktualisieren.
-
-### 4. Keine Änderungen an
-
-- Face-Track-Preclip-Renderer selbst (funktioniert)
-- ID-basierte Speaker-Resolution aus v201/v202 (bleibt korrekt)
-- Anchor-Image-Invariant (v195)
-- UI, Briefing, Composer, Lipsync-2/Pro-Fallbacks für N=1
-
-## Verifikation nach Deploy
-
-1. Health-Ping auf beide Edge Functions.
-2. Query auf `syncso_dispatch_log` (letzte 24h nach Deploy): alle N≥2-Dispatches müssen `canonical_lipsync_pipeline='v204_preclip_bbox_clipspace'`, `input_space='clip'`, `preclip_used=true`, `model='sync-3'` haben.
-3. Keine Dispatches mit `input_space='plate'` mehr für N≥2.
-4. Nächster Multi-Speaker-Run muss ohne `generation_input_face_selection_invalid` durchlaufen.
-
-## Rollback-Plan falls v204 fehlschlägt
-
-Weiterer Fallback ist die v126/v163-Variante (Preclip + `auto_detect:true`). Das wäre ein isolierter Payload-Switch am Dispatch-Punkt, kein weiterer Rollback nötig.
+Der nächste Multi-Speaker-Lip-Sync-Run sendet nicht mehr `p*-fullplate-...mp4` an Sync.so, sondern den Single-Face-Preclip pro Sprecherpass. Damit ist genau der v169/v204-Pfad aktiv, der die Full-Plate-Morphs und `generation_input_face_selection_invalid` vermeiden soll.
