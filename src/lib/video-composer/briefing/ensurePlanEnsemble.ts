@@ -119,7 +119,8 @@ export function ensureProductionPlanEnsemble(
       const key = castKey(c);
       if (present.has(key)) continue;
       if (cast.length >= MAX_CAST) break;
-      cast.push({ ...c, shotType: 'full' });
+      const look = c.characterId ? outfitByCharacterId.get(c.characterId) ?? null : null;
+      cast.push({ ...c, shotType: 'full', ...(look ? { outfitLookId: look } : {}) } as any);
       present.add(key);
     }
     const dedupCast = dedupePlanSceneCast(cast).cast;
