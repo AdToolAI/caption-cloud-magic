@@ -317,6 +317,7 @@ serve(async (req) => {
     if (SILENT_LAYERS_DISABLED) {
       silentAnchorV195Enabled = false;
       silentFacesV183Enabled = false;
+      listenerMouthMatteEnabled = false;
     }
 
     // v197 silent-face freeze tiles — geometry-matched to the master plate,
