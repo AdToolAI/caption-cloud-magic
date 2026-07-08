@@ -137,6 +137,7 @@ export function UnifiedAssetPicker({
   props: propsList,
   prompt,
   onPromptChange,
+  onSceneAssetsChange,
   language = 'en',
 }: UnifiedAssetPickerProps) {
   const lang: Lang = language;
