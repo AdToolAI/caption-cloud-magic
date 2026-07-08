@@ -235,10 +235,13 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // v198: enlarged hard disc — edge falls in hair/background, not on skin,
-  // where Sync.so output and live plate are effectively pixel-identical.
-  // Kills the residual seam-morph left after v196.
-  const mask = 'radial-gradient(circle at center, #000 0%, #000 62%, rgba(0,0,0,0) 63%)';
+  // v205 mux/v169 parity: wide, symmetric alpha-feather over the whole
+  // square crop. Hard discs (v196–v198) put the seam on skin where 1–3%
+  // H.264 quantization drift between Sync.so output and live plate produced
+  // a visible outline. A soft gradient from 30%→78% bleeds the transition
+  // over ~half the crop; the master plate underneath dominates the outer
+  // 22% and the identity change is invisible.
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 30%, rgba(0,0,0,0) 78%)';
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
