@@ -9,6 +9,7 @@ import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { hubDefinitions } from "@/config/hubConfig";
+import { showBetaSurface } from "@/config/betaFlags";
 import {
   Sidebar,
   SidebarMenu,
