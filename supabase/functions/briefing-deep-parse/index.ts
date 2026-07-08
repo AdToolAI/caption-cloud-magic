@@ -1425,6 +1425,8 @@ This overrides any English wording in the briefing's scaffolding
     // ── Pass B — resolution + validation ──────────────────────────────────
     let resolution: any = { scenes: [], unresolved: [] };
     let passBDiagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> = [];
+    let passBModelUsed: string | null = null;
+    let passBError: string | null = null;
     try {
       const passBOut = await callGatewayChain(
         {
@@ -1448,9 +1450,11 @@ This overrides any English wording in the briefing's scaffolding
       );
       resolution = passBOut.result;
       passBDiagnostics = passBOut.diagnostics;
+      passBModelUsed = passBDiagnostics.find((d) => d.ok)?.model ?? null;
     } catch (e: any) {
       console.warn('[briefing-deep-parse] Pass B failed, falling back to local resolution:', e?.message);
       passBDiagnostics = (e as any)?.diagnostics ?? [];
+      passBError = e?.message ?? String(e);
       // Local fallback resolution
 
       const resolvedScenes = (manifest?.scenes ?? []).map((s: any) => {
@@ -1541,6 +1545,8 @@ This overrides any English wording in the briefing's scaffolding
       const FEMALE_POOL = ['EXAVITQu4vr4xnSDxMaL','FGY2WhTYpPnrIDTdsKH5','Xb7hH8MSUJpSbSDYk0k2','XrExE9yKIg1WjnnlVkGX','pFZP5JQG7iQjIQuC4Bku'];
       const voiceByCharacterId = new Map<string, string>();
       const usedGlobal = new Set<string>();
+      const voicePoolStats = { autoAssigned: 0, reusedForCharacter: 0, uniqueVoices: 0 };
+      (plan as any)._voicePoolStats = voicePoolStats;
       // Seed with already-resolved (character → voice) mappings so auto-pick
       // does not steal a voice that a resolved character already owns.
       for (const sc of plan.scenes ?? []) {
@@ -1562,6 +1568,7 @@ This overrides any English wording in the briefing's scaffolding
             c.voiceId = voiceByCharacterId.get(c.characterId)!;
             c.voiceAutoAssigned = true;
             usedInScene.add(c.voiceId);
+            voicePoolStats.reusedForCharacter += 1;
             continue;
           }
           const ch = c.characterId ? charById.get(String(c.characterId)) : null;
@@ -1579,6 +1586,7 @@ This overrides any English wording in the briefing's scaffolding
             c.voiceAutoAssigned = true;
             usedInScene.add(pick);
             usedGlobal.add(pick);
+            voicePoolStats.autoAssigned += 1;
             if (c.characterId) voiceByCharacterId.set(c.characterId, pick);
             try {
               plan.aiFilled = Array.isArray(plan.aiFilled) ? plan.aiFilled : [];
@@ -1587,6 +1595,7 @@ This overrides any English wording in the briefing's scaffolding
           }
         }
       }
+      voicePoolStats.uniqueVoices = usedGlobal.size;
 
       // Dedupe cast after local fill-pass: back-filled `characterId`s may have
       // collapsed two mentionKey-only slots onto the same character.
@@ -1696,9 +1705,10 @@ This overrides any English wording in the briefing's scaffolding
       console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
     }
 
+    let ensembleStats: { repaired: number; required: number } | null = null;
     try {
-      const ensemble = ensureProductionPlanEnsembleServer(plan, briefing, characters);
-      if (ensemble.repaired > 0) {
+      ensembleStats = ensureProductionPlanEnsembleServer(plan, briefing, characters);
+      if (ensembleStats.repaired > 0) {
         (plan as any)._meta = {
           ...((plan as any)._meta ?? {}),
           aiFilled: Array.from(new Set([
@@ -1853,7 +1863,9 @@ This overrides any English wording in the briefing's scaffolding
         if (prev?.version) version = (prev.version as number) + 1;
       }
       const locResolutionForMeta = (plan as any)._locationResolution ?? null;
+      const voicePoolForMeta = (plan as any)._voicePoolStats ?? null;
       try { delete (plan as any)._locationResolution; } catch { /* noop */ }
+      try { delete (plan as any)._voicePoolStats; } catch { /* noop */ }
       const { error: insErr } = await supabase
         .from('composer_production_plans')
         .insert({
@@ -1868,7 +1880,10 @@ This overrides any English wording in the briefing's scaffolding
             passB_ms: tB - tA,
             total_ms: Date.now() - t0,
             model: passAModelUsed,
+            passA_model: passAModelUsed,
+            passB_model: passBModelUsed,
             passA_error: passAError,
+            passB_error: passBError,
             passA_diagnostics: passADiagnostics,
             passB_diagnostics: passBDiagnostics,
             scene_count_corrected: sceneCountCorrection,
@@ -1877,6 +1892,8 @@ This overrides any English wording in the briefing's scaffolding
             catalog_unresolved: passCStats.unresolved,
             catalog_unresolved_samples: passCStats.unresolvedSamples,
             location_resolution: locResolutionForMeta,
+            ensemble_repair: ensembleStats,
+            voice_pool_assignments: voicePoolForMeta,
           },
         });
       if (insErr) {
@@ -1890,7 +1907,7 @@ This overrides any English wording in the briefing's scaffolding
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passA_model: passAModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
