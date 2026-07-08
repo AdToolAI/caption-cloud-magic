@@ -9,7 +9,7 @@
  *
  * Controlled by SceneRenderConfirmProvider via a Promise-based API.
  */
-import { Loader2, Wallet, Sparkles, AlertTriangle, Clock, Info } from 'lucide-react';
+import { Loader2, Wallet, Sparkles, AlertTriangle, Clock, Info, ShieldAlert } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatCredits, formatEur, type AggregatedCost } from '@/lib/composer/estimateSceneRenderCost';
 import { formatEtaRange } from '@/hooks/useProviderEta';
 import RefundGuaranteeBadge from './RefundGuaranteeBadge';
+import { humanProviderName } from '@/config/lipsyncProviderSafety';
 
 export interface SceneRenderConfirmPayload {
   title?: string;
@@ -38,6 +39,8 @@ interface Props {
   payload: SceneRenderConfirmPayload | null;
   suppressed: boolean;
   onSuppressedChange: (next: boolean) => void;
+  riskAcknowledged: boolean;
+  onRiskAcknowledgedChange: (next: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -47,12 +50,26 @@ export default function SceneRenderConfirmDialog({
   payload,
   suppressed,
   onSuppressedChange,
+  riskAcknowledged,
+  onRiskAcknowledgedChange,
   onConfirm,
   onCancel,
 }: Props) {
   if (!payload) return null;
   const { cost, title, description } = payload;
   const multi = cost.scenes.length > 1;
+  const riskyScenes = cost.riskyLipsyncScenes ?? [];
+  const hasRisk = riskyScenes.length > 0;
+  const anyMultiSpeaker = riskyScenes.some((r) => r.info.multiSpeaker);
+  // Provider deduplizieren für die Kopie.
+  const riskyProviders = Array.from(
+    new Set(riskyScenes.map((r) => humanProviderName(r.info.provider))),
+  );
+  const providerLabel =
+    riskyProviders.length === 1
+      ? riskyProviders[0]
+      : riskyProviders.slice(0, -1).join(', ') + ' & ' + riskyProviders.slice(-1);
+  const confirmDisabled = hasRisk && !riskAcknowledged;
 
   return (
     <AlertDialog open={open} onOpenChange={(o) => !o && onCancel()}>
@@ -159,7 +176,7 @@ export default function SceneRenderConfirmDialog({
             </div>
           )}
 
-          {cost.totalCredits > 0 && <RefundGuaranteeBadge />}
+          {cost.totalCredits > 0 && !hasRisk && <RefundGuaranteeBadge />}
 
           {cost.totalCredits === 0 && (
             <div className="rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-[11px] text-amber-300 flex items-start gap-1.5">
@@ -168,17 +185,75 @@ export default function SceneRenderConfirmDialog({
             </div>
           )}
 
+          {hasRisk && (
+            <div className="rounded-lg border-2 border-red-500/50 bg-red-500/10 px-3.5 py-3 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-red-400 shrink-0" />
+                <span className="text-sm font-semibold text-red-200">
+                  Hinweis zu Lip-Sync mit {providerLabel}
+                </span>
+              </div>
+              <p className="text-[11.5px] leading-relaxed text-red-100/90">
+                <strong>{providerLabel}</strong> liefert bei Lip-Sync-Szenen
+                {anyMultiSpeaker ? ' mit mehreren Sprechern' : ''} keine
+                zuverlässigen Ergebnisse. Es kann zu Ghost-Mouthing (Nicht-
+                Sprecher bewegen den Mund), verzerrten Gesichtern und
+                falschen Mundbewegungen kommen.
+              </p>
+              <p className="text-[11.5px] leading-relaxed text-red-100/90">
+                Für stabile Lip-Sync-Renderings empfehlen wir{' '}
+                <strong>Hailuo</strong> oder <strong>HappyHorse</strong>.
+              </p>
+              <div className="text-[11px] leading-relaxed text-red-100/80 space-y-1 pt-1 border-t border-red-500/30">
+                <div className="font-medium text-red-200">
+                  Wenn du trotzdem fortfährst:
+                </div>
+                <ul className="space-y-0.5 pl-3.5 list-disc marker:text-red-400">
+                  <li>
+                    Die Plattform übernimmt keine Haftung für Lip-Sync-
+                    bezogene Bildfehler.
+                  </li>
+                  <li>
+                    Eine Rückerstattung der Credits für Lip-Sync-Artefakte
+                    ist in diesem Fall ausgeschlossen.
+                  </li>
+                  <li>
+                    Andere Fehlerarten (Timeouts, Systemausfälle) bleiben
+                    weiter refundfähig.
+                  </li>
+                </ul>
+              </div>
+              <label
+                htmlFor="risk-ack"
+                className="flex items-start gap-2 pt-1.5 cursor-pointer group"
+              >
+                <Checkbox
+                  id="risk-ack"
+                  checked={riskAcknowledged}
+                  onCheckedChange={(v) => onRiskAcknowledgedChange(v === true)}
+                  className="mt-0.5 border-red-400/60 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
+                />
+                <span className="text-[11.5px] leading-tight text-red-100 group-hover:text-red-50 select-none">
+                  Ich habe die Risiken verstanden und möchte trotzdem
+                  fortfahren.
+                </span>
+              </label>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 pt-1">
             <Checkbox
               id="suppress-confirm"
               checked={suppressed}
               onCheckedChange={(v) => onSuppressedChange(v === true)}
+              disabled={hasRisk}
             />
             <Label
               htmlFor="suppress-confirm"
-              className="text-[11px] text-muted-foreground cursor-pointer"
+              className={`text-[11px] cursor-pointer ${hasRisk ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}
             >
               30 Minuten lang nicht mehr fragen
+              {hasRisk && ' (nicht verfügbar bei Provider-Risiko)'}
             </Label>
           </div>
         </div>
@@ -187,9 +262,16 @@ export default function SceneRenderConfirmDialog({
           <AlertDialogCancel onClick={onCancel}>Abbrechen</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className="bg-gradient-to-r from-primary to-accent"
+            disabled={confirmDisabled}
+            className={
+              hasRisk
+                ? 'bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                : 'bg-gradient-to-r from-primary to-accent'
+            }
           >
-            Rendern für {formatCredits(cost.totalCredits)}
+            {hasRisk
+              ? `Trotzdem rendern für ${formatCredits(cost.totalCredits)}`
+              : `Rendern für ${formatCredits(cost.totalCredits)}`}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
