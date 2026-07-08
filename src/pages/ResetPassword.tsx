@@ -59,9 +59,13 @@ const ResetPassword = () => {
     setLoading(false);
 
     if (error) {
-      toast.error("Fehler beim Zurücksetzen", {
-        description: error.message,
-      });
+      const friendly = mapAuthError(error, 'update');
+      toast.error(friendly.title, { description: friendly.description });
+      trackAuthError(friendly, 'update');
+      // Token-Fehler → zurück zur Anmeldung, damit User neuen Reset-Link anfordern kann
+      if (friendly.code === 'token_invalid') {
+        setTimeout(() => navigate('/auth'), 2000);
+      }
     } else {
       setSuccess(true);
       toast.success("Passwort erfolgreich geändert!");
