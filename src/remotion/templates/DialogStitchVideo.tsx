@@ -498,9 +498,11 @@ const SilentFaceFreeze: React.FC<SilentFaceFreezeProps> = ({
   const top = srcY * scaleY;
   const w = srcSize * scaleX;
   const h = srcSize * scaleY;
-  // v198: enlarged hard disc so seam lands beyond skin.
+  // v205 mux/v169 parity: identical wide feather to CroppedOverlay so the
+  // active-speaker overlay and the silent-face freeze underneath share the
+  // exact same mask profile — no flicker when speakers switch.
   const mask =
-    'radial-gradient(circle at center, #000 0%, #000 55%, rgba(0,0,0,0) 56%)';
+    'radial-gradient(circle at center, #000 0%, #000 30%, rgba(0,0,0,0) 78%)';
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
