@@ -1,76 +1,41 @@
-## Diagnose
+# Duplicate Cast Slots in Production Plan — Fix
 
-Es ist kein gewünschtes Verhalten, sondern ein Logik-Bruch zwischen zwei Pipelines:
+## Problem
+In der Production-Plan-Sheet erscheint gelegentlich derselbe Charakter zweimal in einer Szene (z. B. zwei Slots, beide „Matthew Dusatko"). Ursachen:
 
-1. **Der letzte Fix sitzt im Storyboard-Generator** (`compose-video-storyboard`).
-   Der Screenshot zeigt aber den **Production Plan / Briefing-Parser** (`briefing-deep-parse`). Dieser hat eine eigene Cast-Logik und umgeht den Storyboard-Fix teilweise.
+1. **Pass A/B kann zwei mentionKeys emittieren, die auf denselben `characterId` resolven** (`@sarah` + `@sarah-dusatko` → beide Sarah, oder Fuzzy-Fill-Pass mappt einen unaufgelösten Slot nachträglich auf einen bereits vorhandenen Charakter).
+2. **Local Fill-Pass (Zeile ~1400–1440)** setzt fehlende `characterId` nach — dedupliziert danach aber nicht. Zwei Slots kollabieren auf dieselbe ID, bleiben aber beide in `scene.cast`.
+3. **Ensemble-Repair** (Server + Client) prüft Duplikate nur beim *Hinzufügen* neuer Slots. Bestehende Duplikate werden nicht bereinigt; zusätzlich kann Repair einen weiteren Slot anhängen, wenn ein vorhandener Slot zu diesem Zeitpunkt noch `characterId=null` hatte (unterschiedlicher Dedup-Key).
 
-2. Im Production-Plan-Prompt steht aktuell sinngemäß: **max. 2 Sprecher pro Szene** und Talking-Head gerne auf **einen Cast** pinnen. Bei 3 gewählten Avataren arbeitet diese Regel gegen die neue Ensemble-Anforderung.
+## Fix
 
-3. Wenn die Analyse timed out oder teilweise fehlschlägt, baut der Client einen lokalen Fallback-Plan. Dieser nimmt aktuell praktisch nur den **ersten Avatar** als Cast. Deshalb ist es „ab und zu korrekt und ab und zu fehlerhaft“: je nachdem, ob AI-Pass A/B sauber durchläuft, ein Retry greift oder der lokale Fallback angezeigt wird.
+### 1. Zentraler Dedup-Helper
+Neue Utility `dedupePlanSceneCast(cast)` in `src/lib/video-composer/briefing/planCastDedup.ts`:
+- Key = `characterId` (lowercased) falls vorhanden, sonst `normalizeAssetKey(mentionKey || characterName)`.
+- Ersten Treffer behalten, spätere Duplikate droppen.
+- `shotType`, `voiceId`, `characterName` vom ersten Slot behalten; bevorzugt den Slot mit `characterId != null` (falls die Reihenfolge das nicht garantiert, ein Merge-Pass, der Slots mit ID vor solche ohne ID priorisiert).
 
-4. Die neue `ensureEnsembleScene`-Safety-Net-Funktion existiert, ist aber für den Production-Plan-Pfad noch nicht zuverlässig integriert.
+### 2. Server-Pipeline (`supabase/functions/briefing-deep-parse/index.ts`)
+Dedup an drei Stellen aufrufen (idempotent):
+- Direkt nach Pass B Mapping (~Zeile 750).
+- Nach dem Local Fill-Pass (~Zeile 1440).
+- Am Ende von `ensureProductionPlanEnsembleServer` nach dem Hinzufügen — Duplikate bereinigen, falls Repair welche erzeugt.
 
-## Zielverhalten
+Zusätzlich in `ensureProductionPlanEnsembleServer`: `hasAll`/`coverage` verwenden bereits `characterId || mention`, das bleibt. Nach dem Push in `cast` einmal deduplizieren, bevor `sc.cast = cast` geschrieben wird.
 
-Wenn im Briefing / Picker 2–4 Avatare gewählt sind:
+### 3. Client-Pipeline
+- `src/lib/video-composer/briefing/ensurePlanEnsemble.ts`: nach dem `cast.push`-Loop denselben Dedup-Helper auf `cast` anwenden.
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx`: beim Hydrate (Initial + nach Änderungen) einmal durch alle Szenen laufen und Dedup anwenden, damit auch Legacy-Pläne aus der DB sauber angezeigt werden.
+- `src/hooks/useApplyProductionPlan.ts`: vor dem Mapping in `planSceneToComposerScene` denselben Dedup auf jede Szene anwenden, damit `characterShots` niemals denselben `characterId` doppelt enthält.
 
-- Es darf weiterhin Solo- und 2er-Szenen geben.
-- Aber mindestens eine Szene muss alle gewählten Avatare enthalten.
-- Bei längeren Plänen ab 6 Szenen sollen mindestens zwei Ensemble-Szenen entstehen.
-- Diese Regel muss im **Production Plan**, im **lokalen Fallback** und beim **Plan anwenden** greifen.
+### 4. Telemetrie
+In allen drei Server-Aufrufen zählen, wie viele Duplikate entfernt wurden, und einmal loggen:
+`console.log('[briefing-deep-parse] plan_cast_dedup', { removed, stage })`.
 
-## Umsetzung
+## Umfang
+- 1 neue Datei: `src/lib/video-composer/briefing/planCastDedup.ts`
+- Edits: `briefing-deep-parse/index.ts`, `ensurePlanEnsemble.ts`, `ProductionPlanSheet.tsx`, `useApplyProductionPlan.ts`
+- Deploy: `briefing-deep-parse`
 
-### 1. Production-Plan-Parser härten
-
-In `briefing-deep-parse`:
-
-- Die alte Regel „Max 2 speakers per scene“ so anpassen, dass sie nur für normale Dialog-/Talking-Head-Szenen gilt.
-- Neue harte Regel ergänzen:
-  - bei 2–4 Cast-Avataren mindestens eine Ensemble-Szene mit allen Cast-Mitgliedern
-  - bei ≥6 Szenen mindestens zwei Ensemble-Szenen
-  - Ensemble-Szenen müssen Wide/Group-Shots sein, keine Close-ups
-- Nach Pass A und/oder nach Pass B eine deterministische Reparatur einbauen:
-  - erkennt alle verfügbaren Cast-Avatare aus `## Cast` / Library
-  - prüft, ob genug Szenen alle Cast-Mitglieder haben
-  - wenn nicht, wählt Hook/CTA oder die beste vorhandene Szene
-  - ergänzt fehlende `cast[]` Slots, setzt `engine: cinematic-sync`, `lipSync: true`, `framing: wide/medium-wide`
-  - erweitert `anchorPromptEN`, damit alle Namen auch im Prompt vorkommen
-
-### 2. Lokalen Fallback reparieren
-
-In `useStoryboardTransition.buildLocalFallbackPlan`:
-
-- Nicht nur `briefing.characters[0]` verwenden.
-- Alle ausgewählten Briefing-Charaktere bis max. 4 als Cast-Slots bauen.
-- Mindestens eine Fallback-Szene als Ensemble-Szene erzeugen.
-- Bei 6+ Szenen zweite Ensemble-Szene ergänzen.
-
-### 3. ProductionPlanSheet Safety Net
-
-Vor dem Anzeigen oder spätestens vor „Plan anwenden“:
-
-- Plan normalisieren: wenn 2–4 aktuelle Briefing-Charaktere existieren und keine Ensemble-Szene im Plan ist, wird eine Szene automatisch ergänzt.
-- Das passiert idempotent, damit manuelle Änderungen nicht mehrfach dupliziert werden.
-- Die UI zeigt danach direkt den korrigierten Cast, nicht erst nach dem Anwenden.
-
-### 4. Plan → Composer Mapping absichern
-
-In `useApplyProductionPlan`:
-
-- Vor `planSceneToComposerScene` nochmal prüfen, ob der Plan die Ensemble-Regel erfüllt.
-- Falls nicht, Cast-Slots im Plan ergänzen, damit `characterShots[]` wirklich alle Avatare enthält.
-- Warnung/Telemetry ergänzen, falls ein Lip-Sync-/Cinematic-Sync-Plan wieder nur einen Cast-Slot bekommt.
-
-### 5. Verhalten validieren
-
-Mit einem Testfall „3 Avatare, 3–5 Szenen“ prüfen:
-
-- Production Plan zeigt mindestens eine Szene mit allen 3 Avataren.
-- Nach „Plan anwenden“ hat die entsprechende Composer-Szene `characterShots.length === 3`.
-- Kein Fallback-Pfad erzeugt mehr nur den ersten Avatar.
-
-## Ergebnis
-
-Danach ist die Ensemble-Regel nicht nur im Storyboard-Generator vorhanden, sondern entlang der tatsächlichen Pipeline abgesichert: Briefing-Analyse → Production Plan → Plan anwenden → Composer-Szenen.
+## Validierung
+Briefing mit 3 Avataren, 5 Szenen. Erwartung: keine Szene hat zwei Cast-Slots mit demselben `characterId`; UI-Screenshot zeigt jeden Avatar max. einmal pro Szene; mindestens eine Ensemble-Szene mit allen 3 Avataren bleibt erhalten.
