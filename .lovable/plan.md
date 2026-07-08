@@ -1,39 +1,34 @@
-# Zwei Fixes im Production Plan Sheet
+# Cast & World IDs — Status
 
-## Problem 1 — „Unbenannter Look" im Outfit-Dropdown
+**Gesamtbild:** Die v211-Verdrahtung ist end-to-end intakt. Pass B von `briefing-deep-parse` liefert UUIDs, `ProductionPlanSheet` erhält sie bei User-Edits, `useApplyProductionPlan` schreibt `characterShots[]` + `sceneAssets[]` in die Szene, `buildSceneAssetsForRender` reicht sie an `compose-video-clips`. Der Audit fand **eine echte Lücke** und **eine Aufräumsache** — beide klein, nur Client, kein Edge-Function-Redeploy.
 
-**Ursache:** `useUnifiedMentionLibrary.ts:112` setzt hart `'Unbenannter Look'` als Fallback, wenn `avatar_outfit_looks.name` leer/`null` ist. Dieser String wandert dann durch drei Wege ins Sheet:
-- `outfitById` (Line 344) → `outfitLabelById` (Line 385) — hier wird nur `'Standard-Look'` gefiltert, nicht `'Unbenannter Look'`.
-- `outfitsByCharacter` (Line 323) → `merged[].name` (Line 1192) — gleicher Fallback.
-- Der DB-Fallback (Line 388–390) überschreibt nur, wenn die DB einen Namen hat — bei tatsächlich leerem Namen bleibt „Unbenannter Look" stehen.
+## Was zu tun ist
 
-**Warum es beim Klick verschwindet:** nach Öffnen des Dropdowns rendert `SelectValue` den ausgewählten Look neu aus `merged`, wo inzwischen `outfitLabelById` (mit DB-Namen) gewonnen hat. Reine Timing-/Filter-Lücke.
+### Fix 1 — Non-UUID Katalog-Chars in `characterShots[]` blocken (Bug)
+`useApplyProductionPlan.ts:279–293` mappt `plan.cast[]` → `CharacterShot[]` und schleust die ID nur durch `stripPlanId` (Prefix-Strip). Bei einem `catalog:character:<non-uuid-slug>` (Katalog-Char ohne Brand-Adoption) landet ein Nicht-UUID-String in `characterShots[].characterId`. Das ist genau der Fall den v211 verbietet: der Anchor-Resolver matched strict gegen `brand_characters.id`, kein Silent-Drift.
 
-**Fix (zwei kleine Änderungen):**
+`scene_assets[]`-Zweig (Zeile 477) hat bereits einen `PLAN_UUID_RE.test(cid)`-Guard — der fehlt beim `characterShots[]`-Zweig.
 
-1. `src/hooks/useUnifiedMentionLibrary.ts` — `lookLabel` als leeren String belassen, wenn kein Name vorhanden ist, und das Mention-Label nur mit Avatar-Name bauen (statt „Avatar — Unbenannter Look"). `meta.outfitName` bleibt `''` statt Fake-String.
-2. `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — im `outfitById`- und `outfitsByCharacter`-Aggregator sowohl `'Standard-Look'` als auch `'Unbenannter Look'` als „kein echter Name" behandeln, und im SelectItem-Rendering (Line 1229) einen positionsbasierten Fallback `Look N` verwenden statt „Standard-Look".
+**Fix:** Nach `stripPlanId` prüfen, ob das Ergebnis eine UUID ist. Wenn nicht → Slot verwerfen (nicht in `characterShots[]` aufnehmen). Gleiche Logik wie beim `scene_assets`-Filter, ein Guard reicht.
 
-Effekt: Der Look wird sofort mit dem echten DB-Namen angezeigt, ohne Klick-Trigger.
+### Fix 2 — Kanonischen Resolver statt lokaler Kopie nutzen (Cleanup)
+`useApplyProductionPlan.ts` hat eine lokale `stripPlanId`-Funktion (Zeile 60–65), die funktional identisch mit `resolveCharacterId` (`src/lib/video-composer/resolveCharacterId.ts`) ist. Die Memory `mem://features/cast-world/id-integration.md` nennt `resolveCharacterId` als Single Source of Truth für die Normalisierung — der Apply-Hook ist der letzte Callsite der noch die lokale Kopie nutzt.
 
-## Problem 2 — Tonalität wird ins Skript gesprochen
+**Fix:** `stripPlanId` durch Import von `resolveCharacterId` ersetzen. Die Look-Map wird im Apply-Hook nicht gebaut, aber `resolveCharacterId` funktioniert auch ohne Map für `lib:`-Prefixe und für reine UUIDs — für `outfit:`/`catalog:`-Fälle liefert es dann `null`, was in Kombination mit dem neuen UUID-Guard aus Fix 1 sauber ist. Alternativ: `stripPlanId` beibehalten, aber mit Kommentar auf `resolveCharacterId` verweisen (weniger Risiko).
 
-**Ursache:** `src/hooks/useApplyProductionPlan.ts:384–385` baut den Dialog-Text so:
-```
-${name} — ${mood.toUpperCase()}: ${text}
-```
-Dieser String landet in `composer_scenes.dialog_script`, wird dann von TTS/Lipsync gesprochen — „SKEPTISCH, ENERGISCH" wird also wörtlich vorgelesen und bläht die Skriptdauer auf.
+Empfehlung: **Kommentar-Verweis** statt Ersetzung — das reduziert das Risiko einer Regression zu null und markiert die Duplikation dokumentarisch. Falls du das saubere Refactor willst, sag Bescheid.
 
-**Fix:** `moodSuffix` aus der Konkatenation entfernen — nur noch `${name}: ${text}`. `mood` und `delivery` bleiben als separate Felder auf `dialogTurns` erhalten (Metadata für Voice-Performance-Direction), aber nicht mehr im gesprochenen Text.
-
-## Nicht angefasst
-- Lipsync-Pipeline, Render-Payload, `dialog_shots`, `compose-video-clips`.
-- `dialogTurns.mood`/`delivery` bleiben in der DB — nur die String-Konkatenation für den TTS-Input wird bereinigt.
-- Bereits gerenderte / lipsync-geschützte Szenen: unberührt (Apply-Filter greift wie gehabt).
+## Was NICHT angefasst wird
+- `briefing-deep-parse` (Edge Function) — Pass B emittiert UUIDs korrekt.
+- `ProductionPlanSheet.tsx` — User-Edits erhalten UUIDs sauber.
+- `ensurePlanEnsemble.ts` — spreadet UUIDs korrekt weiter.
+- `buildSceneAssetsForRender` + `compose-video-clips` — v202-Registry funktioniert, hat sogar eine Late-Resolve-Safetynet für `outfit:`-Prefixe.
+- Lipsync-Pipeline, `dialog_shots`, Render-Payload.
 
 ## Betroffene Dateien
-- `src/hooks/useUnifiedMentionLibrary.ts` (1 Stelle)
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` (2 Stellen: `outfitById`/`outfitsByCharacter`-Filter, SelectItem-Fallback)
-- `src/hooks/useApplyProductionPlan.ts` (1 Zeile: moodSuffix entfernen)
+- `src/hooks/useApplyProductionPlan.ts` — UUID-Guard beim `characterShots`-Build hinzufügen (+ optionaler Kommentar-Verweis auf `resolveCharacterId`).
 
-Kein Edge-Function-Redeploy nötig — reiner Client-Fix.
+## Technische Details
+- Guard-Ausdruck: `PLAN_UUID_RE.test(id)` — die Regex existiert bereits in der Datei und wird eine Zeile weiter unten für `scene_assets` verwendet.
+- Verwerfungs-Verhalten: Slot komplett droppen (nicht in `characterShots[]` aufnehmen). Alternative wäre `characterId: null` + `shotType: 'absent'`, aber Drop ist konsistent mit dem existierenden `scene_assets`-Filter.
+- Kein Migration nötig, keine DB-Änderung, keine Edge-Function.
