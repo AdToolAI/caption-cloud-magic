@@ -1568,6 +1568,7 @@ This overrides any English wording in the briefing's scaffolding
             c.voiceId = voiceByCharacterId.get(c.characterId)!;
             c.voiceAutoAssigned = true;
             usedInScene.add(c.voiceId);
+            voicePoolStats.reusedForCharacter += 1;
             continue;
           }
           const ch = c.characterId ? charById.get(String(c.characterId)) : null;
@@ -1585,6 +1586,7 @@ This overrides any English wording in the briefing's scaffolding
             c.voiceAutoAssigned = true;
             usedInScene.add(pick);
             usedGlobal.add(pick);
+            voicePoolStats.autoAssigned += 1;
             if (c.characterId) voiceByCharacterId.set(c.characterId, pick);
             try {
               plan.aiFilled = Array.isArray(plan.aiFilled) ? plan.aiFilled : [];
@@ -1593,6 +1595,7 @@ This overrides any English wording in the briefing's scaffolding
           }
         }
       }
+      voicePoolStats.uniqueVoices = usedGlobal.size;
 
       // Dedupe cast after local fill-pass: back-filled `characterId`s may have
       // collapsed two mentionKey-only slots onto the same character.
