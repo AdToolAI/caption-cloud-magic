@@ -189,7 +189,10 @@ export function resolveSceneCharacterAnchorsAll(
   const prompt = (scene.aiPrompt || '').toLowerCase();
 
   // 2) Any cast members whose names appear in the prompt
-  if (prompt && characters && characters.length > 0) {
+  //    v211 — hard-off in strict mode. Names alone never produce an anchor;
+  //    the storyboard must carry an explicit UUID via characterShots/-Shot
+  //    (populated by CharacterCastPicker + CastConsistencyMap).
+  if (!MOTION_STUDIO_STRICT_IDS && prompt && characters && characters.length > 0) {
     for (const cm of characters) {
       if (seen.has(cm.id)) continue;
       if (!cm.referenceImageUrl) continue;
@@ -209,8 +212,9 @@ export function resolveSceneCharacterAnchorsAll(
     }
   }
 
-  // 3) Favourite Brand Character (if not already in cast)
+  // 3) Favourite Brand Character (if not already in cast) — same strict gate.
   if (
+    !MOTION_STUDIO_STRICT_IDS &&
     prompt &&
     brandChar?.reference_image_url &&
     nameMatchesPrompt(brandChar.name, prompt) &&
