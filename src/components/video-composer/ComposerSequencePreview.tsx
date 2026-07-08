@@ -541,6 +541,14 @@ export default function ComposerSequencePreview({
         standbyEl.muted = resolveVideoMuted(nextScene);
         if (playingRef.current) standbyEl.play().catch(() => {});
       }
+      // Per-scene transition duration (mirrors what the export will apply).
+      const transitionMs = resolveTransitionMs(fromScene);
+      // Drive the CSS opacity transition length to match this cut's duration
+      // instead of the static fallback baked into the <video> style.
+      const vFrom = getVideoForSlot(fromSlot);
+      const vTo = getVideoForSlot(toSlot);
+      if (vFrom) vFrom.style.transition = `opacity ${transitionMs}ms ease-in-out`;
+      if (vTo) vTo.style.transition = `opacity ${transitionMs}ms ease-in-out`;
       // Crossfade
       setOpacityForSlot(toSlot, 1);
       setOpacityForSlot(fromSlot, 0);
@@ -562,7 +570,7 @@ export default function ComposerSequencePreview({
         preloadSlot('C', toIdx + 2);
 
         transitioningRef.current = false;
-      }, CROSSFADE_MS);
+      }, transitionMs);
     };
 
     // Fast path: standby already has enough buffered to play through.
