@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { identifyUser, resetUser, trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
+import { mapAuthError, trackAuthError } from '@/lib/authErrors';
 import { translations, type Language } from '@/lib/translations';
 
 const getLang = (): Language => {
