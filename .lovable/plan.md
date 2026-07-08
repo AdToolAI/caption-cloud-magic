@@ -1,41 +1,45 @@
-# Duplicate Cast Slots in Production Plan — Fix
+# Cast/Outfit/Location ID-Verdrahtung — Audit & Fix
 
-## Problem
-In der Production-Plan-Sheet erscheint gelegentlich derselbe Charakter zweimal in einer Szene (z. B. zwei Slots, beide „Matthew Dusatko"). Ursachen:
+## Befund
 
-1. **Pass A/B kann zwei mentionKeys emittieren, die auf denselben `characterId` resolven** (`@sarah` + `@sarah-dusatko` → beide Sarah, oder Fuzzy-Fill-Pass mappt einen unaufgelösten Slot nachträglich auf einen bereits vorhandenen Charakter).
-2. **Local Fill-Pass (Zeile ~1400–1440)** setzt fehlende `characterId` nach — dedupliziert danach aber nicht. Zwei Slots kollabieren auf dieselbe ID, bleiben aber beide in `scene.cast`.
-3. **Ensemble-Repair** (Server + Client) prüft Duplikate nur beim *Hinzufügen* neuer Slots. Bestehende Duplikate werden nicht bereinigt; zusätzlich kann Repair einen weiteren Slot anhängen, wenn ein vorhandener Slot zu diesem Zeitpunkt noch `characterId=null` hatte (unterschiedlicher Dedup-Key).
+**Location-IDs: OK.**
+- `briefing-deep-parse` resolved Slug / Catalog-UUID / Substring → schreibt `scene.location.locationId` (UUID).
+- `useApplyProductionPlan` strippt `outfit:`/`catalog:`/`lib:` Prefixe, validiert UUID (`PLAN_UUID_RE`), reicht `locationId` an Composer weiter. Kein Dedup nötig (max. 1 Location pro Szene).
+
+**Character-IDs: OK.**
+- Nach v211 UUID-first; Pass-B + Local-Fill + Ensemble-Repair setzen `characterId`. Der neue `dedupePlanSceneCast` verhindert Doppel-Rows pro `characterId`.
+
+**Outfit-IDs (`outfitLookId`): 2 Lücken.**
+
+### Lücke A — Dedup verwirft `outfitLookId`
+`src/lib/video-composer/briefing/planCastDedup.ts` deklariert im `PlanCastSlot`-Interface nur ein Legacy-`outfit: string` Feld. `mergeInto` merged nur `outfit`, nie `outfitLookId`. Wenn zwei Slots denselben `characterId` haben und nur der *zweite* ein `outfitLookId` trägt (typisch: erster Slot aus Pass-B ohne Look, zweiter Slot aus Local-Fill/Manuell mit Look), wird `outfitLookId` beim Dedup verworfen. `useApplyProductionPlan` (Zeile 292/320) findet dann kein Outfit → falscher Portrait-Anchor.
+
+### Lücke B — Ensemble-Injection erbt kein Outfit
+`ensureProductionPlanEnsemble` (`ensurePlanEnsemble.ts`) baut `required[]` aus `briefingCast()`, das nur `{characterId, characterName, mentionKey, referenceImageUrl, voiceId}` liefert — **kein `outfitLookId`**. Wenn Szene 1 für „Sarah" bereits `outfitLookId=<uuid>` gewählt hat und die Ensemble-Szene Sarah nachträglich einfügt, bekommt sie kein Outfit → Anchor rendert Sarah im Default-Portrait statt im gewählten Look.
 
 ## Fix
 
-### 1. Zentraler Dedup-Helper
-Neue Utility `dedupePlanSceneCast(cast)` in `src/lib/video-composer/briefing/planCastDedup.ts`:
-- Key = `characterId` (lowercased) falls vorhanden, sonst `normalizeAssetKey(mentionKey || characterName)`.
-- Ersten Treffer behalten, spätere Duplikate droppen.
-- `shotType`, `voiceId`, `characterName` vom ersten Slot behalten; bevorzugt den Slot mit `characterId != null` (falls die Reihenfolge das nicht garantiert, ein Merge-Pass, der Slots mit ID vor solche ohne ID priorisiert).
+### 1. `src/lib/video-composer/briefing/planCastDedup.ts`
+- `PlanCastSlot`: `outfitLookId?: string | null` ergänzen.
+- `mergeInto`: `if (!merged.outfitLookId && extra.outfitLookId) merged.outfitLookId = extra.outfitLookId;`
+- Analog defensiv `locationId` nicht anfassen (nicht Teil des Slots).
 
-### 2. Server-Pipeline (`supabase/functions/briefing-deep-parse/index.ts`)
-Dedup an drei Stellen aufrufen (idempotent):
-- Direkt nach Pass B Mapping (~Zeile 750).
-- Nach dem Local Fill-Pass (~Zeile 1440).
-- Am Ende von `ensureProductionPlanEnsembleServer` nach dem Hinzufügen — Duplikate bereinigen, falls Repair welche erzeugt.
+### 2. `src/lib/video-composer/briefing/ensurePlanEnsemble.ts`
+- `resolvedPlanCast`-Map zusätzlich `outfitLookId` je `characterId` sammeln (erster Fund gewinnt, über alle Szenen hinweg).
+- Beim Injizieren in `cast.push({ ...c, shotType: 'full', outfitLookId: resolvedOutfit.get(c.characterId) ?? null })` das Outfit aus der Map übernehmen.
 
-Zusätzlich in `ensureProductionPlanEnsembleServer`: `hasAll`/`coverage` verwenden bereits `characterId || mention`, das bleibt. Nach dem Push in `cast` einmal deduplizieren, bevor `sc.cast = cast` geschrieben wird.
+### 3. `supabase/functions/briefing-deep-parse/index.ts`
+- Serverseitiges `dedupeSceneCast`-Helper analog erweitern: `outfitLookId`-Merge (identische Regel wie Client) — Server-Dedup läuft an drei Stellen (nach Pass-B, nach Local-Fill, in Ensemble-Repair).
 
-### 3. Client-Pipeline
-- `src/lib/video-composer/briefing/ensurePlanEnsemble.ts`: nach dem `cast.push`-Loop denselben Dedup-Helper auf `cast` anwenden.
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx`: beim Hydrate (Initial + nach Änderungen) einmal durch alle Szenen laufen und Dedup anwenden, damit auch Legacy-Pläne aus der DB sauber angezeigt werden.
-- `src/hooks/useApplyProductionPlan.ts`: vor dem Mapping in `planSceneToComposerScene` denselben Dedup auf jede Szene anwenden, damit `characterShots` niemals denselben `characterId` doppelt enthält.
+## Nicht angefasst
 
-### 4. Telemetrie
-In allen drei Server-Aufrufen zählen, wie viele Duplikate entfernt wurden, und einmal loggen:
-`console.log('[briefing-deep-parse] plan_cast_dedup', { removed, stage })`.
-
-## Umfang
-- 1 neue Datei: `src/lib/video-composer/briefing/planCastDedup.ts`
-- Edits: `briefing-deep-parse/index.ts`, `ensurePlanEnsemble.ts`, `ProductionPlanSheet.tsx`, `useApplyProductionPlan.ts`
-- Deploy: `briefing-deep-parse`
+- Lip-Sync / Render-Payload / `compose-video-clips` / `scene_assets` UUID-Kanon (v211).
+- `resolveCharacterId` (Prefix-Normalisierung) — greift downstream weiterhin.
+- Location-Pfad, Voice-ID-Pfad — bereits korrekt.
 
 ## Validierung
-Briefing mit 3 Avataren, 5 Szenen. Erwartung: keine Szene hat zwei Cast-Slots mit demselben `characterId`; UI-Screenshot zeigt jeden Avatar max. einmal pro Szene; mindestens eine Ensemble-Szene mit allen 3 Avataren bleibt erhalten.
+
+Briefing mit 3 Avataren, je einem gewählten Outfit-Look, 5 Szenen:
+- Nach Deep-Parse: jede `cast[]` Zeile trägt `characterId` **und** `outfitLookId` durch alle drei Dedup-Stufen.
+- Ensemble-Szene enthält alle 3 Avatare, jeder mit seinem `outfitLookId` aus einer anderen Szene übernommen.
+- `useApplyProductionPlan` → `characterShots[]` propagiert `outfitLookId`; `prepareSceneAnchor` nutzt Outfit-Cover statt Default-Portrait.
