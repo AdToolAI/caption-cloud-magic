@@ -567,6 +567,9 @@ async function callGatewayOnce(opts: CallOpts): Promise<any> {
         tools: [opts.tool],
         tool_choice: { type: 'function', function: { name: opts.tool.function.name } },
         max_tokens: maxTokens,
+        // Determinism: structured extraction against a JSON schema — near-zero temperature
+        // eliminates the "sometimes correct, sometimes wrong" plan drift across identical briefings.
+        temperature: 0.1,
       }),
     });
   } catch (e: any) {
@@ -1005,6 +1008,17 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   const current = scenes.filter(hasAll).length;
   if (current >= requiredEnsembles) return { repaired: 0, required: required.length };
 
+  // C-2 fix — collect first outfitLookId per characterId across all existing scenes
+  // so ensemble-injected cast slots inherit the correct wardrobe instead of the bare portrait.
+  const outfitByCharacterId = new Map<string, string>();
+  for (const sc of scenes) {
+    for (const c of (sc?.cast ?? []) as any[]) {
+      if (c?.characterId && c?.outfitLookId && !outfitByCharacterId.has(c.characterId)) {
+        outfitByCharacterId.set(c.characterId, c.outfitLookId);
+      }
+    }
+  }
+
   const middle: number[] = [];
   for (let i = 1; i < scenes.length - 1; i++) middle.push(i);
   middle.sort((a, b) => coverage(scenes[b]) - coverage(scenes[a]));
@@ -1018,34 +1032,67 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   const joinedNames = names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   const sentence = `${joinedNames} share the scene together in a wide group shot, all faces clearly visible to camera, standing side by side, each with a distinct visible action.`;
 
+  // C-1 fix — build a new scenes array; do NOT mutate input objects in place.
+  const nextScenes = scenes.slice();
+  const toRepair = new Set<number>();
+  {
+    const ordered = order.filter((idx) => scenes[idx] && !hasAll(scenes[idx]));
+    for (const idx of ordered) {
+      if (toRepair.size >= needed) break;
+      toRepair.add(idx);
+    }
+  }
+
   for (const idx of order) {
-    if (repaired >= needed) break;
+    if (!toRepair.has(idx)) continue;
     const sc = scenes[idx];
-    if (!sc || hasAll(sc)) continue;
     const cast = Array.isArray(sc.cast) ? [...sc.cast] : [];
     const present = new Set(cast.map(keyOf).filter(Boolean));
     for (const c of required) {
       const key = keyOf(c);
       if (present.has(key)) continue;
       if (cast.length >= 4) break;
-      cast.push({ ...c, shotType: 'full' });
+      const look = c.characterId ? outfitByCharacterId.get(c.characterId) ?? null : null;
+      cast.push({ ...c, shotType: 'full', ...(look ? { outfitLookId: look } : {}) });
       present.add(key);
     }
     const dedup = dedupeSceneCast(cast);
     if (dedup.removed > 0) {
       console.log('[briefing-deep-parse] plan_cast_dedup', { stage: 'ensemble', scene: sc?.index, removed: dedup.removed });
     }
-    sc.cast = dedup.cast;
-    sc.engine = 'cinematic-sync';
-    sc.lipSync = true;
-    sc.shotDirector = { ...(sc.shotDirector ?? {}), framing: 'wide', angle: sc.shotDirector?.angle ?? 'eye-level', movement: sc.shotDirector?.movement ?? 'static' };
     const prompt = String(sc.anchorPromptEN ?? '').trim();
-    sc.anchorPromptEN = prompt.toLowerCase().includes(joinedNames.toLowerCase()) ? prompt : (prompt ? `${prompt} ${sentence}` : sentence);
-    sc._meta = { ...(sc._meta ?? {}), aiFilled: Array.from(new Set([...(sc._meta?.aiFilled ?? []), 'cast.ensembleGuarantee', 'shotDirector.framing', 'anchorPromptEN'])) };
+    const nextAnchor = prompt.toLowerCase().includes(joinedNames.toLowerCase())
+      ? prompt
+      : (prompt ? `${prompt} ${sentence}` : sentence);
+    nextScenes[idx] = {
+      ...sc,
+      cast: dedup.cast,
+      engine: 'cinematic-sync',
+      lipSync: true,
+      shotDirector: {
+        ...(sc.shotDirector ?? {}),
+        framing: 'wide',
+        angle: sc.shotDirector?.angle ?? 'eye-level',
+        movement: sc.shotDirector?.movement ?? 'static',
+      },
+      anchorPromptEN: nextAnchor,
+      _meta: {
+        ...(sc._meta ?? {}),
+        aiFilled: Array.from(new Set([
+          ...((sc._meta?.aiFilled ?? []) as string[]),
+          'cast.ensembleGuarantee',
+          'shotDirector.framing',
+          'anchorPromptEN',
+        ])),
+      },
+    };
     repaired += 1;
   }
 
-  if (repaired > 0) console.log('[briefing-deep-parse] production_plan_ensemble_repair', { repaired, scenes: scenes.length, cast: required.length });
+  if (repaired > 0) {
+    plan.scenes = nextScenes;
+    console.log('[briefing-deep-parse] production_plan_ensemble_repair', { repaired, scenes: nextScenes.length, cast: required.length });
+  }
   return { repaired, required: required.length };
 }
 
