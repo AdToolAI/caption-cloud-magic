@@ -22,6 +22,7 @@ export interface PlanCastSlot {
   voiceName?: string | null;
   voiceAutoAssigned?: boolean;
   outfit?: string | null;
+  outfitLookId?: string | null;
   referenceImageUrl?: string | null;
   [k: string]: unknown;
 }
@@ -54,6 +55,7 @@ function mergeInto<T extends PlanCastSlot>(base: T, extra: T): T {
   }
   if (!merged.shotType && extra.shotType) merged.shotType = extra.shotType;
   if (!merged.outfit && extra.outfit) merged.outfit = extra.outfit;
+  if (!merged.outfitLookId && extra.outfitLookId) merged.outfitLookId = extra.outfitLookId;
   if (!merged.referenceImageUrl && extra.referenceImageUrl) {
     merged.referenceImageUrl = extra.referenceImageUrl;
   }

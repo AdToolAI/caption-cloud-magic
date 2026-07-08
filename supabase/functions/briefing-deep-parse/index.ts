@@ -747,7 +747,7 @@ function dedupeSceneCast(cast: any[] | undefined | null): { cast: any[]; removed
     const existing = byKey.get(key);
     if (!existing) { byKey.set(key, { slot, originalIdx: idx }); continue; }
     // Merge: fill missing fields from duplicate.
-    for (const f of ['characterId','characterName','voiceId','voiceName','shotType','outfit','referenceImageUrl']) {
+    for (const f of ['characterId','characterName','voiceId','voiceName','shotType','outfit','outfitLookId','referenceImageUrl']) {
       if (!existing.slot[f] && slot[f]) existing.slot[f] = slot[f];
     }
     if (existing.slot.voiceAutoAssigned == null && slot.voiceAutoAssigned != null) {

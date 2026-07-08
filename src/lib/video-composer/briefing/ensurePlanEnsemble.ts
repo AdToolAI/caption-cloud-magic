@@ -74,11 +74,14 @@ export function ensureProductionPlanEnsemble(
   briefing?: ComposerBriefing,
 ): TProductionPlan {
   const resolvedPlanCast = new Map<string, TResolvedCast>();
+  const outfitByCharacterId = new Map<string, string>();
   for (const scene of plan?.scenes ?? []) {
     for (const c of scene.cast ?? []) {
       if (!c.characterId) continue;
       const keys = [c.mentionKey, c.characterName].map(normalizeAssetKey).filter(Boolean);
       for (const key of keys) if (!resolvedPlanCast.has(key)) resolvedPlanCast.set(key, c);
+      const look = (c as any).outfitLookId;
+      if (look && !outfitByCharacterId.has(c.characterId)) outfitByCharacterId.set(c.characterId, look);
     }
   }
   const required = briefingCast(briefing).map((c) => {
@@ -116,7 +119,8 @@ export function ensureProductionPlanEnsemble(
       const key = castKey(c);
       if (present.has(key)) continue;
       if (cast.length >= MAX_CAST) break;
-      cast.push({ ...c, shotType: 'full' });
+      const look = c.characterId ? outfitByCharacterId.get(c.characterId) ?? null : null;
+      cast.push({ ...c, shotType: 'full', ...(look ? { outfitLookId: look } : {}) } as any);
       present.add(key);
     }
     const dedupCast = dedupePlanSceneCast(cast).cast;
