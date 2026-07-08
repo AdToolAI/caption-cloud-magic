@@ -308,6 +308,8 @@ CRITICAL RULES:
 🎭 MULTI-CHARACTER CO-PRESENCE (when ${chars.length} ≥ 2 characters are defined):
 - Aim to feature TWO characters together in roughly 30–60% of the character-bearing scenes (occasionally three). The remaining character scenes can be solo for variety.
 - Pick co-presence scenes naturally based on the story: shared moments, conversations, parallel actions in the same environment, family/team scenes, etc.
+- 🚨 ENSEMBLE REQUIREMENT (HARD): At least ONE scene MUST be an ensemble shot featuring ALL ${chars.length} briefed characters together in a single group composition (max 4 per scene — Nano Banana 2 / Vidu Q2 cast limit). For storyboards with ≥ 6 scenes, provide at least TWO such ensemble scenes. Prefer the Hook or CTA as ensemble anchors. Every ensemble scene follows the LIP-SYNC SAFE GROUP SCENE RULES below.
+
 
 🚨 LIP-SYNC SAFE GROUP SCENE RULES (HARD REQUIREMENT — applies whenever characterShots[] has 2+ entries):
 - Framing MUST be a wide or medium GROUP shot that fits ALL characters in the frame at once. No single-character close-ups, no single-character hero shots when the cast is multi.
