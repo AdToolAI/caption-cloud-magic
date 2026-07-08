@@ -2,18 +2,11 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { STRIPE_PRICE_MAP } from "../_shared/stripe-config.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
-};
-
-// Plan to Stripe Price ID mapping (EUR prices) — canonical single source
-// Kept in sync with src/config/stripe.ts STRIPE_PRICE_MAP (EUR column).
-const STRIPE_PRICE_MAP: Record<string, string> = {
-  basic: "price_1SLqZyDRu4kfSFxjfhMnx186",      // AdTool AI Basic - 14,99€/Monat
-  pro: "price_1TSLxWDRu4kfSFxjEJNi8nGN",        // AdTool AI Pro - 29,99€/Monat (Founders/Launch promo via coupon)
-  enterprise: "price_1SLqfFDRu4kfSFxjy2ZxDkby", // AdTool AI Enterprise - 69,95€/Monat (legacy)
 };
 
 serve(async (req) => {
