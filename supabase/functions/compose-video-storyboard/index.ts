@@ -882,7 +882,7 @@ Generate the storyboard using the create_storyboard function.`;
       }
     }
 
-
+    // 🎬 SERVER-SIDE CAST HARD-ANCHOR — guarantee that EVERY character listed
     // in characterShots is named in the scene's aiPrompt. The client backfill
     // (`applyCastToPrompt`) adds a localised marker; we inject a deterministic
     // English prefix here so providers always receive the names even on race
