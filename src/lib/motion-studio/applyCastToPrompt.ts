@@ -44,29 +44,27 @@ function nameAlreadyInProse(prose: string, fullName: string): boolean {
 }
 
 /**
- * Tolerant character lookup — mirrors `CastConsistencyMap.getAnchor` so the
- * prompt-marker stays in sync with the UI even when the storyboard LLM drifts
- * the `characterId` away from the brand UUID (e.g. "lib:matthew-…",
- * "matthew_dusatko", or the plain name).
+ * v211 — UUID-strict character lookup. Fuzzy first-name / full-name matching
+ * used to silently repair drifted `characterId` values, but that hid legacy
+ * bugs and let stale cast slots pass through with a text-only strategy.
+ * We now require an exact UUID match; the CastConsistencyMap surface is the
+ * approved repair path for scenes whose IDs have drifted.
  */
 function findCharacter(
   slot: CharacterShot,
   chars: ComposerCharacter[] | undefined,
 ): ComposerCharacter | undefined {
   if (!chars?.length || !slot?.characterId) return undefined;
-  // 1) exact id
   const exact = chars.find((c) => c.id === slot.characterId);
   if (exact) return exact;
-  const slotIdLower = safeLower(slot.characterId);
-  if (!slotIdLower) return undefined;
-  // 2) slot id contains first name (≥3 chars)
-  const byNameInId = chars.find((c) => {
-    const first = safeFirstNameLower(c.name);
-    return !!first && first.length >= 3 && slotIdLower.includes(first);
-  });
-  if (byNameInId) return byNameInId;
-  // 3) slot id equals full name lowercased
-  return chars.find((c) => safeLower(c.name) === slotIdLower);
+  if (typeof console !== 'undefined') {
+    // Loud but non-fatal — the anchor/renderer will still see the slot; only the
+    // prompt marker is suppressed for this scene until the ID is repaired.
+    console.warn(
+      `[applyCastToPrompt] no UUID match for slot.characterId="${slot.characterId}"; run CastConsistencyMap to repair.`,
+    );
+  }
+  return undefined;
 }
 
 export function applyCastToPrompt(
