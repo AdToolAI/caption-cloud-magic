@@ -1501,6 +1501,22 @@ This overrides any English wording in the briefing's scaffolding
         }
       }
 
+      // Dedupe cast after local fill-pass: back-filled `characterId`s may have
+      // collapsed two mentionKey-only slots onto the same character.
+      let dedupTotal = 0;
+      for (const sc of plan.scenes ?? []) {
+        const d = dedupeSceneCast(sc.cast);
+        if (d.removed > 0) {
+          sc.cast = d.cast;
+          dedupTotal += d.removed;
+        }
+      }
+      if (dedupTotal > 0) {
+        console.log('[briefing-deep-parse] plan_cast_dedup', { stage: 'fill-pass', removed: dedupTotal });
+      }
+
+
+
       // v177: Local LOCATION fill-pass — analog to cast. Pass-B (Gemini)
       // sometimes returns locationId=null for slug-style mentions like
       // "@home-office" even though the library carries "Home Office".
