@@ -73,7 +73,7 @@ export function TransitionPopover({
           value={value}
           onChange={handleType}
           availableTransitions={palette as string[]}
-          label="Übergang zur nächsten Szene"
+          label={l.title}
         />
 
         <div className="space-y-2">
