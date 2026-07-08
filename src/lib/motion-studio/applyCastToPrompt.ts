@@ -10,7 +10,7 @@
 // - Localised label per UI language.
 
 import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
-import { safeLower, safeFirstNameLower } from './strings';
+import { safeLower } from './strings';
 
 type Lang = 'de' | 'en' | 'es';
 
