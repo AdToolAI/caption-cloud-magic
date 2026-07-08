@@ -22,6 +22,7 @@ export interface PlanCastSlot {
   voiceName?: string | null;
   voiceAutoAssigned?: boolean;
   outfit?: string | null;
+  outfitLookId?: string | null;
   referenceImageUrl?: string | null;
   [k: string]: unknown;
 }
