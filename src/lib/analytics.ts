@@ -204,6 +204,9 @@ export const ANALYTICS_EVENTS = {
   FEATURE_GATE_HIT: 'feature_gate_hit',
   CREDIT_REFUND_TRIGGERED: 'credit_refund_triggered',
   AUTH_ERROR_SHOWN: 'auth_error_shown',
+
+  // Storyboard ensemble guarantee (Phase 5+)
+  STORYBOARD_ENSEMBLE_REPAIR: 'storyboard_ensemble_repair',
 } as const;
 
 /**

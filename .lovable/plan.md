@@ -1,26 +1,57 @@
-# Launch Readiness – Fortschritt
+## Ziel
 
-Phasen 1–3 (Pricing / Marketing / Feature-Gating) ✅
-Phase 4.1 (Founders-Slot RPC) ✅ – atomarer `claim_founders_slot`, advisory lock, unique index
-Phase 4.3 (Zentrale Stripe-Config) ✅ – `_shared/stripe-config.ts`
-Phase 5.1 (Community-RLS) ✅ – Kontrolle: existierende Community-Tabellen (`community_channels`, `community_messages`, `community_message_tags`, `community_audit_log`, `direct_messages`) sind bereits ausschließlich für `authenticated` konfiguriert; keine `USING (true)` gegen `public` mehr offen. Kein Migrations-Bedarf.
-Phase 5.3 (Halbfertige Bereiche verstecken) ✅ – `src/config/betaFlags.ts` mit `BETA_ACTIVE=false` + `showBetaSurface(isAdmin)` Helper. `AppSidebar` filtert `comingSoon`-Hubs für Nicht-Admins während der Beta raus. Admin-Routen sind bereits doppelt gesichert: Frontend via `<ProtectedRoute requireRole="admin">` in `App.tsx`, Edge Functions via `has_role`-RPC bzw. `user_roles`-Select mit `service_role`-Client.
-Phase 5.2 (Auth Fail Audit) ✅ – `src/lib/authErrors.ts` mit `mapAuthError(err, context)` mappt Supabase-Fehler auf freundliche DE-Toasts (invalid_credentials, email_not_confirmed, user_exists, rate_limited, weak_password, token_invalid, provider_disabled, network_error). Angewendet in `useAuth.signIn/signUp` und `ResetPassword`. Bei `token_invalid` im Reset-Flow automatischer Redirect nach `/auth`. Jeder Fehler emittiert `auth_error_shown` PostHog-Event.
-Phase 5.4 (Beta-Beobachtbarkeit) ✅ – Neue Events in `ANALYTICS_EVENTS`: `BETA_SIGNUP`, `FEATURE_GATE_HIT`, `CREDIT_REFUND_TRIGGERED`, `AUTH_ERROR_SHOWN`. `useAuth.signUp` feuert `beta_signup`; `trackFeatureGateHit(feature, plan)`-Helper in `access-control.ts`; `founders_slot_claimed` bereits in `create-checkout`. Admin-Dashboard-Tab "Beta Health" (`src/components/admin/BetaHealth.tsx`) zeigt Founders-Slots-Progress, Total Users und 24h-Signups.
-Phase 4.2 (Teil 1) ✅ – Shared `_shared/timeout.ts` mit `withTimeout` + `fetchWithTimeout`. Angewendet auf:
-  - `generate-ai-video` → Replicate-SDK-Call mit 30s Timeout, 504 + Credit-Refund
-  - `generate-studio-image` → AI-Gateway-Fetch mit 90s Timeout pro Modell/Attempt
-  - `refine-asset-photo` → AI-Gateway-Fetch mit 90s Timeout pro Modell/Attempt
+Wenn im Briefing N Charaktere angegeben sind (2–4), soll **mindestens eine Szene** entstehen, in der **alle N** gemeinsam auftreten. Skaliert nach Storyboard-Länge (mehr Szenen → ggf. mehr Ensemble-Momente).
 
-## Noch offen
+## Root Cause (aktueller Zustand)
 
-### Phase 4.2 – restliche AI-Functions
-Die grossen Composer-/Render-Pipelines haben eigene Webhook-Refund-Loops
-(siehe `compose-clip-webhook` Retry-Resilience) und brauchen kein
-zusätzliches `AbortController`-Wrapping am Dispatch-Punkt. Beobachten,
-ob bei `render-directors-cut` und `lipsync-*` Hänger auftreten – dann
-Case-by-Case den externen Fetch mit `fetchWithTimeout` umhüllen.
+- `compose-video-storyboard` (Edge Function) entscheidet frei pro Szene, welche Charaktere im Shot sind. Es gibt aktuell **keine harte Regel**, dass alle Briefing-Charaktere mindestens einmal gemeinsam vorkommen müssen.
+- `syncCastFromPrompt.ts` gleicht nur nachträglich Prompt ↔ `characterShots` ab — löst aber nicht das Problem, wenn der LLM einen Charakter komplett auslässt.
 
-### Phase 4.4 – Picture Studio UnifiedAssetPicker
-UI-Refactor auf globalen Picker inkl. `brand-uploads`-Bucket.
+## Fix (2-stufig)
 
+### Stufe 1 — Storyboard-Prompt-Härtung (Kern-Fix)
+
+In `supabase/functions/compose-video-storyboard/index.ts`:
+
+1. **Ensemble-Regel in den System-Prompt einbauen** (auf DE + EN + ES lokalisiert, konsistent mit bestehender i18n):
+   > „Wenn das Briefing N ≥ 2 Charaktere enthält, MUSS mindestens eine Szene ein Ensemble-Shot sein, in dem alle N Charaktere gemeinsam sichtbar auftreten (Wide/Group-Shot). Bei Storyboards mit ≥ 6 Szenen: mindestens 2 Ensemble-Momente. Cap: max. 4 Charaktere pro Szene (Nano Banana 2 / Vidu Q2 Limit)."
+
+2. **Post-Validation** nach Storyboard-Rückgabe:
+   - Zähle über alle Szenen: welche `characterId`s tauchen in mindestens einer Szene mit `characterShots.length === N` auf?
+   - Falls **keine** Ensemble-Szene existiert und `characters.length ≥ 2`: wähle heuristisch die passendste Szene (bevorzugt Hook/CTA oder Szene mit den meisten bereits gesetzten Slots) und ergänze fehlende Slots + hänge Namen an den Prompt („… gemeinsam mit {names}").
+   - Log-Event: `storyboard_ensemble_repair` (Debug/Observability).
+
+### Stufe 2 — Client-Side Safety Net
+
+In `src/lib/motion-studio/syncCastFromPrompt.ts`:
+- Aktuelle Name-Match-Heuristik bleibt (nicht anfassen).
+- **Neue Funktion** `ensureEnsembleScene(scenes, characters)` (idempotent): prüft nach Storyboard-Load, ob mindestens eine Szene alle Charaktere hat. Falls nicht → markiere passende Szene und ergänze `characterShots`. Wird in `ClipsTab`/`SceneCard` beim initialen Storyboard-Ingest aufgerufen (nicht bei jedem Render).
+- Setzt `shotType: 'full'` als Default (konsistent mit bestehendem Verhalten).
+
+## Skalierung
+
+| Szenen im Storyboard | Ensemble-Szenen (Mindestanzahl) |
+|---|---|
+| 2–3                  | 1                               |
+| 4–5                  | 1                               |
+| 6–8                  | 2                               |
+| 9+                   | 2                               |
+
+Konservativ — kein Overload, keine „jede Szene alle Charaktere"-Regel (bricht cinematographische Solo-Shots).
+
+## Nicht im Scope
+
+- Änderungen an `compose-video-clips` / `compose-scene-anchor` — die Cast-Slot-Verarbeitung bleibt gleich.
+- Änderungen am Nano-Banana-2 / Vidu-Q2 4-Cast-Cap.
+- Manuelle User-Kontrolle „diese Szene = Ensemble" — kann später als UI-Toggle nachgezogen werden.
+
+## Technische Details
+
+**Files:**
+- `supabase/functions/compose-video-storyboard/index.ts` — System-Prompt + Post-Validation-Block
+- `src/lib/motion-studio/syncCastFromPrompt.ts` — neue `ensureEnsembleScene` Funktion (additiv)
+- Aufrufer der Storyboard-Ingestion (ClipsTab / VideoComposerDashboard) — 1 Zeile Integration
+
+**Migrations:** keine (rein Logik).
+
+**Analytics:** neues Event `storyboard_ensemble_repair` mit `{scenes_total, characters_briefed, repaired_scene_id}` in `analytics.ts`.

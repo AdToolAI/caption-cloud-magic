@@ -308,6 +308,8 @@ CRITICAL RULES:
 🎭 MULTI-CHARACTER CO-PRESENCE (when ${chars.length} ≥ 2 characters are defined):
 - Aim to feature TWO characters together in roughly 30–60% of the character-bearing scenes (occasionally three). The remaining character scenes can be solo for variety.
 - Pick co-presence scenes naturally based on the story: shared moments, conversations, parallel actions in the same environment, family/team scenes, etc.
+- 🚨 ENSEMBLE REQUIREMENT (HARD): At least ONE scene MUST be an ensemble shot featuring ALL ${chars.length} briefed characters together in a single group composition (max 4 per scene — Nano Banana 2 / Vidu Q2 cast limit). For storyboards with ≥ 6 scenes, provide at least TWO such ensemble scenes. Prefer the Hook or CTA as ensemble anchors. Every ensemble scene follows the LIP-SYNC SAFE GROUP SCENE RULES below.
+
 
 🚨 LIP-SYNC SAFE GROUP SCENE RULES (HARD REQUIREMENT — applies whenever characterShots[] has 2+ entries):
 - Framing MUST be a wide or medium GROUP shot that fits ALL characters in the frame at once. No single-character close-ups, no single-character hero shots when the cast is multi.
@@ -795,6 +797,87 @@ Generate the storyboard using the create_storyboard function.`;
         }
         if (removed > 0) {
           console.log(`[storyboard] character-cap auto-repair (${ch.name}): removed ${removed} anchor(s), max ${maxAllowed}, freq=${ch.appearanceFrequency || 'balanced'}`);
+        }
+      }
+    }
+
+    // 🎭 ENSEMBLE GUARANTEE — at least ONE scene must feature ALL briefed
+    // characters together (max 4 per scene — Nano Banana 2 / Vidu Q2 cast cap).
+    // For storyboards with ≥ 6 scenes, guarantee TWO ensemble moments so a
+    // long-form spot has more than one group beat. Prefers hook + CTA as
+    // ensemble anchors; falls back to middle scenes with the most existing
+    // cast overlap. Idempotent: skips when the requirement is already met.
+    if (hasCharacters && scenes.length > 0 && (briefing.characters?.length ?? 0) >= 2) {
+      const allChars = briefing.characters!.slice(0, 4); // cast slot cap = 4
+      const requiredIds = new Set(allChars.map((c) => c.id));
+      const requiredEnsembles = scenes.length >= 6 ? 2 : 1;
+
+      const isEnsemble = (sc: any) => {
+        const visible = (sc.characterShots || []).filter((x: any) => x && x.shotType && x.shotType !== 'absent');
+        const present = new Set(visible.map((x: any) => x.characterId));
+        for (const id of requiredIds) if (!present.has(id)) return false;
+        return true;
+      };
+
+      const currentCount = scenes.filter(isEnsemble).length;
+      if (currentCount < requiredEnsembles) {
+        const needed = requiredEnsembles - currentCount;
+        // Candidate order: hook, cta, then middle scenes sorted by existing
+        // cast coverage (more matches first → smaller edit).
+        const middle: number[] = [];
+        for (let i = 1; i < scenes.length - 1; i++) middle.push(i);
+        middle.sort((a, b) => {
+          const cov = (i: number) => {
+            const visible = (scenes[i].characterShots || []).filter((x: any) => x?.shotType && x.shotType !== 'absent');
+            return visible.filter((x: any) => requiredIds.has(x.characterId)).length;
+          };
+          return cov(b) - cov(a);
+        });
+        const candidateOrder: number[] = [];
+        candidateOrder.push(0);
+        if (scenes.length > 1) candidateOrder.push(scenes.length - 1);
+        for (const i of middle) candidateOrder.push(i);
+
+        const repairedSceneIds: string[] = [];
+        let repaired = 0;
+        for (const idx of candidateOrder) {
+          if (repaired >= needed) break;
+          const sc: any = scenes[idx];
+          if (isEnsemble(sc)) continue;
+
+          const shots: any[] = Array.isArray(sc.characterShots) ? [...sc.characterShots] : [];
+          const present = new Set(
+            shots
+              .filter((x) => x?.shotType && x.shotType !== 'absent')
+              .map((x) => x.characterId),
+          );
+          for (const ch of allChars) {
+            if (present.has(ch.id)) continue;
+            if (shots.filter((x) => x?.shotType && x.shotType !== 'absent').length >= 4) break;
+            const neutral = neutralCharacterAction(language);
+            const heuristic = cleanActionText(promptCharacterActionFallback(sc.aiPrompt, ch.name), 12);
+            const actionEn = heuristic || neutral.en;
+            const actionUser = heuristic ? actionEn : neutral.user;
+            shots.push({
+              characterId: ch.id,
+              shotType: 'full',
+              actionEn,
+              actionUser,
+            });
+            present.add(ch.id);
+          }
+          sc.characterShots = shots;
+          syncPrimaryFromShots(sc);
+          updateClipSource(sc, idx);
+          repairedSceneIds.push(String(sc.id ?? idx));
+          repaired++;
+        }
+        if (repaired > 0) {
+          console.log(
+            `[storyboard] ensemble-guarantee auto-repair: added ensemble to ${repaired} scene(s) — ` +
+              `scenes_total=${scenes.length} characters_briefed=${allChars.length} ` +
+              `repaired_scene_ids=${JSON.stringify(repairedSceneIds)}`,
+          );
         }
       }
     }
