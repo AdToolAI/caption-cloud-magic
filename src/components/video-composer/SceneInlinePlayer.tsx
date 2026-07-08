@@ -276,7 +276,7 @@ export default function SceneInlinePlayer({
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-card/40 to-black/40">
             <ImageIcon className="h-7 w-7 text-muted-foreground/40" />
-            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">Noch nicht gerendert</span>
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">{notRenderedLabel}</span>
           </div>
         )}
 
