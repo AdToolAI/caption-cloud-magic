@@ -153,6 +153,11 @@ const Library = () => {
           </Tabs>
         </div>
       </div>
+      <AssetPhotoUploadSheet
+        kind="character"
+        open={refineCharacterOpen}
+        onOpenChange={setRefineCharacterOpen}
+      />
     </>
   );
 };
