@@ -20,7 +20,7 @@ Die Lipsync-Pipeline ist NICHT mit jedem Provider gleichwertig. Stand Juni 2026.
 | Engine | Hailuo | HappyHorse | Kling | Seedance | Wan | Luma | Vidu | Sora | Pika | Runway | Grok | Veo |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | HeyGen Talking-Head | n/a (eigener Pfad) |
-| Cinematic-Sync / Sync-Segments | ✅ primär | ⚠️ wird auto-migriert → Hailuo | ⚠️ nur als Plate | ⚠️ nur als Plate | ❌ kein audio_plan | ❌ | ❌ | ❌ | ❌ Composer-Fallback → Hailuo | ⚠️ V2V-Spezialist | ❌ | ❌ |
+| Cinematic-Sync / Sync-Segments | ✅ primär | ⚠️ wird auto-migriert → Hailuo | ⚠️ Multi-Speaker unzuverlässig — **v209 User-Consent erforderlich** (Ghost-Mouthing, kein Refund für Lipsync-Artefakte) | ⚠️ nur als Plate | ❌ kein audio_plan | ❌ | ❌ | ❌ | ❌ Composer-Fallback → Hailuo | ⚠️ V2V-Spezialist | ❌ | ❌ |
 | Sync-Polish | ✅ alle Provider — läuft auf jedem MP4 |
 | B-Roll | ✅ alle Provider |
 
