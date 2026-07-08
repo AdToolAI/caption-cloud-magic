@@ -721,6 +721,44 @@ function stripUndef<T extends Record<string, any>>(o: T): T {
   return o;
 }
 
+/**
+ * Dedupe cast slots inside a scene. Two slots are duplicates when their
+ * (lowercased) `characterId` matches, or — if both lack an id — when their
+ * normalized `mentionKey`/`characterName` matches. Slots with `characterId`
+ * win over slots without.
+ */
+function dedupeSceneCast(cast: any[] | undefined | null): { cast: any[]; removed: number } {
+  const input = Array.isArray(cast) ? cast : [];
+  if (input.length < 2) return { cast: input, removed: 0 };
+  const keyOf = (c: any) => {
+    const id = typeof c?.characterId === 'string' ? c.characterId.toLowerCase().trim() : '';
+    if (id) return `id:${id}`;
+    const mk = normalizeMention(String(c?.mentionKey ?? c?.characterName ?? ''));
+    return mk ? `mk:${mk}` : '';
+  };
+  const ordered = input
+    .map((slot, idx) => ({ slot, idx, hasId: !!slot?.characterId }))
+    .sort((a, b) => (a.hasId === b.hasId ? a.idx - b.idx : a.hasId ? -1 : 1));
+  const byKey = new Map<string, { slot: any; originalIdx: number }>();
+  const noKey: { slot: any; originalIdx: number }[] = [];
+  for (const { slot, idx } of ordered) {
+    const key = keyOf(slot);
+    if (!key) { noKey.push({ slot, originalIdx: idx }); continue; }
+    const existing = byKey.get(key);
+    if (!existing) { byKey.set(key, { slot, originalIdx: idx }); continue; }
+    // Merge: fill missing fields from duplicate.
+    for (const f of ['characterId','characterName','voiceId','voiceName','shotType','outfit','referenceImageUrl']) {
+      if (!existing.slot[f] && slot[f]) existing.slot[f] = slot[f];
+    }
+    if (existing.slot.voiceAutoAssigned == null && slot.voiceAutoAssigned != null) {
+      existing.slot.voiceAutoAssigned = slot.voiceAutoAssigned;
+    }
+  }
+  const merged = [...byKey.values(), ...noKey].sort((a, b) => a.originalIdx - b.originalIdx).map((x) => x.slot);
+  const removed = input.length - merged.length;
+  return { cast: removed > 0 ? merged : input, removed };
+}
+
 function mergeManifestAndResolution(manifest: any, resolution: any) {
   const scenesById = new Map<number, any>();
   for (const s of resolution?.scenes ?? []) {
