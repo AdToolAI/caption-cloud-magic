@@ -1,4 +1,6 @@
 import { pricingPlans, PlanType, PlanFeatures } from "@/config/pricing";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+
 
 /**
  * Check if a user's plan has access to a specific feature
