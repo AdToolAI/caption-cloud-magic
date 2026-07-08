@@ -320,7 +320,12 @@ export default function ProductionPlanSheet({
       seen.add(dedupeKey);
       const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
-      const lookName = fromMeta || fromName || m.name?.trim() || 'Standard-Look';
+      // Only propagate real names. Fake fallbacks like "Unbenannter Look"
+      // are dropped so the DB fallback / positional label wins.
+      const rawName = fromMeta || fromName || '';
+      const lookName = /^unbenannter look$/i.test(rawName) || /^standard-look$/i.test(rawName)
+        ? ''
+        : rawName;
       const arr = map.get(base) ?? [];
       arr.push({ lookId, name: lookName });
       map.set(base, arr);
@@ -341,7 +346,10 @@ export default function ProductionPlanSheet({
       if (!lookId || map.has(lookId)) continue;
       const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
-      const lookName = fromMeta || fromName || m.name?.trim() || 'Standard-Look';
+      const rawName = fromMeta || fromName || m.name?.trim() || '';
+      const lookName = /^unbenannter look$/i.test(rawName) || /^standard-look$/i.test(rawName)
+        ? ''
+        : rawName;
       map.set(lookId, {
         lookId,
         name: lookName,
