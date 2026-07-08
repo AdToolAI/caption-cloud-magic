@@ -636,6 +636,29 @@ serve(async (req) => {
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
     }));
 
+    // v205 mux/v169 parity telemetry + guard.
+    const cropsUsed = fanoutShots.filter((s: any) => s?.crop && Number(s.crop?.size) > 0).length;
+    const facemasksUsed = fanoutShots.filter((s: any) => s?.faceMask && Number(s.faceMask?.radius) > 0).length;
+    const silentSlotsUsed = Array.isArray((inputProps as any).silentFaceFreezes)
+      ? ((inputProps as any).silentFaceFreezes as any[]).length
+      : 0;
+    console.log(
+      `[render-sync-segments-audio-mux] scene=${sceneId} overlay_mask_version=${OVERLAY_MASK_VERSION} ` +
+      `crops_used=${cropsUsed} facemasks_used=${facemasksUsed} silent_slots_used=${silentSlotsUsed} ` +
+      `color_match_enabled=${COLOR_MATCH_ENABLED}`,
+    );
+    // Multi-speaker fanout MUST use preclip_crop overlays. A faceMask
+    // fallback on N≥2 means one of the passes lost its preclip_crop — that
+    // resurrects the wide-plate morph artefacts v204 was built to avoid.
+    if (isFanout && donePasses.length >= 2 && facemasksUsed > 0) {
+      const msg =
+        `v205 guard: multi-speaker mux for scene=${sceneId} fell back to faceMask on ` +
+        `${facemasksUsed}/${fanoutShots.length} shots (expected all preclip_crop). ` +
+        `Refusing to dispatch — a pass is missing preclip_crop.`;
+      console.error(`[render-sync-segments-audio-mux] ${msg}`);
+      return json({ error: msg, code: "v205_facemask_fallback_on_multispeaker" }, 500);
+    }
+
     // v194 diagnostic: how many done passes came from silent-stabilizers vs
     // active speakers. Silent stabilizers carry `is_silent_stabilizer=true`
     // on the pass row (written by compose-dialog-segments).
