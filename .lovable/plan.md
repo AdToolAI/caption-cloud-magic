@@ -26,9 +26,6 @@ UI-Refactor auf globalen Picker inkl. `brand-uploads`-Bucket.
 Fehlerpfade durchspielen (Passwort, Token, Paused Account), einheitliche
 Toasts + Redirects nach `/auth`.
 
-### Phase 5.3 – Halbfertige Bereiche verstecken
-`oauthComingSoon`-Buttons hinter `BETA_ACTIVE`-Flag, Admin-Routen doppelt
-absichern (Frontend + Edge via `has_role`).
 
 ### Phase 5.4 – Beta-Beobachtbarkeit
 PostHog-Events (`beta_signup`, `founders_slot_claimed`, `feature_gate_hit`,
