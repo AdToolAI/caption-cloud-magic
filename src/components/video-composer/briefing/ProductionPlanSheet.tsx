@@ -297,7 +297,8 @@ export default function ProductionPlanSheet({
         location,
       };
     });
-    const nextPlan = ensureProductionPlanEnsemble({ ...plan, scenes }, currentBriefing);
+    const basePlan = changed ? { ...plan, scenes } : plan;
+    const nextPlan = ensureProductionPlanEnsemble(basePlan, currentBriefing);
     if (changed || nextPlan !== plan) setPlan(nextPlan);
   }, [plan, findLocationOption, currentBriefing]);
 
