@@ -311,6 +311,14 @@ serve(async (req) => {
       silentFacesV183Enabled = false;
     }
 
+    // v206 — hard override: silent overlay layers are disabled to restore
+    // true v169 behaviour. Only CroppedOverlay is composited over the master
+    // plate. See SILENT_LAYERS_DISABLED constant at top of file.
+    if (SILENT_LAYERS_DISABLED) {
+      silentAnchorV195Enabled = false;
+      silentFacesV183Enabled = false;
+    }
+
     // v197 silent-face freeze tiles — geometry-matched to the master plate,
     // but rendered ONLY during this speaker's silent windows. v195 rendered
     // tiles for the whole scene and relied on active Sync.so overlays covering
