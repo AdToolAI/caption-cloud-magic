@@ -766,7 +766,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
   }
   const scenes = (manifest?.scenes ?? []).map((s: any, i: number) => {
     const r = scenesById.get(s.index);
-    const cast = (s.cast ?? []).map((c: any) => {
+    const rawCast = (s.cast ?? []).map((c: any) => {
       // Fuzzy match by normalized mentionKey (Pass B may return slightly different formatting).
       const needle = normalizeMention(c.mentionKey);
       const rCast =
@@ -784,6 +784,11 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
         referenceImageUrl: null,
       });
     });
+    const dedupMerge = dedupeSceneCast(rawCast);
+    if (dedupMerge.removed > 0) {
+      console.log('[briefing-deep-parse] plan_cast_dedup', { stage: 'merge', scene: s.index, removed: dedupMerge.removed });
+    }
+    const cast = dedupMerge.cast;
     const location = s.location ? (() => {
       const r2 = r?.location;
       return stripUndef({
