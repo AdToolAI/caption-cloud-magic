@@ -9,14 +9,17 @@ import { ArrowDown, Scissors, Waves } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TransitionStyle } from '@/types/video-composer';
 import { TransitionPopover } from './TransitionPopover';
+import { useTranslation } from '@/hooks/useTranslation';
 
-const LABEL: Record<TransitionStyle, string> = {
-  none: 'Cut',
-  crossfade: 'Crossfade',
-  fade: 'Fade',
-  slide: 'Slide',
-  zoom: 'Zoom',
-  wipe: 'Wipe',
+const L10N: Record<'de' | 'en' | 'es', Record<TransitionStyle, string>> = {
+  de: { none: 'Cut', crossfade: 'Crossfade', fade: 'Fade', slide: 'Slide', zoom: 'Zoom', wipe: 'Wipe' },
+  en: { none: 'Cut', crossfade: 'Crossfade', fade: 'Fade', slide: 'Slide', zoom: 'Zoom', wipe: 'Wipe' },
+  es: { none: 'Corte', crossfade: 'Fundido', fade: 'Fade', slide: 'Slide', zoom: 'Zoom', wipe: 'Wipe' },
+};
+const EDIT_LABEL: Record<'de' | 'en' | 'es', string> = {
+  de: 'Übergang bearbeiten',
+  en: 'Edit transition',
+  es: 'Editar transición',
 };
 
 interface TransitionHandleProps {
@@ -32,7 +35,9 @@ export function TransitionHandle({
   onChange,
   disabled,
 }: TransitionHandleProps) {
-  const label = LABEL[value] ?? 'Cut';
+  const { language } = useTranslation();
+  const lang = (language as 'de' | 'en' | 'es') ?? 'de';
+  const label = L10N[lang][value] ?? L10N[lang].none;
   const isCut = value === 'none';
   const Icon = isCut ? Scissors : Waves;
 
@@ -46,7 +51,7 @@ export function TransitionHandle({
       >
         <button
           type="button"
-          aria-label={`Übergang bearbeiten (${label})`}
+          aria-label={`${EDIT_LABEL[lang]} (${label})`}
           className={cn(
             'group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-[0.14em]',
             'border backdrop-blur-md transition-all',

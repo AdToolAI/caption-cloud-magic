@@ -14,6 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { TransitionSelector } from '@/components/video/TransitionSelector';
 import type { TransitionStyle } from '@/types/video-composer';
+import { useTranslation } from '@/hooks/useTranslation';
+
+const L10N = {
+  de: { title: 'Übergang zur nächsten Szene', duration: 'Dauer', more: 'Mehr Übergänge', less: 'Weniger Übergänge' },
+  en: { title: 'Transition to next scene', duration: 'Duration', more: 'More transitions', less: 'Fewer transitions' },
+  es: { title: 'Transición a la siguiente escena', duration: 'Duración', more: 'Más transiciones', less: 'Menos transiciones' },
+} as const;
 
 const ALL_TRANSITIONS: TransitionStyle[] = [
   'none',
@@ -42,6 +49,8 @@ export function TransitionPopover({
 }: TransitionPopoverProps) {
   const [showMore, setShowMore] = useState(false);
   const palette = showMore ? ALL_TRANSITIONS : MIN_PALETTE;
+  const { language } = useTranslation();
+  const l = L10N[(language as 'de' | 'en' | 'es') ?? 'de'] ?? L10N.de;
 
   const handleType = (next: string) => {
     onChange(next as TransitionStyle, duration);
@@ -64,12 +73,12 @@ export function TransitionPopover({
           value={value}
           onChange={handleType}
           availableTransitions={palette as string[]}
-          label="Übergang zur nächsten Szene"
+          label={l.title}
         />
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Dauer</Label>
+            <Label className="text-xs">{l.duration}</Label>
             <span className="text-[11px] font-mono text-primary/80">
               {duration.toFixed(1)}s
             </span>
@@ -90,7 +99,7 @@ export function TransitionPopover({
           className="w-full text-[11px] text-muted-foreground hover:text-foreground"
           onClick={() => setShowMore((v) => !v)}
         >
-          {showMore ? 'Weniger Übergänge' : 'Mehr Übergänge'}
+          {showMore ? l.less : l.more}
         </Button>
       </PopoverContent>
     </Popover>

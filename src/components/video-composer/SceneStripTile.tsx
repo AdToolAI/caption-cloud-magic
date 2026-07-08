@@ -16,6 +16,13 @@ import { cn } from '@/lib/utils';
 import { Check, Loader2, AlertCircle, Sparkles, Image as ImageIcon } from 'lucide-react';
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
+import { useTranslation } from '@/hooks/useTranslation';
+
+const NOT_RENDERED_L10N: Record<'de' | 'en' | 'es', string> = {
+  de: 'Noch nicht gerendert',
+  en: 'Not rendered yet',
+  es: 'Aún no renderizado',
+};
 
 interface SceneStripTileProps {
   scene: ComposerScene;
@@ -68,6 +75,8 @@ function pickThumbnail(scene: ComposerScene): { kind: 'image' | 'video' | 'none'
 }
 
 function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: SceneStripTileProps) {
+  const { language } = useTranslation();
+  const notRendered = NOT_RENDERED_L10N[(language as 'de' | 'en' | 'es') ?? 'de'] ?? NOT_RENDERED_L10N.de;
   const thumb = pickThumbnail(scene);
   const status = STATUS_STYLE[scene.clipStatus] ?? STATUS_STYLE.pending;
   const StatusIcon = status.icon;
@@ -123,7 +132,7 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
         {thumb.kind === 'none' && (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground/50">
             <ImageIcon className="h-6 w-6" />
-            <span className="text-[9px] uppercase tracking-[0.14em]">Noch nicht gerendert</span>
+            <span className="text-[9px] uppercase tracking-[0.14em]">{notRendered}</span>
           </div>
         )}
 

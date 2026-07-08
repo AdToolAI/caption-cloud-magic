@@ -48,6 +48,19 @@ const formatTime = (s: number) => {
 };
 
 const CROSSFADE_MS = 400;
+/** Cut = hard swap, but a few frames of blend hide the src swap glitch. */
+const CUT_MS = 60;
+/** Resolve the effective preview transition duration (ms) for the LEAVING scene.
+ *  Uses the same fields the exporter reads (`transitionType` / `transitionDuration`),
+ *  so preview mirrors what the final MP4 will show. `none` → hard cut. */
+const resolveTransitionMs = (scene: ComposerScene | undefined): number => {
+  if (!scene) return CROSSFADE_MS;
+  const type = (scene.transitionType ?? 'crossfade') as string;
+  if (type === 'none') return CUT_MS;
+  const secs = Number(scene.transitionDuration);
+  if (!Number.isFinite(secs) || secs <= 0) return CROSSFADE_MS;
+  return Math.round(Math.min(1.5, Math.max(0.2, secs)) * 1000);
+};
 const STANDBY_BUDGET_MS = 1500;
 /** Max wait when standby is buffered enough to start (HAVE_CURRENT_DATA but not FUTURE_DATA). */
 const STANDBY_SOFT_WAIT_MS = 200;
@@ -528,6 +541,14 @@ export default function ComposerSequencePreview({
         standbyEl.muted = resolveVideoMuted(nextScene);
         if (playingRef.current) standbyEl.play().catch(() => {});
       }
+      // Per-scene transition duration (mirrors what the export will apply).
+      const transitionMs = resolveTransitionMs(fromScene);
+      // Drive the CSS opacity transition length to match this cut's duration
+      // instead of the static fallback baked into the <video> style.
+      const vFrom = getVideoForSlot(fromSlot);
+      const vTo = getVideoForSlot(toSlot);
+      if (vFrom) vFrom.style.transition = `opacity ${transitionMs}ms ease-in-out`;
+      if (vTo) vTo.style.transition = `opacity ${transitionMs}ms ease-in-out`;
       // Crossfade
       setOpacityForSlot(toSlot, 1);
       setOpacityForSlot(fromSlot, 0);
@@ -549,7 +570,7 @@ export default function ComposerSequencePreview({
         preloadSlot('C', toIdx + 2);
 
         transitioningRef.current = false;
-      }, CROSSFADE_MS);
+      }, transitionMs);
     };
 
     // Fast path: standby already has enough buffered to play through.
