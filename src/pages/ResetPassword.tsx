@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Lock, Eye, EyeOff, CheckCircle2, Shield, KeyRound } from "lucide-react";
 import { Footer } from "@/components/Footer";
+import { mapAuthError, trackAuthError } from "@/lib/authErrors";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
