@@ -4,6 +4,7 @@ Phasen 1–3 (Pricing / Marketing / Feature-Gating) ✅
 Phase 4.1 (Founders-Slot RPC) ✅ – atomarer `claim_founders_slot`, advisory lock, unique index
 Phase 4.3 (Zentrale Stripe-Config) ✅ – `_shared/stripe-config.ts`
 Phase 5.1 (Community-RLS) ✅ – Kontrolle: existierende Community-Tabellen (`community_channels`, `community_messages`, `community_message_tags`, `community_audit_log`, `direct_messages`) sind bereits ausschließlich für `authenticated` konfiguriert; keine `USING (true)` gegen `public` mehr offen. Kein Migrations-Bedarf.
+Phase 5.3 (Halbfertige Bereiche verstecken) ✅ – `src/config/betaFlags.ts` mit `BETA_ACTIVE=false` + `showBetaSurface(isAdmin)` Helper. `AppSidebar` filtert `comingSoon`-Hubs für Nicht-Admins während der Beta raus. Admin-Routen sind bereits doppelt gesichert: Frontend via `<ProtectedRoute requireRole="admin">` in `App.tsx`, Edge Functions via `has_role`-RPC bzw. `user_roles`-Select mit `service_role`-Client (verifiziert für `admin-delete-user`, `admin-suppression-manage`, `admin-stats`, `admin-cost-snapshot`, `admin-stripe-inspect`, `admin-stripe-setup-pricing-v2`).
 Phase 4.2 (Teil 1) ✅ – Shared `_shared/timeout.ts` mit `withTimeout` + `fetchWithTimeout`. Angewendet auf:
   - `generate-ai-video` → Replicate-SDK-Call mit 30s Timeout, 504 + Credit-Refund
   - `generate-studio-image` → AI-Gateway-Fetch mit 90s Timeout pro Modell/Attempt
