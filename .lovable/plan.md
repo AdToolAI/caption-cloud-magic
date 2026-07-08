@@ -1,89 +1,136 @@
-## Ziel
 
-In **Cast & World** kann der Nutzer für jeden Asset-Typ (Character, Prop, Building, Location) **ein beliebiges Foto** hochladen — auch schlecht ausgeleuchtet, mit Hintergrund, schräg — und die KI erzeugt daraus automatisch ein **sauberes Referenzbild mit transparentem Hintergrund** (bzw. neutralem Studio-Hintergrund für Locations, wo Transparenz keinen Sinn ergibt). Das Ergebnis landet als `reference_image_url` in der jeweiligen Brand-Tabelle mit einer echten UUID pro Nutzer/Workspace und fließt unverändert durch die bereits verdrahtete Cast-&-World-ID-Pipeline (v202/v211).
+# 🚀 Launch-Readiness-Audit — Konsolidierter Report
 
-## User-Flow
+Vier parallele Deep-Audits (Pricing/Checkout, Landing/SEO, Studios/Features, Security/RLS) sind abgeschlossen. **Gute Nachricht:** Sicherheit, RLS, Storage & Refund-Logik sind auf Produktionsniveau. **Handlungsbedarf:** Pricing-Inkonsistenzen, unehrliche Landing-Stats, ein paar halbfertige Features die versteckt gehören.
 
-```text
-[Cast & World Panel]
-  └─ „+ Aus Foto erstellen"  (überall gleich: Character / Prop / Building / Location)
-        ↓ File-Picker (JPG/PNG/HEIC/WebP)
-  ┌─────────────────────────────────────────┐
-  │  Preview: Original    →   Cleaned       │
-  │  [Name eingeben]                        │
-  │  [Auto-clean-Modus ▼]                    │
-  │    • Cutout (transparent)  ← Prop/Char  │
-  │    • Studio-Backdrop       ← Building   │
-  │    • Cinematic Restage     ← Location   │
-  │  [Erneut generieren]  [Speichern]       │
-  └─────────────────────────────────────────┘
-```
+---
 
-Ein Klick, ein Sheet, überall dieselbe Komponente.
+## 🛑 BLOCKER — muss vor Launch (Fix-Plan)
 
-## Umsetzung
+### B1. Preis-Mismatch 14,95 € vs 14,99 €
+- `src/config/pricing.ts:68` sagt **14,95 €** (Basic)
+- `PricingSection.tsx:82`, `Pricing.tsx:277`, `BlackTieHero`-Copy sagen **14,99 €**
+- **Fix:** eine Zahl. Empfehlung: **14,99 €** überall (Landing-Promo bleibt konsistent). `pricing.ts` und alle Stripe-Coupon-Rabatte gegen 29,99 € Regularprice prüfen.
 
-### 1. Edge Function `refine-asset-photo` (neu)
-`supabase/functions/refine-asset-photo/index.ts`
-- Input: `{ kind: 'character'|'prop'|'building'|'location', sourceImageUrl, name, description? }`
-- JWT-Auth, Zod-Validation, CORS wie in bestehenden World-Funktionen.
-- Pipeline:
-  1. Lädt das Original aus dem `brand-uploads`-Bucket (siehe Punkt 3).
-  2. Ruft **`google/gemini-3.1-flash-image`** über AI Gateway `/v1/images/generations` (chat-shape, `messages` + `modalities`, `stream:false`) mit einem kind-spezifischen Prompt auf. Das Modell akzeptiert Bild-Input via `image_url`-Block — genau das brauchen wir hier („nimm dieses Foto und render das Motiv sauber neu"). Kind-spezifische Prompts:
-     - `character` / `prop`: „Isolate the main subject on a **solid pure white** background, remove all clutter, studio lighting, sharp focus, 1:1, no text."
-     - `building`: „Architectural hero shot of this building, clean sky background, no people/text/logos."
-     - `location`: „Cinematic establishing shot of this environment, cleaned up, natural depth, no people/text/logos."
-  3. Für `character` / `prop` / `building`: das erzeugte Bild wird durch `@huggingface/transformers` **background-removal serverseitig NICHT** möglich → wir nutzen den bestehenden Client-Helper `src/lib/backgroundRemoval.ts` als **zweiten Schritt im Frontend** nach Empfang des Edge-Function-Outputs. Der Solid-White-Hintergrund vom Prompt macht die Segmentierung robust.
-  4. `location` bleibt als JPG (kein Cutout).
-  5. Endbild (transparent PNG bzw. JPG) wird in den passenden Bucket geladen: `brand-characters/<userId>/<uuid>.png`, `brand-locations/<userId>/<uuid>.jpg|png`.
-  6. Neue Zeile in `brand_characters` / `brand_props` / `brand_buildings` / `brand_locations` mit `reference_image_url` und `user_id = auth.uid()`. Postgres vergibt automatisch die kanonische UUID.
-  7. Antwort enthält die volle Zeile — React Query invalidiert die entsprechenden `useBrand*`-Hooks und der Eintrag erscheint sofort in `useUnifiedMentionLibrary` → UnifiedAssetPicker.
+### B2. Feature-Gates blockieren den Beta-Nutzer
+`pricing.ts:130-148` gated `apiAccess`, `whiteLabel`, `team` hinter `enterprise`. In der Single-Plan-Beta gibt es kein Enterprise → Nutzer werden aus Features ausgesperrt.
+- **Fix:** Für Beta alle nicht-`api`-Features nach `pro` verschieben. `apiAccess` bleibt gated (Feature existiert noch nicht).
 
-### 2. Wiederverwendbare Komponente `AssetPhotoUploadSheet`
-`src/components/cast-world/AssetPhotoUploadSheet.tsx` (neu)
-- Props: `kind`, `open`, `onOpenChange`, `onCreated(assetId)`.
-- Schritte: Datei wählen → in `brand-uploads`-Bucket hochladen → `refine-asset-photo` aufrufen → für Cutout-Kinds `removeBackground()` aus `src/lib/backgroundRemoval.ts` auf das Ergebnis anwenden → gecleantes PNG erneut in den Ziel-Bucket hochladen und `reference_image_url` per RPC updaten (kleine neue Funktion `update_asset_reference_image` mit `SECURITY DEFINER`, prüft `user_id = auth.uid()`).
-- Preview-Panel: „Vorher / Nachher" Slider, „Erneut generieren"-Button (retriggered mit anderem Seed), „Speichern".
+### B3. Customer-Portal zeigt falschen Preis (34,95 €)
+`supabase/functions/customer-portal/index.ts:12-14` referenziert Legacy-Preise. Wenn Nutzer "Abo verwalten" klicken → sehen 34,95 € statt 14,99 €.
+- **Fix:** `STRIPE_PRICE_MAP` auf die aktuellen Pro-Price-IDs aktualisieren.
 
-### 3. Neuer Storage-Bucket `brand-uploads` (private)
-- Migration via `supabase--storage_create_bucket` (nicht via SQL).
-- RLS: `user_id/<file>`-Pfad; nur Owner kann lesen/schreiben. Zwischen-Ergebnisse landen hier und werden nach dem Refinement wieder gelöscht.
+### B4. Unehrliche Stats & JSON-LD (rechtliches Risiko DE)
+- `BlackTieHero.tsx:100-110` → "10K+ Creator / 1M+ Posts / +43 % Engagement"
+- `SocialProofStrip.tsx:32-37` → "4.8/5 · 10.000+ Creators"
+- `LiveDemoShowcase.tsx:189` → "+312 %", "♡ 12,4K"
+- `translations.ts:3926-3942` → drei erfundene Testimonials (Sarah M., Marco R., Lisa K.)
+- `index.html:34` → "Über 10.000 Creator vertrauen …"
+- `pages/Index.tsx:48-49` → JSON-LD `aggregateRating 4.8 / 1200 reviews`
+- **Fix (Beta-ehrlich):**
+  - Hero-Stats: **"BETA" · "3 Monate" · "1000 Founders-Plätze"** (live counter)
+  - `SocialProofStrip` → "Founders-Beta · limitierte Plätze" statt Sternratings
+  - Testimonials-Sektion: **entfernen** bis echte da sind, oder unter Sektion "Beispiel-Prompt" umlabeln
+  - JSON-LD `aggregateRating` **komplett entfernen** (Google-Spam-Risiko)
+  - `LiveDemoShowcase`: harte Zahlen entfernen, qualitativ formulieren
+  - `index.html:34` Meta-Description umschreiben
 
-### 4. UI-Integration
-- **BrandCharacters-Page** (`src/pages/BrandCharacters.tsx`): Neuer Primary-Button „Aus Foto erstellen" neben dem bestehenden „Neuen Character anlegen".
-- **CreatorLibrary / World-Tabs** (`src/pages/CreatorLibrary.tsx`): pro Tab (Props / Buildings / Locations) derselbe Button.
-- **UnifiedAssetPicker Empty-State** (`src/components/video-composer/UnifiedAssetPicker.tsx`): zusätzlich zum bestehenden „In Library öffnen"-Link ein Inline-CTA „Foto hochladen" der das Sheet direkt im Composer öffnet — damit erübrigt sich der Tab-Wechsel für den häufigsten Fall.
+### B5. Legacy-Upgrade-Pfade offen
+- `/upgrade-enterprise` Route in `App.tsx` aktiv (`UpgradeEnterprise.tsx`)
+- `EnterpriseUpgradePrompt.tsx` triggert das
+- `UsageRecommendationWatcher.tsx:15` empfiehlt Upgrade wenn `plan !== "basic"`
+- **Fix:** Route auf `/pricing` redirecten, Prompt-Komponente ausblenden (Feature-Flag `BETA_ACTIVE`).
 
-### 5. IDs & Sichtbarkeit (Antwort auf die Nutzerfrage)
-- Postgres vergibt **automatisch** eine `uuid` beim Insert — dieselbe ID, die die v202/v211-Pipeline erwartet.
-- Alle Uploads sind **privat pro Nutzer/Workspace** (RLS via `user_id`). Kein anderer Nutzer sieht das Asset.
-- Zugriff nur über Ziel-Bucket + RLS-Policy `auth.uid() = user_id`; kein Public-Bucket.
-- Öffentlich gibt es weiterhin nur die von uns geseedeten `*_catalog_previews` (Katalog-IDs, nicht die Brand-Tabellen).
+### B6. `index.html` Verifikationscode-Platzhalter
+`index.html:39` enthält `DEIN_VERIFIKATIONSCODE_HIER` → Google Search Console broken.
+- **Fix:** entfernen oder mit echtem Code ersetzen.
 
-## Technische Notizen
+---
 
-- Kein Migrations-Schema-Change nötig — die Brand-Tabellen existieren, `reference_image_url` ist schon vorhanden.
-- Ein neuer Bucket + eine neue Edge Function + eine Front-Komponente + drei Aufrufer-Stellen.
-- Modellwahl: `google/gemini-3.1-flash-image` (Nano Banana 2) für Restaging — akzeptiert Bild-Input, schnell, günstig, sehr gute Motivtreue.
-- Background-Removal bleibt client-seitig (`@huggingface/transformers`), weil das im Projekt schon läuft und der Solid-White-Hintergrund aus Gemini die Segmentierung sehr robust macht.
-- Feature-Flag `VITE_CAST_WORLD_PHOTO_UPLOAD` (default `true`) um das neue Sheet schnell abschalten zu können.
+## ⚠️ WARNINGS — sollten vor Launch, nicht kritisch
 
-## Dateien
+### W1. Picture Studio ohne UnifiedAssetPicker
+`ImageGenerator.tsx:168` nutzt lokalen `FileReader` statt globaler Cast/World-Bibliothek. → Cast-Konsistenz greift dort nicht.
+- **Fix:** UnifiedAssetPicker einbinden (analog Motion Studio).
 
-**Neu**
-- `supabase/functions/refine-asset-photo/index.ts`
-- `src/components/cast-world/AssetPhotoUploadSheet.tsx`
-- `src/hooks/useRefineAssetPhoto.ts`
-- Storage-Bucket `brand-uploads` + RLS-Migration
-- SQL-Migration: `update_asset_reference_image(kind, asset_id, url)` SECURITY DEFINER
-- `mem/features/cast-world/photo-upload-refinement.md` + Index-Update
+### W2. Stripe-IDs 5-fach hardcoded
+`create-checkout`, `check-subscription`, `stripe-webhook`, `customer-portal`, `pricing.ts` — jede Preisänderung = 5-File-Deploy.
+- **Fix (nice, aber jetzt sinnvoll):** `supabase/functions/_shared/stripe-config.ts` als single source.
 
-**Geändert**
-- `src/pages/BrandCharacters.tsx` — Button + Sheet
-- `src/pages/CreatorLibrary.tsx` — Button pro World-Tab
-- `src/components/video-composer/UnifiedAssetPicker.tsx` — Inline-CTA im Empty-State
+### W3. Community-Tables `USING (true)`
+`community_channels`, `community_messages`, `mentor_slots` → jeder eingeloggte Nutzer sieht alles.
+- **Fix falls Privacy gewünscht:** channel_members-Scope einführen. Falls Community bewusst öffentlich → in Security-Memo dokumentieren (bereits als "accepted-by-design" für realtime.messages markiert, aber die Community-Tables sind separat).
 
-## Was nicht enthalten ist
-- Outfits/Voices (bleiben out-of-scope; Outfits erfordern einen anderen Flow über `avatar_outfit_looks` mit Multi-View-Prompts, Voices sind Audio).
-- Öffentliches Teilen von hochgeladenen Assets — bleibt privat.
-- Batch-Upload mehrerer Fotos in einem Sheet.
+### W4. Halbfertige Features werden angezeigt
+Sollten hinter `BETA_ACTIVE`-Flag / ComingSoon versteckt werden:
+- `Autopilot.tsx` (bereits ComingSoon für Non-Admins ✓)
+- `Carousel.tsx:224` PNG/PDF-Export
+- `Calendar.tsx:446` "Share"/"Filter" hardcoded ComingSoon → Buttons rausnehmen statt "Coming Soon"-Toast
+- Social OAuth für LinkedIn, X, Facebook (`translations.ts:3137` = `oauthComingSoon`) → aus Connector-Liste entfernen, nur IG/TikTok/YT lassen
+
+### W5. Founders-Counter Drift-Risiko
+UI zählt `founders_signups` (DB), Stripe zählt Coupon-Redemptions separat. Kann divergieren.
+- **Fix:** In `create-checkout` **nach** erfolgreichem Session-Create einen Slot atomar reservieren + bei webhook-`checkout.completed` bestätigen. Bei Abbruch nach TTL zurückgeben.
+
+### W6. Edge-Function-Timeouts fehlen bei einigen AI-Endpoints
+Replicate/Sync.so können hängen → Function hängt bis Supabase-Timeout.
+- **Fix:** `AbortController` mit 120-300s Timeout in `generate-ai-video`, `refine-asset-photo`, `render-directors-cut`.
+
+---
+
+## ✅ ALLES GRÜN — bereits launch-reif
+
+- **Motion Studio** UUID-Pipeline v202+, Refund-Logik ✓
+- **AI Video Studio** (ToolkitGenerator) Scene-Anchor + Refunds ✓
+- **Cast & World** CRUD, RLS, Storage-Path-Constraints, refine-asset-photo ✓
+- **Director's Cut** Export-Pipeline + Autosave ✓
+- **Universal Creator** UUID-Wiring ✓
+- **Security:** RLS auf allen kritischen Tabellen, Storage-RLS mit `user_id`-Path-Prefix, `has_role`-RPC serverseitig, Secrets nicht im Client, `credit-refund` atomar ✓
+- **Legal:** Impressum (echte Daten), AGB mit Founders-§, Privacy, DPA, Cookie-Consent ✓
+- **i18n:** DE/EN/ES vollständig auf Landing ✓
+
+---
+
+## 📋 Empfohlene Umsetzungs-Reihenfolge (in dieser Reihenfolge builden)
+
+**Phase 1 — Pricing & Checkout konsistent (Blocker B1-B3, B5)**
+1. `src/config/pricing.ts`: `basic.priceMonthly` 14.95 → **14.99**; Feature-Flags von `enterprise` nach `pro` verschieben (außer `api`)
+2. `supabase/functions/customer-portal/index.ts`: `STRIPE_PRICE_MAP` aktualisieren
+3. `supabase/functions/_shared/stripe-config.ts` (neu): zentrale IDs
+4. `App.tsx`: `/upgrade-enterprise` → Redirect `/pricing`
+5. `EnterpriseUpgradePrompt.tsx`, `UsageRecommendationWatcher.tsx`: hinter `BETA_ACTIVE` ausblenden
+
+**Phase 2 — Landing ehrlich machen (Blocker B4, B6)**
+6. `BlackTieHero.tsx:100-110` Stats-Block ersetzen (BETA / 3 Monate / 1000 Plätze mit `FoundersSlotBadge`)
+7. `SocialProofStrip.tsx` Rating-Zeile entfernen, Beta-Framing
+8. `LiveDemoShowcase.tsx:189` harte Zahlen → qualitativ
+9. `translations.ts` Testimonials & fake Stats entfernen/umlabeln
+10. `pages/Index.tsx:48-49` JSON-LD `aggregateRating` löschen
+11. `index.html:33-39` Title/Meta/Verifikation angleichen
+
+**Phase 3 — Halbfertiges verstecken (W4)**
+12. `Calendar.tsx` "Share"/"Filter"-Buttons entfernen (nicht als ComingSoon-Toast)
+13. `Carousel.tsx` PNG/PDF-Export hinter Feature-Flag
+14. Social-Connect-Liste in `Autopilot`/Settings auf IG/TikTok/YT reduzieren
+
+**Phase 4 — Robustheit (W5, W6, W1)**
+15. Founders-Slot atomar in `create-checkout` reservieren + webhook-confirm
+16. AbortController-Timeouts in Video-AI-Functions
+17. Picture Studio UnifiedAssetPicker (optional — kann Post-Launch)
+
+**Phase 5 — Nice-to-have**
+18. Community-Tables Privacy-Scope oder Doku
+19. Security-Audit-Log für Auth-Fails
+20. Konsolidierte Stripe-Config-Nutzung in allen 5 Files
+
+---
+
+## 🎯 Erwarteter Effekt
+
+Nach Phase 1-3 (≈ 12 Datei-Edits, 2 Edge-Function-Updates, keine Migration nötig): **Plattform ist rechtssicher, konsistent gepreist und ehrlich beworben** → launch-ready für Beta.
+
+Phase 4-5 kann parallel zum Public-Launch laufen.
+
+---
+
+**Bereit zum Umsetzen?** Sag "Phase 1" oder "alles" — dann fange ich mit den Blockern an. Wenn du eine andere Reihenfolge willst, sag Bescheid.
