@@ -111,6 +111,7 @@ const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
+const DebugLipsync = lazy(() => import("./pages/DebugLipsync"));
 const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
 const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
 const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics"));
@@ -188,6 +189,7 @@ function AppLayout() {
                     
                     {/* Main pages */}
                     <Route path="/home" element={<ProtectedRoute redirectTo="/"><Home /></ProtectedRoute>} />
+                    <Route path="/debug/lipsync/:sceneId" element={<ProtectedRoute><DebugLipsync /></ProtectedRoute>} />
                     <Route path="/hub/:hubKey" element={<HubPage />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
