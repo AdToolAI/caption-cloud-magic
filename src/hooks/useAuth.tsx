@@ -210,7 +210,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     
     if (error) {
-      toast.error(error.message || tr('auth.signupErrorGeneric'));
+      const friendly = mapAuthError(error, 'signup');
+      toast.error(friendly.title, { description: friendly.description });
+      trackAuthError(friendly, 'signup');
     } else {
       toast.success(tr('auth.signupSuccessTitle'), {
         description: tr('auth.signupSuccessDesc'),
@@ -222,6 +224,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, {
           email: data.user.email,
           signup_method: 'email',
+        });
+        // Beta launch observability
+        trackEvent(ANALYTICS_EVENTS.BETA_SIGNUP, {
+          email: data.user.email,
+          source: 'email',
         });
         
         identifyUser(data.user.id, { 
