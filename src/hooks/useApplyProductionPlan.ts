@@ -57,6 +57,13 @@ const isUuid = (val?: string | null): val is string =>
 
 const PLAN_UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
+// NOTE: This is a local, prefix-only variant of the canonical
+// `resolveCharacterId` (src/lib/video-composer/resolveCharacterId.ts).
+// The Cast/World v211 SoT is `resolveCharacterId`, but that helper
+// requires an OutfitLookMap which we don't build at apply-time. The
+// downstream `PLAN_UUID_RE.test()` guards ensure non-UUID leftovers
+// (e.g. `catalog:character:<slug>` without embedded UUID) are dropped
+// from both `characterShots[]` and `scene_assets[]`.
 function stripPlanId(id: string) {
   if (!id) return id;
   const m = id.match(PLAN_UUID_RE);
@@ -276,9 +283,15 @@ function planSceneToComposerScene(
   const primaryShot = framingToShotType(ps.shotDirector?.framing, 'full');
   const rawShots: CharacterShot[] = (ps.cast ?? [])
     .filter((c) => c.characterId)
-    .map((c, i) =>
-      ({
-        characterId: stripPrefix(c.characterId as string),
+    .map((c, i) => {
+      const stripped = stripPrefix(c.characterId as string);
+      // v211 invariant: `characterShots[].characterId` MUST be a
+      // brand_characters UUID. Drop non-UUID leftovers (e.g.
+      // `catalog:character:<slug>` for un-adopted catalog chars) so
+      // the anchor resolver in compose-video-clips can strict-match.
+      if (!PLAN_UUID_RE.test(stripped)) return null;
+      return {
+        characterId: stripped,
         // Per-cast override (Stage-3 mapping completion) wins over the
         // scene default. Falls back to primary/profile split for 2-shots.
         shotType: c.shotType
@@ -290,8 +303,9 @@ function planSceneToComposerScene(
         // and swaps the avatar's default portrait for the outfit cover
         // image during anchor composition.
         outfitLookId: c.outfitLookId ?? undefined,
-      }) as CharacterShot,
-    );
+      } as CharacterShot;
+    })
+    .filter((s): s is CharacterShot => s !== null);
 
   // Cast-Dedup: collapse multiple slots that resolve to the same person
   // (UUID + legacy slug, or duplicate UUID entries). First occurrence wins
