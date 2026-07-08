@@ -44,7 +44,7 @@ serve(async (req) => {
     if (userError || !user) throw new Error("Not authenticated");
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
+      apiVersion: STRIPE_API_VERSION,
     });
 
     console.log(`Checkout: user=${user.id} price=${priceId} promo=${promoCode || "none"} coupon=${couponId || "auto"}`);
