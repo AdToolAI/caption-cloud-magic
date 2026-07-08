@@ -16,6 +16,13 @@ import { cn } from '@/lib/utils';
 import { Check, Loader2, AlertCircle, Sparkles, Image as ImageIcon } from 'lucide-react';
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { getClipCost } from '@/types/video-composer';
+import { useTranslation } from '@/hooks/useTranslation';
+
+const NOT_RENDERED_L10N: Record<'de' | 'en' | 'es', string> = {
+  de: 'Noch nicht gerendert',
+  en: 'Not rendered yet',
+  es: 'Aún no renderizado',
+};
 
 interface SceneStripTileProps {
   scene: ComposerScene;
