@@ -778,6 +778,9 @@ export default function StoryboardTab({
               onReorder={onUpdateScenes}
               onAddScene={handleAddSceneClick}
               onGenerate={generateScene}
+              onUpdateSceneTransition={(sceneId, transitionType, transitionDuration) =>
+                updateScene(sceneId, { transitionType, transitionDuration })
+              }
             />
           </div>
         </div>

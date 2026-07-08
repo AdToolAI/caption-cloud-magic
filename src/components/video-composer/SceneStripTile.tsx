@@ -59,8 +59,9 @@ const STATUS_STYLE: Record<string, { label: string; cls: string; icon: React.Com
 };
 
 function pickThumbnail(scene: ComposerScene): { kind: 'image' | 'video' | 'none'; src?: string } {
+  // Only real scene outputs — never the anchor / `referenceImageUrl`, which
+  // is shared across all scenes and would fake a render result.
   if (scene.firstFrameUrl) return { kind: 'image', src: scene.firstFrameUrl };
-  if (scene.referenceImageUrl) return { kind: 'image', src: scene.referenceImageUrl };
   if (scene.lastFrameUrl) return { kind: 'image', src: scene.lastFrameUrl };
   if (scene.clipUrl) return { kind: 'video', src: scene.clipUrl };
   return { kind: 'none' };
@@ -120,8 +121,9 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
           />
         )}
         {thumb.kind === 'none' && (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
-            <ImageIcon className="h-7 w-7" />
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground/50">
+            <ImageIcon className="h-6 w-6" />
+            <span className="text-[9px] uppercase tracking-[0.14em]">Noch nicht gerendert</span>
           </div>
         )}
 

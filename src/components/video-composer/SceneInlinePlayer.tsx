@@ -55,11 +55,10 @@ export default function SceneInlinePlayer({
   const [hovering, setHovering] = useState(false);
 
   const clipUrl = scene.clipUrl;
-  const posterUrl =
-    scene.firstFrameUrl ||
-    scene.referenceImageUrl ||
-    scene.lockReferenceUrl ||
-    undefined;
+  // Only true scene outputs count as a thumbnail. `referenceImageUrl` /
+  // `lockReferenceUrl` are the *anchor* / front image and would otherwise
+  // bleed into every not-yet-rendered scene, faking a render result.
+  const posterUrl = scene.firstFrameUrl || scene.lastFrameUrl || undefined;
   const status = scene.clipStatus;
 
   // Pipeline-Vollständigkeit: Bei Cinematic-Sync/Dialog-/Talking-Head-Szenen
@@ -271,8 +270,9 @@ export default function SceneInlinePlayer({
             className="absolute inset-0 w-full h-full object-cover opacity-80"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-card/40 to-black/40">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-card/40 to-black/40">
             <ImageIcon className="h-7 w-7 text-muted-foreground/40" />
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">Noch nicht gerendert</span>
           </div>
         )}
 
