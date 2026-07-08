@@ -16,6 +16,7 @@
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
+import { fetchWithTimeout, isTimeoutError } from '../_shared/timeout.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,26 +129,40 @@ serve(async (req) => {
 
     for (const model of models) {
       for (let attempt = 1; attempt <= 2; attempt++) {
-        const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${lovableKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: `IMPORTANT: Output an image, not a description. ${promptText}` },
-                  { type: 'image_url', image_url: { url: srcDataUrl } },
-                ],
+        let res: Response;
+        try {
+          res = await fetchWithTimeout(
+            'https://ai.gateway.lovable.dev/v1/chat/completions',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${lovableKey}`,
+                'Content-Type': 'application/json',
               },
-            ],
-            modalities: ['image', 'text'],
-          }),
-        });
+              body: JSON.stringify({
+                model,
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: `IMPORTANT: Output an image, not a description. ${promptText}` },
+                      { type: 'image_url', image_url: { url: srcDataUrl } },
+                    ],
+                  },
+                ],
+                modalities: ['image', 'text'],
+              }),
+            },
+            90_000,
+            `ai-gateway ${model}`,
+          );
+        } catch (e) {
+          if (isTimeoutError(e)) {
+            lastErr = `Timeout after 90s (${model})`;
+            continue;
+          }
+          throw e;
+        }
         if (res.status === 429 || res.status === 402) {
           return new Response(
             JSON.stringify({

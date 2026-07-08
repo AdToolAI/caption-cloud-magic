@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -219,12 +220,16 @@ serve(async (req) => {
 
     // Start video generation on Replicate with webhook - wrapped in try-catch
     try {
-      const prediction = await replicate.predictions.create({
-        version: modelVersion,
-        input: replicateInput,
-        webhook: webhookUrl,
-        webhook_events_filter: ['start', 'completed']
-      });
+      const prediction = await withTimeout(
+        replicate.predictions.create({
+          version: modelVersion,
+          input: replicateInput,
+          webhook: webhookUrl,
+          webhook_events_filter: ['start', 'completed']
+        }),
+        30_000,
+        'replicate.predictions.create',
+      );
 
       console.log(`[generate-ai-video] ✅ Replicate prediction created: ${prediction.id}`);
       console.log(`[generate-ai-video] Webhook configured: ${webhookUrl}`);
@@ -269,6 +274,17 @@ serve(async (req) => {
         console.error('[generate-ai-video] ❌ Refund failed:', refundError);
       } else {
         console.log('[generate-ai-video] ✅ Credits refunded successfully');
+      }
+
+      // Handle explicit timeout on the Replicate SDK call
+      if (isTimeoutError(replicateError)) {
+        return new Response(
+          JSON.stringify({
+            error: "Der Video-Anbieter hat nicht rechtzeitig geantwortet. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es erneut.",
+            code: "REPLICATE_TIMEOUT"
+          }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // Handle 502 Bad Gateway from Replicate (upstream unavailable)
