@@ -6867,7 +6867,7 @@ serve(async (req) => {
         preclip_fps: (pass as any).preclip_fps ?? null,
         preclip_dims: (pass as any).preclip_dims ?? null,
         preclip_crop: (pass as any).preclip_crop ?? null,
-        dispatch_video_kind: speakers.length >= 2 ? "full_plate" : (usePassPreclip ? "preclip" : "full_plate"),
+        dispatch_video_kind: dispatchVideoKind,
 
         payload_summary: {
           model: payload.model,
