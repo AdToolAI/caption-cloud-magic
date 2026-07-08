@@ -1,53 +1,59 @@
-## Ziel
+# Plan: Echte v169-Parity — Silent-Layer abschalten
 
-Mux/Overlay-Pfad exakt auf den v169-Zustand zurücksetzen, der nachweislich ohne sichtbare Kanten/Halos gerendert hat. Sync.so-Dispatch (v204 Preclip + clip-space bbox) bleibt unberührt.
+## Root Cause (Neuanalyse)
 
-## Was v169 anders gemacht hat (Baseline)
+v169 hatte weder Halos noch Morphs — nicht wegen der Maskenform, sondern weil es die zusätzlichen Overlay-Layer schlicht nicht gab.
 
-- **Active Overlay** (`CroppedOverlay`) und **Silent Slots** (`SilentFaceFreeze`) nutzten **identische, breite, symmetrische** Alpha-Feather-Masken über den gesamten Square-Crop — keine harten Kreisränder (55–63%), keine unterschiedlichen Profile für aktiv/silent.
-- **Kein** `faceMask`-Pfad und **keine** Mouth-Mattes im Multi-Speaker-Fall — nur die einheitliche Square-Overlay-Route mit weichem Radial-Gradient.
-- **Kein** Farb-/Helligkeits-Matching-Filter (der käme erst bei Tier 1 der A-Lösung dazu, ist hier explizit ausgeklammert).
-- Bundle wurde nach jedem Mask-Change über `scripts/deploy-remotion-bundle.sh` neu deployed.
+Was seit v169 dazukam und aktuell noch aktiv ist (auch nach v205):
 
-## Plan
+1. **`SilentFaceFreeze`** (v197) — friert pro Non-Speaker einen Master-Plate-Crop ein und legt ihn über die animierende Master-Plate. Mit v169-weicher Maske: das statische Gesicht und das darunter atmende/wackelnde Master-Gesicht divergieren pro Frame → sichtbare **Morph/Wabbel-Effekte** an Rand und Nase.
+2. **`SilentFaceAnchor`** (v183/v190) — statisches Portrait-Overlay auf Silent-Speakern.
+3. **`MouthMatteFreeze`** (v193) — Mund-Matte-Freeze auf Non-Speakern.
+4. **`FaceMaskOverlay`** — Mouth-Matte-Pfad (bereits durch v205-Guard blockiert).
 
-### 1. `src/remotion/templates/DialogStitchVideo.tsx`
+In v169 war exakt eine Schicht aktiv: **`CroppedOverlay` (Sync.so-Output) über Master-Plate**, sonst nichts. Non-Speaker zeigten einfach das rohe Master-Plate-Video. Kein Freeze, kein Portrait, keine Matte → keine Divergenz → keine Morphs.
 
-- **`CroppedOverlay`** (aktiver Sprecher-Overlay, `mode: 'crop'`):
-  - Radial-Gradient-Maske zurücksetzen auf v169-Profil: `core ~30%` voll opak, weicher Fade bis `~78%`, danach transparent. Keine harte Kante bei 55–63%.
-  - Kein `filter: brightness()/saturate()` auf dem inneren `<Video>`.
-- **`SilentFaceFreeze`** (eingefrorene Nicht-Sprecher):
-  - **Exakt dasselbe** Maskenprofil wie `CroppedOverlay` (identische Stops in %). Kein separates, schmaleres Profil.
-- **`FaceMaskOverlay`** (Mouth-Mattes-Pfad):
-  - Für den v169-Rollback im Multi-Speaker-Dialog **deaktiviert** — Mux übergibt keine `faceMask`/`mouthMattes` mehr (siehe §2). Code darf bleiben (Rückwärtskompatibilität), wird aber nicht mehr getriggert.
-- **Version-Marker** im Template: `v205_mux_v169_parity` (nur Logging/Diag, keine Verhaltensverzweigung).
+Der wahrgenommene Lip-Sync-Delay ist mit hoher Wahrscheinlichkeit derselbe Effekt: der Freeze-Layer verdeckt Teile des Mundbereichs des aktiven Sprechers bevor der Sync.so-Overlay einblendet, was als "verspätete Lippen" wirkt.
 
-### 2. `supabase/functions/render-sync-segments-audio-mux/index.ts`
+## Fix
 
-- **Overlay-Modus erzwingen**: Alle Shots werden mit `mode: 'crop'` + `preclip_crop` gebaut, exakt wie v163/v164/v165. Kein Fallback auf `faceMask`, kein `mouthMattes`-Feld.
-- **Silent-Slots**: unverändert wie in v164/v165 (`v164SilentSlotsByExcludedIdx`), aber `shape/coreStopPct/fadeStartPct/fadeEndPct` werden **nicht** mehr per shot gesetzt — das Template nutzt die v169-Defaults.
-- **Konstanten** (fürs Log/Telemetrie, nicht als Runtime-Tuning):
-  - `OVERLAY_MASK_VERSION = "v169_parity"`
-  - `COLOR_MATCH_ENABLED = false`
-- **Telemetrie** in Mux-Row / Log:
-  - `overlay_mask_version`, `crops_used`, `silent_slots_used`, `facemasks_used` (muss `0` sein), `color_match_enabled=false`.
-- **Guard**: Wenn irgendein Shot ohne `preclip_crop` gebaut würde (also alter FaceMask-Pfad), hard-fail + Refund statt still auf FaceMask fallen — damit der v169-Pfad wirklich kanonisch ist.
+### 1. `supabase/functions/render-sync-segments-audio-mux/index.ts`
 
-### 3. Deploy & Verifikation
+- **`silentFaceFreezes` hart auf leer setzen** unter `OVERLAY_MASK_VERSION = "v169_parity"`. Der gesamte v195/v197-Block (Zeilen ~275–364) wird gated: Ergebnis ist immer `silentFaceFreezes = []`, unabhängig vom `system_config.composer.silent_anchor_v195`-Flag.
+- Feature-Flag im Log dokumentieren: `silent_layers_disabled=true`.
+- Ebenso `silentFaceAnchors`/`mouthMattes` (falls in inputProps aufgeführt) leer lassen — kein neuer Code, nur bestehende Feldzuweisungen ausnullen.
+- Bestehender v205-Guard gegen `faceMask`-Fallback bleibt.
 
-1. Edge-Function `render-sync-segments-audio-mux` deployen.
-2. Remotion-Bundle via `scripts/deploy-remotion-bundle.sh` neu deployen (Pflicht, sonst greift der Template-Change nicht).
-3. Eine bekannte Multi-Speaker-Szene neu muxen und prüfen:
-   - Mux-Log zeigt `overlay_mask_version=v169_parity`, `crops_used>=N-1`, `facemasks_used=0`.
-   - Sync.so-Dispatch-Log unverändert `canonical_lipsync_pipeline=v204_preclip_bbox_clipspace`.
-   - Visuell: keine sichtbaren Ovale/Umrandungen mehr um Sprecher; Silent-Freeze-Slots pixelgleich zum Master-Plate.
+### 2. `src/remotion/templates/DialogStitchVideo.tsx`
 
-## Explizit NICHT angefasst
+- Keine Component-Removal, nur Render-Gate: Wenn `silentFaceFreezes` leer/undefined ist (Standard nach dem Edge-Function-Change), werden `SilentFaceFreeze`, `SilentFaceAnchor` und `MouthMatteFreeze` gar nicht erst gemountet. Das ist bereits so — es reicht, dass die Edge-Function die Arrays leer lässt. Kein Template-Change nötig.
+- Sicherheits-Log am Composition-Mount: `console.log('[DialogStitch] v169_parity silent_layers_expected=empty')` — nur Diagnose.
 
-- Sync.so-Dispatch, Preclip-Render, Anchor/Cast-Resolution, ID-Resolution (v201), Silent-Faces-Prinzip.
-- Refund-/Watchdog-Pfade.
-- Kein Poisson-Blending, keine Landmark-Segmentation, kein Color-Match — kommt erst nach Kundenfeedback (B/C später).
+### 3. Nicht angefasst
 
-## Erwartetes Ergebnis
+Sync.so-Dispatch (v204 preclip + clip-space bbox), Preclip-Render, Anchor/Cast-Resolution (v201), Refund/Watchdog, alle CroppedOverlay-Maskenprofile aus v205 (bleiben v169-weich). Kein Poisson-Blending, keine Landmark-Segmentation.
 
-Multi-Speaker-Dialoge sehen wieder aus wie unter v169: keine sichtbaren Kanten oder Halos um aktive/passive Sprecher, während der v204-Dispatchpfad (Preclip + clip-space bbox, `generation_input_face_selection_invalid`-frei) erhalten bleibt.
+### 4. Deploy
+
+1. Edge-Function `render-sync-segments-audio-mux` deployen (automatisch beim Speichern).
+2. Remotion-Bundle über `scripts/deploy-remotion-bundle.sh` neu deployen (erforderlich für das Diagnostik-Log; die eigentliche Verhaltensänderung liegt in der Edge-Function).
+
+## Verifikation
+
+Mux-Log zeigt:
+- `overlay_mask_version=v169_parity`
+- `silent_slots_used=0`
+- `facemasks_used=0`
+- `silent_layers_disabled=true`
+- `crops_used>=N-1`
+
+Visuell:
+- Kein Halo (v205-Weichmaske bleibt).
+- Keine Morphs (kein Freeze-Layer mehr, der gegen die Master-Plate driftet).
+- Lip-Sync-Timing wieder wie v169 (kein Freeze-Layer verdeckt den aktiven Mund).
+
+## Risiko / Trade-off
+
+Non-Speaker in Multi-Speaker-Szenen zeigen wieder die rohe Master-Plate. Auf Plates mit ausgeprägter Idle-Mundbewegung kann leichtes "Ghost-Mouthing" auf Non-Speakern sichtbar werden — genau das v169-Verhalten. Das war unter v169 offenbar akzeptabel, und die spätere professionelle Lösung (Landmark-Mund-Matte + Poisson) bleibt für die Feedback-Phase reserviert.
+
+Falls das Ghost-Mouthing im Test stört, kann in einem separaten Schritt gezielt nur `SilentFaceFreeze` mit schmaler Ellipse unter dem Mundbereich reaktiviert werden — bewusst nicht Teil dieses Rollbacks.
