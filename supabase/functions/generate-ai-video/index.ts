@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
