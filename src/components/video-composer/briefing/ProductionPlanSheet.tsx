@@ -1193,16 +1193,23 @@ export default function ProductionPlanSheet({
                             // option in the dropdown — even if the library
                             // hasn't loaded it under this avatar yet.
                             // v178 Wave 2 — prefer DB-backed name over mention label.
-                            const stableName = (id: string, fallback?: string) =>
-                              outfitLabelById.get(id) ?? fallback ?? 'Gespeicherter Look';
-                            const merged = fromCharacter.map((o) => ({
+                            const stableName = (id: string, fallback?: string, idx?: number) => {
+                              const fromLabel = outfitLabelById.get(id);
+                              if (fromLabel && fromLabel.trim()) return fromLabel;
+                              const cleanFallback = (fallback ?? '').trim();
+                              if (cleanFallback && !/^unbenannter look$/i.test(cleanFallback) && !/^standard-look$/i.test(cleanFallback)) {
+                                return cleanFallback;
+                              }
+                              return `Look ${(idx ?? 0) + 1}`;
+                            };
+                            const merged = fromCharacter.map((o, idx) => ({
                               lookId: o.lookId,
-                              name: stableName(o.lookId, o.name),
+                              name: stableName(o.lookId, o.name, idx),
                             }));
                             if (outfitId && !merged.some((o) => o.lookId === outfitId)) {
                               merged.push({
                                 lookId: outfitId,
-                                name: stableName(outfitId, lookHit?.name),
+                                name: stableName(outfitId, lookHit?.name, merged.length),
                               });
                             }
                             const showOutfitPicker = !!baseId && merged.length > 0;
