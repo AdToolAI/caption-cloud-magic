@@ -388,11 +388,11 @@ export default function ProductionPlanSheet({
   });
   const outfitLabelById = useMemo(() => {
     const map = new Map<string, string>();
-    // Library mentions first.
+    // Library mentions first — only real names, no fake fallbacks.
     for (const [lookId, info] of outfitById) {
-      if (info.name && info.name !== 'Standard-Look') map.set(lookId, info.name);
+      if (info.name) map.set(lookId, info.name);
     }
-    // DB fallback wins for explicit names (avoids "Standard-Look" flicker).
+    // DB fallback wins for explicit names.
     for (const row of dbOutfitLooks) {
       const trimmed = String(row?.name ?? '').trim();
       if (row?.id && trimmed) map.set(row.id, trimmed);
