@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan, type TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
+import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import BriefingPlanSummary from './BriefingPlanSummary';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
@@ -172,10 +173,10 @@ export default function ProductionPlanSheet({
   // When a new initialPlan arrives (subsequent re-opens), refresh local state.
   useEffect(() => {
     if (initialPlan) {
-      setPlan(initialPlan);
+      setPlan(ensureProductionPlanEnsemble(initialPlan, currentBriefing));
       setStep('review');
     }
-  }, [initialPlan]);
+  }, [initialPlan, currentBriefing]);
 
   // Char options: split into Base avatars (no `outfit:` prefix) vs Outfit
   // looks. The cast picker shows base avatars in the Charakter dropdown
@@ -296,8 +297,9 @@ export default function ProductionPlanSheet({
         location,
       };
     });
-    if (changed) setPlan({ ...plan, scenes });
-  }, [plan, findLocationOption]);
+    const nextPlan = ensureProductionPlanEnsemble({ ...plan, scenes }, currentBriefing);
+    if (changed || nextPlan !== plan) setPlan(nextPlan);
+  }, [plan, findLocationOption, currentBriefing]);
 
   /** Outfit looks belonging to a given base character id. */
   const outfitsByCharacter = useMemo(() => {
@@ -483,7 +485,7 @@ export default function ProductionPlanSheet({
       };
       // Second pass if first pass produced new collisions.
       healed.scenes = healed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
-      setPlan(healed);
+      setPlan(ensureProductionPlanEnsemble(healed, currentBriefing));
       setStep('review');
 
     } catch (e: any) {
@@ -519,8 +521,10 @@ export default function ProductionPlanSheet({
     }
     setApplying(true);
     try {
+      const normalizedPlan = ensureProductionPlanEnsemble(plan, currentBriefing);
+      if (normalizedPlan !== plan) setPlan(normalizedPlan);
       const result = await applyPlan({
-        plan,
+        plan: normalizedPlan,
         projectId,
         language,
         currentScenes,
