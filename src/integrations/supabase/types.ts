@@ -17890,6 +17890,20 @@ export type Database = {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
+      claim_founders_slot: {
+        Args: {
+          _founders_coupon?: string
+          _launch_coupon?: string
+          _max_slots?: number
+          _stripe_customer_id: string
+          _user_id: string
+        }
+        Returns: {
+          coupon_id: string
+          is_founder: boolean
+          slot_number: number
+        }[]
+      }
       cleanup_expired_ai_cache: { Args: never; Returns: number }
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
       cleanup_expired_verification_tokens: { Args: never; Returns: undefined }
