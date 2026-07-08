@@ -1,59 +1,71 @@
-# Plan: Echte v169-Parity — Silent-Layer abschalten
+# Plan: v207 — v169-Rebuild-Guide-Audit statt Symptom-Fix
 
-## Root Cause (Neuanalyse)
+## Prämisse
 
-v169 hatte weder Halos noch Morphs — nicht wegen der Maskenform, sondern weil es die zusätzlichen Overlay-Layer schlicht nicht gab.
+Der Nutzer hat den vollständigen **Sync.so Multi-Speaker Lip-Sync Pipeline — Rebuild Guide v169 (PARALLEL)** als Wahrheitsdokument. In v169 lief Multi-Speaker (N=4) sauber ohne Ghost-Mouthing. Statt weiter Overlays oder Prompt-Härtungen zu addieren, prüfen wir jede der **12 Invarianten aus §10 des Guides** gegen den aktuellen Code und dokumentieren jede Abweichung.
 
-Was seit v169 dazukam und aktuell noch aktiv ist (auch nach v205):
+## Vorgehen
 
-1. **`SilentFaceFreeze`** (v197) — friert pro Non-Speaker einen Master-Plate-Crop ein und legt ihn über die animierende Master-Plate. Mit v169-weicher Maske: das statische Gesicht und das darunter atmende/wackelnde Master-Gesicht divergieren pro Frame → sichtbare **Morph/Wabbel-Effekte** an Rand und Nase.
-2. **`SilentFaceAnchor`** (v183/v190) — statisches Portrait-Overlay auf Silent-Speakern.
-3. **`MouthMatteFreeze`** (v193) — Mund-Matte-Freeze auf Non-Speakern.
-4. **`FaceMaskOverlay`** — Mouth-Matte-Pfad (bereits durch v205-Guard blockiert).
+Für jede der 12 Invarianten:
+1. Lokalisiere den entsprechenden Code-Pfad in der Repo.
+2. Vergleiche mit der Guide-Spezifikation.
+3. Kennzeichne mit **✓ match**, **⚠ drift** oder **✗ missing**.
+4. Für jede Drift: minimale Korrektur direkt in dem betroffenen Modul, keine neuen Layer.
 
-In v169 war exakt eine Schicht aktiv: **`CroppedOverlay` (Sync.so-Output) über Master-Plate**, sonst nichts. Non-Speaker zeigten einfach das rohe Master-Plate-Video. Kein Freeze, kein Portrait, keine Matte → keine Divergenz → keine Morphs.
+Kein Refactor, keine Feature-Änderung, keine neuen Feature-Flags. Reine Guide-Parität.
 
-Der wahrgenommene Lip-Sync-Delay ist mit hoher Wahrscheinlichkeit derselbe Effekt: der Freeze-Layer verdeckt Teile des Mundbereichs des aktiven Sprechers bevor der Sync.so-Overlay einblendet, was als "verspätete Lippen" wirkt.
+## Zu prüfende Invarianten (aus §10 Rebuild Guide)
 
-## Fix
+| # | Invariante | Zu prüfen in |
+|---|-----------|--------------|
+| 1 | Eine Hailuo i2v Master-Plate pro Szene | `compose-video-clips/index.ts`, `compose-dialog-scene/index.ts` |
+| 2 | Jeder Speaker-Turn = ein Pass | `compose-dialog-segments/index.ts` (Pass-Aufbau) |
+| 3 | Parallele Passes, `concurrencyCap` bis 4, hart begrenzt durch Sync.so-Plan-Parallelität minus Inflight | `compose-dialog-segments/index.ts`, `syncso_inflight_jobs` |
+| 4 | Jeder Pass verwendet eigenen Preclip als `input_url` — **niemals** `output_url` des vorigen Passes | `pass-face-preclip.ts`, Dispatch-Payload |
+| 5 | Per-Pass PG advisory lock (`FEATURE_PER_PASS_LOCK=true`) | `dialog_dispatch_locks`, `try_acquire_dialog_lock` |
+| 6 | Per-Slot JSONB RPC Write (`update_dialog_shot_pass`) — nie Full-Row-Rewrite | Webhook-Handler `sync-so-webhook/*` |
+| 7 | ASD deterministisch für N≥2: `frame_number+coords` **oder** `bounding_boxes_url`. **Nie** `auto_detect:true` | Dispatch-Payload-Builder |
+| 8 | Auf `sync-3`: `temperature` und `occlusion_detection_enabled` **entfernt** | Payload-Sanitizer |
+| 9 | Auf `lipsync-2-pro`: Retry-Ladder `RETRY_TEMPERATURES=[0.5,0.35,0.7,0.4]`, `MAX_SHOT_RETRIES=4` | Retry-Logik |
+| 10 | Webhook `verify_jwt=false`; `x-webhook-secret` gegen `WEBHOOK_SHARED_SECRET` in Code validiert; idempotent auf Duplikate | `sync-so-webhook/index.ts`, `supabase/config.toml` |
+| 11 | Background-Preclip-Prefanout (`PRECLIP_PREFANOUT_ENABLED=true`) | Preclip-Renderer + Trigger |
+| 12 | Stale-Job-Reconcile ≤500 ms vor Fan-Out; 429-Backoff mit Jitter; pg_cron-Watchdog 1 min, 8 min Pass-Timeout; idempotenter Refund via deterministischer UUID aus `(video_id, pass_idx)` | Watchdog-Function, Reconcile-Function, Refund-Helper |
 
-### 1. `supabase/functions/render-sync-segments-audio-mux/index.ts`
+Zusätzlich Non-§10-Elemente aus dem Guide, die den Multi-Speaker-Output visuell prägen:
 
-- **`silentFaceFreezes` hart auf leer setzen** unter `OVERLAY_MASK_VERSION = "v169_parity"`. Der gesamte v195/v197-Block (Zeilen ~275–364) wird gated: Ergebnis ist immer `silentFaceFreezes = []`, unabhängig vom `system_config.composer.silent_anchor_v195`-Flag.
-- Feature-Flag im Log dokumentieren: `silent_layers_disabled=true`.
-- Ebenso `silentFaceAnchors`/`mouthMattes` (falls in inputProps aufgeführt) leer lassen — kein neuer Code, nur bestehende Feldzuweisungen ausnullen.
-- Bestehender v205-Guard gegen `faceMask`-Fallback bleibt.
+| # | Element | Zu prüfen |
+|---|---------|-----------|
+| A | v166 Anchor-Identity Slot Bridge — Anchor-Portraits + Plate-Identitäten vor ASD-Build gemergt; **kein Fallback** `unlabeled.find(f => f.slot === idx)` | `compose-dialog-segments/index.ts` |
+| B | Final Concat in `finalize-dialog-scene` produziert **einen** `clip_url`; keine Silent-Overlay-Layer im Mux | `finalize-dialog-scene/index.ts`, `render-sync-segments-audio-mux/index.ts` |
+| C | Plate-Prompt-Version = **v167** (nicht v171/v172 verschärft) | `compose-video-clips/index.ts` Zeilen ~861/~864/~1038/~1041 |
+| D | COMPOSE_DIALOG_SEGMENTS_VERSION-String — kann v164 bleiben (Guide-Note), reiner Log-Grep | `compose-dialog-segments/index.ts` Header |
 
-### 2. `src/remotion/templates/DialogStitchVideo.tsx`
+Element **C** ist der einzige Punkt, an dem eine echte Diff-Möglichkeit besteht: seit v169 wurden v171 (Ghost-Speaker Guard), v172 (Closed-Eyes Guard), v182 (N=1 Closed-Mouth Prompt) hinzugefügt. Wenn eine dieser Ergänzungen den Plate-Output *schlechter* macht (z.B. weil Hailuo die verschärften Anweisungen als "halb-offener Mund" interpretiert), wäre eine kontrollierte Rückstellung zum v167-Prompt-Text ein legitimer Fix — aber erst nachdem 1–12 + A/B sauber sind.
 
-- Keine Component-Removal, nur Render-Gate: Wenn `silentFaceFreezes` leer/undefined ist (Standard nach dem Edge-Function-Change), werden `SilentFaceFreeze`, `SilentFaceAnchor` und `MouthMatteFreeze` gar nicht erst gemountet. Das ist bereits so — es reicht, dass die Edge-Function die Arrays leer lässt. Kein Template-Change nötig.
-- Sicherheits-Log am Composition-Mount: `console.log('[DialogStitch] v169_parity silent_layers_expected=empty')` — nur Diagnose.
+## Ergebnis-Format
 
-### 3. Nicht angefasst
+Ich erzeuge `mem/architecture/lipsync/v207-v169-guide-audit.md` mit:
 
-Sync.so-Dispatch (v204 preclip + clip-space bbox), Preclip-Render, Anchor/Cast-Resolution (v201), Refund/Watchdog, alle CroppedOverlay-Maskenprofile aus v205 (bleiben v169-weich). Kein Poisson-Blending, keine Landmark-Segmentation.
+- Tabelle aller 16 Punkte, Ist-Zustand, Guide-Soll, Drift-Bewertung.
+- Für jede Drift ein exakter Datei:Zeile-Verweis + minimale Korrektur.
+- Für jeden ✓-Match: kurze Begründung (Log-Marker oder Code-Zeile).
 
-### 4. Deploy
+## Erst-danach-Fix
 
-1. Edge-Function `render-sync-segments-audio-mux` deployen (automatisch beim Speichern).
-2. Remotion-Bundle über `scripts/deploy-remotion-bundle.sh` neu deployen (erforderlich für das Diagnostik-Log; die eigentliche Verhaltensänderung liegt in der Edge-Function).
+Nach dem Audit gibt es drei mögliche Outcomes:
 
-## Verifikation
+1. **Drift gefunden** — wir korrigieren nur die driftenden Punkte, keine neuen Features. Erwartung: Ghost-Mouthing verschwindet, weil ein Guide-Element fehlt/falsch war.
+2. **Kein Drift, aber Prompt hat sich seit v169 geändert** (Element C) — wir stellen den Plate-Prompt kontrolliert auf v167-Textstand zurück (dokumentiert im Audit-Memo mit Diff).
+3. **Kein Drift, Prompt identisch** — dann ist die einzige verbleibende Erklärung eine **Hailuo/Kling-Modell-Regression** außerhalb unserer Kontrolle. In dem Fall dokumentieren wir das und die Diskussion geht weiter über Modell-Alternativen oder gezielte Overlay-Reaktivierung — bewusst nicht Teil dieses Plans.
 
-Mux-Log zeigt:
-- `overlay_mask_version=v169_parity`
-- `silent_slots_used=0`
-- `facemasks_used=0`
-- `silent_layers_disabled=true`
-- `crops_used>=N-1`
+## Nicht angefasst
 
-Visuell:
-- Kein Halo (v205-Weichmaske bleibt).
-- Keine Morphs (kein Freeze-Layer mehr, der gegen die Master-Plate driftet).
-- Lip-Sync-Timing wieder wie v169 (kein Freeze-Layer verdeckt den aktiven Mund).
+- Kein neuer Silent-Layer.
+- Kein Prompt-Front-Loading, kein neuer Negativ-Prompt.
+- `render-sync-segments-audio-mux` bleibt im v206-Zustand (Silent-Layer aus).
+- Sync.so-Dispatch, Refund/Watchdog, Preclip-Pipeline werden nur **gelesen**, nicht modifiziert (Modifikation nur bei bewiesener Drift zur v169-Guide-Spec).
 
-## Risiko / Trade-off
+## Deploy
 
-Non-Speaker in Multi-Speaker-Szenen zeigen wieder die rohe Master-Plate. Auf Plates mit ausgeprägter Idle-Mundbewegung kann leichtes "Ghost-Mouthing" auf Non-Speakern sichtbar werden — genau das v169-Verhalten. Das war unter v169 offenbar akzeptabel, und die spätere professionelle Lösung (Landmark-Mund-Matte + Poisson) bleibt für die Feedback-Phase reserviert.
-
-Falls das Ghost-Mouthing im Test stört, kann in einem separaten Schritt gezielt nur `SilentFaceFreeze` mit schmaler Ellipse unter dem Mundbereich reaktiviert werden — bewusst nicht Teil dieses Rollbacks.
+- Audit-Memo: kein Deploy nötig.
+- Falls Drift-Korrekturen: Edge-Functions auto, Remotion-Bundle nur wenn Template geändert wurde.
