@@ -98,9 +98,7 @@ export function CalendarToolbar({
               <DropdownMenuItem onClick={onAddNote} disabled={readOnly}>
                 <StickyNote className="w-4 h-4 mr-2" /> {t("calendar.actions.addNote")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onShare}>
-                <Share2 className="w-4 h-4 mr-2" /> {t("calendar.actions.share")}
-              </DropdownMenuItem>
+              {/* Share hidden during Beta — feature not yet shipped */}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onExport('csv')}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" /> {t("calendar.export.csv")}
@@ -262,12 +260,7 @@ export function CalendarToolbar({
                 {t('calendar.addNoteLabel')}
               </DropdownMenuItem>
               
-              <DropdownMenuSeparator className="bg-white/10" />
-              
-              <DropdownMenuItem onClick={onShare}>
-                <Share2 className="w-4 h-4 mr-2" />
-                {t('calendar.shareLabel')}
-              </DropdownMenuItem>
+              {/* Share hidden during Beta — feature not yet shipped */}
               
               <DropdownMenuSeparator className="bg-white/10" />
               
