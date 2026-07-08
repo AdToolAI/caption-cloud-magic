@@ -204,7 +204,8 @@ function AppLayout() {
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/billing" element={<Billing />} />
                     <Route path="/credits" element={<Credits />} />
-                    <Route path="/upgrade-enterprise" element={<UpgradeEnterprise />} />
+                    {/* Beta: single plan only — legacy Enterprise upgrade path redirects to /pricing */}
+                    <Route path="/upgrade-enterprise" element={<Navigate to="/pricing" replace />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     {/* Marketplace legal — must come before /legal/:page catchall */}
