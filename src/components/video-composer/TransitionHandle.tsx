@@ -51,7 +51,7 @@ export function TransitionHandle({
       >
         <button
           type="button"
-          aria-label={`Übergang bearbeiten (${label})`}
+          aria-label={`${EDIT_LABEL[lang]} (${label})`}
           className={cn(
             'group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-[0.14em]',
             'border backdrop-blur-md transition-all',
