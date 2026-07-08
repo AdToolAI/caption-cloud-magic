@@ -62,3 +62,25 @@ export const getRequiredPlan = (feature: keyof PlanFeatures): PlanType | null =>
   
   return null;
 };
+
+/**
+ * Emit a `feature_gate_hit` PostHog event when the UI blocks a user from a
+ * feature they don't have plan access to. Call this from the code path that
+ * actually shows the paywall / lock UI — not from the pure hasAccess check.
+ */
+export const trackFeatureGateHit = (
+  feature: keyof PlanFeatures,
+  userPlan: PlanType | null | undefined,
+  extra: Record<string, unknown> = {}
+): void => {
+  try {
+    trackEvent(ANALYTICS_EVENTS.FEATURE_GATE_HIT, {
+      feature,
+      current_plan: userPlan ?? 'anonymous',
+      required_plan: getRequiredPlan(feature),
+      ...extra,
+    });
+  } catch {
+    // never let analytics break the gate UX
+  }
+};
