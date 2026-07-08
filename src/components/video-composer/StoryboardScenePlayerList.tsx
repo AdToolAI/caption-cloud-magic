@@ -113,6 +113,7 @@ export default function StoryboardScenePlayerList({
   onReorder,
   onAddScene,
   onGenerate,
+  onUpdateSceneTransition,
   className,
 }: Props) {
   const sensors = useSensors(
@@ -142,17 +143,32 @@ export default function StoryboardScenePlayerList({
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
-            {scenes.map((scene, index) => (
-              <SortablePlayer
-                key={scene.id}
-                scene={scene}
-                index={index}
-                isActive={scene.id === selectedSceneId}
-                isGenerating={!!generatingMap[scene.id]}
-                onSelect={() => onSelect(scene.id)}
-                onGenerate={() => onGenerate(scene)}
-              />
-            ))}
+            {scenes.map((scene, index) => {
+              const isLast = index === scenes.length - 1;
+              const transitionType = (scene.transitionType ?? 'none') as TransitionStyle;
+              const transitionDuration = scene.transitionDuration ?? 0.5;
+              return (
+                <div key={scene.id}>
+                  <SortablePlayer
+                    scene={scene}
+                    index={index}
+                    isActive={scene.id === selectedSceneId}
+                    isGenerating={!!generatingMap[scene.id]}
+                    onSelect={() => onSelect(scene.id)}
+                    onGenerate={() => onGenerate(scene)}
+                  />
+                  {!isLast && onUpdateSceneTransition && (
+                    <TransitionHandle
+                      value={transitionType}
+                      duration={transitionDuration}
+                      onChange={(type, duration) =>
+                        onUpdateSceneTransition(scene.id, type, duration)
+                      }
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </SortableContext>
       </DndContext>
