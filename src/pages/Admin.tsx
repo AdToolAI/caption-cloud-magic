@@ -26,8 +26,12 @@ export default function Admin() {
         </p>
       </div>
 
-      <Tabs defaultValue="bugs" className="space-y-6">
+      <Tabs defaultValue="beta-health" className="space-y-6">
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="beta-health" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Beta Health
+          </TabsTrigger>
           <TabsTrigger value="bugs" className="flex items-center gap-2">
             <Bug className="h-4 w-4" />
             Bug Reports
