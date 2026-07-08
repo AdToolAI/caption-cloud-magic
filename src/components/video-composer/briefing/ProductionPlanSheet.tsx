@@ -8,7 +8,7 @@
  * itself respects the protection filter.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -169,11 +169,16 @@ export default function ProductionPlanSheet({
     message: string;
     warnings: string[];
   } | null>(null);
+  const currentBriefingRef = useRef(currentBriefing);
+
+  useEffect(() => {
+    currentBriefingRef.current = currentBriefing;
+  }, [currentBriefing]);
 
   // When a new initialPlan arrives (subsequent re-opens), refresh local state.
   useEffect(() => {
     if (initialPlan) {
-      setPlan(ensureProductionPlanEnsemble(initialPlan, currentBriefing));
+      setPlan(ensureProductionPlanEnsemble(initialPlan, currentBriefingRef.current));
       setStep('review');
     }
   }, [initialPlan]);
