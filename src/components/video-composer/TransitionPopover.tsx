@@ -78,7 +78,7 @@ export function TransitionPopover({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Dauer</Label>
+            <Label className="text-xs">{l.duration}</Label>
             <span className="text-[11px] font-mono text-primary/80">
               {duration.toFixed(1)}s
             </span>
