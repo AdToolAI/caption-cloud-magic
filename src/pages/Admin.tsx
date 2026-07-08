@@ -13,7 +13,8 @@ import { MotionStudioSuperuserPanel } from '@/components/admin/MotionStudioSuper
 import LambdaHealth from '@/pages/admin/LambdaHealth';
 import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPanel';
 import { CharacterMarketplaceReviewPanel } from '@/components/admin/CharacterMarketplaceReviewPanel';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store } from 'lucide-react';
+import { BetaHealth } from '@/components/admin/BetaHealth';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -25,8 +26,12 @@ export default function Admin() {
         </p>
       </div>
 
-      <Tabs defaultValue="bugs" className="space-y-6">
+      <Tabs defaultValue="beta-health" className="space-y-6">
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="beta-health" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Beta Health
+          </TabsTrigger>
           <TabsTrigger value="bugs" className="flex items-center gap-2">
             <Bug className="h-4 w-4" />
             Bug Reports
@@ -80,6 +85,10 @@ export default function Admin() {
             Alerts
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="beta-health">
+          <BetaHealth />
+        </TabsContent>
 
         <TabsContent value="bugs">
           <BugReportsAdmin />
