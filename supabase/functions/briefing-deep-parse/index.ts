@@ -270,9 +270,10 @@ Dramaturgy:
 For EVERY auto-generated scene you MUST fill what the briefing does not specify:
 - "voiceover.text": in the briefing's language, short, speakable, on-message.
   Derive from USPs / Logline / Target Audience. ≤ 25 words per scene.
-- "cast": pick from the "## Cast" mention keys (e.g. "@founder-avatar"). Max 2
-  speakers per scene. Pin to a single cast for talking-head moments; use 2 for
-  dialog. If no cast is provided, leave empty (B-Roll only).
+- "cast": pick from the "## Cast" mention keys (e.g. "@founder-avatar"). For
+  ordinary talking-head moments use 1 speaker; for dialog use 2 speakers; for
+  REQUIRED ensemble moments use ALL selected cast members up to 4. If no cast is
+  provided, leave empty (B-Roll only).
 - "engine": "cinematic-sync" when the scene has cast + spoken VO/dialog;
   "broll" for pure cutaway / product hero / establishing shots; "heygen" only
   if the briefing explicitly asks for HeyGen photo-avatars.
@@ -307,6 +308,13 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
   the beat.
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
+
+ENSEMBLE CAST GUARANTEE (HARD): If the "## Cast" section contains 2–4 selected
+avatars, at least ONE scene MUST include ALL selected cast mention keys together.
+If the plan has 6 or more scenes, at least TWO scenes MUST include ALL selected
+cast mention keys together. These scenes must be wide/medium-wide group shots,
+not close-ups, and anchorPromptEN must name every cast member and describe a
+distinct visible action for each.
 
 INTELLIGENT DEFAULTS — Transition / Overlay / Tone / Performance (NEVER leave undefined):
 You MUST always fill scenes[i].transition, scenes[i].textOverlay (or leave
