@@ -79,55 +79,36 @@ serve(async (req) => {
     // === Pro auto-coupon logic ===
     let resolvedCoupon: string | null = couponId ?? null;
     let foundersSlotReserved = false;
+    let foundersSlotNumber: number | null = null;
 
     if (!resolvedCoupon && !promoCode && PRO_PRICE_IDS.has(priceId)) {
-      // Check if user already has a founders/launch slot
-      const { data: existing } = await supabaseAdmin
-        .from("founders_signups")
-        .select("coupon_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Atomic slot claim via SQL function (advisory lock prevents races)
+      const { data: claim, error: claimErr } = await supabaseAdmin.rpc("claim_founders_slot", {
+        _user_id: user.id,
+        _stripe_customer_id: customerId,
+        _founders_coupon: FOUNDERS_COUPON,
+        _launch_coupon: LAUNCH_COUPON,
+        _max_slots: FOUNDERS_MAX_SLOTS,
+      });
 
-      if (existing) {
-        resolvedCoupon = existing.coupon_id;
-        console.log(`User already has slot: ${resolvedCoupon}`);
+      if (claimErr) {
+        console.error("claim_founders_slot failed:", claimErr.message);
+        // Fail open: no coupon, checkout proceeds at regular price
+        resolvedCoupon = null;
       } else {
-        // Count current founders slots
-        const { count } = await supabaseAdmin
-          .from("founders_signups")
-          .select("*", { count: "exact", head: true })
-          .eq("coupon_id", FOUNDERS_COUPON);
-
-        const founders = count ?? 0;
-        if (founders < FOUNDERS_MAX_SLOTS) {
-          resolvedCoupon = FOUNDERS_COUPON;
-          // Reserve the slot (subscription_id filled later by webhook if available)
-          const { error: insErr } = await supabaseAdmin
-            .from("founders_signups")
-            .insert({
-              user_id: user.id,
-              stripe_customer_id: customerId,
-              coupon_id: FOUNDERS_COUPON,
-            });
-          if (!insErr) {
-            foundersSlotReserved = true;
-            console.log(`Reserved founders slot ${founders + 1}/${FOUNDERS_MAX_SLOTS}`);
-            await trackBusinessEvent("founders_slot_claimed", user.id, {
-              slot_number: founders + 1,
-              max_slots: FOUNDERS_MAX_SLOTS,
-              coupon: FOUNDERS_COUPON,
-            });
-          } else {
-            console.warn("Could not reserve founders slot:", insErr.message);
-          }
-        } else {
-          resolvedCoupon = LAUNCH_COUPON;
-          await supabaseAdmin.from("founders_signups").insert({
-            user_id: user.id,
-            stripe_customer_id: customerId,
-            coupon_id: LAUNCH_COUPON,
+        const row = Array.isArray(claim) ? claim[0] : claim;
+        resolvedCoupon = row?.coupon_id ?? null;
+        foundersSlotReserved = !!row?.is_founder;
+        foundersSlotNumber = row?.slot_number ?? null;
+        console.log(
+          `Slot claimed: coupon=${resolvedCoupon} founder=${foundersSlotReserved} slot=${foundersSlotNumber}`,
+        );
+        if (foundersSlotReserved && foundersSlotNumber) {
+          await trackBusinessEvent("founders_slot_claimed", user.id, {
+            slot_number: foundersSlotNumber,
+            max_slots: FOUNDERS_MAX_SLOTS,
+            coupon: FOUNDERS_COUPON,
           });
-          console.log("Founders sold out, applying launch coupon");
         }
       }
     }
