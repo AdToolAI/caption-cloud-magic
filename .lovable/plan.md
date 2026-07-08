@@ -1,61 +1,90 @@
-# Sauberste Lösung für Ghost-Mouthing (N≥2)
+# Provider-Risk-Warnung im Kosten-Bestätigungs-Dialog
 
-Der Audit hat bewiesen: Die Pipeline ist v169-konform, der Plate-Prompt wurde in v171 gezielt gegen genau dieses Symptom gehärtet. Weitere blinde Prompt- oder Layer-Änderungen wären Rückschritt. Der professionelle Weg ist **erst diagnostizieren, dann gezielt handeln** — statt erneut zu raten.
+## Entscheidungen aus Q&A
 
-## Phase 1 — Root-Cause-Isolation (nicht-invasiv, keine Codeänderung an der Pipeline)
+- **Keine Auto-Migration.** Kling & andere Provider bleiben wählbar. Nutzer entscheidet selbst.
+- **Reine Aufklärung + Haftungsausschluss** im bestehenden Kosten-Fenster vor "Clip generieren".
+- **Refund-Ausschluss betrifft ausschließlich Lipsync-Artefakte** (Ghost-Mouthing, Mund-Fehler, Sync-Drift). Lambda-Timeouts, Sync.so-Ausfälle, Netzwerkfehler etc. bleiben refundfähig wie gehabt.
 
-Ziel: eindeutig feststellen, **wo** die Mundbewegung des Nicht-Sprechers entsteht. Es gibt genau drei Kandidaten, und ein einziger Test trennt sie sauber.
+## Provider-Klassifikation (eine zentrale Stelle)
 
-**Instrumentierung (nur Logging + Debug-Endpoint, read-only):**
+Neue Konstante `LIPSYNC_SAFE_PROVIDERS = ['ai-hailuo', 'ai-happyhorse']` in `src/config/lipsyncProviderSafety.ts`.
 
-1. In `compose-dialog-segments` beim erfolgreichen Abschluss einer N≥2-Szene die Debug-URLs strukturiert in die bestehende `video_creations.debug_payload` schreiben:
-   - `master_plate_url` (Hailuo/Kling raw output, vor jeder Sync-Pass)
-   - `preclip_urls[speakerId]` (pro Sprecher die isolierte Pre-Clip-Quelle)
-   - `pass_output_urls[speakerId]` (Sync.so Output pro Pass, vor Mux)
-   - `final_muxed_url` (nach `render-sync-segments-audio-mux`)
-2. Kleiner interner Debug-View unter `/debug/lipsync/:creationId`, der diese 4 Ebenen nebeneinander abspielt (nur read; nutzt existierende signierte URLs).
+Helper: `isLipsyncRisky(clipSource, hasLipsync, speakerCount)` → boolean.
+Trigger: `hasLipsync === true` UND `clipSource ∉ LIPSYNC_SAFE_PROVIDERS`. Bei N≥2 wird die Warnung schärfer formuliert, aber gleicher Mechanismus.
 
-**Diagnose-Matrix:**
+## Kosten-Bestätigungs-Dialog
 
-```text
-Non-Speaker-Mund bewegt sich in…      → Ursache               → Richtige Maßnahme
-───────────────────────────────────────────────────────────────────────────────
-master_plate_url                       Hailuo/Kling Modell     Phase 2A (Modell)
-preclip_urls[X] außerhalb Turn(X)      Pre-Clip Segmentierung  Phase 2B (Clipping)
-nur in pass_output_urls[X]             Sync.so Bleed           Phase 2C (Sync.so)
-erst in final_muxed_url                Mux/Composite            Phase 2D (Mux)
+Ort: das bestehende Modal, das beim Klick auf "Clip generieren" die Kosten pro Provider auflistet. (Konkret: der Confirm-Step im Composer vor `compose-video-clips`-Dispatch — Datei-Lokalisierung Teil der Implementation.)
+
+**Bestehende Struktur bleibt.** Wir fügen nur einen konditionalen Warn-Block hinzu, wenn `isLipsyncRisky(...)` true ist:
+
+```
+┌─────────────────────────────────────────────────┐
+│  Kostenübersicht                                │
+│  [bestehende Cost-Breakdown-Tabelle]            │
+│                                                 │
+│  ⚠️  Hinweis zu Lipsync mit {ProviderName}      │
+│                                                 │
+│  {ProviderName} liefert bei Lipsync-Szenen      │
+│  {N≥2 ? "mit mehreren Sprechern " : ""}nicht    │
+│  zuverlässige Ergebnisse. Es kann zu            │
+│  Ghost-Mouthing, verzerrten Gesichtern und      │
+│  falschen Mundbewegungen kommen.                │
+│                                                 │
+│  Für stabile Lipsync-Renderings empfehlen wir   │
+│  Hailuo oder HappyHorse.                        │
+│                                                 │
+│  Wenn du trotzdem fortfährst:                   │
+│  • Die Plattform übernimmt keine Haftung für    │
+│    Lipsync-bezogene Bildfehler.                 │
+│  • Eine Rückerstattung der Credits für          │
+│    Lipsync-Artefakte ist in diesem Fall         │
+│    ausgeschlossen.                              │
+│  • Andere Fehlerarten (Timeouts, System-        │
+│    ausfälle) bleiben weiter refundfähig.        │
+│                                                 │
+│  ☐  Ich habe die Risiken verstanden und         │
+│      möchte trotzdem fortfahren.                │
+│                                                 │
+│  [Abbrechen]      [Trotzdem generieren]         │
+└─────────────────────────────────────────────────┘
 ```
 
-Ohne diese Trennung ist jede weitere Änderung Ratearbeit.
+- Checkbox muss aktiv sein, sonst ist "Trotzdem generieren" disabled.
+- Ohne Risiko-Fall: Dialog verhält sich exakt wie heute, kein Warn-Block, kein Extra-Klick.
+- Copy in DE + EN + ES (Core-Localization-Regel).
 
-## Phase 2 — Gezielte Maßnahme (abhängig vom Ergebnis)
+## Consent-Protokollierung (für den Refund-Ausschluss)
 
-Nur **eine** der folgenden Optionen wird umgesetzt — die, die Phase 1 als Ursache identifiziert:
+Damit der Ausschluss nachvollziehbar ist:
 
-**2A — Modell-Adhärenz (Hailuo/Kling reden im Plate):**
-- Provider-Vergleichstest: dieselbe Szene je einmal mit Hailuo und Kling rendern, Ghost-Rate messen.
-- Falls ein Provider stabil besser ist: Provider-Präferenz für N≥2 auf den besseren Provider setzen (bestehender Auswahlmechanismus, kein neues Layer).
-- Falls beide gleich schlecht: minimal-invasive Prompt-Iteration **nur am Plate**, dokumentiert und A/B-getestet gegen aktuellen v175/v182-Stand. Kein Rollback auf v167.
+- Beim Bestätigen wird auf der Szene / im Job-Record markiert: `risky_provider_acknowledged: true`, `acknowledged_provider: 'ai-kling'`, `acknowledged_at: <timestamp>`.
+- Feld sitzt in einer bestehenden Job-Metadata-Spalte (z.B. `composer_scenes.metadata` oder analog `dialog_shots`) — kein neues Schema, nur ein Key mehr im JSONB.
+- Der Credit-Refund-Automat (siehe Memory `Credit Refund Automation`) prüft diesen Key vor Refund: wenn `true` und Fehlerkategorie = `lipsync_artifact`, kein Auto-Refund. Andere Fehlerkategorien (Lambda-Timeout, Provider-500, Sync.so-Terminal) refunden unverändert.
 
-**2B — Pre-Clip Segmentierung leaked Zeit:**
-- Turn-Windows in `v204MultiSpeakerPreclipDispatch` gegen `dialog_turns` neu verifizieren (±Frame-Padding prüfen). Ein-Zeilen-Fix, keine Architekturänderung.
+## Was NICHT geändert wird
 
-**2C — Sync.so Bleed innerhalb eines Passes:**
-- Support-Ticket bei Sync.so mit reproduzierbarem Preclip + Output. Kein clientseitiger Workaround ohne Provider-Bestätigung.
+- Kein Rollback des v171/v172-Plate-Prompts.
+- **Keine Auto-Migration Kling → Hailuo.**
+- Kein neuer Overlay-Layer, kein Preclip-Change.
+- Kein Blockieren von Kling im Provider-Picker — nur Aufklärung.
+- Bestehende Pika- und HappyHorse-Migrationen in `compose-video-clips` bleiben unangetastet (die haben andere Gründe).
 
-**2D — Mux/Composite Artefakt:**
-- `render-sync-segments-audio-mux` prüft, ob Slot-Bridging (v166 Anchor-Identity) korrekt zwischen Pässen wechselt. Fix lokal in der Mux-Funktion.
+## Deliverables
 
-## Was bewusst NICHT gemacht wird
+1. **`src/config/lipsyncProviderSafety.ts`** — `LIPSYNC_SAFE_PROVIDERS` + `isLipsyncRisky` Helper (~20 Zeilen).
+2. **Kosten-Bestätigungs-Dialog** (bestehende Modal-Komponente) — konditionaler Warn-Block + Consent-Checkbox + Disabled-Logik für den Confirm-Button.
+3. **Job-Dispatch** (`compose-video-clips` Client-Aufruf + Edge-Function-Read) — `risky_provider_acknowledged` durchreichen und in Scene-Metadata persistieren.
+4. **Credit-Refund-Automat** — Fehlerkategorie-Check: bei `lipsync_artifact` + `risky_provider_acknowledged === true` → kein Refund, sonst wie bisher.
+5. **Localization** — DE/EN/ES Strings für Warn-Block.
+6. **`mem/architecture/lipsync/v209-risky-provider-consent.md`** — Diagnose (Kling N≥2 Ghost-Mouthing), Entscheidung (Consent statt Auto-Migration), Refund-Regel.
+7. **`mem/architecture/lipsync/provider-compatibility-matrix.md`** — Kling-Zeile aktualisieren: "Multi-Speaker Lipsync unzuverlässig — User-Consent erforderlich".
 
-- **Kein** neuer Overlay-Layer (v183–v197 Reihe war genau der falsche Weg — siehe Memory).
-- **Kein** Rollback des Plate-Prompts auf v167 (würde v171-Fix zurücknehmen).
-- **Kein** erneutes „Blindraten" ohne Isolationsergebnis.
+## Verifizierung
 
-## Deliverables Phase 1
-
-- `compose-dialog-segments`: Debug-Payload-Erweiterung (~10 Zeilen, hinter `DEBUG_LIPSYNC_URLS` Flag).
-- `src/pages/DebugLipsync.tsx`: einfache 4-Panel-Playback-Ansicht.
-- `mem/architecture/lipsync/v208-rootcause-isolation.md`: Protokoll + Matrix.
-
-Nach einem einzigen N≥2-Ghost-Mouthing-Fall wissen wir, wo das Problem sitzt — und lösen es an genau einer Stelle, statt die Pipeline weiter aufzublasen.
+- Kling + Lipsync + N=3 auswählen → Dialog zeigt Warn-Block mit "mehreren Sprechern"-Text, Confirm disabled ohne Checkbox.
+- Hailuo + Lipsync → Dialog unverändert, keine Warnung.
+- Kling ohne Lipsync (B-Roll) → Dialog unverändert, keine Warnung.
+- Nach Bestätigung: `composer_scenes.metadata.risky_provider_acknowledged = true`.
+- Simulierter Lipsync-Artefakt-Fehler bei bestätigter Szene → kein Auto-Refund; simulierter Lambda-Timeout bei gleicher Szene → Refund läuft normal.

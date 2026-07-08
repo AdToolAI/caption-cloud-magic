@@ -20,6 +20,7 @@ import {
 } from '@/types/video-composer';
 import { computeProviderEta } from '@/hooks/useProviderEta';
 import { getRenderWarnings, aggregateWarnings, type RenderWarning } from '@/lib/video-composer/renderWarnings';
+import { getRiskyLipsyncInfo, type RiskyLipsyncInfo } from '@/config/lipsyncProviderSafety';
 
 const CREDIT_PER_EUR = 100;     // 1 credit = €0.01
 const VO_CREDITS_PER_SCENE = 5; // ~€0.05 ElevenLabs avg
@@ -53,6 +54,8 @@ export interface SceneCostBreakdown {
   etaSeconds: number;
   /** Provider/config warnings for this scene. */
   warnings: RenderWarning[];
+  /** v209: Risiko-Info wenn Lipsync auf unsicherem Provider läuft. */
+  riskyLipsync: RiskyLipsyncInfo | null;
 }
 
 export interface AggregatedCost {
@@ -63,6 +66,12 @@ export interface AggregatedCost {
   etaSeconds: number;
   /** Deduplicated warnings across all scenes. */
   warnings: RenderWarning[];
+  /** v209: Alle Szenen, die Lipsync auf einem unsicheren Provider fahren. */
+  riskyLipsyncScenes: Array<{
+    sceneId: string;
+    sceneIndex: number;
+    info: RiskyLipsyncInfo;
+  }>;
 }
 
 interface EstimateOpts {
@@ -172,6 +181,7 @@ export function estimateSceneRenderCost(
     lines,
     etaSeconds,
     warnings: getRenderWarnings(scene),
+    riskyLipsync: lipsyncCredits > 0 ? getRiskyLipsyncInfo(scene) : null,
   };
 }
 
@@ -184,12 +194,20 @@ export function aggregateCost(
   // is roughly the slowest scene plus a small overhead for orchestration.
   const slowest = breakdowns.reduce((mx, b) => Math.max(mx, b.etaSeconds), 0);
   const etaSeconds = Math.round(slowest * 1.2) + (breakdowns.length > 1 ? STITCH_ETA_SECONDS : 0);
+  const riskyLipsyncScenes = breakdowns
+    .filter((b) => b.riskyLipsync)
+    .map((b) => ({
+      sceneId: b.sceneId,
+      sceneIndex: b.sceneIndex,
+      info: b.riskyLipsync as RiskyLipsyncInfo,
+    }));
   return {
     scenes: breakdowns,
     totalCredits: breakdowns.reduce((sum, b) => sum + b.totalCredits, 0),
     totalEur: breakdowns.reduce((sum, b) => sum + b.totalEur, 0),
     etaSeconds,
     warnings: aggregateWarnings(scenes),
+    riskyLipsyncScenes,
   };
 }
 
