@@ -264,6 +264,10 @@ export function useGenerateAllClips({
           durationSeconds: s.durationSeconds,
           characterShot: s.characterShot,
           characterShots: s.characterShots,
+          // v211 — canonical UUID array (Cast + World). Mirrors
+          // `composer_scenes.scene_assets` v202 shape so the edge function
+          // can look up reference images without slug-matching.
+          scene_assets: buildSceneAssetsForRender(s, libLocations),
           dialogScript: s.dialogScript,
           dialogVoices: s.dialogVoices,
           engineOverride: s.engineOverride ?? 'auto',
