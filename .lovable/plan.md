@@ -1,125 +1,89 @@
-# Full Motion Studio ID-Clean + AI Video Studio Cast/World-Integration
-
 ## Ziel
-Cast & World-Assets über die gesamte Video-Pipeline UUID-strict. World-Assets bekommen die gleiche ID-Bridge wie Cast. Universal Creator / ToolkitGenerator / PictureStudio erhalten die gleichen Picker wie Motion Studio.
 
-## Scope
-- Motion Studio (Composer): World-UUID-Bridge + Legacy-Name-Match hart abschalten
-- AI Video Studio (UniversalCreator, ToolkitGenerator, PictureStudio): Cast- und World-Picker einbauen, `characterShots[]` + `scene_assets` schreiben
-- Kein Inline-Create im Composer (später separater Scope)
-- Keine Schema-Änderung nötig — `composer_scenes.scene_assets` (v202) und `brand_characters`/`brand_locations`/`brand_buildings`/`brand_props` existieren
+In **Cast & World** kann der Nutzer für jeden Asset-Typ (Character, Prop, Building, Location) **ein beliebiges Foto** hochladen — auch schlecht ausgeleuchtet, mit Hintergrund, schräg — und die KI erzeugt daraus automatisch ein **sauberes Referenzbild mit transparentem Hintergrund** (bzw. neutralem Studio-Hintergrund für Locations, wo Transparenz keinen Sinn ergibt). Das Ergebnis landet als `reference_image_url` in der jeweiligen Brand-Tabelle mit einer echten UUID pro Nutzer/Workspace und fließt unverändert durch die bereits verdrahtete Cast-&-World-ID-Pipeline (v202/v211).
 
----
+## User-Flow
 
-## Phase A — Motion Studio World-UUID-Bridge
+```text
+[Cast & World Panel]
+  └─ „+ Aus Foto erstellen"  (überall gleich: Character / Prop / Building / Location)
+        ↓ File-Picker (JPG/PNG/HEIC/WebP)
+  ┌─────────────────────────────────────────┐
+  │  Preview: Original    →   Cleaned       │
+  │  [Name eingeben]                        │
+  │  [Auto-clean-Modus ▼]                    │
+  │    • Cutout (transparent)  ← Prop/Char  │
+  │    • Studio-Backdrop       ← Building   │
+  │    • Cinematic Restage     ← Location   │
+  │  [Erneut generieren]  [Speichern]       │
+  └─────────────────────────────────────────┘
+```
 
-**A.1 SceneAssetMention um UUID erweitern**
-- `src/lib/motion-studio/applySceneAssetsToPrompt.ts`: Typ auf `{ type, id, name }` erweitern; Prompt-Marker weiter slug-basiert (rein textuell für LLM), aber Struktur trägt UUID.
-- `src/components/video-composer/UnifiedAssetPicker.tsx:168`: Selection schreibt `{ type: 'location'|'building'|'prop', id: <uuid>, name }`.
-- `src/components/video-composer/SceneDirectorBox.tsx:123`: Callsite an neue Signatur anpassen.
+Ein Klick, ein Sheet, überall dieselbe Komponente.
 
-**A.2 scene_assets Live-Persistenz**
-- Neuer Helper `src/lib/motion-studio/persistSceneAssets.ts` — mappt gewählte World-Assets + `characterShots` zu `SceneAssetRef[]` und schreibt in `composer_scenes.scene_assets` via `useComposerPersistence`.
-- Hook in `UnifiedAssetPicker` onChange, `CharacterCastPicker` onChange, `BriefingTab` character-shot-Edits.
-- Debounced Save (500ms) analog zur bestehenden Scene-Autosave-Logik.
+## Umsetzung
 
-**A.3 Render-Payload erweitern**
-- `src/hooks/useGenerateAllClips.ts:252` + `src/components/video-composer/ClipsTab.tsx:656`: `scenesPayload` um `scene_assets: SceneAssetRef[]` erweitern (aus DB-Snapshot der Szene).
-- Edge Function `compose-video-clips` (kurzer Check): liest heute `scene_assets` bereits per JIT aus DB? Falls ja → Client-Payload optional; falls nein → Payload-Feld ist die Bridge.
+### 1. Edge Function `refine-asset-photo` (neu)
+`supabase/functions/refine-asset-photo/index.ts`
+- Input: `{ kind: 'character'|'prop'|'building'|'location', sourceImageUrl, name, description? }`
+- JWT-Auth, Zod-Validation, CORS wie in bestehenden World-Funktionen.
+- Pipeline:
+  1. Lädt das Original aus dem `brand-uploads`-Bucket (siehe Punkt 3).
+  2. Ruft **`google/gemini-3.1-flash-image`** über AI Gateway `/v1/images/generations` (chat-shape, `messages` + `modalities`, `stream:false`) mit einem kind-spezifischen Prompt auf. Das Modell akzeptiert Bild-Input via `image_url`-Block — genau das brauchen wir hier („nimm dieses Foto und render das Motiv sauber neu"). Kind-spezifische Prompts:
+     - `character` / `prop`: „Isolate the main subject on a **solid pure white** background, remove all clutter, studio lighting, sharp focus, 1:1, no text."
+     - `building`: „Architectural hero shot of this building, clean sky background, no people/text/logos."
+     - `location`: „Cinematic establishing shot of this environment, cleaned up, natural depth, no people/text/logos."
+  3. Für `character` / `prop` / `building`: das erzeugte Bild wird durch `@huggingface/transformers` **background-removal serverseitig NICHT** möglich → wir nutzen den bestehenden Client-Helper `src/lib/backgroundRemoval.ts` als **zweiten Schritt im Frontend** nach Empfang des Edge-Function-Outputs. Der Solid-White-Hintergrund vom Prompt macht die Segmentierung robust.
+  4. `location` bleibt als JPG (kein Cutout).
+  5. Endbild (transparent PNG bzw. JPG) wird in den passenden Bucket geladen: `brand-characters/<userId>/<uuid>.png`, `brand-locations/<userId>/<uuid>.jpg|png`.
+  6. Neue Zeile in `brand_characters` / `brand_props` / `brand_buildings` / `brand_locations` mit `reference_image_url` und `user_id = auth.uid()`. Postgres vergibt automatisch die kanonische UUID.
+  7. Antwort enthält die volle Zeile — React Query invalidiert die entsprechenden `useBrand*`-Hooks und der Eintrag erscheint sofort in `useUnifiedMentionLibrary` → UnifiedAssetPicker.
 
-**A.4 World-Anchor UUID-Tiebreak**
-- `src/lib/motion-studio/prepareSceneAnchor.ts:101–112` (`resolveSceneWorldRefs`): Wenn `mention.id` vorhanden → per UUID matchen; nur Fallback auf Slug-Match wenn UUID fehlt (Legacy-Szenen).
+### 2. Wiederverwendbare Komponente `AssetPhotoUploadSheet`
+`src/components/cast-world/AssetPhotoUploadSheet.tsx` (neu)
+- Props: `kind`, `open`, `onOpenChange`, `onCreated(assetId)`.
+- Schritte: Datei wählen → in `brand-uploads`-Bucket hochladen → `refine-asset-photo` aufrufen → für Cutout-Kinds `removeBackground()` aus `src/lib/backgroundRemoval.ts` auf das Ergebnis anwenden → gecleantes PNG erneut in den Ziel-Bucket hochladen und `reference_image_url` per RPC updaten (kleine neue Funktion `update_asset_reference_image` mit `SECURITY DEFINER`, prüft `user_id = auth.uid()`).
+- Preview-Panel: „Vorher / Nachher" Slider, „Erneut generieren"-Button (retriggered mit anderem Seed), „Speichern".
 
----
+### 3. Neuer Storage-Bucket `brand-uploads` (private)
+- Migration via `supabase--storage_create_bucket` (nicht via SQL).
+- RLS: `user_id/<file>`-Pfad; nur Owner kann lesen/schreiben. Zwischen-Ergebnisse landen hier und werden nach dem Refinement wieder gelöscht.
 
-## Phase B — Legacy-Name-Match hart abschalten (Cast)
+### 4. UI-Integration
+- **BrandCharacters-Page** (`src/pages/BrandCharacters.tsx`): Neuer Primary-Button „Aus Foto erstellen" neben dem bestehenden „Neuen Character anlegen".
+- **CreatorLibrary / World-Tabs** (`src/pages/CreatorLibrary.tsx`): pro Tab (Props / Buildings / Locations) derselbe Button.
+- **UnifiedAssetPicker Empty-State** (`src/components/video-composer/UnifiedAssetPicker.tsx`): zusätzlich zum bestehenden „In Library öffnen"-Link ein Inline-CTA „Foto hochladen" der das Sheet direkt im Composer öffnet — damit erübrigt sich der Tab-Wechsel für den häufigsten Fall.
 
-**B.1 UUID-strict Resolver**
-- `src/lib/motion-studio/resolveSceneCharacterAnchor.ts:34,197`: Sources `cast-name-match` und `brand-name-match` entfernen bzw. hinter Feature-Flag `MOTION_STUDIO_STRICT_IDS=true` (default an).
-- `src/lib/motion-studio/applyCastToPrompt.ts:56–69`: `findCharacter` auf exakten UUID-Match reduzieren; Fuzzy-First-Name-Substring entfernen.
-- Fehlender Match → sichtbarer Warning-Toast + Console-Warnung mit Repair-Hint auf `CastConsistencyMap`.
+### 5. IDs & Sichtbarkeit (Antwort auf die Nutzerfrage)
+- Postgres vergibt **automatisch** eine `uuid` beim Insert — dieselbe ID, die die v202/v211-Pipeline erwartet.
+- Alle Uploads sind **privat pro Nutzer/Workspace** (RLS via `user_id`). Kein anderer Nutzer sieht das Asset.
+- Zugriff nur über Ziel-Bucket + RLS-Policy `auth.uid() = user_id`; kein Public-Bucket.
+- Öffentlich gibt es weiterhin nur die von uns geseedeten `*_catalog_previews` (Katalog-IDs, nicht die Brand-Tabellen).
 
-**B.2 Katalog-baseCharacterId Fix**
-- `src/hooks/useUnifiedMentionLibrary.ts:150–166`: Katalog-Entries bekommen `meta.baseCharacterId` = zugehörige `brand_characters.id` (Lookup über bereits geladene brand_characters-Query, falls Katalog-Character bereits als brand_character existiert; sonst `null` → mentionToCastRef muss diesen Fall werfen, nicht stillschweigend katalog-ID zurückgeben).
-- `src/lib/video-composer/mentionToCastRef.ts`: Wenn `catalog:` ohne `meta.baseCharacterId` → Error werfen (heute fällt es auf `stripLegacyCastIdPrefix` zurück).
+## Technische Notizen
 
----
+- Kein Migrations-Schema-Change nötig — die Brand-Tabellen existieren, `reference_image_url` ist schon vorhanden.
+- Ein neuer Bucket + eine neue Edge Function + eine Front-Komponente + drei Aufrufer-Stellen.
+- Modellwahl: `google/gemini-3.1-flash-image` (Nano Banana 2) für Restaging — akzeptiert Bild-Input, schnell, günstig, sehr gute Motivtreue.
+- Background-Removal bleibt client-seitig (`@huggingface/transformers`), weil das im Projekt schon läuft und der Solid-White-Hintergrund aus Gemini die Segmentierung sehr robust macht.
+- Feature-Flag `VITE_CAST_WORLD_PHOTO_UPLOAD` (default `true`) um das neue Sheet schnell abschalten zu können.
 
-## Phase C — AI Video Studio Cast/World-Integration
+## Dateien
 
-**C.1 ToolkitGenerator vollständig verdrahten**
-- `src/components/ai-video/ToolkitGenerator.tsx`: Neben Character-Mention-Extraction (bereits vorhanden) `UnifiedAssetPicker` einbauen (Locations/Buildings/Props).
-- `characterShots[]` schreiben (nicht nur Text-Mentions), Payload an render-Endpoint um `characterShots` + `scene_assets` erweitern.
-- Verwendet dieselben Prompt-Helper wie Motion Studio (`applyCastToPrompt`, `applySceneAssetsToPrompt`).
+**Neu**
+- `supabase/functions/refine-asset-photo/index.ts`
+- `src/components/cast-world/AssetPhotoUploadSheet.tsx`
+- `src/hooks/useRefineAssetPhoto.ts`
+- Storage-Bucket `brand-uploads` + RLS-Migration
+- SQL-Migration: `update_asset_reference_image(kind, asset_id, url)` SECURITY DEFINER
+- `mem/features/cast-world/photo-upload-refinement.md` + Index-Update
 
-**C.2 UniversalCreator Cast/World**
-- `src/pages/UniversalCreator/UniversalCreator.tsx` (+ Sub-Panels unter `src/pages/UniversalCreator/`): Einbau
-  - `CharacterCastPicker` neben Prompt-Feld
-  - `UnifiedAssetPicker` (Locations/Buildings/Props)
-  - `characterShots` + `scene_assets` an render-Endpoint (`generate-video`/`universal-video-*`)
-- Falls UniversalCreator scenes-los ist (single-shot): `scene_assets` als flat array am Job persistieren (via existing `universal_video_renders`-Feld oder Job-Metadata).
+**Geändert**
+- `src/pages/BrandCharacters.tsx` — Button + Sheet
+- `src/pages/CreatorLibrary.tsx` — Button pro World-Tab
+- `src/components/video-composer/UnifiedAssetPicker.tsx` — Inline-CTA im Empty-State
 
-**C.3 PictureStudio Cast**
-- `src/pages/PictureStudio.tsx`: `CharacterCastPicker` einbauen (Bild-Generierung), `applyCastToPrompt` auf Prompt anwenden, `characterId` an Bild-Generierungs-Endpoint (portrait-Referenz).
-- World-Picker optional (Location als Setting-Referenz) — als Nice-to-have.
-
-**C.4 Shared Prompt-Composer**
-- `src/lib/ai-video/composePrompt.ts` (neu) oder gemeinsame Nutzung von `src/lib/motion-studio/composeFinalPrompt.ts`: Zentrale Funktion für Cast+World-Prompt-Aufbau, damit Motion Studio und AI Video Studio dieselbe Boundary teilen.
-
----
-
-## Phase D — Consistency & Validation
-
-**D.1 Client-Feature-Flag-Awareness**
-- Neue Konstanten in `src/lib/motion-studio/featureFlags.ts`:
-  - `SCENE_ASSETS_REQUIRED` (aus Env / Cloud-Config lesen; fallback false)
-  - `FACE_TRACK_PRECLIP` (info-only)
-- Wenn `SCENE_ASSETS_REQUIRED` und `scene_assets` fehlt → Render-Button in `ClipsTab` / `useGenerateAllClips` blockieren mit klarem Fehler.
-
-**D.2 CastConsistencyMap erweitern**
-- `src/components/video-composer/CastConsistencyMap.tsx`: Panel um World-Assets erweitern (zeigt Slugs an, die kein UUID-Backing haben → Repair-Button, matcht Slug → UUID via Brand-Library, schreibt UUID in Szene).
-
-**D.3 Memory-Dokument**
-- `mem/features/cast-world/id-integration.md`: Vollständiger Datenfluss (Picker → CastRef/SceneAssetRef → DB → Edge Function → Renderer).
-- `mem/index.md`: Eintrag „Cast & World ID-Integration v211".
-
----
-
-## Betroffene Dateien (Übersicht)
-
-**Motion Studio**
-- `src/lib/motion-studio/applySceneAssetsToPrompt.ts` (Typ + UUID)
-- `src/lib/motion-studio/prepareSceneAnchor.ts` (UUID-Match)
-- `src/lib/motion-studio/resolveSceneCharacterAnchor.ts` (Name-Match raus)
-- `src/lib/motion-studio/applyCastToPrompt.ts` (Fuzzy raus)
-- `src/lib/motion-studio/persistSceneAssets.ts` (neu)
-- `src/lib/motion-studio/featureFlags.ts` (neu)
-- `src/components/video-composer/UnifiedAssetPicker.tsx`
-- `src/components/video-composer/CharacterCastPicker.tsx` (onChange schreibt scene_assets)
-- `src/components/video-composer/SceneDirectorBox.tsx`
-- `src/components/video-composer/CastConsistencyMap.tsx` (World-Panel)
-- `src/components/video-composer/BriefingTab.tsx`
-- `src/components/video-composer/ClipsTab.tsx`
-- `src/hooks/useGenerateAllClips.ts`
-- `src/hooks/useUnifiedMentionLibrary.ts` (Katalog-baseCharacterId)
-- `src/lib/video-composer/mentionToCastRef.ts` (Hard-Fail für Katalog ohne baseCharacterId)
-
-**AI Video Studio**
-- `src/components/ai-video/ToolkitGenerator.tsx` (World-Picker + characterShots + scene_assets)
-- `src/pages/UniversalCreator/UniversalCreator.tsx` (+ Sub-Panels)
-- `src/pages/PictureStudio.tsx` (Cast-Picker)
-- `src/lib/ai-video/composePrompt.ts` (neu, oder Shared-Import)
-
-**Memory**
-- `mem/features/cast-world/id-integration.md` (neu)
-- `mem/index.md`
-
-## Nicht enthalten
-- Kein Inline-Create (Quick-Add-Sheets) im Composer — separater Scope
-- Keine Schema-Migration (alle Spalten existieren)
-- Keine Edge-Function-Änderungen außer minimalem Payload-Consumer, falls `compose-video-clips` `scene_assets` heute nur DB-JIT liest
-
-## Risiken
-- **Legacy-Szenen ohne UUIDs**: `CastConsistencyMap` muss vor erstem Strict-Render laufen — bei Bestandsprojekten Migrations-Toast anzeigen.
-- **Katalog-Chars ohne brand_characters-Backing**: mentionToCastRef wirft neu → UI muss den Fehler abfangen und Repair-CTA anzeigen (Katalog-Char zuerst in brand_characters "adopten").
-- **Universal Creator ohne Scene-Modell**: `scene_assets` als flat job-metadata statt pro Szene.
+## Was nicht enthalten ist
+- Outfits/Voices (bleiben out-of-scope; Outfits erfordern einen anderen Flow über `avatar_outfit_looks` mit Multi-View-Prompts, Voices sind Audio).
+- Öffentliches Teilen von hochgeladenen Assets — bleibt privat.
+- Batch-Upload mehrerer Fotos in einem Sheet.

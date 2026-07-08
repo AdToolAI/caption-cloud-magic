@@ -36,6 +36,8 @@ import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
 import { CatalogBrowser } from '@/components/library-hubs/CatalogBrowser';
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
+import { AssetPhotoUploadSheet } from '@/components/cast-world/AssetPhotoUploadSheet';
+import type { RefineKind } from '@/hooks/useRefineAssetPhoto';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -53,6 +55,7 @@ const Library = () => {
   const navigate = useNavigate();
   const tab = (params.get('tab') as TabKey) || 'people';
   const [addAvatarOpen, setAddAvatarOpen] = useState(false);
+  const [refineCharacterOpen, setRefineCharacterOpen] = useState(false);
 
   const setTab = (next: TabKey) => {
     setParams((p) => {
@@ -92,13 +95,23 @@ const Library = () => {
               </p>
             </div>
             {tab === 'people' && (
-              <Button
-                onClick={() => setAddAvatarOpen(true)}
-                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-6 shadow-[0_0_25px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_45px_hsl(var(--primary)/0.45)] transition-all duration-500 shrink-0 self-start md:self-end"
-              >
-                <Plus className="h-4 w-4 mr-2" strokeWidth={3} />
-                <span className="tracking-tight">New Avatar</span>
-              </Button>
+              <div className="flex flex-wrap gap-2 shrink-0 self-start md:self-end">
+                <Button
+                  onClick={() => setRefineCharacterOpen(true)}
+                  variant="outline"
+                  className="rounded-full border-primary/50 text-primary hover:bg-primary/10 px-6 py-6"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  <span className="tracking-tight">AI from photo</span>
+                </Button>
+                <Button
+                  onClick={() => setAddAvatarOpen(true)}
+                  className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-6 shadow-[0_0_25px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_45px_hsl(var(--primary)/0.45)] transition-all duration-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" strokeWidth={3} />
+                  <span className="tracking-tight">New Avatar</span>
+                </Button>
+              </div>
             )}
           </header>
 
@@ -140,6 +153,11 @@ const Library = () => {
           </Tabs>
         </div>
       </div>
+      <AssetPhotoUploadSheet
+        kind="character"
+        open={refineCharacterOpen}
+        onOpenChange={setRefineCharacterOpen}
+      />
     </>
   );
 };
@@ -460,6 +478,7 @@ function AssetTabBody({
   emptyBody,
 }: AssetTabBodyProps) {
   const [open, setOpen] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -485,12 +504,27 @@ function AssetTabBody({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2 flex-wrap">
         <GenerateAssetButton kind={kind} label={label} />
+        <Button
+          onClick={() => setRefineOpen(true)}
+          variant="outline"
+          className="border-primary/40 text-primary hover:bg-primary/10"
+        >
+          <Sparkles className="h-4 w-4 mr-2" /> AI from photo
+        </Button>
         <Button onClick={() => setOpen(true)} variant="outline">
           <Plus className="h-4 w-4 mr-2" /> Upload {label}
         </Button>
       </div>
+
+      <AssetPhotoUploadSheet
+        kind={kind as RefineKind}
+        open={refineOpen}
+        onOpenChange={setRefineOpen}
+      />
+
+
 
       <CatalogBrowser kind={kind} />
 
