@@ -248,7 +248,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     
     if (error) {
-      toast.error(error.message);
+      const friendly = mapAuthError(error, 'signin');
+      toast.error(friendly.title, { description: friendly.description });
+      trackAuthError(friendly, 'signin');
       return { error };
     }
     
