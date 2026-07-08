@@ -46,6 +46,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// v205 mux/v169 parity — telemetry only. Mask stops live in the Remotion
+// template (`DialogStitchVideo.tsx`); this constant just tags the render so
+// operators can grep for the active mask profile.
+const OVERLAY_MASK_VERSION = "v169_parity";
+const COLOR_MATCH_ENABLED = false;
+
 function evenDimension(value: unknown, fallback: number): number {
   const n = Number(value);
   const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
