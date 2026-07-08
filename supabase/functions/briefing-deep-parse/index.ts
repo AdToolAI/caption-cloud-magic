@@ -910,6 +910,97 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
   };
 }
 
+function extractSelectedCastFromBriefing(briefing: string, characters: any[]) {
+  const out: any[] = [];
+  const seen = new Set<string>();
+  const castSection = String(briefing ?? '').split(/##\s+Cast[^\n]*\n/i)[1]?.split(/\n##\s+/)[0] ?? '';
+  const mentionRows = Array.from(castSection.matchAll(/@([a-z0-9][a-z0-9-_]{1,47})[^\n]*(?:\(library:([0-9a-f-]{36})\))?/gi));
+  for (const m of mentionRows) {
+    const mentionKey = `@${m[1]}`;
+    const libId = m[2];
+    const needle = normalizeMention(mentionKey);
+    const hit = libId
+      ? characters.find((ch: any) => String(ch.id) === String(libId))
+      : characters.find((ch: any) => {
+          const n = normalizeMention(ch.name);
+          return n && needle && (n.includes(needle) || needle.includes(n));
+        });
+    const key = String(hit?.id ?? needle);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      mentionKey,
+      characterId: hit?.id ?? null,
+      characterName: hit?.name ?? mentionKey.replace(/^@/, ''),
+      voiceId: hit?.default_voice_id ?? null,
+    });
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
+function ensureProductionPlanEnsembleServer(plan: any, briefing: string, characters: any[]) {
+  const required = extractSelectedCastFromBriefing(briefing, characters);
+  const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
+  if (required.length < 2 || scenes.length === 0) return { repaired: 0, required: required.length };
+
+  const keyOf = (c: any) => String(c?.characterId || normalizeMention(c?.mentionKey || c?.characterName || '')).trim();
+  const requiredKeys = new Set(required.map(keyOf).filter(Boolean));
+  const hasAll = (sc: any) => {
+    const keys = new Set((sc?.cast ?? []).map(keyOf).filter(Boolean));
+    for (const key of requiredKeys) if (!keys.has(key)) return false;
+    return true;
+  };
+  const coverage = (sc: any) => {
+    const keys = new Set((sc?.cast ?? []).map(keyOf).filter(Boolean));
+    let n = 0;
+    for (const key of requiredKeys) if (keys.has(key)) n += 1;
+    return n;
+  };
+  const requiredEnsembles = scenes.length >= 6 ? 2 : 1;
+  const current = scenes.filter(hasAll).length;
+  if (current >= requiredEnsembles) return { repaired: 0, required: required.length };
+
+  const middle: number[] = [];
+  for (let i = 1; i < scenes.length - 1; i++) middle.push(i);
+  middle.sort((a, b) => coverage(scenes[b]) - coverage(scenes[a]));
+  const order = [0];
+  if (scenes.length > 1) order.push(scenes.length - 1);
+  order.push(...middle);
+
+  let repaired = 0;
+  const needed = requiredEnsembles - current;
+  const names = required.map((c) => c.characterName || String(c.mentionKey).replace(/^@/, ''));
+  const joinedNames = names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const sentence = `${joinedNames} share the scene together in a wide group shot, all faces clearly visible to camera, standing side by side, each with a distinct visible action.`;
+
+  for (const idx of order) {
+    if (repaired >= needed) break;
+    const sc = scenes[idx];
+    if (!sc || hasAll(sc)) continue;
+    const cast = Array.isArray(sc.cast) ? [...sc.cast] : [];
+    const present = new Set(cast.map(keyOf).filter(Boolean));
+    for (const c of required) {
+      const key = keyOf(c);
+      if (present.has(key)) continue;
+      if (cast.length >= 4) break;
+      cast.push({ ...c, shotType: 'full' });
+      present.add(key);
+    }
+    sc.cast = cast;
+    sc.engine = 'cinematic-sync';
+    sc.lipSync = true;
+    sc.shotDirector = { ...(sc.shotDirector ?? {}), framing: 'wide', angle: sc.shotDirector?.angle ?? 'eye-level', movement: sc.shotDirector?.movement ?? 'static' };
+    const prompt = String(sc.anchorPromptEN ?? '').trim();
+    sc.anchorPromptEN = prompt.toLowerCase().includes(joinedNames.toLowerCase()) ? prompt : (prompt ? `${prompt} ${sentence}` : sentence);
+    sc._meta = { ...(sc._meta ?? {}), aiFilled: Array.from(new Set([...(sc._meta?.aiFilled ?? []), 'cast.ensembleGuarantee', 'shotDirector.framing', 'anchorPromptEN'])) };
+    repaired += 1;
+  }
+
+  if (repaired > 0) console.log('[briefing-deep-parse] production_plan_ensemble_repair', { repaired, scenes: scenes.length, cast: required.length });
+  return { repaired, required: required.length };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   // QA smoke short-circuit
