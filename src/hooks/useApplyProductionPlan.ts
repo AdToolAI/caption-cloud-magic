@@ -33,6 +33,7 @@ import type {
   PerformanceEnergy,
 } from '@/types/video-composer';
 import type { TProductionPlan, TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
+import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
 
 const DEFAULT_TEXT_OVERLAY = {
   text: '',
@@ -652,10 +653,11 @@ export interface ApplyPlanResult {
 export function useApplyProductionPlan() {
   return useCallback(async (args: ApplyPlanArgs): Promise<ApplyPlanResult> => {
     const {
-      plan, projectId, language,
+      plan: rawPlan, projectId, language,
       currentScenes, currentAssembly, currentBriefing,
       onUpdateBriefing, onUpdateScenes, onApplyAssembly,
     } = args;
+    const plan = ensureProductionPlanEnsemble(rawPlan, currentBriefing);
 
     if (!isUuid(projectId)) {
       throw new Error('Projekt-ID fehlt — Plan wurde nicht angewendet, damit keine unverbundenen Szenen entstehen.');

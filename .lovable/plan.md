@@ -1,57 +1,76 @@
-## Ziel
+## Diagnose
 
-Wenn im Briefing N Charaktere angegeben sind (2–4), soll **mindestens eine Szene** entstehen, in der **alle N** gemeinsam auftreten. Skaliert nach Storyboard-Länge (mehr Szenen → ggf. mehr Ensemble-Momente).
+Es ist kein gewünschtes Verhalten, sondern ein Logik-Bruch zwischen zwei Pipelines:
 
-## Root Cause (aktueller Zustand)
+1. **Der letzte Fix sitzt im Storyboard-Generator** (`compose-video-storyboard`).
+   Der Screenshot zeigt aber den **Production Plan / Briefing-Parser** (`briefing-deep-parse`). Dieser hat eine eigene Cast-Logik und umgeht den Storyboard-Fix teilweise.
 
-- `compose-video-storyboard` (Edge Function) entscheidet frei pro Szene, welche Charaktere im Shot sind. Es gibt aktuell **keine harte Regel**, dass alle Briefing-Charaktere mindestens einmal gemeinsam vorkommen müssen.
-- `syncCastFromPrompt.ts` gleicht nur nachträglich Prompt ↔ `characterShots` ab — löst aber nicht das Problem, wenn der LLM einen Charakter komplett auslässt.
+2. Im Production-Plan-Prompt steht aktuell sinngemäß: **max. 2 Sprecher pro Szene** und Talking-Head gerne auf **einen Cast** pinnen. Bei 3 gewählten Avataren arbeitet diese Regel gegen die neue Ensemble-Anforderung.
 
-## Fix (2-stufig)
+3. Wenn die Analyse timed out oder teilweise fehlschlägt, baut der Client einen lokalen Fallback-Plan. Dieser nimmt aktuell praktisch nur den **ersten Avatar** als Cast. Deshalb ist es „ab und zu korrekt und ab und zu fehlerhaft“: je nachdem, ob AI-Pass A/B sauber durchläuft, ein Retry greift oder der lokale Fallback angezeigt wird.
 
-### Stufe 1 — Storyboard-Prompt-Härtung (Kern-Fix)
+4. Die neue `ensureEnsembleScene`-Safety-Net-Funktion existiert, ist aber für den Production-Plan-Pfad noch nicht zuverlässig integriert.
 
-In `supabase/functions/compose-video-storyboard/index.ts`:
+## Zielverhalten
 
-1. **Ensemble-Regel in den System-Prompt einbauen** (auf DE + EN + ES lokalisiert, konsistent mit bestehender i18n):
-   > „Wenn das Briefing N ≥ 2 Charaktere enthält, MUSS mindestens eine Szene ein Ensemble-Shot sein, in dem alle N Charaktere gemeinsam sichtbar auftreten (Wide/Group-Shot). Bei Storyboards mit ≥ 6 Szenen: mindestens 2 Ensemble-Momente. Cap: max. 4 Charaktere pro Szene (Nano Banana 2 / Vidu Q2 Limit)."
+Wenn im Briefing / Picker 2–4 Avatare gewählt sind:
 
-2. **Post-Validation** nach Storyboard-Rückgabe:
-   - Zähle über alle Szenen: welche `characterId`s tauchen in mindestens einer Szene mit `characterShots.length === N` auf?
-   - Falls **keine** Ensemble-Szene existiert und `characters.length ≥ 2`: wähle heuristisch die passendste Szene (bevorzugt Hook/CTA oder Szene mit den meisten bereits gesetzten Slots) und ergänze fehlende Slots + hänge Namen an den Prompt („… gemeinsam mit {names}").
-   - Log-Event: `storyboard_ensemble_repair` (Debug/Observability).
+- Es darf weiterhin Solo- und 2er-Szenen geben.
+- Aber mindestens eine Szene muss alle gewählten Avatare enthalten.
+- Bei längeren Plänen ab 6 Szenen sollen mindestens zwei Ensemble-Szenen entstehen.
+- Diese Regel muss im **Production Plan**, im **lokalen Fallback** und beim **Plan anwenden** greifen.
 
-### Stufe 2 — Client-Side Safety Net
+## Umsetzung
 
-In `src/lib/motion-studio/syncCastFromPrompt.ts`:
-- Aktuelle Name-Match-Heuristik bleibt (nicht anfassen).
-- **Neue Funktion** `ensureEnsembleScene(scenes, characters)` (idempotent): prüft nach Storyboard-Load, ob mindestens eine Szene alle Charaktere hat. Falls nicht → markiere passende Szene und ergänze `characterShots`. Wird in `ClipsTab`/`SceneCard` beim initialen Storyboard-Ingest aufgerufen (nicht bei jedem Render).
-- Setzt `shotType: 'full'` als Default (konsistent mit bestehendem Verhalten).
+### 1. Production-Plan-Parser härten
 
-## Skalierung
+In `briefing-deep-parse`:
 
-| Szenen im Storyboard | Ensemble-Szenen (Mindestanzahl) |
-|---|---|
-| 2–3                  | 1                               |
-| 4–5                  | 1                               |
-| 6–8                  | 2                               |
-| 9+                   | 2                               |
+- Die alte Regel „Max 2 speakers per scene“ so anpassen, dass sie nur für normale Dialog-/Talking-Head-Szenen gilt.
+- Neue harte Regel ergänzen:
+  - bei 2–4 Cast-Avataren mindestens eine Ensemble-Szene mit allen Cast-Mitgliedern
+  - bei ≥6 Szenen mindestens zwei Ensemble-Szenen
+  - Ensemble-Szenen müssen Wide/Group-Shots sein, keine Close-ups
+- Nach Pass A und/oder nach Pass B eine deterministische Reparatur einbauen:
+  - erkennt alle verfügbaren Cast-Avatare aus `## Cast` / Library
+  - prüft, ob genug Szenen alle Cast-Mitglieder haben
+  - wenn nicht, wählt Hook/CTA oder die beste vorhandene Szene
+  - ergänzt fehlende `cast[]` Slots, setzt `engine: cinematic-sync`, `lipSync: true`, `framing: wide/medium-wide`
+  - erweitert `anchorPromptEN`, damit alle Namen auch im Prompt vorkommen
 
-Konservativ — kein Overload, keine „jede Szene alle Charaktere"-Regel (bricht cinematographische Solo-Shots).
+### 2. Lokalen Fallback reparieren
 
-## Nicht im Scope
+In `useStoryboardTransition.buildLocalFallbackPlan`:
 
-- Änderungen an `compose-video-clips` / `compose-scene-anchor` — die Cast-Slot-Verarbeitung bleibt gleich.
-- Änderungen am Nano-Banana-2 / Vidu-Q2 4-Cast-Cap.
-- Manuelle User-Kontrolle „diese Szene = Ensemble" — kann später als UI-Toggle nachgezogen werden.
+- Nicht nur `briefing.characters[0]` verwenden.
+- Alle ausgewählten Briefing-Charaktere bis max. 4 als Cast-Slots bauen.
+- Mindestens eine Fallback-Szene als Ensemble-Szene erzeugen.
+- Bei 6+ Szenen zweite Ensemble-Szene ergänzen.
 
-## Technische Details
+### 3. ProductionPlanSheet Safety Net
 
-**Files:**
-- `supabase/functions/compose-video-storyboard/index.ts` — System-Prompt + Post-Validation-Block
-- `src/lib/motion-studio/syncCastFromPrompt.ts` — neue `ensureEnsembleScene` Funktion (additiv)
-- Aufrufer der Storyboard-Ingestion (ClipsTab / VideoComposerDashboard) — 1 Zeile Integration
+Vor dem Anzeigen oder spätestens vor „Plan anwenden“:
 
-**Migrations:** keine (rein Logik).
+- Plan normalisieren: wenn 2–4 aktuelle Briefing-Charaktere existieren und keine Ensemble-Szene im Plan ist, wird eine Szene automatisch ergänzt.
+- Das passiert idempotent, damit manuelle Änderungen nicht mehrfach dupliziert werden.
+- Die UI zeigt danach direkt den korrigierten Cast, nicht erst nach dem Anwenden.
 
-**Analytics:** neues Event `storyboard_ensemble_repair` mit `{scenes_total, characters_briefed, repaired_scene_id}` in `analytics.ts`.
+### 4. Plan → Composer Mapping absichern
+
+In `useApplyProductionPlan`:
+
+- Vor `planSceneToComposerScene` nochmal prüfen, ob der Plan die Ensemble-Regel erfüllt.
+- Falls nicht, Cast-Slots im Plan ergänzen, damit `characterShots[]` wirklich alle Avatare enthält.
+- Warnung/Telemetry ergänzen, falls ein Lip-Sync-/Cinematic-Sync-Plan wieder nur einen Cast-Slot bekommt.
+
+### 5. Verhalten validieren
+
+Mit einem Testfall „3 Avatare, 3–5 Szenen“ prüfen:
+
+- Production Plan zeigt mindestens eine Szene mit allen 3 Avataren.
+- Nach „Plan anwenden“ hat die entsprechende Composer-Szene `characterShots.length === 3`.
+- Kein Fallback-Pfad erzeugt mehr nur den ersten Avatar.
+
+## Ergebnis
+
+Danach ist die Ensemble-Regel nicht nur im Storyboard-Generator vorhanden, sondern entlang der tatsächlichen Pipeline abgesichert: Briefing-Analyse → Production Plan → Plan anwenden → Composer-Szenen.

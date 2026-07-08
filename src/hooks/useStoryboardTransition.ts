@@ -18,6 +18,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductionPlan, PlanScene, type TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
+import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
 import { toast } from '@/hooks/use-toast';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
@@ -168,7 +169,15 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
   const total = Number(briefing.duration) || 15;
   const firstMention = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i)?.[0] ?? null;
   const firstChar = briefing.characters?.[0];
-  const cast = firstMention
+  const selectedCast = (briefing.characters ?? []).slice(0, 4).map((c) => ({
+    mentionKey: `@${toMentionSlug(c.name)}`,
+    characterId: c.brandCharacterId ?? null,
+    characterName: c.name,
+    voiceId: null,
+  }));
+  const cast = selectedCast.length > 0
+    ? selectedCast
+    : firstMention
     ? [{
         mentionKey: firstMention,
         characterId: firstChar?.brandCharacterId ?? null,
@@ -199,7 +208,8 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
       ? h.shot
       : `${beatLabel} beat for ${briefing.productName ?? 'the brand'}: cinematic ${framing} shot, ${movement}, ${lighting} lighting.`;
     const voiceover = h?.dialog ? { text: h.dialog } : undefined;
-    const sceneCast = h?.dialog ? cast : (i === 0 ? cast : cast); // keep cast on every scene if available
+    const isRequiredEnsemble = cast.length >= 2 && (i === 0 || (sceneCount >= 6 && i === sceneCount - 1));
+    const sceneCast = isRequiredEnsemble ? cast : cast.slice(0, 1);
     return {
       index: i + 1,
       label: beatLabel,
@@ -235,7 +245,7 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     };
   });
 
-  return ProductionPlan.parse({
+  return ensureProductionPlanEnsemble(ProductionPlan.parse({
     project: {
       name: briefing.productName,
       aspectRatio: briefing.aspectRatio as any,
@@ -250,7 +260,7 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
       severity: 'warn',
     }],
     _meta: { source: 'local-fallback' },
-  });
+  }), briefing);
 }
 
 type Phase = 'idle' | 'A' | 'B' | 'done';
@@ -518,7 +528,7 @@ export function useStoryboardTransition({
     const parsePlan = (data: any): { plan: TProductionPlan | null; dropped: number; error?: string } => {
       let dropped = 0;
       const parsed = ProductionPlan.safeParse(data?.plan);
-      if (parsed.success) return { plan: parsed.data, dropped };
+      if (parsed.success) return { plan: ensureProductionPlanEnsemble(parsed.data, briefing), dropped };
       console.error('[useStoryboardTransition] plan validation failed', parsed.error.flatten());
       const rawScenes: any[] = Array.isArray(data?.plan?.scenes) ? data.plan.scenes : [];
       const survivors: any[] = [];
@@ -528,7 +538,7 @@ export function useStoryboardTransition({
       }
       if (survivors.length > 0) {
         const retry = ProductionPlan.safeParse({ ...(data?.plan ?? {}), scenes: survivors });
-        if (retry.success) return { plan: retry.data, dropped };
+        if (retry.success) return { plan: ensureProductionPlanEnsemble(retry.data, briefing), dropped };
       }
       const issues = parsed.error.issues.slice(0, 2)
         .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join(' · ');
