@@ -1,5 +1,6 @@
 import type { ComposerBriefing } from '@/types/video-composer';
 import type { TProductionPlan, TPlanScene, TResolvedCast } from './productionPlan';
+import { dedupePlanScenesCast, dedupePlanSceneCast } from './planCastDedup';
 
 const MAX_CAST = 4;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -118,11 +119,12 @@ export function ensureProductionPlanEnsemble(
       cast.push({ ...c, shotType: 'full' });
       present.add(key);
     }
+    const dedupCast = dedupePlanSceneCast(cast).cast;
 
     const names = required.map((c) => c.characterName || c.mentionKey.replace(/^@/, ''));
     nextScenes[idx] = {
       ...scene,
-      cast,
+      cast: dedupCast,
       engine: 'cinematic-sync',
       lipSync: true,
       shotDirector: {
@@ -145,5 +147,8 @@ export function ensureProductionPlanEnsemble(
     repaired += 1;
   }
 
-  return repaired > 0 ? { ...plan, scenes: nextScenes } : plan;
+  const finalScenes = repaired > 0 ? nextScenes : plan.scenes;
+  const dedup = dedupePlanScenesCast(finalScenes);
+  if (repaired === 0 && dedup.removed === 0) return plan;
+  return { ...plan, scenes: dedup.scenes as TPlanScene[] };
 }

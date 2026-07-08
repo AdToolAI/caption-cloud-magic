@@ -721,6 +721,44 @@ function stripUndef<T extends Record<string, any>>(o: T): T {
   return o;
 }
 
+/**
+ * Dedupe cast slots inside a scene. Two slots are duplicates when their
+ * (lowercased) `characterId` matches, or — if both lack an id — when their
+ * normalized `mentionKey`/`characterName` matches. Slots with `characterId`
+ * win over slots without.
+ */
+function dedupeSceneCast(cast: any[] | undefined | null): { cast: any[]; removed: number } {
+  const input = Array.isArray(cast) ? cast : [];
+  if (input.length < 2) return { cast: input, removed: 0 };
+  const keyOf = (c: any) => {
+    const id = typeof c?.characterId === 'string' ? c.characterId.toLowerCase().trim() : '';
+    if (id) return `id:${id}`;
+    const mk = normalizeMention(String(c?.mentionKey ?? c?.characterName ?? ''));
+    return mk ? `mk:${mk}` : '';
+  };
+  const ordered = input
+    .map((slot, idx) => ({ slot, idx, hasId: !!slot?.characterId }))
+    .sort((a, b) => (a.hasId === b.hasId ? a.idx - b.idx : a.hasId ? -1 : 1));
+  const byKey = new Map<string, { slot: any; originalIdx: number }>();
+  const noKey: { slot: any; originalIdx: number }[] = [];
+  for (const { slot, idx } of ordered) {
+    const key = keyOf(slot);
+    if (!key) { noKey.push({ slot, originalIdx: idx }); continue; }
+    const existing = byKey.get(key);
+    if (!existing) { byKey.set(key, { slot, originalIdx: idx }); continue; }
+    // Merge: fill missing fields from duplicate.
+    for (const f of ['characterId','characterName','voiceId','voiceName','shotType','outfit','referenceImageUrl']) {
+      if (!existing.slot[f] && slot[f]) existing.slot[f] = slot[f];
+    }
+    if (existing.slot.voiceAutoAssigned == null && slot.voiceAutoAssigned != null) {
+      existing.slot.voiceAutoAssigned = slot.voiceAutoAssigned;
+    }
+  }
+  const merged = [...byKey.values(), ...noKey].sort((a, b) => a.originalIdx - b.originalIdx).map((x) => x.slot);
+  const removed = input.length - merged.length;
+  return { cast: removed > 0 ? merged : input, removed };
+}
+
 function mergeManifestAndResolution(manifest: any, resolution: any) {
   const scenesById = new Map<number, any>();
   for (const s of resolution?.scenes ?? []) {
@@ -728,7 +766,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
   }
   const scenes = (manifest?.scenes ?? []).map((s: any, i: number) => {
     const r = scenesById.get(s.index);
-    const cast = (s.cast ?? []).map((c: any) => {
+    const rawCast = (s.cast ?? []).map((c: any) => {
       // Fuzzy match by normalized mentionKey (Pass B may return slightly different formatting).
       const needle = normalizeMention(c.mentionKey);
       const rCast =
@@ -746,6 +784,11 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
         referenceImageUrl: null,
       });
     });
+    const dedupMerge = dedupeSceneCast(rawCast);
+    if (dedupMerge.removed > 0) {
+      console.log('[briefing-deep-parse] plan_cast_dedup', { stage: 'merge', scene: s.index, removed: dedupMerge.removed });
+    }
+    const cast = dedupMerge.cast;
     const location = s.location ? (() => {
       const r2 = r?.location;
       return stripUndef({
@@ -988,7 +1031,11 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
       cast.push({ ...c, shotType: 'full' });
       present.add(key);
     }
-    sc.cast = cast;
+    const dedup = dedupeSceneCast(cast);
+    if (dedup.removed > 0) {
+      console.log('[briefing-deep-parse] plan_cast_dedup', { stage: 'ensemble', scene: sc?.index, removed: dedup.removed });
+    }
+    sc.cast = dedup.cast;
     sc.engine = 'cinematic-sync';
     sc.lipSync = true;
     sc.shotDirector = { ...(sc.shotDirector ?? {}), framing: 'wide', angle: sc.shotDirector?.angle ?? 'eye-level', movement: sc.shotDirector?.movement ?? 'static' };
@@ -1453,6 +1500,22 @@ This overrides any English wording in the briefing's scaffolding
           }
         }
       }
+
+      // Dedupe cast after local fill-pass: back-filled `characterId`s may have
+      // collapsed two mentionKey-only slots onto the same character.
+      let dedupTotal = 0;
+      for (const sc of plan.scenes ?? []) {
+        const d = dedupeSceneCast(sc.cast);
+        if (d.removed > 0) {
+          sc.cast = d.cast;
+          dedupTotal += d.removed;
+        }
+      }
+      if (dedupTotal > 0) {
+        console.log('[briefing-deep-parse] plan_cast_dedup', { stage: 'fill-pass', removed: dedupTotal });
+      }
+
+
 
       // v177: Local LOCATION fill-pass — analog to cast. Pass-B (Gemini)
       // sometimes returns locationId=null for slug-style mentions like
