@@ -3,18 +3,18 @@ import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { trackBusinessEvent } from "../_shared/telemetry.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import {
+  FOUNDERS_COUPON,
+  LAUNCH_COUPON,
+  FOUNDERS_MAX_SLOTS,
+  PRO_PRICE_IDS,
+  STRIPE_API_VERSION,
+} from "../_shared/stripe-config.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
-
-const FOUNDERS_COUPON = "PRO-FOUNDERS-24M";
-const LAUNCH_COUPON = "PRO-LAUNCH-3M";
-const FOUNDERS_MAX_SLOTS = 1000;
-const PRO_PRICE_IDS = new Set([
-  "price_1TSLxWDRu4kfSFxjEJNi8nGN", // Pro €29.99 v2 EUR
-]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
