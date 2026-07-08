@@ -14,6 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { TransitionSelector } from '@/components/video/TransitionSelector';
 import type { TransitionStyle } from '@/types/video-composer';
+import { useTranslation } from '@/hooks/useTranslation';
+
+const L10N = {
+  de: { title: 'Übergang zur nächsten Szene', duration: 'Dauer', more: 'Mehr Übergänge', less: 'Weniger Übergänge' },
+  en: { title: 'Transition to next scene', duration: 'Duration', more: 'More transitions', less: 'Fewer transitions' },
+  es: { title: 'Transición a la siguiente escena', duration: 'Duración', more: 'Más transiciones', less: 'Menos transiciones' },
+} as const;
 
 const ALL_TRANSITIONS: TransitionStyle[] = [
   'none',
