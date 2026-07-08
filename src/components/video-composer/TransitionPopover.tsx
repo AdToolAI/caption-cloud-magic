@@ -49,6 +49,8 @@ export function TransitionPopover({
 }: TransitionPopoverProps) {
   const [showMore, setShowMore] = useState(false);
   const palette = showMore ? ALL_TRANSITIONS : MIN_PALETTE;
+  const { language } = useTranslation();
+  const l = L10N[(language as 'de' | 'en' | 'es') ?? 'de'] ?? L10N.de;
 
   const handleType = (next: string) => {
     onChange(next as TransitionStyle, duration);
