@@ -14,7 +14,9 @@
 // asset's reference_image_url to the render pipeline (Vidu Q2,
 // Hailuo i2v, Nano Banana scene anchor) — no schema change needed.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { AssetPhotoUploadSheet } from '@/components/cast-world/AssetPhotoUploadSheet';
+import type { RefineKind } from '@/hooks/useRefineAssetPhoto';
 import {
   Plus, X, MapPin, Building2, Package, Sparkles,
 } from 'lucide-react';
