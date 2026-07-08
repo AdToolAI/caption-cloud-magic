@@ -1,5 +1,6 @@
 # Memory: index.md
 Updated: today
+- [v205 Mux/Overlay v169 Parity](mem://architecture/lipsync/v205-mux-v169-parity) — Rollback of hard-disc overlay masks (v196–v198) to v169's wide symmetric alpha-feather (`#000 0% → #000 30% → transparent 78%`) across CroppedOverlay/SilentFaceAnchor/SilentFaceFreeze/MouthMatteFreeze/FaceMaskOverlay. Mux guards against faceMask fallback on N≥2. Sync.so dispatch (v204) unchanged. Requires Remotion bundle redeploy.
 - [v204 Preclip-BBox Clip-Space Rollback](mem://architecture/lipsync/v204-preclip-bbox-clipspace-rollback) — Rollback of v203; multi-speaker N≥2 dispatches use per-pass single-face preclips + `bounding_boxes_url` in clip-space + `sync-3` + `cut_off`. Full-plate bbox path is forbidden (produced `generation_input_face_selection_invalid`). No `auto_detect:true` for N≥2.
 - [v201 Canonical ID Lipsync (v203 REVERTED)](mem://architecture/lipsync/v200-id-only-cast-resolution) — Backend JIT-backfills dialog_turns[].characterId. v203 full-plate zwang has been rolled back to v204 preclip-bbox-clipspace.
 - [v202 Cast & World ID Registry](mem://architecture/video-composer/v202-asset-registry) — composer_scenes.scene_assets jsonb (AssetRef[]) as canonical ID bridge across Composer/Motion Studio/Briefing; JIT backfill in compose-video-clips, feature flag `composer.feature.scene_assets_required`
