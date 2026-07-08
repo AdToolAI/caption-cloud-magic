@@ -55,11 +55,10 @@ export default function SceneInlinePlayer({
   const [hovering, setHovering] = useState(false);
 
   const clipUrl = scene.clipUrl;
-  const posterUrl =
-    scene.firstFrameUrl ||
-    scene.referenceImageUrl ||
-    scene.lockReferenceUrl ||
-    undefined;
+  // Only true scene outputs count as a thumbnail. `referenceImageUrl` /
+  // `lockReferenceUrl` are the *anchor* / front image and would otherwise
+  // bleed into every not-yet-rendered scene, faking a render result.
+  const posterUrl = scene.firstFrameUrl || scene.lastFrameUrl || undefined;
   const status = scene.clipStatus;
 
   // Pipeline-Vollständigkeit: Bei Cinematic-Sync/Dialog-/Talking-Head-Szenen
