@@ -1705,9 +1705,10 @@ This overrides any English wording in the briefing's scaffolding
       console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
     }
 
+    let ensembleStats: { repaired: number; required: number } | null = null;
     try {
-      const ensemble = ensureProductionPlanEnsembleServer(plan, briefing, characters);
-      if (ensemble.repaired > 0) {
+      ensembleStats = ensureProductionPlanEnsembleServer(plan, briefing, characters);
+      if (ensembleStats.repaired > 0) {
         (plan as any)._meta = {
           ...((plan as any)._meta ?? {}),
           aiFilled: Array.from(new Set([
