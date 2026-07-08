@@ -121,8 +121,8 @@ export function ensureProductionPlanEnsemble(
       anchorPromptEN: appendEnsemblePrompt(scene.anchorPromptEN, names),
       _meta: {
         ...((scene as any)._meta ?? {}),
-        aiFilled: Array.from(new Set([...
-          (((scene as any)._meta?.aiFilled ?? []) as string[]),
+        aiFilled: Array.from(new Set([
+          ...(((scene as any)._meta?.aiFilled ?? []) as string[]),
           'cast.ensembleGuarantee',
           'shotDirector.framing',
           'anchorPromptEN',
