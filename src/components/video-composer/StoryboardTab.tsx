@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image as ImageIcon, Loader2 } from 'lucide-react';
 import SceneCard from './SceneCard';
+import { SceneTransitionInlineEditor } from './SceneTransitionInlineEditor';
 import SceneCutDriftIndicator from './SceneCutDriftIndicator';
 import HybridExtendDialog from './HybridExtendDialog';
 // TalkingHeadDialog removed from Composer — standalone /talking-head module owns that flow.
