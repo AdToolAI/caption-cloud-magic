@@ -95,13 +95,23 @@ const Library = () => {
               </p>
             </div>
             {tab === 'people' && (
-              <Button
-                onClick={() => setAddAvatarOpen(true)}
-                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-6 shadow-[0_0_25px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_45px_hsl(var(--primary)/0.45)] transition-all duration-500 shrink-0 self-start md:self-end"
-              >
-                <Plus className="h-4 w-4 mr-2" strokeWidth={3} />
-                <span className="tracking-tight">New Avatar</span>
-              </Button>
+              <div className="flex flex-wrap gap-2 shrink-0 self-start md:self-end">
+                <Button
+                  onClick={() => setRefineCharacterOpen(true)}
+                  variant="outline"
+                  className="rounded-full border-primary/50 text-primary hover:bg-primary/10 px-6 py-6"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  <span className="tracking-tight">AI from photo</span>
+                </Button>
+                <Button
+                  onClick={() => setAddAvatarOpen(true)}
+                  className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-6 shadow-[0_0_25px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_45px_hsl(var(--primary)/0.45)] transition-all duration-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" strokeWidth={3} />
+                  <span className="tracking-tight">New Avatar</span>
+                </Button>
+              </div>
             )}
           </header>
 
