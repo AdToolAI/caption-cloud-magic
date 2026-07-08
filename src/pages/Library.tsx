@@ -462,6 +462,7 @@ function AssetTabBody({
   emptyBody,
 }: AssetTabBodyProps) {
   const [open, setOpen] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -487,12 +488,27 @@ function AssetTabBody({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2 flex-wrap">
         <GenerateAssetButton kind={kind} label={label} />
+        <Button
+          onClick={() => setRefineOpen(true)}
+          variant="outline"
+          className="border-primary/40 text-primary hover:bg-primary/10"
+        >
+          <Sparkles className="h-4 w-4 mr-2" /> AI from photo
+        </Button>
         <Button onClick={() => setOpen(true)} variant="outline">
           <Plus className="h-4 w-4 mr-2" /> Upload {label}
         </Button>
       </div>
+
+      <AssetPhotoUploadSheet
+        kind={kind as RefineKind}
+        open={refineOpen}
+        onOpenChange={setRefineOpen}
+      />
+
+
 
       <CatalogBrowser kind={kind} />
 
