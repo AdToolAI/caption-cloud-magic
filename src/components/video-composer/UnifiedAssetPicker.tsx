@@ -163,14 +163,17 @@ export function UnifiedAssetPicker({
   }, [activeSlugs.join('|'), locations, buildings, propsList]);
 
   /** Rewrites the prompt's leading scene-asset block with the union of all
-   *  three families, preserving order: locations → buildings → props. */
+   *  three families, preserving order: locations → buildings → props.
+   *  v211: mentions carry `{ id, type, name }` so downstream resolvers lock
+   *  by UUID instead of slug-matching. */
   const writeSelection = (next: Record<AssetFamilyConfig['key'], AssetItem[]>) => {
     const flat: SceneAssetMention[] = [
-      ...next.location,
-      ...next.building,
-      ...next.prop,
-    ].map((a) => ({ name: a.name }));
+      ...next.location.map((a) => ({ name: a.name, id: a.id, type: 'location' as const })),
+      ...next.building.map((a) => ({ name: a.name, id: a.id, type: 'building' as const })),
+      ...next.prop.map((a) => ({ name: a.name, id: a.id, type: 'prop' as const })),
+    ];
     onPromptChange(applySceneAssetsToPrompt(prompt, flat));
+    onSceneAssetsChange?.(flat);
   };
 
   const addAsset = (fam: AssetFamilyConfig, asset: AssetItem) => {
