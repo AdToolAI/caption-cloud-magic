@@ -1545,6 +1545,21 @@ This overrides any English wording in the briefing's scaffolding
       console.warn('[briefing-deep-parse] local fill-pass failed (non-fatal):', e?.message);
     }
 
+    try {
+      const ensemble = ensureProductionPlanEnsembleServer(plan, briefing, characters);
+      if (ensemble.repaired > 0) {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          aiFilled: Array.from(new Set([...
+            (((plan as any)._meta?.aiFilled ?? []) as string[]),
+            'scenes.cast.ensembleGuarantee',
+          ])),
+        };
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] ensemble repair failed (non-fatal):', e?.message);
+    }
+
 
     // ── Pass C — Catalog-ID Resolver (v178, Wave 1) ───────────────────────
     // Maps free-text axis values (Mimik/Gestik/Blick/Energy/Framing/Angle/
