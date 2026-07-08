@@ -25,8 +25,9 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { ComposerScene } from '@/types/video-composer';
+import type { ComposerScene, TransitionStyle } from '@/types/video-composer';
 import SceneInlinePlayer from './SceneInlinePlayer';
+import { TransitionHandle } from './TransitionHandle';
 
 interface Props {
   scenes: ComposerScene[];
@@ -36,6 +37,11 @@ interface Props {
   onReorder: (scenes: ComposerScene[]) => void;
   onAddScene: () => void;
   onGenerate: (scene: ComposerScene) => void;
+  onUpdateSceneTransition?: (
+    sceneId: string,
+    transitionType: TransitionStyle,
+    transitionDuration: number,
+  ) => void;
   className?: string;
 }
 
