@@ -108,6 +108,11 @@ export interface UnifiedAssetPickerProps {
   prompt: string;
   onPromptChange: (next: string) => void;
 
+  /** v211 — optional canonical scene-asset callback. When provided, the picker
+   *  emits `{ id, type, name }[]` alongside the prompt-string update so the
+   *  parent can persist `composer_scenes.scene_assets` (v202 canonical column). */
+  onSceneAssetsChange?: (assets: SceneAssetMention[]) => void;
+
   language?: Lang;
 }
 
