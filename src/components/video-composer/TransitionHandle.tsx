@@ -9,14 +9,17 @@ import { ArrowDown, Scissors, Waves } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TransitionStyle } from '@/types/video-composer';
 import { TransitionPopover } from './TransitionPopover';
+import { useTranslation } from '@/hooks/useTranslation';
 
-const LABEL: Record<TransitionStyle, string> = {
-  none: 'Cut',
-  crossfade: 'Crossfade',
-  fade: 'Fade',
-  slide: 'Slide',
-  zoom: 'Zoom',
-  wipe: 'Wipe',
+const L10N: Record<'de' | 'en' | 'es', Record<TransitionStyle, string>> = {
+  de: { none: 'Cut', crossfade: 'Crossfade', fade: 'Fade', slide: 'Slide', zoom: 'Zoom', wipe: 'Wipe' },
+  en: { none: 'Cut', crossfade: 'Crossfade', fade: 'Fade', slide: 'Slide', zoom: 'Zoom', wipe: 'Wipe' },
+  es: { none: 'Corte', crossfade: 'Fundido', fade: 'Fade', slide: 'Slide', zoom: 'Zoom', wipe: 'Wipe' },
+};
+const EDIT_LABEL: Record<'de' | 'en' | 'es', string> = {
+  de: 'Übergang bearbeiten',
+  en: 'Edit transition',
+  es: 'Editar transición',
 };
 
 interface TransitionHandleProps {
