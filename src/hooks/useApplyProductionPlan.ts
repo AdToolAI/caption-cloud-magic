@@ -34,6 +34,7 @@ import type {
 } from '@/types/video-composer';
 import type { TProductionPlan, TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
+import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
 
 const DEFAULT_TEXT_OVERLAY = {
   text: '',
