@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { fetchWithTimeout, isTimeoutError } from "../_shared/timeout.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
