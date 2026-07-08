@@ -276,6 +276,17 @@ serve(async (req) => {
         console.log('[generate-ai-video] ✅ Credits refunded successfully');
       }
 
+      // Handle explicit timeout on the Replicate SDK call
+      if (isTimeoutError(replicateError)) {
+        return new Response(
+          JSON.stringify({
+            error: "Der Video-Anbieter hat nicht rechtzeitig geantwortet. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es erneut.",
+            code: "REPLICATE_TIMEOUT"
+          }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // Handle 502 Bad Gateway from Replicate (upstream unavailable)
       if (replicateError?.response?.status === 502) {
         return new Response(
