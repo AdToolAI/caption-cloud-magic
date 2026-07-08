@@ -1,53 +1,39 @@
-# Briefing/Storyboard-Audit — Vorschlag
+# Zwei Fixes im Production Plan Sheet
 
-Kurze Antwort: **Nein, nicht garantiert fehlerfrei.** Die letzten Fixes (Cast-Dedup, Outfit-Merge, Ensemble-Guarantee, Location-Resolver) adressieren bekannte Symptome, aber es gibt weiterhin Ecken, die ich noch nicht end-to-end verifiziert habe. Bevor ich weitere Änderungen mache, schlage ich ein systematisches Audit mit klar definierten Prüfpunkten vor.
+## Problem 1 — „Unbenannter Look" im Outfit-Dropdown
 
-## Was ich prüfen will
+**Ursache:** `useUnifiedMentionLibrary.ts:112` setzt hart `'Unbenannter Look'` als Fallback, wenn `avatar_outfit_looks.name` leer/`null` ist. Dieser String wandert dann durch drei Wege ins Sheet:
+- `outfitById` (Line 344) → `outfitLabelById` (Line 385) — hier wird nur `'Standard-Look'` gefiltert, nicht `'Unbenannter Look'`.
+- `outfitsByCharacter` (Line 323) → `merged[].name` (Line 1192) — gleicher Fallback.
+- Der DB-Fallback (Line 388–390) überschreibt nur, wenn die DB einen Namen hat — bei tatsächlich leerem Namen bleibt „Unbenannter Look" stehen.
 
-### 1. ID-Kanonisierung (End-to-End)
-- `characterId`, `outfitLookId`, `locationId`, `voiceId` durch alle 6 Stufen: Pass A → Pass B → Local-Fill → Scene-Count-Guard → Ensemble-Repair → `useApplyProductionPlan` → Composer-Scene.
-- Testfälle: (a) reine Slug-Mentions, (b) Catalog-UUIDs, (c) Freitext-Namen, (d) Mixed.
+**Warum es beim Klick verschwindet:** nach Öffnen des Dropdowns rendert `SelectValue` den ausgewählten Look neu aus `merged`, wo inzwischen `outfitLabelById` (mit DB-Namen) gewonnen hat. Reine Timing-/Filter-Lücke.
 
-### 2. Scene-Count-Guard vs. Ensemble-Repair Interaktion
-- Padded Szenen erben Template-Cast → dedupePlanSceneCast greift → Ensemble-Repair prüft Coverage → mögliche Race, wenn Padding schon alle 3 Avatare enthält aber ohne `outfitLookId`.
-- Verify: durationSec-Neuverteilung überschreibt keine benutzerdefinierten Dauern.
+**Fix (zwei kleine Änderungen):**
 
-### 3. Lip-Sync-Schutzfilter (Apply-Hook)
-- Bestätigen, dass `dedupePlanSceneCast` NICHT auf bereits gerenderte Szenen angewendet wird (sonst Datenverlust).
-- 6-Kriterien-Filter greift vor Dedup-Aufruf.
+1. `src/hooks/useUnifiedMentionLibrary.ts` — `lookLabel` als leeren String belassen, wenn kein Name vorhanden ist, und das Mention-Label nur mit Avatar-Name bauen (statt „Avatar — Unbenannter Look"). `meta.outfitName` bleibt `''` statt Fake-String.
+2. `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — im `outfitById`- und `outfitsByCharacter`-Aggregator sowohl `'Standard-Look'` als auch `'Unbenannter Look'` als „kein echter Name" behandeln, und im SelectItem-Rendering (Line 1229) einen positionsbasierten Fallback `Look N` verwenden statt „Standard-Look".
 
-### 4. Outfit-Fallback-Kette
-- Wenn `outfitLookId` fehlt: nutzt `prepareSceneAnchor` Default-Portrait oder erste verfügbare Look?
-- `avatar_outfit_looks`-DB-Fallback in ProductionPlanSheet: greift bei quick-create, aber was bei Löschung?
+Effekt: Der Look wird sofort mit dem echten DB-Namen angezeigt, ohne Klick-Trigger.
 
-### 5. Nicht-Determinismus des Parsers
-- Gemini-Pass-A ist stochastisch — gleicher Input, unterschiedliche Outputs. Schutz durch Scene-Count-Guard + Local-Fill + Ensemble-Repair, aber Performance-Auto-Fill und Anchor-Prompt-Text bleiben variabel.
-- Kein server-seitiges Seeding/Temperature-Locking.
+## Problem 2 — Tonalität wird ins Skript gesprochen
 
-### 6. Persistenz & Versionierung
-- `composer_production_plans` (versioniert) vs. flüchtiger Client-State: Race beim Speichern während Apply?
+**Ursache:** `src/hooks/useApplyProductionPlan.ts:384–385` baut den Dialog-Text so:
+```
+${name} — ${mood.toUpperCase()}: ${text}
+```
+Dieser String landet in `composer_scenes.dialog_script`, wird dann von TTS/Lipsync gesprochen — „SKEPTISCH, ENERGISCH" wird also wörtlich vorgelesen und bläht die Skriptdauer auf.
 
-### 7. Telemetrie-Blindspots
-- `parser_meta.location_resolution` existiert, aber kein `cast_resolution` / `outfit_resolution` / `dedup_stats` — schwer zu debuggen wenn User „manchmal falsch" meldet.
+**Fix:** `moodSuffix` aus der Konkatenation entfernen — nur noch `${name}: ${text}`. `mood` und `delivery` bleiben als separate Felder auf `dialogTurns` erhalten (Metadata für Voice-Performance-Direction), aber nicht mehr im gesprochenen Text.
 
-## Vorgehen
+## Nicht angefasst
+- Lipsync-Pipeline, Render-Payload, `dialog_shots`, `compose-video-clips`.
+- `dialogTurns.mood`/`delivery` bleiben in der DB — nur die String-Konkatenation für den TTS-Input wird bereinigt.
+- Bereits gerenderte / lipsync-geschützte Szenen: unberührt (Apply-Filter greift wie gehabt).
 
-**Phase 1 — Read-Only Audit** (kein Code-Change):
-- Trace alle 4 ID-Typen durch die 6 Stufen anhand der aktuellen Files.
-- Report: Liste konkreter Bugs mit File:Line + Reproduktionsbedingung + Severity (blocker / edge-case / cosmetic).
+## Betroffene Dateien
+- `src/hooks/useUnifiedMentionLibrary.ts` (1 Stelle)
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` (2 Stellen: `outfitById`/`outfitsByCharacter`-Filter, SelectItem-Fallback)
+- `src/hooks/useApplyProductionPlan.ts` (1 Zeile: moodSuffix entfernen)
 
-**Phase 2 — Fix-Batch** (nach deiner Freigabe):
-- Nur Bugs mit Severity blocker/edge-case fixen.
-- Zusätzlich: `parser_meta`-Telemetrie erweitern (`cast_resolution`, `outfit_resolution`, `dedup_stats`) damit „manchmal fehlerhaft"-Reports diagnostizierbar werden.
-- Optional: Gemini-Temperatur auf 0.2 senken für deterministischere Outputs.
-
-**Phase 3 — Validierung**:
-- Manueller Test-Durchlauf mit dem 3-Avatar-Briefing das du zuletzt genutzt hast.
-- Screenshot-Vergleich Production Plan Sheet vs. Storyboard-Szenen.
-
-## Was nicht angefasst wird
-Lip-Sync-Pipeline (v190-v211), Render-Payload, `compose-video-clips`, `scene_assets`, `dialog_shots`.
-
-## Frage vor Start
-
-Soll ich mit **Phase 1 (Read-Only Audit)** beginnen und dir einen Bug-Report liefern, bevor irgendetwas geändert wird? Oder willst du direkt Telemetrie + Determinismus-Fixes ohne vorheriges Audit?
+Kein Edge-Function-Redeploy nötig — reiner Client-Fix.

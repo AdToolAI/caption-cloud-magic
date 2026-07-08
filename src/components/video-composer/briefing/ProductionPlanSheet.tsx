@@ -320,7 +320,12 @@ export default function ProductionPlanSheet({
       seen.add(dedupeKey);
       const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
-      const lookName = fromMeta || fromName || m.name?.trim() || 'Standard-Look';
+      // Only propagate real names. Fake fallbacks like "Unbenannter Look"
+      // are dropped so the DB fallback / positional label wins.
+      const rawName = fromMeta || fromName || '';
+      const lookName = /^unbenannter look$/i.test(rawName) || /^standard-look$/i.test(rawName)
+        ? ''
+        : rawName;
       const arr = map.get(base) ?? [];
       arr.push({ lookId, name: lookName });
       map.set(base, arr);
@@ -341,7 +346,10 @@ export default function ProductionPlanSheet({
       if (!lookId || map.has(lookId)) continue;
       const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
-      const lookName = fromMeta || fromName || m.name?.trim() || 'Standard-Look';
+      const rawName = fromMeta || fromName || m.name?.trim() || '';
+      const lookName = /^unbenannter look$/i.test(rawName) || /^standard-look$/i.test(rawName)
+        ? ''
+        : rawName;
       map.set(lookId, {
         lookId,
         name: lookName,
@@ -380,11 +388,11 @@ export default function ProductionPlanSheet({
   });
   const outfitLabelById = useMemo(() => {
     const map = new Map<string, string>();
-    // Library mentions first.
+    // Library mentions first — only real names, no fake fallbacks.
     for (const [lookId, info] of outfitById) {
-      if (info.name && info.name !== 'Standard-Look') map.set(lookId, info.name);
+      if (info.name) map.set(lookId, info.name);
     }
-    // DB fallback wins for explicit names (avoids "Standard-Look" flicker).
+    // DB fallback wins for explicit names.
     for (const row of dbOutfitLooks) {
       const trimmed = String(row?.name ?? '').trim();
       if (row?.id && trimmed) map.set(row.id, trimmed);
@@ -1185,16 +1193,23 @@ export default function ProductionPlanSheet({
                             // option in the dropdown — even if the library
                             // hasn't loaded it under this avatar yet.
                             // v178 Wave 2 — prefer DB-backed name over mention label.
-                            const stableName = (id: string, fallback?: string) =>
-                              outfitLabelById.get(id) ?? fallback ?? 'Gespeicherter Look';
-                            const merged = fromCharacter.map((o) => ({
+                            const stableName = (id: string, fallback?: string, idx?: number) => {
+                              const fromLabel = outfitLabelById.get(id);
+                              if (fromLabel && fromLabel.trim()) return fromLabel;
+                              const cleanFallback = (fallback ?? '').trim();
+                              if (cleanFallback && !/^unbenannter look$/i.test(cleanFallback) && !/^standard-look$/i.test(cleanFallback)) {
+                                return cleanFallback;
+                              }
+                              return `Look ${(idx ?? 0) + 1}`;
+                            };
+                            const merged = fromCharacter.map((o, idx) => ({
                               lookId: o.lookId,
-                              name: stableName(o.lookId, o.name),
+                              name: stableName(o.lookId, o.name, idx),
                             }));
                             if (outfitId && !merged.some((o) => o.lookId === outfitId)) {
                               merged.push({
                                 lookId: outfitId,
-                                name: stableName(outfitId, lookHit?.name),
+                                name: stableName(outfitId, lookHit?.name, merged.length),
                               });
                             }
                             const showOutfitPicker = !!baseId && merged.length > 0;
@@ -1225,8 +1240,8 @@ export default function ProductionPlanSheet({
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__default__">Standard-Look</SelectItem>
-                                      {merged.map((o) => (
-                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || 'Standard-Look'}</SelectItem>
+                                      {merged.map((o, idx) => (
+                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || `Look ${idx + 1}`}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>

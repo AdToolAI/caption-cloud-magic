@@ -107,10 +107,13 @@ export function useUnifiedMentionLibrary(): {
   const outfitChars: MotionStudioCharacter[] = useMemo(() => {
     const byAvatar = new Map(brandChars.map((c: any) => [c.id, c.name]));
     return outfitLooks.map((l: any) => {
-      // Defensive label: never let `undefined`/`null` rutschen in Template-Strings.
+      // Only use a real DB name. Leave empty when missing — the Sheet
+      // renders a position-based fallback so we never propagate a fake
+      // "Unbenannter Look" label into dropdowns or prompts.
       const lookLabel =
-        (typeof l.name === 'string' && l.name.trim()) ? l.name.trim() : 'Unbenannter Look';
+        (typeof l.name === 'string' && l.name.trim()) ? l.name.trim() : '';
       const avatarName = (byAvatar.get(l.avatar_id) as string | undefined) ?? 'Avatar';
+      const displayName = lookLabel ? `${avatarName} — ${lookLabel}` : avatarName;
       return {
         // ID stays `outfit:<lookId>` so the @-mention dropdown can list
         // multiple looks per avatar as separate picks. Consumers that
@@ -118,8 +121,8 @@ export function useUnifiedMentionLibrary(): {
         // This is the *one* boundary the CastRef contract is enforced at.
         id: `outfit:${l.id}`,
         user_id: l.user_id,
-        name: `${avatarName} — ${lookLabel}`,
-        description: `Saved outfit: ${lookLabel}`,
+        name: displayName,
+        description: lookLabel ? `Saved outfit: ${lookLabel}` : 'Saved outfit',
         signature_items: '',
         reference_image_url: l.front_url ?? l.cover_url,
         reference_image_seed: null,
