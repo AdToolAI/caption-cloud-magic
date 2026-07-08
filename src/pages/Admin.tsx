@@ -86,6 +86,10 @@ export default function Admin() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="beta-health">
+          <BetaHealth />
+        </TabsContent>
+
         <TabsContent value="bugs">
           <BugReportsAdmin />
         </TabsContent>
