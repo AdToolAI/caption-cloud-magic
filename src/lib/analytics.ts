@@ -198,6 +198,12 @@ export const ANALYTICS_EVENTS = {
   UDC_EXPORT_COMPLETED: 'udc_export_completed',
   UDC_SHOWCASE_CTA_CLICKED: 'udc_showcase_cta_clicked',
   UDC_PRICING_CTA_CLICKED: 'udc_pricing_cta_clicked',
+
+  // Beta launch observability (Phase 5.4)
+  BETA_SIGNUP: 'beta_signup',
+  FEATURE_GATE_HIT: 'feature_gate_hit',
+  CREDIT_REFUND_TRIGGERED: 'credit_refund_triggered',
+  AUTH_ERROR_SHOWN: 'auth_error_shown',
 } as const;
 
 /**
