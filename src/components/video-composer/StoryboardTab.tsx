@@ -748,6 +748,15 @@ export default function StoryboardTab({
                       frameFirstMode={frameFirstMode}
                       embedded
                     />
+                    {selectedIndex < scenes.length - 1 && (
+                      <SceneTransitionInlineEditor
+                        transitionType={(selectedScene.transitionType ?? 'none') as any}
+                        transitionDuration={selectedScene.transitionDuration ?? 0.5}
+                        onChange={(transitionType, transitionDuration) =>
+                          updateScene(selectedScene.id, { transitionType, transitionDuration })
+                        }
+                      />
+                    )}
                   </>
                 }
                 styleSlot={
