@@ -1240,8 +1240,8 @@ export default function ProductionPlanSheet({
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__default__">Standard-Look</SelectItem>
-                                      {merged.map((o) => (
-                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || 'Standard-Look'}</SelectItem>
+                                      {merged.map((o, idx) => (
+                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || `Look ${idx + 1}`}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
