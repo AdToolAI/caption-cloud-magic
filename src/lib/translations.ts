@@ -3877,9 +3877,9 @@ export const translations: Record<Language, any> = {
         ctaPrimary: "Start for free",
         ctaSecondary: "Watch demo",
         stats: {
-          creators: "Creators",
-          posts: "Posts created",
-          engagement: "Engagement"
+          creators: "Public Beta",
+          posts: "Months Beta",
+          engagement: "Founders slots"
         },
         deck: {
           headerPlan: "Pro",
@@ -3891,7 +3891,7 @@ export const translations: Record<Language, any> = {
         }
       },
       socialProof: {
-        creators: "10,000+ Creators",
+        creators: "Founders Beta · limited slots",
         worksWith: "Works with"
       },
       liveDemo: {
@@ -8594,9 +8594,9 @@ export const translations: Record<Language, any> = {
         ctaPrimary: "Kostenlos starten",
         ctaSecondary: "Demo ansehen",
         stats: {
-          creators: "Creator",
-          posts: "Posts erstellt",
-          engagement: "Engagement"
+          creators: "Public Beta",
+          posts: "Monate Beta",
+          engagement: "Founders-Plätze"
         },
         deck: {
           headerPlan: "Pro",
@@ -8608,7 +8608,7 @@ export const translations: Record<Language, any> = {
         }
       },
       socialProof: {
-        creators: "10.000+ Creator",
+        creators: "Founders-Beta · limitierte Plätze",
         worksWith: "Funktioniert mit"
       },
       liveDemo: {
@@ -13096,9 +13096,9 @@ export const translations: Record<Language, any> = {
         ctaPrimary: "Empezar gratis",
         ctaSecondary: "Ver demo",
         stats: {
-          creators: "Creadores",
-          posts: "Posts creados",
-          engagement: "Interacción"
+          creators: "Beta pública",
+          posts: "Meses de Beta",
+          engagement: "Plazas Founders"
         },
         deck: {
           headerPlan: "Pro",
@@ -13110,7 +13110,7 @@ export const translations: Record<Language, any> = {
         }
       },
       socialProof: {
-        creators: "10.000+ Creadores",
+        creators: "Beta Founders · plazas limitadas",
         worksWith: "Funciona con"
       },
       liveDemo: {

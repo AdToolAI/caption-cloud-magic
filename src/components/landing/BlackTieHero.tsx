@@ -89,7 +89,7 @@ export const BlackTieHero = () => {
               </Button>
             </div>
 
-            {/* Stats Row */}
+            {/* Stats Row — honest Beta framing (no invented numbers) */}
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -97,17 +97,17 @@ export const BlackTieHero = () => {
               className="flex items-center gap-8 mt-12 justify-center lg:justify-start"
             >
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-foreground">10K+</div>
+                <div className="text-2xl md:text-3xl font-bold text-accent tracking-widest">BETA</div>
                 <div className="text-sm text-muted-foreground">{t('landing.hero.stats.creators')}</div>
               </div>
               <div className="w-px h-10 bg-border" />
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-foreground">1M+</div>
+                <div className="text-2xl md:text-3xl font-bold text-foreground">3</div>
                 <div className="text-sm text-muted-foreground">{t('landing.hero.stats.posts')}</div>
               </div>
               <div className="w-px h-10 bg-border" />
               <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-accent">+43%</div>
+                <div className="text-2xl md:text-3xl font-bold text-accent">1000</div>
                 <div className="text-sm text-muted-foreground">{t('landing.hero.stats.engagement')}</div>
               </div>
             </motion.div>

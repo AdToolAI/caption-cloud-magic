@@ -90,7 +90,7 @@ const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const Status = lazy(() => import("./pages/Status"));
 const Credits = lazy(() => import("./pages/Credits"));
-const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
+// UpgradeEnterprise page retired during Beta — route redirects to /pricing
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const VideoManagement = lazy(() => import("./pages/VideoManagement"));
 const ContentProjects = lazy(() => import("./pages/ContentProjects"));
@@ -204,7 +204,8 @@ function AppLayout() {
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/billing" element={<Billing />} />
                     <Route path="/credits" element={<Credits />} />
-                    <Route path="/upgrade-enterprise" element={<UpgradeEnterprise />} />
+                    {/* Beta: single plan only — legacy Enterprise upgrade path redirects to /pricing */}
+                    <Route path="/upgrade-enterprise" element={<Navigate to="/pricing" replace />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     {/* Marketplace legal — must come before /legal/:page catchall */}

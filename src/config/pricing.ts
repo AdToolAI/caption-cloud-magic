@@ -65,7 +65,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'basic',
     label: 'Basic',
     name: 'Basic',
-    price: { EUR: 14.95, USD: 14.95 },
+    price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
     credits: 800,
     priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
@@ -104,8 +104,10 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       quickCalendarPost: true,
       team: true,
       whiteLabel: true,
+      // Beta: all non-api enterprise-tier features included in Pro so the
+      // single Beta plan does not gate users out of shipped features.
       api: false,
-      xTwitterAccess: false,
+      xTwitterAccess: true,
       storageMb: 5120, // 5 GB
       // Legacy features
       captionsPerMonth: Infinity,
@@ -114,7 +116,8 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       hashtagGenerator: true,
       analytics: true,
       prioritySupport: true,
-      autoSchedule: true
+      autoSchedule: true,
+      whiteLabeling: true
     }
   },
   enterprise: {
@@ -167,7 +170,7 @@ export type PlanType = PlanId;
 // Helper function for backward compatibility
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
-  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.95, currency: '€' };
+  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.99, currency: '€' };
   if (productId === 'prod_TIRWOmhxlzFCwW' || productId === 'prod_UOG4wbiQjDONAj' || productId === 'prod_UOG5TjlcpNNZLZ' || productId === 'prod_UREZAv0LG9vz1E') return { name: 'Pro', price: 29.99, currency: '€' };
   if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.95, currency: '€' };
   return { name: 'Free', price: 0, currency: '€' };

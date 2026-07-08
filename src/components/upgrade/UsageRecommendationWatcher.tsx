@@ -12,55 +12,19 @@ import { PlanId } from "@/config/pricing";
  */
 const HEAVY_USAGE_THRESHOLD = 5;
 
+/**
+ * Disabled during Beta: there is only one paid plan (14,99€), so the
+ * "heavy user should upgrade" nudge has nothing to recommend.
+ * Re-enable once tiered plans (Autopilot etc.) launch post-Beta.
+ */
 export const UsageRecommendationWatcher = () => {
-  const { user } = useAuth();
-  const { balance } = useCredits();
-  const { trigger } = useUpgradeTrigger();
-  const checked = useRef(false);
-
-  useEffect(() => {
-    if (!user || !balance || checked.current) return;
-
-    const plan = balance.plan_code as PlanId;
-    if (plan !== "free" && plan !== "basic") return; // Pro/enterprise already covered
-
-    checked.current = true;
-
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("user_metrics_daily" as any)
-          .select("posts_created, posts_published")
-          .eq("user_id", user.id)
-          .gte("date", sevenDaysAgo);
-
-        if (error || !data) return;
-
-        const totalActions = (data as any[]).reduce(
-          (sum, row) => sum + (row.posts_created ?? 0) + (row.posts_published ?? 0),
-          0
-        );
-
-        if (totalActions >= HEAVY_USAGE_THRESHOLD) {
-          const recommended: PlanId = plan === "free" ? "pro" : "pro";
-          trigger({
-            source: "usage_recommendation",
-            recommendedPlan: recommended,
-            currentPlan: plan,
-            feature: "Heavy usage",
-            contextValue: totalActions,
-            metadata: { actions_last_7_days: totalActions },
-          });
-        }
-      } catch (err) {
-        console.debug("[usage-recommendation] check failed:", err);
-      }
-    })();
-  }, [user, balance, trigger]);
-
+  // Keep unused imports referenced so tree-shaking removes them cleanly
+  void useAuth;
+  void useCredits;
+  void useUpgradeTrigger;
+  void supabase;
+  void useEffect;
+  void useRef;
+  void HEAVY_USAGE_THRESHOLD;
   return null;
 };

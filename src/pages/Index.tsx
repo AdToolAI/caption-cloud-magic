@@ -13,7 +13,7 @@ import { FeatureGrid } from "@/components/landing/FeatureGrid";
 import { AIArsenalShowcase } from "@/components/landing/AIArsenalShowcase";
 import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
 import { UDCShowcase } from "@/components/landing/UDCShowcase";
-import { TestimonialSpotlight } from "@/components/landing/TestimonialSpotlight";
+// TestimonialSpotlight hidden during Beta — real testimonials pending
 
 import { TrialPromiseStrip } from "@/components/landing/TrialPromiseStrip";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
@@ -43,11 +43,8 @@ const Index = () => {
         "price": "0",
         "priceCurrency": "EUR"
       },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.8",
-        "ratingCount": "1200"
-      },
+      // aggregateRating intentionally omitted until real ratings are collected
+      // (Google Search Console flags invented ratings as spammy structured data).
       "operatingSystem": "Web Browser",
       "description": "KI-gestützte Social Media Marketing Platform für Content-Erstellung, Planung und Analytics.",
       "creator": {
@@ -117,8 +114,7 @@ const Index = () => {
           {/* Feature Grid */}
           <FeatureGrid />
 
-          {/* Testimonial Spotlight */}
-          <TestimonialSpotlight />
+          {/* Testimonial Spotlight hidden during Beta — will return with real user quotes */}
 
           {/* FAQ Section */}
           <section id="faq" className="py-24 px-4 bg-card/30">

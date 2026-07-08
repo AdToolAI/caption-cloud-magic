@@ -534,12 +534,8 @@ const Carousel = () => {
                         </TabsList>
                         
                         <TabsContent value="text" className="space-y-3 mt-4">
-                          <ExportBundle 
-                            onExportPNG={handleExportPNG}
-                            onExportPDF={handleExportPDF}
-                            onExportBundle={() => toast.info("Bundle-Export kommt bald!")}
-                            isPro={isPro}
-                          />
+                          {/* Export bundle (PNG/PDF/Bundle) hidden during Beta — feature not yet implemented.
+                              Caption copy button remains functional. */}
 
                           <div className="space-y-3 max-h-[500px] overflow-y-auto">
                             {carouselOutline.slides.map((slide, index) => (

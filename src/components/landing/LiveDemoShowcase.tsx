@@ -157,9 +157,9 @@ export const LiveDemoShowcase = () => {
               <div className="absolute top-3 left-3 text-[9px] uppercase tracking-[0.25em] text-primary font-bold">
                 {t("landing.liveDemo.after")}
               </div>
-              <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 bg-primary/15 border border-primary/40 text-[10px] font-bold text-primary tabular-nums">
+              <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 bg-primary/15 border border-primary/40 text-[10px] font-bold text-primary uppercase tracking-[0.15em]">
                 <TrendingUp className="h-3 w-3" />
-                {t(c.metricKey)}
+                {t("landing.liveDemo.adtoolPost")}
               </div>
               <div className="pt-6">
                 <div className="aspect-square w-full bg-gradient-to-br from-primary/20 via-gold/10 to-gold-dark/15 mb-4 flex items-center justify-center border border-primary/30 relative overflow-hidden">
@@ -185,11 +185,7 @@ export const LiveDemoShowcase = () => {
                 <p className="text-sm text-foreground leading-relaxed font-medium">
                   {t(c.after.captionKey)}
                 </p>
-                <div className="mt-4 pt-4 border-t border-primary/20 flex items-center gap-3 text-[10px] uppercase tracking-[0.18em] text-primary font-semibold">
-                  <span>♡ 12.4K</span>
-                  <span>💬 487</span>
-                  <span>↗ 1.2K</span>
-                </div>
+                {/* Honest Beta: no fabricated engagement numbers */}
               </div>
             </div>
           </motion.div>
