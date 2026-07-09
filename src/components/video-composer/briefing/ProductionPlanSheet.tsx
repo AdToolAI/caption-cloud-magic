@@ -543,7 +543,9 @@ export default function ProductionPlanSheet({
       };
       // Second pass if first pass produced new collisions.
       healed.scenes = healed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
-      setPlan(ensureProductionPlanEnsemble(healed, currentBriefing));
+      const withEnsemble = ensureProductionPlanEnsemble(healed, currentBriefing);
+      const finalized = finalizePlanCanonical(withEnsemble);
+      setPlan(finalized?.plan ?? withEnsemble);
       setStep('review');
 
     } catch (e: any) {
