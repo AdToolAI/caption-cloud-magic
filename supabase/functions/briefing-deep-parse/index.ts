@@ -484,6 +484,7 @@ const TOOL_PASS_B = {
                     voiceName: { type: 'string' },
                     voiceAutoAssigned: { type: 'boolean' },
                     outfit: { type: 'string' },
+                    outfitPreset: { type: 'string', nullable: true },
                   },
                   required: ['mentionKey', 'characterName'],
                 },
