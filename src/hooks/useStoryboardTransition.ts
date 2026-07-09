@@ -314,13 +314,51 @@ function toMentionSlug(name: string): string {
 }
 
 /**
+ * Detect whether the user's briefing already carries an explicit script
+ * (speaker lines like `NAME:` or scene markers `SZENE N` / `SCENE N`).
+ * In that case we switch the parser into LITERAL mode so it does NOT
+ * redistribute dialogue or invent new speakers.
+ */
+export function detectBriefingFidelity(b: ComposerBriefing): {
+  mode: 'literal' | 'auto';
+  hasSceneMarkers: boolean;
+  hasSpeakerLines: boolean;
+  speakerLabels: string[];
+} {
+  const src = String(b.productDescription ?? '');
+  const hasSceneMarkers = /(?:^|\n)\s*(?:szene|scene|shot)\s*\d+\b/i.test(src);
+  // NAME: text  — 2+ letters, uppercase-first token, followed by a colon and text.
+  const speakerRe = /(?:^|\n)\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-\.\s]{1,40}?)\s*[:—-]\s+\S/g;
+  const labels = new Set<string>();
+  for (const m of src.matchAll(speakerRe)) {
+    const raw = (m[1] ?? '').trim();
+    // Filter obvious non-speaker prefixes (Section titles etc.)
+    if (/^(szene|scene|shot|hook|reveal|cta|pain|proof|beat|kamera|shot|framing|mood|note|tone|dialog|dialogue|voiceover|vo|inhalt|briefing|thema|target|zielgruppe|projekt|project)$/i.test(raw)) continue;
+    if (raw.length < 2 || raw.length > 40) continue;
+    labels.add(raw);
+  }
+  const speakerLabels = Array.from(labels);
+  const hasSpeakerLines = speakerLabels.length > 0;
+  const mode: 'literal' | 'auto' = (hasSceneMarkers || hasSpeakerLines) ? 'literal' : 'auto';
+  return { mode, hasSceneMarkers, hasSpeakerLines, speakerLabels };
+}
+
+/**
  * Builds the freeform briefing blob the deep-parser expects.
  * In AUTO-DIRECTOR mode (default), the parser is allowed to synthesize a
  * full screenplay from the structured briefing + selected cast.
+ * In LITERAL mode (script detected), the parser MUST reproduce the script
+ * verbatim — no speaker reassignment, no dialog rewriting.
  */
 function buildBriefingText(b: ComposerBriefing): string {
   const lines: string[] = [];
-  lines.push('Mode: AUTO-DIRECTOR (synthesize full screenplay from briefing + cast)');
+  const fidelity = detectBriefingFidelity(b);
+
+  if (fidelity.mode === 'literal') {
+    lines.push('Mode: LITERAL (reproduce the ## Verbatim Script 1:1 — do NOT reassign speakers, do NOT rewrite dialog, do NOT invent scenes)');
+  } else {
+    lines.push('Mode: AUTO-DIRECTOR (synthesize full screenplay from briefing + cast)');
+  }
   lines.push('');
   if (b.productName) lines.push(`# ${b.productName}`);
   if (b.productDescription) lines.push('', b.productDescription);
@@ -341,6 +379,32 @@ function buildBriefingText(b: ComposerBriefing): string {
       if (c.appearance) lines.push(`  · Appearance: ${c.appearance}`);
       if (c.signatureItems) lines.push(`  · Signature items: ${c.signatureItems}`);
       if (c.appearanceFrequency) lines.push(`  · Frequency: ${c.appearanceFrequency}`);
+    }
+  }
+
+  // LITERAL-mode helpers: give the parser a stable Speaker-Map from
+  // detected script labels → @-mentions of briefed cast (best fuzzy match by
+  // name prefix). Also duplicate the raw script into a dedicated block so
+  // the server can extract it back out and enforce fidelity server-side.
+  if (fidelity.mode === 'literal') {
+    if (fidelity.speakerLabels.length && b.characters?.length) {
+      const norm = (s: string) => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+      lines.push('', '## Speaker Map (script label → @mention)');
+      for (const label of fidelity.speakerLabels) {
+        const n = norm(label);
+        const hit = b.characters.find((c) => {
+          const cn = norm(c.name);
+          return cn && n && (cn.startsWith(n) || n.startsWith(cn) || cn.includes(n) || n.includes(cn));
+        });
+        if (hit) {
+          lines.push(`- ${label} → @${toMentionSlug(hit.name)}`);
+        } else {
+          lines.push(`- ${label} → (unmapped — assign to the closest briefed cast member by role/context)`);
+        }
+      }
+    }
+    if (b.productDescription) {
+      lines.push('', '## Verbatim Script', '```', b.productDescription.trim(), '```');
     }
   }
 
