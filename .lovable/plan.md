@@ -1,61 +1,105 @@
-# Default Outfit Presets für Cast-Slots
+# Briefing ↔ Production Plan — Abweichungs-Audit
 
-## Ziel
-Jeder Cast-Slot bekommt einen Outfit-Dropdown — auch wenn der User noch keine eigenen Looks in `avatar_outfit_looks` gespeichert hat. Der Dropdown enthält dann 10 kuratierte Standard-Outfits, die die häufigsten Werbe-/Content-Kontexte abdecken. Wählt der User einen Preset, wird der Text als Outfit-Beschreibung in den Scene-Prompt injiziert (kein DB-Insert, kein Reference-Image — reiner Prompt-Layer).
+Ich habe dein Original-Briefing gegen den generierten Plan auf den 7 Screenshots durchverglichen. Der Parser weicht in **mehreren gravierenden Punkten** vom Briefing ab. Das sind keine Kleinigkeiten — das Herzstück des Spots (4-Sprecher-Lip-Sync-Swap) wird nicht umgesetzt.
 
-## Preset-Katalog (10 Slots, sprachneutral gehalten)
-Neue Datei `src/config/defaultOutfitPresets.ts`:
+## Kritische Fehler (Show-Stopper)
 
-```ts
-export interface DefaultOutfitPreset {
-  id: string;           // stabile Kennung, z.B. 'preset:business-casual'
-  label: { de: string; en: string; es: string };
-  promptFragment: string; // englisch (Bildqualität)
-}
-```
+**1. Gesamtdauer: 30s statt 15s**
+Briefing sagt explizit „ca. 15 Sekunden" und liefert Timing 0–2,5 / 2,5–5 / 5–7,5 / 7,5–10 / 10–12,5 / 12,5–15. Plan: 3 × 10s = 30s. Parser hat die Timing-Vorgabe komplett ignoriert.
 
-Katalog (Business → Lifestyle → Sport → Formal):
-1. **Business Casual** — "smart casual outfit, neat button-down shirt, chinos"
-2. **Business Formal** — "tailored dark business suit, crisp white shirt"
-3. **Modern Streetwear** — "modern streetwear, oversized hoodie, cargo pants, sneakers"
-4. **Everyday Casual** — "clean casual outfit, plain t-shirt, denim jeans"
-5. **Sport / Athleisure** — "athletic activewear, fitted training top, joggers"
-6. **Fitness Studio** — "gym outfit, tank top and shorts, athletic sneakers"
-7. **Outdoor / Adventure** — "outdoor jacket, hiking pants, sturdy boots"
-8. **Elegant Evening** — "elegant evening wear, sleek dress or dark blazer"
-9. **Creative / Artistic** — "creative fashion, expressive layered outfit, statement accessories"
-10. **Loungewear / Cozy** — "cozy loungewear, soft sweater, relaxed pants"
+**2. Sprecher 4 fehlt vollständig**
+Briefing hat 4 Sprecher mit je einem eigenen Shot. Plan hat nur S01 Hook / S02 Reveal / S03 Proof — Sprecher 4 („…die perfekt zusammenpassen.") und sein Creator-Studio-Shot existieren im Plan nicht.
 
-Diese decken B2B-Ads, Lifestyle, Fitness, Fashion, Wellness ab.
+**3. Endcard-Szene fehlt**
+Briefing verlangt explizit Shot 3B — Endcard „AdTool AI — Perfekte Multi-Speaker-Lip-Sync-Videos in Minuten." Nicht im Plan.
 
-## Änderungen (nur Frontend)
+**4. Split-Screen-Showcase fehlt**
+Briefing Shot 3A: Split-Screen aller 4 Sprecher mit Text „4 Sprecher. 1 Skript. Perfekter Lip-Sync." — nicht im Plan.
 
-### 1. `src/config/defaultOutfitPresets.ts` (neu)
-Konstante Liste + Typ oben.
+**5. Verbatim-Skript nicht übernommen (LITERAL-Mode hat nicht gegriffen)**
+Briefing hat exakte Zeilen:
+- S1: „Mit AdTool AI erstellst du…"
+- S2: „…realistische Lip-Sync-Videos…"
+- S3: „…mit mehreren Sprechern…"
+- S4: „…die perfekt zusammenpassen."
 
-### 2. `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
-- Import `DEFAULT_OUTFIT_PRESETS`.
-- `showOutfitPicker` (Zeile 1215) auf `!!baseId` setzen — der Picker erscheint sobald ein Character gewählt ist, unabhängig davon ob Library-Looks existieren.
-- Im `<SelectContent>` (Zeile 1241-1246):
-  - `Standard-Look` bleibt als Default.
-  - Danach: falls `merged.length > 0`, deren Items rendern.
-  - Falls **keine** Library-Looks existieren: kurze `<SelectLabel>Vorschläge</SelectLabel>` + 10 Preset-Items (`value={preset.id}` = `preset:<id>`, label sprachabhängig).
-- `updateSceneCastOutfit` erweitern: wenn `v` mit `preset:` beginnt, speichern als `outfitLookId=null` PLUS neuem Feld `outfitPreset: string` (Prompt-Fragment) am Cast-Slot. Sonst weiter wie bisher.
+Plan zeigt in den Skript-Feldern stattdessen **Szenenbeschreibungen** wie „Speaker 2, a creative marketer, moves between desks in a modern, bright startup office…" — das ist der Shot-Prompt, nicht der Dialog. Das exakte deutsche Skript ist verloren gegangen.
 
-### 3. `src/lib/video-composer/briefing/productionPlan.ts`
-Zod-Schema `PlanCastSlot`: optionales Feld `outfitPreset: z.string().optional().nullable()` hinzufügen (nicht-brechend, backend ignoriert es).
+**6. Ensemble-Guarantee überschießt bei Solo-Shots**
+S01 Hook zeigt „Cast (4)" mit allen 4 Sprechern gleichzeitig als Gruppen-Shot („share the scene together, each visible to camera"). Briefing sagt aber klar: Shot 1A = **nur Sprecher 1 solo** auf Stadtstraße. Die neue Ensemble-Logik feuert auch dort, wo das Skript sauber Solo-Shots vorgibt.
 
-### 4. `src/hooks/useApplyProductionPlan.ts`
-Beim Merge in die Szene: `outfitPreset` als zusätzliches Prompt-Suffix an `sceneDescription` / Cast-Wardrobe-Feld anhängen (wie bereits `moodSuffix` behandelt wird). Kein Schreiben nach `avatar_outfit_looks`, kein Impact auf Lip-Sync-Guards.
+## Wichtige Fehler (Qualität)
 
-## Explizit NICHT ändern
-- `avatar_outfit_looks` bleibt unangetastet (kein DB-Insert für Presets).
-- Edge-Function `briefing-deep-parse` — Presets sind rein UI/Prompt-seitig.
-- LipSync-, Anchor-, Render-Pipeline — Presets landen nur im Scene-Prompt-Text.
-- `useUnifiedMentionLibrary` — bleibt.
+**7. Locations nicht zugeordnet**
+Alle Szenen zeigen „— nicht zugeordnet —". Briefing gibt 4 konkrete Locations pro Sprecher vor (Stadtstraße / Startup-Office / Café / Creator-Studio). Der Location-Resolver hat keinen davon gemappt — nicht mal als Freitext-Location angelegt.
 
-## Verifikation
-- Neuer Test-Account ohne gespeicherte Outfits: Briefing parsen → jeder Cast-Slot zeigt Outfit-Dropdown mit "Standard-Look" + 10 Presets.
-- Account mit gespeicherten Looks: Library-Looks zuerst, dann Divider + Presets als Fallback-Optionen.
-- Preset wählen → Scene-Prompt enthält das englische Fragment; kein Fehler beim Anwenden; keine Lip-Sync-Szene wird überschrieben.
-- Sprachumschaltung DE/EN/ES ändert nur die Labels im Dropdown, nicht das Prompt-Fragment.
+**8. Outfits alle „Standard-Look"**
+Briefing beschreibt pro Sprecher Kleidung (Business-casual/Hemd+Jacke, Smart-casual, Street/Café-Look, Premium/Studio). Keiner der 10 neuen Default-Presets wurde gezogen, kein Library-Look. Trotz der Preset-Integration von eben.
+
+**9. Voices**
+S01 und S02 zeigen „Auto-Voice beim Anwenden" für Kailee — bei 4 klar unterschiedenen Sprecherprofilen sollte der Voice-Pool 4 distinkte Stimmen zuweisen (v212 voice_pool).
+
+**10. Engine-Zuweisung inkonsistent**
+S01 = cinematic-sync (bei angeblich 4 Sprechern in einem Shot — Cinematic-Sync ist aber der Multi-Speaker-N-Pfad, das passt). S02/S03 = „auto" bei Solo-Shots — sollten auch cinematic-sync werden, wenn Lip-Sync erforderlich ist (Lip-Sync-Badge ist ja auf allen gesetzt).
+
+## Root-Cause-Hypothesen
+
+Basierend auf der Codebase-Historie:
+
+- **Duration-Ignore**: `briefing-deep-parse` fasst 6 Shots zu 3 Szenen zusammen und nimmt Default-Dauer 10s statt aus Briefing zu lesen. Der Prompt fordert keine Timing-Extraktion aus dem Briefing-Text.
+- **Missing Speaker 4 / Endcard / Split-Screen**: Der Parser hat ein 3-Szenen-Bias (Hook/Reveal/Proof-Template) und komprimiert 6 Shots → 3 statt 6 Szenen zu erzeugen. Struktur-Marker wie „Shot 1A/1B/2A/2B/3A/3B" im Briefing werden nicht respektiert.
+- **LITERAL nicht getriggert**: Das Briefing benutzt „Sprecher 1: `„Text…"`" statt `NAME:` als Label. `detectBriefingFidelity` sucht wahrscheinlich nur `^NAME:` Regex und übersieht das Format „Sprecher N:" mit deutschen Anführungszeichen. → LITERAL-Mode nie aktiviert → keine Verbatim-Zeilen → Skript-Feld bekommt Fallback-Szenenbeschreibung.
+- **Ensemble über-fired**: `ensureEnsembleScene` prüft nur „mind. 2 Chars im Cast" und ignoriert, ob das Skript für diese Szene einen Solo-Speaker vorgibt. Das Overrides auch dann, wenn der Text explizit einen Sprecher benennt.
+- **Location nicht gemappt**: „Moderne Stadtstraße" ist Freitext, keine Library-Location. Der Resolver macht kein Fallback auf `locationDescription` als Freitext-String pro Szene.
+- **Outfit-Presets nicht auto-gewählt**: Preset-Zuweisung ist bisher manuell (User klickt Dropdown). Der Parser könnte aus Kleidungs-Keywords im Briefing das passendste Preset vorschlagen.
+
+## Ich empfehle folgendes Fix-Bündel (nur Diagnose, keine Änderung ohne dein OK)
+
+**A. Timing-Extraktion (kritisch)**
+`briefing-deep-parse` System-Prompt erweitern um: „Wenn das Briefing explizite Sekunden/Zeitangaben (`0–2,5s`, `Länge: 15 Sekunden`, `Timing: …`) enthält, MUSS der Plan die Gesamtdauer und pro-Szenen-Dauer daraus übernehmen. Default 10s NUR wenn kein Timing spezifiziert ist."
+
+**B. Shot-Struktur respektieren (kritisch)**
+Prompt-Regel: „Wenn das Briefing Shot-Marker wie `Shot 1A/1B/2A/2B` oder nummerierte Sprecher-Blöcke enthält, erzeuge EINE Szene pro Shot — komprimiere NICHT auf 3 Template-Szenen. Endcard/Split-Screen sind eigene Szenen."
+
+**C. LITERAL-Detector erweitern (kritisch)**
+`detectBriefingFidelity` in `useStoryboardTransition.ts` zusätzlich matchen auf:
+- `Sprecher\s*\d+\s*:` / `Speaker\s*\d+\s*:` / `Character\s*\d+\s*:`
+- Direkte Rede in `„…"` / `"…"` / `«…»` nach einem Sprecher-Label
+Diese Zeilen als Verbatim-Skript-Zeilen behandeln, nicht als Beschreibung.
+
+**D. Ensemble-Guard nur bei fehlender Speaker-Attribution (kritisch)**
+`ensureEnsembleScene` NUR dann feuern, wenn:
+- Szene hat 0 explizite Sprecher-Zuweisung, UND
+- Das Skript-Feld nennt keinen konkreten Speaker-Namen/Label.
+Solo-Shots aus dem Briefing bleiben Solo.
+
+**E. Location-Fallback (wichtig)**
+Wenn Library-Match fehlschlägt, den Location-Freitext aus dem Briefing (z. B. „Moderne Stadtstraße, urbaner Hintergrund") als `locationDescription` in den Plan-Slot legen, damit der Nutzer im Dropdown „+ Anlegen" die Location mit einem Klick übernehmen kann. Aktuell zeigt der Slot „— nicht zugeordnet —" ohne Vorschlagswert.
+
+**F. Outfit-Preset-Auto-Match (nice-to-have)**
+`briefing-deep-parse` bekommt eine Regel: Wenn Cast-Slot einen `outfitDescription` aus dem Briefing hat aber kein `outfitLookId`, wähle das nächstliegende der 10 Default-Presets per Keyword-Match (`business` → business-casual/formal, `studio`/`premium` → tech-founder/evening-elegant, `street`/`casual` → streetwear/weekend-relaxed). Preset-ID in `outfitPreset` schreiben.
+
+## Technische Details (welche Dateien wären betroffen)
+
+- `supabase/functions/briefing-deep-parse/index.ts` — System-Prompt für Timing- & Shot-Struktur-Extraktion, Fidelity-Preservation für Sprecher-Zeilen, Outfit-Preset-Matching
+- `src/hooks/useStoryboardTransition.ts` — `detectBriefingFidelity` Regex-Erweiterung um `Sprecher N:` und deutsche Quotes
+- `src/lib/motion-studio/syncCastFromPrompt.ts` (`ensureEnsembleScene`) — Guard gegen Solo-Shot-Overrides
+- `src/lib/video-composer/briefing/ensurePlanEnsemble.ts` — gleicher Guard client-seitig
+- Location-Fallback: `ProductionPlanSheet.tsx` Location-Dropdown zeigt `locationDescription` als Vorschlagswert im „+ Anlegen"-Feld
+
+## Reihenfolge / Priorität
+
+1. **C** (LITERAL-Detector) — löst 5 & indirekt 6, dein Skript wird 1:1 übernommen
+2. **B** (Shot-Struktur) — löst 2, 3, 4 (Sprecher 4, Endcard, Split-Screen erscheinen)
+3. **A** (Timing) — löst 1 (15s statt 30s)
+4. **D** (Ensemble-Guard) — löst 6 (Solo-Shots bleiben solo)
+5. **E** (Location-Fallback) — löst 7
+6. **F** (Outfit-Auto-Match) — löst 8
+
+## Frage an dich
+
+Willst du:
+- **„alle 6"** — komplettes Fix-Bündel A–F umsetzen
+- **„1–4"** — nur die kritischen 4 (Skript/Struktur/Timing/Ensemble), Location & Outfit später
+- **„nur C+B"** — die zwei größten Hebel zuerst, dann testen und weiter
+- Eigene Auswahl / Reihenfolge nennen
