@@ -22,6 +22,7 @@ import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensu
 import { toast } from '@/hooks/use-toast';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
+import { readBriefingContract } from '@/lib/video-composer/briefing/briefingContract';
 
 /**
  * Build a deterministic Hook/Reveal/CTA arc so the user is never blocked
@@ -299,20 +300,19 @@ function alignPlanScenesToCanonicalTiming(plan: TProductionPlan, timing: Briefin
  * runs as a legacy fallback for offline / local-fallback plans.
  */
 function readServerContractAsTiming(plan: TProductionPlan): BriefingTimingWithWindows | null {
-  const debug = (plan as any)?._meta?.debug;
-  const contract = debug && typeof debug === 'object' ? debug.briefing_contract : null;
-  if (!contract || typeof contract !== 'object') return null;
-  const durationSec = Number(contract.durationSec);
-  if (!Number.isFinite(durationSec) || durationSec <= 0) return null;
-  const sceneCount = Number(contract.sceneCount);
-  const src = String(contract.source ?? 'board');
-  const mode = String(contract.scriptTimingMode ?? 'FREETEXT');
+  const contract = readBriefingContract(plan);
+  if (!contract) return null;
+  const durationSec = contract.durationSec;
+  if (!Number.isFinite(durationSec as number) || (durationSec as number) <= 0) return null;
   return {
-    durationSec,
-    sceneCount: Number.isFinite(sceneCount) && sceneCount > 0 ? Math.round(sceneCount) : undefined,
-    explicitSceneCount: !!contract.explicitSceneCount,
-    continuousScene: !!contract.continuousScene,
-    source: src === 'script' || mode === 'SHOT_MARKERS' ? 'time-windows' : 'explicit-total',
+    durationSec: durationSec as number,
+    sceneCount: contract.sceneCount > 0 ? contract.sceneCount : undefined,
+    explicitSceneCount: contract.explicitSceneCount,
+    continuousScene: contract.continuousScene,
+    source:
+      contract.source === 'script' || contract.scriptTimingMode === 'SHOT_MARKERS'
+        ? 'time-windows'
+        : 'explicit-total',
   };
 }
 

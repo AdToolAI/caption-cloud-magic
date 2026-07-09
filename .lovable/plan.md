@@ -1,136 +1,52 @@
+## Stand nach Phase 1, 2, 6
 
-# Refactor-Plan: Briefing → Storyboard Pipeline
+Live und grün:
+- Server ist alleinige Autorität für Timing/Scene-Count (`briefing_contract` in `plan._meta.debug`).
+- Client (`useStoryboardTransition`) zieht den Contract vor eigener Regex.
+- Shared Helper: `assetKeyUtils.ts`, `planContinuity.ts` (6 Duplikate ersetzt).
+- 12/12 Tests grün, Typecheck grün.
 
-## Kurzbewertung (Ist-Zustand)
+## Was noch offen ist (Phase 3, 4, 5, 7, 8, 9)
 
-Die Logik ist **funktional korrekt geworden**, aber **architektonisch nicht sauber**: dieselbe Aufgabe wird an 3–4 Stellen parallel gelöst. Konkret gemessen im Audit:
+### Phase 3 — Client-Detektoren als Fallback markieren
+`detectScriptTimingMode.ts` und `detectCanonicalBriefingTiming.ts` laufen bei jedem Sheet-Render mit. Wenn der Server-Contract da ist, sollen sie skippen. Verhindert dass alte Regex-Bugs jemals wieder gewinnen.
 
-- **Scene-Contract-Detection**: 2× (Server + Client, regex-identisch)
-- **Duration-Detection**: 2× (Server 4 Patterns, Client 7 Patterns → können divergieren)
-- **Scene-Merge-to-1**: 3 unabhängige Implementierungen
-- **Scene-Count-Align / Redistribution**: 3 unterschiedliche Algorithmen auf denselben Daten
-- **`totalDurationSec` Schreibstellen**: 11 entlang der Pipeline
-- **`finalizePlanCanonical`**: läuft **4×** pro Apply-Vorgang
-- **`normalizeAssetKey`**: 4 lokale Kopien
-- **`shouldInheritContinuity`**: 2 identische Kopien
-- **Cast-Dedup**: 2 Implementierungen
-- **`BriefingTab`** nutzt eine **komplett andere Edge-Function** (`compose-video-storyboard`) und umgeht die ganze Pipeline
+### Phase 4 — `ProductionPlanSheet` entkernen
+Aktuell wickelt das Sheet den Plan in `safePlan` via `useMemo`, was bei jedem Edit erneut `finalizePlanCanonical` triggert und Cursor-Springer/Sync-Bugs erzeugt hat. Finalize nur noch:
+1. einmal beim Empfang vom Server,
+2. einmal im Apply-Guard.
+Sheet arbeitet direkt auf dem Plan.
 
-**Risikohotspot**: `ProductionPlanSheet.tsx` hat einen Feedback-Loop (`useMemo safePlan` → `useEffect onUpdateBriefing` → `currentBriefing` → `safePlan` neu). Nur ein Signature-Ref verhindert die Endlosschleife.
+### Phase 5 — Apply-Pfad vereinheitlichen
+`useApplyProductionPlan` und `useStoryboardTransition` haben je eigene Guards. Ein zentraler `applyPlanToStoryboard(plan, project)` mit dem Finalize-Guard drin, beide Call-Sites nutzen ihn.
 
-Fazit: sauber wäre **eine Quelle der Wahrheit pro Concern**. Das ist der Plan.
+### Phase 7 — `BriefingTab` auf einheitliche Edge-Function
+Aktuell zwei Aufrufpfade (Deep-Parse + Legacy-Fallback). Nur noch `briefing-deep-parse`, Fallback lokal nur wenn Edge-Function 5xx.
 
----
+### Phase 8 — Zod-Schema härten
+`ProductionPlan` erlaubt `unknown` an zu vielen Stellen (`_meta` komplett offen, `cast[].shotType` als String statt Enum). Enger typisieren, damit fehlerhafte Server-Payloads am Schema abprallen.
 
-## Ziel-Architektur
+### Phase 9 — Regression-Tests & Version-Chip
+- Golden-File-Tests für 3 kanonische Briefings (15s/1-scene, 15s/3-scene, 30s free-text).
+- `CLIENT_PIPELINE_VERSION` bump auf 214, Debug-Chip zeigt Server- + Client-Version.
 
-```text
-BriefingTab ──► briefing-deep-parse (Edge)
-                 │
-                 ├─ detectScriptTimingMode
-                 ├─ detectBriefingContract  ◄── EINZIGE Detection
-                 ├─ Pass A (LLM) + LITERAL/SCRIPT_LOCK
-                 ├─ mergeScenesToOne / align (Server-Autorität)
-                 └─ Response: { plan, _meta.briefingContract }
-                                    │
-                                    ▼
-                        useStoryboardTransition
-                        (nur Transport, keine Re-Detection)
-                                    │
-                                    ▼
-                        ProductionPlanSheet
-                        • zeigt plan an
-                        • Validierung READ-ONLY (Warnungen)
-                        • KEIN safePlan-useMemo
-                        • KEIN Write-Back auf Briefing
-                                    │
-                                    ▼
-                        useApplyProductionPlan
-                        finalizePlanCanonical()  ◄── EINMAL, hier
-                        → DB-Write
-```
+## Empfehlung Reihenfolge
 
-**Kernregel**: Der Server ist die **Autorität** für Contract & Timing. Der Client **liest** `_meta.briefingContract`, transformiert nicht mehr eigenständig, sondern **validiert** und **repariert nur einmal** kurz vor dem Schreiben.
+Höchster Impact / niedrigstes Risiko zuerst:
 
----
+1. **Phase 3** (5 min, rein defensiv) — killt latente Regex-Divergenz endgültig.
+2. **Phase 9** (Tests + Version) — sichert das bisher Erreichte ab, bevor wir Sheet umbauen.
+3. **Phase 4** (Sheet entkernen) — größter UX-Gewinn, aber invasivster Change.
+4. **Phase 5** (Apply-Pfad).
+5. **Phase 7** (BriefingTab).
+6. **Phase 8** (Zod härten) — zum Schluss, wenn Payload-Shape stabil ist.
 
-## Phasen
+## Technische Notizen
 
-### Phase 1 — Shared Contract (Grundlage)
-Neue Datei `src/lib/video-composer/briefing/briefingContract.ts` (Deno-kompatibel für Server-Import):
+- Phase 4 ist der einzige Schritt mit Regressionsrisiko (Sheet-State-Handling). Davor Golden-Tests aus Phase 9 anlegen.
+- Phase 8 kann breaking sein für alte gespeicherte `composer_production_plans` — Migration via `.passthrough()` oder Version-Feld im Schema.
+- Kein DB-Change nötig für 3, 4, 5, 7, 9. Phase 8 evtl. Migration je nach Strictness.
 
-```ts
-export interface BriefingContract {
-  totalDurationSec: number;
-  sceneCount: number | null;
-  explicitSceneCount: boolean;
-  continuousScene: boolean;
-  scriptTimingMode: 'SHOT_MARKERS' | 'SPEAKER_BLOCKS' | 'FREETEXT' | 'LITERAL';
-  source: 'explicit-total' | 'scene-math' | 'time-windows' | 'shot-markers' | 'board';
-  windows?: Array<{ start: number; end: number }>;
-}
-```
-Server schreibt in `plan._meta.briefingContract`. `ProductionPlan`-Zod-Schema um dieses Feld erweitern.
+## Frage
 
-### Phase 2 — Server als einzige Detection-Autorität
-- `detectBriefingContract()` im Edge-Function konsolidieren (heute: `detectExplicitSceneContract` + `detectExplicitBriefingTiming` + `parseSmallSceneCount`). Alle Regex-Varianten des Clients übernehmen, damit keine Divergenz mehr entsteht.
-- Emit `_meta.briefingContract` in der Response.
-- Server-Reihenfolge fixieren (dokumentiert im Code-Kommentar): `detect → LLM → merge → align → redistribute → sync total`. Nach `sync total` **keine** weiteren Duration-Writes.
-
-### Phase 3 — Client entkernen
-- `useStoryboardTransition.ts`: `detectSceneContract`, `detectCanonicalBriefingTiming`, `mergeScenesToSingleScene`, `alignPlanScenesToCanonicalTiming`, `applyCanonicalTimingToPlan` **entfernen**. Stattdessen: `readBriefingContract(plan)` (dünner Reader).
-- `finalizePlanCanonical.ts` bleibt, **aber** liest ausschließlich `_meta.briefingContract` — keine Text-Re-Analyse mehr.
-- Fallback-Plan-Builder im Hook: nutzt denselben Reader, kein eigener Detector.
-
-### Phase 4 — ProductionPlanSheet vereinfachen
-- `useMemo safePlan` **entfernen**. Sheet zeigt `plan`-State direkt.
-- `useEffect` auf `initialPlan`: läuft **einmalig**, ruft `finalizePlanCanonical` **nicht** hier auf, sondern nur beim Apply.
-- Validierungs-`useMemo` (READ-ONLY) liefert nur Warnungen für `SafePlanNotice`.
-- `onUpdateBriefing({ duration })` Feedback-Loop **entfernen** — die Briefing-Duration ist ab Response fest, Änderungen sind reine UI-Overrides.
-
-### Phase 5 — Apply-Pfad als einziger Finalizer
-- `useApplyProductionPlan.applyPlan()` ruft `finalizePlanCanonical(plan)` **genau einmal** direkt vor dem DB-Write auf.
-- Inline `dedupMap` (Zeile 318–343) durch `dedupePlanScenesCast` aus `planCastDedup.ts` ersetzen.
-
-### Phase 6 — Helper-Konsolidierung
-Neue Utility-Module, jeweils **eine** Definition:
-- `src/lib/video-composer/briefing/assetKeyUtils.ts` → `normalizeAssetKey` (ersetzt 4 Kopien)
-- `src/lib/video-composer/briefing/planContinuity.ts` → `shouldInheritContinuity` (ersetzt 2 Kopien)
-- `src/lib/video-composer/briefing/planSceneOps.ts` → `mergeScenesToOne`, `alignSceneCount`, `redistributeSceneDurations` (ersetzt 3+3+3 Kopien; Server importiert per Deno-`npm:`-kompatiblem Pfad oder erhält einen 1:1-Mirror + Deno-Test der Verhaltensgleichheit)
-
-### Phase 7 — BriefingTab an Pipeline anschließen
-- `BriefingTab.handleGenerateStoryboard` migrieren: statt `compose-video-storyboard` → `briefing-deep-parse` → `useApplyProductionPlan`.
-- Inline-Multi-Cast-Rewrite (Zeilen 349–430) **löschen** — Server macht das jetzt zentral.
-- (Falls `compose-video-storyboard` andere Aufrufer hat: separaten Adapter behalten; sonst deprecaten.)
-
-### Phase 8 — Zod-Härtung & Tests
-- `PlanScene.durationSec`: `.catch(5)` durch `.default(0)` + expliziten Repair-Log-Eintrag ersetzen, damit stiller Duration-Drift sichtbar wird.
-- Regressionstests erweitern (`useStoryboardTransitionTiming.test.ts`, `finalizePlanCanonical.test.ts`) auf:
-  - 15s / 1 durchgehende Szene / 4 Sprecher (das aktuelle Referenz-Briefing)
-  - 15s / 3 Szenen à 5s
-  - LITERAL-Mode / SHOT_MARKERS / SPEAKER_BLOCKS / FREETEXT
-  - Alterspannen wie „30–45 Jahre" dürfen Duration nicht kapern
-- Deno-Test für Server-Detector mit denselben Fixtures (Client/Server-Parität).
-
-### Phase 9 — Debug/Version-Chip
-- `BriefingPlanSummary` zeigt `briefingContract.source` + Pipeline-Version (`v213 → v214`) prominent.
-- Debug-Panel (`?debug=1`) listet die genutzte Contract-Quelle statt der aktuellen 3 separaten Detection-Blöcke.
-
----
-
-## Aus dem Refactor bewusst rausgehalten
-- Keine Änderungen an Rendering, Lipsync, Lambda-Config, Credits, Auth, Design-System.
-- Keine neuen Features — nur Konsolidierung existierender Logik.
-- Keine Schema-Migration (nur additiv: `_meta.briefingContract`).
-
-## Erwartetes Ergebnis
-- **1** Detection-Ort statt 2
-- **1** Merge-/Align-Ort statt 3
-- **1** Finalize-Aufruf statt 4
-- **0** Feedback-Loops zwischen Sheet und Briefing-State
-- **1** Edge-Function für alle Briefing-Eingänge
-- Kunden-sichtbar: Kein Verhalten ändert sich; Stabilität und Nachvollziehbarkeit steigen deutlich.
-
-## Umsetzungsreihenfolge (empfohlen, in Build-Modus)
-Phase 1 → 2 → 8 (Tests grün auf altem Client) → 3 → 4 → 5 → 6 → 7 → 9.
-Nach jeder Phase Tests laufen; Client bleibt kompatibel, weil neue Felder additiv sind.
+Soll ich in der Reihenfolge 3 → 9 → 4 → 5 → 7 → 8 durchziehen, oder willst du eine andere Priorität? Wenn du "weitermachen" sagst, starte ich mit Phase 3 + 9 (klein, sicher, sofort).

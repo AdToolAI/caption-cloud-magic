@@ -222,4 +222,50 @@ describe('useStoryboardTransition canonical briefing timing', () => {
     expect(normalized.plan.scenes[0].durationSec).toBe(15);
     expect(normalized.plan.scenes[0].dialogTurns).toHaveLength(4);
   });
+
+  it('prefers the server briefing_contract over conflicting client detection', () => {
+    // Briefing text says 30s / 3 scenes but the server contract insists on 15s / 1 scene.
+    // The server is authoritative — the client must NOT re-detect and override.
+    const briefingText = [
+      'Länge: 30 Sekunden',
+      'Szenen: 3 Szenen',
+      '0–10s Sprecher 1: „…“',
+      '10–20s Sprecher 2: „…“',
+      '20–30s Sprecher 3: „…“',
+    ].join('\n');
+    const b = { productName: 'AdTool', productDescription: briefingText, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const plan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
+      scenes: [{
+        index: 1,
+        label: 'Scene 1',
+        durationSec: 15,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [],
+      }],
+      unresolved: [],
+      _meta: {
+        source: 'ai',
+        debug: {
+          briefing_contract: {
+            durationSec: 15,
+            sceneCount: 1,
+            explicitSceneCount: true,
+            continuousScene: true,
+            source: 'explicit-briefing',
+            scriptTimingMode: 'FREETEXT',
+            shots: 0,
+            pipelineVersion: 'server-v214',
+          },
+        },
+      },
+    } as unknown as TProductionPlan;
+
+    const normalized = applyCanonicalTimingToPlan(plan, b, briefingText);
+    expect(normalized.timing?.durationSec).toBe(15);
+    expect(normalized.timing?.sceneCount).toBe(1);
+    expect(normalized.plan.project?.totalDurationSec).toBe(15);
+    expect(normalized.plan.scenes).toHaveLength(1);
+  });
 });
