@@ -1952,6 +1952,21 @@ YOU MUST:
       console.warn('[briefing-deep-parse] strict cast pass failed (non-fatal):', e?.message);
     }
 
+    // v213 — Briefing Fidelity Pass: when the briefing carried an explicit
+    // "## Verbatim Script", enforce 1:1 dialog reproduction + speaker mapping.
+    try {
+      fidelityStats = enforceBriefingFidelity(plan, briefing);
+      if (fidelityStats.mode === 'literal') {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          fidelity: fidelityStats,
+        };
+        console.log('[briefing-deep-parse] fidelity', fidelityStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] fidelity pass failed (non-fatal):', e?.message);
+    }
+
 
 
 
