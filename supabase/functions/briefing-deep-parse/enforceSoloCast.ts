@@ -140,6 +140,18 @@ export function enforceSoloCast(plan: any): { trimmedScenes: number; droppedSlot
         scrubbedFields += 1;
       }
     }
+    // Nested paths (voiceover.text etc.).
+    for (const [outer, inner] of ENSEMBLE_NESTED_PATHS) {
+      const parent = sc?.[outer];
+      if (!parent || typeof parent !== 'object') continue;
+      const v = parent[inner];
+      if (typeof v !== 'string' || !v) continue;
+      const cleaned = scrubEnsemble(v);
+      if (cleaned !== v) {
+        parent[inner] = cleaned;
+        scrubbedFields += 1;
+      }
+    }
   }
 
   return { trimmedScenes, droppedSlots, scrubbedFields };
