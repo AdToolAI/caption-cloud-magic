@@ -19,7 +19,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
-import { Lightbulb, Sparkles, Compass } from 'lucide-react';
+import { Lightbulb, Sparkles, Compass, FileCheck2 } from 'lucide-react';
 import type { TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 
 interface Props {
@@ -56,9 +56,12 @@ export default function BriefingPlanSummary({ plan }: Props) {
 
   const mode = meta?.mode ?? null;
   const research = meta?.research ?? [];
+  const fidelity = (meta as any)?.fidelity as
+    | { mode: 'literal' | 'auto'; repairedTexts?: number; repairedSpeakers?: number; scenesMatched?: number; scenesInScript?: number }
+    | undefined;
 
   // Nothing meaningful to render → keep the footer minimal.
-  if (!mode && !research.length && aiFilledCount === 0) return null;
+  if (!mode && !research.length && aiFilledCount === 0 && !fidelity) return null;
 
   return (
     <div className="rounded-lg border border-amber-300/30 bg-gradient-to-br from-amber-300/[0.06] to-transparent p-2.5 space-y-2 text-xs">
@@ -72,6 +75,31 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <span className="opacity-60">· {Math.round(meta.modeConfidence * 100)}%</span>
               )}
             </Badge>
+          )}
+          {fidelity?.mode === 'literal' && (
+            <HoverCard openDelay={120}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-emerald-400/40 text-emerald-300 gap-1 cursor-help">
+                  <FileCheck2 className="h-3 w-3" />
+                  Skript 1:1 übernommen
+                  {(fidelity.repairedTexts ?? 0) + (fidelity.repairedSpeakers ?? 0) > 0 && (
+                    <span className="opacity-70">· {(fidelity.repairedTexts ?? 0) + (fidelity.repairedSpeakers ?? 0)} repariert</span>
+                  )}
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[320px] text-[11px]">
+                <div className="font-medium mb-1">Briefing-Treue (LITERAL)</div>
+                <div className="text-muted-foreground space-y-0.5">
+                  <div>Szenen im Skript: <span className="text-foreground">{fidelity.scenesInScript ?? 0}</span></div>
+                  <div>Szenen gematcht: <span className="text-foreground">{fidelity.scenesMatched ?? 0}</span></div>
+                  <div>Dialog-Texte repariert: <span className="text-foreground">{fidelity.repairedTexts ?? 0}</span></div>
+                  <div>Sprecher neu zugeordnet: <span className="text-foreground">{fidelity.repairedSpeakers ?? 0}</span></div>
+                </div>
+                <div className="mt-2 text-[10px] text-muted-foreground">
+                  Dein Skript wurde wörtlich übernommen. Die KI hat nur Visuals & Meta ergänzt.
+                </div>
+              </HoverCardContent>
+            </HoverCard>
           )}
           {aiFilledCount > 0 && (
             <HoverCard openDelay={120}>

@@ -1043,6 +1043,138 @@ function enforceStrictCast(plan: any, required: any[]) {
   return { dropped, backfilled };
 }
 
+/**
+ * v213 — Extract the "## Verbatim Script" block emitted by the client
+ * when Mode: LITERAL is active. Returns the script body (without the fence)
+ * along with the parsed Speaker Map (script label → @mention).
+ */
+function extractVerbatimScript(briefing: string): {
+  present: boolean;
+  script: string;
+  speakerMap: Map<string, string>;
+} {
+  const speakerMap = new Map<string, string>();
+  const src = String(briefing ?? '');
+  // Speaker Map block
+  const smMatch = src.match(/##\s+Speaker\s+Map[^\n]*\n([\s\S]*?)(?:\n##\s+|\n```|$)/i);
+  if (smMatch) {
+    for (const line of smMatch[1].split('\n')) {
+      const m = line.match(/^\s*-\s*(.+?)\s*(?:→|->|=>)\s*@([a-z0-9][a-z0-9-_]{1,47})/i);
+      if (m) {
+        speakerMap.set(m[1].trim().toLowerCase(), `@${m[2].toLowerCase()}`);
+      }
+    }
+  }
+  // Verbatim Script block — either ```-fenced or plain until next ## header
+  const vsFenced = src.match(/##\s+Verbatim\s+Script[^\n]*\n```[a-z]*\n([\s\S]*?)\n```/i);
+  const vsPlain = vsFenced ? null : src.match(/##\s+Verbatim\s+Script[^\n]*\n([\s\S]*?)(?:\n##\s+|$)/i);
+  const script = (vsFenced?.[1] ?? vsPlain?.[1] ?? '').trim();
+  return { present: script.length > 0, script, speakerMap };
+}
+
+/**
+ * v213 — Split a verbatim script into scene blocks keyed by SZENE/SCENE N
+ * markers. Falls back to a single virtual scene when no markers exist.
+ */
+function splitScriptIntoScenes(script: string): Array<{ index: number; body: string }> {
+  const src = String(script ?? '');
+  const markerRe = /(?:^|\n)\s*(?:szene|scene|shot)\s*(\d{1,2})\b[^\n]*\n?/gi;
+  const marks: Array<{ index: number; start: number; end: number }> = [];
+  for (const m of src.matchAll(markerRe)) {
+    const idx = parseInt(m[1], 10);
+    if (!Number.isFinite(idx)) continue;
+    const start = (m.index ?? 0) + m[0].length;
+    marks.push({ index: idx, start, end: src.length });
+  }
+  if (marks.length === 0) return [{ index: 1, body: src.trim() }];
+  for (let i = 0; i < marks.length - 1; i++) marks[i].end = marks[i + 1].start;
+  return marks.map((m) => ({ index: m.index, body: src.slice(m.start, m.end).trim() }));
+}
+
+/**
+ * v213 — Extract `NAME: text` dialog lines from a verbatim script block.
+ */
+function extractScriptDialogTurns(sceneBody: string): Array<{ label: string; text: string }> {
+  const lines = String(sceneBody ?? '').split('\n');
+  const turns: Array<{ label: string; text: string }> = [];
+  const speakerRe = /^\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-\.\s]{1,40}?)\s*[:—-]\s+(.+)$/;
+  let current: { label: string; text: string } | null = null;
+  for (const line of lines) {
+    const m = line.match(speakerRe);
+    if (m) {
+      const label = m[1].trim();
+      if (/^(szene|scene|shot|kamera|framing|mood|note|tone|dialog|dialogue|voiceover|vo|hook|reveal|cta|pain|proof|beat)$/i.test(label)) continue;
+      if (current) turns.push(current);
+      current = { label, text: m[2].trim() };
+    } else if (current && line.trim()) {
+      // Continuation of previous speaker
+      current.text = `${current.text} ${line.trim()}`;
+    }
+  }
+  if (current) turns.push(current);
+  return turns;
+}
+
+/**
+ * v213 — Enforce briefing fidelity in LITERAL mode. Compares the parsed
+ * plan against the verbatim script and repairs mismatches:
+ *   1. Dialog text mismatch → overwrite plan text with script text.
+ *   2. Speaker label unmapped → assign speakerMentionKey via speakerMap.
+ * Non-destructive: only touches scenes whose index appears in the script.
+ * Returns telemetry so the UI can surface a "Fidelity" chip.
+ */
+function enforceBriefingFidelity(
+  plan: any,
+  briefing: string,
+): { mode: 'literal' | 'auto'; repairedTexts: number; repairedSpeakers: number; scenesMatched: number; scenesInScript: number } {
+  const { present, script, speakerMap } = extractVerbatimScript(briefing);
+  if (!present) return { mode: 'auto', repairedTexts: 0, repairedSpeakers: 0, scenesMatched: 0, scenesInScript: 0 };
+  const sceneBlocks = splitScriptIntoScenes(script);
+  const byIndex = new Map(sceneBlocks.map((s) => [s.index, s]));
+  let repairedTexts = 0;
+  let repairedSpeakers = 0;
+  let scenesMatched = 0;
+
+  const norm = (s: string) => String(s ?? '').toLowerCase().replace(/[\s\.,!\?—\-–:;"'`«»„"'()\[\]]+/g, '');
+
+  for (const sc of Array.isArray(plan?.scenes) ? plan.scenes : []) {
+    const block = byIndex.get(Number(sc?.index));
+    if (!block) continue;
+    scenesMatched += 1;
+    const scriptTurns = extractScriptDialogTurns(block.body);
+    if (scriptTurns.length === 0) continue;
+
+    // Ensure dialogTurns matches scriptTurns 1:1 in count/order.
+    if (!Array.isArray(sc.dialogTurns) || sc.dialogTurns.length !== scriptTurns.length) {
+      sc.dialogTurns = scriptTurns.map((t) => ({
+        speakerMentionKey: speakerMap.get(t.label.toLowerCase()) ?? `@${t.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        text: t.text,
+      }));
+      repairedTexts += scriptTurns.length;
+      repairedSpeakers += scriptTurns.length;
+      continue;
+    }
+
+    // Same count → repair in place per turn.
+    for (let i = 0; i < scriptTurns.length; i++) {
+      const src = scriptTurns[i];
+      const dst = sc.dialogTurns[i] ?? (sc.dialogTurns[i] = {});
+      if (norm(dst.text) !== norm(src.text)) {
+        dst.text = src.text;
+        repairedTexts += 1;
+      }
+      const expected = speakerMap.get(src.label.toLowerCase());
+      if (expected && dst.speakerMentionKey !== expected) {
+        dst.speakerMentionKey = expected;
+        repairedSpeakers += 1;
+      }
+    }
+  }
+
+  return { mode: 'literal', repairedTexts, repairedSpeakers, scenesMatched, scenesInScript: sceneBlocks.length };
+}
+
+
 function ensureProductionPlanEnsembleServer(plan: any, briefing: string, characters: any[]) {
   const required = extractSelectedCastFromBriefing(briefing, characters);
   const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
@@ -1239,9 +1371,36 @@ This overrides any English wording in the briefing's scaffolding
     let passADiagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> = [];
     let passAModelUsed = 'unknown';
 
+    // v213 — LITERAL-mode override: when the client detected an explicit
+    // script (speaker lines / scene markers) and set `Mode: LITERAL`, we
+    // prepend a hard directive so Pass A reproduces the script 1:1 instead
+    // of running AUTO-DIRECTOR synthesis. Also honors the ## Speaker Map
+    // block if present, mapping script labels → briefed @-mentions.
+    const literalMode = /^Mode:\s*LITERAL\b/mi.test(briefing);
+    const LITERAL_LOCK = literalMode ? `
+═══════════════════════════════════════════════════════════════════════════
+LITERAL MODE — HARD OVERRIDE (top priority over AUTO-DIRECTOR)
+═══════════════════════════════════════════════════════════════════════════
+The user provided an explicit screenplay via "## Verbatim Script".
+YOU MUST:
+  • Reproduce dialogue text 1:1 (word-for-word) from the script — never rewrite,
+    summarize, paraphrase, translate, or trim spoken lines.
+  • Never invent speaker names. Every dialogTurns[].speakerMentionKey MUST
+    resolve via the "## Speaker Map" section to an @-mention listed in
+    "## Cast". If a mapping is missing, use the closest briefed cast member
+    (by role/context), never a made-up name like "George" or "Roger".
+  • Never reassign a line to a different speaker than the script labels.
+  • Emit EXACTLY one scene per "SZENE N" / "SCENE N" marker in the script.
+    Do NOT merge, split, add, or drop scenes.
+  • Fill visual metadata (framing, angle, movement, lighting, anchorPromptEN)
+    freely — that is where you add value. But NEVER change the spoken words
+    or the speaker assignments.
+═══════════════════════════════════════════════════════════════════════════
+` : '';
+
     const passAPromise = callGatewayChain(
       {
-        system: LANGUAGE_LOCK + '\n' + SYSTEM_PASS_A,
+        system: LANGUAGE_LOCK + '\n' + LITERAL_LOCK + '\n' + SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
         user: `BRIEFING (source language: ${languageDisplay}):\n\n${briefing}`,
       },
@@ -1764,6 +1923,7 @@ This overrides any English wording in the briefing's scaffolding
 
     let ensembleStats: { repaired: number; required: number } | null = null;
     let strictCastStats: { dropped: number; backfilled: number } | null = null;
+    let fidelityStats: { mode: 'literal' | 'auto'; repairedTexts: number; repairedSpeakers: number; scenesMatched: number; scenesInScript: number } | null = null;
     try {
       ensembleStats = ensureProductionPlanEnsembleServer(plan, briefing, characters);
       if (ensembleStats.repaired > 0) {
@@ -1790,6 +1950,21 @@ This overrides any English wording in the briefing's scaffolding
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] strict cast pass failed (non-fatal):', e?.message);
+    }
+
+    // v213 — Briefing Fidelity Pass: when the briefing carried an explicit
+    // "## Verbatim Script", enforce 1:1 dialog reproduction + speaker mapping.
+    try {
+      fidelityStats = enforceBriefingFidelity(plan, briefing);
+      if (fidelityStats.mode === 'literal') {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          fidelity: fidelityStats,
+        };
+        console.log('[briefing-deep-parse] fidelity', fidelityStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] fidelity pass failed (non-fatal):', e?.message);
     }
 
 
@@ -1967,6 +2142,7 @@ This overrides any English wording in the briefing's scaffolding
             location_resolution: locResolutionForMeta,
             ensemble_repair: ensembleStats,
             strict_cast: strictCastStats,
+            fidelity: fidelityStats,
             voice_pool_assignments: voicePoolForMeta,
           },
         });
@@ -1981,7 +2157,7 @@ This overrides any English wording in the briefing's scaffolding
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

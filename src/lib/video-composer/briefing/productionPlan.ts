@@ -275,6 +275,18 @@ export const PlanMeta = z.object({
    *                       when the edge function timed out / failed
    */
   source: z.enum(['ai', 'local-fallback']).optional(),
+  /**
+   * v213 — Briefing Fidelity telemetry. Present when LITERAL mode kicked
+   * in (the user shipped an explicit script). Surfaced as a chip in the
+   * ProductionPlanSheet footer.
+   */
+  fidelity: z.object({
+    mode: z.enum(['literal', 'auto']),
+    repairedTexts: z.number().int().min(0),
+    repairedSpeakers: z.number().int().min(0),
+    scenesMatched: z.number().int().min(0),
+    scenesInScript: z.number().int().min(0),
+  }).partial({ repairedTexts: true, repairedSpeakers: true, scenesMatched: true, scenesInScript: true }).optional(),
 }).partial();
 
 export const ProductionPlan = z.object({
