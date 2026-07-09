@@ -782,9 +782,21 @@ export default function ProductionPlanSheet({
   };
 
   const totalPlanSec = useMemo(
-    () => (plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0),
+    () => Math.round((plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0) * 10) / 10,
     [plan],
   );
+
+  // v215 — Consistency Gate: die zentrale Normalisierung garantiert
+  // `project.totalDurationSec === sum(scenes)`. Falls das UI trotzdem einen
+  // Delta zeigt (z.B. wegen manueller Edits), blockieren wir den Apply
+  // und weisen den User darauf hin.
+  const durationInconsistent = useMemo(() => {
+    const target = Number(plan?.project?.totalDurationSec);
+    if (!Number.isFinite(target) || target < 1) return false;
+    return Math.abs(target - totalPlanSec) >= 0.5;
+  }, [plan, totalPlanSec]);
+
+  const normalizationMeta = (plan as any)?._meta?.debug?.normalization ?? null;
 
   // ── Live-recompute unresolved ───────────────────────────────────────────
   // The Edge Function emits `plan.unresolved` once. As the user edits the
