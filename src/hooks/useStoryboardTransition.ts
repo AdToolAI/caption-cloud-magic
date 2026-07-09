@@ -96,6 +96,8 @@ export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefi
     /(?:dauer|duration|länge|laenge)\s+(?:des|der|vom|für|fuer|of)\s+(?:videos?|films?|spots?|ads?)\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
     // "Länge: ca. 15 Sekunden" as a standalone field.
     /(?:^|\n)\s*(?:länge|laenge|film[- ]?länge|film[- ]?laenge|video[- ]?länge|video[- ]?laenge|spot[- ]?länge|spot[- ]?laenge)\s*[:=\-–—]\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
+    // "Ziel: In 15 Sekunden zeigen ..." / "In 15 seconds show ...".
+    /(?:^|\n|[.!?]\s+)[^\n]{0,60}?\b(?:in|within|binnen)\s+(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b[^\n]{0,120}?\b(?:zeigen|show|demonstrieren|demonstrate|erzählen|erzaehlen|video|film|spot|commercial)\b/i,
     /(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b\s*(?:gesamt|total|insgesamt|overall|film|video|spot)\b/i,
     /\b(?:film|video|spot|werbevideo|werbespot|werbefilm|imagefilm|ad)\b[^\n]{0,80}?\b(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
     /(?:ziel|vorgabe|briefing)\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,

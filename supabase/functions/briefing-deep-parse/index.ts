@@ -23,6 +23,67 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
 
+function parsePositiveSeconds(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number(String(raw).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
+}
+
+function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; sceneCount?: number; source: 'explicit-total' | 'scene-math' | 'time-windows' } | null {
+  const raw = String(rawInput ?? '').split(/\n\s*##\s+Project\b/i)[0].trim();
+  if (!raw) return null;
+
+  const sceneCountMatch = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
+  const sceneCount = sceneCountMatch ? Number(sceneCountMatch[1]) : undefined;
+
+  const explicitPatterns = [
+    /(?:gesamt\s*dauer|gesamtdauer|gesamt\s*länge|gesamtlaenge|gesamtlänge|total\s*duration|filmdauer|film\s*dauer|video\s*dauer|spot\s*dauer|laufzeit)(?:\s+(?:des|der|vom|für|fuer|of)\s+(?:videos?|films?|spots?|ads?))?\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
+    /(?:^|\n)\s*(?:länge|laenge|film[- ]?länge|film[- ]?laenge|video[- ]?länge|video[- ]?laenge|spot[- ]?länge|spot[- ]?laenge)\s*[:=\-–—]\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
+    /(?:^|\n|[.!?]\s+)[^\n]{0,60}?\b(?:in|within|binnen)\s+(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b[^\n]{0,120}?\b(?:zeigen|show|demonstrieren|demonstrate|erzählen|erzaehlen|video|film|spot|commercial)\b/i,
+    /\b(?:film|video|spot|werbevideo|werbespot|werbefilm|imagefilm|ad)\b[^\n]{0,80}?\b(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
+  ];
+  for (const re of explicitPatterns) {
+    const seconds = parsePositiveSeconds(raw.match(re)?.[1]);
+    if (seconds && seconds >= 3) return { durationSec: seconds, sceneCount, source: 'explicit-total' };
+  }
+
+  const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b\s*(?:[\/|,;·\-–—]|\(|\[)?\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
+  const compactSeconds = parsePositiveSeconds(compact?.[1]);
+  if (compactSeconds && compactSeconds >= 3) return { durationSec: compactSeconds, sceneCount: Number(compact?.[2] ?? sceneCount), source: 'explicit-total' };
+
+  const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\b/gi;
+  const ageTailRe = /^\s*(?:jahre|jahren|jährig|jaehrig|jährige|jaehrige|years?|yrs?|y\.o\.?)\b/i;
+  const timeAnchorRe = /(?:zeit|timing|sek|sekunden|second|dauer|duration|shot|szene|scene|hook|cta|frame|beat|marker|clip)/i;
+  let maxEnd = 0;
+  let windows = 0;
+  for (const m of raw.matchAll(windowRe)) {
+    const start = parsePositiveSeconds(m[1]);
+    const end = parsePositiveSeconds(m[3]);
+    if (start === null || end === null || end <= start || end > 600) continue;
+    const idx = m.index ?? 0;
+    const after = raw.slice(idx + m[0].length, idx + m[0].length + 20);
+    if (ageTailRe.test(after)) continue;
+    const hasUnit = Boolean(m[2] || m[4]);
+    if (!hasUnit) {
+      const lineStart = raw.lastIndexOf('\n', idx) + 1;
+      const lineEnd = raw.indexOf('\n', idx);
+      const line = raw.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+      if (!timeAnchorRe.test(line)) continue;
+    }
+    maxEnd = Math.max(maxEnd, end);
+    windows += 1;
+  }
+  if (windows >= 2 && maxEnd >= 3) return { durationSec: Math.round(maxEnd * 10) / 10, sceneCount: sceneCount ?? windows, source: 'time-windows' };
+
+  const sceneMath = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,60}?(?:à|a|je|each|x|×)\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
+  const perScene = parsePositiveSeconds(sceneMath?.[2]);
+  if (sceneMath && perScene) {
+    const count = Number(sceneMath[1]);
+    return { durationSec: Math.round(count * perScene * 10) / 10, sceneCount: count, source: 'scene-math' };
+  }
+  return null;
+}
+
 // ── Enums (mirror src/lib/.../manifestSchema.ts) ─────────────────────────────
 
 const FRAMING = ['extreme-wide','wide','medium-wide','medium','medium-close-up','close-up','extreme-close-up'];
@@ -1471,6 +1532,7 @@ YOU MUST:
       console.warn('[briefing-deep-parse] script-timing detect failed (non-fatal):', e?.message);
       scriptTiming = { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
     }
+    const explicitBriefingTiming = detectExplicitBriefingTiming(briefing);
     const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS' ? `
 ═══════════════════════════════════════════════════════════════════════════
 SCRIPT-TIMING LOCK — HARD OVERRIDE (script wins over board settings)
@@ -1792,11 +1854,43 @@ YOU MUST:
         }
       }
 
+      // Duration Authority: explicit user briefing beats both board defaults
+      // and model-generated speech estimates. For the AdTool-style case
+      // ("Länge: ca. 15 Sekunden", "3 Szenen") this locks the manifest to
+      // 15s / 3 scenes BEFORE auto-extend can inflate it from verbose
+      // voiceover text.
+      const explicitScriptLock = !!explicitBriefingTiming
+        && scriptTiming.mode === 'SHOT_MARKERS'
+        && Array.isArray(manifest?.scenes)
+        && manifest.scenes.length > 0
+        && (!explicitBriefingTiming.sceneCount || explicitBriefingTiming.sceneCount === manifest.scenes.length);
+      if (explicitScriptLock) {
+        const targetTotal = explicitBriefingTiming.durationSec;
+        const currentSum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+        const shouldRedistribute = Math.abs(currentSum - targetTotal) >= 0.5;
+        if (shouldRedistribute) {
+          const per = Math.max(1, Math.round((targetTotal / manifest.scenes.length) * 10) / 10);
+          manifest.scenes = manifest.scenes.map((s: any, i: number) => ({ ...s, index: i + 1, durationSec: per }));
+          const sum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+          const drift = Math.round((targetTotal - sum) * 10) / 10;
+          if (Math.abs(drift) >= 0.1 && manifest.scenes.length > 0) {
+            const last = manifest.scenes[manifest.scenes.length - 1];
+            last.durationSec = Math.max(1, Math.round((Number(last.durationSec) + drift) * 10) / 10);
+          }
+        }
+        if (!manifest.project) manifest.project = {};
+        manifest.project.totalDurationSec = targetTotal;
+        (manifest as any).__explicitBriefingTiming = explicitBriefingTiming;
+      }
+
       // G3 — Duration Auto-Extend. If the estimated speech length exceeds the
       // scene's target duration, bump the scene to `speechSec + 1s` so the VO
       // is never clipped. Runs whenever a script is present (scriptTiming),
       // even in Tier 2/3 — we always want to protect the VO.
       if (Array.isArray(manifest?.scenes)) {
+        const explicitScriptLock = !!explicitBriefingTiming
+          && scriptTiming.mode === 'SHOT_MARKERS'
+          && (!explicitBriefingTiming.sceneCount || explicitBriefingTiming.sceneCount === manifest.scenes.length);
         // ~2.6 words/sec at natural pace; strip mood-suffix bracketed text.
         const WORDS_PER_SEC = 2.6;
         const estimateSec = (text: string): number => {
@@ -1822,10 +1916,11 @@ YOU MUST:
           const cur = Math.max(1, Math.round(Number(sc.durationSec) || 0));
           if (target > cur) {
             adjustments.push({ scene: i + 1, from: cur, to: target, speechSec: Math.round(speechSec * 10) / 10 });
+            if (explicitScriptLock) continue;
             sc.durationSec = target;
           }
         }
-        if (adjustments.length > 0) {
+        if (adjustments.length > 0 && !explicitScriptLock) {
           if (!manifest.project) manifest.project = {};
           const sum = manifest.scenes.reduce(
             (a: number, s: any) => a + (Number(s.durationSec) || 0),
@@ -1833,6 +1928,8 @@ YOU MUST:
           );
           manifest.project.totalDurationSec = sum;
           (manifest as any).__durationAutoExtend = adjustments;
+        } else if (adjustments.length > 0 && explicitScriptLock) {
+          (manifest as any).__durationAutoExtendBlocked = adjustments;
         }
       }
     } catch (e: any) {
@@ -2353,6 +2450,9 @@ YOU MUST:
     const durationAutoExtend: any[] = Array.isArray((plan as any).__durationAutoExtend)
       ? (plan as any).__durationAutoExtend
       : [];
+    const durationAutoExtendBlocked: any[] = Array.isArray((plan as any).__durationAutoExtendBlocked)
+      ? (plan as any).__durationAutoExtendBlocked
+      : [];
     try {
       if (projectId) {
         const { data: prev } = await supabase
@@ -2369,6 +2469,7 @@ YOU MUST:
       try { delete (plan as any)._locationResolution; } catch { /* noop */ }
       try { delete (plan as any)._voicePoolStats; } catch { /* noop */ }
       try { delete (plan as any).__durationAutoExtend; } catch { /* noop */ }
+      try { delete (plan as any).__durationAutoExtendBlocked; } catch { /* noop */ }
       const { error: insErr } = await supabase
         .from('composer_production_plans')
         .insert({
@@ -2404,7 +2505,8 @@ YOU MUST:
               shots: scriptTiming?.shots?.length ?? 0,
               source: scriptTiming?.source ?? 'none',
             },
-            duration_auto_extend: durationAutoExtend,
+              duration_auto_extend: durationAutoExtend,
+              duration_auto_extend_blocked: durationAutoExtendBlocked,
             solo_cast: soloStats,
           },
         });
@@ -2432,7 +2534,7 @@ YOU MUST:
     }
     const _canonicalScenes = _scenes.length;
     const _canonicalFromScript = scriptTiming?.mode === 'SHOT_MARKERS' && (scriptTiming?.shots?.length ?? 0) >= 2;
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: _canonicalFromScript ? 'script' : 'board' }, duration_auto_extend: durationAutoExtend }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

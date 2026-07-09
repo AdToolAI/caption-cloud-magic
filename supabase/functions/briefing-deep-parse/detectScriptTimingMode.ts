@@ -373,16 +373,6 @@ export function detectScriptTimingMode(briefing: string): ScriptTimingInfo {
   const marker = extractByShotMarkers(trimmed);
   const subs = extractBySubShotMarkers(trimmed);
   if (marker.length >= 2) {
-    // If sub-shots strictly refine (>= 2x the top-level count and all timed),
-    // use them as the canonical shot list — the user opted into finer control.
-    if (subs.length >= marker.length * 2 && subs.every((s) => s.durationSec != null)) {
-      return {
-        mode: 'SHOT_MARKERS',
-        source,
-        shots: subs,
-        computedTotalSec: subs.reduce((a, s) => a + (s.durationSec ?? 0), 0),
-      };
-    }
     const allTimed = marker.every((s) => s.durationSec != null);
     return {
       mode: 'SHOT_MARKERS',
