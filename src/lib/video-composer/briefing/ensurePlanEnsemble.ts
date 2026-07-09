@@ -1,6 +1,7 @@
 import type { ComposerBriefing } from '@/types/video-composer';
 import type { TProductionPlan, TPlanScene, TResolvedCast } from './productionPlan';
 import { dedupePlanScenesCast, dedupePlanSceneCast } from './planCastDedup';
+import { planIsScriptLocked } from './finalizePlanCanonical';
 
 const MAX_CAST = 4;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -128,6 +129,11 @@ export function ensureProductionPlanEnsemble(
   plan: TProductionPlan,
   briefing?: ComposerBriefing,
 ): TProductionPlan {
+  // v215 — Script/Literal-Lock: wenn der Plan aus einem Skript stammt oder
+  // im LITERAL-Mode ist, darf die Ensemble-Garantie NICHT eingreifen.
+  // Solo-Szenen bleiben Solo, die Sprecherverteilung stammt vom Skript.
+  const scriptLocked = planIsScriptLocked(plan);
+
   const resolvedPlanCast = new Map<string, TResolvedCast>();
   const outfitByCharacterId = new Map<string, string>();
   for (const scene of plan?.scenes ?? []) {
@@ -145,6 +151,17 @@ export function ensureProductionPlanEnsemble(
       ?? resolvedPlanCast.get(normalizeAssetKey(c.characterName));
     return hit?.characterId ? { ...c, characterId: hit.characterId, voiceId: c.voiceId ?? hit.voiceId ?? null } : c;
   });
+
+  // In Script-Lock: nur Scrub (keine „share the scene"-Leaks) + Dedup,
+  // aber KEINE Ensemble-Injektion.
+  if (scriptLocked) {
+    const scrubbed = (plan.scenes ?? []).map(scrubSoloSceneEnsemble);
+    const anyScrubbed = scrubbed.some((s, i) => s !== plan.scenes[i]);
+    const dedup = dedupePlanScenesCast(scrubbed);
+    if (!anyScrubbed && dedup.removed === 0) return plan;
+    return { ...plan, scenes: dedup.scenes as TPlanScene[] };
+  }
+
   if (!plan?.scenes?.length || required.length < 2) return plan;
 
   const requiredCount = plan.scenes.length >= 6 ? 2 : 1;

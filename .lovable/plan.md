@@ -1,98 +1,63 @@
-## Ziel
-Wenn im Briefing eindeutig `15 Sekunden` steht, darf im Production Plan und im Board-Toggle nicht mehr `30s` stehen — auch nicht im `Lokaler Fallback-Plan`.
+## Kurzantwort
+Ja — dieser Plan behebt die strukturelle Ursache, nicht nur die Symptome. Es sind aktuell mehrere kleine Fixes an vielen Stellen, die sich gegenseitig überstimmen. Mit einem einzigen kanonischen Normalisierungs-Gate + harten Blockern verhindern wir künftig, dass widersprüchliche Zustände (`50s Gesamt / 10s Szenen`) überhaupt noch angezeigt oder gespeichert werden können.
 
-## Diagnose
-Der Screenshot zeigt weiterhin `Lokaler Fallback-Plan` mit `30s`. Das bedeutet: Der aktive Pfad ist nicht der volle Backend-Parser, sondern der clientseitige Fallback. Genau dort muss die Briefing-Dauer vor dem Anzeigen des Sheets hart durchgesetzt werden.
+## Warum das diesmal endgültig hält
+1. **Ein einziger Wahrheitsort für Dauer & Szenenzahl** — statt 3 Fallback-Pfaden (Backend, Local Fallback, UI-Sync) rechnet nur noch eine Funktion `finalizePlanCanonical()` direkt vor Anzeige und Apply.
+2. **Hard-Gate statt Silent-Fix** — ist der Plan inkonsistent, wird der Apply-Button rot blockiert. Kein stiller Fehldurchlauf mehr möglich.
+3. **Script-Wins mit klarer Interpretation** — Top-Level `SZENE` vs. Sub-Shots werden explizit unterschieden und sichtbar dokumentiert.
+4. **Ensemble-Injection wird bei Literal/Script-Briefings deaktiviert** — Solo-Szenen bleiben Solo.
+5. **Cast/Voice/Location-ID-Gates** — Voice-Namen wie "Roger/George" können nicht mehr als Charakter durchrutschen.
+6. **Tests decken exakt die Fehlerfälle** aus deinen Screenshots ab (15s vs 30s, 3 vs 6 Shots, Solo-Leaks, Voice-Leaks).
 
-Zusätzlich gibt es zwei wahrscheinliche Ursachen:
-- Der aktuelle Sync greift erst, wenn der Fallback bereits gebaut wurde. Wenn der Fallback-Plan selbst noch `30s` enthält, zeigt das Sheet weiterhin `30s`.
-- Der Nutzer testet auf `useadtool.ai`; falls das die veröffentlichte Domain ist, sieht er ggf. noch den letzten veröffentlichten Build, nicht automatisch die aktuelle Preview-Version.
+## Was der Plan NICHT löst
+- LLM-Halluzinationen bei extrem freiem Briefing (dafür bleibt der Manual Speaker Mapper).
+- Wenn du Board-Dauer und Script-Dauer bewusst gemischt willst — dann brauchen wir eine explizite UI-Toggle-Auswahl.
 
-## Umsetzung
+## Der Plan im Detail
 
-### 1. Kanonische Briefing-Dauer als Single Source of Truth
-Ich ergänze/verschärfe einen zentralen Resolver im Client-Fallback, der ausschließlich den echten Briefing-Text liest und den Board-Wert ignoriert.
+### Phase 1 — Zentrale finale Normalisierung
+Neue Funktion `finalizePlanCanonical(plan, briefing)`, aufgerufen an **genau zwei** Punkten:
+- direkt vor `setPlan(...)` im `ProductionPlanSheet`
+- direkt vor `applyPlan(...)` in `useApplyProductionPlan`
 
-Er erkennt unter anderem:
-- `Gesamtdauer: 15 Sekunden`
-- `Gesamtdauer des Videos: 15 Sekunden`
-- `15 Sekunden / 3 Szenen à 5s`
-- `3 Szenen à 5 Sekunden`
-- `3 Szenen insgesamt 15 Sekunden`
-- Zeitfenster wie `0–5s`, `5–10s`, `10–15s`
-- Varianten mit `Sek.`, `sec`, `s`, Gedankenstrich/Bindestrich und Komma-Zahlen
+Sie erzwingt:
+- `project.totalDurationSec === sum(scenes.durationSec)`
+- Kanonische Briefing-Dauer > Board-Dauer > Szenensumme
+- Script-Shots gewinnen vor Board-Szenenzahl
+- Jede Korrektur landet in `_meta.debug.normalization`
 
-Wichtig: Der automatisch angehängte Board-Block `Total duration: 30s` darf nie als stärkere Quelle zählen als der ursprüngliche Briefing-Text.
+### Phase 2 — Script-First Timing durchgängig
+Erweitertes Erkennen von `Gesamtdauer`, `N Szenen à Xs`, Zeitfenstern `0–5s`, Sub-Shots `1A/1B`. UI zeigt aktive Interpretation.
 
-### 2. Dauer vor dem Sheet hart auf den Plan anwenden
-Nach jedem Plan-Ergebnis — Backend-Plan, Late-Arrival-Plan und Local-Fallback — wird nochmal geprüft:
+### Phase 3 — Local Fallback ehrlich labeln
+Fallback muss kanonisch konsistent sein oder Apply wird blockiert und "Vollanalyse erneut versuchen" angeboten. Keine irreführenden Script-Timing-Chips mehr.
 
-```text
-Briefing-Dauer erkannt? 
-→ plan.project.totalDurationSec = erkannte Dauer
-→ Szene-Dauern passend neu verteilen oder auf Zeitfenster setzen
-→ plan._meta.debug.canonical_timing speichern
-```
+### Phase 4 — Ensemble-Garantie bei Literal/Script hart aus
+Sobald `_meta.fidelity.mode === literal` oder Script-Timing aktiv: keine Ensemble-Injektion, kein "share the scene", Cast strikt = Sprecher der Szene.
 
-Damit kann kein Plan mehr mit `30s` ins Sheet gelangen, wenn das Briefing eindeutig `15s` sagt.
+### Phase 5 — Cast/Voice/Location-ID-Gate
+- `cast[].characterId` muss echte gewählte UUID oder null sein
+- `voiceId` darf nie eine Charakter-UUID sein
+- Voice-Namen (George/Roger) werden nur als Voice-Label gezeigt, nie als Sprecher
+- Nicht zuordenbare Sprecher-Labels bleiben leer → Manual Mapper
 
-### 3. Board-Toggle sofort synchronisieren
-Sobald die kanonische Dauer erkannt wurde, wird vor dem Öffnen des ProductionPlanSheets ausgeführt:
+### Phase 6 — Location-Freetext schützen
+Freie Location-Beschreibungen bleiben bis in den finalen `aiPrompt` erhalten (`Setting: ...`). Auto-Resolve darf sie nicht überschreiben.
 
-```text
-onUpdateBriefing({ duration: 15 })
-```
+### Phase 7 — UI-Diagnose & Blocker
+Im Sheet sichtbar:
+- Quelle (Backend / Local Fallback / Late Arrival)
+- Final normalisierte Dauer & Szenenzahl
+- Script-Interpretation (Top-Level vs Sub-Shots)
+- Roter Blocker bei Inkonsistenz, Apply deaktiviert
 
-Das passiert für:
-- erfolgreichen Backend-Plan
-- Local-Fallback-Plan
-- später nachgeladenen Backend-Plan
+### Phase 8 — Regressions-Tests
+- 15s Briefing + Board 30s → 15s, 3×5s
+- 6 Sub-Shots à 2.5s → 6×2.5s = 15s
+- 50s Fehldetektion → Blocker oder Szenensumme gewinnt
+- Solo-Literal → kein Ensemble-Prompt
+- Voice- vs Charakter-ID Trennung
+- Location-Freetext bleibt in `aiPrompt`
 
-Zusätzlich bleibt der bestehende Sheet-Effect als zweite Sicherung bestehen.
-
-### 4. sichtbarer Diagnose-Chip
-Im Plan-Summary-Chip soll eindeutig sichtbar werden:
-
-```text
-Skript-Dauer verwendet · 15s
-```
-
-Wenn der Fallback aktiv ist:
-
-```text
-Lokaler Fallback · Skript-Dauer 15s
-```
-
-So sieht man sofort, ob Script-Wins wirklich gegriffen hat.
-
-### 5. Mini-Test direkt gegen dein Briefing
-Ich ergänze eine kleine isolierte Testdatei oder lokale Testfunktion für genau dieses Muster:
-
-```text
-15 Sekunden / 3 Szenen à 5s
-```
-
-Erwartung:
-
-```text
-Gesamtdauer: 15s
-Szenen: 3
-S01: 5s
-S02: 5s
-S03: 5s
-Board patch: duration=15
-```
-
-### 6. Veröffentlichung beachten
-Wenn du auf `useadtool.ai` testest, muss nach dem Fix nochmal veröffentlicht werden. Sonst prüfst du eventuell weiterhin den alten Stand, obwohl die Preview bereits korrigiert ist.
-
-## Ergebnis
-Nach dem Fix kann dieser Widerspruch nicht mehr auftreten:
-
-```text
-Briefing: 15 Sekunden
-Production Plan: 30s
-Board-Toggle: 30s
-```
-
-Stattdessen wird der Plan direkt mit `15s` geöffnet und der Toggle automatisch auf `15s` gesetzt.
+## Erwartetes Ergebnis
+`50s / 10s`-Zustand ist strukturell unmöglich. Script-Briefings gewinnen zuverlässig. Cast/Voice/Location sind vor Apply validiert. Wenn etwas nicht sauber ist, siehst du es sofort statt es später im Storyboard zu entdecken.

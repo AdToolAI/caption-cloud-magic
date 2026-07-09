@@ -26,6 +26,7 @@ import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan, type TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
+import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import BriefingPlanSummary from './BriefingPlanSummary';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
@@ -182,7 +183,9 @@ export default function ProductionPlanSheet({
   // When a new initialPlan arrives (subsequent re-opens), refresh local state.
   useEffect(() => {
     if (initialPlan) {
-      setPlan(ensureProductionPlanEnsemble(initialPlan, currentBriefingRef.current));
+      const withEnsemble = ensureProductionPlanEnsemble(initialPlan, currentBriefingRef.current);
+      const finalized = finalizePlanCanonical(withEnsemble);
+      setPlan(finalized?.plan ?? withEnsemble);
       setStep('review');
     }
   }, [initialPlan]);
@@ -540,7 +543,9 @@ export default function ProductionPlanSheet({
       };
       // Second pass if first pass produced new collisions.
       healed.scenes = healed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
-      setPlan(ensureProductionPlanEnsemble(healed, currentBriefing));
+      const withEnsemble = ensureProductionPlanEnsemble(healed, currentBriefing);
+      const finalized = finalizePlanCanonical(withEnsemble);
+      setPlan(finalized?.plan ?? withEnsemble);
       setStep('review');
 
     } catch (e: any) {
@@ -576,7 +581,9 @@ export default function ProductionPlanSheet({
     }
     setApplying(true);
     try {
-      const normalizedPlan = ensureProductionPlanEnsemble(plan, currentBriefing);
+      const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefing);
+      const finalized = finalizePlanCanonical(withEnsemble);
+      const normalizedPlan = finalized?.plan ?? withEnsemble;
       if (normalizedPlan !== plan) setPlan(normalizedPlan);
       const result = await applyPlan({
         plan: normalizedPlan,
@@ -775,9 +782,21 @@ export default function ProductionPlanSheet({
   };
 
   const totalPlanSec = useMemo(
-    () => (plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0),
+    () => Math.round((plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0) * 10) / 10,
     [plan],
   );
+
+  // v215 — Consistency Gate: die zentrale Normalisierung garantiert
+  // `project.totalDurationSec === sum(scenes)`. Falls das UI trotzdem einen
+  // Delta zeigt (z.B. wegen manueller Edits), blockieren wir den Apply
+  // und weisen den User darauf hin.
+  const durationInconsistent = useMemo(() => {
+    const target = Number(plan?.project?.totalDurationSec);
+    if (!Number.isFinite(target) || target < 1) return false;
+    return Math.abs(target - totalPlanSec) >= 0.5;
+  }, [plan, totalPlanSec]);
+
+  const normalizationMeta = (plan as any)?._meta?.debug?.normalization ?? null;
 
   // ── Live-recompute unresolved ───────────────────────────────────────────
   // The Edge Function emits `plan.unresolved` once. As the user edits the
@@ -953,6 +972,43 @@ export default function ProductionPlanSheet({
         {step === 'review' && plan && (
           <ScrollArea className="h-full min-h-0 pr-3 -mr-1">
             <div className="space-y-3">
+              {/* v215 — Konsistenz-Blocker: nur sichtbar, wenn Projekt-Total und
+                  Szenensumme voneinander abweichen. Wenn sichtbar → Apply ist blockiert. */}
+              {durationInconsistent && (
+                <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Plan inkonsistent — Apply blockiert
+                  </div>
+                  <div className="text-muted-foreground">
+                    Projekt-Gesamtdauer <b>{plan.project?.totalDurationSec}s</b> passt nicht
+                    zur Szenensumme <b>{totalPlanSec}s ({plan.scenes.length} Szenen)</b>.
+                    Bitte Szenendauern korrigieren oder das Briefing neu analysieren.
+                  </div>
+                </div>
+              )}
+
+              {/* v215 — Diagnose-Chip: zeigt, aus welcher Quelle die Gesamtdauer
+                  final gesetzt wurde und ob der Plan konsistent normalisiert ist. */}
+              {normalizationMeta && (
+                <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                  <Badge variant="outline" className="border-emerald-400/40 text-emerald-300">
+                    Normalisiert · {normalizationMeta.totalDurationSec}s
+                  </Badge>
+                  <Badge variant="outline" className="border-cyan-400/40 text-cyan-300">
+                    Quelle: {normalizationMeta.durationSource === 'canonical-briefing' ? 'Briefing/Skript'
+                      : normalizationMeta.durationSource === 'plan-project' ? 'Projekt'
+                      : normalizationMeta.durationSource === 'scene-sum' ? 'Szenensumme'
+                      : 'Default'}
+                  </Badge>
+                  {Array.isArray(normalizationMeta.actions) && normalizationMeta.actions.length > 0 && (
+                    <Badge variant="outline" className="border-amber-400/40 text-amber-300" title={normalizationMeta.actions.join(' · ')}>
+                      {normalizationMeta.actions.length} Auto-Fixes
+                    </Badge>
+                  )}
+                </div>
+              )}
+
               {/* Projekt */}
               <SectionCard title="Projekt">
                 <Row label="Name" value={plan.project?.name} />
@@ -1538,7 +1594,12 @@ export default function ProductionPlanSheet({
           {step === 'review' && plan && (
             <>
               <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
-              <Button onClick={handleApply} disabled={applying} className="gap-2">
+              <Button
+                onClick={handleApply}
+                disabled={applying || durationInconsistent}
+                className="gap-2"
+                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : undefined}
+              >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Plan anwenden
               </Button>
