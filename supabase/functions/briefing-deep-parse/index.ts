@@ -2311,7 +2311,7 @@ YOU MUST:
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' } }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
