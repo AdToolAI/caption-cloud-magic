@@ -204,8 +204,30 @@ function extractBySpeakerWithTiming(body: string): DetectedShot[] {
   // Handles Sprecher/Speaker/Talent 1..9 optionally followed by "(0-3s)" or "[0-3s]".
   const re =
     /^\s*(?:Sprecher|Speaker|Talent|Person|Charakter|Character|Rolle|Role)\s*(\d{1,2})\s*([\[(][^\])]*[\])])?\s*[:—-]\s*(.+?)\s*$/gim;
+  // Common continuous-scene form: "0–3s Sprecher 1: Text". These are
+  // internal turns unless an explicit scene-count contract says otherwise.
+  const timedPrefixRe =
+    /^\s*(\d{1,3}(?:[,.]\d+)?)\s*[-–—]\s*(\d{1,3}(?:[,.]\d+)?)\s*(?:s|sek\.?|sekunden|sec\.?|seconds)?\s+(?:Sprecher|Speaker|Talent|Person|Charakter|Character|Rolle|Role)\s*(\d{1,2})\s*[:—-]\s*(.+?)\s*$/gim;
   const shots: DetectedShot[] = [];
   let i = 0;
+  for (const m of src.matchAll(timedPrefixRe)) {
+    i += 1;
+    const start = parseFloat(String(m[1]).replace(',', '.'));
+    const end = parseFloat(String(m[2]).replace(',', '.'));
+    const durationSec = Number.isFinite(start) && Number.isFinite(end) && end > start
+      ? Math.round((end - start) * 10) / 10
+      : null;
+    const label = `Sprecher ${parseInt(m[3], 10)}`;
+    shots.push({
+      index: i,
+      speakerLabel: label,
+      text: stripLine(m[4]),
+      dialogTurns: [],
+      startSec: Number.isFinite(start) ? start : null,
+      endSec: Number.isFinite(end) ? end : null,
+      durationSec,
+    });
+  }
   for (const m of src.matchAll(re)) {
     i += 1;
     const label = `Sprecher ${parseInt(m[1], 10)}`;
