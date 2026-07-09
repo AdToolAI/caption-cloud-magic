@@ -1,34 +1,66 @@
-# Cast & World IDs — Status
+# Fix: Briefing-Analyse produziert Duplikate & lässt Charaktere weg
 
-**Gesamtbild:** Die v211-Verdrahtung ist end-to-end intakt. Pass B von `briefing-deep-parse` liefert UUIDs, `ProductionPlanSheet` erhält sie bei User-Edits, `useApplyProductionPlan` schreibt `characterShots[]` + `sceneAssets[]` in die Szene, `buildSceneAssetsForRender` reicht sie an `compose-video-clips`. Der Audit fand **eine echte Lücke** und **eine Aufräumsache** — beide klein, nur Client, kein Edge-Function-Redeploy.
+## Ursachen (im Audit gefunden)
 
-## Was zu tun ist
+**Bug 1 — Regex verschluckt die Library-UUID.**  
+`extractSelectedCastFromBriefing` in `supabase/functions/briefing-deep-parse/index.ts` (~Zeile 964) benutzt:
+```
+/@([a-z0-9][a-z0-9-_]{1,47})[^\n]*(?:\(library:([0-9a-f-]{36})\))?/gi
+```
+Das gierige `[^\n]*` frisst die gesamte Zeile inklusive `(library:UUID)`, bevor die optionale Group überhaupt versucht zu matchen. Ergebnis: `m[2]` ist **immer** `undefined`, obwohl `useStoryboardTransition.buildBriefingText` die UUID sauber mitschickt. Der "Required-Cast" für die Ensemble-Repair fällt damit auf Fuzzy-Namensmatch zurück — und wenn die Namen sich ähneln (4× "Xxx Dusatko"), matcht gar nichts mehr sauber. Kailee fehlt, ensemble-repair injiziert nichts.
 
-### Fix 1 — Non-UUID Katalog-Chars in `characterShots[]` blocken (Bug)
-`useApplyProductionPlan.ts:279–293` mappt `plan.cast[]` → `CharacterShot[]` und schleust die ID nur durch `stripPlanId` (Prefix-Strip). Bei einem `catalog:character:<non-uuid-slug>` (Katalog-Char ohne Brand-Adoption) landet ein Nicht-UUID-String in `characterShots[].characterId`. Das ist genau der Fall den v211 verbietet: der Anchor-Resolver matched strict gegen `brand_characters.id`, kein Silent-Drift.
+**Bug 2 — Pass B halluzinierte Sprecher rutschen durch die Dedupe.**  
+Gemini erfindet manchmal Dialogsprecher ("George", "Roger"), die nicht im Briefing stehen. Sie landen als Cast-Slots mit `characterId=null` und **eindeutigem** `mentionKey`. Die aktuelle `dedupeSceneCast` betrachtet unterschiedliche mentionKeys als unterschiedliche Slots → beide bleiben. Später resolved die UI diese unbekannten Mentions per Substring-Fallback auf den ersten "Dusatko" im Library → derselbe Charakter erscheint zweimal.
 
-`scene_assets[]`-Zweig (Zeile 477) hat bereits einen `PLAN_UUID_RE.test(cid)`-Guard — der fehlt beim `characterShots[]`-Zweig.
+## Fix
 
-**Fix:** Nach `stripPlanId` prüfen, ob das Ergebnis eine UUID ist. Wenn nicht → Slot verwerfen (nicht in `characterShots[]` aufnehmen). Gleiche Logik wie beim `scene_assets`-Filter, ein Guard reicht.
+Zwei chirurgische Änderungen in `supabase/functions/briefing-deep-parse/index.ts`, plus Deploy.
 
-### Fix 2 — Kanonischen Resolver statt lokaler Kopie nutzen (Cleanup)
-`useApplyProductionPlan.ts` hat eine lokale `stripPlanId`-Funktion (Zeile 60–65), die funktional identisch mit `resolveCharacterId` (`src/lib/video-composer/resolveCharacterId.ts`) ist. Die Memory `mem://features/cast-world/id-integration.md` nennt `resolveCharacterId` als Single Source of Truth für die Normalisierung — der Apply-Hook ist der letzte Callsite der noch die lokale Kopie nutzt.
+### 1. Regex Line-by-Line (`extractSelectedCastFromBriefing`, ~Z. 960–987)
 
-**Fix:** `stripPlanId` durch Import von `resolveCharacterId` ersetzen. Die Look-Map wird im Apply-Hook nicht gebaut, aber `resolveCharacterId` funktioniert auch ohne Map für `lib:`-Prefixe und für reine UUIDs — für `outfit:`/`catalog:`-Fälle liefert es dann `null`, was in Kombination mit dem neuen UUID-Guard aus Fix 1 sauber ist. Alternativ: `stripPlanId` beibehalten, aber mit Kommentar auf `resolveCharacterId` verweisen (weniger Risiko).
+Cast-Section zeilenweise durchlaufen und `@mention` **und** `(library:UUID)` separat matchen:
+```ts
+const UUID_RE = /\(library:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i;
+const MENTION_RE = /@([a-z0-9][a-z0-9-_]{1,47})/i;
+for (const rawLine of castSection.split('\n')) {
+  const line = rawLine.trim();
+  if (!line.startsWith('-')) continue;
+  const mm = line.match(MENTION_RE); if (!mm) continue;
+  const mentionKey = `@${mm[1]}`;
+  const libId = line.match(UUID_RE)?.[1] ?? null;
+  // …hit-Auflösung wie bisher, nur mit korrekt gefülltem libId
+}
+```
+Damit trägt der Required-Cast wieder deterministische UUIDs — Kailee & Co. sind auffindbar, ensemble-repair injiziert fehlende Slots.
 
-Empfehlung: **Kommentar-Verweis** statt Ersetzung — das reduziert das Risiko einer Regression zu null und markiert die Duplikation dokumentarisch. Falls du das saubere Refactor willst, sag Bescheid.
+### 2. Strict-Cast-Pass (neu, direkt nach `ensureProductionPlanEnsembleServer`)
+
+Neue Funktion `enforceStrictCast(plan, required)`, nur aktiv wenn `required.length >= 1` und **alle** Required-Slots eine `characterId` haben. Pro Szene:
+
+- Slot mit `characterId` ∈ required → behalten
+- Slot mit `characterId` ∉ required → **droppen** (halluzinierter Fremd-Sprecher)
+- Slot ohne `characterId`, aber `mentionKey`/`characterName` normalisiert = required-Mention → **back-fillen** mit UUID+Voice
+- Slot ohne match → droppen
+- Danach `dedupeSceneCast` erneut aufrufen
+
+Aufruf in `Deno.serve` direkt nach dem bestehenden `ensembleStats = ensureProductionPlanEnsembleServer(...)`-Block (~Z. 1710). Statistiken (`dropped`, `backfilled`) in `parser_meta` mit aufnehmen (analog `ensemble_repair`).
+
+### 3. Deploy
+
+`supabase functions deploy briefing-deep-parse` — reine Edge-Function-Änderung, kein Client-Code, kein Migration.
 
 ## Was NICHT angefasst wird
-- `briefing-deep-parse` (Edge Function) — Pass B emittiert UUIDs korrekt.
-- `ProductionPlanSheet.tsx` — User-Edits erhalten UUIDs sauber.
-- `ensurePlanEnsemble.ts` — spreadet UUIDs korrekt weiter.
-- `buildSceneAssetsForRender` + `compose-video-clips` — v202-Registry funktioniert, hat sogar eine Late-Resolve-Safetynet für `outfit:`-Prefixe.
-- Lipsync-Pipeline, `dialog_shots`, Render-Payload.
 
-## Betroffene Dateien
-- `src/hooks/useApplyProductionPlan.ts` — UUID-Guard beim `characterShots`-Build hinzufügen (+ optionaler Kommentar-Verweis auf `resolveCharacterId`).
+- `planCastDedup.ts` (Client) — bleibt Sicherheitsnetz, die Ursache liegt server-seitig.
+- Pass A / Pass B Prompts — der Strict-Pass macht sie robust gegen Halluzinationen.
+- `ensurePlanEnsemble.ts` (Client) — bleibt als Legacy-Plan-Fallback.
+- `useApplyProductionPlan.ts` — UUID-Guard bleibt aktiv.
 
-## Technische Details
-- Guard-Ausdruck: `PLAN_UUID_RE.test(id)` — die Regex existiert bereits in der Datei und wird eine Zeile weiter unten für `scene_assets` verwendet.
-- Verwerfungs-Verhalten: Slot komplett droppen (nicht in `characterShots[]` aufnehmen). Alternative wäre `characterId: null` + `shotType: 'absent'`, aber Drop ist konsistent mit dem existierenden `scene_assets`-Filter.
-- Kein Migration nötig, keine DB-Änderung, keine Edge-Function.
+## Verifikation
+
+Nach Deploy: Briefing mit 4 Charakteren (gleicher Nachname) erneut analysieren.
+Erwartetes Ergebnis:
+- Kein Cast-Slot mit erfundenem Namen mehr
+- Alle 4 Charaktere kommen mindestens in einer Ensemble-Szene vor
+- Kein Charakter erscheint doppelt in derselben Szene
+- Telemetrie zeigt `strict_cast: { dropped: N, backfilled: M }`

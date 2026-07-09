@@ -961,13 +961,21 @@ function extractSelectedCastFromBriefing(briefing: string, characters: any[]) {
   const out: any[] = [];
   const seen = new Set<string>();
   const castSection = String(briefing ?? '').split(/##\s+Cast[^\n]*\n/i)[1]?.split(/\n##\s+/)[0] ?? '';
-  const mentionRows = Array.from(castSection.matchAll(/@([a-z0-9][a-z0-9-_]{1,47})[^\n]*(?:\(library:([0-9a-f-]{36})\))?/gi));
-  for (const m of mentionRows) {
-    const mentionKey = `@${m[1]}`;
-    const libId = m[2];
+  // v212 fix: previous single regex used a greedy `[^\n]*` before an optional
+  // `(library:UUID)` group, so the library id NEVER captured. Parse line-by-line
+  // and match mention + library UUID independently.
+  const UUID_RE = /\(library:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i;
+  const MENTION_RE = /@([a-z0-9][a-z0-9-_]{1,47})/i;
+  for (const rawLine of castSection.split('\n')) {
+    const line = rawLine.trim();
+    if (!line.startsWith('-')) continue;
+    const mm = line.match(MENTION_RE);
+    if (!mm) continue;
+    const mentionKey = `@${mm[1]}`;
+    const libId = line.match(UUID_RE)?.[1] ?? null;
     const needle = normalizeMention(mentionKey);
     const hit = libId
-      ? characters.find((ch: any) => String(ch.id) === String(libId))
+      ? characters.find((ch: any) => String(ch.id).toLowerCase() === libId.toLowerCase())
       : characters.find((ch: any) => {
           const n = normalizeMention(ch.name);
           return n && needle && (n.includes(needle) || needle.includes(n));
@@ -984,6 +992,55 @@ function extractSelectedCastFromBriefing(briefing: string, characters: any[]) {
     if (out.length >= 4) break;
   }
   return out;
+}
+
+/**
+ * v212 Strict-Cast enforcement. Runs after ensemble-repair when the briefing
+ * has a deterministic cast (all required chars resolved to library UUIDs).
+ *
+ * Removes hallucinated cast slots (Pass B invents dialogue speakers like
+ * "George", "Roger" that aren't briefed) and back-fills unresolved slots that
+ * match a briefed mentionKey. Then dedupes.
+ */
+function enforceStrictCast(plan: any, required: any[]) {
+  if (!Array.isArray(plan?.scenes) || required.length === 0) return { dropped: 0, backfilled: 0 };
+  if (required.some((r) => !r.characterId)) return { dropped: 0, backfilled: 0 };
+  const idSet = new Set(required.map((r) => String(r.characterId).toLowerCase()));
+  const byMention = new Map<string, any>();
+  for (const r of required) {
+    const mk = normalizeMention(r.mentionKey || r.characterName || '');
+    if (mk) byMention.set(mk, r);
+  }
+  let dropped = 0;
+  let backfilled = 0;
+  for (const sc of plan.scenes) {
+    if (!Array.isArray(sc.cast)) continue;
+    const kept: any[] = [];
+    for (const c of sc.cast) {
+      const id = typeof c?.characterId === 'string' ? c.characterId.toLowerCase() : '';
+      if (id) {
+        if (idSet.has(id)) kept.push(c);
+        else dropped += 1;
+        continue;
+      }
+      const mk = normalizeMention(c?.mentionKey || c?.characterName || '');
+      const hit = mk ? byMention.get(mk) : null;
+      if (hit) {
+        c.characterId = hit.characterId;
+        c.characterName = hit.characterName ?? c.characterName;
+        if (!c.voiceId && hit.voiceId) c.voiceId = hit.voiceId;
+        if (!c.mentionKey && hit.mentionKey) c.mentionKey = hit.mentionKey;
+        backfilled += 1;
+        kept.push(c);
+      } else {
+        dropped += 1;
+      }
+    }
+    if (kept.length !== sc.cast.length) sc.cast = kept;
+    const d = dedupeSceneCast(sc.cast);
+    if (d.removed > 0) sc.cast = d.cast;
+  }
+  return { dropped, backfilled };
 }
 
 function ensureProductionPlanEnsembleServer(plan: any, briefing: string, characters: any[]) {
@@ -1706,6 +1763,7 @@ This overrides any English wording in the briefing's scaffolding
     }
 
     let ensembleStats: { repaired: number; required: number } | null = null;
+    let strictCastStats: { dropped: number; backfilled: number } | null = null;
     try {
       ensembleStats = ensureProductionPlanEnsembleServer(plan, briefing, characters);
       if (ensembleStats.repaired > 0) {
@@ -1720,6 +1778,21 @@ This overrides any English wording in the briefing's scaffolding
     } catch (e: any) {
       console.warn('[briefing-deep-parse] ensemble repair failed (non-fatal):', e?.message);
     }
+
+    // v212 — Strict-Cast Pass: remove hallucinated Pass-B speakers ("George",
+    // "Roger" …) that are not part of the briefed cast, and back-fill any
+    // still-unresolved slot whose mentionKey matches a briefed character.
+    try {
+      const required = extractSelectedCastFromBriefing(briefing, characters);
+      strictCastStats = enforceStrictCast(plan, required);
+      if (strictCastStats.dropped > 0 || strictCastStats.backfilled > 0) {
+        console.log('[briefing-deep-parse] strict_cast', strictCastStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] strict cast pass failed (non-fatal):', e?.message);
+    }
+
+
 
 
     // ── Pass C — Catalog-ID Resolver (v178, Wave 1) ───────────────────────
@@ -1893,6 +1966,7 @@ This overrides any English wording in the briefing's scaffolding
             catalog_unresolved_samples: passCStats.unresolvedSamples,
             location_resolution: locResolutionForMeta,
             ensemble_repair: ensembleStats,
+            strict_cast: strictCastStats,
             voice_pool_assignments: voicePoolForMeta,
           },
         });
@@ -1907,7 +1981,7 @@ This overrides any English wording in the briefing's scaffolding
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
