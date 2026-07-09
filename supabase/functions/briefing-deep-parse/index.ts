@@ -1607,7 +1607,13 @@ YOU MUST:
       const candidates = [numFromWord, maxMarker || null, listCount || null]
         .filter((n): n is number => typeof n === 'number' && n >= 1 && n <= 12);
       // Prefer the most specific: numbered markers > "N Szenen" word > list count
-      const detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
+      let detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
+
+      // G1/G2 — Script-Timing takes precedence: when the detector found ≥2
+      // explicit shots, the scene count IS the shot count and per-shot
+      // durations override the board's totalDurationSec.
+      const useScriptTiming = scriptTiming.mode === 'SHOT_MARKERS' && scriptTiming.shots.length >= 2;
+      if (useScriptTiming) detected = scriptTiming.shots.length;
 
       if (detected && Array.isArray(manifest?.scenes)) {
         const got = manifest.scenes.length;
@@ -1629,8 +1635,6 @@ YOU MUST:
               [...manifest.scenes].reverse().find((x: any) => Array.isArray(x?.cast) && x.cast.length > 0)
               ?? manifest.scenes[0]
               ?? {};
-            // SC-1: preserve characterId + outfitLookId on padded scenes so
-            // ensemble-repair does not append duplicates and outfits survive.
             const cloneCast = (cast: any[] | undefined) =>
               Array.isArray(cast)
                 ? cast.map((c: any) => {
@@ -1641,7 +1645,6 @@ YOU MUST:
                     if (c?.outfitLookId) out.outfitLookId = c.outfitLookId;
                     if (c?.referenceImageUrl) out.referenceImageUrl = c.referenceImageUrl;
                     return out;
-                    // per-turn fields (voiceover text etc.) are intentionally stripped
                   })
                 : undefined;
             const cloneLocation = (loc: any) => {
@@ -1665,28 +1668,81 @@ YOU MUST:
                 shotDirector: template.shotDirector ? { ...template.shotDirector } : undefined,
                 _meta: { aiFilled: ['padded_from_template'] },
               };
-              // Drop undefined keys so downstream `stripUndef` stays clean.
               if (!padded.cast) delete padded.cast;
               if (!padded.location) delete padded.location;
               if (!padded.shotDirector) delete padded.shotDirector;
               manifest.scenes.push(padded);
             }
           }
-          // Redistribute durations + reindex
-          manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
-            ...s,
-            index: i + 1,
-            durationSec: perScene,
-          }));
-          if (!manifest.project) manifest.project = {};
-          manifest.project.totalDurationSec = perScene * detected;
+          // Redistribute durations + reindex. When script-timing is active,
+          // use per-shot durations (variable); otherwise even split.
+          if (useScriptTiming) {
+            const shots = scriptTiming.shots;
+            manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+              ...s,
+              index: i + 1,
+              durationSec: shots[i]?.durationSec ?? perScene,
+            }));
+            const sum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+            if (!manifest.project) manifest.project = {};
+            manifest.project.totalDurationSec = sum || perScene * detected;
+          } else {
+            manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+              ...s,
+              index: i + 1,
+              durationSec: perScene,
+            }));
+            if (!manifest.project) manifest.project = {};
+            manifest.project.totalDurationSec = perScene * detected;
+          }
           sceneCountCorrection = { detected, gemini: got };
-          console.log('[briefing-deep-parse] scene_count_corrected', { detected, gemini: got, perScene });
+          console.log('[briefing-deep-parse] scene_count_corrected', { detected, gemini: got, perScene, scriptWins: useScriptTiming });
+        } else if (useScriptTiming) {
+          // Count matches — still align per-shot durations from the script.
+          const shots = scriptTiming.shots;
+          const allTimed = shots.every((s) => s.durationSec != null);
+          if (allTimed) {
+            manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+              ...s,
+              durationSec: shots[i]?.durationSec ?? s.durationSec,
+            }));
+            const sum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+            if (!manifest.project) manifest.project = {};
+            manifest.project.totalDurationSec = sum;
+          }
+        }
+      }
+
+      // G2 — When script-timing is active, seed each scene with its shot's
+      // dialogTurn + voiceover text (only where the LLM left them empty).
+      // Speaker labels like "Sprecher 2" become "@sprecher-2" mentions which
+      // the Speaker-Map / strict-cast passes then resolve to briefed cast.
+      if (useScriptTiming && Array.isArray(manifest?.scenes)) {
+        const slugify = (v: string) =>
+          String(v ?? '')
+            .toLowerCase()
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        for (let i = 0; i < manifest.scenes.length; i++) {
+          const shot = scriptTiming.shots[i];
+          if (!shot) continue;
+          const sc = manifest.scenes[i];
+          if (!sc || typeof sc !== 'object') continue;
+          if (shot.text && (!sc.voiceover || !String(sc.voiceover.text ?? '').trim())) {
+            sc.voiceover = { ...(sc.voiceover ?? {}), text: shot.text };
+          }
+          if (shot.text && shot.speakerLabel && !Array.isArray(sc.dialogTurns)) {
+            const mention = `@${slugify(shot.speakerLabel) || `sprecher-${i + 1}`}`;
+            sc.dialogTurns = [{ speakerMentionKey: mention, text: shot.text }];
+          }
         }
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] scene-count guard failed (non-fatal):', e?.message);
     }
+
 
     const characters = charRes.data ?? [];
     const locations = buildLocationLibrary(
