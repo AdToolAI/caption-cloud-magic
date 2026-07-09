@@ -2706,7 +2706,36 @@ YOU MUST:
     }
     const _canonicalScenes = _scenes.length;
     const _canonicalFromScript = scriptTiming?.mode === 'SHOT_MARKERS' && (scriptTiming?.shots?.length ?? 0) >= 2;
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
+
+    // Phase 2 (refactor): stamp the server's authoritative BriefingContract onto
+    // plan._meta.debug so the client no longer has to re-run its own detectors.
+    // Client code should prefer plan._meta.debug.briefing_contract when present.
+    const _briefingContract = {
+      durationSec: _canonicalTotal,
+      sceneCount: _canonicalScenes,
+      explicitSceneCount: !!explicitBriefingTiming?.explicitSceneCount,
+      continuousScene: !!explicitBriefingTiming?.continuousScene,
+      source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board'),
+      scriptTimingMode: scriptTiming?.mode ?? 'FREETEXT',
+      shots: scriptTiming?.shots?.length ?? 0,
+      pipelineVersion: 'v214',
+    };
+    try {
+      if (!(plan as any)._meta) (plan as any)._meta = {};
+      const _debug = ((plan as any)._meta.debug ?? {}) as Record<string, unknown>;
+      _debug.briefing_contract = _briefingContract;
+      // Back-compat: mirror as canonical_timing (shape expected by legacy client code).
+      _debug.canonical_timing = {
+        durationSec: _canonicalTotal,
+        sceneCount: _canonicalScenes,
+        explicitSceneCount: _briefingContract.explicitSceneCount,
+        continuousScene: _briefingContract.continuousScene,
+        source: explicitBriefingTiming ? 'explicit-total' : (_canonicalFromScript ? 'time-windows' : 'explicit-total'),
+      };
+      (plan as any)._meta.debug = _debug;
+    } catch { /* non-fatal */ }
+
+    return new Response(JSON.stringify({ plan, version, briefing_contract: _briefingContract, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
