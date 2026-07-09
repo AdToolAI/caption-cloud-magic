@@ -1191,6 +1191,97 @@ function enforceStrictCast(plan: any, required: any[]) {
   return { dropped, backfilled };
 }
 
+function mergePlanScenesToSingleContinuousScene(planLike: any, targetDurationSec: number | null): { merged: boolean; from: number; to: number } {
+  const scenes = Array.isArray(planLike?.scenes) ? planLike.scenes : [];
+  if (scenes.length <= 1) {
+    if (scenes.length === 1 && targetDurationSec && Number.isFinite(targetDurationSec)) {
+      scenes[0].durationSec = targetDurationSec;
+      if (!planLike.project) planLike.project = {};
+      planLike.project.totalDurationSec = targetDurationSec;
+    }
+    return { merged: false, from: scenes.length, to: scenes.length };
+  }
+
+  const base = { ...(scenes[0] ?? {}) };
+  const castByKey = new Map<string, any>();
+  const turns: any[] = [];
+  let voiceText = '';
+  let overlay = base.textOverlay ?? null;
+  let location = base.location ?? null;
+  let anchorPromptEN = String(base.anchorPromptEN ?? '').trim();
+
+  for (const sc of scenes) {
+    for (const c of Array.isArray(sc?.cast) ? sc.cast : []) {
+      const key = String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+      if (key && !castByKey.has(key)) castByKey.set(key, c);
+    }
+    if (Array.isArray(sc?.dialogTurns) && sc.dialogTurns.length > 0) {
+      for (const t of sc.dialogTurns) {
+        const text = String(t?.text ?? '').trim();
+        if (text) turns.push({ ...t, text });
+      }
+    } else if (sc?.voiceover?.text) {
+      const text = String(sc.voiceover.text).trim();
+      if (text) voiceText = voiceText ? `${voiceText} ${text}` : text;
+    }
+    if (!overlay && sc?.textOverlay) overlay = sc.textOverlay;
+    if (!location && sc?.location) location = sc.location;
+    const prompt = String(sc?.anchorPromptEN ?? '').trim();
+    if (prompt && !anchorPromptEN.includes(prompt)) {
+      anchorPromptEN = anchorPromptEN ? `${anchorPromptEN}\n${prompt}` : prompt;
+    }
+  }
+
+  const duration = targetDurationSec && Number.isFinite(targetDurationSec)
+    ? targetDurationSec
+    : scenes.reduce((a: number, s: any) => a + (Number(s?.durationSec) || 0), 0) || 15;
+
+  planLike.scenes = [{
+    ...base,
+    index: 1,
+    label: base.label ?? 'Durchgehende Szene',
+    durationSec: Math.round(duration * 10) / 10,
+    lipSync: base.lipSync === true || turns.length > 0 || castByKey.size > 0,
+    cast: Array.from(castByKey.values()),
+    location: location ?? base.location,
+    anchorPromptEN: anchorPromptEN || base.anchorPromptEN,
+    dialogTurns: turns.length ? turns : base.dialogTurns,
+    voiceover: turns.length ? undefined : (voiceText ? { ...(base.voiceover ?? {}), text: voiceText } : base.voiceover),
+    textOverlay: overlay ?? base.textOverlay,
+  }];
+  if (!planLike.project) planLike.project = {};
+  planLike.project.totalDurationSec = Math.round(duration * 10) / 10;
+  return { merged: true, from: scenes.length, to: 1 };
+}
+
+function applyContinuousScriptTurns(planLike: any, scriptTiming: ScriptTimingInfo, targetDurationSec: number | null) {
+  if (!Array.isArray(planLike?.scenes) || planLike.scenes.length !== 1) return { applied: false, turns: 0 };
+  const sc = planLike.scenes[0];
+  const allTurns: any[] = [];
+  for (const shot of scriptTiming?.shots ?? []) {
+    if (Array.isArray(shot.dialogTurns) && shot.dialogTurns.length > 0) {
+      for (const t of shot.dialogTurns) {
+        const text = String(t?.text ?? '').trim();
+        if (text) allTurns.push({ speakerMentionKey: `@${String(t.speakerLabel ?? 'sprecher').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'sprecher'}`, text });
+      }
+    } else if (shot.text && shot.speakerLabel && shot.sceneKind !== 'endcard') {
+      allTurns.push({ speakerMentionKey: `@${String(shot.speakerLabel).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'sprecher'}`, text: String(shot.text).trim() });
+    } else if (shot.sceneKind === 'endcard' && shot.overlayText && !sc.textOverlay) {
+      sc.textOverlay = { text: shot.overlayText, position: 'center', animation: 'fade-in' };
+    }
+  }
+  if (allTurns.length > 0) {
+    sc.dialogTurns = allTurns;
+    if (sc.voiceover) sc.voiceover.text = '';
+  }
+  if (targetDurationSec && Number.isFinite(targetDurationSec)) {
+    sc.durationSec = targetDurationSec;
+    if (!planLike.project) planLike.project = {};
+    planLike.project.totalDurationSec = targetDurationSec;
+  }
+  return { applied: allTurns.length > 0, turns: allTurns.length };
+}
+
 /**
  * v213 — Extract the "## Verbatim Script" block emitted by the client
  * when Mode: LITERAL is active. Returns the script body (without the fence)
