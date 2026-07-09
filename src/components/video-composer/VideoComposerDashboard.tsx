@@ -1668,6 +1668,7 @@ export default function VideoComposerDashboard() {
                 characters={project.briefing?.characters}
                 onAddCharacter={(c) => updateBriefing({ characters: [...(project.briefing?.characters ?? []), c] })}
                 preferredAspect={project.briefing?.aspectRatio}
+                briefingTargetDurationSec={project.briefing?.duration}
                 onRefetchScenes={refetchScenesFromDb}
                 isGeneratingStoryboard={isGeneratingStoryboard}
                 storyboardError={storyboardError}
