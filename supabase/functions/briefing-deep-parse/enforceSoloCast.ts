@@ -33,10 +33,55 @@ function castKey(c: any): string {
   return normalizeMention(c?.mentionKey || c?.characterName || '');
 }
 
-export function enforceSoloCast(plan: any): { trimmedScenes: number; droppedSlots: number } {
+// I3 — Ensemble phrasing patterns that must never survive on a solo shot.
+// Matches phrases like:
+//   "Samuel, Matthew, Sarah and Kailee share the scene together"
+//   "…each visible to camera with their own action"
+//   "Group scene with Samuel, Matthew…"
+//   "every face composition"
+//   "…teilen sich die Szene"
+const ENSEMBLE_PATTERNS: RegExp[] = [
+  /\b[A-ZÄÖÜ][\w'-]+(?:,\s*[A-ZÄÖÜ][\w'-]+)+(?:\s*(?:and|und|&)\s*[A-ZÄÖÜ][\w'-]+)?\s+(?:share|teilen sich)\b[^.]*\.?/gi,
+  /\b(?:group|ensemble|multi[- ]speaker|four[- ]speaker|four[- ]way)\s+(?:scene|shot|composition|frame)\b[^.]*\.?/gi,
+  /\beach\s+(?:visible|in frame|in shot|to camera)[^.]*\.?/gi,
+  /\bevery\s+face\s+(?:in\s+(?:frame|shot)|visible|composition)[^.]*\.?/gi,
+  /\ball\s+(?:four|4|three|3|speakers?|characters?)\s+(?:visible|in frame|share|together)[^.]*\.?/gi,
+];
+
+const ENSEMBLE_FIELDS = [
+  'action',
+  'sceneAction',
+  'scene_action',
+  'description',
+  'visual',
+  'visualPrompt',
+  'visual_prompt',
+  'visualDirection',
+  'visual_direction',
+  'directorNote',
+  'director_note',
+  'notes',
+  'prompt',
+  'aiPrompt',
+  'ai_prompt',
+  'shotPrompt',
+  'shot_prompt',
+  'summary',
+];
+
+function scrubEnsemble(text: string): string {
+  let out = text;
+  for (const re of ENSEMBLE_PATTERNS) {
+    out = out.replace(re, '');
+  }
+  return out.replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
+}
+
+export function enforceSoloCast(plan: any): { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } {
   const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
   let trimmedScenes = 0;
   let droppedSlots = 0;
+  let scrubbedFields = 0;
 
   for (const sc of scenes) {
     const turns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
@@ -50,33 +95,33 @@ export function enforceSoloCast(plan: any): { trimmedScenes: number; droppedSlot
     const soloKey = [...speakerKeys][0];
     if (!soloKey) continue;
 
+    // Trim cast down to the solo speaker (if cast still has multiple slots).
     const cast = Array.isArray(sc.cast) ? sc.cast : [];
-    if (cast.length <= 1) continue;
-
-    const kept = cast.filter((c: any) => castKey(c) === soloKey);
-    if (kept.length === 0) continue; // no match → don't wipe the cast
-
-    if (kept.length !== cast.length) {
-      droppedSlots += cast.length - kept.length;
-      trimmedScenes += 1;
-      sc.cast = kept;
-      // Also mark the scene meta so the UI can flag the trim.
-      const meta = (sc._meta = sc._meta ?? {});
-      const af = new Set<string>(Array.isArray(meta.aiFilled) ? meta.aiFilled : []);
-      af.add('cast.soloEnforced');
-      meta.aiFilled = [...af];
+    if (cast.length > 1) {
+      const kept = cast.filter((c: any) => castKey(c) === soloKey);
+      if (kept.length > 0 && kept.length !== cast.length) {
+        droppedSlots += cast.length - kept.length;
+        trimmedScenes += 1;
+        sc.cast = kept;
+        const meta = (sc._meta = sc._meta ?? {});
+        const af = new Set<string>(Array.isArray(meta.aiFilled) ? meta.aiFilled : []);
+        af.add('cast.soloEnforced');
+        meta.aiFilled = [...af];
+      }
     }
 
-    // H3 — strip ensemble phrasing from action/description/visual fields so
-    // solo shots don't render "Samuel, Matthew and Sarah share the scene".
-    const ensembleRe = /\b([A-ZÄÖÜ][\w-]+(?:,\s*[A-ZÄÖÜ][\w-]+)+(?:\s*(?:and|und|&)\s*[A-ZÄÖÜ][\w-]+)?)\s+(share the (?:scene|frame|shot)|teilen sich (?:die\s+)?(?:szene|einstellung))\b[^.]*\.?/gi;
-    for (const field of ['action', 'sceneAction', 'description', 'visualDirection', 'visual_direction', 'directorNote', 'notes']) {
+    // I3 — ALWAYS scrub ensemble phrasing on solo shots, even when cast was
+    // already trimmed. The leak lives in prompt/visual/description too.
+    for (const field of ENSEMBLE_FIELDS) {
       const v = sc[field];
       if (typeof v !== 'string' || !v) continue;
-      const cleaned = v.replace(ensembleRe, '').replace(/\s{2,}/g, ' ').trim();
-      if (cleaned !== v) sc[field] = cleaned;
+      const cleaned = scrubEnsemble(v);
+      if (cleaned !== v) {
+        sc[field] = cleaned;
+        scrubbedFields += 1;
+      }
     }
   }
 
-  return { trimmedScenes, droppedSlots };
+  return { trimmedScenes, droppedSlots, scrubbedFields };
 }
