@@ -787,6 +787,13 @@ export default function VideoComposerDashboard() {
   // One-shot DB re-fetch when user switches BACK to the Clips tab.
   // Also flushes pending Storyboard edits to DB BEFORE the refetch so
   // they don't get clobbered.
+  const updateBriefing = useCallback((briefing: Partial<ComposerBriefing>) => {
+    setProject(prev => ({
+      ...prev,
+      briefing: { ...prev.briefing, ...briefing },
+    }));
+  }, []);
+
   // Briefing → Storyboard auto-analyse handoff. Guards against re-analysing
   // a touched/lipsync storyboard. Drives the War Room overlay + the plan
   // review Sheet. Defined here so it can be referenced from handleTabChange.
@@ -997,13 +1004,6 @@ export default function VideoComposerDashboard() {
       localStorage.setItem(TAB_STORAGE_KEY, activeTab);
     } catch { /* ignore */ }
   }, [activeTab]);
-
-  const updateBriefing = useCallback((briefing: Partial<ComposerBriefing>) => {
-    setProject(prev => ({
-      ...prev,
-      briefing: { ...prev.briefing, ...briefing },
-    }));
-  }, []);
 
   const updateProject = useCallback((updates: Partial<LocalProject>) => {
     setProject(prev => ({ ...prev, ...updates }));
