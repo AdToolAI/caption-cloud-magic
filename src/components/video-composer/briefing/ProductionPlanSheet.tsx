@@ -581,7 +581,9 @@ export default function ProductionPlanSheet({
     }
     setApplying(true);
     try {
-      const normalizedPlan = ensureProductionPlanEnsemble(plan, currentBriefing);
+      const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefing);
+      const finalized = finalizePlanCanonical(withEnsemble);
+      const normalizedPlan = finalized?.plan ?? withEnsemble;
       if (normalizedPlan !== plan) setPlan(normalizedPlan);
       const result = await applyPlan({
         plan: normalizedPlan,
