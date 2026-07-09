@@ -85,7 +85,10 @@ const TOOL_PASS_A = {
               },
               location: {
                 type: 'object',
-                properties: { mentionKey: { type: 'string' } },
+                properties: {
+                  mentionKey: { type: 'string' },
+                  description: { type: 'string', description: 'Free-text setting description in ENGLISH when the briefing describes a location NOT already in the library (e.g. "Split-screen office / home office at dawn"). Keep it cinematic and concrete: place, time of day, mood, key props. Leave empty when the briefing references a library mention verbatim.' },
+                },
                 required: ['mentionKey'],
               },
               shotDirector: {
