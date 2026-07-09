@@ -521,6 +521,21 @@ export default function StoryboardTab({
         </div>
       </div>
 
+      {/* G7 — Script-too-long warning: sum of scene durations exceeds the
+          briefing target because Auto-Extend lifted individual scenes to fit
+          the speech. Shown right next to the aggregate price so the user
+          knows why the video is longer (and more expensive) than requested. */}
+      {typeof briefingTargetDurationSec === 'number'
+        && briefingTargetDurationSec > 0
+        && totalDuration > briefingTargetDurationSec + 0.5 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-200">
+          <span className="font-medium">Skript länger als geplant:</span>{' '}
+          Dein Skript benötigt {totalDuration}s, das Briefing sah {briefingTargetDurationSec}s vor.
+          Das Video wird automatisch auf {totalDuration}s verlängert
+          (+{Math.round(totalDuration - briefingTargetDurationSec)}s). Der Preis unten ist bereits angepasst.
+        </div>
+      )}
+
       {/* Summary Bar */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-card/60 border border-border/40">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
