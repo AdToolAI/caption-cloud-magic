@@ -29,6 +29,7 @@ import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensu
 import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import BriefingPlanSummary from './BriefingPlanSummary';
+import SafePlanNotice from './SafePlanNotice';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
 import type { CatalogAxis } from '@/lib/video-composer/catalog';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
