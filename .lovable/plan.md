@@ -1,26 +1,43 @@
-## Problem
-`SpeechDurationHint` zählt jedes Wort im Briefing-Textfeld — also auch Szenen-Marker (`SZENE 1`, `**2,5–5,0 Sek.**`), Regie-Anweisungen (`Sprecher 2, modernes Büro, leichter Walk-in:`), Format-Hinweise, Meta-Text und Markdown. Ergebnis im Screenshot: 2420 Wörter → „~968s Sprech-Dauer" bei einem 15s-Skript. Der Hinweis ist dadurch nutzlos und alarmiert fälschlich rot.
+## Woher kommt die 50s?
 
-## Ziel
-Nur den tatsächlich **gesprochenen** Anteil zählen — genauso, wie `detectScriptTimingMode` / `briefing-deep-parse` das Skript segmentieren.
+`detectCanonicalBriefingTiming` in `src/hooks/useStoryboardTransition.ts` hat zwei kaputte Stufen:
+
+1. **`Länge: ca. 15 Sekunden` wird nicht erkannt.** Pattern 1 verlangt "Gesamtdauer/Laufzeit/Filmdauer/…", nicht bloß "Länge:". Pattern 4 (`\b(?:film|video|spot)\b …`) matcht "Werbevideo" nicht, weil zwischen "Werbe" und "video" keine Wortgrenze ist.
+2. **Zeitfenster-Regex greift auf Alters-Ranges zu.** `windowRe` matcht jeden Zahlen­bereich ohne verpflichtende Zeit-Einheit. Im Briefing stehen:
+   - `Alter: 30–45 Jahre` → 45
+   - `Alter: 25–40 Jahre` (2×) → 40
+   - `Alter: 30–50 Jahre` → **50** ← Maximum
+
+Deshalb kommt der Detector auf `durationSec = 50`. Dann verteilt `applyCanonicalTimingToPlan` das gleichmäßig auf 3 Szenen → 16,67s, gerundet/verschoben zu 12,5/12,5/25 (o. ä.), und `finalizePlanCanonical` meldet "konsistent", weil Projekt-Total und Szenensumme beide 50 sind.
+
+## Warum der manuelle Toggle nicht hält
+
+Der Toggle-Sync im Sheet (`useEffect`) ruft bei jedem Briefing-/Plan-Update erneut `detectCanonicalBriefingTiming` auf und schreibt das Ergebnis zurück ins Projekt-Feld. Solange der Detector 50s liefert, überschreibt er den manuellen Wert bei der nächsten Renderrunde. → Man muss die Wurzel fixen, nicht den Toggle.
 
 ## Änderung
-Datei: `src/components/video-composer/briefing/SpeechDurationHint.tsx`
 
-Neue `extractSpokenText(raw)`-Helper-Funktion, die zeilenweise filtert. Eine Zeile zählt **nicht** als Sprache, wenn sie:
+Datei: `src/hooks/useStoryboardTransition.ts`, Funktion `detectCanonicalBriefingTiming`.
 
-1. leer ist oder nur Whitespace enthält
-2. mit einem Szenen-/Shot-Marker beginnt: `^SZENE\b`, `^SCENE\b`, `^SHOT\b`, `^SC[\s_-]?\d`, `^\d+[A-Z]?[\).:-]` (z. B. `1A)`, `2.`, `3:`)
-3. eine Dauer-/Timing-Zeile ist: enthält `Sek.`/`Sek `/`Sekunden`/`s]`/matcht `\*?\*?\d[.,]?\d*\s*[–-]\s*\d[.,]?\d*\s*Sek`
-4. eine reine Key-Value-Meta-Zeile ist: matcht `^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß /&-]{2,40}:\s*.*$` **ohne** dass ein Anführungszeichen (`"`, `„`, `"`, `«`) in der Zeile vorkommt (Regie/Setting/Kamera/Format/Ziel/Kernbotschaft/Tonalität/etc.)
-5. eine Markdown-/Bullet-Struktur ist: `^[-*•]\s`, `^#{1,6}\s`, oder nur aus `*`/`_`/`-`/`=` besteht
-6. eine reine Klammer-Regieanweisung ist: die ganze Zeile matcht `^[\(\[].*[\)\]]$`
+**Fix A — `Länge:` als Explicit-Total erkennen** (neues Pattern vor die Windows-Stufe):
 
-Bei Zeilen die als Sprache zählen: Klammer-Inline-Regieanweisungen (`(schmunzelt)`, `[pause]`) und führende Sprecher-Labels (`SAMUEL:`, `Sprecher 2 —`, `> `, `„`/`"`-Zitat-Wrapper) werden vor dem Wortzählen entfernt, damit „SAMUEL: Hallo Welt" als 2 Wörter zählt.
+```
+/(?:^|\n)\s*(?:länge|laenge|film[- ]?länge|film[- ]?laenge|video[- ]?länge|video[- ]?laenge|spot[- ]?länge|spot[- ]?laenge)\s*[:=\-–—]\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i
+```
 
-Danach normale Wort-Zählung + bestehende Tone-Logik. Fallback: wenn nach Filterung 0 Wörter aber Rohtext > 20 Wörter → Komponente rendert nichts (statt Fehl-Alarm).
+**Fix B — Werbevideo/Werbespot/Werbefilm matchen** in Pattern 4:
+`\b(?:film|video|spot|werbe(?:video|film|spot)|werbespot|werbevideo|werbefilm|imagefilm|ad)\b`.
+
+**Fix C — Alters-Ranges aus `windowRe` ausschließen.** Windows-Loop erweitern:
+- Fenster verwerfen, wenn im Text unmittelbar nach `end` (nächste ~15 Zeichen) `Jahre|Jahren|years?|yrs?|y\.o\.?|jährig|jaehrig` steht.
+- Zusätzlich: Fenster nur akzeptieren, wenn **entweder** die Einheit-Gruppe (`s|sek|sekunden|seconds|sec`) tatsächlich mit-konsumiert wurde **oder** in derselben Zeile ein Timing-Anker (`Zeit:`, `Timing`, `Sek`, `–` vor Sekundenzahl, Timeline-Bullet `0[.,]?\d*[–-]`) auftaucht. Reine "30–50"-Bereiche ohne Kontext fallen raus.
 
 ## Verifikation
-- Bestehende Tests laufen weiter.
-- Manuell: Briefing aus dem Screenshot einfügen → Anzeige sollte grob den 4 kurzen Dialogzeilen entsprechen (~10–20 Wörter, ~4–8s), nicht 2420/968s.
-- Kein Backend-Change, kein Timing-Pipeline-Change.
+
+- Bestehende Tests grün: `src/hooks/__tests__/useStoryboardTransitionTiming.test.ts`, `src/lib/video-composer/briefing/__tests__/finalizePlanCanonical.test.ts`.
+- Neue Testfälle in `useStoryboardTransitionTiming.test.ts`:
+  - AdTool-Briefing (aus dieser Frage) → `{ durationSec: 15, sceneCount: 3, source: 'explicit-total' }`.
+  - Standalone `"Alter: 30–50 Jahre"` → `null`.
+  - `"Länge: ca. 15 Sekunden"` allein → `15`, source `explicit-total`.
+- Manuell: gleiche Briefing-Eingabe → Sheet zeigt "15s · 3 Szenen · Konsistent", S01 5s, S02 5s, S03 5s. Manueller Toggle auf 15s bleibt stabil, weil der Detector jetzt selbst 15s liefert.
+
+Kein Backend-Change, keine Änderung an Lip-Sync / compose-* / render-Pfad.
