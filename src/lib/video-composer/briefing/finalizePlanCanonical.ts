@@ -153,6 +153,7 @@ function canonicalDurationIsValidated(
   // a real 10/15s script.
   if (source === 'explicit-total' || source === 'script' || source === 'board') {
     if (currentSum < 1 || Math.abs(currentSum - canonicalDur) < 0.5) return true;
+    if (Boolean(canonical.explicitSceneCount) || Boolean(canonical.continuousScene)) return true;
     // Allow modest corrections when the explicit briefing duration names the
     // same number of scenes, e.g. board/default 30s → briefing says 15s for 3
     // scenes. Reject wild stretches such as stale 50s metadata over a concrete
