@@ -113,7 +113,7 @@ function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText:
   }
 
   // "3 Szenen insgesamt 15 Sekunden" / "3 scenes total 15s".
-  const countThenTotal = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,90}?(?:gesamt|insgesamt|total|overall|dauer|duration)?[^\n]{0,30}?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
+  const countThenTotal = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,90}?(?:gesamt|insgesamt|total|overall|dauer|duration)[^\n]{0,30}?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
   const countThenTotalSeconds = normalizeDurationNumber(countThenTotal?.[2]);
   if (countThenTotal && countThenTotalSeconds && countThenTotalSeconds >= 3) {
     return { durationSec: clampDurationForPlan(countThenTotalSeconds), sceneCount: Number(countThenTotal[1]), source: 'explicit-total' };
@@ -163,14 +163,18 @@ function applyCanonicalTimingToPlan(
       project: { ...(plan.project ?? {}), totalDurationSec: target },
       _meta: {
         ...(plan._meta ?? {}),
-        script_timing: {
-          mode: timing.source === 'time-windows' ? 'SHOT_MARKERS' : 'FREETEXT',
-          shots: timing.sceneCount ?? 0,
-          source: 'briefing',
-        },
         debug: { ...((plan._meta as any)?.debug ?? {}), canonical_timing: timing },
       },
     });
+    (next as any)._meta = {
+      ...((next as any)._meta ?? {}),
+      script_timing: {
+        mode: timing.source === 'time-windows' ? 'SHOT_MARKERS' : 'FREETEXT',
+        shots: timing.sceneCount ?? 0,
+        source: 'briefing',
+      },
+      debug: { ...(((next as any)._meta as any)?.debug ?? {}), canonical_timing: timing },
+    };
     return { plan: next, timing, changed: true };
   }
 
@@ -192,14 +196,19 @@ function applyCanonicalTimingToPlan(
     scenes: nextScenes,
     _meta: {
       ...(plan._meta ?? {}),
-      script_timing: (plan._meta as any)?.script_timing ?? {
-        mode: timing.source === 'time-windows' ? 'SHOT_MARKERS' : timing.source === 'scene-math' ? 'SPEAKER_BLOCKS' : 'FREETEXT',
-        shots: timing.sceneCount ?? sceneCount,
-        source: 'briefing',
-      },
       debug: { ...((plan._meta as any)?.debug ?? {}), canonical_timing: timing },
     },
   });
+
+  (next as any)._meta = {
+    ...((next as any)._meta ?? {}),
+    script_timing: (plan._meta as any)?.script_timing ?? {
+      mode: timing.source === 'time-windows' ? 'SHOT_MARKERS' : timing.source === 'scene-math' ? 'SPEAKER_BLOCKS' : 'FREETEXT',
+      shots: timing.sceneCount ?? sceneCount,
+      source: 'briefing',
+    },
+    debug: { ...(((next as any)._meta as any)?.debug ?? {}), canonical_timing: timing },
+  };
 
   return { plan: next, timing, changed: !alreadyAligned };
 }
