@@ -292,13 +292,38 @@ function alignPlanScenesToCanonicalTiming(plan: TProductionPlan, timing: Briefin
   });
 }
 
+/**
+ * Phase 2 (refactor): the Edge Function is now the sole authority for
+ * canonical timing. If it stamped `_meta.debug.briefing_contract` we trust
+ * that verbatim and skip local re-detection. The client-side detector only
+ * runs as a legacy fallback for offline / local-fallback plans.
+ */
+function readServerContractAsTiming(plan: TProductionPlan): BriefingTimingWithWindows | null {
+  const debug = (plan as any)?._meta?.debug;
+  const contract = debug && typeof debug === 'object' ? debug.briefing_contract : null;
+  if (!contract || typeof contract !== 'object') return null;
+  const durationSec = Number(contract.durationSec);
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return null;
+  const sceneCount = Number(contract.sceneCount);
+  const src = String(contract.source ?? 'board');
+  const mode = String(contract.scriptTimingMode ?? 'FREETEXT');
+  return {
+    durationSec,
+    sceneCount: Number.isFinite(sceneCount) && sceneCount > 0 ? Math.round(sceneCount) : undefined,
+    explicitSceneCount: !!contract.explicitSceneCount,
+    continuousScene: !!contract.continuousScene,
+    source: src === 'script' || mode === 'SHOT_MARKERS' ? 'time-windows' : 'explicit-total',
+  };
+}
+
 export function applyCanonicalTimingToPlan(
   plan: TProductionPlan,
   briefing: ComposerBriefing,
   briefingText: string,
 ): { plan: TProductionPlan; timing: BriefingTimingWithWindows | null; changed: boolean } {
-  const timing = detectCanonicalBriefingTiming(briefing, briefingText);
+  const timing = readServerContractAsTiming(plan) ?? detectCanonicalBriefingTiming(briefing, briefingText);
   if (!timing) return { plan, timing: null, changed: false };
+
 
   const target = timing.durationSec;
   const sceneCount = plan.scenes?.length ?? 0;
