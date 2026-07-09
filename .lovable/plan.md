@@ -1,121 +1,54 @@
-# Fidelity-Fix — Briefing 1:1 statt Neuinterpretation
+# Status: Briefing → Storyboard Pipeline
 
-## Diagnose
+## Was jetzt lückenlos ist
 
-Drei Ursachen dafür, dass Dialog/Sprecher „zufällig" wirken obwohl im Briefing alles steht:
+**Eingabe → Parsing**
+- Cast-Mentions inkl. `(library:UUID)` werden korrekt extrahiert (Regex-Fix v213)
+- LITERAL-Mode erkennt `NAME:`-Skripte und schickt `## Verbatim Script` an den Server
+- `ScriptSpeakerMapper` erlaubt manuelles Mapping mit `[manual]`-Override
+- `## Speaker Map`-Block landet im LLM-Prompt
 
-1. **`buildBriefingText` (`src/hooks/useStoryboardTransition.ts`, Z. 323)** setzt hart `Mode: AUTO-DIRECTOR` — auch bei komplettem Skript. Pass A springt in den Synthese-Modus.
-2. **Pass-A-Prompt (`briefing-deep-parse/index.ts`)** darf im AUTO-Modus VO/Dialog aus USPs neu schreiben. Sprecher werden nach Beat verteilt statt nach vorhandener `NAME:`-Zuweisung.
-3. Kein **Fidelity-Check**: nichts vergleicht, ob Dialog-Zeilen wörtlich und beim richtigen `@mention` landen.
-4. Wenn Sprecher-Labels im Skript keinem Cast-Slot zugeordnet sind (nur „Anna: …" ohne dass Anna ausgewählter Character ist), erfindet Pass B `characterId=null`-Slots, die später auf einen bestehenden Character fallbacken → Duplikate.
+**Server-Seite (`briefing-deep-parse`)**
+- Temperature 0.1 (deterministisch)
+- LITERAL_LOCK-Prompt bei Skript-Erkennung
+- `enforceStrictCast` verwirft halluzinierte Sprecher
+- `enforceBriefingFidelity` repariert 1:1-Dialoge via Fuzzy-Match
+- `ensureProductionPlanEnsembleServer` immutable + Ensemble-Garantie
+- `voice_pool` für Cross-Scene-Konsistenz
+- `parser_meta` mit Telemetrie (strict_cast, ensemble, fidelity)
 
-## Lösung — 4 Pakete
+**Plan → UI**
+- `planCastDedup` (characterId + normalisierte Namen)
+- `PLAN_UUID_RE`-Guard verhindert Slug-Leaks
+- `outfitLookId` bleibt bei Merge/Ensemble-Injection erhalten
+- `moodSuffix` wird aus gesprochenem Text gestrippt
+- Positional Labels statt „Unbenannter Look"
+- Badge „Skript 1:1 übernommen" mit Match-Stats
 
-### Paket A — LITERAL-Mode wird erzwungen sobald Skript erkannt wird
+## Bekannte Rest-Risiken (nicht kritisch)
 
-**Client — `src/hooks/useStoryboardTransition.ts`**
-- Neuer Helper `detectBriefingFidelity(briefing)` scannt `productDescription`:
-  - `/(Szene|Scene|Shot)\s*\d+/i` **oder**
-  - `/^\s*[A-ZÄÖÜ][A-ZÄÖÜ\-\s]{1,30}:\s+\S/m` (Sprecher-Zeile) **oder**
-  - nummerierte Liste ≥ 2 mit Doppelpunkt-Sprechern
-  → liefert `{ mode: 'LITERAL' | 'AUTO_DIRECTOR', speakerLabels: string[], briefingLines: [{id, speakerLabel, text}] }`
-- `buildBriefingText` schreibt bei LITERAL:
-  `Mode: LITERAL (PRESERVE briefing verbatim — do NOT rewrite scripts, do NOT redistribute speakers, do NOT invent scenes)`
-- Zusätzlicher Block `## Verbatim Script (authoritative)` mit `[L01] @mention → text` — das Truth-Signal für Pass A und den Fidelity-Check.
+1. **Gemini-Flakes ohne Retry** — bei 5xx/Timeout fällt der Server auf Local-Fallback, aber ohne zweiten Versuch. Kunde sieht dann evtl. schwächeren Plan.
+2. **Keine Plan-Versionierung** — wenn der Kunde nochmal parst, wird der alte Plan überschrieben. Kein Rollback.
+3. **Kein sichtbares Debug-Panel** — `parser_meta` wird geloggt, aber nicht angezeigt. Bei zukünftigen Fehlerberichten musst du in die Logs.
+4. **Keine automatischen E2E-Tests** — jeder Fix wurde manuell verifiziert. Regressionen könnten stillschweigend zurückkommen.
 
-**Server-Prompt — `briefing-deep-parse/index.ts`**
-Neuer Absatz oben im `SYSTEM_PASS_A`:
-> **STRICT LITERAL RULE — highest priority.** When the briefing carries `Mode: LITERAL` OR a `## Verbatim Script (authoritative)` block:
-> - copy every `[Lxx]` line's text verbatim into `dialogTurns[].text`
-> - keep exact `@mention` → speaker mapping
-> - never merge/split lines, never invent speakers not in `## Cast`
-> - preserve line ordering
-> - only Meta (`shotDirector`, `performance`, `musicCue`, `transition`, `anchorPromptEN`, `brollHints`) is yours to invent
+## Vorschlag — 3 optionale Härtungen
 
-### Paket B — Speaker-Mapping-UI im Briefing-Dashboard (NEU)
+### G-1: Gemini Retry mit Backoff (30 Min)
+`briefing-deep-parse`: bei 429/5xx/Timeout einen zweiten Versuch mit 1.5s Delay, bevor Local-Fallback greift. Reduziert „mal geht's, mal nicht"-Fälle spürbar.
 
-Aktuell erfindet die Pipeline Sprecher wenn im Skript „Anna:" steht, Anna aber nicht in `briefing.characters` ausgewählt ist. Skalierbare Lösung: das Mapping **vor** der Analyse einfordern.
+### T-1: Debug-Chip im Summary-Footer (20 Min)
+`BriefingPlanSummary.tsx`: kleiner ausklappbarer Chip mit `parser_meta` (Modell, strict_cast-Drops, fidelity-Matches, ensemble-Injections). Nur bei `?debug=1` sichtbar. Macht künftige Fehleranalyse selbstständig möglich.
 
-**Neue Komponente — `src/components/video-composer/briefing/ScriptSpeakerMapper.tsx`**
-- Wird gerendert wenn `detectBriefingFidelity` Sprecher-Labels findet UND mindestens ein Label keinem ausgewählten Character zuordenbar ist (Name-Substring-Match gegen `briefing.characters`).
-- Zeigt maximal 4 Slots (Hard-Cap wg. Nano Banana 2 / Vidu Q2 Cast-Limit):
-  ```
-  Erkannte Sprecher aus deinem Skript:
-    [ ANNA ]    → [ Character auswählen ▼ ] [ + neu anlegen ]
-    [ BEN  ]    → [ Character auswählen ▼ ] [ + neu anlegen ]
-    [ CHRIS]    → [ Character auswählen ▼ ] [ + neu anlegen ]
-    [ DANA ]    → [ Character auswählen ▼ ] [ + neu anlegen ]
-  ```
-- Wenn Skript **KEINE** Sprecher-Labels enthält (reines Konzept-Briefing): zeigt statt der erkannten Labels 4 leere Slots („Sprecher 1", „Sprecher 2", …) — User kann 1-4 aus der Library picken oder leerlassen.
-- Auswahl schreibt `briefing.characters[]` **und** eine neue Map `briefing.speakerAliases: Record<label, characterId>` (Label-String → Character-ID) für den Server.
-- „+ neu anlegen" öffnet den bestehenden Character-Quick-Create.
-- Analyse-Button ist disabled solange ≥1 erkanntes Label unresolved ist (mit klarer Fehlermeldung, kein stummes Failing).
+### P-1: Plan-Snapshot vor Re-Parse (45 Min)
+Vor jedem neuen Parse den aktuellen Plan als `previousPlan` sichern + „Rückgängig"-Button. Kein Verlust bei versehentlichem Re-Analyze.
 
-**Client-Änderungen**
-- `buildBriefingText` mapt Sprecher-Labels im Verbatim-Block via `speakerAliases` auf `@mentions`. Unresolved Labels bleiben `@unknown-N` und werden von Pass A/B garantiert **nicht** einem existierenden Character zugeordnet (der Fidelity-Check droppt sie).
-- `ComposerBriefing` bekommt `speakerAliases?: Record<string, string>` (label → characterId).
+## Empfehlung
 
-**Skalier-Vorteil**
-- Keine Fuzzy-Namens-Heuristik mehr, kein LLM-Guessing bei Speaker-Zuordnung
-- Für großformatige Skripte (10+ „Anna:"-Zeilen) reicht **ein** Mapping-Klick
-- Deterministisch, keine Halluzinationen mehr möglich
+Die Pipeline ist **funktional lückenlos** für den Beta-Launch. Die vier Risiken oben sind Komfort/Resilienz, keine Bugs.
 
-### Paket C — Fidelity-Check mit Auto-Reparatur (Server)
-
-Neu in `briefing-deep-parse/index.ts`, nach `enforceStrictCast`:
-
-```
-enforceBriefingFidelity(plan, briefingLines, requiredCast) → { plan, stats }
-```
-
-Für jede `briefingLine`:
-- **Text-Match ≥90% + korrekter Sprecher** → ok
-- **Falscher Sprecher** → überschreibe `speakerMentionKey` + `characterId` + `voiceId` (`reassigned++`)
-- **Text abweicht** → `dialogTurns[i].text := briefing text` (`textRestored++`)
-- **Zeile fehlt** → in nächstliegende Szene einfügen (`injected++`)
-
-Danach:
-- **Ghost-Turns** (nicht im Briefing, Sprecher nicht in Cast) → droppen (`droppedGhostTurns++`)
-- `dedupePlanScenesCast` erneut
-- Telemetrie in `parser_meta.fidelity = { total, matched, reassigned, textRestored, injected, droppedGhostTurns }`
-
-Sicherheitsnetze:
-- Läuft NUR bei `briefingLines.length ≥ 1`
-- Fehler → still Fallback auf pre-fidelity-Plan, `parser_meta.fidelity.error` gesetzt
-- Berührt niemals `shotDirector`, `anchorPromptEN`, `performance`, `musicCue`
-
-### Paket D — Fidelity-Chip im Plan-Sheet
-
-`ProductionPlanSheet.tsx` Footer:
-```
-✓ 12/12 Zeilen 1:1 · 0 Sprecher korrigiert · 0 fehlend
-```
-bzw.
-```
-⚠ 12/12 · 2 Sprecher korrigiert · 1 eingefügt   [Details]
-```
-Datenquelle: `plan.parserMeta.fidelity`. Rein UI.
-
-## Betroffene Dateien
-
-- `src/types/video-composer.ts` — `speakerAliases?` in `ComposerBriefing`
-- `src/hooks/useStoryboardTransition.ts` — `detectBriefingFidelity`, `buildBriefingText` (LITERAL-Zweig + Verbatim-Block)
-- `src/components/video-composer/briefing/ScriptSpeakerMapper.tsx` — neu
-- `src/components/video-composer/BriefingTab.tsx` — Einbindung des Mappers, Analyse-Button-Gate
-- `supabase/functions/briefing-deep-parse/index.ts` — `STRICT LITERAL RULE`, `extractVerbatimScript`, `enforceBriefingFidelity`
-- `src/lib/video-composer/briefing/productionPlan.ts` — `fidelity`-Feld im `parser_meta`-Schema (nur lesend)
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Fidelity-Chip
-
-## Unverändert
-
-`useApplyProductionPlan.ts`, `planCastDedup.ts`, `ensurePlanEnsemble.ts`, `ensureProductionPlanEnsembleServer`, Lip-Sync-Pipeline, Render-Pipeline. AUTO-DIRECTOR bei leerem Briefing: bleibt.
-
-## Deploy
-
-`briefing-deep-parse` neu deployen. Keine Migration, kein Breaking Change.
-
-## Verifikation
-
-1. **Skript-Briefing (Paket B in Aktion)**: Briefing mit 4 „NAME:"-Sprechern, keiner in Library → Mapper zeigt 4 Slots, User picked/erstellt Character → Analyse startet erst wenn alle 4 gemappt → `parser_meta.fidelity.matched = total`, `droppedGhostTurns = 0`, keine Duplikate.
-2. **Konzept-Briefing (kein Skript)**: nur USPs → Mapper zeigt 4 optionale Slots („Sprecher 1-4"), User pickt 0-4 → AUTO-DIRECTOR läuft wie bisher, `parser_meta.fidelity` fehlt.
-3. **Legacy-Briefing**: Skript vorhanden UND alle Sprecher bereits in `briefing.characters` → Mapper wird nicht angezeigt, LITERAL + Fidelity-Check laufen direkt.
+**Frag mich:**
+- „G-1" → nur Retry (der wichtigste — reduziert flaky runs)
+- „G-1 + T-1" → Retry + Debug (empfohlen für Beta)
+- „alle drei" → volles Härtungspaket
+- „reicht so" → wir sind fertig, weiter mit anderem Thema
