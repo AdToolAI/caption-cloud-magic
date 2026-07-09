@@ -363,6 +363,18 @@ function planSceneToComposerScene(
     if (wardrobe.length) promptParts.push(`Wardrobe: ${wardrobe.join('; ')}.`);
   }
 
+  // Free-text location fallback: when the briefing describes a setting that is
+  // NOT tied to a library location, spill that description into the i2v prompt
+  // so the AI can render arbitrary backdrops (split-screens, exteriors, action
+  // sets, …). Library locations already carry a reference frame and win.
+  {
+    const loc: any = (ps as any).location;
+    const desc: string | undefined = loc?.description?.trim?.();
+    if (desc && !loc?.locationId) {
+      promptParts.push(`Setting: ${desc}`);
+    }
+  }
+
   const negParts: string[] = [];
   if (ps.negativePromptScene?.trim()) negParts.push(ps.negativePromptScene.trim());
   if (negativePrompt?.trim()) negParts.push(negativePrompt.trim());
