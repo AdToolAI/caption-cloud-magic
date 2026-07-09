@@ -119,7 +119,7 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {fidelity.speakerLabels.map((label) => {
+        {cleanLabels.map((label) => {
           const current = speakerMap[label];
           const auto = autoMatch(label, characters);
           const effective = current ?? auto;
