@@ -35,6 +35,7 @@ import type {
 import type { TProductionPlan, TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
 import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
+import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
 
 const DEFAULT_TEXT_OVERLAY = {
   text: '',
@@ -345,6 +346,23 @@ function planSceneToComposerScene(
   if (ps.anchorPromptEN?.trim()) promptParts.push(ps.anchorPromptEN.trim());
   if (ps.continuityHint?.trim()) promptParts.push(`Continuity: ${ps.continuityHint.trim()}`);
   if (ps.brandAnchor?.note?.trim()) promptParts.push(`Brand: ${ps.brandAnchor.note.trim()}`);
+
+  // Prompt-only default-outfit presets. Applied per cast slot ONLY when
+  // no library outfitLookId is set (the library look wins). English by
+  // design — visual prompts must stay English regardless of UI language.
+  {
+    const wardrobe: string[] = [];
+    for (const c of ps.cast ?? []) {
+      const presetId = (c as any).outfitPreset as string | null | undefined;
+      if (!presetId || c.outfitLookId) continue;
+      const preset = getOutfitPresetById(presetId);
+      if (!preset) continue;
+      const name = (c.characterName ?? '').trim() || 'the speaker';
+      wardrobe.push(`${name} wears ${preset.promptEN}`);
+    }
+    if (wardrobe.length) promptParts.push(`Wardrobe: ${wardrobe.join('; ')}.`);
+  }
+
   const negParts: string[] = [];
   if (ps.negativePromptScene?.trim()) negParts.push(ps.negativePromptScene.trim());
   if (negativePrompt?.trim()) negParts.push(negativePrompt.trim());

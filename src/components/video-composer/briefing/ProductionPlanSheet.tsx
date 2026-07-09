@@ -31,6 +31,10 @@ import BriefingPlanSummary from './BriefingPlanSummary';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
 import type { CatalogAxis } from '@/lib/video-composer/catalog';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
+import {
+  DEFAULT_OUTFIT_PRESETS,
+  outfitPresetLabel,
+} from '@/config/defaultOutfitPresets';
 import type {
   ComposerScene,
   AssemblyConfig,
@@ -346,7 +350,11 @@ export default function ProductionPlanSheet({
       if (!lookId || map.has(lookId)) continue;
       const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
-      const rawName = fromMeta || fromName || m.name?.trim() || '';
+      // NOTE: never fall back to `m.name` — since v213 that is the base
+      // avatar name (e.g. "Matthew Dusatko") which would leak into the
+      // outfit dropdown label. Leaving `rawName` empty here triggers the
+      // positional `Look N` fallback downstream, which is the correct UX.
+      const rawName = fromMeta || fromName || '';
       const lookName = /^unbenannter look$/i.test(rawName) || /^standard-look$/i.test(rawName)
         ? ''
         : rawName;
@@ -619,7 +627,28 @@ export default function ProductionPlanSheet({
         const cast = [...(s.cast ?? [])];
         while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
         const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
-        cast[castIdx] = { ...c, outfitLookId };
+        // Selecting a real library look clears the prompt-only preset so
+        // we never send both signals to the anchor compositor at once.
+        cast[castIdx] = { ...c, outfitLookId, ...(outfitLookId ? { outfitPreset: null } : {}) };
+        return { ...s, cast };
+      }),
+    });
+  };
+
+  /**
+   * Sets the prompt-only default-outfit preset id on a cast slot.
+   * Never touches `outfitLookId`; the apply step appends the English
+   * preset fragment to the scene prompt.
+   */
+  const updateSceneCastPreset = (sceneIndex: number, castIdx: number, presetId: string | null) => {
+    setPlan((p) => p && {
+      ...p,
+      scenes: p.scenes.map((s) => {
+        if (s.index !== sceneIndex) return s;
+        const cast = [...(s.cast ?? [])];
+        while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
+        const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
+        cast[castIdx] = { ...c, outfitPreset: presetId };
         return { ...s, cast };
       }),
     });
@@ -1242,6 +1271,32 @@ export default function ProductionPlanSheet({
                                       <SelectItem value="__default__">Standard-Look</SelectItem>
                                       {merged.map((o, idx) => (
                                         <SelectItem key={o.lookId} value={o.lookId}>{o.name || `Look ${idx + 1}`}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                                {/*
+                                  Preset picker — visible whenever the user
+                                  has no library outfit selected for this
+                                  slot. Prompt-only fallback so every
+                                  character slot always has an outfit
+                                  signal, even before the user builds their
+                                  wardrobe library.
+                                */}
+                                {!outfitId && (
+                                  <Select
+                                    value={(c as any).outfitPreset ?? '__none__'}
+                                    onValueChange={(v) => updateSceneCastPreset(s.index, i, v === '__none__' ? null : v)}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs min-w-[160px]">
+                                      <SelectValue placeholder="Standard-Outfit…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">— kein Preset —</SelectItem>
+                                      {DEFAULT_OUTFIT_PRESETS.map((p) => (
+                                        <SelectItem key={p.id} value={p.id}>
+                                          {outfitPresetLabel(p, language)}
+                                        </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
