@@ -72,6 +72,10 @@ interface StoryboardTabProps {
   /** Called when the Talking-Head dialog adds a new character to the briefing. */
   onAddCharacter?: (character: ComposerCharacter) => void;
   preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
+  /** Briefing target duration (seconds). If the sum of scene durations
+   *  exceeds this (auto-extend triggered because the script is longer),
+   *  the summary bar shows a warning. */
+  briefingTargetDurationSec?: number;
   /**
    * Block M — Hybrid Extend uses the server-side orchestrator which inserts
    * a new scene row directly. The dashboard must refetch from DB to surface it.
