@@ -139,7 +139,7 @@ export function ensureProductionPlanEnsemble(
   for (const scene of plan?.scenes ?? []) {
     for (const c of scene.cast ?? []) {
       if (!c.characterId) continue;
-      const keys = [c.mentionKey, c.characterName].map(normalizeAssetKey).filter(Boolean);
+      const keys = [c.mentionKey, c.characterName].map((v) => normalizeAssetKey(v)).filter(Boolean);
       for (const key of keys) if (!resolvedPlanCast.has(key)) resolvedPlanCast.set(key, c);
       const look = (c as any).outfitLookId;
       if (look && !outfitByCharacterId.has(c.characterId)) outfitByCharacterId.set(c.characterId, look);
