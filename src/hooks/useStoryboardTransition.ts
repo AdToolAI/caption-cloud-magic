@@ -239,7 +239,7 @@ function extractSceneHints(briefingText: string): SceneHint[] {
 function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
   const hints = extractSceneHints(briefingText);
   const canonicalTiming = detectCanonicalBriefingTiming(briefing, briefingText);
-  const total = canonicalTiming?.durationSec ?? Number(briefing.duration) || 15;
+  const total = canonicalTiming?.durationSec ?? (Number(briefing.duration) || 15);
   const firstMention = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i)?.[0] ?? null;
   const firstChar = briefing.characters?.[0];
   const selectedCast = (briefing.characters ?? []).slice(0, 4).map((c) => ({

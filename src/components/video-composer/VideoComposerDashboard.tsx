@@ -797,6 +797,7 @@ export default function VideoComposerDashboard() {
     language: project.language,
     ensureProjectId: ensureStoryboardProjectId,
     navigateToStoryboard: () => setActiveTab('storyboard'),
+    onUpdateBriefing: updateBriefing,
   });
 
   const handleTabChange = useCallback(async (next: TabId) => {
