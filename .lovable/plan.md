@@ -1,47 +1,47 @@
-## Problem
+## Diagnose
 
-Der Speaker-Mapper zeigt Müll-Labels wie "Die Botschaft des Vide", "Medium Close", "Halbnaher Tracking", "Empfohlen", "Studio", "On", "Text" usw. Diese sind keine Sprecher, sondern Bullet-/Sektionsüberschriften aus dem Briefing. Ursache: die Regex `speakerRe` in `detectBriefingFidelity` (`src/hooks/useStoryboardTransition.ts:333`) matcht jeden großgeschriebenen Zeilenanfang gefolgt von `:` oder `-`. Damit rutscht praktisch jede Aufzählung durch.
+Ich habe den Detector-Filter (`detectBriefingFidelity` in `src/hooks/useStoryboardTransition.ts`) mit einem Node-Testlauf gegen genau die Zeilen aus dem Screenshot geprüft (`Medium Close-up:`, `Studio:`, `Split:`, `Empfohlen:`, `Die Botschaft des Videos:` …). Ergebnis: **alle werden korrekt verworfen, nur `SAMUEL:` wird als Label akzeptiert**. Der Code auf dem Branch ist also bereits richtig.
 
-## Fix — 2 kleine, chirurgische Änderungen
+Zwei plausible Ursachen, warum der Screenshot trotzdem den vollen Müll zeigt:
 
-### 1) Detector härten — `src/hooks/useStoryboardTransition.ts` (Zeile 322–346)
+1. **HMR-Cache**: `useMemo(() => detectBriefingFidelity(briefing), [briefing])` hat den alten (permissiven) Detector-Result während Hot-Reload weiterverwendet, weil das `briefing`-Objekt referenzgleich blieb. Ein harter Reload würde es fixen — aber das ist nicht akzeptabel als „Fix".
+2. **Kein zweiter Filter im UI**: `ScriptSpeakerMapper` vertraut blind der Liste vom Detector. Wenn der Detector jemals wieder aufweicht (Regression), landet der Müll sofort wieder im UI.
 
-Neue Akzeptanz-Regel für ein Label ("was ist ein Sprecher?"):
+## Fix — Defense-in-Depth im Mapper selbst
 
-- **Screenplay-Konvention**: ALL-CAPS Ein- oder Zwei-Wort-Label direkt vor Doppelpunkt / Gedankenstrich (`SAMUEL:`, `SPRECHER 1 —`, `MATTHEW DUSATKO:`). 1–3 Tokens, keine Kleinbuchstaben.  
-  ODER
-- **Cast-Match**: Label matcht (case-insensitiv, normalisiert) einen bereits gebrieften `characters[].name` oder dessen erstes Wort.
+Nur eine Datei: `src/components/video-composer/briefing/ScriptSpeakerMapper.tsx`.
 
-Alles andere wird verworfen. Zusätzlich:
-- Bindestrich `-` als Trenner NUR akzeptieren, wenn er von Whitespace umgeben ist (`SAMUEL — Text`), damit "Medium Close-up" nicht mehr matcht.
-- Zeichenlimit von 40 auf 32 reduzieren.
-- Deny-List erweitern um: `setting`, `location`, `endcard`, `hook`, `cta`, `optional`, `empfohlen`, `nicht`, `text`, `on`, `off`, `studio`, `helles`, `medium`, `close`, `wide`, `pan`, `tracking`, `push`, `cinematic`, `perfekter`, `realistische`, `split`, `creator`, `nach`, `da`, `sondern`, `create`.
+**1. Lokale `isValidSpeakerLabel(label, characters)` einführen** (dieselbe Akzeptanz-Regel wie im Detector, dupliziert für Robustheit):
 
-Damit fällt LITERAL-Modus für Briefings, die gar kein echtes Skript enthalten, sauber auf 0 Labels zurück — und die Mapper-Karte verschwindet automatisch (`ScriptSpeakerMapper` bricht schon jetzt bei `speakerLabels.length === 0` ab).
+- Länge 2–32, Tokens ≤ 3.
+- Deny-List (Studio, On, Text, Split, Empfohlen, Optional, Endcard, Creator, Medium, Close, Push, Tracking, Cinematic, Realistische, Perfekter, Helles, Nicht, Nach, Da, Sondern, Create, Die, Der, Das, Ein, Eine, Clean, Heroisch(er), Vier, Benennt, Erstelle, …).
+- Akzeptanz nur, wenn:
+  - **entweder** alle Tokens strikt ALL-CAPS (`^[A-ZÄÖÜ][A-ZÄÖÜ0-9.]*$` bzw. reine Ziffern),
+  - **oder** das Label matcht einen gebrieften Charakter (exact / prefix / suffix nach Normalisierung — keine Substrings).
 
-### 2) Mapper defensiv — `src/components/video-composer/briefing/ScriptSpeakerMapper.tsx`
+**2. Liste vor dem Render filtern**:
 
-Aktuell wird für jedes Label per `autoMatch` fuzzy geraten und die Dropdowns zeigen "Auto → Roger" o.ä. Der User will: **wenn kein sicherer Match, dann leer lassen**.
-
-- `autoMatch` verschärfen: nur Match, wenn normalisierter Charakter-Name **gleich** oder **exakter Präfix/Suffix** des Labels ist (keine `includes`-Substrings mehr). Zwei-Wort-Labels wie "MATTHEW DUSATKO" matchen weiter, "Studio" ↔ irgendwas nicht.
-- Wenn `autoMatch` `null` liefert, bleibt der Select auf `AUTO` mit Anzeige "(kein Match)" — Kunde wählt selbst. (Verhalten ist bereits so; die Regex-Verschärfung räumt nur die Auto-Fehlmatches ab.)
-- Wenn nach dem Filter **kein einziges Label** einen Charakter matcht UND weniger als 2 Labels übrig sind, ganze Karte ausblenden.
-
-## Technische Details
-
-```text
-Label-Akzeptanz-Filter (Pseudo):
-  token1..N = split(rawLabel, /\s+/)
-  if N > 3 → reject
-  if any token contains lowercase letters:
-     → accept only if fuzzyEqualsCharacter(rawLabel)
-  else (all-caps):
-     → accept unless in denyList
+```ts
+const cleanLabels = useMemo(
+  () => fidelity.speakerLabels.filter(l => isValidSpeakerLabel(l, characters)),
+  [fidelity.speakerLabels.join('|'), characters.map(c => c.id).join('|')],
+);
 ```
 
-Keine Änderungen an Backend, Parser, Apply-Hook oder anderen Konsumenten von `detectBriefingFidelity` (nur `hasSpeakerLines`/`speakerLabels` werden strenger — LITERAL-Modus bleibt für echte Skripte aktiv).
+Sämtliche Renderpfade (`.map`, „kein Match"-Warnung, Prune-Effect, `anyMatch`-Check) benutzen `cleanLabels` statt `fidelity.speakerLabels`.
+
+**3. Karte komplett ausblenden**, wenn `cleanLabels.length === 0` **oder** kein einziges `cleanLabels[i]` per `autoMatch` einen Charakter trifft. Damit verschwindet die Sektion garantiert bei diesem Bullet-Briefing.
+
+**4. Prune-Effect nutzt `cleanLabels`** — persistierte `speakerMap`-Einträge zu Junk-Labels (aus früheren Sessions vor dem Fix) werden automatisch weggeräumt.
+
+## Warum das die Beschwerde final erledigt
+
+- Selbst wenn der Detector regressiert oder HMR einen alten Wert cached, filtert das UI eine zweite Mal.
+- Der Filter ist rein presentational — keine Backend-, Parser- oder Prompt-Änderung.
+- Bei einem echten Skript (`SAMUEL:`, `MATTHEW DUSATKO:`) bleibt der Mapper voll funktional.
 
 ## Verifikation
-- User-Screenshot-Briefing → 0 Fake-Labels, Mapper-Karte verschwindet.
-- Echtes Skript mit `MATTHEW:` / `SAMUEL:` → Labels erkannt, LITERAL bleibt an.
+
+- Screenshot-Briefing (Bullet-Titel wie „Medium Close", „Studio", „Empfohlen"): Karte verschwindet komplett.
+- Echtes Skript mit `SAMUEL:` / `MATTHEW:`: Karte erscheint, Auto-Match läuft.
 - Typecheck grün.
