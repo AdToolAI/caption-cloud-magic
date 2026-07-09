@@ -721,8 +721,11 @@ export function useApplyProductionPlan() {
       currentScenes, currentAssembly, currentBriefing,
       onUpdateBriefing, onUpdateScenes, onApplyAssembly,
     } = args;
-    const finalized = finalizePlanCanonical(rawPlan).plan;
+    const finalizeResult = finalizePlanCanonical(rawPlan);
+    const finalized = finalizeResult!.plan;
     const plan = ensureProductionPlanEnsemble(finalized, currentBriefing);
+    // Phase 4 — Beta-Telemetrie: nicht-blockierendes Logging jeder auto-Reparatur.
+    void logPlanRepairEvent(plan, finalizeResult!.normalization, projectId ?? null);
     const target = Number(plan.project?.totalDurationSec);
     const sum = (plan.scenes || []).reduce((acc, scene) => acc + (Number(scene.durationSec) || 0), 0);
     if (Number.isFinite(target) && Number.isFinite(sum) && Math.abs(target - sum) > 0.5) {
