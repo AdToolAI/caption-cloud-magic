@@ -69,6 +69,46 @@ function appendEnsemblePrompt(prompt: string | undefined, names: string[]) {
   return clean ? `${clean} ${sentence}` : sentence;
 }
 
+// I3 (client mirror) — patterns copied from supabase/functions/briefing-deep-parse/enforceSoloCast.ts
+const ENSEMBLE_SCRUB_PATTERNS: RegExp[] = [
+  /\b[A-ZÄÖÜ][\w'-]+(?:,\s*[A-ZÄÖÜ][\w'-]+)+(?:\s*(?:and|und|&)\s*[A-ZÄÖÜ][\w'-]+)?\s+(?:share|teilen sich)\b[^.]*\.?/gi,
+  /\b(?:group|ensemble|multi[- ]speaker|four[- ]speaker|four[- ]way)\s+(?:scene|shot|composition|frame)\b[^.]*\.?/gi,
+  /\beach\s+(?:visible|in frame|in shot|to camera)[^.]*\.?/gi,
+  /\bevery\s+face\s+(?:in\s+(?:frame|shot)|visible|composition)[^.]*\.?/gi,
+  /\ball\s+(?:four|4|three|3|speakers?|characters?)\s+(?:visible|in frame|share|together)[^.]*\.?/gi,
+];
+const ENSEMBLE_SCRUB_FIELDS = [
+  'action', 'sceneAction', 'description', 'visual', 'visualPrompt',
+  'visualDirection', 'directorNote', 'notes', 'prompt', 'aiPrompt',
+  'shotPrompt', 'summary', 'anchorPromptEN',
+] as const;
+
+function scrubEnsembleText(text: string): string {
+  let out = text;
+  for (const re of ENSEMBLE_SCRUB_PATTERNS) out = out.replace(re, '');
+  return out.replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
+}
+
+function scrubSoloSceneEnsemble(scene: TPlanScene): TPlanScene {
+  const turns = (scene as any).dialogTurns as Array<{ speakerMentionKey?: string }> | undefined;
+  if (!Array.isArray(turns) || turns.length === 0) return scene;
+  const speakers = new Set(turns.map((t) => normalizeAssetKey(t?.speakerMentionKey)).filter(Boolean));
+  if (speakers.size !== 1) return scene;
+
+  let changed = false;
+  const next: any = { ...scene };
+  for (const field of ENSEMBLE_SCRUB_FIELDS) {
+    const v = next[field];
+    if (typeof v !== 'string' || !v) continue;
+    const cleaned = scrubEnsembleText(v);
+    if (cleaned !== v) {
+      next[field] = cleaned;
+      changed = true;
+    }
+  }
+  return changed ? (next as TPlanScene) : scene;
+}
+
 /**
  * A scene is "explicitly solo/duet" when its dialogTurns name a fixed set of
  * speakers (< required cast). In that case we MUST NOT force-inject the
