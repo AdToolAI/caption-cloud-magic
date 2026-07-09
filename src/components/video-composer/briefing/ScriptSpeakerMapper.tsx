@@ -26,7 +26,9 @@ function autoMatch(label: string, characters: ComposerCharacter[]): string | nul
   if (!n) return null;
   const hit = characters.find((c) => {
     const cn = normalize(c.name);
-    return cn && (cn.startsWith(n) || n.startsWith(cn) || cn.includes(n) || n.includes(cn));
+    if (!cn) return false;
+    // Strict: equal, or exact prefix/suffix on either side. No substring includes.
+    return cn === n || cn.startsWith(n) || n.startsWith(cn);
   });
   return hit?.id ?? null;
 }
