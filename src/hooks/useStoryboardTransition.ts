@@ -83,7 +83,7 @@ function getOriginalBriefingSource(briefing: ComposerBriefing, briefingText: str
     .trim();
 }
 
-function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText: string): BriefingTimingWithWindows | null {
+export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText: string): BriefingTimingWithWindows | null {
   const raw = getOriginalBriefingSource(briefing, briefingText);
   if (!raw.trim()) return null;
 
@@ -148,7 +148,7 @@ function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText:
   return null;
 }
 
-function applyCanonicalTimingToPlan(
+export function applyCanonicalTimingToPlan(
   plan: TProductionPlan,
   briefing: ComposerBriefing,
   briefingText: string,
