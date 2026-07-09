@@ -2142,6 +2142,7 @@ YOU MUST:
             location_resolution: locResolutionForMeta,
             ensemble_repair: ensembleStats,
             strict_cast: strictCastStats,
+            fidelity: fidelityStats,
             voice_pool_assignments: voicePoolForMeta,
           },
         });
