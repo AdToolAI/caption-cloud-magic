@@ -1966,6 +1966,7 @@ This overrides any English wording in the briefing's scaffolding
             catalog_unresolved_samples: passCStats.unresolvedSamples,
             location_resolution: locResolutionForMeta,
             ensemble_repair: ensembleStats,
+            strict_cast: strictCastStats,
             voice_pool_assignments: voicePoolForMeta,
           },
         });
