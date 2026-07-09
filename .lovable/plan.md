@@ -1,54 +1,61 @@
-# Status: Briefing → Storyboard Pipeline
+# Default Outfit Presets für Cast-Slots
 
-## Was jetzt lückenlos ist
+## Ziel
+Jeder Cast-Slot bekommt einen Outfit-Dropdown — auch wenn der User noch keine eigenen Looks in `avatar_outfit_looks` gespeichert hat. Der Dropdown enthält dann 10 kuratierte Standard-Outfits, die die häufigsten Werbe-/Content-Kontexte abdecken. Wählt der User einen Preset, wird der Text als Outfit-Beschreibung in den Scene-Prompt injiziert (kein DB-Insert, kein Reference-Image — reiner Prompt-Layer).
 
-**Eingabe → Parsing**
-- Cast-Mentions inkl. `(library:UUID)` werden korrekt extrahiert (Regex-Fix v213)
-- LITERAL-Mode erkennt `NAME:`-Skripte und schickt `## Verbatim Script` an den Server
-- `ScriptSpeakerMapper` erlaubt manuelles Mapping mit `[manual]`-Override
-- `## Speaker Map`-Block landet im LLM-Prompt
+## Preset-Katalog (10 Slots, sprachneutral gehalten)
+Neue Datei `src/config/defaultOutfitPresets.ts`:
 
-**Server-Seite (`briefing-deep-parse`)**
-- Temperature 0.1 (deterministisch)
-- LITERAL_LOCK-Prompt bei Skript-Erkennung
-- `enforceStrictCast` verwirft halluzinierte Sprecher
-- `enforceBriefingFidelity` repariert 1:1-Dialoge via Fuzzy-Match
-- `ensureProductionPlanEnsembleServer` immutable + Ensemble-Garantie
-- `voice_pool` für Cross-Scene-Konsistenz
-- `parser_meta` mit Telemetrie (strict_cast, ensemble, fidelity)
+```ts
+export interface DefaultOutfitPreset {
+  id: string;           // stabile Kennung, z.B. 'preset:business-casual'
+  label: { de: string; en: string; es: string };
+  promptFragment: string; // englisch (Bildqualität)
+}
+```
 
-**Plan → UI**
-- `planCastDedup` (characterId + normalisierte Namen)
-- `PLAN_UUID_RE`-Guard verhindert Slug-Leaks
-- `outfitLookId` bleibt bei Merge/Ensemble-Injection erhalten
-- `moodSuffix` wird aus gesprochenem Text gestrippt
-- Positional Labels statt „Unbenannter Look"
-- Badge „Skript 1:1 übernommen" mit Match-Stats
+Katalog (Business → Lifestyle → Sport → Formal):
+1. **Business Casual** — "smart casual outfit, neat button-down shirt, chinos"
+2. **Business Formal** — "tailored dark business suit, crisp white shirt"
+3. **Modern Streetwear** — "modern streetwear, oversized hoodie, cargo pants, sneakers"
+4. **Everyday Casual** — "clean casual outfit, plain t-shirt, denim jeans"
+5. **Sport / Athleisure** — "athletic activewear, fitted training top, joggers"
+6. **Fitness Studio** — "gym outfit, tank top and shorts, athletic sneakers"
+7. **Outdoor / Adventure** — "outdoor jacket, hiking pants, sturdy boots"
+8. **Elegant Evening** — "elegant evening wear, sleek dress or dark blazer"
+9. **Creative / Artistic** — "creative fashion, expressive layered outfit, statement accessories"
+10. **Loungewear / Cozy** — "cozy loungewear, soft sweater, relaxed pants"
 
-## Bekannte Rest-Risiken (nicht kritisch)
+Diese decken B2B-Ads, Lifestyle, Fitness, Fashion, Wellness ab.
 
-1. **Gemini-Flakes ohne Retry** — bei 5xx/Timeout fällt der Server auf Local-Fallback, aber ohne zweiten Versuch. Kunde sieht dann evtl. schwächeren Plan.
-2. **Keine Plan-Versionierung** — wenn der Kunde nochmal parst, wird der alte Plan überschrieben. Kein Rollback.
-3. **Kein sichtbares Debug-Panel** — `parser_meta` wird geloggt, aber nicht angezeigt. Bei zukünftigen Fehlerberichten musst du in die Logs.
-4. **Keine automatischen E2E-Tests** — jeder Fix wurde manuell verifiziert. Regressionen könnten stillschweigend zurückkommen.
+## Änderungen (nur Frontend)
 
-## Vorschlag — 3 optionale Härtungen
+### 1. `src/config/defaultOutfitPresets.ts` (neu)
+Konstante Liste + Typ oben.
 
-### G-1: Gemini Retry mit Backoff (30 Min)
-`briefing-deep-parse`: bei 429/5xx/Timeout einen zweiten Versuch mit 1.5s Delay, bevor Local-Fallback greift. Reduziert „mal geht's, mal nicht"-Fälle spürbar.
+### 2. `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
+- Import `DEFAULT_OUTFIT_PRESETS`.
+- `showOutfitPicker` (Zeile 1215) auf `!!baseId` setzen — der Picker erscheint sobald ein Character gewählt ist, unabhängig davon ob Library-Looks existieren.
+- Im `<SelectContent>` (Zeile 1241-1246):
+  - `Standard-Look` bleibt als Default.
+  - Danach: falls `merged.length > 0`, deren Items rendern.
+  - Falls **keine** Library-Looks existieren: kurze `<SelectLabel>Vorschläge</SelectLabel>` + 10 Preset-Items (`value={preset.id}` = `preset:<id>`, label sprachabhängig).
+- `updateSceneCastOutfit` erweitern: wenn `v` mit `preset:` beginnt, speichern als `outfitLookId=null` PLUS neuem Feld `outfitPreset: string` (Prompt-Fragment) am Cast-Slot. Sonst weiter wie bisher.
 
-### T-1: Debug-Chip im Summary-Footer (20 Min)
-`BriefingPlanSummary.tsx`: kleiner ausklappbarer Chip mit `parser_meta` (Modell, strict_cast-Drops, fidelity-Matches, ensemble-Injections). Nur bei `?debug=1` sichtbar. Macht künftige Fehleranalyse selbstständig möglich.
+### 3. `src/lib/video-composer/briefing/productionPlan.ts`
+Zod-Schema `PlanCastSlot`: optionales Feld `outfitPreset: z.string().optional().nullable()` hinzufügen (nicht-brechend, backend ignoriert es).
 
-### P-1: Plan-Snapshot vor Re-Parse (45 Min)
-Vor jedem neuen Parse den aktuellen Plan als `previousPlan` sichern + „Rückgängig"-Button. Kein Verlust bei versehentlichem Re-Analyze.
+### 4. `src/hooks/useApplyProductionPlan.ts`
+Beim Merge in die Szene: `outfitPreset` als zusätzliches Prompt-Suffix an `sceneDescription` / Cast-Wardrobe-Feld anhängen (wie bereits `moodSuffix` behandelt wird). Kein Schreiben nach `avatar_outfit_looks`, kein Impact auf Lip-Sync-Guards.
 
-## Empfehlung
+## Explizit NICHT ändern
+- `avatar_outfit_looks` bleibt unangetastet (kein DB-Insert für Presets).
+- Edge-Function `briefing-deep-parse` — Presets sind rein UI/Prompt-seitig.
+- LipSync-, Anchor-, Render-Pipeline — Presets landen nur im Scene-Prompt-Text.
+- `useUnifiedMentionLibrary` — bleibt.
 
-Die Pipeline ist **funktional lückenlos** für den Beta-Launch. Die vier Risiken oben sind Komfort/Resilienz, keine Bugs.
-
-**Frag mich:**
-- „G-1" → nur Retry (der wichtigste — reduziert flaky runs)
-- „G-1 + T-1" → Retry + Debug (empfohlen für Beta)
-- „alle drei" → volles Härtungspaket
-- „reicht so" → wir sind fertig, weiter mit anderem Thema
+## Verifikation
+- Neuer Test-Account ohne gespeicherte Outfits: Briefing parsen → jeder Cast-Slot zeigt Outfit-Dropdown mit "Standard-Look" + 10 Presets.
+- Account mit gespeicherten Looks: Library-Looks zuerst, dann Divider + Presets als Fallback-Optionen.
+- Preset wählen → Scene-Prompt enthält das englische Fragment; kein Fehler beim Anwenden; keine Lip-Sync-Szene wird überschrieben.
+- Sprachumschaltung DE/EN/ES ändert nur die Labels im Dropdown, nicht das Prompt-Fragment.
