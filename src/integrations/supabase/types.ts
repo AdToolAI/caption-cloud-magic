@@ -9763,6 +9763,60 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_repair_events: {
+        Row: {
+          actions: string[]
+          consistent: boolean
+          created_at: string
+          duration_source: string | null
+          fidelity_mode: string | null
+          id: string
+          previous_sum: number | null
+          previous_total: number | null
+          project_id: string | null
+          repair_kinds: string[]
+          repair_log: Json
+          scene_count: number | null
+          script_timing_mode: string | null
+          total_duration_sec: number | null
+          user_id: string
+        }
+        Insert: {
+          actions?: string[]
+          consistent?: boolean
+          created_at?: string
+          duration_source?: string | null
+          fidelity_mode?: string | null
+          id?: string
+          previous_sum?: number | null
+          previous_total?: number | null
+          project_id?: string | null
+          repair_kinds?: string[]
+          repair_log?: Json
+          scene_count?: number | null
+          script_timing_mode?: string | null
+          total_duration_sec?: number | null
+          user_id: string
+        }
+        Update: {
+          actions?: string[]
+          consistent?: boolean
+          created_at?: string
+          duration_source?: string | null
+          fidelity_mode?: string | null
+          id?: string
+          previous_sum?: number | null
+          previous_total?: number | null
+          project_id?: string | null
+          repair_kinds?: string[]
+          repair_log?: Json
+          scene_count?: number | null
+          script_timing_mode?: string | null
+          total_duration_sec?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_announcements: {
         Row: {
           author_id: string
