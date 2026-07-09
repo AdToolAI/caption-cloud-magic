@@ -55,6 +55,10 @@ type BriefingTiming = {
   source: 'explicit-total' | 'time-windows' | 'scene-math';
 };
 
+type BriefingTimingWithWindows = BriefingTiming & {
+  windows?: Array<{ start: number; end: number }>;
+};
+
 function normalizeDurationNumber(raw: string | undefined): number | null {
   if (!raw) return null;
   const n = Number(String(raw).replace(',', '.'));
@@ -65,10 +69,22 @@ function clampDurationForPlan(seconds: number): number {
   return Math.max(1, Math.min(600, Math.round(seconds)));
 }
 
-function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText: string): BriefingTiming | null {
+function getOriginalBriefingSource(briefing: ComposerBriefing, briefingText: string): string {
   // Prefer the user's original briefing/script over the generated wrapper text,
   // because the wrapper also appends the current board value (e.g. 30s).
-  const raw = String(briefing.productDescription || briefingText || '');
+  const productDescription = String(briefing.productDescription ?? '').trim();
+  if (productDescription) return productDescription;
+
+  // If only the generated parser payload is available, keep everything before
+  // the synthetic "## Project" block and strip explicit board-duration lines.
+  return String(briefingText ?? '')
+    .split(/\n\s*##\s+Project\b/i)[0]
+    .replace(/^\s*-\s*Total duration\s*:\s*\d+(?:[,.]\d+)?\s*s\s*$/gim, '')
+    .trim();
+}
+
+function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText: string): BriefingTimingWithWindows | null {
+  const raw = getOriginalBriefingSource(briefing, briefingText);
   if (!raw.trim()) return null;
 
   const sceneCountMatch = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
@@ -76,9 +92,10 @@ function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText:
 
   // Strongest signal: explicit total duration words in the actual briefing.
   const explicitTotalPatterns = [
-    /(?:gesamt\s*dauer|gesamtdauer|total\s*duration|filmdauer|video\s*dauer|spot\s*dauer|laufzeit|duration)\s*[:=\-–—]?\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
+    /(?:gesamt\s*dauer|gesamtdauer|gesamt\s*länge|gesamtlaenge|gesamtlänge|total\s*duration|filmdauer|film\s*dauer|video\s*dauer|spot\s*dauer|laufzeit|länge|laenge|dauer|duration)\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
     /(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b\s*(?:gesamt|total|insgesamt|overall|film|video|spot)\b/i,
     /\b(?:film|video|spot)\b[^\n]{0,80}?\b(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
+    /(?:ziel|vorgabe|briefing)\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
   ];
   for (const re of explicitTotalPatterns) {
     const m = raw.match(re);
@@ -89,29 +106,38 @@ function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText:
   }
 
   // Common compact form: "15 Sekunden / 3 Szenen à 5s".
-  const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b\s*[\/|,;·-]\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
+  const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b\s*(?:[\/|,;·\-–—]|\(|\[)?\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
   const compactSeconds = normalizeDurationNumber(compact?.[1]);
   if (compactSeconds && compactSeconds >= 3) {
     return { durationSec: clampDurationForPlan(compactSeconds), sceneCount: Number(compact?.[2] ?? sceneCount), source: 'explicit-total' };
   }
 
+  // "3 Szenen insgesamt 15 Sekunden" / "3 scenes total 15s".
+  const countThenTotal = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,90}?(?:gesamt|insgesamt|total|overall|dauer|duration)?[^\n]{0,30}?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
+  const countThenTotalSeconds = normalizeDurationNumber(countThenTotal?.[2]);
+  if (countThenTotal && countThenTotalSeconds && countThenTotalSeconds >= 3) {
+    return { durationSec: clampDurationForPlan(countThenTotalSeconds), sceneCount: Number(countThenTotal[1]), source: 'explicit-total' };
+  }
+
   // Time windows in scene/shot markers: 0–5s, 5-10s, 10–15s → total 15s.
-  const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek|sekunden|seconds)?\b/gi;
+  const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek\.?)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek\.?|sekunden|seconds)?\b/gi;
   let maxEnd = 0;
   let windows = 0;
+  const parsedWindows: Array<{ start: number; end: number }> = [];
   for (const m of raw.matchAll(windowRe)) {
     const start = normalizeDurationNumber(m[1]);
     const end = normalizeDurationNumber(m[2]);
     if (start === null || end === null || end <= start || end > 600) continue;
     maxEnd = Math.max(maxEnd, end);
     windows += 1;
+    parsedWindows.push({ start, end });
   }
   if (windows >= 2 && maxEnd >= 3) {
-    return { durationSec: clampDurationForPlan(maxEnd), sceneCount: sceneCount ?? windows, source: 'time-windows' };
+    return { durationSec: clampDurationForPlan(maxEnd), sceneCount: sceneCount ?? windows, source: 'time-windows', windows: parsedWindows };
   }
 
   // "3 Szenen à 5 Sekunden" → 15s.
-  const sceneMath = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,60}?(?:à|a|je|each|x|×)\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i);
+  const sceneMath = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,60}?(?:à|a|je|each|x|×)\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
   const perScene = normalizeDurationNumber(sceneMath?.[2]);
   if (sceneMath && perScene) {
     const count = Number(sceneMath[1]);
@@ -119,6 +145,63 @@ function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText:
   }
 
   return null;
+}
+
+function applyCanonicalTimingToPlan(
+  plan: TProductionPlan,
+  briefing: ComposerBriefing,
+  briefingText: string,
+): { plan: TProductionPlan; timing: BriefingTimingWithWindows | null; changed: boolean } {
+  const timing = detectCanonicalBriefingTiming(briefing, briefingText);
+  if (!timing) return { plan, timing: null, changed: false };
+
+  const target = timing.durationSec;
+  const sceneCount = plan.scenes?.length ?? 0;
+  if (sceneCount <= 0) {
+    const next = ProductionPlan.parse({
+      ...plan,
+      project: { ...(plan.project ?? {}), totalDurationSec: target },
+      _meta: {
+        ...(plan._meta ?? {}),
+        script_timing: {
+          mode: timing.source === 'time-windows' ? 'SHOT_MARKERS' : 'FREETEXT',
+          shots: timing.sceneCount ?? 0,
+          source: 'briefing',
+        },
+        debug: { ...((plan._meta as any)?.debug ?? {}), canonical_timing: timing },
+      },
+    });
+    return { plan: next, timing, changed: true };
+  }
+
+  const currentTotal = plan.project?.totalDurationSec;
+  const sum = plan.scenes.reduce((acc, s) => acc + (Number(s.durationSec) || 0), 0);
+  const alreadyAligned = Math.abs((currentTotal ?? sum) - target) < 0.5 && Math.abs(sum - target) < 0.5;
+  const equalDuration = target / sceneCount;
+  const nextScenes = plan.scenes.map((scene, index) => {
+    const win = timing.windows?.[index];
+    const durationSec = win && win.end > win.start
+      ? Math.max(1, Math.min(60, win.end - win.start))
+      : Math.max(1, Math.min(60, equalDuration));
+    return { ...scene, durationSec };
+  });
+
+  const next = ProductionPlan.parse({
+    ...plan,
+    project: { ...(plan.project ?? {}), totalDurationSec: target },
+    scenes: nextScenes,
+    _meta: {
+      ...(plan._meta ?? {}),
+      script_timing: (plan._meta as any)?.script_timing ?? {
+        mode: timing.source === 'time-windows' ? 'SHOT_MARKERS' : timing.source === 'scene-math' ? 'SPEAKER_BLOCKS' : 'FREETEXT',
+        shots: timing.sceneCount ?? sceneCount,
+        source: 'briefing',
+      },
+      debug: { ...((plan._meta as any)?.debug ?? {}), canonical_timing: timing },
+    },
+  });
+
+  return { plan: next, timing, changed: !alreadyAligned };
 }
 
 const FRAMING_TOKENS: Array<[RegExp, string]> = [
