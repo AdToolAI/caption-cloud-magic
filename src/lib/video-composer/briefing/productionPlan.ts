@@ -293,7 +293,7 @@ export const PlanMeta = z.object({
    * `?debug=1` in the URL. Free-form on purpose: shape mirrors the server's
    * response envelope (models used, timings, ensemble/strict-cast stats).
    */
-  debug: z.record(z.any()).optional(),
+  debug: z.record(z.string(), z.any()).optional(),
 }).partial();
 
 export const ProductionPlan = z.object({
