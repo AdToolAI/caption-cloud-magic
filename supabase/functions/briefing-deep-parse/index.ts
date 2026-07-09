@@ -1191,15 +1191,46 @@ function enforceStrictCast(plan: any, required: any[]) {
   return { dropped, backfilled };
 }
 
-function mergePlanScenesToSingleContinuousScene(planLike: any, targetDurationSec: number | null): { merged: boolean; from: number; to: number } {
+function mergePlanScenesToSingleContinuousScene(
+  planLike: any,
+  targetDurationSec: number | null,
+  requiredCast: any[] = []
+): { merged: boolean; from: number; to: number; backfilled: number } {
   const scenes = Array.isArray(planLike?.scenes) ? planLike.scenes : [];
-  if (scenes.length <= 1) {
-    if (scenes.length === 1 && targetDurationSec && Number.isFinite(targetDurationSec)) {
-      scenes[0].durationSec = targetDurationSec;
-      if (!planLike.project) planLike.project = {};
-      planLike.project.totalDurationSec = targetDurationSec;
+  const keyOfCast = (c: any) =>
+    String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+
+  // Helper: deterministically backfill briefed cast into a single scene.
+  const backfillCast = (castArr: any[]): { cast: any[]; backfilled: number } => {
+    const present = new Set(castArr.map(keyOfCast).filter(Boolean));
+    let backfilled = 0;
+    for (const req of requiredCast) {
+      const k = keyOfCast(req);
+      if (!k || present.has(k)) continue;
+      if (castArr.length >= 4) break;
+      castArr.push({ ...req, shotType: 'full' });
+      present.add(k);
+      backfilled += 1;
     }
-    return { merged: false, from: scenes.length, to: scenes.length };
+    return { cast: castArr, backfilled };
+  };
+
+  if (scenes.length <= 1) {
+    let backfilled = 0;
+    if (scenes.length === 1) {
+      if (targetDurationSec && Number.isFinite(targetDurationSec)) {
+        scenes[0].durationSec = targetDurationSec;
+        if (!planLike.project) planLike.project = {};
+        planLike.project.totalDurationSec = targetDurationSec;
+      }
+      if (requiredCast.length >= 2) {
+        const cast = Array.isArray(scenes[0].cast) ? [...scenes[0].cast] : [];
+        const res = backfillCast(cast);
+        scenes[0].cast = res.cast;
+        backfilled = res.backfilled;
+      }
+    }
+    return { merged: false, from: scenes.length, to: scenes.length, backfilled };
   }
 
   const base = { ...(scenes[0] ?? {}) };
@@ -1212,7 +1243,7 @@ function mergePlanScenesToSingleContinuousScene(planLike: any, targetDurationSec
 
   for (const sc of scenes) {
     for (const c of Array.isArray(sc?.cast) ? sc.cast : []) {
-      const key = String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+      const key = keyOfCast(c);
       if (key && !castByKey.has(key)) castByKey.set(key, c);
     }
     if (Array.isArray(sc?.dialogTurns) && sc.dialogTurns.length > 0) {
@@ -1236,13 +1267,17 @@ function mergePlanScenesToSingleContinuousScene(planLike: any, targetDurationSec
     ? targetDurationSec
     : scenes.reduce((a: number, s: any) => a + (Number(s?.durationSec) || 0), 0) || 15;
 
+  // v216 — deterministic ensemble backfill for continuous scenes.
+  const mergedCast = Array.from(castByKey.values());
+  const res = backfillCast(mergedCast);
+
   planLike.scenes = [{
     ...base,
     index: 1,
     label: base.label ?? 'Durchgehende Szene',
     durationSec: Math.round(duration * 10) / 10,
-    lipSync: base.lipSync === true || turns.length > 0 || castByKey.size > 0,
-    cast: Array.from(castByKey.values()),
+    lipSync: base.lipSync === true || turns.length > 0 || res.cast.length > 0,
+    cast: res.cast,
     location: location ?? base.location,
     anchorPromptEN: anchorPromptEN || base.anchorPromptEN,
     dialogTurns: turns.length ? turns : base.dialogTurns,
@@ -1251,7 +1286,7 @@ function mergePlanScenesToSingleContinuousScene(planLike: any, targetDurationSec
   }];
   if (!planLike.project) planLike.project = {};
   planLike.project.totalDurationSec = Math.round(duration * 10) / 10;
-  return { merged: true, from: scenes.length, to: 1 };
+  return { merged: true, from: scenes.length, to: 1, backfilled: res.backfilled };
 }
 
 function applyContinuousScriptTurns(planLike: any, scriptTiming: ScriptTimingInfo, targetDurationSec: number | null) {
@@ -1859,7 +1894,8 @@ YOU MUST:
       if (detected && Array.isArray(manifest?.scenes)) {
         const got = manifest.scenes.length;
         if (detected === 1 && explicitBriefingTiming?.continuousScene && got > 1) {
-          const mergeStats = mergePlanScenesToSingleContinuousScene(manifest, explicitBriefingTiming.durationSec);
+          const requiredCastForMerge = extractSelectedCastFromBriefing(briefing, characters);
+          const mergeStats = mergePlanScenesToSingleContinuousScene(manifest, explicitBriefingTiming.durationSec, requiredCastForMerge);
           applyContinuousScriptTurns(manifest, scriptTiming, explicitBriefingTiming.durationSec);
           sceneCountCorrection = { detected, gemini: got };
           console.log('[briefing-deep-parse] continuous_scene_merged', mergeStats);
@@ -2439,6 +2475,50 @@ YOU MUST:
     } catch (e: any) {
       console.warn('[briefing-deep-parse] ensemble repair failed (non-fatal):', e?.message);
     }
+
+    // v216 — Continuous-Scene Cast Backfill.
+    // ensureProductionPlanEnsembleServer skips scenes with dialogTurns
+    // ("isExplicitlyScripted"). For a single continuous scene with 2+ briefed
+    // speakers, that leaves un-referenced cast slots empty. Deterministically
+    // inject every briefed character into the single scene's cast.
+    try {
+      const scenesArr = Array.isArray((plan as any)?.scenes) ? (plan as any).scenes : [];
+      if (
+        explicitBriefingTiming?.continuousScene &&
+        scenesArr.length === 1
+      ) {
+        const requiredCast = extractSelectedCastFromBriefing(briefing, characters);
+        if (requiredCast.length >= 2) {
+          const sc = scenesArr[0];
+          const cast = Array.isArray(sc.cast) ? [...sc.cast] : [];
+          const keyOf = (c: any) => String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+          const present = new Set(cast.map(keyOf).filter(Boolean));
+          let backfilled = 0;
+          for (const req of requiredCast) {
+            const k = keyOf(req);
+            if (!k || present.has(k)) continue;
+            if (cast.length >= 4) break;
+            cast.push({ ...req, shotType: 'full' });
+            present.add(k);
+            backfilled += 1;
+          }
+          if (backfilled > 0) {
+            sc.cast = cast;
+            (plan as any)._meta = {
+              ...((plan as any)._meta ?? {}),
+              aiFilled: Array.from(new Set([
+                ...(((plan as any)._meta?.aiFilled ?? []) as string[]),
+                'scenes.cast.continuousSceneBackfill',
+              ])),
+            };
+            console.log('[briefing-deep-parse] continuous_scene_cast_backfill', { backfilled, required: requiredCast.length });
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] continuous scene backfill failed (non-fatal):', e?.message);
+    }
+
 
     // v212 — Strict-Cast Pass: remove hallucinated Pass-B speakers ("George",
     // "Roger" …) that are not part of the briefed cast, and back-fill any
