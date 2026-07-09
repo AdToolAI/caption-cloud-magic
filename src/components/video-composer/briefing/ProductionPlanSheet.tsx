@@ -193,7 +193,7 @@ export default function ProductionPlanSheet({
         currentBriefingRef.current?.productDescription ?? '',
       ).plan;
       const finalized = finalizePlanCanonical(withBriefingTiming);
-      setPlan(finalized?.plan ?? withEnsemble);
+      setPlan(finalized?.plan ?? withBriefingTiming);
       setStep('review');
     }
   }, [initialPlan]);
@@ -567,7 +567,8 @@ export default function ProductionPlanSheet({
       // Second pass if first pass produced new collisions.
       healed.scenes = healed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
       const withEnsemble = ensureProductionPlanEnsemble(healed, currentBriefing);
-      const withBriefingTiming = applyCanonicalTimingToPlan(withEnsemble, currentBriefing, briefing).plan;
+      const parseBriefing = { ...currentBriefing, productDescription: briefing } as ComposerBriefing;
+      const withBriefingTiming = applyCanonicalTimingToPlan(withEnsemble, parseBriefing, briefing).plan;
       const finalized = finalizePlanCanonical(withBriefingTiming);
       setPlan(finalized?.plan ?? withBriefingTiming);
       setStep('review');
