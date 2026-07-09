@@ -121,6 +121,50 @@ export default function BriefingPlanSummary({ plan }: Props) {
               </HoverCardContent>
             </HoverCard>
           )}
+          {scriptTimingActive && (
+            <HoverCard openDelay={120}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-sky-400/40 text-sky-300 gap-1 cursor-help">
+                  <Clock className="h-3 w-3" />
+                  Skript-Timing verwendet
+                  <span className="opacity-70">· {scriptTiming!.shots} {scriptTiming!.shots === 1 ? 'Shot' : 'Shots'}</span>
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[320px] text-[11px]">
+                <div className="font-medium mb-1">Skript gewinnt vor Board-Dauer</div>
+                <div className="text-muted-foreground">
+                  Dein Skript enthält {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : 'strukturierte Sprecher-Blöcke'}.
+                  Die im Board eingetragene Gesamtdauer wurde ignoriert und die Szenen folgen dem Skript.
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
+          {extendCount > 0 && (
+            <HoverCard openDelay={120}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-orange-400/40 text-orange-300 gap-1 cursor-help">
+                  <Timer className="h-3 w-3" />
+                  Auto-Extend
+                  <span className="opacity-70">· {extendCount} {extendCount === 1 ? 'Szene' : 'Szenen'}</span>
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[340px] text-[11px]">
+                <div className="font-medium mb-1">Dauer automatisch verlängert</div>
+                <div className="text-muted-foreground space-y-0.5">
+                  {(durationExtend ?? []).slice(0, 6).map((d, i) => (
+                    <div key={i}>
+                      S{String(d.scene).padStart(2, '0')}:{' '}
+                      <span className="text-foreground">{d.from}s → {d.to}s</span>
+                      <span className="opacity-70"> · Sprechdauer ~{d.speechSec}s</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px] text-muted-foreground">
+                  Skript ist länger als die geplante Dauer — die Szene wurde um 1s über die Sprechdauer verlängert, damit die VO nicht abgeschnitten wird.
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
           {aiFilledCount > 0 && (
             <HoverCard openDelay={120}>
               <HoverCardTrigger asChild>
