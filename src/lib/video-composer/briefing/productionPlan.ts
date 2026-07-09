@@ -41,6 +41,14 @@ export const ResolvedCast = z.object({
    * uses the outfit cover image when set.
    */
   outfitLookId: z.string().nullable().optional(),
+  /**
+   * Default-Outfit-Preset id (see `src/config/defaultOutfitPresets.ts`).
+   * Prompt-only: never resolves to a library outfit and never sets
+   * `outfitLookId`. When set alongside `outfitLookId`, the library look
+   * wins. Applied by `useApplyProductionPlan` as an English wardrobe
+   * hint appended to the scene prompt.
+   */
+  outfitPreset: z.string().nullable().optional(),
   /** Free-text outfit hint from the briefing (creative description, NOT a library ID). */
   outfit: z.string().optional(),
   /** ElevenLabs voice id this character should speak with, when known. */
