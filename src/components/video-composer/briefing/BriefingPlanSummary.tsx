@@ -19,7 +19,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
-import { Lightbulb, Sparkles, Compass, FileCheck2, Bug } from 'lucide-react';
+import { Lightbulb, Sparkles, Compass, FileCheck2, Bug, Clock, Timer } from 'lucide-react';
 import type { TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 
 interface Props {
