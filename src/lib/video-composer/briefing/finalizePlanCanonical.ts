@@ -23,6 +23,25 @@ import type { TProductionPlan, TPlanScene } from './productionPlan';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export type RepairKind =
+  | 'duration-normalized'
+  | 'scenes-redistributed'
+  | 'canonical-ignored'
+  | 'project-total-corrected'
+  | 'cast-ids-sanitized'
+  | 'voice-ids-sanitized'
+  | 'default-fallback';
+
+export interface RepairEntry {
+  /** Maschinenlesbarer Typ, z.B. für Telemetrie. */
+  kind: RepairKind;
+  /** Kurze, deutsche Klartext-Zeile für den Kunden. */
+  label: string;
+  /** Optional: numerische Werte für Diagnose. */
+  before?: number;
+  after?: number;
+}
+
 export interface PlanNormalization {
   /** Endgültige Gesamtdauer, die im Plan durchgesetzt wurde. */
   totalDurationSec: number;
@@ -38,8 +57,10 @@ export interface PlanNormalization {
   previousTotal?: number;
   /** Vorherige Szenensumme (falls abweichend). */
   previousSum?: number;
-  /** Aktionen, die beim Finalisieren durchgeführt wurden. */
+  /** Aktionen, die beim Finalisieren durchgeführt wurden (Legacy — String-Log). */
   actions: string[];
+  /** Typisierter, deutscher Repair-Log für die Kunden-UI. */
+  repairLog: RepairEntry[];
   /** True, wenn der Plan strukturell konsistent ist. */
   consistent: boolean;
 }
