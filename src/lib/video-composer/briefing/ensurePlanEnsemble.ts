@@ -210,7 +210,9 @@ export function ensureProductionPlanEnsemble(
   }
 
   const finalScenes = repaired > 0 ? nextScenes : plan.scenes;
-  const dedup = dedupePlanScenesCast(finalScenes);
-  if (repaired === 0 && dedup.removed === 0) return plan;
+  const scrubbed = finalScenes.map(scrubSoloSceneEnsemble);
+  const anyScrubbed = scrubbed.some((s, i) => s !== finalScenes[i]);
+  const dedup = dedupePlanScenesCast(scrubbed);
+  if (repaired === 0 && dedup.removed === 0 && !anyScrubbed) return plan;
   return { ...plan, scenes: dedup.scenes as TPlanScene[] };
 }
