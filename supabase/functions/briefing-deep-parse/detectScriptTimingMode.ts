@@ -247,11 +247,107 @@ function extractByNamedSpeakerBlocks(body: string): DetectedShot[] {
   return shots;
 }
 
+/**
+ * J1 — Sub-Shot markers as canonical scenes.
+ *
+ * Briefings frequently structure content as top-level "SZENE N" containers
+ * with nested "Shot 1A / 1B / 2A / …" sub-shots that carry their own time
+ * windows (in a "Zeit: ca. 0–2,5 Sekunden" line or in the header). When the
+ * user names ≥3 sub-shots each with their own timing, THOSE are the real
+ * scenes — merging them back to top-level Szene containers collapses the
+ * intended shot structure and loses per-speaker durations.
+ *
+ * This detector runs BEFORE `extractByShotMarkers`. Only fires when it finds
+ * ≥3 sub-shot markers so it can't misfire on ambiguous prose.
+ */
+function extractBySubShotMarkers(body: string): DetectedShot[] {
+  const src = String(body ?? '');
+  const re = /(?:^|\n)\s*shot\s*(\d{1,2})\s*([a-zA-Z])\b([^\n]*)/g;
+  const marks: Array<{ label: string; head: string; contentStart: number; headStart: number; end: number }> = [];
+  for (const m of src.matchAll(re)) {
+    const label = `${m[1]}${(m[2] ?? '').toUpperCase()}`;
+    const headStart = m.index ?? 0;
+    marks.push({ label, head: m[3] ?? '', headStart, contentStart: headStart + m[0].length, end: src.length });
+  }
+  if (marks.length < 3) return [];
+  for (let i = 0; i < marks.length - 1; i++) marks[i].end = marks[i + 1].headStart;
+
+  const shots: DetectedShot[] = [];
+  marks.forEach((mk, idx) => {
+    const block = src.slice(mk.contentStart, mk.end);
+
+    // Timing: prefer header ("Shot 1A (0-2,5s)"), else a "Zeit:" line.
+    let timing = parseTimeWindow(mk.head);
+    if (timing.durationSec == null) {
+      const zeitRange = block.match(
+        /(?:zeit|time|dauer)\s*:?\s*(?:ca\.?\s*)?([\d]+(?:[.,]\d+)?)\s*[-–—]\s*([\d]+(?:[.,]\d+)?)\s*(?:sek|sec|s)\b/i,
+      );
+      if (zeitRange) {
+        const a = parseFloat(zeitRange[1].replace(',', '.'));
+        const b = parseFloat(zeitRange[2].replace(',', '.'));
+        if (Number.isFinite(a) && Number.isFinite(b) && b > a) {
+          timing = { startSec: a, endSec: b, durationSec: Math.round((b - a) * 10) / 10 };
+        }
+      } else {
+        const zeitSingle = block.match(
+          /(?:zeit|time|dauer)\s*:?\s*(?:ca\.?\s*)?([\d]+(?:[.,]\d+)?)\s*(?:sek|sec|s)\b/i,
+        );
+        if (zeitSingle) {
+          const d = parseFloat(zeitSingle[1].replace(',', '.'));
+          if (Number.isFinite(d) && d > 0 && d <= 120) {
+            timing = { startSec: null, endSec: null, durationSec: d };
+          }
+        }
+      }
+    }
+
+    // Speaker label: "Shot 1A — Sprecher 1" style header suffix.
+    let speakerLabel: string | null = null;
+    const spkInHead = mk.head.match(/[-–—]\s*(sprecher\s*\d+|speaker\s*\d+|talent\s*\d+)/i);
+    if (spkInHead) speakerLabel = spkInHead[1].replace(/\s+/g, ' ').trim();
+
+    // Spoken text: prefer "Text:" section with quoted body.
+    let text = '';
+    const textLabel = block.match(
+      /(?:^|\n)\s*(?:text|dialog|dialogue|voiceover|vo)\s*:?\s*\n?\s*[„"'"]?([^\n"„"'"]{2,400})[""'"„]?/i,
+    );
+    if (textLabel) text = stripLine(textLabel[1]).replace(/^[„"'"]+|["""'"„]+$/g, '');
+    if (!text) {
+      const anyQuote = block.match(/[„"'"]([^\n"„"'"]{3,400})[""'"„]/);
+      if (anyQuote) text = stripLine(anyQuote[1]);
+    }
+
+    shots.push({
+      index: idx + 1,
+      speakerLabel,
+      text,
+      dialogTurns: text && speakerLabel ? [{ speakerLabel, text }] : [],
+      startSec: timing.startSec,
+      endSec: timing.endSec,
+      durationSec: timing.durationSec,
+    });
+  });
+  return shots;
+}
+
 export function detectScriptTimingMode(briefing: string): ScriptTimingInfo {
   const { body, source } = pickScriptBody(briefing);
   const trimmed = String(body ?? '').trim();
   if (!trimmed) {
     return { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
+  }
+
+  // J1 — Sub-shot markers ("Shot 1A", "Shot 1B", …) win when present. This
+  // catches briefings that group sub-shots under SZENE containers.
+  const subs = extractBySubShotMarkers(trimmed);
+  if (subs.length >= 3) {
+    const allTimed = subs.every((s) => s.durationSec != null);
+    return {
+      mode: 'SHOT_MARKERS',
+      source,
+      shots: subs,
+      computedTotalSec: allTimed ? subs.reduce((a, s) => a + (s.durationSec ?? 0), 0) : null,
+    };
   }
 
   // Tier 1a — explicit SZENE/SCENE/SHOT markers.
