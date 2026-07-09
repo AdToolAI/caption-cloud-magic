@@ -498,6 +498,7 @@ const TOOL_PASS_B = {
                   mentionKey: { type: 'string' },
                   locationId: { type: 'string', nullable: true },
                   locationName: { type: 'string' },
+                  description: { type: 'string', description: 'Free-text setting description (ENGLISH). Pass through from Pass A verbatim when no library match exists so the i2v prompt can render the backdrop as-briefed.' },
                 },
                 required: ['mentionKey', 'locationName'],
               },
