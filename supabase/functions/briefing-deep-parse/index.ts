@@ -1239,9 +1239,36 @@ This overrides any English wording in the briefing's scaffolding
     let passADiagnostics: Array<{ model: string; ok: boolean; ms: number; error?: string }> = [];
     let passAModelUsed = 'unknown';
 
+    // v213 — LITERAL-mode override: when the client detected an explicit
+    // script (speaker lines / scene markers) and set `Mode: LITERAL`, we
+    // prepend a hard directive so Pass A reproduces the script 1:1 instead
+    // of running AUTO-DIRECTOR synthesis. Also honors the ## Speaker Map
+    // block if present, mapping script labels → briefed @-mentions.
+    const literalMode = /^Mode:\s*LITERAL\b/mi.test(briefing);
+    const LITERAL_LOCK = literalMode ? `
+═══════════════════════════════════════════════════════════════════════════
+LITERAL MODE — HARD OVERRIDE (top priority over AUTO-DIRECTOR)
+═══════════════════════════════════════════════════════════════════════════
+The user provided an explicit screenplay via "## Verbatim Script".
+YOU MUST:
+  • Reproduce dialogue text 1:1 (word-for-word) from the script — never rewrite,
+    summarize, paraphrase, translate, or trim spoken lines.
+  • Never invent speaker names. Every dialogTurns[].speakerMentionKey MUST
+    resolve via the "## Speaker Map" section to an @-mention listed in
+    "## Cast". If a mapping is missing, use the closest briefed cast member
+    (by role/context), never a made-up name like "George" or "Roger".
+  • Never reassign a line to a different speaker than the script labels.
+  • Emit EXACTLY one scene per "SZENE N" / "SCENE N" marker in the script.
+    Do NOT merge, split, add, or drop scenes.
+  • Fill visual metadata (framing, angle, movement, lighting, anchorPromptEN)
+    freely — that is where you add value. But NEVER change the spoken words
+    or the speaker assignments.
+═══════════════════════════════════════════════════════════════════════════
+` : '';
+
     const passAPromise = callGatewayChain(
       {
-        system: LANGUAGE_LOCK + '\n' + SYSTEM_PASS_A,
+        system: LANGUAGE_LOCK + '\n' + LITERAL_LOCK + '\n' + SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
         user: `BRIEFING (source language: ${languageDisplay}):\n\n${briefing}`,
       },
