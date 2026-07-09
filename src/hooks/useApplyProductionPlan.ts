@@ -384,18 +384,31 @@ function planSceneToComposerScene(
   const aiPrompt = promptParts.join(' ') || undefined;
 
   // Per-character dialog voices (cinematic-sync / heygen use these).
-  // Fallback chain: plan voice → brand default → deterministic AI pool (gender-aware,
-  // round-robin across the whole apply run) → project-level voice. Result: a speaker
-  // is NEVER left without a voice, even when the briefing and the avatar both omit one.
+  // G4 — bind voice pool STRICTLY to characters who actually speak in this
+  // scene. A cast member that appears in the frame but has no dialog turn
+  // (and isn't the voiceover speaker) does NOT receive a voice — otherwise
+  // silent bystanders leak voices like "Sarah AI" into unrelated scenes.
+  const speakingMentionKeys = new Set<string>();
+  for (const t of ps.dialogTurns ?? []) {
+    const k = (t.speakerMentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
+    if (k) speakingMentionKeys.add(k);
+  }
+  const hasVo = !!ps.voiceover?.text?.trim();
   const dialogVoices: Record<string, string> = {};
-  for (const c of ps.cast ?? []) {
+  for (let idx = 0; idx < (ps.cast ?? []).length; idx += 1) {
+    const c = (ps.cast ?? [])[idx];
     if (!c.characterId) continue;
     const characterId = stripPrefix(c.characterId as string);
+    const mk = (c.mentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
+    // Speaker gating: either turns exist AND this cast is one of them,
+    // or (no turns) only the first cast entry may inherit the voiceover.
+    const isSpeaker = speakingMentionKeys.size > 0
+      ? speakingMentionKeys.has(mk)
+      : hasVo && idx === 0;
+    if (!isSpeaker) continue;
     let vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
       || cleanVoiceId(defaultVoicesByCharacter[characterId]);
     if (!vid && voicePoolPicker) {
-      // Stable per-character: pick once per apply-run, reuse for every scene
-      // that features this speaker so the same person keeps the same voice.
       const cached = voicePoolAssignments[characterId];
       if (cached) {
         vid = cached;

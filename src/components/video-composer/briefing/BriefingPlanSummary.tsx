@@ -47,9 +47,11 @@ export default function BriefingPlanSummary({ plan }: Props) {
   }, [plan, meta]);
 
   const totalUserFields = useMemo(() => {
-    // Rough denominator: each scene contributes ~6 user-relevant slots
-    // (anchor, framing, lighting, performance, music, dialog).
-    return Math.max(1, (plan.scenes?.length ?? 0) * 6);
+    // G8 — denominator counts every fillable prompt slot per scene:
+    // anchor, framing, angle, movement, lighting, performance (mimik+gestik
+    // +blick+energy = 4), music, dialog, transition, voiceover, textOverlay
+    // ≈ 12. With a fully-briefed prompt <10% should read as AI-filled.
+    return Math.max(1, (plan.scenes?.length ?? 0) * 12);
   }, [plan]);
 
   const aiFillPct = Math.min(100, Math.round((aiFilledCount / totalUserFields) * 100));

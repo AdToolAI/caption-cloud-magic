@@ -1,57 +1,34 @@
-# Fix-Bundle G (revidiert) — Szenen-Struktur folgt Top-Level SZENE-Markern
+# Status: Fix-Bundle G — Rest-Arbeiten
 
-## Neuer Leitsatz
-- **Szenenanzahl = Anzahl der Top-Level `SZENE N`-Marker** im Skript (nicht Sub-Shots wie 1A/1B).
-- Beispiel-Briefing: 3 Szenen à 5s = 15s → Parser erzeugt **genau 3 Szenen**.
-- Innerhalb einer Szene: mehrere Sprecher = Ensemble-Cast, dialogTurns halten die Reihenfolge.
-- **Szenendauer flexibel**: Wenn die zugewiesene Sprech-/VO-Länge > Skript-Sollzeit ist, wird die Szene automatisch auf `max(sollzeit, sprechdauer + 1s)` hochgesetzt.
+## Was schon läuft (letzter Turn)
+- **G1 revidiert** — `detectScriptTimingMode` erkennt Top-Level `SZENE N` als eigene Szene, Sub-Shots (1A/1B) landen als `dialogTurns` in der Elternszene.
+- **G2** — Szenenanzahl = Top-Level-Marker (3 Szenen statt 6 bei Testfall).
+- **G3** — Duration Auto-Extend (`max(sollzeit, speechSec+1s)`) im Edge-Fn vor Persist, Diagnose in `plan._meta.duration_auto_extend`.
+- **G6** — Info-Chip „Skript-Timing verwendet" + „Auto-Extend"-Chip in `BriefingPlanSummary`.
 
-## Backend
+## Was noch offen ist
 
-### G1 (revidiert) — `detectScriptTimingMode`
-Umstellen auf Top-Level-SZENE-Erkennung:
-- Regex matcht nur `^SZENE N` / `^SCENE N` / `^SHOT N` (ohne Buchstaben-Suffix)
-- Sub-Shots (1A/1B/2A) werden als `dialogTurns` innerhalb der Elternszene verarbeitet, nicht als eigene Szene
-- Fallback bleibt: Speaker-Blöcke → Tier 2, Freetext → Tier 3
-
-### G2 (revidiert) — Scene-Count-Guard
-- Bei `SHOT_MARKERS`: exakt `topLevelScenes.length` Szenen, cast = Union aller Sprecher in den Sub-Turns dieser Szene
-- Kein Solo-Trim mehr für Szenen mit mehreren Sub-Shot-Speakern → `enforceSoloCast` läuft nur wenn wirklich nur ein Speaker in der ganzen Szene spricht
-
-### G3 — Duration Auto-Extend (neu)
-Nach Voice/VO-Assignment, vor Persist:
-- Für jede Szene: `estimatedSpeechSec` aus `dialogTurns` (Zeichenzahl / ~15 chars-per-sec, deutsch)
-- Wenn `estimatedSpeechSec + 1 > scene.durationSec` → `scene.durationSec = ceil(estimatedSpeechSec + 1)`
-- Diagnose in `parser_meta.duration_adjustments[]` (scene id, old, new, reason)
-
-### G4 — Voice-Pool pro Szene binden
-`useApplyProductionPlan.ts`: Auto-Voice nur für Characters in `resolved_cast` dieser Szene.
+### G4 — Voice-Pool an Szenen-Cast binden
+`src/hooks/useApplyProductionPlan.ts`: Auto-Voice nur für Characters, die tatsächlich in `scene.resolved_cast` einer Szene sprechen. Aktuell werden Voices teils an Nicht-Speaker vergeben (Screenshot: „Sarah AI" in Szene ohne Sarah).
 
 ### G5 — Repair-Count Sanitize
-Neuer Helper `repairsCounter.ts`, nur echte Value-Changes zählen.
+Neuer Helper `src/features/briefing/utils/repairsCounter.ts`. Zählt nur echte Value-Changes (kein Rauschen wie „durationSec: 5 → 5"). Wird in `BriefingPlanSummary` statt Roh-Count verwendet → keine irreführenden „12 repariert" mehr.
 
-## Client
-
-### G6 — Info-Chip statt Warnung
-`ProductionPlanSheet.tsx`: Bei `SHOT_MARKERS` und Board-Dauer ≠ Skript-Dauer → dezenter Chip „Skript-Timing verwendet".
-
-### G7 — Skript-zu-lang-Warnung im Preisfeld (neu)
-Im Clip-Generate-Panel (dort wo der Preis steht):
-- Wenn Summe aller `scene.durationSec` > `project.totalDurationSec` **und** Grund = Speech-Overflow → gelbe Meldung:
+### G7 — Skript-zu-lang-Warnung im Preisfeld
+Im Clip-Generate-Panel (dort wo Preis steht):
+- Wenn `sum(scene.durationSec) > project.totalDurationSec` **und** Grund = Auto-Extend → gelbe Meldung:
   > „Dein Skript ist länger als die geplante Videodauer. Video wird auf {computedSec}s verlängert (+{delta}s)."
-- Preis wird auf die neue Dauer berechnet.
+- Preis auf neue Dauer berechnen.
+Datei: das Panel wo Credits/Preis vor „Clip generieren" angezeigt wird (muss zuerst lokalisiert werden — vermutlich in `src/components/video-composer/GenerationPanel.tsx` o. ä.).
 
 ### G8 — AI-Fill % neu berechnen
-`BriefingPlanSummary.tsx`: nur wirklich fehlende Felder zählen.
-
-## Verifikation gegen 15s-Testfall
-- 3 Szenen à 5s (statt 2 à 10s oder 6 à 2s)
-- Cast pro Szene = Union der dort sprechenden Charaktere
-- Wenn Sprecher-Zeit in Szene 2 z.B. 7s → Szene wird auf 8s gehoben, Meldung im Preisfeld erscheint
-- Info-Chip „Skript-Timing verwendet", Repair-Count realistisch, AI-Fill niedrig
+`BriefingPlanSummary.tsx`: Prozentwert nur über wirklich fehlende Briefing-Felder rechnen (nicht über alle vom Parser gesetzten). Ziel: bei vollem Briefing < 10 %, aktuell zeigt es ~33 %.
 
 ## Nicht enthalten
-- Sub-Shot-Splitting (verworfen — Skript-Top-Struktur gewinnt)
-- Plan-Versioning, Debug-Chips (separat)
+- Debug-Chips (T-1) und Plan-Versioning (P-1) — separate Themen.
+- Sub-Shot-Splitting — bewusst verworfen, Top-Level-SZENE gewinnt.
 
-Nach Approval implementiere ich G1–G8 in einem Zug.
+## Reihenfolge
+G4 → G5 → G8 (im gleichen `BriefingPlanSummary`-Turn) → G7 (nach Lokalisierung des Preisfelds).
+
+Nach Approval implementiere ich G4/G5/G7/G8 in einem Zug und teste gegen den 15s-Testfall (3 Szenen, 4 Sprecher).

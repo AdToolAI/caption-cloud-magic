@@ -1183,12 +1183,22 @@ function enforceBriefingFidelity(
 
     // Ensure dialogTurns matches scriptTurns 1:1 in count/order.
     if (!Array.isArray(sc.dialogTurns) || sc.dialogTurns.length !== scriptTurns.length) {
+      // G5 — Sanitize repair count. Only count the DELTA vs. what the LLM
+      // already produced; do not bill users for the initial dialog fill.
+      const prev = Array.isArray(sc.dialogTurns) ? sc.dialogTurns : [];
+      const textDelta = Math.max(0, scriptTurns.length - prev.length);
+      let speakerDelta = 0;
+      for (const t of scriptTurns) {
+        const expected = speakerMap.get(t.label.toLowerCase());
+        const guess = `@${t.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+        if (expected && expected !== guess) speakerDelta += 1;
+      }
       sc.dialogTurns = scriptTurns.map((t) => ({
         speakerMentionKey: speakerMap.get(t.label.toLowerCase()) ?? `@${t.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
         text: t.text,
       }));
-      repairedTexts += scriptTurns.length;
-      repairedSpeakers += scriptTurns.length;
+      repairedTexts += textDelta;
+      repairedSpeakers += speakerDelta;
       continue;
     }
 

@@ -72,6 +72,10 @@ interface StoryboardTabProps {
   /** Called when the Talking-Head dialog adds a new character to the briefing. */
   onAddCharacter?: (character: ComposerCharacter) => void;
   preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
+  /** Briefing target duration (seconds). If the sum of scene durations
+   *  exceeds this (auto-extend triggered because the script is longer),
+   *  the summary bar shows a warning. */
+  briefingTargetDurationSec?: number;
   /**
    * Block M — Hybrid Extend uses the server-side orchestrator which inserts
    * a new scene row directly. The dashboard must refetch from DB to surface it.
@@ -104,6 +108,7 @@ export default function StoryboardTab({
   characters,
   onAddCharacter,
   preferredAspect,
+  briefingTargetDurationSec,
   onRefetchScenes,
   onEnsurePersisted,
   isGeneratingStoryboard = false,
@@ -515,6 +520,21 @@ export default function StoryboardTab({
           />
         </div>
       </div>
+
+      {/* G7 — Script-too-long warning: sum of scene durations exceeds the
+          briefing target because Auto-Extend lifted individual scenes to fit
+          the speech. Shown right next to the aggregate price so the user
+          knows why the video is longer (and more expensive) than requested. */}
+      {typeof briefingTargetDurationSec === 'number'
+        && briefingTargetDurationSec > 0
+        && totalDuration > briefingTargetDurationSec + 0.5 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-200">
+          <span className="font-medium">Skript länger als geplant:</span>{' '}
+          Dein Skript benötigt {totalDuration}s, das Briefing sah {briefingTargetDurationSec}s vor.
+          Das Video wird automatisch auf {totalDuration}s verlängert
+          (+{Math.round(totalDuration - briefingTargetDurationSec)}s). Der Preis unten ist bereits angepasst.
+        </div>
+      )}
 
       {/* Summary Bar */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-card/60 border border-border/40">
