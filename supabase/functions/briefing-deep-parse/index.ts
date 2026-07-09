@@ -1445,6 +1445,34 @@ YOU MUST:
 ═══════════════════════════════════════════════════════════════════════════
 ` : '';
 
+    // G1 — Script-Timing classification. Determines whether the script or
+    // the board's totalDurationSec wins. See detectScriptTimingMode.ts.
+    let scriptTiming: ScriptTimingInfo;
+    try {
+      scriptTiming = detectScriptTimingMode(briefing);
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] script-timing detect failed (non-fatal):', e?.message);
+      scriptTiming = { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
+    }
+    const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS' ? `
+═══════════════════════════════════════════════════════════════════════════
+SCRIPT-TIMING LOCK — HARD OVERRIDE (script wins over board settings)
+═══════════════════════════════════════════════════════════════════════════
+The briefing contains EXACTLY ${scriptTiming.shots.length} explicit shot
+markers (SZENE/SCENE/SHOT N or numbered Sprecher blocks with time windows).
+YOU MUST:
+  • Emit EXACTLY ${scriptTiming.shots.length} scenes — one per shot marker,
+    in the same order. Merging or splitting is forbidden.
+  • IGNORE any "Gesamtdauer" / "totalDurationSec" hint from the ## Project
+    section. The script's per-shot durations are the source of truth.
+  • When a shot names a single speaker (e.g. "Sprecher 2:"), the scene's
+    cast MUST be exactly that speaker — do not add other briefed cast
+    members. Only shots explicitly showing multiple speakers get an
+    ensemble cast.
+═══════════════════════════════════════════════════════════════════════════
+` : '';
+
+
     const passAPromise = callGatewayChain(
       {
         system: LANGUAGE_LOCK + '\n' + LITERAL_LOCK + '\n' + SYSTEM_PASS_A,
