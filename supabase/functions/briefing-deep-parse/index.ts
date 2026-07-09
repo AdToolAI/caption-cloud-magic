@@ -1923,6 +1923,7 @@ YOU MUST:
 
     let ensembleStats: { repaired: number; required: number } | null = null;
     let strictCastStats: { dropped: number; backfilled: number } | null = null;
+    let fidelityStats: { mode: 'literal' | 'auto'; repairedTexts: number; repairedSpeakers: number; scenesMatched: number; scenesInScript: number } | null = null;
     try {
       ensembleStats = ensureProductionPlanEnsembleServer(plan, briefing, characters);
       if (ensembleStats.repaired > 0) {
