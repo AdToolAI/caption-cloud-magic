@@ -1272,6 +1272,9 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   // be overwritten by ensemble injection. That's a solo/duet shot from the
   // script, not a group moment.
   const isExplicitlyScripted = (sc: any): boolean => {
+    // J6 — never inject ensemble into showcase / endcard scenes.
+    const kind = String(sc?.sceneKind ?? '').toLowerCase();
+    if (kind === 'endcard' || kind === 'ensemble_showcase') return true;
     const turns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
     if (turns.length === 0) return false;
     const speakers = new Set(turns.map((t: any) => normalizeMention(String(t?.speakerMentionKey ?? ''))).filter(Boolean));
