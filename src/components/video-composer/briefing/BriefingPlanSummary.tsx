@@ -69,20 +69,36 @@ export default function BriefingPlanSummary({ plan }: Props) {
   const scriptTimingActive =
     !!scriptTiming && scriptTiming.mode !== 'FREETEXT' && (scriptTiming.shots ?? 0) > 0;
 
-  const canonicalTiming = (meta as any)?.debug?.canonical_timing as
+  const debug = (meta as any)?.debug as Record<string, any> | undefined;
+  const canonicalTiming = debug?.canonical_timing as
     | { durationSec?: number; sceneCount?: number; source?: string }
     | undefined;
   const canonicalDuration = typeof canonicalTiming?.durationSec === 'number'
     ? canonicalTiming.durationSec
     : undefined;
-  const canonicalTimingActive = typeof canonicalDuration === 'number' && canonicalDuration > 0;
+  const normalization = debug?.normalization as
+    | { totalDurationSec?: number; durationSource?: string; previousTotal?: number; previousSum?: number; consistent?: boolean }
+    | undefined;
+  const appliedDuration = typeof normalization?.totalDurationSec === 'number'
+    ? normalization.totalDurationSec
+    : typeof plan.project?.totalDurationSec === 'number'
+      ? plan.project.totalDurationSec
+      : Math.round((plan.scenes ?? []).reduce((acc, scene) => acc + Number(scene.durationSec || 0), 0) * 10) / 10;
+  const canonicalTimingActive = typeof canonicalDuration === 'number'
+    && canonicalDuration > 0
+    && normalization?.durationSource === 'canonical-briefing'
+    && Math.abs(canonicalDuration - appliedDuration) < 0.5;
+  const sceneSumTimingActive = !!normalization
+    && normalization.durationSource === 'scene-sum'
+    && typeof appliedDuration === 'number'
+    && appliedDuration > 0
+    && (typeof canonicalDuration !== 'number' || Math.abs(canonicalDuration - appliedDuration) >= 0.5);
 
   const durationExtend = (meta as any)?.duration_auto_extend as
     | Array<{ scene: number; from: number; to: number; speechSec: number }>
     | undefined;
   const extendCount = Array.isArray(durationExtend) ? durationExtend.length : 0;
 
-  const debug = (meta as any)?.debug as Record<string, any> | undefined;
   const debugEnabled = useMemo(() => {
     if (typeof window === 'undefined') return false;
     try { return new URLSearchParams(window.location.search).get('debug') === '1'; }
@@ -91,7 +107,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
   const showDebug = debugEnabled && !!debug;
 
   // Nothing meaningful to render → keep the footer minimal.
-  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !scriptTimingActive && !canonicalTimingActive && extendCount === 0 && !showDebug) return null;
+  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !scriptTimingActive && !canonicalTimingActive && !sceneSumTimingActive && extendCount === 0 && !showDebug) return null;
 
   return (
     <div className="rounded-lg border border-amber-300/30 bg-gradient-to-br from-amber-300/[0.06] to-transparent p-2.5 space-y-2 text-xs">
@@ -165,6 +181,24 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <div className="text-muted-foreground">
                   Die Gesamtdauer wurde direkt aus dem Briefing gelesen und vor dem Board-Wert angewendet.
                   {canonicalTiming?.sceneCount ? ` Erkannte Struktur: ${canonicalTiming.sceneCount} Szenen.` : ''}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
+          {sceneSumTimingActive && (
+            <HoverCard openDelay={120}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-emerald-400/40 text-emerald-300 gap-1 cursor-help">
+                  <Clock className="h-3 w-3" />
+                  Szenensumme verwendet
+                  <span className="opacity-70">· {appliedDuration}s</span>
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[340px] text-[11px]">
+                <div className="font-medium mb-1">Widersprüchliche Dauer repariert</div>
+                <div className="text-muted-foreground">
+                  Die sichtbaren Szenendauern wurden als Wahrheit verwendet, weil die erkannte Dauer nicht zur Szenensumme passte.
+                  {typeof canonicalDuration === 'number' ? ` Ignorierter Wert: ${canonicalDuration}s.` : ''}
                 </div>
               </HoverCardContent>
             </HoverCard>
