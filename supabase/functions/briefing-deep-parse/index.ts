@@ -2450,6 +2450,9 @@ YOU MUST:
     const durationAutoExtend: any[] = Array.isArray((plan as any).__durationAutoExtend)
       ? (plan as any).__durationAutoExtend
       : [];
+    const durationAutoExtendBlocked: any[] = Array.isArray((plan as any).__durationAutoExtendBlocked)
+      ? (plan as any).__durationAutoExtendBlocked
+      : [];
     try {
       if (projectId) {
         const { data: prev } = await supabase
@@ -2466,6 +2469,7 @@ YOU MUST:
       try { delete (plan as any)._locationResolution; } catch { /* noop */ }
       try { delete (plan as any)._voicePoolStats; } catch { /* noop */ }
       try { delete (plan as any).__durationAutoExtend; } catch { /* noop */ }
+      try { delete (plan as any).__durationAutoExtendBlocked; } catch { /* noop */ }
       const { error: insErr } = await supabase
         .from('composer_production_plans')
         .insert({
@@ -2501,7 +2505,8 @@ YOU MUST:
               shots: scriptTiming?.shots?.length ?? 0,
               source: scriptTiming?.source ?? 'none',
             },
-            duration_auto_extend: durationAutoExtend,
+              duration_auto_extend: durationAutoExtend,
+              duration_auto_extend_blocked: durationAutoExtendBlocked,
             solo_cast: soloStats,
           },
         });
@@ -2529,7 +2534,7 @@ YOU MUST:
     }
     const _canonicalScenes = _scenes.length;
     const _canonicalFromScript = scriptTiming?.mode === 'SHOT_MARKERS' && (scriptTiming?.shots?.length ?? 0) >= 2;
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: _canonicalFromScript ? 'script' : 'board' }, duration_auto_extend: durationAutoExtend }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
