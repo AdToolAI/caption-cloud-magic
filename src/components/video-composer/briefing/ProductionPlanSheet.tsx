@@ -1335,6 +1335,7 @@ export default function ProductionPlanSheet({
                               </Button>
                             )}
                           </div>
+                          {castSlots.map((c, i) => {
                             const split = splitCastId(c.characterId);
                             const explicitLookId = c.outfitLookId ?? split.outfitLookId ?? null;
                             const lookHit = explicitLookId ? outfitById.get(explicitLookId) ?? null : null;
