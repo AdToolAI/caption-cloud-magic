@@ -44,6 +44,13 @@ export interface DetectedShot {
   endSec: number | null;
   /** Explicit duration when parseable ("(3s)" / "[0-3s]"). */
   durationSec: number | null;
+  /** J6 — 'ensemble_showcase' (split-screen w/ all speakers, no dialog),
+   *  'endcard' (branding, no speaker), or null for regular dialog shots. */
+  sceneKind?: 'ensemble_showcase' | 'endcard' | null;
+  /** J4 — Free-text "Location:" line inside the shot's briefing block. */
+  locationHint?: string | null;
+  /** J6 — On-screen overlay/text-caption for endcards. */
+  overlayText?: string | null;
 }
 
 export interface ScriptTimingInfo {
