@@ -262,7 +262,7 @@ function extractByNamedSpeakerBlocks(body: string): DetectedShot[] {
  */
 function extractBySubShotMarkers(body: string): DetectedShot[] {
   const src = String(body ?? '');
-  const re = /(?:^|\n)\s*shot\s*(\d{1,2})\s*([a-zA-Z])\b([^\n]*)/g;
+  const re = /(?:^|\n)\s*shot\s*(\d{1,2})\s*([a-zA-Z])\b([^\n]*)/gi;
   const marks: Array<{ label: string; head: string; contentStart: number; headStart: number; end: number }> = [];
   for (const m of src.matchAll(re)) {
     const label = `${m[1]}${(m[2] ?? '').toUpperCase()}`;
