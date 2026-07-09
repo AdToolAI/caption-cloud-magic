@@ -1894,7 +1894,8 @@ YOU MUST:
       if (detected && Array.isArray(manifest?.scenes)) {
         const got = manifest.scenes.length;
         if (detected === 1 && explicitBriefingTiming?.continuousScene && got > 1) {
-          const mergeStats = mergePlanScenesToSingleContinuousScene(manifest, explicitBriefingTiming.durationSec);
+          const requiredCastForMerge = extractSelectedCastFromBriefing(briefing, characters);
+          const mergeStats = mergePlanScenesToSingleContinuousScene(manifest, explicitBriefingTiming.durationSec, requiredCastForMerge);
           applyContinuousScriptTurns(manifest, scriptTiming, explicitBriefingTiming.durationSec);
           sceneCountCorrection = { detected, gemini: got };
           console.log('[briefing-deep-parse] continuous_scene_merged', mergeStats);
