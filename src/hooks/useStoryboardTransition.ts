@@ -870,6 +870,12 @@ export function useStoryboardTransition({
         };
       } catch { /* non-fatal — debug chip just stays hidden */ }
 
+      const normalized = applyCanonicalTimingToPlan(plan, briefing, text);
+      const displayPlan = normalized.plan;
+      if (normalized.timing && Math.abs((briefing.duration ?? 0) - normalized.timing.durationSec) >= 0.5) {
+        onUpdateBriefing?.({ duration: normalized.timing.durationSec });
+      }
+
       if (dropped > 0) {
         toast({
           title: 'Plan teilweise übernommen',
@@ -887,7 +893,7 @@ export function useStoryboardTransition({
         progress: 0,
         phaseLabel: '',
         planSheetOpen: true,
-        initialPlan: plan,
+        initialPlan: displayPlan,
         activeProjectId,
       });
       return { handled: true };
@@ -917,8 +923,10 @@ export function useStoryboardTransition({
 
       // Soft fail: build a local fallback plan so the user is never stuck.
       try {
-        const fallback = buildLocalFallbackPlan(briefing, text);
-        const fallbackDuration = fallback.project?.totalDurationSec;
+        const fallbackRaw = buildLocalFallbackPlan(briefing, text);
+        const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
+        const fallback = normalizedFallback.plan;
+        const fallbackDuration = normalizedFallback.timing?.durationSec ?? fallback.project?.totalDurationSec;
         if (typeof fallbackDuration === 'number' && Math.abs((briefing.duration ?? 0) - fallbackDuration) >= 0.5) {
           onUpdateBriefing?.({ duration: fallbackDuration });
         }
@@ -959,8 +967,15 @@ export function useStoryboardTransition({
               });
               if (!lateRes.ok) return;
               const lateData = await lateRes.json();
-              const { plan: latePlan } = parsePlan(lateData);
+              const { plan: lateRawPlan } = parsePlan(lateData);
+              const latePlan = lateRawPlan
+                ? applyCanonicalTimingToPlan(lateRawPlan, briefing, text).plan
+                : null;
               if (!latePlan) return;
+              const lateDuration = latePlan.project?.totalDurationSec;
+              if (typeof lateDuration === 'number' && Math.abs((briefing.duration ?? 0) - lateDuration) >= 0.5) {
+                onUpdateBriefing?.({ duration: lateDuration });
+              }
               setState((s) => {
                 // v176: even if the user already closed the sheet (e.g. clicked
                 // "Plan anwenden" against the fallback), reopen it with the
