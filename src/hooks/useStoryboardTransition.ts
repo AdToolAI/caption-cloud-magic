@@ -52,6 +52,10 @@ type SceneHint = {
 type BriefingTiming = {
   durationSec: number;
   sceneCount?: number;
+  /** True when the briefing explicitly says one uninterrupted/continuous scene. */
+  continuousScene?: boolean;
+  /** True when sceneCount came from an explicit scene-count field, not inferred windows. */
+  explicitSceneCount?: boolean;
   source: 'explicit-total' | 'time-windows' | 'scene-math';
 };
 
@@ -67,6 +71,58 @@ function normalizeDurationNumber(raw: string | undefined): number | null {
 
 function clampDurationForPlan(seconds: number): number {
   return Math.max(1, Math.min(600, Math.round(seconds)));
+}
+
+function parseSmallCount(raw: string | undefined): number | null {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (!value) return null;
+  const n = Number(value.replace(',', '.'));
+  if (Number.isFinite(n) && n >= 1 && n <= 12) return Math.round(n);
+  const words: Record<string, number> = {
+    ein: 1, eine: 1, einen: 1, einer: 1, eines: 1, one: 1, single: 1,
+    zwei: 2, two: 2,
+    drei: 3, three: 3,
+    vier: 4, four: 4,
+    fünf: 5, fuenf: 5, five: 5,
+    sechs: 6, six: 6,
+    sieben: 7, seven: 7,
+    acht: 8, eight: 8,
+    neun: 9, nine: 9,
+    zehn: 10, ten: 10,
+    elf: 11, eleven: 11,
+    zwölf: 12, zwoelf: 12, twelve: 12,
+  };
+  return words[value] ?? null;
+}
+
+function detectSceneContract(rawInput: string): { sceneCount?: number; continuousScene?: boolean; explicitSceneCount?: boolean } {
+  const raw = String(rawInput ?? '');
+  const continuousRe = /\b(?:(?:eine?|1|one|single)\s+(?:durchgehende|zusammenh[aä]ngende|kontinuierliche|ununterbrochene|continuous|uninterrupted|single|one[-\s]?take)\s+(?:szene|scene)|(?:szene|scene)\s*(?:[:=\-–—]\s*)?(?:eine?|1|one|single)\s+(?:durchgehende|zusammenh[aä]ngende|kontinuierliche|ununterbrochene|continuous|uninterrupted|single|one[-\s]?take)?\s*(?:szene|scene)?)\b/i;
+  const fieldRe = /(?:^|\n)\s*(?:szenen?|scenes?|scene\s*count|anzahl\s+szenen?)\s*[:=\-–—]\s*(?:ca\.?\s*)?([1-9]\d?|ein(?:e[rsn]?)?|one|single|zwei|two|drei|three|vier|four|f[üu]nf|fuenf|five|sechs|six|sieben|seven|acht|eight|neun|nine|zehn|ten|elf|eleven|zw[öo]lf|zwoelf|twelve)\b([^\n]*)/i;
+  const field = raw.match(fieldRe);
+  if (field) {
+    const count = parseSmallCount(field[1]);
+    if (count) {
+      const suffix = String(field[2] ?? '');
+      return {
+        sceneCount: count,
+        continuousScene: count === 1 && (continuousRe.test(field[0]) || /\b(?:durchgehend|durchgehende|zusammenh[aä]ngend|kontinuierlich|ununterbrochen|continuous|uninterrupted|one[-\s]?take|single)\b/i.test(suffix)),
+        explicitSceneCount: true,
+      };
+    }
+  }
+
+  const countBeforeUnit = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
+  const unitCount = countBeforeUnit ? Number(countBeforeUnit[1]) : undefined;
+  if (unitCount && unitCount >= 1 && unitCount <= 12) {
+    return { sceneCount: unitCount, continuousScene: unitCount === 1 && continuousRe.test(raw), explicitSceneCount: true };
+  }
+
+  if (continuousRe.test(raw)) {
+    return { sceneCount: 1, continuousScene: true, explicitSceneCount: true };
+  }
+
+  return {};
 }
 
 function getOriginalBriefingSource(briefing: ComposerBriefing, briefingText: string): string {
@@ -87,8 +143,8 @@ export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefi
   const raw = getOriginalBriefingSource(briefing, briefingText);
   if (!raw.trim()) return null;
 
-  const sceneCountMatch = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
-  const sceneCount = sceneCountMatch ? Number(sceneCountMatch[1]) : undefined;
+  const sceneContract = detectSceneContract(raw);
+  const sceneCount = sceneContract.sceneCount;
 
   // Strongest signal: explicit total duration words in the actual briefing.
   const explicitTotalPatterns = [
@@ -106,7 +162,7 @@ export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefi
     const m = raw.match(re);
     const seconds = normalizeDurationNumber(m?.[1]);
     if (seconds && seconds >= 3) {
-      return { durationSec: clampDurationForPlan(seconds), sceneCount, source: 'explicit-total' };
+      return { durationSec: clampDurationForPlan(seconds), sceneCount, continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount, source: 'explicit-total' };
     }
   }
 
@@ -114,14 +170,14 @@ export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefi
   const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b\s*(?:[\/|,;·\-–—]|\(|\[)?\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
   const compactSeconds = normalizeDurationNumber(compact?.[1]);
   if (compactSeconds && compactSeconds >= 3) {
-    return { durationSec: clampDurationForPlan(compactSeconds), sceneCount: Number(compact?.[2] ?? sceneCount), source: 'explicit-total' };
+    return { durationSec: clampDurationForPlan(compactSeconds), sceneCount: Number(compact?.[2] ?? sceneCount), continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount || Boolean(compact?.[2]), source: 'explicit-total' };
   }
 
   // "3 Szenen insgesamt 15 Sekunden" / "3 scenes total 15s".
   const countThenTotal = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,90}?(?:gesamt|insgesamt|total|overall|dauer|duration)[^\n]{0,30}?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
   const countThenTotalSeconds = normalizeDurationNumber(countThenTotal?.[2]);
   if (countThenTotal && countThenTotalSeconds && countThenTotalSeconds >= 3) {
-    return { durationSec: clampDurationForPlan(countThenTotalSeconds), sceneCount: Number(countThenTotal[1]), source: 'explicit-total' };
+    return { durationSec: clampDurationForPlan(countThenTotalSeconds), sceneCount: Number(countThenTotal[1]), continuousScene: sceneContract.continuousScene, explicitSceneCount: true, source: 'explicit-total' };
   }
 
   // Time windows in scene/shot markers: 0–5s, 5-10s, 10–15s → total 15s.
@@ -153,7 +209,7 @@ export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefi
     parsedWindows.push({ start, end });
   }
   if (windows >= 2 && maxEnd >= 3) {
-    return { durationSec: clampDurationForPlan(maxEnd), sceneCount: sceneCount ?? windows, source: 'time-windows', windows: parsedWindows };
+    return { durationSec: clampDurationForPlan(maxEnd), sceneCount: sceneCount ?? windows, continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount, source: 'time-windows', windows: parsedWindows };
   }
 
   // "3 Szenen à 5 Sekunden" → 15s.
@@ -161,10 +217,79 @@ export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefi
   const perScene = normalizeDurationNumber(sceneMath?.[2]);
   if (sceneMath && perScene) {
     const count = Number(sceneMath[1]);
-    return { durationSec: clampDurationForPlan(count * perScene), sceneCount: count, source: 'scene-math' };
+    return { durationSec: clampDurationForPlan(count * perScene), sceneCount: count, continuousScene: sceneContract.continuousScene, explicitSceneCount: true, source: 'scene-math' };
   }
 
   return null;
+}
+
+function mergeScenesToSingleScene(scenes: TProductionPlan['scenes'], targetDurationSec: number): TProductionPlan['scenes'] {
+  if (!Array.isArray(scenes) || scenes.length === 0) return scenes;
+  const base = { ...(scenes[0] as any) };
+  const castByKey = new Map<string, any>();
+  const dialogTurns: any[] = [];
+  let overlay: any = base.textOverlay;
+  let voiceText = '';
+  for (const scene of scenes as any[]) {
+    for (const c of Array.isArray(scene?.cast) ? scene.cast : []) {
+      const key = String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+      if (key && !castByKey.has(key)) castByKey.set(key, c);
+    }
+    if (Array.isArray(scene?.dialogTurns) && scene.dialogTurns.length > 0) {
+      for (const turn of scene.dialogTurns) {
+        const text = String(turn?.text ?? '').trim();
+        if (text) dialogTurns.push({ ...turn, text });
+      }
+    } else if (scene?.voiceover?.text) {
+      const text = String(scene.voiceover.text).trim();
+      if (text) voiceText = voiceText ? `${voiceText} ${text}` : text;
+    }
+    if (!overlay && scene?.textOverlay) overlay = scene.textOverlay;
+  }
+  return [{
+    ...base,
+    index: 1,
+    label: base.label ?? 'Durchgehende Szene',
+    durationSec: targetDurationSec,
+    cast: Array.from(castByKey.values()),
+    lipSync: base.lipSync || dialogTurns.length > 0 || Array.from(castByKey.values()).length > 0,
+    dialogTurns: dialogTurns.length > 0 ? dialogTurns : base.dialogTurns,
+    voiceover: dialogTurns.length > 0
+      ? undefined
+      : (voiceText ? { ...(base.voiceover ?? {}), text: voiceText } : base.voiceover),
+    textOverlay: overlay,
+  } as any];
+}
+
+function alignPlanScenesToCanonicalTiming(plan: TProductionPlan, timing: BriefingTimingWithWindows): TProductionPlan['scenes'] {
+  const currentScenes = Array.isArray(plan.scenes) ? plan.scenes : [];
+  const desiredCount = timing.explicitSceneCount && timing.sceneCount && timing.sceneCount >= 1
+    ? Math.max(1, Math.min(12, Math.round(timing.sceneCount)))
+    : currentScenes.length;
+  let scenes = currentScenes;
+  if (desiredCount === 1 && scenes.length > 1) {
+    scenes = mergeScenesToSingleScene(scenes, timing.durationSec);
+  } else if (desiredCount > 0 && scenes.length !== desiredCount) {
+    if (scenes.length > desiredCount) {
+      scenes = scenes.slice(0, desiredCount);
+    } else if (scenes.length > 0) {
+      const template = scenes[scenes.length - 1];
+      while (scenes.length < desiredCount) {
+        scenes = [...scenes, { ...(template as any), index: scenes.length + 1, label: `S${scenes.length + 1}` } as any];
+      }
+    }
+  }
+
+  const sceneCount = scenes.length || currentScenes.length || 1;
+  const equalDuration = timing.durationSec / sceneCount;
+  const windowsMatchScenes = !timing.continuousScene && Array.isArray(timing.windows) && timing.windows.length === sceneCount;
+  return scenes.map((scene, index) => {
+    const win = windowsMatchScenes ? timing.windows?.[index] : undefined;
+    const durationSec = win && win.end > win.start
+      ? Math.max(1, Math.min(60, Math.round((win.end - win.start) * 10) / 10))
+      : Math.max(1, Math.min(60, Math.round(equalDuration * 10) / 10));
+    return { ...scene, index: index + 1, durationSec };
+  });
 }
 
 export function applyCanonicalTimingToPlan(
@@ -200,15 +325,11 @@ export function applyCanonicalTimingToPlan(
 
   const currentTotal = plan.project?.totalDurationSec;
   const sum = plan.scenes.reduce((acc, s) => acc + (Number(s.durationSec) || 0), 0);
-  const alreadyAligned = Math.abs((currentTotal ?? sum) - target) < 0.5 && Math.abs(sum - target) < 0.5;
-  const equalDuration = target / sceneCount;
-  const nextScenes = plan.scenes.map((scene, index) => {
-    const win = timing.windows?.[index];
-    const durationSec = win && win.end > win.start
-      ? Math.max(1, Math.min(60, win.end - win.start))
-      : Math.max(1, Math.min(60, equalDuration));
-    return { ...scene, durationSec };
-  });
+  const desiredSceneCount = timing.explicitSceneCount ? timing.sceneCount : undefined;
+  const alreadyAligned = Math.abs((currentTotal ?? sum) - target) < 0.5
+    && Math.abs(sum - target) < 0.5
+    && (!desiredSceneCount || sceneCount === desiredSceneCount);
+  const nextScenes = alignPlanScenesToCanonicalTiming(plan, timing);
 
   const next = ProductionPlan.parse({
     ...plan,
@@ -223,8 +344,8 @@ export function applyCanonicalTimingToPlan(
   (next as any)._meta = {
     ...((next as any)._meta ?? {}),
     script_timing: (plan._meta as any)?.script_timing ?? {
-      mode: timing.source === 'time-windows' ? 'SHOT_MARKERS' : timing.source === 'scene-math' ? 'SPEAKER_BLOCKS' : 'FREETEXT',
-      shots: timing.sceneCount ?? sceneCount,
+        mode: timing.continuousScene ? 'SPEAKER_BLOCKS' : timing.source === 'time-windows' ? 'SHOT_MARKERS' : timing.source === 'scene-math' ? 'SPEAKER_BLOCKS' : 'FREETEXT',
+        shots: timing.sceneCount ?? nextScenes.length,
       source: 'briefing',
     },
     debug: { ...(((next as any)._meta as any)?.debug ?? {}), canonical_timing: timing },
@@ -377,7 +498,9 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     { beat: 'CTA',    framing: 'medium',          movement: 'static',       energy: 'high' },
   ];
 
-  const sceneCount = Math.max(canonicalTiming?.sceneCount ?? 0, hints.length, defaultBeats.length);
+  const sceneCount = canonicalTiming?.explicitSceneCount && canonicalTiming.sceneCount
+    ? canonicalTiming.sceneCount
+    : Math.max(canonicalTiming?.sceneCount ?? 0, hints.length, defaultBeats.length);
   const per = Math.max(1, Math.min(60, total / sceneCount));
 
   const hasDialogAnywhere = hints.some((h) => !!h.dialog);
