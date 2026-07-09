@@ -11,6 +11,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { resolveCatalogId, CATALOG_VERSION, type CatalogAxis } from "./catalog.ts";
+import { detectScriptTimingMode, type ScriptTimingInfo } from "./detectScriptTimingMode.ts";
+import { enforceSoloCast } from "./enforceSoloCast.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -1443,9 +1445,37 @@ YOU MUST:
 ═══════════════════════════════════════════════════════════════════════════
 ` : '';
 
+    // G1 — Script-Timing classification. Determines whether the script or
+    // the board's totalDurationSec wins. See detectScriptTimingMode.ts.
+    let scriptTiming: ScriptTimingInfo;
+    try {
+      scriptTiming = detectScriptTimingMode(briefing);
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] script-timing detect failed (non-fatal):', e?.message);
+      scriptTiming = { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
+    }
+    const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS' ? `
+═══════════════════════════════════════════════════════════════════════════
+SCRIPT-TIMING LOCK — HARD OVERRIDE (script wins over board settings)
+═══════════════════════════════════════════════════════════════════════════
+The briefing contains EXACTLY ${scriptTiming.shots.length} explicit shot
+markers (SZENE/SCENE/SHOT N or numbered Sprecher blocks with time windows).
+YOU MUST:
+  • Emit EXACTLY ${scriptTiming.shots.length} scenes — one per shot marker,
+    in the same order. Merging or splitting is forbidden.
+  • IGNORE any "Gesamtdauer" / "totalDurationSec" hint from the ## Project
+    section. The script's per-shot durations are the source of truth.
+  • When a shot names a single speaker (e.g. "Sprecher 2:"), the scene's
+    cast MUST be exactly that speaker — do not add other briefed cast
+    members. Only shots explicitly showing multiple speakers get an
+    ensemble cast.
+═══════════════════════════════════════════════════════════════════════════
+` : '';
+
+
     const passAPromise = callGatewayChain(
       {
-        system: LANGUAGE_LOCK + '\n' + LITERAL_LOCK + '\n' + SYSTEM_PASS_A,
+        system: LANGUAGE_LOCK + '\n' + LITERAL_LOCK + '\n' + SCRIPT_TIMING_LOCK + '\n' + SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
         user: `BRIEFING (source language: ${languageDisplay}):\n\n${briefing}`,
       },
@@ -1577,7 +1607,13 @@ YOU MUST:
       const candidates = [numFromWord, maxMarker || null, listCount || null]
         .filter((n): n is number => typeof n === 'number' && n >= 1 && n <= 12);
       // Prefer the most specific: numbered markers > "N Szenen" word > list count
-      const detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
+      let detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
+
+      // G1/G2 — Script-Timing takes precedence: when the detector found ≥2
+      // explicit shots, the scene count IS the shot count and per-shot
+      // durations override the board's totalDurationSec.
+      const useScriptTiming = scriptTiming.mode === 'SHOT_MARKERS' && scriptTiming.shots.length >= 2;
+      if (useScriptTiming) detected = scriptTiming.shots.length;
 
       if (detected && Array.isArray(manifest?.scenes)) {
         const got = manifest.scenes.length;
@@ -1599,8 +1635,6 @@ YOU MUST:
               [...manifest.scenes].reverse().find((x: any) => Array.isArray(x?.cast) && x.cast.length > 0)
               ?? manifest.scenes[0]
               ?? {};
-            // SC-1: preserve characterId + outfitLookId on padded scenes so
-            // ensemble-repair does not append duplicates and outfits survive.
             const cloneCast = (cast: any[] | undefined) =>
               Array.isArray(cast)
                 ? cast.map((c: any) => {
@@ -1611,7 +1645,6 @@ YOU MUST:
                     if (c?.outfitLookId) out.outfitLookId = c.outfitLookId;
                     if (c?.referenceImageUrl) out.referenceImageUrl = c.referenceImageUrl;
                     return out;
-                    // per-turn fields (voiceover text etc.) are intentionally stripped
                   })
                 : undefined;
             const cloneLocation = (loc: any) => {
@@ -1635,28 +1668,81 @@ YOU MUST:
                 shotDirector: template.shotDirector ? { ...template.shotDirector } : undefined,
                 _meta: { aiFilled: ['padded_from_template'] },
               };
-              // Drop undefined keys so downstream `stripUndef` stays clean.
               if (!padded.cast) delete padded.cast;
               if (!padded.location) delete padded.location;
               if (!padded.shotDirector) delete padded.shotDirector;
               manifest.scenes.push(padded);
             }
           }
-          // Redistribute durations + reindex
-          manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
-            ...s,
-            index: i + 1,
-            durationSec: perScene,
-          }));
-          if (!manifest.project) manifest.project = {};
-          manifest.project.totalDurationSec = perScene * detected;
+          // Redistribute durations + reindex. When script-timing is active,
+          // use per-shot durations (variable); otherwise even split.
+          if (useScriptTiming) {
+            const shots = scriptTiming.shots;
+            manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+              ...s,
+              index: i + 1,
+              durationSec: shots[i]?.durationSec ?? perScene,
+            }));
+            const sum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+            if (!manifest.project) manifest.project = {};
+            manifest.project.totalDurationSec = sum || perScene * detected;
+          } else {
+            manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+              ...s,
+              index: i + 1,
+              durationSec: perScene,
+            }));
+            if (!manifest.project) manifest.project = {};
+            manifest.project.totalDurationSec = perScene * detected;
+          }
           sceneCountCorrection = { detected, gemini: got };
-          console.log('[briefing-deep-parse] scene_count_corrected', { detected, gemini: got, perScene });
+          console.log('[briefing-deep-parse] scene_count_corrected', { detected, gemini: got, perScene, scriptWins: useScriptTiming });
+        } else if (useScriptTiming) {
+          // Count matches — still align per-shot durations from the script.
+          const shots = scriptTiming.shots;
+          const allTimed = shots.every((s) => s.durationSec != null);
+          if (allTimed) {
+            manifest.scenes = manifest.scenes.map((s: any, i: number) => ({
+              ...s,
+              durationSec: shots[i]?.durationSec ?? s.durationSec,
+            }));
+            const sum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+            if (!manifest.project) manifest.project = {};
+            manifest.project.totalDurationSec = sum;
+          }
+        }
+      }
+
+      // G2 — When script-timing is active, seed each scene with its shot's
+      // dialogTurn + voiceover text (only where the LLM left them empty).
+      // Speaker labels like "Sprecher 2" become "@sprecher-2" mentions which
+      // the Speaker-Map / strict-cast passes then resolve to briefed cast.
+      if (useScriptTiming && Array.isArray(manifest?.scenes)) {
+        const slugify = (v: string) =>
+          String(v ?? '')
+            .toLowerCase()
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        for (let i = 0; i < manifest.scenes.length; i++) {
+          const shot = scriptTiming.shots[i];
+          if (!shot) continue;
+          const sc = manifest.scenes[i];
+          if (!sc || typeof sc !== 'object') continue;
+          if (shot.text && (!sc.voiceover || !String(sc.voiceover.text ?? '').trim())) {
+            sc.voiceover = { ...(sc.voiceover ?? {}), text: shot.text };
+          }
+          if (shot.text && shot.speakerLabel && !Array.isArray(sc.dialogTurns)) {
+            const mention = `@${slugify(shot.speakerLabel) || `sprecher-${i + 1}`}`;
+            sc.dialogTurns = [{ speakerMentionKey: mention, text: shot.text }];
+          }
         }
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] scene-count guard failed (non-fatal):', e?.message);
     }
+
 
     const characters = charRes.data ?? [];
     const locations = buildLocationLibrary(
@@ -2017,6 +2103,24 @@ YOU MUST:
       console.warn('[briefing-deep-parse] fidelity pass failed (non-fatal):', e?.message);
     }
 
+    // G3 — Solo-Enforcement: for any scene whose dialogTurns name a single
+    // unique speaker (typical "Sprecher N:" solo shot), trim cast to that
+    // one character so ensemble-repair cannot leak the full ensemble in.
+    let soloStats: { trimmed: number; scenesTrimmed: number[] } | null = null;
+    try {
+      soloStats = enforceSoloCast(plan);
+      if (soloStats.trimmed > 0) {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          soloEnforced: soloStats,
+        };
+        console.log('[briefing-deep-parse] solo_cast', soloStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
+    }
+
+
 
 
 
@@ -2207,7 +2311,7 @@ YOU MUST:
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' } }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

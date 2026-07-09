@@ -1,29 +1,67 @@
-# Plan: Location-Freitext-Fallback (E)
+# Fix-Bundle G (Final): Script-Wins & Fehlerbehebung Briefing-Analyse
 
-## Ziel
-Wenn das Briefing eine Location beschreibt, die **nicht** in der Library existiert (z.B. „Split-Screen Office/Home", „verregnete Autobahn bei Nacht", „Bühne mit Nebel"), soll dieser Text **1:1** ins Storyboard übernommen und ans Video-Modell weitergereicht werden — statt still zu verschwinden. Damit bleiben Action-Szenen, exotische Kulissen und Split-Screens auch ohne vorab angelegte Library-Location möglich.
+Ziel: Alle 10 identifizierten Fehler beheben, indem die Root Cause (falsches Scene-Splitting) und die Downstream-Effekte konsequent gelöst werden. Leitprinzip: **Das Skript gewinnt.**
 
-## Änderungen
+## 1. Server: `briefing-deep-parse` (Root Fix)
 
-### 1. Server: `supabase/functions/briefing-deep-parse/index.ts`
-- Pass-A-Prompt: Regel ergänzen „Wenn Location im Briefing beschrieben ist aber kein Library-Match: setze `location.locationId = null`, fülle `location.locationName` mit einer Kurz-Phrase (max 40 Zeichen) und `location.description` mit der **wörtlichen** Briefing-Beschreibung (max 300 Zeichen)."
-- Lokaler Location-Fill-Pass (v178): wenn nach Fuzzy-Match immer noch `locationId === null` UND `description` leer → aus dem Briefing-Text den nächsten Satz nach Location-Keywords (`Setting|Location|Kulisse|Szenerie|Ort`) als Fallback-Description extrahieren.
-- Telemetrie: `parser_meta.location_resolution.viaFreetext` Counter.
+**G1 — `detectScriptTimingMode` Pre-Processor**
+Neue Funktion, die vor Pass A läuft und den Skript-Typ klassifiziert:
+- **Tier 1 (SHOT_MARKERS)**: Skript enthält explizite Marker (`S01`, `Shot 1`, `Szene 2`, `[0-3s]`, `Sprecher 1:` mit Zeitangaben). → Board-Dauer wird **ignoriert**, Scene-Count = Marker-Count.
+- **Tier 2 (SPEAKER_BLOCKS)**: Nur Speaker-Labels (`Sprecher 1:`, `Sarah:`) ohne Zeiten. → Eine Szene pro Speaker-Wechsel, Gesamtdauer aus Board proportional aufgeteilt.
+- **Tier 3 (FREETEXT)**: Kein strukturiertes Skript. → Board-Werte gewinnen (aktuelles Verhalten).
 
-### 2. Schema: `src/lib/video-composer/briefing/productionPlan.ts`
-- `ResolvedLocation.description` bereits vorhanden — sicherstellen dass es durch alle Merges (`ensurePlanEnsemble`, `planCastDedup`) erhalten bleibt. Kein Feld-Neubau.
+**G2 — Strict Split Enforcement**
+- Pass A System Prompt erhält Klausel: „Bei `mode=SHOT_MARKERS` MUSST du exakt `N` Szenen erzeugen, eine pro Marker. Merging ist verboten."
+- Post-Pass A Guard: Wenn `scenes.length !== detectedShots.length` bei Tier 1 → Re-Split auf Client-Seite via deterministischem Splitter (`splitByShotMarkers.ts`).
 
-### 3. UI: `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
-- Wenn `locationId === null` und `description` gesetzt → statt leerer Zelle einen **Freitext-Chip** „🎬 [description]" in der Location-Spalte anzeigen, mit `+ Als Location speichern`-Button (nutzt den vorhandenen `quickCreateLocation`-Pfad, propagiert ID auf alle Szenen mit gleichem `mentionKey`).
-- Location-Dropdown behält Freitext-Wert als disabled Placeholder, damit klar ist: „wird als Prompt-Zusatz genutzt".
+**G3 — Solo-Enforcement**
+- Für jede Szene mit exakt einem Speaker-Label im Skript (`Sprecher 2:` → nur ein Block): `cast` auf diesen einen `characterId` beschränken. Alle anderen entfernen — überschreibt Ensemble-Guarantee für explizit solo geskriptete Shots.
 
-### 4. Apply: `src/hooks/useApplyProductionPlan.ts`
-- Beim Bau des Szenen-Prompts: wenn kein `locationId` aber `description` vorhanden → `Setting: [description]` an den AI-Prompt anhängen (analog zum bestehenden `Wardrobe: …`-Muster für Outfit-Presets). Das garantiert dass der Freitext das Video-Modell erreicht.
+**G4 — Voice Assignment Fix**
+- Voice-Pool nur an Charaktere binden, die in `resolved_cast` der jeweiligen Szene sind. Sarah bekommt keine Voice-Slot in Speaker-2-Szenen.
 
-## Was NICHT geändert wird
-- Kein Umbau des Location-Pickers, keine neue Modal-UI.
-- Kein Schreibzugriff auf `dialog_shots`, `syncso_*`, `clip_source` — Lip-Sync-Pipeline bleibt unangetastet.
-- Keine automatische Erstellung von Library-Einträgen ohne User-Klick.
+**G5 — Repair-Count Sanitizing**
+- `parser_meta.repairs` nur zählen, wenn ein tatsächlicher Wert geändert wurde (nicht bei No-Op-Passes). Behebt „12 repariert" bei 4-Zeilen-Skript.
 
-## Ergebnis
-Briefing-Passagen wie „Sprecher 1 im Home-Office, Sprecher 2 im Café, Split-Screen" landen als Freitext in der Location-Zelle **und** im finalen Video-Prompt — der User sieht sofort was passiert, kann per Klick zur Library speichern, und Action-/Exotic-Szenarien sind ohne Vorarbeit möglich.
+## 2. Client: Anzeige & UX
+
+**G6 — „Script Timing Used" Info-Chip**
+- In `ProductionPlanSheet.tsx` Header: Wenn `parser_meta.timing_mode === 'SHOT_MARKERS'` und `board.totalDurationSec !== computed.totalDurationSec` → dezenter Info-Chip statt Warnung: „Skript-Timing verwendet (Board-Wert ignoriert)".
+
+**G7 — Location Description Fallback verifizieren**
+- Sicherstellen, dass die in vorherigem Fix eingeführte `description` bei Locations tatsächlich in `resolved_location.description` landet und in der UI + AI-Prompt gerendert wird.
+
+**G8 — AI-Fill % Recompute**
+- `computeAiFillPercent` neu berechnen: nur Felder zählen, die im Briefing/Skript wirklich fehlen. Wenn alle 4 Speaker + Skript + Dauer da sind, sollte % niedrig sein.
+
+## 3. Neue Dateien / Änderungen
+
+```text
+supabase/functions/briefing-deep-parse/
+  ├── detectScriptTimingMode.ts        (neu)
+  ├── splitByShotMarkers.ts            (neu, deterministisch)
+  ├── enforceSoloCast.ts               (neu)
+  └── index.ts                         (integrate G1–G5)
+
+src/features/briefing/
+  ├── hooks/useApplyProductionPlan.ts  (G4 voice binding, G7 location desc)
+  ├── components/ProductionPlanSheet.tsx (G6 chip, G8 fill %)
+  └── utils/repairsCounter.ts          (neu, G5)
+```
+
+## 4. Verifikation
+
+Testfall: Das vom User gepostete 15s-Briefing mit 4 Sprechern.
+Erwartetes Ergebnis nach Fix:
+- 6 Szenen (nicht 2)
+- S01–S06 jeweils solo mit dem korrekten Sprecher
+- Voice: nur der jeweilige Sprecher hat einen Voice-Slot
+- Info-Chip „Skript-Timing" statt Warnung
+- Repair-Count realistisch (0–3)
+- AI-Fill % niedrig (~10–20 %)
+
+## Nicht enthalten (bewusst)
+- Debug-Chips (T-1) — separater Wunsch, kann später
+- Plan Versioning (P-1) — separater Wunsch
+
+Nach Approval implementiere ich G1–G8 in einem Zug und teste gegen das gepostete Briefing.
