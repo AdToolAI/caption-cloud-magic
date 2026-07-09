@@ -36,6 +36,7 @@ import type {
 import { VISUAL_STYLES } from '@/config/composerVisualStyles';
 import { suggestShotDirectorForStyle, getStyleLabel } from '@/config/styleToShotDirector';
 import CharacterManager from './CharacterManager';
+import ScriptSpeakerMapper from './briefing/ScriptSpeakerMapper';
 import VideoModeSelector from './VideoModeSelector';
 import BrandKitApplyPanel from './BrandKitApplyPanel';
 import StagePanel from './stage/StagePanel';
