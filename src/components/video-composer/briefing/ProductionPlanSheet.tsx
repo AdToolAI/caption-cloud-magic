@@ -29,6 +29,7 @@ import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensu
 import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import BriefingPlanSummary from './BriefingPlanSummary';
+import SafePlanNotice from './SafePlanNotice';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
 import type { CatalogAxis } from '@/lib/video-composer/catalog';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
@@ -1019,25 +1020,10 @@ export default function ProductionPlanSheet({
                 </div>
               )}
 
-              {/* v215 — Diagnose-Chip: zeigt, aus welcher Quelle die Gesamtdauer
-                  final gesetzt wurde und ob der Plan konsistent normalisiert ist. */}
+              {/* v216 — SafePlanNotice: klare, deutsche Zusammenfassung aller
+                  Auto-Repairs mit aufklappbaren Details (L1 + L2). */}
               {normalizationMeta && (
-                <div className="flex flex-wrap items-center gap-1 text-[10px]">
-                  <Badge variant="outline" className="border-emerald-400/40 text-emerald-300">
-                    Normalisiert · {normalizationMeta.totalDurationSec}s
-                  </Badge>
-                  <Badge variant="outline" className="border-cyan-400/40 text-cyan-300">
-                    Quelle: {normalizationMeta.durationSource === 'canonical-briefing' ? 'Briefing/Skript'
-                      : normalizationMeta.durationSource === 'plan-project' ? 'Projekt'
-                      : normalizationMeta.durationSource === 'scene-sum' ? 'Szenensumme'
-                      : 'Default'}
-                  </Badge>
-                  {Array.isArray(normalizationMeta.actions) && normalizationMeta.actions.length > 0 && (
-                    <Badge variant="outline" className="border-amber-400/40 text-amber-300" title={normalizationMeta.actions.join(' · ')}>
-                      {normalizationMeta.actions.length} Auto-Fixes
-                    </Badge>
-                  )}
-                </div>
+                <SafePlanNotice normalization={normalizationMeta} />
               )}
 
               {/* Projekt */}
