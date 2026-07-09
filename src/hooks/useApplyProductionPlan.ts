@@ -345,6 +345,27 @@ function planSceneToComposerScene(
   if (ps.anchorPromptEN?.trim()) promptParts.push(ps.anchorPromptEN.trim());
   if (ps.continuityHint?.trim()) promptParts.push(`Continuity: ${ps.continuityHint.trim()}`);
   if (ps.brandAnchor?.note?.trim()) promptParts.push(`Brand: ${ps.brandAnchor.note.trim()}`);
+
+  // Prompt-only default-outfit presets. Applied per cast slot ONLY when
+  // no library outfitLookId is set (the library look wins). English by
+  // design — visual prompts must stay English regardless of UI language.
+  try {
+    // Lazy require to keep this hook free of module cycles.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getOutfitPresetById } = require('@/config/defaultOutfitPresets') as
+      typeof import('@/config/defaultOutfitPresets');
+    const wardrobe: string[] = [];
+    for (const c of ps.cast ?? []) {
+      const presetId = (c as any).outfitPreset as string | null | undefined;
+      if (!presetId || c.outfitLookId) continue;
+      const preset = getOutfitPresetById(presetId);
+      if (!preset) continue;
+      const name = (c.characterName ?? '').trim() || 'the speaker';
+      wardrobe.push(`${name} wears ${preset.promptEN}`);
+    }
+    if (wardrobe.length) promptParts.push(`Wardrobe: ${wardrobe.join('; ')}.`);
+  } catch { /* preset module optional */ }
+
   const negParts: string[] = [];
   if (ps.negativePromptScene?.trim()) negParts.push(ps.negativePromptScene.trim());
   if (negativePrompt?.trim()) negParts.push(negativePrompt.trim());
