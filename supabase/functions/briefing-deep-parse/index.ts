@@ -2103,6 +2103,24 @@ YOU MUST:
       console.warn('[briefing-deep-parse] fidelity pass failed (non-fatal):', e?.message);
     }
 
+    // G3 — Solo-Enforcement: for any scene whose dialogTurns name a single
+    // unique speaker (typical "Sprecher N:" solo shot), trim cast to that
+    // one character so ensemble-repair cannot leak the full ensemble in.
+    let soloStats: { trimmed: number; scenesTrimmed: number[] } | null = null;
+    try {
+      soloStats = enforceSoloCast(plan);
+      if (soloStats.trimmed > 0) {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          soloEnforced: soloStats,
+        };
+        console.log('[briefing-deep-parse] solo_cast', soloStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
+    }
+
+
 
 
 
