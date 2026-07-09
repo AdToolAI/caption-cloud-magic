@@ -1475,7 +1475,7 @@ YOU MUST:
 
     const passAPromise = callGatewayChain(
       {
-        system: LANGUAGE_LOCK + '\n' + LITERAL_LOCK + '\n' + SYSTEM_PASS_A,
+        system: LANGUAGE_LOCK + '\n' + LITERAL_LOCK + '\n' + SCRIPT_TIMING_LOCK + '\n' + SYSTEM_PASS_A,
         tool: TOOL_PASS_A,
         user: `BRIEFING (source language: ${languageDisplay}):\n\n${briefing}`,
       },
