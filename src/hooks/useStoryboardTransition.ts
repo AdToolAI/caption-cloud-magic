@@ -327,13 +327,15 @@ export function detectBriefingFidelity(b: ComposerBriefing): {
 } {
   const src = String(b.productDescription ?? '');
   const hasSceneMarkers = /(?:^|\n)\s*(?:szene|scene|shot)\s*\d+\b/i.test(src);
-  // NAME: text  — 2+ letters, uppercase-first token, followed by a colon and text.
-  const speakerRe = /(?:^|\n)\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-\.\s]{1,40}?)\s*[:—-]\s+\S/g;
+  // NAME: text  — 2+ chars, uppercase-first token (letters + optional digits like
+  // "Sprecher 1"), followed by a colon/dash and text OR a newline + non-space
+  // (script blocks where the line begins under the label, e.g. Sprecher 1:\n„…").
+  const speakerRe = /(?:^|\n)\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*[:—-][ \t]*(?:\r?\n\s*)?["„'“‚«»›‹]?\S/g;
   const labels = new Set<string>();
   for (const m of src.matchAll(speakerRe)) {
-    const raw = (m[1] ?? '').trim();
+    const raw = (m[1] ?? '').replace(/\s+/g, ' ').trim();
     // Filter obvious non-speaker prefixes (Section titles etc.)
-    if (/^(szene|scene|shot|hook|reveal|cta|pain|proof|beat|kamera|shot|framing|mood|note|tone|dialog|dialogue|voiceover|vo|inhalt|briefing|thema|target|zielgruppe|projekt|project)$/i.test(raw)) continue;
+    if (/^(szene|scene|shot|hook|reveal|cta|pain|proof|beat|kamera|framing|mood|note|tone|dialog|dialogue|voiceover|vo|inhalt|briefing|thema|target|zielgruppe|projekt|project|duration|dauer|aspect|format|ratio|style|stil|ton|tonalität)$/i.test(raw)) continue;
     if (raw.length < 2 || raw.length > 40) continue;
     labels.add(raw);
   }
