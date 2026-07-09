@@ -56,9 +56,12 @@ export default function BriefingPlanSummary({ plan }: Props) {
 
   const mode = meta?.mode ?? null;
   const research = meta?.research ?? [];
+  const fidelity = (meta as any)?.fidelity as
+    | { mode: 'literal' | 'auto'; repairedTexts?: number; repairedSpeakers?: number; scenesMatched?: number; scenesInScript?: number }
+    | undefined;
 
   // Nothing meaningful to render → keep the footer minimal.
-  if (!mode && !research.length && aiFilledCount === 0) return null;
+  if (!mode && !research.length && aiFilledCount === 0 && !fidelity) return null;
 
   return (
     <div className="rounded-lg border border-amber-300/30 bg-gradient-to-br from-amber-300/[0.06] to-transparent p-2.5 space-y-2 text-xs">
