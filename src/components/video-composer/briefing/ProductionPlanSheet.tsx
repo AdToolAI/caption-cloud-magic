@@ -51,15 +51,11 @@ type Step = 'paste' | 'parsing' | 'review';
 const isUuid = (val?: string | null) =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
+import { normalizeAssetKey as _normalizeAssetKey } from '@/lib/video-composer/briefing/assetKeyUtils';
+import { shouldInheritContinuity } from '@/lib/video-composer/briefing/planContinuity';
+
 const normalizeAssetKey = (value?: string | null) =>
-  String(value ?? '')
-    .trim()
-    .replace(/^@/, '')
-    .replace(/^(locationid|location|ort|place|setting)\s*@?\s*/i, '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '');
+  _normalizeAssetKey(value, { stripLocationPrefix: true });
 
 const uuidInside = (value?: string | null) =>
   String(value ?? '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
@@ -88,21 +84,6 @@ const cloneCastSlot = (slot: PlanCastSlot, sceneIndex: number): PlanCastSlot => 
   characterName: slot.characterName || 'Sprecher',
 });
 
-const shouldInheritContinuity = (scene: TPlanScene, axis: 'cast' | 'location') => {
-  const haystack = [
-    scene.continuityHint,
-    scene.anchorPromptEN,
-    scene.label,
-    scene.beat,
-    scene.voiceover?.text,
-  ].filter(Boolean).join(' ').toLowerCase();
-
-  if (axis === 'cast') {
-    return scene.lipSync || !!scene.voiceover?.text || !!scene.dialogTurns?.length
-      || /(same|gleiche|gleichen|selbe|derselbe|avatar|founder|sprecher|speaker|charakter|character)/i.test(haystack);
-  }
-  return /(same|gleiche|gleichen|selbe|derselbe|desk|location|ort|setting|home\s*office|büro|office)/i.test(haystack);
-};
 
 /**
  * Wave 3 chip: renders a catalog-resolved label (preferred) or the raw
