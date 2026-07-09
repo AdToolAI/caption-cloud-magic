@@ -146,6 +146,81 @@ export default function BriefingPlanSummary({ plan }: Props) {
               </HoverCardContent>
             </HoverCard>
           )}
+          {showDebug && (
+            <HoverCard openDelay={80}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-fuchsia-400/50 text-fuchsia-300 gap-1 cursor-help">
+                  <Bug className="h-3 w-3" />
+                  Debug
+                  {debug?.passA_model && (
+                    <span className="opacity-70">· {String(debug.passA_model).replace('google/gemini-2.5-', 'g25-')}</span>
+                  )}
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[380px] text-[11px] font-mono">
+                <div className="font-sans font-medium mb-1.5 text-foreground">Parser-Diagnostik</div>
+                <div className="space-y-1 text-muted-foreground">
+                  <div>
+                    <span className="text-foreground">Pass A:</span>{' '}
+                    {debug?.passA_model ?? '—'}
+                    {debug?.timings?.passA_ms != null && (
+                      <span className="opacity-70"> · {debug.timings.passA_ms}ms</span>
+                    )}
+                    {debug?.passA_error && (
+                      <div className="text-rose-300 pl-3 truncate" title={String(debug.passA_error)}>
+                        err: {String(debug.passA_error).slice(0, 80)}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-foreground">Pass B:</span>{' '}
+                    {debug?.passB_model ?? '—'}
+                    {debug?.timings?.passB_ms != null && (
+                      <span className="opacity-70"> · {debug.timings.passB_ms}ms</span>
+                    )}
+                    {debug?.passB_error && (
+                      <div className="text-rose-300 pl-3 truncate" title={String(debug.passB_error)}>
+                        err: {String(debug.passB_error).slice(0, 80)}
+                      </div>
+                    )}
+                  </div>
+                  {debug?.ensemble_repair && (
+                    <div>
+                      <span className="text-foreground">Ensemble:</span>{' '}
+                      repaired={debug.ensemble_repair.repaired ?? 0}
+                      {' · '}required={debug.ensemble_repair.required ?? 0}
+                    </div>
+                  )}
+                  {debug?.strict_cast && (
+                    <div>
+                      <span className="text-foreground">Strict-Cast:</span>{' '}
+                      dropped={debug.strict_cast.dropped ?? 0}
+                      {' · '}backfilled={debug.strict_cast.backfilled ?? 0}
+                      {' · '}kept={debug.strict_cast.kept ?? 0}
+                    </div>
+                  )}
+                  {debug?.fidelity && (
+                    <div>
+                      <span className="text-foreground">Fidelity:</span>{' '}
+                      mode={debug.fidelity.mode}
+                      {' · '}scenes={debug.fidelity.scenesMatched ?? 0}/{debug.fidelity.scenesInScript ?? 0}
+                      {' · '}texts={debug.fidelity.repairedTexts ?? 0}
+                      {' · '}speakers={debug.fidelity.repairedSpeakers ?? 0}
+                    </div>
+                  )}
+                  {debug?.version != null && (
+                    <div><span className="text-foreground">Version:</span> v{debug.version}</div>
+                  )}
+                  {debug?.timings?.total_ms != null && (
+                    <div><span className="text-foreground">Total:</span> {debug.timings.total_ms}ms</div>
+                  )}
+                </div>
+                <div className="mt-2 pt-2 border-t border-border/40 text-[10px] font-sans text-muted-foreground">
+                  Nur sichtbar mit <code>?debug=1</code>.
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
         </div>
         <span className="text-muted-foreground text-[10px]">
           ✨ markiert = von der KI auf Basis deines Briefings ergänzt.
