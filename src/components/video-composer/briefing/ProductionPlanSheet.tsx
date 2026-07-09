@@ -30,6 +30,7 @@ import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePla
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import BriefingPlanSummary from './BriefingPlanSummary';
 import SafePlanNotice from './SafePlanNotice';
+import VoicePreviewButton from './VoicePreviewButton';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
 import type { CatalogAxis } from '@/lib/video-composer/catalog';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
@@ -1428,12 +1429,21 @@ export default function ProductionPlanSheet({
                                   </Select>
                                 )}
                                 {(c.voiceName || c.voiceId || baseId) && (
-                                  <Badge variant="secondary" className="text-[10px]">
-                                    🎙 {c.voiceName ?? (c.voiceId ? 'Stimme' : 'Auto-Voice beim Anwenden')}
-                                    {((c as any).voiceAutoAssigned || (!c.voiceId && !c.voiceName && baseId)) && (
-                                      <span className="ml-1 text-amber-300" title="Stimme automatisch von der KI zugeordnet">⚡ AI</span>
+                                  <div className="inline-flex items-center gap-1">
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      🎙 {c.voiceName ?? (c.voiceId ? 'Stimme' : 'Auto-Voice beim Anwenden')}
+                                      {((c as any).voiceAutoAssigned || (!c.voiceId && !c.voiceName && baseId)) && (
+                                        <span className="ml-1 text-amber-300" title="Stimme automatisch von der KI zugeordnet">⚡ AI</span>
+                                      )}
+                                    </Badge>
+                                    {c.voiceId && (
+                                      <VoicePreviewButton
+                                        voiceId={c.voiceId}
+                                        text={s.voiceover?.text ?? undefined}
+                                        label={`Stimme ${c.voiceName ?? ''} anhören`.trim()}
+                                      />
                                     )}
-                                  </Badge>
+                                  </div>
                                 )}
                               </div>
                             );

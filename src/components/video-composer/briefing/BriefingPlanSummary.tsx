@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/hover-card';
 import { Lightbulb, Sparkles, Compass, FileCheck2, Bug, Clock, Timer } from 'lucide-react';
 import type { TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
+import { CLIENT_PIPELINE_VERSION } from '@/config/pipelineVersion';
 
 interface Props {
   plan: TProductionPlan;
@@ -104,7 +105,10 @@ export default function BriefingPlanSummary({ plan }: Props) {
     try { return new URLSearchParams(window.location.search).get('debug') === '1'; }
     catch { return false; }
   }, []);
-  const showDebug = debugEnabled && !!debug;
+  // P4: show the debug chip whenever ?debug=1 is set — even if the
+  // server did not return a `debug` block — so the client pipeline
+  // version is always attributable in bug reports.
+  const showDebug = debugEnabled;
 
   // Nothing meaningful to render → keep the footer minimal.
   if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !scriptTimingActive && !canonicalTimingActive && !sceneSumTimingActive && extendCount === 0 && !showDebug) return null;
@@ -323,9 +327,13 @@ export default function BriefingPlanSummary({ plan }: Props) {
                       {' · '}speakers={debug.fidelity.repairedSpeakers ?? 0}
                     </div>
                   )}
-                  {debug?.version != null && (
-                    <div><span className="text-foreground">Version:</span> v{debug.version}</div>
-                  )}
+                  <div>
+                    <span className="text-foreground">Version:</span>{' '}
+                    Client v{CLIENT_PIPELINE_VERSION}
+                    {debug?.version != null && (
+                      <span className="opacity-70"> · Server v{debug.version}</span>
+                    )}
+                  </div>
                   {debug?.timings?.total_ms != null && (
                     <div><span className="text-foreground">Total:</span> {debug.timings.total_ms}ms</div>
                   )}
