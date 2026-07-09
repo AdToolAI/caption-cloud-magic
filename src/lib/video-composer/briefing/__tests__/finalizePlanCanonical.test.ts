@@ -57,4 +57,41 @@ describe('finalizePlanCanonical', () => {
     expect(scrubbed.scenes[0].voiceover?.text).not.toMatch(/share the scene/i);
     expect(scrubbed.scenes[0].anchorPromptEN).toMatch(/Samuel speaks/i);
   });
+
+  it('enforces an explicit one-scene briefing contract before showing a green plan', () => {
+    const plan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
+      scenes: [1, 2, 3, 4, 5].map((index) => ({
+        index,
+        label: `Segment ${index}`,
+        durationSec: 3,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [{ mentionKey: `@sprecher-${index}`, characterId: null, characterName: `Sprecher ${index}` }],
+        dialogTurns: index <= 4 ? [{ speakerMentionKey: `@sprecher-${index}`, text: `Text ${index}` }] : [],
+      })),
+      unresolved: [],
+      _meta: {
+        debug: {
+          canonical_timing: {
+            durationSec: 15,
+            sceneCount: 1,
+            continuousScene: true,
+            explicitSceneCount: true,
+            source: 'explicit-total',
+          },
+        },
+      },
+    } as TProductionPlan;
+
+    const result = finalizePlanCanonical(plan);
+
+    expect(result?.plan.project?.totalDurationSec).toBe(15);
+    expect(result?.plan.scenes).toHaveLength(1);
+    expect(result?.plan.scenes[0].durationSec).toBe(15);
+    expect(result?.plan.scenes[0].dialogTurns).toHaveLength(4);
+    expect(result?.normalization.sceneCount).toBe(1);
+    expect(result?.normalization.consistent).toBe(true);
+    expect((result?.plan._meta as any)?.debug?.normalization?.actions).toContain('scene-count:5→1');
+  });
 });

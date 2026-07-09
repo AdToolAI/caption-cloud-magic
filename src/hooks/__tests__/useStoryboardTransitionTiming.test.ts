@@ -133,7 +133,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
   it('detects the full AdTool briefing as 15s / 3 scenes despite ages and sub-shot ranges', () => {
     const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const timing = detectCanonicalBriefingTiming(b, `${adToolBriefing}\n\n## Project\n- Total duration: 30s`);
-    expect(timing).toEqual({ durationSec: 15, sceneCount: 3, source: 'explicit-total' });
+    expect(timing).toMatchObject({ durationSec: 15, sceneCount: 3, source: 'explicit-total', explicitSceneCount: true });
   });
 
   it('overrides a stale 50s server plan with the explicit 15s briefing duration', () => {
@@ -164,5 +164,62 @@ describe('useStoryboardTransition canonical briefing timing', () => {
       sceneCount: 3,
       source: 'explicit-total',
     });
+  });
+
+  it('treats "1 durchgehende Szene" as one scene with internal speaker turns, not five scenes', () => {
+    const continuousBriefing = [
+      'AdTool AI Spot — „Vier Sprecher. Eine Szene. Perfekter Lip-Sync.“',
+      'Länge: 15 Sekunden',
+      'Szenen: 1 durchgehende Szene',
+      'Sprecher: 4 Personen',
+      'Timing:',
+      '0–3s Sprecher 1: „Mit AdTool AI erstellst du…“',
+      '3–6s Sprecher 2: „…realistische Lip-Sync-Videos…“',
+      '6–9s Sprecher 3: „…mit mehreren Sprechern…“',
+      '9–12s Sprecher 4: „…die perfekt zusammenpassen.“',
+      '12–15s Endcard: AdTool AI',
+    ].join('\n');
+    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const timing = detectCanonicalBriefingTiming(b, continuousBriefing);
+    expect(timing).toMatchObject({
+      durationSec: 15,
+      sceneCount: 1,
+      continuousScene: true,
+      explicitSceneCount: true,
+      source: 'explicit-total',
+    });
+  });
+
+  it('merges a five-scene server plan back to one scene for a continuous-scene briefing', () => {
+    const continuousBriefing = [
+      'Länge: 15 Sekunden',
+      'Szenen: 1 durchgehende Szene',
+      '0–3s Sprecher 1: „Mit AdTool AI erstellst du…“',
+      '3–6s Sprecher 2: „…realistische Lip-Sync-Videos…“',
+      '6–9s Sprecher 3: „…mit mehreren Sprechern…“',
+      '9–12s Sprecher 4: „…die perfekt zusammenpassen.“',
+      '12–15s Endcard: AdTool AI',
+    ].join('\n');
+    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const badPlan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
+      scenes: [1, 2, 3, 4, 5].map((index) => ({
+        index,
+        label: `Segment ${index}`,
+        durationSec: 3,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [{ mentionKey: `@sprecher-${index}`, characterId: null, characterName: `Sprecher ${index}` }],
+        dialogTurns: index <= 4 ? [{ speakerMentionKey: `@sprecher-${index}`, text: `Text ${index}` }] : [],
+      })),
+      unresolved: [],
+      _meta: { source: 'ai' },
+    } as TProductionPlan;
+
+    const normalized = applyCanonicalTimingToPlan(badPlan, b, continuousBriefing);
+    expect(normalized.plan.project?.totalDurationSec).toBe(15);
+    expect(normalized.plan.scenes).toHaveLength(1);
+    expect(normalized.plan.scenes[0].durationSec).toBe(15);
+    expect(normalized.plan.scenes[0].dialogTurns).toHaveLength(4);
   });
 });

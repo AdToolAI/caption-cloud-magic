@@ -29,12 +29,58 @@ function parsePositiveSeconds(raw: string | undefined): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
 }
 
-function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; sceneCount?: number; source: 'explicit-total' | 'scene-math' | 'time-windows' } | null {
+function parseSmallSceneCount(raw: string | undefined): number | null {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (!value) return null;
+  const n = Number(value.replace(',', '.'));
+  if (Number.isFinite(n) && n >= 1 && n <= 12) return Math.round(n);
+  const words: Record<string, number> = {
+    ein: 1, eine: 1, einen: 1, einer: 1, eines: 1, one: 1, single: 1,
+    zwei: 2, two: 2,
+    drei: 3, three: 3,
+    vier: 4, four: 4,
+    fünf: 5, fuenf: 5, five: 5,
+    sechs: 6, six: 6,
+    sieben: 7, seven: 7,
+    acht: 8, eight: 8,
+    neun: 9, nine: 9,
+    zehn: 10, ten: 10,
+    elf: 11, eleven: 11,
+    zwölf: 12, zwoelf: 12, twelve: 12,
+  };
+  return words[value] ?? null;
+}
+
+function detectExplicitSceneContract(rawInput: string): { sceneCount?: number; continuousScene?: boolean; explicitSceneCount?: boolean } {
+  const raw = String(rawInput ?? '');
+  const continuousRe = /\b(?:(?:eine?|1|one|single)\s+(?:durchgehende|zusammenh[aä]ngende|kontinuierliche|ununterbrochene|continuous|uninterrupted|single|one[-\s]?take)\s+(?:szene|scene)|(?:szene|scene)\s*(?:[:=\-–—]\s*)?(?:eine?|1|one|single)\s+(?:durchgehende|zusammenh[aä]ngende|kontinuierliche|ununterbrochene|continuous|uninterrupted|single|one[-\s]?take)?\s*(?:szene|scene)?)\b/i;
+  const field = raw.match(/(?:^|\n)\s*(?:szenen?|scenes?|scene\s*count|anzahl\s+szenen?)\s*[:=\-–—]\s*(?:ca\.?\s*)?([1-9]\d?|ein(?:e[rsn]?)?|one|single|zwei|two|drei|three|vier|four|f[üu]nf|fuenf|five|sechs|six|sieben|seven|acht|eight|neun|nine|zehn|ten|elf|eleven|zw[öo]lf|zwoelf|twelve)\b([^\n]*)/i);
+  if (field) {
+    const count = parseSmallSceneCount(field[1]);
+    if (count) {
+      const suffix = String(field[2] ?? '');
+      return {
+        sceneCount: count,
+        continuousScene: count === 1 && (continuousRe.test(field[0]) || /\b(?:durchgehend|durchgehende|zusammenh[aä]ngend|kontinuierlich|ununterbrochen|continuous|uninterrupted|one[-\s]?take|single)\b/i.test(suffix)),
+        explicitSceneCount: true,
+      };
+    }
+  }
+  const countBeforeUnit = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
+  const count = countBeforeUnit ? Number(countBeforeUnit[1]) : undefined;
+  if (count && count >= 1 && count <= 12) {
+    return { sceneCount: count, continuousScene: count === 1 && continuousRe.test(raw), explicitSceneCount: true };
+  }
+  if (continuousRe.test(raw)) return { sceneCount: 1, continuousScene: true, explicitSceneCount: true };
+  return {};
+}
+
+function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; sceneCount?: number; continuousScene?: boolean; explicitSceneCount?: boolean; source: 'explicit-total' | 'scene-math' | 'time-windows' } | null {
   const raw = String(rawInput ?? '').split(/\n\s*##\s+Project\b/i)[0].trim();
   if (!raw) return null;
 
-  const sceneCountMatch = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
-  const sceneCount = sceneCountMatch ? Number(sceneCountMatch[1]) : undefined;
+  const sceneContract = detectExplicitSceneContract(raw);
+  const sceneCount = sceneContract.sceneCount;
 
   const explicitPatterns = [
     /(?:gesamt\s*dauer|gesamtdauer|gesamt\s*länge|gesamtlaenge|gesamtlänge|total\s*duration|filmdauer|film\s*dauer|video\s*dauer|spot\s*dauer|laufzeit)(?:\s+(?:des|der|vom|für|fuer|of)\s+(?:videos?|films?|spots?|ads?))?\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
@@ -44,12 +90,12 @@ function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; 
   ];
   for (const re of explicitPatterns) {
     const seconds = parsePositiveSeconds(raw.match(re)?.[1]);
-    if (seconds && seconds >= 3) return { durationSec: seconds, sceneCount, source: 'explicit-total' };
+    if (seconds && seconds >= 3) return { durationSec: seconds, sceneCount, continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount, source: 'explicit-total' };
   }
 
   const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b\s*(?:[\/|,;·\-–—]|\(|\[)?\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
   const compactSeconds = parsePositiveSeconds(compact?.[1]);
-  if (compactSeconds && compactSeconds >= 3) return { durationSec: compactSeconds, sceneCount: Number(compact?.[2] ?? sceneCount), source: 'explicit-total' };
+  if (compactSeconds && compactSeconds >= 3) return { durationSec: compactSeconds, sceneCount: Number(compact?.[2] ?? sceneCount), continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount || Boolean(compact?.[2]), source: 'explicit-total' };
 
   const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\b/gi;
   const ageTailRe = /^\s*(?:jahre|jahren|jährig|jaehrig|jährige|jaehrige|years?|yrs?|y\.o\.?)\b/i;
@@ -73,13 +119,13 @@ function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; 
     maxEnd = Math.max(maxEnd, end);
     windows += 1;
   }
-  if (windows >= 2 && maxEnd >= 3) return { durationSec: Math.round(maxEnd * 10) / 10, sceneCount: sceneCount ?? windows, source: 'time-windows' };
+  if (windows >= 2 && maxEnd >= 3) return { durationSec: Math.round(maxEnd * 10) / 10, sceneCount: sceneCount ?? windows, continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount, source: 'time-windows' };
 
   const sceneMath = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,60}?(?:à|a|je|each|x|×)\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
   const perScene = parsePositiveSeconds(sceneMath?.[2]);
   if (sceneMath && perScene) {
     const count = Number(sceneMath[1]);
-    return { durationSec: Math.round(count * perScene * 10) / 10, sceneCount: count, source: 'scene-math' };
+    return { durationSec: Math.round(count * perScene * 10) / 10, sceneCount: count, continuousScene: sceneContract.continuousScene, explicitSceneCount: true, source: 'scene-math' };
   }
   return null;
 }
@@ -1145,6 +1191,97 @@ function enforceStrictCast(plan: any, required: any[]) {
   return { dropped, backfilled };
 }
 
+function mergePlanScenesToSingleContinuousScene(planLike: any, targetDurationSec: number | null): { merged: boolean; from: number; to: number } {
+  const scenes = Array.isArray(planLike?.scenes) ? planLike.scenes : [];
+  if (scenes.length <= 1) {
+    if (scenes.length === 1 && targetDurationSec && Number.isFinite(targetDurationSec)) {
+      scenes[0].durationSec = targetDurationSec;
+      if (!planLike.project) planLike.project = {};
+      planLike.project.totalDurationSec = targetDurationSec;
+    }
+    return { merged: false, from: scenes.length, to: scenes.length };
+  }
+
+  const base = { ...(scenes[0] ?? {}) };
+  const castByKey = new Map<string, any>();
+  const turns: any[] = [];
+  let voiceText = '';
+  let overlay = base.textOverlay ?? null;
+  let location = base.location ?? null;
+  let anchorPromptEN = String(base.anchorPromptEN ?? '').trim();
+
+  for (const sc of scenes) {
+    for (const c of Array.isArray(sc?.cast) ? sc.cast : []) {
+      const key = String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+      if (key && !castByKey.has(key)) castByKey.set(key, c);
+    }
+    if (Array.isArray(sc?.dialogTurns) && sc.dialogTurns.length > 0) {
+      for (const t of sc.dialogTurns) {
+        const text = String(t?.text ?? '').trim();
+        if (text) turns.push({ ...t, text });
+      }
+    } else if (sc?.voiceover?.text) {
+      const text = String(sc.voiceover.text).trim();
+      if (text) voiceText = voiceText ? `${voiceText} ${text}` : text;
+    }
+    if (!overlay && sc?.textOverlay) overlay = sc.textOverlay;
+    if (!location && sc?.location) location = sc.location;
+    const prompt = String(sc?.anchorPromptEN ?? '').trim();
+    if (prompt && !anchorPromptEN.includes(prompt)) {
+      anchorPromptEN = anchorPromptEN ? `${anchorPromptEN}\n${prompt}` : prompt;
+    }
+  }
+
+  const duration = targetDurationSec && Number.isFinite(targetDurationSec)
+    ? targetDurationSec
+    : scenes.reduce((a: number, s: any) => a + (Number(s?.durationSec) || 0), 0) || 15;
+
+  planLike.scenes = [{
+    ...base,
+    index: 1,
+    label: base.label ?? 'Durchgehende Szene',
+    durationSec: Math.round(duration * 10) / 10,
+    lipSync: base.lipSync === true || turns.length > 0 || castByKey.size > 0,
+    cast: Array.from(castByKey.values()),
+    location: location ?? base.location,
+    anchorPromptEN: anchorPromptEN || base.anchorPromptEN,
+    dialogTurns: turns.length ? turns : base.dialogTurns,
+    voiceover: turns.length ? undefined : (voiceText ? { ...(base.voiceover ?? {}), text: voiceText } : base.voiceover),
+    textOverlay: overlay ?? base.textOverlay,
+  }];
+  if (!planLike.project) planLike.project = {};
+  planLike.project.totalDurationSec = Math.round(duration * 10) / 10;
+  return { merged: true, from: scenes.length, to: 1 };
+}
+
+function applyContinuousScriptTurns(planLike: any, scriptTiming: ScriptTimingInfo, targetDurationSec: number | null) {
+  if (!Array.isArray(planLike?.scenes) || planLike.scenes.length !== 1) return { applied: false, turns: 0 };
+  const sc = planLike.scenes[0];
+  const allTurns: any[] = [];
+  for (const shot of scriptTiming?.shots ?? []) {
+    if (Array.isArray(shot.dialogTurns) && shot.dialogTurns.length > 0) {
+      for (const t of shot.dialogTurns) {
+        const text = String(t?.text ?? '').trim();
+        if (text) allTurns.push({ speakerMentionKey: `@${String(t.speakerLabel ?? 'sprecher').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'sprecher'}`, text });
+      }
+    } else if (shot.text && shot.speakerLabel && shot.sceneKind !== 'endcard') {
+      allTurns.push({ speakerMentionKey: `@${String(shot.speakerLabel).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'sprecher'}`, text: String(shot.text).trim() });
+    } else if (shot.sceneKind === 'endcard' && shot.overlayText && !sc.textOverlay) {
+      sc.textOverlay = { text: shot.overlayText, position: 'center', animation: 'fade-in' };
+    }
+  }
+  if (allTurns.length > 0) {
+    sc.dialogTurns = allTurns;
+    if (sc.voiceover) sc.voiceover.text = '';
+  }
+  if (targetDurationSec && Number.isFinite(targetDurationSec)) {
+    sc.durationSec = targetDurationSec;
+    if (!planLike.project) planLike.project = {};
+    planLike.project.totalDurationSec = targetDurationSec;
+  }
+  return { applied: allTurns.length > 0, turns: allTurns.length };
+}
+
 /**
  * v213 — Extract the "## Verbatim Script" block emitted by the client
  * when Mode: LITERAL is active. Returns the script body (without the fence)
@@ -1533,7 +1670,26 @@ YOU MUST:
       scriptTiming = { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
     }
     const explicitBriefingTiming = detectExplicitBriefingTiming(briefing);
-    const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS' ? `
+    const continuousSceneLock = !!explicitBriefingTiming?.continuousScene
+      && explicitBriefingTiming.sceneCount === 1
+      && scriptTiming.mode === 'SHOT_MARKERS';
+    const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS'
+      ? (continuousSceneLock ? `
+═══════════════════════════════════════════════════════════════════════════
+CONTINUOUS-SCENE SCRIPT LOCK — HARD OVERRIDE
+═══════════════════════════════════════════════════════════════════════════
+The briefing explicitly requests ONE continuous scene (${explicitBriefingTiming.durationSec}s).
+The ${scriptTiming.shots.length} timing/speaker markers are INTERNAL dialog
+turns/beat cues, NOT separate scenes.
+YOU MUST:
+  • Emit EXACTLY 1 scene with durationSec=${explicitBriefingTiming.durationSec}.
+  • Put all spoken speaker lines into that scene's dialogTurns in order.
+  • Use internal timing windows only as timing hints; do NOT create one scene
+    per speaker, time window, Shot 1A/1B, Endcard, or beat.
+  • Keep all selected speakers/cast available in that one scene; do not invent
+    extra people or voices.
+═══════════════════════════════════════════════════════════════════════════
+` : `
 ═══════════════════════════════════════════════════════════════════════════
 SCRIPT-TIMING LOCK — HARD OVERRIDE (script wins over board settings)
 ═══════════════════════════════════════════════════════════════════════════
@@ -1549,7 +1705,7 @@ YOU MUST:
     members. Only shots explicitly showing multiple speakers get an
     ensemble cast.
 ═══════════════════════════════════════════════════════════════════════════
-` : '';
+`) : '';
 
 
     const passAPromise = callGatewayChain(
@@ -1688,18 +1844,30 @@ YOU MUST:
       // Prefer the most specific: numbered markers > "N Szenen" word > list count
       let detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
 
-      // G1/G2 — Script-Timing takes precedence: when the detector found ≥2
-      // explicit shots, the scene count IS the shot count and per-shot
-      // durations override the board's totalDurationSec.
-      const useScriptTiming = scriptTiming.mode === 'SHOT_MARKERS' && scriptTiming.shots.length >= 2;
+      // G1/G2 — Script-Timing takes precedence only when the briefing did NOT
+      // explicitly lock a different top-level scene count. In a brief like
+      // "Szenen: 1 durchgehende Szene", timing windows / speaker markers are
+      // dialog turns inside that one scene, not separate scenes.
+      if (explicitBriefingTiming?.explicitSceneCount && explicitBriefingTiming.sceneCount) {
+        detected = explicitBriefingTiming.sceneCount;
+      }
+      const useScriptTiming = scriptTiming.mode === 'SHOT_MARKERS'
+        && scriptTiming.shots.length >= 2
+        && !(explicitBriefingTiming?.explicitSceneCount && explicitBriefingTiming.sceneCount && explicitBriefingTiming.sceneCount !== scriptTiming.shots.length);
       if (useScriptTiming) detected = scriptTiming.shots.length;
 
       if (detected && Array.isArray(manifest?.scenes)) {
         const got = manifest.scenes.length;
-        if (got !== detected) {
+        if (detected === 1 && explicitBriefingTiming?.continuousScene && got > 1) {
+          const mergeStats = mergePlanScenesToSingleContinuousScene(manifest, explicitBriefingTiming.durationSec);
+          applyContinuousScriptTurns(manifest, scriptTiming, explicitBriefingTiming.durationSec);
+          sceneCountCorrection = { detected, gemini: got };
+          console.log('[briefing-deep-parse] continuous_scene_merged', mergeStats);
+        }
+        if (manifest.scenes.length !== detected) {
           const total = Number(manifest?.project?.totalDurationSec) || (got * 5);
           const perScene = Math.max(2, Math.min(30, Math.round(total / detected)));
-          if (got > detected) {
+          if (manifest.scenes.length > detected) {
             // Truncate keep first N
             manifest.scenes = manifest.scenes.slice(0, detected);
           } else {
@@ -1852,6 +2020,10 @@ YOU MUST:
             sc.dialogTurns = [];
           }
         }
+      }
+
+      if (explicitBriefingTiming?.continuousScene && explicitBriefingTiming.sceneCount === 1 && Array.isArray(manifest?.scenes) && manifest.scenes.length === 1) {
+        applyContinuousScriptTurns(manifest, scriptTiming, explicitBriefingTiming.durationSec);
       }
 
       // Duration Authority: explicit user briefing beats both board defaults

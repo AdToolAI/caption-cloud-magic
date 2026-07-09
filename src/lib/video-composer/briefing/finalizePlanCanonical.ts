@@ -25,6 +25,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export type RepairKind =
   | 'duration-normalized'
+  | 'scene-count-normalized'
   | 'scenes-redistributed'
   | 'canonical-ignored'
   | 'project-total-corrected'
@@ -81,6 +82,17 @@ function readCanonicalDuration(plan: TProductionPlan): number | null {
   const canonical = readCanonicalTiming(plan);
   const raw = canonical ? Number(canonical.durationSec) : NaN;
   return Number.isFinite(raw) && raw >= 1 ? raw : null;
+}
+
+function readCanonicalSceneCount(plan: TProductionPlan): { count: number | null; explicit: boolean; continuous: boolean } {
+  const canonical = readCanonicalTiming(plan);
+  const raw = Number(canonical?.sceneCount ?? canonical?.scenes ?? canonical?.shots);
+  const count = Number.isFinite(raw) && raw >= 1 && raw <= 12 ? Math.round(raw) : null;
+  return {
+    count,
+    explicit: Boolean(canonical?.explicitSceneCount) || Boolean(canonical?.continuousScene),
+    continuous: Boolean(canonical?.continuousScene) || count === 1 && /continuous|durchgehend/i.test(String(canonical?.sourceDetail ?? '')),
+  };
 }
 
 function clampDuration(n: number): number {
@@ -141,6 +153,7 @@ function canonicalDurationIsValidated(
   // a real 10/15s script.
   if (source === 'explicit-total' || source === 'script' || source === 'board') {
     if (currentSum < 1 || Math.abs(currentSum - canonicalDur) < 0.5) return true;
+    if (Boolean(canonical.explicitSceneCount) || Boolean(canonical.continuousScene)) return true;
     // Allow modest corrections when the explicit briefing duration names the
     // same number of scenes, e.g. board/default 30s → briefing says 15s for 3
     // scenes. Reject wild stretches such as stale 50s metadata over a concrete
@@ -194,6 +207,78 @@ function redistributeSceneDurations(
   return { scenes: scaled, changed: true };
 }
 
+function mergeScenesToOne(scenes: TPlanScene[], targetDurationSec: number): TPlanScene[] {
+  if (scenes.length <= 1) return scenes.map((s, index) => ({ ...(s as any), index: index + 1, durationSec: targetDurationSec } as TPlanScene));
+  const base = { ...(scenes[0] as any) };
+  const castByKey = new Map<string, any>();
+  const dialogTurns: any[] = [];
+  let voiceText = '';
+  let overlay = base.textOverlay;
+  let location = base.location;
+  let anchorPromptEN = String(base.anchorPromptEN ?? '').trim();
+
+  for (const scene of scenes as any[]) {
+    for (const c of Array.isArray(scene?.cast) ? scene.cast : []) {
+      const key = String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+      if (key && !castByKey.has(key)) castByKey.set(key, c);
+    }
+    if (Array.isArray(scene?.dialogTurns) && scene.dialogTurns.length > 0) {
+      for (const t of scene.dialogTurns) {
+        const text = String(t?.text ?? '').trim();
+        if (text) dialogTurns.push({ ...t, text });
+      }
+    } else if (scene?.voiceover?.text) {
+      const text = String(scene.voiceover.text).trim();
+      if (text) voiceText = voiceText ? `${voiceText} ${text}` : text;
+    }
+    if (!overlay && scene?.textOverlay) overlay = scene.textOverlay;
+    if (!location && scene?.location) location = scene.location;
+    const prompt = String(scene?.anchorPromptEN ?? '').trim();
+    if (prompt && !anchorPromptEN.includes(prompt)) anchorPromptEN = anchorPromptEN ? `${anchorPromptEN}\n${prompt}` : prompt;
+  }
+
+  return [{
+    ...base,
+    index: 1,
+    durationSec: targetDurationSec,
+    cast: Array.from(castByKey.values()),
+    location,
+    anchorPromptEN,
+    lipSync: base.lipSync || dialogTurns.length > 0 || castByKey.size > 0,
+    dialogTurns: dialogTurns.length > 0 ? dialogTurns : base.dialogTurns,
+    voiceover: dialogTurns.length > 0 ? undefined : (voiceText ? { ...(base.voiceover ?? {}), text: voiceText } : base.voiceover),
+    textOverlay: overlay,
+  } as TPlanScene];
+}
+
+function alignSceneCountToCanonical(
+  scenes: TPlanScene[],
+  canonicalCount: { count: number | null; explicit: boolean; continuous: boolean },
+  target: number,
+): { scenes: TPlanScene[]; changed: boolean; before: number; after: number } {
+  if (!canonicalCount.explicit || !canonicalCount.count || scenes.length === 0) {
+    return { scenes, changed: false, before: scenes.length, after: scenes.length };
+  }
+  const desired = canonicalCount.count;
+  if (scenes.length === desired) {
+    return { scenes: scenes.map((s, i) => ({ ...(s as any), index: i + 1 } as TPlanScene)), changed: false, before: scenes.length, after: scenes.length };
+  }
+  if (desired === 1 || canonicalCount.continuous) {
+    const merged = mergeScenesToOne(scenes, target);
+    return { scenes: merged, changed: true, before: scenes.length, after: merged.length };
+  }
+  let next = scenes;
+  if (next.length > desired) {
+    next = next.slice(0, desired);
+  } else {
+    const template = next[next.length - 1] ?? next[0];
+    while (next.length < desired && template) {
+      next = [...next, { ...(template as any), index: next.length + 1, label: `S${next.length + 1}` } as TPlanScene];
+    }
+  }
+  return { scenes: next.map((s, i) => ({ ...(s as any), index: i + 1 } as TPlanScene)), changed: true, before: scenes.length, after: next.length };
+}
+
 function sanitizeCastIds(scenes: TPlanScene[]): { scenes: TPlanScene[]; changed: boolean; droppedCharIds: number; droppedVoiceIds: number } {
   let changed = false;
   let droppedCharIds = 0;
@@ -237,6 +322,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
 
   const canonicalTiming = readCanonicalTiming(plan);
   const canonicalDur = readCanonicalDuration(plan);
+  const canonicalSceneCount = readCanonicalSceneCount(plan);
   const projectTotal = Number((plan as any)?.project?.totalDurationSec);
   const scenes: TPlanScene[] = Array.isArray((plan as any).scenes) ? [...(plan as any).scenes] : [];
   const currentSum = sumSceneDurations(scenes);
@@ -268,8 +354,14 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
     actions.push(`fallback-default:${target}s`);
   }
 
+  // Szenenanzahl aus explizitem Briefing durchsetzen, bevor Dauern verteilt werden.
+  const sceneCountAligned = alignSceneCountToCanonical(scenes, canonicalSceneCount, target);
+  if (sceneCountAligned.changed) {
+    actions.push(`scene-count:${sceneCountAligned.before}→${sceneCountAligned.after}`);
+  }
+
   // Szenen anpassen, damit Summe = Ziel.
-  const redistributed = redistributeSceneDurations(scenes, target);
+  const redistributed = redistributeSceneDurations(sceneCountAligned.scenes, target);
   const finalScenes = redistributed.scenes;
   if (redistributed.changed) {
     actions.push(`redistributed-scenes:${currentSum}s→${target}s`);
@@ -314,6 +406,14 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
       label: `Szenendauern proportional neu verteilt (${currentSum}s → ${target}s).`,
       before: currentSum,
       after: target,
+    });
+  }
+  if (sceneCountAligned.changed) {
+    repairLog.push({
+      kind: 'scene-count-normalized',
+      label: `Szenenanzahl an dein Briefing angepasst: ${sceneCountAligned.before} → ${sceneCountAligned.after}.`,
+      before: sceneCountAligned.before,
+      after: sceneCountAligned.after,
     });
   }
   if (source === 'scene-sum' && canonicalDur && Math.abs(canonicalDur - currentSum) >= 0.5) {
