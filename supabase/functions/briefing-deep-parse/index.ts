@@ -2169,10 +2169,10 @@ YOU MUST:
     // G3 — Solo-Enforcement: for any scene whose dialogTurns name a single
     // unique speaker (typical "Sprecher N:" solo shot), trim cast to that
     // one character so ensemble-repair cannot leak the full ensemble in.
-    let soloStats: { trimmed: number; scenesTrimmed: number[] } | null = null;
+    let soloStats: { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } | null = null;
     try {
       soloStats = enforceSoloCast(plan);
-      if (soloStats.trimmed > 0) {
+      if (soloStats.trimmedScenes > 0 || soloStats.scrubbedFields > 0) {
         (plan as any)._meta = {
           ...((plan as any)._meta ?? {}),
           soloEnforced: soloStats,
