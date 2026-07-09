@@ -22,6 +22,7 @@ import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensu
 import { toast } from '@/hooks/use-toast';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import type { ComposerScene, ComposerBriefing } from '@/types/video-composer';
+import { readBriefingContract } from '@/lib/video-composer/briefing/briefingContract';
 
 /**
  * Build a deterministic Hook/Reveal/CTA arc so the user is never blocked
