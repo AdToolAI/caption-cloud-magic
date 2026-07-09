@@ -1844,18 +1844,30 @@ YOU MUST:
       // Prefer the most specific: numbered markers > "N Szenen" word > list count
       let detected = maxMarker >= 2 ? maxMarker : (numFromWord ?? (listCount >= 3 ? listCount : null));
 
-      // G1/G2 — Script-Timing takes precedence: when the detector found ≥2
-      // explicit shots, the scene count IS the shot count and per-shot
-      // durations override the board's totalDurationSec.
-      const useScriptTiming = scriptTiming.mode === 'SHOT_MARKERS' && scriptTiming.shots.length >= 2;
+      // G1/G2 — Script-Timing takes precedence only when the briefing did NOT
+      // explicitly lock a different top-level scene count. In a brief like
+      // "Szenen: 1 durchgehende Szene", timing windows / speaker markers are
+      // dialog turns inside that one scene, not separate scenes.
+      if (explicitBriefingTiming?.explicitSceneCount && explicitBriefingTiming.sceneCount) {
+        detected = explicitBriefingTiming.sceneCount;
+      }
+      const useScriptTiming = scriptTiming.mode === 'SHOT_MARKERS'
+        && scriptTiming.shots.length >= 2
+        && !(explicitBriefingTiming?.explicitSceneCount && explicitBriefingTiming.sceneCount && explicitBriefingTiming.sceneCount !== scriptTiming.shots.length);
       if (useScriptTiming) detected = scriptTiming.shots.length;
 
       if (detected && Array.isArray(manifest?.scenes)) {
         const got = manifest.scenes.length;
-        if (got !== detected) {
+        if (detected === 1 && explicitBriefingTiming?.continuousScene && got > 1) {
+          const mergeStats = mergePlanScenesToSingleContinuousScene(manifest, explicitBriefingTiming.durationSec);
+          applyContinuousScriptTurns(manifest, scriptTiming, explicitBriefingTiming.durationSec);
+          sceneCountCorrection = { detected, gemini: got };
+          console.log('[briefing-deep-parse] continuous_scene_merged', mergeStats);
+        }
+        if (manifest.scenes.length !== detected) {
           const total = Number(manifest?.project?.totalDurationSec) || (got * 5);
           const perScene = Math.max(2, Math.min(30, Math.round(total / detected)));
-          if (got > detected) {
+          if (manifest.scenes.length > detected) {
             // Truncate keep first N
             manifest.scenes = manifest.scenes.slice(0, detected);
           } else {
