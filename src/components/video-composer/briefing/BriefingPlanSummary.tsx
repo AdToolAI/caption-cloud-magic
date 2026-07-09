@@ -19,7 +19,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
-import { Lightbulb, Sparkles, Compass, FileCheck2, Bug } from 'lucide-react';
+import { Lightbulb, Sparkles, Compass, FileCheck2, Bug, Clock, Timer } from 'lucide-react';
 import type { TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
 
 interface Props {
@@ -60,11 +60,18 @@ export default function BriefingPlanSummary({ plan }: Props) {
     | { mode: 'literal' | 'auto'; repairedTexts?: number; repairedSpeakers?: number; scenesMatched?: number; scenesInScript?: number }
     | undefined;
 
-  // T-1 — Debug chip: only rendered when the ProductionPlanSheet is opened
-  // with `?debug=1` in the URL. Reads the response envelope attached by
-  // useStoryboardTransition onto plan._meta.debug. Keeps the summary clean
-  // for regular users while giving the operator one-click access to model
-  // timings, strict-cast drops and ensemble-repair counts during Beta.
+  const scriptTiming = (meta as any)?.script_timing as
+    | { mode: 'SHOT_MARKERS' | 'SPEAKER_BLOCKS' | 'FREETEXT'; shots: number; source: 'verbatim' | 'briefing' | 'none' }
+    | null
+    | undefined;
+  const scriptTimingActive =
+    !!scriptTiming && scriptTiming.mode !== 'FREETEXT' && (scriptTiming.shots ?? 0) > 0;
+
+  const durationExtend = (meta as any)?.duration_auto_extend as
+    | Array<{ scene: number; from: number; to: number; speechSec: number }>
+    | undefined;
+  const extendCount = Array.isArray(durationExtend) ? durationExtend.length : 0;
+
   const debug = (meta as any)?.debug as Record<string, any> | undefined;
   const debugEnabled = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -74,7 +81,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
   const showDebug = debugEnabled && !!debug;
 
   // Nothing meaningful to render → keep the footer minimal.
-  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !showDebug) return null;
+  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !scriptTimingActive && extendCount === 0 && !showDebug) return null;
 
   return (
     <div className="rounded-lg border border-amber-300/30 bg-gradient-to-br from-amber-300/[0.06] to-transparent p-2.5 space-y-2 text-xs">
@@ -110,6 +117,50 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 </div>
                 <div className="mt-2 text-[10px] text-muted-foreground">
                   Dein Skript wurde wörtlich übernommen. Die KI hat nur Visuals & Meta ergänzt.
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
+          {scriptTimingActive && (
+            <HoverCard openDelay={120}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-sky-400/40 text-sky-300 gap-1 cursor-help">
+                  <Clock className="h-3 w-3" />
+                  Skript-Timing verwendet
+                  <span className="opacity-70">· {scriptTiming!.shots} {scriptTiming!.shots === 1 ? 'Shot' : 'Shots'}</span>
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[320px] text-[11px]">
+                <div className="font-medium mb-1">Skript gewinnt vor Board-Dauer</div>
+                <div className="text-muted-foreground">
+                  Dein Skript enthält {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : 'strukturierte Sprecher-Blöcke'}.
+                  Die im Board eingetragene Gesamtdauer wurde ignoriert und die Szenen folgen dem Skript.
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
+          {extendCount > 0 && (
+            <HoverCard openDelay={120}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-orange-400/40 text-orange-300 gap-1 cursor-help">
+                  <Timer className="h-3 w-3" />
+                  Auto-Extend
+                  <span className="opacity-70">· {extendCount} {extendCount === 1 ? 'Szene' : 'Szenen'}</span>
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[340px] text-[11px]">
+                <div className="font-medium mb-1">Dauer automatisch verlängert</div>
+                <div className="text-muted-foreground space-y-0.5">
+                  {(durationExtend ?? []).slice(0, 6).map((d, i) => (
+                    <div key={i}>
+                      S{String(d.scene).padStart(2, '0')}:{' '}
+                      <span className="text-foreground">{d.from}s → {d.to}s</span>
+                      <span className="opacity-70"> · Sprechdauer ~{d.speechSec}s</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px] text-muted-foreground">
+                  Skript ist länger als die geplante Dauer — die Szene wurde um 1s über die Sprechdauer verlängert, damit die VO nicht abgeschnitten wird.
                 </div>
               </HoverCardContent>
             </HoverCard>

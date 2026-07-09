@@ -649,6 +649,10 @@ export function useStoryboardTransition({
       try {
         (plan as any)._meta = {
           ...((plan as any)._meta ?? {}),
+          script_timing: data?.script_timing ?? null,
+          duration_auto_extend: Array.isArray(data?.duration_auto_extend)
+            ? data.duration_auto_extend
+            : [],
           debug: {
             passA_model: data?.passA_model ?? null,
             passB_model: data?.passB_model ?? null,
@@ -660,6 +664,9 @@ export function useStoryboardTransition({
             ensemble_repair: data?.ensemble_repair ?? null,
             strict_cast: data?.strict_cast ?? null,
             fidelity: data?.fidelity ?? null,
+            solo_cast: data?.solo_cast ?? null,
+            script_timing: data?.script_timing ?? null,
+            duration_auto_extend: data?.duration_auto_extend ?? [],
             version: data?.version ?? null,
           },
         };
