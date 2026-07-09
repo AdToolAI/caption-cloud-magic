@@ -1245,11 +1245,21 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   const joinedNames = names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   const sentence = `${joinedNames} share the scene together in a wide group shot, all faces clearly visible to camera, standing side by side, each with a distinct visible action.`;
 
+  // v214 — scenes with explicit dialogTurns naming specific speakers must NOT
+  // be overwritten by ensemble injection. That's a solo/duet shot from the
+  // script, not a group moment.
+  const isExplicitlyScripted = (sc: any): boolean => {
+    const turns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
+    if (turns.length === 0) return false;
+    const speakers = new Set(turns.map((t: any) => normalizeMention(String(t?.speakerMentionKey ?? ''))).filter(Boolean));
+    return speakers.size >= 1;
+  };
+
   // C-1 fix — build a new scenes array; do NOT mutate input objects in place.
   const nextScenes = scenes.slice();
   const toRepair = new Set<number>();
   {
-    const ordered = order.filter((idx) => scenes[idx] && !hasAll(scenes[idx]));
+    const ordered = order.filter((idx) => scenes[idx] && !hasAll(scenes[idx]) && !isExplicitlyScripted(scenes[idx]));
     for (const idx of ordered) {
       if (toRepair.size >= needed) break;
       toRepair.add(idx);
