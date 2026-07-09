@@ -1,34 +1,47 @@
-# Status: Fix-Bundle G — Rest-Arbeiten
+## Problem
 
-## Was schon läuft (letzter Turn)
-- **G1 revidiert** — `detectScriptTimingMode` erkennt Top-Level `SZENE N` als eigene Szene, Sub-Shots (1A/1B) landen als `dialogTurns` in der Elternszene.
-- **G2** — Szenenanzahl = Top-Level-Marker (3 Szenen statt 6 bei Testfall).
-- **G3** — Duration Auto-Extend (`max(sollzeit, speechSec+1s)`) im Edge-Fn vor Persist, Diagnose in `plan._meta.duration_auto_extend`.
-- **G6** — Info-Chip „Skript-Timing verwendet" + „Auto-Extend"-Chip in `BriefingPlanSummary`.
+Der Speaker-Mapper zeigt Müll-Labels wie "Die Botschaft des Vide", "Medium Close", "Halbnaher Tracking", "Empfohlen", "Studio", "On", "Text" usw. Diese sind keine Sprecher, sondern Bullet-/Sektionsüberschriften aus dem Briefing. Ursache: die Regex `speakerRe` in `detectBriefingFidelity` (`src/hooks/useStoryboardTransition.ts:333`) matcht jeden großgeschriebenen Zeilenanfang gefolgt von `:` oder `-`. Damit rutscht praktisch jede Aufzählung durch.
 
-## Was noch offen ist
+## Fix — 2 kleine, chirurgische Änderungen
 
-### G4 — Voice-Pool an Szenen-Cast binden
-`src/hooks/useApplyProductionPlan.ts`: Auto-Voice nur für Characters, die tatsächlich in `scene.resolved_cast` einer Szene sprechen. Aktuell werden Voices teils an Nicht-Speaker vergeben (Screenshot: „Sarah AI" in Szene ohne Sarah).
+### 1) Detector härten — `src/hooks/useStoryboardTransition.ts` (Zeile 322–346)
 
-### G5 — Repair-Count Sanitize
-Neuer Helper `src/features/briefing/utils/repairsCounter.ts`. Zählt nur echte Value-Changes (kein Rauschen wie „durationSec: 5 → 5"). Wird in `BriefingPlanSummary` statt Roh-Count verwendet → keine irreführenden „12 repariert" mehr.
+Neue Akzeptanz-Regel für ein Label ("was ist ein Sprecher?"):
 
-### G7 — Skript-zu-lang-Warnung im Preisfeld
-Im Clip-Generate-Panel (dort wo Preis steht):
-- Wenn `sum(scene.durationSec) > project.totalDurationSec` **und** Grund = Auto-Extend → gelbe Meldung:
-  > „Dein Skript ist länger als die geplante Videodauer. Video wird auf {computedSec}s verlängert (+{delta}s)."
-- Preis auf neue Dauer berechnen.
-Datei: das Panel wo Credits/Preis vor „Clip generieren" angezeigt wird (muss zuerst lokalisiert werden — vermutlich in `src/components/video-composer/GenerationPanel.tsx` o. ä.).
+- **Screenplay-Konvention**: ALL-CAPS Ein- oder Zwei-Wort-Label direkt vor Doppelpunkt / Gedankenstrich (`SAMUEL:`, `SPRECHER 1 —`, `MATTHEW DUSATKO:`). 1–3 Tokens, keine Kleinbuchstaben.  
+  ODER
+- **Cast-Match**: Label matcht (case-insensitiv, normalisiert) einen bereits gebrieften `characters[].name` oder dessen erstes Wort.
 
-### G8 — AI-Fill % neu berechnen
-`BriefingPlanSummary.tsx`: Prozentwert nur über wirklich fehlende Briefing-Felder rechnen (nicht über alle vom Parser gesetzten). Ziel: bei vollem Briefing < 10 %, aktuell zeigt es ~33 %.
+Alles andere wird verworfen. Zusätzlich:
+- Bindestrich `-` als Trenner NUR akzeptieren, wenn er von Whitespace umgeben ist (`SAMUEL — Text`), damit "Medium Close-up" nicht mehr matcht.
+- Zeichenlimit von 40 auf 32 reduzieren.
+- Deny-List erweitern um: `setting`, `location`, `endcard`, `hook`, `cta`, `optional`, `empfohlen`, `nicht`, `text`, `on`, `off`, `studio`, `helles`, `medium`, `close`, `wide`, `pan`, `tracking`, `push`, `cinematic`, `perfekter`, `realistische`, `split`, `creator`, `nach`, `da`, `sondern`, `create`.
 
-## Nicht enthalten
-- Debug-Chips (T-1) und Plan-Versioning (P-1) — separate Themen.
-- Sub-Shot-Splitting — bewusst verworfen, Top-Level-SZENE gewinnt.
+Damit fällt LITERAL-Modus für Briefings, die gar kein echtes Skript enthalten, sauber auf 0 Labels zurück — und die Mapper-Karte verschwindet automatisch (`ScriptSpeakerMapper` bricht schon jetzt bei `speakerLabels.length === 0` ab).
 
-## Reihenfolge
-G4 → G5 → G8 (im gleichen `BriefingPlanSummary`-Turn) → G7 (nach Lokalisierung des Preisfelds).
+### 2) Mapper defensiv — `src/components/video-composer/briefing/ScriptSpeakerMapper.tsx`
 
-Nach Approval implementiere ich G4/G5/G7/G8 in einem Zug und teste gegen den 15s-Testfall (3 Szenen, 4 Sprecher).
+Aktuell wird für jedes Label per `autoMatch` fuzzy geraten und die Dropdowns zeigen "Auto → Roger" o.ä. Der User will: **wenn kein sicherer Match, dann leer lassen**.
+
+- `autoMatch` verschärfen: nur Match, wenn normalisierter Charakter-Name **gleich** oder **exakter Präfix/Suffix** des Labels ist (keine `includes`-Substrings mehr). Zwei-Wort-Labels wie "MATTHEW DUSATKO" matchen weiter, "Studio" ↔ irgendwas nicht.
+- Wenn `autoMatch` `null` liefert, bleibt der Select auf `AUTO` mit Anzeige "(kein Match)" — Kunde wählt selbst. (Verhalten ist bereits so; die Regex-Verschärfung räumt nur die Auto-Fehlmatches ab.)
+- Wenn nach dem Filter **kein einziges Label** einen Charakter matcht UND weniger als 2 Labels übrig sind, ganze Karte ausblenden.
+
+## Technische Details
+
+```text
+Label-Akzeptanz-Filter (Pseudo):
+  token1..N = split(rawLabel, /\s+/)
+  if N > 3 → reject
+  if any token contains lowercase letters:
+     → accept only if fuzzyEqualsCharacter(rawLabel)
+  else (all-caps):
+     → accept unless in denyList
+```
+
+Keine Änderungen an Backend, Parser, Apply-Hook oder anderen Konsumenten von `detectBriefingFidelity` (nur `hasSpeakerLines`/`speakerLabels` werden strenger — LITERAL-Modus bleibt für echte Skripte aktiv).
+
+## Verifikation
+- User-Screenshot-Briefing → 0 Fake-Labels, Mapper-Karte verschwindet.
+- Echtes Skript mit `MATTHEW:` / `SAMUEL:` → Labels erkannt, LITERAL bleibt an.
+- Typecheck grün.

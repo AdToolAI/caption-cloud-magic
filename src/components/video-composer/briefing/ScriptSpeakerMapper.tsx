@@ -26,7 +26,9 @@ function autoMatch(label: string, characters: ComposerCharacter[]): string | nul
   if (!n) return null;
   const hit = characters.find((c) => {
     const cn = normalize(c.name);
-    return cn && (cn.startsWith(n) || n.startsWith(cn) || cn.includes(n) || n.includes(cn));
+    if (!cn) return false;
+    // Strict: equal, or exact prefix/suffix on either side. No substring includes.
+    return cn === n || cn.startsWith(n) || n.startsWith(cn);
   });
   return hit?.id ?? null;
 }
@@ -59,6 +61,9 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
 
   if (fidelity.mode !== 'literal' || fidelity.speakerLabels.length === 0) return null;
   if (characters.length === 0) return null;
+  // Hide when nothing confidently matches — user picks manually elsewhere.
+  const anyMatch = fidelity.speakerLabels.some((l) => autoMatch(l, characters));
+  if (!anyMatch) return null;
 
   const t = (de: string, en: string, es: string) =>
     language === 'de' ? de : language === 'es' ? es : en;
