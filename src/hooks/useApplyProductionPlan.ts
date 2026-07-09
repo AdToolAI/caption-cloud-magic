@@ -35,6 +35,7 @@ import type {
 import type { TProductionPlan, TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
 import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
+import { logPlanRepairEvent } from '@/lib/video-composer/briefing/logPlanRepair';
 import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
 import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
 
@@ -720,8 +721,11 @@ export function useApplyProductionPlan() {
       currentScenes, currentAssembly, currentBriefing,
       onUpdateBriefing, onUpdateScenes, onApplyAssembly,
     } = args;
-    const finalized = finalizePlanCanonical(rawPlan).plan;
+    const finalizeResult = finalizePlanCanonical(rawPlan);
+    const finalized = finalizeResult!.plan;
     const plan = ensureProductionPlanEnsemble(finalized, currentBriefing);
+    // Phase 4 — Beta-Telemetrie: nicht-blockierendes Logging jeder auto-Reparatur.
+    void logPlanRepairEvent(plan, finalizeResult!.normalization, projectId ?? null);
     const target = Number(plan.project?.totalDurationSec);
     const sum = (plan.scenes || []).reduce((acc, scene) => acc + (Number(scene.durationSec) || 0), 0);
     if (Number.isFinite(target) && Number.isFinite(sum) && Math.abs(target - sum) > 0.5) {
