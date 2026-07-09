@@ -823,10 +823,16 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
     const cast = dedupMerge.cast;
     const location = s.location ? (() => {
       const r2 = r?.location;
+      const desc = typeof r2?.description === 'string' && r2.description.trim()
+        ? r2.description.trim().slice(0, 600)
+        : (typeof s.location?.description === 'string' && s.location.description.trim()
+            ? s.location.description.trim().slice(0, 600)
+            : undefined);
       return stripUndef({
         mentionKey: s.location.mentionKey,
         locationId: typeof r2?.locationId === 'string' ? r2.locationId : null,
         locationName: r2?.locationName ?? String(s.location.mentionKey ?? '').replace(/^@/, ''),
+        description: desc,
       });
     })() : undefined;
 
