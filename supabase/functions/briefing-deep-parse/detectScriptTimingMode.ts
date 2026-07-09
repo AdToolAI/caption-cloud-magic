@@ -105,14 +105,17 @@ function parseTimeWindow(head: string): { startSec: number | null; endSec: numbe
 function extractByShotMarkers(body: string): DetectedShot[] {
   const src = String(body ?? '');
   const runPass = (re: RegExp) => {
-    const marks: Array<{ index: number; head: string; start: number; end: number }> = [];
+    const marks: Array<{ index: number; head: string; contentStart: number; headStart: number; end: number }> = [];
     for (const m of src.matchAll(re)) {
       const idx = parseInt(m[1], 10);
       if (!Number.isFinite(idx)) continue;
-      const start = (m.index ?? 0) + m[0].length;
-      marks.push({ index: idx, head: m[2] ?? '', start, end: src.length });
+      const headStart = m.index ?? 0;
+      const contentStart = headStart + m[0].length;
+      marks.push({ index: idx, head: m[2] ?? '', headStart, contentStart, end: src.length });
     }
-    for (let i = 0; i < marks.length - 1; i++) marks[i].end = marks[i + 1].start;
+    // Block ends BEFORE the next heading so we don't leak "Szene 2" into
+    // scene 1's dialog.
+    for (let i = 0; i < marks.length - 1; i++) marks[i].end = marks[i + 1].headStart;
     return marks;
   };
   // Pass A — Szene/Scene ONLY (top-level).
@@ -125,7 +128,7 @@ function extractByShotMarkers(body: string): DetectedShot[] {
 
   const shots: DetectedShot[] = [];
   for (const mk of marks) {
-    const block = src.slice(mk.start, mk.end);
+    const block = src.slice(mk.contentStart, mk.end);
     const headTiming = parseTimeWindow(mk.head);
     const lines = block.split('\n').map(stripLine).filter(Boolean);
 
