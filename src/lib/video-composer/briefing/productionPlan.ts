@@ -71,6 +71,15 @@ export const ResolvedLocation = z.object({
   locationId: z.string().nullable(),
   locationName: z.string(),
   referenceImageUrl: z.string().nullable().optional(),
+  /**
+   * Free-text setting description (ENGLISH, cinematic). Populated when the
+   * briefing describes a location that is NOT in the user's library — e.g.
+   * "Split-screen: modern startup office / cozy home office at dawn".
+   * When present AND locationId is null, `useApplyProductionPlan` appends
+   * this as `Setting: …` to the i2v anchor prompt so the AI can render
+   * arbitrary backdrops without forcing a library entry.
+   */
+  description: z.string().max(600).optional(),
 });
 
 // ── Plan-Scene (richer than BriefingScene) ───────────────────────────────────

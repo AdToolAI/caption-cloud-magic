@@ -85,7 +85,10 @@ const TOOL_PASS_A = {
               },
               location: {
                 type: 'object',
-                properties: { mentionKey: { type: 'string' } },
+                properties: {
+                  mentionKey: { type: 'string' },
+                  description: { type: 'string', description: 'Free-text setting description in ENGLISH when the briefing describes a location NOT already in the library (e.g. "Split-screen office / home office at dawn"). Keep it cinematic and concrete: place, time of day, mood, key props. Leave empty when the briefing references a library mention verbatim.' },
+                },
                 required: ['mentionKey'],
               },
               shotDirector: {
@@ -495,6 +498,7 @@ const TOOL_PASS_B = {
                   mentionKey: { type: 'string' },
                   locationId: { type: 'string', nullable: true },
                   locationName: { type: 'string' },
+                  description: { type: 'string', description: 'Free-text setting description (ENGLISH). Pass through from Pass A verbatim when no library match exists so the i2v prompt can render the backdrop as-briefed.' },
                 },
                 required: ['mentionKey', 'locationName'],
               },
@@ -819,10 +823,16 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
     const cast = dedupMerge.cast;
     const location = s.location ? (() => {
       const r2 = r?.location;
+      const desc = typeof r2?.description === 'string' && r2.description.trim()
+        ? r2.description.trim().slice(0, 600)
+        : (typeof s.location?.description === 'string' && s.location.description.trim()
+            ? s.location.description.trim().slice(0, 600)
+            : undefined);
       return stripUndef({
         mentionKey: s.location.mentionKey,
         locationId: typeof r2?.locationId === 'string' ? r2.locationId : null,
         locationName: r2?.locationName ?? String(s.location.mentionKey ?? '').replace(/^@/, ''),
+        description: desc,
       });
     })() : undefined;
 
