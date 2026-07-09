@@ -1405,8 +1405,11 @@ YOU MUST:
         user: `BRIEFING (source language: ${languageDisplay}):\n\n${briefing}`,
       },
       [
-        { model: 'google/gemini-2.5-flash',      timeoutMs: 35_000, maxTokens: 6000, retries: 1 },
-        { model: 'google/gemini-2.5-pro',        timeoutMs: 60_000, maxTokens: 6000, retries: 0 },
+        // G-1: bumped primary flash retries 1 → 2. Total attempts on the
+        // primary model = 3 before falling back to Pro; kills most flaky
+        // 5xx / partial-JSON runs before the user ever sees a fallback plan.
+        { model: 'google/gemini-2.5-flash',      timeoutMs: 35_000, maxTokens: 6000, retries: 2 },
+        { model: 'google/gemini-2.5-pro',        timeoutMs: 60_000, maxTokens: 6000, retries: 1 },
         { model: 'google/gemini-2.5-flash-lite', timeoutMs: 25_000, maxTokens: 6000, retries: 0 },
       ],
       'Pass A',
