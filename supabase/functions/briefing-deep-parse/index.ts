@@ -1041,8 +1041,12 @@ function extractSelectedCastFromBriefing(briefing: string, characters: any[]) {
  */
 function enforceStrictCast(plan: any, required: any[]) {
   if (!Array.isArray(plan?.scenes) || required.length === 0) return { dropped: 0, backfilled: 0 };
-  if (required.some((r) => !r.characterId)) return { dropped: 0, backfilled: 0 };
-  const idSet = new Set(required.map((r) => String(r.characterId).toLowerCase()));
+  // v220 — no longer short-circuit when some briefed characters lack UUIDs.
+  // We still drop hallucinated speakers as long as we have at least one
+  // resolved UUID as the "known good" allowlist reference.
+  const resolvedIds = required.map((r) => r.characterId).filter(Boolean);
+  if (resolvedIds.length === 0) return { dropped: 0, backfilled: 0 };
+  const idSet = new Set(resolvedIds.map((id: any) => String(id).toLowerCase()));
   const byMention = new Map<string, any>();
   for (const r of required) {
     const mk = normalizeMention(r.mentionKey || r.characterName || '');
@@ -2345,6 +2349,10 @@ YOU MUST:
     // failures caused the table to receive ZERO new rows since Jun 23.
     let version = 1;
     let persistError: string | null = null;
+    // Hoist so it stays in scope for the final response payload.
+    const durationAutoExtend: any[] = Array.isArray((plan as any).__durationAutoExtend)
+      ? (plan as any).__durationAutoExtend
+      : [];
     try {
       if (projectId) {
         const { data: prev } = await supabase
@@ -2358,9 +2366,6 @@ YOU MUST:
       }
       const locResolutionForMeta = (plan as any)._locationResolution ?? null;
       const voicePoolForMeta = (plan as any)._voicePoolStats ?? null;
-      const durationAutoExtend = Array.isArray((plan as any).__durationAutoExtend)
-        ? (plan as any).__durationAutoExtend
-        : [];
       try { delete (plan as any)._locationResolution; } catch { /* noop */ }
       try { delete (plan as any)._voicePoolStats; } catch { /* noop */ }
       try { delete (plan as any).__durationAutoExtend; } catch { /* noop */ }
@@ -2414,10 +2419,20 @@ YOU MUST:
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    const _canonicalTotal = Number((plan as any)?.project?.totalDurationSec);
-    const _canonicalScenes = Array.isArray((plan as any)?.scenes) ? (plan as any).scenes.length : 0;
+    // Canonical total = actual scene sum (single source of truth). Reconcile
+    // project.totalDurationSec if it drifted from the sum after any of the
+    // scene-mutation passes (scene-count guard, G3 auto-extend, ensemble).
+    const _scenes = Array.isArray((plan as any)?.scenes) ? (plan as any).scenes : [];
+    const _sceneSum = _scenes.reduce((a: number, s: any) => a + (Number(s?.durationSec) || 0), 0);
+    const _projectTotal = Number((plan as any)?.project?.totalDurationSec);
+    const _canonicalTotal = _sceneSum > 0 ? _sceneSum : (Number.isFinite(_projectTotal) ? _projectTotal : null);
+    if (_sceneSum > 0 && Number.isFinite(_projectTotal) && Math.abs(_projectTotal - _sceneSum) >= 0.5) {
+      if (!(plan as any).project) (plan as any).project = {};
+      (plan as any).project.totalDurationSec = _sceneSum;
+    }
+    const _canonicalScenes = _scenes.length;
     const _canonicalFromScript = scriptTiming?.mode === 'SHOT_MARKERS' && (scriptTiming?.shots?.length ?? 0) >= 2;
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: Number.isFinite(_canonicalTotal) ? _canonicalTotal : null, scene_count: _canonicalScenes, source: _canonicalFromScript ? 'script' : 'board' }, duration_auto_extend: Array.isArray((plan as any).__durationAutoExtend) ? (plan as any).__durationAutoExtend : [] }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: _canonicalFromScript ? 'script' : 'board' }, duration_auto_extend: durationAutoExtend }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

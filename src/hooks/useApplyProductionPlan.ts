@@ -418,7 +418,10 @@ function planSceneToComposerScene(
         vid = picked.id;
       }
     }
-    if (!vid) vid = cleanVoiceId(projectVoiceId);
+    // v220 — do NOT fall back to projectVoiceId here. Project voice is applied
+    // separately at the character level; leaking it into every dialogVoices
+    // slot caused non-speaking characters to inherit the wrong voice
+    // (e.g. "Roger AI" showing up on unrelated cast members).
     if (vid) dialogVoices[characterId] = vid;
   }
 

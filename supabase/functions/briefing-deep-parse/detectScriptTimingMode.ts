@@ -368,9 +368,31 @@ export function detectScriptTimingMode(briefing: string): ScriptTimingInfo {
     return { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
   }
 
-  // J1 — Sub-shot markers ("Shot 1A", "Shot 1B", …) win when present. This
-  // catches briefings that group sub-shots under SZENE containers.
+  // Tier 1a — explicit SZENE/SCENE/SHOT top-level markers WIN when present
+  // (>= 2). Top-level briefing hierarchy takes precedence over nested sub-shots.
+  const marker = extractByShotMarkers(trimmed);
   const subs = extractBySubShotMarkers(trimmed);
+  if (marker.length >= 2) {
+    // If sub-shots strictly refine (>= 2x the top-level count and all timed),
+    // use them as the canonical shot list — the user opted into finer control.
+    if (subs.length >= marker.length * 2 && subs.every((s) => s.durationSec != null)) {
+      return {
+        mode: 'SHOT_MARKERS',
+        source,
+        shots: subs,
+        computedTotalSec: subs.reduce((a, s) => a + (s.durationSec ?? 0), 0),
+      };
+    }
+    const allTimed = marker.every((s) => s.durationSec != null);
+    return {
+      mode: 'SHOT_MARKERS',
+      source,
+      shots: marker,
+      computedTotalSec: allTimed ? marker.reduce((a, s) => a + (s.durationSec ?? 0), 0) : null,
+    };
+  }
+
+  // J1 — Sub-shot markers as a fallback when no top-level SZENE present.
   if (subs.length >= 3) {
     const allTimed = subs.every((s) => s.durationSec != null);
     return {
@@ -378,18 +400,6 @@ export function detectScriptTimingMode(briefing: string): ScriptTimingInfo {
       source,
       shots: subs,
       computedTotalSec: allTimed ? subs.reduce((a, s) => a + (s.durationSec ?? 0), 0) : null,
-    };
-  }
-
-  // Tier 1a — explicit SZENE/SCENE/SHOT markers.
-  const marker = extractByShotMarkers(trimmed);
-  if (marker.length >= 2) {
-    const allTimed = marker.every((s) => s.durationSec != null);
-    return {
-      mode: 'SHOT_MARKERS',
-      source,
-      shots: marker,
-      computedTotalSec: allTimed ? marker.reduce((a, s) => a + (s.durationSec ?? 0), 0) : null,
     };
   }
 
