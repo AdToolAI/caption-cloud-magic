@@ -1,6 +1,7 @@
 import type { ComposerBriefing } from '@/types/video-composer';
 import type { TProductionPlan, TPlanScene, TResolvedCast } from './productionPlan';
 import { dedupePlanScenesCast, dedupePlanSceneCast } from './planCastDedup';
+import { planIsScriptLocked } from './finalizePlanCanonical';
 
 const MAX_CAST = 4;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
