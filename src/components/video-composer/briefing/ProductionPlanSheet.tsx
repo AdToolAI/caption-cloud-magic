@@ -190,6 +190,16 @@ export default function ProductionPlanSheet({
     }
   }, [initialPlan]);
 
+  // Final display/apply gate. Everything visible in the review sheet must pass
+  // through this derived plan, even if a stale raw plan reaches state via local
+  // fallback, late initialPlan, HMR cache, or manual edits.
+  const safePlanResult = useMemo(() => {
+    if (!plan) return null;
+    const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefingRef.current);
+    return finalizePlanCanonical(withEnsemble);
+  }, [plan, currentBriefing]);
+  const safePlan = safePlanResult?.plan ?? null;
+
   // Board-Toggle folgt dem Briefing: sobald die Analyse eine kanonische
   // Gesamtdauer im Plan liefert (aus Skript-Timing abgeleitet), synchronisieren
   // wir den Briefing-Board-State darauf, damit Toggle und Skript nie
@@ -197,10 +207,10 @@ export default function ProductionPlanSheet({
   // + direkter Parse im Sheet). Idempotent via syncedSignatureRef.
   const syncedSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    const target = plan?.project?.totalDurationSec;
-    if (!plan || !target || target < 1) return;
+    const target = safePlan?.project?.totalDurationSec;
+    if (!safePlan || !target || target < 1) return;
     const current = currentBriefingRef.current?.duration;
-    const signature = `${plan.scenes?.length ?? 0}:${target}`;
+    const signature = `${safePlan.scenes?.length ?? 0}:${target}`;
     if (syncedSignatureRef.current === signature) return;
     if (typeof current === 'number' && Math.abs(current - target) < 0.5) {
       syncedSignatureRef.current = signature;
@@ -214,14 +224,14 @@ export default function ProductionPlanSheet({
         title: 'Dauer aus Briefing übernommen',
         description:
           typeof previous === 'number'
-            ? `Board: ${previous}s → ${target}s (${plan.scenes?.length ?? 0} Szenen laut Skript).`
-            : `Board auf ${target}s gesetzt (${plan.scenes?.length ?? 0} Szenen laut Skript).`,
+            ? `Board: ${previous}s → ${target}s (${safePlan.scenes?.length ?? 0} Szenen laut Skript).`
+            : `Board auf ${target}s gesetzt (${safePlan.scenes?.length ?? 0} Szenen laut Skript).`,
       });
     } catch (err) {
       console.warn('[ProductionPlanSheet] board duration auto-sync failed', err);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan]);
+  }, [safePlan]);
 
   // Char options: split into Base avatars (no `outfit:` prefix) vs Outfit
   // looks. The cast picker shows base avatars in the Charakter dropdown
@@ -410,13 +420,13 @@ export default function ProductionPlanSheet({
   // from `avatar_outfit_looks` once and merge into the lookup map below.
   const outfitLookIdsInPlan = useMemo(() => {
     const set = new Set<string>();
-    for (const s of plan?.scenes ?? []) {
+    for (const s of safePlan?.scenes ?? plan?.scenes ?? []) {
       for (const c of (s.cast ?? [])) {
         if (c.outfitLookId) set.add(c.outfitLookId);
       }
     }
     return Array.from(set);
-  }, [plan]);
+  }, [safePlan, plan]);
   const { data: dbOutfitLooks = [] } = useQuery({
     queryKey: ['avatar-outfit-looks-by-plan', outfitLookIdsInPlan.sort().join(',')],
     enabled: outfitLookIdsInPlan.length > 0,
@@ -567,7 +577,8 @@ export default function ProductionPlanSheet({
   };
 
   const handleApply = async () => {
-    if (!plan) return;
+    const planForApply = safePlan ?? plan;
+    if (!planForApply) return;
     setApplyResult(null);
     if (!isUuid(projectId)) {
       const message = 'Projekt-ID fehlt — Plan wurde nicht angewendet.';
@@ -579,11 +590,28 @@ export default function ProductionPlanSheet({
       });
       return;
     }
+    if (durationInconsistent) {
+      const message = 'Plan inkonsistent — Projekt-Gesamtdauer passt nicht zur Szenensumme.';
+      setApplyResult({ ok: false, message, warnings: [] });
+      toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
+      return;
+    }
     setApplying(true);
     try {
-      const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefing);
+      const withEnsemble = ensureProductionPlanEnsemble(planForApply, currentBriefing);
       const finalized = finalizePlanCanonical(withEnsemble);
       const normalizedPlan = finalized?.plan ?? withEnsemble;
+      const finalSum = Math.round((normalizedPlan.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0) * 10) / 10;
+      const finalTarget = Number(normalizedPlan.project?.totalDurationSec);
+      const finalConsistent = finalized?.normalization?.consistent !== false
+        && Number.isFinite(finalTarget)
+        && Math.abs(finalTarget - finalSum) < 0.5;
+      if (!finalConsistent) {
+        const message = `Plan inkonsistent — ${finalTarget || '—'}s Projekt vs. ${finalSum}s Szenensumme.`;
+        setApplyResult({ ok: false, message, warnings: [] });
+        toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
+        return;
+      }
       if (normalizedPlan !== plan) setPlan(normalizedPlan);
       const result = await applyPlan({
         plan: normalizedPlan,
@@ -782,8 +810,8 @@ export default function ProductionPlanSheet({
   };
 
   const totalPlanSec = useMemo(
-    () => Math.round((plan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0) * 10) / 10,
-    [plan],
+    () => Math.round((safePlan?.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0) * 10) / 10,
+    [safePlan],
   );
 
   // v215 — Consistency Gate: die zentrale Normalisierung garantiert
@@ -791,25 +819,26 @@ export default function ProductionPlanSheet({
   // Delta zeigt (z.B. wegen manueller Edits), blockieren wir den Apply
   // und weisen den User darauf hin.
   const durationInconsistent = useMemo(() => {
-    const target = Number(plan?.project?.totalDurationSec);
+    const target = Number(safePlan?.project?.totalDurationSec);
     if (!Number.isFinite(target) || target < 1) return false;
-    return Math.abs(target - totalPlanSec) >= 0.5;
-  }, [plan, totalPlanSec]);
+    const consistent = (safePlan as any)?._meta?.debug?.normalization?.consistent;
+    return consistent === false || Math.abs(target - totalPlanSec) >= 0.5;
+  }, [safePlan, totalPlanSec]);
 
-  const normalizationMeta = (plan as any)?._meta?.debug?.normalization ?? null;
+  const normalizationMeta = (safePlan as any)?._meta?.debug?.normalization ?? null;
 
   // ── Live-recompute unresolved ───────────────────────────────────────────
   // The Edge Function emits `plan.unresolved` once. As the user edits the
   // cast/location dropdowns, items that point at now-resolved fields are
   // filtered out so the "offene Punkte"-Counter shrinks live.
   const liveUnresolved = useMemo(() => {
-    if (!plan) return [] as TProductionPlan['unresolved'];
-    return (plan.unresolved ?? []).filter((u) => {
+    if (!safePlan) return [] as TProductionPlan['unresolved'];
+    return (safePlan.unresolved ?? []).filter((u) => {
       // Gemini/Pass-B has emitted both 0-based paths (scenes[0]) and
       // 1-based scene indexes (scenes[1]). Prefer the actual scene.index
       // contract, then fall back to array position for legacy rows.
       const scenesByPathRef = (ref: number) =>
-        [plan.scenes.find((s) => s.index === ref), plan.scenes[ref]].filter(Boolean);
+        [safePlan.scenes.find((s) => s.index === ref), safePlan.scenes[ref]].filter(Boolean);
       const m = /^scenes\[(\d+)\]\.cast\[(\d+)\]\.characterId$/.exec(u.field);
       if (m) {
         const cIdx = Number(m[2]);
@@ -823,12 +852,12 @@ export default function ProductionPlanSheet({
         })) return false;
       }
       if (u.field === 'project.totalDurationSec') {
-        const proj = plan.project?.totalDurationSec;
+        const proj = safePlan.project?.totalDurationSec;
         if (!proj || proj === totalPlanSec) return false;
       }
       return true;
     });
-  }, [plan, totalPlanSec, findLocationOption]);
+  }, [safePlan, totalPlanSec, findLocationOption]);
 
   /**
    * Auto-Resolve: for every missing cast/location slot, run the same fuzzy
@@ -919,14 +948,14 @@ export default function ProductionPlanSheet({
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileText className="h-4 w-4 text-amber-300" />
             Production Plan — Briefing analysieren & übernehmen
-            {plan?._meta?.source === 'local-fallback' && (
+            {safePlan?._meta?.source === 'local-fallback' && (
               <Badge variant="outline" className="ml-auto text-[10px] border-amber-400/40 text-amber-300 bg-amber-400/[0.06]">
                 Lokaler Fallback-Plan
               </Badge>
             )}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {plan?._meta?.source === 'local-fallback'
+            {safePlan?._meta?.source === 'local-fallback'
               ? 'Die AI-Analyse war offline — dieser Plan wurde lokal aus deinem Briefing-Text extrahiert. Bitte vor dem Übernehmen prüfen.'
               : 'Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.'}
           </DialogDescription>
@@ -969,7 +998,9 @@ export default function ProductionPlanSheet({
           </div>
         )}
 
-        {step === 'review' && plan && (
+        {step === 'review' && safePlan && (() => {
+          const plan = safePlan;
+          return (
           <ScrollArea className="h-full min-h-0 pr-3 -mr-1">
             <div className="space-y-3">
               {/* v215 — Konsistenz-Blocker: nur sichtbar, wenn Projekt-Total und
@@ -1565,12 +1596,13 @@ export default function ProductionPlanSheet({
               <div className="h-4" />
             </div>
           </ScrollArea>
-        )}
+          );
+        })()}
 
         {/* Pre-Apply Summary (Briefing Intelligence v2) — sticky above footer */}
-        {step === 'review' && plan && (
+        {step === 'review' && safePlan && (
           <div className="shrink-0">
-            <BriefingPlanSummary plan={plan} />
+            <BriefingPlanSummary plan={safePlan} />
           </div>
         )}
 
@@ -1591,7 +1623,7 @@ export default function ProductionPlanSheet({
               </Button>
             </>
           )}
-          {step === 'review' && plan && (
+          {step === 'review' && safePlan && (
             <>
               <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
               <Button
