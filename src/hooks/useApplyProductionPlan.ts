@@ -656,8 +656,8 @@ function buildAssembly(
       ...next,
       voiceover: {
         enabled: true,
-        voiceId: v.voiceId ?? next.voiceover?.voiceId ?? 'JBFqnCBsd6RMkjVDRZzb',
-        voiceName: v.voiceName ?? next.voiceover?.voiceName ?? 'George',
+        voiceId: v.voiceId ?? next.voiceover?.voiceId ?? null,
+        voiceName: v.voiceName ?? next.voiceover?.voiceName ?? null,
         script: fullScript || next.voiceover?.script || '',
         speed: v.speed,
         stability: v.stability,

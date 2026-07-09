@@ -44,6 +44,13 @@ export interface DetectedShot {
   endSec: number | null;
   /** Explicit duration when parseable ("(3s)" / "[0-3s]"). */
   durationSec: number | null;
+  /** J6 — 'ensemble_showcase' (split-screen w/ all speakers, no dialog),
+   *  'endcard' (branding, no speaker), or null for regular dialog shots. */
+  sceneKind?: 'ensemble_showcase' | 'endcard' | null;
+  /** J4 — Free-text "Location:" line inside the shot's briefing block. */
+  locationHint?: string | null;
+  /** J6 — On-screen overlay/text-caption for endcards. */
+  overlayText?: string | null;
 }
 
 export interface ScriptTimingInfo {
@@ -317,14 +324,38 @@ function extractBySubShotMarkers(body: string): DetectedShot[] {
       if (anyQuote) text = stripLine(anyQuote[1]);
     }
 
+    // J4 — location freetext: "Location: <text>" or "Setting: <text>" or
+    // "Ort: <text>". Take the first line only.
+    let locationHint: string | null = null;
+    const locMatch = block.match(/(?:^|\n)\s*(?:location|setting|ort|schauplatz)\s*:\s*([^\n]{3,200})/i);
+    if (locMatch) locationHint = stripLine(locMatch[1]).replace(/[.,;:]+$/, '');
+
+    // J6 — showcase vs endcard vs regular dialog shot.
+    let sceneKind: 'ensemble_showcase' | 'endcard' | null = null;
+    let overlayText: string | null = null;
+    const headAndBlock = `${mk.head}\n${block}`;
+    if (/\b(?:endcard|end[- ]?card|outro|branding|logo[- ]?reveal|call[- ]?to[- ]?action|cta[- ]?card)\b/i.test(headAndBlock)) {
+      sceneKind = 'endcard';
+      const overlayMatch = block.match(/(?:^|\n)\s*(?:overlay|caption|onscreen|on[- ]?screen|text)\s*:\s*([^\n]{2,120})/i);
+      if (overlayMatch) overlayText = stripLine(overlayMatch[1]).replace(/^[„"'"]+|["""'"„]+$/g, '');
+    } else if (/\b(?:split[- ]?screen|multi[- ]?frame|showcase|quad[- ]?split|ensemble\s+shot)\b/i.test(headAndBlock)) {
+      sceneKind = 'ensemble_showcase';
+    }
+    // Endcards have no dialog by definition.
+    const finalText = sceneKind === 'endcard' ? '' : text;
+    const finalSpeaker = sceneKind === 'endcard' ? null : speakerLabel;
+
     shots.push({
       index: idx + 1,
-      speakerLabel,
-      text,
-      dialogTurns: text && speakerLabel ? [{ speakerLabel, text }] : [],
+      speakerLabel: finalSpeaker,
+      text: finalText,
+      dialogTurns: finalText && finalSpeaker ? [{ speakerLabel: finalSpeaker, text: finalText }] : [],
       startSec: timing.startSec,
       endSec: timing.endSec,
       durationSec: timing.durationSec,
+      sceneKind,
+      locationHint,
+      overlayText,
     });
   });
   return shots;

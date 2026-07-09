@@ -41,11 +41,15 @@ function castKey(c: any): string {
 //   "every face composition"
 //   "…teilen sich die Szene"
 const ENSEMBLE_PATTERNS: RegExp[] = [
-  /\b[A-ZÄÖÜ][\w'-]+(?:,\s*[A-ZÄÖÜ][\w'-]+)+(?:\s*(?:and|und|&)\s*[A-ZÄÖÜ][\w'-]+)?\s+(?:share|teilen sich)\b[^.]*\.?/gi,
+  // "Samuel Dusatko, Matthew Dusatko, Sarah Dusatko and Kailee share the scene together"
+  /\b[A-ZÄÖÜ][\w'-]+(?:\s+[A-ZÄÖÜ][\w'-]+)?(?:,\s*[A-ZÄÖÜ][\w'-]+(?:\s+[A-ZÄÖÜ][\w'-]+)?)+(?:\s*(?:and|und|&)\s*[A-ZÄÖÜ][\w'-]+(?:\s+[A-ZÄÖÜ][\w'-]+)?)?\s+(?:share|teilen sich)\b[^.]*\.?/gi,
   /\b(?:group|ensemble|multi[- ]speaker|four[- ]speaker|four[- ]way)\s+(?:scene|shot|composition|frame)\b[^.]*\.?/gi,
   /\beach\s+(?:visible|in frame|in shot|to camera)[^.]*\.?/gi,
-  /\bevery\s+face\s+(?:in\s+(?:frame|shot)|visible|composition)[^.]*\.?/gi,
+  /\beach\s+with\s+(?:their|his|her)\s+own\s+action\b[^.]*\.?/gi,
+  /\bevery\s+face\s+(?:in\s+(?:frame|shot)|visible|composition|clearly)[^.]*\.?/gi,
   /\ball\s+(?:four|4|three|3|speakers?|characters?)\s+(?:visible|in frame|share|together)[^.]*\.?/gi,
+  /\ball\s+faces?\s+clearly\s+visible[^.]*\.?/gi,
+  /\bstanding\s+side\s+by\s+side\b[^.]*\.?/gi,
 ];
 
 const ENSEMBLE_FIELDS = [
@@ -67,6 +71,21 @@ const ENSEMBLE_FIELDS = [
   'shotPrompt',
   'shot_prompt',
   'summary',
+  // B1 — anchor prompts leak the same ensemble sentence into the AI prompt.
+  'anchorPromptEN',
+  'anchor_prompt_en',
+  'anchorPrompt',
+  'anchor_prompt',
+  'promptEN',
+  'prompt_en',
+  'sceneAnchor',
+  'scene_anchor',
+];
+
+// Nested string fields scrubbed alongside the top-level list.
+const ENSEMBLE_NESTED_PATHS: Array<[string, string]> = [
+  ['voiceover', 'text'],
+  ['voiceover', 'description'],
 ];
 
 function scrubEnsemble(text: string): string {
@@ -118,6 +137,18 @@ export function enforceSoloCast(plan: any): { trimmedScenes: number; droppedSlot
       const cleaned = scrubEnsemble(v);
       if (cleaned !== v) {
         sc[field] = cleaned;
+        scrubbedFields += 1;
+      }
+    }
+    // Nested paths (voiceover.text etc.).
+    for (const [outer, inner] of ENSEMBLE_NESTED_PATHS) {
+      const parent = sc?.[outer];
+      if (!parent || typeof parent !== 'object') continue;
+      const v = parent[inner];
+      if (typeof v !== 'string' || !v) continue;
+      const cleaned = scrubEnsemble(v);
+      if (cleaned !== v) {
+        parent[inner] = cleaned;
         scrubbedFields += 1;
       }
     }

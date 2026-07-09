@@ -1272,6 +1272,9 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   // be overwritten by ensemble injection. That's a solo/duet shot from the
   // script, not a group moment.
   const isExplicitlyScripted = (sc: any): boolean => {
+    // J6 — never inject ensemble into showcase / endcard scenes.
+    const kind = String(sc?.sceneKind ?? '').toLowerCase();
+    if (kind === 'endcard' || kind === 'ensemble_showcase') return true;
     const turns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
     if (turns.length === 0) return false;
     const speakers = new Set(turns.map((t: any) => normalizeMention(String(t?.speakerMentionKey ?? ''))).filter(Boolean));
@@ -1755,6 +1758,32 @@ YOU MUST:
           } else if (!scHasTurns && shot.text && shot.speakerLabel) {
             const mention = `@${slugify(shot.speakerLabel) || `sprecher-${i + 1}`}`;
             sc.dialogTurns = [{ speakerMentionKey: mention, text: shot.text }];
+          }
+          // J4 — Location freetext from briefing (only if empty).
+          if ((shot as any).locationHint) {
+            const hint = String((shot as any).locationHint).trim();
+            if (hint) {
+              sc.location = sc.location && typeof sc.location === 'object' ? sc.location : {};
+              if (!sc.location.locationId && !sc.location.description) {
+                sc.location.description = hint;
+              }
+              if (!sc.location.mentionKey && !sc.location.locationName) {
+                sc.location.locationName = hint;
+              }
+            }
+          }
+          // J6 — sceneKind + overlay for endcards / ensemble showcases.
+          const kind = (shot as any).sceneKind;
+          if (kind === 'endcard') {
+            sc.sceneKind = 'endcard';
+            sc.dialogTurns = [];
+            sc.cast = [];
+            if (sc.voiceover) sc.voiceover.text = '';
+            const overlay = (shot as any).overlayText;
+            if (overlay && !sc.overlayText) sc.overlayText = overlay;
+          } else if (kind === 'ensemble_showcase') {
+            sc.sceneKind = 'ensemble_showcase';
+            sc.dialogTurns = [];
           }
         }
       }
