@@ -2476,6 +2476,50 @@ YOU MUST:
       console.warn('[briefing-deep-parse] ensemble repair failed (non-fatal):', e?.message);
     }
 
+    // v216 — Continuous-Scene Cast Backfill.
+    // ensureProductionPlanEnsembleServer skips scenes with dialogTurns
+    // ("isExplicitlyScripted"). For a single continuous scene with 2+ briefed
+    // speakers, that leaves un-referenced cast slots empty. Deterministically
+    // inject every briefed character into the single scene's cast.
+    try {
+      const scenesArr = Array.isArray((plan as any)?.scenes) ? (plan as any).scenes : [];
+      if (
+        explicitBriefingTiming?.continuousScene &&
+        scenesArr.length === 1
+      ) {
+        const requiredCast = extractSelectedCastFromBriefing(briefing, characters);
+        if (requiredCast.length >= 2) {
+          const sc = scenesArr[0];
+          const cast = Array.isArray(sc.cast) ? [...sc.cast] : [];
+          const keyOf = (c: any) => String(c?.characterId ?? c?.mentionKey ?? c?.characterName ?? '').toLowerCase();
+          const present = new Set(cast.map(keyOf).filter(Boolean));
+          let backfilled = 0;
+          for (const req of requiredCast) {
+            const k = keyOf(req);
+            if (!k || present.has(k)) continue;
+            if (cast.length >= 4) break;
+            cast.push({ ...req, shotType: 'full' });
+            present.add(k);
+            backfilled += 1;
+          }
+          if (backfilled > 0) {
+            sc.cast = cast;
+            (plan as any)._meta = {
+              ...((plan as any)._meta ?? {}),
+              aiFilled: Array.from(new Set([
+                ...(((plan as any)._meta?.aiFilled ?? []) as string[]),
+                'scenes.cast.continuousSceneBackfill',
+              ])),
+            };
+            console.log('[briefing-deep-parse] continuous_scene_cast_backfill', { backfilled, required: requiredCast.length });
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] continuous scene backfill failed (non-fatal):', e?.message);
+    }
+
+
     // v212 — Strict-Cast Pass: remove hallucinated Pass-B speakers ("George",
     // "Roger" …) that are not part of the briefed cast, and back-fill any
     // still-unresolved slot whose mentionKey matches a briefed character.
