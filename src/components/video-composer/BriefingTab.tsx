@@ -21,6 +21,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { extractFunctionsError } from '@/lib/functionsError';
+import SpeechDurationHint from './briefing/SpeechDurationHint';
 import { useTranslation } from '@/hooks/useTranslation';
 import type {
   ComposerBriefing,
