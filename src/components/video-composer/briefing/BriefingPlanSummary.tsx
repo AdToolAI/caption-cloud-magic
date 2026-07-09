@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/hover-card';
 import { Lightbulb, Sparkles, Compass, FileCheck2, Bug, Clock, Timer } from 'lucide-react';
 import type { TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
+import { CLIENT_PIPELINE_VERSION } from '@/config/pipelineVersion';
 
 interface Props {
   plan: TProductionPlan;
