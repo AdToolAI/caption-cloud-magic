@@ -127,6 +127,9 @@ export function ensureProductionPlanEnsemble(
     if (repaired >= needed) break;
     const scene = nextScenes[idx];
     if (!scene || sceneHasAll(scene, required)) continue;
+    // v214 — respect explicit script/dialog assignments: never overwrite scenes
+    // whose dialogTurns already name specific speakers (LITERAL mode / solo shot).
+    if (sceneIsExplicitlyScripted(scene)) continue;
 
     const cast = [...(scene.cast ?? [])];
     const present = new Set(cast.map(castKey).filter(Boolean));
