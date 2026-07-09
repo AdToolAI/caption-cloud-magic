@@ -35,6 +35,7 @@ import type {
 import type { TProductionPlan, TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
 import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
+import { logPlanRepairEvent } from '@/lib/video-composer/briefing/logPlanRepair';
 import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
 import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
 
