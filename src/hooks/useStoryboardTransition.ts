@@ -389,15 +389,21 @@ function buildBriefingText(b: ComposerBriefing): string {
   if (fidelity.mode === 'literal') {
     if (fidelity.speakerLabels.length && b.characters?.length) {
       const norm = (s: string) => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+      const manualMap = b.speakerMap ?? {};
       lines.push('', '## Speaker Map (script label → @mention)');
       for (const label of fidelity.speakerLabels) {
-        const n = norm(label);
-        const hit = b.characters.find((c) => {
+        // Manual override wins — the user explicitly picked this mapping in
+        // the ScriptSpeakerMapper UI. Fall back to fuzzy name match otherwise.
+        const manualId = manualMap[label];
+        const manualHit = manualId ? b.characters.find((c) => c.id === manualId) : null;
+        const hit = manualHit ?? b.characters.find((c) => {
+          const n = norm(label);
           const cn = norm(c.name);
           return cn && n && (cn.startsWith(n) || n.startsWith(cn) || cn.includes(n) || n.includes(cn));
         });
         if (hit) {
-          lines.push(`- ${label} → @${toMentionSlug(hit.name)}`);
+          const tag = manualHit ? ' [manual]' : '';
+          lines.push(`- ${label} → @${toMentionSlug(hit.name)}${tag}`);
         } else {
           lines.push(`- ${label} → (unmapped — assign to the closest briefed cast member by role/context)`);
         }

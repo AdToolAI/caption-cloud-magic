@@ -36,6 +36,7 @@ import type {
 import { VISUAL_STYLES } from '@/config/composerVisualStyles';
 import { suggestShotDirectorForStyle, getStyleLabel } from '@/config/styleToShotDirector';
 import CharacterManager from './CharacterManager';
+import ScriptSpeakerMapper from './briefing/ScriptSpeakerMapper';
 import VideoModeSelector from './VideoModeSelector';
 import BrandKitApplyPanel from './BrandKitApplyPanel';
 import StagePanel from './stage/StagePanel';
@@ -840,11 +841,18 @@ export default function BriefingTab({
 
       {/* Recurring Characters — Studio only (advanced) */}
       {showStudio && (
-        <CharacterManager
-          characters={briefing.characters || []}
-          language={language}
-          onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
-        />
+        <>
+          <CharacterManager
+            characters={briefing.characters || []}
+            language={language}
+            onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
+          />
+          <ScriptSpeakerMapper
+            briefing={briefing}
+            language={language}
+            onUpdateBriefing={onUpdateBriefing}
+          />
+        </>
       )}
 
       {/* Director's Note — Direct & Studio only */}

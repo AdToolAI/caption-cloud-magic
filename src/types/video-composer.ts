@@ -215,6 +215,15 @@ export interface ComposerBriefing {
    * instead of paid AI video generation. Default false.
    */
   preferStock?: boolean;
+  /**
+   * Manual override of script-speaker labels → briefed character IDs.
+   * Only used in LITERAL mode (when `productDescription` contains a script
+   * with `NAME:` markers). Populated by the ScriptSpeakerMapper UI and
+   * consumed by `buildBriefingText` to emit an authoritative Speaker Map
+   * block for the deep-parser. Labels absent from the map fall back to the
+   * server's fuzzy name-match.
+   */
+  speakerMap?: Record<string, string>;
 }
 
 export interface ComposerScene {
