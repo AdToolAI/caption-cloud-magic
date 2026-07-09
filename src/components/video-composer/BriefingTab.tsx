@@ -21,7 +21,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { extractFunctionsError } from '@/lib/functionsError';
-import SpeechDurationHint from './briefing/SpeechDurationHint';
+
 import { useTranslation } from '@/hooks/useTranslation';
 import type {
   ComposerBriefing,
@@ -627,12 +627,6 @@ export default function BriefingTab({
               placeholder={cfg.descriptionPlaceholder}
               rows={category === 'custom' ? 5 : 3}
               className="bg-background/50 resize-none"
-            />
-            {/* Live-Sprech-Dauer-Hinweis (Phase 2 / L3) — rein clientseitig. */}
-            <SpeechDurationHint
-              text={briefing.productDescription ?? ''}
-              targetDurationSec={briefing.duration}
-              language={language}
             />
           </div>
 
