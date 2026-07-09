@@ -1763,6 +1763,7 @@ This overrides any English wording in the briefing's scaffolding
     }
 
     let ensembleStats: { repaired: number; required: number } | null = null;
+    let strictCastStats: { dropped: number; backfilled: number } | null = null;
     try {
       ensembleStats = ensureProductionPlanEnsembleServer(plan, briefing, characters);
       if (ensembleStats.repaired > 0) {
@@ -1777,6 +1778,21 @@ This overrides any English wording in the briefing's scaffolding
     } catch (e: any) {
       console.warn('[briefing-deep-parse] ensemble repair failed (non-fatal):', e?.message);
     }
+
+    // v212 — Strict-Cast Pass: remove hallucinated Pass-B speakers ("George",
+    // "Roger" …) that are not part of the briefed cast, and back-fill any
+    // still-unresolved slot whose mentionKey matches a briefed character.
+    try {
+      const required = extractSelectedCastFromBriefing(briefing, characters);
+      strictCastStats = enforceStrictCast(plan, required);
+      if (strictCastStats.dropped > 0 || strictCastStats.backfilled > 0) {
+        console.log('[briefing-deep-parse] strict_cast', strictCastStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] strict cast pass failed (non-fatal):', e?.message);
+    }
+
+
 
 
     // ── Pass C — Catalog-ID Resolver (v178, Wave 1) ───────────────────────
