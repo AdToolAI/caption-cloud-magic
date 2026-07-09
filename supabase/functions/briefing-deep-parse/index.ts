@@ -1670,7 +1670,26 @@ YOU MUST:
       scriptTiming = { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
     }
     const explicitBriefingTiming = detectExplicitBriefingTiming(briefing);
-    const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS' ? `
+    const continuousSceneLock = !!explicitBriefingTiming?.continuousScene
+      && explicitBriefingTiming.sceneCount === 1
+      && scriptTiming.mode === 'SHOT_MARKERS';
+    const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS'
+      ? (continuousSceneLock ? `
+═══════════════════════════════════════════════════════════════════════════
+CONTINUOUS-SCENE SCRIPT LOCK — HARD OVERRIDE
+═══════════════════════════════════════════════════════════════════════════
+The briefing explicitly requests ONE continuous scene (${explicitBriefingTiming.durationSec}s).
+The ${scriptTiming.shots.length} timing/speaker markers are INTERNAL dialog
+turns/beat cues, NOT separate scenes.
+YOU MUST:
+  • Emit EXACTLY 1 scene with durationSec=${explicitBriefingTiming.durationSec}.
+  • Put all spoken speaker lines into that scene's dialogTurns in order.
+  • Use internal timing windows only as timing hints; do NOT create one scene
+    per speaker, time window, Shot 1A/1B, Endcard, or beat.
+  • Keep all selected speakers/cast available in that one scene; do not invent
+    extra people or voices.
+═══════════════════════════════════════════════════════════════════════════
+` : `
 ═══════════════════════════════════════════════════════════════════════════
 SCRIPT-TIMING LOCK — HARD OVERRIDE (script wins over board settings)
 ═══════════════════════════════════════════════════════════════════════════
@@ -1686,7 +1705,7 @@ YOU MUST:
     members. Only shots explicitly showing multiple speakers get an
     ensemble cast.
 ═══════════════════════════════════════════════════════════════════════════
-` : '';
+`) : '';
 
 
     const passAPromise = callGatewayChain(
