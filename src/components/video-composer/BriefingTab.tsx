@@ -628,12 +628,6 @@ export default function BriefingTab({
               rows={category === 'custom' ? 5 : 3}
               className="bg-background/50 resize-none"
             />
-            {/* Live-Sprech-Dauer-Hinweis (Phase 2 / L3) — rein clientseitig. */}
-            <SpeechDurationHint
-              text={briefing.productDescription ?? ''}
-              targetDurationSec={briefing.duration}
-              language={language}
-            />
           </div>
 
           {/* Storytelling: Protagonist + Conflict */}
