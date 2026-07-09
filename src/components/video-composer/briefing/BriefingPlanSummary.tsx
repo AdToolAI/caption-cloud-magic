@@ -69,6 +69,14 @@ export default function BriefingPlanSummary({ plan }: Props) {
   const scriptTimingActive =
     !!scriptTiming && scriptTiming.mode !== 'FREETEXT' && (scriptTiming.shots ?? 0) > 0;
 
+  const canonicalTiming = (meta as any)?.debug?.canonical_timing as
+    | { durationSec?: number; sceneCount?: number; source?: string }
+    | undefined;
+  const canonicalDuration = typeof canonicalTiming?.durationSec === 'number'
+    ? canonicalTiming.durationSec
+    : undefined;
+  const canonicalTimingActive = typeof canonicalDuration === 'number' && canonicalDuration > 0;
+
   const durationExtend = (meta as any)?.duration_auto_extend as
     | Array<{ scene: number; from: number; to: number; speechSec: number }>
     | undefined;
@@ -83,7 +91,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
   const showDebug = debugEnabled && !!debug;
 
   // Nothing meaningful to render → keep the footer minimal.
-  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !scriptTimingActive && extendCount === 0 && !showDebug) return null;
+  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !scriptTimingActive && !canonicalTimingActive && extendCount === 0 && !showDebug) return null;
 
   return (
     <div className="rounded-lg border border-amber-300/30 bg-gradient-to-br from-amber-300/[0.06] to-transparent p-2.5 space-y-2 text-xs">
@@ -139,6 +147,24 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <div className="text-muted-foreground">
                   Dein Skript enthält {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : 'strukturierte Sprecher-Blöcke'}.
                   Die im Board eingetragene Gesamtdauer wurde ignoriert und die Szenen folgen dem Skript.
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
+          {canonicalTimingActive && (
+            <HoverCard openDelay={120}>
+              <HoverCardTrigger asChild>
+                <Badge variant="outline" className="border-sky-400/40 text-sky-300 gap-1 cursor-help">
+                  <Clock className="h-3 w-3" />
+                  {meta?.source === 'local-fallback' ? 'Lokaler Fallback' : 'Skript-Dauer verwendet'}
+                  <span className="opacity-70">· {canonicalDuration}s</span>
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent side="top" className="w-[320px] text-[11px]">
+                <div className="font-medium mb-1">Briefing-Dauer gewinnt</div>
+                <div className="text-muted-foreground">
+                  Die Gesamtdauer wurde direkt aus dem Briefing gelesen und vor dem Board-Wert angewendet.
+                  {canonicalTiming?.sceneCount ? ` Erkannte Struktur: ${canonicalTiming.sceneCount} Szenen.` : ''}
                 </div>
               </HoverCardContent>
             </HoverCard>
