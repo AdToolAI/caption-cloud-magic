@@ -1275,6 +1275,32 @@ export default function ProductionPlanSheet({
                                     </SelectContent>
                                   </Select>
                                 )}
+                                {/*
+                                  Preset picker — visible whenever the user
+                                  has no library outfit selected for this
+                                  slot. Prompt-only fallback so every
+                                  character slot always has an outfit
+                                  signal, even before the user builds their
+                                  wardrobe library.
+                                */}
+                                {!outfitId && (
+                                  <Select
+                                    value={(c as any).outfitPreset ?? '__none__'}
+                                    onValueChange={(v) => updateSceneCastPreset(s.index, i, v === '__none__' ? null : v)}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs min-w-[160px]">
+                                      <SelectValue placeholder="Standard-Outfit…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">— kein Preset —</SelectItem>
+                                      {DEFAULT_OUTFIT_PRESETS.map((p) => (
+                                        <SelectItem key={p.id} value={p.id}>
+                                          {outfitPresetLabel(p, language)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
                                 {(c.voiceName || c.voiceId || baseId) && (
                                   <Badge variant="secondary" className="text-[10px]">
                                     🎙 {c.voiceName ?? (c.voiceId ? 'Stimme' : 'Auto-Voice beim Anwenden')}
