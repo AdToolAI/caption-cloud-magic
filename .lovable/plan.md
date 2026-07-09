@@ -1,37 +1,45 @@
-# Plan: Board-Dauer folgt dem Briefing (Single Source of Truth)
+## Ziel
+Wenn im Briefing eindeutig 15 Sekunden steht, darf der Production Plan nicht mehr auf 30 Sekunden bleiben — auch dann nicht, wenn die Online-Analyse in den lokalen Fallback fällt.
 
-## Problem
-Das Briefing sagt „15 Sekunden / 3 Szenen à 5s", aber das Briefing-Board steht auf 30s Gesamtdauer. Aktuell versucht die Pipeline beide Werte zu versöhnen — Ergebnis: 3 Szenen à 10s (30s), weil der Reducer auf die Board-Zahl zurückfällt.
+## Diagnose
+Der aktuelle Screenshot zeigt `Lokaler Fallback-Plan`. Genau dieser Pfad baut den Plan clientseitig in `useStoryboardTransition.ts` und nimmt aktuell weiterhin `briefing.duration` vom Board als Basis. Deshalb bleibt der Plan bei 30s, obwohl der Briefing-Text 15s enthält.
 
-## Lösung: Briefing-Zeit gewinnt, Toggle wird auto-synced
-Sobald `detectScriptTimingMode` eine belastbare Skript-Dauer erkennt (Tier 1 Marker oder Tier 2 Sub-Shots mit Zeitfenstern), schreiben wir diese Dauer zurück in den Board-State — der Toggle bewegt sich sichtbar auf 15s. Kein Widerspruch mehr zwischen Board und Skript.
+## Umsetzung
 
-## Änderungen
+1. **Client-Fallback bekommt dieselbe Script-Wins-Logik**
+   - In `src/hooks/useStoryboardTransition.ts` wird vor `buildLocalFallbackPlan` eine kleine Dauer-Erkennung aus dem Briefing-Text ergänzt.
+   - Sie erkennt klare Angaben wie:
+     - `Gesamtdauer: 15 Sekunden`
+     - `15 Sekunden / 3 Szenen à 5s`
+     - `3 Szenen à 5 Sekunden`
+     - Zeitfenster wie `0–5s`, `5–10s`, `10–15s`
 
-### 1. Server: `briefing-deep-parse` gibt kanonische Dauer zurück
-`supabase/functions/briefing-deep-parse/index.ts`
-- Response um `canonical_duration_seconds` + `canonical_scene_count` + `source: 'script' | 'board'` erweitern (aus `scriptTiming`).
-- Nur setzen wenn `scriptTiming.confidence >= 'high'` (Tier 1/2 mit Zeitfenstern), sonst `null`.
+2. **Fallback-Plan nutzt kanonische Briefing-Dauer statt Board-Dauer**
+   - Wenn eine klare Briefing-Dauer gefunden wird, setzt der lokale Fallback `project.totalDurationSec` auf diese Dauer.
+   - Die Szenendauer wird daraus berechnet, z. B. `15s / 3 Szenen = 5s`.
+   - Keine `per * sceneCount`-Rundung mehr, die wieder 30s erzeugen kann.
 
-### 2. Client: Board-State auto-updaten beim Analyse-Ergebnis
-`src/hooks/useBriefingAnalyze.ts` (bzw. der Hook, der `briefing-deep-parse` aufruft und das Sheet öffnet)
-- Nach erfolgreicher Analyse: wenn `canonical_duration_seconds` gesetzt und ≠ aktueller Board-Dauer → `onUpdateBoard({ totalDurationSec: canonical, sceneCount: canonicalCount })` aufrufen.
-- Toast: „Dauer aus Briefing übernommen: 30s → 15s".
+3. **Board-Toggle auch beim Fallback auto-synchronisieren**
+   - Wenn der lokale Fallback 15s erkennt und das Board noch 30s hat, wird `onUpdateBriefing({ duration: 15 })` ausgelöst.
+   - Dadurch verschiebt sich der Toggle sichtbar auf 15s und Plan/Board widersprechen sich nicht mehr.
 
-### 3. UI: Sichtbarer Hinweis im Sheet
-`src/components/video-composer/briefing/ProductionPlanSheet.tsx`
-- Neben „Gesamtdauer 15s" Chip: „⟳ aus Briefing übernommen (vorher 30s)" wenn Auto-Sync griff.
-- Kleiner „Rückgängig"-Link, der Board wieder auf den alten Wert setzt (User-Escape).
+4. **Optionaler Hinweis für den Nutzer**
+   - Toast: `Dauer aus Briefing übernommen: 30s → 15s`.
+   - Nur einmal pro Analyse, damit keine Toast-/Update-Loops entstehen.
 
-### 4. Reducer-Fallback entfernen
-`supabase/functions/briefing-deep-parse/index.ts` Reducer
-- Wenn `scriptTiming.confidence high` vorhanden: Board-Dauer wird komplett ignoriert (nicht mehr als max/min-Klammer benutzt).
-- Wenn kein belastbares Skript-Timing: Board-Dauer bleibt Fallback wie heute.
-
-## Nicht-Ziele
-- Keine Änderung am Detector selbst — der funktioniert bereits (J1 verifiziert).
-- Kein Auto-Sync bei unsicherem Timing (`confidence: 'low'`) — dort bleibt Board maßgeblich.
-- Keine Umstellung der Lip-Sync/Ensemble-Logik.
+5. **Bestehenden Server-Pfad beibehalten**
+   - Die bereits ergänzte Server-Auto-Sync-Logik bleibt bestehen.
+   - Neu ist nur: Der Offline-/Timeout-Fallback folgt exakt derselben Regel.
 
 ## Ergebnis
-Briefing „15s, 3 Szenen à 5s" → Toggle springt auf 15s, Sheet zeigt 3 Szenen à 5s, keine widersprüchlichen Zahlen mehr.
+Bei unverändertem Briefing mit `15 Sekunden / 3 Szenen à 5s` zeigt auch der lokale Fallback:
+
+```text
+Gesamtdauer: 15s
+Summe Szenen: 15s (3 Szenen)
+S01: 5s
+S02: 5s
+S03: 5s
+```
+
+Der 30s-Widerspruch ist damit an beiden Pfaden geschlossen: Online-Analyse und lokaler Fallback.

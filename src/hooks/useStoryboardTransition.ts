@@ -49,6 +49,78 @@ type SceneHint = {
   seed?: number;
 };
 
+type BriefingTiming = {
+  durationSec: number;
+  sceneCount?: number;
+  source: 'explicit-total' | 'time-windows' | 'scene-math';
+};
+
+function normalizeDurationNumber(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number(String(raw).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function clampDurationForPlan(seconds: number): number {
+  return Math.max(1, Math.min(600, Math.round(seconds)));
+}
+
+function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText: string): BriefingTiming | null {
+  // Prefer the user's original briefing/script over the generated wrapper text,
+  // because the wrapper also appends the current board value (e.g. 30s).
+  const raw = String(briefing.productDescription || briefingText || '');
+  if (!raw.trim()) return null;
+
+  const sceneCountMatch = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
+  const sceneCount = sceneCountMatch ? Number(sceneCountMatch[1]) : undefined;
+
+  // Strongest signal: explicit total duration words in the actual briefing.
+  const explicitTotalPatterns = [
+    /(?:gesamt\s*dauer|gesamtdauer|total\s*duration|filmdauer|video\s*dauer|spot\s*dauer|laufzeit|duration)\s*[:=\-–—]?\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
+    /(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b\s*(?:gesamt|total|insgesamt|overall|film|video|spot)\b/i,
+    /\b(?:film|video|spot)\b[^\n]{0,80}?\b(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
+  ];
+  for (const re of explicitTotalPatterns) {
+    const m = raw.match(re);
+    const seconds = normalizeDurationNumber(m?.[1]);
+    if (seconds && seconds >= 3) {
+      return { durationSec: clampDurationForPlan(seconds), sceneCount, source: 'explicit-total' };
+    }
+  }
+
+  // Common compact form: "15 Sekunden / 3 Szenen à 5s".
+  const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b\s*[\/|,;·-]\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
+  const compactSeconds = normalizeDurationNumber(compact?.[1]);
+  if (compactSeconds && compactSeconds >= 3) {
+    return { durationSec: clampDurationForPlan(compactSeconds), sceneCount: Number(compact?.[2] ?? sceneCount), source: 'explicit-total' };
+  }
+
+  // Time windows in scene/shot markers: 0–5s, 5-10s, 10–15s → total 15s.
+  const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek|sekunden|seconds)?\b/gi;
+  let maxEnd = 0;
+  let windows = 0;
+  for (const m of raw.matchAll(windowRe)) {
+    const start = normalizeDurationNumber(m[1]);
+    const end = normalizeDurationNumber(m[2]);
+    if (start === null || end === null || end <= start || end > 600) continue;
+    maxEnd = Math.max(maxEnd, end);
+    windows += 1;
+  }
+  if (windows >= 2 && maxEnd >= 3) {
+    return { durationSec: clampDurationForPlan(maxEnd), sceneCount: sceneCount ?? windows, source: 'time-windows' };
+  }
+
+  // "3 Szenen à 5 Sekunden" → 15s.
+  const sceneMath = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,60}?(?:à|a|je|each|x|×)\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i);
+  const perScene = normalizeDurationNumber(sceneMath?.[2]);
+  if (sceneMath && perScene) {
+    const count = Number(sceneMath[1]);
+    return { durationSec: clampDurationForPlan(count * perScene), sceneCount: count, source: 'scene-math' };
+  }
+
+  return null;
+}
+
 const FRAMING_TOKENS: Array<[RegExp, string]> = [
   [/extreme[-\s]?close[-\s]?up|ECU/i, 'extreme-close-up'],
   [/close[-\s]?up|\bCU\b/i, 'close-up'],
@@ -166,7 +238,8 @@ function extractSceneHints(briefingText: string): SceneHint[] {
 
 function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
   const hints = extractSceneHints(briefingText);
-  const total = Number(briefing.duration) || 15;
+  const canonicalTiming = detectCanonicalBriefingTiming(briefing, briefingText);
+  const total = canonicalTiming?.durationSec ?? (Number(briefing.duration) || 15);
   const firstMention = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i)?.[0] ?? null;
   const firstChar = briefing.characters?.[0];
   const selectedCast = (briefing.characters ?? []).slice(0, 4).map((c) => ({
@@ -192,8 +265,8 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     { beat: 'CTA',    framing: 'medium',          movement: 'static',       energy: 'high' },
   ];
 
-  const sceneCount = Math.max(hints.length, defaultBeats.length);
-  const per = Math.max(3, Math.min(12, Math.round(total / sceneCount)));
+  const sceneCount = Math.max(canonicalTiming?.sceneCount ?? 0, hints.length, defaultBeats.length);
+  const per = Math.max(1, Math.min(60, total / sceneCount));
 
   const hasDialogAnywhere = hints.some((h) => !!h.dialog);
 
@@ -249,7 +322,7 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     project: {
       name: briefing.productName,
       aspectRatio: briefing.aspectRatio as any,
-      totalDurationSec: per * sceneCount,
+      totalDurationSec: total,
     },
     scenes,
     unresolved: [{
@@ -259,7 +332,10 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
         : 'AI-Director offline — deterministischer Plan erstellt. Bitte vor dem Rendern prüfen.',
       severity: 'warn',
     }],
-    _meta: { source: 'local-fallback' },
+    _meta: {
+      source: 'local-fallback',
+      debug: canonicalTiming ? { canonical_timing: canonicalTiming } : undefined,
+    },
   }), briefing);
 }
 
@@ -275,6 +351,8 @@ interface Args {
   ensureProjectId?: () => Promise<string>;
   /** Navigation hook: switches the dashboard tab to 'storyboard'. */
   navigateToStoryboard: () => void;
+  /** Synchronizes board controls when script timing wins over board defaults. */
+  onUpdateBriefing?: (patch: Partial<ComposerBriefing>) => void;
 }
 
 const isUuid = (val?: string | null) =>
@@ -468,7 +546,7 @@ export interface StoryboardTransitionState {
 }
 
 export function useStoryboardTransition({
-  briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard,
+  briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard, onUpdateBriefing,
 }: Args) {
   const [state, setState] = useState<StoryboardTransitionState>({
     warRoomOpen: false,
@@ -748,6 +826,10 @@ export function useStoryboardTransition({
       // Soft fail: build a local fallback plan so the user is never stuck.
       try {
         const fallback = buildLocalFallbackPlan(briefing, text);
+        const fallbackDuration = fallback.project?.totalDurationSec;
+        if (typeof fallbackDuration === 'number' && Math.abs((briefing.duration ?? 0) - fallbackDuration) >= 0.5) {
+          onUpdateBriefing?.({ duration: fallbackDuration });
+        }
         const reason = isAbort
           ? 'Timeout (>180s)'
           : status ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
@@ -822,7 +904,7 @@ export function useStoryboardTransition({
       }
       return { handled: true };
     }
-  }, [briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard]);
+  }, [briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard, onUpdateBriefing]);
 
   const setPlanSheetOpen = useCallback((open: boolean) => {
     setState((s) => ({ ...s, planSheetOpen: open, initialPlan: open ? s.initialPlan : null }));
