@@ -65,8 +65,16 @@ export function enforceSoloCast(plan: any): { trimmedScenes: number; droppedSlot
       const af = new Set<string>(Array.isArray(meta.aiFilled) ? meta.aiFilled : []);
       af.add('cast.soloEnforced');
       meta.aiFilled = [...af];
-      // Solo shots don't need ensemble framing — keep whatever the script/
-      // director already chose but never force 'wide' framing here.
+    }
+
+    // H3 — strip ensemble phrasing from action/description/visual fields so
+    // solo shots don't render "Samuel, Matthew and Sarah share the scene".
+    const ensembleRe = /\b([A-ZÄÖÜ][\w-]+(?:,\s*[A-ZÄÖÜ][\w-]+)+(?:\s*(?:and|und|&)\s*[A-ZÄÖÜ][\w-]+)?)\s+(share the (?:scene|frame|shot)|teilen sich (?:die\s+)?(?:szene|einstellung))\b[^.]*\.?/gi;
+    for (const field of ['action', 'sceneAction', 'description', 'visualDirection', 'visual_direction', 'directorNote', 'notes']) {
+      const v = sc[field];
+      if (typeof v !== 'string' || !v) continue;
+      const cleaned = v.replace(ensembleRe, '').replace(/\s{2,}/g, ' ').trim();
+      if (cleaned !== v) sc[field] = cleaned;
     }
   }
 
