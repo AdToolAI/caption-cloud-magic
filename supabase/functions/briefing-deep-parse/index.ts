@@ -309,12 +309,36 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
 
-ENSEMBLE CAST GUARANTEE (HARD): If the "## Cast" section contains 2–4 selected
-avatars, at least ONE scene MUST include ALL selected cast mention keys together.
-If the plan has 6 or more scenes, at least TWO scenes MUST include ALL selected
-cast mention keys together. These scenes must be wide/medium-wide group shots,
-not close-ups, and anchorPromptEN must name every cast member and describe a
-distinct visible action for each.
+ENSEMBLE CAST GUARANTEE (SOFT — respect the script): If the "## Cast" section
+contains 2–4 selected avatars, prefer at least ONE ensemble scene where ALL
+selected cast members share the frame. BUT: NEVER force ensemble on a scene
+whose script/dialogTurns explicitly names a SINGLE speaker or a specific subset
+— that scene stays solo/duet. Only expand scenes whose speaker is undefined or
+generic ("group", "team", "everyone"). Ensemble scenes must be wide/medium-wide
+group shots with anchorPromptEN naming every cast member.
+
+TIMING FIDELITY (HARD): If the briefing states explicit per-scene durations
+("Scene 1 – 3s", "Sprecher 1 (0–4s)", "3s + 4s + 4s + 4s = 15s", "15s total"),
+you MUST emit EXACTLY that many scenes with those exact durationSec values.
+Do NOT redistribute to a different scene count. Total durationSec across all
+scenes MUST equal the briefing's stated total (±1s tolerance).
+
+SHOT-STRUCTURE PRESERVATION (HARD): If the briefing enumerates shots or beats
+(1A/1B, "Split-screen", "Endcard", "S01…S04"), emit ONE scene per marker in
+that exact order. Do not merge two beats into a single scene, do not skip a
+beat, do not reorder. Missing beats = broken output.
+
+OUTFIT AUTO-MATCH: For every cast slot on every scene, if the briefing does
+NOT name a specific library outfit look, set resolvedCast[i].outfitPreset to
+the best-fitting id from this fixed list based on briefing tone/scenario:
+  "business-formal", "business-casual", "smart-casual", "streetwear",
+  "creative-modern", "gym-athleisure", "outdoor-casual", "evening-elegant",
+  "weekend-relaxed", "tech-founder".
+Keyword hints: suit/anzug→business-formal; office/büro→business-casual;
+sneaker/casual→smart-casual; hoodie/urban→streetwear; designer/minimal→
+creative-modern; gym/sport→gym-athleisure; outdoor/hike→outdoor-casual;
+evening/gala→evening-elegant; weekend/relaxed→weekend-relaxed; founder/
+startup/saas/tech→tech-founder. Default when unclear: "smart-casual".
 
 INTELLIGENT DEFAULTS — Transition / Overlay / Tone / Performance (NEVER leave undefined):
 You MUST always fill scenes[i].transition, scenes[i].textOverlay (or leave
