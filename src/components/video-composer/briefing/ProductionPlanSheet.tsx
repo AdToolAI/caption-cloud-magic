@@ -183,7 +183,9 @@ export default function ProductionPlanSheet({
   // When a new initialPlan arrives (subsequent re-opens), refresh local state.
   useEffect(() => {
     if (initialPlan) {
-      setPlan(ensureProductionPlanEnsemble(initialPlan, currentBriefingRef.current));
+      const withEnsemble = ensureProductionPlanEnsemble(initialPlan, currentBriefingRef.current);
+      const finalized = finalizePlanCanonical(withEnsemble);
+      setPlan(finalized?.plan ?? withEnsemble);
       setStep('review');
     }
   }, [initialPlan]);
