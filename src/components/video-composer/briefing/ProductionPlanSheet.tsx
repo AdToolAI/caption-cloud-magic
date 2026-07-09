@@ -1314,8 +1314,27 @@ export default function ProductionPlanSheet({
                         const castSlots = (s.cast ?? []).length > 0 ? (s.cast ?? []) : [emptyCastSlot(s.index)];
                         return (
                         <div className="space-y-1">
-                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cast</Label>
-                          {castSlots.map((c, i) => {
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cast</Label>
+                            {castSlots.length < 4 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-[10px] gap-1"
+                                onClick={() => {
+                                  setPlan((p) => p && {
+                                    ...p,
+                                    scenes: p.scenes.map((sc) => sc.index === s.index
+                                      ? { ...sc, cast: [...(sc.cast ?? []), emptyCastSlot(s.index)] }
+                                      : sc),
+                                  });
+                                }}
+                                title="Weiteren Charakter-Slot zu dieser Szene hinzufügen"
+                              >
+                                <Plus className="h-3 w-3" /> Cast-Slot
+                              </Button>
+                            )}
+                          </div>
                             const split = splitCastId(c.characterId);
                             const explicitLookId = c.outfitLookId ?? split.outfitLookId ?? null;
                             const lookHit = explicitLookId ? outfitById.get(explicitLookId) ?? null : null;
