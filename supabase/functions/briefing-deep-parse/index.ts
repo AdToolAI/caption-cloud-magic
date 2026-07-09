@@ -1662,7 +1662,9 @@ YOU MUST:
           }),
         },
         [
-          { model: 'google/gemini-2.5-flash',      timeoutMs: 30_000, maxTokens: 4000, retries: 1 },
+          // G-1: same retry bump as Pass A — cover flash flakiness before we
+          // downgrade to flash-lite for the gap-fill pass.
+          { model: 'google/gemini-2.5-flash',      timeoutMs: 30_000, maxTokens: 4000, retries: 2 },
           { model: 'google/gemini-2.5-flash-lite', timeoutMs: 20_000, maxTokens: 4000, retries: 0 },
         ],
         'Pass B',
