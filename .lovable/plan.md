@@ -1,66 +1,121 @@
-# Fix: Briefing-Analyse produziert Duplikate & lässt Charaktere weg
+# Fidelity-Fix — Briefing 1:1 statt Neuinterpretation
 
-## Ursachen (im Audit gefunden)
+## Diagnose
 
-**Bug 1 — Regex verschluckt die Library-UUID.**  
-`extractSelectedCastFromBriefing` in `supabase/functions/briefing-deep-parse/index.ts` (~Zeile 964) benutzt:
+Drei Ursachen dafür, dass Dialog/Sprecher „zufällig" wirken obwohl im Briefing alles steht:
+
+1. **`buildBriefingText` (`src/hooks/useStoryboardTransition.ts`, Z. 323)** setzt hart `Mode: AUTO-DIRECTOR` — auch bei komplettem Skript. Pass A springt in den Synthese-Modus.
+2. **Pass-A-Prompt (`briefing-deep-parse/index.ts`)** darf im AUTO-Modus VO/Dialog aus USPs neu schreiben. Sprecher werden nach Beat verteilt statt nach vorhandener `NAME:`-Zuweisung.
+3. Kein **Fidelity-Check**: nichts vergleicht, ob Dialog-Zeilen wörtlich und beim richtigen `@mention` landen.
+4. Wenn Sprecher-Labels im Skript keinem Cast-Slot zugeordnet sind (nur „Anna: …" ohne dass Anna ausgewählter Character ist), erfindet Pass B `characterId=null`-Slots, die später auf einen bestehenden Character fallbacken → Duplikate.
+
+## Lösung — 4 Pakete
+
+### Paket A — LITERAL-Mode wird erzwungen sobald Skript erkannt wird
+
+**Client — `src/hooks/useStoryboardTransition.ts`**
+- Neuer Helper `detectBriefingFidelity(briefing)` scannt `productDescription`:
+  - `/(Szene|Scene|Shot)\s*\d+/i` **oder**
+  - `/^\s*[A-ZÄÖÜ][A-ZÄÖÜ\-\s]{1,30}:\s+\S/m` (Sprecher-Zeile) **oder**
+  - nummerierte Liste ≥ 2 mit Doppelpunkt-Sprechern
+  → liefert `{ mode: 'LITERAL' | 'AUTO_DIRECTOR', speakerLabels: string[], briefingLines: [{id, speakerLabel, text}] }`
+- `buildBriefingText` schreibt bei LITERAL:
+  `Mode: LITERAL (PRESERVE briefing verbatim — do NOT rewrite scripts, do NOT redistribute speakers, do NOT invent scenes)`
+- Zusätzlicher Block `## Verbatim Script (authoritative)` mit `[L01] @mention → text` — das Truth-Signal für Pass A und den Fidelity-Check.
+
+**Server-Prompt — `briefing-deep-parse/index.ts`**
+Neuer Absatz oben im `SYSTEM_PASS_A`:
+> **STRICT LITERAL RULE — highest priority.** When the briefing carries `Mode: LITERAL` OR a `## Verbatim Script (authoritative)` block:
+> - copy every `[Lxx]` line's text verbatim into `dialogTurns[].text`
+> - keep exact `@mention` → speaker mapping
+> - never merge/split lines, never invent speakers not in `## Cast`
+> - preserve line ordering
+> - only Meta (`shotDirector`, `performance`, `musicCue`, `transition`, `anchorPromptEN`, `brollHints`) is yours to invent
+
+### Paket B — Speaker-Mapping-UI im Briefing-Dashboard (NEU)
+
+Aktuell erfindet die Pipeline Sprecher wenn im Skript „Anna:" steht, Anna aber nicht in `briefing.characters` ausgewählt ist. Skalierbare Lösung: das Mapping **vor** der Analyse einfordern.
+
+**Neue Komponente — `src/components/video-composer/briefing/ScriptSpeakerMapper.tsx`**
+- Wird gerendert wenn `detectBriefingFidelity` Sprecher-Labels findet UND mindestens ein Label keinem ausgewählten Character zuordenbar ist (Name-Substring-Match gegen `briefing.characters`).
+- Zeigt maximal 4 Slots (Hard-Cap wg. Nano Banana 2 / Vidu Q2 Cast-Limit):
+  ```
+  Erkannte Sprecher aus deinem Skript:
+    [ ANNA ]    → [ Character auswählen ▼ ] [ + neu anlegen ]
+    [ BEN  ]    → [ Character auswählen ▼ ] [ + neu anlegen ]
+    [ CHRIS]    → [ Character auswählen ▼ ] [ + neu anlegen ]
+    [ DANA ]    → [ Character auswählen ▼ ] [ + neu anlegen ]
+  ```
+- Wenn Skript **KEINE** Sprecher-Labels enthält (reines Konzept-Briefing): zeigt statt der erkannten Labels 4 leere Slots („Sprecher 1", „Sprecher 2", …) — User kann 1-4 aus der Library picken oder leerlassen.
+- Auswahl schreibt `briefing.characters[]` **und** eine neue Map `briefing.speakerAliases: Record<label, characterId>` (Label-String → Character-ID) für den Server.
+- „+ neu anlegen" öffnet den bestehenden Character-Quick-Create.
+- Analyse-Button ist disabled solange ≥1 erkanntes Label unresolved ist (mit klarer Fehlermeldung, kein stummes Failing).
+
+**Client-Änderungen**
+- `buildBriefingText` mapt Sprecher-Labels im Verbatim-Block via `speakerAliases` auf `@mentions`. Unresolved Labels bleiben `@unknown-N` und werden von Pass A/B garantiert **nicht** einem existierenden Character zugeordnet (der Fidelity-Check droppt sie).
+- `ComposerBriefing` bekommt `speakerAliases?: Record<string, string>` (label → characterId).
+
+**Skalier-Vorteil**
+- Keine Fuzzy-Namens-Heuristik mehr, kein LLM-Guessing bei Speaker-Zuordnung
+- Für großformatige Skripte (10+ „Anna:"-Zeilen) reicht **ein** Mapping-Klick
+- Deterministisch, keine Halluzinationen mehr möglich
+
+### Paket C — Fidelity-Check mit Auto-Reparatur (Server)
+
+Neu in `briefing-deep-parse/index.ts`, nach `enforceStrictCast`:
+
 ```
-/@([a-z0-9][a-z0-9-_]{1,47})[^\n]*(?:\(library:([0-9a-f-]{36})\))?/gi
+enforceBriefingFidelity(plan, briefingLines, requiredCast) → { plan, stats }
 ```
-Das gierige `[^\n]*` frisst die gesamte Zeile inklusive `(library:UUID)`, bevor die optionale Group überhaupt versucht zu matchen. Ergebnis: `m[2]` ist **immer** `undefined`, obwohl `useStoryboardTransition.buildBriefingText` die UUID sauber mitschickt. Der "Required-Cast" für die Ensemble-Repair fällt damit auf Fuzzy-Namensmatch zurück — und wenn die Namen sich ähneln (4× "Xxx Dusatko"), matcht gar nichts mehr sauber. Kailee fehlt, ensemble-repair injiziert nichts.
 
-**Bug 2 — Pass B halluzinierte Sprecher rutschen durch die Dedupe.**  
-Gemini erfindet manchmal Dialogsprecher ("George", "Roger"), die nicht im Briefing stehen. Sie landen als Cast-Slots mit `characterId=null` und **eindeutigem** `mentionKey`. Die aktuelle `dedupeSceneCast` betrachtet unterschiedliche mentionKeys als unterschiedliche Slots → beide bleiben. Später resolved die UI diese unbekannten Mentions per Substring-Fallback auf den ersten "Dusatko" im Library → derselbe Charakter erscheint zweimal.
+Für jede `briefingLine`:
+- **Text-Match ≥90% + korrekter Sprecher** → ok
+- **Falscher Sprecher** → überschreibe `speakerMentionKey` + `characterId` + `voiceId` (`reassigned++`)
+- **Text abweicht** → `dialogTurns[i].text := briefing text` (`textRestored++`)
+- **Zeile fehlt** → in nächstliegende Szene einfügen (`injected++`)
 
-## Fix
+Danach:
+- **Ghost-Turns** (nicht im Briefing, Sprecher nicht in Cast) → droppen (`droppedGhostTurns++`)
+- `dedupePlanScenesCast` erneut
+- Telemetrie in `parser_meta.fidelity = { total, matched, reassigned, textRestored, injected, droppedGhostTurns }`
 
-Zwei chirurgische Änderungen in `supabase/functions/briefing-deep-parse/index.ts`, plus Deploy.
+Sicherheitsnetze:
+- Läuft NUR bei `briefingLines.length ≥ 1`
+- Fehler → still Fallback auf pre-fidelity-Plan, `parser_meta.fidelity.error` gesetzt
+- Berührt niemals `shotDirector`, `anchorPromptEN`, `performance`, `musicCue`
 
-### 1. Regex Line-by-Line (`extractSelectedCastFromBriefing`, ~Z. 960–987)
+### Paket D — Fidelity-Chip im Plan-Sheet
 
-Cast-Section zeilenweise durchlaufen und `@mention` **und** `(library:UUID)` separat matchen:
-```ts
-const UUID_RE = /\(library:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/i;
-const MENTION_RE = /@([a-z0-9][a-z0-9-_]{1,47})/i;
-for (const rawLine of castSection.split('\n')) {
-  const line = rawLine.trim();
-  if (!line.startsWith('-')) continue;
-  const mm = line.match(MENTION_RE); if (!mm) continue;
-  const mentionKey = `@${mm[1]}`;
-  const libId = line.match(UUID_RE)?.[1] ?? null;
-  // …hit-Auflösung wie bisher, nur mit korrekt gefülltem libId
-}
+`ProductionPlanSheet.tsx` Footer:
 ```
-Damit trägt der Required-Cast wieder deterministische UUIDs — Kailee & Co. sind auffindbar, ensemble-repair injiziert fehlende Slots.
+✓ 12/12 Zeilen 1:1 · 0 Sprecher korrigiert · 0 fehlend
+```
+bzw.
+```
+⚠ 12/12 · 2 Sprecher korrigiert · 1 eingefügt   [Details]
+```
+Datenquelle: `plan.parserMeta.fidelity`. Rein UI.
 
-### 2. Strict-Cast-Pass (neu, direkt nach `ensureProductionPlanEnsembleServer`)
+## Betroffene Dateien
 
-Neue Funktion `enforceStrictCast(plan, required)`, nur aktiv wenn `required.length >= 1` und **alle** Required-Slots eine `characterId` haben. Pro Szene:
+- `src/types/video-composer.ts` — `speakerAliases?` in `ComposerBriefing`
+- `src/hooks/useStoryboardTransition.ts` — `detectBriefingFidelity`, `buildBriefingText` (LITERAL-Zweig + Verbatim-Block)
+- `src/components/video-composer/briefing/ScriptSpeakerMapper.tsx` — neu
+- `src/components/video-composer/BriefingTab.tsx` — Einbindung des Mappers, Analyse-Button-Gate
+- `supabase/functions/briefing-deep-parse/index.ts` — `STRICT LITERAL RULE`, `extractVerbatimScript`, `enforceBriefingFidelity`
+- `src/lib/video-composer/briefing/productionPlan.ts` — `fidelity`-Feld im `parser_meta`-Schema (nur lesend)
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Fidelity-Chip
 
-- Slot mit `characterId` ∈ required → behalten
-- Slot mit `characterId` ∉ required → **droppen** (halluzinierter Fremd-Sprecher)
-- Slot ohne `characterId`, aber `mentionKey`/`characterName` normalisiert = required-Mention → **back-fillen** mit UUID+Voice
-- Slot ohne match → droppen
-- Danach `dedupeSceneCast` erneut aufrufen
+## Unverändert
 
-Aufruf in `Deno.serve` direkt nach dem bestehenden `ensembleStats = ensureProductionPlanEnsembleServer(...)`-Block (~Z. 1710). Statistiken (`dropped`, `backfilled`) in `parser_meta` mit aufnehmen (analog `ensemble_repair`).
+`useApplyProductionPlan.ts`, `planCastDedup.ts`, `ensurePlanEnsemble.ts`, `ensureProductionPlanEnsembleServer`, Lip-Sync-Pipeline, Render-Pipeline. AUTO-DIRECTOR bei leerem Briefing: bleibt.
 
-### 3. Deploy
+## Deploy
 
-`supabase functions deploy briefing-deep-parse` — reine Edge-Function-Änderung, kein Client-Code, kein Migration.
-
-## Was NICHT angefasst wird
-
-- `planCastDedup.ts` (Client) — bleibt Sicherheitsnetz, die Ursache liegt server-seitig.
-- Pass A / Pass B Prompts — der Strict-Pass macht sie robust gegen Halluzinationen.
-- `ensurePlanEnsemble.ts` (Client) — bleibt als Legacy-Plan-Fallback.
-- `useApplyProductionPlan.ts` — UUID-Guard bleibt aktiv.
+`briefing-deep-parse` neu deployen. Keine Migration, kein Breaking Change.
 
 ## Verifikation
 
-Nach Deploy: Briefing mit 4 Charakteren (gleicher Nachname) erneut analysieren.
-Erwartetes Ergebnis:
-- Kein Cast-Slot mit erfundenem Namen mehr
-- Alle 4 Charaktere kommen mindestens in einer Ensemble-Szene vor
-- Kein Charakter erscheint doppelt in derselben Szene
-- Telemetrie zeigt `strict_cast: { dropped: N, backfilled: M }`
+1. **Skript-Briefing (Paket B in Aktion)**: Briefing mit 4 „NAME:"-Sprechern, keiner in Library → Mapper zeigt 4 Slots, User picked/erstellt Character → Analyse startet erst wenn alle 4 gemappt → `parser_meta.fidelity.matched = total`, `droppedGhostTurns = 0`, keine Duplikate.
+2. **Konzept-Briefing (kein Skript)**: nur USPs → Mapper zeigt 4 optionale Slots („Sprecher 1-4"), User pickt 0-4 → AUTO-DIRECTOR läuft wie bisher, `parser_meta.fidelity` fehlt.
+3. **Legacy-Briefing**: Skript vorhanden UND alle Sprecher bereits in `briefing.characters` → Mapper wird nicht angezeigt, LITERAL + Fidelity-Check laufen direkt.
