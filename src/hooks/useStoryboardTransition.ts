@@ -123,14 +123,29 @@ export function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefi
   }
 
   // Time windows in scene/shot markers: 0–5s, 5-10s, 10–15s → total 15s.
-  const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek\.?)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(?:s|sec|sek\.?|sekunden|seconds)?\b/gi;
+  // Capture unit groups so we can require an explicit time unit or contextual time anchor.
+  const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\b/gi;
+  const ageTailRe = /^\s*(?:jahre|jahren|jährig|jaehrig|jährige|jaehrige|years?|yrs?|y\.o\.?)\b/i;
+  const timeAnchorRe = /(?:zeit|timing|sek|sekunden|second|second|dauer|duration|shot|szene|scene|hook|cta|frame|beat|marker|clip)/i;
   let maxEnd = 0;
   let windows = 0;
   const parsedWindows: Array<{ start: number; end: number }> = [];
   for (const m of raw.matchAll(windowRe)) {
     const start = normalizeDurationNumber(m[1]);
-    const end = normalizeDurationNumber(m[2]);
+    const end = normalizeDurationNumber(m[3]);
     if (start === null || end === null || end <= start || end > 600) continue;
+    const idx = (m.index ?? 0);
+    // Skip if this is an "N–M Jahre" age range.
+    const after = raw.slice(idx + m[0].length, idx + m[0].length + 20);
+    if (ageTailRe.test(after)) continue;
+    // Require an explicit time unit in the match OR a time-related anchor in the same line.
+    const hasUnit = Boolean(m[2] || m[4]);
+    if (!hasUnit) {
+      const lineStart = raw.lastIndexOf('\n', idx) + 1;
+      const lineEnd = raw.indexOf('\n', idx);
+      const line = raw.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+      if (!timeAnchorRe.test(line)) continue;
+    }
     maxEnd = Math.max(maxEnd, end);
     windows += 1;
     parsedWindows.push({ start, end });
