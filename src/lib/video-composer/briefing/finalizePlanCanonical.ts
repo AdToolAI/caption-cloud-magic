@@ -48,12 +48,17 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function readCanonicalDuration(plan: TProductionPlan): number | null {
+function readCanonicalTiming(plan: TProductionPlan): Record<string, any> | null {
   const meta = (plan as any)?._meta;
   if (!isPlainObject(meta)) return null;
   const debug = (meta as any).debug;
   const canonical = isPlainObject(debug) ? (debug as any).canonical_timing : null;
-  const raw = isPlainObject(canonical) ? Number((canonical as any).durationSec) : NaN;
+  return isPlainObject(canonical) ? canonical : null;
+}
+
+function readCanonicalDuration(plan: TProductionPlan): number | null {
+  const canonical = readCanonicalTiming(plan);
+  const raw = canonical ? Number(canonical.durationSec) : NaN;
   return Number.isFinite(raw) && raw >= 1 ? raw : null;
 }
 
@@ -70,6 +75,63 @@ function sumSceneDurations(scenes: TPlanScene[] | undefined): number {
     if (Number.isFinite(v) && v > 0) acc += v;
   }
   return Math.round(acc * 10) / 10;
+}
+
+function canonicalWindowTotal(canonical: Record<string, any> | null): number | null {
+  const windows = Array.isArray(canonical?.windows) ? canonical.windows : [];
+  if (windows.length < 2) return null;
+  let maxEnd = 0;
+  for (const win of windows) {
+    const start = Number(win?.start);
+    const end = Number(win?.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+    maxEnd = Math.max(maxEnd, end);
+  }
+  return maxEnd >= 1 ? Math.round(maxEnd * 10) / 10 : null;
+}
+
+function canonicalDurationIsValidated(
+  canonical: Record<string, any> | null,
+  canonicalDur: number | null,
+  scenes: TPlanScene[],
+  currentSum: number,
+): boolean {
+  if (!canonical || !canonicalDur || canonicalDur < 1) return false;
+
+  const source = String(canonical.source ?? '').toLowerCase();
+  const sceneCount = Number(canonical.sceneCount ?? canonical.shots);
+  const windowTotal = canonicalWindowTotal(canonical);
+
+  // Concrete time windows are the strongest signal — but only when the
+  // extracted max-end actually equals the advertised canonical duration.
+  if (source === 'time-windows' && windowTotal && Math.abs(windowTotal - canonicalDur) < 0.5) {
+    return true;
+  }
+
+  // Scene math (e.g. 3 Szenen à 5s) is valid when it matches the current
+  // scene structure. This may redistribute a generic fallback plan.
+  if (source === 'scene-math' && Number.isFinite(sceneCount) && sceneCount === scenes.length) {
+    return true;
+  }
+
+  // Explicit totals are too easy to over-match in long briefings. Treat them
+  // as display/provenance unless the scenes already agree or the plan has no
+  // useful durations yet. This prevents stale "50s" metadata from stretching
+  // a real 10/15s script.
+  if (source === 'explicit-total' || source === 'script' || source === 'board') {
+    if (currentSum < 1 || Math.abs(currentSum - canonicalDur) < 0.5) return true;
+    // Allow modest corrections when the explicit briefing duration names the
+    // same number of scenes, e.g. board/default 30s → briefing says 15s for 3
+    // scenes. Reject wild stretches such as stale 50s metadata over a concrete
+    // 10s script, which caused the visible 50s/10s contradiction.
+    const ratio = canonicalDur / currentSum;
+    return Number.isFinite(sceneCount)
+      && sceneCount === scenes.length
+      && ratio >= 0.4
+      && ratio <= 1.75;
+  }
+
+  return false;
 }
 
 function redistributeSceneDurations(
@@ -152,23 +214,33 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   if (!plan) return null;
   const actions: string[] = [];
 
+  const canonicalTiming = readCanonicalTiming(plan);
   const canonicalDur = readCanonicalDuration(plan);
   const projectTotal = Number((plan as any)?.project?.totalDurationSec);
   const scenes: TPlanScene[] = Array.isArray((plan as any).scenes) ? [...(plan as any).scenes] : [];
   const currentSum = sumSceneDurations(scenes);
+  const canonicalValidated = canonicalDurationIsValidated(canonicalTiming, canonicalDur, scenes, currentSum);
 
-  // Ziel-Dauer bestimmen (Priorität: Kanonisch > Projekt > Szenensumme).
+  // Ziel-Dauer bestimmen. Wichtig: ein bereits konkret getakteter Szenenplan
+  // gewinnt vor widersprüchlichem Projekt-/Canonical-Meta. Nur validierte
+  // Briefing-Timings dürfen Szenendauern proportional umverteilen.
   let target = 0;
   let source: PlanNormalization['durationSource'] = 'default';
-  if (canonicalDur && canonicalDur >= 1) {
+  if (canonicalValidated && canonicalDur && canonicalDur >= 1) {
     target = clampDuration(canonicalDur);
     source = 'canonical-briefing';
-  } else if (Number.isFinite(projectTotal) && projectTotal >= 1) {
-    target = clampDuration(projectTotal);
-    source = 'plan-project';
   } else if (currentSum >= 1) {
     target = clampDuration(currentSum);
     source = 'scene-sum';
+    if (canonicalDur && Math.abs(canonicalDur - currentSum) >= 0.5) {
+      actions.push(`ignored-canonical:${canonicalDur}s→${target}s`);
+    }
+    if (Number.isFinite(projectTotal) && projectTotal >= 1 && Math.abs(projectTotal - currentSum) >= 0.5) {
+      actions.push(`ignored-project:${projectTotal}s→${target}s`);
+    }
+  } else if (Number.isFinite(projectTotal) && projectTotal >= 1) {
+    target = clampDuration(projectTotal);
+    source = 'plan-project';
   } else {
     target = Math.max(scenes.length, 1) * 5;
     source = 'default';

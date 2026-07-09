@@ -1,63 +1,109 @@
-## Kurzantwort
-Ja — dieser Plan behebt die strukturelle Ursache, nicht nur die Symptome. Es sind aktuell mehrere kleine Fixes an vielen Stellen, die sich gegenseitig überstimmen. Mit einem einzigen kanonischen Normalisierungs-Gate + harten Blockern verhindern wir künftig, dass widersprüchliche Zustände (`50s Gesamt / 10s Szenen`) überhaupt noch angezeigt oder gespeichert werden können.
+## Was gerade wirklich schief läuft
+Der aktuelle Screenshot beweist, dass der Plan **nicht zuverlässig durch das Final-Gate läuft**:
 
-## Warum das diesmal endgültig hält
-1. **Ein einziger Wahrheitsort für Dauer & Szenenzahl** — statt 3 Fallback-Pfaden (Backend, Local Fallback, UI-Sync) rechnet nur noch eine Funktion `finalizePlanCanonical()` direkt vor Anzeige und Apply.
-2. **Hard-Gate statt Silent-Fix** — ist der Plan inkonsistent, wird der Apply-Button rot blockiert. Kein stiller Fehldurchlauf mehr möglich.
-3. **Script-Wins mit klarer Interpretation** — Top-Level `SZENE` vs. Sub-Shots werden explizit unterschieden und sichtbar dokumentiert.
-4. **Ensemble-Injection wird bei Literal/Script-Briefings deaktiviert** — Solo-Szenen bleiben Solo.
-5. **Cast/Voice/Location-ID-Gates** — Voice-Namen wie "Roger/George" können nicht mehr als Charakter durchrutschen.
-6. **Tests decken exakt die Fehlerfälle** aus deinen Screenshots ab (15s vs 30s, 3 vs 6 Shots, Solo-Leaks, Voice-Leaks).
+- Es wird weiter `Gesamtdauer 50s` und `Summe Szenen 10s` angezeigt.
+- Der rote Inkonsistenz-Blocker ist nicht sichtbar.
+- Der Button `Plan anwenden` ist aktiv.
+- Es fehlen die `Normalisiert`-Diagnose-Chips.
+- Gleichzeitig zeigt der Footer `Skript-Dauer verwendet · 50s`, obwohl die Szene-Dauern nur 10s ergeben.
 
-## Was der Plan NICHT löst
-- LLM-Halluzinationen bei extrem freiem Briefing (dafür bleibt der Manual Speaker Mapper).
-- Wenn du Board-Dauer und Script-Dauer bewusst gemischt willst — dann brauchen wir eine explizite UI-Toggle-Auswahl.
+Das heißt: Die bisherige Logik ist nicht lückenlos verdrahtet. Es gibt mindestens einen Pfad, der einen alten/rohen Plan direkt ins Sheet bringt oder nachträglich wieder überschreibt. Außerdem normalisiert `finalizePlanCanonical` aktuell auf einen falschen kanonischen Wert, wenn `_meta.debug.canonical_timing.durationSec` bereits falsch ist.
 
-## Der Plan im Detail
+## Ziel
+Der Zustand `50s Gesamt / 10s Szenen` darf **technisch unmöglich** werden — egal ob der Plan vom Backend, Local Fallback, Late Arrival, initialPlan, manuellem Sheet-Parse oder altem Cache kommt.
 
-### Phase 1 — Zentrale finale Normalisierung
-Neue Funktion `finalizePlanCanonical(plan, briefing)`, aufgerufen an **genau zwei** Punkten:
-- direkt vor `setPlan(...)` im `ProductionPlanSheet`
-- direkt vor `applyPlan(...)` in `useApplyProductionPlan`
+## Fix-Plan
 
-Sie erzwingt:
-- `project.totalDurationSec === sum(scenes.durationSec)`
-- Kanonische Briefing-Dauer > Board-Dauer > Szenensumme
-- Script-Shots gewinnen vor Board-Szenenzahl
-- Jede Korrektur landet in `_meta.debug.normalization`
+### 1. Ein „SafePlan“-Wrapper direkt vor jedem Render
+Im `ProductionPlanSheet` wird nicht mehr direkt `plan` gerendert, sondern ein abgeleiteter `safePlan`:
 
-### Phase 2 — Script-First Timing durchgängig
-Erweitertes Erkennen von `Gesamtdauer`, `N Szenen à Xs`, Zeitfenstern `0–5s`, Sub-Shots `1A/1B`. UI zeigt aktive Interpretation.
+```text
+raw plan state → finalize/sanitize → safePlan → UI + Apply
+```
 
-### Phase 3 — Local Fallback ehrlich labeln
-Fallback muss kanonisch konsistent sein oder Apply wird blockiert und "Vollanalyse erneut versuchen" angeboten. Keine irreführenden Script-Timing-Chips mehr.
+Damit kann selbst ein alter oder roher Plan aus irgendeinem Pfad nicht mehr ungefiltert angezeigt werden.
 
-### Phase 4 — Ensemble-Garantie bei Literal/Script hart aus
-Sobald `_meta.fidelity.mode === literal` oder Script-Timing aktiv: keine Ensemble-Injektion, kein "share the scene", Cast strikt = Sprecher der Szene.
+Wichtig:
+- Projekt-Gesamtdauer im UI kommt aus `safePlan`.
+- Szenenliste kommt aus `safePlan`.
+- Summary-Footer kommt aus `safePlan`.
+- Apply bekommt `safePlan`.
+- Der Blocker prüft `safePlan`.
 
-### Phase 5 — Cast/Voice/Location-ID-Gate
-- `cast[].characterId` muss echte gewählte UUID oder null sein
-- `voiceId` darf nie eine Charakter-UUID sein
-- Voice-Namen (George/Roger) werden nur als Voice-Label gezeigt, nie als Sprecher
-- Nicht zuordenbare Sprecher-Labels bleiben leer → Manual Mapper
+### 2. Final-Gate korrigieren: falsche Canonical-Dauer darf nicht gewinnen
+`finalizePlanCanonical` darf `_meta.debug.canonical_timing.durationSec` nicht blind vertrauen.
 
-### Phase 6 — Location-Freetext schützen
-Freie Location-Beschreibungen bleiben bis in den finalen `aiPrompt` erhalten (`Setting: ...`). Auto-Resolve darf sie nicht überschreiben.
+Neue Regel:
+- Wenn `canonical_timing.durationSec` nicht zur Szenensumme passt und keine klaren Zeitfenster/Briefing-Dauer bestätigt sind, gewinnt die Szenensumme.
+- Wenn ein Plan bereits konkrete Szenendauern hat, dann gilt: `project.totalDurationSec = sum(scenes)`.
+- Nur ein validierter Briefing-Timing-Wert darf Szenen proportional umverteilen.
 
-### Phase 7 — UI-Diagnose & Blocker
-Im Sheet sichtbar:
-- Quelle (Backend / Local Fallback / Late Arrival)
-- Final normalisierte Dauer & Szenenzahl
-- Script-Interpretation (Top-Level vs Sub-Shots)
-- Roter Blocker bei Inkonsistenz, Apply deaktiviert
+Damit wird `50s` nicht mehr aus einem fehlerhaften Chip übernommen, wenn die Szenen real nur 10s ergeben.
 
-### Phase 8 — Regressions-Tests
-- 15s Briefing + Board 30s → 15s, 3×5s
-- 6 Sub-Shots à 2.5s → 6×2.5s = 15s
-- 50s Fehldetektion → Blocker oder Szenensumme gewinnt
-- Solo-Literal → kein Ensemble-Prompt
-- Voice- vs Charakter-ID Trennung
-- Location-Freetext bleibt in `aiPrompt`
+### 3. Hard-Blocker unabhängig vom State machen
+Der Blocker wird nicht mehr davon abhängig sein, ob das letzte `setPlan(...)` korrekt lief.
 
-## Erwartetes Ergebnis
-`50s / 10s`-Zustand ist strukturell unmöglich. Script-Briefings gewinnen zuverlässig. Cast/Voice/Location sind vor Apply validiert. Wenn etwas nicht sauber ist, siehst du es sofort statt es später im Storyboard zu entdecken.
+Neue Regel:
+- Wenn irgendein Plan, der im Sheet sichtbar wäre, `project.totalDurationSec !== sum(scenes)` hat, wird automatisch vor Render repariert.
+- Wenn Reparatur nicht möglich ist, ist `Plan anwenden` deaktiviert.
+- Button-Disable und Warnbox verwenden exakt dieselbe Berechnung.
+
+### 4. Apply darf nie einen rohen Plan verwenden
+`handleApply` nimmt nicht mehr `plan`, sondern ausschließlich `safePlan`.
+
+Zusätzlich:
+- Direkt vor `applyPlan(...)` wird nochmal finalisiert.
+- Wenn danach noch inkonsistent: Abbruch mit Toast, kein Storyboard-Write.
+
+### 5. Summary-Chips müssen echte Daten anzeigen
+`BriefingPlanSummary` darf nicht mehr einen falschen `canonical_timing.durationSec` als Wahrheit anzeigen, wenn er vom Projekt/Szenensumme abweicht.
+
+Neue Anzeige:
+- `Skript-Dauer verwendet · Xs` nur, wenn X auch wirklich angewendet wurde.
+- Sonst: `Szenensumme verwendet · Ys` oder Debug-Hinweis.
+- `Skript-Timing verwendet · N Shots` muss mit `safePlan.scenes.length` übereinstimmen.
+
+### 6. Ensemble-Leak final schließen
+Im Screenshot steht noch:
+`Samuel, Matthew, Sarah and Kailee share the scene together...`
+
+Das heißt: Der Scrubber greift für diese Szene nicht, wahrscheinlich weil `dialogTurns`/Speaker nicht eindeutig vorhanden sind oder Script-Lock nicht erkannt wird.
+
+Neue Regel:
+- Wenn Script-Timing aktiv ist und Szene nur eine Sprecher-Zeile oder `Shot 1A — Sprecher 1` enthält, werden Ensemble-Phrasen immer aus `anchorPromptEN`, `aiPrompt`, `description`, `voiceover.text` und `action` entfernt.
+- Keine Ensemble-Injektion in Script/Literal-Plänen.
+
+### 7. Regressionstest für exakt deinen Screenshot-Zustand
+Ein Test wird ergänzt:
+
+```text
+Input: project.totalDurationSec = 50, scenes = [2.5, 2.5, 5]
+Expected:
+- UI/SafePlan zeigt totalDurationSec = 10
+- durationInconsistent = false nach Reparatur
+- Apply nutzt 10s
+- Summary zeigt nicht mehr „Skript-Dauer 50s“
+```
+
+Zusätzlich:
+- Solo-Szene mit Ensemble-Prompt wird gescrubbt.
+- Script-Lock verhindert Cast-Injektion.
+
+## Warum das diesmal anders ist
+Bisher haben wir die Plan-Erzeugung repariert. Der Screenshot zeigt aber, dass die UI/Apply-Schicht trotzdem einen alten oder falschen Plan anzeigen kann.
+
+Dieser Fix setzt die Sicherheit **nicht nur am Eingang**, sondern direkt an der letzten möglichen Stelle:
+
+```text
+Alles, was angezeigt oder angewendet wird, muss durch safePlan.
+```
+
+Damit ist es egal, ob Backend, Local Fallback, Late Arrival oder Cache Mist liefert — die Oberfläche kann den widersprüchlichen Zustand nicht mehr anzeigen und nicht mehr anwenden.
+
+## Danach prüfen wir
+Mit deinem unveränderten Briefing muss gelten:
+- Keine `50s / 10s`-Anzeige mehr.
+- Kein aktiver Apply-Button bei Inkonsistenz.
+- Kein „share the scene together“ in Solo-Shots.
+- Kein falscher Canonical-Chip.
+- Storyboard erhält nur normalisierte Szenen.

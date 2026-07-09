@@ -34,6 +34,7 @@ import type {
 } from '@/types/video-composer';
 import type { TProductionPlan, TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
+import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
 import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
 import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
 
@@ -719,7 +720,13 @@ export function useApplyProductionPlan() {
       currentScenes, currentAssembly, currentBriefing,
       onUpdateBriefing, onUpdateScenes, onApplyAssembly,
     } = args;
-    const plan = ensureProductionPlanEnsemble(rawPlan, currentBriefing);
+    const finalized = finalizePlanCanonical(rawPlan).plan;
+    const plan = ensureProductionPlanEnsemble(finalized, currentBriefing);
+    const target = Number(plan.project?.totalDurationSec);
+    const sum = (plan.scenes || []).reduce((acc, scene) => acc + (Number(scene.durationSec) || 0), 0);
+    if (Number.isFinite(target) && Number.isFinite(sum) && Math.abs(target - sum) > 0.5) {
+      throw new Error(`Plan inkonsistent — Gesamtdauer ${target}s passt nicht zur Szenensumme ${sum}s.`);
+    }
 
     if (!isUuid(projectId)) {
       throw new Error('Projekt-ID fehlt — Plan wurde nicht angewendet, damit keine unverbundenen Szenen entstehen.');

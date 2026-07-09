@@ -76,7 +76,9 @@ const ENSEMBLE_SCRUB_PATTERNS: RegExp[] = [
   /\b(?:group|ensemble|multi[- ]speaker|four[- ]speaker|four[- ]way)\s+(?:scene|shot|composition|frame)\b[^.]*\.?/gi,
   /\beach\s+(?:visible|in frame|in shot|to camera)[^.]*\.?/gi,
   /\bevery\s+face\s+(?:in\s+(?:frame|shot)|visible|composition)[^.]*\.?/gi,
+  /\ball\s+faces?\s+(?:clearly\s+)?(?:visible|in frame|in shot)[^.]*\.?/gi,
   /\ball\s+(?:four|4|three|3|speakers?|characters?)\s+(?:visible|in frame|share|together)[^.]*\.?/gi,
+  /\b(?:standing|sitting)\s+side\s+by\s+side[^.]*\.?/gi,
 ];
 const ENSEMBLE_SCRUB_FIELDS = [
   'action', 'sceneAction', 'description', 'visual', 'visualPrompt',
@@ -104,6 +106,13 @@ function scrubSoloSceneEnsemble(scene: TPlanScene): TPlanScene {
     const cleaned = scrubEnsembleText(v);
     if (cleaned !== v) {
       next[field] = cleaned;
+      changed = true;
+    }
+  }
+  if (typeof next.voiceover?.text === 'string' && next.voiceover.text) {
+    const cleaned = scrubEnsembleText(next.voiceover.text);
+    if (cleaned !== next.voiceover.text) {
+      next.voiceover = { ...next.voiceover, text: cleaned };
       changed = true;
     }
   }
