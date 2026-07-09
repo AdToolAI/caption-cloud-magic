@@ -841,11 +841,18 @@ export default function BriefingTab({
 
       {/* Recurring Characters — Studio only (advanced) */}
       {showStudio && (
-        <CharacterManager
-          characters={briefing.characters || []}
-          language={language}
-          onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
-        />
+        <>
+          <CharacterManager
+            characters={briefing.characters || []}
+            language={language}
+            onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
+          />
+          <ScriptSpeakerMapper
+            briefing={briefing}
+            language={language}
+            onUpdateBriefing={onUpdateBriefing}
+          />
+        </>
       )}
 
       {/* Director's Note — Direct & Studio only */}
