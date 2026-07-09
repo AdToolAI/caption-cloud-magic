@@ -92,7 +92,8 @@ function detectCanonicalBriefingTiming(briefing: ComposerBriefing, briefingText:
 
   // Strongest signal: explicit total duration words in the actual briefing.
   const explicitTotalPatterns = [
-    /(?:gesamt\s*dauer|gesamtdauer|gesamt\s*länge|gesamtlaenge|gesamtlänge|total\s*duration|filmdauer|film\s*dauer|video\s*dauer|spot\s*dauer|laufzeit|länge|laenge|dauer|duration)\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
+    /(?:gesamt\s*dauer|gesamtdauer|gesamt\s*länge|gesamtlaenge|gesamtlänge|total\s*duration|filmdauer|film\s*dauer|video\s*dauer|spot\s*dauer|laufzeit)(?:\s+(?:des|der|vom|für|fuer|of)\s+(?:videos?|films?|spots?|ads?))?\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
+    /(?:dauer|duration|länge|laenge)\s+(?:des|der|vom|für|fuer|of)\s+(?:videos?|films?|spots?|ads?)\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
     /(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b\s*(?:gesamt|total|insgesamt|overall|film|video|spot)\b/i,
     /\b(?:film|video|spot)\b[^\n]{0,80}?\b(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
     /(?:ziel|vorgabe|briefing)\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
