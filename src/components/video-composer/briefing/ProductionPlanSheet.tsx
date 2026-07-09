@@ -1594,7 +1594,12 @@ export default function ProductionPlanSheet({
           {step === 'review' && plan && (
             <>
               <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
-              <Button onClick={handleApply} disabled={applying} className="gap-2">
+              <Button
+                onClick={handleApply}
+                disabled={applying || durationInconsistent}
+                className="gap-2"
+                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : undefined}
+              >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Plan anwenden
               </Button>
