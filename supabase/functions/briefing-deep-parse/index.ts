@@ -2349,6 +2349,10 @@ YOU MUST:
     // failures caused the table to receive ZERO new rows since Jun 23.
     let version = 1;
     let persistError: string | null = null;
+    // Hoist so it stays in scope for the final response payload.
+    const durationAutoExtend: any[] = Array.isArray((plan as any).__durationAutoExtend)
+      ? (plan as any).__durationAutoExtend
+      : [];
     try {
       if (projectId) {
         const { data: prev } = await supabase
@@ -2362,9 +2366,6 @@ YOU MUST:
       }
       const locResolutionForMeta = (plan as any)._locationResolution ?? null;
       const voicePoolForMeta = (plan as any)._voicePoolStats ?? null;
-      const durationAutoExtend = Array.isArray((plan as any).__durationAutoExtend)
-        ? (plan as any).__durationAutoExtend
-        : [];
       try { delete (plan as any)._locationResolution; } catch { /* noop */ }
       try { delete (plan as any)._voicePoolStats; } catch { /* noop */ }
       try { delete (plan as any).__durationAutoExtend; } catch { /* noop */ }
