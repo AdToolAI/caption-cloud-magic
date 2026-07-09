@@ -1358,6 +1358,11 @@ export default function ProductionPlanSheet({
                               </Button>
                             )}
                           </div>
+                          {!selectedLocation && (loc as any)?.description && (
+                            <div className="text-[10px] text-muted-foreground italic pl-1 line-clamp-2">
+                              Setting: {(loc as any).description}
+                            </div>
+                          )}
                         </div>
                         );
                       })()}
