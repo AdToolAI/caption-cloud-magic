@@ -287,6 +287,13 @@ export const PlanMeta = z.object({
     scenesMatched: z.number().int().min(0),
     scenesInScript: z.number().int().min(0),
   }).partial({ repairedTexts: true, repairedSpeakers: true, scenesMatched: true, scenesInScript: true }).optional(),
+  /**
+   * T-1 — Debug envelope attached client-side from the briefing-deep-parse
+   * response. Only rendered when the ProductionPlanSheet is opened with
+   * `?debug=1` in the URL. Free-form on purpose: shape mirrors the server's
+   * response envelope (models used, timings, ensemble/strict-cast stats).
+   */
+  debug: z.record(z.string(), z.any()).optional(),
 }).partial();
 
 export const ProductionPlan = z.object({

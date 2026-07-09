@@ -640,6 +640,29 @@ export function useStoryboardTransition({
       const data = await res.json();
       const { plan, dropped, error: validationErr } = parsePlan(data);
       if (!plan) throw new Error(validationErr || 'Plan-Validierung fehlgeschlagen');
+
+      // T-1 — attach the response envelope onto plan._meta.debug so the
+      // ProductionPlanSheet can surface parser diagnostics behind ?debug=1
+      // without a second round-trip.
+      try {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          debug: {
+            passA_model: data?.passA_model ?? null,
+            passB_model: data?.passB_model ?? null,
+            passA_error: data?.passA_error ?? null,
+            passB_error: data?.passB_error ?? null,
+            passA_diagnostics: data?.passA_diagnostics ?? [],
+            passB_diagnostics: data?.passB_diagnostics ?? [],
+            timings: data?.timings ?? null,
+            ensemble_repair: data?.ensemble_repair ?? null,
+            strict_cast: data?.strict_cast ?? null,
+            fidelity: data?.fidelity ?? null,
+            version: data?.version ?? null,
+          },
+        };
+      } catch { /* non-fatal — debug chip just stays hidden */ }
+
       if (dropped > 0) {
         toast({
           title: 'Plan teilweise übernommen',
