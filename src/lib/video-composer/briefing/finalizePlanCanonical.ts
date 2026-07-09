@@ -291,6 +291,61 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
     actions.push(`project-total:${projectTotal}s→${target}s`);
   }
 
+  // Typisierter Repair-Log — Klartext für den Kunden.
+  const repairLog: RepairEntry[] = [];
+  if (source === 'canonical-briefing' && Number.isFinite(projectTotal) && Math.abs(projectTotal - target) >= 0.5) {
+    repairLog.push({
+      kind: 'duration-normalized',
+      label: `Gesamtdauer an dein Briefing/Skript angepasst: ${projectTotal}s → ${target}s.`,
+      before: projectTotal,
+      after: target,
+    });
+  } else if (Number.isFinite(projectTotal) && Math.abs(projectTotal - target) >= 0.5) {
+    repairLog.push({
+      kind: 'project-total-corrected',
+      label: `Gesamtdauer an die Szenensumme angeglichen: ${projectTotal}s → ${target}s.`,
+      before: projectTotal,
+      after: target,
+    });
+  }
+  if (redistributed.changed) {
+    repairLog.push({
+      kind: 'scenes-redistributed',
+      label: `Szenendauern proportional neu verteilt (${currentSum}s → ${target}s).`,
+      before: currentSum,
+      after: target,
+    });
+  }
+  if (source === 'scene-sum' && canonicalDur && Math.abs(canonicalDur - currentSum) >= 0.5) {
+    repairLog.push({
+      kind: 'canonical-ignored',
+      label: `Widersprüchliche Briefing-Dauer (${canonicalDur}s) ignoriert — Szenensumme (${target}s) gewinnt.`,
+      before: canonicalDur,
+      after: target,
+    });
+  }
+  if (sanitized.droppedCharIds > 0) {
+    repairLog.push({
+      kind: 'cast-ids-sanitized',
+      label: `${sanitized.droppedCharIds} ungültige Charakter-Zuordnung${sanitized.droppedCharIds === 1 ? '' : 'en'} entfernt (kein Match in deiner Charakter-Bibliothek).`,
+      before: sanitized.droppedCharIds,
+    });
+  }
+  if (sanitized.droppedVoiceIds > 0) {
+    repairLog.push({
+      kind: 'voice-ids-sanitized',
+      label: `${sanitized.droppedVoiceIds} versehentlich gesetzte Voice-ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} entfernt (Voice wird sauber aus dem Charakter-Default nachgeladen).`,
+      before: sanitized.droppedVoiceIds,
+    });
+  }
+  if (source === 'default') {
+    repairLog.push({
+      kind: 'default-fallback',
+      label: `Fallback-Gesamtdauer gesetzt (${target}s) — dein Briefing enthielt keine klare Zeitangabe.`,
+      after: target,
+    });
+  }
+
   const nextPlan: TProductionPlan = {
     ...(plan as any),
     project: {
@@ -309,6 +364,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
           previousTotal,
           previousSum,
           actions,
+          repairLog,
           consistent,
           at: new Date().toISOString(),
         },
@@ -325,6 +381,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
       previousTotal,
       previousSum,
       actions,
+      repairLog,
       consistent,
     },
   };
