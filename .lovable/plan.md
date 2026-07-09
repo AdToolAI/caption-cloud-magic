@@ -1,216 +1,136 @@
-## Tiefenanalyse: was wirklich schief läuft
 
-Ja: dein Briefing ist eindeutig.
+# Refactor-Plan: Briefing → Storyboard Pipeline
 
-```text
-Länge: 15 Sekunden
-Szenen: 1 durchgehende Szene
-Sprecher: 4 Personen
-Timing: 0–3 / 3–6 / 6–9 / 9–12 / 12–15
-```
+## Kurzbewertung (Ist-Zustand)
 
-Ein professioneller Parser muss daraus machen:
+Die Logik ist **funktional korrekt geworden**, aber **architektonisch nicht sauber**: dieselbe Aufgabe wird an 3–4 Stellen parallel gelöst. Konkret gemessen im Audit:
 
-```text
-1 Hauptszene, 15s
-innerhalb dieser Szene:
-  - Turn 1: Sprecher 1, 0–3s
-  - Turn 2: Sprecher 2, 3–6s
-  - Turn 3: Sprecher 3, 6–9s
-  - Turn 4: Sprecher 4, 9–12s
-  - Endcard/Overlay, 12–15s
-```
+- **Scene-Contract-Detection**: 2× (Server + Client, regex-identisch)
+- **Duration-Detection**: 2× (Server 4 Patterns, Client 7 Patterns → können divergieren)
+- **Scene-Merge-to-1**: 3 unabhängige Implementierungen
+- **Scene-Count-Align / Redistribution**: 3 unterschiedliche Algorithmen auf denselben Daten
+- **`totalDurationSec` Schreibstellen**: 11 entlang der Pipeline
+- **`finalizePlanCanonical`**: läuft **4×** pro Apply-Vorgang
+- **`normalizeAssetKey`**: 4 lokale Kopien
+- **`shouldInheritContinuity`**: 2 identische Kopien
+- **Cast-Dedup**: 2 Implementierungen
+- **`BriefingTab`** nutzt eine **komplett andere Edge-Function** (`compose-video-storyboard`) und umgeht die ganze Pipeline
 
-Nicht:
+**Risikohotspot**: `ProductionPlanSheet.tsx` hat einen Feedback-Loop (`useMemo safePlan` → `useEffect onUpdateBriefing` → `currentBriefing` → `safePlan` neu). Nur ein Signature-Ref verhindert die Endlosschleife.
 
-```text
-5 Szenen à 3s
-```
+Fazit: sauber wäre **eine Quelle der Wahrheit pro Concern**. Das ist der Plan.
 
-## Eigentliche Ursache
+---
 
-Das Problem ist nicht primär die KI. Das Problem ist unsere Logik vor und nach der KI.
-
-Wir haben aktuell mehrere Reparatur-/Fallback-Schichten, die alle gut gemeint sind, aber dieselben Daten unterschiedlich interpretieren:
-
-1. **`detectCanonicalBriefingTiming`** erkennt zwar `15s`, aber `sceneCount` ist zu schwach.
-   - Es erkennt einfache Muster wie `3 Szenen`.
-   - Es versteht aber nicht ausreichend stark: `Szenen: 1 durchgehende Szene`.
-   - Noch schlimmer: Zeitfenster wie `0–3`, `3–6`, `6–9`, `9–12`, `12–15` können als “Windows” gezählt werden und dadurch indirekt wie 5 Einheiten wirken.
-
-2. **`detectScriptTimingMode.ts` vermischt Hauptszenen und Sprecher-Turns.**
-   - Der Code behandelt `Sprecher 1`, `Sprecher 2`, `Sprecher 3`, `Sprecher 4` schnell als einzelne Shots/Szenen.
-   - In deinem Briefing sind das aber eindeutig Sprecherwechsel innerhalb einer durchgehenden Szene.
-
-3. **Die Server-Anweisung ist falsch formuliert, wenn Script-Timing aktiv ist.**
-   - Dort steht sinngemäß: “Emit exactly N scenes — one per shot marker.”
-   - Wenn der Detector aus Sprecher-/Timingsegmenten N=5 macht, erzwingt der Server genau den falschen Plan.
-
-4. **`applyCanonicalTimingToPlan` korrigiert aktuell Dauer, aber nicht zuverlässig Szenenanzahl.**
-   - Deshalb entsteht jetzt der neue Screenshot-Zustand: `15s · 5 Szenen`.
-   - Das ist besser als 50s, aber immer noch falsch.
-
-5. **`finalizePlanCanonical` prüft nur Dauer-Konsistenz, nicht Briefing-Szenenanzahl.**
-   - Darum kann die UI grün sagen “Plan passt”, obwohl `1 Szene` im Briefing steht und `5 Szenen` im Plan stehen.
-
-## Saubere Ziel-Architektur
-
-Wir brauchen eine harte Trennung:
+## Ziel-Architektur
 
 ```text
-BriefingContract
-  durationSec: 15
-  sceneCount: 1
-  continuousScene: true
-  timingSegments: [0-3, 3-6, 6-9, 9-12, 12-15]
-  speakerTurns: [Sprecher 1, Sprecher 2, Sprecher 3, Sprecher 4]
+BriefingTab ──► briefing-deep-parse (Edge)
+                 │
+                 ├─ detectScriptTimingMode
+                 ├─ detectBriefingContract  ◄── EINZIGE Detection
+                 ├─ Pass A (LLM) + LITERAL/SCRIPT_LOCK
+                 ├─ mergeScenesToOne / align (Server-Autorität)
+                 └─ Response: { plan, _meta.briefingContract }
+                                    │
+                                    ▼
+                        useStoryboardTransition
+                        (nur Transport, keine Re-Detection)
+                                    │
+                                    ▼
+                        ProductionPlanSheet
+                        • zeigt plan an
+                        • Validierung READ-ONLY (Warnungen)
+                        • KEIN safePlan-useMemo
+                        • KEIN Write-Back auf Briefing
+                                    │
+                                    ▼
+                        useApplyProductionPlan
+                        finalizePlanCanonical()  ◄── EINMAL, hier
+                        → DB-Write
 ```
 
-Danach gilt:
+**Kernregel**: Der Server ist die **Autorität** für Contract & Timing. Der Client **liest** `_meta.briefingContract`, transformiert nicht mehr eigenständig, sondern **validiert** und **repariert nur einmal** kurz vor dem Schreiben.
 
-```text
-sceneCount steuert plan.scenes.length
-speakerTurns steuern scenes[0].dialogTurns
-Timing-Segmente steuern dialogTurns/time hints, NICHT sceneCount
-```
+---
 
-## Umsetzungsplan
+## Phasen
 
-### 1. `BriefingContract` als zentrale Autorität einführen
-
-Eine neue, deterministische Hilfslogik extrahiert aus dem Originalbriefing:
-
-- explizite Gesamtdauer
-- explizite Hauptszenenanzahl
-- ob es eine durchgehende Szene ist
-- Timingsegmente
-- Sprecher-Turns
-- Endcard/Overlay-Hinweise
-
-Für dein Beispiel muss diese Funktion exakt liefern:
+### Phase 1 — Shared Contract (Grundlage)
+Neue Datei `src/lib/video-composer/briefing/briefingContract.ts` (Deno-kompatibel für Server-Import):
 
 ```ts
-{
-  durationSec: 15,
-  sceneCount: 1,
-  continuousScene: true,
-  source: 'explicit-briefing',
-  timingSegments: [
-    { start: 0, end: 3 },
-    { start: 3, end: 6 },
-    { start: 6, end: 9 },
-    { start: 9, end: 12 },
-    { start: 12, end: 15, kind: 'endcard' }
-  ],
-  speakerTurns: [
-    { label: 'Sprecher 1', text: 'Mit AdTool AI erstellst du…' },
-    { label: 'Sprecher 2', text: '…realistische Lip-Sync-Videos…' },
-    { label: 'Sprecher 3', text: '…mit mehreren Sprechern…' },
-    { label: 'Sprecher 4', text: '…die perfekt zusammenpassen.' }
-  ]
+export interface BriefingContract {
+  totalDurationSec: number;
+  sceneCount: number | null;
+  explicitSceneCount: boolean;
+  continuousScene: boolean;
+  scriptTimingMode: 'SHOT_MARKERS' | 'SPEAKER_BLOCKS' | 'FREETEXT' | 'LITERAL';
+  source: 'explicit-total' | 'scene-math' | 'time-windows' | 'shot-markers' | 'board';
+  windows?: Array<{ start: number; end: number }>;
 }
 ```
+Server schreibt in `plan._meta.briefingContract`. `ProductionPlan`-Zod-Schema um dieses Feld erweitern.
 
-### 2. Parser-Priorität ändern
+### Phase 2 — Server als einzige Detection-Autorität
+- `detectBriefingContract()` im Edge-Function konsolidieren (heute: `detectExplicitSceneContract` + `detectExplicitBriefingTiming` + `parseSmallSceneCount`). Alle Regex-Varianten des Clients übernehmen, damit keine Divergenz mehr entsteht.
+- Emit `_meta.briefingContract` in der Response.
+- Server-Reihenfolge fixieren (dokumentiert im Code-Kommentar): `detect → LLM → merge → align → redistribute → sync total`. Nach `sync total` **keine** weiteren Duration-Writes.
 
-Neue Regel:
+### Phase 3 — Client entkernen
+- `useStoryboardTransition.ts`: `detectSceneContract`, `detectCanonicalBriefingTiming`, `mergeScenesToSingleScene`, `alignPlanScenesToCanonicalTiming`, `applyCanonicalTimingToPlan` **entfernen**. Stattdessen: `readBriefingContract(plan)` (dünner Reader).
+- `finalizePlanCanonical.ts` bleibt, **aber** liest ausschließlich `_meta.briefingContract` — keine Text-Re-Analyse mehr.
+- Fallback-Plan-Builder im Hook: nutzt denselben Reader, kein eigener Detector.
 
-```text
-Explizite Hauptszenenanzahl gewinnt immer vor Timingsegmenten und Sprecherblöcken.
-```
+### Phase 4 — ProductionPlanSheet vereinfachen
+- `useMemo safePlan` **entfernen**. Sheet zeigt `plan`-State direkt.
+- `useEffect` auf `initialPlan`: läuft **einmalig**, ruft `finalizePlanCanonical` **nicht** hier auf, sondern nur beim Apply.
+- Validierungs-`useMemo` (READ-ONLY) liefert nur Warnungen für `SafePlanNotice`.
+- `onUpdateBriefing({ duration })` Feedback-Loop **entfernen** — die Briefing-Duration ist ab Response fest, Änderungen sind reine UI-Overrides.
 
-Konkret:
+### Phase 5 — Apply-Pfad als einziger Finalizer
+- `useApplyProductionPlan.applyPlan()` ruft `finalizePlanCanonical(plan)` **genau einmal** direkt vor dem DB-Write auf.
+- Inline `dedupMap` (Zeile 318–343) durch `dedupePlanScenesCast` aus `planCastDedup.ts` ersetzen.
 
-- `Szenen: 1 durchgehende Szene` gewinnt vor `0–3`, `3–6`, `6–9`, `9–12`, `12–15`.
-- `Eine Szene, 15 Sekunden` gewinnt vor `Sprecher 1–4`.
-- Nur wenn keine Hauptszenenanzahl angegeben ist, dürfen Timingmarker Hauptszenen erzeugen.
+### Phase 6 — Helper-Konsolidierung
+Neue Utility-Module, jeweils **eine** Definition:
+- `src/lib/video-composer/briefing/assetKeyUtils.ts` → `normalizeAssetKey` (ersetzt 4 Kopien)
+- `src/lib/video-composer/briefing/planContinuity.ts` → `shouldInheritContinuity` (ersetzt 2 Kopien)
+- `src/lib/video-composer/briefing/planSceneOps.ts` → `mergeScenesToOne`, `alignSceneCount`, `redistributeSceneDurations` (ersetzt 3+3+3 Kopien; Server importiert per Deno-`npm:`-kompatiblem Pfad oder erhält einen 1:1-Mirror + Deno-Test der Verhaltensgleichheit)
 
-### 3. Server-Prompt und Server-Guard korrigieren
+### Phase 7 — BriefingTab an Pipeline anschließen
+- `BriefingTab.handleGenerateStoryboard` migrieren: statt `compose-video-storyboard` → `briefing-deep-parse` → `useApplyProductionPlan`.
+- Inline-Multi-Cast-Rewrite (Zeilen 349–430) **löschen** — Server macht das jetzt zentral.
+- (Falls `compose-video-storyboard` andere Aufrufer hat: separaten Adapter behalten; sonst deprecaten.)
 
-Der Server darf bei `continuousScene=true` nicht mehr sagen:
+### Phase 8 — Zod-Härtung & Tests
+- `PlanScene.durationSec`: `.catch(5)` durch `.default(0)` + expliziten Repair-Log-Eintrag ersetzen, damit stiller Duration-Drift sichtbar wird.
+- Regressionstests erweitern (`useStoryboardTransitionTiming.test.ts`, `finalizePlanCanonical.test.ts`) auf:
+  - 15s / 1 durchgehende Szene / 4 Sprecher (das aktuelle Referenz-Briefing)
+  - 15s / 3 Szenen à 5s
+  - LITERAL-Mode / SHOT_MARKERS / SPEAKER_BLOCKS / FREETEXT
+  - Alterspannen wie „30–45 Jahre" dürfen Duration nicht kapern
+- Deno-Test für Server-Detector mit denselben Fixtures (Client/Server-Parität).
 
-```text
-one scene per speaker/shot marker
-```
+### Phase 9 — Debug/Version-Chip
+- `BriefingPlanSummary` zeigt `briefingContract.source` + Pipeline-Version (`v213 → v214`) prominent.
+- Debug-Panel (`?debug=1`) listet die genutzte Contract-Quelle statt der aktuellen 3 separaten Detection-Blöcke.
 
-Sondern:
+---
 
-```text
-Emit exactly 1 scene.
-Put all speaker lines into dialogTurns of that scene.
-Use timing segments as internal timing hints only.
-```
+## Aus dem Refactor bewusst rausgehalten
+- Keine Änderungen an Rendering, Lipsync, Lambda-Config, Credits, Auth, Design-System.
+- Keine neuen Features — nur Konsolidierung existierender Logik.
+- Keine Schema-Migration (nur additiv: `_meta.briefingContract`).
 
-Außerdem wird nach Pass A deterministisch geprüft:
+## Erwartetes Ergebnis
+- **1** Detection-Ort statt 2
+- **1** Merge-/Align-Ort statt 3
+- **1** Finalize-Aufruf statt 4
+- **0** Feedback-Loops zwischen Sheet und Briefing-State
+- **1** Edge-Function für alle Briefing-Eingänge
+- Kunden-sichtbar: Kein Verhalten ändert sich; Stabilität und Nachvollziehbarkeit steigen deutlich.
 
-- Wenn Contract `sceneCount=1`, aber Modell 5 Szenen liefert:
-  - merge zu 1 Szene
-  - alle Dialog-Turns übernehmen
-  - alle Cast-Slots deduplizieren
-  - Location/Setting/Kamera/Movement zusammenführen
-  - Endcard als `textOverlay`/Brand-Hinweis behalten
-
-### 4. Client-Finalizer erweitern
-
-`finalizePlanCanonical` bekommt zusätzlich zur Dauer-Invariante eine Szenenanzahl-Invariante:
-
-```text
-Wenn canonical_timing.sceneCount vorhanden ist:
-  plan.scenes.length muss exakt sceneCount sein
-```
-
-Wenn nicht:
-
-- bei `sceneCount=1`: Szenen mergen
-- bei `sceneCount>1`: Szenen trimmen/padden/redistributieren nur nach explizitem Contract
-- UI darf erst dann grün werden, wenn Dauer UND Szenenanzahl passen
-
-### 5. Local Fallback reparieren
-
-Der lokale Fallback ist aktuell ebenfalls verdächtig:
-
-```ts
-const sceneCount = Math.max(canonicalTiming?.sceneCount ?? 0, hints.length, defaultBeats.length)
-```
-
-Das ist bei explizit `1 Szene` falsch, weil `defaultBeats.length = 3` die 1 überschreiben kann.
-
-Neue Regel:
-
-```text
-Wenn sceneCount explizit erkannt wurde, darf defaultBeats nicht erhöhen.
-```
-
-### 6. Tests mit deinem Briefing
-
-Ich ergänze Regressionen für genau deinen Text:
-
-- `15 Sekunden` erkannt
-- `1 durchgehende Szene` erkannt
-- `0–3 / 3–6 / 6–9 / 9–12 / 12–15` werden als interne Segmente erkannt
-- `Sprecher 1–4` werden als Dialog-Turns erkannt
-- Server-artiger Fehlplan mit 5 Szenen wird zu 1 Szene gemerged
-- Local fallback erzeugt nicht mehr 3 oder 5 Szenen
-- SafePlanNotice ist nur grün bei `15s · 1 Szene`
-
-## Ergebnis
-
-Nach Umsetzung muss dein Beispiel im Production Plan anzeigen:
-
-```text
-Plan passt zu deinem Briefing
-15s · 1 Szene
-Quelle: Briefing/Skript
-```
-
-Und in der Szene:
-
-```text
-Cast: 4 Personen
-DialogTurns: 4 Sprecher
-Setting: Creator-Studio / Startup-Büro / Filmset
-Movement: langsames gemeinsames Tracking auf Kamera
-Endcard: AdTool AI / Multi-Speaker-Lip-Sync in Minuten
-```
-
-Das löst nicht nur diesen Einzelfall, sondern die Grundlogik: Hauptszenen, Sprecherwechsel und Timingsegmente werden künftig nicht mehr vermischt.
+## Umsetzungsreihenfolge (empfohlen, in Build-Modus)
+Phase 1 → 2 → 8 (Tests grün auf altem Client) → 3 → 4 → 5 → 6 → 7 → 9.
+Nach jeder Phase Tests laufen; Client bleibt kompatibel, weil neue Felder additiv sind.

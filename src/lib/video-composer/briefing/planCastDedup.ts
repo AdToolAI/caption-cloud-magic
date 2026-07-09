@@ -27,15 +27,7 @@ export interface PlanCastSlot {
   [k: string]: unknown;
 }
 
-function normalizeAssetKey(value?: string | null): string {
-  return String(value ?? '')
-    .trim()
-    .replace(/^@/, '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '');
-}
+import { normalizeAssetKey } from './assetKeyUtils';
 
 function keyOf(c: PlanCastSlot): string {
   const id = typeof c?.characterId === 'string' ? c.characterId.toLowerCase().trim() : '';

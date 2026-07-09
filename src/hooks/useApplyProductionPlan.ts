@@ -87,20 +87,7 @@ function emptyPlanCastSlot(sceneIndex: number): PlanCastSlot {
   };
 }
 
-function shouldInheritPlanContinuity(scene: TPlanScene, axis: 'cast' | 'location') {
-  const haystack = [
-    scene.continuityHint,
-    scene.anchorPromptEN,
-    scene.label,
-    scene.beat,
-    scene.voiceover?.text,
-  ].filter(Boolean).join(' ').toLowerCase();
-  if (axis === 'cast') {
-    return scene.lipSync || !!scene.voiceover?.text || !!scene.dialogTurns?.length
-      || /(same|gleiche|gleichen|selbe|derselbe|avatar|founder|sprecher|speaker|charakter|character)/i.test(haystack);
-  }
-  return /(same|gleiche|gleichen|selbe|derselbe|desk|location|ort|setting|home\s*office|büro|office)/i.test(haystack);
-}
+import { shouldInheritContinuity as shouldInheritPlanContinuity } from '@/lib/video-composer/briefing/planContinuity';
 
 function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   let lastCast: PlanCastSlot | null = null;
