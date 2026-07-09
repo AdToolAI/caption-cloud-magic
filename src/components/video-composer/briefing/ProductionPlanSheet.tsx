@@ -972,6 +972,43 @@ export default function ProductionPlanSheet({
         {step === 'review' && plan && (
           <ScrollArea className="h-full min-h-0 pr-3 -mr-1">
             <div className="space-y-3">
+              {/* v215 — Konsistenz-Blocker: nur sichtbar, wenn Projekt-Total und
+                  Szenensumme voneinander abweichen. Wenn sichtbar → Apply ist blockiert. */}
+              {durationInconsistent && (
+                <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Plan inkonsistent — Apply blockiert
+                  </div>
+                  <div className="text-muted-foreground">
+                    Projekt-Gesamtdauer <b>{plan.project?.totalDurationSec}s</b> passt nicht
+                    zur Szenensumme <b>{totalPlanSec}s ({plan.scenes.length} Szenen)</b>.
+                    Bitte Szenendauern korrigieren oder das Briefing neu analysieren.
+                  </div>
+                </div>
+              )}
+
+              {/* v215 — Diagnose-Chip: zeigt, aus welcher Quelle die Gesamtdauer
+                  final gesetzt wurde und ob der Plan konsistent normalisiert ist. */}
+              {normalizationMeta && (
+                <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                  <Badge variant="outline" className="border-emerald-400/40 text-emerald-300">
+                    Normalisiert · {normalizationMeta.totalDurationSec}s
+                  </Badge>
+                  <Badge variant="outline" className="border-cyan-400/40 text-cyan-300">
+                    Quelle: {normalizationMeta.durationSource === 'canonical-briefing' ? 'Briefing/Skript'
+                      : normalizationMeta.durationSource === 'plan-project' ? 'Projekt'
+                      : normalizationMeta.durationSource === 'scene-sum' ? 'Szenensumme'
+                      : 'Default'}
+                  </Badge>
+                  {Array.isArray(normalizationMeta.actions) && normalizationMeta.actions.length > 0 && (
+                    <Badge variant="outline" className="border-amber-400/40 text-amber-300" title={normalizationMeta.actions.join(' · ')}>
+                      {normalizationMeta.actions.length} Auto-Fixes
+                    </Badge>
+                  )}
+                </div>
+              )}
+
               {/* Projekt */}
               <SectionCard title="Projekt">
                 <Row label="Name" value={plan.project?.name} />
