@@ -327,17 +327,45 @@ export function detectBriefingFidelity(b: ComposerBriefing): {
 } {
   const src = String(b.productDescription ?? '');
   const hasSceneMarkers = /(?:^|\n)\s*(?:szene|scene|shot)\s*\d+\b/i.test(src);
-  // NAME: text  — 2+ chars, uppercase-first token (letters + optional digits like
-  // "Sprecher 1"), followed by a colon/dash and text OR a newline + non-space
-  // (script blocks where the line begins under the label, e.g. Sprecher 1:\n„…").
-  const speakerRe = /(?:^|\n)\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*[:—-][ \t]*(?:\r?\n\s*)?["„'“‚«»›‹]?\S/g;
+  // Colon OR whitespace-hyphen/em-dash. NO in-word hyphen (so "Close-up" won't match).
+  const speakerRe = /(?:^|\n)\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\.\s]{0,30}?)\s*(?::|\s[—–-]\s)[ \t]*(?:\r?\n\s*)?["„'“‚«»›‹]?\S/g;
+
+  const norm = (s: string) => String(s ?? '').toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+  const castNorms = new Set<string>();
+  const castFirstNorms = new Set<string>();
+  for (const c of b.characters ?? []) {
+    const n = norm(c.name);
+    if (n) castNorms.add(n);
+    const first = String(c.name ?? '').trim().split(/\s+/)[0];
+    const fn = norm(first);
+    if (fn) castFirstNorms.add(fn);
+  }
+  const matchesCast = (raw: string): boolean => {
+    const n = norm(raw);
+    if (!n) return false;
+    if (castNorms.has(n) || castFirstNorms.has(n)) return true;
+    for (const cn of castNorms) if (cn.startsWith(n) || n.startsWith(cn)) return true;
+    return false;
+  };
+
+  const DENY = /^(szene|scene|shot|hook|reveal|cta|pain|proof|beat|kamera|camera|framing|mood|note|tone|dialog|dialogue|voiceover|vo|inhalt|briefing|thema|target|zielgruppe|projekt|project|duration|dauer|aspect|format|ratio|style|stil|ton|tonalitat|setting|location|endcard|optional|empfohlen|nicht|text|on|off|studio|helles|medium|close|wide|pan|tracking|push|cinematic|perfekter|realistische|split|creator|nach|da|sondern|create|die|der|das|ein|eine|clean|heroisch|heroischer|vier|benennt|erstelle)$/i;
+
   const labels = new Set<string>();
   for (const m of src.matchAll(speakerRe)) {
     const raw = (m[1] ?? '').replace(/\s+/g, ' ').trim();
-    // Filter obvious non-speaker prefixes (Section titles etc.)
-    if (/^(szene|scene|shot|hook|reveal|cta|pain|proof|beat|kamera|framing|mood|note|tone|dialog|dialogue|voiceover|vo|inhalt|briefing|thema|target|zielgruppe|projekt|project|duration|dauer|aspect|format|ratio|style|stil|ton|tonalität)$/i.test(raw)) continue;
-    if (raw.length < 2 || raw.length > 40) continue;
-    labels.add(raw);
+    if (raw.length < 2 || raw.length > 32) continue;
+    const tokens = raw.split(/\s+/);
+    if (tokens.length > 3) continue;
+    if (tokens.some((t) => DENY.test(t))) continue;
+
+    // All-caps screenplay label (SAMUEL, SPRECHER 1, MATTHEW DUSATKO)?
+    const allCaps = tokens.every((t) => /^[A-ZÄÖÜ][A-ZÄÖÜ0-9\.]*$/.test(t) || /^\d+$/.test(t));
+    if (allCaps) { labels.add(raw); continue; }
+
+    // Otherwise: only accept when it matches a briefed cast member.
+    if (matchesCast(raw)) labels.add(raw);
   }
   const speakerLabels = Array.from(labels);
   const hasSpeakerLines = speakerLabels.length > 0;
