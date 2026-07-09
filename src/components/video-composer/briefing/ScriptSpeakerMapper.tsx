@@ -162,7 +162,7 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
         })}
       </div>
 
-      {fidelity.speakerLabels.some((l) => !(speakerMap[l] ?? autoMatch(l, characters))) && (
+      {cleanLabels.some((l) => !(speakerMap[l] ?? autoMatch(l, characters))) && (
         <p className="text-[11px] text-destructive/80">
           {t(
             '⚠ Manche Labels haben keine Zuordnung — die KI wird sie erraten.',
