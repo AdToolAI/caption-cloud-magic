@@ -29,12 +29,58 @@ function parsePositiveSeconds(raw: string | undefined): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
 }
 
-function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; sceneCount?: number; source: 'explicit-total' | 'scene-math' | 'time-windows' } | null {
+function parseSmallSceneCount(raw: string | undefined): number | null {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (!value) return null;
+  const n = Number(value.replace(',', '.'));
+  if (Number.isFinite(n) && n >= 1 && n <= 12) return Math.round(n);
+  const words: Record<string, number> = {
+    ein: 1, eine: 1, einen: 1, einer: 1, eines: 1, one: 1, single: 1,
+    zwei: 2, two: 2,
+    drei: 3, three: 3,
+    vier: 4, four: 4,
+    fünf: 5, fuenf: 5, five: 5,
+    sechs: 6, six: 6,
+    sieben: 7, seven: 7,
+    acht: 8, eight: 8,
+    neun: 9, nine: 9,
+    zehn: 10, ten: 10,
+    elf: 11, eleven: 11,
+    zwölf: 12, zwoelf: 12, twelve: 12,
+  };
+  return words[value] ?? null;
+}
+
+function detectExplicitSceneContract(rawInput: string): { sceneCount?: number; continuousScene?: boolean; explicitSceneCount?: boolean } {
+  const raw = String(rawInput ?? '');
+  const continuousRe = /\b(?:(?:eine?|1|one|single)\s+(?:durchgehende|zusammenh[aä]ngende|kontinuierliche|ununterbrochene|continuous|uninterrupted|single|one[-\s]?take)\s+(?:szene|scene)|(?:szene|scene)\s*(?:[:=\-–—]\s*)?(?:eine?|1|one|single)\s+(?:durchgehende|zusammenh[aä]ngende|kontinuierliche|ununterbrochene|continuous|uninterrupted|single|one[-\s]?take)?\s*(?:szene|scene)?)\b/i;
+  const field = raw.match(/(?:^|\n)\s*(?:szenen?|scenes?|scene\s*count|anzahl\s+szenen?)\s*[:=\-–—]\s*(?:ca\.?\s*)?([1-9]\d?|ein(?:e[rsn]?)?|one|single|zwei|two|drei|three|vier|four|f[üu]nf|fuenf|five|sechs|six|sieben|seven|acht|eight|neun|nine|zehn|ten|elf|eleven|zw[öo]lf|zwoelf|twelve)\b([^\n]*)/i);
+  if (field) {
+    const count = parseSmallSceneCount(field[1]);
+    if (count) {
+      const suffix = String(field[2] ?? '');
+      return {
+        sceneCount: count,
+        continuousScene: count === 1 && (continuousRe.test(field[0]) || /\b(?:durchgehend|durchgehende|zusammenh[aä]ngend|kontinuierlich|ununterbrochen|continuous|uninterrupted|one[-\s]?take|single)\b/i.test(suffix)),
+        explicitSceneCount: true,
+      };
+    }
+  }
+  const countBeforeUnit = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
+  const count = countBeforeUnit ? Number(countBeforeUnit[1]) : undefined;
+  if (count && count >= 1 && count <= 12) {
+    return { sceneCount: count, continuousScene: count === 1 && continuousRe.test(raw), explicitSceneCount: true };
+  }
+  if (continuousRe.test(raw)) return { sceneCount: 1, continuousScene: true, explicitSceneCount: true };
+  return {};
+}
+
+function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; sceneCount?: number; continuousScene?: boolean; explicitSceneCount?: boolean; source: 'explicit-total' | 'scene-math' | 'time-windows' } | null {
   const raw = String(rawInput ?? '').split(/\n\s*##\s+Project\b/i)[0].trim();
   if (!raw) return null;
 
-  const sceneCountMatch = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
-  const sceneCount = sceneCountMatch ? Number(sceneCountMatch[1]) : undefined;
+  const sceneContract = detectExplicitSceneContract(raw);
+  const sceneCount = sceneContract.sceneCount;
 
   const explicitPatterns = [
     /(?:gesamt\s*dauer|gesamtdauer|gesamt\s*länge|gesamtlaenge|gesamtlänge|total\s*duration|filmdauer|film\s*dauer|video\s*dauer|spot\s*dauer|laufzeit)(?:\s+(?:des|der|vom|für|fuer|of)\s+(?:videos?|films?|spots?|ads?))?\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
@@ -44,12 +90,12 @@ function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; 
   ];
   for (const re of explicitPatterns) {
     const seconds = parsePositiveSeconds(raw.match(re)?.[1]);
-    if (seconds && seconds >= 3) return { durationSec: seconds, sceneCount, source: 'explicit-total' };
+    if (seconds && seconds >= 3) return { durationSec: seconds, sceneCount, continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount, source: 'explicit-total' };
   }
 
   const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b\s*(?:[\/|,;·\-–—]|\(|\[)?\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
   const compactSeconds = parsePositiveSeconds(compact?.[1]);
-  if (compactSeconds && compactSeconds >= 3) return { durationSec: compactSeconds, sceneCount: Number(compact?.[2] ?? sceneCount), source: 'explicit-total' };
+  if (compactSeconds && compactSeconds >= 3) return { durationSec: compactSeconds, sceneCount: Number(compact?.[2] ?? sceneCount), continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount || Boolean(compact?.[2]), source: 'explicit-total' };
 
   const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\b/gi;
   const ageTailRe = /^\s*(?:jahre|jahren|jährig|jaehrig|jährige|jaehrige|years?|yrs?|y\.o\.?)\b/i;
@@ -73,13 +119,13 @@ function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; 
     maxEnd = Math.max(maxEnd, end);
     windows += 1;
   }
-  if (windows >= 2 && maxEnd >= 3) return { durationSec: Math.round(maxEnd * 10) / 10, sceneCount: sceneCount ?? windows, source: 'time-windows' };
+  if (windows >= 2 && maxEnd >= 3) return { durationSec: Math.round(maxEnd * 10) / 10, sceneCount: sceneCount ?? windows, continuousScene: sceneContract.continuousScene, explicitSceneCount: sceneContract.explicitSceneCount, source: 'time-windows' };
 
   const sceneMath = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,60}?(?:à|a|je|each|x|×)\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
   const perScene = parsePositiveSeconds(sceneMath?.[2]);
   if (sceneMath && perScene) {
     const count = Number(sceneMath[1]);
-    return { durationSec: Math.round(count * perScene * 10) / 10, sceneCount: count, source: 'scene-math' };
+    return { durationSec: Math.round(count * perScene * 10) / 10, sceneCount: count, continuousScene: sceneContract.continuousScene, explicitSceneCount: true, source: 'scene-math' };
   }
   return null;
 }
