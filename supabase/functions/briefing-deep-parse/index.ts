@@ -2022,6 +2022,10 @@ YOU MUST:
         }
       }
 
+      if (explicitBriefingTiming?.continuousScene && explicitBriefingTiming.sceneCount === 1 && Array.isArray(manifest?.scenes) && manifest.scenes.length === 1) {
+        applyContinuousScriptTurns(manifest, scriptTiming, explicitBriefingTiming.durationSec);
+      }
+
       // Duration Authority: explicit user briefing beats both board defaults
       // and model-generated speech estimates. For the AdTool-style case
       // ("Länge: ca. 15 Sekunden", "3 Szenen") this locks the manifest to
