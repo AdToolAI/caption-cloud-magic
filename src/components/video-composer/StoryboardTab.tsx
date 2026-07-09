@@ -108,6 +108,7 @@ export default function StoryboardTab({
   characters,
   onAddCharacter,
   preferredAspect,
+  briefingTargetDurationSec,
   onRefetchScenes,
   onEnsurePersisted,
   isGeneratingStoryboard = false,
