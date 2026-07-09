@@ -31,6 +31,10 @@ import BriefingPlanSummary from './BriefingPlanSummary';
 import { resolveCatalogChip } from '@/lib/video-composer/catalog/useCatalogLabel';
 import type { CatalogAxis } from '@/lib/video-composer/catalog';
 import type { MotionStudioCharacter } from '@/types/motion-studio';
+import {
+  DEFAULT_OUTFIT_PRESETS,
+  outfitPresetLabel,
+} from '@/config/defaultOutfitPresets';
 import type {
   ComposerScene,
   AssemblyConfig,
