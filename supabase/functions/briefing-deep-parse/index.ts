@@ -2414,7 +2414,10 @@ YOU MUST:
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, duration_auto_extend: Array.isArray((plan as any).__durationAutoExtend) ? (plan as any).__durationAutoExtend : [] }), {
+    const _canonicalTotal = Number((plan as any)?.project?.totalDurationSec);
+    const _canonicalScenes = Array.isArray((plan as any)?.scenes) ? (plan as any).scenes.length : 0;
+    const _canonicalFromScript = scriptTiming?.mode === 'SHOT_MARKERS' && (scriptTiming?.shots?.length ?? 0) >= 2;
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: Number.isFinite(_canonicalTotal) ? _canonicalTotal : null, scene_count: _canonicalScenes, source: _canonicalFromScript ? 'script' : 'board' }, duration_auto_extend: Array.isArray((plan as any).__durationAutoExtend) ? (plan as any).__durationAutoExtend : [] }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
