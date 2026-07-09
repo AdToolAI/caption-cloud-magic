@@ -33,6 +33,20 @@ function autoMatch(label: string, characters: ComposerCharacter[]): string | nul
   return hit?.id ?? null;
 }
 
+const DENY_TOKEN = /^(szene|scene|shot|hook|reveal|cta|pain|proof|beat|kamera|camera|framing|mood|note|tone|dialog|dialogue|voiceover|vo|inhalt|briefing|thema|target|zielgruppe|projekt|project|duration|dauer|aspect|format|ratio|style|stil|ton|tonalitat|setting|location|endcard|optional|empfohlen|nicht|text|on|off|studio|helles|medium|close|wide|pan|tracking|push|cinematic|perfekter|perfekte|realistische|realistisch|split|creator|nach|da|sondern|create|die|der|das|ein|eine|clean|heroisch|heroischer|vier|benennt|erstelle|leichter|multi|sagen|zeigen|zuschauer|soll|botschaft|videos|video|felder|erscheinen|hauptfeature|hauptfeatu|realistic|cinematic|sprechern|sprecher|lip|sync|office|ganze|dein|erstes|merken)$/i;
+
+function isValidSpeakerLabel(label: string, characters: ComposerCharacter[]): boolean {
+  const raw = String(label ?? '').replace(/\s+/g, ' ').trim();
+  if (raw.length < 2 || raw.length > 32) return false;
+  const tokens = raw.split(/\s+/);
+  if (tokens.length > 3) return false;
+  if (tokens.some((t) => DENY_TOKEN.test(t))) return false;
+  const allCaps = tokens.every((t) => /^[A-ZÄÖÜ][A-ZÄÖÜ0-9.]*$/.test(t) || /^\d+$/.test(t));
+  if (allCaps) return true;
+  // Otherwise only accept when the label matches a briefed cast member.
+  return autoMatch(raw, characters) !== null;
+}
+
 /**
  * Compact panel shown ONLY when the briefing contains an explicit script
  * (LITERAL mode). Lets the user manually map each detected `NAME:` label to
@@ -44,9 +58,19 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
   const characters = briefing.characters ?? [];
   const speakerMap = briefing.speakerMap ?? {};
 
-  // Prune stale mappings (label removed from script, char removed from cast).
+  // Defense-in-depth: re-validate every label here. Even if the detector
+  // regresses or HMR hands us a stale memoized list, garbage bullet titles
+  // ("Studio", "Medium Close", "Empfohlen"…) never render.
+  const cleanLabels = useMemo(
+    () => fidelity.speakerLabels.filter((l) => isValidSpeakerLabel(l, characters)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fidelity.speakerLabels.join('|'), characters.map((c) => `${c.id}:${c.name}`).join('|')],
+  );
+
+  // Prune stale mappings (label removed from script, char removed from cast,
+  // or label was junk from a pre-fix session).
   useEffect(() => {
-    const validLabels = new Set(fidelity.speakerLabels);
+    const validLabels = new Set(cleanLabels);
     const validCharIds = new Set(characters.map((c) => c.id));
     let changed = false;
     const next: Record<string, string> = {};
@@ -57,12 +81,12 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
     }
     if (changed) onUpdateBriefing({ speakerMap: next });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fidelity.speakerLabels.join('|'), characters.map((c) => c.id).join('|')]);
+  }, [cleanLabels.join('|'), characters.map((c) => c.id).join('|')]);
 
-  if (fidelity.mode !== 'literal' || fidelity.speakerLabels.length === 0) return null;
+  if (fidelity.mode !== 'literal' || cleanLabels.length === 0) return null;
   if (characters.length === 0) return null;
   // Hide when nothing confidently matches — user picks manually elsewhere.
-  const anyMatch = fidelity.speakerLabels.some((l) => autoMatch(l, characters));
+  const anyMatch = cleanLabels.some((l) => autoMatch(l, characters));
   if (!anyMatch) return null;
 
   const t = (de: string, en: string, es: string) =>
@@ -95,7 +119,7 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {fidelity.speakerLabels.map((label) => {
+        {cleanLabels.map((label) => {
           const current = speakerMap[label];
           const auto = autoMatch(label, characters);
           const effective = current ?? auto;
@@ -138,7 +162,7 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
         })}
       </div>
 
-      {fidelity.speakerLabels.some((l) => !(speakerMap[l] ?? autoMatch(l, characters))) && (
+      {cleanLabels.some((l) => !(speakerMap[l] ?? autoMatch(l, characters))) && (
         <p className="text-[11px] text-destructive/80">
           {t(
             '⚠ Manche Labels haben keine Zuordnung — die KI wird sie erraten.',
