@@ -280,7 +280,7 @@ function extractBySubShotMarkers(body: string): DetectedShot[] {
     let timing = parseTimeWindow(mk.head);
     if (timing.durationSec == null) {
       const zeitRange = block.match(
-        /(?:zeit|time|dauer)\s*:?\s*(?:ca\.?\s*)?([\d]+(?:[.,]\d+)?)\s*[-–—]\s*([\d]+(?:[.,]\d+)?)\s*(?:sek|sec|s)\b/i,
+        /(?:zeit|time|dauer)\s*:?\s*(?:ca\.?\s*)?([\d]+(?:[.,]\d+)?)\s*[-–—]\s*([\d]+(?:[.,]\d+)?)\s*(?:sek\w*|sec\w*|s\b)/i,
       );
       if (zeitRange) {
         const a = parseFloat(zeitRange[1].replace(',', '.'));
@@ -290,7 +290,7 @@ function extractBySubShotMarkers(body: string): DetectedShot[] {
         }
       } else {
         const zeitSingle = block.match(
-          /(?:zeit|time|dauer)\s*:?\s*(?:ca\.?\s*)?([\d]+(?:[.,]\d+)?)\s*(?:sek|sec|s)\b/i,
+          /(?:zeit|time|dauer)\s*:?\s*(?:ca\.?\s*)?([\d]+(?:[.,]\d+)?)\s*(?:sek\w*|sec\w*|s\b)/i,
         );
         if (zeitSingle) {
           const d = parseFloat(zeitSingle[1].replace(',', '.'));
