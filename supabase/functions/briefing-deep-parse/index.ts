@@ -1532,6 +1532,7 @@ YOU MUST:
       console.warn('[briefing-deep-parse] script-timing detect failed (non-fatal):', e?.message);
       scriptTiming = { mode: 'FREETEXT', source: 'none', shots: [], computedTotalSec: null };
     }
+    const explicitBriefingTiming = detectExplicitBriefingTiming(briefing);
     const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS' ? `
 ═══════════════════════════════════════════════════════════════════════════
 SCRIPT-TIMING LOCK — HARD OVERRIDE (script wins over board settings)
@@ -1853,11 +1854,43 @@ YOU MUST:
         }
       }
 
+      // Duration Authority: explicit user briefing beats both board defaults
+      // and model-generated speech estimates. For the AdTool-style case
+      // ("Länge: ca. 15 Sekunden", "3 Szenen") this locks the manifest to
+      // 15s / 3 scenes BEFORE auto-extend can inflate it from verbose
+      // voiceover text.
+      const explicitScriptLock = !!explicitBriefingTiming
+        && scriptTiming.mode === 'SHOT_MARKERS'
+        && Array.isArray(manifest?.scenes)
+        && manifest.scenes.length > 0
+        && (!explicitBriefingTiming.sceneCount || explicitBriefingTiming.sceneCount === manifest.scenes.length);
+      if (explicitScriptLock) {
+        const targetTotal = explicitBriefingTiming.durationSec;
+        const currentSum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+        const shouldRedistribute = Math.abs(currentSum - targetTotal) >= 0.5;
+        if (shouldRedistribute) {
+          const per = Math.max(1, Math.round((targetTotal / manifest.scenes.length) * 10) / 10);
+          manifest.scenes = manifest.scenes.map((s: any, i: number) => ({ ...s, index: i + 1, durationSec: per }));
+          const sum = manifest.scenes.reduce((a: number, s: any) => a + (Number(s.durationSec) || 0), 0);
+          const drift = Math.round((targetTotal - sum) * 10) / 10;
+          if (Math.abs(drift) >= 0.1 && manifest.scenes.length > 0) {
+            const last = manifest.scenes[manifest.scenes.length - 1];
+            last.durationSec = Math.max(1, Math.round((Number(last.durationSec) + drift) * 10) / 10);
+          }
+        }
+        if (!manifest.project) manifest.project = {};
+        manifest.project.totalDurationSec = targetTotal;
+        (manifest as any).__explicitBriefingTiming = explicitBriefingTiming;
+      }
+
       // G3 — Duration Auto-Extend. If the estimated speech length exceeds the
       // scene's target duration, bump the scene to `speechSec + 1s` so the VO
       // is never clipped. Runs whenever a script is present (scriptTiming),
       // even in Tier 2/3 — we always want to protect the VO.
       if (Array.isArray(manifest?.scenes)) {
+        const explicitScriptLock = !!explicitBriefingTiming
+          && scriptTiming.mode === 'SHOT_MARKERS'
+          && (!explicitBriefingTiming.sceneCount || explicitBriefingTiming.sceneCount === manifest.scenes.length);
         // ~2.6 words/sec at natural pace; strip mood-suffix bracketed text.
         const WORDS_PER_SEC = 2.6;
         const estimateSec = (text: string): number => {
@@ -1883,10 +1916,11 @@ YOU MUST:
           const cur = Math.max(1, Math.round(Number(sc.durationSec) || 0));
           if (target > cur) {
             adjustments.push({ scene: i + 1, from: cur, to: target, speechSec: Math.round(speechSec * 10) / 10 });
+            if (explicitScriptLock) continue;
             sc.durationSec = target;
           }
         }
-        if (adjustments.length > 0) {
+        if (adjustments.length > 0 && !explicitScriptLock) {
           if (!manifest.project) manifest.project = {};
           const sum = manifest.scenes.reduce(
             (a: number, s: any) => a + (Number(s.durationSec) || 0),
@@ -1894,6 +1928,8 @@ YOU MUST:
           );
           manifest.project.totalDurationSec = sum;
           (manifest as any).__durationAutoExtend = adjustments;
+        } else if (adjustments.length > 0 && explicitScriptLock) {
+          (manifest as any).__durationAutoExtendBlocked = adjustments;
         }
       }
     } catch (e: any) {
