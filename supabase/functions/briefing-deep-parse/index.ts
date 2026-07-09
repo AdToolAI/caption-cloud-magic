@@ -2707,18 +2707,35 @@ YOU MUST:
     const _canonicalScenes = _scenes.length;
     const _canonicalFromScript = scriptTiming?.mode === 'SHOT_MARKERS' && (scriptTiming?.shots?.length ?? 0) >= 2;
 
-    // Phase 2 (refactor): stamp the server's authoritative BriefingContract onto
-    // plan._meta.debug so the client no longer has to re-run its own detectors.
+    // Phase 2 + Phase 8 (refactor): stamp the server's authoritative BriefingContract
+    // onto plan._meta.debug so the client no longer has to re-run its own detectors.
     // Client code should prefer plan._meta.debug.briefing_contract when present.
+    // Phase 8: every field is defensively coerced / clamped before stamping so no
+    // NaN / undefined / out-of-range value can ever leak downstream.
+    const _clampDur = (n: unknown): number | null => {
+      const v = Number(n);
+      if (!Number.isFinite(v) || v < 1) return null;
+      return Math.max(1, Math.min(600, Math.round(v * 10) / 10));
+    };
+    const _clampSceneCount = (n: unknown): number => {
+      const v = Number(n);
+      if (!Number.isFinite(v) || v < 0) return 0;
+      return Math.max(0, Math.min(24, Math.round(v)));
+    };
+    const _validModes = new Set(['FREETEXT', 'SHOT_MARKERS', 'SZENE_BLOCKS']);
+    const _mode = _validModes.has(scriptTiming?.mode as string) ? (scriptTiming!.mode as string) : 'FREETEXT';
+    const _validSources = new Set(['explicit-briefing', 'script', 'board']);
+    const _rawSource = explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board');
+    const _source = _validSources.has(_rawSource) ? _rawSource : 'board';
     const _briefingContract = {
-      durationSec: _canonicalTotal,
-      sceneCount: _canonicalScenes,
+      durationSec: _clampDur(_canonicalTotal),
+      sceneCount: _clampSceneCount(_canonicalScenes),
       explicitSceneCount: !!explicitBriefingTiming?.explicitSceneCount,
       continuousScene: !!explicitBriefingTiming?.continuousScene,
-      source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board'),
-      scriptTimingMode: scriptTiming?.mode ?? 'FREETEXT',
-      shots: scriptTiming?.shots?.length ?? 0,
-      pipelineVersion: 'v214',
+      source: _source,
+      scriptTimingMode: _mode,
+      shots: _clampSceneCount(scriptTiming?.shots?.length ?? 0),
+      pipelineVersion: 'v215',
     };
     try {
       if (!(plan as any)._meta) (plan as any)._meta = {};
@@ -2726,8 +2743,8 @@ YOU MUST:
       _debug.briefing_contract = _briefingContract;
       // Back-compat: mirror as canonical_timing (shape expected by legacy client code).
       _debug.canonical_timing = {
-        durationSec: _canonicalTotal,
-        sceneCount: _canonicalScenes,
+        durationSec: _briefingContract.durationSec,
+        sceneCount: _briefingContract.sceneCount,
         explicitSceneCount: _briefingContract.explicitSceneCount,
         continuousScene: _briefingContract.continuousScene,
         source: explicitBriefingTiming ? 'explicit-total' : (_canonicalFromScript ? 'time-windows' : 'explicit-total'),
