@@ -23,6 +23,7 @@ import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
+import { applyCanonicalTimingToPlan } from '@/hooks/useStoryboardTransition';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan, type TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
@@ -186,7 +187,12 @@ export default function ProductionPlanSheet({
   useEffect(() => {
     if (initialPlan) {
       const withEnsemble = ensureProductionPlanEnsemble(initialPlan, currentBriefingRef.current);
-      const finalized = finalizePlanCanonical(withEnsemble);
+      const withBriefingTiming = applyCanonicalTimingToPlan(
+        withEnsemble,
+        currentBriefingRef.current,
+        currentBriefingRef.current?.productDescription ?? '',
+      ).plan;
+      const finalized = finalizePlanCanonical(withBriefingTiming);
       setPlan(finalized?.plan ?? withEnsemble);
       setStep('review');
     }
@@ -198,7 +204,12 @@ export default function ProductionPlanSheet({
   const safePlanResult = useMemo(() => {
     if (!plan) return null;
     const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefingRef.current);
-    return finalizePlanCanonical(withEnsemble);
+    const withBriefingTiming = applyCanonicalTimingToPlan(
+      withEnsemble,
+      currentBriefingRef.current,
+      currentBriefingRef.current?.productDescription ?? '',
+    ).plan;
+    return finalizePlanCanonical(withBriefingTiming);
   }, [plan, currentBriefing]);
   const safePlan = safePlanResult?.plan ?? null;
 
@@ -556,8 +567,9 @@ export default function ProductionPlanSheet({
       // Second pass if first pass produced new collisions.
       healed.scenes = healed.scenes.map((s, i) => ({ ...s, index: i + 1 }));
       const withEnsemble = ensureProductionPlanEnsemble(healed, currentBriefing);
-      const finalized = finalizePlanCanonical(withEnsemble);
-      setPlan(finalized?.plan ?? withEnsemble);
+      const withBriefingTiming = applyCanonicalTimingToPlan(withEnsemble, currentBriefing, briefing).plan;
+      const finalized = finalizePlanCanonical(withBriefingTiming);
+      setPlan(finalized?.plan ?? withBriefingTiming);
       setStep('review');
 
     } catch (e: any) {
@@ -601,8 +613,13 @@ export default function ProductionPlanSheet({
     setApplying(true);
     try {
       const withEnsemble = ensureProductionPlanEnsemble(planForApply, currentBriefing);
-      const finalized = finalizePlanCanonical(withEnsemble);
-      const normalizedPlan = finalized?.plan ?? withEnsemble;
+      const withBriefingTiming = applyCanonicalTimingToPlan(
+        withEnsemble,
+        currentBriefing,
+        currentBriefing?.productDescription ?? '',
+      ).plan;
+      const finalized = finalizePlanCanonical(withBriefingTiming);
+      const normalizedPlan = finalized?.plan ?? withBriefingTiming;
       const finalSum = Math.round((normalizedPlan.scenes ?? []).reduce((a, s) => a + Number(s.durationSec || 0), 0) * 10) / 10;
       const finalTarget = Number(normalizedPlan.project?.totalDurationSec);
       const finalConsistent = finalized?.normalization?.consistent !== false
