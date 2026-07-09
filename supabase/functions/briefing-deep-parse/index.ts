@@ -23,6 +23,67 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
 
+function parsePositiveSeconds(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number(String(raw).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
+}
+
+function detectExplicitBriefingTiming(rawInput: string): { durationSec: number; sceneCount?: number; source: 'explicit-total' | 'scene-math' | 'time-windows' } | null {
+  const raw = String(rawInput ?? '').split(/\n\s*##\s+Project\b/i)[0].trim();
+  if (!raw) return null;
+
+  const sceneCountMatch = raw.match(/(?:^|[^\d])([1-9]\d?)\s*(?:x|×)?\s*(?:szenen|scenes|shots?)\b/i);
+  const sceneCount = sceneCountMatch ? Number(sceneCountMatch[1]) : undefined;
+
+  const explicitPatterns = [
+    /(?:gesamt\s*dauer|gesamtdauer|gesamt\s*länge|gesamtlaenge|gesamtlänge|total\s*duration|filmdauer|film\s*dauer|video\s*dauer|spot\s*dauer|laufzeit)(?:\s+(?:des|der|vom|für|fuer|of)\s+(?:videos?|films?|spots?|ads?))?\s*[:=\-–—]?\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
+    /(?:^|\n)\s*(?:länge|laenge|film[- ]?länge|film[- ]?laenge|video[- ]?länge|video[- ]?laenge|spot[- ]?länge|spot[- ]?laenge)\s*[:=\-–—]\s*(?:ca\.?\s*)?(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i,
+    /(?:^|\n|[.!?]\s+)[^\n]{0,60}?\b(?:in|within|binnen)\s+(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b[^\n]{0,120}?\b(?:zeigen|show|demonstrieren|demonstrate|erzählen|erzaehlen|video|film|spot|commercial)\b/i,
+    /\b(?:film|video|spot|werbevideo|werbespot|werbefilm|imagefilm|ad)\b[^\n]{0,80}?\b(\d+(?:[,.]\d+)?)\s*(?:sekunden|seconds|secs?|s)\b/i,
+  ];
+  for (const re of explicitPatterns) {
+    const seconds = parsePositiveSeconds(raw.match(re)?.[1]);
+    if (seconds && seconds >= 3) return { durationSec: seconds, sceneCount, source: 'explicit-total' };
+  }
+
+  const compact = raw.match(/(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b\s*(?:[\/|,;·\-–—]|\(|\[)?\s*([1-9]\d?)\s*(?:szenen|scenes|shots?)\b/i);
+  const compactSeconds = parsePositiveSeconds(compact?.[1]);
+  if (compactSeconds && compactSeconds >= 3) return { durationSec: compactSeconds, sceneCount: Number(compact?.[2] ?? sceneCount), source: 'explicit-total' };
+
+  const windowRe = /(?:^|[^\d])(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\s*[–—-]\s*(\d+(?:[,.]\d+)?)\s*(s|sec|sek\.?|sekunden|seconds)?\b/gi;
+  const ageTailRe = /^\s*(?:jahre|jahren|jährig|jaehrig|jährige|jaehrige|years?|yrs?|y\.o\.?)\b/i;
+  const timeAnchorRe = /(?:zeit|timing|sek|sekunden|second|dauer|duration|shot|szene|scene|hook|cta|frame|beat|marker|clip)/i;
+  let maxEnd = 0;
+  let windows = 0;
+  for (const m of raw.matchAll(windowRe)) {
+    const start = parsePositiveSeconds(m[1]);
+    const end = parsePositiveSeconds(m[3]);
+    if (start === null || end === null || end <= start || end > 600) continue;
+    const idx = m.index ?? 0;
+    const after = raw.slice(idx + m[0].length, idx + m[0].length + 20);
+    if (ageTailRe.test(after)) continue;
+    const hasUnit = Boolean(m[2] || m[4]);
+    if (!hasUnit) {
+      const lineStart = raw.lastIndexOf('\n', idx) + 1;
+      const lineEnd = raw.indexOf('\n', idx);
+      const line = raw.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+      if (!timeAnchorRe.test(line)) continue;
+    }
+    maxEnd = Math.max(maxEnd, end);
+    windows += 1;
+  }
+  if (windows >= 2 && maxEnd >= 3) return { durationSec: Math.round(maxEnd * 10) / 10, sceneCount: sceneCount ?? windows, source: 'time-windows' };
+
+  const sceneMath = raw.match(/([1-9]\d?)\s*(?:szenen|scenes|shots?)\b[^\n]{0,60}?(?:à|a|je|each|x|×)\s*(\d+(?:[,.]\d+)?)\s*(?:sekunden|sek\.?|seconds|secs?|s)\b/i);
+  const perScene = parsePositiveSeconds(sceneMath?.[2]);
+  if (sceneMath && perScene) {
+    const count = Number(sceneMath[1]);
+    return { durationSec: Math.round(count * perScene * 10) / 10, sceneCount: count, source: 'scene-math' };
+  }
+  return null;
+}
+
 // ── Enums (mirror src/lib/.../manifestSchema.ts) ─────────────────────────────
 
 const FRAMING = ['extreme-wide','wide','medium-wide','medium','medium-close-up','close-up','extreme-close-up'];
