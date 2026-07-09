@@ -129,7 +129,9 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <Badge variant="outline" className="border-sky-400/40 text-sky-300 gap-1 cursor-help">
                   <Clock className="h-3 w-3" />
                   Skript-Timing verwendet
-                  <span className="opacity-70">· {scriptTiming!.shots} {scriptTiming!.shots === 1 ? 'Shot' : 'Shots'}</span>
+                  {/* J7 — chip reflects the ACTUAL rendered scene count (post-reducer),
+                      not the raw detector output, so it can never disagree with the sheet. */}
+                  <span className="opacity-70">· {plan.scenes?.length ?? 0} {(plan.scenes?.length ?? 0) === 1 ? 'Shot' : 'Shots'}</span>
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
