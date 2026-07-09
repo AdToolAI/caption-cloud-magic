@@ -623,7 +623,28 @@ export default function ProductionPlanSheet({
         const cast = [...(s.cast ?? [])];
         while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
         const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
-        cast[castIdx] = { ...c, outfitLookId };
+        // Selecting a real library look clears the prompt-only preset so
+        // we never send both signals to the anchor compositor at once.
+        cast[castIdx] = { ...c, outfitLookId, ...(outfitLookId ? { outfitPreset: null } : {}) };
+        return { ...s, cast };
+      }),
+    });
+  };
+
+  /**
+   * Sets the prompt-only default-outfit preset id on a cast slot.
+   * Never touches `outfitLookId`; the apply step appends the English
+   * preset fragment to the scene prompt.
+   */
+  const updateSceneCastPreset = (sceneIndex: number, castIdx: number, presetId: string | null) => {
+    setPlan((p) => p && {
+      ...p,
+      scenes: p.scenes.map((s) => {
+        if (s.index !== sceneIndex) return s;
+        const cast = [...(s.cast ?? [])];
+        while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
+        const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
+        cast[castIdx] = { ...c, outfitPreset: presetId };
         return { ...s, cast };
       }),
     });
