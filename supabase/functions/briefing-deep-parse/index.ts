@@ -1733,10 +1733,63 @@ YOU MUST:
           if (shot.text && (!sc.voiceover || !String(sc.voiceover.text ?? '').trim())) {
             sc.voiceover = { ...(sc.voiceover ?? {}), text: shot.text };
           }
-          if (shot.text && shot.speakerLabel && !Array.isArray(sc.dialogTurns)) {
+          // Prefer the shot's sub-turns (Shot 1A + 1B inside SZENE 1). Only
+          // seed when the LLM left dialogTurns empty — never overwrite.
+          const turns = Array.isArray(shot.dialogTurns) ? shot.dialogTurns : [];
+          const scHasTurns = Array.isArray(sc.dialogTurns) && sc.dialogTurns.length > 0;
+          if (!scHasTurns && turns.length > 0) {
+            sc.dialogTurns = turns.map((t: any) => ({
+              speakerMentionKey: `@${slugify(t.speakerLabel) || `sprecher-${i + 1}`}`,
+              text: String(t.text ?? '').trim(),
+            }));
+          } else if (!scHasTurns && shot.text && shot.speakerLabel) {
             const mention = `@${slugify(shot.speakerLabel) || `sprecher-${i + 1}`}`;
             sc.dialogTurns = [{ speakerMentionKey: mention, text: shot.text }];
           }
+        }
+      }
+
+      // G3 — Duration Auto-Extend. If the estimated speech length exceeds the
+      // scene's target duration, bump the scene to `speechSec + 1s` so the VO
+      // is never clipped. Runs whenever a script is present (scriptTiming),
+      // even in Tier 2/3 — we always want to protect the VO.
+      if (Array.isArray(manifest?.scenes)) {
+        // ~2.6 words/sec at natural pace; strip mood-suffix bracketed text.
+        const WORDS_PER_SEC = 2.6;
+        const estimateSec = (text: string): number => {
+          const clean = String(text ?? '')
+            .replace(/\[[^\]]*\]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (!clean) return 0;
+          const words = clean.split(/\s+/).length;
+          return words / WORDS_PER_SEC;
+        };
+        const adjustments: Array<{ scene: number; from: number; to: number; speechSec: number }> = [];
+        for (let i = 0; i < manifest.scenes.length; i++) {
+          const sc = manifest.scenes[i];
+          if (!sc || typeof sc !== 'object') continue;
+          const turns = Array.isArray(sc.dialogTurns) ? sc.dialogTurns : [];
+          const spoken = turns.length > 0
+            ? turns.map((t: any) => String(t?.text ?? '')).join(' ')
+            : String(sc?.voiceover?.text ?? '');
+          const speechSec = estimateSec(spoken);
+          if (speechSec <= 0) continue;
+          const target = Math.max(1, Math.round(speechSec + 1));
+          const cur = Math.max(1, Math.round(Number(sc.durationSec) || 0));
+          if (target > cur) {
+            adjustments.push({ scene: i + 1, from: cur, to: target, speechSec: Math.round(speechSec * 10) / 10 });
+            sc.durationSec = target;
+          }
+        }
+        if (adjustments.length > 0) {
+          if (!manifest.project) manifest.project = {};
+          const sum = manifest.scenes.reduce(
+            (a: number, s: any) => a + (Number(s.durationSec) || 0),
+            0,
+          );
+          manifest.project.totalDurationSec = sum;
+          (manifest as any).__durationAutoExtend = adjustments;
         }
       }
     } catch (e: any) {
@@ -2266,8 +2319,12 @@ YOU MUST:
       }
       const locResolutionForMeta = (plan as any)._locationResolution ?? null;
       const voicePoolForMeta = (plan as any)._voicePoolStats ?? null;
+      const durationAutoExtend = Array.isArray((plan as any).__durationAutoExtend)
+        ? (plan as any).__durationAutoExtend
+        : [];
       try { delete (plan as any)._locationResolution; } catch { /* noop */ }
       try { delete (plan as any)._voicePoolStats; } catch { /* noop */ }
+      try { delete (plan as any).__durationAutoExtend; } catch { /* noop */ }
       const { error: insErr } = await supabase
         .from('composer_production_plans')
         .insert({
@@ -2298,6 +2355,13 @@ YOU MUST:
             strict_cast: strictCastStats,
             fidelity: fidelityStats,
             voice_pool_assignments: voicePoolForMeta,
+            script_timing: {
+              mode: scriptTiming?.mode ?? 'FREETEXT',
+              shots: scriptTiming?.shots?.length ?? 0,
+              source: scriptTiming?.source ?? 'none',
+            },
+            duration_auto_extend: durationAutoExtend,
+            solo_cast: soloStats,
           },
         });
       if (insErr) {
@@ -2311,7 +2375,7 @@ YOU MUST:
       console.error('[briefing-deep-parse] persist threw:', persistError);
     }
 
-    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' } }), {
+    return new Response(JSON.stringify({ plan, version, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, duration_auto_extend: Array.isArray((plan as any).__durationAutoExtend) ? (plan as any).__durationAutoExtend : [] }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

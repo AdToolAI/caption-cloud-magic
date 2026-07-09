@@ -21,13 +21,24 @@
 
 export type ScriptTimingMode = 'SHOT_MARKERS' | 'SPEAKER_BLOCKS' | 'FREETEXT';
 
+export interface DetectedTurn {
+  speakerLabel: string;
+  text: string;
+}
+
 export interface DetectedShot {
   /** 1-based shot index (matches SZENE N when explicit). */
   index: number;
   /** Speaker label as written in the briefing (e.g. "Sprecher 1", "Sarah"). */
   speakerLabel: string | null;
-  /** Spoken text for the shot, verbatim. */
+  /** Spoken text for the shot, verbatim (joined turns for legacy consumers). */
   text: string;
+  /**
+   * Sub-turns inside this top-level shot when the block contains multiple
+   * "Sprecher N:" / named-speaker lines (e.g. Shot 1A + 1B inside SZENE 1).
+   * Empty when the shot is a single-speaker block.
+   */
+  dialogTurns: DetectedTurn[];
   /** Explicit start/end in seconds when a "[0-3s]" style marker was found. */
   startSec: number | null;
   endSec: number | null;
@@ -102,23 +113,37 @@ function extractByShotMarkers(body: string): DetectedShot[] {
   for (const mk of marks) {
     const block = src.slice(mk.start, mk.end);
     const { startSec, endSec, durationSec } = parseTimeWindow(mk.head);
-    // First non-empty NAME: … line inside the block, else full body text.
+    const lines = block.split('\n').map(stripLine).filter(Boolean);
+    // Collect ALL speaker/turn lines inside the SZENE block. Multiple
+    // "Sprecher N:" / "Sarah:" lines become sub-turns of this scene.
+    const turns: DetectedTurn[] = [];
+    for (const line of lines) {
+      // Skip sub-shot heading lines ("Shot 1A", "1A —", "Framing: …").
+      if (/^(?:shot|sub-?shot)\s*\d+[a-z]?\b/i.test(line)) continue;
+      // "Sprecher 1 (0-3s): Text" OR "Sarah: Text" OR "Sarah — Text".
+      const dl = line.match(
+        /^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*(?:[\[(][^\])]*[\])])?\s*[:—-]\s+(.+)$/,
+      );
+      if (!dl) continue;
+      const label = dl[1].trim();
+      if (NON_SPEAKER_LABELS.test(label)) continue;
+      const text = dl[2].trim();
+      if (!text) continue;
+      turns.push({ speakerLabel: label, text });
+    }
     let speakerLabel: string | null = null;
     let text = '';
-    const lines = block.split('\n').map(stripLine).filter(Boolean);
-    for (const line of lines) {
-      const dl = line.match(/^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*[:—-]\s+(.+)$/);
-      if (dl && !NON_SPEAKER_LABELS.test(dl[1].trim())) {
-        speakerLabel = dl[1].trim();
-        text = dl[2].trim();
-        break;
-      }
+    if (turns.length > 0) {
+      speakerLabel = turns[0].speakerLabel;
+      text = turns.map((t) => t.text).join(' ').trim();
+    } else {
+      text = lines.join(' ').trim();
     }
-    if (!text) text = lines.join(' ').trim();
     shots.push({
       index: mk.index,
       speakerLabel,
       text,
+      dialogTurns: turns,
       startSec,
       endSec,
       durationSec,
@@ -147,6 +172,7 @@ function extractBySpeakerWithTiming(body: string): DetectedShot[] {
       index: i,
       speakerLabel: label,
       text: stripLine(m[3]),
+      dialogTurns: [],
       startSec,
       endSec,
       durationSec,
@@ -176,6 +202,7 @@ function extractByNamedSpeakerBlocks(body: string): DetectedShot[] {
       index: i,
       speakerLabel: label,
       text: stripLine(m[2]),
+      dialogTurns: [],
       startSec: null,
       endSec: null,
       durationSec: null,

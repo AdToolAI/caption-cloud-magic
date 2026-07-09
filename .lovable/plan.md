@@ -1,67 +1,57 @@
-# Fix-Bundle G (Final): Script-Wins & Fehlerbehebung Briefing-Analyse
+# Fix-Bundle G (revidiert) — Szenen-Struktur folgt Top-Level SZENE-Markern
 
-Ziel: Alle 10 identifizierten Fehler beheben, indem die Root Cause (falsches Scene-Splitting) und die Downstream-Effekte konsequent gelöst werden. Leitprinzip: **Das Skript gewinnt.**
+## Neuer Leitsatz
+- **Szenenanzahl = Anzahl der Top-Level `SZENE N`-Marker** im Skript (nicht Sub-Shots wie 1A/1B).
+- Beispiel-Briefing: 3 Szenen à 5s = 15s → Parser erzeugt **genau 3 Szenen**.
+- Innerhalb einer Szene: mehrere Sprecher = Ensemble-Cast, dialogTurns halten die Reihenfolge.
+- **Szenendauer flexibel**: Wenn die zugewiesene Sprech-/VO-Länge > Skript-Sollzeit ist, wird die Szene automatisch auf `max(sollzeit, sprechdauer + 1s)` hochgesetzt.
 
-## 1. Server: `briefing-deep-parse` (Root Fix)
+## Backend
 
-**G1 — `detectScriptTimingMode` Pre-Processor**
-Neue Funktion, die vor Pass A läuft und den Skript-Typ klassifiziert:
-- **Tier 1 (SHOT_MARKERS)**: Skript enthält explizite Marker (`S01`, `Shot 1`, `Szene 2`, `[0-3s]`, `Sprecher 1:` mit Zeitangaben). → Board-Dauer wird **ignoriert**, Scene-Count = Marker-Count.
-- **Tier 2 (SPEAKER_BLOCKS)**: Nur Speaker-Labels (`Sprecher 1:`, `Sarah:`) ohne Zeiten. → Eine Szene pro Speaker-Wechsel, Gesamtdauer aus Board proportional aufgeteilt.
-- **Tier 3 (FREETEXT)**: Kein strukturiertes Skript. → Board-Werte gewinnen (aktuelles Verhalten).
+### G1 (revidiert) — `detectScriptTimingMode`
+Umstellen auf Top-Level-SZENE-Erkennung:
+- Regex matcht nur `^SZENE N` / `^SCENE N` / `^SHOT N` (ohne Buchstaben-Suffix)
+- Sub-Shots (1A/1B/2A) werden als `dialogTurns` innerhalb der Elternszene verarbeitet, nicht als eigene Szene
+- Fallback bleibt: Speaker-Blöcke → Tier 2, Freetext → Tier 3
 
-**G2 — Strict Split Enforcement**
-- Pass A System Prompt erhält Klausel: „Bei `mode=SHOT_MARKERS` MUSST du exakt `N` Szenen erzeugen, eine pro Marker. Merging ist verboten."
-- Post-Pass A Guard: Wenn `scenes.length !== detectedShots.length` bei Tier 1 → Re-Split auf Client-Seite via deterministischem Splitter (`splitByShotMarkers.ts`).
+### G2 (revidiert) — Scene-Count-Guard
+- Bei `SHOT_MARKERS`: exakt `topLevelScenes.length` Szenen, cast = Union aller Sprecher in den Sub-Turns dieser Szene
+- Kein Solo-Trim mehr für Szenen mit mehreren Sub-Shot-Speakern → `enforceSoloCast` läuft nur wenn wirklich nur ein Speaker in der ganzen Szene spricht
 
-**G3 — Solo-Enforcement**
-- Für jede Szene mit exakt einem Speaker-Label im Skript (`Sprecher 2:` → nur ein Block): `cast` auf diesen einen `characterId` beschränken. Alle anderen entfernen — überschreibt Ensemble-Guarantee für explizit solo geskriptete Shots.
+### G3 — Duration Auto-Extend (neu)
+Nach Voice/VO-Assignment, vor Persist:
+- Für jede Szene: `estimatedSpeechSec` aus `dialogTurns` (Zeichenzahl / ~15 chars-per-sec, deutsch)
+- Wenn `estimatedSpeechSec + 1 > scene.durationSec` → `scene.durationSec = ceil(estimatedSpeechSec + 1)`
+- Diagnose in `parser_meta.duration_adjustments[]` (scene id, old, new, reason)
 
-**G4 — Voice Assignment Fix**
-- Voice-Pool nur an Charaktere binden, die in `resolved_cast` der jeweiligen Szene sind. Sarah bekommt keine Voice-Slot in Speaker-2-Szenen.
+### G4 — Voice-Pool pro Szene binden
+`useApplyProductionPlan.ts`: Auto-Voice nur für Characters in `resolved_cast` dieser Szene.
 
-**G5 — Repair-Count Sanitizing**
-- `parser_meta.repairs` nur zählen, wenn ein tatsächlicher Wert geändert wurde (nicht bei No-Op-Passes). Behebt „12 repariert" bei 4-Zeilen-Skript.
+### G5 — Repair-Count Sanitize
+Neuer Helper `repairsCounter.ts`, nur echte Value-Changes zählen.
 
-## 2. Client: Anzeige & UX
+## Client
 
-**G6 — „Script Timing Used" Info-Chip**
-- In `ProductionPlanSheet.tsx` Header: Wenn `parser_meta.timing_mode === 'SHOT_MARKERS'` und `board.totalDurationSec !== computed.totalDurationSec` → dezenter Info-Chip statt Warnung: „Skript-Timing verwendet (Board-Wert ignoriert)".
+### G6 — Info-Chip statt Warnung
+`ProductionPlanSheet.tsx`: Bei `SHOT_MARKERS` und Board-Dauer ≠ Skript-Dauer → dezenter Chip „Skript-Timing verwendet".
 
-**G7 — Location Description Fallback verifizieren**
-- Sicherstellen, dass die in vorherigem Fix eingeführte `description` bei Locations tatsächlich in `resolved_location.description` landet und in der UI + AI-Prompt gerendert wird.
+### G7 — Skript-zu-lang-Warnung im Preisfeld (neu)
+Im Clip-Generate-Panel (dort wo der Preis steht):
+- Wenn Summe aller `scene.durationSec` > `project.totalDurationSec` **und** Grund = Speech-Overflow → gelbe Meldung:
+  > „Dein Skript ist länger als die geplante Videodauer. Video wird auf {computedSec}s verlängert (+{delta}s)."
+- Preis wird auf die neue Dauer berechnet.
 
-**G8 — AI-Fill % Recompute**
-- `computeAiFillPercent` neu berechnen: nur Felder zählen, die im Briefing/Skript wirklich fehlen. Wenn alle 4 Speaker + Skript + Dauer da sind, sollte % niedrig sein.
+### G8 — AI-Fill % neu berechnen
+`BriefingPlanSummary.tsx`: nur wirklich fehlende Felder zählen.
 
-## 3. Neue Dateien / Änderungen
+## Verifikation gegen 15s-Testfall
+- 3 Szenen à 5s (statt 2 à 10s oder 6 à 2s)
+- Cast pro Szene = Union der dort sprechenden Charaktere
+- Wenn Sprecher-Zeit in Szene 2 z.B. 7s → Szene wird auf 8s gehoben, Meldung im Preisfeld erscheint
+- Info-Chip „Skript-Timing verwendet", Repair-Count realistisch, AI-Fill niedrig
 
-```text
-supabase/functions/briefing-deep-parse/
-  ├── detectScriptTimingMode.ts        (neu)
-  ├── splitByShotMarkers.ts            (neu, deterministisch)
-  ├── enforceSoloCast.ts               (neu)
-  └── index.ts                         (integrate G1–G5)
+## Nicht enthalten
+- Sub-Shot-Splitting (verworfen — Skript-Top-Struktur gewinnt)
+- Plan-Versioning, Debug-Chips (separat)
 
-src/features/briefing/
-  ├── hooks/useApplyProductionPlan.ts  (G4 voice binding, G7 location desc)
-  ├── components/ProductionPlanSheet.tsx (G6 chip, G8 fill %)
-  └── utils/repairsCounter.ts          (neu, G5)
-```
-
-## 4. Verifikation
-
-Testfall: Das vom User gepostete 15s-Briefing mit 4 Sprechern.
-Erwartetes Ergebnis nach Fix:
-- 6 Szenen (nicht 2)
-- S01–S06 jeweils solo mit dem korrekten Sprecher
-- Voice: nur der jeweilige Sprecher hat einen Voice-Slot
-- Info-Chip „Skript-Timing" statt Warnung
-- Repair-Count realistisch (0–3)
-- AI-Fill % niedrig (~10–20 %)
-
-## Nicht enthalten (bewusst)
-- Debug-Chips (T-1) — separater Wunsch, kann später
-- Plan Versioning (P-1) — separater Wunsch
-
-Nach Approval implementiere ich G1–G8 in einem Zug und teste gegen das gepostete Briefing.
+Nach Approval implementiere ich G1–G8 in einem Zug.
