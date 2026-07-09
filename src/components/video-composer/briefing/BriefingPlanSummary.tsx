@@ -60,11 +60,18 @@ export default function BriefingPlanSummary({ plan }: Props) {
     | { mode: 'literal' | 'auto'; repairedTexts?: number; repairedSpeakers?: number; scenesMatched?: number; scenesInScript?: number }
     | undefined;
 
-  // T-1 — Debug chip: only rendered when the ProductionPlanSheet is opened
-  // with `?debug=1` in the URL. Reads the response envelope attached by
-  // useStoryboardTransition onto plan._meta.debug. Keeps the summary clean
-  // for regular users while giving the operator one-click access to model
-  // timings, strict-cast drops and ensemble-repair counts during Beta.
+  const scriptTiming = (meta as any)?.script_timing as
+    | { mode: 'SHOT_MARKERS' | 'SPEAKER_BLOCKS' | 'FREETEXT'; shots: number; source: 'verbatim' | 'briefing' | 'none' }
+    | null
+    | undefined;
+  const scriptTimingActive =
+    !!scriptTiming && scriptTiming.mode !== 'FREETEXT' && (scriptTiming.shots ?? 0) > 0;
+
+  const durationExtend = (meta as any)?.duration_auto_extend as
+    | Array<{ scene: number; from: number; to: number; speechSec: number }>
+    | undefined;
+  const extendCount = Array.isArray(durationExtend) ? durationExtend.length : 0;
+
   const debug = (meta as any)?.debug as Record<string, any> | undefined;
   const debugEnabled = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -74,7 +81,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
   const showDebug = debugEnabled && !!debug;
 
   // Nothing meaningful to render → keep the footer minimal.
-  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !showDebug) return null;
+  if (!mode && !research.length && aiFilledCount === 0 && !fidelity && !scriptTimingActive && extendCount === 0 && !showDebug) return null;
 
   return (
     <div className="rounded-lg border border-amber-300/30 bg-gradient-to-br from-amber-300/[0.06] to-transparent p-2.5 space-y-2 text-xs">
