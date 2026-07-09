@@ -93,44 +93,80 @@ function parseTimeWindow(head: string): { startSec: number | null; endSec: numbe
 }
 
 /**
- * Split a body into shots using strict SZENE/SCENE/SHOT markers. Returns
- * an empty array when no markers are present.
+ * Split a body into scenes using top-level markers. Two-pass:
+ *   Pass A: match only "SZENE N" / "SCENE N" as top-level.
+ *   Pass B: only if Pass A yields 0 markers, match "SHOT N" as top-level.
+ *
+ * Sub-shot markers ("Shot 1A", "Shot 1B") that appear *inside* a Szene block
+ * are read as dialogTurn boundaries: each Shot Xy captures the next speaker
+ * line PLUS any per-sub-shot duration ("Shot 1A (2.5s)"), and the scene's
+ * `durationSec` is derived by summing sub-shot durations when explicit.
  */
 function extractByShotMarkers(body: string): DetectedShot[] {
   const src = String(body ?? '');
-  const markerRe = /(?:^|\n)\s*(?:szene|scene|shot)\s*(\d{1,2})\b([^\n]*)/gi;
-  const marks: Array<{ index: number; head: string; start: number; end: number }> = [];
-  for (const m of src.matchAll(markerRe)) {
-    const idx = parseInt(m[1], 10);
-    if (!Number.isFinite(idx)) continue;
-    const start = (m.index ?? 0) + m[0].length;
-    marks.push({ index: idx, head: m[2] ?? '', start, end: src.length });
+  const runPass = (re: RegExp) => {
+    const marks: Array<{ index: number; head: string; contentStart: number; headStart: number; end: number }> = [];
+    for (const m of src.matchAll(re)) {
+      const idx = parseInt(m[1], 10);
+      if (!Number.isFinite(idx)) continue;
+      const headStart = m.index ?? 0;
+      const contentStart = headStart + m[0].length;
+      marks.push({ index: idx, head: m[2] ?? '', headStart, contentStart, end: src.length });
+    }
+    // Block ends BEFORE the next heading so we don't leak "Szene 2" into
+    // scene 1's dialog.
+    for (let i = 0; i < marks.length - 1; i++) marks[i].end = marks[i + 1].headStart;
+    return marks;
+  };
+  // Pass A — Szene/Scene ONLY (top-level).
+  let marks = runPass(/(?:^|\n)\s*(?:szene|scene)\s*(\d{1,2})\b([^\n]*)/gi);
+  // Pass B — fall back to Shot as top-level when no Szene markers exist.
+  if (marks.length === 0) {
+    marks = runPass(/(?:^|\n)\s*shot\s*(\d{1,2})\b([^\n]*)/gi);
   }
   if (marks.length === 0) return [];
-  for (let i = 0; i < marks.length - 1; i++) marks[i].end = marks[i + 1].start;
 
   const shots: DetectedShot[] = [];
   for (const mk of marks) {
-    const block = src.slice(mk.start, mk.end);
-    const { startSec, endSec, durationSec } = parseTimeWindow(mk.head);
+    const block = src.slice(mk.contentStart, mk.end);
+    const headTiming = parseTimeWindow(mk.head);
     const lines = block.split('\n').map(stripLine).filter(Boolean);
-    // Collect ALL speaker/turn lines inside the SZENE block. Multiple
-    // "Sprecher N:" / "Sarah:" lines become sub-turns of this scene.
-    const turns: DetectedTurn[] = [];
+
+    // Walk the block line-by-line so we can attach a "Shot 1A (2.5s)" heading
+    // to the *next* speaker line as a per-turn duration.
+    const turns: Array<DetectedTurn & { durationSec: number | null }> = [];
+    let pendingSubDuration: number | null = null;
     for (const line of lines) {
-      // Skip sub-shot heading lines ("Shot 1A", "1A —", "Framing: …").
-      if (/^(?:shot|sub-?shot)\s*\d+[a-z]?\b/i.test(line)) continue;
-      // "Sprecher 1 (0-3s): Text" OR "Sarah: Text" OR "Sarah — Text".
+      const subShotMatch = line.match(/^(?:shot|sub-?shot)\s*\d+[a-z]?\b([^\n]*)/i);
+      if (subShotMatch) {
+        const t = parseTimeWindow(subShotMatch[1] ?? '');
+        pendingSubDuration = t.durationSec ?? null;
+        continue;
+      }
       const dl = line.match(
-        /^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*(?:[\[(][^\])]*[\])])?\s*[:—-]\s+(.+)$/,
+        /^([A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9\-\.\s]{1,40}?)\s*(?:[\[(]([^\])]*)[\])])?\s*[:—-]\s+(.+)$/,
       );
       if (!dl) continue;
       const label = dl[1].trim();
       if (NON_SPEAKER_LABELS.test(label)) continue;
-      const text = dl[2].trim();
+      const inlineTiming = dl[2] ? parseTimeWindow(`(${dl[2]})`).durationSec : null;
+      const text = dl[3].trim();
       if (!text) continue;
-      turns.push({ speakerLabel: label, text });
+      turns.push({
+        speakerLabel: label,
+        text,
+        durationSec: inlineTiming ?? pendingSubDuration,
+      });
+      pendingSubDuration = null;
     }
+
+    // Scene duration: explicit header timing wins, else sum of sub-shot
+    // durations when *all* turns carry a duration, else null.
+    let durationSec: number | null = headTiming.durationSec;
+    if (durationSec == null && turns.length > 0 && turns.every((t) => t.durationSec != null)) {
+      durationSec = turns.reduce((a, t) => a + (t.durationSec ?? 0), 0);
+    }
+
     let speakerLabel: string | null = null;
     let text = '';
     if (turns.length > 0) {
@@ -143,9 +179,9 @@ function extractByShotMarkers(body: string): DetectedShot[] {
       index: mk.index,
       speakerLabel,
       text,
-      dialogTurns: turns,
-      startSec,
-      endSec,
+      dialogTurns: turns.map((t) => ({ speakerLabel: t.speakerLabel, text: t.text })),
+      startSec: headTiming.startSec,
+      endSec: headTiming.endSec,
       durationSec,
     });
   }
