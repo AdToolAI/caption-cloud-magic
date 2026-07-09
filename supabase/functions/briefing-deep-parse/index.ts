@@ -309,12 +309,36 @@ For EVERY auto-generated scene you MUST fill what the briefing does not specify:
 - "brollHints": 3–6 short English Pexels/Pixabay keywords for optional cutaways.
 - "beat": label like "Hook", "Pain", "Reveal", "Proof", "CTA".
 
-ENSEMBLE CAST GUARANTEE (HARD): If the "## Cast" section contains 2–4 selected
-avatars, at least ONE scene MUST include ALL selected cast mention keys together.
-If the plan has 6 or more scenes, at least TWO scenes MUST include ALL selected
-cast mention keys together. These scenes must be wide/medium-wide group shots,
-not close-ups, and anchorPromptEN must name every cast member and describe a
-distinct visible action for each.
+ENSEMBLE CAST GUARANTEE (SOFT — respect the script): If the "## Cast" section
+contains 2–4 selected avatars, prefer at least ONE ensemble scene where ALL
+selected cast members share the frame. BUT: NEVER force ensemble on a scene
+whose script/dialogTurns explicitly names a SINGLE speaker or a specific subset
+— that scene stays solo/duet. Only expand scenes whose speaker is undefined or
+generic ("group", "team", "everyone"). Ensemble scenes must be wide/medium-wide
+group shots with anchorPromptEN naming every cast member.
+
+TIMING FIDELITY (HARD): If the briefing states explicit per-scene durations
+("Scene 1 – 3s", "Sprecher 1 (0–4s)", "3s + 4s + 4s + 4s = 15s", "15s total"),
+you MUST emit EXACTLY that many scenes with those exact durationSec values.
+Do NOT redistribute to a different scene count. Total durationSec across all
+scenes MUST equal the briefing's stated total (±1s tolerance).
+
+SHOT-STRUCTURE PRESERVATION (HARD): If the briefing enumerates shots or beats
+(1A/1B, "Split-screen", "Endcard", "S01…S04"), emit ONE scene per marker in
+that exact order. Do not merge two beats into a single scene, do not skip a
+beat, do not reorder. Missing beats = broken output.
+
+OUTFIT AUTO-MATCH: For every cast slot on every scene, if the briefing does
+NOT name a specific library outfit look, set resolvedCast[i].outfitPreset to
+the best-fitting id from this fixed list based on briefing tone/scenario:
+  "business-formal", "business-casual", "smart-casual", "streetwear",
+  "creative-modern", "gym-athleisure", "outdoor-casual", "evening-elegant",
+  "weekend-relaxed", "tech-founder".
+Keyword hints: suit/anzug→business-formal; office/büro→business-casual;
+sneaker/casual→smart-casual; hoodie/urban→streetwear; designer/minimal→
+creative-modern; gym/sport→gym-athleisure; outdoor/hike→outdoor-casual;
+evening/gala→evening-elegant; weekend/relaxed→weekend-relaxed; founder/
+startup/saas/tech→tech-founder. Default when unclear: "smart-casual".
 
 INTELLIGENT DEFAULTS — Transition / Overlay / Tone / Performance (NEVER leave undefined):
 You MUST always fill scenes[i].transition, scenes[i].textOverlay (or leave
@@ -460,6 +484,7 @@ const TOOL_PASS_B = {
                     voiceName: { type: 'string' },
                     voiceAutoAssigned: { type: 'boolean' },
                     outfit: { type: 'string' },
+                    outfitPreset: { type: 'string', nullable: true },
                   },
                   required: ['mentionKey', 'characterName'],
                 },
@@ -750,7 +775,7 @@ function dedupeSceneCast(cast: any[] | undefined | null): { cast: any[]; removed
     const existing = byKey.get(key);
     if (!existing) { byKey.set(key, { slot, originalIdx: idx }); continue; }
     // Merge: fill missing fields from duplicate.
-    for (const f of ['characterId','characterName','voiceId','voiceName','shotType','outfit','outfitLookId','referenceImageUrl']) {
+    for (const f of ['characterId','characterName','voiceId','voiceName','shotType','outfit','outfitLookId','outfitPreset','referenceImageUrl']) {
       if (!existing.slot[f] && slot[f]) existing.slot[f] = slot[f];
     }
     if (existing.slot.voiceAutoAssigned == null && slot.voiceAutoAssigned != null) {
@@ -1221,11 +1246,21 @@ function ensureProductionPlanEnsembleServer(plan: any, briefing: string, charact
   const joinedNames = names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   const sentence = `${joinedNames} share the scene together in a wide group shot, all faces clearly visible to camera, standing side by side, each with a distinct visible action.`;
 
+  // v214 — scenes with explicit dialogTurns naming specific speakers must NOT
+  // be overwritten by ensemble injection. That's a solo/duet shot from the
+  // script, not a group moment.
+  const isExplicitlyScripted = (sc: any): boolean => {
+    const turns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
+    if (turns.length === 0) return false;
+    const speakers = new Set(turns.map((t: any) => normalizeMention(String(t?.speakerMentionKey ?? ''))).filter(Boolean));
+    return speakers.size >= 1;
+  };
+
   // C-1 fix — build a new scenes array; do NOT mutate input objects in place.
   const nextScenes = scenes.slice();
   const toRepair = new Set<number>();
   {
-    const ordered = order.filter((idx) => scenes[idx] && !hasAll(scenes[idx]));
+    const ordered = order.filter((idx) => scenes[idx] && !hasAll(scenes[idx]) && !isExplicitlyScripted(scenes[idx]));
     for (const idx of ordered) {
       if (toRepair.size >= needed) break;
       toRepair.add(idx);

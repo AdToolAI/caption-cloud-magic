@@ -69,6 +69,21 @@ function appendEnsemblePrompt(prompt: string | undefined, names: string[]) {
   return clean ? `${clean} ${sentence}` : sentence;
 }
 
+/**
+ * A scene is "explicitly solo/duet" when its dialogTurns name a fixed set of
+ * speakers (< required cast). In that case we MUST NOT force-inject the
+ * remaining briefed cast — the script (LITERAL mode) or the LLM decided a
+ * specific speaker breakdown and the ensemble-guarantee would overwrite it.
+ */
+function sceneIsExplicitlyScripted(scene: TPlanScene): boolean {
+  const turns = (scene as any).dialogTurns as Array<{ speakerMentionKey?: string }> | undefined;
+  if (!Array.isArray(turns) || turns.length === 0) return false;
+  const uniqueSpeakers = new Set(
+    turns.map((t) => normalizeAssetKey(t?.speakerMentionKey)).filter(Boolean),
+  );
+  return uniqueSpeakers.size >= 1;
+}
+
 export function ensureProductionPlanEnsemble(
   plan: TProductionPlan,
   briefing?: ComposerBriefing,
@@ -112,6 +127,9 @@ export function ensureProductionPlanEnsemble(
     if (repaired >= needed) break;
     const scene = nextScenes[idx];
     if (!scene || sceneHasAll(scene, required)) continue;
+    // v214 — respect explicit script/dialog assignments: never overwrite scenes
+    // whose dialogTurns already name specific speakers (LITERAL mode / solo shot).
+    if (sceneIsExplicitlyScripted(scene)) continue;
 
     const cast = [...(scene.cast ?? [])];
     const present = new Set(cast.map(castKey).filter(Boolean));
