@@ -1312,12 +1312,12 @@ function ensureContinuousSceneDialogTurns(
   plan: any,
   requiredCast: any[],
   continuousScene: boolean,
-): { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder' } {
-  if (!continuousScene) return { split: false, turns: 0, source: 'dialog' };
+): { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } {
+  if (!continuousScene) return { split: false, turns: 0, source: 'dialog', bound: 0 };
   const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
-  if (scenes.length !== 1) return { split: false, turns: 0, source: 'dialog' };
+  if (scenes.length !== 1) return { split: false, turns: 0, source: 'dialog', bound: 0 };
   if (!Array.isArray(requiredCast) || requiredCast.length < 2) {
-    return { split: false, turns: 0, source: 'dialog' };
+    return { split: false, turns: 0, source: 'dialog', bound: 0 };
   }
   const sc = scenes[0];
   const existingTurns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
@@ -1329,8 +1329,32 @@ function ensureContinuousSceneDialogTurns(
       .filter(Boolean),
   );
   if (uniqSpeakers.size >= requiredCast.length) {
-    return { split: false, turns: existingTurns.length, source: 'dialog' };
+    return { split: false, turns: existingTurns.length, source: 'dialog', bound: existingTurns.filter((t: any) => typeof t?.speakerCharacterId === 'string').length };
   }
+
+  const UUID_RE_INNER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const sceneCast = Array.isArray(sc?.cast) ? sc.cast : [];
+  const castWithUuid = sceneCast
+    .map((c: any) => ({ c, id: typeof c?.characterId === 'string' && UUID_RE_INNER.test(c.characterId) ? c.characterId : null }))
+    .filter((x: any): x is { c: any; id: string } => !!x.id);
+  const castIdSet = new Set(castWithUuid.map((x) => x.id.toLowerCase()));
+  const castByKey = new Map<string, string>();
+  for (const { c, id } of castWithUuid) {
+    for (const raw of [c?.mentionKey, c?.characterName, c?.name]) {
+      const key = normalizeMention(String(raw ?? ''));
+      if (key && !castByKey.has(key)) castByKey.set(key, id);
+    }
+  }
+  const resolveRequiredCharacterId = (c: any, i: number): string | null => {
+    const direct = typeof c?.characterId === 'string' && UUID_RE_INNER.test(c.characterId) ? c.characterId : null;
+    if (direct && castIdSet.has(direct.toLowerCase())) return direct;
+    for (const raw of [c?.mentionKey, c?.characterName, c?.name]) {
+      const key = normalizeMention(String(raw ?? ''));
+      const hit = key ? castByKey.get(key) : undefined;
+      if (hit) return hit;
+    }
+    return castWithUuid[i]?.id ?? null;
+  };
 
   // Build spoken corpus.
   let corpus = '';
@@ -1365,12 +1389,17 @@ function ensureContinuousSceneDialogTurns(
   if (!corpus) {
     // No spoken text yet — emit empty per-speaker placeholders so the user
     // can fill each turn in the UI (rather than one speaker owning nothing).
-    sc.dialogTurns = requiredCast.map((c: any, i: number) => ({
+    let bound = 0;
+    sc.dialogTurns = requiredCast.map((c: any, i: number) => {
+      const speakerCharacterId = resolveRequiredCharacterId(c, i);
+      if (speakerCharacterId) bound += 1;
+      return ({
       speakerMentionKey: mentionFor(c, i),
-      speakerCharacterId: c?.characterId ?? null,
+      speakerCharacterId,
       text: '',
-    }));
-    return { split: true, turns: N, source: 'placeholder' };
+      });
+    });
+    return { split: true, turns: N, source: 'placeholder', bound };
   }
 
   // Split into N chunks: sentence-boundary preferred, word-fallback.
@@ -1393,13 +1422,19 @@ function ensureContinuousSceneDialogTurns(
   }
   while (chunks.length < N) chunks.push('');
 
-  sc.dialogTurns = requiredCast.map((c: any, i: number) => ({
+  let bound = 0;
+  sc.dialogTurns = requiredCast.map((c: any, i: number) => {
+    const speakerCharacterId = resolveRequiredCharacterId(c, i);
+    if (speakerCharacterId) bound += 1;
+    return ({
     speakerMentionKey: mentionFor(c, i),
-    speakerCharacterId: c?.characterId ?? null,
+    speakerCharacterId,
     text: chunks[i] ?? '',
-  }));
+    });
+  });
   if (sc.voiceover) sc.voiceover.text = '';
-  return { split: true, turns: N, source };
+  return { split: true, turns: N, source, bound };
+}
 
 function applyContinuousScriptTurns(planLike: any, scriptTiming: ScriptTimingInfo, targetDurationSec: number | null) {
   if (!Array.isArray(planLike?.scenes) || planLike.scenes.length !== 1) return { applied: false, turns: 0 };
@@ -2723,32 +2758,17 @@ YOU MUST:
       console.warn('[briefing-deep-parse] fidelity pass failed (non-fatal):', e?.message);
     }
 
-    // G3 — Solo-Enforcement: for any scene whose dialogTurns name a single
-    // unique speaker (typical "Sprecher N:" solo shot), trim cast to that
-    // one character so ensemble-repair cannot leak the full ensemble in.
-    let soloStats: { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } | null = null;
-    try {
-      soloStats = enforceSoloCast(plan);
-      if (soloStats.trimmedScenes > 0 || soloStats.scrubbedFields > 0) {
-        (plan as any)._meta = {
-          ...((plan as any)._meta ?? {}),
-          soloEnforced: soloStats,
-        };
-        console.log('[briefing-deep-parse] solo_cast', soloStats);
-      }
-    } catch (e: any) {
-      console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
-    }
-
-    // v218 — Continuous-Scene dialog-turn ensemble split. When the LLM
+    // v219 — Continuous-Scene dialog-turn ensemble split. When the LLM
     // collapsed a multi-speaker briefing into a single dialogTurn or a plain
     // voiceover on a 1-scene continuous plan, split the spoken text into N
     // turns keyed to the briefed cast so per-speaker voice binding works.
-    // Runs BEFORE bindTurnSpeakerIds so the UUIDs get canonicalised in the
-    // same pass.
-    let continuousSplitStats: { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder' } | null = null;
+    // Runs BEFORE solo-cast enforcement and BEFORE bindTurnSpeakerIds. This
+    // prevents a collapsed one-speaker LLM turn from trimming the 4-speaker
+    // scene down to one cast slot before the repair can run.
+    let continuousSplitStats: { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } | null = null;
+    let requiredCastForSplit: any[] = [];
     try {
-      const requiredCastForSplit = extractSelectedCastFromBriefing(briefing, characters);
+      requiredCastForSplit = extractSelectedCastFromBriefing(briefing, characters);
       continuousSplitStats = ensureContinuousSceneDialogTurns(
         plan,
         requiredCastForSplit,
@@ -2767,6 +2787,29 @@ YOU MUST:
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] continuous scene split failed (non-fatal):', e?.message);
+    }
+
+    // G3 — Solo-Enforcement: for any scene whose dialogTurns name a single
+    // unique speaker (typical "Sprecher N:" solo shot), trim cast to that
+    // one character so ensemble-repair cannot leak the full ensemble in.
+    // Explicit one-take/multi-speaker briefings are excluded: if the model
+    // collapsed 4 speakers into one slug, that is exactly what the continuous
+    // split above repairs, not evidence for a solo shot.
+    let soloStats: { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } | null = null;
+    try {
+      const skipSoloForContinuousEnsemble = !!continuousSceneLock && requiredCastForSplit.length >= 2;
+      soloStats = skipSoloForContinuousEnsemble
+        ? { trimmedScenes: 0, droppedSlots: 0, scrubbedFields: 0 }
+        : enforceSoloCast(plan);
+      if (soloStats.trimmedScenes > 0 || soloStats.scrubbedFields > 0) {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          soloEnforced: soloStats,
+        };
+        console.log('[briefing-deep-parse] solo_cast', soloStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
     }
 
     // v217 — Turn → Charakter-UUID Binding. Must run AFTER all cast passes
@@ -2988,6 +3031,7 @@ YOU MUST:
               duration_auto_extend: durationAutoExtend,
               duration_auto_extend_blocked: durationAutoExtendBlocked,
             solo_cast: soloStats,
+            continuous_scene_split: continuousSplitStats,
           },
         });
       if (insErr) {
@@ -3043,7 +3087,7 @@ YOU MUST:
       source: _source,
       scriptTimingMode: _mode,
       shots: _clampSceneCount(scriptTiming?.shots?.length ?? 0),
-      pipelineVersion: 'v215',
+      pipelineVersion: 'v219',
     };
     try {
       if (!(plan as any)._meta) (plan as any)._meta = {};
@@ -3060,7 +3104,7 @@ YOU MUST:
       (plan as any)._meta.debug = _debug;
     } catch { /* non-fatal */ }
 
-    return new Response(JSON.stringify({ plan, version, briefing_contract: _briefingContract, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
+    return new Response(JSON.stringify({ plan, version, briefing_contract: _briefingContract, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, continuous_scene_split: continuousSplitStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
