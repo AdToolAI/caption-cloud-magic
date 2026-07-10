@@ -153,6 +153,12 @@ export const PlanScene = z.object({
   /** Explicit per-turn dialog (used by cinematic-sync / native-dialogue). */
   dialogTurns: z.array(z.object({
     speakerMentionKey: z.string().max(80),
+    /**
+     * v217 — canonical Charakter-UUID des Sprechers. Server-gebunden im
+     * `bindTurnSpeakerIds`-Pass. Client-Voice-Binding läuft AUSSCHLIESSLICH
+     * über dieses Feld; `speakerMentionKey` bleibt nur als Diagnose-Slug.
+     */
+    speakerCharacterId: z.string().uuid().nullable().optional(),
     text: z.string().max(1000),
     mood: z.string().max(80).optional(),
     delivery: z.string().max(240).optional(),
