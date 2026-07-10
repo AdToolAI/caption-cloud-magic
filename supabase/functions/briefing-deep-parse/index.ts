@@ -1289,6 +1289,118 @@ function mergePlanScenesToSingleContinuousScene(
   return { merged: true, from: scenes.length, to: 1, backfilled: res.backfilled };
 }
 
+/**
+ * v218 — Continuous-Scene Dialog-Turn Ensemble Split.
+ *
+ * When the briefing declares a single continuous scene with 2+ briefed
+ * speakers but the LLM collapses everything into a single dialogTurn (or a
+ * plain voiceover), split the spoken text into N chunks — one per briefed
+ * cast member — so the client can bind voices per speaker instead of
+ * assigning the whole script to a single character.
+ *
+ * Strategy:
+ *   1. Only fires for scenes.length === 1 with `continuousScene` contract.
+ *   2. Skip when unique speakers in dialogTurns already >= requiredCast.length.
+ *   3. Corpus = joined dialogTurn texts || voiceover.text.
+ *   4. Split by sentence boundaries; fall back to even word split when
+ *      fewer sentences than speakers.
+ *   5. Emit N dialogTurns keyed to the briefed cast in order and bind the
+ *      canonical UUID directly (bindTurnSpeakerIds runs after this pass
+ *      and will keep them intact).
+ */
+function ensureContinuousSceneDialogTurns(
+  plan: any,
+  requiredCast: any[],
+  continuousScene: boolean,
+): { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder' } {
+  if (!continuousScene) return { split: false, turns: 0, source: 'dialog' };
+  const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
+  if (scenes.length !== 1) return { split: false, turns: 0, source: 'dialog' };
+  if (!Array.isArray(requiredCast) || requiredCast.length < 2) {
+    return { split: false, turns: 0, source: 'dialog' };
+  }
+  const sc = scenes[0];
+  const existingTurns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
+  const uniqSpeakers = new Set(
+    existingTurns
+      .map((t: any) =>
+        String(t?.speakerCharacterId ?? t?.speakerMentionKey ?? '').toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+  if (uniqSpeakers.size >= requiredCast.length) {
+    return { split: false, turns: existingTurns.length, source: 'dialog' };
+  }
+
+  // Build spoken corpus.
+  let corpus = '';
+  let source: 'dialog' | 'voiceover' | 'placeholder' = 'dialog';
+  if (existingTurns.length > 0) {
+    corpus = existingTurns
+      .map((t: any) => String(t?.text ?? '').trim())
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (!corpus && sc?.voiceover?.text) {
+    corpus = String(sc.voiceover.text).trim();
+    source = 'voiceover';
+  }
+
+  const slugify = (v: string) =>
+    String(v ?? '')
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  const mentionFor = (c: any, i: number): string => {
+    const raw = String(c?.mentionKey ?? '').trim();
+    if (raw) return raw.startsWith('@') ? raw : `@${raw}`;
+    const slug = slugify(c?.characterName ?? '') || `sprecher-${i + 1}`;
+    return `@${slug}`;
+  };
+
+  const N = requiredCast.length;
+
+  if (!corpus) {
+    // No spoken text yet — emit empty per-speaker placeholders so the user
+    // can fill each turn in the UI (rather than one speaker owning nothing).
+    sc.dialogTurns = requiredCast.map((c: any, i: number) => ({
+      speakerMentionKey: mentionFor(c, i),
+      speakerCharacterId: c?.characterId ?? null,
+      text: '',
+    }));
+    return { split: true, turns: N, source: 'placeholder' };
+  }
+
+  // Split into N chunks: sentence-boundary preferred, word-fallback.
+  const sentences = corpus
+    .split(/(?<=[.!?…])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const chunks: string[] = [];
+  if (sentences.length >= N) {
+    const per = Math.ceil(sentences.length / N);
+    for (let i = 0; i < N; i++) {
+      chunks.push(sentences.slice(i * per, i * per + per).join(' ').trim());
+    }
+  } else {
+    const words = corpus.split(/\s+/).filter(Boolean);
+    const per = Math.max(1, Math.ceil(words.length / N));
+    for (let i = 0; i < N; i++) {
+      chunks.push(words.slice(i * per, i * per + per).join(' ').trim());
+    }
+  }
+  while (chunks.length < N) chunks.push('');
+
+  sc.dialogTurns = requiredCast.map((c: any, i: number) => ({
+    speakerMentionKey: mentionFor(c, i),
+    speakerCharacterId: c?.characterId ?? null,
+    text: chunks[i] ?? '',
+  }));
+  if (sc.voiceover) sc.voiceover.text = '';
+  return { split: true, turns: N, source };
+
 function applyContinuousScriptTurns(planLike: any, scriptTiming: ScriptTimingInfo, targetDurationSec: number | null) {
   if (!Array.isArray(planLike?.scenes) || planLike.scenes.length !== 1) return { applied: false, turns: 0 };
   const sc = planLike.scenes[0];
