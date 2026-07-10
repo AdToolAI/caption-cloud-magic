@@ -1312,7 +1312,8 @@ function ensureContinuousSceneDialogTurns(
   plan: any,
   requiredCast: any[],
   continuousScene: boolean,
-): { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } {
+  scriptTiming?: ScriptTimingInfo | null,
+): { split: boolean; turns: number; source: 'script-timing' | 'dialog' | 'voiceover' | 'placeholder'; bound: number } {
   if (!continuousScene) return { split: false, turns: 0, source: 'dialog', bound: 0 };
   const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
   if (scenes.length !== 1) return { split: false, turns: 0, source: 'dialog', bound: 0 };
