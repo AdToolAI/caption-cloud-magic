@@ -736,11 +736,21 @@ export default function ProductionPlanSheet({
         if (s.index !== sceneIndex) return s;
         const dialogTurns = [...(s.dialogTurns ?? [])];
         if (!dialogTurns[turnIndex]) return s;
+        const cast = [...(s.cast ?? [])];
+        if (characterId && !cast.some((c) => splitCastId(c.characterId).baseId === characterId)) {
+          const matched = charOptions.find((x) => x.id === characterId);
+          cast.push({
+            ...emptyCastSlot(sceneIndex),
+            mentionKey: matched?.name ?? dialogTurns[turnIndex].speakerMentionKey ?? 'Sprecher',
+            characterId,
+            characterName: matched?.name ?? 'Sprecher',
+          });
+        }
         dialogTurns[turnIndex] = {
           ...dialogTurns[turnIndex],
           speakerCharacterId: characterId,
         };
-        return { ...s, dialogTurns };
+        return { ...s, cast, dialogTurns };
       }),
     });
   };
