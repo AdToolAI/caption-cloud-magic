@@ -271,6 +271,11 @@ export interface ComposerScene {
    */
   dialogVoices?: Record<string, string | DialogVoiceCfg>;
   /**
+   * Local apply-time guard: character IDs that have spoken turns and therefore
+   * must be present in `dialogVoices`. Not persisted as its own DB column.
+   */
+  requiredDialogSpeakerIds?: string[];
+  /**
    * Take-System A/B/C — per-line voiceover takes (Phase B).
    *
    * Map of `lineKey -> DialogTakeBundle`, where `lineKey` is built via

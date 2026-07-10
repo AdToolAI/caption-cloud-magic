@@ -74,6 +74,15 @@ function stripPlanId(id: string) {
   return id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
 }
 
+function hasPersistedDialogVoice(raw: unknown): boolean {
+  if (typeof raw === 'string') return !!cleanVoiceId(raw);
+  if (raw && typeof raw === 'object') {
+    const voiceId = (raw as any).voiceId ?? (raw as any).elevenlabsVoiceId;
+    return !!cleanVoiceId(typeof voiceId === 'string' ? voiceId : null);
+  }
+  return false;
+}
+
 type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
 type PlanLocationSlot = NonNullable<TPlanScene['location']>;
 
@@ -947,15 +956,19 @@ export function useApplyProductionPlan() {
     }
     const fallbackRows = persistedNewRows.filter((r: any) => /Establishing shot: A relevant setting|Reveal beat for the brand|CTA beat for the brand/i.test(String(r.ai_prompt ?? '')));
     if (fallbackRows.length > 0) warnings.push(`${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`);
-    // v217 — verify only checks that lip-sync scenes have at least one
-    // dialog voice. Non-speaking ensemble members (visible only, no turn)
-    // must NOT trigger the "ohne Voice-ID"-warning.
+    // v217/v218 — verify only checks characters that actually have spoken
+    // turns. Non-speaking ensemble members (visible only, no turn) must NOT
+    // trigger the "ohne Voice-ID" warning.
     const lipsyncRowsMissingVoice = persistedNewRows.filter((r: any) => {
       const rowScene = newScenes.find((s) => s.id === String(r.id));
       const needsVoice = rowScene?.dialogMode || !!rowScene?.dialogScript;
       if (!needsVoice) return false;
       const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? r.dialog_voices as Record<string, unknown> : {};
-      const voiceCount = Object.values(voices).filter((v) => typeof v === 'string' && v.trim().length > 0).length;
+      const requiredIds = Array.isArray(rowScene?.requiredDialogSpeakerIds) ? rowScene.requiredDialogSpeakerIds : [];
+      if (requiredIds.length > 0) {
+        return requiredIds.some((id) => !hasPersistedDialogVoice(voices[id]));
+      }
+      const voiceCount = Object.values(voices).filter(hasPersistedDialogVoice).length;
       // No dialog-voice map AND no fallback character voice → truly missing.
       return voiceCount === 0 && !r.character_voice_id;
     });
