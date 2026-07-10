@@ -2628,6 +2628,30 @@ YOU MUST:
       console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
     }
 
+    // v217 — Turn → Charakter-UUID Binding. Must run AFTER all cast passes
+    // (ensemble, strict-cast, fidelity, solo) so the final scene cast is
+    // stable. Client-Voice-Binding depends exclusively on this field.
+    try {
+      const bindStats = bindTurnSpeakerIds(plan);
+      (plan as any)._meta = {
+        ...((plan as any)._meta ?? {}),
+        debug: {
+          ...(((plan as any)._meta?.debug) ?? {}),
+          turnBinding: bindStats,
+        },
+      };
+      if (bindStats.total > 0) {
+        console.log('[briefing-deep-parse] turn_binding', bindStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] turn binding failed (non-fatal):', e?.message);
+    }
+
+
+
+
+
+
 
 
 
