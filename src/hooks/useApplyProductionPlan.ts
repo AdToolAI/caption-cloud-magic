@@ -967,20 +967,20 @@ export function useApplyProductionPlan() {
     }
     const fallbackRows = persistedNewRows.filter((r: any) => /Establishing shot: A relevant setting|Reveal beat for the brand|CTA beat for the brand/i.test(String(r.ai_prompt ?? '')));
     if (fallbackRows.length > 0) warnings.push(`${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`);
+    // v217 — verify only checks that lip-sync scenes have at least one
+    // dialog voice. Non-speaking ensemble members (visible only, no turn)
+    // must NOT trigger the "ohne Voice-ID"-warning.
     const lipsyncRowsMissingVoice = persistedNewRows.filter((r: any) => {
       const rowScene = newScenes.find((s) => s.id === String(r.id));
       const needsVoice = rowScene?.dialogMode || !!rowScene?.dialogScript;
       if (!needsVoice) return false;
       const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? r.dialog_voices as Record<string, unknown> : {};
-      const speakerIds = new Set(
-        (rowScene?.characterShots ?? (rowScene?.characterShot ? [rowScene.characterShot] : []))
-          .map((shot) => String(shot.characterId ?? '').trim())
-          .filter(Boolean),
-      );
-      const missingSpeakerVoice = Array.from(speakerIds).some((id) => !voices[id]);
-      return !r.character_voice_id || speakerIds.size === 0 || missingSpeakerVoice;
+      const voiceCount = Object.values(voices).filter((v) => typeof v === 'string' && v.trim().length > 0).length;
+      // No dialog-voice map AND no fallback character voice → truly missing.
+      return voiceCount === 0 && !r.character_voice_id;
     });
     if (lipsyncRowsMissingVoice.length > 0) warnings.push(`${lipsyncRowsMissingVoice.length} Lip-Sync-Szene(n) ohne Voice-ID.`);
+
 
     // 8) Now remove replaceable old/fallback rows. If that fails, roll back the
     // newly inserted plan rows so the user does not end up with duplicate scenes.
