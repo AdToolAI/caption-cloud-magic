@@ -1357,7 +1357,7 @@ function ensureContinuousSceneDialogTurns(
 
   // Build spoken corpus.
   let corpus = '';
-  let source: 'dialog' | 'voiceover' | 'placeholder' = 'dialog';
+  let source: 'script-timing' | 'dialog' | 'voiceover' | 'placeholder' = 'dialog';
   if (existingTurns.length > 0) {
     corpus = existingTurns
       .map((t: any) => String(t?.text ?? '').trim())
