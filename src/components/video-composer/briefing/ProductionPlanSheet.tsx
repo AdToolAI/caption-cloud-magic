@@ -1076,6 +1076,18 @@ export default function ProductionPlanSheet({
                   </div>
                 </div>
               )}
+              {dialogBindingIssues.length > 0 && (
+                <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Sprecher-Zuordnung fehlt — Apply blockiert
+                  </div>
+                  <div className="text-muted-foreground">
+                    {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} haben keine eindeutige Charakter-ID.
+                    Bitte im Dialog-Block den passenden Charakter auswählen; Stimmen werden danach automatisch gesetzt.
+                  </div>
+                </div>
+              )}
 
               {/* v216 — SafePlanNotice: klare, deutsche Zusammenfassung aller
                   Auto-Repairs mit aufklappbaren Details (L1 + L2). */}
@@ -1730,9 +1742,9 @@ export default function ProductionPlanSheet({
               <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
               <Button
                 onClick={handleApply}
-                disabled={applying || durationInconsistent}
+                disabled={applying || durationInconsistent || dialogBindingIssues.length > 0}
                 className="gap-2"
-                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : undefined}
+                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : dialogBindingIssues.length > 0 ? 'Bitte zuerst alle Dialog-Sprecher zuordnen.' : undefined}
               >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Plan anwenden
