@@ -2740,9 +2740,38 @@ YOU MUST:
       console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
     }
 
+    // v218 — Continuous-Scene dialog-turn ensemble split. When the LLM
+    // collapsed a multi-speaker briefing into a single dialogTurn or a plain
+    // voiceover on a 1-scene continuous plan, split the spoken text into N
+    // turns keyed to the briefed cast so per-speaker voice binding works.
+    // Runs BEFORE bindTurnSpeakerIds so the UUIDs get canonicalised in the
+    // same pass.
+    let continuousSplitStats: { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder' } | null = null;
+    try {
+      const requiredCastForSplit = extractSelectedCastFromBriefing(briefing, characters);
+      continuousSplitStats = ensureContinuousSceneDialogTurns(
+        plan,
+        requiredCastForSplit,
+        !!continuousSceneLock,
+      );
+      if (continuousSplitStats.split) {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          continuousSceneSplit: continuousSplitStats,
+          aiFilled: Array.from(new Set([
+            ...(((plan as any)._meta?.aiFilled ?? []) as string[]),
+            'scenes.dialogTurns.continuousSceneSplit',
+          ])),
+        };
+        console.log('[briefing-deep-parse] continuous_scene_split', continuousSplitStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] continuous scene split failed (non-fatal):', e?.message);
+    }
+
     // v217 — Turn → Charakter-UUID Binding. Must run AFTER all cast passes
-    // (ensemble, strict-cast, fidelity, solo) so the final scene cast is
-    // stable. Client-Voice-Binding depends exclusively on this field.
+    // (ensemble, strict-cast, fidelity, solo, continuous-split) so the final
+    // scene cast is stable. Client-Voice-Binding depends on this field.
     try {
       const bindStats = bindTurnSpeakerIds(plan);
       (plan as any)._meta = {
