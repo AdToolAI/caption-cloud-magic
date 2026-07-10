@@ -1385,6 +1385,48 @@ function ensureContinuousSceneDialogTurns(
 
   const N = requiredCast.length;
 
+  const timingTurns: Array<{ speakerLabel: string; text: string }> = [];
+  for (const shot of scriptTiming?.shots ?? []) {
+    if (shot?.sceneKind === 'endcard') continue;
+    if (Array.isArray(shot?.dialogTurns) && shot.dialogTurns.length > 0) {
+      for (const t of shot.dialogTurns) {
+        const speakerLabel = String(t?.speakerLabel ?? '').trim();
+        const text = String(t?.text ?? '').trim();
+        if (speakerLabel && text) timingTurns.push({ speakerLabel, text });
+      }
+      continue;
+    }
+    const speakerLabel = String(shot?.speakerLabel ?? '').trim();
+    const text = String(shot?.text ?? '').trim();
+    if (speakerLabel && text) timingTurns.push({ speakerLabel, text });
+  }
+
+  const timingSpeakerOrder: string[] = [];
+  const timingSeen = new Set<string>();
+  for (const t of timingTurns) {
+    const key = normalizeMention(t.speakerLabel);
+    if (!key || timingSeen.has(key)) continue;
+    timingSeen.add(key);
+    timingSpeakerOrder.push(key);
+  }
+  if (timingTurns.length >= 2 && timingSpeakerOrder.length >= 2) {
+    let bound = 0;
+    sc.dialogTurns = timingTurns.map((t) => {
+      const speakerIndex = Math.max(0, timingSpeakerOrder.indexOf(normalizeMention(t.speakerLabel)));
+      const castIndex = Math.min(speakerIndex, N - 1);
+      const req = requiredCast[castIndex] ?? requiredCast[0];
+      const speakerCharacterId = resolveRequiredCharacterId(req, castIndex);
+      if (speakerCharacterId) bound += 1;
+      return {
+        speakerMentionKey: mentionFor(req, castIndex),
+        speakerCharacterId,
+        text: t.text,
+      };
+    });
+    if (sc.voiceover) sc.voiceover.text = '';
+    return { split: true, turns: sc.dialogTurns.length, source: 'script-timing', bound };
+  }
+
   if (!corpus) {
     // No spoken text yet — emit empty per-speaker placeholders so the user
     // can fill each turn in the UI (rather than one speaker owning nothing).
