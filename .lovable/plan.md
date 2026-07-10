@@ -1,51 +1,50 @@
-## Befund
+## Symptom
+4-Sprecher-Continuous-Szene (Screenshot): Sprecher 1 & 2 (linke Hälfte) bewegen Lippen korrekt, Sprecher 3 & 4 (rechte Hälfte) bleiben stumm. Alle Passes werden vermutlich als `done` gemeldet — sonst hätte die Szene einen Refund ausgelöst.
 
-Der Fehler sitzt nicht primär im Scene Script Editor. Der Server-Log zeigt für die aktuelle Analyse:
+## Verdacht (nach Memory-Historie v88 / v99 / v122 / v125 / v204)
 
-```text
-scene-count guard failed (non-fatal): Cannot access 'characters' before initialization
-```
+Der Fehler liegt fast sicher **nicht** an fehlender Voice/UUID (das war das vorherige Thema), sondern am Preclip-/Mux-Pfad für Speaker 3 & 4:
 
-Dadurch läuft der entscheidende One-Take-Merge/Continuous-Dialog-Pfad zu früh in einen ReferenceError. Genau dort wird `extractSelectedCastFromBriefing(briefing, characters)` aufgerufen, bevor `characters` aus der Library geladen wurde. Danach macht die Pipeline weiter, aber ohne die korrekte Cast-basierte One-Take-Reparatur — deshalb kann am Ende wieder ein einzelner Sprecher/Turn im Storyboard landen.
+1. **Preclip-Drift auf Nachbarn (v122-Muster)** — `bboxForCrop` für Speaker 3/4 landet auf Speaker 1/2, Face-Gate akzeptiert (1 Gesicht sichtbar), Sync.so animiert das falsche Gesicht.
+2. **Edge-Speaker "silent no-op" (v88/v99-Muster)** — Speaker 3/4 sitzen im äußeren Viertel des 4er-Line-Ups; v88-Skip wurde in v125 deaktiviert. Preclip liegt am Plate-Rand, `auto_detect` findet kein Ziel, Sync.so gibt Preclip 1:1 zurück → geschlossener Mund.
+3. **Mux `preclip_crop` enthält Coords des Nachbarn** — v122 defense-in-depth im Mux ignoriert dann das Overlay und fällt auf faceMask zurück, aber die faceMask sitzt auf den falschen Koordinaten.
+
+Alle drei Muster produzieren einen erfolgreich gerenderten Clip mit stummen Mündern für genau die Speaker deren Coords im äußeren Bereich liegen — **exakt Speaker 3 & 4**.
 
 ## Plan
 
-1. **Server-Reihenfolge korrigieren**
-   - In `briefing-deep-parse` werden `characters` und `locations` direkt nach dem Library-Load initialisiert, bevor der Scene-Count-Guard läuft.
-   - Der spätere doppelte `const characters = ...` Block wird entfernt/umgebaut, damit keine doppelte Deklaration entsteht.
+### Phase 1 — Diagnose (read-only, keine Codeänderung)
 
-2. **Continuous-One-Take-Trigger vereinheitlichen**
-   - Den alten `continuousSceneLock` nicht mehr nur an `SHOT_MARKERS` koppeln.
-   - Für `1 durchgehende Szene` muss der Pfad auch bei `SPEAKER_BLOCKS` greifen.
+1. Aus dem UI die `scene_id` der aktuellen Szene erfragen (oder aus letztem Composer-Run holen).
+2. `composer_scenes.dialog_shots.passes[]` inspizieren für jeden der 4 Speaker:
+   - `coords` vs. `preclip_crop.{x,y,size}` — landet Coord im inner-70%-Kern des Crops?
+   - `preclip_url` vorhanden? Frame-Diff (später) oder Sichtcheck: bewegt sich der Mund im Preclip selbst?
+   - `variant` / `sync_options.active_speaker_detection` — `bbox-url-pro` oder `preclip+auto_detect`?
+   - Sync.so `provider_status` / `error_type` pro Pass.
+3. Edge-function-Logs für `compose-dialog-segments` und `render-sync-segments-audio-mux` filtern nach der scene_id: `v122_bbox_drift_rejected`, `v88_edge_speaker_skip_preclip`, `v99_preclip_bbox`, `coordsMatch=false`, `provider_unknown_error`.
+4. Ergebnis: eindeutige Zuordnung zu einem der 3 Muster oben.
 
-3. **Dialog-Turns nach jedem potenziellen Überschreiber erneut absichern**
-   - Nach `applyContinuousScriptTurns`, `strictCast`, `fidelity`, `soloCast` und `bindTurnSpeakerIds` wird geprüft:
-     - explizit 1 Szene
-     - 2+ gebriefte Sprecher
-     - weniger gültige `speakerCharacterId` UUIDs als gebriefte Sprecher
-   - Falls ja, rekonstruiert `ensureContinuousSceneDialogTurns` deterministisch die Turns aus `scriptTiming` und bindet die Cast-UUIDs.
+### Phase 2 — Gezielter Fix (nach Diagnose)
 
-4. **Client-Apply gegen stale/kaputte Pläne absichern**
-   - In `useApplyProductionPlan` vor `dialogScript`-Build eine letzte Safety-Net-Prüfung:
-     - Wenn eine 1-Szene-Planung mehrere Cast-UUIDs hat, aber nur 0/1 gültige Dialog-Sprecher, werden Turns aus vorhandenem `dialogTurns`/`voiceover`/Cast-Reihenfolge rekonstruiert.
-   - Damit auch ein alter Review-Plan nicht mehr als „1 Sprecher spricht alles“ gespeichert wird.
+Je nach Ergebnis genau **einer** dieser Patches, nicht alle:
 
-5. **Nachweis/Validierung**
-   - Edge Function deployen.
-   - Logs prüfen, dass kein `Cannot access 'characters' before initialization` mehr kommt.
-   - Prüfen, dass `continuous_scene_split` und `turn_binding` für den One-Take-Fall laufen.
-   - Danach muss der angewendete Scene Script Editor `4 Blöcke • 4 Sprecher` statt `1 Block • 1 Sprecher` zeigen.
+**A) Wenn Preclip-Drift (Muster 1):** v122-Guard verschärfen — inner-Anteil von 70 % → 60 % senken und den Rejection-Retry auch dann auslösen, wenn `bboxForCrop` aus `speakerPlateBboxes` (nicht faceMap) kam. Aktuell verlässt sich der Guard darauf, dass `bboxForCrop` überhaupt gesetzt war; für plate-identity-basierte Bboxes ist die Erkennung schwächer.
 
-## Erwartetes Ergebnis
+**B) Wenn Edge-Silent-No-op (Muster 2):** v88 nicht global reaktivieren (das brach v125-Szene), sondern **konditional**: Edge-Speaker mit v161-Preclip zusätzlich mit v99-Explicit-Bbox dispatchen (`auto_detect:false`, static `bounding_boxes` in Crop-lokalem Space). Dieser Pfad existiert bereits — sicherstellen dass er für alle Edge-Speaker greift, nicht nur wenn eine bestimmte Bedingung erfüllt ist.
 
-Neue Briefing-Analyse und Apply erzeugen für den 15s-One-Take:
+**C) Wenn Mux-Coords-Mismatch (Muster 3):** in `render-sync-segments-audio-mux` die faceMask-Fallback-Position aus `pass.coords` (Plate-Space) statt aus `preclip_crop.center` ableiten, wenn v122-Guard im Mux gefeuert hat.
 
-```text
-1 Szene
-4 Cast-Slots
-4 Dialog-Turns
-4 gültige speakerCharacterId UUIDs
-Scene Script: 4 Blöcke • 4 Sprecher
-```
+### Phase 3 — Verifikation
 
-Wichtig: Bereits angewendete kaputte Szenen werden durch den Fix nicht automatisch rückwirkend repariert. Nach Deployment muss die Briefing-Analyse neu gestartet und der Plan neu angewendet werden.
+1. Szene reset via `useResetLipSync` und Neu-Rendern.
+2. Frame-Diff-Prüfung: `ffmpeg -filter:v "select='eq(n,0)+eq(n,60)+eq(n,120)'"` auf Mundregion jedes Speakers — Mean-Abs-Diff ≥ 4 = animiert, < 2 = still.
+3. Sichtcheck der finalen Szene: alle 4 Münder synchron.
+
+## Was ich vom User brauche
+
+Kurz eines von beiden bestätigen, dann starte ich Phase 1:
+
+- **Option A:** Ich habe die aktuellste `scene_id` (letzter Composer-Run) — sofort Diagnose starten.
+- **Option B:** User teilt die scene_id oder den letzten Composer-Screenshot mit sichtbarem Log/URL.
+
+Kein Preise-/Wiring-/UI-Change in diesem Ticket — reiner Lip-Sync-Pipeline-Fix.
