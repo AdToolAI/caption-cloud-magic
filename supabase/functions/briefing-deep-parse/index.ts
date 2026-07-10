@@ -1312,7 +1312,8 @@ function ensureContinuousSceneDialogTurns(
   plan: any,
   requiredCast: any[],
   continuousScene: boolean,
-): { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } {
+  scriptTiming?: ScriptTimingInfo | null,
+): { split: boolean; turns: number; source: 'script-timing' | 'dialog' | 'voiceover' | 'placeholder'; bound: number } {
   if (!continuousScene) return { split: false, turns: 0, source: 'dialog', bound: 0 };
   const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
   if (scenes.length !== 1) return { split: false, turns: 0, source: 'dialog', bound: 0 };
@@ -1321,18 +1322,16 @@ function ensureContinuousSceneDialogTurns(
   }
   const sc = scenes[0];
   const existingTurns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
-  const uniqSpeakers = new Set(
+  const UUID_RE_INNER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uniqBoundSpeakers = new Set(
     existingTurns
-      .map((t: any) =>
-        String(t?.speakerCharacterId ?? t?.speakerMentionKey ?? '').toLowerCase(),
-      )
+      .map((t: any) => (typeof t?.speakerCharacterId === 'string' && UUID_RE_INNER.test(t.speakerCharacterId) ? t.speakerCharacterId.toLowerCase() : ''))
       .filter(Boolean),
   );
-  if (uniqSpeakers.size >= requiredCast.length) {
-    return { split: false, turns: existingTurns.length, source: 'dialog', bound: existingTurns.filter((t: any) => typeof t?.speakerCharacterId === 'string').length };
+  if (uniqBoundSpeakers.size >= requiredCast.length) {
+    return { split: false, turns: existingTurns.length, source: 'dialog', bound: uniqBoundSpeakers.size };
   }
 
-  const UUID_RE_INNER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const sceneCast = Array.isArray(sc?.cast) ? sc.cast : [];
   const castWithUuid = sceneCast
     .map((c: any) => ({ c, id: typeof c?.characterId === 'string' && UUID_RE_INNER.test(c.characterId) ? c.characterId : null }))
@@ -1358,7 +1357,7 @@ function ensureContinuousSceneDialogTurns(
 
   // Build spoken corpus.
   let corpus = '';
-  let source: 'dialog' | 'voiceover' | 'placeholder' = 'dialog';
+  let source: 'script-timing' | 'dialog' | 'voiceover' | 'placeholder' = 'dialog';
   if (existingTurns.length > 0) {
     corpus = existingTurns
       .map((t: any) => String(t?.text ?? '').trim())
@@ -1385,6 +1384,48 @@ function ensureContinuousSceneDialogTurns(
   };
 
   const N = requiredCast.length;
+
+  const timingTurns: Array<{ speakerLabel: string; text: string }> = [];
+  for (const shot of scriptTiming?.shots ?? []) {
+    if (shot?.sceneKind === 'endcard') continue;
+    if (Array.isArray(shot?.dialogTurns) && shot.dialogTurns.length > 0) {
+      for (const t of shot.dialogTurns) {
+        const speakerLabel = String(t?.speakerLabel ?? '').trim();
+        const text = String(t?.text ?? '').trim();
+        if (speakerLabel && text) timingTurns.push({ speakerLabel, text });
+      }
+      continue;
+    }
+    const speakerLabel = String(shot?.speakerLabel ?? '').trim();
+    const text = String(shot?.text ?? '').trim();
+    if (speakerLabel && text) timingTurns.push({ speakerLabel, text });
+  }
+
+  const timingSpeakerOrder: string[] = [];
+  const timingSeen = new Set<string>();
+  for (const t of timingTurns) {
+    const key = normalizeMention(t.speakerLabel);
+    if (!key || timingSeen.has(key)) continue;
+    timingSeen.add(key);
+    timingSpeakerOrder.push(key);
+  }
+  if (timingTurns.length >= 2 && timingSpeakerOrder.length >= 2) {
+    let bound = 0;
+    sc.dialogTurns = timingTurns.map((t) => {
+      const speakerIndex = Math.max(0, timingSpeakerOrder.indexOf(normalizeMention(t.speakerLabel)));
+      const castIndex = Math.min(speakerIndex, N - 1);
+      const req = requiredCast[castIndex] ?? requiredCast[0];
+      const speakerCharacterId = resolveRequiredCharacterId(req, castIndex);
+      if (speakerCharacterId) bound += 1;
+      return {
+        speakerMentionKey: mentionFor(req, castIndex),
+        speakerCharacterId,
+        text: t.text,
+      };
+    });
+    if (sc.voiceover) sc.voiceover.text = '';
+    return { split: true, turns: sc.dialogTurns.length, source: 'script-timing', bound };
+  }
 
   if (!corpus) {
     // No spoken text yet — emit empty per-speaker placeholders so the user
@@ -2765,14 +2806,16 @@ YOU MUST:
     // Runs BEFORE solo-cast enforcement and BEFORE bindTurnSpeakerIds. This
     // prevents a collapsed one-speaker LLM turn from trimming the 4-speaker
     // scene down to one cast slot before the repair can run.
-    let continuousSplitStats: { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } | null = null;
+    let continuousSplitStats: { split: boolean; turns: number; source: 'script-timing' | 'dialog' | 'voiceover' | 'placeholder'; bound: number } | null = null;
     let requiredCastForSplit: any[] = [];
     try {
       requiredCastForSplit = extractSelectedCastFromBriefing(briefing, characters);
+      const explicitContinuousScene = !!explicitBriefingTiming?.continuousScene && explicitBriefingTiming.sceneCount === 1;
       continuousSplitStats = ensureContinuousSceneDialogTurns(
         plan,
         requiredCastForSplit,
-        !!continuousSceneLock,
+        explicitContinuousScene,
+        scriptTiming,
       );
       if (continuousSplitStats.split) {
         (plan as any)._meta = {
@@ -2797,7 +2840,7 @@ YOU MUST:
     // split above repairs, not evidence for a solo shot.
     let soloStats: { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } | null = null;
     try {
-      const skipSoloForContinuousEnsemble = !!continuousSceneLock && requiredCastForSplit.length >= 2;
+      const skipSoloForContinuousEnsemble = !!explicitBriefingTiming?.continuousScene && explicitBriefingTiming.sceneCount === 1 && requiredCastForSplit.length >= 2;
       soloStats = skipSoloForContinuousEnsemble
         ? { trimmedScenes: 0, droppedSlots: 0, scrubbedFields: 0 }
         : enforceSoloCast(plan);
@@ -3074,7 +3117,7 @@ YOU MUST:
       if (!Number.isFinite(v) || v < 0) return 0;
       return Math.max(0, Math.min(24, Math.round(v)));
     };
-    const _validModes = new Set(['FREETEXT', 'SHOT_MARKERS', 'SZENE_BLOCKS']);
+    const _validModes = new Set(['FREETEXT', 'SHOT_MARKERS', 'SPEAKER_BLOCKS', 'SZENE_BLOCKS']);
     const _mode = _validModes.has(scriptTiming?.mode as string) ? (scriptTiming!.mode as string) : 'FREETEXT';
     const _validSources = new Set(['explicit-briefing', 'script', 'board']);
     const _rawSource = explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board');
@@ -3087,7 +3130,7 @@ YOU MUST:
       source: _source,
       scriptTimingMode: _mode,
       shots: _clampSceneCount(scriptTiming?.shots?.length ?? 0),
-      pipelineVersion: 'v219',
+      pipelineVersion: 'v220',
     };
     try {
       if (!(plan as any)._meta) (plan as any)._meta = {};
