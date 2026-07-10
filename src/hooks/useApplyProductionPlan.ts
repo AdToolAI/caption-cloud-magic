@@ -111,21 +111,6 @@ function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
       cast.push(sourceCast && shouldInheritPlanContinuity(scene, 'cast')
         ? { ...sourceCast, mentionKey: sourceCast.mentionKey || `S${String(scene.index).padStart(2, '0')} Sprecher` }
         : emptyPlanCastSlot(scene.index));
-    } else if (sourceCast && shouldInheritPlanContinuity(scene, 'cast')) {
-      for (let i = 0; i < cast.length; i += 1) {
-        if (!cast[i].characterId) {
-          cast[i] = {
-            ...cast[i],
-            characterId: sourceCast.characterId,
-            characterName: sourceCast.characterName,
-            referenceImageUrl: sourceCast.referenceImageUrl,
-            outfitLookId: cast[i].outfitLookId ?? sourceCast.outfitLookId ?? null,
-            voiceId: cast[i].voiceId ?? sourceCast.voiceId ?? null,
-            voiceName: cast[i].voiceName ?? sourceCast.voiceName,
-            voiceAutoAssigned: cast[i].voiceAutoAssigned ?? sourceCast.voiceAutoAssigned,
-          };
-        }
-      }
     }
 
     const resolvedCast = cast.find((c) => c.characterId || c.outfitLookId) ?? null;
