@@ -1312,12 +1312,12 @@ function ensureContinuousSceneDialogTurns(
   plan: any,
   requiredCast: any[],
   continuousScene: boolean,
-): { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder' } {
-  if (!continuousScene) return { split: false, turns: 0, source: 'dialog' };
+): { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } {
+  if (!continuousScene) return { split: false, turns: 0, source: 'dialog', bound: 0 };
   const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
-  if (scenes.length !== 1) return { split: false, turns: 0, source: 'dialog' };
+  if (scenes.length !== 1) return { split: false, turns: 0, source: 'dialog', bound: 0 };
   if (!Array.isArray(requiredCast) || requiredCast.length < 2) {
-    return { split: false, turns: 0, source: 'dialog' };
+    return { split: false, turns: 0, source: 'dialog', bound: 0 };
   }
   const sc = scenes[0];
   const existingTurns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
@@ -1329,8 +1329,32 @@ function ensureContinuousSceneDialogTurns(
       .filter(Boolean),
   );
   if (uniqSpeakers.size >= requiredCast.length) {
-    return { split: false, turns: existingTurns.length, source: 'dialog' };
+    return { split: false, turns: existingTurns.length, source: 'dialog', bound: existingTurns.filter((t: any) => typeof t?.speakerCharacterId === 'string').length };
   }
+
+  const UUID_RE_INNER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const sceneCast = Array.isArray(sc?.cast) ? sc.cast : [];
+  const castWithUuid = sceneCast
+    .map((c: any) => ({ c, id: typeof c?.characterId === 'string' && UUID_RE_INNER.test(c.characterId) ? c.characterId : null }))
+    .filter((x: any): x is { c: any; id: string } => !!x.id);
+  const castIdSet = new Set(castWithUuid.map((x) => x.id.toLowerCase()));
+  const castByKey = new Map<string, string>();
+  for (const { c, id } of castWithUuid) {
+    for (const raw of [c?.mentionKey, c?.characterName, c?.name]) {
+      const key = normalizeMention(String(raw ?? ''));
+      if (key && !castByKey.has(key)) castByKey.set(key, id);
+    }
+  }
+  const resolveRequiredCharacterId = (c: any, i: number): string | null => {
+    const direct = typeof c?.characterId === 'string' && UUID_RE_INNER.test(c.characterId) ? c.characterId : null;
+    if (direct && castIdSet.has(direct.toLowerCase())) return direct;
+    for (const raw of [c?.mentionKey, c?.characterName, c?.name]) {
+      const key = normalizeMention(String(raw ?? ''));
+      const hit = key ? castByKey.get(key) : undefined;
+      if (hit) return hit;
+    }
+    return castWithUuid[i]?.id ?? null;
+  };
 
   // Build spoken corpus.
   let corpus = '';
@@ -1365,12 +1389,17 @@ function ensureContinuousSceneDialogTurns(
   if (!corpus) {
     // No spoken text yet — emit empty per-speaker placeholders so the user
     // can fill each turn in the UI (rather than one speaker owning nothing).
-    sc.dialogTurns = requiredCast.map((c: any, i: number) => ({
+    let bound = 0;
+    sc.dialogTurns = requiredCast.map((c: any, i: number) => {
+      const speakerCharacterId = resolveRequiredCharacterId(c, i);
+      if (speakerCharacterId) bound += 1;
+      return ({
       speakerMentionKey: mentionFor(c, i),
-      speakerCharacterId: c?.characterId ?? null,
+      speakerCharacterId,
       text: '',
-    }));
-    return { split: true, turns: N, source: 'placeholder' };
+      });
+    });
+    return { split: true, turns: N, source: 'placeholder', bound };
   }
 
   // Split into N chunks: sentence-boundary preferred, word-fallback.
@@ -1393,13 +1422,19 @@ function ensureContinuousSceneDialogTurns(
   }
   while (chunks.length < N) chunks.push('');
 
-  sc.dialogTurns = requiredCast.map((c: any, i: number) => ({
+  let bound = 0;
+  sc.dialogTurns = requiredCast.map((c: any, i: number) => {
+    const speakerCharacterId = resolveRequiredCharacterId(c, i);
+    if (speakerCharacterId) bound += 1;
+    return ({
     speakerMentionKey: mentionFor(c, i),
-    speakerCharacterId: c?.characterId ?? null,
+    speakerCharacterId,
     text: chunks[i] ?? '',
-  }));
+    });
+  });
   if (sc.voiceover) sc.voiceover.text = '';
-  return { split: true, turns: N, source };
+  return { split: true, turns: N, source, bound };
+}
 
 function applyContinuousScriptTurns(planLike: any, scriptTiming: ScriptTimingInfo, targetDurationSec: number | null) {
   if (!Array.isArray(planLike?.scenes) || planLike.scenes.length !== 1) return { applied: false, turns: 0 };
