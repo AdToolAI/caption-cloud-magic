@@ -74,6 +74,15 @@ function stripPlanId(id: string) {
   return id.startsWith('lib:') ? id.slice(4) : id.replace(/^(outfit|catalog):/, '');
 }
 
+function hasPersistedDialogVoice(raw: unknown): boolean {
+  if (typeof raw === 'string') return !!cleanVoiceId(raw);
+  if (raw && typeof raw === 'object') {
+    const voiceId = (raw as any).voiceId ?? (raw as any).elevenlabsVoiceId;
+    return !!cleanVoiceId(typeof voiceId === 'string' ? voiceId : null);
+  }
+  return false;
+}
+
 type PlanCastSlot = NonNullable<TPlanScene['cast']>[number];
 type PlanLocationSlot = NonNullable<TPlanScene['location']>;
 
@@ -376,40 +385,13 @@ function planSceneToComposerScene(
   //
   // Rule: a cast member receives a voice iff its `characterId` matches a
   // `speakerCharacterId` on one of the scene's dialogTurns (or is the sole
-  // cast entry with a voiceover). No name matching, no slug fuzz.
-  //
-  // Legacy migration: if turns are present but none carry
-  // `speakerCharacterId` (older plans), positional-bind against the
-  // UUID-cast in briefing order — same rule as the server pass.
+  // cast entry with a voiceover). No name matching, no slug fuzz, no legacy
+  // positional guessing at apply-time. Missing turn IDs are blocked before
+  // this mapper runs and must be fixed in the review UI.
   const rawTurns = Array.isArray(ps.dialogTurns) ? ps.dialogTurns : [];
-  const uuidCastInOrder: string[] = (ps.cast ?? [])
-    .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : ''))
-    .filter((id) => id && PLAN_UUID_RE.test(id));
-  const anyTurnHasBoundId = rawTurns.some((t) => {
-    const id = (t as any).speakerCharacterId;
-    return typeof id === 'string' && PLAN_UUID_RE.test(id);
-  });
-  const legacySlugToUuid = new Map<string, string>();
-  if (!anyTurnHasBoundId && rawTurns.length > 0 && uuidCastInOrder.length > 0) {
-    const orderedSlugs: string[] = [];
-    const seen = new Set<string>();
-    for (const t of rawTurns) {
-      const slug = (t.speakerMentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
-      if (!slug || seen.has(slug)) continue;
-      seen.add(slug);
-      orderedSlugs.push(slug);
-    }
-    if (uuidCastInOrder.length >= orderedSlugs.length) {
-      for (let i = 0; i < orderedSlugs.length; i += 1) {
-        legacySlugToUuid.set(orderedSlugs[i], uuidCastInOrder[i]);
-      }
-    }
-  }
   const resolveTurnSpeakerId = (t: any): string | null => {
     const bound = typeof t?.speakerCharacterId === 'string' ? t.speakerCharacterId : null;
-    if (bound && PLAN_UUID_RE.test(bound)) return bound;
-    const slug = String(t?.speakerMentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
-    return slug ? (legacySlugToUuid.get(slug) ?? null) : null;
+    return bound && PLAN_UUID_RE.test(bound) ? stripPrefix(bound) : null;
   };
 
   const speakingCharacterIds = new Set<string>();
@@ -417,6 +399,12 @@ function planSceneToComposerScene(
     const id = resolveTurnSpeakerId(t);
     if (id) speakingCharacterIds.add(id);
   }
+  const castCharacterIds = new Set(
+    (ps.cast ?? [])
+      .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : null))
+      .filter((x): x is string => !!x && PLAN_UUID_RE.test(x)),
+  );
+  const requiredDialogSpeakerIds = Array.from(speakingCharacterIds).filter((id) => castCharacterIds.has(id));
   const hasVo = !!ps.voiceover?.text?.trim();
   const dialogVoices: Record<string, string> = {};
   for (let idx = 0; idx < (ps.cast ?? []).length; idx += 1) {
@@ -458,7 +446,7 @@ function planSceneToComposerScene(
   if (hasDialogTurns) {
     dialogScript = rawTurns
       .map((t) => {
-        const sid = resolveTurnSpeakerId(t);
+      const sid = resolveTurnSpeakerId(t);
         const match = sid
           ? (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === sid)
           : undefined;
@@ -591,6 +579,7 @@ function planSceneToComposerScene(
     dialogMode,
     dialogScript,
     dialogVoices: Object.keys(dialogVoices).length ? dialogVoices : undefined,
+    requiredDialogSpeakerIds,
     shotDirector: (ps.shotDirector || rawLocationId?.startsWith('catalog:'))
       ? {
           framing: ps.shotDirector?.framing,
@@ -650,7 +639,7 @@ function planSceneToComposerScene(
         .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : null))
         .find((x): x is string => !!x);
       const fromDialog = firstCharId ? dialogVoices[firstCharId] : undefined;
-      return fromDialog || cleanVoiceId(projectVoiceId);
+      return fromDialog || (dialogMode ? undefined : cleanVoiceId(projectVoiceId));
     })(),
 
   } as ComposerScene;
@@ -967,15 +956,19 @@ export function useApplyProductionPlan() {
     }
     const fallbackRows = persistedNewRows.filter((r: any) => /Establishing shot: A relevant setting|Reveal beat for the brand|CTA beat for the brand/i.test(String(r.ai_prompt ?? '')));
     if (fallbackRows.length > 0) warnings.push(`${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`);
-    // v217 — verify only checks that lip-sync scenes have at least one
-    // dialog voice. Non-speaking ensemble members (visible only, no turn)
-    // must NOT trigger the "ohne Voice-ID"-warning.
+    // v217/v218 — verify only checks characters that actually have spoken
+    // turns. Non-speaking ensemble members (visible only, no turn) must NOT
+    // trigger the "ohne Voice-ID" warning.
     const lipsyncRowsMissingVoice = persistedNewRows.filter((r: any) => {
       const rowScene = newScenes.find((s) => s.id === String(r.id));
       const needsVoice = rowScene?.dialogMode || !!rowScene?.dialogScript;
       if (!needsVoice) return false;
       const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? r.dialog_voices as Record<string, unknown> : {};
-      const voiceCount = Object.values(voices).filter((v) => typeof v === 'string' && v.trim().length > 0).length;
+      const requiredIds = Array.isArray(rowScene?.requiredDialogSpeakerIds) ? rowScene.requiredDialogSpeakerIds : [];
+      if (requiredIds.length > 0) {
+        return requiredIds.some((id) => !hasPersistedDialogVoice(voices[id]));
+      }
+      const voiceCount = Object.values(voices).filter(hasPersistedDialogVoice).length;
       // No dialog-voice map AND no fallback character voice → truly missing.
       return voiceCount === 0 && !r.character_voice_id;
     });

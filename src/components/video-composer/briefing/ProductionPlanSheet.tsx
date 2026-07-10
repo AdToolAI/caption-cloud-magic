@@ -592,6 +592,12 @@ export default function ProductionPlanSheet({
       toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
       return;
     }
+    if (dialogBindingIssues.length > 0) {
+      const message = `${dialogBindingIssues.length} Dialog-Sprecher noch keinem Charakter zugeordnet.`;
+      setApplyResult({ ok: false, message, warnings: [] });
+      toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
+      return;
+    }
     setApplying(true);
     try {
       const withEnsemble = ensureProductionPlanEnsemble(planForApply, currentBriefing);
@@ -723,6 +729,32 @@ export default function ProductionPlanSheet({
     });
   };
 
+  const updateDialogTurnSpeaker = (sceneIndex: number, turnIndex: number, characterId: string | null) => {
+    setPlan((p) => p && {
+      ...p,
+      scenes: p.scenes.map((s) => {
+        if (s.index !== sceneIndex) return s;
+        const dialogTurns = [...(s.dialogTurns ?? [])];
+        if (!dialogTurns[turnIndex]) return s;
+        const cast = [...(s.cast ?? [])];
+        if (characterId && !cast.some((c) => splitCastId(c.characterId).baseId === characterId)) {
+          const matched = charOptions.find((x) => x.id === characterId);
+          cast.push({
+            ...emptyCastSlot(sceneIndex),
+            mentionKey: matched?.name ?? dialogTurns[turnIndex].speakerMentionKey ?? 'Sprecher',
+            characterId,
+            characterName: matched?.name ?? 'Sprecher',
+          });
+        }
+        dialogTurns[turnIndex] = {
+          ...dialogTurns[turnIndex],
+          speakerCharacterId: characterId,
+        };
+        return { ...s, cast, dialogTurns };
+      }),
+    });
+  };
+
   const updateSceneLocation = (sceneIndex: number, locationId: string | null) => {
     setPlan((p) => p && {
       ...p,
@@ -825,6 +857,31 @@ export default function ProductionPlanSheet({
     const consistent = (safePlan as any)?._meta?.debug?.normalization?.consistent;
     return consistent === false || Math.abs(target - totalPlanSec) >= 0.5;
   }, [safePlan, totalPlanSec]);
+
+  const dialogBindingIssues = useMemo(() => {
+    if (!safePlan) return [] as Array<{ sceneIndex: number; turnIndex: number; label: string }>;
+    const issues: Array<{ sceneIndex: number; turnIndex: number; label: string }> = [];
+    for (const scene of safePlan.scenes ?? []) {
+      const turns = scene.dialogTurns ?? [];
+      if (!turns.length) continue;
+      const castIds = new Set(
+        (scene.cast ?? [])
+          .map((c) => splitCastId(c.characterId).baseId)
+          .filter((id): id is string => !!id && isUuid(id)),
+      );
+      turns.forEach((turn, turnIndex) => {
+        const boundId = uuidInside((turn as any).speakerCharacterId ?? null);
+        if (!boundId || !castIds.has(boundId)) {
+          issues.push({
+            sceneIndex: scene.index,
+            turnIndex,
+            label: turn.speakerMentionKey?.replace(/^@/, '') || `Turn ${turnIndex + 1}`,
+          });
+        }
+      });
+    }
+    return issues;
+  }, [safePlan, outfitById]);
 
   const normalizationMeta = (safePlan as any)?._meta?.debug?.normalization ?? null;
 
@@ -1016,6 +1073,18 @@ export default function ProductionPlanSheet({
                     Projekt-Gesamtdauer <b>{plan.project?.totalDurationSec}s</b> passt nicht
                     zur Szenensumme <b>{totalPlanSec}s ({plan.scenes.length} Szenen)</b>.
                     Bitte Szenendauern korrigieren oder das Briefing neu analysieren.
+                  </div>
+                </div>
+              )}
+              {dialogBindingIssues.length > 0 && (
+                <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Sprecher-Zuordnung fehlt — Apply blockiert
+                  </div>
+                  <div className="text-muted-foreground">
+                    {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} haben keine eindeutige Charakter-ID.
+                    Bitte im Dialog-Block den passenden Charakter auswählen; Stimmen werden danach automatisch gesetzt.
                   </div>
                 </div>
               )}
@@ -1243,15 +1312,45 @@ export default function ProductionPlanSheet({
                             Dialog ({s.dialogTurns!.length} Turn{s.dialogTurns!.length === 1 ? '' : 's'})
                           </Label>
                           <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 space-y-1 font-mono text-[11px]">
-                            {s.dialogTurns!.map((t, i) => (
-                              <div key={i}>
-                                <span className="text-amber-300">
-                                  {t.speakerMentionKey.replace(/^@/, '').toUpperCase()}
-                                  {t.mood ? ` — ${t.mood.toUpperCase()}` : ''}:
-                                </span>{' '}
+                            {s.dialogTurns!.map((t, i) => {
+                              const boundId = uuidInside((t as any).speakerCharacterId ?? null);
+                              const castIds = new Set(
+                                (s.cast ?? [])
+                                  .map((c) => splitCastId(c.characterId).baseId)
+                                  .filter((id): id is string => !!id && isUuid(id)),
+                              );
+                              const isBound = !!boundId && castIds.has(boundId);
+                              return (
+                              <div key={i} className={`grid gap-1 rounded px-1.5 py-1 ${isBound ? '' : 'border border-destructive/50 bg-destructive/10'}`}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-amber-300">
+                                    {t.speakerMentionKey.replace(/^@/, '').toUpperCase()}
+                                    {t.mood ? ` — ${t.mood.toUpperCase()}` : ''}:
+                                  </span>
+                                  <Select
+                                    value={isBound ? boundId : '__none__'}
+                                    onValueChange={(v) => updateDialogTurnSpeaker(s.index, i, v === '__none__' ? null : v)}
+                                  >
+                                    <SelectTrigger className="h-7 min-w-[150px] max-w-[220px] text-[11px] font-sans">
+                                      <SelectValue placeholder="Sprecher wählen…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">— Sprecher zuordnen —</SelectItem>
+                                      {charOptions.map((o) => (
+                                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {!isBound && (
+                                    <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive">
+                                      Voice-ID blockiert bis Sprecher zugeordnet ist
+                                    </Badge>
+                                  )}
+                                </div>
                                 <span className="text-muted-foreground">{t.text}</span>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1643,9 +1742,9 @@ export default function ProductionPlanSheet({
               <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
               <Button
                 onClick={handleApply}
-                disabled={applying || durationInconsistent}
+                disabled={applying || durationInconsistent || dialogBindingIssues.length > 0}
                 className="gap-2"
-                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : undefined}
+                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : dialogBindingIssues.length > 0 ? 'Bitte zuerst alle Dialog-Sprecher zuordnen.' : undefined}
               >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Plan anwenden
