@@ -1005,11 +1005,23 @@ Generate the storyboard using the create_storyboard function.`;
       }
     }
 
+    // v223: multi-speaker prompt slim — strip LLM-emitted "Four speakers, …"
+    // enumerators and per-turn "<Name> is speaking" suffixes from ai_prompt
+    // and sceneActionEn. These patterns trigger Alibaba Green Net ("HappyHorse")
+    // as role-instruction / person-impersonation heuristics. Speaker binding
+    // lives in dialog_turns / speakerCharacterId, not in the image prompt.
+    const SPEAKER_COUNT_PREFIX = /\b(?:Two|Three|Four|Five|Six|Seven|Eight)\s+speakers?,\s*/gi;
+    const IS_SPEAKING_SUFFIX =
+      /\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,2}\s+is\s+speaking(?:,\s*while\s+[^.]+)?\.?/g;
+    const slimPrompt = (t: unknown) =>
+      String(t ?? "").replace(SPEAKER_COUNT_PREFIX, "").replace(IS_SPEAKING_SUFFIX, "").replace(/[ \t]+/g, " ").trim();
+    for (const sc of scenes as any[]) {
+      if (sc?.aiPrompt) sc.aiPrompt = slimPrompt(sc.aiPrompt);
+      if (sc?.sceneActionEn) sc.sceneActionEn = slimPrompt(sc.sceneActionEn);
+      if (sc?.sceneActionUser) sc.sceneActionUser = slimPrompt(sc.sceneActionUser);
+    }
 
-
-
-
-    return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
+    return new Response(JSON.stringify({ scenes, sceneCount: scenes.length, pipelineVersion: "v223-multi-speaker-prompt-slim" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

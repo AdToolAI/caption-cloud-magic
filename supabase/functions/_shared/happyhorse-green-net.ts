@@ -68,6 +68,14 @@ const REPLACEMENTS: Array<[RegExp, string, string]> = [
   // self-monologue leaks (typical dialog-leak into visual prompt)
   [/^\s*Und ich [^\n.!?]{0,120}[.!?]?/gim, "", "self-monologue-de"],
   [/^\s*I('| a)m (just )?(editing|cutting|posting|filming|recording)[^\n.!?]{0,120}[.!?]?/gim, "", "self-monologue-en"],
+
+  // ── v223: multi-speaker prompt slim ────────────────────────────────────
+  // "Four speakers, X, Y, Z, and W, are ..." → "X, Y, Z, and W are ..."
+  // Green Net flags the enumerator ("N speakers, …") as role-instruction.
+  [/\b(?:Two|Three|Four|Five|Six|Seven|Eight)\s+speakers?,\s*/gi, "", "speaker-count-prefix"],
+  // "Samuel Dusatko is speaking[, while the others are visible and attentive]."
+  // → strip entirely; speaker binding lives in dialog_turns, not the image prompt.
+  [/\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,2}\s+is\s+speaking(?:,\s*while\s+[^.]+)?\.?/g, "", "is-speaking-suffix"],
 ];
 
 // Collapse near-duplicate sentences (same sentence repeated within the prompt
