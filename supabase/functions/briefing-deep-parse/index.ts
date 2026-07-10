@@ -3031,6 +3031,7 @@ YOU MUST:
               duration_auto_extend: durationAutoExtend,
               duration_auto_extend_blocked: durationAutoExtendBlocked,
             solo_cast: soloStats,
+            continuous_scene_split: continuousSplitStats,
           },
         });
       if (insErr) {
@@ -3086,7 +3087,7 @@ YOU MUST:
       source: _source,
       scriptTimingMode: _mode,
       shots: _clampSceneCount(scriptTiming?.shots?.length ?? 0),
-      pipelineVersion: 'v215',
+      pipelineVersion: 'v219',
     };
     try {
       if (!(plan as any)._meta) (plan as any)._meta = {};
@@ -3103,7 +3104,7 @@ YOU MUST:
       (plan as any)._meta.debug = _debug;
     } catch { /* non-fatal */ }
 
-    return new Response(JSON.stringify({ plan, version, briefing_contract: _briefingContract, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
+    return new Response(JSON.stringify({ plan, version, briefing_contract: _briefingContract, timings: { passA_ms: tA - t0, passB_ms: tB - tA, total_ms: Date.now() - t0 }, passA_error: passAError, passB_error: passBError, passA_model: passAModelUsed, passB_model: passBModelUsed, passA_diagnostics: passADiagnostics, passB_diagnostics: passBDiagnostics, ensemble_repair: ensembleStats, strict_cast: strictCastStats, fidelity: fidelityStats, solo_cast: soloStats, continuous_scene_split: continuousSplitStats, script_timing: { mode: scriptTiming?.mode ?? 'FREETEXT', shots: scriptTiming?.shots?.length ?? 0, source: scriptTiming?.source ?? 'none' }, canonical: { duration_seconds: _canonicalTotal, scene_count: _canonicalScenes, source: explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board') }, duration_auto_extend: durationAutoExtend, duration_auto_extend_blocked: durationAutoExtendBlocked }), {
 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
