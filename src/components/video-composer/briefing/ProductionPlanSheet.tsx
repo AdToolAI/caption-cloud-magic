@@ -292,22 +292,6 @@ export default function ProductionPlanSheet({
           : emptyCastSlot(s.index);
         cast.push(inherited);
         changed = true;
-      } else if (sourceCast && shouldInheritContinuity(s, 'cast')) {
-        for (let i = 0; i < cast.length; i += 1) {
-          if (!cast[i]?.characterId) {
-            cast[i] = {
-              ...cast[i],
-              characterId: sourceCast.characterId,
-              characterName: sourceCast.characterName,
-              referenceImageUrl: sourceCast.referenceImageUrl,
-              outfitLookId: cast[i].outfitLookId ?? sourceCast.outfitLookId ?? null,
-              voiceId: cast[i].voiceId ?? sourceCast.voiceId ?? null,
-              voiceName: cast[i].voiceName ?? sourceCast.voiceName,
-              voiceAutoAssigned: cast[i].voiceAutoAssigned ?? sourceCast.voiceAutoAssigned,
-            };
-            changed = true;
-          }
-        }
       }
 
       const resolvedCast = cast.find((c) => c.characterId || c.outfitLookId) ?? null;
