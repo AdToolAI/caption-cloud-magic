@@ -2758,32 +2758,17 @@ YOU MUST:
       console.warn('[briefing-deep-parse] fidelity pass failed (non-fatal):', e?.message);
     }
 
-    // G3 — Solo-Enforcement: for any scene whose dialogTurns name a single
-    // unique speaker (typical "Sprecher N:" solo shot), trim cast to that
-    // one character so ensemble-repair cannot leak the full ensemble in.
-    let soloStats: { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } | null = null;
-    try {
-      soloStats = enforceSoloCast(plan);
-      if (soloStats.trimmedScenes > 0 || soloStats.scrubbedFields > 0) {
-        (plan as any)._meta = {
-          ...((plan as any)._meta ?? {}),
-          soloEnforced: soloStats,
-        };
-        console.log('[briefing-deep-parse] solo_cast', soloStats);
-      }
-    } catch (e: any) {
-      console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
-    }
-
-    // v218 — Continuous-Scene dialog-turn ensemble split. When the LLM
+    // v219 — Continuous-Scene dialog-turn ensemble split. When the LLM
     // collapsed a multi-speaker briefing into a single dialogTurn or a plain
     // voiceover on a 1-scene continuous plan, split the spoken text into N
     // turns keyed to the briefed cast so per-speaker voice binding works.
-    // Runs BEFORE bindTurnSpeakerIds so the UUIDs get canonicalised in the
-    // same pass.
-    let continuousSplitStats: { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder' } | null = null;
+    // Runs BEFORE solo-cast enforcement and BEFORE bindTurnSpeakerIds. This
+    // prevents a collapsed one-speaker LLM turn from trimming the 4-speaker
+    // scene down to one cast slot before the repair can run.
+    let continuousSplitStats: { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } | null = null;
+    let requiredCastForSplit: any[] = [];
     try {
-      const requiredCastForSplit = extractSelectedCastFromBriefing(briefing, characters);
+      requiredCastForSplit = extractSelectedCastFromBriefing(briefing, characters);
       continuousSplitStats = ensureContinuousSceneDialogTurns(
         plan,
         requiredCastForSplit,
@@ -2802,6 +2787,29 @@ YOU MUST:
       }
     } catch (e: any) {
       console.warn('[briefing-deep-parse] continuous scene split failed (non-fatal):', e?.message);
+    }
+
+    // G3 — Solo-Enforcement: for any scene whose dialogTurns name a single
+    // unique speaker (typical "Sprecher N:" solo shot), trim cast to that
+    // one character so ensemble-repair cannot leak the full ensemble in.
+    // Explicit one-take/multi-speaker briefings are excluded: if the model
+    // collapsed 4 speakers into one slug, that is exactly what the continuous
+    // split above repairs, not evidence for a solo shot.
+    let soloStats: { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } | null = null;
+    try {
+      const skipSoloForContinuousEnsemble = !!continuousSceneLock && requiredCastForSplit.length >= 2;
+      soloStats = skipSoloForContinuousEnsemble
+        ? { trimmedScenes: 0, droppedSlots: 0, scrubbedFields: 0 }
+        : enforceSoloCast(plan);
+      if (soloStats.trimmedScenes > 0 || soloStats.scrubbedFields > 0) {
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          soloEnforced: soloStats,
+        };
+        console.log('[briefing-deep-parse] solo_cast', soloStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] solo cast pass failed (non-fatal):', e?.message);
     }
 
     // v217 — Turn → Charakter-UUID Binding. Must run AFTER all cast passes
