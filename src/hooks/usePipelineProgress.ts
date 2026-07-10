@@ -337,14 +337,24 @@ export function usePipelineProgress({
   const hasLipsyncScenes = useMemo(
     () =>
       scenes.some(
-        (s) =>
-          !isCanceledLipsyncScene(s) &&
-          ((s as any).twoshotStage ||
+        (s) => {
+          if (isCanceledLipsyncScene(s)) return false;
+          // v223: a scene whose master clip failed can never enter lipsync.
+          // Do not treat it as a lipsync target — otherwise the global bar
+          // shows misleading progress (e.g. 96%) for a scene that hard-failed
+          // at image generation (Green-Net reject, etc.).
+          const cs = (s as any).clipStatus ?? (s as any).clip_status;
+          if (cs === 'failed') return false;
+          return (
+            (s as any).twoshotStage ||
             s.engineOverride === 'cinematic-sync' ||
-            dialogVoiceCount(s) > 1),
+            dialogVoiceCount(s) > 1
+          );
+        },
       ),
     [scenes],
   );
+
 
   const aiScenes = useMemo(
     () => scenes.filter((s) => s.clipSource?.startsWith('ai-')),
