@@ -592,6 +592,12 @@ export default function ProductionPlanSheet({
       toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
       return;
     }
+    if (dialogBindingIssues.length > 0) {
+      const message = `${dialogBindingIssues.length} Dialog-Sprecher noch keinem Charakter zugeordnet.`;
+      setApplyResult({ ok: false, message, warnings: [] });
+      toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
+      return;
+    }
     setApplying(true);
     try {
       const withEnsemble = ensureProductionPlanEnsemble(planForApply, currentBriefing);
