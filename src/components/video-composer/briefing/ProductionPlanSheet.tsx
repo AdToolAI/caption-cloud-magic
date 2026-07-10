@@ -826,6 +826,31 @@ export default function ProductionPlanSheet({
     return consistent === false || Math.abs(target - totalPlanSec) >= 0.5;
   }, [safePlan, totalPlanSec]);
 
+  const dialogBindingIssues = useMemo(() => {
+    if (!safePlan) return [] as Array<{ sceneIndex: number; turnIndex: number; label: string }>;
+    const issues: Array<{ sceneIndex: number; turnIndex: number; label: string }> = [];
+    for (const scene of safePlan.scenes ?? []) {
+      const turns = scene.dialogTurns ?? [];
+      if (!turns.length) continue;
+      const castIds = new Set(
+        (scene.cast ?? [])
+          .map((c) => splitCastId(c.characterId).baseId)
+          .filter((id): id is string => !!id && isUuid(id)),
+      );
+      turns.forEach((turn, turnIndex) => {
+        const boundId = uuidInside((turn as any).speakerCharacterId ?? null);
+        if (!boundId || !castIds.has(boundId)) {
+          issues.push({
+            sceneIndex: scene.index,
+            turnIndex,
+            label: turn.speakerMentionKey?.replace(/^@/, '') || `Turn ${turnIndex + 1}`,
+          });
+        }
+      });
+    }
+    return issues;
+  }, [safePlan, outfitById]);
+
   const normalizationMeta = (safePlan as any)?._meta?.debug?.normalization ?? null;
 
   // ── Live-recompute unresolved ───────────────────────────────────────────
