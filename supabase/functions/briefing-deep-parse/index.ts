@@ -2806,14 +2806,16 @@ YOU MUST:
     // Runs BEFORE solo-cast enforcement and BEFORE bindTurnSpeakerIds. This
     // prevents a collapsed one-speaker LLM turn from trimming the 4-speaker
     // scene down to one cast slot before the repair can run.
-    let continuousSplitStats: { split: boolean; turns: number; source: 'dialog' | 'voiceover' | 'placeholder'; bound: number } | null = null;
+    let continuousSplitStats: { split: boolean; turns: number; source: 'script-timing' | 'dialog' | 'voiceover' | 'placeholder'; bound: number } | null = null;
     let requiredCastForSplit: any[] = [];
     try {
       requiredCastForSplit = extractSelectedCastFromBriefing(briefing, characters);
+      const explicitContinuousScene = !!explicitBriefingTiming?.continuousScene && explicitBriefingTiming.sceneCount === 1;
       continuousSplitStats = ensureContinuousSceneDialogTurns(
         plan,
         requiredCastForSplit,
-        !!continuousSceneLock,
+        explicitContinuousScene,
+        scriptTiming,
       );
       if (continuousSplitStats.split) {
         (plan as any)._meta = {
@@ -2838,7 +2840,7 @@ YOU MUST:
     // split above repairs, not evidence for a solo shot.
     let soloStats: { trimmedScenes: number; droppedSlots: number; scrubbedFields: number } | null = null;
     try {
-      const skipSoloForContinuousEnsemble = !!continuousSceneLock && requiredCastForSplit.length >= 2;
+      const skipSoloForContinuousEnsemble = !!explicitBriefingTiming?.continuousScene && explicitBriefingTiming.sceneCount === 1 && requiredCastForSplit.length >= 2;
       soloStats = skipSoloForContinuousEnsemble
         ? { trimmedScenes: 0, droppedSlots: 0, scrubbedFields: 0 }
         : enforceSoloCast(plan);
@@ -3115,7 +3117,7 @@ YOU MUST:
       if (!Number.isFinite(v) || v < 0) return 0;
       return Math.max(0, Math.min(24, Math.round(v)));
     };
-    const _validModes = new Set(['FREETEXT', 'SHOT_MARKERS', 'SZENE_BLOCKS']);
+    const _validModes = new Set(['FREETEXT', 'SHOT_MARKERS', 'SPEAKER_BLOCKS', 'SZENE_BLOCKS']);
     const _mode = _validModes.has(scriptTiming?.mode as string) ? (scriptTiming!.mode as string) : 'FREETEXT';
     const _validSources = new Set(['explicit-briefing', 'script', 'board']);
     const _rawSource = explicitBriefingTiming ? 'explicit-briefing' : (_canonicalFromScript ? 'script' : 'board');
@@ -3128,7 +3130,7 @@ YOU MUST:
       source: _source,
       scriptTimingMode: _mode,
       shots: _clampSceneCount(scriptTiming?.shots?.length ?? 0),
-      pipelineVersion: 'v219',
+      pipelineVersion: 'v220',
     };
     try {
       if (!(plan as any)._meta) (plan as any)._meta = {};
