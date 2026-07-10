@@ -1318,6 +1318,69 @@ function applyContinuousScriptTurns(planLike: any, scriptTiming: ScriptTimingInf
 }
 
 /**
+ * v217 — Bind each dialogTurn to a canonical Charakter-UUID from the scene
+ * cast. **ID-only**: no name matching, no slug heuristics, no fuzzy compare.
+ *
+ * Strategy per scene:
+ *   1. Skip when no turns or no cast with UUIDs.
+ *   2. If turn.speakerCharacterId already set and points to a cast UUID → keep.
+ *   3. Positional bind when # UUID-cast-slots >= # unique turn speakers
+ *      (turn appearance order → cast[] index in briefing order).
+ *   4. Else leave null (diagnostic).
+ */
+function bindTurnSpeakerIds(planLike: any): { total: number; byCastIndex: number; alreadySet: number; unresolved: number } {
+  const stats = { total: 0, byCastIndex: 0, alreadySet: 0, unresolved: 0 };
+  const scenes = Array.isArray(planLike?.scenes) ? planLike.scenes : [];
+  const UUID_RE_INNER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  for (const sc of scenes) {
+    const turns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
+    if (turns.length === 0) continue;
+    const cast = Array.isArray(sc?.cast) ? sc.cast : [];
+    const uuidCast: string[] = cast
+      .map((c: any) => (typeof c?.characterId === 'string' && UUID_RE_INNER.test(c.characterId) ? c.characterId : null))
+      .filter((x: string | null): x is string => !!x);
+    const uuidCastSet = new Set(uuidCast.map((id) => id.toLowerCase()));
+
+    // Deterministic order in which unique speaker slugs appear in turns.
+    const orderedSlugs: string[] = [];
+    const seenSlug = new Set<string>();
+    for (const t of turns) {
+      const slug = String(t?.speakerMentionKey ?? '').toLowerCase().replace(/^@/, '');
+      if (!slug || seenSlug.has(slug)) continue;
+      seenSlug.add(slug);
+      orderedSlugs.push(slug);
+    }
+
+    // Build slug → uuid map by position when possible.
+    const slugToUuid = new Map<string, string>();
+    if (uuidCast.length >= orderedSlugs.length && orderedSlugs.length > 0) {
+      for (let i = 0; i < orderedSlugs.length; i += 1) {
+        slugToUuid.set(orderedSlugs[i], uuidCast[i]);
+      }
+    }
+
+    for (const t of turns) {
+      stats.total += 1;
+      const existing = typeof t?.speakerCharacterId === 'string' ? t.speakerCharacterId : null;
+      if (existing && UUID_RE_INNER.test(existing) && uuidCastSet.has(existing.toLowerCase())) {
+        stats.alreadySet += 1;
+        continue;
+      }
+      const slug = String(t?.speakerMentionKey ?? '').toLowerCase().replace(/^@/, '');
+      const mapped = slug ? slugToUuid.get(slug) : undefined;
+      if (mapped) {
+        t.speakerCharacterId = mapped;
+        stats.byCastIndex += 1;
+      } else {
+        t.speakerCharacterId = null;
+        stats.unresolved += 1;
+      }
+    }
+  }
+  return stats;
+}
+
+/**
  * v213 — Extract the "## Verbatim Script" block emitted by the client
  * when Mode: LITERAL is active. Returns the script body (without the fence)
  * along with the parsed Speaker Map (script label → @mention).
