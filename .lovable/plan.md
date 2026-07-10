@@ -1,17 +1,61 @@
-## Status Briefing-Pipeline
+## Neuer Ansatz — ID-only, kein Namens-Matching
 
-Kernpipeline ist stabil. Server ist Autorität (`briefing_contract` mit Clamping v215), Client zieht den Contract vor eigener Detektion, `finalizePlanCanonical` blockt inkonsistente Pläne, Ensemble-Leaks/Cast-Dedup/Voice-Binding/UUID-Guards sind drin, 13/13 Tests grün, Typecheck grün.
+Das Voice-Binding läuft strikt über **Charakter-UUIDs**. Kein Fuzzy-Match, keine Vornamen, keine Slugs. Der Server ist die einzige Instanz, die einem Turn eine Charakter-UUID zuordnet — der Client konsumiert nur noch.
 
-Für den Beta-Launch ist damit **nichts Kritisches mehr offen**. Was noch übrig ist, ist reine Refactor-Hygiene ohne Nutzerimpact — kann warten:
+### Root Cause (unverändert)
 
-### Optional (kein Blocker)
+`dialogTurns` tragen aktuell nur `speakerMentionKey` (Slug wie `@samuel`). Der Client in `useApplyProductionPlan.ts` (Z. 386–414) matcht diesen Slug per String-Vergleich gegen `cast.mentionKey` (`@samuel-dusatko`). Kein Match → keine Voice-ID → Warnung.
 
-- **Phase 4** — `ProductionPlanSheet` entkernen: `safePlan`/`useMemo` raus, Finalize nur beim Empfang + im Apply-Guard. UX-Gewinn bei Edits (kein Cursor-Springen), aber invasiv.
-- **Phase 5** — Apply-Pfad vereinheitlichen: `useApplyProductionPlan` + `useStoryboardTransition` teilen sich einen `applyPlanToStoryboard`-Helper mit dem Finalize-Guard.
-- **Phase 7** — `BriefingTab` auf einen einzigen Edge-Function-Pfad (`briefing-deep-parse`), Legacy-Fallback nur bei 5xx.
+## Fix — Server bindet UUID, Client nutzt UUID
 
-### Empfehlung
+### Phase 1 — Server: `speakerCharacterId` in jeden Turn schreiben
 
-Für den Beta-Launch **liegen lassen**. Erst anfassen, wenn a) ein konkreter UX-Bug aus dem Sheet gemeldet wird oder b) nach dem Launch ein Refactor-Fenster frei ist. Vorher noch Golden-Files (Phase 9 Rest) anlegen, damit Phase 4 nicht regressiert.
+`supabase/functions/briefing-deep-parse/index.ts`:
 
-Sag „Phase 4 starten", wenn ich das Sheet trotzdem jetzt umbauen soll — sonst ist die Pipeline aus meiner Sicht launch-fertig.
+- Nach `enforceStrictCast` (Z. 2528) einen neuen deterministischen Pass **`bindTurnSpeakerIds(plan)`** ergänzen. Er iteriert über jede Szene und ordnet jedem `dialogTurn` eine UUID aus dem Szenen-Cast zu — ausschließlich anhand strukturierter Daten, keine Namens-Heuristik:
+
+  1. **Direkter Cast-Index**: Wenn `dialogTurns` in Reihenfolge zur `cast[]` mit gesetzten `characterId` passt (gleiche Anzahl UUID-Slots wie Turns), positional binden — `turn[i].speakerCharacterId = cast[i].characterId`.
+  2. **`speakerLabelIndex`**: Wenn die Turns in `applyContinuousScriptTurns` erzeugt werden, gibt der Skript-Parser bereits eine deterministische Reihenfolge (1., 2., 3., 4. Sprecher-Auftritt). Diese Position → Index im Cast (nach `enforceStrictCast` sortiert stabil in Briefing-Reihenfolge).
+  3. **Kein Match möglich** → `speakerCharacterId = null` (Diagnose-Feld, kein Fehler).
+
+- In `applyContinuousScriptTurns` (Z. 1292–1320) den Turn-Emitter erweitern: statt nur `speakerMentionKey` auch `speakerCharacterId` schreiben, sobald der Cast bekannt ist (Cast-Merge läuft in `mergePlanScenesToSingleContinuousScene` **vor** `applyContinuousScriptTurns`, also verfügbar).
+
+- Server-Meta: `plan._meta.debug.turnBinding = { total, byCastIndex, byLabelIndex, unresolved }` für die Debug-Chip-Anzeige.
+
+### Phase 2 — Schema: Feld auf DialogTurn ergänzen
+
+`src/lib/video-composer/briefing/productionPlan.ts`:
+
+- Zod-Schema `DialogTurn` um `speakerCharacterId: z.string().uuid().nullable().optional()` erweitern. Optional, damit Legacy-Pläne kompatibel bleiben.
+
+### Phase 3 — Client: Voice-Binding ausschließlich über UUID
+
+`src/hooks/useApplyProductionPlan.ts`:
+
+- Z. 380–384: `speakingMentionKeys` **ersetzen** durch `speakingCharacterIds: Set<uuid>` — aufgebaut aus `dialogTurns.map(t => t.speakerCharacterId).filter(isUuid)`.
+- Z. 386–414 (Voice-Loop): `isSpeaker` bestimmt sich rein aus `speakingCharacterIds.has(cast.characterId)`. Kein `mk`-Vergleich mehr, kein Namens-Fallback.
+- Z. 424–437 (`dialogScript`-Bau): Speaker-Name wird via `cast.find(c => c.characterId === turn.speakerCharacterId)?.characterName` geholt. Fallback nur wenn `speakerCharacterId` fehlt → `'NARRATOR'`.
+- Z. 936–948 (Verify): `speakingCharIds = new Set(turns.speakerCharacterId)`; Warnung nur wenn ein Sprecher-UUID in `dialog_voices` fehlt. Sichtbar-stumme Slots ignoriert.
+
+### Phase 4 — Legacy-Kompatibilität (isolierter Migrationspfad)
+
+Für Pläne ohne `speakerCharacterId` auf den Turns (alte gespeicherte Drafts):
+
+- Ein **einmaliger** Client-Migrator direkt vor dem Voice-Binding, der positional bindet, falls `turns.length === cast.filter(c => isUuid(c.characterId)).length`. Kein Namens-Fallback. Wenn ambiguous → Turn bleibt ohne UUID, Verify meldet ehrlich „Sprecher unauflösbar" statt falsch stumm zu schalten.
+
+### Phase 5 — Pipeline-Version
+
+`src/config/pipelineVersion.ts` → **217**. Server-Version-Marker im Response-Meta ebenfalls hochziehen.
+
+### Was NICHT angefasst wird
+
+- `finalizePlanCanonical.sanitizeCastIds` — bleibt.
+- Ensemble-/Strict-Cast-Passes — bleiben.
+- Kein Fuzzy-Match, kein Vorname-Fallback, keine Slug-Präfix-Heuristik. Ausschließlich UUIDs.
+
+## Erwartetes Ergebnis
+
+- Jeder `dialogTurn` trägt eine eindeutige `speakerCharacterId`.
+- `composer_scenes.dialog_voices` wird pro UUID sauber befüllt.
+- Warnung *"Lip-Sync-Szene ohne Voice-ID"* verschwindet für alle Fälle, in denen der Server einen Sprecher an einen Cast-UUID binden kann.
+- Wenn der Server **nicht** binden kann (Cast unvollständig), meldet die UI das ehrlich und deterministisch — kein stiller Datenverlust.
