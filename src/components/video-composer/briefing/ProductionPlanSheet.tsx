@@ -729,6 +729,22 @@ export default function ProductionPlanSheet({
     });
   };
 
+  const updateDialogTurnSpeaker = (sceneIndex: number, turnIndex: number, characterId: string | null) => {
+    setPlan((p) => p && {
+      ...p,
+      scenes: p.scenes.map((s) => {
+        if (s.index !== sceneIndex) return s;
+        const dialogTurns = [...(s.dialogTurns ?? [])];
+        if (!dialogTurns[turnIndex]) return s;
+        dialogTurns[turnIndex] = {
+          ...dialogTurns[turnIndex],
+          speakerCharacterId: characterId,
+        };
+        return { ...s, dialogTurns };
+      }),
+    });
+  };
+
   const updateSceneLocation = (sceneIndex: number, locationId: string | null) => {
     setPlan((p) => p && {
       ...p,
