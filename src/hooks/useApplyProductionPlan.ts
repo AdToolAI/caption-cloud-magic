@@ -272,6 +272,7 @@ function planSceneToComposerScene(
   genderByCharacter: Record<string, 'male' | 'female' | 'neutral' | null | undefined> = {},
   voicePoolPicker?: VoicePoolPicker,
   voicePoolAssignments: Record<string, string> = {},
+  isSingleScenePlan = false,
 ): ComposerScene {
 
   // Build characterShots from resolved cast. The plan stores `characterId`
@@ -388,11 +389,94 @@ function planSceneToComposerScene(
   // cast entry with a voiceover). No name matching, no slug fuzz, no legacy
   // positional guessing at apply-time. Missing turn IDs are blocked before
   // this mapper runs and must be fixed in the review UI.
-  const rawTurns = Array.isArray(ps.dialogTurns) ? ps.dialogTurns : [];
+  let rawTurns = Array.isArray(ps.dialogTurns) ? ps.dialogTurns : [];
   const resolveTurnSpeakerId = (t: any): string | null => {
     const bound = typeof t?.speakerCharacterId === 'string' ? t.speakerCharacterId : null;
     return bound && PLAN_UUID_RE.test(bound) ? stripPrefix(bound) : null;
   };
+
+  // v221 client-side last resort: if an older/stale 1-scene plan still arrives
+  // with a multi-character cast but only 0/1 bound dialog speaker, never let it
+  // serialize as "one speaker owns the whole script". Server v221 should prevent
+  // this; this guard protects already-open Review sheets and cached plans.
+  if (isSingleScenePlan) {
+    const castSpeakerSlots = (ps.cast ?? [])
+      .map((c) => {
+        const characterId = c.characterId ? stripPrefix(String(c.characterId)) : null;
+        return characterId && PLAN_UUID_RE.test(characterId)
+          ? { ...c, characterId }
+          : null;
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null)
+      .filter((c, i, arr) => arr.findIndex((x) => x.characterId === c.characterId) === i);
+    const validBoundSpeakerIds = new Set(
+      rawTurns
+        .map(resolveTurnSpeakerId)
+        .filter((id): id is string => !!id && castSpeakerSlots.some((c) => c.characterId === id)),
+    );
+    if (castSpeakerSlots.length >= 2 && validBoundSpeakerIds.size < 2) {
+      const mentionKeyFor = (c: any, i: number) => {
+        const raw = String(c?.mentionKey ?? '').trim();
+        if (raw) return raw.startsWith('@') ? raw : `@${raw}`;
+        const slug = String(c?.characterName ?? `sprecher-${i + 1}`)
+          .toLowerCase()
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        return `@${slug || `sprecher-${i + 1}`}`;
+      };
+      const normalizeSpeakerKey = (value: unknown) => String(value ?? '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/^@/, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      if (rawTurns.length >= 2) {
+        const order: string[] = [];
+        for (const t of rawTurns) {
+          const key = normalizeSpeakerKey((t as any)?.speakerMentionKey);
+          if (key && !order.includes(key)) order.push(key);
+        }
+        rawTurns = rawTurns.map((t, i) => {
+          const key = normalizeSpeakerKey((t as any)?.speakerMentionKey);
+          const orderIndex = key ? order.indexOf(key) : -1;
+          const castIndex = Math.min(orderIndex >= 0 ? orderIndex : i, castSpeakerSlots.length - 1);
+          const slot = castSpeakerSlots[castIndex] ?? castSpeakerSlots[0];
+          return {
+            ...t,
+            speakerMentionKey: mentionKeyFor(slot, castIndex),
+            speakerCharacterId: slot.characterId,
+          };
+        });
+      } else {
+        const corpus = rawTurns.map((t) => String((t as any)?.text ?? '').trim()).filter(Boolean).join(' ')
+          || String(ps.voiceover?.text ?? '').trim();
+        if (corpus) {
+          const sentences = corpus.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+          const chunks: string[] = [];
+          if (sentences.length >= castSpeakerSlots.length) {
+            const per = Math.ceil(sentences.length / castSpeakerSlots.length);
+            for (let i = 0; i < castSpeakerSlots.length; i += 1) {
+              chunks.push(sentences.slice(i * per, i * per + per).join(' ').trim());
+            }
+          } else {
+            const words = corpus.split(/\s+/).filter(Boolean);
+            const per = Math.max(1, Math.ceil(words.length / castSpeakerSlots.length));
+            for (let i = 0; i < castSpeakerSlots.length; i += 1) {
+              chunks.push(words.slice(i * per, i * per + per).join(' ').trim());
+            }
+          }
+          rawTurns = castSpeakerSlots.map((slot, i) => ({
+            speakerMentionKey: mentionKeyFor(slot, i),
+            speakerCharacterId: slot.characterId,
+            text: chunks[i] ?? '',
+          }));
+        }
+      }
+    }
+  }
 
   const speakingCharacterIds = new Set<string>();
   for (const t of rawTurns) {
@@ -852,6 +936,7 @@ export function useApplyProductionPlan() {
           genderByCharacter,
           voicePoolPicker,
           voicePoolAssignments,
+          hydratedScenes.length === 1,
         ),
       );
 
