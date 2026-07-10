@@ -1957,8 +1957,7 @@ YOU MUST:
     }
     const explicitBriefingTiming = detectExplicitBriefingTiming(briefing);
     const continuousSceneLock = !!explicitBriefingTiming?.continuousScene
-      && explicitBriefingTiming.sceneCount === 1
-      && scriptTiming.mode === 'SHOT_MARKERS';
+      && explicitBriefingTiming.sceneCount === 1;
     const SCRIPT_TIMING_LOCK = scriptTiming.mode === 'SHOT_MARKERS'
       ? (continuousSceneLock ? `
 ═══════════════════════════════════════════════════════════════════════════
@@ -2059,6 +2058,14 @@ YOU MUST:
     const [charRes, locRes, catalogLocRes, catalogBuildingRes, catalogPropRes] = libResult.status === 'fulfilled'
       ? libResult.value
       : [{ data: [] } as any, { data: [] } as any, { data: [] } as any, { data: [] } as any, { data: [] } as any];
+
+    const characters = charRes.data ?? [];
+    const locations = buildLocationLibrary(
+      locRes.data ?? [],
+      catalogLocRes.data ?? [],
+      catalogBuildingRes.data ?? [],
+      catalogPropRes.data ?? [],
+    );
 
     // ── Safety net: if Pass A returned 0 scenes (modelblip / extreme thin
     //    briefing), synthesize a deterministic 3-scene arc so the user is
@@ -2394,17 +2401,6 @@ YOU MUST:
     } catch (e: any) {
       console.warn('[briefing-deep-parse] scene-count guard failed (non-fatal):', e?.message);
     }
-
-
-    const characters = charRes.data ?? [];
-    const locations = buildLocationLibrary(
-      locRes.data ?? [],
-      catalogLocRes.data ?? [],
-      catalogBuildingRes.data ?? [],
-      catalogPropRes.data ?? [],
-    );
-
-
     // Curated voice list (mirror of src/lib/elevenlabs-voices catalog).
     const voices = [
       { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', language: 'multilingual' },
