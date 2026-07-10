@@ -427,7 +427,10 @@ function planSceneToComposerScene(
         rawTurns = rawTurns.map((t, i) => {
           const key = normalizeSpeakerKey((t as any)?.speakerMentionKey);
           const orderIndex = key ? order.indexOf(key) : -1;
-          const castIndex = Math.min(orderIndex >= 0 ? orderIndex : i, castSpeakerSlots.length - 1);
+          const castIndex = Math.min(
+            order.length >= 2 && orderIndex >= 0 ? orderIndex : i,
+            castSpeakerSlots.length - 1,
+          );
           const slot = castSpeakerSlots[castIndex] ?? castSpeakerSlots[0];
           return {
             ...t,
