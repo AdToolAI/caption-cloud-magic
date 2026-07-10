@@ -1148,7 +1148,7 @@ function extractSelectedCastFromBriefing(briefing: string, characters: any[]) {
  */
 function enforceStrictCast(plan: any, required: any[]) {
   if (!Array.isArray(plan?.scenes) || required.length === 0) return { dropped: 0, backfilled: 0 };
-  // v220 — no longer short-circuit when some briefed characters lack UUIDs.
+  // v221 — no longer short-circuit when some briefed characters lack UUIDs.
   // We still drop hallucinated speakers as long as we have at least one
   // resolved UUID as the "known good" allowlist reference.
   const resolvedIds = required.map((r) => r.characterId).filter(Boolean);
@@ -2870,6 +2870,43 @@ YOU MUST:
       console.warn('[briefing-deep-parse] turn binding failed (non-fatal):', e?.message);
     }
 
+    // v221 — final continuous-scene guard. Some earlier passes intentionally
+    // rewrite dialogTurns without IDs (fidelity / script-timing merge), and
+    // stale model output can still collapse a 4-speaker one-take back to one
+    // bound speaker. Re-run the deterministic split after the final binding
+    // pass, then bind once more so the response cannot persist/apply as
+    // "1 Block • 1 Sprecher".
+    try {
+      const explicitContinuousScene = !!explicitBriefingTiming?.continuousScene && explicitBriefingTiming.sceneCount === 1;
+      const postSplitStats = ensureContinuousSceneDialogTurns(
+        plan,
+        requiredCastForSplit.length ? requiredCastForSplit : extractSelectedCastFromBriefing(briefing, characters),
+        explicitContinuousScene,
+        scriptTiming,
+      );
+      if (postSplitStats.split) {
+        const postBindStats = bindTurnSpeakerIds(plan);
+        continuousSplitStats = postSplitStats;
+        (plan as any)._meta = {
+          ...((plan as any)._meta ?? {}),
+          continuousSceneSplit: postSplitStats,
+          aiFilled: Array.from(new Set([
+            ...(((plan as any)._meta?.aiFilled ?? []) as string[]),
+            'scenes.dialogTurns.continuousSceneSplit.finalGuard',
+          ])),
+          debug: {
+            ...(((plan as any)._meta?.debug) ?? {}),
+            turnBinding: postBindStats,
+            continuousSceneSplitFinalGuard: postSplitStats,
+          },
+        };
+        console.log('[briefing-deep-parse] continuous_scene_split_final_guard', postSplitStats);
+        if (postBindStats.total > 0) console.log('[briefing-deep-parse] turn_binding_final_guard', postBindStats);
+      }
+    } catch (e: any) {
+      console.warn('[briefing-deep-parse] continuous scene final guard failed (non-fatal):', e?.message);
+    }
+
 
 
 
@@ -3126,7 +3163,7 @@ YOU MUST:
       source: _source,
       scriptTimingMode: _mode,
       shots: _clampSceneCount(scriptTiming?.shots?.length ?? 0),
-      pipelineVersion: 'v220',
+      pipelineVersion: 'v221',
     };
     try {
       if (!(plan as any)._meta) (plan as any)._meta = {};
