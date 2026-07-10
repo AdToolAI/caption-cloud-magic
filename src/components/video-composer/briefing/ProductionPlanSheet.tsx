@@ -1300,15 +1300,45 @@ export default function ProductionPlanSheet({
                             Dialog ({s.dialogTurns!.length} Turn{s.dialogTurns!.length === 1 ? '' : 's'})
                           </Label>
                           <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 space-y-1 font-mono text-[11px]">
-                            {s.dialogTurns!.map((t, i) => (
-                              <div key={i}>
-                                <span className="text-amber-300">
-                                  {t.speakerMentionKey.replace(/^@/, '').toUpperCase()}
-                                  {t.mood ? ` — ${t.mood.toUpperCase()}` : ''}:
-                                </span>{' '}
+                            {s.dialogTurns!.map((t, i) => {
+                              const boundId = uuidInside((t as any).speakerCharacterId ?? null);
+                              const castIds = new Set(
+                                (s.cast ?? [])
+                                  .map((c) => splitCastId(c.characterId).baseId)
+                                  .filter((id): id is string => !!id && isUuid(id)),
+                              );
+                              const isBound = !!boundId && castIds.has(boundId);
+                              return (
+                              <div key={i} className={`grid gap-1 rounded px-1.5 py-1 ${isBound ? '' : 'border border-destructive/50 bg-destructive/10'}`}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-amber-300">
+                                    {t.speakerMentionKey.replace(/^@/, '').toUpperCase()}
+                                    {t.mood ? ` — ${t.mood.toUpperCase()}` : ''}:
+                                  </span>
+                                  <Select
+                                    value={isBound ? boundId : '__none__'}
+                                    onValueChange={(v) => updateDialogTurnSpeaker(s.index, i, v === '__none__' ? null : v)}
+                                  >
+                                    <SelectTrigger className="h-7 min-w-[150px] max-w-[220px] text-[11px] font-sans">
+                                      <SelectValue placeholder="Sprecher wählen…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">— Sprecher zuordnen —</SelectItem>
+                                      {charOptions.map((o) => (
+                                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {!isBound && (
+                                    <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive">
+                                      Voice-ID blockiert bis Sprecher zugeordnet ist
+                                    </Badge>
+                                  )}
+                                </div>
                                 <span className="text-muted-foreground">{t.text}</span>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
