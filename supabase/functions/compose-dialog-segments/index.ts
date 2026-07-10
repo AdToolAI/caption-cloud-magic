@@ -1638,9 +1638,20 @@ serve(async (req) => {
             }
           }
         }
+        // v222 — Bridge writes characterId onto faces but the original
+        // resolvedCount was computed BEFORE the bridge ran. Recompute so
+        // downstream guards (haveBboxUrlPathForEdge, preclip eligibility,
+        // v107 hard-preclip enforcement, snapshot persistence) see the true
+        // number of identified faces. Root cause of DB-verified scene
+        // 7d45c852 (2026-07-10): 4 bridged faces, resolvedCount stuck at 0,
+        // pipeline fell back to `bbox-url-pro` full-plate single job → only
+        // speakers 1 & 2 (left half) lip-synced, 3 & 4 stayed silent.
+        plateIdentityMap.resolvedCount = plateIdentityMap.faces.filter(
+          (f) => !!f.characterId,
+        ).length;
         const partial = anchorByVisual.length < platesByVisual.length ? "_partial" : "";
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v183_anchor_identity_slot_bridge${partial} bridged=${plateIdentityMap.faces.filter((f) => f.characterId).length}/${plateIdentityMap.faces.length} anchor_ids=${anchorByVisual.map((f) => f.characterId).join(",")}`,
+          `[compose-dialog-segments] scene=${sceneId} v183_anchor_identity_slot_bridge${partial} bridged=${plateIdentityMap.faces.filter((f) => f.characterId).length}/${plateIdentityMap.faces.length} anchor_ids=${anchorByVisual.map((f) => f.characterId).join(",")} resolvedCount_after_bridge=${plateIdentityMap.resolvedCount}`,
         );
       }
 
