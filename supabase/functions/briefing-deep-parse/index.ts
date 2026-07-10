@@ -1322,18 +1322,16 @@ function ensureContinuousSceneDialogTurns(
   }
   const sc = scenes[0];
   const existingTurns = Array.isArray(sc?.dialogTurns) ? sc.dialogTurns : [];
-  const uniqSpeakers = new Set(
+  const UUID_RE_INNER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uniqBoundSpeakers = new Set(
     existingTurns
-      .map((t: any) =>
-        String(t?.speakerCharacterId ?? t?.speakerMentionKey ?? '').toLowerCase(),
-      )
+      .map((t: any) => (typeof t?.speakerCharacterId === 'string' && UUID_RE_INNER.test(t.speakerCharacterId) ? t.speakerCharacterId.toLowerCase() : ''))
       .filter(Boolean),
   );
-  if (uniqSpeakers.size >= requiredCast.length) {
-    return { split: false, turns: existingTurns.length, source: 'dialog', bound: existingTurns.filter((t: any) => typeof t?.speakerCharacterId === 'string').length };
+  if (uniqBoundSpeakers.size >= requiredCast.length) {
+    return { split: false, turns: existingTurns.length, source: 'dialog', bound: uniqBoundSpeakers.size };
   }
 
-  const UUID_RE_INNER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const sceneCast = Array.isArray(sc?.cast) ? sc.cast : [];
   const castWithUuid = sceneCast
     .map((c: any) => ({ c, id: typeof c?.characterId === 'string' && UUID_RE_INNER.test(c.characterId) ? c.characterId : null }))
