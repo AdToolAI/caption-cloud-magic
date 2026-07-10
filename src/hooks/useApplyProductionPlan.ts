@@ -372,15 +372,50 @@ function planSceneToComposerScene(
   }
   const aiPrompt = promptParts.join(' ') || undefined;
 
-  // Per-character dialog voices (cinematic-sync / heygen use these).
-  // G4 — bind voice pool STRICTLY to characters who actually speak in this
-  // scene. A cast member that appears in the frame but has no dialog turn
-  // (and isn't the voiceover speaker) does NOT receive a voice — otherwise
-  // silent bystanders leak voices like "Sarah AI" into unrelated scenes.
-  const speakingMentionKeys = new Set<string>();
-  for (const t of ps.dialogTurns ?? []) {
-    const k = (t.speakerMentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
-    if (k) speakingMentionKeys.add(k);
+  // Per-character dialog voices — v217 ID-ONLY binding.
+  //
+  // Rule: a cast member receives a voice iff its `characterId` matches a
+  // `speakerCharacterId` on one of the scene's dialogTurns (or is the sole
+  // cast entry with a voiceover). No name matching, no slug fuzz.
+  //
+  // Legacy migration: if turns are present but none carry
+  // `speakerCharacterId` (older plans), positional-bind against the
+  // UUID-cast in briefing order — same rule as the server pass.
+  const rawTurns = Array.isArray(ps.dialogTurns) ? ps.dialogTurns : [];
+  const uuidCastInOrder: string[] = (ps.cast ?? [])
+    .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : ''))
+    .filter((id) => id && PLAN_UUID_RE.test(id));
+  const anyTurnHasBoundId = rawTurns.some((t) => {
+    const id = (t as any).speakerCharacterId;
+    return typeof id === 'string' && PLAN_UUID_RE.test(id);
+  });
+  const legacySlugToUuid = new Map<string, string>();
+  if (!anyTurnHasBoundId && rawTurns.length > 0 && uuidCastInOrder.length > 0) {
+    const orderedSlugs: string[] = [];
+    const seen = new Set<string>();
+    for (const t of rawTurns) {
+      const slug = (t.speakerMentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      orderedSlugs.push(slug);
+    }
+    if (uuidCastInOrder.length >= orderedSlugs.length) {
+      for (let i = 0; i < orderedSlugs.length; i += 1) {
+        legacySlugToUuid.set(orderedSlugs[i], uuidCastInOrder[i]);
+      }
+    }
+  }
+  const resolveTurnSpeakerId = (t: any): string | null => {
+    const bound = typeof t?.speakerCharacterId === 'string' ? t.speakerCharacterId : null;
+    if (bound && PLAN_UUID_RE.test(bound)) return bound;
+    const slug = String(t?.speakerMentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
+    return slug ? (legacySlugToUuid.get(slug) ?? null) : null;
+  };
+
+  const speakingCharacterIds = new Set<string>();
+  for (const t of rawTurns) {
+    const id = resolveTurnSpeakerId(t);
+    if (id) speakingCharacterIds.add(id);
   }
   const hasVo = !!ps.voiceover?.text?.trim();
   const dialogVoices: Record<string, string> = {};
@@ -388,11 +423,10 @@ function planSceneToComposerScene(
     const c = (ps.cast ?? [])[idx];
     if (!c.characterId) continue;
     const characterId = stripPrefix(c.characterId as string);
-    const mk = (c.mentionKey ?? '').replace(/^@/, '').trim().toLowerCase();
-    // Speaker gating: either turns exist AND this cast is one of them,
-    // or (no turns) only the first cast entry may inherit the voiceover.
-    const isSpeaker = speakingMentionKeys.size > 0
-      ? speakingMentionKeys.has(mk)
+    // Speaker gating — ID-only. Voiceover falls back to first cast entry
+    // only when NO turns exist at all.
+    const isSpeaker = speakingCharacterIds.size > 0
+      ? speakingCharacterIds.has(characterId)
       : hasVo && idx === 0;
     if (!isSpeaker) continue;
     let vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
@@ -409,27 +443,26 @@ function planSceneToComposerScene(
     }
     // v220 — do NOT fall back to projectVoiceId here. Project voice is applied
     // separately at the character level; leaking it into every dialogVoices
-    // slot caused non-speaking characters to inherit the wrong voice
-    // (e.g. "Roger AI" showing up on unrelated cast members).
+    // slot caused non-speaking characters to inherit the wrong voice.
     if (vid) dialogVoices[characterId] = vid;
   }
 
 
 
   const engine = ps.engine ?? 'auto';
-  const hasDialogTurns = Array.isArray(ps.dialogTurns) && ps.dialogTurns.length > 0;
+  const hasDialogTurns = rawTurns.length > 0;
   const dialogMode = ps.lipSync || LIPSYNC_ENGINES.has(engine) || !!ps.voiceover?.text || hasDialogTurns;
 
-  // Build dialogScript.
+  // Build dialogScript — speaker name lookup via UUID.
   let dialogScript: string | undefined;
   if (hasDialogTurns) {
-    dialogScript = (ps.dialogTurns ?? [])
+    dialogScript = rawTurns
       .map((t) => {
-        const rawKey = (t.speakerMentionKey ?? '').replace(/^@/, '').trim();
-        const match = (ps.cast ?? []).find(
-          (c) => (c.mentionKey ?? '').replace(/^@/, '').toLowerCase() === rawKey.toLowerCase(),
-        );
-        const name = (match?.characterName ?? rawKey ?? 'NARRATOR').toUpperCase();
+        const sid = resolveTurnSpeakerId(t);
+        const match = sid
+          ? (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === sid)
+          : undefined;
+        const name = (match?.characterName ?? 'NARRATOR').toUpperCase();
         // Only the spoken line goes into dialog_script. Mood/delivery
         // stay on dialogTurns as performance metadata — never spoken.
         return `${name}: ${t.text.trim()}`;
@@ -440,6 +473,7 @@ function planSceneToComposerScene(
       ? `${(ps.cast ?? [])[0]?.characterName?.toUpperCase() ?? 'NARRATOR'}: ${ps.voiceover.text}`
       : `NARRATOR: ${ps.voiceover.text}`;
   }
+
 
   const sceneType: ComposerScene['sceneType'] = (() => {
     const beat = (ps.beat ?? '').toLowerCase();
