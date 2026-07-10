@@ -1,62 +1,44 @@
-## Wurzelursache (DB-verifiziert an Szene 7d45c852)
+# Plan: HappyHorse Green-Net-Reject beheben + Progress-Bar entkoppeln
 
-`plate_identity`:
-- 4 Gesichter mit `characterId` + `matchConfidence: 0.85` erkannt (alle 4 Speaker sauber gemappt)
-- **aber** `resolvedCount: 0`
+Ziel: Prompt-Profil wieder auf den Stand der bewiesenen Success-Szene (`7d45c852…`) bringen, damit HappyHorse nicht mehr durch Alibaba Green Net blockiert wird. Zusätzlich Sanitizer als Sicherheitsnetz und Progress-Bar-Bug fixen.
 
-Konsequenz in `compose-dialog-segments`:
-- `haveBboxUrlPathForEdge` / preclip-eligibility Guards prüfen u.a. `(plateIdentityMap.resolvedCount ?? 0) > 0` → false
-- Pipeline verwarf die 4 fertigen Preclips (`preclip_used: false`) und schaltete auf `retry_variant: bbox-url-pro`
-- Es lief nur **1 Sync.so-Job** (`sync_job_id: eb2e25b8`) über die volle 1284×718-Plate mit 4 per-frame Bboxes
-- Sync.so sync-3 animiert im Full-Plate-Mode mit 4 gleichzeitigen Bboxes typischerweise nur 2 Gesichter zuverlässig — genau die 2 links im Bild
-- Alle 4 Passes werden `done` markiert, weil der Single-Job als „gesamter Output" für die Szene gilt
+## Fix A′ — Wurzelfix in Storyboard-Emission (Primär)
 
-## Fix — 2 Ebenen, minimaler Blast Radius
+Datei: `supabase/functions/compose-video-storyboard/index.ts` (bzw. der Prompt-Builder, der den `ai_prompt` zusammensetzt)
 
-### A) Wurzelfix: `resolvedCount` korrekt berechnen
-**Datei:** `supabase/functions/_shared/plate-face-identity.ts`
+- Bei Multi-Speaker-Szenen (`dialog_turns.length >= 2` oder `continuousSceneLock`):
+  - **Kein** `"<Name> is speaking"`-Suffix mehr in den Bild-Prompt schreiben. Sprecher-Zuordnung läuft ausschließlich über `dialog_turns` / `speakerCharacterId`.
+  - **Kein** `"Four speakers, …"`-Prefix / keinen Zähler-Satz emittieren.
+  - Volle Namen (First + Last) im Bild-Prompt max. **einmal pro Charakter** verwenden; danach nur noch Vorname oder Rolle.
+- Solo-Szenen bleiben unverändert.
+- Version-Bump: `compose-video-storyboard` → `v223-multi-speaker-prompt-slim`.
 
-Aktuell wird `resolvedCount` unabhängig von der Anzahl der tatsächlich zugewiesenen `characterId`s auf 0 gesetzt (oder von einer Extra-Bedingung abhängig gemacht, die 0.85-Confidence-Matches verwirft). Wir ändern das auf:
+## Fix A — Sanitizer als Netz (Sekundär)
 
-```ts
-resolvedCount = faces.filter(f => !!f.characterId && f.matchConfidence >= MATCH_CONFIDENCE_MIN).length
-```
+Datei: `supabase/functions/_shared/happyhorse-green-net.ts`
 
-Mit `MATCH_CONFIDENCE_MIN = 0.7` (die real gemessenen 0.85 fallen zuverlässig darüber; 0.7 ist der Wert, den v160 bereits als „identity-matched" ansieht).
+- Neue Pass-Regel: Full-Name-Repetition pro Prompt auf **max. 2** cappen (danach Vorname).
+- Regex-Strip: `/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+is speaking\b/gi` → entfernen.
+- Regex-Strip: `/\b(Two|Three|Four|Five)\s+speakers?[^.]*\./gi` → entfernen.
+- Wird als letzter Sanitizer-Schritt VOR HappyHorse-Call aufgerufen (in `compose-dialog-segments` / `compose-video-storyboard`).
 
-### B) Defense-in-depth im Composer
-**Datei:** `supabase/functions/compose-dialog-segments/index.ts`, Bereich um Zeile 4674-4678 und beim v204-Multipass-Fallback
+## Fix B — Progress-Bar entkoppeln
 
-Zusätzliche Bedingung: **wenn** alle 4 Preclips bereits erfolgreich gerendert sind (`passes[i].preclip_url && passes[i].preclip_crop` vorhanden) **und** die Anzahl matched `characterId`s ≥ speakers.length ist, **dann** darf der Full-Plate `bbox-url-pro`-Fallback nicht mehr gewählt werden — stattdessen den Preclip-Pfad dispatchen (jeder Speaker bekommt seinen eigenen Sync.so-Job).
+Datei: `src/hooks/usePipelineProgress.ts`
 
-Dieser Guard ist unabhängig von `resolvedCount` und schützt zusätzlich gegen andere Regressionen, die den `resolvedCount`-Zähler nullen.
-
-### C) Diagnose-Log
-Ein einziger Log-Eintrag pro Szene beim Pfad-Entscheid:
-```
-[v222_pipeline_choice] scene=<id> preclipsReady=N/M matchedIds=N/M chosen=preclip|bbox-url-pro reason=<...>
-```
-Damit die nächste Regression innerhalb einer Log-Zeile erkennbar wird — nicht wie diesmal erst nach DB-Forensik.
+- Beim Aggregieren der Lipsync-Targets `clipStatus === 'failed'` ausschließen.
+- Wenn alle Targets einer Szene `failed` → Lipsync-Progress für diese Szene = 0 %, nicht 96 %.
 
 ## Verifikation
 
-1. `CLIENT_PIPELINE_VERSION` / `COMPOSE_DIALOG_SEGMENTS_VERSION` auf `v222` bumpen
-2. `compose-dialog-segments` deployen
-3. User setzt die Szene `7d45c852` mit `useResetLipSync` zurück, Composer startet automatisch
-4. Erwartung in DB nach ~90s:
-   - `preclip_used: true`
-   - **4 verschiedene** `sync_job_id`s (einer pro Pass), nicht ein globaler
-   - `retry_variant: null` oder `preclip+bbox-explicit`, nicht `bbox-url-pro`
-   - `resolvedCount: 4`
-5. Visuell: alle 4 Münder animiert
+1. Neue Szene mit identischem 4-Sprecher-Briefing generieren.
+2. DB prüfen: `ai_prompt` enthält **keine** `is speaking`-Suffixe und **keinen** `Four speakers`-Prefix.
+3. HappyHorse-Response ≠ `[green_net_rejected]`.
+4. UI: Progress-Bar zeigt bei fehlgeschlagener Szene keinen Lipsync-Fortschritt mehr.
 
-## Was NICHT angefasst wird
+## Technische Details
 
-- Briefing/Storyboard-Pipeline (v221-Fixes sind produktiv, Thema abgeschlossen)
-- v88/v99/v122-Historie (Preclip-Geometrie ist sauber, kein Fix nötig)
-- Sync.so-Payload-Vertrag, Mux-Timeline, Audio-Tight-Slicer
-- Voice/Cast-UUID-Binding (Wurzel war Pipeline-Choice, nicht Speaker-Zuweisung)
-
-## Zeitplan
-
-Einmaliger Fix, keine Migration. Deploy → Reset → Verify in einem Turn.
+- Kein Schema-Change, keine Migration.
+- Betroffene Edge-Functions: `compose-video-storyboard`, `compose-dialog-segments` (nur Sanitizer-Aufruf).
+- Client-Bump: `CLIENT_PIPELINE_VERSION` → 223.
+- Rollback: Version-Flag `PROMPT_SLIM_V223` (default an) — bei Bedarf per Env deaktivierbar.
