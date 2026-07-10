@@ -159,6 +159,7 @@ export default function ProductionPlanSheet({
     warnings: string[];
   } | null>(null);
   const currentBriefingRef = useRef(currentBriefing);
+  const autoBoundDialogSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     currentBriefingRef.current = currentBriefing;
@@ -463,6 +464,49 @@ export default function ProductionPlanSheet({
     if (rawId.startsWith('lib:')) return { baseId: rawId.slice(4), outfitLookId: null };
     return { baseId: rawId, outfitLookId: null };
   };
+
+  // v219 Safety-Bind: legacy/stale continuous plans can arrive with one
+  // dialog turn per visible cast member, but without `speakerCharacterId`.
+  // If the mapping is unambiguous by position (N turns == N cast UUIDs), bind
+  // it in the review sheet before the Apply gate blocks the user.
+  useEffect(() => {
+    if (!plan?.scenes?.length) return;
+    const signature = JSON.stringify(
+      plan.scenes.map((s) => ({
+        i: s.index,
+        cast: (s.cast ?? []).map((c) => uuidInside(c.characterId ?? null)),
+        turns: (s.dialogTurns ?? []).map((t: any) => uuidInside(t?.speakerCharacterId ?? null) ?? t?.speakerMentionKey ?? ''),
+      })),
+    );
+    if (autoBoundDialogSignatureRef.current === signature) return;
+
+    let changed = false;
+    const nextScenes = plan.scenes.map((s) => {
+      const turns = Array.isArray(s.dialogTurns) ? s.dialogTurns : [];
+      if (turns.length < 2) return s;
+      const castIds = (s.cast ?? [])
+        .map((c) => uuidInside(c.characterId ?? null) ?? splitCastId(c.characterId).baseId)
+        .filter((id): id is string => !!id && isUuid(id));
+      const uniqueCastIds = Array.from(new Set(castIds));
+      if (uniqueCastIds.length !== turns.length) return s;
+      const allUnboundOrInvalid = turns.every((t: any) => {
+        const id = uuidInside(t?.speakerCharacterId ?? null);
+        return !id || !uniqueCastIds.includes(id);
+      });
+      if (!allUnboundOrInvalid) return s;
+      changed = true;
+      return {
+        ...s,
+        dialogTurns: turns.map((t: any, i: number) => ({
+          ...t,
+          speakerCharacterId: uniqueCastIds[i],
+        })),
+      };
+    });
+
+    autoBoundDialogSignatureRef.current = signature;
+    if (changed) setPlan({ ...plan, scenes: nextScenes });
+  }, [plan]);
 
 
   // Identify which existing scenes are lipsync-protected (display only).
