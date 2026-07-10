@@ -1,50 +1,62 @@
-## Symptom
-4-Sprecher-Continuous-Szene (Screenshot): Sprecher 1 & 2 (linke Hälfte) bewegen Lippen korrekt, Sprecher 3 & 4 (rechte Hälfte) bleiben stumm. Alle Passes werden vermutlich als `done` gemeldet — sonst hätte die Szene einen Refund ausgelöst.
+## Wurzelursache (DB-verifiziert an Szene 7d45c852)
 
-## Verdacht (nach Memory-Historie v88 / v99 / v122 / v125 / v204)
+`plate_identity`:
+- 4 Gesichter mit `characterId` + `matchConfidence: 0.85` erkannt (alle 4 Speaker sauber gemappt)
+- **aber** `resolvedCount: 0`
 
-Der Fehler liegt fast sicher **nicht** an fehlender Voice/UUID (das war das vorherige Thema), sondern am Preclip-/Mux-Pfad für Speaker 3 & 4:
+Konsequenz in `compose-dialog-segments`:
+- `haveBboxUrlPathForEdge` / preclip-eligibility Guards prüfen u.a. `(plateIdentityMap.resolvedCount ?? 0) > 0` → false
+- Pipeline verwarf die 4 fertigen Preclips (`preclip_used: false`) und schaltete auf `retry_variant: bbox-url-pro`
+- Es lief nur **1 Sync.so-Job** (`sync_job_id: eb2e25b8`) über die volle 1284×718-Plate mit 4 per-frame Bboxes
+- Sync.so sync-3 animiert im Full-Plate-Mode mit 4 gleichzeitigen Bboxes typischerweise nur 2 Gesichter zuverlässig — genau die 2 links im Bild
+- Alle 4 Passes werden `done` markiert, weil der Single-Job als „gesamter Output" für die Szene gilt
 
-1. **Preclip-Drift auf Nachbarn (v122-Muster)** — `bboxForCrop` für Speaker 3/4 landet auf Speaker 1/2, Face-Gate akzeptiert (1 Gesicht sichtbar), Sync.so animiert das falsche Gesicht.
-2. **Edge-Speaker "silent no-op" (v88/v99-Muster)** — Speaker 3/4 sitzen im äußeren Viertel des 4er-Line-Ups; v88-Skip wurde in v125 deaktiviert. Preclip liegt am Plate-Rand, `auto_detect` findet kein Ziel, Sync.so gibt Preclip 1:1 zurück → geschlossener Mund.
-3. **Mux `preclip_crop` enthält Coords des Nachbarn** — v122 defense-in-depth im Mux ignoriert dann das Overlay und fällt auf faceMask zurück, aber die faceMask sitzt auf den falschen Koordinaten.
+## Fix — 2 Ebenen, minimaler Blast Radius
 
-Alle drei Muster produzieren einen erfolgreich gerenderten Clip mit stummen Mündern für genau die Speaker deren Coords im äußeren Bereich liegen — **exakt Speaker 3 & 4**.
+### A) Wurzelfix: `resolvedCount` korrekt berechnen
+**Datei:** `supabase/functions/_shared/plate-face-identity.ts`
 
-## Plan
+Aktuell wird `resolvedCount` unabhängig von der Anzahl der tatsächlich zugewiesenen `characterId`s auf 0 gesetzt (oder von einer Extra-Bedingung abhängig gemacht, die 0.85-Confidence-Matches verwirft). Wir ändern das auf:
 
-### Phase 1 — Diagnose (read-only, keine Codeänderung)
+```ts
+resolvedCount = faces.filter(f => !!f.characterId && f.matchConfidence >= MATCH_CONFIDENCE_MIN).length
+```
 
-1. Aus dem UI die `scene_id` der aktuellen Szene erfragen (oder aus letztem Composer-Run holen).
-2. `composer_scenes.dialog_shots.passes[]` inspizieren für jeden der 4 Speaker:
-   - `coords` vs. `preclip_crop.{x,y,size}` — landet Coord im inner-70%-Kern des Crops?
-   - `preclip_url` vorhanden? Frame-Diff (später) oder Sichtcheck: bewegt sich der Mund im Preclip selbst?
-   - `variant` / `sync_options.active_speaker_detection` — `bbox-url-pro` oder `preclip+auto_detect`?
-   - Sync.so `provider_status` / `error_type` pro Pass.
-3. Edge-function-Logs für `compose-dialog-segments` und `render-sync-segments-audio-mux` filtern nach der scene_id: `v122_bbox_drift_rejected`, `v88_edge_speaker_skip_preclip`, `v99_preclip_bbox`, `coordsMatch=false`, `provider_unknown_error`.
-4. Ergebnis: eindeutige Zuordnung zu einem der 3 Muster oben.
+Mit `MATCH_CONFIDENCE_MIN = 0.7` (die real gemessenen 0.85 fallen zuverlässig darüber; 0.7 ist der Wert, den v160 bereits als „identity-matched" ansieht).
 
-### Phase 2 — Gezielter Fix (nach Diagnose)
+### B) Defense-in-depth im Composer
+**Datei:** `supabase/functions/compose-dialog-segments/index.ts`, Bereich um Zeile 4674-4678 und beim v204-Multipass-Fallback
 
-Je nach Ergebnis genau **einer** dieser Patches, nicht alle:
+Zusätzliche Bedingung: **wenn** alle 4 Preclips bereits erfolgreich gerendert sind (`passes[i].preclip_url && passes[i].preclip_crop` vorhanden) **und** die Anzahl matched `characterId`s ≥ speakers.length ist, **dann** darf der Full-Plate `bbox-url-pro`-Fallback nicht mehr gewählt werden — stattdessen den Preclip-Pfad dispatchen (jeder Speaker bekommt seinen eigenen Sync.so-Job).
 
-**A) Wenn Preclip-Drift (Muster 1):** v122-Guard verschärfen — inner-Anteil von 70 % → 60 % senken und den Rejection-Retry auch dann auslösen, wenn `bboxForCrop` aus `speakerPlateBboxes` (nicht faceMap) kam. Aktuell verlässt sich der Guard darauf, dass `bboxForCrop` überhaupt gesetzt war; für plate-identity-basierte Bboxes ist die Erkennung schwächer.
+Dieser Guard ist unabhängig von `resolvedCount` und schützt zusätzlich gegen andere Regressionen, die den `resolvedCount`-Zähler nullen.
 
-**B) Wenn Edge-Silent-No-op (Muster 2):** v88 nicht global reaktivieren (das brach v125-Szene), sondern **konditional**: Edge-Speaker mit v161-Preclip zusätzlich mit v99-Explicit-Bbox dispatchen (`auto_detect:false`, static `bounding_boxes` in Crop-lokalem Space). Dieser Pfad existiert bereits — sicherstellen dass er für alle Edge-Speaker greift, nicht nur wenn eine bestimmte Bedingung erfüllt ist.
+### C) Diagnose-Log
+Ein einziger Log-Eintrag pro Szene beim Pfad-Entscheid:
+```
+[v222_pipeline_choice] scene=<id> preclipsReady=N/M matchedIds=N/M chosen=preclip|bbox-url-pro reason=<...>
+```
+Damit die nächste Regression innerhalb einer Log-Zeile erkennbar wird — nicht wie diesmal erst nach DB-Forensik.
 
-**C) Wenn Mux-Coords-Mismatch (Muster 3):** in `render-sync-segments-audio-mux` die faceMask-Fallback-Position aus `pass.coords` (Plate-Space) statt aus `preclip_crop.center` ableiten, wenn v122-Guard im Mux gefeuert hat.
+## Verifikation
 
-### Phase 3 — Verifikation
+1. `CLIENT_PIPELINE_VERSION` / `COMPOSE_DIALOG_SEGMENTS_VERSION` auf `v222` bumpen
+2. `compose-dialog-segments` deployen
+3. User setzt die Szene `7d45c852` mit `useResetLipSync` zurück, Composer startet automatisch
+4. Erwartung in DB nach ~90s:
+   - `preclip_used: true`
+   - **4 verschiedene** `sync_job_id`s (einer pro Pass), nicht ein globaler
+   - `retry_variant: null` oder `preclip+bbox-explicit`, nicht `bbox-url-pro`
+   - `resolvedCount: 4`
+5. Visuell: alle 4 Münder animiert
 
-1. Szene reset via `useResetLipSync` und Neu-Rendern.
-2. Frame-Diff-Prüfung: `ffmpeg -filter:v "select='eq(n,0)+eq(n,60)+eq(n,120)'"` auf Mundregion jedes Speakers — Mean-Abs-Diff ≥ 4 = animiert, < 2 = still.
-3. Sichtcheck der finalen Szene: alle 4 Münder synchron.
+## Was NICHT angefasst wird
 
-## Was ich vom User brauche
+- Briefing/Storyboard-Pipeline (v221-Fixes sind produktiv, Thema abgeschlossen)
+- v88/v99/v122-Historie (Preclip-Geometrie ist sauber, kein Fix nötig)
+- Sync.so-Payload-Vertrag, Mux-Timeline, Audio-Tight-Slicer
+- Voice/Cast-UUID-Binding (Wurzel war Pipeline-Choice, nicht Speaker-Zuweisung)
 
-Kurz eines von beiden bestätigen, dann starte ich Phase 1:
+## Zeitplan
 
-- **Option A:** Ich habe die aktuellste `scene_id` (letzter Composer-Run) — sofort Diagnose starten.
-- **Option B:** User teilt die scene_id oder den letzten Composer-Screenshot mit sichtbarem Log/URL.
-
-Kein Preise-/Wiring-/UI-Change in diesem Ticket — reiner Lip-Sync-Pipeline-Fix.
+Einmaliger Fix, keine Migration. Deploy → Reset → Verify in einem Turn.
