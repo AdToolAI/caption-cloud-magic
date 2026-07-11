@@ -1383,8 +1383,8 @@ export default function ProductionPlanSheet({
                                     </SelectContent>
                                   </Select>
                                   {!isBound && (
-                                    <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive">
-                                      Voice-ID blockiert bis Sprecher zugeordnet ist
+                                    <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-500">
+                                      Sprecher noch offen
                                     </Badge>
                                   )}
                                 </div>
