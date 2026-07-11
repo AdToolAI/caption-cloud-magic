@@ -59,6 +59,8 @@ type BriefingTiming = {
   explicitSceneCount?: boolean;
   /** True when the UI duration slider intentionally overrides text/server timing. */
   sliderAuthoritative?: boolean;
+  /** Frozen user slider value captured when the analysis started. */
+  requestedDurationSec?: number;
   source: 'explicit-total' | 'time-windows' | 'scene-math';
 };
 
@@ -1156,11 +1158,10 @@ export function useStoryboardTransition({
         };
       } catch { /* non-fatal — debug chip just stays hidden */ }
 
-      const normalized = applyCanonicalTimingToPlan(plan, briefing, text);
+      const requestedDurationSec = normalizeUserSliderDuration(briefing?.duration);
+      const planWithRequestedDuration = attachRequestedDurationToPlan(plan, requestedDurationSec);
+      const normalized = applyCanonicalTimingToPlan(planWithRequestedDuration, briefing, text);
       const displayPlan = normalized.plan;
-      if (normalized.timing && Math.abs((briefing.duration ?? 0) - normalized.timing.durationSec) >= 0.5) {
-        onUpdateBriefing?.({ duration: normalized.timing.durationSec });
-      }
 
       if (dropped > 0) {
         toast({
@@ -1239,10 +1240,6 @@ export function useStoryboardTransition({
           const fallbackRaw = buildLocalFallbackPlan(briefing, text);
           const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
           const fallback = normalizedFallback.plan;
-          const fallbackDuration = normalizedFallback.timing?.durationSec ?? fallback.project?.totalDurationSec;
-          if (typeof fallbackDuration === 'number' && Math.abs((briefing.duration ?? 0) - fallbackDuration) >= 0.5) {
-            onUpdateBriefing?.({ duration: fallbackDuration });
-          }
           toast({
             title: 'AI-Analyse nicht verfügbar',
             description: `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
@@ -1279,14 +1276,14 @@ export function useStoryboardTransition({
             if (!lateRes.ok) throw new Error(`late-arrival status ${lateRes.status}`);
             const lateData = await lateRes.json();
             const { plan: lateRawPlan } = parsePlan(lateData);
-            const latePlan = lateRawPlan
-              ? applyCanonicalTimingToPlan(lateRawPlan, briefing, text).plan
+            const requestedDurationSec = normalizeUserSliderDuration(briefing?.duration);
+            const latePlanWithRequestedDuration = lateRawPlan
+              ? attachRequestedDurationToPlan(lateRawPlan, requestedDurationSec)
+              : null;
+            const latePlan = latePlanWithRequestedDuration
+              ? applyCanonicalTimingToPlan(latePlanWithRequestedDuration, briefing, text).plan
               : null;
             if (!latePlan) throw new Error('late-arrival plan invalid');
-            const lateDuration = latePlan.project?.totalDurationSec;
-            if (typeof lateDuration === 'number' && Math.abs((briefing.duration ?? 0) - lateDuration) >= 0.5) {
-              onUpdateBriefing?.({ duration: lateDuration });
-            }
             if (cancelledRef.current) return;
             window.clearTimeout(graceTimer);
             if (resolved) {
