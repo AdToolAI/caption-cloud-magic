@@ -1036,6 +1036,30 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       if (Object.keys(p).length) performance = p;
     }
 
+    // v230 — per-character performances map (keyed by cast mentionKey).
+    // Sanitized identically to `performance`; unknown keys are kept as-is
+    // and resolved against `cast` on the client apply hook.
+    let performances: any = undefined;
+    if (s.performances && typeof s.performances === 'object' && !Array.isArray(s.performances)) {
+      const out: Record<string, any> = {};
+      for (const [rawKey, val] of Object.entries(s.performances)) {
+        if (!val || typeof val !== 'object') continue;
+        const v: any = val;
+        const p = stripUndef({
+          mimik: v.mimik,
+          gestik: v.gestik,
+          blick: v.blick,
+          energy: v.energy != null ? clamp(v.energy, 1, 5, 3) : undefined,
+        });
+        if (!Object.keys(p).length) continue;
+        // Normalize key: keep the leading "@" the resolver expects.
+        const key = String(rawKey ?? '').trim();
+        if (!key) continue;
+        out[key.startsWith('@') ? key : `@${key.replace(/^@+/, '')}`] = p;
+      }
+      if (Object.keys(out).length) performances = out;
+    }
+
     // Per-scene aiFilled trail (BriefingIntel v2). Sanitized: stringify,
     // de-dupe, max 30 entries. UI shows a ✨ badge next to these fields.
     let sceneMeta: any = undefined;
@@ -1073,7 +1097,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       shotDirector: s.shotDirector,
       anchorPromptEN: s.anchorPromptEN,
       performance,
-      brollHints,
+      performances,
       brandAnchor: s.brandAnchor,
       negativePromptScene: s.negativePromptScene,
       continuityHint: s.continuityHint,
