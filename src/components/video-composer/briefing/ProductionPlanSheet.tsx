@@ -620,12 +620,9 @@ export default function ProductionPlanSheet({
       toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
       return;
     }
-    if (dialogBindingIssues.length > 0) {
-      const message = `${dialogBindingIssues.length} Dialog-Sprecher noch keinem Charakter zugeordnet.`;
-      setApplyResult({ ok: false, message, warnings: [] });
-      toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
-      return;
-    }
+    // v225 — Sprecher-Zuordnung ist nicht mehr Apply-blockierend. Fehlende
+    // Bindings landen als leere Slots im Dialog-Studio und lassen sich dort
+    // (inkl. Stimme) manuell setzen.
     setApplying(true);
     try {
       const withEnsemble = ensureProductionPlanEnsemble(planForApply, currentBriefing);
@@ -1105,14 +1102,15 @@ export default function ProductionPlanSheet({
                 </div>
               )}
               {dialogBindingIssues.length > 0 && (
-                <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
-                  <div className="flex items-center gap-2 font-medium text-destructive">
+                <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-medium text-amber-400">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    Sprecher-Zuordnung fehlt — Apply blockiert
+                    Sprecher-Zuordnung offen (optional)
                   </div>
                   <div className="text-muted-foreground">
-                    {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} haben keine eindeutige Charakter-ID.
-                    Bitte im Dialog-Block den passenden Charakter auswählen; Stimmen werden danach automatisch gesetzt.
+                    {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} noch ohne Charakter.
+                    Du kannst den Plan trotzdem anwenden — Sprecher und Stimme lassen sich
+                    danach jederzeit im Dialog-Studio pro Szene setzen.
                   </div>
                 </div>
               )}
@@ -1383,8 +1381,8 @@ export default function ProductionPlanSheet({
                                     </SelectContent>
                                   </Select>
                                   {!isBound && (
-                                    <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive">
-                                      Voice-ID blockiert bis Sprecher zugeordnet ist
+                                    <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-500">
+                                      Sprecher noch offen
                                     </Badge>
                                   )}
                                 </div>
@@ -1786,9 +1784,9 @@ export default function ProductionPlanSheet({
               <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
               <Button
                 onClick={handleApply}
-                disabled={applying || durationInconsistent || dialogBindingIssues.length > 0}
+                disabled={applying || durationInconsistent}
                 className="gap-2"
-                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : dialogBindingIssues.length > 0 ? 'Bitte zuerst alle Dialog-Sprecher zuordnen.' : undefined}
+                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : undefined}
               >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Plan anwenden

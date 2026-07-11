@@ -481,34 +481,19 @@ function planSceneToComposerScene(
   );
   const requiredDialogSpeakerIds = Array.from(speakingCharacterIds).filter((id) => castCharacterIds.has(id));
   const hasVo = !!ps.voiceover?.text?.trim();
+  // v225 — Voice-Auto-Binding entfernt. Die KI liefert nur die Sprecher-Slots
+  // (Character-IDs auf den Dialog-Turns). Die konkrete Stimme wählt der User
+  // manuell im Dialog-Studio pro Sprecher — kein Auto-Pool, keine Default-
+  // Voice, keine „ohne Voice-ID"-Warnung mehr.
   const dialogVoices: Record<string, string> = {};
-  for (let idx = 0; idx < (ps.cast ?? []).length; idx += 1) {
-    const c = (ps.cast ?? [])[idx];
-    if (!c.characterId) continue;
-    const characterId = stripPrefix(c.characterId as string);
-    // Speaker gating — ID-only. Voiceover falls back to first cast entry
-    // only when NO turns exist at all.
-    const isSpeaker = speakingCharacterIds.size > 0
-      ? speakingCharacterIds.has(characterId)
-      : hasVo && idx === 0;
-    if (!isSpeaker) continue;
-    let vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
-      || cleanVoiceId(defaultVoicesByCharacter[characterId]);
-    if (!vid && voicePoolPicker) {
-      const cached = voicePoolAssignments[characterId];
-      if (cached) {
-        vid = cached;
-      } else {
-        const picked = voicePoolPicker.pick(genderByCharacter[characterId]);
-        voicePoolAssignments[characterId] = picked.id;
-        vid = picked.id;
-      }
-    }
-    // v220 — do NOT fall back to projectVoiceId here. Project voice is applied
-    // separately at the character level; leaking it into every dialogVoices
-    // slot caused non-speaking characters to inherit the wrong voice.
-    if (vid) dialogVoices[characterId] = vid;
-  }
+  // Referenzen bewusst behalten, damit ungenutzte Variablen den Compiler
+  // nicht anmeckern (voicePool/defaults werden für andere Pfade weiter
+  // benötigt, z. B. Character-Level Voice-Sync außerhalb dieser Funktion).
+  void hasVo;
+  void voicePoolPicker;
+  void voicePoolAssignments;
+  void defaultVoicesByCharacter;
+  void genderByCharacter;
 
 
 
@@ -708,13 +693,9 @@ function planSceneToComposerScene(
     // v175: per-cast voiceId on the scene root so the upcoming insert path
     // can drop the first speaker into character_voice_id (single-speaker fast-path).
     characterVoiceId: (() => {
-      // Prefer the first speaker's resolved voice from `dialogVoices` (already
-      // includes the AI pool fallback above), then project default.
-      const firstCharId = (ps.cast ?? [])
-        .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : null))
-        .find((x): x is string => !!x);
-      const fromDialog = firstCharId ? dialogVoices[firstCharId] : undefined;
-      return fromDialog || (dialogMode ? undefined : cleanVoiceId(projectVoiceId));
+      // v225 — no auto-voice fallback. Project-voice only applies when there
+      // is truly no dialog at all (pure narrator/voiceover fast-path).
+      return dialogMode ? undefined : cleanVoiceId(projectVoiceId);
     })(),
 
   } as ComposerScene;
@@ -1032,23 +1013,8 @@ export function useApplyProductionPlan() {
     }
     const fallbackRows = persistedNewRows.filter((r: any) => /Establishing shot: A relevant setting|Reveal beat for the brand|CTA beat for the brand/i.test(String(r.ai_prompt ?? '')));
     if (fallbackRows.length > 0) warnings.push(`${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`);
-    // v217/v218 — verify only checks characters that actually have spoken
-    // turns. Non-speaking ensemble members (visible only, no turn) must NOT
-    // trigger the "ohne Voice-ID" warning.
-    const lipsyncRowsMissingVoice = persistedNewRows.filter((r: any) => {
-      const rowScene = newScenes.find((s) => s.id === String(r.id));
-      const needsVoice = rowScene?.dialogMode || !!rowScene?.dialogScript;
-      if (!needsVoice) return false;
-      const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? r.dialog_voices as Record<string, unknown> : {};
-      const requiredIds = Array.isArray(rowScene?.requiredDialogSpeakerIds) ? rowScene.requiredDialogSpeakerIds : [];
-      if (requiredIds.length > 0) {
-        return requiredIds.some((id) => !hasPersistedDialogVoice(voices[id]));
-      }
-      const voiceCount = Object.values(voices).filter(hasPersistedDialogVoice).length;
-      // No dialog-voice map AND no fallback character voice → truly missing.
-      return voiceCount === 0 && !r.character_voice_id;
-    });
-    if (lipsyncRowsMissingVoice.length > 0) warnings.push(`${lipsyncRowsMissingVoice.length} Lip-Sync-Szene(n) ohne Voice-ID.`);
+    // v225 — Voice-IDs werden bewusst leer gelassen und im Dialog-Studio
+    // manuell zugewiesen. Kein „ohne Voice-ID"-Blocker mehr auf Plan-Apply.
 
 
     // 8) Now remove replaceable old/fallback rows. If that fails, roll back the
