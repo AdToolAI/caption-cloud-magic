@@ -1027,18 +1027,30 @@ export function useApplyProductionPlan() {
         const { data, error } = await supabase
           .from('composer_scenes')
           .insert(rows as any)
-          .select('id, order_index, dialog_script, dialog_voices, ai_prompt, mentioned_character_ids, character_voice_id');
+          .select('id, order_index, dialog_script, dialog_turns, dialog_voices, ai_prompt, mentioned_character_ids, character_voice_id');
         if (error) {
           console.error('[useApplyProductionPlan] INSERT failed', error);
           throw new Error(`Neue Plan-Szenen konnten nicht gespeichert werden: ${error.message}`);
         } else if (Array.isArray(data)) {
           // Map returned UUIDs back into newScenes (by order_index — stable
-          // because we built rows in that exact order).
-          const byOrder = new Map<number, string>();
-          for (const r of data as any[]) byOrder.set(Number(r.order_index), String(r.id));
+          // because we built rows in that exact order). Also merge the
+          // persisted `dialog_turns` back onto the in-memory scene so the
+          // UI immediately sees ID-first turns (no reload/refetch needed).
+          const byOrder = new Map<number, any>();
+          for (const r of data as any[]) byOrder.set(Number(r.order_index), r);
           for (let i = 0; i < newScenes.length; i++) {
-            const realId = byOrder.get(insertStartOrder + i);
-            if (realId) newScenes[i] = { ...newScenes[i], id: realId, orderIndex: insertStartOrder + i };
+            const row = byOrder.get(insertStartOrder + i);
+            if (!row) continue;
+            const persistedTurns = Array.isArray(row.dialog_turns) ? row.dialog_turns : [];
+            newScenes[i] = {
+              ...newScenes[i],
+              id: String(row.id),
+              orderIndex: insertStartOrder + i,
+              dialogScript: row.dialog_script ?? newScenes[i].dialogScript,
+              // Prefer DB-persisted turns; fall back to in-memory build if
+              // the DB returned an empty jsonb array for any reason.
+              dialogTurns: persistedTurns.length > 0 ? persistedTurns : (newScenes[i] as any).dialogTurns,
+            } as ComposerScene;
           }
         }
     }
@@ -1046,7 +1058,7 @@ export function useApplyProductionPlan() {
     // 7) Verify DB state before telling the UI this succeeded.
     const { data: verifyRows, error: verifyError } = await supabase
       .from('composer_scenes')
-      .select('id, order_index, dialog_script, dialog_voices, ai_prompt, mentioned_character_ids, character_voice_id')
+      .select('id, order_index, dialog_script, dialog_turns, dialog_voices, ai_prompt, mentioned_character_ids, character_voice_id')
       .eq('project_id', projectId)
       .order('order_index', { ascending: true });
     if (verifyError) {
