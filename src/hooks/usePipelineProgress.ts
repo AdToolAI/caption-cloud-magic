@@ -112,7 +112,10 @@ const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
   export: 90,
 };
 
-const TERMINAL_TWOSHOT_STAGES = new Set(['done', 'complete', 'failed', 'audio_mux_failed', 'canceled']);
+// v231 — `needs_clip_rerender` is a terminal FAIL state (hard-fail after noop
+// ladder). Without it here, the progress bar hangs at ~23% because the scene
+// is never counted as "settled" (see sync-so-webhook v134 hard-fail branch).
+const TERMINAL_TWOSHOT_STAGES = new Set(['done', 'complete', 'failed', 'audio_mux_failed', 'canceled', 'needs_clip_rerender']);
 const TERMINAL_DIALOG_SHOT_STATUSES = new Set(['done', 'failed', 'canceled']);
 
 function isCanceledLipsyncScene(scene: any) {
