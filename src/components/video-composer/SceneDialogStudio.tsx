@@ -1258,9 +1258,35 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // engineOverride/lipSyncWithVoiceover to already be set, which meant a
     // single-speaker Kling/Wan/… scene clicking the lip-sync button silently
     // fell through to the inline VO path and never triggered Sync.so.
+    // v232 — Single-Speaker Symmetrie: für 1 Sprecher darf der Button-Klick
+    // NICHT mehr `renderAsSeparateScenes` (Multi-Speaker-Toggle) verlangen.
+    // Das war der Grund, warum der User den Toggle erst manuell einschalten
+    // musste, bevor der Cinematic-Sync-Pfad griff.
     const buttonIntendsLipSync =
-      (blocks.length === 1 && renderAsSeparateScenes) ||
+      (blocks.length === 1 && allHavePortraits) ||
       (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes);
+
+    // Portrait fehlt bei 1 Sprecher → sofortiger Hinweis statt Silent-Kill.
+    if (blocks.length === 1 && !allHavePortraits) {
+      const missingPortrait = speakers[0];
+      const name = missingPortrait ? (sceneCast.find((c) => c.id === missingPortrait.id)?.name || missingPortrait.name || 'Sprecher') : 'Sprecher';
+      toast({
+        title:
+          language === 'de'
+            ? `Kein Portrait für ${name}`
+            : language === 'es'
+            ? `Sin retrato para ${name}`
+            : `No portrait for ${name}`,
+        description:
+          language === 'de'
+            ? `Weise ${name} im Cast einen Brand-Character mit Portrait zu — sonst ist kein Lip-Sync möglich.`
+            : language === 'es'
+            ? `Asigna a ${name} un Brand-Character con retrato; sin él no hay lip-sync real.`
+            : `Assign ${name} a Brand-Character with a portrait — without it, real lip-sync is impossible.`,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const forceCinematicSync =
       blocks.length === 1 &&
