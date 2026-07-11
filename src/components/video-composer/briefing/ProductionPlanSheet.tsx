@@ -1105,14 +1105,15 @@ export default function ProductionPlanSheet({
                 </div>
               )}
               {dialogBindingIssues.length > 0 && (
-                <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
-                  <div className="flex items-center gap-2 font-medium text-destructive">
+                <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-medium text-amber-400">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    Sprecher-Zuordnung fehlt — Apply blockiert
+                    Sprecher-Zuordnung offen (optional)
                   </div>
                   <div className="text-muted-foreground">
-                    {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} haben keine eindeutige Charakter-ID.
-                    Bitte im Dialog-Block den passenden Charakter auswählen; Stimmen werden danach automatisch gesetzt.
+                    {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} noch ohne Charakter.
+                    Du kannst den Plan trotzdem anwenden — Sprecher und Stimme lassen sich
+                    danach jederzeit im Dialog-Studio pro Szene setzen.
                   </div>
                 </div>
               )}
