@@ -557,7 +557,8 @@ export function usePipelineProgress({
       if (isAutoRetry && (s as any).lipSyncStatus !== 'failed') return false;
       return (s as any).lipSyncStatus === 'failed' ||
         (s as any).twoshotStage === 'failed' ||
-        (s as any).twoshotStage === 'audio_mux_failed';
+        (s as any).twoshotStage === 'audio_mux_failed' ||
+        (s as any).twoshotStage === 'needs_clip_rerender';
     });
 
     const b = baselineRef.current;
