@@ -1184,8 +1184,10 @@ export function useStoryboardTransition({
       let attempt = 0;
       while (true) {
         try {
-          res = await doFetch();
+          // v238 — first attempt uses parallel-fire; retries use single fetch.
+          res = attempt === 0 ? await doParallelFetch() : await doFetch();
         } catch (fetchErr: any) {
+
           const isAbort = fetchErr?.name === 'AbortError';
           const hasStatus = typeof fetchErr?.status === 'number';
           if (!isAbort && !hasStatus && attempt < NETWORK_RETRY_DELAYS_MS.length) {
