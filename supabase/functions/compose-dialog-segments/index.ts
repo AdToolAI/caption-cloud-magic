@@ -1882,29 +1882,32 @@ serve(async (req) => {
         // detections (whiteboard/hand false-positives sit >30% off).
         const padPx = Math.round(Math.min(plateDims.width, plateDims.height) * 0.20);
 
-        // v189 — Identity-Trust Gate. When AWS Rekognition matched the
-        // plate face against the character portrait with matchConfidence
-        // ≥ 0.60, the identity is authoritative. Skip v185 repair for
-        // those slots — the plate bbox is the ground truth, anchor
-        // coords are only a fallback signal. This is exactly the
-        // scenario the v169 guide §7.2 describes as "identity resolve"
-        // and it MUST win over anchor-derived positions.
-        const IDENTITY_TRUST_THRESHOLD = 0.60;
+        // v239 — Detector-First Trust Gate.
+        //
+        // Prior versions (v185/v189) only trusted a slot when AWS Rekognition
+        // returned matchConfidence >= 0.60. Any slot with lower or missing
+        // matchConfidence fell through to the anchor-in-bbox test and was
+        // frequently overwritten by anchor-space repair coords — destroying
+        // correctly detected plate bboxes for both N=1 (mouth-closed, wrong
+        // region) and N>=2 (only low-confidence speakers kipped, high-conf
+        // speakers stayed correct → "speakers 3+4 broken while 1+2 work").
+        //
+        // v239 makes the detector itself authoritative: a slot is trusted
+        // when EITHER the native detector confidence is high (>= 0.70) OR
+        // the AWS cross-check confidence is at least 0.55. Non-trusted
+        // slots are no longer judged by anchor overlap — that test punishes
+        // legitimate Hailuo drift. Instead we apply objective sanity
+        // criteria on the bbox itself: in-plate, plausible area, plausible
+        // aspect ratio. Only bboxes that fail those objective checks are
+        // treated as repair candidates.
+        const DETECTOR_TRUST_THRESHOLD = 0.70;
+        const IDENTITY_TRUST_THRESHOLD = 0.55;
         const plateIdentityFaces = plateIdentityMap?.faces ?? [];
         const trustedSlots: number[] = [];
+        const trustReasons: Record<number, string> = {};
         speakers.forEach((_sp, i) => {
-          const sourceTag = coordSources[i] ?? "";
-          // Only trust slots that were assigned via identity match paths.
-          const identityAssigned =
-            sourceTag === "identity" ||
-            sourceTag.startsWith("v183-") ||
-            sourceTag === "single-speaker-largest-face" ||
-            sourceTag === "plate-persisted-mouth" ||
-            sourceTag === "plate-persisted";
-          if (!identityAssigned) return;
           const box = speakerPlateBboxes[i];
           if (!box) return;
-          // Find the matching plate face and check confidence.
           const bx1 = box[0], by1 = box[1], bx2 = box[2], by2 = box[3];
           const match = plateIdentityFaces.find((f) => {
             if (!Array.isArray(f.bbox) || f.bbox.length !== 4) return false;
@@ -1915,28 +1918,98 @@ serve(async (req) => {
               Math.abs(f.bbox[3] - by2) < 4
             );
           });
-          const conf = Number((match as any)?.matchConfidence);
-          if (Number.isFinite(conf) && conf >= IDENTITY_TRUST_THRESHOLD) {
+          const detConf = Number((match as any)?.confidence);
+          const idConf = Number((match as any)?.matchConfidence);
+          if (Number.isFinite(detConf) && detConf >= DETECTOR_TRUST_THRESHOLD) {
             trustedSlots.push(i);
+            trustReasons[i] = `detector=${detConf.toFixed(2)}`;
+            return;
+          }
+          if (Number.isFinite(idConf) && idConf >= IDENTITY_TRUST_THRESHOLD) {
+            trustedSlots.push(i);
+            trustReasons[i] = `identity=${idConf.toFixed(2)}`;
+            return;
+          }
+          // Legacy source-tag fallback — keep the previous whitelist so
+          // slots that carry an explicit identity-assign tag stay trusted
+          // even if the plate face record lacks a confidence field.
+          const sourceTag = coordSources[i] ?? "";
+          const identityAssigned =
+            sourceTag === "identity" ||
+            sourceTag.startsWith("v183-") ||
+            sourceTag === "single-speaker-largest-face" ||
+            sourceTag === "plate-persisted-mouth" ||
+            sourceTag === "plate-persisted";
+          if (identityAssigned && Number.isFinite(idConf) && idConf >= 0.60) {
+            trustedSlots.push(i);
+            trustReasons[i] = `legacy=${idConf.toFixed(2)}`;
           }
         });
 
-        // Identify slots where anchor coord agrees with the plate bbox.
+        // v239 — Objective bbox sanity check. Replaces the anchor-in-bbox
+        // test for non-trusted slots. A bbox is "sane" when it lies inside
+        // the plate (with 5% tolerance), covers between 0.3% and 25% of
+        // plate area, and has an aspect ratio between 0.4 and 2.5.
+        const plateArea = Math.max(1, plateDims.width * plateDims.height);
+        const inPlateTol = Math.max(
+          8,
+          Math.round(Math.min(plateDims.width, plateDims.height) * 0.05),
+        );
+        const bboxSanity = (
+          box: [number, number, number, number],
+        ): { ok: boolean; reason: string } => {
+          const [bx1, by1, bx2, by2] = box;
+          const w = bx2 - bx1;
+          const h = by2 - by1;
+          if (w <= 0 || h <= 0) return { ok: false, reason: "degenerate" };
+          if (
+            bx1 < -inPlateTol ||
+            by1 < -inPlateTol ||
+            bx2 > plateDims.width + inPlateTol ||
+            by2 > plateDims.height + inPlateTol
+          ) {
+            return { ok: false, reason: "out_of_plate" };
+          }
+          const areaRatio = (w * h) / plateArea;
+          if (areaRatio < 0.003) return { ok: false, reason: "area_too_small" };
+          if (areaRatio > 0.25) return { ok: false, reason: "area_too_large" };
+          const aspect = w / h;
+          if (aspect < 0.4 || aspect > 2.5) {
+            return { ok: false, reason: `aspect=${aspect.toFixed(2)}` };
+          }
+          return { ok: true, reason: "ok" };
+        };
+
         const goodSlots: number[] = [];
         const badSlots: number[] = [];
+        const badReasons: Record<number, string> = {};
         speakers.forEach((_sp, i) => {
           const box = speakerPlateBboxes[i];
           const anchor = anchorSpeakerCoords[i];
           if (!box || !anchor) return;
           if (trustedSlots.includes(i)) {
-            // Identity-trusted — never repair, always count as good.
             goodSlots.push(i);
             return;
           }
-          if (contains(box, anchor, padPx)) goodSlots.push(i);
-          else badSlots.push(i);
+          const sanity = bboxSanity(box);
+          if (sanity.ok) {
+            goodSlots.push(i);
+          } else {
+            badSlots.push(i);
+            badReasons[i] = sanity.reason;
+          }
         });
 
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v239_repair_gate ` +
+          `trusted=${trustedSlots.length}/${speakers.length} ` +
+          `sanity_ok=${goodSlots.length - trustedSlots.length}/${speakers.length - trustedSlots.length} ` +
+          `repaired=${badSlots.length}/${speakers.length} ` +
+          `trust_reasons=${JSON.stringify(trustReasons)} ` +
+          `bad_reasons=${JSON.stringify(badReasons)} ` +
+          `det_threshold=${DETECTOR_TRUST_THRESHOLD} id_threshold=${IDENTITY_TRUST_THRESHOLD}`,
+        );
+        // Legacy log line kept for dashboards that grep on the old tag.
         console.log(
           `[compose-dialog-segments] scene=${sceneId} v189_identity_trust_gate ` +
           `trusted=${trustedSlots.length}/${speakers.length} good=${goodSlots.length} bad=${badSlots.length} ` +
