@@ -1901,6 +1901,8 @@ Deno.serve(async (req) => {
     return qaMockJson(corsHeaders, { fn: "briefing-deep-parse" });
   }
 
+
+
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

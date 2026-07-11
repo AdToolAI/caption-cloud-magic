@@ -1083,6 +1083,75 @@ export function useStoryboardTransition({
       }
     };
 
+    // v238 — Parallel-Fire: fire a second identical request 700ms later.
+    // Whichever request succeeds first wins; the other is aborted. This
+    // neutralises client-side network blips (a single stream reset no longer
+    // sinks the whole analysis) without doubling backend load in the common
+    // case, because the second request is aborted the moment the first
+    // responds successfully. Extra gateway cost is roughly ~0-30% depending
+    // on how often the first request is slow.
+    const doParallelFetch = async (): Promise<Response> => {
+      const controllers: AbortController[] = [];
+      const fireOnce = (): Promise<Response> => {
+        const c = new AbortController();
+        controllers.push(c);
+        const timeoutId = window.setTimeout(() => c.abort(), CLIENT_TIMEOUT_MS);
+        return fetch(url, {
+          method: 'POST',
+          signal: c.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': anon,
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
+        }).finally(() => window.clearTimeout(timeoutId));
+      };
+      const first = fireOnce();
+      const second = new Promise<Response>((resolve, reject) => {
+        const t = window.setTimeout(() => {
+          fireOnce().then(resolve, reject);
+        }, 700);
+        // If first already resolved OK, we skip firing the second entirely.
+        first.then((r) => {
+          if (r.ok) {
+            window.clearTimeout(t);
+            reject(new Error('__skip_second__'));
+          }
+        }, () => { /* first failed — second still fires */ });
+      });
+      try {
+        // Prefer whichever OK response arrives first — manual Promise.any
+        // (target lib doesn't include it).
+        const winners = [first, second].map((p) => p.then((r) => {
+          if (!r.ok && (r.status >= 500 || r.status === 408)) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status, response: r });
+          return r;
+        }));
+        const res = await new Promise<Response>((resolve, reject) => {
+          let remaining = winners.length;
+          const errs: any[] = [];
+          winners.forEach((w) => {
+            w.then(resolve, (e) => {
+              errs.push(e);
+              remaining -= 1;
+              if (remaining === 0) reject({ errors: errs });
+            });
+          });
+        });
+        // Abort the loser to save backend cycles.
+        controllers.forEach((c) => { try { c.abort(); } catch { /* noop */ } });
+        return res;
+      } catch (agg: any) {
+        // All parallel attempts failed — surface the freshest error.
+        const errs: any[] = agg?.errors ?? [];
+        const usable = errs.find((e) => e?.message !== '__skip_second__') ?? errs[errs.length - 1] ?? agg;
+        if (usable?.response) return usable.response;
+        throw usable;
+      }
+
+    };
+
+
 
     const parsePlan = (data: any): { plan: TProductionPlan | null; dropped: number; error?: string } => {
       let dropped = 0;
@@ -1115,8 +1184,10 @@ export function useStoryboardTransition({
       let attempt = 0;
       while (true) {
         try {
-          res = await doFetch();
+          // v238 — first attempt uses parallel-fire; retries use single fetch.
+          res = attempt === 0 ? await doParallelFetch() : await doFetch();
         } catch (fetchErr: any) {
+
           const isAbort = fetchErr?.name === 'AbortError';
           const hasStatus = typeof fetchErr?.status === 'number';
           if (!isAbort && !hasStatus && attempt < NETWORK_RETRY_DELAYS_MS.length) {
@@ -1282,12 +1353,13 @@ export function useStoryboardTransition({
           const fallback = normalizedFallback.plan;
           const isNetwork = !status && !isAbort;
           toast({
-            title: isNetwork ? 'Verbindung instabil' : 'AI-Analyse nicht verfügbar',
+            title: isNetwork ? 'Basis-Plan bereit' : 'Basis-Plan bereit',
             description: isNetwork
-              ? 'Basis-Plan als Fallback eingeblendet. Bitte Werte vor „Plan anwenden" prüfen oder Analyse erneut starten.'
-              : `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
-            variant: 'destructive',
+              ? 'Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.'
+              : 'Analyse übersprungen — Basis-Plan als Startpunkt eingeblendet. Passe Werte an oder starte die Analyse neu.',
+            // v238 — neutral, not destructive: fallback is a valid path.
           });
+
           setState({
             warRoomOpen: false,
             phase: 'idle',

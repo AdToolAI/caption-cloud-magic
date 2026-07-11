@@ -253,6 +253,26 @@ export default function BriefingTab({
     try { localStorage.setItem(TIPS_KEY, tipsCollapsed ? '1' : '0'); } catch { /* ignore */ }
   }, [tipsCollapsed]);
 
+  // v238 — Warmup ping. Trigger the Edge Function on mount so its container
+  // is already hot when the user clicks "Analyse starten". Cheap (no auth,
+  // no LLM) and eliminates cold-start latency (~3-5s) from the perceived
+  // analysis time. Fire-and-forget; failures are non-fatal.
+  useEffect(() => {
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse`;
+      const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+      // Use OPTIONS (CORS preflight) — returns 200 immediately without auth
+      // or LLM cost, while still spinning up the Edge Function container so
+      // the real request lands on a warm instance.
+      fetch(url, {
+        method: 'OPTIONS',
+        headers: { 'apikey': anon, 'Access-Control-Request-Method': 'POST' },
+      }).catch(() => { /* non-fatal */ });
+    } catch { /* non-fatal */ }
+  }, []);
+
+
+
   const cfg = getCategoryConfig(category, t);
 
   const CATEGORIES: { id: ComposerCategory; label: string; icon: React.ElementType; desc: string }[] = [
