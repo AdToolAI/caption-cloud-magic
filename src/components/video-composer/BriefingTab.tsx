@@ -259,15 +259,18 @@ export default function BriefingTab({
   // analysis time. Fire-and-forget; failures are non-fatal.
   useEffect(() => {
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse?warmup=1`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/briefing-deep-parse`;
       const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+      // Use OPTIONS (CORS preflight) — returns 200 immediately without auth
+      // or LLM cost, while still spinning up the Edge Function container so
+      // the real request lands on a warm instance.
       fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': anon, 'Authorization': `Bearer ${anon}` },
-        body: '{}',
+        method: 'OPTIONS',
+        headers: { 'apikey': anon, 'Access-Control-Request-Method': 'POST' },
       }).catch(() => { /* non-fatal */ });
     } catch { /* non-fatal */ }
   }, []);
+
 
 
   const cfg = getCategoryConfig(category, t);
