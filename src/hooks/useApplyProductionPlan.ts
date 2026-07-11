@@ -52,6 +52,13 @@ function newSceneId() {
   return `scene_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function newTurnId() {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch { /* noop */ }
+  return `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 const LIPSYNC_ENGINES = new Set([
   'cinematic-sync', 'sync-polish', 'sync-segments', 'native-dialogue',
 ]);
@@ -276,8 +283,10 @@ function planSceneToComposerScene(
       // `catalog:character:<slug>` for un-adopted catalog chars) so
       // the anchor resolver in compose-video-clips can strict-match.
       if (!PLAN_UUID_RE.test(stripped)) return null;
+      const characterName = (c.characterName ?? '').trim();
       return {
         characterId: stripped,
+        ...(characterName ? { characterName, name: characterName } : {}),
         // Per-cast override (Stage-3 mapping completion) wins over the
         // scene default. Falls back to primary/profile split for 2-shots.
         shotType: c.shotType
@@ -489,8 +498,11 @@ function planSceneToComposerScene(
   for (const speakerId of speakingCharacterIds) {
     if (!castCharacterIds.has(speakerId)) continue;
     if (characterShots.some((s) => stripPrefix(s.characterId) === speakerId)) continue;
+    const planCast = (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === speakerId);
+    const characterName = (planCast?.characterName ?? '').trim();
     characterShots.push({
       characterId: speakerId,
+      ...(characterName ? { characterName, name: characterName } : {}),
       shotType: primaryShot === 'detail' ? 'profile' : 'profile',
     } as CharacterShot);
   }
@@ -517,14 +529,33 @@ function planSceneToComposerScene(
 
   // Build dialogScript — speaker name lookup via UUID.
   let dialogScript: string | undefined;
+  let dialogTurns: ComposerScene['dialogTurns'] | undefined;
   if (hasDialogTurns) {
+    dialogTurns = spokenTurns
+      .map((t, order) => {
+        const sid = resolveTurnSpeakerId(t);
+        if (!sid) return null;
+        const match = (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === sid);
+        const text = String((t as any).text ?? '').trim();
+        if (!text) return null;
+        return {
+          turnId: newTurnId(),
+          characterId: sid,
+          displayName: (match?.characterName ?? '').trim() || undefined,
+          text,
+          mood: (t as any).mood,
+          delivery: (t as any).delivery,
+          order,
+        };
+      })
+      .filter((t): t is NonNullable<typeof t> => !!t && PLAN_UUID_RE.test(t.characterId));
     dialogScript = spokenTurns
       .map((t) => {
       const sid = resolveTurnSpeakerId(t);
         const match = sid
           ? (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === sid)
           : undefined;
-        const name = (match?.characterName ?? 'NARRATOR').toUpperCase();
+        const name = (match?.characterName ?? 'NARRATOR').trim() || 'NARRATOR';
         // Only the spoken line goes into dialog_script. Mood/delivery
         // stay on dialogTurns as performance metadata — never spoken.
         return `${name}: ${t.text.trim()}`;
@@ -652,6 +683,7 @@ function planSceneToComposerScene(
     engineOverride: engine !== 'auto' ? (engine as any) : undefined,
     dialogMode,
     dialogScript,
+    dialogTurns,
     dialogVoices: Object.keys(dialogVoices).length ? dialogVoices : undefined,
     requiredDialogSpeakerIds,
     shotDirector: (ps.shotDirector || rawLocationId?.startsWith('catalog:'))
@@ -973,6 +1005,7 @@ export function useApplyProductionPlan() {
           character_shot: (s.characterShot ?? null) as any,
           character_shots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])) as any,
           dialog_script: s.dialogScript ?? null,
+          dialog_turns: ((s as any).dialogTurns ?? []) as any,
           dialog_voices: ((s as any).dialogVoices ?? {}) as any,
           dialog_takes: ((s as any).dialogTakes ?? {}) as any,
           engine_override: (s as any).engineOverride ?? 'auto',
