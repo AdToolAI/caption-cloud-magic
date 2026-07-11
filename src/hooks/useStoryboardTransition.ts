@@ -451,7 +451,7 @@ export function applyCanonicalTimingToPlan(
         canonical_timing: debugTiming,
       },
     };
-    return { plan: next, timing, changed: true };
+    return { plan: next, timing: debugTiming, changed: true };
   }
 
   const currentTotal = plan.project?.totalDurationSec;
@@ -926,7 +926,7 @@ export interface StoryboardTransitionState {
 }
 
 export function useStoryboardTransition({
-  briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard, onUpdateBriefing,
+  briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard,
 }: Args) {
   const [state, setState] = useState<StoryboardTransitionState>({
     warRoomOpen: false,
@@ -1006,6 +1006,7 @@ export function useStoryboardTransition({
     }
     // GUARD 3 — empty briefing: nothing to analyse.
     const text = buildBriefingText(briefing);
+    const analysisRequestedDurationSec = normalizeUserSliderDuration(briefing?.duration);
     if (text.length < 40) {
       return { handled: false };
     }
@@ -1158,8 +1159,7 @@ export function useStoryboardTransition({
         };
       } catch { /* non-fatal — debug chip just stays hidden */ }
 
-      const requestedDurationSec = normalizeUserSliderDuration(briefing?.duration);
-      const planWithRequestedDuration = attachRequestedDurationToPlan(plan, requestedDurationSec);
+      const planWithRequestedDuration = attachRequestedDurationToPlan(plan, analysisRequestedDurationSec);
       const normalized = applyCanonicalTimingToPlan(planWithRequestedDuration, briefing, text);
       const displayPlan = normalized.plan;
 
@@ -1276,9 +1276,8 @@ export function useStoryboardTransition({
             if (!lateRes.ok) throw new Error(`late-arrival status ${lateRes.status}`);
             const lateData = await lateRes.json();
             const { plan: lateRawPlan } = parsePlan(lateData);
-            const requestedDurationSec = normalizeUserSliderDuration(briefing?.duration);
             const latePlanWithRequestedDuration = lateRawPlan
-              ? attachRequestedDurationToPlan(lateRawPlan, requestedDurationSec)
+              ? attachRequestedDurationToPlan(lateRawPlan, analysisRequestedDurationSec)
               : null;
             const latePlan = latePlanWithRequestedDuration
               ? applyCanonicalTimingToPlan(latePlanWithRequestedDuration, briefing, text).plan
@@ -1330,7 +1329,7 @@ export function useStoryboardTransition({
       }
       return { handled: true };
     }
-  }, [briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard, onUpdateBriefing]);
+  }, [briefing, projectId, scenes, language, ensureProjectId, navigateToStoryboard]);
 
   const setPlanSheetOpen = useCallback((open: boolean) => {
     setState((s) => ({ ...s, planSheetOpen: open, initialPlan: open ? s.initialPlan : null }));
