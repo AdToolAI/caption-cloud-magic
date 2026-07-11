@@ -1303,16 +1303,29 @@ export function useStoryboardTransition({
         // Plan innerhalb von 45s, ersetzt er die Retry-Phase direkt durch
         // die Plan-Sheet mit AI-Ergebnis; sonst greift der Fallback.
         (async () => {
+          const lateFetch = async (): Promise<Response> => fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': anon,
+              'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
+          });
+          let lateRes: Response | null = null;
           try {
-            const lateRes = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': anon,
-                'Authorization': `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
-            });
+            try {
+              lateRes = await lateFetch();
+            } catch (netErr: any) {
+              // v237 — one additional network-only retry after 8s
+              console.warn('[useStoryboardTransition] late-arrival network error — retrying in 8s', {
+                name: netErr?.name,
+                online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+              });
+              await new Promise((r) => setTimeout(r, 8000));
+              if (cancelledRef.current) return;
+              lateRes = await lateFetch();
+            }
             if (!lateRes.ok) throw new Error(`late-arrival status ${lateRes.status}`);
             const lateData = await lateRes.json();
             const { plan: lateRawPlan } = parsePlan(lateData);
@@ -1326,8 +1339,6 @@ export function useStoryboardTransition({
             if (cancelledRef.current) return;
             window.clearTimeout(graceTimer);
             if (resolved) {
-              // Fallback wurde bereits eingeblendet – dennoch ersetzen wir
-              // ihn transparent durch den echten Plan.
               setState((s) => {
                 const sheetWasClosed = !s.planSheetOpen;
                 toast({
