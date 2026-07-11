@@ -64,7 +64,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
   const briefing = {
     productName: 'AdTool',
     productDescription: 'Motion-Studio-Briefing\nGesamtdauer: 15 Sekunden / 3 Szenen à 5s\nSZENE 1 — 0–5s\nSZENE 2 — 5–10s\nSZENE 3 — 10–15s',
-    duration: 30,
+    duration: 15,
     aspectRatio: '16:9',
     characters: [],
   } as unknown as ComposerBriefing;
@@ -131,13 +131,13 @@ describe('useStoryboardTransition canonical briefing timing', () => {
   });
 
   it('detects the full AdTool briefing as 15s / 3 scenes despite ages and sub-shot ranges', () => {
-    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const timing = detectCanonicalBriefingTiming(b, `${adToolBriefing}\n\n## Project\n- Total duration: 30s`);
     expect(timing).toMatchObject({ durationSec: 15, sceneCount: 3, source: 'explicit-total', explicitSceneCount: true });
   });
 
-  it('overrides a stale 50s server plan with the explicit 15s briefing duration', () => {
-    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+  it('overrides a stale 50s server plan with the 15s duration slider', () => {
+    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const staleServerPlan = {
       project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 50 },
       scenes: [16.7, 16.7, 16.6].map((durationSec, idx) => ({
@@ -166,6 +166,44 @@ describe('useStoryboardTransition canonical briefing timing', () => {
     });
   });
 
+  it('lets the duration slider override stale shot windows instead of keeping a 5.1s scene sum', () => {
+    const textWithShortWindows = [
+      'Szenen: 3 Szenen',
+      '0–1,7s Sprecher 1: „Hook.“',
+      '1,7–3,4s Sprecher 2: „Proof.“',
+      '3,4–5,1s Sprecher 3: „CTA.“',
+    ].join('\n');
+    const b = {
+      productName: 'AdTool',
+      productDescription: textWithShortWindows,
+      duration: 15,
+      aspectRatio: '16:9',
+      characters: [],
+    } as unknown as ComposerBriefing;
+    const plan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 5.1 },
+      scenes: [1.7, 1.7, 1.7].map((durationSec, idx) => ({
+        index: idx + 1,
+        label: `S${idx + 1}`,
+        durationSec,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [],
+      })),
+      unresolved: [],
+      _meta: { source: 'ai' },
+    } as TProductionPlan;
+
+    const normalized = applyCanonicalTimingToPlan(plan, b, textWithShortWindows);
+
+    expect(normalized.timing?.durationSec).toBe(15);
+    expect(normalized.timing?.sliderAuthoritative).toBe(true);
+    expect(normalized.timing?.windows).toBeUndefined();
+    expect(normalized.plan.project?.totalDurationSec).toBe(15);
+    expect(normalized.plan.scenes.map((scene) => scene.durationSec)).toEqual([5, 5, 5]);
+    expect((normalized.plan._meta as any)?.debug?.canonical_timing?.sliderAuthoritative).toBe(true);
+  });
+
   it('treats "1 durchgehende Szene" as one scene with internal speaker turns, not five scenes', () => {
     const continuousBriefing = [
       'AdTool AI Spot — „Vier Sprecher. Eine Szene. Perfekter Lip-Sync.“',
@@ -179,7 +217,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
       '9–12s Sprecher 4: „…die perfekt zusammenpassen.“',
       '12–15s Endcard: AdTool AI',
     ].join('\n');
-    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const timing = detectCanonicalBriefingTiming(b, continuousBriefing);
     expect(timing).toMatchObject({
       durationSec: 15,
@@ -200,7 +238,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
       '9–12s Sprecher 4: „…die perfekt zusammenpassen.“',
       '12–15s Endcard: AdTool AI',
     ].join('\n');
-    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const badPlan = {
       project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
       scenes: [1, 2, 3, 4, 5].map((index) => ({
@@ -225,7 +263,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
 
   it('prefers the server briefing_contract over conflicting client detection', () => {
     // Briefing text says 30s / 3 scenes but the server contract insists on 15s / 1 scene.
-    // The server is authoritative — the client must NOT re-detect and override.
+    // The duration slider is also 15s here; scene structure still comes from the server contract.
     const briefingText = [
       'Länge: 30 Sekunden',
       'Szenen: 3 Szenen',
@@ -233,7 +271,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
       '10–20s Sprecher 2: „…“',
       '20–30s Sprecher 3: „…“',
     ].join('\n');
-    const b = { productName: 'AdTool', productDescription: briefingText, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: briefingText, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const plan = {
       project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
       scenes: [{

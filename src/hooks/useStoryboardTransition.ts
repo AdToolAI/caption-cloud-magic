@@ -57,6 +57,8 @@ type BriefingTiming = {
   continuousScene?: boolean;
   /** True when sceneCount came from an explicit scene-count field, not inferred windows. */
   explicitSceneCount?: boolean;
+  /** True when the UI duration slider intentionally overrides text/server timing. */
+  sliderAuthoritative?: boolean;
   source: 'explicit-total' | 'time-windows' | 'scene-math';
 };
 
@@ -327,10 +329,18 @@ export function applyCanonicalTimingToPlan(
   // Slider gesetzt hat, ist das die einzige Wahrheit. Text-Angaben und
   // Server-Contract werden proportional auf diesen Wert normalisiert, damit
   // es keine Verwirrung mehr gibt ("Text sagt 15s, Slider steht auf 5s").
+  // v235 — harte Durchsetzung: alte Shot-Windows dürfen NICHT erhalten bleiben,
+  // sonst ziehen sie die Szenenebene wieder auf z.B. 1.7+1.7+1.7=5.1s zurück.
   const sliderDuration = Number(briefing?.duration);
   if (Number.isFinite(sliderDuration) && sliderDuration > 0) {
     if (timing) {
-      timing = { ...timing, durationSec: sliderDuration, source: timing.source };
+      timing = {
+        ...timing,
+        durationSec: sliderDuration,
+        source: 'explicit-total',
+        windows: undefined,
+        sliderAuthoritative: true,
+      };
     } else {
       timing = {
         durationSec: sliderDuration,
@@ -338,6 +348,7 @@ export function applyCanonicalTimingToPlan(
         explicitSceneCount: false,
         continuousScene: false,
         source: 'explicit-total',
+        sliderAuthoritative: true,
       } as BriefingTimingWithWindows;
     }
   }

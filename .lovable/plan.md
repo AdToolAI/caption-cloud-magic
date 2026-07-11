@@ -1,38 +1,37 @@
-# v234 — Slider ist Single Source of Truth, jetzt auch im Sheet-Rendering
-
 ## Diagnose
 
-Der Slider im Briefing-Tab stand auf 15s, aber der Production Plan zeigt „Gesamtdauer 5s / Summe Szenen 5.1s (3 Szenen)". Ursache:
+Der Fehler ist kein Anzeigeproblem mehr, sondern ein Timing-Prioritätsfehler:
 
-1. In `useStoryboardTransition.applyCanonicalTimingToPlan` gewinnt der Slider korrekt (v233). Dieser Pfad läuft aber nur **einmal beim Analysieren** — also mit dem Slider-Wert, der zum Analysezeitpunkt gültig war (hier: 5s).
-2. Im `ProductionPlanSheet` gibt es zwar einen `safePlanResult`-Memo, der beim Ändern des Briefings neu normalisiert. Aber die **UI rendert `plan` (State), nicht `safePlan`** — 26 Referenzen auf `safePlan`, 63 auf `plan.` in der Datei. Header, "Gesamtdauer"-Row, "Summe Szenen", Szenenliste, Consistency-Chips lesen alle `plan.*`.
-3. Der `useEffect [initialPlan]` setzt `plan` nur bei neuem `initialPlan`. Wenn der Slider bewegt wird, während das Sheet offen ist (oder bevor der Kunde neu analysiert), bleibt der State auf dem alten Wert stehen.
-4. Zusätzlich: Der lokale `plan`-State ignoriert Slider-Änderungen des `currentBriefing`-Props komplett — daher wird der 15s-Wert nie in den State geschrieben, obwohl `safePlan` ihn intern schon kennt.
+- Der Slider-Wert wird zwar auf `15s` in `canonical_timing.durationSec` geschrieben.
+- Gleichzeitig bleiben aber alte `windows` / Shot-Marker aus dem KI-Plan erhalten, z.B. 3 Shots à ca. `1.7s`.
+- `alignPlanScenesToCanonicalTiming` sieht diese Windows und setzt die Szenen wieder auf `1.7 + 1.7 + 1.7 = 5.1s`.
+- Danach sieht `finalizePlanCanonical`: Projektdauer 15s, Szenensumme 5.1s, alte Windows widersprechen 15s, also gewinnt wieder die Szenensumme.
 
-## Fix
+Kurz: Der Slider gewinnt aktuell nur auf Projektebene, aber die alten Shot-Windows gewinnen noch auf Szenenebene.
 
-Zwei kleine, chirurgische Anpassungen in `src/components/video-composer/briefing/ProductionPlanSheet.tsx`:
+## Plan
 
-1. **Anzeige aus `safePlan` ableiten**: Alle Read-Only-Rows und Consistency-Checks (Projekt-Card, Szenen-Header, „Summe Szenen", Konsistenz-Chip, `totalPlanSec`-Berechnung) auf `safePlan ?? plan` umstellen. Editier-Handler bleiben auf `plan` (Bearbeitung schreibt weiterhin in den lokalen State).
-2. **Slider-Änderung propagiert in `plan`-State**: Neuer `useEffect` mit Dependency `[currentBriefing?.duration]`, der bei Slider-Änderung `applyCanonicalTimingToPlan` auf den aktuellen `plan`-State fährt und Ergebnis zurückschreibt (nur wenn `changed === true` und keine bereits gerenderten/gelockten Szenen betroffen sind — die bestehende „no overwrite of rendered scenes"-Regel bleibt intakt).
-3. **`useApplyProductionPlan`**: „Plan anwenden" arbeitet ohnehin über `safePlan` beim Apply-Pfad (Zeilen 554/603). Kein Change nötig, aber wir stellen sicher, dass der Slider-Wert final in `project.totalDurationSec` landet.
-4. Version-Bump auf `CLIENT_PIPELINE_VERSION = 234`.
+1. **Slider-Override wirklich hart machen**
+   - In `applyCanonicalTimingToPlan` beim Slider-Override nicht nur `durationSec` ersetzen.
+   - Zusätzlich alte `windows` entfernen oder ignorieren, damit sie nicht wieder 5.1s erzwingen.
+   - Szenen werden dann proportional aus dem Slider berechnet: bei 15s / 3 Szenen = 5s pro Szene.
 
-## Was nicht geändert wird
+2. **Timing-Meta eindeutig markieren**
+   - Den Plan intern mit `slider_authoritative: true` / ähnlichem Debug-Marker markieren.
+   - Dadurch ist später eindeutig sichtbar: Diese Dauer kommt aus dem Videodauer-Slider, nicht aus Skript-Shots.
 
-- `useStoryboardTransition.applyCanonicalTimingToPlan` bleibt wie in v233.
-- Kein Auto-Overwrite bereits gerenderter Szenen (Lip-Sync-aktiv / rendered = frozen).
-- Kein Backend-Change.
+3. **Finalizer absichern**
+   - `finalizePlanCanonical` soll slider-authoritative Timing immer als validiert behandeln.
+   - Falls trotzdem eine alte Szenensumme ankommt, wird sie auf den Slider zurückverteilt statt wieder 5.1s gewinnen zu lassen.
 
-## Technische Details
+4. **UI-Klarheit im Production Plan**
+   - Die Anzeige bleibt aus `safePlan` abgeleitet.
+   - Optional den Hinweis von „Quelle: Briefing/Skript“ auf „Quelle: Videodauer-Slider“ ändern, damit der Kunde versteht, warum 15s gewinnt.
 
-- Neue Konstante `displayPlan = safePlan ?? plan` oben im Render-Block einführen; im JSX systematisch `plan.` → `displayPlan.` ersetzen, wo nur gelesen wird.
-- `totalPlanSec = displayPlan.scenes.reduce(...)`.
-- Slider-Sync-Effect:
-  ```ts
-  useEffect(() => {
-    if (!plan) return;
-    const { plan: next, changed } = applyCanonicalTimingToPlan(plan, currentBriefing, currentBriefing?.productDescription ?? '');
-    if (changed) setPlan(next);
-  }, [currentBriefing?.duration]);
-  ```
+5. **Regressionstest ergänzen**
+   - Testfall: Plan mit 3 Szenen und alten Windows/Szenendauern von 5.1s, Briefing-Slider 15s.
+   - Erwartung: `project.totalDurationSec = 15`, Szenensumme = `15`, einzelne Szenen etwa `5s`.
+
+## Ergebnis
+
+Nach dem Fix kann ein alter Shot-/Script-Timing-Wert wie 5.1s den Slider nicht mehr überschreiben. Wenn der Slider auf 15s steht, zeigt der Production Plan auch 15s Gesamtdauer und 15s Szenensumme.

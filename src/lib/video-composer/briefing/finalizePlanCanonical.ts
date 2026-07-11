@@ -31,6 +31,7 @@ export type RepairKind =
   | 'project-total-corrected'
   | 'cast-ids-sanitized'
   | 'voice-ids-sanitized'
+  | 'slider-duration-normalized'
   | 'default-fallback';
 
 export interface RepairEntry {
@@ -51,6 +52,7 @@ export interface PlanNormalization {
   /** Woher die Gesamtdauer kommt. */
   durationSource:
     | 'canonical-briefing'
+    | 'briefing-slider'
     | 'plan-project'
     | 'scene-sum'
     | 'default';
@@ -130,6 +132,11 @@ function canonicalDurationIsValidated(
   currentSum: number,
 ): boolean {
   if (!canonical || !canonicalDur || canonicalDur < 1) return false;
+
+  // v235 — Videodauer-Slider ist die harte Nutzerentscheidung. Wenn er
+  // clientseitig in canonical_timing gestempelt wurde, darf eine alte
+  // Szenensumme (z.B. 5.1s aus Shot-Windows) nie mehr zurückgewinnen.
+  if (canonical.sliderAuthoritative === true) return true;
 
   const source = String(canonical.source ?? '').toLowerCase();
   const sceneCount = Number(canonical.sceneCount ?? canonical.shots);
@@ -323,6 +330,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   const canonicalTiming = readCanonicalTiming(plan);
   const canonicalDur = readCanonicalDuration(plan);
   const canonicalSceneCount = readCanonicalSceneCount(plan);
+  const sliderAuthoritative = canonicalTiming?.sliderAuthoritative === true;
   const projectTotal = Number((plan as any)?.project?.totalDurationSec);
   const scenes: TPlanScene[] = Array.isArray((plan as any).scenes) ? [...(plan as any).scenes] : [];
   const currentSum = sumSceneDurations(scenes);
@@ -335,7 +343,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   let source: PlanNormalization['durationSource'] = 'default';
   if (canonicalValidated && canonicalDur && canonicalDur >= 1) {
     target = clampDuration(canonicalDur);
-    source = 'canonical-briefing';
+    source = sliderAuthoritative ? 'briefing-slider' : 'canonical-briefing';
   } else if (currentSum >= 1) {
     target = clampDuration(currentSum);
     source = 'scene-sum';
@@ -385,7 +393,14 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
 
   // Typisierter Repair-Log — Klartext für den Kunden.
   const repairLog: RepairEntry[] = [];
-  if (source === 'canonical-briefing' && Number.isFinite(projectTotal) && Math.abs(projectTotal - target) >= 0.5) {
+  if (source === 'briefing-slider' && Number.isFinite(projectTotal) && Math.abs(projectTotal - target) >= 0.5) {
+    repairLog.push({
+      kind: 'slider-duration-normalized',
+      label: `Gesamtdauer vom Videodauer-Slider übernommen: ${projectTotal}s → ${target}s.`,
+      before: projectTotal,
+      after: target,
+    });
+  } else if (source === 'canonical-briefing' && Number.isFinite(projectTotal) && Math.abs(projectTotal - target) >= 0.5) {
     repairLog.push({
       kind: 'duration-normalized',
       label: `Gesamtdauer an dein Briefing/Skript angepasst: ${projectTotal}s → ${target}s.`,

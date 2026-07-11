@@ -9,6 +9,7 @@ interface SafePlanNoticeProps {
 }
 
 const SOURCE_LABEL: Record<PlanNormalization['durationSource'], string> = {
+  'briefing-slider': 'Videodauer-Slider',
   'canonical-briefing': 'Briefing/Skript',
   'plan-project': 'Projekt-Board',
   'scene-sum': 'Szenensumme',
