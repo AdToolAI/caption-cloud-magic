@@ -127,4 +127,38 @@ describe('finalizePlanCanonical', () => {
     expect(result?.normalization.durationSource).toBe('briefing-slider');
     expect(result?.normalization.consistent).toBe(true);
   });
+
+  it('uses frozen requestedDurationSec even when canonical timing still says 5.1s', () => {
+    const plan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 5.1 },
+      scenes: [1.7, 1.7, 1.7].map((durationSec, idx) => ({
+        index: idx + 1,
+        label: `Shot ${idx + 1}`,
+        durationSec,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [],
+      })),
+      unresolved: [],
+      _meta: {
+        debug: {
+          requestedDurationSec: 15,
+          canonical_timing: {
+            durationSec: 5.1,
+            sceneCount: 3,
+            source: 'time-windows',
+            windows: [{ start: 0, end: 1.7 }, { start: 1.7, end: 3.4 }, { start: 3.4, end: 5.1 }],
+          },
+        },
+      },
+    } as TProductionPlan;
+
+    const result = finalizePlanCanonical(plan);
+
+    expect(result?.plan.project?.totalDurationSec).toBe(15);
+    expect(result?.plan.scenes.map((scene) => scene.durationSec)).toEqual([5, 5, 5]);
+    expect(result?.normalization.durationSource).toBe('briefing-slider');
+    expect(result?.normalization.consistent).toBe(true);
+    expect((result?.plan._meta as any)?.debug?.normalization?.actions).toContain('slider-overrode-scene-sum:5.1s→15s');
+  });
 });
