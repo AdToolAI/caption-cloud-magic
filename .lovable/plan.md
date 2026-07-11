@@ -1,47 +1,38 @@
-## Plan v233 — Slider ist Single Source of Truth für Videodauer
+# v234 — Slider ist Single Source of Truth, jetzt auch im Sheet-Rendering
 
-### Entscheidung
-Der **Videodauer-Slider** im Briefing-Tab gewinnt IMMER gegen jede aus dem Briefing-Text erkannte Zeitangabe. Kein Fallback-Guessing mehr, kein „15s im Text, 5s im Slider" Konflikt.
+## Diagnose
 
-### Verhalten
-- Slider steht z. B. auf `5s` → Plan hat exakt 5 s Gesamtdauer, egal was im Freitext steht.
-- Slider steht auf `15s` → Plan hat exakt 15 s, auch wenn der Text nichts dazu sagt oder etwas anderes sagt.
-- Gilt gleichermaßen für:
-  - AI-Plan von `briefing-deep-parse`
-  - Local-Fallback-Plan (`buildLocalFallbackPlan`)
-  - Late-Arrival-Retry
-  - `detectCanonicalBriefingTiming` / SZENE-Block-Extraktion
+Der Slider im Briefing-Tab stand auf 15s, aber der Production Plan zeigt „Gesamtdauer 5s / Summe Szenen 5.1s (3 Szenen)". Ursache:
 
-### Umsetzung (technisch)
+1. In `useStoryboardTransition.applyCanonicalTimingToPlan` gewinnt der Slider korrekt (v233). Dieser Pfad läuft aber nur **einmal beim Analysieren** — also mit dem Slider-Wert, der zum Analysezeitpunkt gültig war (hier: 5s).
+2. Im `ProductionPlanSheet` gibt es zwar einen `safePlanResult`-Memo, der beim Ändern des Briefings neu normalisiert. Aber die **UI rendert `plan` (State), nicht `safePlan`** — 26 Referenzen auf `safePlan`, 63 auf `plan.` in der Datei. Header, "Gesamtdauer"-Row, "Summe Szenen", Szenenliste, Consistency-Chips lesen alle `plan.*`.
+3. Der `useEffect [initialPlan]` setzt `plan` nur bei neuem `initialPlan`. Wenn der Slider bewegt wird, während das Sheet offen ist (oder bevor der Kunde neu analysiert), bleibt der State auf dem alten Wert stehen.
+4. Zusätzlich: Der lokale `plan`-State ignoriert Slider-Änderungen des `currentBriefing`-Props komplett — daher wird der 15s-Wert nie in den State geschrieben, obwohl `safePlan` ihn intern schon kennt.
 
-1. **`briefing-deep-parse` (Edge Function)**
-   - `targetDurationSec` aus dem Client-Payload (Slider-Wert) wird zur harten Vorgabe.
-   - Nach Pass A + Pass B: **Enforce-Duration-Pass**, der Szenen-Durations proportional auf `targetDurationSec` skaliert (Summe = Slider ±0.5s Toleranz).
-   - Prompt-Hinweis: „Total duration MUST equal {targetDurationSec}s. Ignore any conflicting duration mentioned in the briefing text."
+## Fix
 
-2. **`buildLocalFallbackPlan`**
-   - Nutzt `briefing.duration` (Slider) direkt, nicht `?? 5`.
-   - Verteilt gleichmäßig auf N Szenen (N aus Briefing/SZENE-Blöcken oder Default 3).
+Zwei kleine, chirurgische Anpassungen in `src/components/video-composer/briefing/ProductionPlanSheet.tsx`:
 
-3. **`detectCanonicalBriefingTiming`**
-   - Wenn Slider gesetzt (>0), Text-Timing wird nur zur Szenenverteilung genutzt, Summe wird auf Slider normalisiert.
+1. **Anzeige aus `safePlan` ableiten**: Alle Read-Only-Rows und Consistency-Checks (Projekt-Card, Szenen-Header, „Summe Szenen", Konsistenz-Chip, `totalPlanSec`-Berechnung) auf `safePlan ?? plan` umstellen. Editier-Handler bleiben auf `plan` (Bearbeitung schreibt weiterhin in den lokalen State).
+2. **Slider-Änderung propagiert in `plan`-State**: Neuer `useEffect` mit Dependency `[currentBriefing?.duration]`, der bei Slider-Änderung `applyCanonicalTimingToPlan` auf den aktuellen `plan`-State fährt und Ergebnis zurückschreibt (nur wenn `changed === true` und keine bereits gerenderten/gelockten Szenen betroffen sind — die bestehende „no overwrite of rendered scenes"-Regel bleibt intakt).
+3. **`useApplyProductionPlan`**: „Plan anwenden" arbeitet ohnehin über `safePlan` beim Apply-Pfad (Zeilen 554/603). Kein Change nötig, aber wir stellen sicher, dass der Slider-Wert final in `project.totalDurationSec` landet.
+4. Version-Bump auf `CLIENT_PIPELINE_VERSION = 234`.
 
-4. **`ProductionPlanSheet` UI**
-   - Kleiner Hinweis unter der Gesamtdauer: „Aus Slider übernommen ({X}s)".
-   - Wenn Text-Angabe (z. B. „15 Sekunden") ≠ Slider, gelbes Info-Chip: „Text erwähnt {Y}s, Slider gewinnt".
+## Was nicht geändert wird
 
-5. **`useStoryboardTransition` / v232 Loader**
-   - Passt: Slider-Wert wird bereits mitgeschickt, jetzt eben auch hart durchgesetzt.
+- `useStoryboardTransition.applyCanonicalTimingToPlan` bleibt wie in v233.
+- Kein Auto-Overwrite bereits gerenderter Szenen (Lip-Sync-aktiv / rendered = frozen).
+- Kein Backend-Change.
 
-### Version
-- `CLIENT_PIPELINE_VERSION` → **233**
+## Technische Details
 
-### Betroffene Dateien
-- `supabase/functions/briefing-deep-parse/index.ts` — Enforce-Duration-Pass, Prompt-Update
-- `src/lib/video-composer/briefing/buildLocalFallbackPlan.ts` — Slider first
-- `src/lib/video-composer/briefing/detectCanonicalBriefingTiming.ts` — Normalisieren auf Slider
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Hinweis-Chip
-- `src/config/pipelineVersion.ts` — 232 → 233
-
-### Nicht angefasst
-- Lip-Sync-Pipeline, Cast/Voice-Routing, v231 Motion Gate, v232 Loader/Single-Speaker-Fix.
+- Neue Konstante `displayPlan = safePlan ?? plan` oben im Render-Block einführen; im JSX systematisch `plan.` → `displayPlan.` ersetzen, wo nur gelesen wird.
+- `totalPlanSec = displayPlan.scenes.reduce(...)`.
+- Slider-Sync-Effect:
+  ```ts
+  useEffect(() => {
+    if (!plan) return;
+    const { plan: next, changed } = applyCanonicalTimingToPlan(plan, currentBriefing, currentBriefing?.productDescription ?? '');
+    if (changed) setPlan(next);
+  }, [currentBriefing?.duration]);
+  ```
