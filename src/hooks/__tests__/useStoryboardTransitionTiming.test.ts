@@ -64,7 +64,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
   const briefing = {
     productName: 'AdTool',
     productDescription: 'Motion-Studio-Briefing\nGesamtdauer: 15 Sekunden / 3 Szenen à 5s\nSZENE 1 — 0–5s\nSZENE 2 — 5–10s\nSZENE 3 — 10–15s',
-    duration: 30,
+    duration: 15,
     aspectRatio: '16:9',
     characters: [],
   } as unknown as ComposerBriefing;
@@ -131,7 +131,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
   });
 
   it('detects the full AdTool briefing as 15s / 3 scenes despite ages and sub-shot ranges', () => {
-    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const timing = detectCanonicalBriefingTiming(b, `${adToolBriefing}\n\n## Project\n- Total duration: 30s`);
     expect(timing).toMatchObject({ durationSec: 15, sceneCount: 3, source: 'explicit-total', explicitSceneCount: true });
   });
@@ -217,7 +217,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
       '9–12s Sprecher 4: „…die perfekt zusammenpassen.“',
       '12–15s Endcard: AdTool AI',
     ].join('\n');
-    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const timing = detectCanonicalBriefingTiming(b, continuousBriefing);
     expect(timing).toMatchObject({
       durationSec: 15,
@@ -263,7 +263,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
 
   it('prefers the server briefing_contract over conflicting client detection', () => {
     // Briefing text says 30s / 3 scenes but the server contract insists on 15s / 1 scene.
-    // The server is authoritative — the client must NOT re-detect and override.
+    // The duration slider is also 15s here; scene structure still comes from the server contract.
     const briefingText = [
       'Länge: 30 Sekunden',
       'Szenen: 3 Szenen',
@@ -271,7 +271,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
       '10–20s Sprecher 2: „…“',
       '20–30s Sprecher 3: „…“',
     ].join('\n');
-    const b = { productName: 'AdTool', productDescription: briefingText, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: briefingText, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const plan = {
       project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
       scenes: [{
