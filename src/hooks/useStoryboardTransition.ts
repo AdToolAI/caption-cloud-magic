@@ -1089,68 +1089,92 @@ export function useStoryboardTransition({
         return { handled: true };
       }
 
-      // Soft fail: build a local fallback plan so the user is never stuck.
+      // v232 — Soft-fail Grace-Window.
+      // Statt sofort mit einem Local-Fallback-Plan zu öffnen (Nutzer sieht
+      // 5.1s / 3 Szenen statt seiner 15s-Vorgabe und interpretiert es als
+      // Bug), halten wir das War-Room-Modal offen und geben der Backend-
+      // Analyse ein Grace-Window von 45s, in dem der Late-Arrival-Retry
+      // läuft. Erst wenn auch dieser scheitert, fällt die UI auf den
+      // Local-Fallback-Plan zurück — dann aber klar als Schätzung markiert.
       try {
-        const fallbackRaw = buildLocalFallbackPlan(briefing, text);
-        const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
-        const fallback = normalizedFallback.plan;
-        const fallbackDuration = normalizedFallback.timing?.durationSec ?? fallback.project?.totalDurationSec;
-        if (typeof fallbackDuration === 'number' && Math.abs((briefing.duration ?? 0) - fallbackDuration) >= 0.5) {
-          onUpdateBriefing?.({ duration: fallbackDuration });
-        }
         const reason = isAbort
-          ? 'Timeout (>180s)'
+          ? 'Timeout'
           : status ? (status === 504 ? `Timeout (${status})` : `Status ${status}`)
           : 'Netzwerkfehler';
-        toast({
-          title: 'Auto-Analyse dauert länger als erwartet',
-          description: `${reason} — Basis-Plan eingeblendet. Wir versuchen den vollen Plan im Hintergrund nachzuladen.`,
-        });
-        setState({
-          warRoomOpen: false,
-          phase: 'idle',
-          progress: 0,
-          phaseLabel: '',
-          planSheetOpen: true,
-          initialPlan: fallback,
-          activeProjectId,
-        });
 
-        // LATE-ARRIVAL: if the timeout fired but the function is still
-        // running on the backend, retry once without a timeout and swap
-        // the fallback plan when the real one arrives — but only while
-        // the user is still viewing the (untouched) fallback sheet.
-        // Also retry on 502/503/504 — the function is often still running.
-        if (isAbort || status === 504 || status === 502 || status === 503) {
-          (async () => {
-            try {
-              const lateRes = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': anon,
-                  'Authorization': `Bearer ${authToken}`,
-                },
-                  body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
-              });
-              if (!lateRes.ok) return;
-              const lateData = await lateRes.json();
-              const { plan: lateRawPlan } = parsePlan(lateData);
-              const latePlan = lateRawPlan
-                ? applyCanonicalTimingToPlan(lateRawPlan, briefing, text).plan
-                : null;
-              if (!latePlan) return;
-              const lateDuration = latePlan.project?.totalDurationSec;
-              if (typeof lateDuration === 'number' && Math.abs((briefing.duration ?? 0) - lateDuration) >= 0.5) {
-                onUpdateBriefing?.({ duration: lateDuration });
-              }
+        // Halte War-Room offen, aber wechsle in eine "Retry"-Phase.
+        setState((s) => ({
+          ...s,
+          warRoomOpen: true,
+          planSheetOpen: false,
+          phase: 'B',
+          progress: Math.max(s.progress || 0, 80),
+          phaseLabel: `${reason} — versuche nochmal (bis 45s) …`,
+        }));
+
+        const GRACE_MS = 45_000;
+        let resolved = false;
+
+        const openFallback = () => {
+          if (resolved || cancelledRef.current) return;
+          resolved = true;
+          const fallbackRaw = buildLocalFallbackPlan(briefing, text);
+          const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
+          const fallback = normalizedFallback.plan;
+          const fallbackDuration = normalizedFallback.timing?.durationSec ?? fallback.project?.totalDurationSec;
+          if (typeof fallbackDuration === 'number' && Math.abs((briefing.duration ?? 0) - fallbackDuration) >= 0.5) {
+            onUpdateBriefing?.({ duration: fallbackDuration });
+          }
+          toast({
+            title: 'AI-Analyse nicht verfügbar',
+            description: `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
+            variant: 'destructive',
+          });
+          setState({
+            warRoomOpen: false,
+            phase: 'idle',
+            progress: 0,
+            phaseLabel: '',
+            planSheetOpen: true,
+            initialPlan: fallback,
+            activeProjectId,
+          });
+        };
+
+        const graceTimer = window.setTimeout(openFallback, GRACE_MS);
+
+        // Late-arrival retry — bei jeder Soft-Fail-Ursache versuchen wir
+        // Server-seitig nochmal (kein Client-Timeout mehr). Kommt der echte
+        // Plan innerhalb von 45s, ersetzt er die Retry-Phase direkt durch
+        // die Plan-Sheet mit AI-Ergebnis; sonst greift der Fallback.
+        (async () => {
+          try {
+            const lateRes = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': anon,
+                'Authorization': `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
+            });
+            if (!lateRes.ok) throw new Error(`late-arrival status ${lateRes.status}`);
+            const lateData = await lateRes.json();
+            const { plan: lateRawPlan } = parsePlan(lateData);
+            const latePlan = lateRawPlan
+              ? applyCanonicalTimingToPlan(lateRawPlan, briefing, text).plan
+              : null;
+            if (!latePlan) throw new Error('late-arrival plan invalid');
+            const lateDuration = latePlan.project?.totalDurationSec;
+            if (typeof lateDuration === 'number' && Math.abs((briefing.duration ?? 0) - lateDuration) >= 0.5) {
+              onUpdateBriefing?.({ duration: lateDuration });
+            }
+            if (cancelledRef.current) return;
+            window.clearTimeout(graceTimer);
+            if (resolved) {
+              // Fallback wurde bereits eingeblendet – dennoch ersetzen wir
+              // ihn transparent durch den echten Plan.
               setState((s) => {
-                // v176: even if the user already closed the sheet (e.g. clicked
-                // "Plan anwenden" against the fallback), reopen it with the
-                // real plan so they can re-apply. The apply-hook's protection
-                // filter (clip_status='pending' && clip_url IS NULL &&
-                // !lipSyncStatus && !dialogLockedAt) ensures we never overwrite
-                // rendered or locked scenes.
                 const sheetWasClosed = !s.planSheetOpen;
                 toast({
                   title: sheetWasClosed
@@ -1162,11 +1186,23 @@ export function useStoryboardTransition({
                 });
                 return { ...s, planSheetOpen: true, initialPlan: latePlan, activeProjectId };
               });
-            } catch (lateErr) {
-              console.warn('[useStoryboardTransition] late-arrival failed', lateErr);
+              return;
             }
-          })();
-        }
+            resolved = true;
+            setState({
+              warRoomOpen: false,
+              phase: 'idle',
+              progress: 0,
+              phaseLabel: '',
+              planSheetOpen: true,
+              initialPlan: latePlan,
+              activeProjectId,
+            });
+          } catch (lateErr) {
+            console.warn('[useStoryboardTransition] late-arrival failed', lateErr);
+            // Grace-Timer greift ohnehin und öffnet Fallback.
+          }
+        })();
       } catch (fallbackErr: any) {
         console.error('[useStoryboardTransition] local fallback failed', fallbackErr);
         toast({

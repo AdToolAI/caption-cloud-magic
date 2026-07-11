@@ -1,46 +1,44 @@
+## Bug-Fix Plan v232
 
-# v231 – Sauberer Fix: Motion Content Gate für Einzelsprecher
+### Bug 1 — Local-Fallback zeigt 5.1s / 3 Szenen statt 15s / 1 Szene
 
-## Ziel
-N=1-Szenen dürfen nicht mehr mit einem statischen Sync.so-Output („Noop") als erfolgreich markiert werden. Der Kunde bekommt entweder ein sichtbar animiertes Lip-Sync-Overlay oder einen sauberen Retry + automatischen Credit-Refund – niemals einen eingefrorenen Sprecher.
+**Ursache:** Wenn `briefing-deep-parse` (Gemini) hakt oder timeout, greift sofort ein Local-Fallback mit `briefing.duration ?? 5` und heuristischer 3-Beat-Aufteilung. Der Nutzer sieht diese Schätz-Zahlen als "Wahrheit" und interpretiert sie als Bug.
 
-## Warum dieser Ansatz
-Der einfache Zwischenweg („v150-Suppress zurücknehmen") flickt nur ein Symptom und öffnet frühere Fehlerklassen wieder. Der professionelle Weg ist, die bereits für Multi-Speaker etablierte **Motion Content Gate (v113)** konsequent auch auf N=1 anzuwenden – gleiche Logik, gleiche Qualitätsschwelle, kein Sonderpfad mehr.
+**Fix (A – Fallback erst nach Timeout):**
+1. `ProductionPlanSheet.tsx` / Trigger-Hook: Statt sofort `buildLocalFallbackPlan` anzuzeigen, Modal im **Loading-State** halten (Spinner + „Briefing wird analysiert …").
+2. Hartes Timeout: 45s. Erst danach Fallback-Plan mit deutlichem gelben Banner „Lokale Schätzung – AI-Analyse fehlgeschlagen" anzeigen.
+3. Wenn AI zwischenzeitlich fertig wird, Loader durch echten Plan ersetzen (kein Fallback-Flash).
+4. Wenn Fallback greift, `detectCanonicalBriefingTiming` weiterhin bevorzugen (schadet nicht), aber es ist explizit als „Schätzung" markiert.
 
-## Umfang (nur N=1-Pfad in `compose-dialog-segments` / Sync-Webhook)
+### Bug 2 — Single-Speaker Lip-Sync wird still gekillt
 
-1. **Motion-Probe im Webhook aktivieren**
-   - Nach Erhalt des Sync.so-Ergebnisses: FFprobe/Frame-Diff auf dem voiced Window (nicht dem Tail-Hold).
-   - Metriken: `sizeRatio`, `motionAmplification`, `lipRegionΔ` – identische Schwellen wie Multi-Cast.
-   - Ergebnis wird als `motion_gate: pass|noop|weak` im Scene-Log persistiert.
+**Ursache:** In `SceneDialogStudio.tsx` L1261-1270 verlangt `buttonIntendsLipSync` für 1 Sprecher `renderAsSeparateScenes=true` (der Multi-Speaker-Toggle). Ergebnis: Klick auf „Clip mit Lip-Sync generieren" bei 1 Sprecher → `forceCinematicSync=false` → fällt in `handleGenerateInline()` → dieser Pfad bricht ab, weil Voiceover-Path nicht sauber für 1-Speaker-Lip-Sync konfiguriert ist. Erst nachdem der Multi-Speaker-Toggle sichtbar/aktiv wird (bei State-Refresh), funktioniert es.
 
-2. **Retry-Ladder vereinheitlichen**
-   - Bei `noop`/`weak`: gleiche Ladder wie N≥2 (Prompt-Reinforce → Model-Bump → Re-Preclip), max. 2 Retries.
-   - Nach letztem Retry ohne Pass: Scene → `failed`, `twoshot_stage=failed`, sauberer Fehlertext.
+**Fix (A – Symmetrisch):**
+1. `buttonIntendsLipSync` für 1 Sprecher entkoppeln von `renderAsSeparateScenes`. Neue Regel:
+   ```
+   buttonIntendsLipSync =
+     (blocks.length === 1 && allHavePortraits) ||
+     (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes)
+   ```
+   Damit reicht bei 1 Sprecher ein Portrait + Klick, um sofort in Cinematic-Sync zu routen.
+2. `forceCinematicSync` bleibt logisch, greift jetzt aber zuverlässig.
+3. `renderAsSeparateScenes`-Toggle bleibt für Multi-Speaker sichtbar; für 1 Sprecher wird er gar nicht mehr benötigt und ausgeblendet (keine verwirrende UI-Umschaltung mehr).
+4. Falls `allHavePortraits=false` bei 1 Sprecher → klarer Toast statt Silent-Kill: „Kein Portrait für {Name} — Lip-Sync nicht möglich, bitte Cast-Portrait hinterlegen."
 
-3. **v150-Suppress gezielt aufheben – nur für N=1**
-   - Der byte-basierte Fallback-Check bleibt für Multi-Cast aus (kein Regress), wird aber im N=1-Pfad als *zusätzlicher* Kanary reaktiviert, falls die Motion-Probe unerwartet fehlschlägt.
+### Version-Bump
 
-4. **Automatischer Credit-Refund**
-   - Bei endgültigem Fail idempotenter Refund über die bestehende `refund_scene_credits`-RPC (gleiche Policy wie Lambda-Timeouts).
+- `CLIENT_PIPELINE_VERSION` → **232**
 
-5. **Progress-Bar-Fix (mitgenommen, klein & isoliert)**
-   - `twoshot_stage` wird bei Abbruch/Fail deterministisch auf `failed` gesetzt, damit `usePipelineProgress` nicht bei 23 % hängen bleibt.
-   - Kein Verhalten außerhalb des Fehlerpfads geändert.
+### Betroffene Dateien
 
-6. **Versionierung & Telemetrie**
-   - `LIPSYNC_PIPELINE_VERSION` → **231**, `MOTION_GATE_VERSION` → **2**.
-   - Log-Felder: `motion_gate`, `retry_count`, `refund_issued` – für spätere Diagnose ohne Frame-Downloads.
+- `src/hooks/useBriefingDeepParse.ts` (oder Trigger im `BriefingTab.tsx` / `ProductionPlanSheet.tsx`) – Loading-Gate + 45s-Timeout
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` – Loader-UI + Fallback-Banner
+- `src/components/video-composer/SceneDialogStudio.tsx` – `buttonIntendsLipSync` erweitern, 1-Sprecher-Toggle ausblenden, Portrait-Missing-Toast
+- `src/config/pipelineVersion.ts` – 231 → 232
 
-## Nicht enthalten (bewusst)
-- Kein Anfassen der Multi-Cast-Pipeline.
-- Keine Änderungen am v230 Life-Layer (Idle-Motion Damping bleibt).
-- Keine neuen UI-Flows – Fehler-Toast + Refund-Notice nutzen bestehende Komponenten.
+### Nicht angefasst
 
-## Technische Details
-- Datei-Scope: `supabase/functions/compose-dialog-segments/*` (Webhook-Handler, Motion-Probe-Utility), `_shared/motion-gate.ts` (neu, gemeinsam mit v113), `usePipelineProgress.ts` (Fail-Flag).
-- Idempotenz über `scene_id + attempt` – kein doppelter Refund möglich.
-- Frame-Probe läuft serverseitig (ffmpeg schon verfügbar), keine Client-Kosten.
-
-## Erfolgs­kriterium
-- Reproduzierte N=1-Szene (`9267e69b`) liefert nach Re-Run entweder sichtbare Lippenbewegung im voiced Window ODER sauberen `failed`-State inkl. Refund. Progress-Bar erreicht in beiden Fällen 100 % bzw. Fail-State.
+- Server-seitige Sync.so / compose-video-clips-Logik (v231 Motion Gate bleibt aktiv).
+- Multi-Speaker-Routing.
+- Voice-Auto-Binding (bleibt bewusst leer, v225).
