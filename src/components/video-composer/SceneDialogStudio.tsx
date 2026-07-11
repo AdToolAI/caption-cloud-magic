@@ -490,6 +490,17 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return [...lib, ...custom, ...autoFallbacks];
   }, [elVoices, customVoices]);
 
+  const dialogTurnsToScript = () =>
+    canonicalDialogTurns
+      .map((turn) => {
+        const speaker = sceneCast.find((c) => c.id === turn.characterId || c.brandCharacterId === turn.characterId);
+        const name = speaker?.name ?? turn.displayName ?? `Character ${turn.characterId.slice(0, 8)}`;
+        return `${name}: ${turn.text}`;
+      })
+      .join('\n');
+
+  const displayScriptFromScene = () => sanitizeDialogScript(scene.dialogScript) || dialogTurnsToScript();
+
   // ── Voice map state — backwards-compatible (string → DialogVoiceCfg) ──
   const normalizeVoiceMap = (
     raw: Record<string, string | DialogVoiceCfg> | undefined,
@@ -503,7 +514,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return out;
   };
 
-  const [script, setScript] = useState(() => sanitizeDialogScript(scene.dialogScript));
+  const [script, setScript] = useState(() => displayScriptFromScene());
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
     normalizeVoiceMap(scene.dialogVoices),
   );
@@ -544,7 +555,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   // re-render after our own debounced save would clobber the user's in-flight
   // typing (cursor jump / dropped characters).
   useEffect(() => {
-    const cleanedScript = sanitizeDialogScript(scene.dialogScript);
+    const cleanedScript = displayScriptFromScene();
     setScript(cleanedScript);
     if ((scene.dialogScript ?? '') && cleanedScript !== (scene.dialogScript ?? '')) {
       onUpdate({ dialogScript: cleanedScript });
