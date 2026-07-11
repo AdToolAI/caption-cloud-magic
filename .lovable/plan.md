@@ -1,40 +1,36 @@
 ## Ziel
-Voice-Auto-Binding aus der Briefing-Analyse komplett entfernen. Die KI liefert nur noch **Sprecher-Slots** (Anzahl + Charakter-IDs), die Stimme weist der User manuell im Storyboard/Dialog-Studio zu. Damit verschwindet der wiederkehrende Fehler „Lip-Sync-Szene(n) ohne Voice-ID" beim Plan-Apply.
+Beim Plan-Apply liegt das Skript bereits mit korrekt zugeordneten Sprechern in der Szene. Der Kunde wählt im Dialog-Studio nur noch die Stimme pro Sprecher — kein leeres Skript, kein „0 Sprecher"-Zustand mehr.
 
-## Warum
-- Auto-Voice-Resolution (voice_pool, Character-Default, Fallback-Chain) war die Hauptquelle für „Apply blockiert"-Toasts der letzten Runden.
-- Sprecher-Erkennung (wer spricht welche Zeile) funktioniert stabil — nur die Voice-ID-Zuweisung ist fragil.
-- User will lieber einmal manuell im Studio klicken als jedes Mal einen Fehler debuggen.
+## Beobachtung
+Im aktuellen Screenshot steht das Skript zwar im Textfeld (`Samuel Dusatko: Hi!` / `Matthew Dusatko: Hi Samuel!`), aber die Kopfzeile zeigt „0 Blocke · 0 Sprecher · ~3s". Grund: `parseDialogScript(script, sceneCast)` findet die Namen nicht, weil `sceneCast` nach dem Apply nicht alle sprechenden Charaktere enthält. `dialogScript` wird zwar aus `spokenTurns` gebaut — aber nur Charaktere, die es in `characterShots` schaffen, landen in `scene.cast`. Sprecher ohne eigenen ShotDirector-Eintrag fallen aus dem Cast.
 
 ## Änderungen
 
-### 1. Apply-Pfad entschärfen
+### 1. Apply-Hook: sprechenden Cast garantieren
 `src/hooks/useApplyProductionPlan.ts`
-- `dialogVoices` NICHT mehr aus Plan/Character-Defaults befüllen. Szene wird mit leerem `dialogVoices: {}` gespeichert.
-- Warnung „X Lip-Sync-Szene(n) ohne Voice-ID" entfernen — kein Fehler-Toast mehr, stattdessen neutraler Hinweis „Stimmen im Studio zuweisen".
-- Turns behalten `speakerCharacterId` (UUID) — Voice-Slot bleibt einfach `null`.
+- Nach dem Build von `characterShots` einen zusätzlichen Merge-Schritt einfügen: jede in `spokenTurns` referenzierte `speakerCharacterId`, die noch nicht in `characterShots` steht, wird als leichter Cast-Eintrag (`{ characterId, characterName, action: '' }`) angehängt.
+- Dadurch enthält `scene.cast`/`characterShots` alle Sprecher → `parseDialogScript` erkennt die `NAME:`-Präfixe wieder.
 
-### 2. Plan-Sheet UI
+### 2. Skript-Vorbelegung sicherstellen
+`src/hooks/useApplyProductionPlan.ts`
+- `dialogScript` bleibt UPPERCASE-präfixiert (`SAMUEL DUSATKO: Hi!`). Parser matcht case-insensitive — kein zusätzlicher Change nötig, nur verifizieren.
+- `dialogMode` bleibt `true`, sobald `spokenTurns.length > 0` — damit das Skript-Panel sofort aufgeklappt ist.
+
+### 3. Stimmen bleiben leer (bereits v225)
+- `dialogVoices = {}` bleibt unverändert.
+- Im Dialog-Studio rendert pro erkanntem Sprecher automatisch ein leerer `VoicePicker`-Slot (funktioniert schon, sobald Punkt 1 den Cast füllt).
+
+### 4. Plan-Sheet: klarer Hinweis
 `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
-- Roten „Sprecher-Zuordnung fehlt"-Banner + Apply-Block entfernen.
-- Manuelles Speaker-Mapping-UI (ScriptSpeakerMapper) bleibt für Charakter-Zuordnung, aber ohne Voice-Pflichtfeld.
-- Footer-Meldung „1 Lip-Sync-Szene(n) ohne Voice-ID" → ersetzen durch „Stimmen weist du im Storyboard zu".
-
-### 3. Storyboard/Studio: sichtbarer Voice-Slot je Sprecher
-`src/components/video-composer/SceneDialogStudio.tsx` (bzw. bestehendes Dialog-Panel)
-- Pro erkanntem Sprecher (aus `dialogTurns[].speakerCharacterId`) einen leeren Voice-Picker-Slot rendern.
-- Wiederverwendung des bestehenden `AvatarVoicePicker` / `VoicePicker` — schreibt in `scene.dialogVoices[characterId]`.
-- Leere Slots zeigen dezenten Hinweis „Stimme wählen" statt Fehler.
-
-### 4. Render-Guard
-`src/lib/video-composer/lipSyncIntent.ts` bleibt unverändert. Aber vor dem eigentlichen Lip-Sync-Render:
-- Falls Szene Lip-Sync-Intent hat und Voice-Slots leer → freundlicher Toast beim Render-Klick („Bitte erst Stimmen im Dialog-Panel zuweisen"), kein Silent-Fail, kein Auto-Fallback auf Default-Voice.
+- Footer-Text angleichen: „Skript & Sprecher sind gesetzt — Stimmen wählst du im Storyboard."
 
 ### 5. Nicht angefasst
-- Speaker-Detection, ensembleGuarantee, planCastDedup, dialogTurns-Reconstruction — alles bleibt.
-- voice_pool im Server (`briefing-deep-parse`) darf weiter geliefert werden, wird aber vom Client ignoriert (keine Server-Änderung nötig, minimales Risiko).
+- Speaker-Detection, Ensemble-Guarantee, dedup, dialogTurns-Reconstruction, LipSync-Guard.
+- Kein Server-Change nötig.
 
 ## Ergebnis
-- Plan-Apply schlägt nie mehr wegen Voice-ID fehl.
-- User sieht im Studio pro Sprecher einen leeren Voice-Slot und wählt bewusst die Stimme.
-- Weniger „magisch", dafür deterministisch und fehlerfrei.
+Nach „Plan anwenden":
+- Skript steht mit `NAME:`-Präfixen im Studio.
+- Kopfzeile zeigt korrekt „N Blöcke · N Sprecher".
+- Pro Sprecher ein leerer Voice-Slot → Kunde klickt bewusst die Stimme.
+- Kein „0 Sprecher"-Bug, kein Voice-ID-Fehler-Toast.

@@ -1109,8 +1109,7 @@ export default function ProductionPlanSheet({
                   </div>
                   <div className="text-muted-foreground">
                     {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} noch ohne Charakter.
-                    Du kannst den Plan trotzdem anwenden — Sprecher und Stimme lassen sich
-                    danach jederzeit im Dialog-Studio pro Szene setzen.
+                    Skript & Sprecher werden trotzdem übernommen — die Stimme wählst du im Storyboard pro Sprecher.
                   </div>
                 </div>
               )}

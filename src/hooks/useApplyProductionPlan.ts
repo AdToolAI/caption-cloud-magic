@@ -480,6 +480,20 @@ function planSceneToComposerScene(
       .filter((x): x is string => !!x && PLAN_UUID_RE.test(x)),
   );
   const requiredDialogSpeakerIds = Array.from(speakingCharacterIds).filter((id) => castCharacterIds.has(id));
+
+  // v226 — Speaking-Cast-Merge: jeder Sprecher, der im Skript vorkommt, aber
+  // (noch) keinen ShotDirector-Eintrag in characterShots hat, wird als
+  // leichter Cast-Eintrag angehängt. Ohne das erkennt parseDialogScript im
+  // Studio die `NAME:`-Präfixe nicht (→ „0 Sprecher"-Bug), obwohl das
+  // dialogScript korrekt vorbelegt ist.
+  for (const speakerId of speakingCharacterIds) {
+    if (!castCharacterIds.has(speakerId)) continue;
+    if (characterShots.some((s) => stripPrefix(s.characterId) === speakerId)) continue;
+    characterShots.push({
+      characterId: speakerId,
+      shotType: primaryShot === 'detail' ? 'profile' : 'profile',
+    } as CharacterShot);
+  }
   const hasVo = !!ps.voiceover?.text?.trim();
   // v225 — Voice-Auto-Binding entfernt. Die KI liefert nur die Sprecher-Slots
   // (Character-IDs auf den Dialog-Turns). Die konkrete Stimme wählt der User
