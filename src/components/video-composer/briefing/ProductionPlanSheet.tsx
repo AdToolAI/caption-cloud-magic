@@ -1334,14 +1334,27 @@ export default function ProductionPlanSheet({
                         </div>
                       )}
 
-                      {/* Dialog turns (multi-speaker, lipsync-ready) */}
-                      {(s.dialogTurns ?? []).length > 0 && (
+                      {/* Dialog turns (multi-speaker, lipsync-ready) — directive/style lines filtered from view */}
+                      {(() => {
+                        const { visible, hiddenCount } = getVisibleTurns(s.dialogTurns ?? []);
+                        if (visible.length === 0 && hiddenCount === 0) return null;
+                        return (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Dialog ({s.dialogTurns!.length} Turn{s.dialogTurns!.length === 1 ? '' : 's'})
+                            Dialog ({visible.length} Turn{visible.length === 1 ? '' : 's'})
+                            {hiddenCount > 0 && (
+                              <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
+                                · {hiddenCount} Regie-Notiz{hiddenCount === 1 ? '' : 'en'} ausgeblendet
+                              </span>
+                            )}
                           </Label>
+                          {visible.length === 0 ? (
+                            <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 text-[11px] italic text-muted-foreground">
+                              Regie-Notizen ausgeblendet — Skript wird aus dem Briefing generiert.
+                            </div>
+                          ) : (
                           <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 space-y-1 font-mono text-[11px]">
-                            {s.dialogTurns!.map((t, i) => {
+                            {visible.map(({ turn: t, originalIndex: i }) => {
                               const boundId = uuidInside((t as any).speakerCharacterId ?? null);
                               const castIds = new Set(
                                 (s.cast ?? [])
@@ -1381,8 +1394,11 @@ export default function ProductionPlanSheet({
                               );
                             })}
                           </div>
+                          )}
                         </div>
-                      )}
+                        );
+                      })()}
+
 
                       {/* Stage-2 plan extras: brollHints / brandAnchor / continuity / music / per-scene negative */}
                       {(s.brollHints?.length || s.brandAnchor || s.musicCue || s.continuityHint || s.negativePromptScene) && (
