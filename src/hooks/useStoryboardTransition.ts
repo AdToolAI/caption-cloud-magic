@@ -66,6 +66,50 @@ type BriefingTimingWithWindows = BriefingTiming & {
   windows?: Array<{ start: number; end: number }>;
 };
 
+const MIN_USER_SLIDER_DURATION_SEC = 15;
+
+function normalizeUserSliderDuration(raw: unknown): number | null {
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= MIN_USER_SLIDER_DURATION_SEC && value <= 600
+    ? value
+    : null;
+}
+
+export function readRequestedDurationFromPlan(plan: TProductionPlan | null | undefined): number | null {
+  const debug = (plan as any)?._meta?.debug;
+  const candidates = [
+    debug?.requestedDurationSec,
+    debug?.sliderDurationSec,
+    debug?.briefingDurationSec,
+    debug?.canonical_timing?.requestedDurationSec,
+  ];
+  for (const candidate of candidates) {
+    const value = normalizeUserSliderDuration(candidate);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+function attachRequestedDurationToPlan(plan: TProductionPlan, requestedDurationSec: number | null): TProductionPlan {
+  if (requestedDurationSec === null) return plan;
+  return {
+    ...(plan as any),
+    _meta: {
+      ...((plan as any)._meta ?? {}),
+      debug: {
+        ...((plan as any)._meta?.debug ?? {}),
+        requestedDurationSec,
+      },
+    },
+  } as TProductionPlan;
+}
+
+function resolveAuthoritativeSliderDuration(briefing: ComposerBriefing, plan: TProductionPlan): number | null {
+  // The UI slider cannot produce 5.1s (min 15s, step 15). Values below 15s
+  // are therefore stale plan feedback and must not be treated as user input.
+  return normalizeUserSliderDuration(briefing?.duration) ?? readRequestedDurationFromPlan(plan);
+}
+
 function normalizeDurationNumber(raw: string | undefined): number | null {
   if (!raw) return null;
   const n = Number(String(raw).replace(',', '.'));
@@ -323,7 +367,23 @@ export function applyCanonicalTimingToPlan(
   briefing: ComposerBriefing,
   briefingText: string,
 ): { plan: TProductionPlan; timing: BriefingTimingWithWindows | null; changed: boolean } {
-  let timing = readServerContractAsTiming(plan) ?? detectCanonicalBriefingTiming(briefing, briefingText);
+  const requestedDurationSec = resolveAuthoritativeSliderDuration(briefing, plan);
+  const serverTiming = readServerContractAsTiming(plan);
+  const localTiming = detectCanonicalBriefingTiming(briefing, briefingText);
+  let timing = serverTiming ?? localTiming;
+
+  // If an old server contract only carries short shot windows (e.g. 5.1s)
+  // but the raw briefing contains a valid explicit total (e.g. 15s), prefer
+  // the explicit briefing total unless the user slider overrides both below.
+  if (
+    !requestedDurationSec &&
+    serverTiming &&
+    localTiming &&
+    localTiming.durationSec >= MIN_USER_SLIDER_DURATION_SEC &&
+    serverTiming.durationSec < MIN_USER_SLIDER_DURATION_SEC
+  ) {
+    timing = localTiming;
+  }
 
   // v233 — Slider wins. Wenn der Nutzer im Briefing-Tab eine Videodauer per
   // Slider gesetzt hat, ist das die einzige Wahrheit. Text-Angaben und
@@ -331,8 +391,8 @@ export function applyCanonicalTimingToPlan(
   // es keine Verwirrung mehr gibt ("Text sagt 15s, Slider steht auf 5s").
   // v235 — harte Durchsetzung: alte Shot-Windows dürfen NICHT erhalten bleiben,
   // sonst ziehen sie die Szenenebene wieder auf z.B. 1.7+1.7+1.7=5.1s zurück.
-  const sliderDuration = Number(briefing?.duration);
-  if (Number.isFinite(sliderDuration) && sliderDuration > 0) {
+  const sliderDuration = requestedDurationSec;
+  if (sliderDuration !== null) {
     if (timing) {
       timing = {
         ...timing,
@@ -340,6 +400,7 @@ export function applyCanonicalTimingToPlan(
         source: 'explicit-total',
         windows: undefined,
         sliderAuthoritative: true,
+        requestedDurationSec: sliderDuration,
       };
     } else {
       timing = {
@@ -349,6 +410,7 @@ export function applyCanonicalTimingToPlan(
         continuousScene: false,
         source: 'explicit-total',
         sliderAuthoritative: true,
+        requestedDurationSec: sliderDuration,
       } as BriefingTimingWithWindows;
     }
   }
@@ -357,6 +419,9 @@ export function applyCanonicalTimingToPlan(
 
 
   const target = timing.durationSec;
+  const debugTiming = requestedDurationSec !== null
+    ? { ...timing, requestedDurationSec }
+    : timing;
   const sceneCount = plan.scenes?.length ?? 0;
   if (sceneCount <= 0) {
     const next = ProductionPlan.parse({
@@ -364,7 +429,11 @@ export function applyCanonicalTimingToPlan(
       project: { ...(plan.project ?? {}), totalDurationSec: target },
       _meta: {
         ...(plan._meta ?? {}),
-        debug: { ...((plan._meta as any)?.debug ?? {}), canonical_timing: timing },
+        debug: {
+          ...((plan._meta as any)?.debug ?? {}),
+          ...(requestedDurationSec !== null ? { requestedDurationSec } : {}),
+          canonical_timing: debugTiming,
+        },
       },
     });
     (next as any)._meta = {
@@ -374,7 +443,11 @@ export function applyCanonicalTimingToPlan(
         shots: timing.sceneCount ?? 0,
         source: 'briefing',
       },
-      debug: { ...(((next as any)._meta as any)?.debug ?? {}), canonical_timing: timing },
+      debug: {
+        ...(((next as any)._meta as any)?.debug ?? {}),
+        ...(requestedDurationSec !== null ? { requestedDurationSec } : {}),
+        canonical_timing: debugTiming,
+      },
     };
     return { plan: next, timing, changed: true };
   }
@@ -393,7 +466,11 @@ export function applyCanonicalTimingToPlan(
     scenes: nextScenes,
     _meta: {
       ...(plan._meta ?? {}),
-      debug: { ...((plan._meta as any)?.debug ?? {}), canonical_timing: timing },
+      debug: {
+        ...((plan._meta as any)?.debug ?? {}),
+        ...(requestedDurationSec !== null ? { requestedDurationSec } : {}),
+        canonical_timing: debugTiming,
+      },
     },
   });
 
@@ -404,10 +481,14 @@ export function applyCanonicalTimingToPlan(
         shots: timing.sceneCount ?? nextScenes.length,
       source: 'briefing',
     },
-    debug: { ...(((next as any)._meta as any)?.debug ?? {}), canonical_timing: timing },
+    debug: {
+      ...(((next as any)._meta as any)?.debug ?? {}),
+      ...(requestedDurationSec !== null ? { requestedDurationSec } : {}),
+      canonical_timing: debugTiming,
+    },
   };
 
-  return { plan: next, timing, changed: !alreadyAligned };
+  return { plan: next, timing: debugTiming, changed: !alreadyAligned };
 }
 
 const FRAMING_TOKENS: Array<[RegExp, string]> = [
@@ -528,8 +609,8 @@ function extractSceneHints(briefingText: string): SceneHint[] {
 function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
   const hints = extractSceneHints(briefingText);
   const canonicalTiming = detectCanonicalBriefingTiming(briefing, briefingText);
-  const sliderTotal = Number(briefing?.duration);
-  const total = Number.isFinite(sliderTotal) && sliderTotal > 0
+  const sliderTotal = normalizeUserSliderDuration(briefing?.duration);
+  const total = sliderTotal !== null
     ? sliderTotal
     : (canonicalTiming?.durationSec ?? 15);
   const firstMention = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i)?.[0] ?? null;
@@ -628,7 +709,10 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     }],
     _meta: {
       source: 'local-fallback',
-      debug: canonicalTiming ? { canonical_timing: canonicalTiming } : undefined,
+      debug: {
+        ...(canonicalTiming ? { canonical_timing: canonicalTiming } : {}),
+        ...(sliderTotal !== null ? { requestedDurationSec: sliderTotal } : {}),
+      },
     },
   }), briefing);
 }
