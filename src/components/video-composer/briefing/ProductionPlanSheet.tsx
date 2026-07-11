@@ -620,12 +620,9 @@ export default function ProductionPlanSheet({
       toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
       return;
     }
-    if (dialogBindingIssues.length > 0) {
-      const message = `${dialogBindingIssues.length} Dialog-Sprecher noch keinem Charakter zugeordnet.`;
-      setApplyResult({ ok: false, message, warnings: [] });
-      toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
-      return;
-    }
+    // v225 — Sprecher-Zuordnung ist nicht mehr Apply-blockierend. Fehlende
+    // Bindings landen als leere Slots im Dialog-Studio und lassen sich dort
+    // (inkl. Stimme) manuell setzen.
     setApplying(true);
     try {
       const withEnsemble = ensureProductionPlanEnsemble(planForApply, currentBriefing);
