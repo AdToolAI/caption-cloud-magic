@@ -1098,6 +1098,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       anchorPromptEN: s.anchorPromptEN,
       performance,
       performances,
+      brollHints,
       brandAnchor: s.brandAnchor,
       negativePromptScene: s.negativePromptScene,
       continuityHint: s.continuityHint,
