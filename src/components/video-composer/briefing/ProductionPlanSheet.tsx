@@ -1787,9 +1787,9 @@ export default function ProductionPlanSheet({
               <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
               <Button
                 onClick={handleApply}
-                disabled={applying || durationInconsistent || dialogBindingIssues.length > 0}
+                disabled={applying || durationInconsistent}
                 className="gap-2"
-                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : dialogBindingIssues.length > 0 ? 'Bitte zuerst alle Dialog-Sprecher zuordnen.' : undefined}
+                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : undefined}
               >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Plan anwenden
