@@ -1280,9 +1280,12 @@ export function useStoryboardTransition({
           const fallbackRaw = buildLocalFallbackPlan(briefing, text);
           const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
           const fallback = normalizedFallback.plan;
+          const isNetwork = !status && !isAbort;
           toast({
-            title: 'AI-Analyse nicht verfügbar',
-            description: `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
+            title: isNetwork ? 'Verbindung instabil' : 'AI-Analyse nicht verfügbar',
+            description: isNetwork
+              ? 'Basis-Plan als Fallback eingeblendet. Bitte Werte vor „Plan anwenden" prüfen oder Analyse erneut starten.'
+              : `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
             variant: 'destructive',
           });
           setState({
