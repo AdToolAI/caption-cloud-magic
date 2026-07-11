@@ -220,6 +220,20 @@ const TOOL_PASS_A = {
                   energy: { type: 'integer' },
                 },
               },
+              performances: {
+                type: 'object',
+                description:
+                  'v230 — Per-character performance map keyed by cast mentionKey (with leading "@"). Values follow the same shape as `performance`. Emitted when the briefing gives distinct attitudes per speaker (skeptical customer vs. enthusiastic founder). Falls back to the flat `performance` object when the whole scene shares one direction.',
+                additionalProperties: {
+                  type: 'object',
+                  properties: {
+                    mimik: { type: 'string' },
+                    gestik: { type: 'string' },
+                    blick: { type: 'string' },
+                    energy: { type: 'integer' },
+                  },
+                },
+              },
               brollHints: {
                 type: 'array',
                 description: 'Stock-footage keywords for B-Roll search (max 12, English).',
@@ -499,6 +513,28 @@ scenes[i]._meta.aiFilled (e.g. "transition.type", "textOverlay.text",
     Override only when the briefing names a different cue (e.g. "ruhig",
     "energetisch", "nachdenklich"). Always add the filled axes to
     scenes[i]._meta.aiFilled when the briefing did not state them.
+
+  • performances (v230, per-character, MANDATORY for multi-cast scenes):
+    When a scene has 2+ speakers in `cast`, ALSO emit a `performances`
+    object keyed by each cast member's mentionKey (with leading "@"),
+    where each value has the same shape as `performance` and is derived
+    from that character's role/attitude in the briefing. Examples:
+        skeptical customer   → { mimik: "concerned",  gestik: "cross-arms", blick: "away",       energy: 2 }
+        enthusiastic founder → { mimik: "confident",  gestik: "open-palms", blick: "to-camera",  energy: 4 }
+        subject-matter expert→ { mimik: "confident",  gestik: "hand-on-chin", blick: "to-speaker", energy: 3 }
+        attentive listener   → { mimik: "curious",    gestik: "still",      blick: "to-speaker", energy: 2 }
+        excited teammate     → { mimik: "warm-smile", gestik: "lean-in",    blick: "to-speaker", energy: 4 }
+    Enums are the same as for `performance`:
+        mimik  ∈ {neutral, warm-smile, curious, concerned, confident, surprised}
+        gestik ∈ {still, hand-on-chin, open-palms, point, cross-arms, lean-in}
+        blick  ∈ {to-camera, to-speaker, away, down-thinking}
+        energy ∈ 1..5
+    If the briefing gives no attitude cue for a speaker, reuse the
+    beat-role defaults above. DIALOG-SAFETY still applies: face-occluding
+    gestures are forbidden on the active speaker of any lip-sync turn.
+    Track auto-filled axes in scenes[i]._meta.aiFilled as
+    "performances.<mentionKey>.<axis>". Never invent narrative content —
+    only performance axes.
 
   • seed: DO NOT auto-fill. Leave undefined unless the briefing literally
     names a number ("Seed: 12345"). Random per render is the correct A/B
@@ -1000,6 +1036,30 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       if (Object.keys(p).length) performance = p;
     }
 
+    // v230 — per-character performances map (keyed by cast mentionKey).
+    // Sanitized identically to `performance`; unknown keys are kept as-is
+    // and resolved against `cast` on the client apply hook.
+    let performances: any = undefined;
+    if (s.performances && typeof s.performances === 'object' && !Array.isArray(s.performances)) {
+      const out: Record<string, any> = {};
+      for (const [rawKey, val] of Object.entries(s.performances)) {
+        if (!val || typeof val !== 'object') continue;
+        const v: any = val;
+        const p = stripUndef({
+          mimik: v.mimik,
+          gestik: v.gestik,
+          blick: v.blick,
+          energy: v.energy != null ? clamp(v.energy, 1, 5, 3) : undefined,
+        });
+        if (!Object.keys(p).length) continue;
+        // Normalize key: keep the leading "@" the resolver expects.
+        const key = String(rawKey ?? '').trim();
+        if (!key) continue;
+        out[key.startsWith('@') ? key : `@${key.replace(/^@+/, '')}`] = p;
+      }
+      if (Object.keys(out).length) performances = out;
+    }
+
     // Per-scene aiFilled trail (BriefingIntel v2). Sanitized: stringify,
     // de-dupe, max 30 entries. UI shows a ✨ badge next to these fields.
     let sceneMeta: any = undefined;
@@ -1037,6 +1097,7 @@ function mergeManifestAndResolution(manifest: any, resolution: any) {
       shotDirector: s.shotDirector,
       anchorPromptEN: s.anchorPromptEN,
       performance,
+      performances,
       brollHints,
       brandAnchor: s.brandAnchor,
       negativePromptScene: s.negativePromptScene,

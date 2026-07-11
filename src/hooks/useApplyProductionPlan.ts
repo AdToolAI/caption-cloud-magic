@@ -435,26 +435,58 @@ function planSceneToComposerScene(
   })();
 
   // ── Performance Layer (Mimik/Gestik/Blick/Energy) ─────────────────────
-  // Plan emits ONE performance block per scene → applied to every cast
-  // member that resolved to a library character. Free-form German/English
-  // hints are mapped to the strict ScenePerformance enums.
+  // v230 — Prefer per-character `performances` map when the parser
+  // produced it (each speaker gets their own attitude). Fall back to the
+  // flat `performance` field fanned out to every cast slot. Enum filters
+  // (mapExpression/mapGesture/mapGaze) still gate unknown values.
   let performance: Record<string, ScenePerformance> | undefined;
-  if (ps.performance && characterShots.length > 0) {
-    const sp: ScenePerformance = {
-      expression: mapExpression(ps.performance.mimik),
-      gesture: mapGesture(ps.performance.gestik),
-      gaze: mapGaze(ps.performance.blick),
-      energy: clampEnergy(ps.performance.energy),
-    };
-    // Wave 3.1 — forward Pass-C Catalog-ID shadow fields if the parser
-    // produced them (`mimikId/gestikId/blickId`). They survive in the
-    // ScenePerformance JSONB and feed the ⚡-AI chips. Zero prompt impact.
-    const psPerf = ps.performance as any;
-    const shadow = {
-      mimikId: psPerf.mimikId ?? psPerf.mimicId ?? null,
-      gestikId: psPerf.gestikId ?? psPerf.gestureId ?? null,
-      blickId: psPerf.blickId ?? psPerf.gazeId ?? null,
-    };
+  const buildOne = (raw: any): ScenePerformance => ({
+    expression: mapExpression(raw?.mimik),
+    gesture: mapGesture(raw?.gestik),
+    gaze: mapGaze(raw?.blick),
+    energy: clampEnergy(raw?.energy),
+  });
+  const shadowFor = (raw: any) => ({
+    mimikId: raw?.mimikId ?? raw?.mimicId ?? null,
+    gestikId: raw?.gestikId ?? raw?.gestureId ?? null,
+    blickId: raw?.blickId ?? raw?.gazeId ?? null,
+  });
+  const perChar = (ps as any).performances as Record<string, any> | undefined;
+  if (perChar && typeof perChar === 'object' && characterShots.length > 0) {
+    // Map mentionKey → characterId via ps.cast
+    const keyToCharId = new Map<string, string>();
+    for (const c of (ps.cast ?? [])) {
+      if (c.characterId && c.mentionKey) {
+        const norm = c.mentionKey.startsWith('@') ? c.mentionKey : `@${c.mentionKey}`;
+        keyToCharId.set(norm.toLowerCase(), c.characterId);
+      }
+    }
+    const out: Record<string, ScenePerformance> = {};
+    for (const [rawKey, raw] of Object.entries(perChar)) {
+      const key = (rawKey.startsWith('@') ? rawKey : `@${rawKey}`).toLowerCase();
+      const cid = keyToCharId.get(key);
+      if (!cid) continue;
+      const sp = buildOne(raw);
+      const shadow = shadowFor(raw);
+      if (sp.expression || sp.gesture || sp.gaze || sp.energy || shadow.mimikId || shadow.gestikId || shadow.blickId) {
+        out[cid] = { ...sp, ...shadow } as ScenePerformance;
+      }
+    }
+    // Fan-out the flat performance to any cast slot the map didn't cover.
+    if (ps.performance) {
+      const sp = buildOne(ps.performance);
+      const shadow = shadowFor(ps.performance);
+      const hasAny = sp.expression || sp.gesture || sp.gaze || sp.energy || shadow.mimikId || shadow.gestikId || shadow.blickId;
+      if (hasAny) {
+        for (const cs of characterShots) {
+          if (!out[cs.characterId]) out[cs.characterId] = { ...sp, ...shadow } as ScenePerformance;
+        }
+      }
+    }
+    if (Object.keys(out).length) performance = out;
+  } else if (ps.performance && characterShots.length > 0) {
+    const sp = buildOne(ps.performance);
+    const shadow = shadowFor(ps.performance);
     if (sp.expression || sp.gesture || sp.gaze || sp.energy || shadow.mimikId || shadow.gestikId || shadow.blickId) {
       performance = {};
       for (const cs of characterShots) {

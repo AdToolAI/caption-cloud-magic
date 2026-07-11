@@ -129,6 +129,19 @@ export const PlanScene = z.object({
     energy: z.number().int().min(1).max(5).optional(),
   }).optional(),
 
+  /**
+   * v230 — Per-character performance map keyed by cast `mentionKey`
+   * (with leading "@"). When present, `useApplyProductionPlan` writes
+   * one ScenePerformance per cast member; otherwise it falls back to
+   * fanning out the flat `performance` field to all speakers.
+   */
+  performances: z.record(z.string(), z.object({
+    mimik: z.string().max(120).optional(),
+    gestik: z.string().max(120).optional(),
+    blick: z.string().max(120).optional(),
+    energy: z.number().int().min(1).max(5).optional(),
+  })).optional(),
+
   // ── Stage-2 schema extensions ────────────────────────────────────────────
   /** Stock-footage keywords for B-Roll search (Pexels/Pixabay). */
   brollHints: z.array(z.string().max(80)).max(12).optional(),
