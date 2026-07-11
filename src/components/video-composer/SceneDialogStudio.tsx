@@ -13,7 +13,7 @@
  * composer_scenes (added in migration 20260507-…).
  */
 
-import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle } from 'lucide-react';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
@@ -551,19 +551,28 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return Array.from(new Set([speakerId, brandId].filter(Boolean)));
   };
 
-  // Sync only when switching to a different scene — otherwise the parent's
-  // re-render after our own debounced save would clobber the user's in-flight
-  // typing (cursor jump / dropped characters).
+  // Sync when switching scenes OR when external state (plan-apply, hydration,
+  // realtime) brings fresh dialogTurns/dialogScript. We protect in-flight
+  // typing: if the user's local `script` differs from the persisted
+  // `scene.dialogScript`, we don't overwrite — the debounced save effect
+  // below will flush the user's edits back onto the scene.
+  const lastSyncedSceneIdRef = useRef<string | null>(null);
   useEffect(() => {
     const cleanedScript = displayScriptFromScene();
-    setScript(cleanedScript);
-    if ((scene.dialogScript ?? '') && cleanedScript !== (scene.dialogScript ?? '')) {
-      onUpdate({ dialogScript: cleanedScript });
+    const sceneChanged = lastSyncedSceneIdRef.current !== scene.id;
+    const localMatchesPersisted =
+      script === (scene.dialogScript ?? '') || script === '';
+    if (sceneChanged || localMatchesPersisted) {
+      setScript(cleanedScript);
+      if ((scene.dialogScript ?? '') && cleanedScript !== (scene.dialogScript ?? '')) {
+        onUpdate({ dialogScript: cleanedScript });
+      }
+      setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
+      setDialogTakes((scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {});
     }
-    setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
-    setDialogTakes((scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {});
+    lastSyncedSceneIdRef.current = scene.id;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.id]);
+  }, [scene.id, scene.dialogScript, canonicalDialogTurns]);
 
   // Persist script with debounce. If canonical ID turns exist, keep them as the
   // technical source of truth and only update turn text by line order.
