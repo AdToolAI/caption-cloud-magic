@@ -614,7 +614,27 @@ serve(async (req) => {
       const reencodedPassthroughSuspect_DEPRECATED = !syncOutputUnchanged &&
         sizeRatio >= 0.65 && sizeRatio <= 1.35;
       const reencodedPassthroughSuspect = false; // v150: disabled, see comment above
-      const noopSuspect = syncOutputUnchanged || syncOutputResolutionRegression;
+      // v231 — Motion Content Gate für Einzelsprecher (N=1).
+      // Für Multi-Cast ist die bytes-Heuristik ein False-Positive-Generator
+      // (v150-Kommentar oben). Für N=1 gibt es aber KEINE Kaskaden-Risiken:
+      // ein statischer Sync.so-Output („Noop") lässt den Sprecher eingefroren
+      // erscheinen und der Kunde bekommt sichtbar keine Lippenbewegung.
+      // Deshalb reaktivieren wir den byte-basierten Gate GEZIELT und nur mit
+      // einem sehr engen Passthrough-Band (0.92–1.08), das nur echte
+      // Beinahe-Identitäts-Outputs trifft (real animiertes Lip-Sync
+      // produziert typischerweise sizeRatio ≤ 0.90 durch veränderte
+      // Keyframes im Mund-Bereich).
+      const isSingleSpeakerScene = totalPasses === 1;
+      const singleSpeakerMotionNoop = isSingleSpeakerScene &&
+        !syncOutputUnchanged &&
+        inBytes > 0 && outBytes > 0 &&
+        sizeRatio >= 0.92 && sizeRatio <= 1.08;
+      const noopSuspect = syncOutputUnchanged || syncOutputResolutionRegression || singleSpeakerMotionNoop;
+      if (singleSpeakerMotionNoop) {
+        console.warn(
+          `[sync-so-webhook] v231_n1_motion_gate scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(3)} → NOOP suspect (single-speaker tight-band)`,
+        );
+      }
       // v150 — Diagnostik-Log auch wenn nur die alte (jetzt deaktivierte)
       // bytes-Heuristik anschlagen würde. So sehen wir in den Logs, ob die
       // alte v128 noch täglich False-Positives produziert hätte — ohne dass
