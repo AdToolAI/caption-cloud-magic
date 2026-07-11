@@ -1,15 +1,16 @@
 /**
- * planDisplayFilter — Presentation-only sanitizer for Production Plan.
+ * planDisplayFilter — sanitizer for Production Plan script display/persistence.
  *
  * Filters out "directive" lines (style adjectives, timing notes, structural
  * markers, AUTO-DIRECTOR headers) so the customer sees only real spoken
- * dialog. Does NOT mutate the underlying dialogTurns array — apply/bind
- * logic still runs on the full list.
+ * dialog. Callers decide whether to use this only for display or before
+ * persisting a dialogScript.
  */
 
 const DIRECTIVE_MARKERS = [
   /auto[-\s]?director/i,
   /synthesize\s+full\s+screenplay/i,
+  /full\s+screenplay\s+from\s+briefing/i,
   /take\s+[a-z]\s+aufnehmen/i,
   /shot\s+pro\s+zeile/i,
 ];
@@ -17,8 +18,18 @@ const DIRECTIVE_MARKERS = [
 const STRUCTURAL_PATTERNS = [
   /^\d+\s*sekunden?$/i,
   /^0\s*bis\s*\d+\s*sekunden?$/i,
+  /^\d+\s*(bis|to|-)\s*\d+\s*(sekunden?|seconds?)$/i,
   /^\d+\s*(hauptfigur(en)?|durchgehende\s*szene|sprecher|shot(s)?|block|szene)\b/i,
   /^\d+\s*(main\s+character|continuous\s+scene|speakers?|shots?|scenes?)\b/i,
+];
+
+const ACTION_DIRECTIVE_PATTERNS = [
+  /^(eine|ein|a|an)\s+.*\b(szene|scene)\b.*\b(zeigen|show|depict|soll|should)\b/i,
+  /\b(eine|ein|a|an)\s+.*\b(szene|scene)\b.*\b(wird|is|are)\s+(gezeigt|shown|depicted)\b/i,
+  /^fokus\s+auf\b/i,
+  /^focus\s+on\b/i,
+  /^(kein|keine|ohne|no)\s+.*\b(gore|brutalität|brutality|violence|comic|game[-\s]?look|stil|style|unnötig|unnecessary|explizit|explicit)\b/i,
+  /\b(trümmergeräusche|debris\s+sounds|sound\s+design|negative\s+prompt)\b/i,
 ];
 
 // Common German style adjectives typically emitted as bare tone descriptors.
@@ -58,9 +69,24 @@ export function isDirectiveTurn(text: unknown): boolean {
   if (!t) return true; // empty turn = noise
   if (DIRECTIVE_MARKERS.some((r) => r.test(t))) return true;
   if (STRUCTURAL_PATTERNS.some((r) => r.test(t))) return true;
+  if (ACTION_DIRECTIVE_PATTERNS.some((r) => r.test(t))) return true;
   if (isStyleAdjectiveChain(t)) return true;
   if (isFragment(t)) return true;
   return false;
+}
+
+export function sanitizeDialogScript(script: string | null | undefined): string {
+  if (!script) return '';
+  return script
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => {
+      const match = line.match(/^([^:\n]{1,96}):\s*(.*)$/);
+      const spokenText = match ? match[2]?.trim() : line;
+      return !isDirectiveTurn(spokenText);
+    })
+    .join('\n');
 }
 
 export interface VisibleTurnsResult<T> {
