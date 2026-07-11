@@ -321,7 +321,27 @@ export function applyCanonicalTimingToPlan(
   briefing: ComposerBriefing,
   briefingText: string,
 ): { plan: TProductionPlan; timing: BriefingTimingWithWindows | null; changed: boolean } {
-  const timing = readServerContractAsTiming(plan) ?? detectCanonicalBriefingTiming(briefing, briefingText);
+  let timing = readServerContractAsTiming(plan) ?? detectCanonicalBriefingTiming(briefing, briefingText);
+
+  // v233 — Slider wins. Wenn der Nutzer im Briefing-Tab eine Videodauer per
+  // Slider gesetzt hat, ist das die einzige Wahrheit. Text-Angaben und
+  // Server-Contract werden proportional auf diesen Wert normalisiert, damit
+  // es keine Verwirrung mehr gibt ("Text sagt 15s, Slider steht auf 5s").
+  const sliderDuration = Number(briefing?.duration);
+  if (Number.isFinite(sliderDuration) && sliderDuration > 0) {
+    if (timing) {
+      timing = { ...timing, durationSec: sliderDuration, source: timing.source };
+    } else {
+      timing = {
+        durationSec: sliderDuration,
+        sceneCount: undefined,
+        explicitSceneCount: false,
+        continuousScene: false,
+        source: 'explicit-total',
+      } as BriefingTimingWithWindows;
+    }
+  }
+
   if (!timing) return { plan, timing: null, changed: false };
 
 
@@ -497,7 +517,10 @@ function extractSceneHints(briefingText: string): SceneHint[] {
 function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
   const hints = extractSceneHints(briefingText);
   const canonicalTiming = detectCanonicalBriefingTiming(briefing, briefingText);
-  const total = canonicalTiming?.durationSec ?? (Number(briefing.duration) || 15);
+  const sliderTotal = Number(briefing?.duration);
+  const total = Number.isFinite(sliderTotal) && sliderTotal > 0
+    ? sliderTotal
+    : (canonicalTiming?.durationSec ?? 15);
   const firstMention = briefingText.match(/@[a-z0-9][a-z0-9-_]{1,47}/i)?.[0] ?? null;
   const firstChar = briefing.characters?.[0];
   const selectedCast = (briefing.characters ?? []).slice(0, 4).map((c) => ({

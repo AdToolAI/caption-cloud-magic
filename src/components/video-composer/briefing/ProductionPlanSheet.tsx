@@ -196,38 +196,12 @@ export default function ProductionPlanSheet({
   }, [plan, currentBriefing]);
   const safePlan = safePlanResult?.plan ?? null;
 
-  // Board-Toggle folgt dem Briefing: sobald die Analyse eine kanonische
-  // Gesamtdauer im Plan liefert (aus Skript-Timing abgeleitet), synchronisieren
-  // wir den Briefing-Board-State darauf, damit Toggle und Skript nie
-  // widersprüchliche Zahlen zeigen. Läuft für beide Pfade (War-Room initialPlan
-  // + direkter Parse im Sheet). Idempotent via syncedSignatureRef.
-  const syncedSignatureRef = useRef<string | null>(null);
-  useEffect(() => {
-    const target = safePlan?.project?.totalDurationSec;
-    if (!safePlan || !target || target < 1) return;
-    const current = currentBriefingRef.current?.duration;
-    const signature = `${safePlan.scenes?.length ?? 0}:${target}`;
-    if (syncedSignatureRef.current === signature) return;
-    if (typeof current === 'number' && Math.abs(current - target) < 0.5) {
-      syncedSignatureRef.current = signature;
-      return;
-    }
-    syncedSignatureRef.current = signature;
-    const previous = current;
-    try {
-      onUpdateBriefing({ duration: target });
-      toast({
-        title: 'Dauer aus Briefing übernommen',
-        description:
-          typeof previous === 'number'
-            ? `Board: ${previous}s → ${target}s (${safePlan.scenes?.length ?? 0} Szenen laut Skript).`
-            : `Board auf ${target}s gesetzt (${safePlan.scenes?.length ?? 0} Szenen laut Skript).`,
-      });
-    } catch (err) {
-      console.warn('[ProductionPlanSheet] board duration auto-sync failed', err);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safePlan]);
+  // v233 — Slider gewinnt. Der Videodauer-Slider im Briefing-Tab ist die
+  // einzige Wahrheit für die Gesamtdauer. Wir überschreiben ihn niemals
+  // mehr aus dem Plan heraus (früher: Auto-Sync auf `totalDurationSec` aus
+  // Skript-Timing). Der Plan wird bereits vor der Anzeige durch
+  // `applyCanonicalTimingToPlan` auf den Slider-Wert normalisiert.
+
 
   // Char options: split into Base avatars (no `outfit:` prefix) vs Outfit
   // looks. The cast picker shows base avatars in the Charakter dropdown

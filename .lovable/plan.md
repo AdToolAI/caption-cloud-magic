@@ -1,44 +1,47 @@
-## Bug-Fix Plan v232
+## Plan v233 — Slider ist Single Source of Truth für Videodauer
 
-### Bug 1 — Local-Fallback zeigt 5.1s / 3 Szenen statt 15s / 1 Szene
+### Entscheidung
+Der **Videodauer-Slider** im Briefing-Tab gewinnt IMMER gegen jede aus dem Briefing-Text erkannte Zeitangabe. Kein Fallback-Guessing mehr, kein „15s im Text, 5s im Slider" Konflikt.
 
-**Ursache:** Wenn `briefing-deep-parse` (Gemini) hakt oder timeout, greift sofort ein Local-Fallback mit `briefing.duration ?? 5` und heuristischer 3-Beat-Aufteilung. Der Nutzer sieht diese Schätz-Zahlen als "Wahrheit" und interpretiert sie als Bug.
+### Verhalten
+- Slider steht z. B. auf `5s` → Plan hat exakt 5 s Gesamtdauer, egal was im Freitext steht.
+- Slider steht auf `15s` → Plan hat exakt 15 s, auch wenn der Text nichts dazu sagt oder etwas anderes sagt.
+- Gilt gleichermaßen für:
+  - AI-Plan von `briefing-deep-parse`
+  - Local-Fallback-Plan (`buildLocalFallbackPlan`)
+  - Late-Arrival-Retry
+  - `detectCanonicalBriefingTiming` / SZENE-Block-Extraktion
 
-**Fix (A – Fallback erst nach Timeout):**
-1. `ProductionPlanSheet.tsx` / Trigger-Hook: Statt sofort `buildLocalFallbackPlan` anzuzeigen, Modal im **Loading-State** halten (Spinner + „Briefing wird analysiert …").
-2. Hartes Timeout: 45s. Erst danach Fallback-Plan mit deutlichem gelben Banner „Lokale Schätzung – AI-Analyse fehlgeschlagen" anzeigen.
-3. Wenn AI zwischenzeitlich fertig wird, Loader durch echten Plan ersetzen (kein Fallback-Flash).
-4. Wenn Fallback greift, `detectCanonicalBriefingTiming` weiterhin bevorzugen (schadet nicht), aber es ist explizit als „Schätzung" markiert.
+### Umsetzung (technisch)
 
-### Bug 2 — Single-Speaker Lip-Sync wird still gekillt
+1. **`briefing-deep-parse` (Edge Function)**
+   - `targetDurationSec` aus dem Client-Payload (Slider-Wert) wird zur harten Vorgabe.
+   - Nach Pass A + Pass B: **Enforce-Duration-Pass**, der Szenen-Durations proportional auf `targetDurationSec` skaliert (Summe = Slider ±0.5s Toleranz).
+   - Prompt-Hinweis: „Total duration MUST equal {targetDurationSec}s. Ignore any conflicting duration mentioned in the briefing text."
 
-**Ursache:** In `SceneDialogStudio.tsx` L1261-1270 verlangt `buttonIntendsLipSync` für 1 Sprecher `renderAsSeparateScenes=true` (der Multi-Speaker-Toggle). Ergebnis: Klick auf „Clip mit Lip-Sync generieren" bei 1 Sprecher → `forceCinematicSync=false` → fällt in `handleGenerateInline()` → dieser Pfad bricht ab, weil Voiceover-Path nicht sauber für 1-Speaker-Lip-Sync konfiguriert ist. Erst nachdem der Multi-Speaker-Toggle sichtbar/aktiv wird (bei State-Refresh), funktioniert es.
+2. **`buildLocalFallbackPlan`**
+   - Nutzt `briefing.duration` (Slider) direkt, nicht `?? 5`.
+   - Verteilt gleichmäßig auf N Szenen (N aus Briefing/SZENE-Blöcken oder Default 3).
 
-**Fix (A – Symmetrisch):**
-1. `buttonIntendsLipSync` für 1 Sprecher entkoppeln von `renderAsSeparateScenes`. Neue Regel:
-   ```
-   buttonIntendsLipSync =
-     (blocks.length === 1 && allHavePortraits) ||
-     (blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes)
-   ```
-   Damit reicht bei 1 Sprecher ein Portrait + Klick, um sofort in Cinematic-Sync zu routen.
-2. `forceCinematicSync` bleibt logisch, greift jetzt aber zuverlässig.
-3. `renderAsSeparateScenes`-Toggle bleibt für Multi-Speaker sichtbar; für 1 Sprecher wird er gar nicht mehr benötigt und ausgeblendet (keine verwirrende UI-Umschaltung mehr).
-4. Falls `allHavePortraits=false` bei 1 Sprecher → klarer Toast statt Silent-Kill: „Kein Portrait für {Name} — Lip-Sync nicht möglich, bitte Cast-Portrait hinterlegen."
+3. **`detectCanonicalBriefingTiming`**
+   - Wenn Slider gesetzt (>0), Text-Timing wird nur zur Szenenverteilung genutzt, Summe wird auf Slider normalisiert.
 
-### Version-Bump
+4. **`ProductionPlanSheet` UI**
+   - Kleiner Hinweis unter der Gesamtdauer: „Aus Slider übernommen ({X}s)".
+   - Wenn Text-Angabe (z. B. „15 Sekunden") ≠ Slider, gelbes Info-Chip: „Text erwähnt {Y}s, Slider gewinnt".
 
-- `CLIENT_PIPELINE_VERSION` → **232**
+5. **`useStoryboardTransition` / v232 Loader**
+   - Passt: Slider-Wert wird bereits mitgeschickt, jetzt eben auch hart durchgesetzt.
+
+### Version
+- `CLIENT_PIPELINE_VERSION` → **233**
 
 ### Betroffene Dateien
-
-- `src/hooks/useBriefingDeepParse.ts` (oder Trigger im `BriefingTab.tsx` / `ProductionPlanSheet.tsx`) – Loading-Gate + 45s-Timeout
-- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` – Loader-UI + Fallback-Banner
-- `src/components/video-composer/SceneDialogStudio.tsx` – `buttonIntendsLipSync` erweitern, 1-Sprecher-Toggle ausblenden, Portrait-Missing-Toast
-- `src/config/pipelineVersion.ts` – 231 → 232
+- `supabase/functions/briefing-deep-parse/index.ts` — Enforce-Duration-Pass, Prompt-Update
+- `src/lib/video-composer/briefing/buildLocalFallbackPlan.ts` — Slider first
+- `src/lib/video-composer/briefing/detectCanonicalBriefingTiming.ts` — Normalisieren auf Slider
+- `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — Hinweis-Chip
+- `src/config/pipelineVersion.ts` — 232 → 233
 
 ### Nicht angefasst
-
-- Server-seitige Sync.so / compose-video-clips-Logik (v231 Motion Gate bleibt aktiv).
-- Multi-Speaker-Routing.
-- Voice-Auto-Binding (bleibt bewusst leer, v225).
+- Lip-Sync-Pipeline, Cast/Voice-Routing, v231 Motion Gate, v232 Loader/Single-Speaker-Fix.
