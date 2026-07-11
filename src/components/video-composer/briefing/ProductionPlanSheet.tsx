@@ -186,21 +186,39 @@ export default function ProductionPlanSheet({
   // fallback, late initialPlan, HMR cache, or manual edits.
   const safePlanResult = useMemo(() => {
     if (!plan) return null;
-    const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefingRef.current);
+    const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefing);
     const withBriefingTiming = applyCanonicalTimingToPlan(
       withEnsemble,
-      currentBriefingRef.current,
-      currentBriefingRef.current?.productDescription ?? '',
+      currentBriefing,
+      currentBriefing?.productDescription ?? '',
     ).plan;
     return finalizePlanCanonical(withBriefingTiming);
   }, [plan, currentBriefing]);
   const safePlan = safePlanResult?.plan ?? null;
+
+  // v234 — Slider-Änderungen fließen live in den lokalen Plan-State zurück.
+  // safePlan re-normalisiert bereits per Memo, aber der editierbare `plan`
+  // State (der beim Apply persistiert wird) muss ebenfalls dem Slider folgen,
+  // damit „Gesamtdauer" und „Summe Szenen" im Sheet nicht stehenbleiben, wenn
+  // der Kunde den Videodauer-Slider nach dem Analysieren noch anpasst.
+  useEffect(() => {
+    if (!plan) return;
+    const { plan: next, changed } = applyCanonicalTimingToPlan(
+      plan,
+      currentBriefing,
+      currentBriefing?.productDescription ?? '',
+    );
+    if (changed) setPlan(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBriefing?.duration]);
 
   // v233 — Slider gewinnt. Der Videodauer-Slider im Briefing-Tab ist die
   // einzige Wahrheit für die Gesamtdauer. Wir überschreiben ihn niemals
   // mehr aus dem Plan heraus (früher: Auto-Sync auf `totalDurationSec` aus
   // Skript-Timing). Der Plan wird bereits vor der Anzeige durch
   // `applyCanonicalTimingToPlan` auf den Slider-Wert normalisiert.
+
+
 
 
   // Char options: split into Base avatars (no `outfit:` prefix) vs Outfit
