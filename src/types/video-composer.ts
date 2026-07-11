@@ -263,6 +263,16 @@ export interface ComposerScene {
    * speaker and auto-spawns sub-scenes for shot-reverse-shot.
    */
   dialogScript?: string;
+  /** Canonical ID-referenced dialog turns; names in dialogScript are display-only. */
+  dialogTurns?: Array<{
+    turnId?: string;
+    characterId: string;
+    displayName?: string;
+    text: string;
+    mood?: string;
+    delivery?: string;
+    order?: number;
+  }>;
   /**
    * Map of characterId → voice config.
    *  - Legacy: plain string = ElevenLabs voiceId

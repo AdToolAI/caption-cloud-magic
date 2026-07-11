@@ -35,7 +35,7 @@ import { extractFunctionsError } from '@/lib/functionsError';
 // The standalone /talking-head module still owns that hook.
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
-import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
+import { parseDialogScript, uniqueSpeakers, type DialogBlock } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
 import { sanitizeDialogScript } from '@/lib/motion-studio/planDisplayFilter';
@@ -51,9 +51,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import {
   AUTO_VOICE_OPTIONS,
   cleanVoiceId,
-  createVoicePoolPicker,
   getAutoVoiceName,
-  normalizeAutoVoiceGender,
   toElevenLabsDialogVoice,
 } from '@/lib/video-composer/autoVoiceAssignment';
 import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
@@ -268,6 +266,29 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { data: accessibleChars = [] } = useAccessibleCharacters();
   const confirmRender = useSceneRenderConfirm();
 
+  const isUuid = (value: string | null | undefined) =>
+    !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
+  const canonicalDialogTurns = useMemo(() => {
+    const turns = Array.isArray(scene.dialogTurns) ? scene.dialogTurns : [];
+    return turns
+      .map((turn, index) => {
+        const characterId = String((turn as any)?.characterId ?? '').trim();
+        const text = String((turn as any)?.text ?? '').trim();
+        if (!isUuid(characterId) || !text) return null;
+        return {
+          turnId: (turn as any)?.turnId ? String((turn as any).turnId) : undefined,
+          characterId,
+          displayName: String((turn as any)?.displayName ?? '').trim() || undefined,
+          text,
+          mood: (turn as any)?.mood ? String((turn as any).mood) : undefined,
+          order: typeof (turn as any)?.order === 'number' ? Number((turn as any).order) : index,
+        };
+      })
+      .filter((turn): turn is NonNullable<typeof turn> => !!turn)
+      .sort((a, b) => a.order - b.order);
+  }, [scene.dialogTurns]);
+
   // Build the cast subset of ComposerCharacters that are actually in this scene.
   // Library-Fallback in 3 Stufen, damit der Studio nicht leer rendert wenn der
   // Plan/Briefing-Apply die IDs nicht 1:1 in die Project-Cast-Liste schreibt:
@@ -292,6 +313,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const sceneCast = useMemo<ComposerCharacter[]>(() => {
     const lowered = (s: string) => (s || '').toLowerCase();
     const firstOf = (s: string) => lowered(s).split(/\s+/)[0] ?? '';
+    const buildSyntheticFromId = (id: string, displayName?: string): ComposerCharacter => ({
+      id,
+      name: displayName?.trim() || `Character ${id.slice(0, 8)}`,
+      appearance: '',
+      signatureItems: '',
+      brandCharacterId: id,
+    });
     const findByName = (needle: string): ComposerCharacter | undefined => {
       const n = lowered(needle);
       const nFirst = firstOf(needle);
@@ -329,6 +357,17 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       })
       .filter((c): c is ComposerCharacter => !!c);
 
+    for (const turn of canonicalDialogTurns) {
+      if (resolved.some((c) => c.id === turn.characterId || c.brandCharacterId === turn.characterId)) continue;
+      const direct = characters.find((c) => c.id === turn.characterId || c.brandCharacterId === turn.characterId);
+      if (direct) {
+        resolved.push(direct);
+        continue;
+      }
+      const libHit = accessibleChars.find((b: any) => b.id === turn.characterId);
+      resolved.push(libHit ? buildSyntheticFromLibrary(libHit) : buildSyntheticFromId(turn.characterId, turn.displayName));
+    }
+
     // Script-name Fallback: wenn der Cast-Resolver leer ist, das Skript aber
     // "NAME: ..."-Zeilen enthält, lösen wir die Namen direkt gegen die
     // Briefing-Liste + Avatar-Library auf, damit Sprecher- und Stimm-Auswahl
@@ -354,7 +393,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
 
     return resolved;
-  }, [cast, characters, accessibleChars, scene.dialogScript]);
+  }, [cast, characters, accessibleChars, scene.dialogScript, canonicalDialogTurns]);
 
 
 
@@ -451,6 +490,17 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return [...lib, ...custom, ...autoFallbacks];
   }, [elVoices, customVoices]);
 
+  const dialogTurnsToScript = () =>
+    canonicalDialogTurns
+      .map((turn) => {
+        const speaker = sceneCast.find((c) => c.id === turn.characterId || c.brandCharacterId === turn.characterId);
+        const name = speaker?.name ?? turn.displayName ?? `Character ${turn.characterId.slice(0, 8)}`;
+        return `${name}: ${turn.text}`;
+      })
+      .join('\n');
+
+  const displayScriptFromScene = () => sanitizeDialogScript(scene.dialogScript) || dialogTurnsToScript();
+
   // ── Voice map state — backwards-compatible (string → DialogVoiceCfg) ──
   const normalizeVoiceMap = (
     raw: Record<string, string | DialogVoiceCfg> | undefined,
@@ -464,7 +514,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return out;
   };
 
-  const [script, setScript] = useState(() => sanitizeDialogScript(scene.dialogScript));
+  const [script, setScript] = useState(() => displayScriptFromScene());
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
     normalizeVoiceMap(scene.dialogVoices),
   );
@@ -476,6 +526,17 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const [genStage, setGenStage] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [renderAsSeparateScenes, setRenderAsSeparateScenes] = useState(false);
+
+  const scriptLineTexts = (value: string) =>
+    String(value ?? '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^([^:\n]{1,96}):\s*(.*)$/);
+        return (match ? match[2] : line).trim();
+      })
+      .filter(Boolean);
 
   const cleanDialogVoiceCfg = (cfg?: DialogVoiceCfg): DialogVoiceCfg | undefined => {
     if (!cfg?.voiceId) return undefined;
@@ -494,7 +555,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   // re-render after our own debounced save would clobber the user's in-flight
   // typing (cursor jump / dropped characters).
   useEffect(() => {
-    const cleanedScript = sanitizeDialogScript(scene.dialogScript);
+    const cleanedScript = displayScriptFromScene();
     setScript(cleanedScript);
     if ((scene.dialogScript ?? '') && cleanedScript !== (scene.dialogScript ?? '')) {
       onUpdate({ dialogScript: cleanedScript });
@@ -504,15 +565,27 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Persist script with debounce.
+  // Persist script with debounce. If canonical ID turns exist, keep them as the
+  // technical source of truth and only update turn text by line order.
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
     const handle = setTimeout(() => {
-      onUpdate({ dialogScript: script });
+      const updates: Partial<ComposerScene> = { dialogScript: script };
+      if (canonicalDialogTurns.length > 0) {
+        const texts = scriptLineTexts(script);
+        if (texts.length === canonicalDialogTurns.length) {
+          updates.dialogTurns = canonicalDialogTurns.map((turn, order) => ({
+            ...turn,
+            text: texts[order] ?? turn.text,
+            order,
+          }));
+        }
+      }
+      onUpdate(updates);
     }, 500);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [script]);
+  }, [script, canonicalDialogTurns]);
 
   /** Persist voice map immediately on change */
   const updateSpeakerVoice = (speakerId: string, patch: Partial<DialogVoiceCfg>) => {
@@ -621,18 +694,34 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
   };
 
-  const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
+  const idBlocks = useMemo<DialogBlock[] | null>(() => {
+    if (canonicalDialogTurns.length === 0) return null;
+    const texts = scriptLineTexts(script);
+    const hasAlignedEditorText = texts.length === canonicalDialogTurns.length;
+    const out = canonicalDialogTurns
+      .map((turn, index) => {
+        const speaker = sceneCast.find((c) => c.id === turn.characterId || c.brandCharacterId === turn.characterId);
+        const speakerId = speaker?.id ?? turn.characterId;
+        return {
+          speakerId,
+          speakerName: speaker?.name ?? turn.displayName ?? `Character ${turn.characterId.slice(0, 8)}`,
+          text: hasAlignedEditorText ? (texts[index] ?? turn.text) : turn.text,
+        } satisfies DialogBlock;
+      })
+      .filter((block) => block.text.trim().length > 0);
+    return out.length > 0 ? out : null;
+  }, [canonicalDialogTurns, script, sceneCast]);
+
+  const blocks = useMemo(() => idBlocks ?? parseDialogScript(script, sceneCast), [idBlocks, script, sceneCast]);
   const speakers = useMemo(() => uniqueSpeakers(blocks, sceneCast), [blocks, sceneCast]);
 
   const resolvedVoicePerSpeaker = useMemo<Record<string, DialogVoiceCfg>>(() => {
     const sceneVoices = normalizeVoiceMap(scene.dialogVoices);
-    const poolPicker = createVoicePoolPicker();
     const out: Record<string, DialogVoiceCfg> = {};
 
     for (const sp of speakers) {
       const castEntry = sceneCast.find((c) => c.id === sp.id);
       const lookupId = castEntry?.brandCharacterId ?? sp.id;
-      const brand = accessibleChars.find((b) => b.id === lookupId);
       const aliases = Array.from(new Set([sp.id, lookupId].filter(Boolean)));
       const existing = aliases
         .map((key) => cleanDialogVoiceCfg(voicePerSpeaker[key]) ?? cleanDialogVoiceCfg(sceneVoices[key]))
@@ -641,18 +730,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       const fromSceneRoot = rootVoiceId
         ? toElevenLabsDialogVoice(rootVoiceId, getAutoVoiceName(rootVoiceId), true)
         : undefined;
-      const defaultId = cleanVoiceId(defaultVoiceByCharId[sp.id] ?? defaultVoiceByCharId[lookupId]);
-      const fromBrand = defaultId
-        ? toElevenLabsDialogVoice(defaultId, getAutoVoiceName(defaultId) ?? sp.name)
-        : undefined;
-      const picked = poolPicker.pick(normalizeAutoVoiceGender((brand as any)?.gender));
-      const fromPool = toElevenLabsDialogVoice(picked.id, picked.name, true);
-      const chosen = existing ?? fromSceneRoot ?? fromBrand ?? fromPool;
+      const chosen = existing ?? fromSceneRoot;
       if (chosen?.voiceId) out[sp.id] = chosen;
     }
 
     return out;
-  }, [speakers, sceneCast, accessibleChars, voicePerSpeaker, scene.dialogVoices, (scene as any).characterVoiceId, defaultVoiceByCharId]);
+  }, [speakers, sceneCast, voicePerSpeaker, scene.dialogVoices, (scene as any).characterVoiceId]);
 
   const resolvedDialogVoiceMap = useMemo<Record<string, DialogVoiceCfg>>(() => {
     const next: Record<string, DialogVoiceCfg> = { ...voicePerSpeaker };
