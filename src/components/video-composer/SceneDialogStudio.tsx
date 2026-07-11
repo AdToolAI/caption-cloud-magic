@@ -1939,6 +1939,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           className="mt-1 font-mono text-xs"
         />
 
+        {(!script || script.trim().length === 0) && sceneCast.length > 0 && (
+          <p className="mt-1.5 text-[10px] text-muted-foreground italic">
+            {language === 'de'
+              ? `Skript eintragen — ${sceneCast.length} Sprecher-Slot${sceneCast.length === 1 ? '' : 's'} und Timing sind für dich vorbereitet.`
+              : language === 'es'
+              ? `Escribe el guion — ${sceneCast.length} slot${sceneCast.length === 1 ? '' : 's'} de hablante y el ritmo están listos.`
+              : `Write the script — ${sceneCast.length} speaker slot${sceneCast.length === 1 ? '' : 's'} and timing are prepared for you.`}
+          </p>
+        )}
+
         {blocks.length > 0 && (
           <div className="mt-2 space-y-1 rounded-md border border-border/40 bg-background/40 p-2">
             {blocks.map((b, i) => {
