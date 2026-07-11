@@ -1,65 +1,43 @@
-# v230 — Performance & Life-Layer (revidiert)
+# Diagnose-Plan — Einzelsprecher bewegt Lippen nicht (Szene `9267e69b`)
 
-Zwei zusammengehörige Verbesserungen: (a) das Restzucken der Lippen bei Nicht-Sprechern **dämpfen ohne die Szene einzufrieren**, und (b) Mimik/Gestik/Blick/Energy pro Sprecher aus dem Briefing kontextuell autofüllen.
+**Ziel:** Bevor wir Code anfassen, empirisch klären, ob Sync.so einen Noop geliefert hat, ob der Preclip wirklich 720p war, und ob der Tail-Hold der Grund für die Wahrnehmung „keine Lippenbewegung" ist. Erst dann Fix.
 
-## Teil A — Idle-Lip-Motion dämpfen, nicht abschalten
+## Verdachts-Matrix
 
-Statt „mouth completely motionless" (wirkt tot) zielen wir auf **stumme, natürliche Ruhe**: minimales Atmen durch die Nase, sehr seltene Mikro-Zuckungen, aber **kein Lippen-Flapping, kein Muttern, kein Kau-Rhythmus, kein Sprech-Muster**. Damit bleibt die Szene lebendig, sync-3 hat trotzdem einen sauberen Idle-Zustand.
+| # | Hypothese | Verifikation |
+|---|---|---|
+| H1 | Sync.so-Output ist ein Near-Noop (sizeRatio 1.24, v150 hat's unterdrückt) | Mean-Diff / Frame-Diff zwischen Preclip-Input und Sync-Output |
+| H2 | Preclip real < 720p (v113-Fallschutz greift nicht bei N=1) | `ffprobe` auf `p1-preclip-98a242fffd59b408.mp4` |
+| H3 | Voiced-Window (0–1.35 s) ist so kurz gegen 5 s Master, dass die restlichen 3.65 s Tail-Hold als „keine Bewegung" wahrgenommen werden | Frames aus finalem Mux bei t=0.5 s vs t=3 s extrahieren |
+| H4 | Retry-Ladder hat bei `bbox-url-pro` ein stilles `done` geschrieben (kein Refund, kein weiterer Retry) | `_v106_probe` + Sync-so-webhook Logs für _v104..v106 lesen |
 
-Änderungen in `supabase/functions/compose-video-clips/index.ts`:
+## Vorgehen (nur Read/Probe, keine Deploys)
 
-1. **Plate-Wortlaut** `neutralTwoShotPrompt` (N≥2-Variante): Ergänzung am Ende:
-   *"Non-speakers stay silently at rest — lips softly closed, breathing calmly through the nose, only micro facial life (occasional blinks, tiny weight shifts, a soft swallow at most). No lip-flap, no chewing pattern, no rhythmic mouth motion, no whispering shapes; the mouth never forms syllables."*
-2. **Master-Suffix** `buildCinematicSyncMasterPrompt`: analoges Kurz-Statement (ein Satz), damit der Renderer die Regel selbst sieht.
-3. **Negativ-Prompt** (`CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE`): Ergänzung um die *speech-artigen* Muster, ohne totale Bewegungssperre:
-   `rhythmic lip motion, syllable-shaped mouth, whispering lips, lip-flap, chewing pattern, mouth mouthing words, non-speaker mouthing along`.
+### Schritt 1 — Dateien empirisch messen
+- `ffprobe` auf `p1-preclip-98a242fffd59b408.mp4` → reale Breite/Höhe (H2).
+- `ffprobe` auf `9267e69b-lipsync-pass-1.mp4` (Sync.so-Output) → Dauer, Breite/Höhe.
+- Frame-Diff (SSIM/mean-diff) über gleich viele Sample-Frames zwischen Input-Preclip und Output → H1 quantifizieren.
 
-Damit bleiben Atmen, Blinzeln, Mikro-Bewegung erlaubt — nur Sprech-artige Muster werden unterdrückt. Sync.so-Parameter bleiben unangetastet (auto_detect, sync-3, 720p Preclip).
+### Schritt 2 — Finaler Mux inspizieren
+- Frame-Extraktion aus dem finalen `dialog-stitch-muxed-…mp4` bei t=0.3 s, t=0.8 s, t=1.2 s, t=3 s.
+- Vergleich: bewegt sich der Mund in 0.3–1.2 s? Steht er ab 1.4 s still?
 
-## Teil B — Performance-Autofill aus dem Briefing (kontextbasiert)
+### Schritt 3 — Logs aggregieren
+- `sync-so-webhook` mit Filter `9267e69b` (ganze Historie inkl. _v104/_v105/_v106) — schauen ob die ersten Dispatches als „failed" oder „retrying" markiert wurden.
+- `compose-dialog-segments` Logs für die Szene, insb. `retry_variant`-Übergänge.
 
-Aktuell (v177) sind Performance-Defaults **statisch pro Beat-Rolle**. Wir erweitern Pass A in `supabase/functions/briefing-deep-parse/index.ts`, damit das LLM pro Sprecher pro Szene **charakter- und tonalitätsspezifisch** ableitet.
+### Schritt 4 — Auswertung & Fix-Empfehlung
+Basierend auf H1–H4 exakt eine der folgenden Empfehlungen (in separater Plan-Runde):
 
-Neuer Prompt-Block (zwischen Intelligent-Defaults und Schluss-Regeln):
+- **Wenn H1 (Noop)**: `sync-so-webhook` bekommt einen N=1-Zweig, der die v113-Dimension-Probe + optionale Mean-Diff-Prüfung auch für Single-Speaker fährt und bei Noop-Verdacht einen weiteren Retry (statt still `done`) auslöst.
+- **Wenn H2 (Preclip < 720)**: Fix im Preclip-Renderer wie v113 für N=1 nachziehen, plus ffprobe-Guard vor Dispatch.
+- **Wenn H3 (nur Wahrnehmung)**: Tail-Hold entfernen bzw. Master-Platte im Mund-Bereich für den Sprecher trotz v230-Dämpfung minimal atmen lassen — dokumentieren, nicht als Bug behandeln.
+- **Wenn H4 (Retry-Ladder-Loch)**: Retry-Ladder bekommt einen Terminal-Failure-Zweig, der bei ausbleibender Motion refundiert statt „done" zu schreiben.
 
-```
-PERFORMANCE INFERENCE (per character per scene, MANDATORY):
-For every character in `cast`, emit `performance[characterId]` with:
-- expression ∈ {neutral, warm-smile, curious, concerned, confident, surprised}
-- gesture   ∈ {still, hand-on-chin, open-palms, point, cross-arms, lean-in}
-- gaze      ∈ {to-camera, to-speaker, away, down-thinking}
-- energy    ∈ 1..5
+## Was ich NICHT jetzt anfasse
+- Keine Code-Änderungen in dieser Runde.
+- Keine neuen Retries oder Refunds vor Diagnose.
+- v230 Idle-Motion-Damping bleibt aktiv (Multi-Speaker-Regression sonst).
 
-Derive values from the character's role/attitude in the briefing
-(skeptical customer → concerned/cross-arms/away/2; enthusiastic
-founder → confident/open-palms/to-camera/4; expert → confident/
-hand-on-chin/to-speaker/3; listener → curious/still/to-speaker/2).
-If the briefing gives no attitude cue, fall back to the beat-role
-defaults from Intelligent-Defaults. Never invent narrative content.
-Track each auto-filled axis in `_meta.aiFilled` as
-`performance.<characterId>.<axis>`.
-```
-
-Zusätzlich:
-
-- `src/lib/video-composer/briefing/productionPlan.ts`: sicherstellen, dass `performance` sowohl als `Record<characterId, ScenePerformance>` als auch als flaches Objekt akzeptiert wird (Backwards-Compat).
-- `src/hooks/useApplyProductionPlan.ts`: beim Übertragen als per-Character-Map schreiben; flaches Objekt auf alle aktiven Cast-Slots derselben Szene fannen. Bestehende `mapExpression/mapGesture/mapGaze`-Enum-Filter bleiben (Schutz gegen unbekannte Werte).
-- `ensureEnsembleScene.ts` / `ensurePlanEnsemble.ts`: nachträglich hinzugefügte Cast-Slots bekommen v177-Beat-Defaults, damit kein Slot performance-leer bleibt.
-
-**Kein Renderer-Umbau nötig**: `buildPerformanceBlock` + `derivePerformanceEntries` (in `src/lib/motion-studio/buildPerformanceBlock.ts`) rendern bereits den `[4 PERFORMANCE]`-Block in den Final-Prompt via `composeFinalPrompt`, und `buildInvokePrompt` läuft für Single-Scene-Invokes.
-
-## Teil C — Version & Telemetrie
-
-- `CLIENT_PIPELINE_VERSION` → 230, Server-Version im Log → 230.
-- Debug-Chip zeigt Perf-Autofill-Achsen-Anzahl aus `_meta.aiFilled`.
-
-## Nicht im Scope
-
-- Sync.so/Rekognition/Anchor-Audit/Green-Net unverändert.
-- Auto-Script/Auto-Voice bleiben leer (v229-Konzept).
-
-## Verifikation
-
-1. Briefing mit vier unterschiedlichen Charakteren → Sheet zeigt pro Szene per Sprecher unterschiedliche Performance-Chips.
-2. Render einer 4-Cast-Szene → Nicht-Sprecher wirken ruhig aber lebendig (Atmen, Blinzeln), keine sprech-artige Lippenbewegung mehr.
-3. `?debug=1` zeigt Client 230 / Server 230 + Perf-Autofill-Zähler > 0.
+## Nächster Schritt
+Nach deiner Freigabe: Ich starte Schritt 1–3 (nur Probes/Logs), poste die Zahlen (Preclip-Real-Res, Sync-Output-Res, SSIM/mean-diff, Frame-Screenshots) und **erst dann** kommt ein zweiter Plan mit dem exakten Fix.
