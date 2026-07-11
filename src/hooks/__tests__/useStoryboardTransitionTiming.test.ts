@@ -136,8 +136,8 @@ describe('useStoryboardTransition canonical briefing timing', () => {
     expect(timing).toMatchObject({ durationSec: 15, sceneCount: 3, source: 'explicit-total', explicitSceneCount: true });
   });
 
-  it('overrides a stale 50s server plan with the explicit 15s briefing duration', () => {
-    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+  it('overrides a stale 50s server plan with the 15s duration slider', () => {
+    const b = { productName: 'AdTool', productDescription: adToolBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const staleServerPlan = {
       project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 50 },
       scenes: [16.7, 16.7, 16.6].map((durationSec, idx) => ({
@@ -238,7 +238,7 @@ describe('useStoryboardTransition canonical briefing timing', () => {
       '9–12s Sprecher 4: „…die perfekt zusammenpassen.“',
       '12–15s Endcard: AdTool AI',
     ].join('\n');
-    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 30, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
+    const b = { productName: 'AdTool', productDescription: continuousBriefing, duration: 15, aspectRatio: '16:9', characters: [] } as unknown as ComposerBriefing;
     const badPlan = {
       project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
       scenes: [1, 2, 3, 4, 5].map((index) => ({
