@@ -321,7 +321,27 @@ export function applyCanonicalTimingToPlan(
   briefing: ComposerBriefing,
   briefingText: string,
 ): { plan: TProductionPlan; timing: BriefingTimingWithWindows | null; changed: boolean } {
-  const timing = readServerContractAsTiming(plan) ?? detectCanonicalBriefingTiming(briefing, briefingText);
+  let timing = readServerContractAsTiming(plan) ?? detectCanonicalBriefingTiming(briefing, briefingText);
+
+  // v233 — Slider wins. Wenn der Nutzer im Briefing-Tab eine Videodauer per
+  // Slider gesetzt hat, ist das die einzige Wahrheit. Text-Angaben und
+  // Server-Contract werden proportional auf diesen Wert normalisiert, damit
+  // es keine Verwirrung mehr gibt ("Text sagt 15s, Slider steht auf 5s").
+  const sliderDuration = Number(briefing?.duration);
+  if (Number.isFinite(sliderDuration) && sliderDuration > 0) {
+    if (timing) {
+      timing = { ...timing, durationSec: sliderDuration, source: timing.source };
+    } else {
+      timing = {
+        durationSec: sliderDuration,
+        sceneCount: undefined,
+        explicitSceneCount: false,
+        continuousScene: false,
+        source: 'explicit-total',
+      } as BriefingTimingWithWindows;
+    }
+  }
+
   if (!timing) return { plan, timing: null, changed: false };
 
 
