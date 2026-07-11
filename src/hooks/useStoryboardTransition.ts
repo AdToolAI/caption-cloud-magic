@@ -1353,12 +1353,13 @@ export function useStoryboardTransition({
           const fallback = normalizedFallback.plan;
           const isNetwork = !status && !isAbort;
           toast({
-            title: isNetwork ? 'Verbindung instabil' : 'AI-Analyse nicht verfügbar',
+            title: isNetwork ? 'Basis-Plan bereit' : 'Basis-Plan bereit',
             description: isNetwork
-              ? 'Basis-Plan als Fallback eingeblendet. Bitte Werte vor „Plan anwenden" prüfen oder Analyse erneut starten.'
-              : `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
-            variant: 'destructive',
+              ? 'Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.'
+              : 'Analyse übersprungen — Basis-Plan als Startpunkt eingeblendet. Passe Werte an oder starte die Analyse neu.',
+            // v238 — neutral, not destructive: fallback is a valid path.
           });
+
           setState({
             warRoomOpen: false,
             phase: 'idle',
