@@ -1223,7 +1223,15 @@ export function useStoryboardTransition({
       const isAbort = e?.name === 'AbortError';
       const status: number | undefined = e?.status;
       const msg: string = isAbort ? `Timeout nach ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s` : (e?.message || 'Deep-Parse fehlgeschlagen');
-      console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: e?.body, isAbort });
+      console.error('[useStoryboardTransition] deep-parse failed', {
+        status,
+        msg,
+        body: e?.body,
+        isAbort,
+        name: e?.name,
+        cause: e?.cause?.code ?? e?.cause?.name ?? null,
+        online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+      });
 
 
       // Hard blocks (credits / rate-limit / payload): keep classic toast + navigate.
