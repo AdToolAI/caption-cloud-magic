@@ -13,7 +13,7 @@
  * composer_scenes (added in migration 20260507-…).
  */
 
-import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle } from 'lucide-react';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
