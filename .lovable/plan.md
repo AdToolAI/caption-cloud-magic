@@ -1,58 +1,41 @@
 ## Diagnose
 
-Der Screenshot zeigt jetzt eindeutig: Der Plan ist nicht inkonsistent, sondern wird **konsistent falsch** auf `5.1s` normalisiert:
+Der Slider ist jetzt authoritativ — top. Der rote „AI-Analyse nicht verfügbar / Netzwerkfehler — Basis-Plan" Toast erscheint aber weiterhin, obwohl die Edge Function laut Logs sauber durchläuft (Pass A ~17s, Pass B ~8s, Persist ok).
 
-- `SafePlanNotice` sagt: `5.1s · 3 Szenen`, Quelle: `Szenensumme`.
-- Das bedeutet: `finalizePlanCanonical` sieht **keinen slider-authoritative Canonical-Timing-Marker**.
-- Wenn dieser Marker fehlt, gewinnt weiterhin die alte Szenensumme `1.7 + 1.7 + 1.7 = 5.1s`.
+Konkret zeigt das an:
 
-Der eigentliche Fehler ist daher sehr wahrscheinlich nicht mehr nur `finalizePlanCanonical`, sondern der **Dauer-Wert kommt im Sheet nicht zuverlässig als 15 an** oder wird unterwegs wieder auf 5.1 zurückgeschrieben.
+- Der Fehler ist **nicht** Timeout (`isAbort=true`) und **nicht** ein bekannter Status (402/429/413/504). Es ist der generische Fall `Netzwerkfehler` in `useStoryboardTransition.ts` Zeile ~1222 — d.h. `fetch()` hat vor der Antwort geworfen (TypeError: Failed to fetch / abgebrochene Verbindung / kurzer Connectivity-Blip / Browser-Extension / Preflight).
+- Die Edge Function braucht ~25–35s bis zur Antwort. In dieser Zeit ist die Verbindung anfällig gegenüber:
+  - kurzen WLAN/Proxy-Aussetzern,
+  - Tab-Throttling,
+  - HTTP/2-Stream-Resets,
+  - Browser-Extensions (Adblocker, "Bestätigen Sie, dass Sie es sind" im Screenshot → Sicherheits-Overlay).
+- Der Late-Arrival-Retry im Grace-Window versucht die gleiche Anfrage nochmal — der Nutzer sieht aber sofort den roten Fallback-Toast + „Lokaler Fallback-Plan"-Banner, weil das Sheet nach 45s ohne Erfolg geöffnet wird bzw. der Late-Retry ebenfalls im gleichen Netzwerkzustand fehlschlägt.
 
-Der konkrete verdächtige Codepfad ist:
+Der eigentliche Fix ist daher nicht am Slider, sondern am Netzwerk-Resilienz-Pfad.
 
-```text
-BriefingTab Slider
-  -> VideoComposerDashboard project.briefing.duration
-  -> useStoryboardTransition applyCanonicalTimingToPlan
-  -> ProductionPlanSheet currentBriefing.duration
-  -> finalizePlanCanonical
-```
+## Plan (v237 — Network Resilience für Briefing-Deep-Parse)
 
-Zusätzlich gibt es noch alte Stellen in `useStoryboardTransition`, die nach einer Normalisierung `onUpdateBriefing({ duration: normalized.timing.durationSec })` aufrufen. Wenn `normalized.timing` aus alten Short-Windows/Planwerten kommt, kann dadurch der Slider-State selbst wieder auf `5.1` gezogen werden. Genau das würde erklären, warum im Sheet keine Slider-Quelle mehr sichtbar ist.
+1. **Sofortiger Silent-Retry auf reine Netzwerkfehler**
+   - In `useStoryboardTransition.ts` bei `fetch`-Reject ohne `status` (echter `TypeError: Failed to fetch`) bis zu **2 stille Retries** mit 1,5s / 4s Backoff einfügen, **bevor** der Soft-Fail-Pfad greift.
+   - Der War-Room bleibt sichtbar mit Label `Verbindung wiederhergestellt — analysiere weiter …`.
+   - Timeout/Abort/HTTP-Status bleiben unverändert (kein Retry auf 4xx/5xx).
 
-## Plan
+2. **Late-Arrival-Retry nur einmal, mit Backoff und eigenem AbortController**
+   - Der bestehende Late-Arrival-Fetch bekommt 1 zusätzlichen Versuch nach 8s, wenn der erste erneut mit reinem Netzwerkfehler bricht.
+   - Bricht auch dieser, öffnet sich der Fallback wie heute — aber mit klarerem Toast (`Verbindung instabil — Basis-Plan als Fallback`).
 
-1. **Slider-Wert vor Analyse einfrieren**
-   - Beim Start der Briefing-Analyse den aktuellen `briefing.duration` als `requestedDurationSec` in den Plan-Meta-Daten speichern.
-   - Dieser Wert wird dann im Plan mitgeführt, auch wenn React-State oder spätere Fallback-/Late-Arrival-Flows sich verändern.
+3. **Bessere Fehler-Attribution im Console-Log**
+   - `console.error('[useStoryboardTransition] deep-parse failed', ...)` erweitern um `navigator.onLine`, `e?.name`, `e?.cause?.code`, `attempt`, so dass wir im nächsten Bugreport eindeutig sehen, ob es Offline, DNS, CORS oder Stream-Reset ist.
 
-2. **Kein Rückschreiben aus Plan-Timing in den Slider mehr**
-   - Alle Stellen entfernen/anpassen, die `onUpdateBriefing({ duration: normalized.timing.durationSec })` aus AI-/Fallback-/Late-Arrival-Planwerten machen.
-   - Der Slider darf nur durch den Nutzer geändert werden, nicht durch erkannte Script-Windows oder Plan-Summen.
+4. **Kein Verhaltenswechsel bei echten Serverfehlern**
+   - 402/429/413/504 und Abort/Timeout laufen weiterhin exakt in ihre bestehenden Pfade. Retry greift ausschließlich bei „reinem" Netzwerkfehler (kein `status`, kein `AbortError`).
 
-3. **ProductionPlanSheet strikt gegen den eingefrorenen Slider normalisieren**
-   - `ProductionPlanSheet` nutzt zuerst `currentBriefing.duration`.
-   - Falls dieser Wert durch alte State-Hydration falsch ist, nutzt es den im Plan gespeicherten `requestedDurationSec`.
-   - Erst danach wird `applyCanonicalTimingToPlan`/`finalizePlanCanonical` ausgeführt.
-
-4. **UI-Werte nur aus `safePlan` anzeigen**
-   - Projekt-Gesamtdauer, Szenensumme, Szenenanzahl und Szenendauern bleiben konsequent aus `safePlan`.
-   - Zusätzlich soll die Quelle dann sichtbar `Videodauer-Slider` sein, nicht `Szenensumme`.
-
-5. **Regressionstest für den echten Screenshot-Fall**
-   - Plan: 3 Szenen à `1.7s`, Projekt `5.1s`, altes Short-Window-Meta.
-   - Briefing/Requested Slider: `15s`.
-   - Erwartung: Anzeige/Finalplan `15s`, Szenen `[5,5,5]`, Quelle `briefing-slider`.
-   - Extra-Test: Analyse darf `briefing.duration` nicht mehr von `15` auf `5.1` zurückschreiben.
+5. **Version-Bump**
+   - `CLIENT_PIPELINE_VERSION` → 237.
 
 ## Ergebnis nach Umsetzung
 
-Wenn der Nutzer den Slider auf `15s` stellt, kann kein alter Shot-Marker, keine Szenensumme und kein AI-/Fallback-Plan den Wert mehr auf `5.1s` zurücksetzen. Im Production Plan muss dann stehen:
-
-```text
-15s · 3 Szenen
-Quelle: Videodauer-Slider
-Gesamtdauer: 15s
-Summe Szenen: 15s
-Szenen: 5s / 5s / 5s
-```
+- Der Fallback-Toast erscheint nur noch, wenn wirklich **3 Versuche + 45s Late-Retry** scheitern — praktisch nur bei echtem Verbindungsverlust.
+- Der Slider-Fix aus v236 bleibt unangetastet.
+- Bei sporadischen Netzwerk-Blips (wie im aktuellen Screenshot mit dem Sicherheits-Overlay) läuft die Analyse still weiter und öffnet direkt den echten AI-Plan statt des Basis-Fallbacks.
