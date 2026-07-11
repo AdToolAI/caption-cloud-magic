@@ -1,41 +1,50 @@
-# ID-Audit: Wo laufen Assets wirklich über IDs?
+## Entscheidung
+Auto-Eintrag des Dialog-Skripts wird **entfernt** — analog zum Voice-Konzept. Die KI plant weiterhin alles rundherum (Szenen, Sprecher-Slots, Timing, Location, Outfits, Continuity), aber der eigentliche Wortlaut kommt vom Kunden.
 
-Kurzbefund pro Modul. „ID-only" heißt: Charaktere, Locations, Outfits werden intern per UUID referenziert, Namen sind nur Anzeige.
+## Umsetzung
 
-## 1) Briefing → Production Plan → Storyboard   ✅ ID-only
+### 1. Skript nicht mehr automatisch setzen
+Datei: `src/hooks/useApplyProductionPlan.ts`
 
-- `useApplyProductionPlan.ts`: `characterShots[].characterId`, `dialogTurns[].characterId`, `mentioned_character_ids`, `mentioned_location_ids`, `outfitLookId` — alle als geprüfte UUIDs (`PLAN_UUID_RE`, `stripPrefix`), Non-UUIDs werden verworfen.
-- `SceneDialogStudio.tsx`: `canonicalDialogTurns` liest ausschließlich `turn.characterId`, resolved über `characters` → `brandCharacterId` → Avatar-Library; Namen sind rein UI.
-- Persistenz: `dialog_turns` JSONB, `mentioned_character_ids`, `mentioned_location_ids` — alle ID-basiert.
-- Voice-Auswahl: bewusst leer, manuell im Studio (v225).
-- **Status:** vollständig ID-verdrahtet.
+- Beim Anwenden des Production Plans:
+  - `dialog_script` wird als `null`/leer persistiert.
+  - `dialog_turns` wird als leeres Array `[]` persistiert.
+  - `dialog_mode` bleibt korrekt gesetzt (true, wenn Dialog-Szene geplant ist).
+  - `character_shots`, `dialog_voices` (leer), Sprecher-Slots, Timing usw. bleiben erhalten.
+- Keine `spokenTurns`-Ableitung, keine `ensureContinuousSceneDialogTurns`-Aufrufe, keine LITERAL-/AUTO-Rekonstruktion mehr im Apply-Pfad.
 
-## 2) Motion Studio (`src/pages/MotionStudio/StudioMode.tsx`)   ⚠️ überwiegend ID, eine Lücke
+### 2. UI-Signal für den Kunden
+Datei: `src/components/video-composer/SceneDialogStudio.tsx`
 
-- Charaktere: `selectedCharacters` mit `c.id`, wird als `mentioned_character_ids` gespeichert und in `briefing.characters[].id` mitgegeben. ✅
-- Location: `selectedLocationId` → `mentioned_location_ids: [selectedLocationId]`. ✅
-- Snippet-Import: übernimmt `snippet.location_id`. ✅
-- **Lücke:** Outfits/Looks werden im Motion-Studio-Modus nicht als `outfitLookId` gesetzt — nur Charakter- und Location-ID gehen ins Scene-Row. Der Composer erzeugt Outfits dann per Fallback/Default. Für echte ID-Only-Parität sollte Motion Studio pro Character den ausgewählten `outfitLookId` mitschicken.
+- Wenn `dialog_mode=true`, aber Skriptfeld leer ist, wird ein dezenter Hinweis angezeigt:
+  „Skript eintragen — Sprecher und Timing wurden für dich vorbereitet."
+- Sprecher-Slots (`character_shots`) und deren Anzahl bleiben sichtbar, damit der Kunde weiß, für wen er schreibt.
 
-## 3) AI Video Studio / Universal Creator (`src/pages/UniversalCreator/UniversalCreator.tsx`)   ➖ nicht relevant
+### 3. Studio-Zähler als Sicherheitsnetz härten
+Datei: `src/components/video-composer/SceneDialogStudio.tsx`
 
-- Kein Cast/Location-Konzept. Arbeitet mit `BackgroundAsset`, `background_music_id`, Scene-Timings, Subtitles. Es gibt keine Charaktere/Outfits, die per ID verdrahtet werden müssten.
-- `background_music_id`, Asset-IDs, Projekt-ID werden konsistent verwendet. ✅
-- **Status:** ID-Frage nicht anwendbar; das Modul ist asset-basiert und sauber.
+- Der Header-Zähler (`Blöcke • Sprecher • ~Xs`) darf nicht auf `0` hängen bleiben, wenn sichtbarer Text existiert.
+- Fallback-Parser erkennt jede Zeile im Format `Name: Text` als Block, auch wenn der Cast noch nicht vollständig aufgelöst ist.
+- Sprecher, die im Text auftauchen aber (noch) nicht im `sceneCast` sind, werden temporär gezählt, damit die Anzeige nie „lügt".
 
-## 4) Picture Studio (`src/pages/PictureStudio.tsx`)   ➖ nicht anwendbar
+### 4. Apply-Blockade endgültig entfernen
+- „Plan anwenden" wird nicht mehr durch fehlende Voice-IDs oder fehlende Turns blockiert.
+- Der Toast „X Lip-Sync-Szene(n) ohne Voice-ID" wird zu einem neutralen Hinweis statt einer Warnung.
 
-- Reine Bildgenerierung (`ImageGenerator`, `MagicEditPanel`, `BatchGeneratePanel`, `BackgroundReplacer`). Keine Cast/Location/Outfit-Referenzen im Page-Root.
-- Bilder werden aktuell **nicht** aus der Brand-Library gepickt (bekannter, bewusst geskippter Punkt aus früherer Runde). Das ist ein Feature-Gap, keine ID-Verdrahtungslücke.
+### 5. Server-Aufräumen (defensiv)
+Datei: `supabase/functions/briefing-deep-parse/index.ts`
 
-## Empfehlung (falls du willst, dass ich fixe)
+- Der Server darf weiterhin ein vorgeschlagenes Skript ausliefern (für spätere Features/Analytics), aber der Client **nutzt** es nicht mehr für `dialog_script`/`dialog_turns`.
+- Keine Änderungen an Sprecher-, Szenen-, Timing-, Location- oder Outfit-Erkennung.
 
-Nur eine echte Lücke:
+## Was bleibt gleich
+- Briefing-Analyse: Szenen, Sprecher, Timing, Locations, Outfits, Cast-IDs, Continuity, Voice-Pool-Vorschläge.
+- Manuelle Voice-Zuordnung durch den Kunden.
+- Lip-Sync-Pipeline, Render-Pipeline, alles Downstream.
 
-**A. Motion Studio: `outfitLookId` pro Charakter mitschicken**
-- In `StudioMode.tsx` beim Insert von `composer_scenes` zusätzlich ein `character_shots`-JSON mit `{ characterId, outfitLookId }` schreiben (oder in `briefing.characters[].outfitLookId`), damit der Composer die exakt gewählten Looks übernimmt statt Default-Presets zu ziehen.
-- Danach zieht `useApplyProductionPlan` den Look automatisch, da die Kette schon ID-basiert ist.
+## Was wegfällt
+- Automatisch generierter Dialog-Text im Skriptfeld.
+- Alle Fehlerklassen rund um „Meta-Zeilen als Dialog", „0 Blöcke trotz Text", „Plan blockiert wegen fehlender Turns".
 
-**Optional B. Picture Studio ↔ Brand Library** (früher geskippt): eigener kleiner Punkt, kein ID-Bug.
-
-Sag Bescheid, ob ich (A) umsetzen soll — dann läuft die komplette Composer-Pipeline durchgängig ID-only.
+## Erwartetes Ergebnis
+Nach „Plan anwenden" sieht der Kunde: vorbereitete Szenen mit Sprecher-Slots, leerem Skriptfeld und klarem Hinweis, den Dialog selbst einzutragen. Sobald er tippt, zählt der Header korrekt. Stimmen ordnet er wie bisher manuell zu.
