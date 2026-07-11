@@ -1900,6 +1900,18 @@ Deno.serve(async (req) => {
   if (isQaMockRequest(req)) {
     return qaMockJson(corsHeaders, { fn: "briefing-deep-parse" });
   }
+  // v238 — Warmup ping. Client triggers `?warmup=1` when the briefing tab
+  // mounts so the Edge Function is hot when the user actually clicks
+  // "Analyse starten". No auth needed, no LLM call, ~5ms turnaround.
+  try {
+    const _u = new URL(req.url);
+    if (_u.searchParams.get('warmup') === '1') {
+      return new Response(JSON.stringify({ ok: true, warm: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  } catch { /* non-fatal */ }
+
 
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
