@@ -1,50 +1,31 @@
-## Entscheidung
-Auto-Eintrag des Dialog-Skripts wird **entfernt** — analog zum Voice-Konzept. Die KI plant weiterhin alles rundherum (Szenen, Sprecher-Slots, Timing, Location, Outfits, Continuity), aber der eigentliche Wortlaut kommt vom Kunden.
+# Fix: Reduce false anchor-identity swaps on N≥2 (Gemini Pro-Confirmation)
 
-## Umsetzung
+## Kontext
+Der Fehler `anchor_identity_swap_detected` im Screenshot stammt aus dem **Anchor-Audit vor Hailuo** (`_shared/identity-audit.ts`), nicht aus der Lipsync-Pipeline. Die Lipsync-Pipeline (Plate/Face-Detect, Mund-Landmarks, ASD) nutzt weiterhin unverändert **AWS Rekognition** — wird nicht angefasst.
 
-### 1. Skript nicht mehr automatisch setzen
-Datei: `src/hooks/useApplyProductionPlan.ts`
+## Was gebaut wird
 
-- Beim Anwenden des Production Plans:
-  - `dialog_script` wird als `null`/leer persistiert.
-  - `dialog_turns` wird als leeres Array `[]` persistiert.
-  - `dialog_mode` bleibt korrekt gesetzt (true, wenn Dialog-Szene geplant ist).
-  - `character_shots`, `dialog_voices` (leer), Sprecher-Slots, Timing usw. bleiben erhalten.
-- Keine `spokenTurns`-Ableitung, keine `ensureContinuousSceneDialogTurns`-Aufrufe, keine LITERAL-/AUTO-Rekonstruktion mehr im Apply-Pfad.
+### `_shared/identity-audit.ts` — v171 Pro-Confirmation auf N≥2 ausweiten
 
-### 2. UI-Signal für den Kunden
-Datei: `src/components/video-composer/SceneDialogStudio.tsx`
+Aktueller Zustand:
+- N=1: Flash sagt `mismatch` → zweiter Pass mit `google/gemini-2.5-pro`. Nur bei beidseitiger Bestätigung Hard-Fail. Sonst Softpass.
+- N≥2: Ein einzelner Flash-Mismatch → hart `reason=swap` → Hailuo/Sync.so blockiert.
 
-- Wenn `dialog_mode=true`, aber Skriptfeld leer ist, wird ein dezenter Hinweis angezeigt:
-  „Skript eintragen — Sprecher und Timing wurden für dich vorbereitet."
-- Sprecher-Slots (`character_shots`) und deren Anzahl bleiben sichtbar, damit der Kunde weiß, für wen er schreibt.
+Änderung:
+- Wenn Flash bei N≥2 verdächtig viele Mismatches meldet (**≥ 50 % aller Refs** oder „all mismatched" wie im Screenshot), zweiten Pass mit `google/gemini-2.5-pro` mit identischem Prompt + Portraits fahren.
+- `reason=swap` wird nur zurückgegeben, wenn **Flash UND Pro** übereinstimmend mindestens einen Slot als Mismatch markieren.
+- Widerspricht Pro (alle `match` oder `uncertain`), Softpass mit `v171.decision="softpass_ok_multi"` + Log-Eintrag in `audio_plan.twoshot.anchor_face_audit.v171`.
+- Einzelne Mismatches unter dem Schwellwert bleiben beim v111-Verhalten (Face-Lock-Retry via `strictSwapMode`) — nichts ändert sich am Retry-Ladder.
+- `ANCHOR_AUDIT_VERSION` **8 → 12** bumpen, um gepinnte Audits aus der Zeit zwischen den Versionen zu invalidieren.
 
-### 3. Studio-Zähler als Sicherheitsnetz härten
-Datei: `src/components/video-composer/SceneDialogStudio.tsx`
+### Was **nicht** angefasst wird
+- Lipsync-Pipeline (`plate-face-detect.ts`, `plate-face-identity.ts`, ASD-Strategy, Rekognition-Aufrufe) — bleibt unverändert.
+- `compose-scene-anchor` und der Face-Lock-Attempt-3 (v131.6) — bleiben.
+- `compose-video-clips` Hard-Abort-Zweig — bleibt. Er reagiert nur nicht mehr auf False-Positives.
+- Progress-Bar-Fix — separat, kein Teil dieses Plans.
 
-- Der Header-Zähler (`Blöcke • Sprecher • ~Xs`) darf nicht auf `0` hängen bleiben, wenn sichtbarer Text existiert.
-- Fallback-Parser erkennt jede Zeile im Format `Name: Text` als Block, auch wenn der Cast noch nicht vollständig aufgelöst ist.
-- Sprecher, die im Text auftauchen aber (noch) nicht im `sceneCast` sind, werden temporär gezählt, damit die Anzeige nie „lügt".
-
-### 4. Apply-Blockade endgültig entfernen
-- „Plan anwenden" wird nicht mehr durch fehlende Voice-IDs oder fehlende Turns blockiert.
-- Der Toast „X Lip-Sync-Szene(n) ohne Voice-ID" wird zu einem neutralen Hinweis statt einer Warnung.
-
-### 5. Server-Aufräumen (defensiv)
-Datei: `supabase/functions/briefing-deep-parse/index.ts`
-
-- Der Server darf weiterhin ein vorgeschlagenes Skript ausliefern (für spätere Features/Analytics), aber der Client **nutzt** es nicht mehr für `dialog_script`/`dialog_turns`.
-- Keine Änderungen an Sprecher-, Szenen-, Timing-, Location- oder Outfit-Erkennung.
-
-## Was bleibt gleich
-- Briefing-Analyse: Szenen, Sprecher, Timing, Locations, Outfits, Cast-IDs, Continuity, Voice-Pool-Vorschläge.
-- Manuelle Voice-Zuordnung durch den Kunden.
-- Lip-Sync-Pipeline, Render-Pipeline, alles Downstream.
-
-## Was wegfällt
-- Automatisch generierter Dialog-Text im Skriptfeld.
-- Alle Fehlerklassen rund um „Meta-Zeilen als Dialog", „0 Blöcke trotz Text", „Plan blockiert wegen fehlender Turns".
-
-## Erwartetes Ergebnis
-Nach „Plan anwenden" sieht der Kunde: vorbereitete Szenen mit Sprecher-Slots, leerem Skriptfeld und klarem Hinweis, den Dialog selbst einzutragen. Sobald er tippt, zählt der Header korrekt. Stimmen ordnet er wie bisher manuell zu.
+## Verifikation
+1. 4-Cast-Anchor, Flash meldet „all four mismatched", Pro widerspricht → Softpass, Pipeline läuft weiter.
+2. Echter Swap (Flash + Pro melden übereinstimmend Mismatch) → weiterhin Hard-Fail → v131.6 Face-Lock-Attempt-3 kann noch fangen.
+3. 1 einzelner Slot-Mismatch bei N=4 → alter v111-Pfad (Face-Lock-Retry) — unverändert.
+4. `audio_plan.twoshot.anchor_face_audit.v171.decision` in `composer_scenes` einsehbar für Forensik.
