@@ -1,37 +1,58 @@
 ## Diagnose
 
-Der Fehler ist kein Anzeigeproblem mehr, sondern ein Timing-Prioritätsfehler:
+Der Screenshot zeigt jetzt eindeutig: Der Plan ist nicht inkonsistent, sondern wird **konsistent falsch** auf `5.1s` normalisiert:
 
-- Der Slider-Wert wird zwar auf `15s` in `canonical_timing.durationSec` geschrieben.
-- Gleichzeitig bleiben aber alte `windows` / Shot-Marker aus dem KI-Plan erhalten, z.B. 3 Shots à ca. `1.7s`.
-- `alignPlanScenesToCanonicalTiming` sieht diese Windows und setzt die Szenen wieder auf `1.7 + 1.7 + 1.7 = 5.1s`.
-- Danach sieht `finalizePlanCanonical`: Projektdauer 15s, Szenensumme 5.1s, alte Windows widersprechen 15s, also gewinnt wieder die Szenensumme.
+- `SafePlanNotice` sagt: `5.1s · 3 Szenen`, Quelle: `Szenensumme`.
+- Das bedeutet: `finalizePlanCanonical` sieht **keinen slider-authoritative Canonical-Timing-Marker**.
+- Wenn dieser Marker fehlt, gewinnt weiterhin die alte Szenensumme `1.7 + 1.7 + 1.7 = 5.1s`.
 
-Kurz: Der Slider gewinnt aktuell nur auf Projektebene, aber die alten Shot-Windows gewinnen noch auf Szenenebene.
+Der eigentliche Fehler ist daher sehr wahrscheinlich nicht mehr nur `finalizePlanCanonical`, sondern der **Dauer-Wert kommt im Sheet nicht zuverlässig als 15 an** oder wird unterwegs wieder auf 5.1 zurückgeschrieben.
+
+Der konkrete verdächtige Codepfad ist:
+
+```text
+BriefingTab Slider
+  -> VideoComposerDashboard project.briefing.duration
+  -> useStoryboardTransition applyCanonicalTimingToPlan
+  -> ProductionPlanSheet currentBriefing.duration
+  -> finalizePlanCanonical
+```
+
+Zusätzlich gibt es noch alte Stellen in `useStoryboardTransition`, die nach einer Normalisierung `onUpdateBriefing({ duration: normalized.timing.durationSec })` aufrufen. Wenn `normalized.timing` aus alten Short-Windows/Planwerten kommt, kann dadurch der Slider-State selbst wieder auf `5.1` gezogen werden. Genau das würde erklären, warum im Sheet keine Slider-Quelle mehr sichtbar ist.
 
 ## Plan
 
-1. **Slider-Override wirklich hart machen**
-   - In `applyCanonicalTimingToPlan` beim Slider-Override nicht nur `durationSec` ersetzen.
-   - Zusätzlich alte `windows` entfernen oder ignorieren, damit sie nicht wieder 5.1s erzwingen.
-   - Szenen werden dann proportional aus dem Slider berechnet: bei 15s / 3 Szenen = 5s pro Szene.
+1. **Slider-Wert vor Analyse einfrieren**
+   - Beim Start der Briefing-Analyse den aktuellen `briefing.duration` als `requestedDurationSec` in den Plan-Meta-Daten speichern.
+   - Dieser Wert wird dann im Plan mitgeführt, auch wenn React-State oder spätere Fallback-/Late-Arrival-Flows sich verändern.
 
-2. **Timing-Meta eindeutig markieren**
-   - Den Plan intern mit `slider_authoritative: true` / ähnlichem Debug-Marker markieren.
-   - Dadurch ist später eindeutig sichtbar: Diese Dauer kommt aus dem Videodauer-Slider, nicht aus Skript-Shots.
+2. **Kein Rückschreiben aus Plan-Timing in den Slider mehr**
+   - Alle Stellen entfernen/anpassen, die `onUpdateBriefing({ duration: normalized.timing.durationSec })` aus AI-/Fallback-/Late-Arrival-Planwerten machen.
+   - Der Slider darf nur durch den Nutzer geändert werden, nicht durch erkannte Script-Windows oder Plan-Summen.
 
-3. **Finalizer absichern**
-   - `finalizePlanCanonical` soll slider-authoritative Timing immer als validiert behandeln.
-   - Falls trotzdem eine alte Szenensumme ankommt, wird sie auf den Slider zurückverteilt statt wieder 5.1s gewinnen zu lassen.
+3. **ProductionPlanSheet strikt gegen den eingefrorenen Slider normalisieren**
+   - `ProductionPlanSheet` nutzt zuerst `currentBriefing.duration`.
+   - Falls dieser Wert durch alte State-Hydration falsch ist, nutzt es den im Plan gespeicherten `requestedDurationSec`.
+   - Erst danach wird `applyCanonicalTimingToPlan`/`finalizePlanCanonical` ausgeführt.
 
-4. **UI-Klarheit im Production Plan**
-   - Die Anzeige bleibt aus `safePlan` abgeleitet.
-   - Optional den Hinweis von „Quelle: Briefing/Skript“ auf „Quelle: Videodauer-Slider“ ändern, damit der Kunde versteht, warum 15s gewinnt.
+4. **UI-Werte nur aus `safePlan` anzeigen**
+   - Projekt-Gesamtdauer, Szenensumme, Szenenanzahl und Szenendauern bleiben konsequent aus `safePlan`.
+   - Zusätzlich soll die Quelle dann sichtbar `Videodauer-Slider` sein, nicht `Szenensumme`.
 
-5. **Regressionstest ergänzen**
-   - Testfall: Plan mit 3 Szenen und alten Windows/Szenendauern von 5.1s, Briefing-Slider 15s.
-   - Erwartung: `project.totalDurationSec = 15`, Szenensumme = `15`, einzelne Szenen etwa `5s`.
+5. **Regressionstest für den echten Screenshot-Fall**
+   - Plan: 3 Szenen à `1.7s`, Projekt `5.1s`, altes Short-Window-Meta.
+   - Briefing/Requested Slider: `15s`.
+   - Erwartung: Anzeige/Finalplan `15s`, Szenen `[5,5,5]`, Quelle `briefing-slider`.
+   - Extra-Test: Analyse darf `briefing.duration` nicht mehr von `15` auf `5.1` zurückschreiben.
 
-## Ergebnis
+## Ergebnis nach Umsetzung
 
-Nach dem Fix kann ein alter Shot-/Script-Timing-Wert wie 5.1s den Slider nicht mehr überschreiben. Wenn der Slider auf 15s steht, zeigt der Production Plan auch 15s Gesamtdauer und 15s Szenensumme.
+Wenn der Nutzer den Slider auf `15s` stellt, kann kein alter Shot-Marker, keine Szenensumme und kein AI-/Fallback-Plan den Wert mehr auf `5.1s` zurücksetzen. Im Production Plan muss dann stehen:
+
+```text
+15s · 3 Szenen
+Quelle: Videodauer-Slider
+Gesamtdauer: 15s
+Summe Szenen: 15s
+Szenen: 5s / 5s / 5s
+```
