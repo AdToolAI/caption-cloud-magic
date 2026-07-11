@@ -721,8 +721,66 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return out.length > 0 ? out : null;
   }, [canonicalDialogTurns, script, sceneCast]);
 
-  const blocks = useMemo(() => idBlocks ?? parseDialogScript(script, sceneCast), [idBlocks, script, sceneCast]);
-  const speakers = useMemo(() => uniqueSpeakers(blocks, sceneCast), [blocks, sceneCast]);
+  // v229 — Robust fallback: wenn weder ID-Turns noch der Namens-Parser Blöcke
+  // finden, sichtbare `Name: Text`-Zeilen trotzdem als Blöcke zählen. Sprecher,
+  // die (noch) nicht im Cast auflösbar sind, werden temporär erzeugt, damit
+  // der Header nie „0 Blöcke" bei sichtbarem Text zeigt.
+  const looseBlocks = useMemo<DialogBlock[]>(() => {
+    const out: DialogBlock[] = [];
+    for (const raw of String(script ?? '').split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      const m = line.match(/^([^:\n]{2,96}):\s*(.+)$/);
+      if (!m) continue;
+      const speakerName = m[1].trim();
+      const text = m[2].trim();
+      if (!speakerName || !text) continue;
+      const resolved = sceneCast.find((c) => {
+        const a = (c.name || '').toLowerCase().trim();
+        const b = speakerName.toLowerCase().trim();
+        if (!a || !b) return false;
+        return a === b || a.split(/\s+/)[0] === b.split(/\s+/)[0];
+      });
+      const slug = speakerName
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || `speaker-${out.length + 1}`;
+      out.push({
+        speakerId: resolved?.id ?? slug,
+        speakerName: resolved?.name ?? speakerName,
+        text,
+      });
+    }
+    return out;
+  }, [script, sceneCast]);
+
+  const blocks = useMemo(() => {
+    if (idBlocks && idBlocks.length > 0) return idBlocks;
+    const parsed = parseDialogScript(script, sceneCast);
+    if (parsed.length > 0) return parsed;
+    return looseBlocks;
+  }, [idBlocks, script, sceneCast, looseBlocks]);
+
+  const speakers = useMemo(() => {
+    const resolved = uniqueSpeakers(blocks, sceneCast);
+    if (resolved.length > 0 || blocks.length === 0) return resolved;
+    // Blocks vorhanden, aber keiner der Sprecher ist im Cast auflösbar
+    // (async Cast-Load, oder Kunde hat noch keinen Slot vergeben). Wir
+    // erzeugen leichte Cast-Einträge, damit die Zählung stimmt.
+    const byId = new Map<string, ComposerCharacter>();
+    for (const b of blocks) {
+      if (byId.has(b.speakerId)) continue;
+      byId.set(b.speakerId, {
+        id: b.speakerId,
+        name: b.speakerName,
+        appearance: '',
+        signatureItems: '',
+      });
+    }
+    return Array.from(byId.values());
+  }, [blocks, sceneCast]);
 
   const resolvedVoicePerSpeaker = useMemo<Record<string, DialogVoiceCfg>>(() => {
     const sceneVoices = normalizeVoiceMap(scene.dialogVoices);
@@ -1880,6 +1938,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           rows={4}
           className="mt-1 font-mono text-xs"
         />
+
+        {(!script || script.trim().length === 0) && sceneCast.length > 0 && (
+          <p className="mt-1.5 text-[10px] text-muted-foreground italic">
+            {language === 'de'
+              ? `Skript eintragen — ${sceneCast.length} Sprecher-Slot${sceneCast.length === 1 ? '' : 's'} und Timing sind für dich vorbereitet.`
+              : language === 'es'
+              ? `Escribe el guion — ${sceneCast.length} slot${sceneCast.length === 1 ? '' : 's'} de hablante y el ritmo están listos.`
+              : `Write the script — ${sceneCast.length} speaker slot${sceneCast.length === 1 ? '' : 's'} and timing are prepared for you.`}
+          </p>
+        )}
 
         {blocks.length > 0 && (
           <div className="mt-2 space-y-1 rounded-md border border-border/40 bg-background/40 p-2">

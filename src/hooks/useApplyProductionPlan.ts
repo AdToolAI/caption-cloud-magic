@@ -377,128 +377,33 @@ function planSceneToComposerScene(
   }
   const aiPrompt = promptParts.join(' ') || undefined;
 
-  // Per-character dialog voices — v217 ID-ONLY binding.
-  //
-  // Rule: a cast member receives a voice iff its `characterId` matches a
-  // `speakerCharacterId` on one of the scene's dialogTurns (or is the sole
-  // cast entry with a voiceover). No name matching, no slug fuzz, no legacy
-  // positional guessing at apply-time. Missing turn IDs are blocked before
-  // this mapper runs and must be fixed in the review UI.
-  let rawTurns = Array.isArray(ps.dialogTurns) ? ps.dialogTurns : [];
-  const resolveTurnSpeakerId = (t: any): string | null => {
-    const bound = typeof t?.speakerCharacterId === 'string' ? t.speakerCharacterId : null;
-    return bound && PLAN_UUID_RE.test(bound) ? stripPrefix(bound) : null;
-  };
+  // v229 — Auto-Skript entfernt. Analog zur Voice-Zuweisung liefert die KI
+  // nur noch die Sprecher-Slots (character_shots) + dialog_mode. Der
+  // eigentliche Wortlaut (dialog_script / dialog_turns) wird NICHT mehr aus
+  // dem Briefing generiert. Der Kunde schreibt den Dialog manuell im
+  // Dialog-Studio. Grund: Auto-Skript-Erkennung war zu fragil (Meta-Zeilen
+  // wurden als Dialog gespeichert, „0 Blöcke trotz Text", Plan-Apply blockiert).
+  const engine = ps.engine ?? 'auto';
+  const dialogMode =
+    ps.lipSync ||
+    LIPSYNC_ENGINES.has(engine) ||
+    !!ps.voiceover?.text ||
+    (Array.isArray(ps.dialogTurns) && ps.dialogTurns.length > 0) ||
+    (Array.isArray(ps.cast) && ps.cast.length >= 2);
 
-  // v221 client-side last resort: if an older/stale 1-scene plan still arrives
-  // with a multi-character cast but only 0/1 bound dialog speaker, never let it
-  // serialize as "one speaker owns the whole script". Server v221 should prevent
-  // this; this guard protects already-open Review sheets and cached plans.
-  if (isSingleScenePlan) {
-    const castSpeakerSlots = (ps.cast ?? [])
-      .map((c) => {
-        const characterId = c.characterId ? stripPrefix(String(c.characterId)) : null;
-        return characterId && PLAN_UUID_RE.test(characterId)
-          ? { ...c, characterId }
-          : null;
-      })
-      .filter((c): c is NonNullable<typeof c> => c !== null)
-      .filter((c, i, arr) => arr.findIndex((x) => x.characterId === c.characterId) === i);
-    const validBoundSpeakerIds = new Set(
-      rawTurns
-        .map(resolveTurnSpeakerId)
-        .filter((id): id is string => !!id && castSpeakerSlots.some((c) => c.characterId === id)),
-    );
-    if (castSpeakerSlots.length >= 2 && validBoundSpeakerIds.size < 2) {
-      const mentionKeyFor = (c: any, i: number) => {
-        const raw = String(c?.mentionKey ?? '').trim();
-        if (raw) return raw.startsWith('@') ? raw : `@${raw}`;
-        const slug = String(c?.characterName ?? `sprecher-${i + 1}`)
-          .toLowerCase()
-          .normalize('NFKD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        return `@${slug || `sprecher-${i + 1}`}`;
-      };
-      const normalizeSpeakerKey = (value: unknown) => String(value ?? '')
-        .toLowerCase()
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/^@/, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      if (rawTurns.length >= 2) {
-        const order: string[] = [];
-        for (const t of rawTurns) {
-          const key = normalizeSpeakerKey((t as any)?.speakerMentionKey);
-          if (key && !order.includes(key)) order.push(key);
-        }
-        rawTurns = rawTurns.map((t, i) => {
-          const key = normalizeSpeakerKey((t as any)?.speakerMentionKey);
-          const orderIndex = key ? order.indexOf(key) : -1;
-          const castIndex = Math.min(
-            order.length >= 2 && orderIndex >= 0 ? orderIndex : i,
-            castSpeakerSlots.length - 1,
-          );
-          const slot = castSpeakerSlots[castIndex] ?? castSpeakerSlots[0];
-          return {
-            ...t,
-            speakerMentionKey: mentionKeyFor(slot, castIndex),
-            speakerCharacterId: slot.characterId,
-          };
-        });
-      } else {
-        const corpus = rawTurns.map((t) => String((t as any)?.text ?? '').trim()).filter(Boolean).join(' ')
-          || String(ps.voiceover?.text ?? '').trim();
-        if (corpus) {
-          const sentences = corpus.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
-          const chunks: string[] = [];
-          if (sentences.length >= castSpeakerSlots.length) {
-            const per = Math.ceil(sentences.length / castSpeakerSlots.length);
-            for (let i = 0; i < castSpeakerSlots.length; i += 1) {
-              chunks.push(sentences.slice(i * per, i * per + per).join(' ').trim());
-            }
-          } else {
-            const words = corpus.split(/\s+/).filter(Boolean);
-            const per = Math.max(1, Math.ceil(words.length / castSpeakerSlots.length));
-            for (let i = 0; i < castSpeakerSlots.length; i += 1) {
-              chunks.push(words.slice(i * per, i * per + per).join(' ').trim());
-            }
-          }
-          rawTurns = castSpeakerSlots.map((slot, i) => ({
-            speakerMentionKey: mentionKeyFor(slot, i),
-            speakerCharacterId: slot.characterId,
-            text: chunks[i] ?? '',
-          }));
-        }
-      }
-    }
-  }
-
-  const spokenTurns = rawTurns.filter((t) => !isDirectiveTurn((t as any)?.text));
-
-  const speakingCharacterIds = new Set<string>();
-  for (const t of spokenTurns) {
-    const id = resolveTurnSpeakerId(t);
-    if (id) speakingCharacterIds.add(id);
-  }
+  // Sprecher-Slots: alle Cast-Mitglieder werden als characterShots angehängt,
+  // damit im Dialog-Studio für jeden Sprecher ein Slot sichtbar ist – auch
+  // wenn kein Shot-Director-Eintrag im Plan war.
   const castCharacterIds = new Set(
     (ps.cast ?? [])
       .map((c) => (c.characterId ? stripPrefix(c.characterId as string) : null))
       .filter((x): x is string => !!x && PLAN_UUID_RE.test(x)),
   );
-  const requiredDialogSpeakerIds = Array.from(speakingCharacterIds).filter((id) => castCharacterIds.has(id));
-
-  // v226 — Speaking-Cast-Merge: jeder Sprecher, der im Skript vorkommt, aber
-  // (noch) keinen ShotDirector-Eintrag in characterShots hat, wird als
-  // leichter Cast-Eintrag angehängt. Ohne das erkennt parseDialogScript im
-  // Studio die `NAME:`-Präfixe nicht (→ „0 Sprecher"-Bug), obwohl das
-  // dialogScript korrekt vorbelegt ist.
-  for (const speakerId of speakingCharacterIds) {
-    if (!castCharacterIds.has(speakerId)) continue;
+  for (const speakerId of castCharacterIds) {
     if (characterShots.some((s) => stripPrefix(s.characterId) === speakerId)) continue;
-    const planCast = (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === speakerId);
+    const planCast = (ps.cast ?? []).find(
+      (c) => stripPrefix(String(c.characterId ?? '')) === speakerId,
+    );
     const characterName = (planCast?.characterName ?? '').trim();
     characterShots.push({
       characterId: speakerId,
@@ -506,66 +411,16 @@ function planSceneToComposerScene(
       shotType: primaryShot === 'detail' ? 'profile' : 'profile',
     } as CharacterShot);
   }
-  const hasVo = !!ps.voiceover?.text?.trim();
-  // v225 — Voice-Auto-Binding entfernt. Die KI liefert nur die Sprecher-Slots
-  // (Character-IDs auf den Dialog-Turns). Die konkrete Stimme wählt der User
-  // manuell im Dialog-Studio pro Sprecher — kein Auto-Pool, keine Default-
-  // Voice, keine „ohne Voice-ID"-Warnung mehr.
+
+  // Voice-Auto-Binding entfällt weiterhin — Kunde wählt Stimmen manuell.
   const dialogVoices: Record<string, string> = {};
-  // Referenzen bewusst behalten, damit ungenutzte Variablen den Compiler
-  // nicht anmeckern (voicePool/defaults werden für andere Pfade weiter
-  // benötigt, z. B. Character-Level Voice-Sync außerhalb dieser Funktion).
-  void hasVo;
+  const requiredDialogSpeakerIds: string[] = [];
+  const dialogScript: string | undefined = undefined;
+  const dialogTurns: ComposerScene['dialogTurns'] | undefined = undefined;
   void voicePoolPicker;
   void voicePoolAssignments;
   void defaultVoicesByCharacter;
   void genderByCharacter;
-
-
-
-  const engine = ps.engine ?? 'auto';
-  const hasDialogTurns = spokenTurns.length > 0;
-  const dialogMode = ps.lipSync || LIPSYNC_ENGINES.has(engine) || !!ps.voiceover?.text || hasDialogTurns;
-
-  // Build dialogScript — speaker name lookup via UUID.
-  let dialogScript: string | undefined;
-  let dialogTurns: ComposerScene['dialogTurns'] | undefined;
-  if (hasDialogTurns) {
-    dialogTurns = spokenTurns
-      .map((t, order) => {
-        const sid = resolveTurnSpeakerId(t);
-        if (!sid) return null;
-        const match = (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === sid);
-        const text = String((t as any).text ?? '').trim();
-        if (!text) return null;
-        return {
-          turnId: newTurnId(),
-          characterId: sid,
-          displayName: (match?.characterName ?? '').trim() || undefined,
-          text,
-          mood: (t as any).mood,
-          delivery: (t as any).delivery,
-          order,
-        };
-      })
-      .filter((t): t is NonNullable<typeof t> => !!t && PLAN_UUID_RE.test(t.characterId));
-    dialogScript = spokenTurns
-      .map((t) => {
-      const sid = resolveTurnSpeakerId(t);
-        const match = sid
-          ? (ps.cast ?? []).find((c) => stripPrefix(String(c.characterId ?? '')) === sid)
-          : undefined;
-        const name = (match?.characterName ?? 'NARRATOR').trim() || 'NARRATOR';
-        // Only the spoken line goes into dialog_script. Mood/delivery
-        // stay on dialogTurns as performance metadata — never spoken.
-        return `${name}: ${t.text.trim()}`;
-      })
-      .join('\n');
-  } else if (ps.voiceover?.text) {
-    dialogScript = characterShots[0]
-      ? `${(ps.cast ?? [])[0]?.characterName?.toUpperCase() ?? 'NARRATOR'}: ${ps.voiceover.text}`
-      : `NARRATOR: ${ps.voiceover.text}`;
-  }
 
 
   const sceneType: ComposerScene['sceneType'] = (() => {
