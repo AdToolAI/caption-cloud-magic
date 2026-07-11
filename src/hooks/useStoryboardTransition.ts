@@ -1107,7 +1107,7 @@ export function useStoryboardTransition({
           ...s,
           warRoomOpen: true,
           planSheetOpen: false,
-          phase: 'D',
+          phase: 'B',
           progress: Math.max(s.progress || 0, 80),
           phaseLabel: `${reason} — versuche nochmal (bis 45s) …`,
         }));
