@@ -172,6 +172,26 @@ export default function StudioMode() {
         projectTitle.trim() ||
         `Studio Mode · ${new Date().toLocaleDateString('de-DE')}`;
 
+      // v228: Resolve selected characters to canonical brand_character UUIDs.
+      // `selectedCharacters` may include synthetic outfit/catalog mentions —
+      // resolve `meta.baseCharacterId` so the composer receives real IDs and
+      // carry `outfitLookId` per character shot for ID-only continuity.
+      const resolvedCharacters = selectedCharacters.map((c) => {
+        const baseId = c.meta?.baseCharacterId ?? c.id;
+        return {
+          characterId: baseId,
+          outfitLookId: c.meta?.outfitLookId ?? null,
+          name: c.name,
+          description: c.description,
+          signatureItems: c.signature_items,
+          referenceImageUrl: c.reference_image_url ?? undefined,
+          voiceId: c.voice_id ?? undefined,
+        };
+      });
+      const resolvedCharIds = Array.from(
+        new Set(resolvedCharacters.map((c) => c.characterId))
+      );
+
       const briefing = {
         mode: 'manual' as const,
         productName: title,
@@ -185,13 +205,14 @@ export default function StudioMode() {
         duration: cleanScenes.reduce((sum, s) => sum + s.duration, 0),
         aspectRatio: '16:9' as const,
         brandColors: [],
-        characters: selectedCharacters.map((c) => ({
-          id: c.id,
+        characters: resolvedCharacters.map((c) => ({
+          id: c.characterId,
           name: c.name,
           description: c.description,
-          signatureItems: c.signature_items,
-          referenceImageUrl: c.reference_image_url ?? undefined,
-          voiceId: c.voice_id ?? undefined,
+          signatureItems: c.signatureItems,
+          referenceImageUrl: c.referenceImageUrl,
+          voiceId: c.voiceId,
+          outfitLookId: c.outfitLookId ?? undefined,
         })),
       };
 
@@ -214,15 +235,20 @@ export default function StudioMode() {
         throw new Error(insErr?.message || 'Projekt konnte nicht erstellt werden');
       }
 
-      // Insert scenes — schema-compatible minimal payload
+      // Insert scenes — ID-only: character_shots carries per-character outfit binding.
+      const characterShots = resolvedCharacters.map((c) => ({
+        characterId: c.characterId,
+        outfitLookId: c.outfitLookId,
+      }));
       const sceneRows = cleanScenes.map((s, idx) => ({
         project_id: inserted.id,
         order_index: idx,
         scene_type: 'custom',
         ai_prompt: s.prompt,
         duration_seconds: s.duration,
-        mentioned_character_ids: selectedCharIds,
+        mentioned_character_ids: resolvedCharIds,
         mentioned_location_ids: selectedLocationId ? [selectedLocationId] : [],
+        character_shots: characterShots as any,
         clip_status: 'pending',
       }));
 
