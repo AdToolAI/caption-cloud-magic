@@ -196,6 +196,58 @@ export async function auditAnchorIdentity(
       };
     }
 
+    // v171.3 — Multi-cast Pro-Confirmation for suspiciously high mismatch rates.
+    // Gemini Flash on N≥2 anchors occasionally returns "all mismatched" even
+    // though the anchor is fine (stylized cinematic renders, uneven lighting).
+    // When the mismatch rate is ≥50% (i.e. Flash claims half or more of the
+    // cast is wrong), re-check with Gemini 2.5 Pro. Only hard-fail when both
+    // agree. Below the threshold → keep the existing v111 hard-fail path so
+    // Face-Lock retry (v131.6) can still fire on true single-slot swaps.
+    const highMismatchRate = mismatched.length >= 2 && mismatched.length / N >= 0.5;
+    if (highMismatchRate) {
+      console.log(
+        `[identity-audit] v171 N=${N} high-mismatch-rate flagged by Flash (mismatched=${mismatched.join(",") || "—"}, reason=${reason}); confirming with Pro…`,
+      );
+      const pass2 = await runAuditOnce(
+        anchorUrl,
+        portraitUrls,
+        names,
+        lovableKey,
+        "google/gemini-2.5-pro",
+        Math.max(timeoutMs, 30_000),
+      );
+      const proSaysSwap = !!pass2 && (pass2.mismatched.length > 0 || pass2.reason === "swap");
+      if (!proSaysSwap) {
+        console.log(
+          `[identity-audit] v171_multicast_swap_softpass: flash=mismatch(${mismatched.length}/${N}), pro=${pass2 ? "match" : "null"} → ok`,
+        );
+        return {
+          ok: true,
+          totalPeople: pass2?.totalPeople ?? totalPeople,
+          extraPeople: pass2?.extraPeople ?? extraPeople,
+          v171: {
+            pass1: "swap",
+            pass2: pass2 ? (pass2.reason || "match") : "null",
+            decision: "softpass_ok_multi",
+            note: `Flash flagged ${mismatched.length}/${N} mismatches, Pro disagreed — multi-cast soft-pass.`,
+          },
+        };
+      }
+      console.log(
+        `[identity-audit] v171_multicast_swap_confirmed: flash + pro both mismatch → hard fail`,
+      );
+      return {
+        ok: false,
+        reason: "swap",
+        mismatched: pass2.mismatched.length > 0 ? pass2.mismatched : mismatched,
+        totalPeople: pass2.totalPeople ?? totalPeople,
+        extraPeople: pass2.extraPeople ?? extraPeople,
+        detail:
+          pass2.detail || detail || `swap (confirmed): ${mismatched.join(", ") || "unspecified"}`,
+        v171: { pass1: "swap", pass2: "swap", decision: "hard_fail_multi" },
+      };
+    }
+
     return {
       ok: false,
       reason: "swap",
