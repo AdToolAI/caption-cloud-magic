@@ -94,4 +94,37 @@ describe('finalizePlanCanonical', () => {
     expect(result?.normalization.consistent).toBe(true);
     expect((result?.plan._meta as any)?.debug?.normalization?.actions).toContain('scene-count:5→1');
   });
+
+  it('treats slider-authoritative timing as stronger than stale 5.1s scene durations', () => {
+    const plan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 15 },
+      scenes: [1.7, 1.7, 1.7].map((durationSec, idx) => ({
+        index: idx + 1,
+        label: `Shot ${idx + 1}`,
+        durationSec,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [],
+      })),
+      unresolved: [],
+      _meta: {
+        debug: {
+          canonical_timing: {
+            durationSec: 15,
+            sceneCount: 3,
+            explicitSceneCount: true,
+            source: 'explicit-total',
+            sliderAuthoritative: true,
+          },
+        },
+      },
+    } as TProductionPlan;
+
+    const result = finalizePlanCanonical(plan);
+
+    expect(result?.plan.project?.totalDurationSec).toBe(15);
+    expect(result?.plan.scenes.map((scene) => scene.durationSec)).toEqual([5, 5, 5]);
+    expect(result?.normalization.durationSource).toBe('briefing-slider');
+    expect(result?.normalization.consistent).toBe(true);
+  });
 });

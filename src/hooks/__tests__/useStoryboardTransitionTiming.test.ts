@@ -166,6 +166,44 @@ describe('useStoryboardTransition canonical briefing timing', () => {
     });
   });
 
+  it('lets the duration slider override stale shot windows instead of keeping a 5.1s scene sum', () => {
+    const textWithShortWindows = [
+      'Szenen: 3 Szenen',
+      '0–1,7s Sprecher 1: „Hook.“',
+      '1,7–3,4s Sprecher 2: „Proof.“',
+      '3,4–5,1s Sprecher 3: „CTA.“',
+    ].join('\n');
+    const b = {
+      productName: 'AdTool',
+      productDescription: textWithShortWindows,
+      duration: 15,
+      aspectRatio: '16:9',
+      characters: [],
+    } as unknown as ComposerBriefing;
+    const plan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 5.1 },
+      scenes: [1.7, 1.7, 1.7].map((durationSec, idx) => ({
+        index: idx + 1,
+        label: `S${idx + 1}`,
+        durationSec,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [],
+      })),
+      unresolved: [],
+      _meta: { source: 'ai' },
+    } as TProductionPlan;
+
+    const normalized = applyCanonicalTimingToPlan(plan, b, textWithShortWindows);
+
+    expect(normalized.timing?.durationSec).toBe(15);
+    expect(normalized.timing?.sliderAuthoritative).toBe(true);
+    expect(normalized.timing?.windows).toBeUndefined();
+    expect(normalized.plan.project?.totalDurationSec).toBe(15);
+    expect(normalized.plan.scenes.map((scene) => scene.durationSec)).toEqual([5, 5, 5]);
+    expect((normalized.plan._meta as any)?.debug?.canonical_timing?.sliderAuthoritative).toBe(true);
+  });
+
   it('treats "1 durchgehende Szene" as one scene with internal speaker turns, not five scenes', () => {
     const continuousBriefing = [
       'AdTool AI Spot — „Vier Sprecher. Eine Szene. Perfekter Lip-Sync.“',
