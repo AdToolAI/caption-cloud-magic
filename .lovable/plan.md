@@ -1,55 +1,41 @@
-## Korrektur der Richtung
+# ID-Audit: Wo laufen Assets wirklich über IDs?
 
-Du hast recht: **die Verdrahtung darf nicht über Namen laufen**. Namen dürfen nur Anzeige-Labels sein. Die technische Zuordnung muss durchgehend über Character-IDs laufen, weil genau dafür Cast & World integriert wurde.
+Kurzbefund pro Modul. „ID-only" heißt: Charaktere, Locations, Outfits werden intern per UUID referenziert, Namen sind nur Anzeige.
 
-## Ziel
+## 1) Briefing → Production Plan → Storyboard   ✅ ID-only
 
-Wenn die Briefing-Analyse Sprecher zuordnet, soll im Storyboard gelten:
+- `useApplyProductionPlan.ts`: `characterShots[].characterId`, `dialogTurns[].characterId`, `mentioned_character_ids`, `mentioned_location_ids`, `outfitLookId` — alle als geprüfte UUIDs (`PLAN_UUID_RE`, `stripPrefix`), Non-UUIDs werden verworfen.
+- `SceneDialogStudio.tsx`: `canonicalDialogTurns` liest ausschließlich `turn.characterId`, resolved über `characters` → `brandCharacterId` → Avatar-Library; Namen sind rein UI.
+- Persistenz: `dialog_turns` JSONB, `mentioned_character_ids`, `mentioned_location_ids` — alle ID-basiert.
+- Voice-Auswahl: bewusst leer, manuell im Studio (v225).
+- **Status:** vollständig ID-verdrahtet.
 
-```text
-Dialog-Turn 1 -> characterId A
-Dialog-Turn 2 -> characterId B
-Dialog-Turn 3 -> characterId C
-Dialog-Turn 4 -> characterId D
-```
+## 2) Motion Studio (`src/pages/MotionStudio/StudioMode.tsx`)   ⚠️ überwiegend ID, eine Lücke
 
-Der sichtbare Text im Editor darf weiterhin `Samuel Dusatko: ...` anzeigen, aber die eigentliche Sprecher-Erkennung, Blockzählung und spätere Lip-Sync-/Voice-Zuordnung darf nicht davon abhängen, ob der Name exakt matcht.
+- Charaktere: `selectedCharacters` mit `c.id`, wird als `mentioned_character_ids` gespeichert und in `briefing.characters[].id` mitgegeben. ✅
+- Location: `selectedLocationId` → `mentioned_location_ids: [selectedLocationId]`. ✅
+- Snippet-Import: übernimmt `snippet.location_id`. ✅
+- **Lücke:** Outfits/Looks werden im Motion-Studio-Modus nicht als `outfitLookId` gesetzt — nur Charakter- und Location-ID gehen ins Scene-Row. Der Composer erzeugt Outfits dann per Fallback/Default. Für echte ID-Only-Parität sollte Motion Studio pro Character den ausgewählten `outfitLookId` mitschicken.
 
-## Umsetzung
+## 3) AI Video Studio / Universal Creator (`src/pages/UniversalCreator/UniversalCreator.tsx`)   ➖ nicht relevant
 
-1. **Plan-Apply schreibt ID-basierte Dialog-Metadaten in die Szene**
-   - Beim Anwenden des Production Plans werden die `dialogTurns` mit `speakerCharacterId` als technische Quelle übernommen.
-   - Für jede Szene wird eine stabile, geordnete Dialog-Struktur gespeichert, z. B. sinngemäß:
-     ```text
-     [{ speakerId: UUID, displayName: "Samuel Dusatko", text: "..." }]
-     ```
-   - `displayName` ist nur UI; `speakerId` ist verbindlich.
+- Kein Cast/Location-Konzept. Arbeitet mit `BackgroundAsset`, `background_music_id`, Scene-Timings, Subtitles. Es gibt keine Charaktere/Outfits, die per ID verdrahtet werden müssten.
+- `background_music_id`, Asset-IDs, Projekt-ID werden konsistent verwendet. ✅
+- **Status:** ID-Frage nicht anwendbar; das Modul ist asset-basiert und sauber.
 
-2. **`dialogScript` bleibt nur die sichtbare Editor-Fassung**
-   - Das Textfeld zeigt weiterhin menschenlesbar:
-     ```text
-     Samuel Dusatko: Hi!
-     Matthew Dusatko: Hi Samuel!
-     ```
-   - Diese Darstellung wird nicht mehr als alleinige technische Wahrheit verwendet.
+## 4) Picture Studio (`src/pages/PictureStudio.tsx`)   ➖ nicht anwendbar
 
-3. **SceneDialogStudio liest zuerst die ID-Struktur**
-   - Für Blockzählung, Sprecherzählung, Voice-Slots und spätere Voiceover-Erzeugung nutzt das Studio zuerst die gespeicherten `speakerId`s.
-   - Der bestehende Textparser wird nur noch als manueller Fallback genutzt, wenn der Nutzer komplett frei Text eingibt und keine ID-Struktur vorhanden ist.
+- Reine Bildgenerierung (`ImageGenerator`, `MagicEditPanel`, `BatchGeneratePanel`, `BackgroundReplacer`). Keine Cast/Location/Outfit-Referenzen im Page-Root.
+- Bilder werden aktuell **nicht** aus der Brand-Library gepickt (bekannter, bewusst geskippter Punkt aus früherer Runde). Das ist ein Feature-Gap, keine ID-Verdrahtungslücke.
 
-4. **Cast-Auflösung bleibt UUID-basiert**
-   - `characterShots[].characterId`, `speakerCharacterId`, `requiredDialogSpeakerIds` und Voice-Maps werden auf dieselbe UUID normalisiert.
-   - Kein Fuzzy-Matching, kein First-Name-Matching, kein Name-Substring-Matching für automatische Briefing-Pläne.
+## Empfehlung (falls du willst, dass ich fixe)
 
-5. **Manuelle Bearbeitung bleibt möglich**
-   - Wenn der Nutzer im Storyboard Text ändert, bleiben die vorhandenen Zeilen weiter an ihre IDs gebunden, solange die Zeilenstruktur erhalten bleibt.
-   - Wenn der Nutzer neue Sprecherzeilen manuell hinzufügt, kann der bestehende Parser als UI-Fallback greifen und der Nutzer ordnet diese manuell zu.
+Nur eine echte Lücke:
 
-6. **Validierung**
-   - Testfall: 4 zugeordnete Sprecher im Production Plan müssen im Storyboard sofort als 4 Dialog-Blöcke / 4 Sprecher erscheinen.
-   - Stimmen bleiben leer und werden manuell ausgewählt.
-   - Anzeige-Namen dürfen fehlen oder anders geschrieben sein, solange die IDs vorhanden sind.
+**A. Motion Studio: `outfitLookId` pro Charakter mitschicken**
+- In `StudioMode.tsx` beim Insert von `composer_scenes` zusätzlich ein `character_shots`-JSON mit `{ characterId, outfitLookId }` schreiben (oder in `briefing.characters[].outfitLookId`), damit der Composer die exakt gewählten Looks übernimmt statt Default-Presets zu ziehen.
+- Danach zieht `useApplyProductionPlan` den Look automatisch, da die Kette schon ID-basiert ist.
 
-## Ergebnis
+**Optional B. Picture Studio ↔ Brand Library** (früher geskippt): eigener kleiner Punkt, kein ID-Bug.
 
-Die Pipeline wird damit wieder sauber: **Briefing-Analyse setzt Sprecher per ID, Storyboard übernimmt Skript per ID, Voice bleibt manuell. Namen sind nur Labels, nicht die Verdrahtung.**
+Sag Bescheid, ob ich (A) umsetzen soll — dann läuft die komplette Composer-Pipeline durchgängig ID-only.
