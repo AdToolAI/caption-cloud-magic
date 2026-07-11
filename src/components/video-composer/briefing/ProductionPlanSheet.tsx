@@ -350,10 +350,10 @@ export default function ProductionPlanSheet({
       seen.add(dedupeKey);
       const fromMeta = m.meta?.outfitName ? String(m.meta.outfitName).trim() : '';
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
-      // Only propagate real names. Fake fallbacks like "Unbenannter Look"
-      // are dropped so the DB fallback / positional label wins.
+      // Only drop obvious library-generated empty placeholders. A DB-backed
+      // "Standard-Look" remains a valid user-visible outfit name below.
       const rawName = fromMeta || fromName || '';
-      const lookName = /^unbenannter look$/i.test(rawName) || /^standard-look$/i.test(rawName)
+      const lookName = /^unbenannter look$/i.test(rawName)
         ? ''
         : rawName;
       const arr = map.get(base) ?? [];
@@ -381,7 +381,7 @@ export default function ProductionPlanSheet({
       // outfit dropdown label. Leaving `rawName` empty here triggers the
       // positional `Look N` fallback downstream, which is the correct UX.
       const rawName = fromMeta || fromName || '';
-      const lookName = /^unbenannter look$/i.test(rawName) || /^standard-look$/i.test(rawName)
+      const lookName = /^unbenannter look$/i.test(rawName)
         ? ''
         : rawName;
       map.set(lookId, {
@@ -1492,23 +1492,23 @@ export default function ProductionPlanSheet({
                             // option in the dropdown — even if the library
                             // hasn't loaded it under this avatar yet.
                             // v178 Wave 2 — prefer DB-backed name over mention label.
-                            const stableName = (id: string, fallback?: string, idx?: number) => {
+                            const stableName = (id: string, fallback?: string) => {
                               const fromLabel = outfitLabelById.get(id);
                               if (fromLabel && fromLabel.trim()) return fromLabel;
                               const cleanFallback = (fallback ?? '').trim();
-                              if (cleanFallback && !/^unbenannter look$/i.test(cleanFallback) && !/^standard-look$/i.test(cleanFallback)) {
+                              if (cleanFallback && !/^unbenannter look$/i.test(cleanFallback)) {
                                 return cleanFallback;
                               }
-                              return `Look ${(idx ?? 0) + 1}`;
+                              return 'Outfit lädt…';
                             };
-                            const merged = fromCharacter.map((o, idx) => ({
+                            const merged = fromCharacter.map((o) => ({
                               lookId: o.lookId,
-                              name: stableName(o.lookId, o.name, idx),
+                              name: stableName(o.lookId, o.name),
                             }));
                             if (outfitId && !merged.some((o) => o.lookId === outfitId)) {
                               merged.push({
                                 lookId: outfitId,
-                                name: stableName(outfitId, lookHit?.name, merged.length),
+                                name: stableName(outfitId, lookHit?.name),
                               });
                             }
                             const showOutfitPicker = !!baseId && merged.length > 0;
@@ -1539,8 +1539,8 @@ export default function ProductionPlanSheet({
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__default__">Standard-Look</SelectItem>
-                                      {merged.map((o, idx) => (
-                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || `Look ${idx + 1}`}</SelectItem>
+                                      {merged.map((o) => (
+                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || 'Outfit lädt…'}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
