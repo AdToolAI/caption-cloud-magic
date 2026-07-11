@@ -51,9 +51,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import {
   AUTO_VOICE_OPTIONS,
   cleanVoiceId,
-  createVoicePoolPicker,
   getAutoVoiceName,
-  normalizeAutoVoiceGender,
   toElevenLabsDialogVoice,
 } from '@/lib/video-composer/autoVoiceAssignment';
 import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
