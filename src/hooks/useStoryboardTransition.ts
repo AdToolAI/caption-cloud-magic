@@ -1121,12 +1121,23 @@ export function useStoryboardTransition({
         }, () => { /* first failed — second still fires */ });
       });
       try {
-        // Prefer whichever OK response arrives first.
+        // Prefer whichever OK response arrives first — manual Promise.any
+        // (target lib doesn't include it).
         const winners = [first, second].map((p) => p.then((r) => {
           if (!r.ok && (r.status >= 500 || r.status === 408)) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status, response: r });
           return r;
         }));
-        const res = await Promise.any(winners);
+        const res = await new Promise<Response>((resolve, reject) => {
+          let remaining = winners.length;
+          const errs: any[] = [];
+          winners.forEach((w) => {
+            w.then(resolve, (e) => {
+              errs.push(e);
+              remaining -= 1;
+              if (remaining === 0) reject({ errors: errs });
+            });
+          });
+        });
         // Abort the loser to save backend cycles.
         controllers.forEach((c) => { try { c.abort(); } catch { /* noop */ } });
         return res;
@@ -1137,6 +1148,7 @@ export function useStoryboardTransition({
         if (usable?.response) return usable.response;
         throw usable;
       }
+
     };
 
 
