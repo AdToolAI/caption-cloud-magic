@@ -481,34 +481,19 @@ function planSceneToComposerScene(
   );
   const requiredDialogSpeakerIds = Array.from(speakingCharacterIds).filter((id) => castCharacterIds.has(id));
   const hasVo = !!ps.voiceover?.text?.trim();
+  // v225 — Voice-Auto-Binding entfernt. Die KI liefert nur die Sprecher-Slots
+  // (Character-IDs auf den Dialog-Turns). Die konkrete Stimme wählt der User
+  // manuell im Dialog-Studio pro Sprecher — kein Auto-Pool, keine Default-
+  // Voice, keine „ohne Voice-ID"-Warnung mehr.
   const dialogVoices: Record<string, string> = {};
-  for (let idx = 0; idx < (ps.cast ?? []).length; idx += 1) {
-    const c = (ps.cast ?? [])[idx];
-    if (!c.characterId) continue;
-    const characterId = stripPrefix(c.characterId as string);
-    // Speaker gating — ID-only. Voiceover falls back to first cast entry
-    // only when NO turns exist at all.
-    const isSpeaker = speakingCharacterIds.size > 0
-      ? speakingCharacterIds.has(characterId)
-      : hasVo && idx === 0;
-    if (!isSpeaker) continue;
-    let vid = cleanVoiceId(c.voiceId, defaultVoicesByCharacter)
-      || cleanVoiceId(defaultVoicesByCharacter[characterId]);
-    if (!vid && voicePoolPicker) {
-      const cached = voicePoolAssignments[characterId];
-      if (cached) {
-        vid = cached;
-      } else {
-        const picked = voicePoolPicker.pick(genderByCharacter[characterId]);
-        voicePoolAssignments[characterId] = picked.id;
-        vid = picked.id;
-      }
-    }
-    // v220 — do NOT fall back to projectVoiceId here. Project voice is applied
-    // separately at the character level; leaking it into every dialogVoices
-    // slot caused non-speaking characters to inherit the wrong voice.
-    if (vid) dialogVoices[characterId] = vid;
-  }
+  // Referenzen bewusst behalten, damit ungenutzte Variablen den Compiler
+  // nicht anmeckern (voicePool/defaults werden für andere Pfade weiter
+  // benötigt, z. B. Character-Level Voice-Sync außerhalb dieser Funktion).
+  void hasVo;
+  void voicePoolPicker;
+  void voicePoolAssignments;
+  void defaultVoicesByCharacter;
+  void genderByCharacter;
 
 
 
