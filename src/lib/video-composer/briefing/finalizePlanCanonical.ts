@@ -86,6 +86,25 @@ function readCanonicalDuration(plan: TProductionPlan): number | null {
   return Number.isFinite(raw) && raw >= 1 ? raw : null;
 }
 
+function readRequestedDuration(plan: TProductionPlan): number | null {
+  const meta = (plan as any)?._meta;
+  const debug = isPlainObject(meta) ? (meta as any).debug : null;
+  if (!isPlainObject(debug)) return null;
+  const candidates = [
+    (debug as any).requestedDurationSec,
+    (debug as any).sliderDurationSec,
+    (debug as any).briefingDurationSec,
+    (debug as any).canonical_timing?.requestedDurationSec,
+  ];
+  for (const candidate of candidates) {
+    const value = Number(candidate);
+    // The Briefing slider is min 15s. Values like 5.1s are stale scene sums,
+    // not user slider input, so they must never become authoritative here.
+    if (Number.isFinite(value) && value >= 15 && value <= 600) return value;
+  }
+  return null;
+}
+
 function readCanonicalSceneCount(plan: TProductionPlan): { count: number | null; explicit: boolean; continuous: boolean } {
   const canonical = readCanonicalTiming(plan);
   const raw = Number(canonical?.sceneCount ?? canonical?.scenes ?? canonical?.shots);
@@ -329,8 +348,9 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
 
   const canonicalTiming = readCanonicalTiming(plan);
   const canonicalDur = readCanonicalDuration(plan);
+  const requestedDuration = readRequestedDuration(plan);
   const canonicalSceneCount = readCanonicalSceneCount(plan);
-  const sliderAuthoritative = canonicalTiming?.sliderAuthoritative === true;
+  const sliderAuthoritative = canonicalTiming?.sliderAuthoritative === true || requestedDuration !== null;
   const projectTotal = Number((plan as any)?.project?.totalDurationSec);
   const scenes: TPlanScene[] = Array.isArray((plan as any).scenes) ? [...(plan as any).scenes] : [];
   const currentSum = sumSceneDurations(scenes);
@@ -341,7 +361,16 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   // Briefing-Timings dürfen Szenendauern proportional umverteilen.
   let target = 0;
   let source: PlanNormalization['durationSource'] = 'default';
-  if (canonicalValidated && canonicalDur && canonicalDur >= 1) {
+  if (requestedDuration !== null) {
+    target = clampDuration(requestedDuration);
+    source = 'briefing-slider';
+    if (currentSum >= 1 && Math.abs(currentSum - target) >= 0.5) {
+      actions.push(`slider-overrode-scene-sum:${currentSum}s→${target}s`);
+    }
+    if (canonicalDur && Math.abs(canonicalDur - target) >= 0.5) {
+      actions.push(`slider-overrode-canonical:${canonicalDur}s→${target}s`);
+    }
+  } else if (canonicalValidated && canonicalDur && canonicalDur >= 1) {
     target = clampDuration(canonicalDur);
     source = sliderAuthoritative ? 'briefing-slider' : 'canonical-briefing';
   } else if (currentSum >= 1) {
@@ -472,6 +501,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
       ...((plan as any)._meta ?? {}),
       debug: {
         ...(((plan as any)._meta as any)?.debug ?? {}),
+        ...(requestedDuration !== null ? { requestedDurationSec: requestedDuration } : {}),
         normalization: {
           totalDurationSec: target,
           sceneCount: sanitized.scenes.length,

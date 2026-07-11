@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyCanonicalTimingToPlan,
   detectCanonicalBriefingTiming,
+  readRequestedDurationFromPlan,
 } from '@/hooks/useStoryboardTransition';
 import type { ComposerBriefing } from '@/types/video-composer';
 import type { TProductionPlan } from '@/lib/video-composer/briefing/productionPlan';
@@ -202,6 +203,49 @@ describe('useStoryboardTransition canonical briefing timing', () => {
     expect(normalized.plan.project?.totalDurationSec).toBe(15);
     expect(normalized.plan.scenes.map((scene) => scene.durationSec)).toEqual([5, 5, 5]);
     expect((normalized.plan._meta as any)?.debug?.canonical_timing?.sliderAuthoritative).toBe(true);
+  });
+
+  it('keeps the frozen requested slider duration when briefing state was polluted with 5.1s', () => {
+    const b = {
+      productName: 'AdTool',
+      productDescription: 'The total duration is 15 seconds, split into 3 scenes of approximately 5 seconds each.',
+      duration: 5.1,
+      aspectRatio: '16:9',
+      characters: [],
+    } as unknown as ComposerBriefing;
+    const plan = {
+      project: { name: 'AdTool', aspectRatio: '16:9', totalDurationSec: 5.1 },
+      scenes: [1.7, 1.7, 1.7].map((durationSec, idx) => ({
+        index: idx + 1,
+        label: `S${idx + 1}`,
+        durationSec,
+        engine: 'cinematic-sync',
+        lipSync: true,
+        cast: [],
+      })),
+      unresolved: [],
+      _meta: {
+        source: 'ai',
+        debug: {
+          requestedDurationSec: 15,
+          canonical_timing: {
+            durationSec: 5.1,
+            sceneCount: 3,
+            source: 'time-windows',
+            windows: [{ start: 0, end: 1.7 }, { start: 1.7, end: 3.4 }, { start: 3.4, end: 5.1 }],
+          },
+        },
+      },
+    } as TProductionPlan;
+
+    const normalized = applyCanonicalTimingToPlan(plan, b, b.productDescription!);
+
+    expect(readRequestedDurationFromPlan(plan)).toBe(15);
+    expect(normalized.timing?.durationSec).toBe(15);
+    expect(normalized.timing?.sliderAuthoritative).toBe(true);
+    expect(normalized.plan.project?.totalDurationSec).toBe(15);
+    expect(normalized.plan.scenes.map((scene) => scene.durationSec)).toEqual([5, 5, 5]);
+    expect((normalized.plan._meta as any)?.debug?.requestedDurationSec).toBe(15);
   });
 
   it('treats "1 durchgehende Szene" as one scene with internal speaker turns, not five scenes', () => {

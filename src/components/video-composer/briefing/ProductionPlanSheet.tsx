@@ -23,7 +23,7 @@ import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
-import { applyCanonicalTimingToPlan } from '@/hooks/useStoryboardTransition';
+import { applyCanonicalTimingToPlan, readRequestedDurationFromPlan } from '@/hooks/useStoryboardTransition';
 import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan, type TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
@@ -166,6 +166,15 @@ export default function ProductionPlanSheet({
     currentBriefingRef.current = currentBriefing;
   }, [currentBriefing]);
 
+  const planRequestedDurationSec = useMemo(() => readRequestedDurationFromPlan(plan), [plan]);
+  const effectiveCurrentBriefing = useMemo(() => {
+    const currentDuration = Number(currentBriefing?.duration);
+    if (planRequestedDurationSec !== null && (!Number.isFinite(currentDuration) || currentDuration < 15)) {
+      return { ...currentBriefing, duration: planRequestedDurationSec } as ComposerBriefing;
+    }
+    return currentBriefing;
+  }, [currentBriefing, planRequestedDurationSec]);
+
   // When a new initialPlan arrives (subsequent re-opens), refresh local state.
   useEffect(() => {
     if (initialPlan) {
@@ -186,14 +195,14 @@ export default function ProductionPlanSheet({
   // fallback, late initialPlan, HMR cache, or manual edits.
   const safePlanResult = useMemo(() => {
     if (!plan) return null;
-    const withEnsemble = ensureProductionPlanEnsemble(plan, currentBriefing);
+    const withEnsemble = ensureProductionPlanEnsemble(plan, effectiveCurrentBriefing);
     const withBriefingTiming = applyCanonicalTimingToPlan(
       withEnsemble,
-      currentBriefing,
-      currentBriefing?.productDescription ?? '',
+      effectiveCurrentBriefing,
+      effectiveCurrentBriefing?.productDescription ?? '',
     ).plan;
     return finalizePlanCanonical(withBriefingTiming);
-  }, [plan, currentBriefing]);
+  }, [plan, effectiveCurrentBriefing]);
   const safePlan = safePlanResult?.plan ?? null;
 
   // v234 — Slider-Änderungen fließen live in den lokalen Plan-State zurück.
@@ -205,12 +214,12 @@ export default function ProductionPlanSheet({
     if (!plan) return;
     const { plan: next, changed } = applyCanonicalTimingToPlan(
       plan,
-      currentBriefing,
-      currentBriefing?.productDescription ?? '',
+      effectiveCurrentBriefing,
+      effectiveCurrentBriefing?.productDescription ?? '',
     );
     if (changed) setPlan(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBriefing?.duration]);
+  }, [effectiveCurrentBriefing?.duration]);
 
   // v233 — Slider gewinnt. Der Videodauer-Slider im Briefing-Tab ist die
   // einzige Wahrheit für die Gesamtdauer. Wir überschreiben ihn niemals
@@ -617,11 +626,11 @@ export default function ProductionPlanSheet({
     // (inkl. Stimme) manuell setzen.
     setApplying(true);
     try {
-      const withEnsemble = ensureProductionPlanEnsemble(planForApply, currentBriefing);
+      const withEnsemble = ensureProductionPlanEnsemble(planForApply, effectiveCurrentBriefing);
       const withBriefingTiming = applyCanonicalTimingToPlan(
         withEnsemble,
-        currentBriefing,
-        currentBriefing?.productDescription ?? '',
+        effectiveCurrentBriefing,
+        effectiveCurrentBriefing?.productDescription ?? '',
       ).plan;
       const finalized = finalizePlanCanonical(withBriefingTiming);
       const normalizedPlan = finalized?.plan ?? withBriefingTiming;
