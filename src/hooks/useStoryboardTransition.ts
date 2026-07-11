@@ -1105,17 +1105,49 @@ export function useStoryboardTransition({
     };
 
     try {
-      // First attempt; on transient 502/503/504, retry once after 2s before
-      // surfacing any error — backend chain has its own retries but a fresh
-      // edge-runtime cold start can still kick a 503.
-      let res = await doFetch();
-      if (!res.ok && (res.status === 502 || res.status === 503 || res.status === 504)) {
-        console.warn(`[useStoryboardTransition] deep-parse ${res.status} — 1× client retry after 2s`);
-        try { await res.text(); } catch { /* drain */ }
-        await new Promise((r) => setTimeout(r, 2000));
-        if (cancelledRef.current) return { handled: true };
-        res = await doFetch();
+      // v237 — Network-resilient fetch. Silent retries on:
+      //   (a) transient 502/503/504,
+      //   (b) pure network errors (no HTTP status, not AbortError) — e.g.
+      //       stream reset, brief WLAN blip, extension interference.
+      // Real timeouts (AbortError) and hard client errors (4xx) are NOT retried.
+      const NETWORK_RETRY_DELAYS_MS = [1500, 4000];
+      let res: Response | null = null;
+      let attempt = 0;
+      while (true) {
+        try {
+          res = await doFetch();
+        } catch (fetchErr: any) {
+          const isAbort = fetchErr?.name === 'AbortError';
+          const hasStatus = typeof fetchErr?.status === 'number';
+          if (!isAbort && !hasStatus && attempt < NETWORK_RETRY_DELAYS_MS.length) {
+            const delay = NETWORK_RETRY_DELAYS_MS[attempt];
+            console.warn('[useStoryboardTransition] deep-parse network error — silent retry', {
+              attempt: attempt + 1,
+              delay,
+              online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+              name: fetchErr?.name,
+              cause: fetchErr?.cause?.code ?? null,
+            });
+            setState((s) => ({ ...s, phaseLabel: 'Verbindung wiederhergestellt — analysiere weiter …' }));
+            await new Promise((r) => setTimeout(r, delay));
+            if (cancelledRef.current) return { handled: true };
+            attempt += 1;
+            continue;
+          }
+          throw fetchErr;
+        }
+        if (res.ok) break;
+        if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < NETWORK_RETRY_DELAYS_MS.length) {
+          console.warn(`[useStoryboardTransition] deep-parse ${res.status} — client retry`, { attempt: attempt + 1 });
+          try { await res.text(); } catch { /* drain */ }
+          await new Promise((r) => setTimeout(r, NETWORK_RETRY_DELAYS_MS[attempt]));
+          if (cancelledRef.current) return { handled: true };
+          attempt += 1;
+          continue;
+        }
+        break;
       }
+      if (!res) throw new Error('deep-parse: no response');
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
