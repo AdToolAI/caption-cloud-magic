@@ -1,71 +1,44 @@
-# Warum schlägt die Briefing-Analyse überhaupt fehl?
+# Plan v239 — Anchor-Repair-Overwrite endgültig entschärfen (Single + Multi-Speaker)
 
-## Ehrliche Diagnose
+## Kernproblem (in einem Satz)
+Der `v185-anchor-repair`-Pfad in `compose-dialog-segments/index.ts` überschreibt korrekt detektierte Plate-BBoxen (Gemini/AWS) mit einer Anchor-abgeleiteten Notfall-Box, sobald die Identitäts-Confidence unter 0.60 liegt — sowohl bei N=1 (Mund bleibt zu, falsche Region) als auch bei N≥2 (nur die niedrig-konfidenten Slots kippen, siehe „Sprecher 3+4 statt 1+2").
 
-Der `briefing-deep-parse`-Call ist ein **~25-35s laufender LLM-Request** (Gemini 2.5 Pro über Lovable AI Gateway). In dieser Zeit können 4 Dinge schiefgehen — und jedes davon triggert aktuell den roten Fallback-Toast:
+## Ziel
+`v185-repair` wird von einem **standardmäßig aktiven Overwrite** zu einer **letzten Notfall-Bremse** — er darf nur noch feuern, wenn die Plate-Box eindeutig unbrauchbar ist (offensichtlich außerhalb des Bildes, Nullfläche, oder klarer False-Positive auf Non-Face-Region).
 
-1. **Netzwerk-Blip beim Client** (WLAN wechselt Kanal, VPN reconnect, Browser-Extension) → reiner `TypeError: Failed to fetch`
-2. **Gateway-Timeout** (Gemini Pro > 30s bei komplexen Briefings) → 504
-3. **Rate-Limit** bei Gateway (429) — selten, aber möglich
-4. **Model-Error** (5xx vom Provider)
+## Änderungen
 
-**Kernproblem:** Wir haben nur eine Chance. Wenn diese eine Anfrage failt, sehen wir den Fallback — obwohl der Server 2s später vielleicht antwortet.
+### 1. `compose-dialog-segments/index.ts` — Repair-Gate härten (Zeile ~1859–1994)
 
-Und: Der User sieht IMMER einen roten Toast, auch wenn der Fallback-Plan qualitativ okay ist. Das fühlt sich nach "Fehler" an, obwohl technisch alles im Rahmen läuft.
+- **Neue Priorität 1 — Gemini/AWS-Detection ist authoritativ**  
+  Wenn `plateIdentityMap.faces[i]` eine BBox mit `confidence ≥ 0.70` **oder** `matchConfidence ≥ 0.55` liefert, wird dieser Slot als *trusted* markiert — unabhängig vom `coordSources`-Tag. Trusted-Slots werden nie repariert.
+- **Neue Priorität 2 — Sanity-Check statt Anchor-Vergleich**  
+  Für nicht-trusted Slots ersetzen wir den Anchor-in-BBox-Test durch drei objektive Sanity-Kriterien:
+  1. BBox liegt komplett im Plate (mit ≤ 5 % Toleranz).
+  2. BBox-Fläche zwischen 0.3 % und 25 % der Plate-Fläche.
+  3. BBox-Aspect-Ratio zwischen 0.4 und 2.5.
+  Fällt ein Kriterium, gilt der Slot als *broken* und wird repariert. Anchor-Drift alleine löst keinen Repair mehr aus.
+- **Repair selbst bleibt unverändert** (Median-Nachbarn + Anchor-Zentrierung), aber nur für tatsächlich broken slots.
+- **Neues Log**: `v239_repair_gate trusted=X/N sanity_ok=Y/N repaired=Z/N reasons=[...]` mit `scene_id` und Slot-Details für spätere Diagnose.
 
-## Kann das komplett vermieden werden?
+### 2. `compose-dialog-segments/index.ts` — Motion Content Gate für N=1 nachziehen (Zeile Umgebung `v113` / `v231`)
+- Sicherstellen, dass der N=1 Byte-Check-Retry nach v239 nur noch dann feuert, wenn Sync.so nachweislich einen Noop lieferte — nicht wegen einer reparaturbedingt falschen BBox.
 
-**Ehrlich: Nein, zu 100% nicht.** Ein LLM-Call übers Netz kann immer failen. Aber wir können die **Wahrnehmung von Fehlern auf ~0 drücken**, indem wir:
+### 3. Beobachtbarkeit
+- `plate_identity_min_confidence`, `plate_identity_min_margin`, und neu `v239_repaired_slots` in den bestehenden Diagnostik-Payload aufnehmen (`compose_diagnostics_events` / `scene_events`), damit wir bei Support-Tickets sofort sehen, welcher Slot repariert wurde und warum.
 
-- Fehler **unsichtbar** wegretryen (statt roter Toast)
-- **Schneller** antworten (weniger Timeout-Risiko)
-- **Server-seitig** absichern (statt nur Client-Retry)
+## Was NICHT geändert wird
+- Kein Wechsel Gemini → AWS. Gemini liefert korrekte Daten; das Problem lag ausschließlich im Downstream-Overwrite.
+- Keine Änderung an `v183-anchor-identity-slot-bridge`, `v189-identity-trust-gate` selbst (nur der Gate wird strenger), `v181`, `v185`-Preclip-Logik, oder Sync.so-Dispatch.
+- Keine UI-, Briefing- oder Studio-Änderungen.
 
-## Plan: Zero-Visible-Failure Strategie (v238)
+## Verifikation
+1. **Multi-Speaker-Regression-Case** (Szene mit 4 Sprechern, gemischte Confidences): erwartet `v239_repair_gate trusted=4/4 repaired=0/4`, alle vier Speaker mit korrekter Lip-Motion.
+2. **Single-Speaker-Case aus der aktuellen Meldung** (Szene `f663b958`): erwartet `trusted=1/1 repaired=0/1`, Mund folgt Skript, kein Character-Miss.
+3. **Echter False-Positive-Case** (künstlich: BBox 5×5 auf Whiteboard): erwartet `repaired=1/N reasons=[area_too_small]`, Sync.so bekommt eine plausible Box.
+4. **Logs** (`edge_function_logs`): `v239_repair_gate` erscheint für jede Szene; `v185_anchor_plate_bbox_repair` fällt bei sauberen Szenen auf 0.
 
-### 1. Server-seitiger Retry in `briefing-deep-parse`
-Aktuell retryt nur der Client. Besser: Die Edge Function selbst versucht Gemini bis zu **3x intern** (2.5 Pro → 2.5 Pro → 2.5 Flash als Fallback-Model) bevor sie überhaupt antwortet. Der Client sieht nur ein Ergebnis.
-
-**Wirkung:** Eliminiert ~80% der Gateway/Model-Fehler, ohne dass der User es merkt.
-
-### 2. Optimistic UI statt roter Toast
-Wenn der Client-Retry doch nötig ist:
-- **Kein roter Toast mehr** beim ersten Fehlversuch
-- Stattdessen: dezenter Hinweis "Analyse läuft noch…" im War-Room
-- Roter Toast **nur**, wenn alle Retries endgültig scheitern
-
-### 3. Parallel-Fire Strategie
-Bei jedem Analyse-Start feuern wir **zwei Requests parallel** ab (mit 500ms Versatz). Wer zuerst antwortet, gewinnt — der zweite wird verworfen.
-**Kosten:** ~1.5x Gateway-Cost bei Analyse (klein, weil einmalig pro Briefing).
-**Wirkung:** Netzwerk-Blips einer einzelnen Verbindung werden komplett neutralisiert.
-
-### 4. Prewarm der Edge Function
-Cold-Starts kosten 3-5s. Wir triggern die Function 1x beim Öffnen des Briefing-Tabs mit einem `?warmup=1` Ping — ohne echten LLM-Call. Wenn der User dann auf "Analysieren" klickt, ist die Function heiß.
-
-### 5. Ehrliches Fallback-Signaling
-Wenn wirklich alles scheitert und der lokale Fallback-Plan greift:
-- **Grüner Toast**, nicht rot: "Plan erstellt — du kannst ihn wie gewohnt anpassen."
-- Kleiner Info-Badge im Plan: "Basis-Plan (KI-Analyse übersprungen)"
-- Kein Panik-Signal, weil der Fallback funktioniert.
-
-## Technische Details
-
-**Dateien:**
-- `supabase/functions/briefing-deep-parse/index.ts` — interne 3x-Retry-Schleife mit Model-Downgrade auf Attempt 3
-- `supabase/functions/briefing-deep-parse/index.ts` — Warmup-Handler für `?warmup=1`
-- `src/hooks/useStoryboardTransition.ts` — Parallel-Fire (2 Requests, 500ms Versatz), Toast-Farben angleichen
-- `src/pages/…/BriefingTab.tsx` (oder Container) — Warmup-Ping beim Mount
-
-**Nicht angefasst:**
-- Slider-Logik (v236 bleibt)
-- Ensemble/Cast-Logik (v221+ bleibt)
-- Pipeline-Version bleibt 237, wird auf 238 gehoben nach Umsetzung
-
-## Was das NICHT löst
-
-- Wenn der User komplett offline ist, geht nichts. Aber dann ist auch der Fallback-Toast berechtigt.
-- Wenn Gemini global ausfällt (sehr selten): der Fallback-Plan greift wie bisher — nur eben freundlich signalisiert.
-
-## Frage vor Umsetzung
-
-Willst du **alle 5 Punkte** in einem Rutsch, oder ist dir Punkt **3 (Parallel-Fire)** zu teuer? Punkt 3 verdoppelt die Analyse-Kosten pro Briefing (aber nur da, nicht in der Render-Pipeline). Ich empfehle: alle 5, weil der Effekt spürbar ist und die Analyse-Kosten pro Briefing im Cent-Bereich liegen.
+## Technische Notizen
+- Der Trust-Threshold `0.60` wird bewusst nur für den *Fallback*-Pfad gehalten. Die neue primäre Regel ist `detectorConfidence ≥ 0.70` (Gemini-nativ) — das entspricht dem Bereich, den wir empirisch in den Logs als „nie falsch" beobachten.
+- Änderung ist rein additiv/Restriktion — keine DB-Migration, keine neuen Secrets, keine Client-Änderungen nötig.
+- Rollout ist rückwärtskompatibel: fällt der neue Gate durch (z. B. plateIdentityMap fehlt), greift der bisherige v185-Pfad exakt wie heute.
