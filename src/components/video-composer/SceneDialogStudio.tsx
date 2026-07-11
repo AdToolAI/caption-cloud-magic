@@ -690,8 +690,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     const out = canonicalDialogTurns
       .map((turn, index) => {
         const speaker = sceneCast.find((c) => c.id === turn.characterId || c.brandCharacterId === turn.characterId);
+        const speakerId = speaker?.id ?? turn.characterId;
         return {
-          speakerId: turn.characterId,
+          speakerId,
           speakerName: speaker?.name ?? turn.displayName ?? `Character ${turn.characterId.slice(0, 8)}`,
           text: hasAlignedEditorText ? (texts[index] ?? turn.text) : turn.text,
         } satisfies DialogBlock;
