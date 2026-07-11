@@ -378,8 +378,7 @@ export default function ProductionPlanSheet({
       const fromName = (m.name?.split(' — ')[1] ?? '').trim();
       // NOTE: never fall back to `m.name` — since v213 that is the base
       // avatar name (e.g. "Matthew Dusatko") which would leak into the
-      // outfit dropdown label. Leaving `rawName` empty here triggers the
-      // positional `Look N` fallback downstream, which is the correct UX.
+      // outfit dropdown label. Missing labels stay neutral until DB names load.
       const rawName = fromMeta || fromName || '';
       const lookName = /^unbenannter look$/i.test(rawName)
         ? ''
