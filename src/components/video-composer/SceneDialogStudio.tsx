@@ -38,6 +38,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
+import { sanitizeDialogScript } from '@/lib/motion-studio/planDisplayFilter';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import {
   resolveDialogVoice,
@@ -463,7 +464,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return out;
   };
 
-  const [script, setScript] = useState(scene.dialogScript ?? '');
+  const [script, setScript] = useState(() => sanitizeDialogScript(scene.dialogScript));
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
     normalizeVoiceMap(scene.dialogVoices),
   );
@@ -493,7 +494,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   // re-render after our own debounced save would clobber the user's in-flight
   // typing (cursor jump / dropped characters).
   useEffect(() => {
-    setScript(scene.dialogScript ?? '');
+    const cleanedScript = sanitizeDialogScript(scene.dialogScript);
+    setScript(cleanedScript);
+    if ((scene.dialogScript ?? '') && cleanedScript !== (scene.dialogScript ?? '')) {
+      onUpdate({ dialogScript: cleanedScript });
+    }
     setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
     setDialogTakes((scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {});
     // eslint-disable-next-line react-hooks/exhaustive-deps

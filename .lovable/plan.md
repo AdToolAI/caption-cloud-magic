@@ -1,56 +1,57 @@
-## Problem
+## Ziel
 
-Im Production-Plan-Sheet werden aktuell **alle Briefing-Zeilen als Dialog-Turns** angezeigt — inklusive Regie-Anweisungen wie:
-- „AUTO-DIRECTOR (synthesize full screenplay…)"
-- „Cinematic, realistisch"
-- „15 Sekunden"
-- „1 durchgehende Szene", „1 Hauptfigur"
-- „Düster, intensiv, realistisch, hochwertig"
-- „0 bis 15 Sekunden", „oder Game-Look", „und Trümmergeräusche"
+Die Regie-/Briefing-Zeilen dürfen nicht mehr als gesprochenes Skript erscheinen — weder im Production-Plan noch nach dem Anwenden im Storyboard/Scene Script Editor. Outfit-Dropdowns sollen außerdem nicht mehr irreführend „Look 1“ / „Look 2“ anzeigen, wenn die echte Outfit-Bezeichnung noch lädt oder vorhanden ist.
 
-Diese sind für den Kunden **verwirrend** und wirken unprofessionell. Der Kunde soll nur sehen:
-1. Das eigentliche gesprochene Skript (Dialog-Turns mit Speaker + Text)
-2. Optional: Kurze Szenen-Beschreibung (Action/Setting) — aber nicht als „Sprecher-Zeile"
+## Diagnose
 
-## Ursache
+1. Der bisherige Filter greift nur in einem Anzeige-Block im Production Plan.
+2. Beim Anwenden wird `dialogScript` weiterhin aus den rohen `dialogTurns` gebaut und gespeichert.
+3. Der Scene Script Editor liest genau dieses gespeicherte `dialogScript`; deshalb tauchen `AUTO-DIRECTOR`, `15 Sekunden`, `Cinematic, realistisch`, `1 Hauptfigur` usw. weiter als Sprecherzeilen auf.
+4. Die Outfit-IDs sind grundsätzlich korrekt verdrahtet; „Look 1/2“ ist ein UI-Fallback, der sichtbar wird, wenn die Namens-Query noch nicht fertig ist oder ein Name als Platzhalter verworfen wird.
 
-Zwei zusammenwirkende Punkte:
-1. **Server (`briefing-deep-parse`)**: Fällt bei kurzen One-Take-Briefings in einen Modus, der jede Briefing-Zeile als eigenen Dialog-Turn emittiert und dem ersten (oder Default-)Sprecher zuordnet.
-2. **Client (`ProductionPlanSheet.tsx`)**: Rendert stumpf jeden `dialogTurns[]`-Eintrag ohne Filter für Regie-Metadaten (Style-Adjektive, Timing-Angaben, Look-Notizen, AUTO-DIRECTOR-Marker).
+## Umsetzung
 
-## Fix — UI-only Sanitizer (nicht-invasiv)
+### 1. Zentralen Skript-Sanitizer erweitern
 
-Reine Präsentations-Fixes im Client. Keine Server-Änderung, keine DB-Migration, keine Pipeline-Logik.
+Datei: `src/lib/motion-studio/planDisplayFilter.ts`
 
-### 1. `src/lib/motion-studio/planDisplayFilter.ts` (neu)
+- `isDirectiveTurn()` bleibt zentrale Erkennung.
+- Erkennung erweitern um typische Regie-/Briefing-Sätze:
+  - `AUTO-DIRECTOR`, `synthesize full screenplay`, `full screenplay from briefing`
+  - Timing: `15 Sekunden`, `0 bis 15 Sekunden`, `3-15 seconds`
+  - Struktur: `1 Hauptfigur`, `1 durchgehende Szene`, `4 Sprecher`
+  - Style-Ketten: `Cinematic, realistisch`, `Düster, intensiv, realistisch, hochwertig`
+  - Negative-/Action-Fragmente wie `oder Game-Look`, `und Trümmergeräusche`, `Kein unnötiger Gore...`
+- Neue Funktion `sanitizeDialogScript(script)` hinzufügen, die Zeilen im Format `SPEAKER: text` prüft und nur echte gesprochene Zeilen zurückgibt.
 
-Helper `isDirectiveTurn(text)` — erkennt Regie-Rauschen und filtert es aus der Anzeige:
-- Marker: `AUTO-DIRECTOR`, `synthesize full screenplay`, `Take A aufnehmen`
-- Timing-only: `^\d+\s*Sekunden$`, `^0\s*bis\s*\d+\s*Sekunden$`
-- Struktur-only: `^\d+\s*(Hauptfigur|durchgehende\s*Szene|Sprecher|Shot)`
-- Reine Style-Adjektiv-Ketten ohne Verb (z.B. „Düster, intensiv, realistisch, hochwertig", „Cinematic, realistisch") → Heuristik: nur Adjektive/Kommas, ≤ 6 Tokens, kein Verb, kein Punkt
-- Fragmente die mit „oder ", „und " beginnen und < 4 Wörter haben
+### 2. Apply-Pfad bereinigen, bevor gespeichert wird
 
-Zweiter Helper `getVisibleTurns(scene)` — gibt gefilterte Liste zurück, behält aber `_hiddenCount` für Telemetrie.
+Datei: `src/hooks/useApplyProductionPlan.ts`
 
-### 2. `src/components/video-composer/ProductionPlanSheet.tsx`
+- Beim Erzeugen von `dialogScript` aus `rawTurns` zuerst alle `isDirectiveTurn(t.text)`-Einträge herausfiltern.
+- `hasDialogTurns`, Sprecher-Voice-Ermittlung und `dialogScript` sollen mit den bereinigten Turns arbeiten, damit Regiezeilen nicht als Sprecher gelten.
+- Falls keine echten Dialogzeilen übrig bleiben, kein Fake-Dialog speichern; dann bleibt nur Szene/Action/Prompt erhalten.
 
-- Turn-Liste durch `getVisibleTurns(scene)` ersetzen.
-- Falls nach Filter **keine Turns** übrig bleiben, kurzen Hinweis rendern: „Regie-Notizen ausgeblendet — Skript wird aus dem Briefing generiert."
-- Existierende „Sprecher-Zuordnung fehlt"-Guards greifen weiterhin auf `dialogTurns` (die echten, unfilterten) zu — Apply-Logik unverändert.
+### 3. Alte bereits gespeicherte Skripte im Editor automatisch sauber anzeigen
 
-### 3. Szenen-Beschreibung separat
+Datei: `src/components/video-composer/SceneDialogStudio.tsx`
 
-Falls die Szene ein `sceneAction` / `description`-Feld hat, dies **einmal oben** in der Karte als kursiver Regie-Hinweis anzeigen (nicht als Sprecher-Zeile).
+- Beim Initialisieren und beim Szenenwechsel `scene.dialogScript` durch `sanitizeDialogScript()` laufen lassen.
+- Wenn ein bestehendes gespeichertes Skript bereinigt wurde, einmalig per `onUpdate({ dialogScript: cleaned })` zurückschreiben, damit alte verschmutzte Szenen repariert werden.
+- Manuelles Tippen des Nutzers bleibt unverändert; nur geladene vorhandene Skripte werden bereinigt.
+
+### 4. Outfit-Label-Fallback korrigieren
+
+Datei: `src/components/video-composer/briefing/ProductionPlanSheet.tsx`
+
+- Den finalen sichtbaren Fallback `Look ${idx + 1}` entfernen.
+- Wenn ein echter Name noch nicht geladen ist, stattdessen neutral `Outfit lädt…` oder `Outfit` anzeigen, nicht `Look 1/2`.
+- DB-Namen aus `avatar_outfit_looks.name` weiterhin priorisieren.
+- `Standard-Look` nicht pauschal als ungültig behandeln, wenn es aus der Datenbank kommt; nur offensichtliche leere/unnamed Platzhalter aus der Mention-Library verwerfen.
 
 ## Verifikation
 
-- Screenshot-Case (aktueller Upload): Nur noch echte gesprochene Zeilen sichtbar (Samuel, Matthew, Sarah, Kailee mit ihren tatsächlichen Skript-Sätzen). Alle „1 Hauptfigur / Düster, intensiv / 15 Sekunden"-Zeilen verschwinden.
-- Multi-Speaker-15s-Briefing: 4 echte Turns sichtbar, keine Style-Zeilen.
-- Sprecher-Bind-Warnung erscheint weiterhin korrekt, wenn echte Turns keine `speakerCharacterId` haben.
-
-## Out of Scope
-
-- Server-Parser bleibt unverändert (v221/v222 Pipeline berührt).
-- Keine Änderung an Apply-Logik, Ensemble-Guards, Lipsync-Pipeline.
-- Falls du willst, kann ich in Phase 2 den Parser (`briefing-deep-parse`) so hardhen, dass diese Regie-Zeilen gar nicht erst als Turns emittiert werden — aber das ist riskanter und der UI-Filter reicht für den Kunden-Eindruck.
+- Letzte betroffene Szene mit gespeichertem `dialog_script` enthält aktuell nachweislich Regiezeilen wie `AUTO-DIRECTOR`, `15 Sekunden`, `1 Hauptfigur`.
+- Nach dem Fix soll der Scene Script Editor diese Zeilen nicht mehr anzeigen und beim Laden bereinigt speichern.
+- Neue Production-Plan-Anwendung darf nur echte Sprecherzeilen in `dialogScript` übernehmen.
+- Outfit-Dropdown darf bei noch ladenden Namen nicht mehr „Look 1/2“ zeigen.

@@ -38,6 +38,7 @@ import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePla
 import { logPlanRepairEvent } from '@/lib/video-composer/briefing/logPlanRepair';
 import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
 import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
+import { isDirectiveTurn } from '@/lib/motion-studio/planDisplayFilter';
 
 const DEFAULT_TEXT_OVERLAY = {
   text: '',
@@ -466,8 +467,10 @@ function planSceneToComposerScene(
     }
   }
 
+  const spokenTurns = rawTurns.filter((t) => !isDirectiveTurn((t as any)?.text));
+
   const speakingCharacterIds = new Set<string>();
-  for (const t of rawTurns) {
+  for (const t of spokenTurns) {
     const id = resolveTurnSpeakerId(t);
     if (id) speakingCharacterIds.add(id);
   }
@@ -510,13 +513,13 @@ function planSceneToComposerScene(
 
 
   const engine = ps.engine ?? 'auto';
-  const hasDialogTurns = rawTurns.length > 0;
+  const hasDialogTurns = spokenTurns.length > 0;
   const dialogMode = ps.lipSync || LIPSYNC_ENGINES.has(engine) || !!ps.voiceover?.text || hasDialogTurns;
 
   // Build dialogScript — speaker name lookup via UUID.
   let dialogScript: string | undefined;
   if (hasDialogTurns) {
-    dialogScript = rawTurns
+    dialogScript = spokenTurns
       .map((t) => {
       const sid = resolveTurnSpeakerId(t);
         const match = sid
