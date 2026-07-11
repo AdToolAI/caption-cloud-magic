@@ -28,6 +28,7 @@ import { useApplyProductionPlan } from '@/hooks/useApplyProductionPlan';
 import { ProductionPlan, type TProductionPlan, type TPlanScene } from '@/lib/video-composer/briefing/productionPlan';
 import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensurePlanEnsemble';
 import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
+import { getVisibleTurns } from '@/lib/motion-studio/planDisplayFilter';
 import { extractFunctionsErrorDetails } from '@/lib/functionsError';
 import BriefingPlanSummary from './BriefingPlanSummary';
 import SafePlanNotice from './SafePlanNotice';
