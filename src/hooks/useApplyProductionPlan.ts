@@ -1013,23 +1013,8 @@ export function useApplyProductionPlan() {
     }
     const fallbackRows = persistedNewRows.filter((r: any) => /Establishing shot: A relevant setting|Reveal beat for the brand|CTA beat for the brand/i.test(String(r.ai_prompt ?? '')));
     if (fallbackRows.length > 0) warnings.push(`${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`);
-    // v217/v218 — verify only checks characters that actually have spoken
-    // turns. Non-speaking ensemble members (visible only, no turn) must NOT
-    // trigger the "ohne Voice-ID" warning.
-    const lipsyncRowsMissingVoice = persistedNewRows.filter((r: any) => {
-      const rowScene = newScenes.find((s) => s.id === String(r.id));
-      const needsVoice = rowScene?.dialogMode || !!rowScene?.dialogScript;
-      if (!needsVoice) return false;
-      const voices = r.dialog_voices && typeof r.dialog_voices === 'object' ? r.dialog_voices as Record<string, unknown> : {};
-      const requiredIds = Array.isArray(rowScene?.requiredDialogSpeakerIds) ? rowScene.requiredDialogSpeakerIds : [];
-      if (requiredIds.length > 0) {
-        return requiredIds.some((id) => !hasPersistedDialogVoice(voices[id]));
-      }
-      const voiceCount = Object.values(voices).filter(hasPersistedDialogVoice).length;
-      // No dialog-voice map AND no fallback character voice → truly missing.
-      return voiceCount === 0 && !r.character_voice_id;
-    });
-    if (lipsyncRowsMissingVoice.length > 0) warnings.push(`${lipsyncRowsMissingVoice.length} Lip-Sync-Szene(n) ohne Voice-ID.`);
+    // v225 — Voice-IDs werden bewusst leer gelassen und im Dialog-Studio
+    // manuell zugewiesen. Kein „ohne Voice-ID"-Blocker mehr auf Plan-Apply.
 
 
     // 8) Now remove replaceable old/fallback rows. If that fails, roll back the
