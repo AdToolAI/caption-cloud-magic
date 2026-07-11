@@ -1105,17 +1105,49 @@ export function useStoryboardTransition({
     };
 
     try {
-      // First attempt; on transient 502/503/504, retry once after 2s before
-      // surfacing any error — backend chain has its own retries but a fresh
-      // edge-runtime cold start can still kick a 503.
-      let res = await doFetch();
-      if (!res.ok && (res.status === 502 || res.status === 503 || res.status === 504)) {
-        console.warn(`[useStoryboardTransition] deep-parse ${res.status} — 1× client retry after 2s`);
-        try { await res.text(); } catch { /* drain */ }
-        await new Promise((r) => setTimeout(r, 2000));
-        if (cancelledRef.current) return { handled: true };
-        res = await doFetch();
+      // v237 — Network-resilient fetch. Silent retries on:
+      //   (a) transient 502/503/504,
+      //   (b) pure network errors (no HTTP status, not AbortError) — e.g.
+      //       stream reset, brief WLAN blip, extension interference.
+      // Real timeouts (AbortError) and hard client errors (4xx) are NOT retried.
+      const NETWORK_RETRY_DELAYS_MS = [1500, 4000];
+      let res: Response | null = null;
+      let attempt = 0;
+      while (true) {
+        try {
+          res = await doFetch();
+        } catch (fetchErr: any) {
+          const isAbort = fetchErr?.name === 'AbortError';
+          const hasStatus = typeof fetchErr?.status === 'number';
+          if (!isAbort && !hasStatus && attempt < NETWORK_RETRY_DELAYS_MS.length) {
+            const delay = NETWORK_RETRY_DELAYS_MS[attempt];
+            console.warn('[useStoryboardTransition] deep-parse network error — silent retry', {
+              attempt: attempt + 1,
+              delay,
+              online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+              name: fetchErr?.name,
+              cause: fetchErr?.cause?.code ?? null,
+            });
+            setState((s) => ({ ...s, phaseLabel: 'Verbindung wiederhergestellt — analysiere weiter …' }));
+            await new Promise((r) => setTimeout(r, delay));
+            if (cancelledRef.current) return { handled: true };
+            attempt += 1;
+            continue;
+          }
+          throw fetchErr;
+        }
+        if (res.ok) break;
+        if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < NETWORK_RETRY_DELAYS_MS.length) {
+          console.warn(`[useStoryboardTransition] deep-parse ${res.status} — client retry`, { attempt: attempt + 1 });
+          try { await res.text(); } catch { /* drain */ }
+          await new Promise((r) => setTimeout(r, NETWORK_RETRY_DELAYS_MS[attempt]));
+          if (cancelledRef.current) return { handled: true };
+          attempt += 1;
+          continue;
+        }
+        break;
       }
+      if (!res) throw new Error('deep-parse: no response');
       stopProgress();
       if (cancelledRef.current) return { handled: true };
 
@@ -1191,7 +1223,15 @@ export function useStoryboardTransition({
       const isAbort = e?.name === 'AbortError';
       const status: number | undefined = e?.status;
       const msg: string = isAbort ? `Timeout nach ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s` : (e?.message || 'Deep-Parse fehlgeschlagen');
-      console.error('[useStoryboardTransition] deep-parse failed', { status, msg, body: e?.body, isAbort });
+      console.error('[useStoryboardTransition] deep-parse failed', {
+        status,
+        msg,
+        body: e?.body,
+        isAbort,
+        name: e?.name,
+        cause: e?.cause?.code ?? e?.cause?.name ?? null,
+        online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+      });
 
 
       // Hard blocks (credits / rate-limit / payload): keep classic toast + navigate.
@@ -1240,9 +1280,12 @@ export function useStoryboardTransition({
           const fallbackRaw = buildLocalFallbackPlan(briefing, text);
           const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
           const fallback = normalizedFallback.plan;
+          const isNetwork = !status && !isAbort;
           toast({
-            title: 'AI-Analyse nicht verfügbar',
-            description: `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
+            title: isNetwork ? 'Verbindung instabil' : 'AI-Analyse nicht verfügbar',
+            description: isNetwork
+              ? 'Basis-Plan als Fallback eingeblendet. Bitte Werte vor „Plan anwenden" prüfen oder Analyse erneut starten.'
+              : `${reason} — Basis-Plan eingeblendet (nur Schätzung). Bitte Werte vor „Plan anwenden" prüfen.`,
             variant: 'destructive',
           });
           setState({
@@ -1263,16 +1306,29 @@ export function useStoryboardTransition({
         // Plan innerhalb von 45s, ersetzt er die Retry-Phase direkt durch
         // die Plan-Sheet mit AI-Ergebnis; sonst greift der Fallback.
         (async () => {
+          const lateFetch = async (): Promise<Response> => fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': anon,
+              'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
+          });
+          let lateRes: Response | null = null;
           try {
-            const lateRes = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': anon,
-                'Authorization': `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ briefing: text, projectId: activeProjectId, language }),
-            });
+            try {
+              lateRes = await lateFetch();
+            } catch (netErr: any) {
+              // v237 — one additional network-only retry after 8s
+              console.warn('[useStoryboardTransition] late-arrival network error — retrying in 8s', {
+                name: netErr?.name,
+                online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+              });
+              await new Promise((r) => setTimeout(r, 8000));
+              if (cancelledRef.current) return;
+              lateRes = await lateFetch();
+            }
             if (!lateRes.ok) throw new Error(`late-arrival status ${lateRes.status}`);
             const lateData = await lateRes.json();
             const { plan: lateRawPlan } = parsePlan(lateData);
@@ -1286,8 +1342,6 @@ export function useStoryboardTransition({
             if (cancelledRef.current) return;
             window.clearTimeout(graceTimer);
             if (resolved) {
-              // Fallback wurde bereits eingeblendet – dennoch ersetzen wir
-              // ihn transparent durch den echten Plan.
               setState((s) => {
                 const sheetWasClosed = !s.planSheetOpen;
                 toast({
