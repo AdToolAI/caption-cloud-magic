@@ -1487,21 +1487,8 @@ const ParallaxBackground: React.FC<{
       ) : (
         <div style={{ position: 'absolute', width: '110%', height: '110%', left: '-5%', top: '-5%', background: DEFAULT_FALLBACK_GRADIENT }} />
       )}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%)',
-          transform: `translateY(${interpolate(progress, [0, 1], [0, -5])}px)`,
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          boxShadow: 'inset 0 0 150px 50px rgba(0,0,0,0.4)',
-        }}
-      />
+      {/* v242: bottom-gradient + inset-boxShadow removed — no cinematic framing in Universal Creator. */}
+
     </div>
   );
 };
