@@ -3099,6 +3099,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                    disableSceneFx={diagToggles.disableSceneFx}
                    contrastOverlayType={contrastOverlayType}
                    cinematicProfile={cinematicProfile}
+                   useOriginalAudio={useOriginalAudio}
+                   originalAudioVolume={originalAudioVolume}
+                   previewMode={previewMode}
                  />
                 <TextOverlay
                   scene={(() => {
