@@ -51,7 +51,21 @@ function SortableScene({ scene, onUpdate, onDelete }: { scene: Scene; onUpdate: 
               <div className="font-medium">Scene {scene.order + 1}</div>
               <div className="text-sm text-muted-foreground capitalize">{scene.background.type}</div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => onDelete(scene.id)}><Trash2 className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-1">
+              {scene.background.type === 'video' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title={scene.originalAudio?.muted ? t('uc.originalAudioUnmute') : t('uc.originalAudioMute')}
+                  onClick={() => onUpdate(scene.id, {
+                    originalAudio: { ...(scene.originalAudio || {}), muted: !scene.originalAudio?.muted },
+                  })}
+                >
+                  {scene.originalAudio?.muted ? <VolumeX className="h-4 w-4 text-muted-foreground" /> : <Volume2 className="h-4 w-4" />}
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => onDelete(scene.id)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
           </div>
           {getBackgroundPreview(scene.background)}
           <div className="grid grid-cols-2 gap-3">
