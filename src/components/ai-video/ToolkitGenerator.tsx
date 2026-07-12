@@ -997,17 +997,41 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </div>
 
         {model.capabilities.audio && (
-          <div className="sm:col-span-3 flex items-center justify-between p-3 rounded-md bg-background/40 border border-border/40">
-            <div className="flex items-center gap-2">
-              {generateAudio
-                ? <Volume2 className="h-4 w-4 text-primary" />
-                : <VolumeX className="h-4 w-4 text-muted-foreground" />
-              }
-              <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
-                {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
-              </Label>
+          <div className="sm:col-span-3 space-y-2 p-3 rounded-md bg-background/40 border border-border/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {generateAudio
+                  ? <Volume2 className="h-4 w-4 text-primary" />
+                  : <VolumeX className="h-4 w-4 text-muted-foreground" />
+                }
+                <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
+                  {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
+                </Label>
+              </div>
+              <Switch id="audio-switch" checked={generateAudio} onCheckedChange={setGenerateAudio} />
             </div>
-            <Switch id="audio-switch" checked={generateAudio} onCheckedChange={setGenerateAudio} />
+            {generateAudio && (
+              <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
+                <Label className="text-xs text-muted-foreground">
+                  {language === 'de' ? 'Gesprochene Sprache' : language === 'es' ? 'Idioma hablado' : 'Spoken language'}
+                </Label>
+                <Select value={spokenLanguage} onValueChange={(v) => setSpokenLanguage(v as 'auto' | 'de' | 'en' | 'es')}>
+                  <SelectTrigger className="h-8 w-[180px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">
+                      {language === 'de'
+                        ? `Auto (UI: ${language === 'de' ? 'Deutsch' : 'English'})`
+                        : `Auto (UI: ${language === 'es' ? 'Español' : 'English'})`}
+                    </SelectItem>
+                    <SelectItem value="de">Deutsch</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         )}
       </Card>
