@@ -453,13 +453,21 @@ export function UniversalCreator() {
       break;
     case 'audio':
       stepContent = (
-        <AudioAssetSelector
-          selectedMusicId={audioConfig.background_music_id}
-          musicVolume={audioConfig.music_volume}
-          onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
-          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
-          onMusicUrlChange={setSelectedMusicUrl}
-        />
+        <div className="space-y-6">
+          <AudioAssetSelector
+            selectedMusicId={audioConfig.background_music_id}
+            musicVolume={audioConfig.music_volume}
+            onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
+            onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+            onMusicUrlChange={setSelectedMusicUrl}
+          />
+          <OriginalAudioMixPanel
+            enabled={contentConfig?.useOriginalAudio === true}
+            volume={typeof contentConfig?.originalAudioVolume === 'number' ? contentConfig!.originalAudioVolume! : 0.6}
+            onEnabledChange={(v) => setContentConfig(prev => ({ ...(prev || {} as ContentConfig), useOriginalAudio: v }))}
+            onVolumeChange={(v) => setContentConfig(prev => ({ ...(prev || {} as ContentConfig), originalAudioVolume: v }))}
+          />
+        </div>
       );
       break;
     case 'subtitles':
