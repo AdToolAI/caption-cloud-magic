@@ -245,14 +245,28 @@ export function RemotionPreviewPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewAudio.voiceoverUrl, previewAudio.backgroundMusicUrl]);
 
+  // Keep Remotion Player volume in sync with the external mix, so the
+  // scene <Video>'s original audio track follows master mute/volume.
+  const applyPlayerVolume = useCallback(() => {
+    const p = playerRef.current;
+    if (!p) return;
+    const v = isMuted ? 0 : clampAudioVolume(volume);
+    try { p.setVolume(v); } catch { /* noop */ }
+  }, [isMuted, volume]);
+
+  useEffect(() => {
+    applyPlayerVolume();
+  }, [applyPlayerVolume]);
+
   useEffect(() => {
     if (!autoPlay || !playerRef.current) return;
     setHasEverInteracted(true);
     setIsMuted(false);
     playerRef.current.unmute();
+    applyPlayerVolume();
     playerRef.current.play();
     void playPreviewAudio();
-  }, [autoPlay, playPreviewAudio]);
+  }, [autoPlay, playPreviewAudio, applyPlayerVolume]);
 
   useEffect(() => {
     const player = playerRef.current;
