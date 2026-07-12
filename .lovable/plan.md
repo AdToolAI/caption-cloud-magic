@@ -1,45 +1,50 @@
-## Ziel
-Step 4 im Universal Content Creator soll das in Step 3 gewählte Video visuell 1:1 übernehmen: nur auf das gewählte Ausgabeformat eingepasst, aber ohne Schatten, Vignette, Color-Grading, Filmgrain, Style-Overlay, Ken-Burns, Szenen-FX oder sonstige Director’s-Cut-/Cinematic-Effekte.
+# AI Video Studio — Spoken-Language-Fix (Provider-Audio)
 
-## Gefundene Ursache
-Der erste Fix hat `CategoryContrastOverlay` entfernt, aber im Step-4-Renderpfad sind weiterhin visuelle Post-Processing-Schichten aktiv:
+## Problem
+Modelle wie **Kling 3.0 Pro**, **Veo** und **Sora** liefern bei aktivem `generateAudio` selbst Lip-Sync + Voiceover — der Provider-TTS defaultet aber auf **Englisch**, weil unser Prompt keine Zielsprache spezifiziert. Der User will bei deutschen Briefings deutsches Audio.
 
-- `CinematicPostLayer` erzeugt weiterhin Vignette/Filmgrain je nach Kategorie.
-- `MOOD_FILTERS` verändert Helligkeit/Kontrast/Sättigung des Videos.
-- `styleOverlays[style]` legt zusätzliche transparente Farbverläufe über das Bild.
-- `SceneTypeEffects` kann je nach Szene weitere Schatten/Glow-Effekte setzen, falls nicht deaktiviert.
-- Bildpfade enthalten teils zusätzliche `filter: saturate(...) contrast(...)`; für Video ist vor allem Cinematic/Post-Layer relevant.
+## Ursache
+In `src/components/ai-video/ToolkitGenerator.tsx` (Zeile ~272–290) wird der finale Prompt aus `mentionResolved.prompt + shotSuffix + brandSuffix + castSuffix + noTextSuffix` gebaut. Es fehlt eine **Spoken-Language-Direktive**. Kling/Veo/Sora inferieren die Sprache aus dem Prompt-Text — steht dort "Create a cinematic ad…" (auch bei DE-UI), spricht der Character Englisch.
 
-## Umsetzung
-1. **Raw-Preview-Modus für Universal Creator einführen**
-   - Im Payload Builder `buildUniversalCreatorCustomizations` einen klaren Schalter setzen, z. B. `rawMediaMode: true` oder über `diag` einen Universal-Creator-spezifischen Clean-Modus.
-   - Dieser Modus gilt für Preview und Export, damit Step 4 und finaler Render identisch bleiben.
+## Fix-Plan
 
-2. **Alle visuellen Effekte im Universal-Creator-Pfad deaktivieren**
-   - In `UniversalCreatorVideo.tsx` bei aktivem Raw-Modus:
-     - kein `CinematicPostLayer`
-     - kein `MOOD_FILTERS`-Filter
-     - kein `styleOverlays[style]`
-     - kein `SceneTypeEffects`
-     - kein `FloatingIcons`
-     - keine automatischen Ken-Burns-/Zoom-/Pan-Transformationen auf hochgeladenen Medien
-   - `TextOverlay`, Untertitel und Audio bleiben separat steuerbar, aber das Hintergrundvideo selbst bleibt clean.
+### 1. Spoken-Language-Suffix im Prompt-Builder
+`ToolkitGenerator.tsx`: neuen Suffix nur anhängen, wenn `generateAudio === true` **und** `model.capabilities.audio`:
 
-3. **Video-Einpassung auf Format beschränken**
-   - Für Step 4 wird das Video mit stabiler Format-Anpassung gerendert:
-     - Standard: `object-fit: cover`, damit das Zielformat sauber gefüllt wird.
-     - Keine Abdunklung, keine Ränder, keine Schatten.
-   - Falls gewünscht, kann später ein UI-Schalter `Füllen / Einpassen` ergänzt werden; für diesen Fix bleibt es bei der bestehenden Formatlogik ohne visuelle Filter.
+```text
+All spoken dialogue, narration and voiceover MUST be performed in German (Deutsch).
+Do not use English or any other language for speech. Lip movement must match German phonemes.
+```
 
-4. **Fallback nur für echte Fehler verwenden**
-   - Wenn ein Video nicht lädt, darf weiterhin ein Fallback erscheinen.
-   - Dieser Fallback darf keine Vignette/Schatten enthalten und soll klar vom echten Video-Look getrennt bleiben.
+Sprache aus `useTranslation().language` ableiten:
+- `de` → German (Deutsch)
+- `es` → Spanish (Español)
+- `en` → English (Fallback)
 
-5. **Validierung**
-   - Einen lokalen Preview-Check mit einer Video-Szene machen:
-     - Step 3 Rohvideo vs. Step 4 Remotion Preview vergleichen.
-     - Prüfen, dass keine dunklen Ecken/Umrandungen mehr sichtbar sind.
-     - Prüfen, dass Originalsound/Voiceover-Mix unverändert weiter funktioniert.
+Der Suffix wird **vor** `noTextSuffix` eingefügt und ist explizit genug, dass Kling/Veo/Sora-TTS ihn respektieren.
 
-## Ergebnis
-Step 4 zeigt das hochgeladene Video wie Step 3: nur ins Ausgabeformat gebracht, ohne zusätzliche Optik. Director’s-Cut-artige Looks bleiben aus dem Universal Content Creator draußen.
+### 2. Optionaler UI-Override (Sprache manuell wählen)
+Klein-Dropdown im Audio-Bereich neben dem `generateAudio`-Toggle: `Deutsch / English / Español / Auto (UI-Sprache)`. Default = Auto = UI-Sprache. State: `spokenLanguage`, persistiert im gleichen `localStorage`-Namespace wie der Prompt-Draft.
+
+Nur sichtbar wenn `model.capabilities.audio && generateAudio`.
+
+### 3. Backend passthrough (defensiv, für zukünftige native-Params)
+`spokenLanguage` als optionales Feld ins `body` der Edge-Function-Aufrufe (`generate-kling-video`, `generate-veo-video`, `generate-sora-video`) mitgeben. Server nutzt es aktuell nur zum Logging — sobald ein Provider einen nativen Language-Param exponiert (Kling roadmap), lässt es sich dort andocken, ohne den Client anzufassen.
+
+**Kein Refactor der Edge Functions** in diesem Turn — nur `spokenLanguage` durchreichen + loggen.
+
+### 4. Kein Effekt auf Motion Studio / Composer
+Lip-Sync im Composer läuft über ElevenLabs/Hume mit expliziter `language` — nicht betroffen. Änderung bleibt strikt in `ToolkitGenerator.tsx` + optionaler passthrough-Param in den drei betroffenen Edge Functions.
+
+## Technische Details
+
+**Files:**
+- `src/components/ai-video/ToolkitGenerator.tsx` — neuer `spokenLanguageSuffix`, State + Selector, Body-Feld.
+- `supabase/functions/generate-kling-video/index.ts` — `spokenLanguage` optional aus Body lesen + loggen.
+- `supabase/functions/generate-veo-video/index.ts` — dito.
+- `supabase/functions/generate-sora-video/index.ts` — dito (falls existent, sonst skip).
+
+**Kein DB-Migrationsbedarf, keine Credits-Änderung, keine Auswirkung auf Composer/Motion-Pipeline.**
+
+## Erwartetes Ergebnis
+Bei DE-UI + `generateAudio=on` liefert Kling 3.0 Pro das 15s-Werbevideo mit **deutschem Voiceover + korrektem deutschen Lip-Sync**. User kann Sprache im UI überschreiben, falls z. B. spanisches Audio bei DE-Prompt gewünscht.

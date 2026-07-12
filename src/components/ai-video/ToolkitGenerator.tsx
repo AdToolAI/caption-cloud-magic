@@ -101,6 +101,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [duration, setDuration] = useState<number>(model.durations[0]);
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
+  // Provider-side TTS (Kling / Veo / Sora) defaults to English unless the prompt
+  // explicitly names a target language. We let the user override the auto-pick
+  // (which follows the UI language) so a DE user can force ES/EN audio if desired.
+  const SPOKEN_LANG_KEY = 'ai-video-toolkit:spoken-lang';
+  const [spokenLanguage, setSpokenLanguage] = useState<'auto' | 'de' | 'en' | 'es'>(() => {
+    try {
+      const v = typeof localStorage !== 'undefined' ? localStorage.getItem(SPOKEN_LANG_KEY) : null;
+      return v === 'de' || v === 'en' || v === 'es' || v === 'auto' ? v : 'auto';
+    } catch { return 'auto'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(SPOKEN_LANG_KEY, spokenLanguage); } catch { /* noop */ }
+  }, [spokenLanguage]);
+  const effectiveSpokenLang: 'de' | 'en' | 'es' =
+    spokenLanguage === 'auto'
+      ? (language === 'de' ? 'de' : language === 'es' ? 'es' : 'en')
+      : spokenLanguage;
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /**
    * Placement of the uploaded reference image within the generated clip:
@@ -286,7 +303,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // Guard against gibberish/faux-text hallucinations from video models
       // (Hailuo/Kling/Veo/Sora/Seedance/…). Motion Studio path is not touched.
       const noTextSuffix = 'No written text, no letters, no signage, no captions, no logos, no on-screen typography, no readable characters of any language. Any incidental text in the scene must remain out of focus and illegible.';
-      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, noTextSuffix]
+      // Spoken-Language-Lock: only when the model actually produces audio AND
+      // the user opted in. Without this, provider TTS (Kling/Veo/Sora) defaults
+      // to English regardless of the descriptive prompt language.
+      const langLabel = effectiveSpokenLang === 'de'
+        ? 'German (Deutsch)'
+        : effectiveSpokenLang === 'es'
+        ? 'Spanish (Español)'
+        : 'English';
+      const spokenLangSuffix = (model.capabilities.audio && generateAudio)
+        ? `All spoken dialogue, narration and voiceover MUST be performed in ${langLabel}. Do not use any other language for speech. Lip movement must match ${langLabel} phonemes.`
+        : '';
+      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, noTextSuffix]
         .filter(Boolean)
         .join('\n\n');
 
@@ -530,7 +558,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         // Do not overwrite the composed character anchor if it was already routed above.
         body.referenceImages = composedSubjectRefs;
       }
-      if (model.capabilities.audio) body.generateAudio = generateAudio;
+      if (model.capabilities.audio) {
+        body.generateAudio = generateAudio;
+        if (generateAudio) body.spokenLanguage = effectiveSpokenLang;
+      }
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
@@ -966,17 +997,41 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </div>
 
         {model.capabilities.audio && (
-          <div className="sm:col-span-3 flex items-center justify-between p-3 rounded-md bg-background/40 border border-border/40">
-            <div className="flex items-center gap-2">
-              {generateAudio
-                ? <Volume2 className="h-4 w-4 text-primary" />
-                : <VolumeX className="h-4 w-4 text-muted-foreground" />
-              }
-              <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
-                {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
-              </Label>
+          <div className="sm:col-span-3 space-y-2 p-3 rounded-md bg-background/40 border border-border/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {generateAudio
+                  ? <Volume2 className="h-4 w-4 text-primary" />
+                  : <VolumeX className="h-4 w-4 text-muted-foreground" />
+                }
+                <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
+                  {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
+                </Label>
+              </div>
+              <Switch id="audio-switch" checked={generateAudio} onCheckedChange={setGenerateAudio} />
             </div>
-            <Switch id="audio-switch" checked={generateAudio} onCheckedChange={setGenerateAudio} />
+            {generateAudio && (
+              <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
+                <Label className="text-xs text-muted-foreground">
+                  {language === 'de' ? 'Gesprochene Sprache' : language === 'es' ? 'Idioma hablado' : 'Spoken language'}
+                </Label>
+                <Select value={spokenLanguage} onValueChange={(v) => setSpokenLanguage(v as 'auto' | 'de' | 'en' | 'es')}>
+                  <SelectTrigger className="h-8 w-[180px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">
+                      {language === 'de'
+                        ? `Auto (UI: ${language === 'de' ? 'Deutsch' : 'English'})`
+                        : `Auto (UI: ${language === 'es' ? 'Español' : 'English'})`}
+                    </SelectItem>
+                    <SelectItem value="de">Deutsch</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         )}
       </Card>
