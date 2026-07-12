@@ -449,16 +449,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }
       }
 
-      // i2v: composed scene frame > manual upload > @-mention fallback.
-      // Kein stiller Fallback aufs rohe Porträt mehr — dank Hard-Guard oben.
-      const referenceImage =
-        composedFirstFrame ??
-        startImageUrl ??
-        mentionResolved.referenceImageUrl ??
-        null;
-      // Route the reference image according to the user-selected placement.
-      // 'end'    → capabilities.endFrame (only Luma Ray 2 supports end-only)
-      // 'anchor' → capabilities.anchorOnly (Vidu Q2 / Kling 3 subject-reference)
+      // v241 — Split routing:
+      //   • composedFirstFrame (Nano-Banana-2 Multi-Char Anchor) is ALWAYS
+      //     used as identity anchor: startImageUrl for i2v models, first
+      //     referenceImages slot for anchor-only models. Placement is ignored
+      //     for the composed anchor (character must appear at frame 0).
+      //   • Any user-uploaded reference image or @-mention fallback follows
+      //     the selected placement (start / end / anchor) as before, but only
+      //     when no composed anchor exists.
       const effectivePlacement: 'start' | 'end' | 'anchor' =
         referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
         : referencePlacement === 'anchor' && !model.capabilities.anchorOnly ? 'start'
@@ -475,15 +473,35 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         return;
       }
 
-      if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
-        body.startImageUrl = referenceImage;
-      } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
-        body.endImageUrl = referenceImage;
-      } else if (referenceImage && effectivePlacement === 'anchor' && model.capabilities.anchorOnly) {
-        // Anchor mode: pass image via referenceImages[] without forcing a frame.
-        // Kling 3 accepts up to 7 refs, Vidu Q2 handles this through its own multi-ref path.
-        if (!model.capabilities.multiRef) {
-          body.referenceImages = [referenceImage];
+      // Route the composed character anchor first (highest priority).
+      let anchorRoute: 'start' | 'anchor' | 'text-only' | 'none' = 'none';
+      if (composedFirstFrame) {
+        if (model.capabilities.i2v) {
+          body.startImageUrl = composedFirstFrame;
+          anchorRoute = 'start';
+        } else if (model.capabilities.anchorOnly && !model.capabilities.multiRef) {
+          body.referenceImages = [composedFirstFrame];
+          anchorRoute = 'anchor';
+        }
+      } else {
+        // No composed anchor → follow user-selected placement with any manual
+        // upload or @-mention fallback.
+        const referenceImage =
+          startImageUrl ??
+          mentionResolved.referenceImageUrl ??
+          null;
+        if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
+          body.startImageUrl = referenceImage;
+        } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
+          body.endImageUrl = referenceImage;
+        } else if (referenceImage && effectivePlacement === 'anchor' && model.capabilities.anchorOnly) {
+          if (!model.capabilities.multiRef) {
+            body.referenceImages = [referenceImage];
+          }
+        } else if (anchorChars.length > 0 && !modelAcceptsImageAnchor) {
+          // Text-only model with picked cast — nothing to attach; prompt-only
+          // enforcement via castSuffix + lead phrase is our only lever.
+          anchorRoute = 'text-only';
         }
       }
       // v2v: pass reference clip + reference type (Kling-3 omni)
