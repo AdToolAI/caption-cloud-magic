@@ -1823,6 +1823,9 @@ const SceneBackground: React.FC<{
           sceneType={type}
           primaryColor={primaryColor}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          muted={audioMuted}
+          volume={audioVolume}
+          previewMode={previewMode}
         />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
         {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
