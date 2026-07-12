@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Plus, Trash2, Video, Image, Palette } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Video, Image, Palette, Volume2, VolumeX } from 'lucide-react';
 import type { Scene, SceneBackground } from '@/types/scene';
 import { useTranslation } from '@/hooks/useTranslation';
 
