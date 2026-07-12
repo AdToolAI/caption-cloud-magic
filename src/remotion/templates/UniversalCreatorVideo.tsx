@@ -1879,7 +1879,7 @@ const SceneBackground: React.FC<{
     return (
       <PopInElement delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
-          {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
+          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
           {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
@@ -1896,7 +1896,7 @@ const SceneBackground: React.FC<{
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
-          {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
+          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
           {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
@@ -1971,7 +1971,7 @@ const SceneBackground: React.FC<{
   return (
     <AbsoluteFill style={{ opacity, filter: moodFilter }}>
       <div style={{ width: '100%', height: '100%', transform, overflow: 'hidden' }}>
-        {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
+        {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
       </div>
       <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
       {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
