@@ -1018,6 +1018,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </p>
       )}
 
+      {debugMode && (
+        <p className="text-center text-[10px] font-mono text-muted-foreground/70">
+          debug · anchorComposed={String(lastAnchorComposed)} · route={lastAnchorRoute} · cast={castCharacterIds.length + (brandCharacter ? 1 : 0)} · model={model.id}
+        </p>
+      )}
+
+
       <VideoPromptOptimizer
         open={showOptimizer}
         onClose={() => setShowOptimizer(false)}
