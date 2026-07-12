@@ -391,11 +391,12 @@ export function RemotionPreviewPlayer({
     if (!playerRef.current) return;
     if (!hasEverInteracted) setHasEverInteracted(true);
     playerRef.current.unmute();
-    playerRef.current.setVolume(0);
     setIsMuted(false);
+    // Player volume drives scene <Video> original audio; keep it in sync with master.
+    try { playerRef.current.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
     playerRef.current.play(e);
     void playPreviewAudio();
-  }, [hasEverInteracted, playPreviewAudio]);
+  }, [hasEverInteracted, playPreviewAudio, volume]);
 
   const handlePauseClick = useCallback(() => {
     playerRef.current?.pause();
@@ -406,13 +407,14 @@ export function RemotionPreviewPlayer({
     if (isMuted) {
       setIsMuted(false);
       playerRef.current?.unmute();
-      playerRef.current?.setVolume(0);
+      try { playerRef.current?.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
       if (isPlaying) void playPreviewAudio();
     } else {
       setIsMuted(true);
+      try { playerRef.current?.setVolume(0); } catch { /* noop */ }
       pausePreviewAudio();
     }
-  }, [isMuted, isPlaying, pausePreviewAudio, playPreviewAudio]);
+  }, [isMuted, isPlaying, pausePreviewAudio, playPreviewAudio, volume]);
 
   const handleVolumeChange = useCallback((value: number[]) => {
     const newVolume = clampAudioVolume(value[0]);
