@@ -1,17 +1,45 @@
-## Ursache
+## Ziel
+Step 4 im Universal Content Creator soll das in Step 3 gewählte Video visuell 1:1 übernehmen: nur auf das gewählte Ausgabeformat eingepasst, aber ohne Schatten, Vignette, Color-Grading, Filmgrain, Style-Overlay, Ken-Burns, Szenen-FX oder sonstige Director’s-Cut-/Cinematic-Effekte.
 
-Die Remotion-Komposition `UniversalCreatorVideo` legt bei jedem Szenen-Render einen `CategoryContrastOverlay` (Vignette + Dunkel-Gradient) und stellenweise einen `inset boxShadow` über das Video. Das ist Director's-Cut-Terrain, im Universal Creator gibt es dafür keine Regler — der Effekt erscheint also ungewollt und macht Step 4 dunkler als Step 3.
+## Gefundene Ursache
+Der erste Fix hat `CategoryContrastOverlay` entfernt, aber im Step-4-Renderpfad sind weiterhin visuelle Post-Processing-Schichten aktiv:
 
-## Fix
+- `CinematicPostLayer` erzeugt weiterhin Vignette/Filmgrain je nach Kategorie.
+- `MOOD_FILTERS` verändert Helligkeit/Kontrast/Sättigung des Videos.
+- `styleOverlays[style]` legt zusätzliche transparente Farbverläufe über das Bild.
+- `SceneTypeEffects` kann je nach Szene weitere Schatten/Glow-Effekte setzen, falls nicht deaktiviert.
+- Bildpfade enthalten teils zusätzliche `filter: saturate(...) contrast(...)`; für Video ist vor allem Cinematic/Post-Layer relevant.
 
-Nur Presentation-Layer, eine Datei: `src/remotion/templates/UniversalCreatorVideo.tsx`.
+## Umsetzung
+1. **Raw-Preview-Modus für Universal Creator einführen**
+   - Im Payload Builder `buildUniversalCreatorCustomizations` einen klaren Schalter setzen, z. B. `rawMediaMode: true` oder über `diag` einen Universal-Creator-spezifischen Clean-Modus.
+   - Dieser Modus gilt für Preview und Export, damit Step 4 und finaler Render identisch bleiben.
 
-1. **`CategoryContrastOverlay` entfernen** an allen 6 Render-Pfaden (Zeilen 1833, 1855, 1870, 1886, 1903, 1979). Die Komponente selbst bleibt im Code (unbenutzt), damit ein späterer Director's-Cut-Port sie wiederverwenden kann.
-2. **Fallback-Vignette-Layer entschärfen** in `GradientFallback` (Zeilen 1490–1504): den `inset boxShadow 0 0 150px 50px rgba(0,0,0,0.4)` und den Bottom-Gradient entfernen. Betrifft nur den Fallback ohne Video-Asset.
-3. **Cinematic-Post-Layer prüfen** (`CinematicPostLayer`, `SceneTypeEffects`, `FloatingIcons` — Zeilen 1834–1836): diese sind Szenen-FX (Ken-Burns/Icons), keine Umrandungen. Bleiben unverändert. `disableSceneFx` steht im Universal Creator bereits standardmäßig auf `true` beim Preview-Player-Rendering — falls nicht: zusätzlich hart auf `true` setzen für den Universal-Creator-Pfad.
+2. **Alle visuellen Effekte im Universal-Creator-Pfad deaktivieren**
+   - In `UniversalCreatorVideo.tsx` bei aktivem Raw-Modus:
+     - kein `CinematicPostLayer`
+     - kein `MOOD_FILTERS`-Filter
+     - kein `styleOverlays[style]`
+     - kein `SceneTypeEffects`
+     - kein `FloatingIcons`
+     - keine automatischen Ken-Burns-/Zoom-/Pan-Transformationen auf hochgeladenen Medien
+   - `TextOverlay`, Untertitel und Audio bleiben separat steuerbar, aber das Hintergrundvideo selbst bleibt clean.
+
+3. **Video-Einpassung auf Format beschränken**
+   - Für Step 4 wird das Video mit stabiler Format-Anpassung gerendert:
+     - Standard: `object-fit: cover`, damit das Zielformat sauber gefüllt wird.
+     - Keine Abdunklung, keine Ränder, keine Schatten.
+   - Falls gewünscht, kann später ein UI-Schalter `Füllen / Einpassen` ergänzt werden; für diesen Fix bleibt es bei der bestehenden Formatlogik ohne visuelle Filter.
+
+4. **Fallback nur für echte Fehler verwenden**
+   - Wenn ein Video nicht lädt, darf weiterhin ein Fallback erscheinen.
+   - Dieser Fallback darf keine Vignette/Schatten enthalten und soll klar vom echten Video-Look getrennt bleiben.
+
+5. **Validierung**
+   - Einen lokalen Preview-Check mit einer Video-Szene machen:
+     - Step 3 Rohvideo vs. Step 4 Remotion Preview vergleichen.
+     - Prüfen, dass keine dunklen Ecken/Umrandungen mehr sichtbar sind.
+     - Prüfen, dass Originalsound/Voiceover-Mix unverändert weiter funktioniert.
 
 ## Ergebnis
-
-Step 4 zeigt das Video 1:1 wie Step 3, ohne Vignette/Rahmen. Untertitel-Kontrast im Universal Creator wird bereits über den Text-Style (Stroke/Shadow/Box) im `PrecisionSubtitleOverlay` gesichert — kein Contrast-Overlay nötig.
-
-Kein Backend-Change, keine Business-Logik, kein Renderer-Payload-Change (das gerenderte Endergebnis wird gleich clean wie die Vorschau).
+Step 4 zeigt das hochgeladene Video wie Step 3: nur ins Ausgabeformat gebracht, ohne zusätzliche Optik. Director’s-Cut-artige Looks bleiben aus dem Universal Content Creator draußen.

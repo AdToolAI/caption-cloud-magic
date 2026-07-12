@@ -154,6 +154,9 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
     // Original scene-video audio (global settings; per-scene overrides live on scene.originalAudio)
     useOriginalAudio,
     originalAudioVolume,
+    // Universal Creator is a clean media assembler: keep user media visually raw.
+    // Director's-Cut-style grading/vignettes/effects must not leak into Step 4/export.
+    rawMediaMode: true,
     // Subtitles
     subtitles: subtitleConfig?.segments || [],
     subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
