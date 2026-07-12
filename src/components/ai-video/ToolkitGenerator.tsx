@@ -118,6 +118,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     spokenLanguage === 'auto'
       ? (language === 'de' ? 'de' : language === 'es' ? 'es' : 'en')
       : spokenLanguage;
+  // Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext
+  // produziert. Alles außerhalb → ambient-only Fallback (kein Voiceover), sonst
+  // erfindet z. B. Kling für DE/ES eine Fantasie-Sprache.
+  const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
+    veo:        ['en', 'de', 'es'],
+    sora:       ['en', 'de', 'es'],
+    kling:      ['en'],
+    grok:       ['en'],
+    happyhorse: ['en'],
+    ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
+  };
+  const ttsLangSupported =
+    (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /**
    * Placement of the uploaded reference image within the generated clip:
