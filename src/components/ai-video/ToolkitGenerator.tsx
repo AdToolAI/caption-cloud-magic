@@ -522,8 +522,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }
         body.referenceImages = viduReferences.map((s) => s.url);
         body.referenceRoles = viduReferences.map((s) => s.role);
-      } else if (composedSubjectRefs && composedSubjectRefs.length > 0) {
+      } else if (composedSubjectRefs && composedSubjectRefs.length > 0 && !body.referenceImages) {
         // Subject-reference providers (non-Vidu path is rare, but keep it symmetric).
+        // Do not overwrite the composed character anchor if it was already routed above.
         body.referenceImages = composedSubjectRefs;
       }
       if (model.capabilities.audio) body.generateAudio = generateAudio;
