@@ -425,7 +425,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           if (
             !composedFirstFrame &&
             !(providerSupportsSubjectRefs && composedSubjectRefs && composedSubjectRefs.length > 0) &&
-            model.capabilities.i2v
+            (model.capabilities.i2v || model.capabilities.anchorOnly)
           ) {
             throw new Error(
               language === 'de'
