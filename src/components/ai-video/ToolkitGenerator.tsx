@@ -674,6 +674,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         supportsImageInput={model.capabilities.i2v}
       />
 
+      {/* v241 — text-only warning: model can't accept image reference at all */}
+      {castCharacterIds.length > 0 &&
+        !model.capabilities.i2v &&
+        !model.capabilities.anchorOnly &&
+        !model.capabilities.multiRef && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            {language === 'de'
+              ? `${model.name} akzeptiert keine Bild-Referenz — die gewählten Charaktere werden nur textlich beschrieben. Für garantierte Charakter-Treue wähle ein Modell mit Bild-Anker (Kling, Veo, Hailuo, HappyHorse …).`
+              : language === 'es'
+              ? `${model.name} no acepta imagen de referencia — los personajes se describen sólo por texto. Para fidelidad garantizada usa un modelo con anclaje de imagen (Kling, Veo, Hailuo, HappyHorse …).`
+              : `${model.name} does not accept a reference image — the selected characters will only be described in text. For guaranteed character fidelity pick an image-anchor model (Kling, Veo, Hailuo, HappyHorse …).`}
+          </span>
+        </div>
+      )}
+
       {/* ── Multi-Reference (only for capabilities.multiRef → Vidu Q2 Reference2V) ── */}
       {model.capabilities.multiRef && (
         <MultiReferenceUploader
