@@ -1054,6 +1054,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 </Select>
               </div>
             )}
+            {generateAudio && !ttsLangSupported && (
+              <p className="text-[11px] leading-snug text-amber-500/90 pt-1 border-t border-border/30">
+                {language === 'de'
+                  ? `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : 'diese Sprache'} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`
+                  : language === 'es'
+                  ? `${model.name} no admite ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'} de forma fiable. Esta escena se generará sin voz — solo sonido ambiente/música. Para voz real usa p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`
+                  : `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. This scene will render without voiceover — ambient sound / music only. For real voiceover pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`}
+              </p>
+            )}
           </div>
         )}
       </Card>
