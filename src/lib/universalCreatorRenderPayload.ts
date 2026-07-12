@@ -91,6 +91,14 @@ export function normalizeScenesForUniversalCreatorVideo(scenes?: any[] | null): 
       soundEffectType: scene.soundEffectType || 'none',
       useAnimation: Boolean(scene.useAnimation && scene.animatedVideoUrl),
       beatAligned: Boolean(scene.beatAligned),
+      // Preserve per-scene original-audio override (step-2 mute etc.)
+      originalAudio: scene.originalAudio && typeof scene.originalAudio === 'object'
+        ? {
+            muted: scene.originalAudio.muted === true,
+            ...(typeof scene.originalAudio.enabled === 'boolean' ? { enabled: scene.originalAudio.enabled } : {}),
+            ...(typeof scene.originalAudio.volume === 'number' ? { volume: clampAudioVolume(scene.originalAudio.volume) } : {}),
+          }
+        : undefined,
     };
   });
 }
@@ -121,11 +129,19 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
     typeof musicVolume === 'number' ? musicVolume : DEFAULT_MUSIC_VOLUME,
   );
 
+  const useOriginalAudio = contentConfig?.useOriginalAudio === true;
+  const originalAudioVolume = clampAudioVolume(
+    typeof contentConfig?.originalAudioVolume === 'number' ? contentConfig.originalAudioVolume : 0.6,
+  );
+
+  const actualVo = Number(contentConfig?.actualVoiceoverDuration ?? contentConfig?.voiceoverDuration ?? 0);
+  const voDurationForRender = Number.isFinite(actualVo) && actualVo > 0 ? actualVo : durationSeconds;
+
   return {
     // Voice-over
     ...(hasVoiceover && {
       voiceoverUrl: contentConfig!.voiceoverUrl,
-      voiceoverDuration: durationSeconds,
+      voiceoverDuration: voDurationForRender,
       voiceoverVolume: clampAudioVolume(
         contentConfig?.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME,
       ),
@@ -135,6 +151,9 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
       backgroundMusicUrl: selectedMusicUrl,
       backgroundMusicVolume: getEffectiveBackgroundMusicVolume(rawMusicVolume, hasVoiceover),
     }),
+    // Original scene-video audio (global settings; per-scene overrides live on scene.originalAudio)
+    useOriginalAudio,
+    originalAudioVolume,
     // Subtitles
     subtitles: subtitleConfig?.segments || [],
     subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,

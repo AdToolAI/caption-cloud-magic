@@ -234,6 +234,9 @@ export const UniversalCreatorVideoSchema = z.object({
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().default(0.35),
   masterVolume: z.number().default(1.0),
+  useOriginalAudio: z.boolean().default(false),
+  originalAudioVolume: z.number().default(0.6),
+  previewMode: z.boolean().default(false),
   soundEffects: z.array(z.object({
     sceneId: z.string(),
     soundUrl: z.string(),
@@ -1799,8 +1802,18 @@ const SceneBackground: React.FC<{
   disableSceneFx?: boolean;
   contrastOverlayType?: ContrastOverlayType;
   cinematicProfile?: CinematicProfile;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile }) => {
+  useOriginalAudio?: boolean;
+  originalAudioVolume?: number;
+  previewMode?: boolean;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile, useOriginalAudio = false, originalAudioVolume = 0.6, previewMode = false }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
+
+  // Resolve per-scene original-audio: step-2 hard-mute wins, then per-scene toggle, then global.
+  const sceneOA = (scene as any).originalAudio as { muted?: boolean; enabled?: boolean; volume?: number } | undefined;
+  const forcedMute = sceneOA?.muted === true;
+  const sceneWantsAudio = typeof sceneOA?.enabled === 'boolean' ? sceneOA.enabled : useOriginalAudio;
+  const audioMuted = forcedMute || !sceneWantsAudio;
+  const audioVolume = typeof sceneOA?.volume === 'number' ? sceneOA.volume : originalAudioVolume;
   
   // Hailuo animated video
   if (animatedVideoUrl && useAnimation) {
@@ -1813,6 +1826,9 @@ const SceneBackground: React.FC<{
           sceneType={type}
           primaryColor={primaryColor}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          muted={audioMuted}
+          volume={audioVolume}
+          previewMode={previewMode}
         />
         <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
         {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
@@ -1866,7 +1882,7 @@ const SceneBackground: React.FC<{
     return (
       <PopInElement delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
-          {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
+          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
           {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
@@ -1883,7 +1899,7 @@ const SceneBackground: React.FC<{
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
-          {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
+          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
           {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
@@ -1958,7 +1974,7 @@ const SceneBackground: React.FC<{
   return (
     <AbsoluteFill style={{ opacity, filter: moodFilter }}>
       <div style={{ width: '100%', height: '100%', transform, overflow: 'hidden' }}>
-        {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
+        {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
       </div>
       <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
       {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
@@ -1969,23 +1985,39 @@ const SceneBackground: React.FC<{
   );
 };
 
-// SafeVideo with delayRender + 20s timeout for Lambda stability (analog to SafeImg)
-const SafeVideo: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string; style?: React.CSSProperties }> = ({ src, sceneType, primaryColor, secondaryColor, style }) => {
+// SafeVideo with delayRender + timeout for Lambda stability (analog to SafeImg)
+// In preview mode the delayRender handle is released after 2s to avoid black-screen deadlocks
+// when the video is still buffering; Lambda keeps the full 20s window to guarantee clean frames.
+const SafeVideo: React.FC<{
+  src: string;
+  sceneType?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  style?: React.CSSProperties;
+  muted?: boolean;
+  volume?: number;
+  previewMode?: boolean;
+}> = ({ src, sceneType, primaryColor, secondaryColor, style, muted = true, volume = 1, previewMode = false }) => {
   const [failed, setFailed] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
   const [handle] = React.useState(() => delayRender('SafeVideo: ' + (src?.slice(0, 40) || 'unknown')));
 
   React.useEffect(() => {
     if (loaded || failed) return;
+    const timeoutMs = previewMode ? 2000 : 20000;
     const timer = setTimeout(() => {
-      if (!loaded && !failed) {
+      if (previewMode) {
+        // Preview: release handle silently so the composition keeps rendering.
+        // The <Video> keeps loading and appears as soon as data arrives.
+        try { continueRender(handle); } catch (_) {}
+      } else if (!loaded && !failed) {
         console.warn(`[SafeVideo] Timeout: video not loaded after 20s, forcing fallback for ${src?.slice(0, 60)}`);
         setFailed(true);
         try { continueRender(handle); } catch (_) {}
       }
-    }, 20000);
+    }, timeoutMs);
     return () => clearTimeout(timer);
-  }, [src, loaded, failed, handle]);
+  }, [src, loaded, failed, handle, previewMode]);
 
   if (failed || !src) {
     return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
@@ -1995,7 +2027,8 @@ const SafeVideo: React.FC<{ src: string; sceneType?: string; primaryColor?: stri
       src={src}
       style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
       loop
-      muted
+      muted={muted}
+      volume={muted ? 0 : Math.max(0, Math.min(1, volume))}
       pauseWhenBuffering
       onLoadedData={() => {
         if (!loaded) {
@@ -2050,7 +2083,7 @@ const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string
 };
 
 // Helper to render background content
-function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string) {
+function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string, audioMuted: boolean = true, audioVolume: number = 1, previewMode: boolean = false) {
   if (background.type === 'color') {
     return <AbsoluteFill style={{ backgroundColor: background.color || '#000000' }} />;
   }
@@ -2068,7 +2101,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   if (background.type === 'video' && background.videoUrl) {
     return (
       <AbsoluteFill>
-        <SafeVideo src={background.videoUrl} sceneType={sceneType} primaryColor={primaryColor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <SafeVideo src={background.videoUrl} sceneType={sceneType} primaryColor={primaryColor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted={audioMuted} volume={audioVolume} previewMode={previewMode} />
       </AbsoluteFill>
     );
   }
@@ -2700,6 +2733,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   preferredFont = 'inter',
   category = 'social-reel',
   diag,
+  useOriginalAudio = false,
+  originalAudioVolume = 0.6,
+  previewMode = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
@@ -3063,6 +3099,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                    disableSceneFx={diagToggles.disableSceneFx}
                    contrastOverlayType={contrastOverlayType}
                    cinematicProfile={cinematicProfile}
+                   useOriginalAudio={useOriginalAudio}
+                   originalAudioVolume={originalAudioVolume}
+                   previewMode={previewMode}
                  />
                 <TextOverlay
                   scene={(() => {

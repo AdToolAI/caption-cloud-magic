@@ -147,8 +147,11 @@ export function RemotionPreviewPlayer({
 
   const inputProps: Record<string, any> = useMemo(() => ({
     ...customizations,
-    // Preview audio is mixed through persistent HTMLAudioElements below. This
-    // keeps Remotion from remounting <Audio /> nodes on every slider movement.
+    // Preview audio (VO/music) is mixed through persistent HTMLAudioElements below.
+    // Original scene audio stays inside the Remotion <Video /> and is controlled
+    // via useOriginalAudio + per-scene overrides. previewMode enables SafeVideo's
+    // 2s delayRender fallback so buffering doesn't cause a black screen.
+    previewMode: true,
     diag: {
       ...(customizations?.diag || {}),
       silentRender: true,

@@ -12,6 +12,15 @@ export interface SceneTransition {
   direction?: 'left' | 'right' | 'up' | 'down';
 }
 
+export interface SceneOriginalAudio {
+  /** Hard mute set in step 2 — always wins over global toggle. */
+  muted?: boolean;
+  /** Overrides global useOriginalAudio toggle when defined. */
+  enabled?: boolean;
+  /** Overrides global originalAudioVolume when defined. 0..1 */
+  volume?: number;
+}
+
 export interface Scene {
   id: string;
   order: number;
@@ -22,6 +31,7 @@ export interface Scene {
     type: 'none' | 'zoomIn' | 'panLeft' | 'panRight' | 'panUp' | 'panDown';
     intensity?: number;
   };
+  originalAudio?: SceneOriginalAudio;
 }
 
 export interface ScenesConfig {
