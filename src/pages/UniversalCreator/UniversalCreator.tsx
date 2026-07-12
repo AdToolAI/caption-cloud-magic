@@ -22,6 +22,7 @@ import { SubtitleTimingStep } from '@/components/universal-creator/steps/Subtitl
 import { PreviewExportStep } from '@/components/universal-creator/steps/PreviewExportStep';
 import { BackgroundAssetSelector } from '@/components/universal-creator/BackgroundAssetSelector';
 import { AudioAssetSelector } from '@/components/universal-creator/AudioAssetSelector';
+import { OriginalAudioMixPanel } from '@/components/universal-creator/OriginalAudioMixPanel';
 import { SceneTimeline } from '@/components/universal-creator/SceneTimeline';
 import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPreviewPlayer';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
