@@ -558,7 +558,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         // Do not overwrite the composed character anchor if it was already routed above.
         body.referenceImages = composedSubjectRefs;
       }
-      if (model.capabilities.audio) body.generateAudio = generateAudio;
+      if (model.capabilities.audio) {
+        body.generateAudio = generateAudio;
+        if (generateAudio) body.spokenLanguage = effectiveSpokenLang;
+      }
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
