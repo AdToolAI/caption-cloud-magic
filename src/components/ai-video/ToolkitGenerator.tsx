@@ -578,7 +578,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       }
       if (model.capabilities.audio) {
         body.generateAudio = generateAudio;
-        if (generateAudio) body.spokenLanguage = effectiveSpokenLang;
+        if (generateAudio && ttsLangSupported) {
+          body.spokenLanguage = effectiveSpokenLang;
+        } else if (generateAudio && !ttsLangSupported) {
+          body.suppressDialogue = true;
+        }
       }
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
