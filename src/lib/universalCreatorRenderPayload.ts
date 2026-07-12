@@ -91,6 +91,14 @@ export function normalizeScenesForUniversalCreatorVideo(scenes?: any[] | null): 
       soundEffectType: scene.soundEffectType || 'none',
       useAnimation: Boolean(scene.useAnimation && scene.animatedVideoUrl),
       beatAligned: Boolean(scene.beatAligned),
+      // Preserve per-scene original-audio override (step-2 mute etc.)
+      originalAudio: scene.originalAudio && typeof scene.originalAudio === 'object'
+        ? {
+            muted: scene.originalAudio.muted === true,
+            ...(typeof scene.originalAudio.enabled === 'boolean' ? { enabled: scene.originalAudio.enabled } : {}),
+            ...(typeof scene.originalAudio.volume === 'number' ? { volume: clampAudioVolume(scene.originalAudio.volume) } : {}),
+          }
+        : undefined,
     };
   });
 }
