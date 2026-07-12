@@ -26,6 +26,10 @@ export interface ContentConfig {
   voiceoverVolume?: number; // 0–1, default 1.0
   backgroundMusicUrl?: string;
   backgroundMusicVolume?: number;
+  /** Global toggle to include original scene-video audio. Default false. */
+  useOriginalAudio?: boolean;
+  /** Global volume for original scene-video audio when useOriginalAudio=true. 0..1, default 0.6. */
+  originalAudioVolume?: number;
 }
 
 export interface SubtitleWord {
