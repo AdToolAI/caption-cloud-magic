@@ -506,6 +506,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           anchorRoute = 'text-only';
         }
       }
+      setLastAnchorRoute(anchorRoute);
       // v2v: pass reference clip + reference type (Kling-3 omni)
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
