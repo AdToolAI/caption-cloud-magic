@@ -1,47 +1,39 @@
-## Ziel
-Drei zusammenhängende Probleme im Universal Content Creator lösen:
+## Ursache (verifiziert im Code)
 
-1. **Schwarze Szene bleibt schwarz**, wenn eine leere Default-Szene existiert und man in Schritt 3 ein Video als Hintergrund wählt. Nur eine *neue* Szene hinzufügen bringt das Video an.
-2. **Mute-Toggle scheinbar nicht sichtbar** in Schritt 2/3 — weil er nur bei `background.type === 'video'` gerendert wird und die vorhandene Szene bei den Nutzern noch `type: 'color'` (schwarz) ist.
-3. **Original-Ton bleibt stumm** obwohl ein Video-Hintergrund gewählt ist, weil der globale `useOriginalAudio`-Toggle in Schritt 4 per Default aus ist.
+Der Original-Ton der Szene läuft in Remotion via `<Video>` innerhalb der Composition. In `RemotionPreviewPlayer.tsx` wird nach jedem Klick auf Play und im Autoplay-Effekt aktiv:
 
-## Ursache (kurz)
+```
+playerRef.current.unmute();
+playerRef.current.setVolume(0);   // ← killt den Original-Ton
+```
 
-- `BackgroundAssetSelector` setzt nur den State `backgroundAsset`. Erst `handleAddScene()` (Button "Szene hinzufügen") übernimmt das Asset in eine neue Szene. Eine bereits existierende schwarze Default-Szene wird nie aktualisiert.
-- Der Volume2/VolumeX-Button in `SceneTimeline` erscheint erst wenn eine Szene tatsächlich Video ist. Solange die Auto-Übernahme fehlt, sieht der Nutzer den Toggle nie.
-- `contentConfig.useOriginalAudio` ist standardmäßig `undefined` → im Player als "aus" gewertet.
+Zeilen 252/253 (Autoplay), 379/380 (handlePlayClick), 394/395 (toggleMute). Die Zeile `setVolume(0)` stammt aus der Zeit, als Voice-Over und Musik ausschließlich extern über HTMLAudioElements liefen und der Player deshalb stumm bleiben sollte, um Doppelspur zu vermeiden. VO/Musik werden über `diag.silentRender=true` (Zeile 157 im Player, ausgewertet in `UniversalCreatorVideo.tsx` Zeile 2973/3034/3045) bereits aus der Composition entfernt — das `setVolume(0)` mutet damit heute nur noch den `<Video>`-Originalton.
 
-## Änderungen
+Deshalb:
+- Der Player-Slider steht sichtbar auf 100 % (extern gemischt), aber der Remotion-Player intern auf 0 → Original-Video-Ton stumm.
+- Der Master-Mute-Button im Preview steuert den externen Mix, nicht den Remotion-Player. Original-Ton bleibt daher stumm, egal was der Nutzer klickt.
 
-### 1. Hintergrund-Auswahl übernimmt eine leere Default-Szene automatisch
-`src/pages/UniversalCreator/UniversalCreator.tsx`
+## Fix
 
-- `BackgroundAssetSelector.onSelectAsset` wird über einen neuen Handler `handleSelectBackgroundAsset(asset)` geführt:
-  - Setzt weiterhin `setBackgroundAsset(asset)`.
-  - Wenn `scenes.length === 0`: sofort eine Szene mit dem Asset erzeugen (`addScene(mapped, 5)`).
-  - Wenn die *letzte* Szene eine unveränderte Default-Schwarz-Szene ist (`background.type === 'color'` und `color` in `{'#000000','#000'}` und keine `videoUrl/imageUrl`): diese Szene per `setScenes` durch das gemappte Video/Bild ersetzen statt eine neue anzuhängen.
-  - Andernfalls: Verhalten wie bisher (Asset nur staged, Nutzer entscheidet über "Szene hinzufügen").
-- `handleAddScene` bleibt, damit man bewusst weitere Szenen anhängen kann.
+Datei: `src/components/universal-creator/RemotionPreviewPlayer.tsx`
 
-### 2. Per-Szene Mute-Toggle in Schritt 3 immer erreichbar machen
-`src/components/universal-creator/SceneTimeline.tsx`
+1. Player-Volume an den externen Mix koppeln, statt ihn auf 0 zu forcieren.
+   - Neue kleine Helferfunktion `applyPlayerVolume()` liest den aktuellen `isMuted`/`volume`-State und ruft `playerRef.current.setVolume(isMuted ? 0 : volume)`. Unmute/Mute werden weiterhin über `unmute()` / interne `isMuted`-Steuerung geführt.
+2. Ersetzen:
+   - `handlePlayClick`: `setVolume(0)` → `applyPlayerVolume()`.
+   - Autoplay-`useEffect`: nach `unmute()` → `applyPlayerVolume()` statt implizites Volume 0.
+   - `toggleMute` (unmute-Zweig): `setVolume(0)` → `applyPlayerVolume()`; im Mute-Zweig zusätzlich `playerRef.current?.mute()` bzw. `setVolume(0)` — konsistent mit dem externen Mix, damit auch der Original-Ton mit der Master-Mute-Taste stumm geht.
+   - `handleVolumeChange`: nach Setzen des externen Volumes zusätzlich `applyPlayerVolume()` aufrufen, damit der Original-Ton dem Master-Slider folgt.
+3. Ein `useEffect([isMuted, volume])` synchronisiert das Player-Volume nachträglich, falls React-State-Updates asynchron auflaufen (z. B. beim Laden von neuen `customizations`).
 
-- Toggle-Button rendert weiter nur, wenn die Szene tatsächlich einen Audio-tragenden Hintergrund hat (`background.type === 'video'`), da bei Farbe/Bild/Gradient kein Original-Ton existiert. Nach Fix #1 wird die Szene sofort zum Video-Typ, sodass der Toggle sichtbar wird — was das Nutzer-Problem "Toggle fehlt in Schritt 2" auflöst, ohne UI-Rauschen bei stummen Backgrounds.
-- Kleiner Text-Hinweis unter der Szene bei Nicht-Video-Typen: "Original-Ton nur für Video-Szenen verfügbar." (optional, i18n-Key `uc.originalAudioOnlyVideo`).
+## Warum keine weiteren Änderungen nötig sind
 
-### 3. Original-Ton standardmäßig aktivieren
-`src/pages/UniversalCreator/UniversalCreator.tsx`
+- Der pro-Szene `muted`-Toggle und das globale `useOriginalAudio` werden schon korrekt an `<Video muted volume>` gereicht (`UniversalCreatorVideo.tsx` 1815/1816, 2030/2031). Deren Logik ist nachweislich intakt.
+- Voice-Over und Musik laufen weiter extern via `voiceoverAudioRef` / `musicAudioRef`; `diag.silentRender=true` stellt sicher, dass es keine Doppelspur gibt.
+- Der finale Export in `render-universal-creator` läuft ohne `previewMode`/`silentRender` — dort ist das Verhalten sowieso vom Player-Volume unabhängig.
 
-- Beim ersten Anhängen einer Video-Szene (Fix #1 oder normales Add): falls `contentConfig?.useOriginalAudio === undefined`, auf `true` initialisieren und `originalAudioVolume` auf `0.6` setzen. So hört der Nutzer den Original-Ton sofort, kann ihn aber jederzeit in Schritt 4 oder pro Szene in Schritt 3 stummschalten.
-- Die vorhandenen Overrides (per-Szene `muted`) gewinnen weiterhin wie in v-Original geplant.
+## Nicht Teil des Fixes
 
-## Technische Notizen
-
-- Keine Änderungen an `SafeVideo`, `UniversalCreatorVideo.tsx`, oder am Render-Payload nötig — die Verkabelung Audio→Remotion existiert bereits, sie wurde nur nie mit `useOriginalAudio=true` und einer Video-Szene aktiviert.
-- Erkennung "unveränderte Default-Schwarz-Szene" bewusst konservativ (nur exakt Default-Farbe & keine sonstigen Media-URLs), damit Nutzer, die absichtlich eine schwarze Farbszene angelegt haben, diese nicht verlieren.
-- i18n: neuer Key `uc.originalAudioOnlyVideo` (DE/EN/ES).
-
-## Nicht Teil dieses Plans
-- Umbau des Wizard-Ablaufs.
-- Änderungen an anderen Steps oder am Export-Payload.
-- Neue Audio-Ducking-Logik gegenüber Voice-Over (bereits vorhanden).
+- Änderungen am Render-Payload oder an `SafeVideo`.
+- Änderungen am Per-Szene-Mute-Toggle (funktioniert bereits, sobald der Player-Volume-Bug gefixt ist).
+- Änderungen an VO/Musik-Mix (getrennter Kanal, nicht betroffen).

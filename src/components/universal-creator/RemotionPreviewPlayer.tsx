@@ -245,14 +245,28 @@ export function RemotionPreviewPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewAudio.voiceoverUrl, previewAudio.backgroundMusicUrl]);
 
+  // Keep Remotion Player volume in sync with the external mix, so the
+  // scene <Video>'s original audio track follows master mute/volume.
+  const applyPlayerVolume = useCallback(() => {
+    const p = playerRef.current;
+    if (!p) return;
+    const v = isMuted ? 0 : clampAudioVolume(volume);
+    try { p.setVolume(v); } catch { /* noop */ }
+  }, [isMuted, volume]);
+
+  useEffect(() => {
+    applyPlayerVolume();
+  }, [applyPlayerVolume]);
+
   useEffect(() => {
     if (!autoPlay || !playerRef.current) return;
     setHasEverInteracted(true);
     setIsMuted(false);
     playerRef.current.unmute();
+    applyPlayerVolume();
     playerRef.current.play();
     void playPreviewAudio();
-  }, [autoPlay, playPreviewAudio]);
+  }, [autoPlay, playPreviewAudio, applyPlayerVolume]);
 
   useEffect(() => {
     const player = playerRef.current;
@@ -377,11 +391,12 @@ export function RemotionPreviewPlayer({
     if (!playerRef.current) return;
     if (!hasEverInteracted) setHasEverInteracted(true);
     playerRef.current.unmute();
-    playerRef.current.setVolume(0);
     setIsMuted(false);
+    // Player volume drives scene <Video> original audio; keep it in sync with master.
+    try { playerRef.current.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
     playerRef.current.play(e);
     void playPreviewAudio();
-  }, [hasEverInteracted, playPreviewAudio]);
+  }, [hasEverInteracted, playPreviewAudio, volume]);
 
   const handlePauseClick = useCallback(() => {
     playerRef.current?.pause();
@@ -392,13 +407,14 @@ export function RemotionPreviewPlayer({
     if (isMuted) {
       setIsMuted(false);
       playerRef.current?.unmute();
-      playerRef.current?.setVolume(0);
+      try { playerRef.current?.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
       if (isPlaying) void playPreviewAudio();
     } else {
       setIsMuted(true);
+      try { playerRef.current?.setVolume(0); } catch { /* noop */ }
       pausePreviewAudio();
     }
-  }, [isMuted, isPlaying, pausePreviewAudio, playPreviewAudio]);
+  }, [isMuted, isPlaying, pausePreviewAudio, playPreviewAudio, volume]);
 
   const handleVolumeChange = useCallback((value: number[]) => {
     const newVolume = clampAudioVolume(value[0]);
