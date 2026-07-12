@@ -1799,8 +1799,18 @@ const SceneBackground: React.FC<{
   disableSceneFx?: boolean;
   contrastOverlayType?: ContrastOverlayType;
   cinematicProfile?: CinematicProfile;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile }) => {
+  useOriginalAudio?: boolean;
+  originalAudioVolume?: number;
+  previewMode?: boolean;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile, useOriginalAudio = false, originalAudioVolume = 0.6, previewMode = false }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
+
+  // Resolve per-scene original-audio: step-2 hard-mute wins, then per-scene toggle, then global.
+  const sceneOA = (scene as any).originalAudio as { muted?: boolean; enabled?: boolean; volume?: number } | undefined;
+  const forcedMute = sceneOA?.muted === true;
+  const sceneWantsAudio = typeof sceneOA?.enabled === 'boolean' ? sceneOA.enabled : useOriginalAudio;
+  const audioMuted = forcedMute || !sceneWantsAudio;
+  const audioVolume = typeof sceneOA?.volume === 'number' ? sceneOA.volume : originalAudioVolume;
   
   // Hailuo animated video
   if (animatedVideoUrl && useAnimation) {
