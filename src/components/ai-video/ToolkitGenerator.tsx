@@ -101,6 +101,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [duration, setDuration] = useState<number>(model.durations[0]);
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
+  // Provider-side TTS (Kling / Veo / Sora) defaults to English unless the prompt
+  // explicitly names a target language. We let the user override the auto-pick
+  // (which follows the UI language) so a DE user can force ES/EN audio if desired.
+  const SPOKEN_LANG_KEY = 'ai-video-toolkit:spoken-lang';
+  const [spokenLanguage, setSpokenLanguage] = useState<'auto' | 'de' | 'en' | 'es'>(() => {
+    try {
+      const v = typeof localStorage !== 'undefined' ? localStorage.getItem(SPOKEN_LANG_KEY) : null;
+      return v === 'de' || v === 'en' || v === 'es' || v === 'auto' ? v : 'auto';
+    } catch { return 'auto'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(SPOKEN_LANG_KEY, spokenLanguage); } catch { /* noop */ }
+  }, [spokenLanguage]);
+  const effectiveSpokenLang: 'de' | 'en' | 'es' =
+    spokenLanguage === 'auto'
+      ? (language === 'de' ? 'de' : language === 'es' ? 'es' : 'en')
+      : spokenLanguage;
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /**
    * Placement of the uploaded reference image within the generated clip:
