@@ -2733,6 +2733,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   preferredFont = 'inter',
   category = 'social-reel',
   diag,
+  useOriginalAudio = false,
+  originalAudioVolume = 0.6,
+  previewMode = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
