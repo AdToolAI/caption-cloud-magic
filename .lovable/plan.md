@@ -1,39 +1,47 @@
-## Ursache (verifiziert im Code)
+## Diagnose
 
-Der Original-Ton der Szene läuft in Remotion via `<Video>` innerhalb der Composition. In `RemotionPreviewPlayer.tsx` wird nach jedem Klick auf Play und im Autoplay-Effekt aktiv:
+`ToolkitGenerator.tsx` komponiert heute nur bedingt einen Nano-Banana-2 Startframe:
+- nur bei `referencePlacement === 'start'`
+- nur bei Modellen mit `ClipSource` (LTX/Grok fallen raus)
+- Ergebnis wird nur genutzt wenn `model.capabilities.i2v === true`
 
-```
-playerRef.current.unmute();
-playerRef.current.setVolume(0);   // ← killt den Original-Ton
-```
+Für text-only Modelle (Sora 2, Grok, LTX) landet gar kein Bild beim Provider → der Charakter erscheint zufällig (50/50).
+Zusätzlich: bei mehreren gepickten Charakteren komponieren wir zwar den Frame mit allen Slots (`characterShots` bis 4), aber der Frame wird nicht immer als Startframe/Anchor durchgereicht — z. B. bei Vidu Q2 konkurriert er als ein `referenceImages[]`-Slot mit anderen Referenzen.
 
-Zeilen 252/253 (Autoplay), 379/380 (handlePlayClick), 394/395 (toggleMute). Die Zeile `setVolume(0)` stammt aus der Zeit, als Voice-Over und Musik ausschließlich extern über HTMLAudioElements liefen und der Player deshalb stumm bleiben sollte, um Doppelspur zu vermeiden. VO/Musik werden über `diag.silentRender=true` (Zeile 157 im Player, ausgewertet in `UniversalCreatorVideo.tsx` Zeile 2973/3034/3045) bereits aus der Composition entfernt — das `setVolume(0)` mutet damit heute nur noch den `<Video>`-Originalton.
+Motion Studio funktioniert zuverlässig, weil dort `prepareSceneAnchor` immer den Nano-Banana-2 Multi-Character-Frame komponiert und als `startImageUrl` (bzw. echten Anchor) durchreicht — inkl. Lip-Sync-Pfad. Genau die Frame-Kompo, **ohne** Lip-Sync, wollen wir 1:1 ins AI Video Studio übernehmen.
 
-Deshalb:
-- Der Player-Slider steht sichtbar auf 100 % (extern gemischt), aber der Remotion-Player intern auf 0 → Original-Video-Ton stumm.
-- Der Master-Mute-Button im Preview steuert den externen Mix, nicht den Remotion-Player. Original-Ton bleibt daher stumm, egal was der Nutzer klickt.
+## Ziel
 
-## Fix
+Wenn im Toolkit **einer oder mehrere** Charaktere gepickt sind, wird immer ein Nano-Banana-2 Multi-Character-Startframe komponiert und garantiert als erste Referenz an das gewählte Modell übergeben — ohne Lip-Sync-Kette.
 
-Datei: `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+## Umsetzung
 
-1. Player-Volume an den externen Mix koppeln, statt ihn auf 0 zu forcieren.
-   - Neue kleine Helferfunktion `applyPlayerVolume()` liest den aktuellen `isMuted`/`volume`-State und ruft `playerRef.current.setVolume(isMuted ? 0 : volume)`. Unmute/Mute werden weiterhin über `unmute()` / interne `isMuted`-Steuerung geführt.
-2. Ersetzen:
-   - `handlePlayClick`: `setVolume(0)` → `applyPlayerVolume()`.
-   - Autoplay-`useEffect`: nach `unmute()` → `applyPlayerVolume()` statt implizites Volume 0.
-   - `toggleMute` (unmute-Zweig): `setVolume(0)` → `applyPlayerVolume()`; im Mute-Zweig zusätzlich `playerRef.current?.mute()` bzw. `setVolume(0)` — konsistent mit dem externen Mix, damit auch der Original-Ton mit der Master-Mute-Taste stumm geht.
-   - `handleVolumeChange`: nach Setzen des externen Volumes zusätzlich `applyPlayerVolume()` aufrufen, damit der Original-Ton dem Master-Slider folgt.
-3. Ein `useEffect([isMuted, volume])` synchronisiert das Player-Volume nachträglich, falls React-State-Updates asynchron auflaufen (z. B. beim Laden von neuen `customizations`).
+### 1. Anchor-Kompo immer erzwingen wenn Cast vorhanden
+`src/components/ai-video/ToolkitGenerator.tsx`:
+- `shouldCompose` vereinfachen: Kompo läuft, sobald `anchorChars.length >= 1` und Modell entweder i2v- oder anchor-fähig ist — unabhängig von `referencePlacement`, außer der User hat manuell ein `startImageUrl` hochgeladen.
+- Cap bleibt bei 4 Slots (Nano Banana 2 Limit).
+- Bei `placement === 'end'` wird der Frame nur als Identity-Referenz (nicht als Startframe) genutzt, damit der Motiv-Endframe nicht doppelt erscheint.
 
-## Warum keine weiteren Änderungen nötig sind
+### 2. Routing des komponierten Frames
+- **i2v-Modelle** (Kling, Veo, Wan, Hailuo, Luma, Seedance, Runway, Pika, HappyHorse) → `body.startImageUrl = composedFirstFrame`.
+- **Anchor-fähig** (Vidu Q2, Kling 3 subject-ref) → composed Frame als **erster** Slot in `referenceImages` mit expliziter Rolle `character-anchor`, damit er nicht von User-Refs verdrängt wird.
+- **Text-only** (Sora 2, Grok, LTX) → kein Bild-Pfad möglich; stattdessen:
+  - Prompt-Suffix hart ausbauen: volle Appearance + Signature Items für jeden gepickten Charakter + Führungssatz „All listed characters MUST appear on-screen, recognizable as described."
+  - Unter dem Cast-Picker Hinweis: „Dieses Modell akzeptiert keine Bild-Referenz — Charaktere werden nur textlich beschrieben." (nur wenn Modell text-only)
 
-- Der pro-Szene `muted`-Toggle und das globale `useOriginalAudio` werden schon korrekt an `<Video muted volume>` gereicht (`UniversalCreatorVideo.tsx` 1815/1816, 2030/2031). Deren Logik ist nachweislich intakt.
-- Voice-Over und Musik laufen weiter extern via `voiceoverAudioRef` / `musicAudioRef`; `diag.silentRender=true` stellt sicher, dass es keine Doppelspur gibt.
-- Der finale Export in `render-universal-creator` läuft ohne `previewMode`/`silentRender` — dort ist das Verhalten sowieso vom Player-Volume unabhängig.
+### 3. Hard-Guard erweitern
+Der bestehende Guard (Z. 421) prüft nur i2v. Auch bei anchor-fähigen Modellen muss ein komponierter Frame **oder** eine Subject-Ref vorhanden sein — sonst Abbruch mit klarer Fehlermeldung statt stiller Namens-Fallback.
 
-## Nicht Teil des Fixes
+### 4. Kein Lip-Sync
+Wir triggern im Toolkit **keine** Sync.so-Kette und keine `dialog_shots`-Persistenz. Der Frame ist rein visueller Anchor; Audio bleibt Toolkit-Standard (kein VO, kein Face-Track-Preclip). Damit bleibt die Pipeline schlank und die Kosten stabil.
 
-- Änderungen am Render-Payload oder an `SafeVideo`.
-- Änderungen am Per-Szene-Mute-Toggle (funktioniert bereits, sobald der Player-Volume-Bug gefixt ist).
-- Änderungen an VO/Musik-Mix (getrennter Kanal, nicht betroffen).
+### 5. Debug-Chip (opt-in)
+Bei `?debug=1` unter dem Generate-Button: `anchorComposed`, `referenceRoute` (start/end/anchor/text-only), `characterCount`. Hilft bei künftigen 50/50-Reports.
+
+## Betroffene Dateien
+- `src/components/ai-video/ToolkitGenerator.tsx` — Kompo-Bedingungen, Route-Zuweisung, Hard-Guard, Debug-Chip
+- `src/components/ai-video/ToolkitCastWorldPicker.tsx` — text-only Warnhinweis
+- `buildCastWorldPromptSuffix` — Führungssatz bei mehreren Chars
+
+## Nicht angefasst
+Motion Studio, `prepareSceneAnchor` (wird nur wiederverwendet), Sync.so / Lip-Sync-Pipeline, Universal Creator, Picture Studio.

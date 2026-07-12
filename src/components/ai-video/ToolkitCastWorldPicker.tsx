@@ -439,10 +439,21 @@ export function buildCastWorldPromptSuffix(
   props: MotionStudioLocation[],
 ): string {
   const lines: string[] = [];
-  for (const c of characters) {
-    lines.push(`Featuring ${c.name}: ${c.description}.`);
-    if (c.signature_items?.trim()) {
-      lines.push(`Signature wardrobe (${c.name}): ${c.signature_items}.`);
+  if (characters.length > 0) {
+    // v241 — strong lead phrase so text-only providers (Vidu T2V, Runway v2v,
+    // …) reliably render the picked cast. Image-anchor providers get the
+    // composed Nano-Banana-2 startframe as primary lever.
+    const names = characters.map((c) => c.name).join(', ');
+    lines.push(
+      characters.length === 1
+        ? `The character ${names} MUST appear on-screen, clearly recognizable as described.`
+        : `All listed characters (${names}) MUST appear on-screen together, each clearly recognizable as described.`,
+    );
+    for (const c of characters) {
+      lines.push(`Featuring ${c.name}: ${c.description}.`);
+      if (c.signature_items?.trim()) {
+        lines.push(`Signature wardrobe (${c.name}): ${c.signature_items}.`);
+      }
     }
   }
   if (location) {

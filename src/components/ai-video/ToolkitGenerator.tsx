@@ -125,6 +125,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [composingScene, setComposingScene] = useState(false);
   const [lastAnchorComposed, setLastAnchorComposed] = useState(false);
+  const [lastAnchorRoute, setLastAnchorRoute] = useState<'start' | 'anchor' | 'text-only' | 'none'>('none');
+  const debugMode = searchParams.get('debug') === '1';
 
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
@@ -364,16 +366,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const clipSource = toolkitModelToClipSource(model);
       const hasCastOrWorld =
         anchorChars.length > 0 || !!castLocation || !!castBuilding || castProps.length > 0;
-      // Skip the composed first-frame anchor whenever the user wants the
-      // reference at the END or only as an identity anchor — otherwise the
-      // reference motif would appear at frame 0 (composed) AND at the intended
-      // moment (prompt), producing a visible double-appearance.
-      const placementSkipsAnchor = referencePlacement !== 'start';
+      const modelAcceptsImageAnchor =
+        !!model.capabilities.i2v || !!model.capabilities.anchorOnly;
+      // v241 — Multi-Character Startframe-Parität mit Motion Studio.
+      // Wir komponieren den Nano-Banana-2 Startframe IMMER, sobald Cast/World
+      // vorhanden ist, das Modell einen Bild-Anker akzeptiert und der User
+      // keinen eigenen Startframe hochgeladen hat. Placement 'end' / 'anchor'
+      // blockiert die Kompo nicht mehr — der komponierte Charakter-Frame wird
+      // im Routing-Block unten deterministisch als Startframe (i2v) bzw.
+      // erster Anchor-Ref (anchorOnly) durchgereicht.
       const shouldCompose =
         !startImageUrl &&
-        !placementSkipsAnchor &&
         hasCastOrWorld &&
         !!clipSource &&
+        modelAcceptsImageAnchor &&
         !(model.capabilities.multiRef && viduReferences.length > 0);
 
       if (shouldCompose) {
@@ -421,7 +427,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           if (
             !composedFirstFrame &&
             !(providerSupportsSubjectRefs && composedSubjectRefs && composedSubjectRefs.length > 0) &&
-            model.capabilities.i2v
+            (model.capabilities.i2v || model.capabilities.anchorOnly)
           ) {
             throw new Error(
               language === 'de'
@@ -445,16 +451,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }
       }
 
-      // i2v: composed scene frame > manual upload > @-mention fallback.
-      // Kein stiller Fallback aufs rohe Porträt mehr — dank Hard-Guard oben.
-      const referenceImage =
-        composedFirstFrame ??
-        startImageUrl ??
-        mentionResolved.referenceImageUrl ??
-        null;
-      // Route the reference image according to the user-selected placement.
-      // 'end'    → capabilities.endFrame (only Luma Ray 2 supports end-only)
-      // 'anchor' → capabilities.anchorOnly (Vidu Q2 / Kling 3 subject-reference)
+      // v241 — Split routing:
+      //   • composedFirstFrame (Nano-Banana-2 Multi-Char Anchor) is ALWAYS
+      //     used as identity anchor: startImageUrl for i2v models, first
+      //     referenceImages slot for anchor-only models. Placement is ignored
+      //     for the composed anchor (character must appear at frame 0).
+      //   • Any user-uploaded reference image or @-mention fallback follows
+      //     the selected placement (start / end / anchor) as before, but only
+      //     when no composed anchor exists.
       const effectivePlacement: 'start' | 'end' | 'anchor' =
         referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
         : referencePlacement === 'anchor' && !model.capabilities.anchorOnly ? 'start'
@@ -471,17 +475,38 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         return;
       }
 
-      if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
-        body.startImageUrl = referenceImage;
-      } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
-        body.endImageUrl = referenceImage;
-      } else if (referenceImage && effectivePlacement === 'anchor' && model.capabilities.anchorOnly) {
-        // Anchor mode: pass image via referenceImages[] without forcing a frame.
-        // Kling 3 accepts up to 7 refs, Vidu Q2 handles this through its own multi-ref path.
-        if (!model.capabilities.multiRef) {
-          body.referenceImages = [referenceImage];
+      // Route the composed character anchor first (highest priority).
+      let anchorRoute: 'start' | 'anchor' | 'text-only' | 'none' = 'none';
+      if (composedFirstFrame) {
+        if (model.capabilities.i2v) {
+          body.startImageUrl = composedFirstFrame;
+          anchorRoute = 'start';
+        } else if (model.capabilities.anchorOnly && !model.capabilities.multiRef) {
+          body.referenceImages = [composedFirstFrame];
+          anchorRoute = 'anchor';
+        }
+      } else {
+        // No composed anchor → follow user-selected placement with any manual
+        // upload or @-mention fallback.
+        const referenceImage =
+          startImageUrl ??
+          mentionResolved.referenceImageUrl ??
+          null;
+        if (referenceImage && model.capabilities.i2v && effectivePlacement === 'start') {
+          body.startImageUrl = referenceImage;
+        } else if (referenceImage && effectivePlacement === 'end' && model.capabilities.endFrame) {
+          body.endImageUrl = referenceImage;
+        } else if (referenceImage && effectivePlacement === 'anchor' && model.capabilities.anchorOnly) {
+          if (!model.capabilities.multiRef) {
+            body.referenceImages = [referenceImage];
+          }
+        } else if (anchorChars.length > 0 && !modelAcceptsImageAnchor) {
+          // Text-only model with picked cast — nothing to attach; prompt-only
+          // enforcement via castSuffix + lead phrase is our only lever.
+          anchorRoute = 'text-only';
         }
       }
+      setLastAnchorRoute(anchorRoute);
       // v2v: pass reference clip + reference type (Kling-3 omni)
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
@@ -500,8 +525,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }
         body.referenceImages = viduReferences.map((s) => s.url);
         body.referenceRoles = viduReferences.map((s) => s.role);
-      } else if (composedSubjectRefs && composedSubjectRefs.length > 0) {
+      } else if (composedSubjectRefs && composedSubjectRefs.length > 0 && !body.referenceImages) {
         // Subject-reference providers (non-Vidu path is rare, but keep it symmetric).
+        // Do not overwrite the composed character anchor if it was already routed above.
         body.referenceImages = composedSubjectRefs;
       }
       if (model.capabilities.audio) body.generateAudio = generateAudio;
@@ -647,6 +673,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         consistencyKey={consistencyKey}
         supportsImageInput={model.capabilities.i2v}
       />
+
+      {/* v241 — text-only warning: model can't accept image reference at all */}
+      {castCharacterIds.length > 0 &&
+        !model.capabilities.i2v &&
+        !model.capabilities.anchorOnly &&
+        !model.capabilities.multiRef && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            {language === 'de'
+              ? `${model.name} akzeptiert keine Bild-Referenz — die gewählten Charaktere werden nur textlich beschrieben. Für garantierte Charakter-Treue wähle ein Modell mit Bild-Anker (Kling, Veo, Hailuo, HappyHorse …).`
+              : language === 'es'
+              ? `${model.name} no acepta imagen de referencia — los personajes se describen sólo por texto. Para fidelidad garantizada usa un modelo con anclaje de imagen (Kling, Veo, Hailuo, HappyHorse …).`
+              : `${model.name} does not accept a reference image — the selected characters will only be described in text. For guaranteed character fidelity pick an image-anchor model (Kling, Veo, Hailuo, HappyHorse …).`}
+          </span>
+        </div>
+      )}
 
       {/* ── Multi-Reference (only for capabilities.multiRef → Vidu Q2 Reference2V) ── */}
       {model.capabilities.multiRef && (
@@ -974,6 +1017,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             : 'Scene-Aware: character composed into the scene (no portrait-locked first frame).'}
         </p>
       )}
+
+      {debugMode && (
+        <p className="text-center text-[10px] font-mono text-muted-foreground/70">
+          debug · anchorComposed={String(lastAnchorComposed)} · route={lastAnchorRoute} · cast={castCharacterIds.length + (brandCharacter ? 1 : 0)} · model={model.id}
+        </p>
+      )}
+
 
       <VideoPromptOptimizer
         open={showOptimizer}
