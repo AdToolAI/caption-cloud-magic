@@ -60,11 +60,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const body = await req.json() as GenerateRequest & { spokenLanguage?: string };
+    const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
     const { prompt, model, duration, aspectRatio, generateAudio, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
+    const suppressDialogue = body.suppressDialogue === true;
     if (generateAudio && spokenLanguage) {
       console.log(`[generate-kling-video] spokenLanguage=${spokenLanguage} (prompt lock applied client-side)`);
+    }
+    if (generateAudio && suppressDialogue) {
+      console.log(`[generate-kling-video] suppressDialogue=true — ambient-only fallback (provider TTS lang unsupported)`);
     }
 
     // Validate duration (3-15 seconds)

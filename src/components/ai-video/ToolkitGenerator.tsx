@@ -118,6 +118,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     spokenLanguage === 'auto'
       ? (language === 'de' ? 'de' : language === 'es' ? 'es' : 'en')
       : spokenLanguage;
+  // Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext
+  // produziert. Alles außerhalb → ambient-only Fallback (kein Voiceover), sonst
+  // erfindet z. B. Kling für DE/ES eine Fantasie-Sprache.
+  const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
+    veo:        ['en', 'de', 'es'],
+    sora:       ['en', 'de', 'es'],
+    kling:      ['en'],
+    grok:       ['en'],
+    happyhorse: ['en'],
+    ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
+  };
+  const ttsLangSupported =
+    (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /**
    * Placement of the uploaded reference image within the generated clip:
@@ -303,18 +316,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // Guard against gibberish/faux-text hallucinations from video models
       // (Hailuo/Kling/Veo/Sora/Seedance/…). Motion Studio path is not touched.
       const noTextSuffix = 'No written text, no letters, no signage, no captions, no logos, no on-screen typography, no readable characters of any language. Any incidental text in the scene must remain out of focus and illegible.';
-      // Spoken-Language-Lock: only when the model actually produces audio AND
-      // the user opted in. Without this, provider TTS (Kling/Veo/Sora) defaults
-      // to English regardless of the descriptive prompt language.
+      // Spoken-Language-Guard: only append a language directive if the provider's
+      // native TTS actually supports the chosen language. Otherwise Kling/Grok
+      // hallucinate fantasy phonemes instead of speaking German/Spanish → fall
+      // back to ambient-only (silent characters + room tone / background music).
       const langLabel = effectiveSpokenLang === 'de'
         ? 'German (Deutsch)'
         : effectiveSpokenLang === 'es'
         ? 'Spanish (Español)'
         : 'English';
-      const spokenLangSuffix = (model.capabilities.audio && generateAudio)
+      const dialogueSuppressed = !!(model.capabilities.audio && generateAudio) && !ttsLangSupported;
+      const spokenLangSuffix = (model.capabilities.audio && generateAudio && ttsLangSupported)
         ? `All spoken dialogue, narration and voiceover MUST be performed in ${langLabel}. Do not use any other language for speech. Lip movement must match ${langLabel} phonemes.`
         : '';
-      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, noTextSuffix]
+      const ambientOnlySuffix = dialogueSuppressed
+        ? 'IMPORTANT: Do NOT generate any spoken dialogue, narration, voiceover, or lip-synced speech. Characters must remain silent — closed or naturally resting mouths, no lip movement matching speech. The audio track should contain ONLY ambient environmental sound, room tone, or subtle background music appropriate for the scene. No singing, no whispering, no non-verbal vocalizations that imply language.'
+        : '';
+      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, ambientOnlySuffix, noTextSuffix]
         .filter(Boolean)
         .join('\n\n');
 
@@ -560,7 +578,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       }
       if (model.capabilities.audio) {
         body.generateAudio = generateAudio;
-        if (generateAudio) body.spokenLanguage = effectiveSpokenLang;
+        if (generateAudio && ttsLangSupported) {
+          body.spokenLanguage = effectiveSpokenLang;
+        } else if (generateAudio && !ttsLangSupported) {
+          body.suppressDialogue = true;
+        }
       }
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
@@ -1031,6 +1053,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+            )}
+            {generateAudio && !ttsLangSupported && (
+              <p className="text-[11px] leading-snug text-amber-500/90 pt-1 border-t border-border/30">
+                {language === 'de'
+                  ? `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : 'diese Sprache'} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`
+                  : language === 'es'
+                  ? `${model.name} no admite ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'} de forma fiable. Esta escena se generará sin voz — solo sonido ambiente/música. Para voz real usa p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`
+                  : `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. This scene will render without voiceover — ambient sound / music only. For real voiceover pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`}
+              </p>
             )}
           </div>
         )}

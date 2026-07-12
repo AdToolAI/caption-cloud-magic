@@ -1,50 +1,69 @@
-# AI Video Studio — Spoken-Language-Fix (Provider-Audio)
+# AI Video Studio — Spoken-Language Capability Guard
 
 ## Problem
-Modelle wie **Kling 3.0 Pro**, **Veo** und **Sora** liefern bei aktivem `generateAudio` selbst Lip-Sync + Voiceover — der Provider-TTS defaultet aber auf **Englisch**, weil unser Prompt keine Zielsprache spezifiziert. Der User will bei deutschen Briefings deutsches Audio.
+Kling 3.0 Pro (und einige andere Provider) beherrschen zwar nativen Audio+Lip-Sync, aber ihre TTS unterstützt **nicht alle Sprachen**. Bei einer DE-Direktive versucht Kling das nachzuahmen und produziert eine **Fantasie-/Kauderwelsch-Sprache** statt sauberes Deutsch. Das wirkt schlimmer als gar kein Voiceover.
+
+Wunsch: Wenn die Zielsprache vom Provider **nicht sicher unterstützt** wird, soll gar kein Voiceover/Lip-Sync gebaut werden — nur **Ambient/Musik/Hintergrundgeräusche**.
 
 ## Ursache
-In `src/components/ai-video/ToolkitGenerator.tsx` (Zeile ~272–290) wird der finale Prompt aus `mentionResolved.prompt + shotSuffix + brandSuffix + castSuffix + noTextSuffix` gebaut. Es fehlt eine **Spoken-Language-Direktive**. Kling/Veo/Sora inferieren die Sprache aus dem Prompt-Text — steht dort "Create a cinematic ad…" (auch bei DE-UI), spricht der Character Englisch.
+`ToolkitGenerator.tsx` schickt aktuell bei `generateAudio && capabilities.audio` immer eine Sprach-Direktive ("All spoken dialogue MUST be performed in German…") ohne zu prüfen, ob das Modell diese Sprache überhaupt kann. Kling z. B. ist im TTS praktisch auf EN/ZH beschränkt — bei DE/ES bekommt der Prompt zwar den Sprach-Hinweis, das Modell erfindet aber Phoneme.
 
-## Fix-Plan
+## Fix-Plan (nur Frontend, minimal-invasiv)
 
-### 1. Spoken-Language-Suffix im Prompt-Builder
-`ToolkitGenerator.tsx`: neuen Suffix nur anhängen, wenn `generateAudio === true` **und** `model.capabilities.audio`:
+### 1. Provider-TTS-Fähigkeitskarte
+Neue kleine Konstante in `src/config/aiVideoModelRegistry.ts` (oder gleich in `ToolkitGenerator.tsx` privat, um Registry nicht aufzublähen):
 
-```text
-All spoken dialogue, narration and voiceover MUST be performed in German (Deutsch).
-Do not use English or any other language for speech. Lip movement must match German phonemes.
+```ts
+// Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext produziert.
+// Alles außerhalb → ambient-only Fallback (kein Voiceover).
+const PROVIDER_TTS_LANGS: Record<ToolkitModel['family'], ReadonlyArray<'en'|'de'|'es'>> = {
+  veo:         ['en', 'de', 'es'], // Google multilingual TTS
+  sora:        ['en', 'de', 'es'], // OpenAI multilingual
+  kling:       ['en'],             // ZH/EN reliable; DE/ES → Gibberish
+  grok:        ['en'],
+  happyhorse:  ['en'],             // nativeDialogue-Flag, aber capabilities.audio=false → egal
+  // Rest hat capabilities.audio=false und ist ohnehin nicht relevant:
+  ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
+};
 ```
 
-Sprache aus `useTranslation().language` ableiten:
-- `de` → German (Deutsch)
-- `es` → Spanish (Español)
-- `en` → English (Fallback)
+### 2. Effektive Entscheidung im Prompt-Builder
+In `ToolkitGenerator.tsx` (~Z. 314):
 
-Der Suffix wird **vor** `noTextSuffix` eingefügt und ist explizit genug, dass Kling/Veo/Sora-TTS ihn respektieren.
+- `const langSupported = generateAudio && model.capabilities.audio && PROVIDER_TTS_LANGS[model.family].includes(effectiveSpokenLang);`
+- Neu: `const willHaveDialogue = langSupported;`
+- Wenn `generateAudio && !langSupported`: statt `spokenLangSuffix` einen **`ambientOnlySuffix`** anhängen:
 
-### 2. Optionaler UI-Override (Sprache manuell wählen)
-Klein-Dropdown im Audio-Bereich neben dem `generateAudio`-Toggle: `Deutsch / English / Español / Auto (UI-Sprache)`. Default = Auto = UI-Sprache. State: `spokenLanguage`, persistiert im gleichen `localStorage`-Namespace wie der Prompt-Draft.
+```text
+IMPORTANT: Do NOT generate any spoken dialogue, narration, voiceover, or lip-synced speech.
+Characters must remain silent — closed or naturally resting mouths, no lip movement matching speech.
+The audio track should contain ONLY ambient environmental sound, room tone, or subtle background music
+appropriate for the scene. No singing, no whispering, no non-verbal vocalizations that imply language.
+```
 
-Nur sichtbar wenn `model.capabilities.audio && generateAudio`.
+- `spokenLangSuffix` (das bestehende „All spoken dialogue MUST be in <lang>") wird nur noch bei `langSupported` gehängt.
 
-### 3. Backend passthrough (defensiv, für zukünftige native-Params)
-`spokenLanguage` als optionales Feld ins `body` der Edge-Function-Aufrufe (`generate-kling-video`, `generate-veo-video`, `generate-sora-video`) mitgeben. Server nutzt es aktuell nur zum Logging — sobald ein Provider einen nativen Language-Param exponiert (Kling roadmap), lässt es sich dort andocken, ohne den Client anzufassen.
+### 3. Body-Payload absichern
+`body.spokenLanguage` nur bei `langSupported` senden. Zusätzlich `body.suppressDialogue = true` mitgeben, wenn Ambient-Fallback greift — Edge Functions loggen es und können später einen nativen "no-speech"-Parameter dort andocken, ohne den Client anzufassen.
 
-**Kein Refactor der Edge Functions** in diesem Turn — nur `spokenLanguage` durchreichen + loggen.
+`generateAudio` selbst bleibt `true` (der Provider soll ja Ambient/Umgebungssound liefern) — wir schalten nur die **Dialoge** ab.
 
-### 4. Kein Effekt auf Motion Studio / Composer
-Lip-Sync im Composer läuft über ElevenLabs/Hume mit expliziter `language` — nicht betroffen. Änderung bleibt strikt in `ToolkitGenerator.tsx` + optionaler passthrough-Param in den drei betroffenen Edge Functions.
+### 4. UI-Hinweis unter dem Sprach-Dropdown
+Wenn User eine Sprache wählt, die das aktuelle Modell nicht kann, kleiner gedämpfter Hinweis unter dem Select:
 
-## Technische Details
+> „<Modelname> unterstützt <Sprache> nicht zuverlässig. Für diese Szene wird **kein Voiceover** generiert — nur Umgebungssound. Für deutsches/spanisches Voiceover z. B. **Veo 3.1** oder **Sora 2** wählen, oder das Voiceover nachträglich im Motion Studio ergänzen."
 
-**Files:**
-- `src/components/ai-video/ToolkitGenerator.tsx` — neuer `spokenLanguageSuffix`, State + Selector, Body-Feld.
-- `supabase/functions/generate-kling-video/index.ts` — `spokenLanguage` optional aus Body lesen + loggen.
-- `supabase/functions/generate-veo-video/index.ts` — dito.
-- `supabase/functions/generate-sora-video/index.ts` — dito (falls existent, sonst skip).
+Textkeys 3-sprachig (DE/EN/ES) — konsistent mit dem restlichen Toolkit.
 
-**Kein DB-Migrationsbedarf, keine Credits-Änderung, keine Auswirkung auf Composer/Motion-Pipeline.**
+### 5. Edge-Functions (minimal)
+`generate-kling-video/index.ts`, `generate-veo-video/index.ts`: zusätzlich `suppressDialogue` aus Body lesen und in `console.log` mitgeben. Kein Verhalten ändern (Kling/Veo API kennen keinen "no-speech"-Toggle — der Prompt-Suffix macht die Arbeit).
+
+## Was nicht angefasst wird
+- Motion Studio / Composer / ElevenLabs-Pfad — dort wird Sprache separat gesetzt, keine Fantasie-TTS möglich.
+- Kein Auto-Modelwechsel — User bleibt Herr über die Modellauswahl.
+- Keine Credit-Logik-Änderung — Ambient-Only kostet genauso viel wie mit Audio; das Modell rendert weiter.
 
 ## Erwartetes Ergebnis
-Bei DE-UI + `generateAudio=on` liefert Kling 3.0 Pro das 15s-Werbevideo mit **deutschem Voiceover + korrektem deutschen Lip-Sync**. User kann Sprache im UI überschreiben, falls z. B. spanisches Audio bei DE-Prompt gewünscht.
+- Kling 3.0 Pro + DE-Briefing → Video mit **stummen Charakteren + Ambient/Musik**, kein Kauderwelsch mehr.
+- Veo 3.1 / Sora 2 + DE → weiterhin **echtes deutsches Voiceover mit Lip-Sync** (unverändert).
+- Klarer UI-Hinweis, warum kein Sprech-Audio kam, mit Modell-Alternativen.

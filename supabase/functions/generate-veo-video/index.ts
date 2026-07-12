@@ -81,11 +81,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const body = await req.json() as GenerateRequest & { spokenLanguage?: string };
+    const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
     const { prompt, model, duration: rawDuration, aspectRatio, startImageUrl, generateAudio = true, negativePrompt } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
+    const suppressDialogue = body.suppressDialogue === true;
     if (generateAudio && spokenLanguage) {
       console.log(`[generate-veo-video] spokenLanguage=${spokenLanguage} (prompt lock applied client-side)`);
+    }
+    if (generateAudio && suppressDialogue) {
+      console.log(`[generate-veo-video] suppressDialogue=true — ambient-only fallback (provider TTS lang unsupported)`);
     }
 
     if (!prompt || !prompt.trim()) {
