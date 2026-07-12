@@ -125,6 +125,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [composingScene, setComposingScene] = useState(false);
   const [lastAnchorComposed, setLastAnchorComposed] = useState(false);
+  const [lastAnchorRoute, setLastAnchorRoute] = useState<'start' | 'anchor' | 'text-only' | 'none'>('none');
+  const debugMode = searchParams.get('debug') === '1';
 
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
