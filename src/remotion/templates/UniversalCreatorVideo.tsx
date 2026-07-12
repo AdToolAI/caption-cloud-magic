@@ -2080,7 +2080,7 @@ const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string
 };
 
 // Helper to render background content
-function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string) {
+function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string, audioMuted: boolean = true, audioVolume: number = 1, previewMode: boolean = false) {
   if (background.type === 'color') {
     return <AbsoluteFill style={{ backgroundColor: background.color || '#000000' }} />;
   }
