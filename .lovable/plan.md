@@ -1,44 +1,30 @@
-# Plan v239 — Anchor-Repair-Overwrite endgültig entschärfen (Single + Multi-Speaker)
+# Fix — Kein Gibberish-Text mehr in AI-Video-Studio-Clips
 
-## Kernproblem (in einem Satz)
-Der `v185-anchor-repair`-Pfad in `compose-dialog-segments/index.ts` überschreibt korrekt detektierte Plate-BBoxen (Gemini/AWS) mit einer Anchor-abgeleiteten Notfall-Box, sobald die Identitäts-Confidence unter 0.60 liegt — sowohl bei N=1 (Mund bleibt zu, falsche Region) als auch bei N≥2 (nur die niedrig-konfidenten Slots kippen, siehe „Sprecher 3+4 statt 1+2").
+## Problem
+Im **AI Video Studio** (`ToolkitGenerator`) rendern die Video-Modelle (Hailuo, Kling, Veo, Sora, Seedance, HappyHorse, …) manchmal Text/Schilder/Overlays im Bild — meist unleserliches Kauderwelsch. Das wirkt unsauber. Im **Motion Studio** tritt das kaum auf und bleibt unangetastet.
 
-## Ziel
-`v185-repair` wird von einem **standardmäßig aktiven Overwrite** zu einer **letzten Notfall-Bremse** — er darf nur noch feuern, wenn die Plate-Box eindeutig unbrauchbar ist (offensichtlich außerhalb des Bildes, Nullfläche, oder klarer False-Positive auf Non-Face-Region).
+## Ursache
+Der finale Prompt (`ToolkitGenerator.tsx` Z. 264–280) enthält keinen expliziten „no text / no writing / no signage"-Guard. Ohne diese Direktive halluzinieren die Modelle spontan Beschriftungen (Plakate, Bauchbinden, T-Shirt-Aufdrucke, Straßenschilder).
 
-## Änderungen
+## Änderung — punktuell und isoliert auf AI Video Studio
 
-### 1. `compose-dialog-segments/index.ts` — Repair-Gate härten (Zeile ~1859–1994)
+**1 Datei:** `src/components/ai-video/ToolkitGenerator.tsx`
 
-- **Neue Priorität 1 — Gemini/AWS-Detection ist authoritativ**  
-  Wenn `plateIdentityMap.faces[i]` eine BBox mit `confidence ≥ 0.70` **oder** `matchConfidence ≥ 0.55` liefert, wird dieser Slot als *trusted* markiert — unabhängig vom `coordSources`-Tag. Trusted-Slots werden nie repariert.
-- **Neue Priorität 2 — Sanity-Check statt Anchor-Vergleich**  
-  Für nicht-trusted Slots ersetzen wir den Anchor-in-BBox-Test durch drei objektive Sanity-Kriterien:
-  1. BBox liegt komplett im Plate (mit ≤ 5 % Toleranz).
-  2. BBox-Fläche zwischen 0.3 % und 25 % der Plate-Fläche.
-  3. BBox-Aspect-Ratio zwischen 0.4 und 2.5.
-  Fällt ein Kriterium, gilt der Slot als *broken* und wird repariert. Anchor-Drift alleine löst keinen Repair mehr aus.
-- **Repair selbst bleibt unverändert** (Median-Nachbarn + Anchor-Zentrierung), aber nur für tatsächlich broken slots.
-- **Neues Log**: `v239_repair_gate trusted=X/N sanity_ok=Y/N repaired=Z/N reasons=[...]` mit `scene_id` und Slot-Details für spätere Diagnose.
+Direkt vor der `body`-Konstruktion (~Z. 280) einen `noTextSuffix` an den zusammengesetzten Prompt hängen:
 
-### 2. `compose-dialog-segments/index.ts` — Motion Content Gate für N=1 nachziehen (Zeile Umgebung `v113` / `v231`)
-- Sicherstellen, dass der N=1 Byte-Check-Retry nach v239 nur noch dann feuert, wenn Sync.so nachweislich einen Noop lieferte — nicht wegen einer reparaturbedingt falschen BBox.
+```
+No written text, no letters, no signage, no captions, no logos, no on-screen typography, no readable characters of any language. Any incidental text in the scene must remain out of focus and illegible.
+```
 
-### 3. Beobachtbarkeit
-- `plate_identity_min_confidence`, `plate_identity_min_margin`, und neu `v239_repaired_slots` in den bestehenden Diagnostik-Payload aufnehmen (`compose_diagnostics_events` / `scene_events`), damit wir bei Support-Tickets sofort sehen, welcher Slot repariert wurde und warum.
+- Wird **nur** im AI-Video-Studio-Pfad angehängt (in `ToolkitGenerator.tsx`).
+- Landet im `finalPrompt`, der an alle Provider (Hailuo / Kling / Veo / Sora / Seedance / …) geht — Modell-agnostisch, keine Registry-Änderung nötig.
+- Idempotent: wird an das bereits mit `\n\n` gejointe Prompt-Ende angehängt.
 
-## Was NICHT geändert wird
-- Kein Wechsel Gemini → AWS. Gemini liefert korrekte Daten; das Problem lag ausschließlich im Downstream-Overwrite.
-- Keine Änderung an `v183-anchor-identity-slot-bridge`, `v189-identity-trust-gate` selbst (nur der Gate wird strenger), `v181`, `v185`-Preclip-Logik, oder Sync.so-Dispatch.
-- Keine UI-, Briefing- oder Studio-Änderungen.
+## Ausdrücklich NICHT geändert
+- `compose-video-clips`, `compose-scene-anchor`, `compose-dialog-segments` — Motion-Studio-Pipeline bleibt exakt wie sie ist.
+- Keine Änderung an `VideoPromptOptimizer`, Cast/World-Suffix-Buildern, Shot-Director.
+- Keine Registry-, DB- oder Server-Änderung.
 
 ## Verifikation
-1. **Multi-Speaker-Regression-Case** (Szene mit 4 Sprechern, gemischte Confidences): erwartet `v239_repair_gate trusted=4/4 repaired=0/4`, alle vier Speaker mit korrekter Lip-Motion.
-2. **Single-Speaker-Case aus der aktuellen Meldung** (Szene `f663b958`): erwartet `trusted=1/1 repaired=0/1`, Mund folgt Skript, kein Character-Miss.
-3. **Echter False-Positive-Case** (künstlich: BBox 5×5 auf Whiteboard): erwartet `repaired=1/N reasons=[area_too_small]`, Sync.so bekommt eine plausible Box.
-4. **Logs** (`edge_function_logs`): `v239_repair_gate` erscheint für jede Szene; `v185_anchor_plate_bbox_repair` fällt bei sauberen Szenen auf 0.
-
-## Technische Notizen
-- Der Trust-Threshold `0.60` wird bewusst nur für den *Fallback*-Pfad gehalten. Die neue primäre Regel ist `detectorConfidence ≥ 0.70` (Gemini-nativ) — das entspricht dem Bereich, den wir empirisch in den Logs als „nie falsch" beobachten.
-- Änderung ist rein additiv/Restriktion — keine DB-Migration, keine neuen Secrets, keine Client-Änderungen nötig.
-- Rollout ist rückwärtskompatibel: fällt der neue Gate durch (z. B. plateIdentityMap fehlt), greift der bisherige v185-Pfad exakt wie heute.
+- Neuer AI-Video-Studio-Clip mit einem Prompt, der bisher zuverlässig Kauderwelschtext produziert hat (z. B. „Gründer sitzt vor Laptop" → oft T-Shirt- oder Bildschirm-Text). Erwartung: sauberes Bild ohne Schrift.
+- Motion-Studio-Rendering unverändert (Regressions-Check per bestehendem Storyboard).

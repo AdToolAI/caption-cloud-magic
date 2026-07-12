@@ -261,7 +261,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
         : '';
       const shotSuffix = buildShotPromptSuffix(shotSelection);
-      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix]
+      // Guard against gibberish/faux-text hallucinations from video models
+      // (Hailuo/Kling/Veo/Sora/Seedance/…). Motion Studio path is not touched.
+      const noTextSuffix = 'No written text, no letters, no signage, no captions, no logos, no on-screen typography, no readable characters of any language. Any incidental text in the scene must remain out of focus and illegible.';
+      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, noTextSuffix]
         .filter(Boolean)
         .join('\n\n');
 
