@@ -1793,7 +1793,8 @@ const SceneBackground: React.FC<{
   useOriginalAudio?: boolean;
   originalAudioVolume?: number;
   previewMode?: boolean;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile, useOriginalAudio = false, originalAudioVolume = 0.6, previewMode = false }) => {
+  rawMediaMode?: boolean;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile, useOriginalAudio = false, originalAudioVolume = 0.6, previewMode = false, rawMediaMode = false }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
 
   // Resolve per-scene original-audio: step-2 hard-mute wins, then per-scene toggle, then global.
@@ -1806,7 +1807,7 @@ const SceneBackground: React.FC<{
   // Hailuo animated video
   if (animatedVideoUrl && useAnimation) {
     const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
-    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+    const moodFilter = !rawMediaMode && cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <AbsoluteFill style={{ opacity, filter: moodFilter }}>
         <SafeVideo
@@ -1819,9 +1820,9 @@ const SceneBackground: React.FC<{
           previewMode={previewMode}
         />
         {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
-        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
-        {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
-        {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
+        {!rawMediaMode && cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
+        {!rawMediaMode && !disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+        {!rawMediaMode && !disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
     );
   }
@@ -1831,51 +1832,55 @@ const SceneBackground: React.FC<{
   
   // Ken Burns
   if (animation === 'kenBurns' && (background.type === 'image' || !background.type)) {
-    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+    const moodFilter = !rawMediaMode && cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <AbsoluteFill style={{ filter: moodFilter }}>
-        <KenBurnsImage
-          imageUrl={safeImageUrl}
-          direction={kenBurnsDirection}
-          frame={frame}
-          durationInFrames={durationInFrames}
-        />
+        {rawMediaMode ? renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode, rawMediaMode) : (
+          <KenBurnsImage
+            imageUrl={safeImageUrl}
+            direction={kenBurnsDirection}
+            frame={frame}
+            durationInFrames={durationInFrames}
+          />
+        )}
         {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
-        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
-        <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-        {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
-        {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
+        {!rawMediaMode && cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
+        {!rawMediaMode && <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />}
+        {!rawMediaMode && !disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+        {!rawMediaMode && !disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
     );
   }
   
   // Parallax
   if (animation === 'parallax') {
-    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+    const moodFilter = !rawMediaMode && cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <AbsoluteFill style={{ filter: moodFilter }}>
-        <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
+        {rawMediaMode ? renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode, rawMediaMode) : (
+          <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
+        )}
         {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
-        {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
-        <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-        {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
-        {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
+        {!rawMediaMode && cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
+        {!rawMediaMode && <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />}
+        {!rawMediaMode && !disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+        {!rawMediaMode && !disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
     );
   }
   
   // Pop-In
   if (animation === 'popIn') {
-    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+    const moodFilter = !rawMediaMode && cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <PopInElement delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
-          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
+          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode, rawMediaMode)}
           {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
-          {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
-          <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-          {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
-          {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
+          {!rawMediaMode && cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
+          {!rawMediaMode && <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />}
+          {!rawMediaMode && !disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+          {!rawMediaMode && !disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
         </AbsoluteFill>
       </PopInElement>
     );
@@ -1883,16 +1888,16 @@ const SceneBackground: React.FC<{
   
   // Fly-In
   if (animation === 'flyIn') {
-    const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+    const moodFilter = !rawMediaMode && cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
-          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
+          {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode, rawMediaMode)}
           {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
-          {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
-          <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-          {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
-          {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
+          {!rawMediaMode && cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
+          {!rawMediaMode && <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />}
+          {!rawMediaMode && !disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+          {!rawMediaMode && !disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
         </AbsoluteFill>
       </FlyInElement>
     );
@@ -1951,24 +1956,27 @@ const SceneBackground: React.FC<{
       break;
     default:
       // Phase 13: For fadeIn/none with image backgrounds, apply auto Ken-Burns
-      if (isImageBackground) {
+      if (!rawMediaMode && isImageBackground) {
         transform = `scale(${kenBurnsAutoScale}) translate(${kenBurnsAutoPanX}px, ${kenBurnsAutoPanY}px)`;
       }
       break;
   }
   
-  const moodFilter = cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
+  if (rawMediaMode) {
+    transform = 'scale(1)';
+  }
+  const moodFilter = !rawMediaMode && cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
   
   return (
     <AbsoluteFill style={{ opacity, filter: moodFilter }}>
       <div style={{ width: '100%', height: '100%', transform, overflow: 'hidden' }}>
-        {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
+        {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode, rawMediaMode)}
       </div>
       {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
-      {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
-      <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-      {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
-      {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
+      {!rawMediaMode && cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
+      {!rawMediaMode && <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />}
+      {!rawMediaMode && !disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+      {!rawMediaMode && !disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
     </AbsoluteFill>
   );
 };
