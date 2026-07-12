@@ -234,6 +234,9 @@ export const UniversalCreatorVideoSchema = z.object({
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().default(0.35),
   masterVolume: z.number().default(1.0),
+  useOriginalAudio: z.boolean().default(false),
+  originalAudioVolume: z.number().default(0.6),
+  previewMode: z.boolean().default(false),
   soundEffects: z.array(z.object({
     sceneId: z.string(),
     soundUrl: z.string(),
