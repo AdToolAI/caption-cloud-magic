@@ -1788,7 +1788,8 @@ const SceneBackground: React.FC<{
   previewMode?: boolean;
   rawMediaMode?: boolean;
 }> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle', cinematicProfile, useOriginalAudio = false, originalAudioVolume = 0.6, previewMode = false, rawMediaMode = false }) => {
-  const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
+  const { background, animation: sceneAnimation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
+  const animation = rawMediaMode ? 'none' : sceneAnimation;
 
   // Resolve per-scene original-audio: step-2 hard-mute wins, then per-scene toggle, then global.
   const sceneOA = (scene as any).originalAudio as { muted?: boolean; enabled?: boolean; volume?: number } | undefined;
@@ -1799,7 +1800,7 @@ const SceneBackground: React.FC<{
   
   // Hailuo animated video
   if (animatedVideoUrl && useAnimation) {
-    const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+    const opacity = rawMediaMode ? 1 : interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
     const moodFilter = !rawMediaMode && cinematicProfile ? MOOD_FILTERS[cinematicProfile.mood] : undefined;
     return (
       <AbsoluteFill style={{ opacity, filter: moodFilter }}>
