@@ -427,10 +427,51 @@ export function UniversalCreator() {
     }
   };
 
+  const isDefaultBlackScene = (s: Scene | undefined): boolean => {
+    if (!s) return false;
+    const bg = s.background;
+    if (!bg || bg.type !== 'color') return false;
+    const c = (bg.color || '').toLowerCase();
+    return (c === '#000000' || c === '#000') && !bg.videoUrl && !bg.imageUrl;
+  };
+
+  const maybeEnableOriginalAudioDefault = (mapped: ReturnType<typeof mapBackgroundAssetToUniversalVideo>) => {
+    if (mapped.type !== 'video') return;
+    setContentConfig((prev) => {
+      const base = (prev || {}) as ContentConfig;
+      if (base.useOriginalAudio !== undefined) return base;
+      return {
+        ...base,
+        useOriginalAudio: true,
+        originalAudioVolume: typeof base.originalAudioVolume === 'number' ? base.originalAudioVolume : 0.6,
+      };
+    });
+  };
+
+  const handleSelectBackgroundAsset = (asset: BackgroundAsset | null) => {
+    setBackgroundAsset(asset);
+    if (!asset) return;
+    const mapped = mapBackgroundAssetToUniversalVideo(asset);
+
+    if (scenes.length === 0) {
+      addScene(mapped, 5);
+      maybeEnableOriginalAudioDefault(mapped);
+      return;
+    }
+
+    const lastIdx = scenes.length - 1;
+    const last = scenes[lastIdx];
+    if (isDefaultBlackScene(last)) {
+      setScenes((prev) => prev.map((s, i) => (i === lastIdx ? { ...s, background: mapped } : s)));
+      maybeEnableOriginalAudioDefault(mapped);
+    }
+  };
+
   const handleAddScene = () => {
     if (backgroundAsset) {
       const sceneBackground = mapBackgroundAssetToUniversalVideo(backgroundAsset);
       addScene(sceneBackground, 5);
+      maybeEnableOriginalAudioDefault(sceneBackground);
     } else {
       addScene({ type: 'color', color: '#000000' }, 5);
     }
