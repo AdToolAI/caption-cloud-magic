@@ -303,7 +303,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // Guard against gibberish/faux-text hallucinations from video models
       // (Hailuo/Kling/Veo/Sora/Seedance/…). Motion Studio path is not touched.
       const noTextSuffix = 'No written text, no letters, no signage, no captions, no logos, no on-screen typography, no readable characters of any language. Any incidental text in the scene must remain out of focus and illegible.';
-      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, noTextSuffix]
+      // Spoken-Language-Lock: only when the model actually produces audio AND
+      // the user opted in. Without this, provider TTS (Kling/Veo/Sora) defaults
+      // to English regardless of the descriptive prompt language.
+      const langLabel = effectiveSpokenLang === 'de'
+        ? 'German (Deutsch)'
+        : effectiveSpokenLang === 'es'
+        ? 'Spanish (Español)'
+        : 'English';
+      const spokenLangSuffix = (model.capabilities.audio && generateAudio)
+        ? `All spoken dialogue, narration and voiceover MUST be performed in ${langLabel}. Do not use any other language for speech. Lip movement must match ${langLabel} phonemes.`
+        : '';
+      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, noTextSuffix]
         .filter(Boolean)
         .join('\n\n');
 
