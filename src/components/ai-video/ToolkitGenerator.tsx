@@ -303,18 +303,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // Guard against gibberish/faux-text hallucinations from video models
       // (Hailuo/Kling/Veo/Sora/Seedance/…). Motion Studio path is not touched.
       const noTextSuffix = 'No written text, no letters, no signage, no captions, no logos, no on-screen typography, no readable characters of any language. Any incidental text in the scene must remain out of focus and illegible.';
-      // Spoken-Language-Lock: only when the model actually produces audio AND
-      // the user opted in. Without this, provider TTS (Kling/Veo/Sora) defaults
-      // to English regardless of the descriptive prompt language.
+      // Spoken-Language-Guard: only append a language directive if the provider's
+      // native TTS actually supports the chosen language. Otherwise Kling/Grok
+      // hallucinate fantasy phonemes instead of speaking German/Spanish → fall
+      // back to ambient-only (silent characters + room tone / background music).
       const langLabel = effectiveSpokenLang === 'de'
         ? 'German (Deutsch)'
         : effectiveSpokenLang === 'es'
         ? 'Spanish (Español)'
         : 'English';
-      const spokenLangSuffix = (model.capabilities.audio && generateAudio)
+      const dialogueSuppressed = !!(model.capabilities.audio && generateAudio) && !ttsLangSupported;
+      const spokenLangSuffix = (model.capabilities.audio && generateAudio && ttsLangSupported)
         ? `All spoken dialogue, narration and voiceover MUST be performed in ${langLabel}. Do not use any other language for speech. Lip movement must match ${langLabel} phonemes.`
         : '';
-      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, noTextSuffix]
+      const ambientOnlySuffix = dialogueSuppressed
+        ? 'IMPORTANT: Do NOT generate any spoken dialogue, narration, voiceover, or lip-synced speech. Characters must remain silent — closed or naturally resting mouths, no lip movement matching speech. The audio track should contain ONLY ambient environmental sound, room tone, or subtle background music appropriate for the scene. No singing, no whispering, no non-verbal vocalizations that imply language.'
+        : '';
+      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, ambientOnlySuffix, noTextSuffix]
         .filter(Boolean)
         .join('\n\n');
 
