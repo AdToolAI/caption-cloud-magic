@@ -77,7 +77,27 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const model: ToolkitModel = getToolkitModelById(modelId) ?? getDefaultToolkitModel();
 
   /* ── Form state ── */
-  const [prompt, setPrompt] = useState('');
+  const PROMPT_DRAFT_KEY = 'ai-video-toolkit:prompt-draft';
+  const [prompt, setPrompt] = useState<string>(() => {
+    try {
+      return typeof localStorage !== 'undefined' ? (localStorage.getItem(PROMPT_DRAFT_KEY) ?? '') : '';
+    } catch {
+      return '';
+    }
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (prompt && prompt.trim()) {
+          localStorage.setItem(PROMPT_DRAFT_KEY, prompt);
+        } else {
+          localStorage.removeItem(PROMPT_DRAFT_KEY);
+        }
+      } catch { /* noop */ }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [prompt]);
   const [duration, setDuration] = useState<number>(model.durations[0]);
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);

@@ -1,30 +1,21 @@
-# Fix — Kein Gibberish-Text mehr in AI-Video-Studio-Clips
-
 ## Problem
-Im **AI Video Studio** (`ToolkitGenerator`) rendern die Video-Modelle (Hailuo, Kling, Veo, Sora, Seedance, HappyHorse, …) manchmal Text/Schilder/Overlays im Bild — meist unleserliches Kauderwelsch. Das wirkt unsauber. Im **Motion Studio** tritt das kaum auf und bleibt unangetastet.
+Im AI Video Studio (`ToolkitGenerator.tsx`) ist der Prompt reiner React-State (`useState('')`). Beim Verlassen der Seite (Route-Wechsel) wird die Komponente unmounted und das eingetragene Briefing geht verloren.
 
-## Ursache
-Der finale Prompt (`ToolkitGenerator.tsx` Z. 264–280) enthält keinen expliziten „no text / no writing / no signage"-Guard. Ohne diese Direktive halluzinieren die Modelle spontan Beschriftungen (Plakate, Bauchbinden, T-Shirt-Aufdrucke, Straßenschilder).
+## Fix
+Prompt-Text in `localStorage` persistieren — analog zu den bereits vorhandenen Draft-Patterns im Projekt (`universal-video-draft.ts`).
 
-## Änderung — punktuell und isoliert auf AI Video Studio
+### Änderungen in `src/components/ai-video/ToolkitGenerator.tsx`
+1. Storage-Key definieren: `ai-video-toolkit:prompt-draft`
+2. `useState('')` durch Lazy-Initializer ersetzen, der aus `localStorage` liest.
+3. `useEffect` hinzufügen, das bei jeder Änderung von `prompt` den Wert (debounced, ~300ms) in `localStorage` schreibt. Bei leerem String → Key entfernen.
+4. Nach erfolgreicher Generierung (Ende von `handleGenerate`) den Draft **nicht** automatisch löschen — der Nutzer soll den Prompt für Iterationen behalten. Optional: kleiner „Prompt zurücksetzen"-Button (nicht Teil dieses Fixes, falls nicht gewünscht).
 
-**1 Datei:** `src/components/ai-video/ToolkitGenerator.tsx`
+### Scope-Grenzen
+- Nur `prompt` wird persistiert. Modell, Cast-Auswahl, Aspect Ratio etc. bleiben unverändert (kein Feature-Creep).
+- Motion Studio, Picture Studio, Universal Creator werden nicht berührt.
+- Keine Backend-Änderungen.
 
-Direkt vor der `body`-Konstruktion (~Z. 280) einen `noTextSuffix` an den zusammengesetzten Prompt hängen:
-
-```
-No written text, no letters, no signage, no captions, no logos, no on-screen typography, no readable characters of any language. Any incidental text in the scene must remain out of focus and illegible.
-```
-
-- Wird **nur** im AI-Video-Studio-Pfad angehängt (in `ToolkitGenerator.tsx`).
-- Landet im `finalPrompt`, der an alle Provider (Hailuo / Kling / Veo / Sora / Seedance / …) geht — Modell-agnostisch, keine Registry-Änderung nötig.
-- Idempotent: wird an das bereits mit `\n\n` gejointe Prompt-Ende angehängt.
-
-## Ausdrücklich NICHT geändert
-- `compose-video-clips`, `compose-scene-anchor`, `compose-dialog-segments` — Motion-Studio-Pipeline bleibt exakt wie sie ist.
-- Keine Änderung an `VideoPromptOptimizer`, Cast/World-Suffix-Buildern, Shot-Director.
-- Keine Registry-, DB- oder Server-Änderung.
-
-## Verifikation
-- Neuer AI-Video-Studio-Clip mit einem Prompt, der bisher zuverlässig Kauderwelschtext produziert hat (z. B. „Gründer sitzt vor Laptop" → oft T-Shirt- oder Bildschirm-Text). Erwartung: sauberes Bild ohne Schrift.
-- Motion-Studio-Rendering unverändert (Regressions-Check per bestehendem Storyboard).
+## Test
+1. Prompt eintragen → Sidebar-Route wechseln → zurück ins AI Video Studio → Prompt ist erhalten.
+2. Reload der Seite → Prompt ist erhalten.
+3. Prompt leeren → LocalStorage-Key ist entfernt.
