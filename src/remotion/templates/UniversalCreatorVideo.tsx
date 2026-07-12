@@ -108,13 +108,6 @@ const GradientFallback: React.FC<{
         background: `radial-gradient(ellipse 60% 40% at 50% 50%, ${accentColor}10 0%, transparent 70%)`,
         pointerEvents: 'none',
       }} />
-      {/* Bottom gradient for text readability */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.4) 100%)',
-        pointerEvents: 'none',
-      }} />
     </AbsoluteFill>
   );
 };
@@ -2079,7 +2072,7 @@ const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string
 };
 
 // Helper to render background content
-function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string, audioMuted: boolean = true, audioVolume: number = 1, previewMode: boolean = false) {
+function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl?: string, sceneType?: string, primaryColor?: string, secondaryColor?: string, audioMuted: boolean = true, audioVolume: number = 1, previewMode: boolean = false, rawMediaMode: boolean = false) {
   if (background.type === 'color') {
     return <AbsoluteFill style={{ backgroundColor: background.color || '#000000' }} />;
   }
@@ -2105,7 +2098,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   // Default: image with gradient fallback for invalid URLs
   if (safeImageUrl) {
     return (
-      <AbsoluteFill style={{ filter: 'saturate(1.15) contrast(1.05)' }}>
+      <AbsoluteFill style={rawMediaMode ? undefined : { filter: 'saturate(1.15) contrast(1.05)' }}>
         <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />
       </AbsoluteFill>
     );
@@ -2732,6 +2725,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   useOriginalAudio = false,
   originalAudioVolume = 0.6,
   previewMode = false,
+  rawMediaMode = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
@@ -3051,7 +3045,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       
       {/* Render scenes as sequences */}
       {sceneTimings.map((scene, index) => {
-        const transitionType = (() => {
+        const transitionType = rawMediaMode ? 'none' as const : (() => {
           if (scene.transition?.type === 'none') return 'none' as const;
           if (scene.transition?.type === 'morph') return 'morph' as const;
           if (scene.transition?.type === 'wipe') return 'wipe' as const;
@@ -3061,10 +3055,10 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         })();
         
         // Phase 1: Get DrawOnEffect type for this scene
-        const drawOnType = getDrawOnEffectType(scene.type);
+        const drawOnType = rawMediaMode ? null : getDrawOnEffectType(scene.type);
         
         // Phase 1: Check if should show MorphTransition
-        const showMorphTransition = ['solution', 'cta'].includes(scene.type);
+        const showMorphTransition = !rawMediaMode && ['solution', 'cta'].includes(scene.type);
         
         return (
           <Sequence
@@ -3098,6 +3092,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                    useOriginalAudio={useOriginalAudio}
                    originalAudioVolume={originalAudioVolume}
                    previewMode={previewMode}
+                   rawMediaMode={rawMediaMode}
                  />
                 <TextOverlay
                   scene={(() => {
