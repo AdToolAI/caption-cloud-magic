@@ -1487,21 +1487,8 @@ const ParallaxBackground: React.FC<{
       ) : (
         <div style={{ position: 'absolute', width: '110%', height: '110%', left: '-5%', top: '-5%', background: DEFAULT_FALLBACK_GRADIENT }} />
       )}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%)',
-          transform: `translateY(${interpolate(progress, [0, 1], [0, -5])}px)`,
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          boxShadow: 'inset 0 0 150px 50px rgba(0,0,0,0.4)',
-        }}
-      />
+      {/* v242: bottom-gradient + inset-boxShadow removed — no cinematic framing in Universal Creator. */}
+
     </div>
   );
 };
@@ -1830,7 +1817,7 @@ const SceneBackground: React.FC<{
           volume={audioVolume}
           previewMode={previewMode}
         />
-        <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
         {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1852,7 +1839,7 @@ const SceneBackground: React.FC<{
           frame={frame}
           durationInFrames={durationInFrames}
         />
-        <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
         {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
@@ -1867,7 +1854,7 @@ const SceneBackground: React.FC<{
     return (
       <AbsoluteFill style={{ filter: moodFilter }}>
         <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
-        <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+        {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
         {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
@@ -1883,7 +1870,7 @@ const SceneBackground: React.FC<{
       <PopInElement delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
           {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
-          <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+          {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
           {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
@@ -1900,7 +1887,7 @@ const SceneBackground: React.FC<{
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill style={{ filter: moodFilter }}>
           {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
-          <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+          {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
           {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
@@ -1976,7 +1963,7 @@ const SceneBackground: React.FC<{
       <div style={{ width: '100%', height: '100%', transform, overflow: 'hidden' }}>
         {renderBackgroundContent(background, safeImageUrl, type, primaryColor, undefined, audioMuted, audioVolume, previewMode)}
       </div>
-      <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
+      {/* v242: CategoryContrastOverlay removed — Universal Creator has no cinematic controls (belongs to Director's Cut). */}
       {cinematicProfile && <CinematicPostLayer profile={cinematicProfile} frame={frame} />}
       <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
       {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
