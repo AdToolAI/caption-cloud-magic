@@ -364,16 +364,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const clipSource = toolkitModelToClipSource(model);
       const hasCastOrWorld =
         anchorChars.length > 0 || !!castLocation || !!castBuilding || castProps.length > 0;
-      // Skip the composed first-frame anchor whenever the user wants the
-      // reference at the END or only as an identity anchor — otherwise the
-      // reference motif would appear at frame 0 (composed) AND at the intended
-      // moment (prompt), producing a visible double-appearance.
-      const placementSkipsAnchor = referencePlacement !== 'start';
+      const modelAcceptsImageAnchor =
+        !!model.capabilities.i2v || !!model.capabilities.anchorOnly;
+      // v241 — Multi-Character Startframe-Parität mit Motion Studio.
+      // Wir komponieren den Nano-Banana-2 Startframe IMMER, sobald Cast/World
+      // vorhanden ist, das Modell einen Bild-Anker akzeptiert und der User
+      // keinen eigenen Startframe hochgeladen hat. Placement 'end' / 'anchor'
+      // blockiert die Kompo nicht mehr — der komponierte Charakter-Frame wird
+      // im Routing-Block unten deterministisch als Startframe (i2v) bzw.
+      // erster Anchor-Ref (anchorOnly) durchgereicht.
       const shouldCompose =
         !startImageUrl &&
-        !placementSkipsAnchor &&
         hasCastOrWorld &&
         !!clipSource &&
+        modelAcceptsImageAnchor &&
         !(model.capabilities.multiRef && viduReferences.length > 0);
 
       if (shouldCompose) {
