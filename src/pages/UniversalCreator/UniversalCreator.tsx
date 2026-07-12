@@ -488,7 +488,7 @@ export function UniversalCreator() {
     case 'scenes':
       stepContent = (
         <div className="space-y-6">
-          <BackgroundAssetSelector selectedAsset={backgroundAsset} onSelectAsset={setBackgroundAsset} />
+          <BackgroundAssetSelector selectedAsset={backgroundAsset} onSelectAsset={handleSelectBackgroundAsset} />
           <SceneTimeline scenes={scenes} onScenesChange={setScenes} onAddScene={handleAddScene} />
         </div>
       );
