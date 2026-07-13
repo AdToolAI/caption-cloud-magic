@@ -7789,6 +7789,8 @@ export type Database = {
           claimed_at: string
           coupon_id: string
           id: string
+          revoked_at: string | null
+          revoked_reason: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           user_id: string
@@ -7797,6 +7799,8 @@ export type Database = {
           claimed_at?: string
           coupon_id: string
           id?: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           user_id: string
@@ -7805,6 +7809,8 @@ export type Database = {
           claimed_at?: string
           coupon_id?: string
           id?: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           user_id?: string
@@ -18019,6 +18025,16 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      founder_status_details: {
+        Args: { _user_id: string }
+        Returns: {
+          claimed_at: string
+          expires_at: string
+          is_active: boolean
+          revoked_at: string
+          revoked_reason: string
+        }[]
+      }
       get_ai_superuser_id: { Args: never; Returns: string }
       get_conversion_funnel: { Args: { days?: number }; Returns: Json }
       get_template_performance_summary: {
@@ -18101,6 +18117,7 @@ export type Database = {
         Args: { date_param: string; user_id_param: string }
         Returns: number
       }
+      is_founder_active: { Args: { _user_id: string }; Returns: boolean }
       is_workspace_admin: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
@@ -18203,6 +18220,10 @@ export type Database = {
         Returns: string[]
       }
       reset_monthly_credits: { Args: never; Returns: undefined }
+      revoke_founder_status: {
+        Args: { _reason: string; _user_id: string }
+        Returns: boolean
+      }
       seed_ai_superuser_demo_data: {
         Args: { _user_id: string }
         Returns: undefined
