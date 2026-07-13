@@ -102,7 +102,8 @@ async function processStage(
         })
         .eq("id", u.id);
 
-      if (stage !== "day_0") await markMarketingEmailSent(supabase, u.id);
+      // Always mark send so the 3-day cap starts (day_0 included)
+      await markMarketingEmailSent(supabase, u.id);
 
       sent++;
     } catch (e) {
