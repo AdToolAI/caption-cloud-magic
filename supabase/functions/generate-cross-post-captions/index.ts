@@ -1,8 +1,14 @@
 // Cross-Post Magic — generates per-channel captions from a single briefing.
 // Uses Lovable AI Gateway (Gemini 2.5 Flash) with tool-calling for strict JSON.
 
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 type Channel = "instagram" | "tiktok" | "linkedin" | "youtube";
 type Tone = "default" | "hype" | "educational" | "story" | "bold" | "premium";
