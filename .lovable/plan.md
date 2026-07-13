@@ -1,98 +1,61 @@
-# Fix-Plan v242 — Outfit-Konflikt & Lip-Sync-Hard-Gate
 
-Drei saubere, klar abgegrenzte Änderungen — keine unnötigen Nebenbaustellen.
+# v243 — False-Fallback im Briefing-Analyzer beheben
 
----
+## Diagnose (aus Edge-Logs + Client-Code)
 
-## 1) Outfit-Dropdowns entwirren (ProductionPlanSheet)
+Server-Seite (Edge Fn `briefing-deep-parse`) war für dieses Briefing **nicht offline**:
 
-**Problem**
-- Label „Outfit lädt…" bleibt teils dauerhaft sichtbar, obwohl die Library längst geladen ist (Library-ID von der KI erfunden → kein Match → Fallback greift permanent).
-- User kann gleichzeitig einen **Library-Outfit** und ein **Preset-Outfit** setzen → widersprüchlicher State.
+- 3 erfolgreiche Requests innerhalb 15 s
+- Pass A (Gemini 2.5 Flash) ok, Pass B ok
+- Plan-Summary: 3 Szenen × 5 s, `cinematic-sync`, cast 1 (VO)
+- v1, v2, v3 persistiert in `composer_production_plans`
 
-**Lösung — ein einziges Outfit-Feld pro Slot**
+Client-Seite (`useStoryboardTransition.ts`) fiel trotzdem in `buildLocalFallbackPlan`, das setzt `_meta.source = 'local-fallback'`. Der `ProductionPlanSheet` zeigt darauf den gelben „Lokaler Fallback-Plan"-Badge + „AI-Analyse war offline".
 
-Statt zwei nebeneinander liegender Selects rendern wir **ein** Select mit gruppierten Sektionen:
+Wahrscheinliche Ursache: `parsePlan` → `ProductionPlan.safeParse` verwirft die Server-Antwort wegen eines Feldes, das der Server anders schreibt als das Zod-Schema erwartet (z. B. `_meta.source` mit anderem String, striktere `voice`/`captions`-Enums, unbekannte Top-Level-Felder aus neueren Server-Passes). Fällt der erste Fetch in Validation-Fail → Catch → Grace-Window 45 s → Late-Arrival kommt zwar zurück (v3), aber ebenfalls im gleichen Validator → Grace-Timer öffnet Fallback zuerst.
 
-```text
-[ Outfit für ANNA ▾ ]
- ├─ Standard-Look
- ├─ ── Meine Looks ──
- │   • Business Casual
- │   • Streetwear
- └─ ── Presets ──
-     • Casual Denim
-     • Formal Suit
-     • …
-```
+## Ziele
 
-- Auswahl aus **Meine Looks** setzt `outfitLookId`, löscht `outfitPreset`.
-- Auswahl aus **Presets** setzt `outfitPreset`, löscht `outfitLookId`.
-- „Standard-Look" löscht beides.
-- Damit ist Mutual-Exclusivity strukturell erzwungen — keine Race-Conditions.
+1. Kein „Lokaler Fallback-Plan"-Badge, wenn der Server einen validen Plan geliefert hat.
+2. Root-Cause identifizieren statt weiter unterdrücken (Diagnose-Log auf `warn`, nicht nur `error.flatten()`).
+3. Zod-Schema toleranter machen ohne die Lip-Sync-Invarianten aufzuweichen.
 
-**Ladezustand**
-- Der Fallback-Text „Outfit lädt…" wird ersetzt: Wenn eine `outfitLookId` referenziert wird, die (noch) nicht in der Library existiert, zeigen wir den Eintrag **gar nicht** an und fallen automatisch auf „Standard-Look" zurück. Kein Phantom-Eintrag mehr.
+## Umsetzung
 
----
+### 1. Diagnose härten — `useStoryboardTransition.ts`
+- In `parsePlan` bei Fehlern die **rohen `data`-Keys** und die ersten 5 `parsed.error.issues` mit `path`+`code`+`message` loggen (bisher nur `flatten()`).
+- Response-Body zusätzlich als Preview (erste 500 Zeichen) loggen, damit sichtbar ist, was Server tatsächlich schickt.
+- Beim Erfolg `_meta.source = 'ai'` explizit setzen, falls Server es weglässt.
 
-## 2) Lip-Sync-Toggle als echtes Hard-Gate
+### 2. Schema entschärfen — `src/lib/video-composer/briefing/productionPlan.ts`
+- `ProductionPlan` bekommt `.passthrough()` auf Top-Level und auf `PlanMeta`, damit neue Server-Felder (`script_timing`, `duration_auto_extend`, etc.) den Parser nicht killen.
+- `PlanVoice.provider` von `z.literal('elevenlabs')` auf `z.string().optional()` lockern (Provider-Feld ist rein informativ, kein Enum-Grund für harten Fail).
+- `PlanUnresolved.severity` mit `.catch('warn')` versehen, damit unbekannte Severity-Werte nicht die ganze Validierung sprengen.
 
-**Problem**
-Auch mit `lipSyncWithVoiceover = false` startet die Sync.so-Pipeline, weil `SceneDialogStudio.handleGenerate` beim Klick auf „Generieren" unbedingt `engineOverride: 'cinematic-sync'`, `twoshotStage: 'audio'` und `lipSyncWithVoiceover: true` schreibt.
+### 3. Fallback-Semantik korrigieren
+- `_meta.source` bekommt einen dritten Wert: `'ai-partial'`, gesetzt wenn `dropped > 0` (heißt: AI-Plan mit Teilverlust — kein „offline"-Badge).
+- Fallback-Badge im `ProductionPlanSheet.tsx` nur bei `source === 'local-fallback'` (bleibt so). Kein Text-Change nötig.
 
-**Lösung — respektiere die User-Intention**
+### 4. Late-Arrival-Übernahme sicherstellen
+- Wenn `lateArrival` einen validen Plan liefert **nach** bereits geöffnetem Fallback-Sheet: aktueller Code zeigt Toast „Vollständiger Plan nachgeladen — bitte erneut anwenden". Damit User es nicht übersieht, `latePlan` mit `_meta.source='ai'` überschreiben und ein Debug-Log ausgeben.
 
-In `SceneDialogStudio.tsx` (Block ab Zeile ~1524) neu:
+### 5. Kein Backend-Change
+Server-Antwort ist korrekt — nur der Client-Guard ist zu streng. Keine Änderung an `briefing-deep-parse/index.ts`, keine Migration, keine Kredit-/Lipsync-Pfade.
 
-```ts
-const wantsLipSync =
-  scene.lipSyncWithVoiceover === true ||
-  scene.dialogMode === true;
+## Betroffene Dateien
 
-if (!wantsLipSync) {
-  // No lip-sync path: erzeuge nur das Master-Video ohne Cinematic-Sync.
-  // Skript bleibt als reine Regie-Notiz erhalten (keine TTS-Kopplung).
-  onUpdate({
-    clipStatus: 'generating',
-    engineOverride: 'auto',
-    twoshotStage: null,
-  });
-  await triggerPlainClipGeneration();   // == handleGenerateSingle-Äquivalent
-  return;
-}
+- `src/hooks/useStoryboardTransition.ts` (Diagnose-Log, `source:'ai'`-Setter, `ai-partial`)
+- `src/lib/video-composer/briefing/productionPlan.ts` (Schema-Lockerung + passthrough)
+- (optional) `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — nichts nötig
 
-// sonst: bestehende Cinematic-Sync-Pipeline
-```
+## Verifikation
 
-Zusätzlich in `SceneInlinePlayer.tsx` (Zeile 324): der Default-Subtitle
-`"VO & Lip-Sync inklusive"` wird zu einer intent-abhängigen Variante:
+1. Briefing des Users erneut analysieren → gelber „Fallback"-Badge muss verschwinden, Plan zeigt AI-Werte.
+2. In der Konsole: `[useStoryboardTransition] deep-parse OK { source: 'ai', dropped: 0 }`.
+3. Bei einem künstlich fehlerhaften Server-Response (test): Log listet exakte Zod-Path-Probleme — kein Silent-Fail mehr.
 
-```ts
-sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
-```
+## Nicht in Scope
 
-**Ergebnis**
-- Toggle AUS → weder Sync.so-Auftrag noch VO-Mux, kein Twoshot-Stage.
-- Progress-Bar zeigt keine Lipsync-Phase (bereits gefixt in `usePipelineProgress.ts`).
-- Toggle AN → Verhalten unverändert.
-
----
-
-## 3) Regression-Guard
-
-- Vitest-Case für `isLipSyncIntentional` bleibt Single-Source-of-Truth.
-- Neuer Test: `SceneDialogStudio.handleGenerate` mit `lipSyncWithVoiceover=false` ruft **nicht** `compose-twoshot-audio` / `compose-dialog-segments` auf.
-
----
-
-## Technische Details (kurz)
-
-| Datei | Änderung |
-|---|---|
-| `src/components/video-composer/briefing/ProductionPlanSheet.tsx` | Zwei Outfit-Selects → ein gruppiertes Select; Fallback „Outfit lädt…" entfernt; `updateSceneCastOutfit` / `updateSceneCastPreset` löschen jeweils das andere Feld. |
-| `src/components/video-composer/SceneDialogStudio.tsx` | `handleGenerate`: Early-Branch für „Lip-Sync AUS" → plain clip generation ohne cinematic-sync-Marker. |
-| `src/components/video-composer/SceneInlinePlayer.tsx` | Default-Subtitle intent-abhängig. |
-| `src/components/video-composer/__tests__/` | Neuer Test für Toggle-Off-Pfad. |
-
-Keine DB-Migration, keine Edge-Function-Änderung, keine Kredit-Logik-Änderung.
+- Ensemble-/Solo-Repair-Änderungen
+- Sync.so / Lip-Sync-Pipeline
+- Prompt-Text-Änderungen

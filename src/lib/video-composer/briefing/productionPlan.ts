@@ -171,7 +171,8 @@ export const PlanScene = z.object({
      * `bindTurnSpeakerIds`-Pass. Client-Voice-Binding läuft AUSSCHLIESSLICH
      * über dieses Feld; `speakerMentionKey` bleibt nur als Diagnose-Slug.
      */
-    speakerCharacterId: z.string().uuid().nullable().optional(),
+    // v243 — tolerate non-UUID legacy IDs; the applier re-resolves anyway.
+    speakerCharacterId: z.string().nullable().optional(),
     text: z.string().max(1000),
     mood: z.string().max(80).optional(),
     delivery: z.string().max(240).optional(),
@@ -227,7 +228,10 @@ export const PlanScene = z.object({
 });
 
 export const PlanVoice = z.object({
-  provider: z.literal('elevenlabs').default('elevenlabs'),
+  // v243 — provider is informational; server may send other strings.
+  // Keeping this as z.literal('elevenlabs') caused the whole plan to be
+  // rejected client-side and drove the false "local-fallback" badge.
+  provider: z.string().optional(),
   voiceId: z.string().optional(),
   voiceName: z.string().optional(),
   model: z.string().default('eleven_multilingual_v2'),
@@ -237,7 +241,7 @@ export const PlanVoice = z.object({
   speakerBoost: z.boolean().optional(),
   speed: z.number().min(0.7).max(1.3).optional(),
   requestStitching: z.boolean().default(true),
-}).partial().optional();
+}).partial().passthrough().optional();
 
 export const PlanCaptions = z.object({
   enabled: z.boolean().default(true),
@@ -267,8 +271,9 @@ export const PlanUnresolved = z.object({
   field: z.string(),
   reason: z.string(),
   suggestion: z.string().optional(),
-  severity: z.enum(['info', 'warn', 'error']).default('warn'),
-});
+  // v243 — tolerate unknown severities from newer server passes.
+  severity: z.enum(['info', 'warn', 'error']).catch('warn').default('warn'),
+}).passthrough();
 
 /**
  * Per-scene AI-enrichment trail. Lists the dotted field paths that the
@@ -307,10 +312,11 @@ export const PlanMeta = z.object({
   /**
    * Provenance of this plan:
    *  - 'ai'             — produced by briefing-deep-parse
+   *  - 'ai-partial'     — AI plan, but some scenes/fields were dropped in Zod
    *  - 'local-fallback' — produced by useStoryboardTransition.buildLocalFallbackPlan
    *                       when the edge function timed out / failed
    */
-  source: z.enum(['ai', 'local-fallback']).optional(),
+  source: z.enum(['ai', 'ai-partial', 'local-fallback']).optional(),
   /**
    * v213 — Briefing Fidelity telemetry. Present when LITERAL mode kicked
    * in (the user shipped an explicit script). Surfaced as a chip in the
@@ -330,18 +336,18 @@ export const PlanMeta = z.object({
    * response envelope (models used, timings, ensemble/strict-cast stats).
    */
   debug: z.record(z.string(), z.any()).optional(),
-}).partial();
+}).partial().passthrough();
 
 export const ProductionPlan = z.object({
   project: PlanProject.optional(),
-  scenes: z.array(PlanScene.extend({ _meta: PlanSceneMeta.optional() })).default([]),
+  scenes: z.array(PlanScene.extend({ _meta: PlanSceneMeta.optional() }).passthrough()).default([]),
   voice: PlanVoice,
   captions: PlanCaptions,
   negativePrompt: z.string().max(4000).optional(),
   unresolved: z.array(PlanUnresolved).default([]),
   /** Briefing-Intelligence v2 metadata. Optional for backward compat. */
   _meta: PlanMeta.optional(),
-});
+}).passthrough();
 
 export type TProductionPlan = z.infer<typeof ProductionPlan>;
 export type TPlanScene = z.infer<typeof PlanScene>;
