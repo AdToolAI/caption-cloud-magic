@@ -65,6 +65,10 @@ serve(async (req) => {
 
     for (const u of users) {
       try {
+        // Global 3-day frequency cap
+        if (!(await canSendMarketingEmail(supabase, u.id, "verify_reminder"))) {
+          continue;
+        }
         // Generate fresh verification token (24h lifetime)
         const verificationToken = crypto.randomUUID();
         const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
