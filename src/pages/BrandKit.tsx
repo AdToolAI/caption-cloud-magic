@@ -57,10 +57,7 @@ const BrandKit = () => {
     secondaryColor: ""
   });
 
-  const isPro = subscribed && (
-    productId === 'prod_TIRWOmhxlzFCwW' || // Pro Plan
-    productId === 'prod_TIRYBu4fdR2BEw'    // Enterprise Plan
-  );
+  const isPro = isSubscribed(subscribed, productId);
 
   // Fetch existing brand kits
   const { data: brandKits = [], isLoading } = useQuery({
