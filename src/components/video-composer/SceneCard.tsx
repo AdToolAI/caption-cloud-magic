@@ -2781,6 +2781,9 @@ export default function SceneCard({
                         <PromptMentionEditor
                           value={scene.aiPrompt || ""}
                           onChange={(v) => onUpdate({ aiPrompt: v })}
+                          onEditingChange={(editing) => {
+                            promptEditingRef.current = editing;
+                          }}
                           placeholder={
                             lang === "de"
                               ? "Describe the scene… nutze @charakter und @location aus deiner Library"
