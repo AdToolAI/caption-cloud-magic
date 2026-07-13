@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useAuth } from "@/hooks/useAuth";
-import { getProductInfo } from "@/config/pricing";
+import { getProductInfo, isSubscribed } from "@/config/pricing";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
