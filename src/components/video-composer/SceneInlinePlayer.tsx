@@ -322,7 +322,7 @@ export default function SceneInlinePlayer({
                 const totalPasses = passesArr.length;
                 const donePasses = passesArr.filter((p: any) => p?.status === "done" || p?.status === "failed").length;
                 let title = 'Szene wird gebaut…';
-                let sub = 'VO & Lip-Sync inklusive';
+                let sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
                 if (status === 'ready' && lipsyncRunning) {
                   if (lipSyncStatus === 'stitching' || twoshotStage === 'dialog_stitching') {
                     title = 'Lip-Sync wird zusammengesetzt…';
