@@ -145,25 +145,26 @@ export default function PromptMentionEditor({
   }, [suggestions.length, trigger?.query]);
 
   const resolvedMentions = useMemo(
-    () => findMentions(value, characters, locations),
-    [value, characters, locations]
+    () => findMentions(draft, characters, locations),
+    [draft, characters, locations]
   );
 
   const updateTrigger = () => {
     const ta = textareaRef.current;
     if (!ta) return;
-    const t = getActiveMentionTrigger(value, ta.selectionStart ?? 0);
+    const t = getActiveMentionTrigger(draft, ta.selectionStart ?? 0);
     setTrigger(t);
   };
 
   const insertSuggestion = (s: Suggestion) => {
     if (!trigger) return;
     const token = nameToToken(s.name);
-    const before = value.slice(0, trigger.start);
+    const before = draft.slice(0, trigger.start);
     const afterStart = trigger.start + 1 + trigger.query.length;
-    const after = value.slice(afterStart);
+    const after = draft.slice(afterStart);
     // Insert `@<token> ` (trailing space for nicer UX).
     const next = `${before}@${token} ${after}`;
+    setDraft(next);
     onChange(next);
     setTrigger(null);
     // Restore caret after insertion
@@ -195,20 +196,53 @@ export default function PromptMentionEditor({
     }
   };
 
+  const rememberCaret = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    lastCaretRef.current = {
+      start: ta.selectionStart ?? 0,
+      end: ta.selectionEnd ?? 0,
+    };
+  };
+
   return (
     <div className="relative">
       <Textarea
         ref={textareaRef}
-        value={value}
+        value={draft}
         onChange={(e) => {
-          onChange(e.target.value);
+          const next = e.target.value;
+          setDraft(next);
+          onChange(next);
+          rememberCaret();
           // updateTrigger after value commits in next tick
           requestAnimationFrame(updateTrigger);
         }}
+        onFocus={() => {
+          isEditingRef.current = true;
+          onEditingChange?.(true);
+          rememberCaret();
+        }}
         onKeyDown={handleKeyDown}
-        onKeyUp={updateTrigger}
-        onClick={updateTrigger}
+        onKeyUp={() => {
+          rememberCaret();
+          updateTrigger();
+        }}
+        onClick={() => {
+          rememberCaret();
+          updateTrigger();
+        }}
         onBlur={() => {
+          isEditingRef.current = false;
+          onEditingChange?.(false);
+          // Sync any external value that arrived while editing.
+          if (value !== draft && typeof value === 'string') {
+            // Prefer the user's draft as source-of-truth: push it upstream
+            // one more time in case the last onChange was swallowed by a
+            // sibling effect. We do NOT overwrite draft with external value
+            // here — the user's typed text wins.
+            onChange(draft);
+          }
           // Defer so click on dropdown still registers
           setTimeout(() => setTrigger(null), 150);
         }}
@@ -217,6 +251,7 @@ export default function PromptMentionEditor({
         disabled={disabled}
         className={cn('text-xs bg-background/50 resize-none', className)}
       />
+
 
       {/* Mention summary chips below the editor */}
       {resolvedMentions.length > 0 && (
