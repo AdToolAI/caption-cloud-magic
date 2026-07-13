@@ -1156,8 +1156,28 @@ export function useStoryboardTransition({
     const parsePlan = (data: any): { plan: TProductionPlan | null; dropped: number; error?: string } => {
       let dropped = 0;
       const parsed = ProductionPlan.safeParse(data?.plan);
-      if (parsed.success) return { plan: ensureProductionPlanEnsemble(parsed.data, briefing), dropped };
-      console.error('[useStoryboardTransition] plan validation failed', parsed.error.flatten());
+      if (parsed.success) {
+        // v243 — stamp provenance so the UI never shows the fallback badge
+        // on a valid AI plan (server occasionally omits _meta.source).
+        const stamped = parsed.data as any;
+        stamped._meta = { ...(stamped._meta ?? {}), source: (stamped._meta?.source ?? 'ai') };
+        return { plan: ensureProductionPlanEnsemble(stamped, briefing), dropped };
+      }
+      // v243 — richer diagnostics so the next false-fallback is one console log away.
+      try {
+        const issues = parsed.error.issues.slice(0, 6).map((i) => ({
+          path: i.path.join('.') || '<root>',
+          code: i.code,
+          message: i.message,
+        }));
+        console.warn('[useStoryboardTransition] plan validation failed', {
+          issues,
+          rawKeys: data?.plan && typeof data.plan === 'object' ? Object.keys(data.plan) : null,
+          rawPreview: (() => {
+            try { return JSON.stringify(data ?? {}).slice(0, 500); } catch { return null; }
+          })(),
+        });
+      } catch { /* noop */ }
       const rawScenes: any[] = Array.isArray(data?.plan?.scenes) ? data.plan.scenes : [];
       const survivors: any[] = [];
       for (const s of rawScenes) {
@@ -1166,7 +1186,11 @@ export function useStoryboardTransition({
       }
       if (survivors.length > 0) {
         const retry = ProductionPlan.safeParse({ ...(data?.plan ?? {}), scenes: survivors });
-        if (retry.success) return { plan: ensureProductionPlanEnsemble(retry.data, briefing), dropped };
+        if (retry.success) {
+          const stamped = retry.data as any;
+          stamped._meta = { ...(stamped._meta ?? {}), source: dropped > 0 ? 'ai-partial' : 'ai' };
+          return { plan: ensureProductionPlanEnsemble(stamped, briefing), dropped };
+        }
       }
       const issues = parsed.error.issues.slice(0, 2)
         .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join(' · ');
