@@ -10,7 +10,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
 import { FEATURE_COSTS } from "@/lib/featureCosts";
-import { getProductInfo } from "@/config/pricing";
+import { getProductInfo, isSubscribed } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import {
