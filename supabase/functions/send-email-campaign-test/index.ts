@@ -47,6 +47,20 @@ Deno.serve(async (req) => {
     }
     const user = userData.user;
 
+    // Beta-mode guard: block outbound campaign broadcasts during beta phase
+    const { data: betaCfg } = await supabase
+      .from('system_config')
+      .select('value')
+      .eq('key', 'email.beta_mode')
+      .maybeSingle();
+    const isBeta = (betaCfg?.value === true) || ((betaCfg?.value as any)?.enabled === true);
+    if (isBeta) {
+      return new Response(
+        JSON.stringify({ error: 'Email campaigns are disabled during the public beta phase.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const body: RequestBody = await req.json();
     const { campaignId, subjectIndex, variantIndex, recipientEmail } = body;
 

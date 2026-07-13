@@ -17,7 +17,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM = "AdTool <notify@useadtool.ai>";
+const FROM = "AdTool <notify@notify.useadtool.ai>";
 const BASE_URL = "https://useadtool.ai";
 
 interface ProgressInput {

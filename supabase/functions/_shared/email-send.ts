@@ -33,12 +33,13 @@ export interface SendEmailResult {
 }
 
 const APP_DOMAIN = "useadtool.ai";
+const SENDER_DOMAIN = "notify.useadtool.ai"; // Lovable-managed verified subdomain
 const APP_URL = Deno.env.get("APP_URL") || `https://${APP_DOMAIN}`;
 
 const FROM_BY_CATEGORY: Record<EmailCategory, string> = {
-  transactional: `AdTool AI <support@${APP_DOMAIN}>`,
-  marketing: `AdTool AI <hello@${APP_DOMAIN}>`,
-  system: `AdTool Alerts <alerts@${APP_DOMAIN}>`,
+  transactional: `AdTool AI <support@${SENDER_DOMAIN}>`,
+  marketing: `AdTool AI <hello@${SENDER_DOMAIN}>`,
+  system: `AdTool Alerts <alerts@${SENDER_DOMAIN}>`,
 };
 
 let _resend: Resend | null = null;

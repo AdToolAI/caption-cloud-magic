@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { renderReminderEmail, type Lang } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,6 +65,10 @@ serve(async (req) => {
 
     for (const u of users) {
       try {
+        // Global 3-day frequency cap
+        if (!(await canSendMarketingEmail(supabase, u.id, "verify_reminder"))) {
+          continue;
+        }
         // Generate fresh verification token (24h lifetime)
         const verificationToken = crypto.randomUUID();
         const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
@@ -107,6 +112,7 @@ serve(async (req) => {
           .from("profiles")
           .update({ verify_reminder_sent_at: new Date().toISOString() })
           .eq("id", u.id);
+        await markMarketingEmailSent(supabase, u.id);
 
         sent++;
       } catch (e) {
