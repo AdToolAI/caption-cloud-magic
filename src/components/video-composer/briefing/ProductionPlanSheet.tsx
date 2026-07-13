@@ -749,7 +749,8 @@ export default function ProductionPlanSheet({
         const cast = [...(s.cast ?? [])];
         while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
         const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
-        cast[castIdx] = { ...c, outfitPreset: presetId };
+        // Mutual exclusivity: setting a preset clears any library outfitLookId.
+        cast[castIdx] = { ...c, outfitPreset: presetId, ...(presetId ? { outfitLookId: null } : {}) };
         return { ...s, cast };
       }),
     });
