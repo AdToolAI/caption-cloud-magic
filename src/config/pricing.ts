@@ -63,8 +63,8 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
   },
   basic: {
     id: 'basic',
-    label: 'Basic',
-    name: 'Basic',
+    label: 'Beta-Basic',
+    name: 'Beta-Basic',
     price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
     credits: 800,
@@ -73,20 +73,21 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     checkoutUrl: '',
     features: {
       posting: true,
-      quickCalendarPost: false,
-      team: false,
-      whiteLabel: false,
+      quickCalendarPost: true,
+      team: true,
+      whiteLabel: true,
       api: false,
-      xTwitterAccess: false,
-      storageMb: 2048, // 2 GB
+      xTwitterAccess: true,
+      storageMb: 5120, // 5 GB — Beta users get full access
       // Legacy features
-      captionsPerMonth: 200,
-      brandsLimit: 2,
+      captionsPerMonth: Infinity,
+      brandsLimit: Infinity,
       hasWatermark: false,
       hashtagGenerator: true,
-      analytics: false,
-      prioritySupport: false,
-      autoSchedule: false
+      analytics: true,
+      prioritySupport: true,
+      autoSchedule: true,
+      whiteLabeling: true,
     }
   },
   // Legacy aliases — during Beta only "beta-basic" exists. These entries
