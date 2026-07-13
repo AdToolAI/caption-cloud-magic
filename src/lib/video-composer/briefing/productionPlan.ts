@@ -171,7 +171,8 @@ export const PlanScene = z.object({
      * `bindTurnSpeakerIds`-Pass. Client-Voice-Binding läuft AUSSCHLIESSLICH
      * über dieses Feld; `speakerMentionKey` bleibt nur als Diagnose-Slug.
      */
-    speakerCharacterId: z.string().uuid().nullable().optional(),
+    // v243 — tolerate non-UUID legacy IDs; the applier re-resolves anyway.
+    speakerCharacterId: z.string().nullable().optional(),
     text: z.string().max(1000),
     mood: z.string().max(80).optional(),
     delivery: z.string().max(240).optional(),
