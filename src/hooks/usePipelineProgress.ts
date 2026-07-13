@@ -346,9 +346,8 @@ export function usePipelineProgress({
           const cs = (s as any).clipStatus ?? (s as any).clip_status;
           if (cs === 'failed') return false;
           return (
-            (s as any).twoshotStage ||
-            s.engineOverride === 'cinematic-sync' ||
-            dialogVoiceCount(s) > 1
+            isLipSyncIntentional(s as any) ||
+            !!(s as any).twoshotStage
           );
         },
       ),
