@@ -122,7 +122,7 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
       const rows = parseCSV(text);
 
       // Check plan limits
-      const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+      const isPro = isSubscribed(subscribed, productId);
 
       // Validate rows
       const validRows = rows.filter(validateRow);
