@@ -36,6 +36,12 @@ export const AIVideoCreditPurchase = () => {
 
   return (
     <div className="space-y-6">
+      {founder.isActive && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
+          <Crown className="h-4 w-4" />
+          <span className="font-medium">Gründer-Vorteil aktiv: −20 % auf alle Video-Credits (24 Monate).</span>
+        </div>
+      )}
       {currency === 'EUR' && (
         <p className="text-xs text-muted-foreground text-center">
           Alle Preise inkl. 19% MwSt. (Deutschland). Eine Rechnung wird automatisch nach dem Kauf per E-Mail zugestellt und im Billing-Bereich verfügbar.
