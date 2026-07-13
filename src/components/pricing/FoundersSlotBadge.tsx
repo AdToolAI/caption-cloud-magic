@@ -57,7 +57,7 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
         )}
       </div>
       <a
-        href="/legal/terms"
+        href="/legal/terms#section-8"
         className="text-[10px] leading-tight text-muted-foreground/60 hover:text-muted-foreground/90 transition-colors text-center max-w-xs"
       >
         Begrenztes Einführungsangebot. Änderungen vorbehalten. Gilt nur bei aktivem Betrieb des Dienstes. Details siehe AGB §8.
