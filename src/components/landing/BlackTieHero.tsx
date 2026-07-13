@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SithCommandDeck } from "./SithCommandDeck";
+import { FoundersBenefitsDialog } from "./FoundersBenefitsDialog";
 
 export const BlackTieHero = () => {
   const { t } = useTranslation();
+  const [foundersOpen, setFoundersOpen] = useState(false);
 
   return (
     <section className="relative flex items-center overflow-hidden pt-2 pb-8 md:pt-4 md:pb-12 px-4">
@@ -89,29 +92,45 @@ export const BlackTieHero = () => {
               </Button>
             </div>
 
-            {/* Stats Row — honest Beta framing (no invented numbers) */}
+            {/* Stats Row — honest Beta framing, klickbar für Founders-Vorteile */}
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6, duration: 0.5 }}
-              className="flex items-center gap-8 mt-12 justify-center lg:justify-start"
+              className="mt-12 flex flex-col items-center lg:items-start gap-2"
             >
-              <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-accent tracking-widest">BETA</div>
-                <div className="text-sm text-muted-foreground">{t('landing.hero.stats.creators')}</div>
-              </div>
-              <div className="w-px h-10 bg-border" />
-              <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-foreground">3</div>
-                <div className="text-sm text-muted-foreground">{t('landing.hero.stats.posts')}</div>
-              </div>
-              <div className="w-px h-10 bg-border" />
-              <div className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-accent">1000</div>
-                <div className="text-sm text-muted-foreground">{t('landing.hero.stats.engagement')}</div>
-              </div>
+              <button
+                type="button"
+                onClick={() => setFoundersOpen(true)}
+                aria-label="Founders-Vorteile ansehen"
+                className="group flex items-center gap-8 rounded-2xl border border-transparent hover:border-primary/40 hover:bg-primary/5 px-6 py-3 transition-all duration-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              >
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-accent tracking-widest group-hover:scale-105 transition-transform">BETA</div>
+                  <div className="text-sm text-muted-foreground">{t('landing.hero.stats.creators')}</div>
+                </div>
+                <div className="w-px h-10 bg-border" />
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-foreground group-hover:scale-105 transition-transform">3</div>
+                  <div className="text-sm text-muted-foreground">{t('landing.hero.stats.posts')}</div>
+                </div>
+                <div className="w-px h-10 bg-border" />
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-accent group-hover:scale-105 transition-transform">1000</div>
+                  <div className="text-sm text-muted-foreground">{t('landing.hero.stats.engagement')}</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFoundersOpen(true)}
+                className="text-xs text-primary/70 hover:text-primary transition-colors underline underline-offset-4"
+              >
+                → Klicken für Founders-Vorteile & Preisgarantie
+              </button>
             </motion.div>
           </motion.div>
+
+          <FoundersBenefitsDialog open={foundersOpen} onOpenChange={setFoundersOpen} />
 
           {/* Right Column - Sith Command Deck (3D Laptop) */}
           <motion.div
