@@ -89,27 +89,27 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       autoSchedule: false
     }
   },
+  // Legacy aliases — during Beta only "beta-basic" exists. These entries
+  // point at the same price/product as `basic` so any lingering imports keep
+  // working, but the Pricing UI only surfaces the single Beta plan.
   pro: {
     id: 'pro',
-    label: 'Pro',
-    name: 'Pro',
-    price: { EUR: 29.99, USD: 29.99 },
+    label: 'Beta-Basic',
+    name: 'Beta-Basic',
+    price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
-    credits: 2500,
-    priceId: 'price_1TSLxWDRu4kfSFxjEJNi8nGN',
-    productId: 'prod_UOG4wbiQjDONAj',
+    credits: 800,
+    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    productId: 'prod_TIRSoTyzmRpbpT',
     checkoutUrl: '',
     features: {
       posting: true,
       quickCalendarPost: true,
       team: true,
       whiteLabel: true,
-      // Beta: all non-api enterprise-tier features included in Pro so the
-      // single Beta plan does not gate users out of shipped features.
       api: false,
       xTwitterAccess: true,
-      storageMb: 5120, // 5 GB
-      // Legacy features
+      storageMb: 5120,
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
       hasWatermark: false,
@@ -117,37 +117,36 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       analytics: true,
       prioritySupport: true,
       autoSchedule: true,
-      whiteLabeling: true
+      whiteLabeling: true,
     }
   },
   enterprise: {
     id: 'enterprise',
-    label: 'Enterprise',
-    name: 'Enterprise',
-    price: { EUR: 69.95, USD: 69.95 },
+    label: 'Beta-Basic',
+    name: 'Beta-Basic',
+    price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
-    credits: 'unlimited',
-    priceId: 'price_1SLqfFDRu4kfSFxjy2ZxDkby',
-    productId: 'prod_TIRYBu4fdR2BEw',
+    credits: 800,
+    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    productId: 'prod_TIRSoTyzmRpbpT',
     checkoutUrl: '',
     features: {
       posting: true,
       quickCalendarPost: true,
       team: true,
       whiteLabel: true,
-      api: true,
+      api: false,
       xTwitterAccess: true,
-      storageMb: 10240, // 10 GB
-      // Legacy features
+      storageMb: 5120,
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
       hasWatermark: false,
       hashtagGenerator: true,
       analytics: true,
       prioritySupport: true,
-      apiAccess: true,
+      apiAccess: false,
       whiteLabeling: true,
-      autoSchedule: true
+      autoSchedule: true,
     }
   }
 } as const;
