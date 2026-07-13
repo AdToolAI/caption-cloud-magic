@@ -66,7 +66,7 @@ const Pricing = () => {
     setProLoading(true);
     trackEvent(ANALYTICS_EVENTS.CHECKOUT_STARTED, {
       plan: "pro",
-      price_id: pricingPlans.pro.priceId,
+      price_id: pricingPlans.basic.priceId,
       currency,
       coupon: couponCode || null,
       reactivation: isReactivation,
