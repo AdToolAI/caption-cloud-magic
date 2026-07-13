@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Shield, Database, Scale, Cookie, Lock, Globe, Users, Mail, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface LegalSectionProps {
@@ -9,6 +9,7 @@ interface LegalSectionProps {
   children: React.ReactNode;
   defaultOpen?: boolean;
   index?: number;
+  id?: string;
 }
 
 const iconMap: Record<string, React.ElementType> = {
