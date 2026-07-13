@@ -63,8 +63,8 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
   },
   basic: {
     id: 'basic',
-    label: 'Basic',
-    name: 'Basic',
+    label: 'Beta-Basic',
+    name: 'Beta-Basic',
     price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
     credits: 800,
@@ -73,42 +73,12 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     checkoutUrl: '',
     features: {
       posting: true,
-      quickCalendarPost: false,
-      team: false,
-      whiteLabel: false,
-      api: false,
-      xTwitterAccess: false,
-      storageMb: 2048, // 2 GB
-      // Legacy features
-      captionsPerMonth: 200,
-      brandsLimit: 2,
-      hasWatermark: false,
-      hashtagGenerator: true,
-      analytics: false,
-      prioritySupport: false,
-      autoSchedule: false
-    }
-  },
-  pro: {
-    id: 'pro',
-    label: 'Pro',
-    name: 'Pro',
-    price: { EUR: 29.99, USD: 29.99 },
-    currency: '€',
-    credits: 2500,
-    priceId: 'price_1TSLxWDRu4kfSFxjEJNi8nGN',
-    productId: 'prod_UOG4wbiQjDONAj',
-    checkoutUrl: '',
-    features: {
-      posting: true,
       quickCalendarPost: true,
       team: true,
       whiteLabel: true,
-      // Beta: all non-api enterprise-tier features included in Pro so the
-      // single Beta plan does not gate users out of shipped features.
       api: false,
       xTwitterAccess: true,
-      storageMb: 5120, // 5 GB
+      storageMb: 5120, // 5 GB — Beta users get full access
       // Legacy features
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
@@ -117,37 +87,67 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       analytics: true,
       prioritySupport: true,
       autoSchedule: true,
-      whiteLabeling: true
+      whiteLabeling: true,
     }
   },
-  enterprise: {
-    id: 'enterprise',
-    label: 'Enterprise',
-    name: 'Enterprise',
-    price: { EUR: 69.95, USD: 69.95 },
+  // Legacy aliases — during Beta only "beta-basic" exists. These entries
+  // point at the same price/product as `basic` so any lingering imports keep
+  // working, but the Pricing UI only surfaces the single Beta plan.
+  pro: {
+    id: 'pro',
+    label: 'Beta-Basic',
+    name: 'Beta-Basic',
+    price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
-    credits: 'unlimited',
-    priceId: 'price_1SLqfFDRu4kfSFxjy2ZxDkby',
-    productId: 'prod_TIRYBu4fdR2BEw',
+    credits: 800,
+    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    productId: 'prod_TIRSoTyzmRpbpT',
     checkoutUrl: '',
     features: {
       posting: true,
       quickCalendarPost: true,
       team: true,
       whiteLabel: true,
-      api: true,
+      api: false,
       xTwitterAccess: true,
-      storageMb: 10240, // 10 GB
-      // Legacy features
+      storageMb: 5120,
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
       hasWatermark: false,
       hashtagGenerator: true,
       analytics: true,
       prioritySupport: true,
-      apiAccess: true,
+      autoSchedule: true,
       whiteLabeling: true,
-      autoSchedule: true
+    }
+  },
+  enterprise: {
+    id: 'enterprise',
+    label: 'Beta-Basic',
+    name: 'Beta-Basic',
+    price: { EUR: 14.99, USD: 14.99 },
+    currency: '€',
+    credits: 800,
+    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    productId: 'prod_TIRSoTyzmRpbpT',
+    checkoutUrl: '',
+    features: {
+      posting: true,
+      quickCalendarPost: true,
+      team: true,
+      whiteLabel: true,
+      api: false,
+      xTwitterAccess: true,
+      storageMb: 5120,
+      captionsPerMonth: Infinity,
+      brandsLimit: Infinity,
+      hasWatermark: false,
+      hashtagGenerator: true,
+      analytics: true,
+      prioritySupport: true,
+      apiAccess: false,
+      whiteLabeling: true,
+      autoSchedule: true,
     }
   }
 } as const;
@@ -167,14 +167,39 @@ export const FEATURE_FLAGS = {
 export const pricingPlans = PRICING_V21;
 export type PlanType = PlanId;
 
-// Helper function for backward compatibility
+// Helper — during Beta every non-empty productId that ever represented a paid
+// plan (legacy Basic/Pro/Enterprise) is normalized to Beta-Basic so past
+// subscribers keep full access.
+const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
+  'prod_TIRSoTyzmRpbpT', // Basic (canonical)
+  'prod_TDoWFAZjKKUnA2', // legacy Basic
+  'prod_TDoYdYP1nOOWsN', // legacy Pro
+  'prod_TIRWOmhxlzFCwW', // legacy Pro
+  'prod_UOG4wbiQjDONAj', // Pro v2
+  'prod_UOG5TjlcpNNZLZ', // Pro alt
+  'prod_UREZAv0LG9vz1E', // Pro alt
+  'prod_TIRYBu4fdR2BEw', // Enterprise
+]);
+
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
-  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.99, currency: '€' };
-  if (productId === 'prod_TIRWOmhxlzFCwW' || productId === 'prod_UOG4wbiQjDONAj' || productId === 'prod_UOG5TjlcpNNZLZ' || productId === 'prod_UREZAv0LG9vz1E') return { name: 'Pro', price: 29.99, currency: '€' };
-  if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.95, currency: '€' };
+  if (LEGACY_PAID_PRODUCT_IDS.has(productId)) {
+    return { name: 'Beta-Basic', price: 14.99, currency: '€' };
+  }
   return { name: 'Free', price: 0, currency: '€' };
 };
+
+/**
+ * Single source of truth for "does this user have a paid subscription?".
+ * During Beta there is exactly one paid plan (Beta-Basic), so any active
+ * subscription unlocks every feature. `productId` is accepted for forward
+ * compatibility when tiers return.
+ */
+export const isSubscribed = (
+  subscribed: boolean | null | undefined,
+  _productId?: string | null,
+): boolean => !!subscribed;
+
 
 // Access control helpers
 export const hasAccess = (

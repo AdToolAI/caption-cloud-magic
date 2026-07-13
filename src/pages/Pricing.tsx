@@ -66,7 +66,7 @@ const Pricing = () => {
     setProLoading(true);
     trackEvent(ANALYTICS_EVENTS.CHECKOUT_STARTED, {
       plan: "pro",
-      price_id: pricingPlans.pro.priceId,
+      price_id: pricingPlans.basic.priceId,
       currency,
       coupon: couponCode || null,
       reactivation: isReactivation,
@@ -74,7 +74,7 @@ const Pricing = () => {
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
-          priceId: pricingPlans.pro.priceId,
+          priceId: pricingPlans.basic.priceId,
           ...(couponCode ? { promoCode: couponCode } : {}),
         },
       });
@@ -270,8 +270,8 @@ const Pricing = () => {
                       {t("landing.pricing.singlePlanDescription")}
                     </p>
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-lg text-muted-foreground/60 line-through tabular-nums">
-                        {currencySymbol}29.99
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-primary/40 bg-primary/10 text-primary text-[10px] font-bold tracking-wider uppercase">
+                        Beta
                       </span>
                       <span className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-gold-dark bg-clip-text text-transparent tabular-nums">
                         {currencySymbol}14.99

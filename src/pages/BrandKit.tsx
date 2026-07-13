@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { isSubscribed } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
@@ -57,10 +58,7 @@ const BrandKit = () => {
     secondaryColor: ""
   });
 
-  const isPro = subscribed && (
-    productId === 'prod_TIRWOmhxlzFCwW' || // Pro Plan
-    productId === 'prod_TIRYBu4fdR2BEw'    // Enterprise Plan
-  );
+  const isPro = isSubscribed(subscribed, productId);
 
   // Fetch existing brand kits
   const { data: brandKits = [], isLoading } = useQuery({

@@ -83,7 +83,7 @@ export const PlanLimitDialog = ({ open, onOpenChange, feature }: PlanLimitDialog
             <div>
               <h4 className="font-semibold">Media Storage</h4>
               <p className="text-sm text-muted-foreground">
-                Basic: 2 GB • Pro: 5 GB • Enterprise: 10 GB
+                Beta-Basic: 5 GB inklusive
               </p>
             </div>
           </div>
@@ -91,13 +91,8 @@ export const PlanLimitDialog = ({ open, onOpenChange, feature }: PlanLimitDialog
 
         <div className="space-y-2">
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-center">
-            <div className="text-lg font-bold">Pro Plan</div>
-            <div className="text-2xl font-bold">{symbol}{pricingPlans.pro.price[currency]}</div>
-            <div className="text-sm text-muted-foreground">per month</div>
-          </div>
-          <div className="rounded-lg border border-primary/20 bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-3 text-center">
-            <div className="text-lg font-bold">Enterprise Plan</div>
-            <div className="text-2xl font-bold">{symbol}{pricingPlans.enterprise.price[currency]}</div>
+            <div className="text-lg font-bold">Beta-Basic</div>
+            <div className="text-2xl font-bold">{symbol}{pricingPlans.basic.price[currency]}</div>
             <div className="text-sm text-muted-foreground">per month</div>
           </div>
         </div>

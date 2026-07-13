@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { isSubscribed } from "@/config/pricing";
 import { useAICall } from "@/hooks/useAICall";
 import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,7 +37,7 @@ const Coach = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
   
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isPro = isSubscribed(subscribed, productId);
 
   // Dynamic quick prompts - start with static translations, then update dynamically
   const [dynamicQuickPrompts, setDynamicQuickPrompts] = useState<string[]>([]);

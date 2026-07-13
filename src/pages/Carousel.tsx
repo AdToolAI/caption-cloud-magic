@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { getProductInfo } from "@/config/pricing";
+import { getProductInfo, isSubscribed } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,7 +71,7 @@ const Carousel = () => {
   const [activeTab, setActiveTab] = useState<"text" | "design" | "flow">("text");
 
   const planInfo = getProductInfo(productId);
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isPro = isSubscribed(subscribed, productId);
 
   useEffect(() => {
     if (session?.user) {

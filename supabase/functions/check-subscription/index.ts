@@ -64,22 +64,20 @@ serve(withTelemetry("check-subscription", async (req) => {
 
     const profile = profileResult.data;
 
+    // Beta: only one plan exists — normalize everything to Beta-Basic.
+    const BETA_BASIC_PRODUCT_ID = 'prod_TIRSoTyzmRpbpT';
+
     // Check for test mode first
     if (profile?.test_mode_plan) {
-      const testProductId = profile.test_mode_plan === 'pro' 
-        ? 'prod_TDoYdYP1nOOWsN' 
-        : profile.test_mode_plan === 'basic' 
-        ? 'prod_TDoWFAZjKKUnA2' 
-        : null;
-      
       return new Response(
         JSON.stringify({
           subscribed: profile.test_mode_plan !== 'free',
-          product_id: testProductId,
+          product_id: profile.test_mode_plan !== 'free' ? BETA_BASIC_PRODUCT_ID : null,
+          plan: 'beta-basic',
           subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
           test_mode: true,
         }),
-        { 
+        {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         }
@@ -91,16 +89,11 @@ serve(withTelemetry("check-subscription", async (req) => {
     // blocks client writes). For non-Stripe enterprise users we still honor it, but
     // only when there is no stripe_customer_id (i.e. truly an out-of-band plan).
     if (profile?.plan && profile.plan !== 'free' && !profile?.stripe_customer_id) {
-      const planToProductId: Record<string, string> = {
-        'basic': 'prod_TIRSoTyzmRpbpT',
-        'pro': 'prod_TIRWOmhxlzFCwW',
-        'enterprise': 'prod_TIRYBu4fdR2BEw'
-      };
-
       return new Response(
         JSON.stringify({
           subscribed: true,
-          product_id: planToProductId[profile.plan] || null,
+          product_id: BETA_BASIC_PRODUCT_ID,
+          plan: 'beta-basic',
           subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
           plan_based: true
         }),
@@ -167,7 +160,8 @@ serve(withTelemetry("check-subscription", async (req) => {
     return new Response(
       JSON.stringify({
         subscribed: hasActiveSubscription,
-        product_id: productId,
+        product_id: hasActiveSubscription ? BETA_BASIC_PRODUCT_ID : productId,
+        plan: hasActiveSubscription ? 'beta-basic' : 'free',
         subscription_end: subscriptionEnd,
       }),
       { 
