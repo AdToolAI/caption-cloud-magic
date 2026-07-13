@@ -8,7 +8,7 @@ export const AccountHeroHeader = () => {
   const { user, subscribed, productId } = useAuth();
   const { t } = useTranslation();
   const planInfo = getProductInfo(productId);
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isPro = isSubscribed(subscribed, productId);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-card/80 via-card/60 to-muted/40 backdrop-blur-xl p-8 mb-8">
