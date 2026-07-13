@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
-import { getProductInfo } from "@/config/pricing";
+import { getProductInfo, isSubscribed } from "@/config/pricing";
 import { Settings, Shield, CheckCircle2, Crown } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
