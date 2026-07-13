@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Shield, Database, Scale, Cookie, Lock, Globe, Users, Mail, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface LegalSectionProps {
@@ -9,6 +9,7 @@ interface LegalSectionProps {
   children: React.ReactNode;
   defaultOpen?: boolean;
   index?: number;
+  id?: string;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -28,17 +29,34 @@ export const LegalSection = ({
   icon = "shield", 
   children, 
   defaultOpen = false,
-  index = 0 
+  index = 0,
+  id,
 }: LegalSectionProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const Icon = iconMap[icon] || Shield;
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    if (typeof window === "undefined") return;
+    if (window.location.hash.replace("#", "") === id) {
+      setIsOpen(true);
+      // Wait for expand animation, then scroll into view
+      const t = setTimeout(() => {
+        ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [id]);
 
   return (
     <motion.div
+      id={id}
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.4 }}
-      className="group"
+      className="group scroll-mt-24"
     >
       <div
         className={cn(

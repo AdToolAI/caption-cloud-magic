@@ -88,7 +88,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
             Abo gebunden. Bei <strong className="text-foreground">Kündigung, Pausierung oder Kontolöschung</strong>{" "}
             geht dein Founder-Status <strong className="text-foreground">dauerhaft verloren</strong> und der Slot wird
             für neue Nutzer freigegeben. Details in unseren{" "}
-            <Link to="/legal" className="text-primary hover:underline">AGB §8</Link>.
+            <Link to="/legal/terms#section-8" className="text-primary hover:underline">AGB §8</Link>.
           </div>
         </div>
 

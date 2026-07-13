@@ -153,7 +153,7 @@ const Legal = () => {
                 </ul>
               </LegalSection>
 
-              <LegalSection title="8. Aktionspreise, Founders- und Launch-Angebote" icon="alert" index={7}>
+              <LegalSection id="section-8" title="8. Aktionspreise, Founders- und Launch-Angebote" icon="alert" index={7}>
                 <div className="space-y-3">
                   <p>
                     Sämtliche als „Founders-Deal", „Launch-Promo", „Einführungspreis" oder vergleichbar gekennzeichneten
