@@ -14,6 +14,7 @@ import { Loader2, AlertTriangle, ArrowLeft, FileDown, Trash2, ShieldAlert, Crown
 
 const DeleteAccount = () => {
   const { user, signOut } = useAuth();
+  const founder = useFounderStatus();
   const { toast } = useToast();
   const navigate = useNavigate();
 
