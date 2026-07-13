@@ -82,6 +82,9 @@ serve(async (req) => {
 
     const userId = user.id;
 
+    // Revoke founders status before wipe (releases the slot for a new user)
+    await admin.rpc("revoke_founder_status", { _user_id: userId, _reason: "admin_delete" });
+
     // Clean up known dependent rows first (best-effort)
     await admin.from("email_verification_tokens").delete().eq("user_id", userId);
     await admin.from("wallets").delete().eq("user_id", userId);
