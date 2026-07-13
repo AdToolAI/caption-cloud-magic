@@ -1,61 +1,50 @@
+# Fix-Plan v246 — KI-Prompt-Feld stabilisieren
 
-# v243 — False-Fallback im Briefing-Analyzer beheben
+## Diagnose
 
-## Diagnose (aus Edge-Logs + Client-Code)
+Das Feld ist ein kontrolliertes `<Textarea>` in `PromptMentionEditor`, dessen `value` direkt aus `scene.aiPrompt` kommt. In `SceneCard.tsx` gibt es **zwei Sync-Effekte, die während des Tippens den Prompt rewritten**:
 
-Server-Seite (Edge Fn `briefing-deep-parse`) war für dieses Briefing **nicht offline**:
+1. **Zeile 683–718 (Action-Sync)** — depsArray enthält `scene.aiPrompt` selbst. Jeder Tastendruck → `onUpdate({aiPrompt})` → Effekt läuft erneut → `applyActionsToPrompt(...)` strippt `[SceneAction]`/`[CastActions]`-Marker und setzt sie neu → `onUpdate({aiPrompt: next})` überschreibt den vom User eben getippten Wert.
+2. **Zeile 636–672 (Dialog-Sync)** — feuert bei jedem `scene.dialogScript`- oder `characters?.length`-Change und ruft `applyDialogToPrompt` → im Mittelblock des Prompts platziert.
+3. **`SceneActionField` schiebt asynchron `sceneActionEn`** nach (Auto-Translate mit 500 ms Debounce). Das ist eine weitere externe Änderung, die Effekt #1 triggert, während der User im Prompt tippt.
 
-- 3 erfolgreiche Requests innerhalb 15 s
-- Pass A (Gemini 2.5 Flash) ok, Pass B ok
-- Plan-Summary: 3 Szenen × 5 s, `cinematic-sync`, cast 1 (VO)
-- v1, v2, v3 persistiert in `composer_production_plans`
+Symptome dadurch:
+- **Cursor springt ans Ende**: kontrollierter Textarea-Reset. React setzt selectionStart/End nicht zurück, wenn `value` in-place ausgetauscht wird.
+- **Eintrag verschwindet**: getippter Text landet zwischen zwei Marker-Blöcken; `applyActionsToPrompt` schneidet den Bereich beim Re-Insert weg.
 
-Client-Seite (`useStoryboardTransition.ts`) fiel trotzdem in `buildLocalFallbackPlan`, das setzt `_meta.source = 'local-fallback'`. Der `ProductionPlanSheet` zeigt darauf den gelben „Lokaler Fallback-Plan"-Badge + „AI-Analyse war offline".
+## Zielverhalten
+Solange der User im `aiPrompt`-Feld tippt, darf **kein** externer Effekt den Wert rewritten. Erst nach Blur oder Idle (~600 ms) darf Marker-Re-Injection laufen. Der Rest der Pipeline (Dialog-Sync bei DB-Reload, Action-Marker nach Blur) bleibt unverändert.
 
-Wahrscheinliche Ursache: `parsePlan` → `ProductionPlan.safeParse` verwirft die Server-Antwort wegen eines Feldes, das der Server anders schreibt als das Zod-Schema erwartet (z. B. `_meta.source` mit anderem String, striktere `voice`/`captions`-Enums, unbekannte Top-Level-Felder aus neueren Server-Passes). Fällt der erste Fetch in Validation-Fail → Catch → Grace-Window 45 s → Late-Arrival kommt zwar zurück (v3), aber ebenfalls im gleichen Validator → Grace-Timer öffnet Fallback zuerst.
+## Änderungen
 
-## Ziele
+### 1. `PromptMentionEditor.tsx` — Local Draft Buffer + Caret Preservation
+- Interner `draft`-State, initialisiert aus `value`.
+- `onChange` schreibt sofort in `draft` und ruft `onChange(next)` upstream **direkt** (kein Debounce; upstream State bleibt Wahrheit für andere Panels).
+- Ein `isEditingRef` (true zwischen `onFocus`/`onBlur`) wird auf `data-editing="true"` am Textarea gespiegelt, damit SceneCard das lesen kann.
+- Wenn externes `value` sich ändert *während* `isEditingRef.current === true`, wird der eigene `draft` **nicht** überschrieben (Ausnahme: neuer Wert enthält `draft` als Prefix → Marker-Injection außerhalb der Editier-Region ist ok).
+- Nach jedem externen `value`-Change, der doch übernommen wird: `selectionStart/End` restaurieren (aus dem letzten bekannten Caret-Offset relativ zum Textende).
 
-1. Kein „Lokaler Fallback-Plan"-Badge, wenn der Server einen validen Plan geliefert hat.
-2. Root-Cause identifizieren statt weiter unterdrücken (Diagnose-Log auf `warn`, nicht nur `error.flatten()`).
-3. Zod-Schema toleranter machen ohne die Lip-Sync-Invarianten aufzuweichen.
+### 2. `SceneCard.tsx` — Editing-Guard für Sync-Effekte
+- Neuer Ref `promptEditingRef` (gesetzt via `onFocus`/`onBlur` in einer `<div>`, die den `PromptMentionEditor` umschließt — leichter als Callback-Prop).
+- Effekt **Action-Sync** (Zeile 683–718):
+  - `scene.aiPrompt` aus der DepsArray entfernen (Effekt reagiert nur noch auf externe Signale: `sceneActionEn`, `characterShots.actionEn`, `promptMode`, `characters?.length`).
+  - Frühabbruch, wenn `promptEditingRef.current === true`.
+  - Beim Blur des Feldes einmal manuell nachziehen (via `onBlur`-Callback).
+- Effekt **Dialog-Sync** (Zeile 636–672): identischer Editing-Guard, ansonsten unverändert.
 
-## Umsetzung
+### 3. `SceneActionField.tsx` — Kein Effekt-Trigger während Prompt-Editing
+- Kein Code-Change nötig. Die 500 ms Debounce-Translation ist ok; sie triggert Effekt #1 nur noch nach Blur des Prompts, weil der Guard aus (2) greift.
 
-### 1. Diagnose härten — `useStoryboardTransition.ts`
-- In `parsePlan` bei Fehlern die **rohen `data`-Keys** und die ersten 5 `parsed.error.issues` mit `path`+`code`+`message` loggen (bisher nur `flatten()`).
-- Response-Body zusätzlich als Preview (erste 500 Zeichen) loggen, damit sichtbar ist, was Server tatsächlich schickt.
-- Beim Erfolg `_meta.source = 'ai'` explizit setzen, falls Server es weglässt.
+### 4. Regression-Test
+- `src/components/video-composer/__tests__/PromptMentionEditor.test.tsx` (neu): simuliert Tippen mitten im String während `value` extern mit einer Marker-Injection überschrieben wird — erwartet: Cursor bleibt, Draft bleibt.
 
-### 2. Schema entschärfen — `src/lib/video-composer/briefing/productionPlan.ts`
-- `ProductionPlan` bekommt `.passthrough()` auf Top-Level und auf `PlanMeta`, damit neue Server-Felder (`script_timing`, `duration_auto_extend`, etc.) den Parser nicht killen.
-- `PlanVoice.provider` von `z.literal('elevenlabs')` auf `z.string().optional()` lockern (Provider-Feld ist rein informativ, kein Enum-Grund für harten Fail).
-- `PlanUnresolved.severity` mit `.catch('warn')` versehen, damit unbekannte Severity-Werte nicht die ganze Validierung sprengen.
+## Nicht-Ziele
+- Kein Wechsel auf uncontrolled Textarea (würde `@`-Mention-Trigger komplizieren).
+- Keine Änderung an `applyActionsToPrompt`/`applyDialogToPrompt` selbst.
+- Kein Debounce des Upstream-`onChange` (würde @-Mention-Vorschläge verzögern).
 
-### 3. Fallback-Semantik korrigieren
-- `_meta.source` bekommt einen dritten Wert: `'ai-partial'`, gesetzt wenn `dropped > 0` (heißt: AI-Plan mit Teilverlust — kein „offline"-Badge).
-- Fallback-Badge im `ProductionPlanSheet.tsx` nur bei `source === 'local-fallback'` (bleibt so). Kein Text-Change nötig.
+## Technische Details (Ref)
+- `promptEditingRef` wird als 3. optionales Prop an `PromptMentionEditor` durchgereicht (`onEditingChange?: (editing: boolean) => void`), damit SceneCard den Zustand kennt, ohne DOM-Attribute zu inspizieren.
+- Caret-Restore-Strategie: nach jedem `setDraft(externalValue)`-Merge `ta.setSelectionRange(prevStart, prevEnd)` in `requestAnimationFrame`.
 
-### 4. Late-Arrival-Übernahme sicherstellen
-- Wenn `lateArrival` einen validen Plan liefert **nach** bereits geöffnetem Fallback-Sheet: aktueller Code zeigt Toast „Vollständiger Plan nachgeladen — bitte erneut anwenden". Damit User es nicht übersieht, `latePlan` mit `_meta.source='ai'` überschreiben und ein Debug-Log ausgeben.
-
-### 5. Kein Backend-Change
-Server-Antwort ist korrekt — nur der Client-Guard ist zu streng. Keine Änderung an `briefing-deep-parse/index.ts`, keine Migration, keine Kredit-/Lipsync-Pfade.
-
-## Betroffene Dateien
-
-- `src/hooks/useStoryboardTransition.ts` (Diagnose-Log, `source:'ai'`-Setter, `ai-partial`)
-- `src/lib/video-composer/briefing/productionPlan.ts` (Schema-Lockerung + passthrough)
-- (optional) `src/components/video-composer/briefing/ProductionPlanSheet.tsx` — nichts nötig
-
-## Verifikation
-
-1. Briefing des Users erneut analysieren → gelber „Fallback"-Badge muss verschwinden, Plan zeigt AI-Werte.
-2. In der Konsole: `[useStoryboardTransition] deep-parse OK { source: 'ai', dropped: 0 }`.
-3. Bei einem künstlich fehlerhaften Server-Response (test): Log listet exakte Zod-Path-Probleme — kein Silent-Fail mehr.
-
-## Nicht in Scope
-
-- Ensemble-/Solo-Repair-Änderungen
-- Sync.so / Lip-Sync-Pipeline
-- Prompt-Text-Änderungen
+Nach Approval setze ich das um und ergänze den Regressionstest.

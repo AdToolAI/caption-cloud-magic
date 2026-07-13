@@ -31,6 +31,9 @@ interface PromptMentionEditorProps {
   rows?: number;
   className?: string;
   disabled?: boolean;
+  /** Notifies parent when the field is focused/blurred so parent sync-effects
+   *  can skip work while the user is actively editing. */
+  onEditingChange?: (editing: boolean) => void;
 }
 
 interface Suggestion {
