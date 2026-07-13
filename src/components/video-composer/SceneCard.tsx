@@ -508,6 +508,10 @@ export default function SceneCard({
 
   // K-P1 — Cmd/Ctrl + Shift + S toggles Free ↔ Structured for the focused card.
   const cardRef = useRef<HTMLDivElement | null>(null);
+  // v246: true while the KI-Prompt textarea is focused. Sibling sync-effects
+  // (Dialog-Sync, Action-Sync) must skip work while this is true, otherwise
+  // they rewrite the prompt mid-keystroke → caret jumps + text disappears.
+  const promptEditingRef = useRef(false);
   const isMac = useMemo(
     () => typeof navigator !== "undefined" && /Mac/i.test(navigator.platform),
     [],
