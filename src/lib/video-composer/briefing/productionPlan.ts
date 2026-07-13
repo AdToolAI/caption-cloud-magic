@@ -335,18 +335,18 @@ export const PlanMeta = z.object({
    * response envelope (models used, timings, ensemble/strict-cast stats).
    */
   debug: z.record(z.string(), z.any()).optional(),
-}).partial();
+}).partial().passthrough();
 
 export const ProductionPlan = z.object({
   project: PlanProject.optional(),
-  scenes: z.array(PlanScene.extend({ _meta: PlanSceneMeta.optional() })).default([]),
+  scenes: z.array(PlanScene.extend({ _meta: PlanSceneMeta.optional() }).passthrough()).default([]),
   voice: PlanVoice,
   captions: PlanCaptions,
   negativePrompt: z.string().max(4000).optional(),
   unresolved: z.array(PlanUnresolved).default([]),
   /** Briefing-Intelligence v2 metadata. Optional for backward compat. */
   _meta: PlanMeta.optional(),
-});
+}).passthrough();
 
 export type TProductionPlan = z.infer<typeof ProductionPlan>;
 export type TPlanScene = z.infer<typeof PlanScene>;
