@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
+import { useFounderStatus } from "@/hooks/useFounderStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle, ArrowLeft, FileDown, Trash2, ShieldAlert } from "lucide-react";
+import { Loader2, AlertTriangle, ArrowLeft, FileDown, Trash2, ShieldAlert, Crown } from "lucide-react";
 
 const DeleteAccount = () => {
   const { user, signOut } = useAuth();
