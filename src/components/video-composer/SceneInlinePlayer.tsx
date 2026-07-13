@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 
 interface Props {
   scene: ComposerScene;
