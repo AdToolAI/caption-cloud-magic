@@ -103,6 +103,21 @@ export function useComposerScenesRealtime(projectId: string | undefined, onScene
 
   useEffect(() => {
     if (!projectId) return;
+
+    let subscribed = false;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const schedulePoll = (ms: number) => {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        callbackRef.current?.();
+      }, ms);
+    };
+
+    // v247: Realtime-Polling-Fallback. WS bleibt Primary, Poll ist Safety-Net,
+    // insbesondere wenn WS hinter Custom-Domains (z.B. useadtool.ai) scheitert.
+    schedulePoll(8_000);
+
     const channel = supabase
       .channel(`composer-scenes:${projectId}`)
       .on(
@@ -117,9 +132,20 @@ export function useComposerScenesRealtime(projectId: string | undefined, onScene
           callbackRef.current?.();
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          subscribed = true;
+          schedulePoll(15_000);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          subscribed = false;
+          schedulePoll(8_000);
+        }
+      });
+
     return () => {
+      if (pollTimer) clearInterval(pollTimer);
       supabase.removeChannel(channel);
+      void subscribed;
     };
   }, [projectId]);
 }
