@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { subscribePipelineEvents, type PipelinePhaseId } from '@/lib/pipelineEvents';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 
 export interface PipelinePhaseState {
   id: PipelinePhaseId;
