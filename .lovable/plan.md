@@ -1,69 +1,80 @@
-# AI Video Studio — Spoken-Language Capability Guard
+# Universal Creator — Wizard springt nach Render auf Step 2 (Clean-Fix)
 
-## Problem
-Kling 3.0 Pro (und einige andere Provider) beherrschen zwar nativen Audio+Lip-Sync, aber ihre TTS unterstützt **nicht alle Sprachen**. Bei einer DE-Direktive versucht Kling das nachzuahmen und produziert eine **Fantasie-/Kauderwelsch-Sprache** statt sauberes Deutsch. Das wirkt schlimmer als gar kein Voiceover.
+## Root Cause
 
-Wunsch: Wenn die Zielsprache vom Provider **nicht sicher unterstützt** wird, soll gar kein Voiceover/Lip-Sync gebaut werden — nur **Ambient/Musik/Hintergrundgeräusche**.
+Zwei Zustandsmaschinen kollidieren auf **einer** Spalte:
 
-## Ursache
-`ToolkitGenerator.tsx` schickt aktuell bei `generateAudio && capabilities.audio` immer eine Sprach-Direktive ("All spoken dialogue MUST be performed in German…") ohne zu prüfen, ob das Modell diese Sprache überhaupt kann. Kling z. B. ist im TTS praktisch auf EN/ZH beschränkt — bei DE/ES bekommt der Prompt zwar den Sprach-Hinweis, das Modell erfindet aber Phoneme.
+- Der Wizard nutzt `content_projects.status = 'draft'` als **Wiederaufnahme-Signal** ("dieses Projekt ist noch in Bearbeitung").
+- `render-with-remotion` überschreibt genau dieselbe Spalte mit `'rendering'`, sobald ein Render startet (`supabase/functions/render-with-remotion/index.ts:483–489`).
+- Auto-Resume filtert hart auf `.eq('status', 'draft')` (`src/pages/UniversalCreator/UniversalCreator.tsx:383`).
 
-## Fix-Plan (nur Frontend, minimal-invasiv)
+Folge: Nach Render-Start ist das Projekt für Auto-Resume unsichtbar. Sobald die Seite neu mountet (Reload, Tab-Wechsel mit `visibilitychange`-Auth-Refresh, Menü-Navigation zurück ohne `?project=…`), fällt der Wizard auf localStorage/Defaults zurück → optisch "wieder in Step 2".
 
-### 1. Provider-TTS-Fähigkeitskarte
-Neue kleine Konstante in `src/config/aiVideoModelRegistry.ts` (oder gleich in `ToolkitGenerator.tsx` privat, um Registry nicht aufzublähen):
+Die schnelle Lösung (Filter aufweichen) kaschiert nur das Symptom. Sauber ist es, die beiden Lifecycles zu **trennen**.
 
-```ts
-// Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext produziert.
-// Alles außerhalb → ambient-only Fallback (kein Voiceover).
-const PROVIDER_TTS_LANGS: Record<ToolkitModel['family'], ReadonlyArray<'en'|'de'|'es'>> = {
-  veo:         ['en', 'de', 'es'], // Google multilingual TTS
-  sora:        ['en', 'de', 'es'], // OpenAI multilingual
-  kling:       ['en'],             // ZH/EN reliable; DE/ES → Gibberish
-  grok:        ['en'],
-  happyhorse:  ['en'],             // nativeDialogue-Flag, aber capabilities.audio=false → egal
-  // Rest hat capabilities.audio=false und ist ohnehin nicht relevant:
-  ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
-};
+## Clean-Fix — Trennung von Editier- und Render-Lifecycle
+
+### 1. Neue Semantik für `content_projects.status`
+
+Nur noch **Wizard-Lifecycle**:
+
+- `draft` — vom User bearbeitbar
+- `archived` — vom User explizit "fertig / weglegen"
+
+Render-Status verschwindet aus dieser Spalte. Er lebt bereits vollständig in `video_renders` (`status`, `video_url`, `error_message`) und wird per Realtime beobachtet — es gibt keinen fachlichen Grund, ihn zu duplizieren.
+
+### 2. `render-with-remotion` Edge-Function
+
+- **Entfernen:** `update({ status: 'rendering', … })` auf `content_projects`.
+- **Behalten:** `render_engine`-Feld darf einmalig gesetzt werden (informativ, kein Lifecycle).
+- Wenn Telemetrie gewünscht ist, ein optionales Feld `last_render_started_at` hinzufügen — beeinflusst kein Resume-Verhalten.
+
+### 3. Auto-Resume vereinfachen
+
+`src/pages/UniversalCreator/UniversalCreator.tsx`:
+
+- Filter bleibt `.eq('status', 'draft')` — jetzt aber semantisch korrekt, weil kein Backend den Status mehr wegzieht.
+- Zusätzliche Defensive: **`?project=<id>` ist die Primärquelle**. Wenn der URL-Param existiert, wird immer `hydrateFromDb` mit dieser ID benutzt, unabhängig vom Status. (Ist heute schon so — bleibt.)
+
+### 4. `saveProgress` beim Sprung nach Step 5 synchronisieren
+
+Kleiner Bonus, damit ein Reload während des Renders deterministisch auf Step 5 landet:
+
+- In `goToNext()` **vor** `setCurrentStep(next)` einmal `await saveProgress()`, wenn `next === n.length - 1` (Preview & Export).
+- Verhindert die 500 ms Debounce-Lücke zwischen Klick "Weiter → Preview" und dem tatsächlichen DB-Schreiben von `current_step = 4`.
+
+### 5. Migration / Backfill
+
+Ein SQL-Migrationsschritt, der Alt-Datensätze bereinigt:
+
+```sql
+update public.content_projects
+set status = 'draft'
+where content_type = 'universal'
+  and status in ('rendering', 'completed');
 ```
 
-### 2. Effektive Entscheidung im Prompt-Builder
-In `ToolkitGenerator.tsx` (~Z. 314):
+Grund: Diese Zeilen wurden vom alten Code fälschlich aus dem Draft-Pool entfernt und würden sonst nach dem Fix nicht wieder auftauchen.
 
-- `const langSupported = generateAudio && model.capabilities.audio && PROVIDER_TTS_LANGS[model.family].includes(effectiveSpokenLang);`
-- Neu: `const willHaveDialogue = langSupported;`
-- Wenn `generateAudio && !langSupported`: statt `spokenLangSuffix` einen **`ambientOnlySuffix`** anhängen:
+### 6. Kein Change nötig
 
-```text
-IMPORTANT: Do NOT generate any spoken dialogue, narration, voiceover, or lip-synced speech.
-Characters must remain silent — closed or naturally resting mouths, no lip movement matching speech.
-The audio track should contain ONLY ambient environmental sound, room tone, or subtle background music
-appropriate for the scene. No singing, no whispering, no non-verbal vocalizations that imply language.
-```
+- `PreviewExportStep.tsx` — Render-Flow ist korrekt.
+- `video_renders`-Tabelle und Realtime-Handler — bleiben unverändert.
+- localStorage-Backup — bleibt als Second-Line-Fallback.
 
-- `spokenLangSuffix` (das bestehende „All spoken dialogue MUST be in <lang>") wird nur noch bei `langSupported` gehängt.
+## Technische Details
 
-### 3. Body-Payload absichern
-`body.spokenLanguage` nur bei `langSupported` senden. Zusätzlich `body.suppressDialogue = true` mitgeben, wenn Ambient-Fallback greift — Edge Functions loggen es und können später einen nativen "no-speech"-Parameter dort andocken, ohne den Client anzufassen.
+Betroffene Dateien:
 
-`generateAudio` selbst bleibt `true` (der Provider soll ja Ambient/Umgebungssound liefern) — wir schalten nur die **Dialoge** ab.
+- `supabase/functions/render-with-remotion/index.ts` (Update-Statement entfernen)
+- `src/pages/UniversalCreator/UniversalCreator.tsx` (`goToNext` await, Kommentar an Auto-Resume)
+- Neue Migration `supabase/migrations/<ts>_content_projects_status_cleanup.sql`
 
-### 4. UI-Hinweis unter dem Sprach-Dropdown
-Wenn User eine Sprache wählt, die das aktuelle Modell nicht kann, kleiner gedämpfter Hinweis unter dem Select:
+Keine Änderung am Schema von `content_projects` (Spalten bleiben). Keine Änderung am `video_renders`-Contract. Keine breaking changes für andere Consumer, die `content_projects.status` lesen — die haben nach dem Backfill wieder konsistente Werte.
 
-> „<Modelname> unterstützt <Sprache> nicht zuverlässig. Für diese Szene wird **kein Voiceover** generiert — nur Umgebungssound. Für deutsches/spanisches Voiceover z. B. **Veo 3.1** oder **Sora 2** wählen, oder das Voiceover nachträglich im Motion Studio ergänzen."
+## Verifikation
 
-Textkeys 3-sprachig (DE/EN/ES) — konsistent mit dem restlichen Toolkit.
-
-### 5. Edge-Functions (minimal)
-`generate-kling-video/index.ts`, `generate-veo-video/index.ts`: zusätzlich `suppressDialogue` aus Body lesen und in `console.log` mitgeben. Kein Verhalten ändern (Kling/Veo API kennen keinen "no-speech"-Toggle — der Prompt-Suffix macht die Arbeit).
-
-## Was nicht angefasst wird
-- Motion Studio / Composer / ElevenLabs-Pfad — dort wird Sprache separat gesetzt, keine Fantasie-TTS möglich.
-- Kein Auto-Modelwechsel — User bleibt Herr über die Modellauswahl.
-- Keine Credit-Logik-Änderung — Ambient-Only kostet genauso viel wie mit Audio; das Modell rendert weiter.
-
-## Erwartetes Ergebnis
-- Kling 3.0 Pro + DE-Briefing → Video mit **stummen Charakteren + Ambient/Musik**, kein Kauderwelsch mehr.
-- Veo 3.1 / Sora 2 + DE → weiterhin **echtes deutsches Voiceover mit Lip-Sync** (unverändert).
-- Klarer UI-Hinweis, warum kein Sprech-Audio kam, mit Modell-Alternativen.
+- Manuell: Projekt bis Step 5 ausfüllen → "Render" klicken → Reload während Render läuft → erwartet: bleibt auf Step 5, Render-Job wird per Realtime weiterverfolgt.
+- Manuell: Render fertig → in ein anderes Tool wechseln → zurück auf `/universal-creator` → erwartet: Auto-Resume lädt Projekt auf Step 5 mit "completed"-Job.
+- Manuell: `handleNewProject()` klicken → altes Projekt wird nicht überschrieben (URL-Reset schützt bereits, unverändert).
+- SQL-Check nach Backfill: `select status, count(*) from content_projects where content_type = 'universal' group by 1` — nur noch `draft` / `archived`.
