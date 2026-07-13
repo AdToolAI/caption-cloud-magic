@@ -167,14 +167,39 @@ export const FEATURE_FLAGS = {
 export const pricingPlans = PRICING_V21;
 export type PlanType = PlanId;
 
-// Helper function for backward compatibility
+// Helper — during Beta every non-empty productId that ever represented a paid
+// plan (legacy Basic/Pro/Enterprise) is normalized to Beta-Basic so past
+// subscribers keep full access.
+const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
+  'prod_TIRSoTyzmRpbpT', // Basic (canonical)
+  'prod_TDoWFAZjKKUnA2', // legacy Basic
+  'prod_TDoYdYP1nOOWsN', // legacy Pro
+  'prod_TIRWOmhxlzFCwW', // legacy Pro
+  'prod_UOG4wbiQjDONAj', // Pro v2
+  'prod_UOG5TjlcpNNZLZ', // Pro alt
+  'prod_UREZAv0LG9vz1E', // Pro alt
+  'prod_TIRYBu4fdR2BEw', // Enterprise
+]);
+
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
-  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.99, currency: '€' };
-  if (productId === 'prod_TIRWOmhxlzFCwW' || productId === 'prod_UOG4wbiQjDONAj' || productId === 'prod_UOG5TjlcpNNZLZ' || productId === 'prod_UREZAv0LG9vz1E') return { name: 'Pro', price: 29.99, currency: '€' };
-  if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.95, currency: '€' };
+  if (LEGACY_PAID_PRODUCT_IDS.has(productId)) {
+    return { name: 'Beta-Basic', price: 14.99, currency: '€' };
+  }
   return { name: 'Free', price: 0, currency: '€' };
 };
+
+/**
+ * Single source of truth for "does this user have a paid subscription?".
+ * During Beta there is exactly one paid plan (Beta-Basic), so any active
+ * subscription unlocks every feature. `productId` is accepted for forward
+ * compatibility when tiers return.
+ */
+export const isSubscribed = (
+  subscribed: boolean | null | undefined,
+  _productId?: string | null,
+): boolean => !!subscribed;
+
 
 // Access control helpers
 export const hasAccess = (
