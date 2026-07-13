@@ -1,62 +1,74 @@
+# Founders-Rabatt (20%) + Status-Forfeit
 
-## Ziel
-Nur noch **ein** Abo: **Beta-Basic – 14,99 €/Monat**. Pro/Enterprise/Legacy-Produkte werden aus UI, Gating-Logik und Preistabellen entfernt. Alle bezahlten Nutzer erhalten den vollen Funktionsumfang (kein Feature-Lock mehr innerhalb der Beta).
+Zwei Erweiterungen für das Beta-Founder-Programm.
 
-## Was ist heute inkonsistent
-- `src/config/pricing.ts` listet Basic + Pro + Enterprise (14,99 / 29,99 / 69,95).
-- `src/pages/Pricing.tsx` zeigt „29,99 durchgestrichen → 14,99".
-- `src/pages/Credits.tsx` zeigt Basic-Preis als **14,95 €** (falsch, Tippfehler).
-- Gating-Checks in `Coach.tsx`, `Carousel.tsx`, `Rewriter.tsx`, `BrandKit.tsx`, `AccountHeroHeader.tsx`, `CSVUploadDialog.tsx` prüfen auf alte Produkt-IDs (`prod_TDoYdYP1nOOWsN`, `prod_TIRWOmhxlzFCwW`, `prod_TIRYBu4fdR2BEw`) → aktuelle Beta-Basic-Zahler werden dort als „Free" behandelt.
-- `check-subscription` Edge Function mappt noch alte Produkt-IDs auf Tier-Namen.
+## 1) 20% Video-Credit-Rabatt für 24 Monate
 
-## Änderungen
+**Zielgruppe:** Nutzer mit Zeile in `founders_signups` mit `coupon_id = 'PRO-FOUNDERS-24M'`, deren `claimed_at` weniger als 24 Monate zurückliegt UND deren Status nicht widerrufen ist (siehe Teil 2).
 
-**1. Zentrale Plan-Definition**
-- `src/config/pricing.ts`: nur noch **ein** Eintrag `beta-basic` (14,99 € EUR / 14.99 $ USD, Price-ID `price_1SLqZyDRu4kfSFxjfhMnx186`, Product-ID `prod_TIRSoTyzmRpbpT`). Pro & Enterprise-Objekte entfernt.
-- `src/config/stripe.ts`: entfernt `STRIPE_PRICE_IDS.pro` / `.enterprise` und Produkt-IDs `pro` / `enterprise`. `PRO_REGULAR_PRICE_EUR`-Referenzen bereinigen. Nur `basic` bleibt.
-- Neuer Helper `isSubscribed(subscribed, productId)` in `src/config/pricing.ts` – ersetzt alle `isPro`-Checks (Beta = ein Plan = alle Features frei).
+**Umfang:** Rabatt gilt für alle vier AI-Video-Credit-Packs (Starter/Standard/Pro/Enterprise, EUR + USD) — also den `ai-video-purchase-credits`-Flow. Das Beta-Basic-Abo (14,99€) ist davon **nicht** betroffen, das bleibt der eigene 24-Monats-Preis-Lock.
 
-**2. Pricing-Seite (`src/pages/Pricing.tsx`)**
-- Nur eine Karte: „Beta-Basic – 14,99 €/Monat".
-- Kein durchgestrichener 29,99-Preis mehr; stattdessen „Beta-Preis" + „14,99 € für 24 Monate garantiert (Founders 1000)".
-- SEO-Meta anpassen (Title/Description auf 14,99).
+### Datenbank
+- Migration: SQL-Helper `public.is_founder_active(_user_id uuid) returns boolean`
+  - `true`, wenn Zeile in `founders_signups` mit `coupon_id='PRO-FOUNDERS-24M'`, `revoked_at IS NULL` und `claimed_at > now() - interval '24 months'`.
+  - `SECURITY DEFINER`, `SET search_path = public`, `GRANT EXECUTE … TO authenticated, service_role`.
 
-**3. Landing / Home**
-- `src/pages/Index.tsx` und relevante Landing-Sections: Preistext auf 14,99 € vereinheitlichen, Pro-/Enterprise-Vergleichstabellen entfernen.
+### Stripe
+- Einmalig via Stripe-API einen wiederverwendbaren Coupon anlegen: `id = FOUNDERS_VIDEO_20`, `percent_off = 20`, `duration = forever`, `applies_to = all` (Credits sind One-off). Coupon-ID als ENV `STRIPE_FOUNDERS_VIDEO_COUPON` im Edge-Runtime hinterlegen (Fallback `FOUNDERS_VIDEO_20` im Code).
 
-**4. Credits-Seite (`src/pages/Credits.tsx`)**
-- Basic-Preis von 14,95 → **14,99** (EUR & USD Anzeige).
-- Pro-Plan-Karte entfernen; nur Beta-Basic + Credit-Packs (14,95/29,95/44,95 bleiben unverändert, wie zuletzt bestätigt).
+### Edge-Function `ai-video-purchase-credits`
+- Nach Auth: `is_founder_active(user.id)` prüfen.
+- Wenn `true`: `discounts: [{ coupon: FOUNDERS_VIDEO_20 }]` an `stripe.checkout.sessions.create` anhängen und `founder_discount: 'true'` in `metadata` schreiben. Beide Rechnungsfooter (DE/EN) erweitern um „inkl. 20% Founder-Rabatt".
+- Bei `false`: Verhalten unverändert.
 
-**5. Feature-Gating vereinheitlichen**
-Ersetze in diesen Dateien den alten `isPro`-Check (`productId === 'prod_TDoYdYP1nOOWsN'` etc.) durch `isSubscribed(subscribed, productId)`:
-- `src/pages/Coach.tsx`
-- `src/pages/Carousel.tsx`
-- `src/pages/Rewriter.tsx`
-- `src/pages/BrandKit.tsx`
-- `src/components/account/AccountHeroHeader.tsx`
-- `src/components/performance/CSVUploadDialog.tsx`
+### UI
+- `Credits.tsx` (Top-up-Karten) + `src/components/credits/*`:
+  - Founder-Status per neuer `useFounderStatus()`-Hook (ruft `is_founder_active` via RPC, cached, invalidiert bei Auth-Change).
+  - Wenn aktiv: gold-getönter Badge „Founder −20%" auf jeder Pack-Karte, durchgestrichener Originalpreis, effektiver Preis darunter (`price * 0.8`).
+  - Kurze Info-Zeile: „Founder-Rabatt aktiv bis TT.MM.JJJJ" (aus `claimed_at + 24 months`).
 
-Damit sind alle bezahlten Beta-Nutzer überall vollwertig freigeschaltet.
+## 2) Founder-Status verfällt bei Pause / Deaktivierung / Löschung
 
-**6. `getPlanFromProductId` (in `pricing.ts`)**
-- Nur noch Mapping `prod_TIRSoTyzmRpbpT → Beta-Basic, 14,99 €`. Legacy-IDs (Pro/Enterprise) werden auf „Beta-Basic" gemappt, damit Altkäufer nicht als „unbekannt" erscheinen.
+**Ereignisse, die den Status widerrufen:**
+- Konto-Löschung (User-initiiert via `/account/delete` und Admin via `admin-delete-user`).
+- Abo-Kündigung / Ausbleiben der Zahlung (Stripe-Event `customer.subscription.deleted` bzw. `invoice.payment_failed` nach Grace-Period).
+- Manueller „Pause account"-Flow (falls implementiert — wir bauen den Hook ein, damit spätere Pause-UI ihn direkt nutzen kann).
 
-**7. Edge Function `check-subscription`**
-- Entfernt Tier-Ableitung (Basic/Pro/Enterprise). Gibt zurück: `{ subscribed, product_id, plan: 'beta-basic', subscription_end }`.
+**Nicht widerrufend:** Reguläres Logout, „Logout on all devices". Diese berühren den Status nicht.
 
-**8. Text/Kopie**
-- Alle Vorkommen „Pro Plan"/„Enterprise Plan"/„Basic Plan" in sichtbaren Strings (Account, Header-Badges, Toasts) → **„Beta-Basic"**.
+### Datenbank
+- Migration `founders_signups` erweitern:
+  - `revoked_at timestamptz`
+  - `revoked_reason text` (`'account_deleted' | 'subscription_canceled' | 'account_paused' | 'admin'`)
+- Index `idx_founders_signups_active` auf `(user_id) WHERE revoked_at IS NULL`.
+- Neue SECURITY-DEFINER-RPC `public.revoke_founder_status(_user_id uuid, _reason text)` (nur `service_role`), setzt `revoked_at = now()` idempotent.
 
-## Nicht Teil dieses Plans
-- Stripe-Produkte in Stripe selbst archivieren (kann später per Dashboard/API; Code referenziert sie ohnehin nicht mehr).
-- Credit-Pack-Preise (bleiben).
-- Founders-Preisgarantie-Logik (existiert bereits).
+### Serverseitige Verdrahtung
+- `supabase/functions/admin-delete-user/index.ts`: vor dem Auth-Delete `revoke_founder_status(userId, 'admin')` aufrufen (Zeile ~85, direkt bei den anderen `admin.from(...).delete()`-Calls, aber als `rpc`, damit die Zeile in `founders_signups` als „widerrufen" erhalten bleibt, statt gelöscht zu werden — wichtig für die Founder-Kontingent-Zählung: eine widerrufene Zeile blockiert den Slot NICHT weiter, siehe unten).
+- User-Delete-Flow `/account/delete` (Seite `DeleteAccount`): Edge-Function `delete-own-account` (neu, falls nicht vorhanden — Route in `App.tsx` prüfen; falls Delete-Logik dort clientseitig ist, ziehen wir sie in eine neue Edge-Function um, die zuerst `revoke_founder_status(user.id, 'account_deleted')` aufruft, dann `admin.auth.admin.deleteUser`).
+- `supabase/functions/stripe-webhook/index.ts`: Handler für `customer.subscription.deleted` erweitern → `revoke_founder_status(user.id, 'subscription_canceled')`. `user.id` via `customer_id`-Lookup in `profiles`/`founders_signups.stripe_customer_id`.
+- Vorbereitung für Pause: neuer generischer Endpoint `pause-account` (Skeleton, ruft `revoke_founder_status(user.id, 'account_paused')` und setzt später `profiles.paused_at`). Falls kein Pause-Flow existiert, nur den RPC bereitstellen und keine neue Route erstellen.
 
-## Technische Notiz
-Ein neuer Helper zentralisiert alle Zugangsprüfungen:
-```ts
-// src/config/pricing.ts
-export const isSubscribed = (subscribed: boolean, _productId?: string | null) => !!subscribed;
-```
-Damit können später weitere Tiers wieder eingeführt werden, ohne 6 Dateien anfassen zu müssen.
+### Slot-Kontingent
+- `claim_founders_slot` bleibt idempotent, aber die Zählung `WHERE coupon_id = _founders_coupon` wird auf `AND revoked_at IS NULL` eingeschränkt, damit widerrufene Slots wieder frei werden für neue Nutzer (freundlicher zu späten Anmeldern, bleibt fair bei 1000-Grenze).
+- Zusatz: Wenn ein Nutzer nach Widerruf zurückkommt, entscheidet die Funktion frisch — bekommt er einen neuen Slot nur, wenn wieder unter 1000 aktive Founders. Bestehende widerrufene Zeile wird per `UPDATE … SET revoked_at=NULL, claimed_at=now()` reaktiviert falls freie Slots vorhanden, sonst Fallback-Coupon.
+
+### UI
+- Bei aktivem Widerruf zeigt der Badge auf `/pricing` (`FoundersSlotBadge`) und Credits-Seite den regulären (nicht-Founder-)Zustand.
+- Beim Klick auf „Konto löschen" wird der bestehende Bestätigungsdialog ergänzt um eine Warnzeile (rot, unter dem Haupttext): „Dein Founder-Status (20% Video-Rabatt & Preisgarantie 14,99€ für 24 Monate) geht dabei unwiderruflich verloren."
+
+## Technische Details
+
+- **Migrationsreihenfolge:** `revoked_at`-Spalten zuerst, dann `is_founder_active`, dann `revoke_founder_status`, dann Update von `claim_founders_slot`.
+- **RLS:** Beide neuen RPCs sind `SECURITY DEFINER`, keine neuen Tabellen, keine RLS-Änderungen an `founders_signups`.
+- **Stripe-Coupon-Anlage:** Einmalig via `stripe_api_write` (`PostCoupons`) mit `id=FOUNDERS_VIDEO_20`, `percent_off=20`, `duration=forever`.
+- **Kein Impact auf Beta-Basic-Abo:** Preis-Lock 14,99€ läuft weiter über den bestehenden `PRO-FOUNDERS-24M`-Coupon in `create-checkout`; der neue Rabatt greift ausschließlich in `ai-video-purchase-credits`.
+- **Idempotenz:** `revoke_founder_status` setzt `revoked_at` nur, wenn noch NULL. `is_founder_active` ist reine Read-Funktion.
+
+## Betroffene Dateien
+
+- Neu: 2 SQL-Migrationen (Spalten + Funktionen).
+- Bearbeiten: `supabase/functions/ai-video-purchase-credits/index.ts`, `supabase/functions/admin-delete-user/index.ts`, `supabase/functions/stripe-webhook/index.ts`, `supabase/migrations/*` für `claim_founders_slot`-Update.
+- Neu (Client): `src/hooks/useFounderStatus.ts`.
+- Bearbeiten (Client): `src/pages/Credits.tsx`, `src/components/credits/*` (Pack-Karten), `src/components/account/AdvancedTab.tsx` (+ Delete-Dialog-Seite) für den Warnhinweis.
+- Stripe: einmaliger API-Call zum Anlegen des `FOUNDERS_VIDEO_20`-Coupons.
