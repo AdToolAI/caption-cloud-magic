@@ -745,9 +745,7 @@ export function usePipelineProgress({
   // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
   const lipTargetCount = (scenes ?? []).filter((s: any) =>
     !isCanceledLipsyncScene(s) &&
-    (s.twoshotStage ||
-      s.engineOverride === 'cinematic-sync' ||
-      (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
+    (isLipSyncIntentional(s) || !!s.twoshotStage),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
     const n = s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
