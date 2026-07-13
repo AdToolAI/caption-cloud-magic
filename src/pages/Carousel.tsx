@@ -71,7 +71,7 @@ const Carousel = () => {
   const [activeTab, setActiveTab] = useState<"text" | "design" | "flow">("text");
 
   const planInfo = getProductInfo(productId);
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isPro = isSubscribed(subscribed, productId);
 
   useEffect(() => {
     if (session?.user) {
