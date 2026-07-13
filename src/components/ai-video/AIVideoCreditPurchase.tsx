@@ -2,18 +2,21 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Check } from 'lucide-react';
+import { Sparkles, Check, Crown } from 'lucide-react';
 import { AI_VIDEO_CREDIT_PACKS } from '@/config/aiVideoCredits';
 import { Currency } from '@/config/pricing';
 import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useFounderStatus } from '@/hooks/useFounderStatus';
 import { toast } from 'sonner';
 
 export const AIVideoCreditPurchase = () => {
   const { language, t } = useTranslation();
+  const founder = useFounderStatus();
   const [loading, setLoading] = useState<string | null>(null);
   const currency: Currency = getCurrencyForLanguage(language);
+  const discountFactor = founder.isActive ? 0.8 : 1;
 
   const handlePurchase = async (packId: keyof typeof AI_VIDEO_CREDIT_PACKS) => {
     setLoading(packId);
@@ -33,6 +36,12 @@ export const AIVideoCreditPurchase = () => {
 
   return (
     <div className="space-y-6">
+      {founder.isActive && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
+          <Crown className="h-4 w-4" />
+          <span className="font-medium">Gründer-Vorteil aktiv: −20 % auf alle Video-Credits (24 Monate).</span>
+        </div>
+      )}
       {currency === 'EUR' && (
         <p className="text-xs text-muted-foreground text-center">
           Alle Preise inkl. 19% MwSt. (Deutschland). Eine Rechnung wird automatisch nach dem Kauf per E-Mail zugestellt und im Billing-Bereich verfügbar.
@@ -55,8 +64,20 @@ export const AIVideoCreditPurchase = () => {
               <div>
                 <h3 className="text-lg font-semibold">{pack.name[currency]}</h3>
                 <p className="text-xs text-muted-foreground mt-1">{pack.description[currency]}</p>
-                <div className="mt-3">
-                  <span className="text-3xl font-bold">{formatPrice(pack.price[currency], currency)}</span>
+                <div className="mt-3 flex items-baseline gap-2">
+                  {founder.isActive ? (
+                    <>
+                      <span className="text-3xl font-bold text-primary">
+                        {formatPrice(pack.price[currency] * discountFactor, currency)}
+                      </span>
+                      <span className="text-sm text-muted-foreground line-through">
+                        {formatPrice(pack.price[currency], currency)}
+                      </span>
+                      <Badge variant="secondary" className="ml-1">−20%</Badge>
+                    </>
+                  ) : (
+                    <span className="text-3xl font-bold">{formatPrice(pack.price[currency], currency)}</span>
+                  )}
                 </div>
               </div>
 

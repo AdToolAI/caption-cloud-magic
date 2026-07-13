@@ -89,11 +89,21 @@ serve(async (req) => {
       throw new Error("User profile not found");
     }
 
-    if (!['pro', 'enterprise'].includes(profile.plan)) {
+    // Beta: unified plan gating — any paid tier (basic/pro/enterprise) qualifies
+    if (!['basic', 'pro', 'enterprise'].includes(profile.plan)) {
       return new Response(
-        JSON.stringify({ error: "AI Video Generation requires Pro or Enterprise plan" }),
+        JSON.stringify({ error: "AI Video Generation requires an active Beta-Basic subscription" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Founders 20% discount (24 months from claim, forfeits on account deletion/subscription cancel)
+    let isFounder = false;
+    try {
+      const { data: founderRes } = await supabaseClient.rpc('is_founder_active', { _user_id: user.id });
+      isFounder = !!founderRes;
+    } catch (e) {
+      console.warn("[ai-video-purchase-credits] founder check failed", e);
     }
 
     // Parse request with currency
@@ -138,14 +148,17 @@ serve(async (req) => {
       ],
       mode: 'payment',
       currency: currency.toLowerCase(),
+      allow_promotion_codes: !isFounder,
+      discounts: isFounder ? [{ coupon: 'FOUNDERS_VIDEO_20' }] : undefined,
       invoice_creation: {
         enabled: true,
         invoice_data: {
-          description: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack`,
+          description: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack${isFounder ? ' (Founders -20%)' : ''}`,
           metadata: {
             user_id: user.id,
             pack_id: packId,
             type: 'ai_video_credits',
+            founders_discount: isFounder ? 'true' : 'false',
           },
           footer: currency === 'EUR' 
             ? 'Alle Preise inkl. 19% MwSt. (Deutschland). Vielen Dank für Ihren Einkauf.'
@@ -161,12 +174,13 @@ serve(async (req) => {
         base_amount: pack.price.toString(),
         bonus_amount: pack.bonus.toString(),
         bonus_percent: pack.bonusPercent.toString(),
+        founders_discount: isFounder ? '20' : '0',
         type: 'ai_video_credits',
       },
     });
 
     return new Response(
-      JSON.stringify({ url: session.url, sessionId: session.id }),
+      JSON.stringify({ url: session.url, sessionId: session.id, foundersDiscount: isFounder }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 

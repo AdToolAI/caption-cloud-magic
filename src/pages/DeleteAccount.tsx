@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
+import { useFounderStatus } from "@/hooks/useFounderStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle, ArrowLeft, FileDown, Trash2, ShieldAlert } from "lucide-react";
+import { Loader2, AlertTriangle, ArrowLeft, FileDown, Trash2, ShieldAlert, Crown } from "lucide-react";
 
 const DeleteAccount = () => {
   const { user, signOut } = useAuth();
+  const founder = useFounderStatus();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -119,6 +121,19 @@ const DeleteAccount = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Founder-Status Warnung */}
+          {founder.isActive && (
+            <Card className="backdrop-blur-xl bg-primary/5 border border-primary/30">
+              <CardContent className="p-4 flex items-start gap-3">
+                <Crown className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div className="text-sm text-muted-foreground">
+                  <p className="font-medium text-primary mb-1">Sie verlieren Ihren Gründer-Status</p>
+                  <p>Mit der Löschung endet Ihre 24-Monats-Preisgarantie (14,99&nbsp;€) und der 20&nbsp;% Rabatt auf Video-Credits. Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Was wird gelöscht */}
           <Card className="backdrop-blur-xl bg-card/60 border border-destructive/20">
