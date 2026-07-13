@@ -28,6 +28,8 @@ const OPT_IN_ENGINES = new Set(['cinematic-sync', 'sync-segments', 'native-dialo
 
 export function isLipSyncIntentional(scene: LipSyncSceneCamel | null | undefined): boolean {
   if (!scene) return false;
+  // v245 Toggle-Veto: explicit OFF is a hard override, regardless of engine.
+  if (scene.lipSyncWithVoiceover === false) return false;
   if (scene.lipSyncWithVoiceover === true) return true;
   if (scene.dialogMode === true) return true;
   return OPT_IN_ENGINES.has(String(scene.engineOverride ?? ''));
@@ -35,6 +37,8 @@ export function isLipSyncIntentional(scene: LipSyncSceneCamel | null | undefined
 
 export function isLipSyncIntentionalRow(row: LipSyncSceneSnake | null | undefined): boolean {
   if (!row) return false;
+  // v245 Toggle-Veto: explicit OFF is a hard override, regardless of engine.
+  if (row.lip_sync_with_voiceover === false) return false;
   if (row.lip_sync_with_voiceover === true) return true;
   if (row.dialog_mode === true) return true;
   return OPT_IN_ENGINES.has(String(row.engine_override ?? ''));
