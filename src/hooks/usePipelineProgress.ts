@@ -294,9 +294,7 @@ export function usePipelineProgress({
     const lipTargets = ss.filter(
       (s) =>
         !isCanceledLipsyncScene(s) &&
-        ((s as any).twoshotStage ||
-          s.engineOverride === 'cinematic-sync' ||
-          (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
+        (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
     );
     const dsTotals = lipTargets.reduce(
       (acc, s) => {
