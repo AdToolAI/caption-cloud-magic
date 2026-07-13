@@ -478,14 +478,16 @@ serve(async (req) => {
       p_amount: credits_required
     });
 
-    // Update project status (only if project_id provided)
+    // NOTE: We intentionally do NOT overwrite content_projects.status here.
+    // The 'status' column is the wizard/user lifecycle ('draft' | 'archived')
+    // and is used by Universal Creator's auto-resume logic. Render lifecycle
+    // lives fully in the video_renders table (observed via realtime).
+    // Overwriting status='rendering' here previously caused the wizard to
+    // "reset" to Step 2 because auto-resume filters on status='draft'.
     if (project_id) {
       await supabaseAdmin
         .from('content_projects')
-        .update({
-          status: 'rendering',
-          render_engine: 'remotion'
-        })
+        .update({ render_engine: 'remotion' })
         .eq('id', project_id);
     }
 
