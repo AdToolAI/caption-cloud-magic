@@ -112,6 +112,7 @@ serve(async (req) => {
           .from("profiles")
           .update({ verify_reminder_sent_at: new Date().toISOString() })
           .eq("id", u.id);
+        await markMarketingEmailSent(supabase, u.id);
 
         sent++;
       } catch (e) {
