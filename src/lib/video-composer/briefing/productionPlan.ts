@@ -227,7 +227,10 @@ export const PlanScene = z.object({
 });
 
 export const PlanVoice = z.object({
-  provider: z.literal('elevenlabs').default('elevenlabs'),
+  // v243 — provider is informational; server may send other strings.
+  // Keeping this as z.literal('elevenlabs') caused the whole plan to be
+  // rejected client-side and drove the false "local-fallback" badge.
+  provider: z.string().optional(),
   voiceId: z.string().optional(),
   voiceName: z.string().optional(),
   model: z.string().default('eleven_multilingual_v2'),
@@ -237,7 +240,7 @@ export const PlanVoice = z.object({
   speakerBoost: z.boolean().optional(),
   speed: z.number().min(0.7).max(1.3).optional(),
   requestStitching: z.boolean().default(true),
-}).partial().optional();
+}).partial().passthrough().optional();
 
 export const PlanCaptions = z.object({
   enabled: z.boolean().default(true),
