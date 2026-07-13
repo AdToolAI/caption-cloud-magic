@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 
 interface Props {
   scene: ComposerScene;
@@ -321,7 +322,7 @@ export default function SceneInlinePlayer({
                 const totalPasses = passesArr.length;
                 const donePasses = passesArr.filter((p: any) => p?.status === "done" || p?.status === "failed").length;
                 let title = 'Szene wird gebaut…';
-                let sub = 'VO & Lip-Sync inklusive';
+                let sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
                 if (status === 'ready' && lipsyncRunning) {
                   if (lipSyncStatus === 'stitching' || twoshotStage === 'dialog_stitching') {
                     title = 'Lip-Sync wird zusammengesetzt…';

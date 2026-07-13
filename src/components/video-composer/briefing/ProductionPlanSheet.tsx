@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, CheckCircle2, FileText, Loader2, Plus, Shield, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -749,7 +749,8 @@ export default function ProductionPlanSheet({
         const cast = [...(s.cast ?? [])];
         while (cast.length <= castIdx) cast.push(emptyCastSlot(sceneIndex));
         const c = cast[castIdx] ?? emptyCastSlot(sceneIndex);
-        cast[castIdx] = { ...c, outfitPreset: presetId };
+        // Mutual exclusivity: setting a preset clears any library outfitLookId.
+        cast[castIdx] = { ...c, outfitPreset: presetId, ...(presetId ? { outfitLookId: null } : {}) };
         return { ...s, cast };
       }),
     });
@@ -1485,30 +1486,32 @@ export default function ProductionPlanSheet({
                             const baseId = split.baseId ?? lookHit?.baseId ?? null;
                             const outfitId = explicitLookId;
                             const fromCharacter = baseId ? (outfitsByCharacter.get(baseId) ?? []) : [];
-                            // Ensure the selected look is always a valid
-                            // option in the dropdown — even if the library
-                            // hasn't loaded it under this avatar yet.
-                            // v178 Wave 2 — prefer DB-backed name over mention label.
-                            const stableName = (id: string, fallback?: string) => {
-                              const fromLabel = outfitLabelById.get(id);
-                              if (fromLabel && fromLabel.trim()) return fromLabel;
-                              const cleanFallback = (fallback ?? '').trim();
-                              if (cleanFallback && !/^unbenannter look$/i.test(cleanFallback)) {
-                                return cleanFallback;
+                            // Only offer library looks that actually exist in the
+                            // Wardrobe DB — an LLM-invented outfitLookId that
+                            // doesn't resolve is silently dropped (no
+                            // "Outfit lädt…" phantom row).
+                            const librarylooks = fromCharacter
+                              .map((o) => ({ lookId: o.lookId, name: (outfitLabelById.get(o.lookId) || o.name || '').trim() }))
+                              .filter((o) => !!o.name);
+                            const validOutfitId = outfitId && librarylooks.some((o) => o.lookId === outfitId) ? outfitId : null;
+                            const currentPreset = (c as any).outfitPreset as string | null | undefined;
+                            // Single-source select value: library outfit takes
+                            // precedence, else preset, else default.
+                            const selectValue = validOutfitId
+                              ? `look:${validOutfitId}`
+                              : currentPreset
+                                ? `preset:${currentPreset}`
+                                : '__default__';
+                            const onOutfitChange = (v: string) => {
+                              if (v === '__default__') {
+                                updateSceneCastOutfit(s.index, i, null);
+                                updateSceneCastPreset(s.index, i, null);
+                              } else if (v.startsWith('look:')) {
+                                updateSceneCastOutfit(s.index, i, v.slice(5));
+                              } else if (v.startsWith('preset:')) {
+                                updateSceneCastPreset(s.index, i, v.slice(7));
                               }
-                              return 'Outfit lädt…';
                             };
-                            const merged = fromCharacter.map((o) => ({
-                              lookId: o.lookId,
-                              name: stableName(o.lookId, o.name),
-                            }));
-                            if (outfitId && !merged.some((o) => o.lookId === outfitId)) {
-                              merged.push({
-                                lookId: outfitId,
-                                name: stableName(outfitId, lookHit?.name),
-                              });
-                            }
-                            const showOutfitPicker = !!baseId && merged.length > 0;
                             return (
                               <div key={`${c.mentionKey}-${i}`} className="flex items-center gap-2 flex-wrap">
                                 <Badge variant="outline" className="text-[10px] shrink-0">{c.mentionKey}</Badge>
@@ -1526,45 +1529,33 @@ export default function ProductionPlanSheet({
                                     ))}
                                   </SelectContent>
                                 </Select>
-                                {showOutfitPicker && (
-                                  <Select
-                                    value={outfitId ?? '__default__'}
-                                    onValueChange={(v) => updateSceneCastOutfit(s.index, i, v === '__default__' ? null : v)}
-                                  >
-                                    <SelectTrigger className="h-7 text-xs min-w-[120px]">
+                                {!!baseId && (
+                                  <Select value={selectValue} onValueChange={onOutfitChange}>
+                                    <SelectTrigger className="h-7 text-xs min-w-[180px]">
                                       <SelectValue placeholder="Outfit…" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__default__">Standard-Look</SelectItem>
-                                      {merged.map((o) => (
-                                        <SelectItem key={o.lookId} value={o.lookId}>{o.name || 'Outfit lädt…'}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                                {/*
-                                  Preset picker — visible whenever the user
-                                  has no library outfit selected for this
-                                  slot. Prompt-only fallback so every
-                                  character slot always has an outfit
-                                  signal, even before the user builds their
-                                  wardrobe library.
-                                */}
-                                {!outfitId && (
-                                  <Select
-                                    value={(c as any).outfitPreset ?? '__none__'}
-                                    onValueChange={(v) => updateSceneCastPreset(s.index, i, v === '__none__' ? null : v)}
-                                  >
-                                    <SelectTrigger className="h-7 text-xs min-w-[160px]">
-                                      <SelectValue placeholder="Standard-Outfit…" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__none__">— kein Preset —</SelectItem>
-                                      {DEFAULT_OUTFIT_PRESETS.map((p) => (
-                                        <SelectItem key={p.id} value={p.id}>
-                                          {outfitPresetLabel(p, language)}
-                                        </SelectItem>
-                                      ))}
+                                      {librarylooks.length > 0 && (
+                                        <>
+                                          <SelectSeparator />
+                                          <SelectGroup>
+                                            <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">Meine Looks</SelectLabel>
+                                            {librarylooks.map((o) => (
+                                              <SelectItem key={`look-${o.lookId}`} value={`look:${o.lookId}`}>{o.name}</SelectItem>
+                                            ))}
+                                          </SelectGroup>
+                                        </>
+                                      )}
+                                      <SelectSeparator />
+                                      <SelectGroup>
+                                        <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">Presets</SelectLabel>
+                                        {DEFAULT_OUTFIT_PRESETS.map((p) => (
+                                          <SelectItem key={`preset-${p.id}`} value={`preset:${p.id}`}>
+                                            {outfitPresetLabel(p, language)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectGroup>
                                     </SelectContent>
                                   </Select>
                                 )}

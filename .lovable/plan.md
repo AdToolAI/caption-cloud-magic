@@ -1,54 +1,98 @@
-# Bug: Ladebalken zeigt Lip-Sync obwohl Toggle AUS
+# Fix-Plan v242 — Outfit-Konflikt & Lip-Sync-Hard-Gate
 
-## Analyse — Root Cause
+Drei saubere, klar abgegrenzte Änderungen — keine unnötigen Nebenbaustellen.
 
-Der Clip wurde korrekt **ohne** Sync.so gerendert (Provider-nativ, Toggle war aus). Trotzdem zeigt `PipelineProgressBar` eine Lipsync-Phase mit Fortschritt/Warten. Grund:
+---
 
-`src/hooks/usePipelineProgress.ts` benutzt an **drei** Stellen eine **eigene** Heuristik, um zu entscheiden, ob eine Szene ein Lip-Sync-Target ist:
+## 1) Outfit-Dropdowns entwirren (ProductionPlanSheet)
 
-```ts
-(s.twoshotStage
-  || s.engineOverride === 'cinematic-sync'
-  || dialogVoiceCount(s) > 1)   // ← ← ← der Übeltäter
+**Problem**
+- Label „Outfit lädt…" bleibt teils dauerhaft sichtbar, obwohl die Library längst geladen ist (Library-ID von der KI erfunden → kein Match → Fallback greift permanent).
+- User kann gleichzeitig einen **Library-Outfit** und ein **Preset-Outfit** setzen → widersprüchlicher State.
+
+**Lösung — ein einziges Outfit-Feld pro Slot**
+
+Statt zwei nebeneinander liegender Selects rendern wir **ein** Select mit gruppierten Sektionen:
+
+```text
+[ Outfit für ANNA ▾ ]
+ ├─ Standard-Look
+ ├─ ── Meine Looks ──
+ │   • Business Casual
+ │   • Streetwear
+ └─ ── Presets ──
+     • Casual Denim
+     • Formal Suit
+     • …
 ```
 
-Sobald ein Briefing ≥ 2 Sprecher hat (`dialogVoices`-Map), gilt die Szene für die Progress-UI als Lip-Sync-Target — **auch wenn der User `lipSyncWithVoiceover` bewusst ausgeschaltet hat**, `dialogMode=false` ist und der `engineOverride` z. B. auf `broll` steht.
+- Auswahl aus **Meine Looks** setzt `outfitLookId`, löscht `outfitPreset`.
+- Auswahl aus **Presets** setzt `outfitPreset`, löscht `outfitLookId`.
+- „Standard-Look" löscht beides.
+- Damit ist Mutual-Exclusivity strukturell erzwungen — keine Race-Conditions.
 
-Konsequenz:
-- `hasLipsyncScenes = true` → Lipsync-Balken wird sichtbar
-- `lipsyncTotal > 0` → Baseline erwartet Sync.so-Runs, die aber nie kommen
-- Balken hängt in der Lipsync-Phase und suggeriert einen Prozess, der backend-seitig gar nicht startet
+**Ladezustand**
+- Der Fallback-Text „Outfit lädt…" wird ersetzt: Wenn eine `outfitLookId` referenziert wird, die (noch) nicht in der Library existiert, zeigen wir den Eintrag **gar nicht** an und fallen automatisch auf „Standard-Look" zurück. Kein Phantom-Eintrag mehr.
 
-Wir haben bereits die **Single Source of Truth** dafür: `src/lib/video-composer/lipSyncIntent.ts → isLipSyncIntentional(scene)`. Sie wird in der Render-Dispatch-Logik konsistent verwendet, aber die Progress-Ableitung wurde bei ihrer Einführung nicht mit umgestellt (v-drift).
+---
 
-## Fix — 1 Datei, 3 Stellen
+## 2) Lip-Sync-Toggle als echtes Hard-Gate
 
-**Nur `src/hooks/usePipelineProgress.ts`.** Kein Backend, keine Render-Pipeline-Änderung.
+**Problem**
+Auch mit `lipSyncWithVoiceover = false` startet die Sync.so-Pipeline, weil `SceneDialogStudio.handleGenerate` beim Klick auf „Generieren" unbedingt `engineOverride: 'cinematic-sync'`, `twoshotStage: 'audio'` und `lipSyncWithVoiceover: true` schreibt.
 
-1. Import ergänzen:
-   ```ts
-   import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
-   ```
-2. Alle drei Vorkommen der lokalen Heuristik durch `isLipSyncIntentional(s)` ersetzen:
-   - `useEffect` `clips:start`-Baseline-Snapshot (~Zeile 226): `lipTargets`-Filter
-   - Lazy-Baseline-`useEffect` (~Zeile 295): `lipTargets`-Filter
-   - `hasLipsyncScenes` `useMemo` (~Zeile 340): Rückgabewert
-   - `lipsyncReal` `useMemo` (~Zeile 447/465): das `dialogVoiceCount(s) > 1`-Bein
-3. Zusätzliche Absicherung in `hasLipsyncScenes`: Wenn `twoshotStage` bereits `'canceled'`/nicht gesetzt ist **und** `isLipSyncIntentional(s) === false`, gilt die Szene nie als Target — auch nicht rückwirkend, wenn eine ältere DB-Zeile noch einen alten `twoshotStage`-Wert trägt.
-4. `dialogVoiceCount` bleibt bestehen (wird an anderen Stellen für Shot-Berechnungen genutzt), verliert aber seine Rolle als Intent-Signal.
+**Lösung — respektiere die User-Intention**
 
-## Erwartetes Verhalten nach Fix
+In `SceneDialogStudio.tsx` (Block ab Zeile ~1524) neu:
 
-- Toggle AUS + Provider-nativer Clip fertig → `hasLipsyncScenes=false` → Lipsync-Phase erscheint **gar nicht** in der Bar, `PHASE_WEIGHTS.lipsync` wird auf die anderen Phasen umverteilt (bestehende Logik).
-- Toggle AN oder `dialogMode` oder manuelle Sync-Engine → Verhalten unverändert.
-- Bestehende, echte Sync.so-Runs (twoshotStage/dialogShots aktiv) werden weiterhin korrekt erkannt, weil `isLipSyncIntentional` das über `engineOverride ∈ {cinematic-sync, sync-segments, native-dialogue}` bzw. den Toggle abdeckt.
+```ts
+const wantsLipSync =
+  scene.lipSyncWithVoiceover === true ||
+  scene.dialogMode === true;
 
-## Verifikation
+if (!wantsLipSync) {
+  // No lip-sync path: erzeuge nur das Master-Video ohne Cinematic-Sync.
+  // Skript bleibt als reine Regie-Notiz erhalten (keine TTS-Kopplung).
+  onUpdate({
+    clipStatus: 'generating',
+    engineOverride: 'auto',
+    twoshotStage: null,
+  });
+  await triggerPlainClipGeneration();   // == handleGenerateSingle-Äquivalent
+  return;
+}
 
-- Vitest: bestehende `lipSyncIntent.test.ts` bleibt grün.
-- Manuell: Szene mit 2 Sprechern im Briefing, Lip-Sync-Toggle aus, Render starten → Progress-Bar zeigt nur noch Clips + (ggf.) Voiceover/Musik/Export, keine Lipsync-Zeile.
+// sonst: bestehende Cinematic-Sync-Pipeline
+```
 
-## Was NICHT geändert wird
+Zusätzlich in `SceneInlinePlayer.tsx` (Zeile 324): der Default-Subtitle
+`"VO & Lip-Sync inklusive"` wird zu einer intent-abhängigen Variante:
 
-- Kein Eingriff in Render-Dispatch, `compose-dialog-segments`, Sync.so-Webhooks, Credit-Refund, `PipelineProgressBar.tsx`.
-- Kein neuer State, keine Migration, kein UI-Redesign.
+```ts
+sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
+```
+
+**Ergebnis**
+- Toggle AUS → weder Sync.so-Auftrag noch VO-Mux, kein Twoshot-Stage.
+- Progress-Bar zeigt keine Lipsync-Phase (bereits gefixt in `usePipelineProgress.ts`).
+- Toggle AN → Verhalten unverändert.
+
+---
+
+## 3) Regression-Guard
+
+- Vitest-Case für `isLipSyncIntentional` bleibt Single-Source-of-Truth.
+- Neuer Test: `SceneDialogStudio.handleGenerate` mit `lipSyncWithVoiceover=false` ruft **nicht** `compose-twoshot-audio` / `compose-dialog-segments` auf.
+
+---
+
+## Technische Details (kurz)
+
+| Datei | Änderung |
+|---|---|
+| `src/components/video-composer/briefing/ProductionPlanSheet.tsx` | Zwei Outfit-Selects → ein gruppiertes Select; Fallback „Outfit lädt…" entfernt; `updateSceneCastOutfit` / `updateSceneCastPreset` löschen jeweils das andere Feld. |
+| `src/components/video-composer/SceneDialogStudio.tsx` | `handleGenerate`: Early-Branch für „Lip-Sync AUS" → plain clip generation ohne cinematic-sync-Marker. |
+| `src/components/video-composer/SceneInlinePlayer.tsx` | Default-Subtitle intent-abhängig. |
+| `src/components/video-composer/__tests__/` | Neuer Test für Toggle-Off-Pfad. |
+
+Keine DB-Migration, keine Edge-Function-Änderung, keine Kredit-Logik-Änderung.
