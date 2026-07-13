@@ -74,7 +74,7 @@ const Pricing = () => {
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
-          priceId: pricingPlans.pro.priceId,
+          priceId: pricingPlans.basic.priceId,
           ...(couponCode ? { promoCode: couponCode } : {}),
         },
       });
