@@ -36,7 +36,7 @@ const Coach = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
   
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isPro = isSubscribed(subscribed, productId);
 
   // Dynamic quick prompts - start with static translations, then update dynamically
   const [dynamicQuickPrompts, setDynamicQuickPrompts] = useState<string[]>([]);
