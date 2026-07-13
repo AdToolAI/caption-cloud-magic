@@ -270,8 +270,9 @@ export const PlanUnresolved = z.object({
   field: z.string(),
   reason: z.string(),
   suggestion: z.string().optional(),
-  severity: z.enum(['info', 'warn', 'error']).default('warn'),
-});
+  // v243 — tolerate unknown severities from newer server passes.
+  severity: z.enum(['info', 'warn', 'error']).catch('warn').default('warn'),
+}).passthrough();
 
 /**
  * Per-scene AI-enrichment trail. Lists the dotted field paths that the
