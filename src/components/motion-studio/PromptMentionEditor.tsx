@@ -96,6 +96,7 @@ export default function PromptMentionEditor({
   rows = 3,
   className,
   disabled,
+  onEditingChange,
 }: PromptMentionEditorProps) {
   const { characters, locations } = useUnifiedMentionLibrary();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -103,6 +104,35 @@ export default function PromptMentionEditor({
     null
   );
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // ── Local draft buffer ──────────────────────────────────────────────
+  // The textarea is *effectively* controlled by `draft`. `draft` mirrors
+  // `value` while the user is NOT typing. While `isEditingRef.current`
+  // is true, external `value` changes are ignored — this prevents sibling
+  // sync-effects in SceneCard from rewriting the prompt mid-keystroke,
+  // which caused caret-jumps and disappearing text.
+  const [draft, setDraft] = useState(value);
+  const isEditingRef = useRef(false);
+  const lastCaretRef = useRef<{ start: number; end: number } | null>(null);
+
+  useEffect(() => {
+    if (isEditingRef.current) return;
+    if (value === draft) return;
+    setDraft(value);
+    // Restore caret if the field currently has focus (rare during !editing,
+    // but safe when a re-render was triggered by an external state change).
+    const ta = textareaRef.current;
+    const caret = lastCaretRef.current;
+    if (ta && caret && document.activeElement === ta) {
+      requestAnimationFrame(() => {
+        try {
+          ta.setSelectionRange(caret.start, caret.end);
+        } catch {}
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
 
   const suggestions = useMemo(() => {
     if (!trigger) return [];
