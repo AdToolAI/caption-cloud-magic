@@ -29,6 +29,8 @@ export const BYPASS_TEMPLATES = new Set<string>([
   "reauthentication",
   "ticket_resolved",
   "ticket_reply",
+  "verify_reminder",
+  "ticket_reply",
   "invoice",
   "receipt",
 ]);
