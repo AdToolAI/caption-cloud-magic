@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { isSubscribed } from "@/config/pricing";
 import { useAICall } from "@/hooks/useAICall";
 import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { supabase } from "@/integrations/supabase/client";
