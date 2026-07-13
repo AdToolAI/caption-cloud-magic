@@ -160,7 +160,8 @@ serve(withTelemetry("check-subscription", async (req) => {
     return new Response(
       JSON.stringify({
         subscribed: hasActiveSubscription,
-        product_id: productId,
+        product_id: hasActiveSubscription ? BETA_BASIC_PRODUCT_ID : productId,
+        plan: hasActiveSubscription ? 'beta-basic' : 'free',
         subscription_end: subscriptionEnd,
       }),
       { 
