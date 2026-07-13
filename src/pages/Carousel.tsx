@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { getProductInfo } from "@/config/pricing";
+import { getProductInfo, isSubscribed } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
