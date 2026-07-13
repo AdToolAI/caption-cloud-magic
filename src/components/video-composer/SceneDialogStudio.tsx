@@ -1150,6 +1150,31 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   };
 
   const handleGenerate = async () => {
+    // ── Hard-Gate v242 ────────────────────────────────────────────────
+    // Lip-Sync-Toggle ist die einzig gültige Absichtsquelle. Ist er AUS
+    // (und der Nutzer hat auch keinen Dialog-Mode aktiviert), starten wir
+    // KEINE Sync.so-Pipeline aus dem Studio heraus — sonst kostet der
+    // Klick Credits obwohl der Nutzer explizit "kein Lip-Sync" gewählt hat.
+    const wantsLipSync =
+      scene.lipSyncWithVoiceover === true || scene.dialogMode === true;
+    if (!wantsLipSync) {
+      toast({
+        title:
+          language === 'de'
+            ? 'Lip-Sync ist ausgeschaltet'
+            : language === 'es'
+              ? 'Lip-Sync está desactivado'
+              : 'Lip-Sync is off',
+        description:
+          language === 'de'
+            ? 'Aktiviere den Dialog & Lip-Sync-Schalter, um das Studio zu starten — oder nutze den regulären "Generieren"-Button für einen reinen Bild-Render ohne Sync.so.'
+            : language === 'es'
+              ? 'Activa el interruptor de Diálogo & Lip-Sync para usar el Studio — o pulsa "Generar" para un render solo de imagen.'
+              : 'Turn the Dialog & Lip-Sync switch on to use the Studio — or use the standard Generate button for an image-only render.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (blocks.length === 0) {
       toast({ title: t.parseEmpty, variant: 'destructive' });
       return;
