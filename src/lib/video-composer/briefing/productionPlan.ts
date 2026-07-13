@@ -311,10 +311,11 @@ export const PlanMeta = z.object({
   /**
    * Provenance of this plan:
    *  - 'ai'             — produced by briefing-deep-parse
+   *  - 'ai-partial'     — AI plan, but some scenes/fields were dropped in Zod
    *  - 'local-fallback' — produced by useStoryboardTransition.buildLocalFallbackPlan
    *                       when the edge function timed out / failed
    */
-  source: z.enum(['ai', 'local-fallback']).optional(),
+  source: z.enum(['ai', 'ai-partial', 'local-fallback']).optional(),
   /**
    * v213 — Briefing Fidelity telemetry. Present when LITERAL mode kicked
    * in (the user shipped an explicit script). Surfaced as a chip in the
