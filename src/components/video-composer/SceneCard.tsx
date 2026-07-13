@@ -640,6 +640,8 @@ export default function SceneCard({
   useEffect(() => {
     if (!scene.clipSource.startsWith("ai-")) return;
     if (!characters || characters.length === 0) return;
+    // v246: never rewrite the prompt while the user is typing in it.
+    if (promptEditingRef.current) return;
     // Gate re-injection on the marker wrapper — Action-First intent mode
     // no longer emits the "Audio plan" string, so we check for the
     // canonical `[Dialog]` block instead.
