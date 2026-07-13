@@ -64,8 +64,20 @@ export const AIVideoCreditPurchase = () => {
               <div>
                 <h3 className="text-lg font-semibold">{pack.name[currency]}</h3>
                 <p className="text-xs text-muted-foreground mt-1">{pack.description[currency]}</p>
-                <div className="mt-3">
-                  <span className="text-3xl font-bold">{formatPrice(pack.price[currency], currency)}</span>
+                <div className="mt-3 flex items-baseline gap-2">
+                  {founder.isActive ? (
+                    <>
+                      <span className="text-3xl font-bold text-primary">
+                        {formatPrice(pack.price[currency] * discountFactor, currency)}
+                      </span>
+                      <span className="text-sm text-muted-foreground line-through">
+                        {formatPrice(pack.price[currency], currency)}
+                      </span>
+                      <Badge variant="secondary" className="ml-1">−20%</Badge>
+                    </>
+                  ) : (
+                    <span className="text-3xl font-bold">{formatPrice(pack.price[currency], currency)}</span>
+                  )}
                 </div>
               </div>
 
