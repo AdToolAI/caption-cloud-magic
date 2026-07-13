@@ -456,9 +456,8 @@ export function usePipelineProgress({
         if (ls === 'canceled') return false;
         if (isCanceledLipsyncScene(s)) return false;
         return (
-          (s as any).twoshotStage ||
-          s.engineOverride === 'cinematic-sync' ||
-          dialogVoiceCount(s) > 1
+          isLipSyncIntentional(s as any) ||
+          !!(s as any).twoshotStage
         );
       },
     );
