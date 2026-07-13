@@ -39,7 +39,7 @@ async function maybeSendEmail(subject: string, html: string, admins: string[]) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Lambda Monitor <alerts@useadtool.ai>',
+        from: 'Lambda Monitor <alerts@notify.useadtool.ai>',
         to: admins,
         subject,
         html,
