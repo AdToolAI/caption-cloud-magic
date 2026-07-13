@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { renderReminderEmail, type Lang } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
