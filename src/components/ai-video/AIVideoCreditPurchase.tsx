@@ -2,18 +2,21 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Check } from 'lucide-react';
+import { Sparkles, Check, Crown } from 'lucide-react';
 import { AI_VIDEO_CREDIT_PACKS } from '@/config/aiVideoCredits';
 import { Currency } from '@/config/pricing';
 import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useFounderStatus } from '@/hooks/useFounderStatus';
 import { toast } from 'sonner';
 
 export const AIVideoCreditPurchase = () => {
   const { language, t } = useTranslation();
+  const founder = useFounderStatus();
   const [loading, setLoading] = useState<string | null>(null);
   const currency: Currency = getCurrencyForLanguage(language);
+  const discountFactor = founder.isActive ? 0.8 : 1;
 
   const handlePurchase = async (packId: keyof typeof AI_VIDEO_CREDIT_PACKS) => {
     setLoading(packId);
