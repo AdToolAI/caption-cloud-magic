@@ -27,6 +27,15 @@ describe('isLipSyncIntentional', () => {
     // auto-force cinematic-sync. It must not.
     expect(isLipSyncIntentional({ engineOverride: 'auto' })).toBe(false);
   });
+
+  it('v245 veto: explicit toggle=false blocks even cinematic-sync engine', () => {
+    expect(
+      isLipSyncIntentional({ lipSyncWithVoiceover: false, engineOverride: 'cinematic-sync' }),
+    ).toBe(false);
+    expect(
+      isLipSyncIntentional({ lipSyncWithVoiceover: false, dialogMode: true }),
+    ).toBe(false);
+  });
 });
 
 describe('isLipSyncIntentionalRow (snake_case)', () => {
@@ -35,5 +44,15 @@ describe('isLipSyncIntentionalRow (snake_case)', () => {
     expect(isLipSyncIntentionalRow({ engine_override: 'sync-segments' })).toBe(true);
     expect(isLipSyncIntentionalRow({ engine_override: 'auto' })).toBe(false);
     expect(isLipSyncIntentionalRow(null)).toBe(false);
+  });
+
+  it('v245 veto: lip_sync_with_voiceover=false overrides engine_override', () => {
+    expect(
+      isLipSyncIntentionalRow({
+        lip_sync_with_voiceover: false,
+        engine_override: 'cinematic-sync',
+        dialog_mode: true,
+      }),
+    ).toBe(false);
   });
 });
