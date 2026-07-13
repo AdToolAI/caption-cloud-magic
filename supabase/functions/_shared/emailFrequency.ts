@@ -46,14 +46,20 @@ export async function canSendMarketingEmail(
 ): Promise<boolean> {
   if (BYPASS_TEMPLATES.has(template)) return true;
 
-  // Global kill-switch
+  // Global kill-switches (marketing_paused, beta_mode blocks broadcast-class templates)
   try {
-    const { data: cfg } = await supabase
+    const { data: cfgs } = await supabase
       .from("system_config")
-      .select("value")
-      .eq("key", "email.marketing_paused")
-      .maybeSingle();
-    if (cfg?.value === true || cfg?.value?.paused === true) return false;
+      .select("key,value")
+      .in("key", ["email.marketing_paused", "email.beta_mode", "email.winback_paused"]);
+    const map = new Map<string, unknown>((cfgs ?? []).map((r: any) => [r.key, r.value]));
+    const paused = map.get("email.marketing_paused");
+    if (paused === true || (paused as any)?.paused === true) return false;
+    const beta = map.get("email.beta_mode");
+    const isBeta = beta === true || (beta as any)?.enabled === true;
+    if (isBeta && template.startsWith("winback_")) return false;
+    const winbackPaused = map.get("email.winback_paused");
+    if ((winbackPaused === true || (winbackPaused as any)?.paused === true) && template.startsWith("winback_")) return false;
   } catch {
     // ignore — fail open
   }
