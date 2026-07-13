@@ -148,14 +148,17 @@ serve(async (req) => {
       ],
       mode: 'payment',
       currency: currency.toLowerCase(),
+      allow_promotion_codes: !isFounder,
+      discounts: isFounder ? [{ coupon: 'FOUNDERS_VIDEO_20' }] : undefined,
       invoice_creation: {
         enabled: true,
         invoice_data: {
-          description: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack`,
+          description: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack${isFounder ? ' (Founders -20%)' : ''}`,
           metadata: {
             user_id: user.id,
             pack_id: packId,
             type: 'ai_video_credits',
+            founders_discount: isFounder ? 'true' : 'false',
           },
           footer: currency === 'EUR' 
             ? 'Alle Preise inkl. 19% MwSt. (Deutschland). Vielen Dank für Ihren Einkauf.'
@@ -171,12 +174,13 @@ serve(async (req) => {
         base_amount: pack.price.toString(),
         bonus_amount: pack.bonus.toString(),
         bonus_percent: pack.bonusPercent.toString(),
+        founders_discount: isFounder ? '20' : '0',
         type: 'ai_video_credits',
       },
     });
 
     return new Response(
-      JSON.stringify({ url: session.url, sessionId: session.id }),
+      JSON.stringify({ url: session.url, sessionId: session.id, foundersDiscount: isFounder }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 
