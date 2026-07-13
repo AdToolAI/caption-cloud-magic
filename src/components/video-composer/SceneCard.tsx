@@ -688,6 +688,8 @@ export default function SceneCard({
   // new `aiPrompt`.
   useEffect(() => {
     if (!scene.clipSource.startsWith("ai-")) return;
+    // v246: never rewrite the prompt while the user is typing in it.
+    if (promptEditingRef.current) return;
     const sceneActionEn = (scene.sceneActionEn ?? "").trim();
     const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
     const castActions: CastActionEntry[] = cast
@@ -713,15 +715,18 @@ export default function SceneCard({
       const next = applyActionsToPrompt(scene.aiPrompt || "", sceneActionEn, castActions);
       if (next !== (scene.aiPrompt || "")) onUpdate({ aiPrompt: next });
     }
+    // v246: `scene.aiPrompt` removed from deps — otherwise every keystroke
+    // in the KI-Prompt field re-runs this effect and the marker rewrite
+    // races with the user's typing. External signals still trigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scene.sceneActionEn,
-    scene.aiPrompt,
     promptMode,
     characters?.length,
     scene.characterShots?.map((s) => `${s.characterId}:${s.actionEn ?? ""}`).join("|"),
     scene.characterShot?.actionEn,
   ]);
+
 
   const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next, promptSlotOrder);
