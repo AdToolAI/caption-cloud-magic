@@ -41,7 +41,7 @@ const Rewriter = () => {
   const maxChars = 1000;
   const freeLimit = 3;
   
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isPro = isSubscribed(subscribed, productId);
 
   const checkUsage = async () => {
     if (!user) return;
