@@ -89,11 +89,21 @@ serve(async (req) => {
       throw new Error("User profile not found");
     }
 
-    if (!['pro', 'enterprise'].includes(profile.plan)) {
+    // Beta: unified plan gating — any paid tier (basic/pro/enterprise) qualifies
+    if (!['basic', 'pro', 'enterprise'].includes(profile.plan)) {
       return new Response(
-        JSON.stringify({ error: "AI Video Generation requires Pro or Enterprise plan" }),
+        JSON.stringify({ error: "AI Video Generation requires an active Beta-Basic subscription" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Founders 20% discount (24 months from claim, forfeits on account deletion/subscription cancel)
+    let isFounder = false;
+    try {
+      const { data: founderRes } = await supabaseClient.rpc('is_founder_active', { _user_id: user.id });
+      isFounder = !!founderRes;
+    } catch (e) {
+      console.warn("[ai-video-purchase-credits] founder check failed", e);
     }
 
     // Parse request with currency
