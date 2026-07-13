@@ -349,6 +349,17 @@ serve(withTelemetry('stripe-webhook', async (req) => {
         const user = users?.find(u => u.email === email);
 
         if (user) {
+          // Revoke founders status when the paid subscription ends
+          try {
+            await supabaseAdmin.rpc('revoke_founder_status', {
+              _user_id: user.id,
+              _reason: 'subscription_cancelled',
+            });
+            console.log('[STRIPE-WEBHOOK] Revoked founders status:', user.id);
+          } catch (e) {
+            console.error('[STRIPE-WEBHOOK] Failed to revoke founders status:', e);
+          }
+
           // Downgrade to free plan
           await supabaseAdmin.from('profiles').update({ plan: 'free' }).eq('id', user.id);
           await supabaseAdmin
