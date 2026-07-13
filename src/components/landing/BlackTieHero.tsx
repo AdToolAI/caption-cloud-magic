@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SithCommandDeck } from "./SithCommandDeck";
+import { FoundersBenefitsDialog } from "./FoundersBenefitsDialog";
 
 export const BlackTieHero = () => {
   const { t } = useTranslation();
+  const [foundersOpen, setFoundersOpen] = useState(false);
 
   return (
     <section className="relative flex items-center overflow-hidden pt-2 pb-8 md:pt-4 md:pb-12 px-4">
