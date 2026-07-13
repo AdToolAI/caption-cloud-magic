@@ -21,11 +21,11 @@ const Credits = () => {
     if (!balance) return language === 'de' ? 'Laden...' : language === 'es' ? 'Cargando...' : 'Loading...';
     const planNames: Record<string, Record<string, string>> = {
       free: { en: 'Free Plan', de: 'Kostenloser Plan', es: 'Plan Gratis' },
-      basic: { en: 'Basic Plan', de: 'Basic Plan', es: 'Plan Básico' },
-      pro: { en: 'Pro Plan', de: 'Pro Plan', es: 'Plan Pro' },
-      enterprise: { en: 'Enterprise Plan', de: 'Enterprise Plan', es: 'Plan Empresarial' },
+      basic: { en: 'Beta-Basic', de: 'Beta-Basic', es: 'Beta-Basic' },
+      pro: { en: 'Beta-Basic', de: 'Beta-Basic', es: 'Beta-Basic' },
+      enterprise: { en: 'Beta-Basic', de: 'Beta-Basic', es: 'Beta-Basic' },
     };
-    return planNames[balance.plan_code]?.[language] || 'Plan';
+    return planNames[balance.plan_code]?.[language] || 'Beta-Basic';
   };
 
   const packages = [
