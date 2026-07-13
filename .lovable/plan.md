@@ -1,80 +1,54 @@
-# Universal Creator — Wizard springt nach Render auf Step 2 (Clean-Fix)
+# Bug: Ladebalken zeigt Lip-Sync obwohl Toggle AUS
 
-## Root Cause
+## Analyse — Root Cause
 
-Zwei Zustandsmaschinen kollidieren auf **einer** Spalte:
+Der Clip wurde korrekt **ohne** Sync.so gerendert (Provider-nativ, Toggle war aus). Trotzdem zeigt `PipelineProgressBar` eine Lipsync-Phase mit Fortschritt/Warten. Grund:
 
-- Der Wizard nutzt `content_projects.status = 'draft'` als **Wiederaufnahme-Signal** ("dieses Projekt ist noch in Bearbeitung").
-- `render-with-remotion` überschreibt genau dieselbe Spalte mit `'rendering'`, sobald ein Render startet (`supabase/functions/render-with-remotion/index.ts:483–489`).
-- Auto-Resume filtert hart auf `.eq('status', 'draft')` (`src/pages/UniversalCreator/UniversalCreator.tsx:383`).
+`src/hooks/usePipelineProgress.ts` benutzt an **drei** Stellen eine **eigene** Heuristik, um zu entscheiden, ob eine Szene ein Lip-Sync-Target ist:
 
-Folge: Nach Render-Start ist das Projekt für Auto-Resume unsichtbar. Sobald die Seite neu mountet (Reload, Tab-Wechsel mit `visibilitychange`-Auth-Refresh, Menü-Navigation zurück ohne `?project=…`), fällt der Wizard auf localStorage/Defaults zurück → optisch "wieder in Step 2".
-
-Die schnelle Lösung (Filter aufweichen) kaschiert nur das Symptom. Sauber ist es, die beiden Lifecycles zu **trennen**.
-
-## Clean-Fix — Trennung von Editier- und Render-Lifecycle
-
-### 1. Neue Semantik für `content_projects.status`
-
-Nur noch **Wizard-Lifecycle**:
-
-- `draft` — vom User bearbeitbar
-- `archived` — vom User explizit "fertig / weglegen"
-
-Render-Status verschwindet aus dieser Spalte. Er lebt bereits vollständig in `video_renders` (`status`, `video_url`, `error_message`) und wird per Realtime beobachtet — es gibt keinen fachlichen Grund, ihn zu duplizieren.
-
-### 2. `render-with-remotion` Edge-Function
-
-- **Entfernen:** `update({ status: 'rendering', … })` auf `content_projects`.
-- **Behalten:** `render_engine`-Feld darf einmalig gesetzt werden (informativ, kein Lifecycle).
-- Wenn Telemetrie gewünscht ist, ein optionales Feld `last_render_started_at` hinzufügen — beeinflusst kein Resume-Verhalten.
-
-### 3. Auto-Resume vereinfachen
-
-`src/pages/UniversalCreator/UniversalCreator.tsx`:
-
-- Filter bleibt `.eq('status', 'draft')` — jetzt aber semantisch korrekt, weil kein Backend den Status mehr wegzieht.
-- Zusätzliche Defensive: **`?project=<id>` ist die Primärquelle**. Wenn der URL-Param existiert, wird immer `hydrateFromDb` mit dieser ID benutzt, unabhängig vom Status. (Ist heute schon so — bleibt.)
-
-### 4. `saveProgress` beim Sprung nach Step 5 synchronisieren
-
-Kleiner Bonus, damit ein Reload während des Renders deterministisch auf Step 5 landet:
-
-- In `goToNext()` **vor** `setCurrentStep(next)` einmal `await saveProgress()`, wenn `next === n.length - 1` (Preview & Export).
-- Verhindert die 500 ms Debounce-Lücke zwischen Klick "Weiter → Preview" und dem tatsächlichen DB-Schreiben von `current_step = 4`.
-
-### 5. Migration / Backfill
-
-Ein SQL-Migrationsschritt, der Alt-Datensätze bereinigt:
-
-```sql
-update public.content_projects
-set status = 'draft'
-where content_type = 'universal'
-  and status in ('rendering', 'completed');
+```ts
+(s.twoshotStage
+  || s.engineOverride === 'cinematic-sync'
+  || dialogVoiceCount(s) > 1)   // ← ← ← der Übeltäter
 ```
 
-Grund: Diese Zeilen wurden vom alten Code fälschlich aus dem Draft-Pool entfernt und würden sonst nach dem Fix nicht wieder auftauchen.
+Sobald ein Briefing ≥ 2 Sprecher hat (`dialogVoices`-Map), gilt die Szene für die Progress-UI als Lip-Sync-Target — **auch wenn der User `lipSyncWithVoiceover` bewusst ausgeschaltet hat**, `dialogMode=false` ist und der `engineOverride` z. B. auf `broll` steht.
 
-### 6. Kein Change nötig
+Konsequenz:
+- `hasLipsyncScenes = true` → Lipsync-Balken wird sichtbar
+- `lipsyncTotal > 0` → Baseline erwartet Sync.so-Runs, die aber nie kommen
+- Balken hängt in der Lipsync-Phase und suggeriert einen Prozess, der backend-seitig gar nicht startet
 
-- `PreviewExportStep.tsx` — Render-Flow ist korrekt.
-- `video_renders`-Tabelle und Realtime-Handler — bleiben unverändert.
-- localStorage-Backup — bleibt als Second-Line-Fallback.
+Wir haben bereits die **Single Source of Truth** dafür: `src/lib/video-composer/lipSyncIntent.ts → isLipSyncIntentional(scene)`. Sie wird in der Render-Dispatch-Logik konsistent verwendet, aber die Progress-Ableitung wurde bei ihrer Einführung nicht mit umgestellt (v-drift).
 
-## Technische Details
+## Fix — 1 Datei, 3 Stellen
 
-Betroffene Dateien:
+**Nur `src/hooks/usePipelineProgress.ts`.** Kein Backend, keine Render-Pipeline-Änderung.
 
-- `supabase/functions/render-with-remotion/index.ts` (Update-Statement entfernen)
-- `src/pages/UniversalCreator/UniversalCreator.tsx` (`goToNext` await, Kommentar an Auto-Resume)
-- Neue Migration `supabase/migrations/<ts>_content_projects_status_cleanup.sql`
+1. Import ergänzen:
+   ```ts
+   import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
+   ```
+2. Alle drei Vorkommen der lokalen Heuristik durch `isLipSyncIntentional(s)` ersetzen:
+   - `useEffect` `clips:start`-Baseline-Snapshot (~Zeile 226): `lipTargets`-Filter
+   - Lazy-Baseline-`useEffect` (~Zeile 295): `lipTargets`-Filter
+   - `hasLipsyncScenes` `useMemo` (~Zeile 340): Rückgabewert
+   - `lipsyncReal` `useMemo` (~Zeile 447/465): das `dialogVoiceCount(s) > 1`-Bein
+3. Zusätzliche Absicherung in `hasLipsyncScenes`: Wenn `twoshotStage` bereits `'canceled'`/nicht gesetzt ist **und** `isLipSyncIntentional(s) === false`, gilt die Szene nie als Target — auch nicht rückwirkend, wenn eine ältere DB-Zeile noch einen alten `twoshotStage`-Wert trägt.
+4. `dialogVoiceCount` bleibt bestehen (wird an anderen Stellen für Shot-Berechnungen genutzt), verliert aber seine Rolle als Intent-Signal.
 
-Keine Änderung am Schema von `content_projects` (Spalten bleiben). Keine Änderung am `video_renders`-Contract. Keine breaking changes für andere Consumer, die `content_projects.status` lesen — die haben nach dem Backfill wieder konsistente Werte.
+## Erwartetes Verhalten nach Fix
+
+- Toggle AUS + Provider-nativer Clip fertig → `hasLipsyncScenes=false` → Lipsync-Phase erscheint **gar nicht** in der Bar, `PHASE_WEIGHTS.lipsync` wird auf die anderen Phasen umverteilt (bestehende Logik).
+- Toggle AN oder `dialogMode` oder manuelle Sync-Engine → Verhalten unverändert.
+- Bestehende, echte Sync.so-Runs (twoshotStage/dialogShots aktiv) werden weiterhin korrekt erkannt, weil `isLipSyncIntentional` das über `engineOverride ∈ {cinematic-sync, sync-segments, native-dialogue}` bzw. den Toggle abdeckt.
 
 ## Verifikation
 
-- Manuell: Projekt bis Step 5 ausfüllen → "Render" klicken → Reload während Render läuft → erwartet: bleibt auf Step 5, Render-Job wird per Realtime weiterverfolgt.
-- Manuell: Render fertig → in ein anderes Tool wechseln → zurück auf `/universal-creator` → erwartet: Auto-Resume lädt Projekt auf Step 5 mit "completed"-Job.
-- Manuell: `handleNewProject()` klicken → altes Projekt wird nicht überschrieben (URL-Reset schützt bereits, unverändert).
-- SQL-Check nach Backfill: `select status, count(*) from content_projects where content_type = 'universal' group by 1` — nur noch `draft` / `archived`.
+- Vitest: bestehende `lipSyncIntent.test.ts` bleibt grün.
+- Manuell: Szene mit 2 Sprechern im Briefing, Lip-Sync-Toggle aus, Render starten → Progress-Bar zeigt nur noch Clips + (ggf.) Voiceover/Musik/Export, keine Lipsync-Zeile.
+
+## Was NICHT geändert wird
+
+- Kein Eingriff in Render-Dispatch, `compose-dialog-segments`, Sync.so-Webhooks, Credit-Refund, `PipelineProgressBar.tsx`.
+- Kein neuer State, keine Migration, kein UI-Redesign.

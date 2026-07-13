@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { subscribePipelineEvents, type PipelinePhaseId } from '@/lib/pipelineEvents';
+import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 
 export interface PipelinePhaseState {
   id: PipelinePhaseId;
@@ -226,9 +227,7 @@ export function usePipelineProgress({
         const lipTargets = ss.filter(
           (s) =>
             !isCanceledLipsyncScene(s) &&
-            ((s as any).twoshotStage ||
-              s.engineOverride === 'cinematic-sync' ||
-              (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
+            (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
         );
         const dsTotals = lipTargets.reduce(
           (acc, s) => {
@@ -295,9 +294,7 @@ export function usePipelineProgress({
     const lipTargets = ss.filter(
       (s) =>
         !isCanceledLipsyncScene(s) &&
-        ((s as any).twoshotStage ||
-          s.engineOverride === 'cinematic-sync' ||
-          (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
+        (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
     );
     const dsTotals = lipTargets.reduce(
       (acc, s) => {
@@ -349,9 +346,8 @@ export function usePipelineProgress({
           const cs = (s as any).clipStatus ?? (s as any).clip_status;
           if (cs === 'failed') return false;
           return (
-            (s as any).twoshotStage ||
-            s.engineOverride === 'cinematic-sync' ||
-            dialogVoiceCount(s) > 1
+            isLipSyncIntentional(s as any) ||
+            !!(s as any).twoshotStage
           );
         },
       ),
@@ -460,9 +456,8 @@ export function usePipelineProgress({
         if (ls === 'canceled') return false;
         if (isCanceledLipsyncScene(s)) return false;
         return (
-          (s as any).twoshotStage ||
-          s.engineOverride === 'cinematic-sync' ||
-          dialogVoiceCount(s) > 1
+          isLipSyncIntentional(s as any) ||
+          !!(s as any).twoshotStage
         );
       },
     );
@@ -750,9 +745,7 @@ export function usePipelineProgress({
   // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
   const lipTargetCount = (scenes ?? []).filter((s: any) =>
     !isCanceledLipsyncScene(s) &&
-    (s.twoshotStage ||
-      s.engineOverride === 'cinematic-sync' ||
-      (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1),
+    (isLipSyncIntentional(s) || !!s.twoshotStage),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
     const n = s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
