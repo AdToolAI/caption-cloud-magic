@@ -1,3 +1,10 @@
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 /**
  * extract-subtitle-keywords — Lovable AI Gateway (Gemini Flash, structured output).
  * Input:  { subtitles: [{ id, text }] }
@@ -7,7 +14,6 @@
  * per subtitle line get the highlight box. Falls back to empty arrays on error
  * so the renderer always has a safe shape.
  */
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { isQaMockRequest } from '../_shared/qaMock.ts';
 import { createOpenAICompatible } from 'npm:@ai-sdk/openai-compatible';
 import { generateText, Output } from 'npm:ai';
