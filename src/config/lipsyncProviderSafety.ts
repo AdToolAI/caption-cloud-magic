@@ -22,6 +22,9 @@ import type { ClipSource, ComposerScene } from '@/types/video-composer';
 export const LIPSYNC_SAFE_PROVIDERS: readonly ClipSource[] = [
   'ai-hailuo',
   'ai-happyhorse',
+  // Kling 3.0 Omni: native lip-sync — kein Sync.so-Pass nötig, deshalb
+  // per Definition "safe" (kein Ghost-Mouthing-Risiko).
+  'ai-kling-omni',
 ] as const;
 
 export function isSafeLipsyncProvider(source: ClipSource | string | undefined): boolean {
