@@ -421,7 +421,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     durations: [5, 10],
     resolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.14, USD: 0.14 },
+    costPerSecond: { EUR: 0.12, USD: 0.12 },
     badge: 'Wartung',
     tagline: 'Smooth motion · Start+End frame morphing',
     legacyRoute: '/pika-video-studio',
