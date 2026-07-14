@@ -162,7 +162,7 @@ serve(async (req) => {
     console.log(`[generate-kling-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
-    const resolution = model === 'kling-3-pro' ? '1080p' : '720p';
+    const resolution = modelConfig.resolution;
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
