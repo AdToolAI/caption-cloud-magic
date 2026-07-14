@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity } from 'lucide-react';
@@ -47,18 +48,34 @@ export default function MusicStudio() {
   const cost = tierPricing.eur;
   const insufficient = balance < cost;
   const maxDur = tierPricing.maxDuration;
-  const language = useMemo(() => {
-    if (typeof navigator === 'undefined') return 'en' as const;
-    const lang = navigator.language?.slice(0, 2);
-    return (lang === 'de' || lang === 'es') ? (lang as 'de' | 'es') : 'en';
-  }, []);
+  const [language, setLanguage] = useState<string>(() => {
+    if (typeof navigator === 'undefined') return 'en';
+    const lang = navigator.language?.slice(0, 2) || 'en';
+    return isLanguageSupported('vocal', lang) ? lang : 'en';
+  });
+
+  // When tier changes, ensure selected language is still supported
+  useEffect(() => {
+    const supported = MUSIC_LANGUAGE_SUPPORT[tier];
+    if (supported.length === 0) return; // instrumental-only tier
+    if (!supported.some((l) => l.code === language)) {
+      setLanguage(supported[0].code);
+    }
+  }, [tier]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const showLanguagePicker = tierHasVocals(tier, instrumental);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     if (tier === 'vocal' && !lyrics.trim()) return;
     const safeDuration = Math.min(duration, maxDur);
+    // Append explicit [LANGUAGE: …] directive so the provider strictly matches the vocal language.
+    const langMeta = showLanguagePicker ? getLanguageMeta(tier, language) : undefined;
+    const finalPrompt = langMeta
+      ? `${prompt.trim()}\n\n[LANGUAGE: ${langMeta.name}] — Sing exclusively in ${langMeta.name}. Do not mix languages.`
+      : prompt.trim();
     const track = await generateMusic({
-      prompt: prompt.trim(),
+      prompt: finalPrompt,
       tier,
       durationSeconds: safeDuration,
       genre: genre !== 'any' ? genre : undefined,
@@ -78,7 +95,7 @@ export default function MusicStudio() {
       prompt: prompt.trim(),
       genre: genre !== 'any' ? genre : undefined,
       mood,
-      language,
+      language: (['en', 'de', 'es'] as const).includes(language as any) ? (language as 'en' | 'de' | 'es') : 'en',
     });
     if (generated) setLyrics(generated);
   };
@@ -265,6 +282,37 @@ export default function MusicStudio() {
                       </div>
                       <Switch id="instr" checked={instrumental} onCheckedChange={setInstrumental} />
                     </div>
+                  )}
+
+                  {showLanguagePicker && MUSIC_LANGUAGE_SUPPORT[tier].length > 0 && (
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <Label htmlFor="vocal-lang" className="text-sm text-foreground">Gesangssprache</Label>
+                          <p className="text-[11px] text-muted-foreground">Nur Sprachen, die dieser Provider sauber singt</p>
+                        </div>
+                        <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
+                          {tierPricing.engine}
+                        </Badge>
+                      </div>
+                      <select
+                        id="vocal-lang"
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        disabled={loading}
+                        className="w-full h-9 px-3 rounded-md bg-background/40 border border-primary/20 text-sm focus:border-primary/60 focus:outline-none"
+                      >
+                        {MUSIC_LANGUAGE_SUPPORT[tier].map((l) => (
+                          <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {!showLanguagePicker && (tier === 'standard' || tier === 'pro') && instrumental && (
+                    <p className="text-[11px] text-muted-foreground italic">
+                      Instrumental aktiv — keine Sprachauswahl nötig. Deaktiviere „Instrumental" für Gesang.
+                    </p>
                   )}
 
                   {tier === 'vocal' && (
