@@ -1,6 +1,7 @@
 import { Currency } from './pricing';
 
-// Margin policy: Replicate $0.04/$0.07 per second → user 0.12/0.20 €/s (~67/65% margin)
+// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
+// Std: $0.04/s → €0.12/s | Pro: $0.07/s → €0.21/s
 export const WAN_VIDEO_MODELS = {
   'wan-standard': {
     name: 'Wan 2.5 Standard',
@@ -26,15 +27,15 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.5',
     costPerSecond: {
-      EUR: 0.20,
-      USD: 0.20,
+      EUR: 0.21,
+      USD: 0.21,
     },
     minDuration: 5,
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 1,00€ pro 5 Sekunden',
-      USD: 'Premium 1080p quality from $1.00 per 5 seconds',
+      EUR: 'Premium 1080p-Qualität ab 1,05€ pro 5 Sekunden',
+      USD: 'Premium 1080p quality from $1.05 per 5 seconds',
     },
     badge: 'Premium',
   },
@@ -62,8 +63,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.6',
     costPerSecond: {
-      EUR: 0.20,
-      USD: 0.20,
+      EUR: 0.21,
+      USD: 0.21,
     },
     minDuration: 5,
     maxDuration: 10,
