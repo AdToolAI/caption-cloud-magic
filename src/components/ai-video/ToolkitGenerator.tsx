@@ -227,7 +227,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model.id]);
 
-  const cost = duration * model.costPerSecond[currency];
+  // Canonical per-second price from server catalog (falls back to local config).
+  const { getPricePerSecond } = useVideoPricingCatalog();
+  const pricePerSecond = getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency];
+  const cost = duration * pricePerSecond;
   const symbol = currency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;
   const canAfford = isUnlimited || (wallet?.balance_euros ?? 0) >= cost;
