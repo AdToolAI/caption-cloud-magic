@@ -174,7 +174,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     provider: 'Kuaishou',
     family: 'kling',
     // Own edge function — native lip-sync bypasses Sync.so pipeline.
-    edgeFunction: 'generate-kling-omni-video',
+    edgeFunction: 'generate-kling-video',
     group: 'premium',
     icon: Film,
     capabilities: { t2v: true, i2v: true, v2v: false, audio: true, nativeDialogue: true, anchorOnly: false },
