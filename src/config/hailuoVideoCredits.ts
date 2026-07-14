@@ -23,18 +23,18 @@ export const HAILUO_VIDEO_MODELS = {
     name: 'Hailuo 2.3 Pro',
     provider: 'MiniMax (Replicate)',
     quality: '1080p',
-    // Replicate $0.075/s → user €0.22/s (~66% margin)
+    // Replicate $0.075/s → user €0.23/s (3.00× margin)
     costPerSecond: {
-      EUR: 0.22,
-      USD: 0.22,
+      EUR: 0.23,
+      USD: 0.23,
     },
     minDuration: 6,
     maxDuration: 10,
     allowedDurations: [6, 10] as const,
     allowedResolutions: ['768p', '1080p'] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 1,32€ pro 6 Sekunden',
-      USD: 'Premium 1080p quality from $1.32 per 6 seconds',
+      EUR: 'Premium 1080p-Qualität ab 1,38€ pro 6 Sekunden',
+      USD: 'Premium 1080p quality from $1.38 per 6 seconds',
     },
     badge: 'Premium',
   },
