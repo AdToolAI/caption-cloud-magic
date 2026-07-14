@@ -290,7 +290,7 @@ serve(async (req) => {
           {
             input: {
               lyrics: lyrics!.trim(),
-              song_description: styleDesc,
+              prompt: styleDesc,
             },
           }
         );
