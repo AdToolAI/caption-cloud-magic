@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { ModelSelector } from './ModelSelector';
+import AIVideoCostConfirmDialog, { type AIVideoCostConfirmPayload } from './AIVideoCostConfirmDialog';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import {
   ToolkitCastWorldPicker,
