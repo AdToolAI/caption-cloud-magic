@@ -48,6 +48,9 @@ interface GenerateRequest {
   dialogText?: string;
   /** Omni only: TTS voice preset / gender hint. */
   voicePreset?: string;
+  /** Omni only: per-speaker voice mapping (max 2). Used when a scene contains
+   *  multiple named speakers in the dialogue transcript. */
+  speakerVoices?: Array<{ name: string; voice: string }>;
   // Image-to-Video
   startImageUrl?: string;
   endImageUrl?: string;
@@ -87,7 +90,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
-    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
+    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, speakerVoices, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
     const suppressDialogue = body.suppressDialogue === true;
 
@@ -233,8 +236,13 @@ serve(async (req) => {
     if (modelConfig.supportsNativeLipSync && dialogText && dialogText.trim().length > 0 && !suppressDialogue) {
       replicateInput.dialog = dialogText.trim();
       if (voicePreset) replicateInput.voice = voicePreset;
+      if (Array.isArray(speakerVoices) && speakerVoices.length > 0) {
+        replicateInput.speaker_voices = speakerVoices
+          .slice(0, 2)
+          .map((s) => ({ name: String(s.name || '').slice(0, 40), voice: String(s.voice || 'neutral') }));
+      }
       if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
-      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${spokenLanguage ?? 'auto'}, chars=${dialogText.length})`);
+      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${spokenLanguage ?? 'auto'}, chars=${dialogText.length}, speakers=${speakerVoices?.length ?? 1})`);
     }
 
     // Image-to-Video

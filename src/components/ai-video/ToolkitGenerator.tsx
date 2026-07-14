@@ -137,9 +137,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     ? (['en', 'de', 'es'] as const).includes(effectiveSpokenLang)
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
-  /* ── Kling Omni: native Lip-Sync dialogue + voice preset ── */
-  const [omniDialogText, setOmniDialogText] = useState<string>('');
-  const [omniVoicePreset, setOmniVoicePreset] = useState<'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral'>('female-warm');
+  /* ── Kling Omni: per-speaker native Lip-Sync (max. 2 speakers) ── */
+  type OmniVoicePreset = 'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral';
+  type OmniLine = { characterId: string | null; line: string; voicePreset: OmniVoicePreset };
+  const [omniLines, setOmniLines] = useState<OmniLine[]>([
+    { characterId: null, line: '', voicePreset: 'female-warm' },
+  ]);
   /**
    * Placement of the uploaded reference image within the generated clip:
    *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
@@ -195,6 +198,33 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     () => castPropIds.map((id) => libLocations.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l),
     [libLocations, castPropIds],
   );
+
+  /**
+   * Keep `omniLines` in sync with the selected Cast characters (max 2 for Kling Omni).
+   * Preserves existing dialog text & voice preset per row when possible.
+   */
+  useEffect(() => {
+    const targetIds = castCharacterIds.slice(0, 2);
+    if (targetIds.length === 0) return;
+    setOmniLines((prev) => {
+      const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm'];
+      const next: OmniLine[] = targetIds.map((cid, i) => {
+        const existing = prev.find((r) => r.characterId === cid);
+        if (existing) return existing;
+        const fallback = prev[i];
+        return {
+          characterId: cid,
+          line: fallback?.characterId ? '' : (fallback?.line ?? ''),
+          voicePreset: fallback?.voicePreset ?? defaults[i] ?? 'neutral',
+        };
+      });
+      // If length or ids changed, replace; otherwise keep referential equality.
+      const same =
+        next.length === prev.length &&
+        next.every((r, i) => prev[i] && prev[i].characterId === r.characterId);
+      return same ? prev : next;
+    });
+  }, [castCharacterIds]);
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
@@ -604,13 +634,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
       // Kling 3.0 Omni — native Lip-Sync in DE/EN/ES bypasses Sync.so.
-      // If the user provided dialogue, pass it to the edge function together
-      // with the chosen voice preset and language. Max 2 speakers per clip.
-      if (isKlingOmni && omniDialogText.trim()) {
-        body.dialogText = omniDialogText.trim();
-        body.voicePreset = omniVoicePreset;
-        body.spokenLanguage = effectiveSpokenLang;
-        body.nativeLipSync = true;
+      // Per-speaker lines are merged into a screenplay-style dialog string
+      // and — when > 1 speaker — additionally passed as `speaker_voices`.
+      if (isKlingOmni) {
+        const activeLines = omniLines
+          .filter((l) => l.line.trim().length > 0)
+          .slice(0, 2);
+        if (activeLines.length > 0) {
+          const named = activeLines.map((l, i) => {
+            const c = l.characterId ? libCharacters.find((x) => x.id === l.characterId) : null;
+            const name = c?.name?.trim() || `Speaker ${i + 1}`;
+            return { name, line: l.line.trim(), voice: l.voicePreset };
+          });
+          body.dialogText = named.map((n) => `${n.name}: ${n.line}`).join('\n');
+          body.voicePreset = named[0].voice;
+          if (named.length > 1) {
+            body.speakerVoices = named.map((n) => ({ name: n.name, voice: n.voice }));
+          }
+          body.spokenLanguage = effectiveSpokenLang;
+          body.nativeLipSync = true;
+        }
       }
 
       // Sora 2 cannot accept image input → toast hint when a character is selected
@@ -1143,46 +1186,100 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </Badge>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="omni-dialog" className="text-xs text-muted-foreground">
-                {language === 'de'
-                  ? 'Dialog-Text (optional). Leer lassen für stummen Clip mit Ambient-Audio.'
-                  : 'Dialogue text (optional). Leave empty for a silent clip with ambient audio.'}
-              </Label>
-              <Textarea
-                id="omni-dialog"
-                value={omniDialogText}
-                onChange={(e) => setOmniDialogText(e.target.value.slice(0, 600))}
-                placeholder={
-                  language === 'de'
-                    ? 'z. B. "Willkommen bei AdTool AI — dein Werbespot in 15 Sekunden."'
-                    : 'e.g. "Welcome to AdTool AI — your ad in 15 seconds."'
-                }
-                className="min-h-[64px] text-sm bg-background/40"
-              />
-              <p className="text-[10px] text-muted-foreground text-right tabular-nums">
-                {omniDialogText.length}/600
-              </p>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {language === 'de'
+                ? 'Ein Block pro Sprecher — Dialog & Stimme direkt am Charakter. Leer lassen für stummen Clip mit Ambient-Audio.'
+                : 'One block per speaker — dialogue & voice attached to the character. Leave empty for a silent clip with ambient audio.'}
+            </p>
+
+            {/* Per-speaker rows */}
+            <div className="space-y-3">
+              {omniLines.map((row, idx) => {
+                const c = row.characterId ? libCharacters.find((x) => x.id === row.characterId) : null;
+                const displayName = c?.name?.trim() || (language === 'de' ? `Sprecher ${idx + 1}` : `Speaker ${idx + 1}`);
+                const initials = displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+                const updateRow = (patch: Partial<OmniLine>) =>
+                  setOmniLines((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+                const removeRow = () =>
+                  setOmniLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+                return (
+                  <div key={idx} className="rounded-md border border-primary/20 bg-background/40 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      {c?.reference_image_url ? (
+                        <img
+                          src={c.reference_image_url}
+                          alt={displayName}
+                          className="h-10 w-10 rounded-full object-cover border border-primary/30 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+                          {initials || '?'}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{displayName}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {c ? (language === 'de' ? 'Aus Cast & World' : 'From Cast & World') : (language === 'de' ? 'Anonymer Sprecher' : 'Anonymous speaker')}
+                        </p>
+                      </div>
+                      <Select value={row.voicePreset} onValueChange={(v) => updateRow({ voicePreset: v as OmniVoicePreset })}>
+                        <SelectTrigger className="h-8 w-[160px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="female-warm">{language === 'de' ? 'Weiblich · warm' : 'Female · warm'}</SelectItem>
+                          <SelectItem value="female-bright">{language === 'de' ? 'Weiblich · hell' : 'Female · bright'}</SelectItem>
+                          <SelectItem value="male-warm">{language === 'de' ? 'Männlich · warm' : 'Male · warm'}</SelectItem>
+                          <SelectItem value="male-deep">{language === 'de' ? 'Männlich · tief' : 'Male · deep'}</SelectItem>
+                          <SelectItem value="neutral">{language === 'de' ? 'Neutral' : 'Neutral'}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {omniLines.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={removeRow}
+                          aria-label="Remove speaker"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <Textarea
+                      value={row.line}
+                      onChange={(e) => updateRow({ line: e.target.value.slice(0, 300) })}
+                      placeholder={
+                        language === 'de'
+                          ? `Dialog von ${displayName} …`
+                          : `${displayName}'s line …`
+                      }
+                      className="min-h-[56px] text-sm bg-background/60"
+                    />
+                    <p className="text-[10px] text-muted-foreground text-right tabular-nums">
+                      {row.line.length}/300
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
-            {omniDialogText.trim() && (
-              <div className="flex items-center justify-between gap-3">
-                <Label className="text-xs text-muted-foreground">
-                  {language === 'de' ? 'Voice-Preset' : 'Voice preset'}
-                </Label>
-                <Select value={omniVoicePreset} onValueChange={(v) => setOmniVoicePreset(v as typeof omniVoicePreset)}>
-                  <SelectTrigger className="h-8 w-[200px] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="female-warm">{language === 'de' ? 'Weiblich · warm' : 'Female · warm'}</SelectItem>
-                    <SelectItem value="female-bright">{language === 'de' ? 'Weiblich · hell' : 'Female · bright'}</SelectItem>
-                    <SelectItem value="male-warm">{language === 'de' ? 'Männlich · warm' : 'Male · warm'}</SelectItem>
-                    <SelectItem value="male-deep">{language === 'de' ? 'Männlich · tief' : 'Male · deep'}</SelectItem>
-                    <SelectItem value="neutral">{language === 'de' ? 'Neutral' : 'Neutral'}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {omniLines.length < 2 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-primary/30"
+                onClick={() =>
+                  setOmniLines((prev) => [
+                    ...prev,
+                    { characterId: null, line: '', voicePreset: 'male-warm' },
+                  ])
+                }
+              >
+                + {language === 'de' ? 'Zweiten Sprecher hinzufügen' : 'Add second speaker'}
+              </Button>
             )}
 
             {castCharacterIds.length > 2 && (
