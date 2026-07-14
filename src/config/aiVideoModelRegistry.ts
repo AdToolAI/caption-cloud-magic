@@ -440,7 +440,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     durations: [5, 10],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.26, USD: 0.26 },
+    costPerSecond: { EUR: 0.27, USD: 0.27 },
     badge: 'Wartung',
     tagline: 'High-fidelity Pika · 1080p',
     legacyRoute: '/pika-video-studio',
