@@ -47,12 +47,9 @@ export function useMusicGeneration() {
       });
 
       if (error) {
-        const errPayload: any = (error as any).context?.body
-          ? await (error as any).context.body.text().then((t: string) => { try { return JSON.parse(t); } catch { return null; } })
-          : null;
-
+        const errPayload: any = await parseInvokeError(error);
         const code = errPayload?.code;
-        const msg = errPayload?.error || error.message;
+        const msg = errPayload?.error || errPayload?.message || error.message;
 
         if (code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET') {
           toast.error(msg, {
