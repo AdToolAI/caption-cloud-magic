@@ -1216,14 +1216,47 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                           {initials || '?'}
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{displayName}</p>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        {/* Character select — bound per row; other rows' picks are disabled */}
+                        <Select
+                          value={row.characterId ?? '__anon'}
+                          onValueChange={(v) => {
+                            const nextId = v === '__anon' ? null : v;
+                            setOmniLines((prev) =>
+                              prev.map((r, i) => (i === idx ? { ...r, characterId: nextId } : r)),
+                            );
+                            // Ensure picked character is in the Cast pool for the anchor composer.
+                            if (nextId) {
+                              setCastCharacterIds((prev) =>
+                                prev.includes(nextId) ? prev : (prev.length >= 4 ? prev : [...prev, nextId]),
+                              );
+                            }
+                            omniPrefilledRef.current = true;
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__anon">
+                              {language === 'de' ? `Anonym (Sprecher ${idx + 1})` : `Anonymous (Speaker ${idx + 1})`}
+                            </SelectItem>
+                            {libCharacters.map((ch) => {
+                              const usedElsewhere = omniLines.some((r, i) => i !== idx && r.characterId === ch.id);
+                              return (
+                                <SelectItem key={ch.id} value={ch.id} disabled={usedElsewhere}>
+                                  {ch.name}{usedElsewhere ? (language === 'de' ? ' · bereits zugewiesen' : ' · already assigned') : ''}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
                         <p className="text-[10px] text-muted-foreground truncate">
                           {c ? (language === 'de' ? 'Aus Cast & World' : 'From Cast & World') : (language === 'de' ? 'Anonymer Sprecher' : 'Anonymous speaker')}
                         </p>
                       </div>
                       <Select value={row.voicePreset} onValueChange={(v) => updateRow({ voicePreset: v as OmniVoicePreset })}>
-                        <SelectTrigger className="h-8 w-[160px] text-xs">
+                        <SelectTrigger className="h-8 w-[150px] text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
