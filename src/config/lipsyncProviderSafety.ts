@@ -81,6 +81,7 @@ export function humanProviderName(source: ClipSource | string): string {
     'ai-hailuo': 'Hailuo',
     'ai-happyhorse': 'HappyHorse',
     'ai-kling': 'Kling',
+    'ai-kling-omni': 'Kling 3.0 Omni',
     'ai-veo': 'Veo',
     'ai-wan': 'Wan',
     'ai-luma': 'Luma',
