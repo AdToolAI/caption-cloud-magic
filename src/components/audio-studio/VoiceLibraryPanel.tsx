@@ -175,7 +175,7 @@ export function VoiceLibraryPanel() {
         )}
       </div>
 
-      <VoiceCloneDialog open={showCloneDialog} onOpenChange={setShowCloneDialog} />
+      <VoiceStudioDialog open={showCloneDialog} onOpenChange={setShowCloneDialog} />
     </Card>
   );
 }
