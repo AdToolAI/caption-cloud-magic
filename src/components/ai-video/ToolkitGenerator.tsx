@@ -649,6 +649,42 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }
   };
 
+  /* Gate: opens cost-confirm dialog unless user suppressed it within 24 h. */
+  const handleGenerate = () => {
+    if (!prompt.trim()) {
+      toast.error(language === 'de' ? 'Bitte gib einen Prompt ein.' : 'Please enter a prompt.');
+      return;
+    }
+    if (!canAfford) {
+      toast.error(
+        language === 'de'
+          ? 'Nicht genügend Credits. Bitte Credits aufladen.'
+          : 'Not enough credits. Please top up.',
+      );
+      return;
+    }
+    try {
+      const until = Number(localStorage.getItem(COST_SUPPRESS_KEY) ?? '0');
+      if (Date.now() < until) {
+        void runGenerate();
+        return;
+      }
+    } catch { /* noop */ }
+    setCostDialogSuppressed(false);
+    setCostDialogOpen(true);
+  };
+
+  const confirmCostAndGenerate = () => {
+    if (costDialogSuppressed) {
+      try {
+        localStorage.setItem(COST_SUPPRESS_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+      } catch { /* noop */ }
+    }
+    setCostDialogOpen(false);
+    void runGenerate();
+  };
+
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
