@@ -1,6 +1,7 @@
 import { Currency } from './pricing';
 
-// Margin policy: Replicate $0.06/$0.10 per second → user 0.18/0.28 €/s (~67/64% margin)
+// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
+// Std: $0.06/s → €0.18/s | Pro: $0.10/s → €0.30/s
 export const KLING_VIDEO_MODELS = {
   'kling-3-standard': {
     name: 'Kling 3.0 Standard',
@@ -24,15 +25,15 @@ export const KLING_VIDEO_MODELS = {
     provider: 'Kuaishou (Replicate)',
     quality: '1080p',
     costPerSecond: {
-      EUR: 0.28,
-      USD: 0.28,
+      EUR: 0.30,
+      USD: 0.30,
     },
     minDuration: 3,
     maxDuration: 15,
     allowedDurations: [3, 5, 8, 10, 15] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 1,40€ pro 5 Sekunden',
-      USD: 'Premium 1080p quality from $1.40 per 5 seconds',
+      EUR: 'Premium 1080p-Qualität ab 1,50€ pro 5 Sekunden',
+      USD: 'Premium 1080p quality from $1.50 per 5 seconds',
     },
     badge: 'Premium',
   },
