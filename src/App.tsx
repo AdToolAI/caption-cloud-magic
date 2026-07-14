@@ -285,7 +285,7 @@ function AppLayout() {
           <Route path="/avatars/:id" element={<ProtectedRoute><AvatarDetail /></ProtectedRoute>} />
           <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-          <Route path="/kling-video-studio" element={<Navigate to="/ai-video-studio?model=kling-3-standard" replace />} />
+          <Route path="/kling-video-studio" element={<Navigate to="/ai-video-studio?model=kling-3" replace />} />
           <Route path="/seedance-video-studio" element={<Navigate to="/ai-video-studio?model=seedance-standard" replace />} />
           <Route path="/wan-video-studio" element={<Navigate to="/ai-video-studio?model=wan-2-6-standard" replace />} />
           <Route path="/hailuo-video-studio" element={<Navigate to="/ai-video-studio?model=hailuo-standard" replace />} />

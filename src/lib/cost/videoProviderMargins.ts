@@ -52,8 +52,7 @@ export const VIDEO_PROVIDER_MARGINS: VideoProviderMargin[] = [
   { id: 'seedance-standard', label: 'Seedance 2.0 Std', unit: 'per-second', sellEUR: 0.09, costEUR: 0.03, tier: 'standard' },
   { id: 'seedance-pro',      label: 'Seedance 2.0 Pro', unit: 'per-second', sellEUR: 0.18, costEUR: 0.06, tier: 'standard' },
   // Kling
-  { id: 'kling-3-standard', label: 'Kling 3 Std 720p', unit: 'per-second', sellEUR: 0.18, costEUR: 0.06, tier: 'standard' },
-  { id: 'kling-3-pro',      label: 'Kling 3 Pro 1080p', unit: 'per-second', sellEUR: 0.30, costEUR: 0.10, tier: 'standard' },
+  { id: 'kling-3',          label: 'Kling 3.0 1080p', unit: 'per-second', sellEUR: 0.18, costEUR: 0.06, tier: 'standard' },
   // Wan 2.5 / 2.6
   { id: 'wan-standard',     label: 'Wan 2.5 Std', unit: 'per-second', sellEUR: 0.12, costEUR: 0.04, tier: 'standard' },
   { id: 'wan-pro',          label: 'Wan 2.5 Pro', unit: 'per-second', sellEUR: 0.21, costEUR: 0.07, tier: 'standard' },

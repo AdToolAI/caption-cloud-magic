@@ -15,8 +15,9 @@ const corsHeaders = {
 // Replicate model slug + per-model capabilities. Prices come from the shared
 // pricing catalog (single source of truth) — do NOT duplicate them here.
 type KlingModelId =
-  | 'kling-3-standard'
-  | 'kling-3-pro'
+  | 'kling-3'
+  | 'kling-3-standard' // legacy alias → kling-3
+  | 'kling-3-pro'      // legacy alias → kling-3
   | 'kling-2.5-turbo'
   | 'kling-2.6'
   | 'kling-omni';
@@ -28,11 +29,13 @@ const KLING_MODEL_CONFIG: Record<KlingModelId, {
   supportsNativeLipSync: boolean;
   resolution: '720p' | '1080p';
 }> = {
-  'kling-3-standard': { slug: 'kwaivgi/kling-v3-standard',  mode: 'standard', supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '720p'  },
-  'kling-3-pro':      { slug: 'kwaivgi/kling-v3-pro',       mode: 'pro',      supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
-  'kling-2.5-turbo':  { slug: 'kwaivgi/kling-v2.5-turbo-pro',                supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
-  'kling-2.6':        { slug: 'kwaivgi/kling-v2.6',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
-  'kling-omni':       { slug: 'kwaivgi/kling-v3-omni-video',                 supportsNativeAudio: true,  supportsNativeLipSync: true,  resolution: '1080p' },
+  'kling-3':          { slug: 'kwaivgi/kling-v3-video',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  // Legacy aliases resolve to the unified v3 slug (Replicate consolidated 3.0).
+  'kling-3-standard': { slug: 'kwaivgi/kling-v3-video',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-3-pro':      { slug: 'kwaivgi/kling-v3-video',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.5-turbo':  { slug: 'kwaivgi/kling-v2.5-turbo-pro',                    supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.6':        { slug: 'kwaivgi/kling-v2.6',                              supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-omni':       { slug: 'kwaivgi/kling-v3-omni-video',                     supportsNativeAudio: true,  supportsNativeLipSync: true,  resolution: '1080p' },
 };
 
 interface GenerateRequest {
@@ -89,7 +92,7 @@ serve(async (req) => {
     const suppressDialogue = body.suppressDialogue === true;
 
     // Resolve model config (with safe fallback to Standard)
-    const modelConfig = KLING_MODEL_CONFIG[model] ?? KLING_MODEL_CONFIG['kling-3-standard'];
+    const modelConfig = KLING_MODEL_CONFIG[model] ?? KLING_MODEL_CONFIG['kling-3'];
 
     if (generateAudio && spokenLanguage) {
       console.log(`[generate-kling-video] model=${model} spokenLanguage=${spokenLanguage}`);

@@ -16,8 +16,9 @@ import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
   'sora-2-standard': 'Sora 2 Standard',
   'sora-2-pro': 'Sora 2 Pro',
-  'kling-3-standard': 'Kling 3.0 Standard',
-  'kling-3-pro': 'Kling 3.0 Pro',
+  'kling-3': 'Kling 3.0',
+  'kling-3-standard': 'Kling 3.0',
+  'kling-3-pro': 'Kling 3.0',
   'seedance-standard': 'Seedance 2.0 Standard',
   'seedance-pro': 'Seedance 2.0 Pro',
   'wan-standard': 'Wan 2.5 Standard',

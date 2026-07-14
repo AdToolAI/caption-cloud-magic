@@ -33,33 +33,19 @@ export const KLING_VIDEO_MODELS = {
     },
     badge: 'Ambient Audio',
   },
-  'kling-3-standard': {
-    name: 'Kling 3.0 Standard',
+  'kling-3': {
+    name: 'Kling 3.0',
     provider: 'Kuaishou (Replicate)',
-    quality: '720p',
+    quality: '1080p',
     costPerSecond: { EUR: 0.18, USD: 0.18 },
     minDuration: 3,
     maxDuration: 15,
     allowedDurations: [3, 5, 8, 10, 15] as const,
     description: {
-      EUR: 'Hochwertige AI-Videos ab 0,90€ pro 5 Sekunden',
-      USD: 'High-quality AI videos from $0.90 per 5 seconds',
+      EUR: 'Kling 3.0 · 1080p · 0,90 € pro 5 Sekunden',
+      USD: 'Kling 3.0 · 1080p · $0.90 per 5 seconds',
     },
     badge: 'Empfohlen',
-  },
-  'kling-3-pro': {
-    name: 'Kling 3.0 Pro',
-    provider: 'Kuaishou (Replicate)',
-    quality: '1080p',
-    costPerSecond: { EUR: 0.24, USD: 0.24 },
-    minDuration: 3,
-    maxDuration: 15,
-    allowedDurations: [3, 5, 8, 10, 15] as const,
-    description: {
-      EUR: 'Premium 1080p ab 1,20 € pro 5 Sekunden',
-      USD: 'Premium 1080p from $1.20 per 5 seconds',
-    },
-    badge: 'Premium',
   },
   'kling-omni': {
     name: 'Kling 3.0 Omni',
