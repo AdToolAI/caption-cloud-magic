@@ -9,8 +9,12 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMusicGeneration, MUSIC_TIER_PRICING, type MusicTier, type GeneratedMusicTrack } from '@/hooks/useMusicGeneration';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
+import { useTranslation } from '@/hooks/useTranslation';
+import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const GENRES = [
