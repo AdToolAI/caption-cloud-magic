@@ -37,6 +37,22 @@ export interface ProviderCapability {
   multiSpeaker: boolean;
   /** Human-readable label for UI hints. */
   label: string;
+  /**
+   * NEW (v250 — Kling Omni): provider produces final lip-synced video in
+   * ONE call. When true, the composer skips the Sync.so pipeline entirely
+   * for scenes using this provider.
+   */
+  nativeLipSync?: boolean;
+  /** NEW: provider generates TTS + ambient audio natively (no ElevenLabs step). */
+  nativeAudio?: boolean;
+  /** NEW: ISO-639-1 language codes the provider speaks with correct lip-sync. */
+  supportedLanguages?: string[];
+  /** NEW: Multi-shot capability (Kling Omni can chain 2–6 cam angles). */
+  multiShot?: { min: number; max: number };
+  /** NEW: Provider supports start-frame + end-frame interpolation. */
+  startEndFrames?: boolean;
+  /** NEW: Hard cap on speakers per scene (Omni: 2, Hailuo: 4+). */
+  maxSpeakers?: number;
 }
 
 export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
