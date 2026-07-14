@@ -232,31 +232,47 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   );
 
   /**
-   * One-time convenience prefill: when the user picks Cast characters and all
-   * `omniLines` are still empty (anonymous + no dialog), we pre-assign up to
-   * two cast characters to the speaker rows. After that, `omniLines` is the
-   * single source of truth — cast changes no longer overwrite it.
+   * Kling Omni: `omniLines` is the SINGLE source of truth for cast + speakers.
+   *   • Adding/removing a row updates `castCharacterIds` (anchor pool) below.
+   *   • First 2 rows may enable Lip-Sync (Kling Omni cap).
+   *   • Silent rows (lipSync=false) appear as extras in the anchor.
+   * When the user switches TO Omni with an existing cast, we seed rows once
+   * from `castCharacterIds` so nothing is lost.
    */
   const omniPrefilledRef = useRef(false);
   useEffect(() => {
+    if (!isKlingOmni) {
+      omniPrefilledRef.current = false;
+      return;
+    }
     if (omniPrefilledRef.current) return;
-    if (castCharacterIds.length === 0) return;
-    const allEmpty = omniLines.every((r) => !r.characterId && !r.line.trim());
-    if (!allEmpty) {
+    if (omniLines.length > 0) {
       omniPrefilledRef.current = true;
       return;
     }
-    const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm'];
-    const targetIds = castCharacterIds.slice(0, 2);
+    if (castCharacterIds.length === 0) return;
+    const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm', 'female-bright', 'male-deep'];
     setOmniLines(
-      targetIds.map((cid, i) => ({
+      castCharacterIds.slice(0, 4).map((cid, i) => ({
         characterId: cid,
+        lipSync: i < 2,
         line: '',
         voicePreset: defaults[i] ?? 'neutral',
       })),
     );
     omniPrefilledRef.current = true;
-  }, [castCharacterIds, omniLines]);
+  }, [isKlingOmni, castCharacterIds, omniLines.length]);
+
+  /* Mirror Omni rows → castCharacterIds so the anchor composer includes them. */
+  useEffect(() => {
+    if (!isKlingOmni) return;
+    const ids = omniLines.map((r) => r.characterId).filter(Boolean) as string[];
+    setCastCharacterIds((prev) => {
+      if (prev.length === ids.length && prev.every((id, i) => id === ids[i])) return prev;
+      return ids;
+    });
+  }, [isKlingOmni, omniLines]);
+
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
