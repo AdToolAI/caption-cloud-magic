@@ -1,21 +1,22 @@
 import { Currency } from './pricing';
 
-// Margin policy: Replicate $0.07/$0.12 per second → user 0.20/0.35 €/s (~65/66% margin)
+// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
+// Std: $0.07/s → €0.21/s | Pro: $0.12/s → €0.36/s
 export const LUMA_VIDEO_MODELS = {
   'luma-standard': {
     name: 'Luma Ray 2 Standard',
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.20,
-      USD: 0.20,
+      EUR: 0.21,
+      USD: 0.21,
     },
     minDuration: 5,
     maxDuration: 9,
     allowedDurations: [5, 9] as const,
     description: {
-      EUR: 'Cinematic AI-Videos ab 1,00€ pro 5 Sekunden',
-      USD: 'Cinematic AI videos from $1.00 per 5 seconds',
+      EUR: 'Cinematic AI-Videos ab 1,05€ pro 5 Sekunden',
+      USD: 'Cinematic AI videos from $1.05 per 5 seconds',
     },
     badge: 'Empfohlen',
   },
@@ -24,15 +25,15 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.35,
-      USD: 0.35,
+      EUR: 0.36,
+      USD: 0.36,
     },
     minDuration: 5,
     maxDuration: 9,
     allowedDurations: [5, 9] as const,
     description: {
-      EUR: 'Premium cinematic Qualität ab 1,75€ pro 5 Sekunden',
-      USD: 'Premium cinematic quality from $1.75 per 5 seconds',
+      EUR: 'Premium cinematic Qualität ab 1,80€ pro 5 Sekunden',
+      USD: 'Premium cinematic quality from $1.80 per 5 seconds',
     },
     badge: 'Premium',
   },
