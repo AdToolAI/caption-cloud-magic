@@ -75,7 +75,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground truncate">
-                  {selected.provider} · {selected.resolution} · {symbol}{selected.costPerSecond[currency].toFixed(2)}/s
+                  {selected.provider} · {selected.resolution} · {symbol}{priceFor(selected).toFixed(2)}/s
                 </p>
               </div>
             </div>
