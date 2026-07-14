@@ -137,12 +137,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     ? (['en', 'de', 'es'] as const).includes(effectiveSpokenLang)
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
-  /* ── Kling Omni: per-speaker native Lip-Sync (max. 2 speakers) ── */
+  /* ── Kling Omni: unified Cast + per-speaker Lip-Sync (max. 4 cast, 2 lip-sync) ── */
   type OmniVoicePreset = 'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral';
-  type OmniLine = { characterId: string | null; line: string; voicePreset: OmniVoicePreset };
-  const [omniLines, setOmniLines] = useState<OmniLine[]>([
-    { characterId: null, line: '', voicePreset: 'female-warm' },
-  ]);
+  /**
+   * A row is ALWAYS bound to a Cast & World character (strict — no anonymous
+   * slots any more). `lipSync=true` means this character speaks in the clip;
+   * `line` + `voicePreset` are only used in that case. Silent rows are
+   * still composed into the anchor image.
+   */
+  type OmniLine = { characterId: string; lipSync: boolean; line: string; voicePreset: OmniVoicePreset };
+  const [omniLines, setOmniLines] = useState<OmniLine[]>([]);
   /**
    * Placement of the uploaded reference image within the generated clip:
    *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
