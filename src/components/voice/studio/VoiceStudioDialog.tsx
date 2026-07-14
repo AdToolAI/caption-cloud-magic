@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomVoices } from "@/hooks/useCustomVoices";
 import {
   VOICE_TRAINING_SCRIPTS,
+  personalizeScript,
   type TrainingScriptLang,
 } from "@/config/voiceTrainingScripts";
 import { encodeWav } from "@/lib/audio/wavEncoder";
