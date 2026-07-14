@@ -88,6 +88,10 @@ export function MusicGeneratorPanel({
   const [bpm, setBpm] = useState<number>(prefillBpm || defaultBpm || 120);
   const [generatedTrack, setGeneratedTrack] = useState<GeneratedMusicTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [vocalLanguage, setVocalLanguage] = useState<string>(() => {
+    const initial = (uiLanguage as string) || 'en';
+    return isLanguageSupported('vocal', initial) ? initial : 'en';
+  });
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Sync BPM when parent supplies a freshly detected value (e.g. from BeatSyncTimeline)
