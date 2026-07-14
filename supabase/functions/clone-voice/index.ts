@@ -31,9 +31,13 @@ serve(async (req) => {
 
     const { name, sample_urls, language, description, remove_background_noise } = await req.json();
 
-    if (!sample_urls || sample_urls.length < 1) {
-      throw new Error('At least 1 voice sample required');
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      throw new Error('Voice-Name fehlt (mindestens 2 Zeichen).');
     }
+    if (!Array.isArray(sample_urls) || sample_urls.length < 1) {
+      throw new Error('Mindestens 1 Audio-Sample erforderlich.');
+    }
+    console.log(`[clone-voice] samples=${sample_urls.length} lang=${language} denoise=${remove_background_noise}`);
 
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
     if (!ELEVENLABS_API_KEY) {
