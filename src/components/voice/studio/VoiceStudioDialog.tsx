@@ -482,6 +482,33 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
 
         {step === 2 && (
           <div className="space-y-4">
+            <Card className="p-3 bg-muted/40 border-primary/20">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                  <p className="text-sm font-medium truncate">
+                    Dein Skript — beim Aufnehmen ablesen
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyScript}
+                  className="gap-1.5 shrink-0"
+                >
+                  <Copy className="h-3.5 w-3.5" /> Kopieren
+                </Button>
+              </div>
+              <div className="max-h-48 overflow-y-auto rounded bg-background/50 p-3 border border-border/50">
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {personalizedText}
+                </p>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Tipp: Aufnahme starten, kurz durchatmen, dann natürlich vorlesen.
+              </p>
+            </Card>
+
             <Tabs defaultValue="mic">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="mic" className="gap-2">
