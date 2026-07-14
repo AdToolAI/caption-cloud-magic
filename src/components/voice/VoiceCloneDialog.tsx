@@ -147,13 +147,13 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {audioFiles.length}/5 Samples ({3 - audioFiles.length > 0 ? `${3 - audioFiles.length} noch erforderlich` : 'bereit zum Klonen'})
+              {audioFiles.length}/5 Samples ({audioFiles.length < 1 ? 'mindestens 1 erforderlich' : 'bereit zum Klonen'})
             </p>
           </div>
 
           <Button
             onClick={handleSubmit}
-            disabled={loading || uploading || audioFiles.length < 3}
+            disabled={loading || uploading || audioFiles.length < 1}
             className="w-full"
           >
             {uploading ? 'Lädt hoch...' : loading ? 'Klont Voice...' : 'Voice klonen'}
