@@ -584,8 +584,9 @@ function AssetTabBody({
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
+                <EntityIdBadge id={item.id} label="ID" />
                 {item.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
+                  <p className="text-xs text-muted-foreground line-clamp-2 pt-1">
                     {item.description}
                   </p>
                 )}
