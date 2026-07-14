@@ -142,7 +142,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                         </p>
                       </div>
                       <span className="text-[11px] tabular-nums text-primary font-medium shrink-0">
-                        {symbol}{m.costPerSecond[currency].toFixed(2)}/s
+                        {symbol}{priceFor(m).toFixed(2)}/s
                       </span>
                     </div>
 
