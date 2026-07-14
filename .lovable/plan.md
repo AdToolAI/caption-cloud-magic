@@ -1,45 +1,137 @@
-# Preis-Konsistenz UI ↔ Abbuchung
+# Kling-Integration — Adaptive Model-Auswahl statt eigener Bereich
 
-## Was der User meint
-Die im Studio angezeigten Sekundenpreise (z. B. Seedance Mini `0,06 €/s → 12s = 0,72 €`) stimmen nicht immer mit dem tatsächlich abgebuchten Betrag überein (`1,80 €` in der letzten Generation). Auch wenn die Abbuchung "korrekt" wirken mag — die Diskrepanz zwischen Ansage und Beleg ist für Kunden das Problem.
+## Deine zwei Fragen zuerst beantwortet
 
-## Root Cause
-Wir haben **zwei getrennte Preistabellen**:
+### 1. Ist Kling Omni Lip-Sync mit **deutschen Stimmen** kompatibel?
 
-1. **Frontend** — `src/config/{seedance,kling,wan,…}VideoCredits.ts` → wird für die Preis-Anzeige (`ModelSelector`, `ToolkitGenerator`) genutzt.
-2. **Backend** — `MODEL_PRICING` konstante in jeder Edge Function (`generate-seedance-video`, `generate-kling-video`, …) → wird für die tatsächliche Abbuchung genutzt.
+**Ja.** Kling 3.0 Omni ist genau dafür gebaut. Der native Audio-Path unterstützt laut Kuaishou-Release-Notes (Feb 2026, globaler Rollout Mai 2026):
 
-Wenn die beiden auseinanderlaufen (z. B. weil ein Deploy hängengeblieben ist, wie bei Seedance Mini geschehen: FE `0.06`, Edge Function noch alt mit `0.15`), sieht der Kunde eine falsche Ansage.
+- **Deutsch, Englisch, Spanisch, Französisch, Portugiesisch, Japanisch, Chinesisch, Koreanisch** (mind. 8 Sprachen mit voller Lip-Sync-Adhärenz)
+- TTS + Viseme-Timing wird in einem einzigen Modell-Pass erzeugt → keine Nachträgliche-Sync-Fehler
+- Charakter-Referenz-Bild bleibt identitätstreu (Face-Preservation ist Teil des Omni-Trainings)
 
-Zusätzlich: In `ai_video_generations.cost_per_second` speichern wir zwar den tatsächlich verrechneten Preis, aber die UI-History (`VideoGenerationHistory`) zeigt bereits `total_cost_euros` aus DB — das ist schon korrekt. Das Problem sitzt **vor** der Generierung, im Kosten-Preview.
+Das ist der große Unterschied zu Kling 2.1/2.5 und zu Veo/Kling-Standard, wo deutsches Voiceover oft in Fantasie-Kauderwelsch abgleitet (der Bug, den wir mit dem "Spoken-Language-Capability-Guard" abfangen mussten). **Omni braucht diesen Guard nicht** — Deutsch geht sauber durch.
 
-## Fix in 3 Schritten
+Zwei Einschränkungen bleiben:
+- **Multi-Speaker (≥3 Personen in einer Szene)** ist bei Omni Neuland. Für Werbespots mit 3+ Sprechern bleibt Hailuo→Sync.so vorerst der bewährte Pfad.
+- Stimmen-Vielfalt ist auf Klings interne TTS-Voices beschränkt. Wer eine spezifische ElevenLabs-Voice will, bleibt bei der klassischen Pipeline.
 
-### 1. Ein kanonischer Preis-Katalog `supabase/functions/_shared/videoPricingCatalog.ts`
-- Enthält für jedes Modell: `{ id, replicateCostEUR, sellEUR, minDuration, maxDuration }`.
-- Wird von **allen** Edge Functions importiert (`generate-*-video`) statt eigener `MODEL_PRICING`.
-- Wird durch einen simplen `pricing-catalog` GET-Edge-Function nach außen exponiert (kein Auth nötig, cache-fähig).
+### 2. Adaptive UI statt eigener Kling-Area — besser?
 
-### 2. Frontend zieht Preise live vom Server
-- Neuer Hook `useVideoPricingCatalog()` (React Query, `staleTime: 5min`) holt die kanonische Liste.
-- `ModelSelector`, `ToolkitGenerator`, `CostComparisonWidget` nutzen den Hook statt statischer `costPerSecond`-Werte.
-- Fallback: Wenn Fetch fehlschlägt, greifen die client-configs (`src/config/*Credits`) als Notreserve.
+**Ja, deutlich besser.** Zustimmung an drei Fronten:
 
-### 3. Abbuchungs-Beleg im UI („Was du bezahlt hast")
-- Nach jeder Generierung zeigt die Toast-/Result-Karte den **tatsächlich abgebuchten Betrag** aus `ai_video_generations.total_cost_euros` (nicht mehr die vorab kalkulierte Schätzung).
-- `VideoGenerationHistory` zeigt diesen Wert bereits — Toast-Meldungen (`useSeedanceGeneration`, `useVeoGeneration`, …) ergänzen um die Formulierung: „Abgebucht: 0,72 € (12s × 0,06 €/s)".
+- **Konsistenz.** Der Nutzer muss nicht lernen, dass es "zwei Studios" gibt. Alle Video-Modelle stehen in einer Liste, das mentale Modell bleibt einfach.
+- **Skalierbarkeit.** Wenn morgen Sora 3 oder Runway Gen-5 auch Native-Lip-Sync bekommt, brauchen wir keine dritte Area — die gleiche Adapter-Logik greift.
+- **Weniger Code-Duplikation.** Kein zweiter `ToolkitGenerator`, kein zweiter Cost-Widget, kein zweiter Preset-Selektor.
 
-### 4. Migration der bestehenden Edge Functions
-Alle 11 `generate-*-video` Funktionen umstellen auf den Shared-Katalog:
-`generate-seedance-video`, `generate-kling-video`, `generate-wan-video`, `generate-luma-video`, `generate-hailuo-video`, `generate-happyhorse-video`, `generate-ltx-video`, `generate-veo-video`, `generate-grok-video`, `generate-vidu-video`, `generate-runway-video`, `generate-pika-video`.
+Der saubere Pattern-Name dafür ist **"Capability-Driven UI"**: die UI reagiert auf `providerCapabilities[modelId]`, nicht auf eine Modell-Whitelist. Das haben wir bereits als Fundament (`src/lib/video-composer/providerCapabilities.ts`) — wir müssen es nur konsequent nutzen.
 
-## Nicht im Scope
-- Neue Provider/Modelle.
-- UI-Redesign der Kosten-Karten (nur Datenquelle wird umgestellt).
-- Change der 3,00×-Marge — Preise bleiben identisch, nur ihre Quelle wird vereinheitlicht.
+---
 
-## Nebeneffekt (positiv)
-Der Seedance-Mini-Bug (stale-Deploy → 0,15 €/s statt 0,06 €/s) kann sich strukturell nicht mehr wiederholen: Ein Preis-Update in `videoPricingCatalog.ts` wirkt gleichzeitig auf FE-Anzeige und BE-Abbuchung, weil beide dieselbe Quelle ziehen.
+## Umsetzung — der überarbeitete Ansatz
 
-## Refund-Empfehlung
-Für die aktuelle Seedance-Generation von `bestofproducts4u@gmail.com` (`4e6cbb81…`, 1,80 € statt 0,72 €) im gleichen Zug 1,08 € Video-Credit-Refund gutschreiben und im `ai_video_transactions` mit Grund `pricing_desync_refund` protokollieren.
+### 1. Model-Liste erweitern (keine eigene Area)
+
+Vier neue Einträge werden **in die bestehende Modelliste** von `ModelSelector` einsortiert, gruppiert nach Provider:
+
+| Anzeige | ID | Preis EUR/s | Badges |
+| --- | --- | --- | --- |
+| Kling 2.5 Turbo | `kling-2.5-turbo` | 0,09 | ⚡ Fast |
+| Kling 2.6 | `kling-2.6` | 0,12 | 🎧 Ambient Audio |
+| Kling 3.0 Pro | `kling-3-pro` | 0,24 | ✨ 1080p |
+| **Kling 3.0 Omni** | `kling-omni` | 0,60 | 🎤 Native Lip-Sync · 🌍 DE/EN/ES · 🎬 Multi-Shot |
+
+Die alten Einträge `kling-3-standard`/`kling-3-pro` in `klingVideoCredits.ts` werden intern auf die neuen Namen gemapped (Rückwärtskompatibilität für bestehende Sessions).
+
+### 2. Capabilities pro Modell in `providerCapabilities.ts` deklarieren
+
+Die Erweiterung ist der Kern. Statt heute nur `durations/lipsync/multiSpeaker` bekommt jedes Modell eine reichere Fähigkeits-Beschreibung:
+
+```
+{
+  durations: [5, 10, 15],
+  nativeLipSync: true,        // NEU: Provider macht Lip-Sync selbst
+  nativeAudio: true,          // NEU: Provider macht Audio selbst
+  supportedLanguages: ['de', 'en', 'es', 'fr', ...],  // NEU
+  multiShot: { min: 2, max: 6 },  // NEU
+  imageToVideo: true,
+  startEndFrames: true,       // NEU
+  maxSpeakers: 2,             // NEU: 3+ → klassische Pipeline
+}
+```
+
+Nur Kling Omni bekommt alle Flags auf `true`; die übrigen Modelle behalten den bestehenden Stand. Kein Breaking-Change.
+
+### 3. UI reagiert adaptiv auf Capabilities
+
+`ToolkitGenerator.tsx` liest die Capabilities des aktuell ausgewählten Modells und blendet abhängig davon Panels ein oder aus:
+
+- **`nativeLipSync: true` UND Skript vorhanden**
+  - "Dialog & Lip-Sync"-Toggle wird **automatisch an** (nicht mehr optional versteckt)
+  - Sprach-Selector erscheint (DE/EN/ES/…) — aber nur die vom Modell unterstützten Sprachen
+  - Info-Badge: "Native Lip-Sync — kein Sync.so nötig"
+  - Sync.so-Pipeline wird für diese Szene **hart übersprungen** (siehe Backend-Punkt 4)
+
+- **`nativeAudio: true`**
+  - Ambient/Musik-Panel bekommt einen zusätzlichen Radio-Button "Vom Modell generieren lassen"
+  - Bestehendes ElevenLabs-Voice-Panel wird ausgeblendet (Modell macht TTS selbst)
+
+- **`multiShot.max > 1`**
+  - Optionaler "Multi-Shot"-Akkordeon-Bereich erscheint (2–6 Shots mit Timing-Slider). Default: 1 Shot (Standardverhalten unverändert).
+
+- **`startEndFrames: true`**
+  - Im Reference-Image-Uploader erscheint ein zweites Feld "End-Frame (optional)"
+
+- **`maxSpeakers === 2` bei Omni**
+  - Wenn Nutzer ≥3 Sprecher zuweist, Warntoast: "Kling Omni unterstützt max. 2 Sprecher. Für ≥3 empfehlen wir Hailuo (Sync.so-Pipeline)." mit Ein-Klick-Wechsel.
+
+Alle anderen Modelle sehen die Panels **nicht** — die UI bleibt für sie exakt wie heute. Kein Regressionsrisiko.
+
+### 4. Backend — ein einziger neuer Edge-Function-Slug
+
+- **`generate-kling-omni-video`** (neu): eigener Payload (Multi-Shot-Array, Language-Locale, Audio-Config), Preis aus `_shared/videoPricingCatalog.ts`, Refund-Automatik nach bestehendem Muster.
+- **Pipeline-Bypass**: `useTwoShotAutoTrigger` und `SceneDialogStudio` prüfen `providerCapabilities[modelId].nativeLipSync` — bei `true` wird `compose-dialog-segments`/Sync.so **komplett übersprungen**, der Omni-Clip ist der finale Clip.
+- **`LIPSYNC_SAFE_PROVIDERS`** in `lipsyncProviderSafety.ts` wird um `ai-kling-omni` erweitert → kein v209-Warndialog mehr für Omni.
+- Kling 2.5 Turbo, 2.6, 3.0 Pro laufen weiter über die bestehende `generate-kling-video`-Function (nur Slug- und Preis-Erweiterung nötig).
+
+### 5. Kein neuer Tab, kein neuer Bereich
+
+`KlingStudioPanel.tsx` aus dem letzten Entwurf entfällt komplett. Der bestehende `ToolkitGenerator` wird um ~150 Zeilen Capability-abhängige Blöcke erweitert, sonst nichts.
+
+---
+
+## Warum das strukturell sauberer ist
+
+- **Ein Ort für Preise.** Der `videoPricingCatalog` bleibt Single-Source-of-Truth. Kein Bypass, keine Sonderpreise für einen "Kling-Bereich".
+- **Ein Ort für Capabilities.** Jedes neue Modell wird an einer einzigen Datei beschrieben, und die UI passt sich automatisch an.
+- **Test-Oberfläche stabil.** Bestehende Playwright-Tests am `ToolkitGenerator` bleiben grün, weil nur zusätzliche (optionale) Panels dazukommen.
+- **Marketing-tauglich.** Wir können später ganz einfach Filter-Chips ins Modell-Dropdown einbauen ("Nur Modelle mit Native Lip-Sync", "Nur Modelle mit Deutsch") — die Capabilities sind schon da.
+
+## Rollout in 3 Phasen (revised)
+
+**Phase 1 — Preise, Registry & Capabilities (rein additive Änderungen)**
+- 4 neue Kling-Modelle in `videoPricingCatalog.ts`, `aiVideoModelRegistry.ts`, `klingVideoCredits.ts`.
+- `providerCapabilities.ts` um die neuen Flags (`nativeLipSync`, `nativeAudio`, `supportedLanguages`, `multiShot`, `startEndFrames`, `maxSpeakers`) erweitern.
+- Nur Kling Omni bekommt alle Flags `true`; andere Modelle behalten den heutigen Stand.
+
+**Phase 2 — `generate-kling-omni-video` Edge Function + Pipeline-Bypass**
+- Eigene Function mit Native-Audio- und Language-Locale-Payload.
+- Bypass-Logik in `useTwoShotAutoTrigger`/`SceneDialogStudio`.
+- `LIPSYNC_SAFE_PROVIDERS`-Eintrag.
+
+**Phase 3 — Adaptive UI-Panels in `ToolkitGenerator`**
+- Sprach-Selector, Native-Lip-Sync-Badge, Multi-Shot-Akkordeon, Start-/End-Frame-Feld.
+- Alle Panels rein Capability-getrieben, keine Modell-Whitelist im UI-Code.
+- Warntoast bei ≥3 Sprechern + Ein-Klick-Wechsel zu Hailuo.
+
+Motion Studio bekommt die Capability-Erkennung automatisch, weil `SceneCard.tsx` bereits über `providerCapabilities` läuft — nur der Provider-Picker muss die 4 neuen Kling-Varianten anzeigen.
+
+---
+
+## Offene Punkte vor Phase 1
+
+1. **Omni-Launch-Preis.** 0,60 €/s (3,00× Marge, 9 € pro 15-s-Clip) oder Beta-Aktion bei 0,45 €/s (2,25×)?
+2. **Fallback-Verhalten.** Wenn Omni-Call fehlschlägt: automatisch auf Kling 2.6 + Sync.so degradieren, oder Refund + Fehlermeldung anzeigen?
+3. **Sprachen-Umfang zum Launch.** Nur DE/EN/ES (unsere drei Plattform-Sprachen) oder direkt alle 8 von Kling unterstützten?
+
+Sag Bescheid zu den drei Punkten, dann starte ich mit Phase 1 (rein additive Änderungen, keine bestehende Pipeline wird angefasst).
