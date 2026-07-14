@@ -9,6 +9,7 @@ import { AvatarVoicePicker } from './AvatarVoicePicker';
 import { AvatarPortraitDialog } from './AvatarPortraitDialog';
 import TalkingHeadDialog from '@/components/video-composer/TalkingHeadDialog';
 import { SubmitCharacterToMarketplaceDialog } from '@/components/marketplace/SubmitCharacterToMarketplaceDialog';
+import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 
 interface BrandCharacterCardProps {
   character: BrandCharacter;
