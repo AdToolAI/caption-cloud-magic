@@ -1,50 +1,35 @@
-## Problem
+## Ziel
+Kling Omni darf bei ausgewähltem Deutsch keine englisch-akzentierte Fantasiesprache mehr erzeugen. Wenn Deutsch nicht zuverlässig nativ unterstützt wird, wird Audio/Lip-Sync hart deaktiviert statt dem Nutzer ein falsches Ergebnis zu liefern.
 
-Bei Kling Omni läuft der Lip-Sync technisch, aber:
-1. Die Stimmen klingen englisch und sprechen kein sauberes Deutsch (Gibberish/Fantasiesprache).
-2. Der Dialog wird nur als separates `dialog`-Feld an Replicate übergeben — nicht in den eigentlichen `prompt` eingebettet.
+## Befund
+Die aktuelle Verdrahtung sendet zwar `spokenLanguage=de` und hängt den Dialog an den Prompt, aber das Replicate-API-Beispiel für `kwaivgi/kling-v3-omni-video` dokumentiert nur `prompt`, `duration` und `generate_audio`. Das spricht dafür, dass `dialog`, `spoken_language`, `voice` und `speaker_voices` zumindest nicht zuverlässig als harte Steuerparameter wirken. Deshalb erfindet Kling weiterhin Sprache aus dem Prompt.
 
-## Ursachen
+## Plan
 
-- **Prompt enthält keinen Dialog**: Der Prompt beschreibt nur die Szene visuell. Kling Omni konditioniert die Lip-Motion aber deutlich besser, wenn der gesprochene Text auch im Prompt erwähnt wird (Sprecher-Attribution + Zitat).
-- **`spoken_language` wird als 2-Buchstaben-Code (`de`, `en`, `es`) gesendet** — Replicate/Kling Omni erwartet aber den Klarnamen (`german`, `english`, `spanish`). Ohne gültige Sprache fällt das Modell auf einen englisch-gefärbten Default zurück → phonetisches Gestottere.
-- **Prompt sagt der Engine nicht, in welcher Sprache gesprochen wird** — auch wenn `spoken_language` korrekt ist, hilft ein expliziter Hinweis im Prompt zusätzlich.
+### 1. Kling Omni Deutsch/Spanisch nicht mehr als „native Lip-Sync kompatibel“ ausweisen
+- In der AI-Video-Studio-Logik wird Kling Omni für native Provider-Stimmen nur noch als zuverlässig für Englisch behandelt.
+- Für Deutsch/Spanisch greift automatisch der bestehende Ambient/Silent-Fallback.
+- Die UI-Texte wie „Native Lip-Sync in DE/EN/ES“ werden korrigiert, damit nichts versprochen wird, was das Modell nicht stabil liefert.
 
-## Änderungen (Frontend only + kleine Edge-Function-Normalisierung)
+### 2. Harte Runtime-Sperre gegen Fantasie-Sprache
+- Wenn Kling Omni aktiv ist und `effectiveSpokenLang !== 'en'`:
+  - `generateAudio` wird vor dem Backend-Call deaktiviert bzw. `suppressDialogue=true` gesetzt.
+  - `dialogText`, `voicePreset`, `speakerVoices`, `nativeLipSync` werden nicht gesendet.
+  - Der Prompt bekommt eine klare Silence-Direktive: keine Sprache, keine Lippenbewegung zu Sprache, nur Ambient/Roomtone.
 
-### 1. `src/components/ai-video/ToolkitGenerator.tsx`
-Vor dem `supabase.functions.invoke(...)`-Call im Omni-Branch (Zeilen 700–718) den `prompt` mit einem sauberen Dialog-Block anreichern, wenn Lip-Sync-Zeilen vorhanden sind:
+### 3. Backend zusätzlich absichern
+- In `generate-kling-video` wird dieselbe Regel serverseitig gespiegelt: Kling Omni + nicht-Englisch + Dialog/Audio wird nicht an den Provider weitergereicht.
+- Dadurch kann auch ein veralteter Client oder ein manipulierter Request keine deutsche Fantasiesprache auslösen.
+- Provider-Input-Logging bleibt, aber ohne sensible Inhalte; es zeigt klar, ob `suppressDialogue` aktiv ist.
 
-```
-[SPOKEN LANGUAGE]: German (Hochdeutsch) — all voices speak clearly and naturally in German.
-[DIALOG]
-Sarah: "Hi! Willkommen bei AdTool."
-Matthew: "Danke Sarah — was empfiehlst du?"
-```
+### 4. UI ehrlich machen
+- Im Kling-Omni-Panel bei Deutsch anzeigen: Deutsch ist für Kling Omni aktuell silent-only; für echtes deutsches Lip-Sync muss die Motion-Studio/gesicherte Pipeline genutzt werden.
+- Der Lip-Sync-Schalter für Omni wird bei Deutsch/Spanisch deaktiviert oder automatisch auf „aus“ gesetzt, damit keine Credits für ein erwartbar falsches Ergebnis ausgegeben werden.
 
-- Block wird an das Ende des vorhandenen `prompt` gehängt (nicht ersetzt) → optimierter visueller Prompt bleibt erhalten.
-- Sprachlabel dynamisch aus `effectiveSpokenLang` (`de` → "German (Hochdeutsch)", `en` → "English", `es` → "Spanish (Castellano)").
-- Nur aktiv, wenn `activeLines.length > 0`.
+### 5. Smoke-Test / Verifikation
+- Prüfen, dass ein deutscher Omni-Request keinen `dialog`, kein `spoken_language=german`, kein `generate_audio=true` und keine Voice-Felder mehr an Kling sendet.
+- Prüfen, dass Englisch weiterhin mit Omni Native Audio/Lip-Sync möglich bleibt.
+- Edge Function deployen.
 
-### 2. `supabase/functions/generate-kling-video/index.ts`
-Kleine Normalisierung in Zeilen 231 / 244: `spoken_language` von `de`/`en`/`es` auf `german`/`english`/`spanish` mappen bevor an Replicate gesendet. Fallback: der übergebene Wert unverändert.
-
-```ts
-const LANG_MAP: Record<string, string> = { de: 'german', en: 'english', es: 'spanish' };
-const klingLang = LANG_MAP[spokenLanguage?.toLowerCase() ?? ''] ?? spokenLanguage;
-```
-
-### 3. Keine UI-Änderungen an Voice-Presets nötig
-`female-warm` / `male-warm` etc. sind Kling-native Preset-Labels und funktionieren mit `spoken_language`, sobald diese korrekt gesetzt ist.
-
-## Nicht betroffen
-
-- Motion Studio, andere Modelle, Sync.so-Pipeline.
-- `omniLines`-State und UI bleiben unverändert.
-- Kein DB/Migrations-Change.
-
-## Erwartetes Ergebnis
-
-- Kling Omni erhält im `prompt` klare Sprach- und Dialoginformation → Lip-Motion und Prosodie passen zum Text.
-- `spoken_language=german` erzwingt deutsche Aussprache statt englischer Default-Voice.
-- Kein Gibberish mehr; Sprecher sprechen exakt die eingegebenen Zeilen auf Deutsch.
+## Ergebnis
+Deutsch in Kling Omni produziert dann nicht mehr „Fairytale-Sprache“, sondern gar keine Provider-Stimme/Lip-Sync. Das ist die sichere Variante, bis Kling Omni über die API eine wirklich steuerbare deutsche Dialog-/Voice-Schnittstelle bereitstellt.
