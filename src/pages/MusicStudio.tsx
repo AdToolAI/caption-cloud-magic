@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity } from 'lucide-react';
