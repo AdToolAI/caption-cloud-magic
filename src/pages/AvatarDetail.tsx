@@ -14,6 +14,7 @@ import { WardrobePerspectiveCard } from '@/components/brand-characters/WardrobeP
 import { SavedOutfitsSection } from '@/components/brand-characters/SavedOutfitsSection';
 import { SavedOutfitViewerCard } from '@/components/brand-characters/SavedOutfitViewerCard';
 import { VoiceProfileCard } from '@/components/avatars/VoiceProfileCard';
+import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 import { AvatarDefaultPerformanceCard } from '@/components/avatars/AvatarDefaultPerformanceCard';
 
 import type { OutfitLook } from '@/hooks/useSavedOutfits';
