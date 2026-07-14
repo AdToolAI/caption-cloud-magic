@@ -35,11 +35,22 @@ export function useCustomVoices() {
     fetchVoices();
   }, []);
 
-  const cloneVoice = async (name: string, sample_urls: string[], language: string) => {
+  const cloneVoice = async (
+    name: string,
+    sample_urls: string[],
+    language: string,
+    options?: { description?: string; remove_background_noise?: boolean },
+  ) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('clone-voice', {
-        body: { name, sample_urls, language },
+        body: {
+          name,
+          sample_urls,
+          language,
+          description: options?.description,
+          remove_background_noise: options?.remove_background_noise ?? true,
+        },
       });
 
       if (error) throw error;
@@ -55,7 +66,7 @@ export function useCustomVoices() {
       console.error('Error cloning voice:', error);
       toast({
         title: 'Fehler',
-        description: 'Voice Cloning fehlgeschlagen',
+        description: error instanceof Error ? error.message : 'Voice Cloning fehlgeschlagen',
         variant: 'destructive',
       });
       return null;
@@ -63,6 +74,7 @@ export function useCustomVoices() {
       setLoading(false);
     }
   };
+
 
   const deleteVoice = async (voice_id: string) => {
     try {
