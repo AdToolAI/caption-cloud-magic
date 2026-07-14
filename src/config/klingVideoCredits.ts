@@ -1,16 +1,43 @@
 import { Currency } from './pricing';
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.06/s → €0.18/s | Pro: $0.10/s → €0.30/s
+// Margin policy: exactly 3.00× Replicate cost (updated 14.07.2026 for Kling 3.0 Omni).
+// Prices here MUST match _shared/videoPricingCatalog.ts — the backend reads
+// from the catalog, and the frontend reads from useVideoPricingCatalog() with
+// this file as fallback only.
 export const KLING_VIDEO_MODELS = {
+  'kling-2.5-turbo': {
+    name: 'Kling 2.5 Turbo Pro',
+    provider: 'Kuaishou (Replicate)',
+    quality: '720p',
+    costPerSecond: { EUR: 0.09, USD: 0.09 },
+    minDuration: 5,
+    maxDuration: 10,
+    allowedDurations: [5, 8, 10] as const,
+    description: {
+      EUR: 'Schneller Draft-Cut ab 0,45 € pro 5 Sekunden',
+      USD: 'Fast draft cut from $0.45 per 5 seconds',
+    },
+    badge: 'Fast',
+  },
+  'kling-2.6': {
+    name: 'Kling 2.6',
+    provider: 'Kuaishou (Replicate)',
+    quality: '1080p',
+    costPerSecond: { EUR: 0.12, USD: 0.12 },
+    minDuration: 5,
+    maxDuration: 15,
+    allowedDurations: [5, 8, 10, 15] as const,
+    description: {
+      EUR: 'Sweet Spot mit Ambient-Audio ab 0,60 € pro 5 Sekunden',
+      USD: 'Sweet spot with ambient audio from $0.60 per 5 seconds',
+    },
+    badge: 'Ambient Audio',
+  },
   'kling-3-standard': {
     name: 'Kling 3.0 Standard',
     provider: 'Kuaishou (Replicate)',
     quality: '720p',
-    costPerSecond: {
-      EUR: 0.18,
-      USD: 0.18,
-    },
+    costPerSecond: { EUR: 0.18, USD: 0.18 },
     minDuration: 3,
     maxDuration: 15,
     allowedDurations: [3, 5, 8, 10, 15] as const,
@@ -24,18 +51,29 @@ export const KLING_VIDEO_MODELS = {
     name: 'Kling 3.0 Pro',
     provider: 'Kuaishou (Replicate)',
     quality: '1080p',
-    costPerSecond: {
-      EUR: 0.30,
-      USD: 0.30,
-    },
+    costPerSecond: { EUR: 0.24, USD: 0.24 },
     minDuration: 3,
     maxDuration: 15,
     allowedDurations: [3, 5, 8, 10, 15] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 1,50€ pro 5 Sekunden',
-      USD: 'Premium 1080p quality from $1.50 per 5 seconds',
+      EUR: 'Premium 1080p ab 1,20 € pro 5 Sekunden',
+      USD: 'Premium 1080p from $1.20 per 5 seconds',
     },
     badge: 'Premium',
+  },
+  'kling-omni': {
+    name: 'Kling 3.0 Omni',
+    provider: 'Kuaishou (Replicate)',
+    quality: '1080p · Native Lip-Sync',
+    costPerSecond: { EUR: 0.60, USD: 0.60 },
+    minDuration: 5,
+    maxDuration: 15,
+    allowedDurations: [5, 8, 10, 15] as const,
+    description: {
+      EUR: 'Native Lip-Sync in DE/EN/ES · 3,00 € pro 5 Sekunden',
+      USD: 'Native lip-sync in DE/EN/ES · $3.00 per 5 seconds',
+    },
+    badge: 'Native Lip-Sync',
   },
 } as const;
 
