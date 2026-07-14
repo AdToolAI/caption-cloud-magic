@@ -14,6 +14,7 @@
  *   - QA cockpit margin checks
  *
  * Costs based on Replicate / Runway public list prices, June 2026.
+ * NORMALIZED 14.07.2026: All sell prices set to exactly 3.00× cost.
  * Tier `premium-engine` flags ultra-expensive frontier models
  * (Sora/Veo/Grok) that get a transparency badge in the UI.
  */
