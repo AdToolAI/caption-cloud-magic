@@ -48,11 +48,22 @@ export default function MusicStudio() {
   const cost = tierPricing.eur;
   const insufficient = balance < cost;
   const maxDur = tierPricing.maxDuration;
-  const language = useMemo(() => {
-    if (typeof navigator === 'undefined') return 'en' as const;
-    const lang = navigator.language?.slice(0, 2);
-    return (lang === 'de' || lang === 'es') ? (lang as 'de' | 'es') : 'en';
-  }, []);
+  const [language, setLanguage] = useState<string>(() => {
+    if (typeof navigator === 'undefined') return 'en';
+    const lang = navigator.language?.slice(0, 2) || 'en';
+    return isLanguageSupported('vocal', lang) ? lang : 'en';
+  });
+
+  // When tier changes, ensure selected language is still supported
+  useEffect(() => {
+    const supported = MUSIC_LANGUAGE_SUPPORT[tier];
+    if (supported.length === 0) return; // instrumental-only tier
+    if (!supported.some((l) => l.code === language)) {
+      setLanguage(supported[0].code);
+    }
+  }, [tier]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const showLanguagePicker = tierHasVocals(tier, instrumental);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
