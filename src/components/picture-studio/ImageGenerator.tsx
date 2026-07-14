@@ -22,6 +22,7 @@ import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { getCachedState, setCachedState } from "./imageGeneratorCache";
 import { PromptHelperDialog, type PromptHelperResult } from "./PromptHelperDialog";
 import { PreflightCheck } from "./PreflightCheck";
+import AIVideoCostConfirmDialog from "@/components/ai-video/AIVideoCostConfirmDialog";
 import {
   PICTURE_MODES,
   type PictureMode,
@@ -886,6 +887,36 @@ export function ImageGenerator() {
         autoEnhance={helperAutoEnhance}
         onApply={handleHelperApply}
       />
+
+      <AIVideoCostConfirmDialog
+        open={costDialogOpen}
+        payload={{
+          title: 'Bild generieren?',
+          description:
+            'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.',
+          modelName: tier === 'fast' ? 'Fast (Seedream 4)' : tier === 'pro' ? 'Pro (SDXL)' : tier === 'ultra' ? 'Ultra (Flux Pro)' : 'Standard',
+          modelBadge: tier.toUpperCase(),
+          lines: [
+            {
+              label: variantsCount > 1 ? `${variantsCount} Varianten × Preis` : 'Preis pro Bild',
+              value: `${variantsCount} × ${currencySymbol}${baseCost.toFixed(2)}`,
+              detail: `${aspectRatio} · ${style}`,
+            },
+          ],
+          totalLabel: 'Gesamtkosten',
+          totalValue: `${currencySymbol}${cost.toFixed(2)}`,
+          currencySymbol,
+          totalCost: cost,
+          walletBalance: balance,
+          isUnlimited: false,
+        }}
+        suppressed={costDialogSuppressed}
+        onSuppressedChange={setCostDialogSuppressed}
+        onConfirm={confirmCostAndGenerate}
+        onCancel={() => setCostDialogOpen(false)}
+        onTopUp={() => navigate('/ai-video-purchase-credits')}
+      />
     </div>
+
   );
 }
