@@ -69,8 +69,13 @@ export default function MusicStudio() {
     if (!prompt.trim()) return;
     if (tier === 'vocal' && !lyrics.trim()) return;
     const safeDuration = Math.min(duration, maxDur);
+    // Append explicit [LANGUAGE: …] directive so the provider strictly matches the vocal language.
+    const langMeta = showLanguagePicker ? getLanguageMeta(tier, language) : undefined;
+    const finalPrompt = langMeta
+      ? `${prompt.trim()}\n\n[LANGUAGE: ${langMeta.name}] — Sing exclusively in ${langMeta.name}. Do not mix languages.`
+      : prompt.trim();
     const track = await generateMusic({
-      prompt: prompt.trim(),
+      prompt: finalPrompt,
       tier,
       durationSeconds: safeDuration,
       genre: genre !== 'any' ? genre : undefined,
