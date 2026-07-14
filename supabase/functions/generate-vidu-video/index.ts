@@ -16,12 +16,11 @@ const corsHeaders = {
 type ViduModel = "vidu-q2-reference" | "vidu-q2-i2v" | "vidu-q2-t2v";
 
 // Vidu Q2 charges a flat fee per generation (5s fixed clip).
-// We expose it as cost/sec for UI parity (price / 5s).
-// Pricing aligned with the q3 family on Replicate (q3-pro ≈ $0.95/5s, q3-turbo ≈ $0.40/5s).
+// Normalized 14.07.2026 to 3.00× cost margin (q3-pro ≈ $0.22 flat, q3-turbo ≈ $0.20 flat).
 const FLAT_PRICE_EUR: Record<ViduModel, number> = {
-  "vidu-q2-reference": 0.95,
-  "vidu-q2-i2v": 0.95,
-  "vidu-q2-t2v": 0.40,
+  "vidu-q2-reference": 0.66,
+  "vidu-q2-i2v":       0.66,
+  "vidu-q2-t2v":       0.60,
 };
 
 // Replicate slugs. The original `vidu/q2-*` models were retired by Replicate

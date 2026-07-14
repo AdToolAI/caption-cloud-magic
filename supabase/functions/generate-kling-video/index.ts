@@ -11,10 +11,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Kling 3.0 Customer Pricing per second
+// Kling 3.0 Customer Pricing per second — normalized 14.07.2026 to 3.00× cost margin
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'kling-3-standard': { EUR: 0.15, USD: 0.15 },
-  'kling-3-pro': { EUR: 0.20, USD: 0.20 },
+  'kling-3-standard': { EUR: 0.18, USD: 0.18 },
+  'kling-3-pro':      { EUR: 0.30, USD: 0.30 },
 };
 
 interface GenerateRequest {

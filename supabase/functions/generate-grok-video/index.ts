@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'grok-imagine': { EUR: 0.42, USD: 0.42 }, // Premium-Engine tier (~65% margin)
+  'grok-imagine': { EUR: 0.45, USD: 0.45 }, // Normalized 14.07.2026 — 3.00× cost margin
 };
 
 // xAI Grok Imagine — text-to-video and image-to-video with native audio

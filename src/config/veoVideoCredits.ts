@@ -2,13 +2,13 @@ import { Currency } from './pricing';
 
 /**
  * Google Veo 3.1 Pricing — alle 4 Varianten
- * Basis: Replicate Listenpreis (USD/s, Stand Juni 2026) → Verkaufspreis ~65% Marge
+ * Basis: Replicate Listenpreis (USD/s, Juni 2026) → Verkaufspreis exakt 3.00× (normalisiert 14.07.2026)
  *
- * | Variante     | Replicate $/s | Verkauf €/s | Marge |
- * | lite-720p    | 0.15          | 0.42        | 64%   |
- * | lite-1080p   | 0.22          | 0.62        | 65%   |
- * | fast         | 0.40          | 1.15        | 65%   |
- * | pro          | 1.10          | 3.15        | 65%   |
+ * | Variante     | Replicate $/s | Verkauf €/s |
+ * | lite-720p    | 0.15          | 0.45        |
+ * | lite-1080p   | 0.22          | 0.66        |
+ * | fast         | 0.40          | 1.20        |
+ * | pro          | 1.10          | 3.30        |
  */
 export const VEO_VIDEO_MODELS = {
   'veo-3.1-lite-720p': {
@@ -18,15 +18,15 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '720p' as const,
     costPerSecond: {
-      EUR: 0.42,
-      USD: 0.42,
+      EUR: 0.45,
+      USD: 0.45,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Native Audio + 720p Video ab 1,68€ pro 4 Sekunden',
-      USD: 'Native Audio + 720p Video from $1.68 per 4 seconds',
+      EUR: 'Native Audio + 720p Video ab 1,80€ pro 4 Sekunden',
+      USD: 'Native Audio + 720p Video from $1.80 per 4 seconds',
     },
     badge: '🎵 Native Audio',
   },
@@ -37,15 +37,15 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 0.62,
-      USD: 0.62,
+      EUR: 0.66,
+      USD: 0.66,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: '1080p Lite mit Audio ab 2,48€ pro 4 Sekunden',
-      USD: '1080p Lite with audio from $2.48 per 4 seconds',
+      EUR: '1080p Lite mit Audio ab 2,64€ pro 4 Sekunden',
+      USD: '1080p Lite with audio from $2.64 per 4 seconds',
     },
     badge: '🎵 HD Audio',
   },
@@ -56,15 +56,15 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 1.15,
-      USD: 1.15,
+      EUR: 1.20,
+      USD: 1.20,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Schnelle 1080p-Generierung ab 4,60€ pro 4 Sekunden',
-      USD: 'Fast 1080p generation from $4.60 per 4 seconds',
+      EUR: 'Schnelle 1080p-Generierung ab 4,80€ pro 4 Sekunden',
+      USD: 'Fast 1080p generation from $4.80 per 4 seconds',
     },
     badge: '⚡ Premium-Engine',
   },
@@ -75,15 +75,15 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 3.15,
-      USD: 3.15,
+      EUR: 3.30,
+      USD: 3.30,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Premium Cinematic 1080p ab 12,60€ pro 4 Sekunden',
-      USD: 'Premium Cinematic 1080p from $12.60 per 4 seconds',
+      EUR: 'Premium Cinematic 1080p ab 13,20€ pro 4 Sekunden',
+      USD: 'Premium Cinematic 1080p from $13.20 per 4 seconds',
     },
     badge: '👑 Premium-Engine',
   },

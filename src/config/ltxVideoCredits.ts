@@ -1,20 +1,22 @@
 import { Currency } from './pricing';
 
+// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
+// Std: $0.02/s → €0.06/s | Pro: $0.04/s → €0.12/s
 export const LTX_VIDEO_MODELS = {
   'ltx-standard': {
     name: 'LTX Video 2.0',
     provider: 'Lightricks (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.08,
-      USD: 0.08,
+      EUR: 0.06,
+      USD: 0.06,
     },
     minDuration: 4,
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Schnelle, günstige Generierung ab 0,32€ pro 4 Sekunden',
-      USD: 'Fast and affordable from $0.32 per 4 seconds',
+      EUR: 'Schnelle, günstige Generierung ab 0,24€ pro 4 Sekunden',
+      USD: 'Fast and affordable from $0.24 per 4 seconds',
     },
     badge: 'Schnell & Günstig',
   },

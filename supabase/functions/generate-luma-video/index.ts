@@ -11,9 +11,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
+// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'luma-standard': { EUR: 0.18, USD: 0.18 },
-  'luma-pro': { EUR: 0.25, USD: 0.25 },
+  'luma-standard': { EUR: 0.21, USD: 0.21 },
+  'luma-pro':      { EUR: 0.36, USD: 0.36 },
 };
 
 interface GenerateRequest {

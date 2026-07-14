@@ -144,28 +144,29 @@ export const AI_VIDEO_PRICING = {
   defaultDuration: 10, // seconds
 } as const;
 
-// Margin policy: Premium Engine (Sora) — Replicate cost ~$0.20-0.45/s → user 0.55/1.30 €/s (~64-65% margin)
+// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
+// Std: $0.20/s → €0.60/s | Pro: $0.45/s → €1.35/s
 export const AI_VIDEO_MODELS = {
   'sora-2-standard': {
     name: 'Sora 2 Standard',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 0.55,
-      USD: 0.55,
+      EUR: 0.60,
+      USD: 0.60,
     },
     maxDuration: 30,
-    description: 'Hochwertige AI-Videos ab 5,50€ pro 10 Sekunden',
+    description: 'Hochwertige AI-Videos ab 6,00€ pro 10 Sekunden',
     badge: 'Premium-Engine',
   },
   'sora-2-pro': {
     name: 'Sora 2 Pro',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 1.30,
-      USD: 1.30,
+      EUR: 1.35,
+      USD: 1.35,
     },
     maxDuration: 30,
-    description: 'Premium-Qualität ab 13,00€ pro 10 Sekunden',
+    description: 'Premium-Qualität ab 13,50€ pro 10 Sekunden',
     badge: 'Premium-Engine',
   },
 } as const;

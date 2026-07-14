@@ -12,9 +12,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
+// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'hailuo-standard': { EUR: 0.15, USD: 0.15 },
-  'hailuo-pro': { EUR: 0.22, USD: 0.22 },
+  'hailuo-standard': { EUR: 0.14, USD: 0.14 },
+  'hailuo-pro':      { EUR: 0.23, USD: 0.23 },
 };
 
 interface GenerateRequest {
