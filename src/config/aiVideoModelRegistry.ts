@@ -496,7 +496,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     durations: [5],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.11, USD: 0.11 },
+    costPerSecond: { EUR: 0.12, USD: 0.12 },
     badge: 'T2V',
     tagline: '5s Clip aus reinem Prompt',
     legacyRoute: '/vidu-studio',
