@@ -1315,13 +1315,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </Button>
             )}
 
-            {castCharacterIds.length > 2 && (
-              <p className="text-[11px] leading-snug text-amber-500/90">
-                {language === 'de'
-                  ? `Kling Omni unterstützt max. 2 Sprecher pro Clip. Aktuell ${castCharacterIds.length} Charaktere ausgewählt — nur die ersten 2 erhalten Lip-Sync.`
-                  : `Kling Omni supports max. 2 speakers per clip. Currently ${castCharacterIds.length} characters selected — only the first 2 get lip-sync.`}
-              </p>
-            )}
+            {(() => {
+              const withDialog = omniLines.filter((r) => r.line.trim()).length;
+              const anchorCount = castCharacterIds.length;
+              if (anchorCount <= withDialog) return null;
+              const silent = anchorCount - withDialog;
+              return (
+                <p className="text-[11px] leading-snug text-amber-500/90">
+                  {language === 'de'
+                    ? `${anchorCount} Charakter(e) im Anchor · ${withDialog} mit Dialog · ${silent} stumme(r) Statist(en). Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.`
+                    : `${anchorCount} character(s) in anchor · ${withDialog} with dialog · ${silent} silent extra(s). Kling Omni allows max. 2 speaking characters per clip.`}
+                </p>
+              );
+            })()}
           </div>
         )}
       </Card>
