@@ -122,6 +122,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext
   // produziert. Alles außerhalb → ambient-only Fallback (kein Voiceover), sonst
   // erfindet z. B. Kling für DE/ES eine Fantasie-Sprache.
+  // Kling 3.0 Omni ist die einzige Kling-Variante mit nativem DE/EN/ES-Lip-Sync.
   const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
     veo:        ['en', 'de', 'es'],
     sora:       ['en', 'de', 'es'],
@@ -130,8 +131,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     happyhorse: ['en'],
     ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
   };
-  const ttsLangSupported =
-    (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
+  const isKlingOmni = model.id === 'kling-omni';
+  const ttsLangSupported = isKlingOmni
+    ? (['en', 'de', 'es'] as const).includes(effectiveSpokenLang)
+    : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /**
    * Placement of the uploaded reference image within the generated clip:
