@@ -33,6 +33,7 @@ interface VoiceProfileCardProps {
     name?: string;
     default_voice_id?: string | null;
     default_voice_name?: string | null;
+    default_voice_provider?: string | null;
     voice_settings?: any;
   };
 }
