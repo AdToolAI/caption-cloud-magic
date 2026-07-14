@@ -461,7 +461,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     durations: [5],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
-    // Flat €0.65 / 5s = €0.13/s for UI parity (real billing is flat per generation)
+    // Flat €0.66 / 5s ≈ €0.13/s for UI parity (real billing is flat per generation)
     costPerSecond: { EUR: 0.13, USD: 0.13 },
     badge: 'Multi-Ref',
     tagline: 'Bis zu 7 Refs: Charakter + Produkt + Location in einer Szene',
