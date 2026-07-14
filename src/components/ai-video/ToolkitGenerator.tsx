@@ -878,6 +878,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         onPropIdsChange={setCastPropIds}
         consistencyKey={consistencyKey}
         supportsImageInput={model.capabilities.i2v}
+        hideCharacters={isKlingOmni}
       />
 
       {/* v241 — text-only warning: model can't accept image reference at all */}
