@@ -198,6 +198,33 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     () => castPropIds.map((id) => libLocations.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l),
     [libLocations, castPropIds],
   );
+
+  /**
+   * Keep `omniLines` in sync with the selected Cast characters (max 2 for Kling Omni).
+   * Preserves existing dialog text & voice preset per row when possible.
+   */
+  useEffect(() => {
+    const targetIds = castCharacterIds.slice(0, 2);
+    if (targetIds.length === 0) return;
+    setOmniLines((prev) => {
+      const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm'];
+      const next: OmniLine[] = targetIds.map((cid, i) => {
+        const existing = prev.find((r) => r.characterId === cid);
+        if (existing) return existing;
+        const fallback = prev[i];
+        return {
+          characterId: cid,
+          line: fallback?.characterId ? '' : (fallback?.line ?? ''),
+          voicePreset: fallback?.voicePreset ?? defaults[i] ?? 'neutral',
+        };
+      });
+      // If length or ids changed, replace; otherwise keep referential equality.
+      const same =
+        next.length === prev.length &&
+        next.every((r, i) => prev[i] && prev[i].characterId === r.characterId);
+      return same ? prev : next;
+    });
+  }, [castCharacterIds]);
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
