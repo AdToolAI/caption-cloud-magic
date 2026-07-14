@@ -137,9 +137,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     ? (['en', 'de', 'es'] as const).includes(effectiveSpokenLang)
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
-  /* ── Kling Omni: native Lip-Sync dialogue + voice preset ── */
-  const [omniDialogText, setOmniDialogText] = useState<string>('');
-  const [omniVoicePreset, setOmniVoicePreset] = useState<'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral'>('female-warm');
+  /* ── Kling Omni: per-speaker native Lip-Sync (max. 2 speakers) ── */
+  type OmniVoicePreset = 'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral';
+  type OmniLine = { characterId: string | null; line: string; voicePreset: OmniVoicePreset };
+  const [omniLines, setOmniLines] = useState<OmniLine[]>([
+    { characterId: null, line: '', voicePreset: 'female-warm' },
+  ]);
   /**
    * Placement of the uploaded reference image within the generated clip:
    *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
