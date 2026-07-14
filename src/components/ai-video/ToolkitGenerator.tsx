@@ -607,13 +607,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
       // Kling 3.0 Omni — native Lip-Sync in DE/EN/ES bypasses Sync.so.
-      // If the user provided dialogue, pass it to the edge function together
-      // with the chosen voice preset and language. Max 2 speakers per clip.
-      if (isKlingOmni && omniDialogText.trim()) {
-        body.dialogText = omniDialogText.trim();
-        body.voicePreset = omniVoicePreset;
-        body.spokenLanguage = effectiveSpokenLang;
-        body.nativeLipSync = true;
+      // Per-speaker lines are merged into a screenplay-style dialog string
+      // and — when > 1 speaker — additionally passed as `speaker_voices`.
+      if (isKlingOmni) {
+        const activeLines = omniLines
+          .filter((l) => l.line.trim().length > 0)
+          .slice(0, 2);
+        if (activeLines.length > 0) {
+          const named = activeLines.map((l, i) => {
+            const c = l.characterId ? libCharacters.find((x) => x.id === l.characterId) : null;
+            const name = c?.name?.trim() || `Speaker ${i + 1}`;
+            return { name, line: l.line.trim(), voice: l.voicePreset };
+          });
+          body.dialogText = named.map((n) => `${n.name}: ${n.line}`).join('\n');
+          body.voicePreset = named[0].voice;
+          if (named.length > 1) {
+            body.speakerVoices = named.map((n) => ({ name: n.name, voice: n.voice }));
+          }
+          body.spokenLanguage = effectiveSpokenLang;
+          body.nativeLipSync = true;
+        }
       }
 
       // Sora 2 cannot accept image input → toast hint when a character is selected
