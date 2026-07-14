@@ -173,10 +173,10 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    // Build Seedance input
+    // Build Seedance input — Seedance 2.0 supports 3–15s across all tiers.
     const replicateInput: Record<string, any> = {
       prompt,
-      duration: Math.min(duration, 12),
+      duration: Math.min(Math.max(duration, 3), 15),
       aspect_ratio: aspectRatio,
     };
 
