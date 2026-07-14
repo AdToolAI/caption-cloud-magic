@@ -46,6 +46,7 @@ import type { CharacterShot, ComposerCharacter, ComposerScene } from '@/types/vi
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
+import { useVideoPricingCatalog } from '@/hooks/useVideoPricingCatalog';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getCurrencyForLanguage } from '@/lib/currency';
 import type { Currency } from '@/config/pricing';
@@ -226,7 +227,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model.id]);
 
-  const cost = duration * model.costPerSecond[currency];
+  // Canonical per-second price from server catalog (falls back to local config).
+  const { getPricePerSecond } = useVideoPricingCatalog();
+  const pricePerSecond = getPricePerSecond(model.id, currency) ?? model.costPerSecond[currency];
+  const cost = duration * pricePerSecond;
   const symbol = currency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;
   const canAfford = isUnlimited || (wallet?.balance_euros ?? 0) >= cost;
@@ -1077,7 +1081,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {symbol}{cost.toFixed(2)}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {duration}s × {symbol}{model.costPerSecond[currency].toFixed(2)}/s · {model.name}
+            {duration}s × {symbol}{pricePerSecond.toFixed(2)}/s · {model.name}
           </p>
         </div>
         <Button

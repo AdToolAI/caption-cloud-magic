@@ -11,12 +11,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Seedance 2.0 Customer Pricing per second (normalized 14.07.2026 to 3.00× cost margin)
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'seedance-mini':     { EUR: 0.06, USD: 0.06 },
-  'seedance-standard': { EUR: 0.09, USD: 0.09 },
-  'seedance-pro':      { EUR: 0.18, USD: 0.18 },
-};
+// Seedance 2.0 pricing is now sourced from the canonical catalog so the UI
+// preview and the deducted amount can never diverge again.
+import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 
 // Replicate model slug per tier
 const REPLICATE_SLUG: Record<string, string> = {
@@ -86,11 +83,13 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    const currency = walletPreview?.currency || 'EUR';
+    const currency = (walletPreview?.currency || 'EUR') as 'EUR' | 'USD';
 
-    // Calculate cost
-    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['seedance-standard'];
-    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
+    // Calculate cost from the canonical shared catalog (single source of truth
+    // shared with the frontend via /functions/v1/pricing-catalog).
+    const costPerSecond = resolveCostPerSecond(model, currency)
+      ?? resolveCostPerSecond('seedance-standard', currency)
+      ?? 0.09;
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
@@ -174,10 +173,10 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    // Build Seedance input
+    // Build Seedance input — Seedance 2.0 supports 3–15s across all tiers.
     const replicateInput: Record<string, any> = {
       prompt,
-      duration: Math.min(duration, 12),
+      duration: Math.min(Math.max(duration, 3), 15),
       aspect_ratio: aspectRatio,
     };
 

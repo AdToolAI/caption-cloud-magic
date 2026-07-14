@@ -13,6 +13,7 @@ import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Lock, Wrench, Crown } from 'lucide-react';
 import { isPremiumEngine } from '@/lib/cost/videoProviderMargins';
+import { useVideoPricingCatalog } from '@/hooks/useVideoPricingCatalog';
 
 interface ModelSelectorProps {
   value: string;
@@ -37,6 +38,11 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as 'de' | 'en' | 'es';
   const symbol = currency === 'USD' ? '$' : '€';
   const list = models ?? AI_VIDEO_TOOLKIT_MODELS;
+  const { getPricePerSecond } = useVideoPricingCatalog();
+
+  // Canonical price (from server catalog) with local-config fallback.
+  const priceFor = (m: ToolkitModel) =>
+    getPricePerSecond(m.id, currency) ?? m.costPerSecond[currency];
 
   const grouped = useMemo(() => {
     const map: Record<ToolkitModelGroup, ToolkitModel[]> = {
@@ -69,7 +75,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground truncate">
-                  {selected.provider} · {selected.resolution} · {symbol}{selected.costPerSecond[currency].toFixed(2)}/s
+                  {selected.provider} · {selected.resolution} · {symbol}{priceFor(selected).toFixed(2)}/s
                 </p>
               </div>
             </div>
@@ -136,7 +142,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                         </p>
                       </div>
                       <span className="text-[11px] tabular-nums text-primary font-medium shrink-0">
-                        {symbol}{m.costPerSecond[currency].toFixed(2)}/s
+                        {symbol}{priceFor(m).toFixed(2)}/s
                       </span>
                     </div>
 
