@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { OutfitLook } from '@/hooks/useSavedOutfits';
 import { OutfitLightbox, type LightboxFrame } from './OutfitLightbox';
+import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 
 const PERSPECTIVES: Array<{ key: keyof OutfitLook; label: string }> = [
   { key: 'front_url', label: 'Front' },
