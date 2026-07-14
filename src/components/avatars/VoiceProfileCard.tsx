@@ -195,6 +195,25 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
         </Button>
       </div>
 
+      <div className="mb-4 rounded-lg border border-primary/15 bg-background/40 p-3">
+        <AvatarVoicePicker
+          value={avatar.default_voice_id ?? null}
+          provider={(avatar.default_voice_provider as any) ?? null}
+          onChange={handleVoiceChange}
+          disabled={saving}
+        />
+        {avatar.default_voice_name && (
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            Aktive Stimme: <span className="text-foreground">{avatar.default_voice_name}</span>
+          </p>
+        )}
+        {!avatar.default_voice_id && (
+          <p className="mt-1.5 text-[10px] text-amber-500/80">
+            Noch keine Stimme zugewiesen — wähle eine aus, damit dieser Charakter im Motion Studio & AI Video Studio spricht.
+          </p>
+        )}
+      </div>
+
       <div className="space-y-4">
         <SliderRow
           label="Stability"
