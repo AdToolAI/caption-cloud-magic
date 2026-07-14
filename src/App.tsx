@@ -147,7 +147,7 @@ const StockVideos = lazy(() => import("./pages/StockVideos"));
 const VerifyLicense = lazy(() => import("./pages/VerifyLicense"));
 const SharedBrandKit = lazy(() => import("./pages/SharedBrandKit"));
 const MyLicenses = lazy(() => import("./pages/MyLicenses"));
-const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
+
 const HubPage = lazy(() => import("./pages/HubPage"));
 const Community = lazy(() => import("./pages/Community"));
 const GamingHub = lazy(() => import("./pages/GamingHub"));
