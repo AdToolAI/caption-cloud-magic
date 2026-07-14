@@ -288,6 +288,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [omniMediaLock]);
 
+  /* Kling Omni DE/ES hard-lock: the provider currently produces English-accented
+   * fantasy speech for non-English native audio. Keep the cast, but remove all
+   * native dialog state so no accidental prompt/API path can trigger speech. */
+  useEffect(() => {
+    if (!omniNonEnglishSilent) return;
+    setOmniLines((prev) => {
+      if (!prev.some((r) => r.lipSync || r.line.trim())) return prev;
+      return prev.map((r) => ({ ...r, lipSync: false, line: '' }));
+    });
+  }, [omniNonEnglishSilent]);
+
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
