@@ -161,33 +161,37 @@ export function useUnifiedMentionLibrary(): {
       const key = (c?.name || '').toLowerCase().trim();
       if (key && !brandByName.has(key)) brandByName.set(key, c.id);
     }
-    return catalogCharacters.map((r: any) => {
-      const key = (r?.name || '').toLowerCase().trim();
-      const adoptedId = brandByName.get(key) ?? null;
-      return {
-        id: `catalog:character:${r.id}`,
-        user_id: null as any,
-        name: r.name,
-        description: r.theme_pack ? r.theme_pack.replace(':', ' / ') : '',
-        signature_items: '',
-        reference_image_url: r.reference_image_url,
-        reference_image_seed: null,
-        voice_id: null,
-        tags: ['catalog'],
-        usage_count: 0,
-        workspace_id: null,
-        created_at: '',
-        updated_at: '',
-        meta: adoptedId
-          ? { kind: 'catalog' as const, baseCharacterId: adoptedId }
-          : undefined,
-      } as MotionStudioCharacter;
-    });
+    return catalogCharacters
+      .map((r: any) => {
+        const key = (r?.name || '').toLowerCase().trim();
+        const adoptedId = brandByName.get(key) ?? null;
+        if (!adoptedId) return null; // Cast & World lock: only bridged catalog rows.
+        return {
+          id: `catalog:character:${r.id}`,
+          user_id: null as any,
+          name: r.name,
+          description: r.theme_pack ? r.theme_pack.replace(':', ' / ') : '',
+          signature_items: '',
+          reference_image_url: r.reference_image_url,
+          reference_image_seed: null,
+          voice_id: null,
+          tags: ['catalog'],
+          usage_count: 0,
+          workspace_id: null,
+          created_at: '',
+          updated_at: '',
+          meta: { kind: 'catalog' as const, baseCharacterId: adoptedId },
+        } as MotionStudioCharacter;
+      })
+      .filter((x): x is MotionStudioCharacter => !!x);
   }, [catalogCharacters, brandChars]);
 
+  // Cast & World is the single source of truth for CHARACTERS.
+  // Legacy `motion_studio_characters` (msChars) are intentionally excluded —
+  // only rows with a real `brand_characters.id` (UUID) survive here.
   const characters = useMemo(
-    () => [...outfitChars, ...dedupe(dedupe(brandChars.map(adaptCharacter), msChars), catalogChars)],
-    [outfitChars, brandChars, msChars, catalogChars],
+    () => [...outfitChars, ...brandChars.map(adaptCharacter), ...catalogChars],
+    [outfitChars, brandChars, catalogChars],
   );
   // Locations slot also carries Buildings + Props as mentionable scene
   // references — the resolver feeds them as extra reference URLs to Vidu /

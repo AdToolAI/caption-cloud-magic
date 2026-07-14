@@ -7,7 +7,7 @@ import { BrandCharacterCard } from '@/components/brand-characters/BrandCharacter
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { PresetAvatarGallery } from '@/components/brand-characters/PresetAvatarGallery';
+
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -142,8 +142,6 @@ const BrandCharacters = () => {
             </Card>
           </div>
 
-          {/* Preset gallery (always visible — quick start) */}
-          <PresetAvatarGallery />
 
           {/* Your library */}
           {isLoading ? (

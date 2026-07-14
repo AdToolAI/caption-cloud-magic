@@ -41,7 +41,7 @@ import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix'
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { applySceneAssetsToPrompt } from '@/lib/motion-studio/applySceneAssetsToPrompt';
 import { toolkitModelToClipSource } from '@/lib/ai-video/toolkitModelToClipSource';
-import type { MotionStudioLocation } from '@/types/motion-studio';
+import type { MotionStudioCharacter, MotionStudioLocation } from '@/types/motion-studio';
 import type { CharacterShot, ComposerCharacter, ComposerScene } from '@/types/video-composer';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -174,8 +174,36 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [costDialogOpen, setCostDialogOpen] = useState(false);
   const [costDialogSuppressed, setCostDialogSuppressed] = useState(false);
 
-  /* ── Library Cast & Locations (Scene Continuity) ── */
-  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  /* ── Library Cast & Locations (Scene Continuity) ──
+   * Characters: STRICT Cast & World lock — only rows from `brand_characters`
+   * (UUID) are selectable. Legacy `motion_studio_characters` are no longer
+   * exposed as pickable characters anywhere in the AI Video Studio.
+   * Locations still come from Motion Studio Library (buildings + props). */
+  const { locations: libLocations } = useMotionStudioLibrary();
+  const { characters: brandCharList } = useBrandCharacters();
+  const libCharacters = useMemo<MotionStudioCharacter[]>(
+    () =>
+      (brandCharList ?? []).map((c: any) => ({
+        id: c.id,
+        user_id: c.user_id,
+        name: c.name ?? 'Unnamed',
+        description:
+          c.description ??
+          c.visual_identity_json?.identity_card_prompt ??
+          c.visual_identity_json?.identityCard ??
+          '',
+        signature_items: c.visual_identity_json?.signature_items ?? '',
+        reference_image_url: c.portrait_url ?? c.reference_image_url ?? null,
+        reference_image_seed: null,
+        voice_id: c.default_voice_id ?? null,
+        tags: [],
+        usage_count: c.usage_count ?? 0,
+        workspace_id: null,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+      })),
+    [brandCharList],
+  );
   const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
   const [castCharacterIds, setCastCharacterIds] = useState<string[]>([]);
   const [castLocationId, setCastLocationId] = useState<string | null>(null);
