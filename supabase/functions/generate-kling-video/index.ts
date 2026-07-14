@@ -84,20 +84,27 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
-    const { prompt, model, duration, aspectRatio, generateAudio, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
+    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
     const suppressDialogue = body.suppressDialogue === true;
+
+    // Resolve model config (with safe fallback to Standard)
+    const modelConfig = KLING_MODEL_CONFIG[model] ?? KLING_MODEL_CONFIG['kling-3-standard'];
+
     if (generateAudio && spokenLanguage) {
-      console.log(`[generate-kling-video] spokenLanguage=${spokenLanguage} (prompt lock applied client-side)`);
+      console.log(`[generate-kling-video] model=${model} spokenLanguage=${spokenLanguage}`);
     }
     if (generateAudio && suppressDialogue) {
-      console.log(`[generate-kling-video] suppressDialogue=true — ambient-only fallback (provider TTS lang unsupported)`);
+      console.log(`[generate-kling-video] model=${model} suppressDialogue=true — ambient-only fallback`);
     }
 
-    // Validate duration (3-15 seconds)
-    if (duration < 3 || duration > 15) {
+    // Validate duration against catalog (per-model maxDuration).
+    const catalogEntry = VIDEO_PRICING_CATALOG[model];
+    const minDur = catalogEntry?.minDuration ?? 3;
+    const maxDur = catalogEntry?.maxDuration ?? 15;
+    if (duration < minDur || duration > maxDur) {
       return new Response(
-        JSON.stringify({ error: "Duration must be between 3 and 15 seconds for Kling 3.0" }),
+        JSON.stringify({ error: `Duration must be between ${minDur} and ${maxDur} seconds for ${model}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
