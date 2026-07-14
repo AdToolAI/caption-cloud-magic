@@ -1,36 +1,31 @@
-## Ziel
-Sprachauswahl fürs Lied im Music Studio – nur Sprachen, die vom jeweiligen Provider sauber unterstützt werden. Der Prompt/die Lyrics-Generierung erhalten die Sprache explizit, sodass die KI nicht mehr raten muss (aktuell ergibt „Sad Song about … in English" trotzdem oft deutsche Lyrics).
+## Warum die Sprachauswahl fehlt
 
-## Provider-Sprachmatrix (nur verifiziert-saubere Sprachen)
-- **quick** (MusicGen, instrumental) → kein Vokal → Sprachwahl ausgeblendet
-- **adaptive** (Stable Audio 2.5, instrumental) → kein Vokal → ausgeblendet
-- **vocal** (MiniMax Music 1.5) → EN, DE, ES, FR, IT, PT, JA, KO, ZH
-- **standard** (ElevenLabs Music) → EN, DE, ES, FR, IT, PT, NL, PL, JA
-- **pro** (ElevenLabs Music Pro) → gleiche Liste wie standard
+Der Screenshot zeigt Route `/music-studio` → gerendert von `src/pages/MusicStudio.tsx`.
+Die letzte Sprachauswahl-Integration landete aber nur in `src/components/audio-studio/MusicGeneratorPanel.tsx` (die im Audio Studio genutzt wird). `MusicStudio.tsx` bestimmt die Sprache aktuell nur aus `navigator.language` — es gibt kein UI-Element.
 
-Endgültige Anzeigeliste pro Tier wird aus einer zentralen Map (`MUSIC_LANGUAGE_SUPPORT`) in `src/lib/music/languageSupport.ts` gerendert; nur der Schnitt „Provider unterstützt + wir garantieren Qualität" (EN/DE/ES/FR/IT/PT + JA für standard/pro, + KO/ZH für vocal) ist auswählbar.
+## Fix — Sprachauswahl in MusicStudio.tsx nachrüsten
 
-## UI-Änderungen (nur Frontend)
-`src/components/audio-studio/MusicGeneratorPanel.tsx`
-- Neuer `Select`-Block „Sprache" zwischen Mood und BPM, mit Flag-Emoji + Sprachname.
-- Wird nur gerendert, wenn Tier ∈ {standard, vocal, pro} **und** `instrumental === false` (bzw. für vocal immer, da Lyrics Pflicht sind).
-- Default: aus `useTranslation().language` (fällt auf `en` zurück, falls Provider die aktuelle UI-Sprache nicht kann).
-- Wechsel des Tiers, das die gewählte Sprache nicht kann → Auto-Fallback auf `en` + Toast-Hinweis.
-- „AI Lyrics generieren" ruft `generateLyrics({ language })` bereits – wir reichen die neue State-Variable durch.
+1. **State ergänzen** in `src/pages/MusicStudio.tsx`
+   - `const [language, setLanguage] = useState<string>('en')` (statt `useMemo`)
+   - Beim Mount initial aus `navigator.language` vorbelegen, sofern vom aktuellen Tier unterstützt (`isLanguageSupported`); sonst `'en'`.
 
-## Prompt-Härtung
-- Vor dem Absenden hängt der Client an den `prompt` einen unmissverständlichen Block an: `\n\n[LANGUAGE: <Full name>] All sung vocals MUST be in <Full name>. Do not switch language.`
-- `lyrics` werden unverändert übernommen (User-Text hat Vorrang).
-- Kein Backend-Change nötig, weil Sprache im Prompt landet; `generate-music-lyrics` bekommt die Sprache bereits über den existierenden `language`-Param.
+2. **Tier-Wechsel absichern**
+   - `useEffect([tier])`: Wenn aktuelle `language` in `MUSIC_LANGUAGE_SUPPORT[tier]` nicht vorkommt → auf ersten unterstützten Wert zurückfallen (bzw. leer wenn Tier keinen Gesang hat).
 
-## Persistenz
-- `useToolkitDraft`-analog: Sprache wird im lokalen State gehalten, kein DB-Schema-Change.
+3. **UI-Dropdown einbauen** (zwischen „Instrumental"-Switch und Lyrics-Editor)
+   - Sichtbar nur wenn `tierHasVocals(tier, instrumental) === true` (also `standard`/`pro` mit Instrumental=off oder `vocal`).
+   - Label: „Gesangssprache".
+   - Optionen: `MUSIC_LANGUAGE_SUPPORT[tier]` mit `flag + label`.
+   - Für `quick`/`adaptive` oder Instrumental=on: Dropdown ausblenden und Hinweis „Instrumental — keine Sprache nötig".
 
-## Neue/Editierte Dateien
-1. `src/lib/music/languageSupport.ts` *(neu)* — Map `Record<MusicTier, Array<{code, label, flag}>>` + Helper `isLanguageSupported(tier, code)`.
-2. `src/components/audio-studio/MusicGeneratorPanel.tsx` — Language-Select, Prompt-Suffix, Fallback-Logik, Weiterreichen an `generateLyrics`.
+4. **Prompt-Härtung im Submit**
+   - In `handleGenerate` bei vokalen Tiers `[LANGUAGE: <name>]` an den Prompt anhängen (via `getLanguageMeta(tier, language).name`), analog zum bestehenden Audio-Studio-Panel.
+   - `generateLyrics`-Aufruf: `language` als 2-Letter-Code weiterreichen (bereits vorhanden, aber jetzt aus dem State).
 
-## Nicht enthalten
-- Kein Edge-Function-Deploy (rein clientseitig).
-- Keine Änderungen an Pricing, Tier-Struktur oder Voice Studio.
-- Backend-Validierung der Sprache wird nicht hinzugefügt – Prompt-Direktive reicht laut Provider-Docs.
+5. **Kein Backend-/Business-Logic-Change**
+   - `useMusicGeneration.ts`, Edge Functions, Preise bleiben unangetastet.
+   - Reine Presentation-Layer-Ergänzung in einer Datei.
+
+## Ergebnis
+
+Im Music Studio erscheint für `MiniMax Music 1.5` (vocal) sowie ElevenLabs standard/pro (wenn Instrumental aus) eine „Gesangssprache"-Dropdown mit exakt den Sprachen, die der jeweilige Provider sauber singt (DE ✓ für alle drei). Die Auswahl wird per `[LANGUAGE: …]`-Direktive in Prompt und Lyrics-Generator erzwungen.
