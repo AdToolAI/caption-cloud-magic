@@ -99,7 +99,41 @@ export interface ToolkitModel {
 const sharedAspect = ['16:9', '9:16', '1:1'];
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
-  /* ─────────── Recommended ─────────── */
+  /* ─────────── Kling family ─────────── */
+  {
+    id: 'kling-2.5-turbo',
+    name: KLING_VIDEO_MODELS['kling-2.5-turbo'].name,
+    provider: 'Kuaishou',
+    family: 'kling',
+    edgeFunction: 'generate-kling-video',
+    group: 'recommended',
+    icon: Film,
+    capabilities: { t2v: true, i2v: true, v2v: false, audio: false, nativeDialogue: false, anchorOnly: true },
+    durations: [5, 8, 10],
+    resolution: '720p',
+    aspectRatios: sharedAspect,
+    costPerSecond: KLING_VIDEO_MODELS['kling-2.5-turbo'].costPerSecond,
+    badge: 'Fast',
+    tagline: 'Schneller Draft · Iteration',
+    legacyRoute: '/kling-video-studio',
+  },
+  {
+    id: 'kling-2.6',
+    name: KLING_VIDEO_MODELS['kling-2.6'].name,
+    provider: 'Kuaishou',
+    family: 'kling',
+    edgeFunction: 'generate-kling-video',
+    group: 'recommended',
+    icon: Film,
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: false, anchorOnly: true },
+    durations: [5, 8, 10, 15],
+    resolution: '1080p',
+    aspectRatios: sharedAspect,
+    costPerSecond: KLING_VIDEO_MODELS['kling-2.6'].costPerSecond,
+    badge: 'Ambient Audio',
+    tagline: 'Sweet Spot · Ambient-Audio',
+    legacyRoute: '/kling-video-studio',
+  },
   {
     id: 'kling-3-standard',
     name: KLING_VIDEO_MODELS['kling-3-standard'].name,
@@ -132,6 +166,24 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     costPerSecond: KLING_VIDEO_MODELS['kling-3-pro'].costPerSecond,
     badge: 'Premium',
     tagline: '1080p · Premium-Qualität',
+    legacyRoute: '/kling-video-studio',
+  },
+  {
+    id: 'kling-omni',
+    name: KLING_VIDEO_MODELS['kling-omni'].name,
+    provider: 'Kuaishou',
+    family: 'kling',
+    // Own edge function — native lip-sync bypasses Sync.so pipeline.
+    edgeFunction: 'generate-kling-video',
+    group: 'premium',
+    icon: Film,
+    capabilities: { t2v: true, i2v: true, v2v: false, audio: true, nativeDialogue: true, anchorOnly: false },
+    durations: [5, 8, 10, 15],
+    resolution: '1080p',
+    aspectRatios: sharedAspect,
+    costPerSecond: KLING_VIDEO_MODELS['kling-omni'].costPerSecond,
+    badge: 'Native Lip-Sync',
+    tagline: 'Native Lip-Sync in DE/EN/ES · Multi-Shot',
     legacyRoute: '/kling-video-studio',
   },
 

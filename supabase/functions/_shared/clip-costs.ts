@@ -17,6 +17,8 @@ export type ClipQuality = "standard" | "pro";
 export const CLIP_COSTS: Record<string, Record<ClipQuality, number>> = {
   "ai-hailuo":     { standard: 0.14, pro: 0.23 },
   "ai-kling":      { standard: 0.18, pro: 0.30 },
+  "ai-kling-omni": { standard: 0.60, pro: 0.60 }, // native lip-sync + audio
+
   "ai-sora":       { standard: 0.60, pro: 1.35 },
   "ai-wan":        { standard: 0.12, pro: 0.21 },
   "ai-seedance":   { standard: 0.09, pro: 0.18 }, // Mini tier is 0.06 (see registry)

@@ -37,6 +37,22 @@ export interface ProviderCapability {
   multiSpeaker: boolean;
   /** Human-readable label for UI hints. */
   label: string;
+  /**
+   * NEW (v250 — Kling Omni): provider produces final lip-synced video in
+   * ONE call. When true, the composer skips the Sync.so pipeline entirely
+   * for scenes using this provider.
+   */
+  nativeLipSync?: boolean;
+  /** NEW: provider generates TTS + ambient audio natively (no ElevenLabs step). */
+  nativeAudio?: boolean;
+  /** NEW: ISO-639-1 language codes the provider speaks with correct lip-sync. */
+  supportedLanguages?: string[];
+  /** NEW: Multi-shot capability (Kling Omni can chain 2–6 cam angles). */
+  multiShot?: { min: number; max: number };
+  /** NEW: Provider supports start-frame + end-frame interpolation. */
+  startEndFrames?: boolean;
+  /** NEW: Hard cap on speakers per scene (Omni: 2, Hailuo: 4+). */
+  maxSpeakers?: number;
 }
 
 export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
@@ -123,12 +139,44 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     label: 'Vidu',
   },
   'ai-kling-omni': {
-    durations: [5, 10],
-    lipsync: false,
-    multiSpeaker: false,
+    // Kling 3.0 Omni: native audio + lip-sync + multi-shot in one call.
+    // Max 15s per generation, DE/EN/ES lip-sync verified in Kuaishou release notes.
+    durations: [5, 8, 10, 15],
+    lipsync: true,
+    multiSpeaker: true,
     label: 'Kling Omni',
+    nativeLipSync: true,
+    nativeAudio: true,
+    supportedLanguages: ['de', 'en', 'es'],
+    multiShot: { min: 2, max: 6 },
+    startEndFrames: true,
+    maxSpeakers: 2,
   },
 };
+
+/** True if this provider produces final lip-synced video without Sync.so. */
+export function providerHasNativeLipSync(clipSource: string | undefined | null): boolean {
+  if (!clipSource) return false;
+  return !!PROVIDER_CAPS[clipSource]?.nativeLipSync;
+}
+
+/** True if this provider generates its own audio (TTS + ambient). */
+export function providerHasNativeAudio(clipSource: string | undefined | null): boolean {
+  if (!clipSource) return false;
+  return !!PROVIDER_CAPS[clipSource]?.nativeAudio;
+}
+
+/** Languages this provider speaks with correct lip-sync. */
+export function providerSupportedLanguages(clipSource: string | undefined | null): string[] {
+  if (!clipSource) return [];
+  return PROVIDER_CAPS[clipSource]?.supportedLanguages ?? [];
+}
+
+/** Hard cap on speakers per scene, or Infinity when unspecified. */
+export function providerMaxSpeakers(clipSource: string | undefined | null): number {
+  if (!clipSource) return Infinity;
+  return PROVIDER_CAPS[clipSource]?.maxSpeakers ?? Infinity;
+}
 
 const DEFAULT_LIPSYNC_PROVIDER: ClipSource = 'ai-hailuo';
 

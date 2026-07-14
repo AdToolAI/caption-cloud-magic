@@ -22,6 +22,7 @@ export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof
 export type ClipSource =
   | 'ai-hailuo'
   | 'ai-kling'
+  | 'ai-kling-omni'
   | 'ai-sora'
   | 'ai-wan'
   | 'ai-seedance'
@@ -953,6 +954,7 @@ export const SCENE_TYPE_LABELS: Record<SceneType, { de: string; en: string; es: 
 export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> = {
   'ai-hailuo':   { de: 'KI (Hailuo)', en: 'AI (Hailuo)' },
   'ai-kling':    { de: 'KI (Kling)', en: 'AI (Kling)' },
+  'ai-kling-omni': { de: 'KI (Kling 3.0 Omni) 🎤', en: 'AI (Kling 3.0 Omni) 🎤' },
   'ai-sora':     { de: 'KI (Sora)', en: 'AI (Sora)' },
   'ai-wan':      { de: 'KI (Wan 2.5)', en: 'AI (Wan 2.5)' },
   'ai-seedance': { de: 'KI (Seedance)', en: 'AI (Seedance)' },
@@ -974,6 +976,8 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
 export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> = {
   'ai-hailuo':   { standard: 0.14, pro: 0.23 },
   'ai-kling':    { standard: 0.18, pro: 0.30 },
+  // Kling 3.0 Omni: native lip-sync + audio in one call, 3.00× margin
+  'ai-kling-omni': { standard: 0.60, pro: 0.60 },
   'ai-sora':     { standard: 0.60, pro: 1.35 },
   'ai-wan':      { standard: 0.12, pro: 0.21 },
   'ai-seedance': { standard: 0.09, pro: 0.18 }, // Mini = 0.06 (see registry)
@@ -996,6 +1000,7 @@ export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> 
 export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-hailuo':   { standard: 'Standard 768p', pro: 'Pro 1080p' },
   'ai-kling':    { standard: 'Standard 720p', pro: 'Pro 1080p' },
+  'ai-kling-omni': { standard: 'Omni 1080p +Native Lip-Sync', pro: 'Omni 1080p +Native Lip-Sync' },
   'ai-sora':     { standard: 'Standard',      pro: 'Pro' },
   'ai-wan':      { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-seedance': { standard: 'Standard 720p', pro: 'Pro 1080p' },

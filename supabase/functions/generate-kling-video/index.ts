@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,18 +12,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Kling 3.0 Customer Pricing per second — normalized 14.07.2026 to 3.00× cost margin
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'kling-3-standard': { EUR: 0.18, USD: 0.18 },
-  'kling-3-pro':      { EUR: 0.30, USD: 0.30 },
+// Replicate model slug + per-model capabilities. Prices come from the shared
+// pricing catalog (single source of truth) — do NOT duplicate them here.
+type KlingModelId =
+  | 'kling-3-standard'
+  | 'kling-3-pro'
+  | 'kling-2.5-turbo'
+  | 'kling-2.6'
+  | 'kling-omni';
+
+const KLING_MODEL_CONFIG: Record<KlingModelId, {
+  slug: string;
+  mode?: 'standard' | 'pro';
+  supportsNativeAudio: boolean;
+  supportsNativeLipSync: boolean;
+  resolution: '720p' | '1080p';
+}> = {
+  'kling-3-standard': { slug: 'kwaivgi/kling-v3-standard',  mode: 'standard', supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '720p'  },
+  'kling-3-pro':      { slug: 'kwaivgi/kling-v3-pro',       mode: 'pro',      supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.5-turbo':  { slug: 'kwaivgi/kling-v2.5-turbo-pro',                supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.6':        { slug: 'kwaivgi/kling-v2.6',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-omni':       { slug: 'kwaivgi/kling-v3-omni-video',                 supportsNativeAudio: true,  supportsNativeLipSync: true,  resolution: '1080p' },
 };
 
 interface GenerateRequest {
   prompt: string;
-  model: 'kling-3-standard' | 'kling-3-pro';
+  model: KlingModelId;
   duration: number; // 3-15 seconds
   aspectRatio: '16:9' | '9:16' | '1:1';
   generateAudio?: boolean;
+  /** Omni only: spoken dialogue text (used as native lip-sync source). */
+  dialogText?: string;
+  /** Omni only: TTS voice preset / gender hint. */
+  voicePreset?: string;
   // Image-to-Video
   startImageUrl?: string;
   endImageUrl?: string;
@@ -62,20 +84,27 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
-    const { prompt, model, duration, aspectRatio, generateAudio, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
+    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
     const suppressDialogue = body.suppressDialogue === true;
+
+    // Resolve model config (with safe fallback to Standard)
+    const modelConfig = KLING_MODEL_CONFIG[model] ?? KLING_MODEL_CONFIG['kling-3-standard'];
+
     if (generateAudio && spokenLanguage) {
-      console.log(`[generate-kling-video] spokenLanguage=${spokenLanguage} (prompt lock applied client-side)`);
+      console.log(`[generate-kling-video] model=${model} spokenLanguage=${spokenLanguage}`);
     }
     if (generateAudio && suppressDialogue) {
-      console.log(`[generate-kling-video] suppressDialogue=true — ambient-only fallback (provider TTS lang unsupported)`);
+      console.log(`[generate-kling-video] model=${model} suppressDialogue=true — ambient-only fallback`);
     }
 
-    // Validate duration (3-15 seconds)
-    if (duration < 3 || duration > 15) {
+    // Validate duration against catalog (per-model maxDuration).
+    const catalogEntry = VIDEO_PRICING_CATALOG[model];
+    const minDur = catalogEntry?.minDuration ?? 3;
+    const maxDur = catalogEntry?.maxDuration ?? 15;
+    if (duration < minDur || duration > maxDur) {
       return new Response(
-        JSON.stringify({ error: "Duration must be between 3 and 15 seconds for Kling 3.0" }),
+        JSON.stringify({ error: `Duration must be between ${minDur} and ${maxDur} seconds for ${model}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -95,10 +124,9 @@ serve(async (req) => {
 
     const currency = walletPreview?.currency || 'EUR';
 
-    // Calculate cost
-    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['kling-3-standard'];
-    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
-    const totalCost = duration * costPerSecond;
+    // Canonical price from shared pricing catalog — single source of truth.
+    const costPerSecond = resolveCostPerSecond(model, currency as 'EUR' | 'USD') ?? 0.18;
+    const totalCost = +(duration * costPerSecond).toFixed(4);
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
     // Check wallet balance
@@ -134,7 +162,7 @@ serve(async (req) => {
     console.log(`[generate-kling-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
-    const resolution = model === 'kling-3-pro' ? '1080p' : '720p';
+    const resolution = modelConfig.resolution;
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
@@ -181,16 +209,29 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    // Build Kling input
+    // Build Kling input (model-driven — Omni gets native audio + lip-sync fields)
     const replicateInput: Record<string, any> = {
       prompt,
       duration: duration,
       aspect_ratio: aspectRatio,
-      mode: model === 'kling-3-pro' ? 'pro' : 'standard',
     };
+    if (modelConfig.mode) {
+      replicateInput.mode = modelConfig.mode;
+    }
 
-    if (generateAudio) {
+    // Native audio (Kling 2.6 / Omni). Ambient-only fallback disables TTS.
+    if (modelConfig.supportsNativeAudio && generateAudio && !suppressDialogue) {
       replicateInput.generate_audio = true;
+      if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
+    }
+
+    // Native lip-sync (Omni only): if we have dialog text, hand it to Kling
+    // and skip the downstream Sync.so pipeline entirely.
+    if (modelConfig.supportsNativeLipSync && dialogText && dialogText.trim().length > 0 && !suppressDialogue) {
+      replicateInput.dialog = dialogText.trim();
+      if (voicePreset) replicateInput.voice = voicePreset;
+      if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
+      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${spokenLanguage ?? 'auto'}, chars=${dialogText.length})`);
     }
 
     // Image-to-Video
@@ -207,14 +248,15 @@ serve(async (req) => {
       replicateInput.video_reference_type = videoReferenceType || 'feature';
     }
 
-    console.log(`[generate-kling-video] Replicate input:`, JSON.stringify({
+    console.log(`[generate-kling-video] Replicate slug=${modelConfig.slug} input:`, JSON.stringify({
       ...replicateInput,
       prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
+      dialog: replicateInput.dialog ? `${String(replicateInput.dialog).substring(0, 60)}…` : undefined,
     }));
 
     try {
       const prediction = await replicate.predictions.create({
-        model: 'kwaivgi/kling-v3-omni-video',
+        model: modelConfig.slug,
         input: replicateInput,
         webhook: webhookUrl,
         webhook_events_filter: ['start', 'completed']
