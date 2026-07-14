@@ -350,6 +350,35 @@ export function MusicGeneratorPanel({
           <Switch checked={instrumental} onCheckedChange={setInstrumental} disabled={loading} />
         </div>
 
+        {/* Gesangssprache (nur bei Tiers mit Vocals) */}
+        {showLanguage && (
+          <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm font-medium">Gesangssprache</Label>
+                <p className="text-xs text-muted-foreground">
+                  Nur Sprachen, die dieser Provider sauber singt.
+                </p>
+              </div>
+              <Select value={vocalLanguage} onValueChange={setVocalLanguage} disabled={loading}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableLanguages.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      <span className="mr-2">{l.flag}</span>
+                      {l.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+
+
         {/* BPM Match (Beat-Sync) */}
         <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-3">
           <div className="flex items-center justify-between">
