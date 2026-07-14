@@ -402,7 +402,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     durations: [5, 10],
     resolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
-    costPerSecond: { EUR: 0.23, USD: 0.23 },
+    costPerSecond: { EUR: 0.24, USD: 0.24 },
     badge: 'V2V Specialist',
     tagline: 'Restyle & transform existing clips',
     legacyRoute: '/runway-video-studio',
