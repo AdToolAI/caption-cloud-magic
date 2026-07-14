@@ -71,6 +71,7 @@ export function ToolkitCastWorldPicker({
   onPropIdsChange,
   consistencyKey,
   supportsImageInput,
+  hideCharacters = false,
 }: Props) {
   const { language } = useTranslation();
   // Cast & World lock: characters come exclusively from `brand_characters`.
