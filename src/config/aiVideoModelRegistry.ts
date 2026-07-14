@@ -479,7 +479,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     durations: [5],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
-    costPerSecond: { EUR: 0.11, USD: 0.11 },
+    costPerSecond: { EUR: 0.12, USD: 0.12 },
     badge: 'I2V',
     tagline: 'Animiert ein Standbild zu einem 5s-Clip',
     legacyRoute: '/vidu-studio',
