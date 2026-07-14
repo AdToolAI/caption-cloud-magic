@@ -45,7 +45,10 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
 
   // Kling
   'kling-3-standard':     { id: 'kling-3-standard',     label: 'Kling 3 Std 720p',     unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 5,  maxDuration: 10 },
-  'kling-3-pro':          { id: 'kling-3-pro',          label: 'Kling 3 Pro 1080p',    unit: 'per-second', sellEUR: 0.30, sellUSD: 0.30, costEUR: 0.10,  minDuration: 5,  maxDuration: 10 },
+  'kling-3-pro':          { id: 'kling-3-pro',          label: 'Kling 3.0 Pro 1080p',  unit: 'per-second', sellEUR: 0.24, sellUSD: 0.24, costEUR: 0.08,  minDuration: 5,  maxDuration: 15 },
+  'kling-2.5-turbo':      { id: 'kling-2.5-turbo',      label: 'Kling 2.5 Turbo Pro',  unit: 'per-second', sellEUR: 0.09, sellUSD: 0.09, costEUR: 0.03,  minDuration: 5,  maxDuration: 10 },
+  'kling-2.6':            { id: 'kling-2.6',            label: 'Kling 2.6',            unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 5,  maxDuration: 15 },
+  'kling-omni':           { id: 'kling-omni',           label: 'Kling 3.0 Omni',       unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 5,  maxDuration: 15 },
 
   // Wan 2.5 / 2.6
   'wan-standard':         { id: 'wan-standard',         label: 'Wan 2.5 Std',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 4,  maxDuration: 10 },
