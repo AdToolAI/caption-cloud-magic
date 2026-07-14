@@ -954,6 +954,7 @@ export const SCENE_TYPE_LABELS: Record<SceneType, { de: string; en: string; es: 
 export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> = {
   'ai-hailuo':   { de: 'KI (Hailuo)', en: 'AI (Hailuo)' },
   'ai-kling':    { de: 'KI (Kling)', en: 'AI (Kling)' },
+  'ai-kling-omni': { de: 'KI (Kling 3.0 Omni) 🎤', en: 'AI (Kling 3.0 Omni) 🎤' },
   'ai-sora':     { de: 'KI (Sora)', en: 'AI (Sora)' },
   'ai-wan':      { de: 'KI (Wan 2.5)', en: 'AI (Wan 2.5)' },
   'ai-seedance': { de: 'KI (Seedance)', en: 'AI (Seedance)' },
