@@ -297,7 +297,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   };
 
   /* ── Generate dispatch ── */
-  const handleGenerate = async () => {
+  const runGenerate = async () => {
     if (!prompt.trim()) {
       toast.error(language === 'de' ? 'Bitte gib einen Prompt ein.' : 'Please enter a prompt.');
       return;
