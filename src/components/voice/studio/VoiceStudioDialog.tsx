@@ -101,6 +101,8 @@ async function probeDuration(blob: Blob): Promise<number> {
 export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [scriptLang, setScriptLang] = useState<TrainingScriptLang>("de");
+  const [speakerName, setSpeakerName] = useState("");
+
 
   // Recorder state
   const [isRecording, setIsRecording] = useState(false);
