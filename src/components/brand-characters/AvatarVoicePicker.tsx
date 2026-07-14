@@ -63,20 +63,10 @@ export const AvatarVoicePicker = ({ value, onChange, disabled }: AvatarVoicePick
           <SelectValue placeholder="Pick a voice…" />
         </SelectTrigger>
         <SelectContent className="z-[60] bg-background border-primary/20">
-          <SelectGroup>
-            <SelectLabel className="text-[10px] uppercase tracking-widest text-primary/60">
-              ElevenLabs Library
-            </SelectLabel>
-            {ELEVENLABS_VOICES.map((v) => (
-              <SelectItem key={v.id} value={v.id} className="text-xs">
-                {v.name}
-              </SelectItem>
-            ))}
-          </SelectGroup>
           {customList.length > 0 && (
             <SelectGroup>
-              <SelectLabel className="text-[10px] uppercase tracking-widest text-primary/60 mt-2">
-                Your Custom Voices
+              <SelectLabel className="text-[10px] uppercase tracking-widest text-primary/60">
+                ⭐ Deine geklonten Stimmen
               </SelectLabel>
               {customList.map((v) => (
                 <SelectItem key={v.id} value={v.elevenlabs_voice_id} className="text-xs">
@@ -85,6 +75,16 @@ export const AvatarVoicePicker = ({ value, onChange, disabled }: AvatarVoicePick
               ))}
             </SelectGroup>
           )}
+          <SelectGroup>
+            <SelectLabel className="text-[10px] uppercase tracking-widest text-primary/60 mt-2">
+              ElevenLabs Library
+            </SelectLabel>
+            {ELEVENLABS_VOICES.map((v) => (
+              <SelectItem key={v.id} value={v.id} className="text-xs">
+                {v.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>
