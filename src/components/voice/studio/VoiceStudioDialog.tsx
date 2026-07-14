@@ -443,14 +443,33 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 <Copy className="h-3.5 w-3.5" /> Kopieren
               </Button>
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="speaker-name" className="text-sm">
+                Dein Name (wird ins Skript eingesetzt)
+              </Label>
+              <Input
+                id="speaker-name"
+                value={speakerName}
+                onChange={(e) => setSpeakerName(e.target.value)}
+                placeholder="z. B. Max"
+                maxLength={40}
+              />
+              <p className="text-xs text-muted-foreground">
+                Wir ersetzen den Platzhalter <code>{"{NAME}"}</code> im Skript automatisch —
+                so klingt die Vorstellung natürlich.
+              </p>
+            </div>
             <Card className="p-4 bg-muted/30 max-h-72 overflow-y-auto">
-              <p className="text-xs text-muted-foreground mb-2">{script.hint}</p>
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{script.text}</p>
+              <p className="text-xs text-muted-foreground mb-2">{personalizedHint}</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{personalizedText}</p>
             </Card>
             <div className="flex justify-end">
               <Button
                 onClick={() => {
                   setVoiceLang(scriptLang);
+                  if (!voiceName && speakerName.trim()) {
+                    setVoiceName(`${speakerName.trim()} Voice`);
+                  }
                   setStep(2);
                 }}
               >
@@ -459,6 +478,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
             </div>
           </div>
         )}
+
 
         {step === 2 && (
           <div className="space-y-4">
