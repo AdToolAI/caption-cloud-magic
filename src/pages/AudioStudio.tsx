@@ -278,6 +278,9 @@ export default function AudioStudio() {
                 </div>
               </Card>
 
+              {/* Meine Stimmen — geklonte Voices */}
+              <MyVoicesSection onCreate={() => setShowVoiceStudio(true)} />
+
               {/* AI Music Generator Teaser */}
               <Card 
                 onClick={() => setShowMusicGen(true)}
