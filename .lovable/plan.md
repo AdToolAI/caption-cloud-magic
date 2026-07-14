@@ -1,42 +1,18 @@
-## Zwei Ergänzungen in Cast & World
+# Fix: „n.context.body.text is not a function" beim Track-Erstellen
 
-### 1. Voice-Auswahl auf der Charakter-Detailseite
+## Ursache
+In `src/hooks/useMusicGeneration.ts` (Zeile 51) wird bei einem Edge-Function-Fehler versucht, `error.context.body.text()` aufzurufen. Bei aktuellen `supabase.functions.invoke`-Versionen ist `context.body` aber kein `Response`-Stream mehr, sondern bereits ein geparstes Objekt/String — der Aufruf `.text()` wirft daher `is not a function`. Der eigentliche Backend-Fehler (z. B. `INSUFFICIENT_CREDITS`, `MISSING_LYRICS`, Provider-Fehler) wird dadurch komplett verschluckt und durch den Crash-Toast ersetzt.
 
-**Problem:** `/avatars/:id` zeigt eine „Voice Profile"-Karte (Stability, Similarity, Style, Speed, Speaker Boost), aber keinen Voice-Picker. Preview ist deshalb deaktiviert ("Set a default voice first"). Custom Voices aus dem Audio Studio sind hier nicht erreichbar.
+## Fix
+Robuste Payload-Extraktion in `useMusicGeneration.ts`, die alle drei Formen abdeckt:
+1. `context.body` ist bereits ein Objekt → direkt verwenden
+2. `context.body` ist ein String → `JSON.parse` mit Fallback
+3. `context.body` ist ein `Response`/Blob mit `.text()` → wie bisher (in try/catch)
+4. sonst → `context` selbst oder `error.message` als Fallback
 
-Die Datenverdrahtung existiert bereits: `brand_characters.default_voice_id / _provider / _name` wird von Motion Studio, AI Video Studio (`ToolkitGenerator`), `TalkingHeadDialog`, `SceneDialogStudio`, `useApplyProductionPlan` und `useUnifiedMentionLibrary` automatisch als Default gelesen. Es fehlt nur die UI zum Setzen auf der Detailseite.
+Kein Verhaltens-Change am Erfolgspfad, keine UI-Änderung — nur der Error-Reader wird gehärtet, damit die bestehenden Toasts (Credits, Rate-Limit, Missing Lyrics, generisch) wieder korrekt greifen.
 
-**Änderungen (rein UI):**
-- **`src/components/avatars/VoiceProfileCard.tsx`** — neuen Block **„Voice Selection"** oberhalb der Slider einfügen mit `AvatarVoicePicker` (ElevenLabs-Library **und** Custom Voices aus `useCustomVoices`) + `VoicePreviewButton`. `onChange` schreibt `default_voice_id / _provider / _name` in `brand_characters` und invalidiert die `avatar-detail`-Query. Hinweis darunter: „Wird als Default in Motion Studio & AI Video Studio übernommen."
-- **`src/components/brand-characters/AvatarVoicePicker.tsx`** — „Your Custom Voices"-Gruppe an den **Anfang** der Liste ziehen, damit frisch geklonte Stimmen sofort sichtbar sind.
+## Betroffene Datei
+- `src/hooks/useMusicGeneration.ts` — Ersatz des `context.body.text()`-Blocks durch eine kleine `parseInvokeError`-Helper-Funktion im selben File.
 
-### 2. IDs überall in Cast & World sichtbar
-
-Betrifft Charaktere, Locations, Outfits/Wardrobe-Items, Props/Objekte, Buildings — jede Entität, die eine `id` hat.
-
-**Anzeige-Muster:** kleine Monospace-Badge mit den ersten 8 Zeichen der UUID + Copy-Icon (klickt → schreibt volle UUID in die Zwischenablage + Toast „ID kopiert"). Tooltip zeigt die volle UUID.
-
-**Neue Komponente:** `src/components/cast-world/EntityIdBadge.tsx`
-```
-<Badge>ID · abc12345…</Badge>  ← Copy-to-clipboard
-```
-Klein, `text-[10px]`, `font-mono`, `text-muted-foreground`, unaufdringlich in Ecke oder unter Titel.
-
-**Einbau-Stellen (nur bestehende UI, keine neuen Routen):**
-- `src/pages/AvatarDetail.tsx` — direkt unter `Samuel Dusatko`-Name
-- `src/components/brand-characters/BrandCharacterCard.tsx` — Karte in der Bibliothek (Ecke oben rechts)
-- `src/components/motion-studio/CharacterCard.tsx` (falls vorhanden) — Motion-Studio-Bibliothek
-- `src/components/motion-studio/LocationCard.tsx` — Locations
-- Outfit-/Wardrobe-Karten in `AvatarDetail.tsx` (Casual/Streetwear/Brunch/Loungewear-Kacheln) — `outfit_look_id` als Badge
-- Prop-/Building-/Objekt-Karten (falls vorhanden unter `src/components/motion-studio/props*` oder `objects*`)
-
-Vor dem Einbau kurz `rg` fahren, um alle relevanten Karten-Komponenten zu erfassen; alle bekommen dieselbe `<EntityIdBadge>`.
-
-### Nicht Teil dieses Plans
-- Kein Schema-Change (IDs existieren bereits).
-- Keine Änderung an Downstream-Pipelines.
-- Kein neuer Edge-Function-Call.
-
-### Verifikation
-- `/avatars/:id` öffnen → Voice-Picker sichtbar, Auswahl (ElevenLabs oder Custom) → Preview funktioniert → nach Reload persistiert → Motion Studio zeigt Stimme als vorbelegt.
-- In allen Cast & World Listen und Detailansichten (Charakter, Location, Outfit, Prop/Building) ist eine ID-Badge sichtbar, Klick kopiert die volle UUID in die Zwischenablage.
+Nach dem Fix zeigt der Toast wieder den echten Backend-Grund an, sodass wir sehen, ob es ein Credits-, Lyrics- oder Provider-Problem ist.

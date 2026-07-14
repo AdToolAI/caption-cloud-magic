@@ -34,6 +34,26 @@ export const MUSIC_TIER_PRICING: Record<MusicTier, { eur: number; maxDuration: n
   pro:      { eur: 1.40, maxDuration: 300, engine: 'ElevenLabs Music Pro', description: 'Long-form professional production' },
 };
 
+async function parseInvokeError(error: any): Promise<any> {
+  try {
+    const body = error?.context?.body ?? error?.context;
+    if (!body) return null;
+    if (typeof body === 'object' && typeof (body as any).text !== 'function' && !(body instanceof Blob)) {
+      return body;
+    }
+    if (typeof body === 'string') {
+      try { return JSON.parse(body); } catch { return { error: body }; }
+    }
+    if (typeof (body as any).text === 'function') {
+      const t = await (body as any).text();
+      try { return JSON.parse(t); } catch { return { error: t }; }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function useMusicGeneration() {
   const [loading, setLoading] = useState(false);
   const [generatingLyrics, setGeneratingLyrics] = useState(false);
@@ -47,12 +67,9 @@ export function useMusicGeneration() {
       });
 
       if (error) {
-        const errPayload: any = (error as any).context?.body
-          ? await (error as any).context.body.text().then((t: string) => { try { return JSON.parse(t); } catch { return null; } })
-          : null;
-
+        const errPayload: any = await parseInvokeError(error);
         const code = errPayload?.code;
-        const msg = errPayload?.error || error.message;
+        const msg = errPayload?.error || errPayload?.message || error.message;
 
         if (code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET') {
           toast.error(msg, {
