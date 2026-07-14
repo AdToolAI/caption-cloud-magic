@@ -949,7 +949,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       )}
 
       {/* ── Image upload (only for I2V) ── */}
-      {model.capabilities.i2v && (
+      {model.capabilities.i2v && !omniMediaLock && (
         <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60 space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-medium">
