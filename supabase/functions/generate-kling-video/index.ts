@@ -92,7 +92,7 @@ serve(async (req) => {
     const suppressDialogue = body.suppressDialogue === true;
 
     // Resolve model config (with safe fallback to Standard)
-    const modelConfig = KLING_MODEL_CONFIG[model] ?? KLING_MODEL_CONFIG['kling-3-standard'];
+    const modelConfig = KLING_MODEL_CONFIG[model] ?? KLING_MODEL_CONFIG['kling-3'];
 
     if (generateAudio && spokenLanguage) {
       console.log(`[generate-kling-video] model=${model} spokenLanguage=${spokenLanguage}`);
