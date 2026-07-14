@@ -143,9 +143,11 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       setVoiceDesc("");
       setConsent(false);
       setPlayingId(null);
+      setSpeakerName("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
 
   const startRecording = useCallback(async () => {
     try {
