@@ -1,26 +1,36 @@
-## Befund
+# Plan: "Meine Stimmen"-Sektion im Audio Studio
 
-Der aktuell deployte Backend-Code ist noch alt: Die Logs zeigen eindeutig `At least 3 voice samples required` in `clone-voice`, obwohl die Datei im Projekt bereits auf mindestens 1 Sample geändert wurde. Der Fehler ist also kein UI-Problem, sondern ein nicht aktualisierter Deployment-Stand der Function.
+Nach dem Klonen war unklar, wo die Stimme landet. Wir bauen eine sichtbare Voice-Library direkt ins Audio Studio, damit man alle eigenen Voices verwalten und testen kann.
 
-## Plan
+## Was gebaut wird
 
-1. **Kleinen No-op/Versionsmarker in `clone-voice` setzen**
-   - Damit Lovable Cloud die Function sicher als geändert erkennt.
-   - Die Mindestanforderung bleibt: 1 Sample, mindestens 30 Sekunden Gesamtaufnahme über die UI.
+1. **Neue Komponente `MyVoicesSection.tsx`** (in `src/components/audio-studio/`)
+   - Grid/Liste aller Voices aus `useCustomVoices` (Filter: sichtbar für den User)
+   - Pro Karte: Name, Sprache, Erstelldatum, Status-Badge (Aktiv / Inaktiv)
+   - Aktionen:
+     - **Preview** (Play-Button): nutzt Edge Function `preview-voice` mit einem kurzen Standardtext in der Voice-Sprache
+     - **Umbenennen** (Inline-Edit)
+     - **Aktiv-Toggle** (nutzt bestehendes `toggleVoiceActive`)
+     - **Löschen** (mit Confirm-Dialog, nutzt bestehendes `deleteVoice`)
+   - Empty State: „Noch keine eigenen Stimmen — jetzt klonen" mit CTA öffnet `VoiceStudioDialog`
 
-2. **Fehlerantworten sauberer machen**
-   - Statt pauschal `500` bei Validierungsfehlern gibt die Function klare Statuscodes und lesbare JSON-Fehler zurück.
-   - Die UI kann dann statt „Edge Function returned a non-2xx status code“ die echte Ursache anzeigen.
+2. **Integration in `src/pages/AudioStudio.tsx`**
+   - Neue Sektion direkt unter der bestehenden „Eigene Stimme erstellen" Hero Card
+   - Titel: **„Meine Stimmen"** mit Count-Badge (`{voices.length}`)
+   - Auto-Refresh nach erfolgreichem Klonen (via `refetch` aus dem Hook)
 
-3. **Function direkt deployen und testen**
-   - `clone-voice` nach der Änderung gezielt neu deployen.
-   - Danach Logs prüfen, ob die alte `At least 3 voice samples required`-Version verschwunden ist.
+3. **Post-Clone-Verbesserung in `VoiceStudioDialog.tsx`**
+   - Success-Toast wird ergänzt um Hinweis: „Deine Stimme ist jetzt in ‚Meine Stimmen' verfügbar"
+   - Dialog schließt und scrollt sanft zur neuen Sektion
 
-4. **Falls danach ein neuer Fehler erscheint**
-   - Den echten Provider-Fehler sichtbar machen, z. B. fehlender ElevenLabs-Connector/API-Key, Datei nicht erreichbar, Formatproblem oder Provider-Limit.
+## Technisches
 
-## Technische Details
+- Datenquelle: bestehende Tabelle `custom_voices` via `useCustomVoices` Hook — keine Schema-Änderungen
+- Preview: existierende Edge Function `preview-voice` (bereits im `VoicePicker` im Einsatz)
+- Umbenennen: kleines Update in `useCustomVoices` — neue Funktion `renameVoice(id, name)` (UPDATE auf `custom_voices.name`)
+- Design: konsistent mit James-Bond-2028 Tokens (Deep Black / Gold), Glassmorphism-Karten wie im restlichen Audio Studio
 
-- Betroffene Function: `clone-voice`
-- Aktueller Log-Beweis: deployte Runtime wirft noch `At least 3 voice samples required`
-- Ziel: Deployment-Synchronisation erzwingen + echte Fehlerdetails an die Voice-Studio-UI weitergeben
+## Nicht enthalten
+
+- Keine Änderungen am AI Video Studio / Kling Omni Panel (dort sind Custom Voices bereits über `AvatarVoicePicker` / `VoicePicker` verfügbar)
+- Kein Sharing / keine Marketplace-Features für Voices
