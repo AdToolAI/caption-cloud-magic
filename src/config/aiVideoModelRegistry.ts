@@ -611,7 +611,7 @@ export function getDefaultToolkitModel(): ToolkitModel {
 
 /** Maps a legacy /<family>-video-studio route to a sensible default model id. */
 export const LEGACY_ROUTE_TO_MODEL: Record<string, string> = {
-  '/kling-video-studio':    'kling-3-standard',
+  '/kling-video-studio':    'kling-3',
   '/veo-video-studio':      'veo-3.1-fast',
   '/ltx-video-studio':      'ltx-standard',
   '/wan-video-studio':      'wan-2-6-standard',
