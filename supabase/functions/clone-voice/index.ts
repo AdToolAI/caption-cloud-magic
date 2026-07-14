@@ -30,7 +30,7 @@ serve(async (req) => {
   }
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
-    return qaMockJson(corsHeaders, { fn: "clone-voice" });
+    return qaMockJson(corsHeaders, { fn: "clone-voice", version: FUNCTION_VERSION });
   }
 
   try {
