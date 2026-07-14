@@ -385,6 +385,8 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
   };
 
   const script = VOICE_TRAINING_SCRIPTS[scriptLang];
+  const personalizedText = personalizeScript(script.text, speakerName, scriptLang);
+  const personalizedHint = personalizeScript(script.hint, speakerName, scriptLang);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
