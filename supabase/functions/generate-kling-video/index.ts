@@ -90,7 +90,7 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
-    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
+    const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, speakerVoices, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
     const suppressDialogue = body.suppressDialogue === true;
 
