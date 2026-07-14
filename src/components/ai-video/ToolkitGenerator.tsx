@@ -46,6 +46,7 @@ import type { CharacterShot, ComposerCharacter, ComposerScene } from '@/types/vi
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
+import { useVideoPricingCatalog } from '@/hooks/useVideoPricingCatalog';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getCurrencyForLanguage } from '@/lib/currency';
 import type { Currency } from '@/config/pricing';
