@@ -1159,46 +1159,100 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </Badge>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="omni-dialog" className="text-xs text-muted-foreground">
-                {language === 'de'
-                  ? 'Dialog-Text (optional). Leer lassen für stummen Clip mit Ambient-Audio.'
-                  : 'Dialogue text (optional). Leave empty for a silent clip with ambient audio.'}
-              </Label>
-              <Textarea
-                id="omni-dialog"
-                value={omniDialogText}
-                onChange={(e) => setOmniDialogText(e.target.value.slice(0, 600))}
-                placeholder={
-                  language === 'de'
-                    ? 'z. B. "Willkommen bei AdTool AI — dein Werbespot in 15 Sekunden."'
-                    : 'e.g. "Welcome to AdTool AI — your ad in 15 seconds."'
-                }
-                className="min-h-[64px] text-sm bg-background/40"
-              />
-              <p className="text-[10px] text-muted-foreground text-right tabular-nums">
-                {omniDialogText.length}/600
-              </p>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {language === 'de'
+                ? 'Ein Block pro Sprecher — Dialog & Stimme direkt am Charakter. Leer lassen für stummen Clip mit Ambient-Audio.'
+                : 'One block per speaker — dialogue & voice attached to the character. Leave empty for a silent clip with ambient audio.'}
+            </p>
+
+            {/* Per-speaker rows */}
+            <div className="space-y-3">
+              {omniLines.map((row, idx) => {
+                const c = row.characterId ? libCharacters.find((x) => x.id === row.characterId) : null;
+                const displayName = c?.name?.trim() || (language === 'de' ? `Sprecher ${idx + 1}` : `Speaker ${idx + 1}`);
+                const initials = displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+                const updateRow = (patch: Partial<OmniLine>) =>
+                  setOmniLines((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+                const removeRow = () =>
+                  setOmniLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+                return (
+                  <div key={idx} className="rounded-md border border-primary/20 bg-background/40 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      {c?.reference_image_url ? (
+                        <img
+                          src={c.reference_image_url}
+                          alt={displayName}
+                          className="h-10 w-10 rounded-full object-cover border border-primary/30 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+                          {initials || '?'}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{displayName}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {c ? (language === 'de' ? 'Aus Cast & World' : 'From Cast & World') : (language === 'de' ? 'Anonymer Sprecher' : 'Anonymous speaker')}
+                        </p>
+                      </div>
+                      <Select value={row.voicePreset} onValueChange={(v) => updateRow({ voicePreset: v as OmniVoicePreset })}>
+                        <SelectTrigger className="h-8 w-[160px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="female-warm">{language === 'de' ? 'Weiblich · warm' : 'Female · warm'}</SelectItem>
+                          <SelectItem value="female-bright">{language === 'de' ? 'Weiblich · hell' : 'Female · bright'}</SelectItem>
+                          <SelectItem value="male-warm">{language === 'de' ? 'Männlich · warm' : 'Male · warm'}</SelectItem>
+                          <SelectItem value="male-deep">{language === 'de' ? 'Männlich · tief' : 'Male · deep'}</SelectItem>
+                          <SelectItem value="neutral">{language === 'de' ? 'Neutral' : 'Neutral'}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {omniLines.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={removeRow}
+                          aria-label="Remove speaker"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <Textarea
+                      value={row.line}
+                      onChange={(e) => updateRow({ line: e.target.value.slice(0, 300) })}
+                      placeholder={
+                        language === 'de'
+                          ? `Dialog von ${displayName} …`
+                          : `${displayName}'s line …`
+                      }
+                      className="min-h-[56px] text-sm bg-background/60"
+                    />
+                    <p className="text-[10px] text-muted-foreground text-right tabular-nums">
+                      {row.line.length}/300
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
-            {omniDialogText.trim() && (
-              <div className="flex items-center justify-between gap-3">
-                <Label className="text-xs text-muted-foreground">
-                  {language === 'de' ? 'Voice-Preset' : 'Voice preset'}
-                </Label>
-                <Select value={omniVoicePreset} onValueChange={(v) => setOmniVoicePreset(v as typeof omniVoicePreset)}>
-                  <SelectTrigger className="h-8 w-[200px] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="female-warm">{language === 'de' ? 'Weiblich · warm' : 'Female · warm'}</SelectItem>
-                    <SelectItem value="female-bright">{language === 'de' ? 'Weiblich · hell' : 'Female · bright'}</SelectItem>
-                    <SelectItem value="male-warm">{language === 'de' ? 'Männlich · warm' : 'Male · warm'}</SelectItem>
-                    <SelectItem value="male-deep">{language === 'de' ? 'Männlich · tief' : 'Male · deep'}</SelectItem>
-                    <SelectItem value="neutral">{language === 'de' ? 'Neutral' : 'Neutral'}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {omniLines.length < 2 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-primary/30"
+                onClick={() =>
+                  setOmniLines((prev) => [
+                    ...prev,
+                    { characterId: null, line: '', voicePreset: 'male-warm' },
+                  ])
+                }
+              >
+                + {language === 'de' ? 'Zweiten Sprecher hinzufügen' : 'Add second speaker'}
+              </Button>
             )}
 
             {castCharacterIds.length > 2 && (
