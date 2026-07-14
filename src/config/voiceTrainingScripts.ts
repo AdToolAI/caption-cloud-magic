@@ -2,9 +2,14 @@
  * Voice-cloning training scripts (~60–90s spoken).
  * Phonetically balanced: statements, question, exclamation, numbers,
  * soft & hard consonants, vowel range, prosody variation.
+ *
+ * The {NAME} placeholder is replaced at runtime with the user's own name so
+ * the recording sounds natural ("Hallo, mein Name ist …").
  */
 
 export type TrainingScriptLang = "de" | "en" | "es";
+
+export const NAME_PLACEHOLDER = "{NAME}";
 
 export const VOICE_TRAINING_SCRIPTS: Record<
   TrainingScriptLang,
@@ -12,8 +17,8 @@ export const VOICE_TRAINING_SCRIPTS: Record<
 > = {
   de: {
     title: "Deutsches Trainingsskript",
-    hint: "Sprich in normalem Tempo, natürlich und ruhig. Ziel: 60–90 Sekunden.",
-    text: `Hallo, mein Name ist Alex und ich nehme diese Aufnahme auf, um meine eigene Stimme zu klonen.
+    hint: "Sprich in normalem Tempo, natürlich und ruhig. Ziel: 60–90 Sekunden. Ersetze {NAME} durch deinen eigenen Namen.",
+    text: `Hallo, mein Name ist {NAME} und ich nehme diese Aufnahme auf, um meine eigene Stimme zu klonen.
 
 Heute ist ein sonniger Tag, und ich sitze in einem ruhigen Raum ohne Hintergrundgeräusche. Ich spreche gleichmäßig, deutlich und in meinem natürlichen Tonfall.
 
@@ -25,8 +30,8 @@ Manchmal flüstere ich, manchmal spreche ich energisch – doch für dieses Trai
   },
   en: {
     title: "English training script",
-    hint: "Speak at a normal pace, calm and natural. Target 60–90 seconds.",
-    text: `Hello, my name is Alex, and I'm recording this sample to clone my own voice.
+    hint: "Speak at a normal pace, calm and natural. Target 60–90 seconds. Replace {NAME} with your own name.",
+    text: `Hello, my name is {NAME}, and I'm recording this sample to clone my own voice.
 
 It's a bright, quiet day, and I'm sitting in a room with almost no background noise. I'm speaking steadily, clearly, and in my natural tone.
 
@@ -38,8 +43,8 @@ Sometimes I whisper, sometimes I speak with energy — but for this training I'l
   },
   es: {
     title: "Guion de entrenamiento en español",
-    hint: "Habla a ritmo normal, tranquilo y natural. Objetivo: 60–90 segundos.",
-    text: `Hola, me llamo Alex y estoy grabando esta muestra para clonar mi propia voz.
+    hint: "Habla a ritmo normal, tranquilo y natural. Objetivo: 60–90 segundos. Sustituye {NAME} por tu propio nombre.",
+    text: `Hola, me llamo {NAME} y estoy grabando esta muestra para clonar mi propia voz.
 
 Hoy es un día soleado y estoy en una habitación tranquila, casi sin ruido de fondo. Hablo de forma constante, clara y con mi tono natural.
 
@@ -50,3 +55,10 @@ Los números y las fechas también cuentan: el diecisiete de marzo de dos mil ve
 A veces susurro, a veces hablo con energía, pero para este entrenamiento me mantengo neutral. Gracias por escuchar, y vamos a crear una gran voz.`,
   },
 };
+
+/** Replace the {NAME} placeholder with the given speaker name (fallback: localized "[Your name]"). */
+export function personalizeScript(text: string, name: string, lang: TrainingScriptLang): string {
+  const fallback = lang === "en" ? "[your name]" : lang === "es" ? "[tu nombre]" : "[dein Name]";
+  const value = name.trim() || fallback;
+  return text.split(NAME_PLACEHOLDER).join(value);
+}
