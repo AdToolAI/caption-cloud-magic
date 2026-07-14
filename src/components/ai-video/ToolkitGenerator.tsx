@@ -1220,165 +1220,224 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           </div>
         )}
 
-        {/* ── Kling 3.0 Omni — Native Lip-Sync Panel ── */}
-        {isKlingOmni && (
-          <div className="sm:col-span-3 space-y-3 p-3 rounded-md bg-primary/5 border border-primary/30">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <Label className="text-sm">
-                  {language === 'de' ? 'Native Lip-Sync (DE/EN/ES)' : 'Native lip-sync (DE/EN/ES)'}
-                </Label>
+        {/* ── Kling 3.0 Omni — Unified Cast + Native Lip-Sync ── */}
+        {isKlingOmni && (() => {
+          const MAX_CAST = 4;
+          const LIP_SYNC_MAX = 2;
+          const lipSyncCount = omniLines.filter((r) => r.lipSync).length;
+          const withDialog = omniLines.filter((r) => r.lipSync && r.line.trim()).length;
+          const silent = omniLines.length - omniLines.filter((r) => r.lipSync).length;
+
+          const updateRow = (idx: number, patch: Partial<OmniLine>) =>
+            setOmniLines((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+          const removeRow = (idx: number) =>
+            setOmniLines((prev) => prev.filter((_, i) => i !== idx));
+          const addRow = () => {
+            const used = new Set(omniLines.map((r) => r.characterId));
+            const next = libCharacters.find((c) => !used.has(c.id));
+            if (!next) {
+              toast.info(language === 'de' ? 'Kein weiterer Charakter in Cast & World verfügbar.' : 'No further character available in Cast & World.');
+              return;
+            }
+            const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm', 'female-bright', 'male-deep'];
+            setOmniLines((prev) => [
+              ...prev,
+              { characterId: next.id, lipSync: prev.filter((r) => r.lipSync).length < LIP_SYNC_MAX, line: '', voicePreset: defaults[prev.length] ?? 'neutral' },
+            ]);
+          };
+          const toggleLipSync = (idx: number, checked: boolean) => {
+            const row = omniLines[idx];
+            if (!row) return;
+            if (checked && lipSyncCount >= LIP_SYNC_MAX) return;
+            if (!checked && row.line.trim()) {
+              if (!confirm(language === 'de' ? 'Lip-Sync für diesen Charakter deaktivieren? Der Dialogtext wird verworfen.' : 'Disable lip-sync for this character? The dialogue will be discarded.')) return;
+              updateRow(idx, { lipSync: false, line: '' });
+              return;
+            }
+            updateRow(idx, { lipSync: checked });
+          };
+
+          return (
+            <div className="sm:col-span-3 space-y-3 p-3 rounded-md bg-primary/5 border border-primary/30">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <Label className="text-sm">
+                    {language === 'de' ? 'Cast & Native Lip-Sync (DE/EN/ES)' : 'Cast & Native Lip-Sync (DE/EN/ES)'}
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="border-primary/40 text-primary text-[10px] tabular-nums">
+                    {lipSyncCount}/{LIP_SYNC_MAX} {language === 'de' ? 'Lip-Sync' : 'Lip-Sync'}
+                  </Badge>
+                  <Badge variant="outline" className="border-primary/40 text-primary text-[10px] tabular-nums">
+                    {omniLines.length}/{MAX_CAST} {language === 'de' ? 'Cast' : 'Cast'}
+                  </Badge>
+                </div>
               </div>
-              <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
-                {language === 'de' ? 'Ein Rendering — kein Sync.so nötig' : 'Single render — no Sync.so needed'}
-              </Badge>
-            </div>
 
-            <p className="text-[11px] text-muted-foreground leading-snug">
-              {language === 'de'
-                ? 'Ein Block pro Sprecher — Dialog & Stimme direkt am Charakter. Leer lassen für stummen Clip mit Ambient-Audio.'
-                : 'One block per speaker — dialogue & voice attached to the character. Leave empty for a silent clip with ambient audio.'}
-            </p>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {language === 'de'
+                  ? 'Bis zu 4 Charaktere aus Cast & World. Aktiviere den Lip-Sync-Switch für max. 2 sprechende Charaktere — die anderen erscheinen als stumme Statist:innen im Bild.'
+                  : 'Up to 4 characters from Cast & World. Toggle lip-sync for up to 2 speaking characters — the rest appear as silent extras in the frame.'}
+              </p>
 
-            {/* Per-speaker rows */}
-            <div className="space-y-3">
-              {omniLines.map((row, idx) => {
-                const c = row.characterId ? libCharacters.find((x) => x.id === row.characterId) : null;
-                const displayName = c?.name?.trim() || (language === 'de' ? `Sprecher ${idx + 1}` : `Speaker ${idx + 1}`);
-                const initials = displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-                const updateRow = (patch: Partial<OmniLine>) =>
-                  setOmniLines((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
-                const removeRow = () =>
-                  setOmniLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
-                return (
-                  <div key={idx} className="rounded-md border border-primary/20 bg-background/40 p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      {c?.reference_image_url ? (
-                        <img
-                          src={c.reference_image_url}
-                          alt={displayName}
-                          className="h-10 w-10 rounded-full object-cover border border-primary/30 flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
-                          {initials || '?'}
+              {omniLines.length === 0 && (
+                <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-4 text-center text-[12px] text-muted-foreground">
+                  {language === 'de'
+                    ? 'Noch keine Charaktere. Füge unten deinen ersten Cast-Charakter hinzu.'
+                    : 'No characters yet. Add your first cast character below.'}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {omniLines.map((row, idx) => {
+                  const c = libCharacters.find((x) => x.id === row.characterId);
+                  const displayName = c?.name?.trim() || (language === 'de' ? `Charakter ${idx + 1}` : `Character ${idx + 1}`);
+                  const initials = displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+                  const switchDisabled = !row.lipSync && lipSyncCount >= LIP_SYNC_MAX;
+                  return (
+                    <div key={idx} className="rounded-md border border-primary/20 bg-background/40 p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        {c?.reference_image_url ? (
+                          <img
+                            src={c.reference_image_url}
+                            alt={displayName}
+                            className="h-10 w-10 rounded-full object-cover border border-primary/30 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+                            {initials || '?'}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <Select
+                            value={row.characterId}
+                            onValueChange={(v) => updateRow(idx, { characterId: v })}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {libCharacters.map((ch) => {
+                                const usedElsewhere = omniLines.some((r, i) => i !== idx && r.characterId === ch.id);
+                                return (
+                                  <SelectItem key={ch.id} value={ch.id} disabled={usedElsewhere}>
+                                    {ch.name}{usedElsewhere ? (language === 'de' ? ' · bereits zugewiesen' : ' · already assigned') : ''}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {language === 'de' ? 'Aus Cast & World' : 'From Cast & World'}
+                          </p>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0 space-y-1">
-                        {/* Character select — bound per row; other rows' picks are disabled */}
-                        <Select
-                          value={row.characterId ?? '__anon'}
-                          onValueChange={(v) => {
-                            const nextId = v === '__anon' ? null : v;
-                            setOmniLines((prev) =>
-                              prev.map((r, i) => (i === idx ? { ...r, characterId: nextId } : r)),
-                            );
-                            // Ensure picked character is in the Cast pool for the anchor composer.
-                            if (nextId) {
-                              setCastCharacterIds((prev) =>
-                                prev.includes(nextId) ? prev : (prev.length >= 4 ? prev : [...prev, nextId]),
-                              );
-                            }
-                            omniPrefilledRef.current = true;
-                          }}
+                        <div
+                          className="flex flex-col items-center gap-1"
+                          title={
+                            switchDisabled
+                              ? (language === 'de'
+                                  ? 'Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.'
+                                  : 'Kling Omni allows max. 2 speaking characters per clip.')
+                              : undefined
+                          }
                         >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__anon">
-                              {language === 'de' ? `Anonym (Sprecher ${idx + 1})` : `Anonymous (Speaker ${idx + 1})`}
-                            </SelectItem>
-                            {libCharacters.map((ch) => {
-                              const usedElsewhere = omniLines.some((r, i) => i !== idx && r.characterId === ch.id);
-                              return (
-                                <SelectItem key={ch.id} value={ch.id} disabled={usedElsewhere}>
-                                  {ch.name}{usedElsewhere ? (language === 'de' ? ' · bereits zugewiesen' : ' · already assigned') : ''}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          {c ? (language === 'de' ? 'Aus Cast & World' : 'From Cast & World') : (language === 'de' ? 'Anonymer Sprecher' : 'Anonymous speaker')}
-                        </p>
-                      </div>
-                      <Select value={row.voicePreset} onValueChange={(v) => updateRow({ voicePreset: v as OmniVoicePreset })}>
-                        <SelectTrigger className="h-8 w-[150px] text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="female-warm">{language === 'de' ? 'Weiblich · warm' : 'Female · warm'}</SelectItem>
-                          <SelectItem value="female-bright">{language === 'de' ? 'Weiblich · hell' : 'Female · bright'}</SelectItem>
-                          <SelectItem value="male-warm">{language === 'de' ? 'Männlich · warm' : 'Male · warm'}</SelectItem>
-                          <SelectItem value="male-deep">{language === 'de' ? 'Männlich · tief' : 'Male · deep'}</SelectItem>
-                          <SelectItem value="neutral">{language === 'de' ? 'Neutral' : 'Neutral'}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {omniLines.length > 1 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Lip-Sync</span>
+                            <Switch
+                              checked={row.lipSync}
+                              disabled={switchDisabled}
+                              onCheckedChange={(v) => toggleLipSync(idx, v)}
+                            />
+                          </div>
+                          {row.lipSync && (
+                            <span className="text-[10px] font-semibold text-primary tabular-nums">
+                              {omniLines.filter((r, i) => r.lipSync && i <= idx).length}/{LIP_SYNC_MAX}
+                            </span>
+                          )}
+                        </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={removeRow}
-                          aria-label="Remove speaker"
+                          onClick={() => removeRow(idx)}
+                          aria-label="Remove character"
                         >
                           <X className="h-4 w-4" />
                         </Button>
+                      </div>
+
+                      {row.lipSync && (
+                        <>
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                              {language === 'de' ? 'Stimme' : 'Voice'}
+                            </Label>
+                            <Select value={row.voicePreset} onValueChange={(v) => updateRow(idx, { voicePreset: v as OmniVoicePreset })}>
+                              <SelectTrigger className="h-8 w-[180px] text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="female-warm">{language === 'de' ? 'Weiblich · warm' : 'Female · warm'}</SelectItem>
+                                <SelectItem value="female-bright">{language === 'de' ? 'Weiblich · hell' : 'Female · bright'}</SelectItem>
+                                <SelectItem value="male-warm">{language === 'de' ? 'Männlich · warm' : 'Male · warm'}</SelectItem>
+                                <SelectItem value="male-deep">{language === 'de' ? 'Männlich · tief' : 'Male · deep'}</SelectItem>
+                                <SelectItem value="neutral">{language === 'de' ? 'Neutral' : 'Neutral'}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Textarea
+                            value={row.line}
+                            onChange={(e) => updateRow(idx, { line: e.target.value.slice(0, 300) })}
+                            placeholder={
+                              language === 'de'
+                                ? `Dialog von ${displayName} …`
+                                : `${displayName}'s line …`
+                            }
+                            className="min-h-[56px] text-sm bg-background/60"
+                          />
+                          <p className="text-[10px] text-muted-foreground text-right tabular-nums">
+                            {row.line.length}/300
+                          </p>
+                        </>
+                      )}
+                      {!row.lipSync && (
+                        <p className="text-[10px] text-muted-foreground italic pl-12">
+                          {language === 'de'
+                            ? 'Stumme:r Statist:in — erscheint im Anchor, spricht nicht.'
+                            : 'Silent extra — appears in the anchor, does not speak.'}
+                        </p>
                       )}
                     </div>
-                    <Textarea
-                      value={row.line}
-                      onChange={(e) => updateRow({ line: e.target.value.slice(0, 300) })}
-                      placeholder={
-                        language === 'de'
-                          ? `Dialog von ${displayName} …`
-                          : `${displayName}'s line …`
-                      }
-                      className="min-h-[56px] text-sm bg-background/60"
-                    />
-                    <p className="text-[10px] text-muted-foreground text-right tabular-nums">
-                      {row.line.length}/300
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
 
-            {omniLines.length < 2 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs border-primary/30"
-                onClick={() =>
-                  setOmniLines((prev) => [
-                    ...prev,
-                    { characterId: null, line: '', voicePreset: 'male-warm' },
-                  ])
-                }
-              >
-                + {language === 'de' ? 'Zweiten Sprecher hinzufügen' : 'Add second speaker'}
-              </Button>
-            )}
+              {omniLines.length < MAX_CAST && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs border-primary/30"
+                  onClick={addRow}
+                  disabled={libCharacters.length <= omniLines.length}
+                >
+                  + {language === 'de' ? 'Charakter hinzufügen' : 'Add character'}
+                </Button>
+              )}
 
-            {(() => {
-              const withDialog = omniLines.filter((r) => r.line.trim()).length;
-              const anchorCount = castCharacterIds.length;
-              if (anchorCount <= withDialog) return null;
-              const silent = anchorCount - withDialog;
-              return (
-                <p className="text-[11px] leading-snug text-amber-500/90">
+              {omniLines.length > 0 && (
+                <p className="text-[11px] leading-snug text-muted-foreground">
                   {language === 'de'
-                    ? `${anchorCount} Charakter(e) im Anchor · ${withDialog} mit Dialog · ${silent} stumme(r) Statist(en). Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.`
-                    : `${anchorCount} character(s) in anchor · ${withDialog} with dialog · ${silent} silent extra(s). Kling Omni allows max. 2 speaking characters per clip.`}
+                    ? `${omniLines.length} Charakter(e) im Anchor · ${withDialog}/${LIP_SYNC_MAX} mit Dialog · ${silent} stumme(r) Statist(en).`
+                    : `${omniLines.length} character(s) in anchor · ${withDialog}/${LIP_SYNC_MAX} with dialogue · ${silent} silent extra(s).`}
                 </p>
-              );
-            })()}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })()}
       </Card>
 
       {/* ── Generate CTA ── */}
