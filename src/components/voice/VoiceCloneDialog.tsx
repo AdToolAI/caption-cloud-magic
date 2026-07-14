@@ -32,10 +32,10 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
   };
 
   const handleSubmit = async () => {
-    if (!name || audioFiles.length < 3) {
+    if (!name || audioFiles.length < 1) {
       toast({
         title: 'Fehler',
-        description: 'Mindestens 3 Audio-Samples erforderlich',
+        description: 'Mindestens 1 Audio-Sample erforderlich',
         variant: 'destructive',
       });
       return;
