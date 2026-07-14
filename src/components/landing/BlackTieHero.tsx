@@ -61,12 +61,12 @@ export const BlackTieHero = () => {
             </p>
 
             {/* Subtle pricing hint - service info, not a banner */}
-            <a
-              href="#pricing"
+            <Link
+              to="/pricing"
               className="inline-block text-sm text-muted-foreground/70 hover:text-primary transition-colors duration-300 mb-8"
             >
               {t('landing.hero.pricingHint')}
-            </a>
+            </Link>
 
             {/* CTA Group */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -85,10 +85,10 @@ export const BlackTieHero = () => {
                 size="lg"
                 className="border-primary/50 text-primary hover:bg-primary/10 hover:border-primary transition-all duration-300 h-12 px-8 backdrop-blur-sm"
               >
-                <Link to="/pricing" className="flex items-center gap-2">
+                <a href="#live-demo" className="flex items-center gap-2">
                   <Play className="h-4 w-4" />
                   {t('landing.hero.ctaSecondary')}
-                </Link>
+                </a>
               </Button>
             </div>
 

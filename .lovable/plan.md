@@ -1,38 +1,29 @@
-## Ziel
-Das goldene Sparkles-Icon aus dem Screenshot wird das neue App-Logo — überall im UI und als Favicon (Browser-Tab / Suchleiste).
+## Landing-Page Audit — Ergebnisse
 
-## Assets
-- Upload `user-uploads://image-1784060666.png` (goldene Sparkles auf schwarz) → wird zur einzigen Logo-Quelle.
-- Zwei Varianten aus derselben Datei:
-  1. **Icon-only** (`public/favicon.png`) — für Browser-Tab.
-  2. **Icon + Wortmarke** wird nicht ersetzt: die "AdTool AI"-Wortmarke im Header bleibt, nur das Icon davor wird ausgetauscht.
+Ich habe die Startseite (`/`) headless im Browser durchgetestet: alle Buttons/Links extrahiert, Console/Netzwerk mitgelesen, komplette Seite gescrollt. Der Rest der Seite (Hero-Video, Founders-Dialog, Sprachumschalter, Cookie-Banner, FAQ-Accordion, Footer-Legal, FeatureGrid-Links `/calendar`, `/analytics`, `/brand-kit`, `/coach`, `/composer`, `/goals`) funktioniert sauber. Nur ein Sentry-Envelope 400 (externer Dienst, kein App-Bug) im Log.
 
-## Schritte
-1. **Favicon**
-   - `public/favicon.png` mit dem Sparkles-Icon überschreiben.
-   - Alte `public/favicon.ico` löschen.
-   - `index.html` prüfen: `<link rel="icon" href="/favicon.png" type="image/png">` — falls schon so, nichts ändern; sonst anpassen.
-   - Apple-Touch-Icon (falls vorhanden) auf dieselbe Datei zeigen lassen.
+### Gefundene Probleme
 
-2. **App-Header-Logo**
-   - Bestehendes AdTool-AI-Logo-Asset (aktuell goldenes "A"-Clapper) durch das Sparkles-Icon ersetzen.
-   - Neues Asset unter `src/assets/logo-sparkles.png` als Lovable-Asset-Pointer anlegen (via `lovable-assets`, kein Binary im Repo).
-   - Zentrale Logo-Komponente (z. B. `src/components/Logo.tsx` bzw. wo aktuell das "A"-Clapper importiert wird) auf das neue Asset umstellen.
-   - Größe/Alignment im Header unverändert lassen; nur die Bildquelle tauschen.
+| # | Ort | Problem | Fix |
+|---|---|---|---|
+| 1 | `UDCShowcase.tsx` L71 | Button „Open Directors Cut" verlinkt auf **`/directors-cut`** — Route existiert **nicht** (nur `/universal-directors-cut`). Klick landet auf NotFound. | Link auf `/universal-directors-cut` umstellen. |
+| 2 | `UDCShowcase.tsx` L73/79 | CTA-Labels **„Open Directors Cut" / „See pricing"** sind Englisch mitten auf der deutschen Startseite. | Übersetzen: „Directors Cut öffnen" / „Preise ansehen" (via `useTranslation` oder direkt). |
+| 3 | `BlackTieHero.tsx` L64–69 | Pricing-Hint-Link `href="#pricing"` — auf `Index.tsx` gibt es **keinen** `#pricing`-Anker (PricingSection ist auf der Startseite nicht mehr eingebunden). Klick tut nichts. | `<a href="#pricing">` durch `<Link to="/pricing">` ersetzen. |
+| 4 | `BlackTieHero.tsx` L88 | Sekundär-CTA **„Demo ansehen"** verlinkt auf `/pricing` statt auf eine Demo. Erwartungsbruch. | Auf die vorhandene `LiveDemoShowcase` scrollen (`#live-demo`) und in `LiveDemoShowcase` ein `id="live-demo"` setzen. |
+| 5 | `BlackTieFooter.tsx` L26 | Footer-Eintrag **„Status"** zeigt auf `/coming-soon`, obwohl die echte `/status`-Seite existiert und live ist. | Href auf `/status` ändern. |
 
-3. **Weitere Fundstellen prüfen und angleichen**
-   - Loading-Splash / Auth-Seiten / E-Mail-Templates / OG-Fallback — überall dort, wo aktuell das alte Clapper-Icon steht, dieselbe neue Datei einsetzen.
-   - Manifest (`public/manifest.json`) `icons`-Einträge auf die neue PNG umbiegen.
+### Nicht anzufassen (bewusst so)
+- Header-CTA „Kostenlos starten" → `/auth`, Hero-CTA → `/generator` (ProtectedRoute leitet gast-user ohnehin nach `/auth`). Unterschied ist beabsichtigt, damit angemeldete User direkt in den Generator kommen.
+- Footer-Legal doppelt (`/privacy` + `/legal/privacy`): beide Routen zeigen auf denselben `Legal`-Renderer, keine Kollision.
+- Sentry 400: externer Ingest-Endpoint, kein Deploy-Blocker.
 
-4. **Sanity-Check**
-   - Preview neu laden → Favicon im Tab sichtbar.
-   - Header-Logo im Dashboard, Landing, Auth sichtbar.
-   - Kein doppeltes altes Logo mehr im Bundle.
+### Umsetzung
+Fünf gezielte Search/Replace-Edits in 3 Dateien:
+- `src/components/landing/UDCShowcase.tsx` (Punkt 1 + 2)
+- `src/components/landing/BlackTieHero.tsx` (Punkt 3 + 4)
+- `src/components/landing/LiveDemoShowcase.tsx` (Punkt 4 — `id="live-demo"` an die Section)
+- `src/components/landing/BlackTieFooter.tsx` (Punkt 5)
 
-## Was ich NICHT ändere
-- Keine Farbtokens, kein Design-System-Update.
-- Keine Wortmarke "AdTool AI" austauschen.
-- Keine Logik/Business-Layer.
+Anschließend die Seite nochmal headless durchklicken und die vier vorher toten/irreführenden Ziele verifizieren.
 
-## Offene Frage
-Auf dem zweiten Screenshot ist neben dem Sparkles-Icon weiter der Buchstabe "A" als Wortmarke zu sehen. Soll ich das so lassen (Sparkles-Icon + Text "AdTool AI") oder soll das Icon das "A" komplett ersetzen (nur Sparkles + "dTool AI" wäre komisch — vermutlich meinst du: Sparkles + volle Wortmarke)?
+Kein Backend-, kein Business-Logic-Change — reine Frontend-Verdrahtung.

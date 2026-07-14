@@ -23,7 +23,7 @@ export const BlackTieFooter = () => {
       { label: "Blog", href: "/coming-soon" },
       { label: "Tutorials", href: "/coming-soon" },
       { label: "API Docs", href: "/coming-soon" },
-      { label: "Status", href: "/coming-soon" },
+      { label: "Status", href: "/status" },
     ],
     company: [
       { label: t("landing.footer.aboutUs"), href: "/coming-soon" },

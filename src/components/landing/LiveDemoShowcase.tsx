@@ -50,7 +50,7 @@ export const LiveDemoShowcase = () => {
   const prev = () => setActive((p) => (p - 1 + cases.length) % cases.length);
 
   return (
-    <section className="relative py-24 px-4 overflow-hidden">
+    <section id="live-demo" className="relative py-24 px-4 overflow-hidden scroll-mt-24">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsla(43,90%,68%,0.06),transparent_60%)] pointer-events-none" />
 
       <div className="container max-w-7xl mx-auto relative">
