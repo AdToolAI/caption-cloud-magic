@@ -165,8 +165,8 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolution: '1080p',
     aspectRatios: sharedAspect,
     costPerSecond: KLING_VIDEO_MODELS['kling-omni'].costPerSecond,
-    badge: 'Native Lip-Sync',
-    tagline: 'Native Lip-Sync in DE/EN/ES · Multi-Shot',
+    badge: 'Lip-Sync EN',
+    tagline: 'Native Lip-Sync EN · DE/ES silent-only',
     legacyRoute: '/kling-video-studio',
   },
 
