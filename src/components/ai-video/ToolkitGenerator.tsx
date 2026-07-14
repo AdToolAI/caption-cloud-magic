@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { ModelSelector } from './ModelSelector';
+import AIVideoCostConfirmDialog, { type AIVideoCostConfirmPayload } from './AIVideoCostConfirmDialog';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import {
   ToolkitCastWorldPicker,
@@ -165,6 +166,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [lastAnchorRoute, setLastAnchorRoute] = useState<'start' | 'anchor' | 'text-only' | 'none'>('none');
   const debugMode = searchParams.get('debug') === '1';
 
+  /* ── Kosten-Confirm-Gate ── */
+  const COST_SUPPRESS_KEY = 'ai-video-toolkit:cost-suppressed-until';
+  const [costDialogOpen, setCostDialogOpen] = useState(false);
+  const [costDialogSuppressed, setCostDialogSuppressed] = useState(false);
+
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
   const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
@@ -292,7 +298,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   };
 
   /* ── Generate dispatch ── */
-  const handleGenerate = async () => {
+  const runGenerate = async () => {
     if (!prompt.trim()) {
       toast.error(language === 'de' ? 'Bitte gib einen Prompt ein.' : 'Please enter a prompt.');
       return;
@@ -643,6 +649,42 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       setGenerating(false);
     }
   };
+
+  /* Gate: opens cost-confirm dialog unless user suppressed it within 24 h. */
+  const handleGenerate = () => {
+    if (!prompt.trim()) {
+      toast.error(language === 'de' ? 'Bitte gib einen Prompt ein.' : 'Please enter a prompt.');
+      return;
+    }
+    if (!canAfford) {
+      toast.error(
+        language === 'de'
+          ? 'Nicht genügend Credits. Bitte Credits aufladen.'
+          : 'Not enough credits. Please top up.',
+      );
+      return;
+    }
+    try {
+      const until = Number(localStorage.getItem(COST_SUPPRESS_KEY) ?? '0');
+      if (Date.now() < until) {
+        void runGenerate();
+        return;
+      }
+    } catch { /* noop */ }
+    setCostDialogSuppressed(false);
+    setCostDialogOpen(true);
+  };
+
+  const confirmCostAndGenerate = () => {
+    if (costDialogSuppressed) {
+      try {
+        localStorage.setItem(COST_SUPPRESS_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+      } catch { /* noop */ }
+    }
+    setCostDialogOpen(false);
+    void runGenerate();
+  };
+
 
   return (
     <motion.div
@@ -1245,6 +1287,39 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Kosten-Confirm vor Generierung */}
+      <AIVideoCostConfirmDialog
+        open={costDialogOpen}
+        payload={{
+          title: language === 'de' ? 'Video generieren?' : 'Generate video?',
+          description:
+            language === 'de'
+              ? 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.'
+              : 'Cost overview — once confirmed, generation starts and your AI wallet will be charged.',
+          modelName: model.name,
+          modelBadge: model.badge ?? undefined,
+          lines: [
+            {
+              label: language === 'de' ? 'Länge × Preis / Sekunde' : 'Duration × price/second',
+              value: `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}`,
+              detail: `${aspectRatio} · ${model.name}`,
+            },
+          ],
+          totalLabel: language === 'de' ? 'Gesamtkosten' : 'Total',
+          totalValue: `${symbol}${cost.toFixed(2)}`,
+          currencySymbol: symbol,
+          totalCost: cost,
+          walletBalance: wallet?.balance_euros ?? null,
+          isUnlimited,
+        }}
+        suppressed={costDialogSuppressed}
+        onSuppressedChange={setCostDialogSuppressed}
+        onConfirm={confirmCostAndGenerate}
+        onCancel={() => setCostDialogOpen(false)}
+        onTopUp={() => { window.location.href = '/credits'; }}
+      />
+
 
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">

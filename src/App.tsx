@@ -147,7 +147,7 @@ const StockVideos = lazy(() => import("./pages/StockVideos"));
 const VerifyLicense = lazy(() => import("./pages/VerifyLicense"));
 const SharedBrandKit = lazy(() => import("./pages/SharedBrandKit"));
 const MyLicenses = lazy(() => import("./pages/MyLicenses"));
-const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
+
 const HubPage = lazy(() => import("./pages/HubPage"));
 const Community = lazy(() => import("./pages/Community"));
 const GamingHub = lazy(() => import("./pages/GamingHub"));
@@ -315,7 +315,7 @@ function AppLayout() {
            <Route path="/marketplace" element={<Marketplace />} />
            <Route path="/autopilot" element={<ProtectedRoute><Autopilot /></ProtectedRoute>} />
            <Route path="/creator-studio" element={<ProtectedRoute><CreatorStudio /></ProtectedRoute>} />
-           <Route path="/video-translator" element={<VideoTranslator />} />
+           <Route path="/video-translator" element={<Navigate to="/home" replace />} />
            <Route path="/community" element={<Community />} />
            <Route path="/gaming" element={<GamingHub />} />
           <Route path="/explainer-studio" element={<Navigate to="/home" replace />} />

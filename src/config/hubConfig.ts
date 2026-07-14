@@ -89,7 +89,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/queue", titleKey: "Render-Queue", descKey: "Live-Status aller Motion-Studio-Renderjobs", icon: Activity },
       { route: "/library", titleKey: "Cast & World Library", descKey: "Avatare, Locations, Buildings & Props — alles in einer Bibliothek, mit @-Mention überall einsetzbar", icon: Users },
       { route: "/creator-library", titleKey: "Creator Library", descKey: "Videos · Photos · Music · SFX — royalty-free Bundle, inklusive in allen Paid-Plans", icon: Library },
-      { route: "/video-translator", titleKey: "vidTrans.hubTitle", descKey: "hubItemDesc.videoTranslator", icon: Languages },
+      
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
       { route: "/marketplace", titleKey: "Template Marketplace", descKey: "Community-Templates entdecken & kaufen", icon: Store },
       { route: "/creator-studio", titleKey: "Creator Studio", descKey: "Eigene Templates verkaufen & Earnings tracken", icon: CoinsIcon },
