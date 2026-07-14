@@ -1,30 +1,26 @@
-# Voice Studio – "1 Sample reicht"-Fix
+## Befund
 
-## Problem
-Beim Klonen einer eigenen Stimme (1 zusammenhängende Aufnahme, 53.8s) bricht die Edge Function mit HTTP 400 ab:
+Der aktuell deployte Backend-Code ist noch alt: Die Logs zeigen eindeutig `At least 3 voice samples required` in `clone-voice`, obwohl die Datei im Projekt bereits auf mindestens 1 Sample geändert wurde. Der Fehler ist also kein UI-Problem, sondern ein nicht aktualisierter Deployment-Stand der Function.
 
-> `Error in clone-voice: At least 3 voice samples required`
+## Plan
 
-Die alte 3-Sample-Regel stammt aus der ursprünglichen Multi-Upload-Version (WhatsApp-Snippets). Der neue Voice-Studio-Flow nimmt aber **eine einzige, zusammenhängende Aufnahme** (Mic oder WhatsApp-Voice-Note) mit dem Trainingsskript auf — ElevenLabs Instant Voice Cloning akzeptiert das ab ~30s.
+1. **Kleinen No-op/Versionsmarker in `clone-voice` setzen**
+   - Damit Lovable Cloud die Function sicher als geändert erkennt.
+   - Die Mindestanforderung bleibt: 1 Sample, mindestens 30 Sekunden Gesamtaufnahme über die UI.
 
-## Fix (klein & fokussiert)
+2. **Fehlerantworten sauberer machen**
+   - Statt pauschal `500` bei Validierungsfehlern gibt die Function klare Statuscodes und lesbare JSON-Fehler zurück.
+   - Die UI kann dann statt „Edge Function returned a non-2xx status code“ die echte Ursache anzeigen.
 
-### 1. `supabase/functions/clone-voice/index.ts`
-- Mindestanzahl Samples von `3` auf `1` senken.
-- Klarere Fehlermeldung: `"Mindestens 1 Audio-Sample erforderlich"`.
-- Rest (Storage-Download, ElevenLabs Upload, `remove_background_noise`, DB-Insert) bleibt unverändert.
+3. **Function direkt deployen und testen**
+   - `clone-voice` nach der Änderung gezielt neu deployen.
+   - Danach Logs prüfen, ob die alte `At least 3 voice samples required`-Version verschwunden ist.
 
-### 2. `src/components/voice/studio/VoiceStudioDialog.tsx`
-- Client-Validierung in Step 2 (`canProceedToClone`) von "≥3 Samples" auf "≥1 Sample **UND** Gesamt-Dauer ≥ 30s" umstellen (verhindert zu kurze Aufnahmen und passt zu ElevenLabs Empfehlung).
-- Zusammenfassungs-Hinweis anpassen: bei <30s Warnung "Mind. 30 Sekunden empfohlen", sonst grünes "Bereit".
+4. **Falls danach ein neuer Fehler erscheint**
+   - Den echten Provider-Fehler sichtbar machen, z. B. fehlender ElevenLabs-Connector/API-Key, Datei nicht erreichbar, Formatproblem oder Provider-Limit.
 
-### 3. `src/components/voice/VoiceCloneDialog.tsx` (Legacy-Multi-Upload)
-- Ebenfalls von `>= 3` auf `>= 1` senken, damit Legacy-Pfad konsistent bleibt (nur falls noch irgendwo eingebunden). UI-Text "min. 3" → "min. 1".
+## Technische Details
 
-## Nicht Teil des Fixes
-- Kein Change an Storage, RLS, ElevenLabs-Params oder Voice-Library-UI.
-- Kein Change am Trainingsskript oder Namens-Personalisierung.
-
-## Verifikation
-- Erneut mit 1 Aufnahme (~50s) klonen → Edge Function liefert `voice_id`, Toast "Voice Clone erstellt".
-- Edge Function Logs prüfen: kein `At least 3 voice samples required` mehr.
+- Betroffene Function: `clone-voice`
+- Aktueller Log-Beweis: deployte Runtime wirft noch `At least 3 voice samples required`
+- Ziel: Deployment-Synchronisation erzwingen + echte Fehlerdetails an die Voice-Studio-UI weitergeben
