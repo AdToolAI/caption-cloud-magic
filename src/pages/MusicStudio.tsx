@@ -284,6 +284,37 @@ export default function MusicStudio() {
                     </div>
                   )}
 
+                  {showLanguagePicker && MUSIC_LANGUAGE_SUPPORT[tier].length > 0 && (
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <Label htmlFor="vocal-lang" className="text-sm text-foreground">Gesangssprache</Label>
+                          <p className="text-[11px] text-muted-foreground">Nur Sprachen, die dieser Provider sauber singt</p>
+                        </div>
+                        <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
+                          {tierPricing.engine}
+                        </Badge>
+                      </div>
+                      <select
+                        id="vocal-lang"
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        disabled={loading}
+                        className="w-full h-9 px-3 rounded-md bg-background/40 border border-primary/20 text-sm focus:border-primary/60 focus:outline-none"
+                      >
+                        {MUSIC_LANGUAGE_SUPPORT[tier].map((l) => (
+                          <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {!showLanguagePicker && (tier === 'standard' || tier === 'pro') && instrumental && (
+                    <p className="text-[11px] text-muted-foreground italic">
+                      Instrumental aktiv — keine Sprachauswahl nötig. Deaktiviere „Instrumental" für Gesang.
+                    </p>
+                  )}
+
                   {tier === 'vocal' && (
                     <LyricsEditor
                       value={lyrics}
