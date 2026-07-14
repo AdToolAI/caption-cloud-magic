@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -200,31 +200,31 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   );
 
   /**
-   * Keep `omniLines` in sync with the selected Cast characters (max 2 for Kling Omni).
-   * Preserves existing dialog text & voice preset per row when possible.
+   * One-time convenience prefill: when the user picks Cast characters and all
+   * `omniLines` are still empty (anonymous + no dialog), we pre-assign up to
+   * two cast characters to the speaker rows. After that, `omniLines` is the
+   * single source of truth — cast changes no longer overwrite it.
    */
+  const omniPrefilledRef = useRef(false);
   useEffect(() => {
+    if (omniPrefilledRef.current) return;
+    if (castCharacterIds.length === 0) return;
+    const allEmpty = omniLines.every((r) => !r.characterId && !r.line.trim());
+    if (!allEmpty) {
+      omniPrefilledRef.current = true;
+      return;
+    }
+    const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm'];
     const targetIds = castCharacterIds.slice(0, 2);
-    if (targetIds.length === 0) return;
-    setOmniLines((prev) => {
-      const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm'];
-      const next: OmniLine[] = targetIds.map((cid, i) => {
-        const existing = prev.find((r) => r.characterId === cid);
-        if (existing) return existing;
-        const fallback = prev[i];
-        return {
-          characterId: cid,
-          line: fallback?.characterId ? '' : (fallback?.line ?? ''),
-          voicePreset: fallback?.voicePreset ?? defaults[i] ?? 'neutral',
-        };
-      });
-      // If length or ids changed, replace; otherwise keep referential equality.
-      const same =
-        next.length === prev.length &&
-        next.every((r, i) => prev[i] && prev[i].characterId === r.characterId);
-      return same ? prev : next;
-    });
-  }, [castCharacterIds]);
+    setOmniLines(
+      targetIds.map((cid, i) => ({
+        characterId: cid,
+        line: '',
+        voicePreset: defaults[i] ?? 'neutral',
+      })),
+    );
+    omniPrefilledRef.current = true;
+  }, [castCharacterIds, omniLines]);
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
@@ -1216,14 +1216,47 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                           {initials || '?'}
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{displayName}</p>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        {/* Character select — bound per row; other rows' picks are disabled */}
+                        <Select
+                          value={row.characterId ?? '__anon'}
+                          onValueChange={(v) => {
+                            const nextId = v === '__anon' ? null : v;
+                            setOmniLines((prev) =>
+                              prev.map((r, i) => (i === idx ? { ...r, characterId: nextId } : r)),
+                            );
+                            // Ensure picked character is in the Cast pool for the anchor composer.
+                            if (nextId) {
+                              setCastCharacterIds((prev) =>
+                                prev.includes(nextId) ? prev : (prev.length >= 4 ? prev : [...prev, nextId]),
+                              );
+                            }
+                            omniPrefilledRef.current = true;
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__anon">
+                              {language === 'de' ? `Anonym (Sprecher ${idx + 1})` : `Anonymous (Speaker ${idx + 1})`}
+                            </SelectItem>
+                            {libCharacters.map((ch) => {
+                              const usedElsewhere = omniLines.some((r, i) => i !== idx && r.characterId === ch.id);
+                              return (
+                                <SelectItem key={ch.id} value={ch.id} disabled={usedElsewhere}>
+                                  {ch.name}{usedElsewhere ? (language === 'de' ? ' · bereits zugewiesen' : ' · already assigned') : ''}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
                         <p className="text-[10px] text-muted-foreground truncate">
                           {c ? (language === 'de' ? 'Aus Cast & World' : 'From Cast & World') : (language === 'de' ? 'Anonymer Sprecher' : 'Anonymous speaker')}
                         </p>
                       </div>
                       <Select value={row.voicePreset} onValueChange={(v) => updateRow({ voicePreset: v as OmniVoicePreset })}>
-                        <SelectTrigger className="h-8 w-[160px] text-xs">
+                        <SelectTrigger className="h-8 w-[150px] text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1282,13 +1315,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </Button>
             )}
 
-            {castCharacterIds.length > 2 && (
-              <p className="text-[11px] leading-snug text-amber-500/90">
-                {language === 'de'
-                  ? `Kling Omni unterstützt max. 2 Sprecher pro Clip. Aktuell ${castCharacterIds.length} Charaktere ausgewählt — nur die ersten 2 erhalten Lip-Sync.`
-                  : `Kling Omni supports max. 2 speakers per clip. Currently ${castCharacterIds.length} characters selected — only the first 2 get lip-sync.`}
-              </p>
-            )}
+            {(() => {
+              const withDialog = omniLines.filter((r) => r.line.trim()).length;
+              const anchorCount = castCharacterIds.length;
+              if (anchorCount <= withDialog) return null;
+              const silent = anchorCount - withDialog;
+              return (
+                <p className="text-[11px] leading-snug text-amber-500/90">
+                  {language === 'de'
+                    ? `${anchorCount} Charakter(e) im Anchor · ${withDialog} mit Dialog · ${silent} stumme(r) Statist(en). Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.`
+                    : `${anchorCount} character(s) in anchor · ${withDialog} with dialog · ${silent} silent extra(s). Kling Omni allows max. 2 speaking characters per clip.`}
+                </p>
+              );
+            })()}
           </div>
         )}
       </Card>
