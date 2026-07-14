@@ -915,8 +915,30 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </div>
       )}
 
+      {/* ── Omni Media-Lock notice — replaces manual media inputs when Omni
+       *  is active and characters are booked (anchor is composed automatically). */}
+      {omniMediaLock && (
+        <Card className="p-4 bg-primary/5 border-primary/30 border-dashed">
+          <div className="flex items-start gap-3">
+            <ImagePlus className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <div className="space-y-1 text-xs leading-relaxed">
+              <div className="font-medium text-foreground">
+                {language === 'de'
+                  ? 'Referenzbild automatisch — Startbild / Multi-Ref / V2V gesperrt'
+                  : 'Reference image automatic — Start image / Multi-Ref / V2V locked'}
+              </div>
+              <div className="text-muted-foreground">
+                {language === 'de'
+                  ? 'Kling Omni komponiert das Referenzbild automatisch aus den gebuchten Charakteren. Manuelle Uploads würden den Anker überschreiben und zu fremden Gesichtern mit deinen Stimmen führen. Entferne alle Charaktere oben, um manuelle Bilder/Videos zu nutzen.'
+                  : 'Kling Omni composes the reference image automatically from the booked characters. Manual uploads would overwrite the anchor and produce foreign faces with your voices. Remove all characters above to use manual images/videos.'}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* ── Multi-Reference (only for capabilities.multiRef → Vidu Q2 Reference2V) ── */}
-      {model.capabilities.multiRef && (
+      {model.capabilities.multiRef && !omniMediaLock && (
         <MultiReferenceUploader
           slots={viduReferences}
           onChange={setViduReferences}
