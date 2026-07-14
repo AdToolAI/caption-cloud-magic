@@ -42,48 +42,49 @@ export interface VideoProviderMargin {
  */
 export const VIDEO_PROVIDER_MARGINS: VideoProviderMargin[] = [
   // Hailuo
-  { id: 'hailuo-standard', label: 'Hailuo 2.3 Std 768p', unit: 'per-second', sellEUR: 0.15, costEUR: 0.045, tier: 'standard' },
-  { id: 'hailuo-pro',      label: 'Hailuo 2.3 Pro 1080p', unit: 'per-second', sellEUR: 0.22, costEUR: 0.075, tier: 'standard' },
+  { id: 'hailuo-standard', label: 'Hailuo 2.3 Std 768p', unit: 'per-second', sellEUR: 0.14, costEUR: 0.045, tier: 'standard' },
+  { id: 'hailuo-pro',      label: 'Hailuo 2.3 Pro 1080p', unit: 'per-second', sellEUR: 0.23, costEUR: 0.075, tier: 'standard' },
   // HappyHorse
-  { id: 'happyhorse-standard', label: 'HappyHorse 720p', unit: 'per-second', sellEUR: 0.40, costEUR: 0.14, tier: 'standard' },
-  { id: 'happyhorse-pro',      label: 'HappyHorse Pro 1080p', unit: 'per-second', sellEUR: 0.80, costEUR: 0.28, tier: 'standard' },
+  { id: 'happyhorse-standard', label: 'HappyHorse 720p', unit: 'per-second', sellEUR: 0.42, costEUR: 0.14, tier: 'standard' },
+  { id: 'happyhorse-pro',      label: 'HappyHorse Pro 1080p', unit: 'per-second', sellEUR: 0.84, costEUR: 0.28, tier: 'standard' },
   // Seedance
-  { id: 'seedance-standard', label: 'Seedance 2.0 Std', unit: 'per-second', sellEUR: 0.15, costEUR: 0.03, tier: 'standard' },
-  { id: 'seedance-pro',      label: 'Seedance 2.0 Pro', unit: 'per-second', sellEUR: 0.20, costEUR: 0.06, tier: 'standard' },
+  { id: 'seedance-mini',     label: 'Seedance 2.0 Mini', unit: 'per-second', sellEUR: 0.06, costEUR: 0.02, tier: 'standard' },
+  { id: 'seedance-standard', label: 'Seedance 2.0 Std', unit: 'per-second', sellEUR: 0.09, costEUR: 0.03, tier: 'standard' },
+  { id: 'seedance-pro',      label: 'Seedance 2.0 Pro', unit: 'per-second', sellEUR: 0.18, costEUR: 0.06, tier: 'standard' },
   // Kling
   { id: 'kling-3-standard', label: 'Kling 3 Std 720p', unit: 'per-second', sellEUR: 0.18, costEUR: 0.06, tier: 'standard' },
-  { id: 'kling-3-pro',      label: 'Kling 3 Pro 1080p', unit: 'per-second', sellEUR: 0.28, costEUR: 0.10, tier: 'standard' },
+  { id: 'kling-3-pro',      label: 'Kling 3 Pro 1080p', unit: 'per-second', sellEUR: 0.30, costEUR: 0.10, tier: 'standard' },
   // Wan 2.5 / 2.6
   { id: 'wan-standard',     label: 'Wan 2.5 Std', unit: 'per-second', sellEUR: 0.12, costEUR: 0.04, tier: 'standard' },
-  { id: 'wan-pro',          label: 'Wan 2.5 Pro', unit: 'per-second', sellEUR: 0.20, costEUR: 0.07, tier: 'standard' },
+  { id: 'wan-pro',          label: 'Wan 2.5 Pro', unit: 'per-second', sellEUR: 0.21, costEUR: 0.07, tier: 'standard' },
   { id: 'wan-2-6-standard', label: 'Wan 2.6 Std', unit: 'per-second', sellEUR: 0.12, costEUR: 0.04, tier: 'standard' },
-  { id: 'wan-2-6-pro',      label: 'Wan 2.6 Pro', unit: 'per-second', sellEUR: 0.20, costEUR: 0.07, tier: 'standard' },
+  { id: 'wan-2-6-pro',      label: 'Wan 2.6 Pro', unit: 'per-second', sellEUR: 0.21, costEUR: 0.07, tier: 'standard' },
   // Luma
-  { id: 'luma-standard', label: 'Luma Ray 2 Std', unit: 'per-second', sellEUR: 0.20, costEUR: 0.07, tier: 'standard' },
-  { id: 'luma-pro',      label: 'Luma Ray 2 Pro', unit: 'per-second', sellEUR: 0.35, costEUR: 0.12, tier: 'standard' },
+  { id: 'luma-standard', label: 'Luma Ray 2 Std', unit: 'per-second', sellEUR: 0.21, costEUR: 0.07, tier: 'standard' },
+  { id: 'luma-pro',      label: 'Luma Ray 2 Pro', unit: 'per-second', sellEUR: 0.36, costEUR: 0.12, tier: 'standard' },
   // LTX
-  { id: 'ltx-standard', label: 'LTX 2.0 Std', unit: 'per-second', sellEUR: 0.08, costEUR: 0.02, tier: 'standard' },
+  { id: 'ltx-standard', label: 'LTX 2.0 Std', unit: 'per-second', sellEUR: 0.06, costEUR: 0.02, tier: 'standard' },
   { id: 'ltx-pro',      label: 'LTX 2.0 Pro', unit: 'per-second', sellEUR: 0.12, costEUR: 0.04, tier: 'standard' },
   // Vidu Q2 (flat 5s)
-  { id: 'vidu-q2-reference', label: 'Vidu Q2 Reference (5s)', unit: 'per-clip', sellEUR: 0.65, costEUR: 0.22, tier: 'standard' },
-  { id: 'vidu-q2-i2v',       label: 'Vidu Q2 I2V (5s)',       unit: 'per-clip', sellEUR: 0.55, costEUR: 0.20, tier: 'standard' },
-  { id: 'vidu-q2-t2v',       label: 'Vidu Q2 T2V (5s)',       unit: 'per-clip', sellEUR: 0.55, costEUR: 0.20, tier: 'standard' },
+  { id: 'vidu-q2-reference', label: 'Vidu Q2 Reference (5s)', unit: 'per-clip', sellEUR: 0.66, costEUR: 0.22, tier: 'standard' },
+  { id: 'vidu-q2-i2v',       label: 'Vidu Q2 I2V (5s)',       unit: 'per-clip', sellEUR: 0.60, costEUR: 0.20, tier: 'standard' },
+  { id: 'vidu-q2-t2v',       label: 'Vidu Q2 T2V (5s)',       unit: 'per-clip', sellEUR: 0.60, costEUR: 0.20, tier: 'standard' },
   // Pika
-  { id: 'pika-2-2-standard', label: 'Pika 2.2 Std', unit: 'per-second', sellEUR: 0.14, costEUR: 0.04, tier: 'standard' },
-  { id: 'pika-2-2-pro',      label: 'Pika 2.2 Pro', unit: 'per-second', sellEUR: 0.26, costEUR: 0.09, tier: 'standard' },
+  { id: 'pika-2-2-standard', label: 'Pika 2.2 Std', unit: 'per-second', sellEUR: 0.12, costEUR: 0.04, tier: 'standard' },
+  { id: 'pika-2-2-pro',      label: 'Pika 2.2 Pro', unit: 'per-second', sellEUR: 0.27, costEUR: 0.09, tier: 'standard' },
   // Runway Gen-4 Aleph
-  { id: 'runway-gen4-aleph', label: 'Runway Gen-4 Aleph', unit: 'per-second', sellEUR: 0.23, costEUR: 0.08, tier: 'standard' },
+  { id: 'runway-gen4-aleph', label: 'Runway Gen-4 Aleph', unit: 'per-second', sellEUR: 0.24, costEUR: 0.08, tier: 'standard' },
   // PREMIUM ENGINES — frontier models, user-visible disclaimer
-  { id: 'veo-3.1-lite-720p',  label: 'Veo 3.1 Lite 720p',  unit: 'per-second', sellEUR: 0.42, costEUR: 0.15, tier: 'premium-engine' },
-  { id: 'veo-3.1-lite-1080p', label: 'Veo 3.1 Lite 1080p', unit: 'per-second', sellEUR: 0.62, costEUR: 0.22, tier: 'premium-engine' },
-  { id: 'veo-3.1-fast',       label: 'Veo 3.1 Fast 1080p', unit: 'per-second', sellEUR: 1.15, costEUR: 0.40, tier: 'premium-engine' },
-  { id: 'veo-3.1-pro',        label: 'Veo 3.1 Pro 1080p',  unit: 'per-second', sellEUR: 3.15, costEUR: 1.10, tier: 'premium-engine' },
-  { id: 'sora-2-standard',    label: 'Sora 2 Standard',    unit: 'per-second', sellEUR: 0.55, costEUR: 0.20, tier: 'premium-engine' },
-  { id: 'sora-2-pro',         label: 'Sora 2 Pro',         unit: 'per-second', sellEUR: 1.30, costEUR: 0.45, tier: 'premium-engine' },
-  { id: 'grok-imagine',       label: 'Grok Imagine',       unit: 'per-second', sellEUR: 0.42, costEUR: 0.15, tier: 'premium-engine' },
+  { id: 'veo-3.1-lite-720p',  label: 'Veo 3.1 Lite 720p',  unit: 'per-second', sellEUR: 0.45, costEUR: 0.15, tier: 'premium-engine' },
+  { id: 'veo-3.1-lite-1080p', label: 'Veo 3.1 Lite 1080p', unit: 'per-second', sellEUR: 0.66, costEUR: 0.22, tier: 'premium-engine' },
+  { id: 'veo-3.1-fast',       label: 'Veo 3.1 Fast 1080p', unit: 'per-second', sellEUR: 1.20, costEUR: 0.40, tier: 'premium-engine' },
+  { id: 'veo-3.1-pro',        label: 'Veo 3.1 Pro 1080p',  unit: 'per-second', sellEUR: 3.30, costEUR: 1.10, tier: 'premium-engine' },
+  { id: 'sora-2-standard',    label: 'Sora 2 Standard',    unit: 'per-second', sellEUR: 0.60, costEUR: 0.20, tier: 'premium-engine' },
+  { id: 'sora-2-pro',         label: 'Sora 2 Pro',         unit: 'per-second', sellEUR: 1.35, costEUR: 0.45, tier: 'premium-engine' },
+  { id: 'grok-imagine',       label: 'Grok Imagine',       unit: 'per-second', sellEUR: 0.45, costEUR: 0.15, tier: 'premium-engine' },
 ];
 
-export const MARGIN_FLOOR = 0.60; // warn if margin < 60%
+export const MARGIN_FLOOR = 0.66; // warn if margin < 66% (drift below 2.94× target)
 
 export function computeMarginPct(row: Pick<VideoProviderMargin, 'sellEUR' | 'costEUR'>): number {
   if (row.sellEUR <= 0) return 0;
