@@ -122,6 +122,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext
   // produziert. Alles außerhalb → ambient-only Fallback (kein Voiceover), sonst
   // erfindet z. B. Kling für DE/ES eine Fantasie-Sprache.
+  // Kling 3.0 Omni ist die einzige Kling-Variante mit nativem DE/EN/ES-Lip-Sync.
   const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
     veo:        ['en', 'de', 'es'],
     sora:       ['en', 'de', 'es'],
@@ -130,9 +131,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     happyhorse: ['en'],
     ltx: [], wan: [], hailuo: [], luma: [], seedance: [], runway: [], pika: [], vidu: [],
   };
-  const ttsLangSupported =
-    (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
+  const isKlingOmni = model.id === 'kling-omni';
+  const ttsLangSupported = isKlingOmni
+    ? (['en', 'de', 'es'] as const).includes(effectiveSpokenLang)
+    : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  /* ── Kling Omni: native Lip-Sync dialogue + voice preset ── */
+  const [omniDialogText, setOmniDialogText] = useState<string>('');
+  const [omniVoicePreset, setOmniVoicePreset] = useState<'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral'>('female-warm');
   /**
    * Placement of the uploaded reference image within the generated clip:
    *  - 'start'  → i2v startImageUrl (default, image is visible at frame 0)
@@ -590,6 +596,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       }
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
+
+      // Kling 3.0 Omni — native Lip-Sync in DE/EN/ES bypasses Sync.so.
+      // If the user provided dialogue, pass it to the edge function together
+      // with the chosen voice preset and language. Max 2 speakers per clip.
+      if (isKlingOmni && omniDialogText.trim()) {
+        body.dialogText = omniDialogText.trim();
+        body.voicePreset = omniVoicePreset;
+        body.spokenLanguage = effectiveSpokenLang;
+        body.nativeLipSync = true;
+      }
 
       // Sora 2 cannot accept image input → toast hint when a character is selected
       if (model.family === 'sora' && (anchorChars.length > 0 || castLocation || castBuilding)) {
@@ -1065,6 +1081,73 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   : language === 'es'
                   ? `${model.name} no admite ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'} de forma fiable. Esta escena se generará sin voz — solo sonido ambiente/música. Para voz real usa p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`
                   : `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. This scene will render without voiceover — ambient sound / music only. For real voiceover pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Kling 3.0 Omni — Native Lip-Sync Panel ── */}
+        {isKlingOmni && (
+          <div className="sm:col-span-3 space-y-3 p-3 rounded-md bg-primary/5 border border-primary/30">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <Label className="text-sm">
+                  {language === 'de' ? 'Native Lip-Sync (DE/EN/ES)' : 'Native lip-sync (DE/EN/ES)'}
+                </Label>
+              </div>
+              <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
+                {language === 'de' ? 'Ein Rendering — kein Sync.so nötig' : 'Single render — no Sync.so needed'}
+              </Badge>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="omni-dialog" className="text-xs text-muted-foreground">
+                {language === 'de'
+                  ? 'Dialog-Text (optional). Leer lassen für stummen Clip mit Ambient-Audio.'
+                  : 'Dialogue text (optional). Leave empty for a silent clip with ambient audio.'}
+              </Label>
+              <Textarea
+                id="omni-dialog"
+                value={omniDialogText}
+                onChange={(e) => setOmniDialogText(e.target.value.slice(0, 600))}
+                placeholder={
+                  language === 'de'
+                    ? 'z. B. "Willkommen bei AdTool AI — dein Werbespot in 15 Sekunden."'
+                    : 'e.g. "Welcome to AdTool AI — your ad in 15 seconds."'
+                }
+                className="min-h-[64px] text-sm bg-background/40"
+              />
+              <p className="text-[10px] text-muted-foreground text-right tabular-nums">
+                {omniDialogText.length}/600
+              </p>
+            </div>
+
+            {omniDialogText.trim() && (
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-xs text-muted-foreground">
+                  {language === 'de' ? 'Voice-Preset' : 'Voice preset'}
+                </Label>
+                <Select value={omniVoicePreset} onValueChange={(v) => setOmniVoicePreset(v as typeof omniVoicePreset)}>
+                  <SelectTrigger className="h-8 w-[200px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="female-warm">{language === 'de' ? 'Weiblich · warm' : 'Female · warm'}</SelectItem>
+                    <SelectItem value="female-bright">{language === 'de' ? 'Weiblich · hell' : 'Female · bright'}</SelectItem>
+                    <SelectItem value="male-warm">{language === 'de' ? 'Männlich · warm' : 'Male · warm'}</SelectItem>
+                    <SelectItem value="male-deep">{language === 'de' ? 'Männlich · tief' : 'Male · deep'}</SelectItem>
+                    <SelectItem value="neutral">{language === 'de' ? 'Neutral' : 'Neutral'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {castCharacterIds.length > 2 && (
+              <p className="text-[11px] leading-snug text-amber-500/90">
+                {language === 'de'
+                  ? `Kling Omni unterstützt max. 2 Sprecher pro Clip. Aktuell ${castCharacterIds.length} Charaktere ausgewählt — nur die ersten 2 erhalten Lip-Sync.`
+                  : `Kling Omni supports max. 2 speakers per clip. Currently ${castCharacterIds.length} characters selected — only the first 2 get lip-sync.`}
               </p>
             )}
           </div>
