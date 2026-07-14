@@ -11,15 +11,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Seedance 2.0 Customer Pricing per second
+// Seedance 2.0 Customer Pricing per second (normalized 14.07.2026 to 3.00× cost margin)
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'seedance-standard': { EUR: 0.15, USD: 0.15 },
-  'seedance-pro': { EUR: 0.20, USD: 0.20 },
+  'seedance-mini':     { EUR: 0.06, USD: 0.06 },
+  'seedance-standard': { EUR: 0.09, USD: 0.09 },
+  'seedance-pro':      { EUR: 0.18, USD: 0.18 },
+};
+
+// Replicate model slug per tier
+const REPLICATE_SLUG: Record<string, string> = {
+  'seedance-mini':     'bytedance/seedance-2-mini',
+  'seedance-standard': 'bytedance/seedance-1-lite',
+  'seedance-pro':      'bytedance/seedance-1-lite',
 };
 
 interface GenerateRequest {
   prompt: string;
-  model: 'seedance-standard' | 'seedance-pro';
+  model: 'seedance-mini' | 'seedance-standard' | 'seedance-pro';
   duration: number; // 3-15 seconds
   aspectRatio: '16:9' | '9:16' | '1:1';
   // Image-to-Video
