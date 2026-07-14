@@ -10,9 +10,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
+// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
 const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'ltx-standard': { EUR: 0.08, USD: 0.08 },
-  'ltx-pro': { EUR: 0.12, USD: 0.12 },
+  'ltx-standard': { EUR: 0.06, USD: 0.06 },
+  'ltx-pro':      { EUR: 0.12, USD: 0.12 },
 };
 
 // Lightricks LTX Video 2.0 — text-to-video and image-to-video
