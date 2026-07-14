@@ -165,6 +165,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [lastAnchorRoute, setLastAnchorRoute] = useState<'start' | 'anchor' | 'text-only' | 'none'>('none');
   const debugMode = searchParams.get('debug') === '1';
 
+  /* ── Kosten-Confirm-Gate ── */
+  const COST_SUPPRESS_KEY = 'ai-video-toolkit:cost-suppressed-until';
+  const [costDialogOpen, setCostDialogOpen] = useState(false);
+  const [costDialogSuppressed, setCostDialogSuppressed] = useState(false);
+
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
   const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
