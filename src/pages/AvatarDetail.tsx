@@ -105,8 +105,11 @@ const AvatarDetail = () => {
                       )}
                     </div>
                     <h1 className="font-serif text-2xl">{avatar.name}</h1>
+                    <div className="mt-1.5">
+                      <EntityIdBadge id={avatar.id} label="Character-ID" />
+                    </div>
                     {avatar.description && (
-                      <p className="text-sm text-muted-foreground mt-1.5">{avatar.description}</p>
+                      <p className="text-sm text-muted-foreground mt-2">{avatar.description}</p>
                     )}
                     {avatar.default_voice_name && (
                       <p className="text-xs text-primary mt-3">🎙 {avatar.default_voice_name}</p>
