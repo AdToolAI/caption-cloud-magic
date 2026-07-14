@@ -1,56 +1,45 @@
+## Klarifizierung
 
-# Voice Cloning Studio — Skript, Aufnahme, Enhance, Library
+Du hast recht: Das, was ihr eigentlich wolltet, ist im Code zwar teilweise gebaut, aber aus Nutzersicht nicht sauber auffindbar.
 
-Kurz zur Idee: sehr gut und **schlanker Scope**. Wir haben schon `clone-voice` Edge-Function + `custom_voices` Tabelle + `VoiceLibraryPanel` in AudioStudio. Wir bauen den Upload-Dialog zu einem richtigen **Voice Studio Flow** aus. Kein neuer Backend-Stack nötig, ElevenLabs Instant Voice Clone (bereits verdrahtet) reicht.
+Aktueller Stand:
+- Das `VoiceStudioDialog` existiert bereits mit Skript, Mikrofonaufnahme, Datei-/WhatsApp-Upload, Rauschunterdrückung und Clone-Submit.
+- Es ist aber nur tief im AudioStudio unter dem Tab `Custom Voices` erreichbar.
+- Auf der aktuellen AudioStudio-Startfläche sieht man nur Upload, Music-to-Video und AI Music Generator — keinen klaren Einstieg wie „Eigene Stimme erstellen“.
+- Deshalb wirkt es so, als wäre Custom Voice Creation nicht integriert.
+- Im Music Studio selbst sind Custom Voices nicht integriert, weil die Music-Engines keine echte externe Voice-ID als Gesangsstimme akzeptieren. Custom Voices sind für gesprochenes Voiceover/TTS, nicht für KI-Gesang.
 
-## Was der User bekommt
+## Plan
 
-Ein Dialog / Panel in `AudioStudio → Custom Voices` mit drei Schritten:
+1. **Voice Studio als sichtbaren Haupt-CTA ins AudioStudio holen**
+   - Eine dritte prominente Karte direkt oben ergänzen: `Eigene Stimme erstellen`.
+   - Text: Skript vorlesen, Mikrofon aufnehmen oder WhatsApp-Sprachnachricht hochladen, Stimme optimieren und in der Voice Library nutzen.
+   - Klick öffnet direkt den vorhandenen `VoiceStudioDialog`.
 
-1. **Skript lesen** — vorgefertigter deutscher/englischer Trainingstext (~60–90s), der alle wichtigen Phoneme + Prosodie-Varianten abdeckt (Aussagesatz, Frage, Ausruf, Zahlen, weiche/harte Konsonanten). Copy-Button + Sprache umschaltbar.
-2. **Aufnahme** — zwei Wege, side-by-side:
-   - **Mikro aufnehmen**: In-Browser Recording, Web-Audio-API → WAV 16 kHz mono (kein `MediaRecorder`-Fragment-Problem). Live-Pegelanzeige, Mindestdauer 30s, Maximaldauer 180s.
-   - **Datei hochladen**: MP3/M4A/OGG/WAV/OPUS (WhatsApp Voice Notes = OGG/Opus). Bis zu 5 Dateien, max 20 MB.
-3. **Qualität + Klonen** — pro Sample zeigen wir: Dauer, RMS-Lautstärke, geschätzter Noise-Floor. Auto-Enhance-Toggle (default an) läuft **serverseitig** per bestehender `audio-studio-enhance` Function (Rauschentfernung / Normalisierung) bevor die gesäuberten Samples an ElevenLabs `voices/add` gehen. Danach Name + Sprache eintragen → Klonen.
+2. **Upload-Bereich um Voice-Creation ergänzen**
+   - Die Feature-Karten unten im Upload-Bereich erweitern/ersetzen, sodass `Custom Voice`, `Skript vorlesen`, `WhatsApp Upload` und `Rauschoptimierung` klar sichtbar sind.
+   - Dadurch sieht man schon vor Datei-Upload, dass AudioStudio auch Stimmen erstellen kann.
 
-Nach Erfolg landet die Stimme automatisch in der bestehenden Custom-Voices-Liste und ist im ganzen App-Voice-Picker verwendbar (VO, Motion Studio, Directors Cut) — keine Extra-Verdrahtung nötig.
+3. **Custom-Voices-Tab leichter erreichbar machen**
+   - Den Tab `Custom Voices` prominenter platzieren bzw. mit Badge `Neu` markieren.
+   - Optional nach erfolgreichem Clone automatisch in diesen Tab springen, damit der Nutzer die neue Stimme sofort sieht.
 
-## Technische Umsetzung
+4. **Voice Studio UX prüfen und glätten**
+   - Bestehende 3 Schritte beibehalten: Skript → Aufnahme/Upload → Stimme klonen.
+   - Sicherstellen, dass das Skript gut sichtbar ist und nicht wie ein versteckter Dialog wirkt.
+   - Texte klarer machen: „Für Voiceovers, Motion Studio, Directors Cut nutzbar“.
 
-### Frontend
-- Neuer Ordner `src/components/voice/studio/`:
-  - `VoiceStudioDialog.tsx` — Stepper (Skript → Aufnahme → Review → Clone), ersetzt den heutigen `VoiceCloneDialog`.
-  - `TrainingScript.tsx` — statische Skripte in `src/config/voiceTrainingScripts.ts` (DE/EN, ~120 Wörter, phonetisch balanciert).
-  - `MicRecorder.tsx` — Web-Audio-API + `ScriptProcessor`/`AudioWorklet`, encodiert WAV 16 kHz mono via kleinem inline Encoder (`src/lib/audio/wavEncoder.ts`).
-  - `SampleList.tsx` — Liste mit Waveform-Preview (bestehender `Wavesurfer`, sonst simple `<audio>`), Delete, Enhance-Badge.
-- `useCustomVoices.ts` wird um `enhanceBeforeClone: boolean` erweitert (default true).
+5. **Music Studio sauber abgrenzen**
+   - Im AI Music Generator / Music Studio keine falsche Erwartung wecken.
+   - Kurzer Hinweis im Vocal-Bereich: Custom Voices sind für gesprochene Voiceovers; KI-Gesang nutzt eigene Sänger-Stimmen der Music-Engine.
 
-### Backend
-- **Kein neues Modell.** Zwei bestehende Functions werden verkettet:
-  1. Client uploadt Rohsamples nach Storage-Bucket `voice-samples` (private, RLS: `user_id` = erster Pfad-Segment). Falls Bucket noch nicht existiert → per `storage_create_bucket` anlegen + RLS-Policies.
-  2. Neue Edge-Function `voice-sample-enhance` (dünner Wrapper) ruft für jedes Sample die vorhandene `audio-studio-enhance` Logik: Denoise + Loudness-Normalisierung auf −16 LUFS, Trim führende/hintere Stille. Ergebnis liegt in `voice-samples/enhanced/`.
-  3. Bestehende `clone-voice` Function wird mit den **enhanced URLs** aufgerufen — keine Änderung an ElevenLabs-Payload nötig.
-- WhatsApp-Opus wird **serverseitig** in der Enhance-Function nach WAV transkodiert (ffmpeg schon in Edge Functions verfügbar über bestehenden Audio-Enhance-Pfad). Falls nicht: fallback via `openai/gpt-4o-transcribe`-freundliches WAV re-encode Snippet.
+## Technische Details
 
-### Storage / DB
-- Neuer Bucket `voice-samples` (privat) — falls schon Bucket `voiceover-audio` mit passender RLS genutzt wird, weiterverwenden. Path: `{user_id}/{voice_draft_id}/raw/*` und `.../enhanced/*`.
-- Kein Schema-Change nötig: `custom_voices.sample_urls` speichert bereits die finalen URLs. Optional Spalte `raw_sample_urls jsonb` als Backup — nur wenn User zustimmt.
+- Hauptdatei: `src/pages/AudioStudio.tsx`
+- Bereits vorhanden: `src/components/voice/studio/VoiceStudioDialog.tsx`
+- Bereits vorhanden: `src/components/audio-studio/VoiceLibraryPanel.tsx`
+- Eventuell kleiner Hinweis in `src/pages/MusicStudio.tsx` oder `MusicGeneratorPanel`, je nachdem welcher Generator auf `/audio-studio` geöffnet wird.
 
-### Guardrails
-- Consent-Checkbox „Ich bin die Stimme oder habe die schriftliche Erlaubnis" — Pflicht vor Klonen (ElevenLabs-TOS).
-- Mindestqualität: 30s Gesamt-Audio nach Trim, sonst Fehler mit klarer Meldung.
-- Credit-Check vor Klonen (bestehendes Wallet-System).
+## Ergebnis
 
-## Was NICHT im Scope ist
-
-- Realtime-Streaming-Transcription
-- Multi-lingual Professional Voice Clone (dauert 4+h ElevenLabs training) — bleibt Instant Clone
-- Voice-Marktplatz / Sharing zwischen Usern
-
-## Offene Fragen
-
-1. **Bucket-Strategie**: neuen `voice-samples` Bucket anlegen (empfohlen, klarer Scope) oder existierenden `voiceover-audio` weiternutzen?
-2. **Enhance immer an?** Default AN, aber Toggle sichtbar — okay, oder soll Enhance stumm/immer laufen ohne Option?
-3. **Sprachauswahl-Skripte**: erstmal nur **DE + EN**, oder direkt auch ES (weil die App dreisprachig ist)?
-
-Wenn okay, baue ich Schritt für Schritt: (1) Trainingsskripte + WAV-Encoder, (2) Studio-Dialog mit Mic + Upload, (3) Enhance-Wrapper-Function + Bucket, (4) Integration in VoiceLibraryPanel, alten `VoiceCloneDialog` entfernen.
+Nach Umsetzung sieht der Nutzer im AudioStudio sofort: Hier kann ich eine eigene Stimme erstellen, ein Skript vorlesen oder WhatsApp-Audio hochladen. Die bestehende technische Funktion wird nicht neu erfunden, sondern korrekt sichtbar und verständlich in den Flow eingebunden.
