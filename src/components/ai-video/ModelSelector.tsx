@@ -13,6 +13,7 @@ import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Lock, Wrench, Crown } from 'lucide-react';
 import { isPremiumEngine } from '@/lib/cost/videoProviderMargins';
+import { useVideoPricingCatalog } from '@/hooks/useVideoPricingCatalog';
 
 interface ModelSelectorProps {
   value: string;
