@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { AvatarVoicePicker } from '@/components/brand-characters/AvatarVoicePicker';
 import {
   DEFAULT_VOICE_TUNING,
   resolveCharacterVoiceProfile,
