@@ -1245,7 +1245,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
                 </Label>
               </div>
-              <Switch id="audio-switch" checked={generateAudio} onCheckedChange={setGenerateAudio} />
+              <Switch
+                id="audio-switch"
+                checked={generateAudio && !omniNonEnglishSilent}
+                disabled={omniNonEnglishSilent}
+                onCheckedChange={setGenerateAudio}
+              />
             </div>
             {generateAudio && (
               <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
