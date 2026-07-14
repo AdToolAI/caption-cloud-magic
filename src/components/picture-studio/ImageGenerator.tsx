@@ -281,7 +281,7 @@ export function ImageGenerator() {
     return data?.image || null;
   };
 
-  const handleGenerate = async () => {
+  const runGenerate = async () => {
     if (!prompt.trim()) {
       toast.error(t('picStudio.promptRequired'));
       return;
@@ -296,6 +296,7 @@ export function ImageGenerator() {
       navigate('/ai-video-purchase-credits');
       return;
     }
+
 
     setReplicateLoading(true);
     try {
