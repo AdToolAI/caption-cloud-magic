@@ -48,6 +48,9 @@ interface GenerateRequest {
   dialogText?: string;
   /** Omni only: TTS voice preset / gender hint. */
   voicePreset?: string;
+  /** Omni only: per-speaker voice mapping (max 2). Used when a scene contains
+   *  multiple named speakers in the dialogue transcript. */
+  speakerVoices?: Array<{ name: string; voice: string }>;
   // Image-to-Video
   startImageUrl?: string;
   endImageUrl?: string;
