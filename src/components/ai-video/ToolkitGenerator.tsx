@@ -1288,6 +1288,39 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Kosten-Confirm vor Generierung */}
+      <AIVideoCostConfirmDialog
+        open={costDialogOpen}
+        payload={{
+          title: language === 'de' ? 'Video generieren?' : 'Generate video?',
+          description:
+            language === 'de'
+              ? 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.'
+              : 'Cost overview — once confirmed, generation starts and your AI wallet will be charged.',
+          modelName: model.name,
+          modelBadge: model.badge ?? undefined,
+          lines: [
+            {
+              label: language === 'de' ? 'Länge × Preis / Sekunde' : 'Duration × price/second',
+              value: `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}`,
+              detail: `${aspectRatio} · ${model.name}`,
+            },
+          ],
+          totalLabel: language === 'de' ? 'Gesamtkosten' : 'Total',
+          totalValue: `${symbol}${cost.toFixed(2)}`,
+          currencySymbol: symbol,
+          totalCost: cost,
+          walletBalance: wallet?.balance_euros ?? null,
+          isUnlimited,
+        }}
+        suppressed={costDialogSuppressed}
+        onSuppressedChange={setCostDialogSuppressed}
+        onConfirm={confirmCostAndGenerate}
+        onCancel={() => setCostDialogOpen(false)}
+        onTopUp={() => { window.location.href = '/credits'; }}
+      />
+
+
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">
         {language === 'de'
