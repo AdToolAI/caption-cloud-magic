@@ -273,6 +273,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     });
   }, [isKlingOmni, omniLines]);
 
+  /* ── Omni Media-Lock: when Omni + at least one character is selected, the
+   *  anchor image is composed automatically. Manual Startbild / Multi-Ref /
+   *  V2V uploads would overwrite the anchor and produce foreign faces with
+   *  the wrong voices, so we hard-lock them and clear any prior uploads. */
+  const omniMediaLock = isKlingOmni && omniLines.some((r) => !!r.characterId);
+  useEffect(() => {
+    if (!omniMediaLock) return;
+    if (startImageUrl) setStartImageUrl(null);
+    if (referenceVideoUrl) setReferenceVideoUrl(null);
+    if (viduReferences.length) setViduReferences([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [omniMediaLock]);
+
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
