@@ -192,8 +192,10 @@ serve(async (req) => {
     }));
 
     try {
+      const replicateSlug = REPLICATE_SLUG[model] || REPLICATE_SLUG['seedance-standard'];
+      console.log(`[generate-seedance-video] Using Replicate model: ${replicateSlug}`);
       const prediction = await replicate.predictions.create({
-        model: 'bytedance/seedance-1-lite',
+        model: replicateSlug,
         input: replicateInput,
         webhook: webhookUrl,
         webhook_events_filter: ['start', 'completed']
