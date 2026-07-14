@@ -120,17 +120,34 @@ export function MusicGeneratorPanel({
   const balance = wallet?.balance_euros ?? 0;
   const insufficient = balance < tierInfo.eur;
 
+  const showLanguage = tierHasVocals(tier, instrumental);
+  const availableLanguages = MUSIC_LANGUAGE_SUPPORT[tier];
+
   const handleTierChange = (newTier: MusicTier) => {
     setTier(newTier);
     if (duration > MUSIC_TIER_PRICING[newTier].maxDuration) {
       setDuration(MUSIC_TIER_PRICING[newTier].maxDuration);
     }
+    // Auto-fallback if current language isn't supported by the new tier's provider.
+    if (tierHasVocals(newTier, instrumental) && !isLanguageSupported(newTier, vocalLanguage)) {
+      setVocalLanguage('en');
+      toast.info('Sprache auf Englisch zurückgesetzt', {
+        description: `Der Provider dieses Tiers unterstützt die zuvor gewählte Sprache nicht.`,
+      });
+    }
   };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
+    let finalPrompt = prompt;
+    if (showLanguage) {
+      const meta = getLanguageMeta(tier, vocalLanguage);
+      if (meta) {
+        finalPrompt = `${prompt}\n\n[LANGUAGE: ${meta.name}] All sung vocals MUST be in ${meta.name}. Do not switch language, do not mix languages, no fantasy or made-up words.`;
+      }
+    }
     const track = await generateMusic({
-      prompt,
+      prompt: finalPrompt,
       tier,
       durationSeconds: effectiveDuration,
       genre,
