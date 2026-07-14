@@ -38,6 +38,11 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as 'de' | 'en' | 'es';
   const symbol = currency === 'USD' ? '$' : '€';
   const list = models ?? AI_VIDEO_TOOLKIT_MODELS;
+  const { getPricePerSecond } = useVideoPricingCatalog();
+
+  // Canonical price (from server catalog) with local-config fallback.
+  const priceFor = (m: ToolkitModel) =>
+    getPricePerSecond(m.id, currency) ?? m.costPerSecond[currency];
 
   const grouped = useMemo(() => {
     const map: Record<ToolkitModelGroup, ToolkitModel[]> = {
