@@ -333,7 +333,7 @@ export function ImageGenerator() {
               label: 'Mit Fast erneut',
               onClick: () => {
                 setTier('fast');
-                setTimeout(() => { void handleGenerate(); }, 50);
+                setTimeout(() => { void runGenerate(); }, 50);
               },
             } : undefined,
           });
@@ -349,6 +349,38 @@ export function ImageGenerator() {
       setReplicateLoading(false);
     }
   };
+
+  /* Confirm gate — only premium tiers (paid Replicate) require confirmation. */
+  const COST_SUPPRESS_KEY = 'picture-studio:cost-suppressed-until';
+  const [costDialogOpen, setCostDialogOpen] = useState(false);
+  const [costDialogSuppressed, setCostDialogSuppressed] = useState(false);
+
+  const handleGenerate = () => {
+    if (!prompt.trim()) { toast.error(t('picStudio.promptRequired')); return; }
+    if (!user) { toast.error(t('picStudio.loginRequired')); return; }
+    // Free tier (Gemini/Standard "Gratis im Abo") skips confirm.
+    if (cost <= 0) { void runGenerate(); return; }
+    if (hasInsufficientCredits) {
+      toast.error(`Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`);
+      navigate('/ai-video-purchase-credits');
+      return;
+    }
+    try {
+      const until = Number(localStorage.getItem(COST_SUPPRESS_KEY) ?? '0');
+      if (Date.now() < until) { void runGenerate(); return; }
+    } catch { /* noop */ }
+    setCostDialogSuppressed(false);
+    setCostDialogOpen(true);
+  };
+
+  const confirmCostAndGenerate = () => {
+    if (costDialogSuppressed) {
+      try { localStorage.setItem(COST_SUPPRESS_KEY, String(Date.now() + 24 * 60 * 60 * 1000)); } catch { /* noop */ }
+    }
+    setCostDialogOpen(false);
+    void runGenerate();
+  };
+
 
   const handleGenerationSuccess = async (image: any) => {
     const imgUrl = image.previewUrl || image.url;
