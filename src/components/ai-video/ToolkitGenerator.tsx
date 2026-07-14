@@ -1303,12 +1303,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm', 'female-bright', 'male-deep'];
             setOmniLines((prev) => [
               ...prev,
-              { characterId: next.id, lipSync: prev.filter((r) => r.lipSync).length < LIP_SYNC_MAX, line: '', voicePreset: defaults[prev.length] ?? 'neutral' },
+              { characterId: next.id, lipSync: !omniNonEnglishSilent && prev.filter((r) => r.lipSync).length < LIP_SYNC_MAX, line: '', voicePreset: defaults[prev.length] ?? 'neutral' },
             ]);
           };
           const toggleLipSync = (idx: number, checked: boolean) => {
             const row = omniLines[idx];
             if (!row) return;
+            if (checked && omniNonEnglishSilent) {
+              toast.info(
+                language === 'de'
+                  ? 'Kling Omni spricht Deutsch aktuell nicht zuverlässig. Dieser Clip bleibt stumm; nutze Motion Studio für deutsches Lip-Sync.'
+                  : 'Kling Omni does not speak this language reliably yet. This clip stays silent; use Motion Studio for non-English lip-sync.',
+              );
+              return;
+            }
             if (checked && lipSyncCount >= LIP_SYNC_MAX) return;
             if (!checked && row.line.trim()) {
               if (!confirm(language === 'de' ? 'Lip-Sync für diesen Charakter deaktivieren? Der Dialogtext wird verworfen.' : 'Disable lip-sync for this character? The dialogue will be discarded.')) return;
@@ -1324,7 +1332,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <Label className="text-sm">
-                    {language === 'de' ? 'Cast & Native Lip-Sync (DE/EN/ES)' : 'Cast & Native Lip-Sync (DE/EN/ES)'}
+                    {language === 'de' ? 'Cast & Omni Anchor (Lip-Sync nur EN)' : 'Cast & Omni Anchor (Lip-Sync EN only)'}
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1338,7 +1346,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </div>
 
               <p className="text-[11px] text-muted-foreground leading-snug">
-                {language === 'de'
+                {omniNonEnglishSilent && language === 'de'
+                  ? 'Deutsch ist bei Kling Omni aktuell silent-only, weil die native Stimme sonst Fantasiesprache mit englischem Akzent erzeugt. Die Charaktere erscheinen im Bild, sprechen aber nicht. Für deutsches Lip-Sync bitte Motion Studio verwenden.'
+                  : omniNonEnglishSilent
+                  ? 'This language is silent-only for Kling Omni because native speech is not reliable yet. Characters appear in frame but do not speak. Use Motion Studio for non-English lip-sync.'
+                  : language === 'de'
                   ? 'Bis zu 4 Charaktere aus Cast & World. Aktiviere den Lip-Sync-Switch für max. 2 sprechende Charaktere — die anderen erscheinen als stumme Statist:innen im Bild.'
                   : 'Up to 4 characters from Cast & World. Toggle lip-sync for up to 2 speaking characters — the rest appear as silent extras in the frame.'}
               </p>
@@ -1356,7 +1368,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   const c = libCharacters.find((x) => x.id === row.characterId);
                   const displayName = c?.name?.trim() || (language === 'de' ? `Charakter ${idx + 1}` : `Character ${idx + 1}`);
                   const initials = displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-                  const switchDisabled = !row.lipSync && lipSyncCount >= LIP_SYNC_MAX;
+                  const switchDisabled = omniNonEnglishSilent || (!row.lipSync && lipSyncCount >= LIP_SYNC_MAX);
                   return (
                     <div key={idx} className="rounded-md border border-primary/20 bg-background/40 p-3 space-y-2">
                       <div className="flex items-center gap-2">
@@ -1398,7 +1410,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                           className="flex flex-col items-center gap-1"
                           title={
                             switchDisabled
-                              ? (language === 'de'
+                              ? (omniNonEnglishSilent
+                                  ? (language === 'de'
+                                      ? 'Deutsch/Spanisch sind für Kling Omni gesperrt, um Fantasie-Sprache zu verhindern.'
+                                      : 'Non-English lip-sync is blocked for Kling Omni to prevent fantasy speech.')
+                                  : language === 'de'
                                   ? 'Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.'
                                   : 'Kling Omni allows max. 2 speaking characters per clip.')
                               : undefined
