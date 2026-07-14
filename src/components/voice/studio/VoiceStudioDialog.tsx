@@ -326,12 +326,13 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
 
   const copyScript = async () => {
     try {
-      await navigator.clipboard.writeText(VOICE_TRAINING_SCRIPTS[scriptLang].text);
+      await navigator.clipboard.writeText(personalizedText);
       toast.success("Skript kopiert");
     } catch {
       toast.error("Kopieren fehlgeschlagen");
     }
   };
+
 
   const canProceedTo3 =
     samples.length > 0 && totalSec >= MIN_TOTAL_SEC && totalSec <= MAX_TOTAL_SEC;
