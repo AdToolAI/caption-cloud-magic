@@ -163,6 +163,7 @@ export function useCustomVoices() {
     cloneVoice,
     deleteVoice,
     toggleVoiceActive,
+    renameVoice,
     refetch: fetchVoices,
   };
 }
