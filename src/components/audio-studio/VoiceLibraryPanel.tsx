@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Mic, Plus, Trash2, Play, Pause, Loader2, Sparkles } from 'lucide-react';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
-import { VoiceCloneDialog } from '@/components/voice/VoiceCloneDialog';
+import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
