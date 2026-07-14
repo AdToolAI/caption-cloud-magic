@@ -209,16 +209,29 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
-    // Build Kling input
+    // Build Kling input (model-driven — Omni gets native audio + lip-sync fields)
     const replicateInput: Record<string, any> = {
       prompt,
       duration: duration,
       aspect_ratio: aspectRatio,
-      mode: model === 'kling-3-pro' ? 'pro' : 'standard',
     };
+    if (modelConfig.mode) {
+      replicateInput.mode = modelConfig.mode;
+    }
 
-    if (generateAudio) {
+    // Native audio (Kling 2.6 / Omni). Ambient-only fallback disables TTS.
+    if (modelConfig.supportsNativeAudio && generateAudio && !suppressDialogue) {
       replicateInput.generate_audio = true;
+      if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
+    }
+
+    // Native lip-sync (Omni only): if we have dialog text, hand it to Kling
+    // and skip the downstream Sync.so pipeline entirely.
+    if (modelConfig.supportsNativeLipSync && dialogText && dialogText.trim().length > 0 && !suppressDialogue) {
+      replicateInput.dialog = dialogText.trim();
+      if (voicePreset) replicateInput.voice = voicePreset;
+      if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
+      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${spokenLanguage ?? 'auto'}, chars=${dialogText.length})`);
     }
 
     // Image-to-Video
@@ -235,14 +248,15 @@ serve(async (req) => {
       replicateInput.video_reference_type = videoReferenceType || 'feature';
     }
 
-    console.log(`[generate-kling-video] Replicate input:`, JSON.stringify({
+    console.log(`[generate-kling-video] Replicate slug=${modelConfig.slug} input:`, JSON.stringify({
       ...replicateInput,
       prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
+      dialog: replicateInput.dialog ? `${String(replicateInput.dialog).substring(0, 60)}…` : undefined,
     }));
 
     try {
       const prediction = await replicate.predictions.create({
-        model: 'kwaivgi/kling-v3-omni-video',
+        model: modelConfig.slug,
         input: replicateInput,
         webhook: webhookUrl,
         webhook_events_filter: ['start', 'completed']
