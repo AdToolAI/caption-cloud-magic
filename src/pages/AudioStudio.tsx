@@ -12,6 +12,7 @@ import { FillerWordPanel } from '@/components/audio-studio/FillerWordPanel';
 import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBeforeAfterComparison';
 import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
 import { VoiceLibraryPanel } from '@/components/audio-studio/VoiceLibraryPanel';
+import { MyVoicesSection } from '@/components/audio-studio/MyVoicesSection';
 import { MusicGeneratorPanel } from '@/components/audio-studio/MusicGeneratorPanel';
 import { AutoMatchPanel } from '@/components/audio-studio/AutoMatchPanel';
 import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
@@ -276,6 +277,9 @@ export default function AudioStudio() {
                   </Button>
                 </div>
               </Card>
+
+              {/* Meine Stimmen — geklonte Voices */}
+              <MyVoicesSection onCreate={() => setShowVoiceStudio(true)} />
 
               {/* AI Music Generator Teaser */}
               <Card 
