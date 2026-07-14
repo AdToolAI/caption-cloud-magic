@@ -52,13 +52,13 @@ export function VoiceLibraryPanel() {
         <div>
           <h3 className="text-lg font-semibold">Custom Voices</h3>
           <p className="text-sm text-muted-foreground">
-            Verwalte deine geklonten Stimmen, weise sie Charakteren in deiner Motion-Studio-Library
-            zu und teste die Synthese mit eigenem Text.
+            Erstelle eigene Stimmen per Skript, Mikrofon oder WhatsApp-Upload und nutze sie danach
+            für Voiceovers, Motion Studio und Directors Cut.
           </p>
         </div>
         <Button onClick={() => setShowCloneDialog(true)} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
-          Voice Studio öffnen
+          Stimme erstellen
         </Button>
       </div>
 
@@ -164,8 +164,8 @@ export function VoiceLibraryPanel() {
             <Mic className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">Keine Custom Voices</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Erstelle deine erste Custom Voice durch Voice Cloning. Du kannst diese danach in der
-              Motion Studio Library deinen Charakteren zuweisen.
+              Lies das geführte Skript vor oder lade eine WhatsApp-Sprachnachricht hoch. Die Stimme
+              wird bereinigt und danach in deinen Voiceover-Tools verfügbar.
             </p>
             <Button onClick={() => setShowCloneDialog(true)} className="gap-2">
               <Plus className="h-4 w-4" />
