@@ -225,10 +225,16 @@ serve(async (req) => {
       replicateInput.mode = modelConfig.mode;
     }
 
+    // Kling expects language as the full English name, not a 2-letter code.
+    const LANG_MAP: Record<string, string> = { de: 'german', en: 'english', es: 'spanish' };
+    const klingLang = spokenLanguage
+      ? (LANG_MAP[spokenLanguage.toLowerCase()] ?? spokenLanguage)
+      : undefined;
+
     // Native audio (Kling 2.6 / Omni). Ambient-only fallback disables TTS.
     if (modelConfig.supportsNativeAudio && generateAudio && !suppressDialogue) {
       replicateInput.generate_audio = true;
-      if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
+      if (klingLang) replicateInput.spoken_language = klingLang;
     }
 
     // Native lip-sync (Omni only): if we have dialog text, hand it to Kling
@@ -241,8 +247,8 @@ serve(async (req) => {
           .slice(0, 2)
           .map((s) => ({ name: String(s.name || '').slice(0, 40), voice: String(s.voice || 'neutral') }));
       }
-      if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
-      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${spokenLanguage ?? 'auto'}, chars=${dialogText.length}, speakers=${speakerVoices?.length ?? 1})`);
+      if (klingLang) replicateInput.spoken_language = klingLang;
+      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${klingLang ?? 'auto'}, chars=${dialogText.length}, speakers=${speakerVoices?.length ?? 1})`);
     }
 
     // Image-to-Video

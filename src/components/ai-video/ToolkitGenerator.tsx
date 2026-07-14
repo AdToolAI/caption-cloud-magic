@@ -714,6 +714,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           }
           body.spokenLanguage = effectiveSpokenLang;
           body.nativeLipSync = true;
+
+          // Embed spoken language + dialogue into the visual prompt so Kling
+          // Omni conditions lip-motion + prosody on the exact text and locks
+          // the language. Without this, native voices fall back to an English-
+          // accented default even when spoken_language is set.
+          const langLabel =
+            effectiveSpokenLang === 'de'
+              ? 'German (Hochdeutsch) — all voices speak clearly and naturally in German'
+              : effectiveSpokenLang === 'es'
+                ? 'Spanish (Castellano) — all voices speak clearly and naturally in Spanish'
+                : 'English — all voices speak clearly and naturally in English';
+          const dialogBlock = named.map((n) => `${n.name}: "${n.line}"`).join('\n');
+          body.prompt = `${body.prompt}\n\n[SPOKEN LANGUAGE]: ${langLabel}.\n[DIALOG]\n${dialogBlock}`;
         }
       }
 
