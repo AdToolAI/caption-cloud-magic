@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -10,6 +11,24 @@ interface CustomVoice {
   sample_urls: string[];
   is_active: boolean;
   created_at: string;
+}
+
+async function getFunctionErrorMessage(error: unknown, fallback = 'Voice Cloning fehlgeschlagen') {
+  if (error instanceof FunctionsHttpError) {
+    const raw = await error.context.text().catch(() => '');
+    if (raw) {
+      try {
+        const payload = JSON.parse(raw) as { error?: unknown; details?: unknown };
+        const message = typeof payload.error === 'string' ? payload.error : fallback;
+        const details = typeof payload.details === 'string' ? payload.details : '';
+        return details ? `${message}\n${details.slice(0, 280)}` : message;
+      } catch {
+        return raw.slice(0, 360);
+      }
+    }
+  }
+
+  return error instanceof Error ? error.message : fallback;
 }
 
 export function useCustomVoices() {
@@ -64,9 +83,10 @@ export function useCustomVoices() {
       return data;
     } catch (error) {
       console.error('Error cloning voice:', error);
+      const description = await getFunctionErrorMessage(error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Voice Cloning fehlgeschlagen',
+        description,
         variant: 'destructive',
       });
       return null;
