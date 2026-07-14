@@ -107,6 +107,29 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
     }
   };
 
+  const handleVoiceChange = async (
+    v: { voiceId: string; provider: 'elevenlabs' | 'custom'; name: string } | null,
+  ) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('brand_characters')
+        .update({
+          default_voice_id: v?.voiceId ?? null,
+          default_voice_provider: v?.provider ?? null,
+          default_voice_name: v?.name ?? null,
+        } as any)
+        .eq('id', avatarId);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ['avatar-detail', avatarId] });
+      toast.success(v ? `Voice gesetzt: ${v.name}` : 'Voice entfernt');
+    } catch (e: any) {
+      toast.error(e?.message || 'Konnte Voice nicht speichern');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const playPreview = async () => {
     if (!voiceId) {
       toast.error('Set a default voice first (Avatar settings).');
