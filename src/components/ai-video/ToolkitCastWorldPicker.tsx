@@ -185,36 +185,38 @@ export function ToolkitCastWorldPicker({
         </Link>
       </div>
 
-      {/* Characters (multi) */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-          <Users className="h-3.5 w-3.5" />
-          {t('Charaktere', 'Characters', 'Personajes')}
-          <span className="text-muted-foreground/60">
-            {selectedChars.length}/{MAX_CHARACTERS}
-          </span>
+      {/* Characters (multi) — hidden when a specialised upstream panel manages cast (e.g. Kling Omni). */}
+      {!hideCharacters && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            {t('Charaktere', 'Characters', 'Personajes')}
+            <span className="text-muted-foreground/60">
+              {selectedChars.length}/{MAX_CHARACTERS}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedChars.map((c) => (
+              <SelectedChip
+                key={c.id}
+                name={c.name}
+                imageUrl={c.reference_image_url}
+                onRemove={() => removeChar(c.id)}
+              />
+            ))}
+            {selectedChars.length < MAX_CHARACTERS && (
+              <MotionAssetPicker
+                items={characters.filter((c) => !characterIds.includes(c.id))}
+                loading={loading}
+                onPick={(c) => addChar(c.id)}
+                language={language}
+                emptyLabel={t('Noch keine Charaktere.', 'No characters yet.', 'Aún no hay personajes.')}
+                triggerLabel={t('Charakter hinzufügen', 'Add character', 'Añadir personaje')}
+              />
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {selectedChars.map((c) => (
-            <SelectedChip
-              key={c.id}
-              name={c.name}
-              imageUrl={c.reference_image_url}
-              onRemove={() => removeChar(c.id)}
-            />
-          ))}
-          {selectedChars.length < MAX_CHARACTERS && (
-            <MotionAssetPicker
-              items={characters.filter((c) => !characterIds.includes(c.id))}
-              loading={loading}
-              onPick={(c) => addChar(c.id)}
-              language={language}
-              emptyLabel={t('Noch keine Charaktere.', 'No characters yet.', 'Aún no hay personajes.')}
-              triggerLabel={t('Charakter hinzufügen', 'Add character', 'Añadir personaje')}
-            />
-          )}
-        </div>
-      </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-3">
         {/* Location (single) */}
