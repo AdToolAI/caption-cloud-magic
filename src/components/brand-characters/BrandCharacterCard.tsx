@@ -9,6 +9,7 @@ import { AvatarVoicePicker } from './AvatarVoicePicker';
 import { AvatarPortraitDialog } from './AvatarPortraitDialog';
 import TalkingHeadDialog from '@/components/video-composer/TalkingHeadDialog';
 import { SubmitCharacterToMarketplaceDialog } from '@/components/marketplace/SubmitCharacterToMarketplaceDialog';
+import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 
 interface BrandCharacterCardProps {
   character: BrandCharacter;
@@ -89,8 +90,11 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
         <div className="p-3 space-y-3">
           <div>
             <h3 className="font-serif text-lg leading-tight">{character.name}</h3>
+            <div className="mt-1">
+              <EntityIdBadge id={character.id} label="ID" />
+            </div>
             {character.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{character.description}</p>
+              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{character.description}</p>
             )}
           </div>
 

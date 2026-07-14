@@ -1,36 +1,42 @@
-# Plan: "Meine Stimmen"-Sektion im Audio Studio
+## Zwei Ergänzungen in Cast & World
 
-Nach dem Klonen war unklar, wo die Stimme landet. Wir bauen eine sichtbare Voice-Library direkt ins Audio Studio, damit man alle eigenen Voices verwalten und testen kann.
+### 1. Voice-Auswahl auf der Charakter-Detailseite
 
-## Was gebaut wird
+**Problem:** `/avatars/:id` zeigt eine „Voice Profile"-Karte (Stability, Similarity, Style, Speed, Speaker Boost), aber keinen Voice-Picker. Preview ist deshalb deaktiviert ("Set a default voice first"). Custom Voices aus dem Audio Studio sind hier nicht erreichbar.
 
-1. **Neue Komponente `MyVoicesSection.tsx`** (in `src/components/audio-studio/`)
-   - Grid/Liste aller Voices aus `useCustomVoices` (Filter: sichtbar für den User)
-   - Pro Karte: Name, Sprache, Erstelldatum, Status-Badge (Aktiv / Inaktiv)
-   - Aktionen:
-     - **Preview** (Play-Button): nutzt Edge Function `preview-voice` mit einem kurzen Standardtext in der Voice-Sprache
-     - **Umbenennen** (Inline-Edit)
-     - **Aktiv-Toggle** (nutzt bestehendes `toggleVoiceActive`)
-     - **Löschen** (mit Confirm-Dialog, nutzt bestehendes `deleteVoice`)
-   - Empty State: „Noch keine eigenen Stimmen — jetzt klonen" mit CTA öffnet `VoiceStudioDialog`
+Die Datenverdrahtung existiert bereits: `brand_characters.default_voice_id / _provider / _name` wird von Motion Studio, AI Video Studio (`ToolkitGenerator`), `TalkingHeadDialog`, `SceneDialogStudio`, `useApplyProductionPlan` und `useUnifiedMentionLibrary` automatisch als Default gelesen. Es fehlt nur die UI zum Setzen auf der Detailseite.
 
-2. **Integration in `src/pages/AudioStudio.tsx`**
-   - Neue Sektion direkt unter der bestehenden „Eigene Stimme erstellen" Hero Card
-   - Titel: **„Meine Stimmen"** mit Count-Badge (`{voices.length}`)
-   - Auto-Refresh nach erfolgreichem Klonen (via `refetch` aus dem Hook)
+**Änderungen (rein UI):**
+- **`src/components/avatars/VoiceProfileCard.tsx`** — neuen Block **„Voice Selection"** oberhalb der Slider einfügen mit `AvatarVoicePicker` (ElevenLabs-Library **und** Custom Voices aus `useCustomVoices`) + `VoicePreviewButton`. `onChange` schreibt `default_voice_id / _provider / _name` in `brand_characters` und invalidiert die `avatar-detail`-Query. Hinweis darunter: „Wird als Default in Motion Studio & AI Video Studio übernommen."
+- **`src/components/brand-characters/AvatarVoicePicker.tsx`** — „Your Custom Voices"-Gruppe an den **Anfang** der Liste ziehen, damit frisch geklonte Stimmen sofort sichtbar sind.
 
-3. **Post-Clone-Verbesserung in `VoiceStudioDialog.tsx`**
-   - Success-Toast wird ergänzt um Hinweis: „Deine Stimme ist jetzt in ‚Meine Stimmen' verfügbar"
-   - Dialog schließt und scrollt sanft zur neuen Sektion
+### 2. IDs überall in Cast & World sichtbar
 
-## Technisches
+Betrifft Charaktere, Locations, Outfits/Wardrobe-Items, Props/Objekte, Buildings — jede Entität, die eine `id` hat.
 
-- Datenquelle: bestehende Tabelle `custom_voices` via `useCustomVoices` Hook — keine Schema-Änderungen
-- Preview: existierende Edge Function `preview-voice` (bereits im `VoicePicker` im Einsatz)
-- Umbenennen: kleines Update in `useCustomVoices` — neue Funktion `renameVoice(id, name)` (UPDATE auf `custom_voices.name`)
-- Design: konsistent mit James-Bond-2028 Tokens (Deep Black / Gold), Glassmorphism-Karten wie im restlichen Audio Studio
+**Anzeige-Muster:** kleine Monospace-Badge mit den ersten 8 Zeichen der UUID + Copy-Icon (klickt → schreibt volle UUID in die Zwischenablage + Toast „ID kopiert"). Tooltip zeigt die volle UUID.
 
-## Nicht enthalten
+**Neue Komponente:** `src/components/cast-world/EntityIdBadge.tsx`
+```
+<Badge>ID · abc12345…</Badge>  ← Copy-to-clipboard
+```
+Klein, `text-[10px]`, `font-mono`, `text-muted-foreground`, unaufdringlich in Ecke oder unter Titel.
 
-- Keine Änderungen am AI Video Studio / Kling Omni Panel (dort sind Custom Voices bereits über `AvatarVoicePicker` / `VoicePicker` verfügbar)
-- Kein Sharing / keine Marketplace-Features für Voices
+**Einbau-Stellen (nur bestehende UI, keine neuen Routen):**
+- `src/pages/AvatarDetail.tsx` — direkt unter `Samuel Dusatko`-Name
+- `src/components/brand-characters/BrandCharacterCard.tsx` — Karte in der Bibliothek (Ecke oben rechts)
+- `src/components/motion-studio/CharacterCard.tsx` (falls vorhanden) — Motion-Studio-Bibliothek
+- `src/components/motion-studio/LocationCard.tsx` — Locations
+- Outfit-/Wardrobe-Karten in `AvatarDetail.tsx` (Casual/Streetwear/Brunch/Loungewear-Kacheln) — `outfit_look_id` als Badge
+- Prop-/Building-/Objekt-Karten (falls vorhanden unter `src/components/motion-studio/props*` oder `objects*`)
+
+Vor dem Einbau kurz `rg` fahren, um alle relevanten Karten-Komponenten zu erfassen; alle bekommen dieselbe `<EntityIdBadge>`.
+
+### Nicht Teil dieses Plans
+- Kein Schema-Change (IDs existieren bereits).
+- Keine Änderung an Downstream-Pipelines.
+- Kein neuer Edge-Function-Call.
+
+### Verifikation
+- `/avatars/:id` öffnen → Voice-Picker sichtbar, Auswahl (ElevenLabs oder Custom) → Preview funktioniert → nach Reload persistiert → Motion Studio zeigt Stimme als vorbelegt.
+- In allen Cast & World Listen und Detailansichten (Charakter, Location, Outfit, Prop/Building) ist eine ID-Badge sichtbar, Klick kopiert die volle UUID in die Zwischenablage.

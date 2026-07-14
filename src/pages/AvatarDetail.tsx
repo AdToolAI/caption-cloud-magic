@@ -14,6 +14,7 @@ import { WardrobePerspectiveCard } from '@/components/brand-characters/WardrobeP
 import { SavedOutfitsSection } from '@/components/brand-characters/SavedOutfitsSection';
 import { SavedOutfitViewerCard } from '@/components/brand-characters/SavedOutfitViewerCard';
 import { VoiceProfileCard } from '@/components/avatars/VoiceProfileCard';
+import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 import { AvatarDefaultPerformanceCard } from '@/components/avatars/AvatarDefaultPerformanceCard';
 
 import type { OutfitLook } from '@/hooks/useSavedOutfits';
@@ -105,8 +106,11 @@ const AvatarDetail = () => {
                       )}
                     </div>
                     <h1 className="font-serif text-2xl">{avatar.name}</h1>
+                    <div className="mt-1.5">
+                      <EntityIdBadge id={avatar.id} label="Character-ID" />
+                    </div>
                     {avatar.description && (
-                      <p className="text-sm text-muted-foreground mt-1.5">{avatar.description}</p>
+                      <p className="text-sm text-muted-foreground mt-2">{avatar.description}</p>
                     )}
                     {avatar.default_voice_name && (
                       <p className="text-xs text-primary mt-3">🎙 {avatar.default_voice_name}</p>

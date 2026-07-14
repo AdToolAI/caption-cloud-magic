@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { OutfitLook } from '@/hooks/useSavedOutfits';
 import { OutfitLightbox, type LightboxFrame } from './OutfitLightbox';
+import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 
 const PERSPECTIVES: Array<{ key: keyof OutfitLook; label: string }> = [
   { key: 'front_url', label: 'Front' },
@@ -70,7 +71,11 @@ export function SavedOutfitViewerCard({
       <div>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saved outfit</p>
         <h3 className="font-serif text-lg leading-tight">{look.name}</h3>
-        <p className="text-[10px] text-muted-foreground mt-0.5">From your library · click any image to zoom</p>
+        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+          <EntityIdBadge id={look.id} label="Outfit-ID" />
+          <EntityIdBadge id={look.avatar_id} label="Char-ID" />
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1.5">From your library · click any image to zoom</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {PERSPECTIVES.map(({ key, label }, i) => {

@@ -38,6 +38,7 @@ import { CatalogBrowser } from '@/components/library-hubs/CatalogBrowser';
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
 import { AssetPhotoUploadSheet } from '@/components/cast-world/AssetPhotoUploadSheet';
 import type { RefineKind } from '@/hooks/useRefineAssetPhoto';
+import { EntityIdBadge } from '@/components/cast-world/EntityIdBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -583,8 +584,9 @@ function AssetTabBody({
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
+                <EntityIdBadge id={item.id} label="ID" />
                 {item.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
+                  <p className="text-xs text-muted-foreground line-clamp-2 pt-1">
                     {item.description}
                   </p>
                 )}

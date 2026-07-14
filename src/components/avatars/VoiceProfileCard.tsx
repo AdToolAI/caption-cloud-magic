@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { AvatarVoicePicker } from '@/components/brand-characters/AvatarVoicePicker';
 import {
   DEFAULT_VOICE_TUNING,
   resolveCharacterVoiceProfile,
@@ -32,6 +33,7 @@ interface VoiceProfileCardProps {
     name?: string;
     default_voice_id?: string | null;
     default_voice_name?: string | null;
+    default_voice_provider?: string | null;
     voice_settings?: any;
   };
 }
@@ -105,6 +107,29 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
     }
   };
 
+  const handleVoiceChange = async (
+    v: { voiceId: string; provider: 'elevenlabs' | 'custom'; name: string } | null,
+  ) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('brand_characters')
+        .update({
+          default_voice_id: v?.voiceId ?? null,
+          default_voice_provider: v?.provider ?? null,
+          default_voice_name: v?.name ?? null,
+        } as any)
+        .eq('id', avatarId);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ['avatar-detail', avatarId] });
+      toast.success(v ? `Voice gesetzt: ${v.name}` : 'Voice entfernt');
+    } catch (e: any) {
+      toast.error(e?.message || 'Konnte Voice nicht speichern');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const playPreview = async () => {
     if (!voiceId) {
       toast.error('Set a default voice first (Avatar settings).');
@@ -168,6 +193,25 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
           {previewing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
           Preview
         </Button>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-primary/15 bg-background/40 p-3">
+        <AvatarVoicePicker
+          value={avatar.default_voice_id ?? null}
+          provider={(avatar.default_voice_provider as any) ?? null}
+          onChange={handleVoiceChange}
+          disabled={saving}
+        />
+        {avatar.default_voice_name && (
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            Aktive Stimme: <span className="text-foreground">{avatar.default_voice_name}</span>
+          </p>
+        )}
+        {!avatar.default_voice_id && (
+          <p className="mt-1.5 text-[10px] text-amber-500/80">
+            Noch keine Stimme zugewiesen — wähle eine aus, damit dieser Charakter im Motion Studio & AI Video Studio spricht.
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">
