@@ -315,7 +315,7 @@ function AppLayout() {
            <Route path="/marketplace" element={<Marketplace />} />
            <Route path="/autopilot" element={<ProtectedRoute><Autopilot /></ProtectedRoute>} />
            <Route path="/creator-studio" element={<ProtectedRoute><CreatorStudio /></ProtectedRoute>} />
-           <Route path="/video-translator" element={<VideoTranslator />} />
+           <Route path="/video-translator" element={<Navigate to="/home" replace />} />
            <Route path="/community" element={<Community />} />
            <Route path="/gaming" element={<GamingHub />} />
           <Route path="/explainer-studio" element={<Navigate to="/home" replace />} />
