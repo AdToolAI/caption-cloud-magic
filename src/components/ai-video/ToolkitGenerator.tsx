@@ -700,7 +700,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         body.generateAudio = generateAudio && ttsLangSupported && !omniNonEnglishSilent;
         if (generateAudio && ttsLangSupported && !omniNonEnglishSilent) {
           body.spokenLanguage = effectiveSpokenLang;
-        } else if (generateAudio && !ttsLangSupported || omniNonEnglishSilent) {
+        } else if ((generateAudio && !ttsLangSupported) || omniNonEnglishSilent) {
           body.suppressDialogue = true;
         }
       }
