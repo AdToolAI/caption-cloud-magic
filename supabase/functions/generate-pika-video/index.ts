@@ -10,10 +10,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Margin policy: Pika ~$0.04/$0.09 per second → user 0.14/0.26 €/s (~64-65% margin)
+// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
+// Std: $0.04/s → €0.12/s | Pro: $0.09/s → €0.27/s
 const MODEL_PRICING: Record<string, number> = {
-  'pika-2-2-standard': 0.14,
-  'pika-2-2-pro': 0.26,
+  'pika-2-2-standard': 0.12,
+  'pika-2-2-pro': 0.27,
 };
 
 // Pika 2.2 on Replicate
