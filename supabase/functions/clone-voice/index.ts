@@ -29,10 +29,10 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { name, sample_urls, language } = await req.json();
+    const { name, sample_urls, language, description, remove_background_noise } = await req.json();
 
-    if (!sample_urls || sample_urls.length < 3) {
-      throw new Error('At least 3 voice samples required');
+    if (!sample_urls || sample_urls.length < 1) {
+      throw new Error('At least 1 voice sample required');
     }
 
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
@@ -40,21 +40,35 @@ serve(async (req) => {
       throw new Error('ELEVENLABS_API_KEY not configured');
     }
 
-    // Download audio samples
+    // Download audio samples, keep their real container so ElevenLabs
+    // can decode OGG/Opus (WhatsApp voice notes), M4A, MP3, WAV, etc.
     const audioFiles = await Promise.all(
-      sample_urls.map(async (url: string) => {
+      sample_urls.map(async (url: string, idx: number) => {
         const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to fetch sample ${idx}: ${response.status}`);
         const blob = await response.blob();
-        return blob;
+        const contentType = response.headers.get('content-type') || blob.type || 'audio/mpeg';
+        const extFromType: Record<string, string> = {
+          'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/wav': 'wav', 'audio/wave': 'wav',
+          'audio/x-wav': 'wav', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a',
+          'audio/ogg': 'ogg', 'audio/opus': 'ogg', 'audio/webm': 'webm', 'audio/flac': 'flac',
+        };
+        const cleanType = contentType.split(';')[0].trim().toLowerCase();
+        const ext = extFromType[cleanType] || (url.match(/\.(mp3|wav|m4a|ogg|opus|webm|flac)(?:\?|$)/i)?.[1]?.toLowerCase()) || 'mp3';
+        return { blob, ext, type: cleanType };
       })
     );
 
     // Create FormData for ElevenLabs
     const formData = new FormData();
     formData.append('name', name);
-    audioFiles.forEach((blob, idx) => {
-      formData.append('files', blob, `sample_${idx}.mp3`);
+    if (description) formData.append('description', String(description).slice(0, 500));
+    // ElevenLabs' built-in denoise on ingest — no external DSP required.
+    formData.append('remove_background_noise', remove_background_noise === false ? 'false' : 'true');
+    audioFiles.forEach(({ blob, ext }, idx) => {
+      formData.append('files', blob, `sample_${idx}.${ext}`);
     });
+
 
     // Call ElevenLabs Voice Cloning API
     const cloneResponse = await fetch('https://api.elevenlabs.io/v1/voices/add', {

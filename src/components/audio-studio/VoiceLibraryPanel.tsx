@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Mic, Plus, Trash2, Play, Pause, Loader2, Sparkles } from 'lucide-react';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
-import { VoiceCloneDialog } from '@/components/voice/VoiceCloneDialog';
+import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -58,7 +58,7 @@ export function VoiceLibraryPanel() {
         </div>
         <Button onClick={() => setShowCloneDialog(true)} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
-          Voice klonen
+          Voice Studio öffnen
         </Button>
       </div>
 
@@ -175,7 +175,7 @@ export function VoiceLibraryPanel() {
         )}
       </div>
 
-      <VoiceCloneDialog open={showCloneDialog} onOpenChange={setShowCloneDialog} />
+      <VoiceStudioDialog open={showCloneDialog} onOpenChange={setShowCloneDialog} />
     </Card>
   );
 }
