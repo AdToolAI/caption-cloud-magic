@@ -374,7 +374,16 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       });
 
       if (result) {
+        toast.success('Stimme erfolgreich geklont', {
+          description: 'Du findest sie jetzt unter „Meine Stimmen".',
+        });
         onOpenChange(false);
+        // Sanft zur Sektion scrollen (falls im Audio Studio geöffnet)
+        setTimeout(() => {
+          document
+            .getElementById('my-voices')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 250);
       }
     } catch (err) {
       console.error("[VoiceStudio] submit error:", err);
