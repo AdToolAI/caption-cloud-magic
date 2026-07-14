@@ -50,16 +50,16 @@ export const KLING_VIDEO_MODELS = {
   'kling-omni': {
     name: 'Kling 3.0 Omni',
     provider: 'Kuaishou (Replicate)',
-    quality: '1080p · Native Lip-Sync',
+    quality: '1080p · Native Lip-Sync EN',
     costPerSecond: { EUR: 0.60, USD: 0.60 },
     minDuration: 5,
     maxDuration: 15,
     allowedDurations: [5, 8, 10, 15] as const,
     description: {
-      EUR: 'Native Lip-Sync in DE/EN/ES · 3,00 € pro 5 Sekunden',
-      USD: 'Native lip-sync in DE/EN/ES · $3.00 per 5 seconds',
+      EUR: 'Native Lip-Sync auf Englisch · DE/ES silent-only · 3,00 € pro 5 Sekunden',
+      USD: 'Native lip-sync in English · DE/ES silent-only · $3.00 per 5 seconds',
     },
-    badge: 'Native Lip-Sync',
+    badge: 'Lip-Sync EN',
   },
 } as const;
 

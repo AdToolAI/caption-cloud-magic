@@ -92,7 +92,9 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest & { spokenLanguage?: string; suppressDialogue?: boolean };
     const { prompt, model, duration, aspectRatio, generateAudio, dialogText, voicePreset, speakerVoices, startImageUrl, endImageUrl, referenceVideoUrl, videoReferenceType } = body;
     const spokenLanguage = typeof body.spokenLanguage === 'string' ? body.spokenLanguage : undefined;
-    const suppressDialogue = body.suppressDialogue === true;
+    const spokenLanguageKey = spokenLanguage?.trim().toLowerCase();
+    const forceOmniSilent = model === 'kling-omni' && spokenLanguageKey !== 'en' && spokenLanguageKey !== 'english';
+    const suppressDialogue = body.suppressDialogue === true || forceOmniSilent;
 
     // Resolve model config (with safe fallback to Standard)
     const modelConfig = KLING_MODEL_CONFIG[model] ?? KLING_MODEL_CONFIG['kling-3'];
@@ -102,6 +104,9 @@ serve(async (req) => {
     }
     if (generateAudio && suppressDialogue) {
       console.log(`[generate-kling-video] model=${model} suppressDialogue=true — ambient-only fallback`);
+    }
+    if (forceOmniSilent) {
+      console.log(`[generate-kling-video] Kling Omni non-English native speech blocked (lang=${spokenLanguageKey ?? 'unset'})`);
     }
 
     // Validate duration against catalog (per-model maxDuration).
@@ -217,7 +222,9 @@ serve(async (req) => {
 
     // Build Kling input (model-driven — Omni gets native audio + lip-sync fields)
     const replicateInput: Record<string, any> = {
-      prompt,
+      prompt: forceOmniSilent
+        ? `${prompt}\n\nIMPORTANT: No spoken dialogue, no narration, no voiceover, no singing, no whispering, and no language-like vocal sounds. Characters must keep closed or naturally resting mouths; do not animate lips as if speaking. Audio, if any, must be only ambient room tone or subtle background sound.`
+        : prompt,
       duration: duration,
       aspect_ratio: aspectRatio,
     };

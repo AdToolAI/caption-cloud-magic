@@ -123,7 +123,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext
   // produziert. Alles außerhalb → ambient-only Fallback (kein Voiceover), sonst
   // erfindet z. B. Kling für DE/ES eine Fantasie-Sprache.
-  // Kling 3.0 Omni ist die einzige Kling-Variante mit nativem DE/EN/ES-Lip-Sync.
+  // Kling 3.0 Omni klingt für DE/ES weiterhin englisch/fantasy-artig; deshalb
+  // erlauben wir dort native Stimmen nur für Englisch und sperren den Rest hart.
   const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
     veo:        ['en', 'de', 'es'],
     sora:       ['en', 'de', 'es'],
@@ -134,8 +135,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   };
   const isKlingOmni = model.id === 'kling-omni';
   const ttsLangSupported = isKlingOmni
-    ? (['en', 'de', 'es'] as const).includes(effectiveSpokenLang)
+    ? effectiveSpokenLang === 'en'
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
+  const omniNonEnglishSilent = isKlingOmni && effectiveSpokenLang !== 'en';
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /* ── Kling Omni: unified Cast + per-speaker Lip-Sync (max. 4 cast, 2 lip-sync) ── */
   type OmniVoicePreset = 'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral';
@@ -286,6 +288,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [omniMediaLock]);
 
+  /* Kling Omni DE/ES hard-lock: the provider currently produces English-accented
+   * fantasy speech for non-English native audio. Keep the cast, but remove all
+   * native dialog state so no accidental prompt/API path can trigger speech. */
+  useEffect(() => {
+    if (!omniNonEnglishSilent) return;
+    setOmniLines((prev) => {
+      if (!prev.some((r) => r.lipSync || r.line.trim())) return prev;
+      return prev.map((r) => ({ ...r, lipSync: false, line: '' }));
+    });
+  }, [omniNonEnglishSilent]);
+
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
@@ -432,7 +445,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         : effectiveSpokenLang === 'es'
         ? 'Spanish (Español)'
         : 'English';
-      const dialogueSuppressed = !!(model.capabilities.audio && generateAudio) && !ttsLangSupported;
+      const dialogueSuppressed = omniNonEnglishSilent || (!!(model.capabilities.audio && generateAudio) && !ttsLangSupported);
       const spokenLangSuffix = (model.capabilities.audio && generateAudio && ttsLangSupported)
         ? `All spoken dialogue, narration and voiceover MUST be performed in ${langLabel}. Do not use any other language for speech. Lip movement must match ${langLabel} phonemes.`
         : '';
@@ -684,20 +697,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         body.referenceImages = composedSubjectRefs;
       }
       if (model.capabilities.audio) {
-        body.generateAudio = generateAudio;
-        if (generateAudio && ttsLangSupported) {
+        body.generateAudio = generateAudio && ttsLangSupported && !omniNonEnglishSilent;
+        if (generateAudio && ttsLangSupported && !omniNonEnglishSilent) {
           body.spokenLanguage = effectiveSpokenLang;
-        } else if (generateAudio && !ttsLangSupported) {
+        } else if ((generateAudio && !ttsLangSupported) || omniNonEnglishSilent) {
           body.suppressDialogue = true;
         }
       }
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
-      // Kling 3.0 Omni — native Lip-Sync in DE/EN/ES bypasses Sync.so.
+      // Kling 3.0 Omni — native Lip-Sync is allowed for English only. DE/ES are
+      // hard-silenced because the provider currently returns fantasy language.
       // Per-speaker lines are merged into a screenplay-style dialog string
       // and — when > 1 speaker — additionally passed as `speaker_voices`.
-      if (isKlingOmni) {
+      if (isKlingOmni && ttsLangSupported && !omniNonEnglishSilent) {
         const activeLines = omniLines
           .filter((l) => l.lipSync && l.line.trim().length > 0)
           .slice(0, 2);
@@ -719,12 +733,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           // Omni conditions lip-motion + prosody on the exact text and locks
           // the language. Without this, native voices fall back to an English-
           // accented default even when spoken_language is set.
-          const langLabel =
-            effectiveSpokenLang === 'de'
-              ? 'German (Hochdeutsch) — all voices speak clearly and naturally in German'
-              : effectiveSpokenLang === 'es'
-                ? 'Spanish (Castellano) — all voices speak clearly and naturally in Spanish'
-                : 'English — all voices speak clearly and naturally in English';
+          const langLabel = 'English — all voices speak clearly and naturally in English';
           const dialogBlock = named.map((n) => `${n.name}: "${n.line}"`).join('\n');
           body.prompt = `${body.prompt}\n\n[SPOKEN LANGUAGE]: ${langLabel}.\n[DIALOG]\n${dialogBlock}`;
         }
@@ -1236,7 +1245,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
                 </Label>
               </div>
-              <Switch id="audio-switch" checked={generateAudio} onCheckedChange={setGenerateAudio} />
+              <Switch
+                id="audio-switch"
+                checked={generateAudio && !omniNonEnglishSilent}
+                disabled={omniNonEnglishSilent}
+                onCheckedChange={setGenerateAudio}
+              />
             </div>
             {generateAudio && (
               <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
@@ -1294,12 +1308,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm', 'female-bright', 'male-deep'];
             setOmniLines((prev) => [
               ...prev,
-              { characterId: next.id, lipSync: prev.filter((r) => r.lipSync).length < LIP_SYNC_MAX, line: '', voicePreset: defaults[prev.length] ?? 'neutral' },
+              { characterId: next.id, lipSync: !omniNonEnglishSilent && prev.filter((r) => r.lipSync).length < LIP_SYNC_MAX, line: '', voicePreset: defaults[prev.length] ?? 'neutral' },
             ]);
           };
           const toggleLipSync = (idx: number, checked: boolean) => {
             const row = omniLines[idx];
             if (!row) return;
+            if (checked && omniNonEnglishSilent) {
+              toast.info(
+                language === 'de'
+                  ? 'Kling Omni spricht Deutsch aktuell nicht zuverlässig. Dieser Clip bleibt stumm; nutze Motion Studio für deutsches Lip-Sync.'
+                  : 'Kling Omni does not speak this language reliably yet. This clip stays silent; use Motion Studio for non-English lip-sync.',
+              );
+              return;
+            }
             if (checked && lipSyncCount >= LIP_SYNC_MAX) return;
             if (!checked && row.line.trim()) {
               if (!confirm(language === 'de' ? 'Lip-Sync für diesen Charakter deaktivieren? Der Dialogtext wird verworfen.' : 'Disable lip-sync for this character? The dialogue will be discarded.')) return;
@@ -1315,7 +1337,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <Label className="text-sm">
-                    {language === 'de' ? 'Cast & Native Lip-Sync (DE/EN/ES)' : 'Cast & Native Lip-Sync (DE/EN/ES)'}
+                    {language === 'de' ? 'Cast & Omni Anchor (Lip-Sync nur EN)' : 'Cast & Omni Anchor (Lip-Sync EN only)'}
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1329,7 +1351,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </div>
 
               <p className="text-[11px] text-muted-foreground leading-snug">
-                {language === 'de'
+                {omniNonEnglishSilent && language === 'de'
+                  ? 'Deutsch ist bei Kling Omni aktuell silent-only, weil die native Stimme sonst Fantasiesprache mit englischem Akzent erzeugt. Die Charaktere erscheinen im Bild, sprechen aber nicht. Für deutsches Lip-Sync bitte Motion Studio verwenden.'
+                  : omniNonEnglishSilent
+                  ? 'This language is silent-only for Kling Omni because native speech is not reliable yet. Characters appear in frame but do not speak. Use Motion Studio for non-English lip-sync.'
+                  : language === 'de'
                   ? 'Bis zu 4 Charaktere aus Cast & World. Aktiviere den Lip-Sync-Switch für max. 2 sprechende Charaktere — die anderen erscheinen als stumme Statist:innen im Bild.'
                   : 'Up to 4 characters from Cast & World. Toggle lip-sync for up to 2 speaking characters — the rest appear as silent extras in the frame.'}
               </p>
@@ -1347,7 +1373,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   const c = libCharacters.find((x) => x.id === row.characterId);
                   const displayName = c?.name?.trim() || (language === 'de' ? `Charakter ${idx + 1}` : `Character ${idx + 1}`);
                   const initials = displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-                  const switchDisabled = !row.lipSync && lipSyncCount >= LIP_SYNC_MAX;
+                  const switchDisabled = omniNonEnglishSilent || (!row.lipSync && lipSyncCount >= LIP_SYNC_MAX);
                   return (
                     <div key={idx} className="rounded-md border border-primary/20 bg-background/40 p-3 space-y-2">
                       <div className="flex items-center gap-2">
@@ -1389,7 +1415,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                           className="flex flex-col items-center gap-1"
                           title={
                             switchDisabled
-                              ? (language === 'de'
+                              ? (omniNonEnglishSilent
+                                  ? (language === 'de'
+                                      ? 'Deutsch/Spanisch sind für Kling Omni gesperrt, um Fantasie-Sprache zu verhindern.'
+                                      : 'Non-English lip-sync is blocked for Kling Omni to prevent fantasy speech.')
+                                  : language === 'de'
                                   ? 'Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.'
                                   : 'Kling Omni allows max. 2 speaking characters per clip.')
                               : undefined
