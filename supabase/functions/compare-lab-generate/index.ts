@@ -27,7 +27,7 @@ const ENGINE_CONFIG: Record<EngineKey, {
   modelField: string;
 }> = {
   sora:     { fn: 'generate-sora-chain',    model: 'sora-2',          costPerSec: 0.10, modelField: 'model' },
-  kling:    { fn: 'generate-kling-video',   model: 'kling-3-standard', costPerSec: 0.15, modelField: 'model' },
+  kling:    { fn: 'generate-kling-video',   model: 'kling-3', costPerSec: 0.18, modelField: 'model' },
   seedance: { fn: 'generate-seedance-video', model: 'seedance-1-lite', costPerSec: 0.06, modelField: 'model' },
   wan:      { fn: 'generate-wan-video',     model: 'wan-2.5-t2v',     costPerSec: 0.10, modelField: 'model' },
   hailuo:   { fn: 'generate-hailuo-video',  model: 'hailuo-2.3',      costPerSec: 0.08, modelField: 'model' },
