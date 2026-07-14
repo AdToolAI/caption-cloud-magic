@@ -55,6 +55,9 @@ interface Props {
   consistencyKey: string;
   /** True if the current model accepts an image input. */
   supportsImageInput: boolean;
+  /** Hide the Characters section (used when a specialised cast panel — e.g.
+   *  Kling Omni Native Lip-Sync — manages characters upstream). */
+  hideCharacters?: boolean;
 }
 
 export function ToolkitCastWorldPicker({
