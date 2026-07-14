@@ -11,12 +11,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Seedance 2.0 Customer Pricing per second (normalized 14.07.2026 to 3.00× cost margin)
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'seedance-mini':     { EUR: 0.06, USD: 0.06 },
-  'seedance-standard': { EUR: 0.09, USD: 0.09 },
-  'seedance-pro':      { EUR: 0.18, USD: 0.18 },
-};
+// Seedance 2.0 pricing is now sourced from the canonical catalog so the UI
+// preview and the deducted amount can never diverge again.
+import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 
 // Replicate model slug per tier
 const REPLICATE_SLUG: Record<string, string> = {
