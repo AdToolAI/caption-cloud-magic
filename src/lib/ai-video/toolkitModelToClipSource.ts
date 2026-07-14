@@ -10,6 +10,9 @@ import type { ClipSource } from '@/types/video-composer';
 import type { ToolkitModel } from '@/config/aiVideoModelRegistry';
 
 export function toolkitModelToClipSource(model: ToolkitModel): ClipSource | null {
+  // Kling Omni has its own ClipSource so the composer can detect the
+  // native-lip-sync capability and bypass the Sync.so pipeline.
+  if (model.id === 'kling-omni') return 'ai-kling-omni';
   switch (model.family) {
     case 'kling':      return 'ai-kling';
     case 'veo':        return 'ai-veo';
