@@ -1081,7 +1081,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {symbol}{cost.toFixed(2)}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {duration}s × {symbol}{model.costPerSecond[currency].toFixed(2)}/s · {model.name}
+            {duration}s × {symbol}{pricePerSecond.toFixed(2)}/s · {model.name}
           </p>
         </div>
         <Button
