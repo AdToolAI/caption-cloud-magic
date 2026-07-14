@@ -1,18 +1,36 @@
-# Fix: „n.context.body.text is not a function" beim Track-Erstellen
+## Ziel
+Sprachauswahl fürs Lied im Music Studio – nur Sprachen, die vom jeweiligen Provider sauber unterstützt werden. Der Prompt/die Lyrics-Generierung erhalten die Sprache explizit, sodass die KI nicht mehr raten muss (aktuell ergibt „Sad Song about … in English" trotzdem oft deutsche Lyrics).
 
-## Ursache
-In `src/hooks/useMusicGeneration.ts` (Zeile 51) wird bei einem Edge-Function-Fehler versucht, `error.context.body.text()` aufzurufen. Bei aktuellen `supabase.functions.invoke`-Versionen ist `context.body` aber kein `Response`-Stream mehr, sondern bereits ein geparstes Objekt/String — der Aufruf `.text()` wirft daher `is not a function`. Der eigentliche Backend-Fehler (z. B. `INSUFFICIENT_CREDITS`, `MISSING_LYRICS`, Provider-Fehler) wird dadurch komplett verschluckt und durch den Crash-Toast ersetzt.
+## Provider-Sprachmatrix (nur verifiziert-saubere Sprachen)
+- **quick** (MusicGen, instrumental) → kein Vokal → Sprachwahl ausgeblendet
+- **adaptive** (Stable Audio 2.5, instrumental) → kein Vokal → ausgeblendet
+- **vocal** (MiniMax Music 1.5) → EN, DE, ES, FR, IT, PT, JA, KO, ZH
+- **standard** (ElevenLabs Music) → EN, DE, ES, FR, IT, PT, NL, PL, JA
+- **pro** (ElevenLabs Music Pro) → gleiche Liste wie standard
 
-## Fix
-Robuste Payload-Extraktion in `useMusicGeneration.ts`, die alle drei Formen abdeckt:
-1. `context.body` ist bereits ein Objekt → direkt verwenden
-2. `context.body` ist ein String → `JSON.parse` mit Fallback
-3. `context.body` ist ein `Response`/Blob mit `.text()` → wie bisher (in try/catch)
-4. sonst → `context` selbst oder `error.message` als Fallback
+Endgültige Anzeigeliste pro Tier wird aus einer zentralen Map (`MUSIC_LANGUAGE_SUPPORT`) in `src/lib/music/languageSupport.ts` gerendert; nur der Schnitt „Provider unterstützt + wir garantieren Qualität" (EN/DE/ES/FR/IT/PT + JA für standard/pro, + KO/ZH für vocal) ist auswählbar.
 
-Kein Verhaltens-Change am Erfolgspfad, keine UI-Änderung — nur der Error-Reader wird gehärtet, damit die bestehenden Toasts (Credits, Rate-Limit, Missing Lyrics, generisch) wieder korrekt greifen.
+## UI-Änderungen (nur Frontend)
+`src/components/audio-studio/MusicGeneratorPanel.tsx`
+- Neuer `Select`-Block „Sprache" zwischen Mood und BPM, mit Flag-Emoji + Sprachname.
+- Wird nur gerendert, wenn Tier ∈ {standard, vocal, pro} **und** `instrumental === false` (bzw. für vocal immer, da Lyrics Pflicht sind).
+- Default: aus `useTranslation().language` (fällt auf `en` zurück, falls Provider die aktuelle UI-Sprache nicht kann).
+- Wechsel des Tiers, das die gewählte Sprache nicht kann → Auto-Fallback auf `en` + Toast-Hinweis.
+- „AI Lyrics generieren" ruft `generateLyrics({ language })` bereits – wir reichen die neue State-Variable durch.
 
-## Betroffene Datei
-- `src/hooks/useMusicGeneration.ts` — Ersatz des `context.body.text()`-Blocks durch eine kleine `parseInvokeError`-Helper-Funktion im selben File.
+## Prompt-Härtung
+- Vor dem Absenden hängt der Client an den `prompt` einen unmissverständlichen Block an: `\n\n[LANGUAGE: <Full name>] All sung vocals MUST be in <Full name>. Do not switch language.`
+- `lyrics` werden unverändert übernommen (User-Text hat Vorrang).
+- Kein Backend-Change nötig, weil Sprache im Prompt landet; `generate-music-lyrics` bekommt die Sprache bereits über den existierenden `language`-Param.
 
-Nach dem Fix zeigt der Toast wieder den echten Backend-Grund an, sodass wir sehen, ob es ein Credits-, Lyrics- oder Provider-Problem ist.
+## Persistenz
+- `useToolkitDraft`-analog: Sprache wird im lokalen State gehalten, kein DB-Schema-Change.
+
+## Neue/Editierte Dateien
+1. `src/lib/music/languageSupport.ts` *(neu)* — Map `Record<MusicTier, Array<{code, label, flag}>>` + Helper `isLanguageSupported(tier, code)`.
+2. `src/components/audio-studio/MusicGeneratorPanel.tsx` — Language-Select, Prompt-Suffix, Fallback-Logik, Weiterreichen an `generateLyrics`.
+
+## Nicht enthalten
+- Kein Edge-Function-Deploy (rein clientseitig).
+- Keine Änderungen an Pricing, Tier-Struktur oder Voice Studio.
+- Backend-Validierung der Sprache wird nicht hinzugefügt – Prompt-Direktive reicht laut Provider-Docs.

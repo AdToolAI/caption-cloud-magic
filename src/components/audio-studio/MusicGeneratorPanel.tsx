@@ -9,8 +9,12 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMusicGeneration, MUSIC_TIER_PRICING, type MusicTier, type GeneratedMusicTrack } from '@/hooks/useMusicGeneration';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
+import { useTranslation } from '@/hooks/useTranslation';
+import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const GENRES = [
@@ -62,6 +66,7 @@ export function MusicGeneratorPanel({
 }: MusicGeneratorPanelProps) {
   const { generateMusic, loading } = useMusicGeneration();
   const { wallet } = useAIVideoWallet();
+  const { language: uiLanguage } = useTranslation();
 
   const matchMoodIdx = (mood?: string): number => {
     if (!mood) return 2;
@@ -83,6 +88,10 @@ export function MusicGeneratorPanel({
   const [bpm, setBpm] = useState<number>(prefillBpm || defaultBpm || 120);
   const [generatedTrack, setGeneratedTrack] = useState<GeneratedMusicTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [vocalLanguage, setVocalLanguage] = useState<string>(() => {
+    const initial = (uiLanguage as string) || 'en';
+    return isLanguageSupported('vocal', initial) ? initial : 'en';
+  });
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Sync BPM when parent supplies a freshly detected value (e.g. from BeatSyncTimeline)
@@ -111,17 +120,34 @@ export function MusicGeneratorPanel({
   const balance = wallet?.balance_euros ?? 0;
   const insufficient = balance < tierInfo.eur;
 
+  const showLanguage = tierHasVocals(tier, instrumental);
+  const availableLanguages = MUSIC_LANGUAGE_SUPPORT[tier];
+
   const handleTierChange = (newTier: MusicTier) => {
     setTier(newTier);
     if (duration > MUSIC_TIER_PRICING[newTier].maxDuration) {
       setDuration(MUSIC_TIER_PRICING[newTier].maxDuration);
     }
+    // Auto-fallback if current language isn't supported by the new tier's provider.
+    if (tierHasVocals(newTier, instrumental) && !isLanguageSupported(newTier, vocalLanguage)) {
+      setVocalLanguage('en');
+      toast.info('Sprache auf Englisch zurückgesetzt', {
+        description: `Der Provider dieses Tiers unterstützt die zuvor gewählte Sprache nicht.`,
+      });
+    }
   };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
+    let finalPrompt = prompt;
+    if (showLanguage) {
+      const meta = getLanguageMeta(tier, vocalLanguage);
+      if (meta) {
+        finalPrompt = `${prompt}\n\n[LANGUAGE: ${meta.name}] All sung vocals MUST be in ${meta.name}. Do not switch language, do not mix languages, no fantasy or made-up words.`;
+      }
+    }
     const track = await generateMusic({
-      prompt,
+      prompt: finalPrompt,
       tier,
       durationSeconds: effectiveDuration,
       genre,
@@ -323,6 +349,35 @@ export function MusicGeneratorPanel({
           </div>
           <Switch checked={instrumental} onCheckedChange={setInstrumental} disabled={loading} />
         </div>
+
+        {/* Gesangssprache (nur bei Tiers mit Vocals) */}
+        {showLanguage && (
+          <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm font-medium">Gesangssprache</Label>
+                <p className="text-xs text-muted-foreground">
+                  Nur Sprachen, die dieser Provider sauber singt.
+                </p>
+              </div>
+              <Select value={vocalLanguage} onValueChange={setVocalLanguage} disabled={loading}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableLanguages.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      <span className="mr-2">{l.flag}</span>
+                      {l.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+
 
         {/* BPM Match (Beat-Sync) */}
         <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-3">
