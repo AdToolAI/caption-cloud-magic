@@ -90,7 +90,7 @@ export default function MusicStudio() {
       prompt: prompt.trim(),
       genre: genre !== 'any' ? genre : undefined,
       mood,
-      language,
+      language: (['en', 'de', 'es'] as const).includes(language as any) ? (language as 'en' | 'de' | 'es') : 'en',
     });
     if (generated) setLyrics(generated);
   };
