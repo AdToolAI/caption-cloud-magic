@@ -165,7 +165,7 @@ export function sourceToModelId(clipSource: ClipSource, clipQuality: ClipQuality
 /** Sensible default modelId per composer category. */
 export function getDefaultModelIdForCategory(category: ComposerCategory | string | undefined): string {
   switch (category) {
-    case 'storytelling':  return 'kling-3-standard';
+    case 'storytelling':  return 'kling-3';
     case 'corporate-ad':  return 'veo-3.1-fast';
     case 'product-ad':    return 'hailuo-standard';
     default:              return 'hailuo-standard';
