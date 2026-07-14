@@ -135,6 +135,28 @@ export function useCustomVoices() {
     }
   };
 
+  const renameVoice = async (voice_id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      const { error } = await supabase
+        .from('custom_voices')
+        .update({ name: trimmed })
+        .eq('id', voice_id);
+
+      if (error) throw error;
+      toast({ title: 'Umbenannt', description: `Voice heißt jetzt „${trimmed}"` });
+      await fetchVoices();
+    } catch (error) {
+      console.error('Error renaming voice:', error);
+      toast({
+        title: 'Fehler',
+        description: 'Voice konnte nicht umbenannt werden',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return {
     voices,
     loading,
