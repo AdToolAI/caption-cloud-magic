@@ -175,7 +175,7 @@ export function MusicGeneratorPanel({
               Generiere Studio-Qualität Musik
             </h2>
             <p className="text-sm text-muted-foreground">
-              Beschreibe deinen Sound. KI komponiert kommerziell nutzbare Tracks in Sekunden.
+              Beschreibe deinen Sound. KI komponiert Tracks mit eingebauten Sänger-Stimmen; eigene Stimmen sind für gesprochene Voiceovers verfügbar.
             </p>
           </div>
 
@@ -229,6 +229,10 @@ export function MusicGeneratorPanel({
 
       {/* Prompt + Options */}
       <Card className="backdrop-blur-xl bg-card/60 border-border/50 p-5 space-y-5">
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-xs text-muted-foreground">
+          Custom Voices aus dem Voice Studio werden für gesprochene Voiceovers genutzt. Der Musik-Generator unterstützt aktuell keine extern geklonten Sänger-Stimmen.
+        </div>
+
         <div className="space-y-2">
           <Label className="text-sm font-medium">Beschreibe deinen Track</Label>
           <Textarea

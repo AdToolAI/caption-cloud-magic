@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers, MessageCircle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -17,6 +17,7 @@ import { AutoMatchPanel } from '@/components/audio-studio/AutoMatchPanel';
 import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { StemMixerPanel } from '@/components/audio-studio/StemMixerPanel';
 import { FinalMixPanel } from '@/components/audio-studio/FinalMixPanel';
+import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +37,7 @@ export default function AudioStudio() {
   const [stemSet, setStemSet] = useState<{ sourceTitle: string; stems: Array<{ type: 'vocals' | 'drums' | 'bass' | 'other'; url: string; assetId?: string }> } | null>(null);
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [showAutoMatch, setShowAutoMatch] = useState(false);
+  const [showVoiceStudio, setShowVoiceStudio] = useState(false);
   const [musicGenPrefill, setMusicGenPrefill] = useState<{
     prompt: string; genre: string; mood: string; bpm: number; duration: number;
   } | null>(null);
@@ -248,6 +250,33 @@ export default function AudioStudio() {
                 </div>
               </Card>
 
+              {/* Voice Studio Teaser */}
+              <Card
+                onClick={() => setShowVoiceStudio(true)}
+                className="relative overflow-hidden cursor-pointer backdrop-blur-xl bg-gradient-to-br from-primary/10 via-card/60 to-cyan-500/10 border-primary/30 hover:border-primary/60 hover:shadow-[0_0_40px_rgba(var(--primary),0.25)] transition-all p-5 group"
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/15 rounded-full blur-[60px] pointer-events-none" />
+                <div className="relative flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center shrink-0">
+                    <Mic className="w-7 h-7 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <h3 className="text-lg font-bold">Eigene Stimme erstellen</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">Voice Studio</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Skript vorlesen, per Mikrofon aufnehmen oder WhatsApp-Sprachnachricht hochladen — danach für Voiceovers nutzen.
+                    </p>
+                  </div>
+                  <Button className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shrink-0 hidden sm:flex">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Voice erstellen
+                  </Button>
+                </div>
+              </Card>
+
               {/* AI Music Generator Teaser */}
               <Card 
                 onClick={() => setShowMusicGen(true)}
@@ -320,10 +349,10 @@ export default function AudioStudio() {
                 {/* Feature preview cards */}
                 <div className="px-8 pb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
                   {[
-                    { icon: Wand2, label: 'Studio Sound', desc: 'Ein-Klick Optimierung' },
-                    { icon: Mic, label: 'Transcript Editing', desc: 'Audio wie Text bearbeiten' },
-                    { icon: Music, label: 'Beat-Sync', desc: 'Automatische Schnitte auf Beats' },
-                    { icon: Volume2, label: 'Filler Removal', desc: '"Ähms" automatisch entfernen' }
+                    { icon: Mic, label: 'Custom Voice', desc: 'Eigene Stimme klonen' },
+                    { icon: FileText, label: 'Skript vorlesen', desc: 'Geführter Aufnahme-Text' },
+                    { icon: MessageCircle, label: 'WhatsApp Upload', desc: 'Sprachnachricht nutzen' },
+                    { icon: Wand2, label: 'Rauschoptimierung', desc: 'Samples automatisch säubern' }
                   ].map((feature, i) => (
                     <motion.div
                       key={feature.label}
@@ -409,7 +438,7 @@ export default function AudioStudio() {
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
                       { id: 'filler', label: 'Filler-Wörter', icon: Volume2 },
                       { id: 'library', label: 'Bibliothek', icon: Library },
-                      { id: 'voices', label: 'Custom Voices', icon: Mic }
+                      { id: 'voices', label: 'Custom Voices', icon: Mic, badge: 'NEU' }
                     ].map((tab) => (
                       <Button
                         key={tab.id}
@@ -716,6 +745,7 @@ export default function AudioStudio() {
           )}
         </AnimatePresence>
       </div>
+      <VoiceStudioDialog open={showVoiceStudio} onOpenChange={setShowVoiceStudio} />
     </div>
   );
 }
