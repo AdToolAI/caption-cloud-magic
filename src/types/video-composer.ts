@@ -1000,6 +1000,7 @@ export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> 
 export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-hailuo':   { standard: 'Standard 768p', pro: 'Pro 1080p' },
   'ai-kling':    { standard: 'Standard 720p', pro: 'Pro 1080p' },
+  'ai-kling-omni': { standard: 'Omni 1080p +Native Lip-Sync', pro: 'Omni 1080p +Native Lip-Sync' },
   'ai-sora':     { standard: 'Standard',      pro: 'Pro' },
   'ai-wan':      { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-seedance': { standard: 'Standard 720p', pro: 'Pro 1080p' },
