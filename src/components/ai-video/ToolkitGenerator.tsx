@@ -200,31 +200,31 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   );
 
   /**
-   * Keep `omniLines` in sync with the selected Cast characters (max 2 for Kling Omni).
-   * Preserves existing dialog text & voice preset per row when possible.
+   * One-time convenience prefill: when the user picks Cast characters and all
+   * `omniLines` are still empty (anonymous + no dialog), we pre-assign up to
+   * two cast characters to the speaker rows. After that, `omniLines` is the
+   * single source of truth — cast changes no longer overwrite it.
    */
+  const omniPrefilledRef = useRef(false);
   useEffect(() => {
+    if (omniPrefilledRef.current) return;
+    if (castCharacterIds.length === 0) return;
+    const allEmpty = omniLines.every((r) => !r.characterId && !r.line.trim());
+    if (!allEmpty) {
+      omniPrefilledRef.current = true;
+      return;
+    }
+    const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm'];
     const targetIds = castCharacterIds.slice(0, 2);
-    if (targetIds.length === 0) return;
-    setOmniLines((prev) => {
-      const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm'];
-      const next: OmniLine[] = targetIds.map((cid, i) => {
-        const existing = prev.find((r) => r.characterId === cid);
-        if (existing) return existing;
-        const fallback = prev[i];
-        return {
-          characterId: cid,
-          line: fallback?.characterId ? '' : (fallback?.line ?? ''),
-          voicePreset: fallback?.voicePreset ?? defaults[i] ?? 'neutral',
-        };
-      });
-      // If length or ids changed, replace; otherwise keep referential equality.
-      const same =
-        next.length === prev.length &&
-        next.every((r, i) => prev[i] && prev[i].characterId === r.characterId);
-      return same ? prev : next;
-    });
-  }, [castCharacterIds]);
+    setOmniLines(
+      targetIds.map((cid, i) => ({
+        characterId: cid,
+        line: '',
+        voicePreset: defaults[i] ?? 'neutral',
+      })),
+    );
+    omniPrefilledRef.current = true;
+  }, [castCharacterIds, omniLines]);
   const consistencyKey = `ai-${model.family}`;
 
   /* ── Brand Character Lock (cross-studio persistent character) ── */
