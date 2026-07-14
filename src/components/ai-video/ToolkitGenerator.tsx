@@ -597,6 +597,16 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
+      // Kling 3.0 Omni — native Lip-Sync in DE/EN/ES bypasses Sync.so.
+      // If the user provided dialogue, pass it to the edge function together
+      // with the chosen voice preset and language. Max 2 speakers per clip.
+      if (isKlingOmni && omniDialogText.trim()) {
+        body.dialogText = omniDialogText.trim();
+        body.voicePreset = omniVoicePreset;
+        body.spokenLanguage = effectiveSpokenLang;
+        body.nativeLipSync = true;
+      }
+
       // Sora 2 cannot accept image input → toast hint when a character is selected
       if (model.family === 'sora' && (anchorChars.length > 0 || castLocation || castBuilding)) {
         toast.info(
