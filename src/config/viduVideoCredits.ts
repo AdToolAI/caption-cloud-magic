@@ -10,13 +10,14 @@
  * other providers (= flat / 5).
  */
 
-// Margin policy: Replicate flat ~$0.20/clip → user 0.55–0.65 €/clip (~64–69% margin)
+// Margin policy: exactly 3.00× Replicate flat cost (normalized 14.07.2026)
+// Ref: $0.22/clip → €0.66 | I2V/T2V: $0.20/clip → €0.60
 export const VIDU_VIDEO_MODELS = {
   'vidu-q2-reference': {
     name: 'Vidu Q2 Reference',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.65,
-    flatCostUSD: 0.65,
+    flatCostEUR: 0.66,
+    flatCostUSD: 0.66,
     fixedDuration: 5,
     maxReferences: 7,
     description: 'Bis zu 7 Referenzbilder (Character + Produkt + Location) in einer 5s-Szene',
@@ -25,8 +26,8 @@ export const VIDU_VIDEO_MODELS = {
   'vidu-q2-i2v': {
     name: 'Vidu Q2 Image-to-Video',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.55,
-    flatCostUSD: 0.55,
+    flatCostEUR: 0.60,
+    flatCostUSD: 0.60,
     fixedDuration: 5,
     description: 'Animiert ein Standbild zu einem 5s-Clip',
     badge: 'I2V',
@@ -34,8 +35,8 @@ export const VIDU_VIDEO_MODELS = {
   'vidu-q2-t2v': {
     name: 'Vidu Q2 Text-to-Video',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.55,
-    flatCostUSD: 0.55,
+    flatCostEUR: 0.60,
+    flatCostUSD: 0.60,
     fixedDuration: 5,
     description: '5s Clip aus reinem Prompt',
     badge: 'T2V',
