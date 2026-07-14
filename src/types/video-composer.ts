@@ -22,6 +22,7 @@ export type SceneType = 'hook' | 'problem' | 'solution' | 'demo' | 'social-proof
 export type ClipSource =
   | 'ai-hailuo'
   | 'ai-kling'
+  | 'ai-kling-omni'
   | 'ai-sora'
   | 'ai-wan'
   | 'ai-seedance'
