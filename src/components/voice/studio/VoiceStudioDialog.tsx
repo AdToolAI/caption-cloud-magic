@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomVoices } from "@/hooks/useCustomVoices";
 import {
   VOICE_TRAINING_SCRIPTS,
+  personalizeScript,
   type TrainingScriptLang,
 } from "@/config/voiceTrainingScripts";
 import { encodeWav } from "@/lib/audio/wavEncoder";
@@ -100,6 +101,8 @@ async function probeDuration(blob: Blob): Promise<number> {
 export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [scriptLang, setScriptLang] = useState<TrainingScriptLang>("de");
+  const [speakerName, setSpeakerName] = useState("");
+
 
   // Recorder state
   const [isRecording, setIsRecording] = useState(false);
@@ -140,9 +143,11 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       setVoiceDesc("");
       setConsent(false);
       setPlayingId(null);
+      setSpeakerName("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
 
   const startRecording = useCallback(async () => {
     try {
@@ -321,12 +326,13 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
 
   const copyScript = async () => {
     try {
-      await navigator.clipboard.writeText(VOICE_TRAINING_SCRIPTS[scriptLang].text);
+      await navigator.clipboard.writeText(personalizedText);
       toast.success("Skript kopiert");
     } catch {
       toast.error("Kopieren fehlgeschlagen");
     }
   };
+
 
   const canProceedTo3 =
     samples.length > 0 && totalSec >= MIN_TOTAL_SEC && totalSec <= MAX_TOTAL_SEC;
@@ -379,6 +385,8 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
   };
 
   const script = VOICE_TRAINING_SCRIPTS[scriptLang];
+  const personalizedText = personalizeScript(script.text, speakerName, scriptLang);
+  const personalizedHint = personalizeScript(script.hint, speakerName, scriptLang);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -435,14 +443,33 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 <Copy className="h-3.5 w-3.5" /> Kopieren
               </Button>
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="speaker-name" className="text-sm">
+                Dein Name (wird ins Skript eingesetzt)
+              </Label>
+              <Input
+                id="speaker-name"
+                value={speakerName}
+                onChange={(e) => setSpeakerName(e.target.value)}
+                placeholder="z. B. Max"
+                maxLength={40}
+              />
+              <p className="text-xs text-muted-foreground">
+                Wir ersetzen den Platzhalter <code>{"{NAME}"}</code> im Skript automatisch —
+                so klingt die Vorstellung natürlich.
+              </p>
+            </div>
             <Card className="p-4 bg-muted/30 max-h-72 overflow-y-auto">
-              <p className="text-xs text-muted-foreground mb-2">{script.hint}</p>
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{script.text}</p>
+              <p className="text-xs text-muted-foreground mb-2">{personalizedHint}</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{personalizedText}</p>
             </Card>
             <div className="flex justify-end">
               <Button
                 onClick={() => {
                   setVoiceLang(scriptLang);
+                  if (!voiceName && speakerName.trim()) {
+                    setVoiceName(`${speakerName.trim()} Voice`);
+                  }
                   setStep(2);
                 }}
               >
@@ -452,8 +479,36 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
           </div>
         )}
 
+
         {step === 2 && (
           <div className="space-y-4">
+            <Card className="p-3 bg-muted/40 border-primary/20">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                  <p className="text-sm font-medium truncate">
+                    Dein Skript — beim Aufnehmen ablesen
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyScript}
+                  className="gap-1.5 shrink-0"
+                >
+                  <Copy className="h-3.5 w-3.5" /> Kopieren
+                </Button>
+              </div>
+              <div className="max-h-48 overflow-y-auto rounded bg-background/50 p-3 border border-border/50">
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {personalizedText}
+                </p>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Tipp: Aufnahme starten, kurz durchatmen, dann natürlich vorlesen.
+              </p>
+            </Card>
+
             <Tabs defaultValue="mic">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="mic" className="gap-2">
