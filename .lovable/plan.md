@@ -1,75 +1,54 @@
 ## Ziel
+Überall (Motion Studio, AI Video Studio, Composer, Mention-Library, Briefing-Apply) dürfen nur noch Charaktere abrufbar sein, die aus **Cast & World** stammen und eine echte `brand_characters.id` (UUID) besitzen. Alle Legacy-Avatar-Quellen werden entfernt.
 
-Die Kling-Omni Sprecher-Blöcke sauber mit **Cast & World** verheiraten: pro Sprecher-Zeile eine **explizite Charakter-Zuweisung** über Dropdown — kein Auto-Sync im Hintergrund, keine widersprüchlichen Zustände zwischen "Anonymer Sprecher" und Cast-Auswahl.
+## Legacy-Quellen (Ist-Zustand)
+Aus der Analyse existieren drei parallele Quellen, die die „alte Avatar-Logik" tragen:
 
-## Ist-Zustand (Problem)
+1. **`system_preset_avatars`** — Preset-Galerie auf `/brand-characters` (`PresetAvatarGallery` + `usePresetAvatars` + `clonePreset`).
+2. **`motion_studio_characters`** — legacy Motion-Studio-Library (`useMotionStudioLibrary`), wird via `useUnifiedMentionLibrary` in Composer/AI-Video-Picker gemischt.
+3. **`catalog:character:*`** Mentions ohne Brand-Bridge — erscheinen im @-Picker, führen zu `mentionToCastRef` warnings und Kling/Omni-Slots ohne resolvbare UUID.
 
-Aktuell laufen **zwei parallele Wahrheiten**:
-- `castCharacterIds` aus dem `CharacterCastPicker` (bis zu 4 Charaktere für Anchor/First-Frame).
-- `omniLines[]` mit optionaler `characterId` — wird via `useEffect` (Zeile 203-227) **automatisch** aus `castCharacterIds.slice(0, 2)` gespiegelt.
+Kanonisch bleibt: **`brand_characters`** (+ `avatar_outfit_looks` als Outfit-Layer darauf, weiterhin an dieselbe `brand_characters.id` gebunden).
 
-Daraus entstehen Widersprüche:
-1. Nutzer wählt 3 Cast-Charaktere → Omni bekommt nur die ersten 2, Cast Nr. 3 taucht **im Anchor-Bild** auf, aber ohne Dialog/Voice — verwirrend.
-2. Nutzer klickt "+ Zweiten Sprecher hinzufügen" **ohne** Cast → anonyme Zeile, aber Anchor zeigt gar keinen Charakter → Lip-Sync auf leerem Frame.
-3. Nutzer entfernt einen Cast-Charakter → dessen Dialog-Zeile verschwindet plötzlich, evtl. mit bereits eingegebenem Text (Datenverlust).
-4. Reihenfolge Cast ≠ Reihenfolge Sprecher-Blöcke → S1/S2 im Screenplay-Payload matcht nicht mit Left/Right im Anchor.
+## Änderungen
 
-## Soll-Zustand (Ein Modell, eine Wahrheit)
+### 1) Preset-Avatar-Bibliothek entfernen
+- `src/pages/BrandCharacters.tsx`: Import + Render von `PresetAvatarGallery` entfernen.
+- Löschen: `src/components/brand-characters/PresetAvatarGallery.tsx`, `src/hooks/usePresetAvatars.ts`.
+- Keine DB-Migration in diesem Schritt — die Tabelle `system_preset_avatars` bleibt (read-only Legacy) unangetastet, um Fremdschlüssel/Historie nicht zu brechen; sie ist danach von der UI nicht mehr erreichbar.
 
-**`omniLines` ist die einzige Quelle** für Omni-Sprecher. Cast & World liefert nur den *Pool* verfügbarer Charaktere. Jede Sprecher-Zeile hat:
+### 2) Motion-Studio-Legacy-Characters aus der Mention-Library werfen
+- `src/hooks/useUnifiedMentionLibrary.ts`: `msChars` NICHT mehr in `characters` mergen. Locations (`msLocs`) bleiben unberührt (dies ist Cast & World / Motion Studio Location-Kanon, kein Charakter).
+- `useMotionStudioLibrary` selbst bleibt bestehen, wird aber für Character-Nutzung stillgelegt: alle Consumer, die Characters lesen (siehe Grep), lesen ausschließlich aus `brand_characters` (`useBrandCharacters`).
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ [Portrait/Initial]  [Charakter ▼: Sarah Dusatko    ]  🗑     │
-│                     [Voice-Preset ▼: Weiblich · warm    ]    │
-│ ┌────────────────────────────────────────────────────────┐   │
-│ │ Dialog von Sarah …                                     │   │
-│ └────────────────────────────────────────────────────────┘   │
-│                                             0/300 Zeichen    │
-└──────────────────────────────────────────────────────────────┘
-```
+### 3) Katalog-Charaktere ohne Brand-Bridge ausblenden
+- `useUnifiedMentionLibrary.ts`: Bei `catalogChars` nur Rows aufnehmen, deren `adoptedId` (Brand-Bridge auf `brand_characters.id`) gesetzt ist. Katalog-Einträge ohne Adoption sind nicht mehr auswählbar (verhindert das bekannte `mentionToCastRef` "no brand bridge" Warning und leere Kling-Omni-Slots).
+- `mentionToCastRef`: Kein Fallback mehr für `kind:'catalog'` ohne `baseCharacterId` — bereits vorhanden, wird durch (3) faktisch tot.
 
-Charakter-Dropdown-Optionen:
-- **Alle** `libCharacters` (Cast & World) — Portrait + Name.
-- **"Anonym (Speaker N)"** als expliziter Eintrag ganz unten.
-- Bereits in anderen Zeilen gewählte Charaktere sind **disabled** (kein Doppel-Cast pro Clip).
+### 4) Cast-Picker im AI Video Studio konsolidieren
+- `ToolkitCastPicker` / `ToolkitCastWorldPicker` / Kling-Omni Speaker-Dropdown (`ToolkitGenerator.tsx`): Quelle strikt auf `brand_characters` (via `useBrandCharacters`) umstellen. Character-Optionen aus `motion_studio_characters` fallen weg — Locations aus Motion Studio bleiben.
 
-### Cast-Sync-Regel (klar, nicht magisch)
+### 5) Guardrails
+- `mentionToCastRef`: Warning zu Error-Log verschärfen, wenn eine Nicht-UUID durchkommt (defensive; sollte nach (2)+(3) nie feuern).
+- `PLAN_UUID_RE`-Filter in `useApplyProductionPlan` bleibt aktiv.
 
-- **Cast-Auswahl fügt Sprecher-Zeilen nicht mehr automatisch hinzu.** Stattdessen: wenn `omniLines` leer ist und Nutzer im Cast-Picker Charaktere wählt, füllt sich Zeile 1 (und optional Zeile 2) **einmalig** vor — als Convenience, nicht als Live-Binding.
-- Wählt der Nutzer im Dropdown einer Zeile einen Charakter, wird dieser **automatisch in `castCharacterIds` aufgenommen** (falls nicht schon drin, max. 4). So bleibt die Anchor-Komposition konsistent.
-- Entfernt der Nutzer eine Sprecher-Zeile, bleibt der Charakter im Cast (falls andere Zeilen ihn brauchen oder als stummer Anchor-Beisteher gewünscht).
-- **Cast-Charaktere ohne Sprecher-Zeile** = stumme Statisten im Anchor (max. 4 Cast, davon max. 2 mit Dialog). Amber-Hinweis unter dem Cast-Picker: „N Charaktere im Anchor, davon M mit Dialog."
-
-### Payload-Vertrag (unverändert vom letzten Turn)
-
-- `body.startImageUrl` = `composedFirstFrame` (Anchor mit **allen** Cast-Charakteren).
-- `body.dialogText` = Screenplay-Format aus `omniLines` (`Name: Dialog\n`).
-- `body.speakerVoices` = `[{ name, voice }]` nur für Zeilen mit non-empty `line`.
-- `body.spokenLanguage`, `body.nativeLipSync=true`.
+## Nicht Teil dieses Plans
+- Keine Änderungen an `brand_characters`, `avatar_outfit_looks`, `character_shots`.
+- Keine DB-Migrationen (keine Drops auf `system_preset_avatars` / `motion_studio_characters`, um Datenhistorie und FKs unangetastet zu lassen).
+- Keine Änderung an Backend-Edge-Functions — der Server erwartet bereits `brand_characters.id` (v201/v202).
+- Cast & World Locations aus `motion_studio_locations` bleiben, da eigenständiger Kanon (nicht Teil der „Avatar"-Legacy).
 
 ## Betroffene Dateien
-
-- `src/components/ai-video/ToolkitGenerator.tsx`
-  - **State-Modell**: `OmniLine.characterId` bleibt `string | null` (`null` = anonym).
-  - **`useEffect` (Z. 203-227) ersetzen**: kein Zwangs-Sync mehr; stattdessen einmalige Vorbelegung, wenn `omniLines` alle leer + `characterId=null`.
-  - **UI-Block (Z. 1197-1281)**: pro Zeile ein `<Select>` mit Charakter-Optionen (disabled bei Duplikaten) + Anonym-Option. Portrait aus `reference_image_url` mit Fallback-Avatar.
-  - **Handler** `setLineCharacter(idx, charId)`: schreibt `omniLines[idx].characterId` und pusht `charId` in `castCharacterIds`, falls neu.
-  - **Warnung**: Reduzierte Amber-Warnung — nur wenn > 2 Zeilen mit `line.trim()` (unmöglich per UI, aber defensiv) oder wenn `castCharacterIds.length > 4`.
-- **Backend / Edge Function**: **keine Änderung**. `generate-kling-video` erhält denselben Payload.
+- `src/pages/BrandCharacters.tsx` (Preset-Sektion entfernen)
+- `src/components/brand-characters/PresetAvatarGallery.tsx` (löschen)
+- `src/hooks/usePresetAvatars.ts` (löschen)
+- `src/hooks/useUnifiedMentionLibrary.ts` (msChars raus, catalog nur mit Bridge)
+- `src/components/ai-video/ToolkitCastPicker.tsx` + `ToolkitCastWorldPicker.tsx` (Quelle vereinheitlichen)
+- `src/components/ai-video/ToolkitGenerator.tsx` (Kling-Omni Speaker-Dropdown nur Brand)
+- `src/lib/video-composer/mentionToCastRef.ts` (Guardrail verschärfen)
 
 ## Verifikation
-
-1. Kein Cast gewählt → 1 Sprecher-Zeile (Anonym), Voice+Dialog editierbar, Anchor = generisches Portrait (Fallback).
-2. 1 Cast-Charakter gewählt → Zeile 1 vor-belegt mit diesem Charakter, Voice-Preset auf Default. Dialog leer.
-3. 2 Cast-Charaktere → Zeile 1 & 2 (falls zweite hinzugefügt) vor-belegt.
-4. Nutzer ändert in Zeile 1 den Charakter auf einen anderen Cast-Character → Cast bleibt komplett (nichts wird entfernt), Zuweisung ist eindeutig.
-5. Nutzer wählt in Zeile 2 denselben Charakter wie Zeile 1 → Option ist disabled, nicht auswählbar.
-6. Zeile mit `line=''` gelöscht → Cast-Charakter bleibt im Anchor als stummer Statist.
-7. Generierung: Console-Log zeigt `dialog=..., speaker_voices=[...], start_image=<url>` korrekt.
-
-## Nicht im Scope
-
-- Kein Umbau von Motion Studio / SceneDialogStudio.
-- Keine Änderungen am Anchor-Composer oder an `composedFirstFrame`.
-- Keine Voice-Auto-Wahl aus `brand_characters.voice_settings` (kann Phase 2 sein — Kling-Omni-Presets sind eine andere Voice-Familie als ElevenLabs, nicht direkt mappbar).
+- Mention-Picker in Composer + AI Video Studio zeigen ausschließlich Brand-Characters + deren Outfit-Looks.
+- `/brand-characters` zeigt keine Preset-Galerie mehr.
+- Kling-Omni Speaker-Dropdown enthält nur echte Brand-Character-UUIDs.
+- Build grün; keine offenen Imports auf `usePresetAvatars` / `PresetAvatarGallery`.
