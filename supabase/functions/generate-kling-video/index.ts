@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,18 +12,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Kling 3.0 Customer Pricing per second — normalized 14.07.2026 to 3.00× cost margin
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'kling-3-standard': { EUR: 0.18, USD: 0.18 },
-  'kling-3-pro':      { EUR: 0.30, USD: 0.30 },
+// Replicate model slug + per-model capabilities. Prices come from the shared
+// pricing catalog (single source of truth) — do NOT duplicate them here.
+type KlingModelId =
+  | 'kling-3-standard'
+  | 'kling-3-pro'
+  | 'kling-2.5-turbo'
+  | 'kling-2.6'
+  | 'kling-omni';
+
+const KLING_MODEL_CONFIG: Record<KlingModelId, {
+  slug: string;
+  mode?: 'standard' | 'pro';
+  supportsNativeAudio: boolean;
+  supportsNativeLipSync: boolean;
+  resolution: '720p' | '1080p';
+}> = {
+  'kling-3-standard': { slug: 'kwaivgi/kling-v3-standard',  mode: 'standard', supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '720p'  },
+  'kling-3-pro':      { slug: 'kwaivgi/kling-v3-pro',       mode: 'pro',      supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.5-turbo':  { slug: 'kwaivgi/kling-v2.5-turbo-pro',                supportsNativeAudio: false, supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-2.6':        { slug: 'kwaivgi/kling-v2.6',                          supportsNativeAudio: true,  supportsNativeLipSync: false, resolution: '1080p' },
+  'kling-omni':       { slug: 'kwaivgi/kling-v3-omni-video',                 supportsNativeAudio: true,  supportsNativeLipSync: true,  resolution: '1080p' },
 };
 
 interface GenerateRequest {
   prompt: string;
-  model: 'kling-3-standard' | 'kling-3-pro';
+  model: KlingModelId;
   duration: number; // 3-15 seconds
   aspectRatio: '16:9' | '9:16' | '1:1';
   generateAudio?: boolean;
+  /** Omni only: spoken dialogue text (used as native lip-sync source). */
+  dialogText?: string;
+  /** Omni only: TTS voice preset / gender hint. */
+  voicePreset?: string;
   // Image-to-Video
   startImageUrl?: string;
   endImageUrl?: string;
