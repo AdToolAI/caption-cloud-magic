@@ -12,7 +12,7 @@ export const SEEDANCE_VIDEO_MODELS = {
       USD: 0.06,
     },
     minDuration: 3,
-    maxDuration: 12,
+    maxDuration: 15,
     description: {
       EUR: 'Schnelle 720p-AI-Videos ab 0,30€ pro 5 Sekunden',
       USD: 'Fast 720p AI videos from $0.30 per 5 seconds',
