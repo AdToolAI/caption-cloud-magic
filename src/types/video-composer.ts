@@ -969,23 +969,23 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
 };
 
 // Estimated costs per clip source × quality tier — EUR per second
-// Margin policy: ~60-70% across the board. Sora/Veo/Grok = Premium-Engine tier (~65%).
+// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin across all video models.
 // Keep aligned with `src/lib/cost/videoProviderMargins.ts` and `supabase/functions/_shared/clip-costs.ts`.
 export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> = {
-  'ai-hailuo':   { standard: 0.15, pro: 0.22 },
-  'ai-kling':    { standard: 0.18, pro: 0.28 },
-  'ai-sora':     { standard: 0.55, pro: 1.30 },
-  'ai-wan':      { standard: 0.12, pro: 0.20 },
-  'ai-seedance': { standard: 0.15, pro: 0.20 },
-  'ai-luma':     { standard: 0.20, pro: 0.35 },
-  // Veo 3.1: standard = Lite 720p, pro = Pro 1080p (premium-engine tier)
-  'ai-veo':      { standard: 0.42, pro: 3.15 },
-  'ai-runway':   { standard: 0.23, pro: 0.23 },
-  'ai-pika':     { standard: 0.14, pro: 0.26 },
-  // Vidu Q2: flat €0.65 per 5s clip → 0.13 €/s for parity
+  'ai-hailuo':   { standard: 0.14, pro: 0.23 },
+  'ai-kling':    { standard: 0.18, pro: 0.30 },
+  'ai-sora':     { standard: 0.60, pro: 1.35 },
+  'ai-wan':      { standard: 0.12, pro: 0.21 },
+  'ai-seedance': { standard: 0.09, pro: 0.18 }, // Mini = 0.06 (see registry)
+  'ai-luma':     { standard: 0.21, pro: 0.36 },
+  // Veo 3.1: standard = Lite 720p, pro = Pro 1080p
+  'ai-veo':      { standard: 0.45, pro: 3.30 },
+  'ai-runway':   { standard: 0.24, pro: 0.24 },
+  'ai-pika':     { standard: 0.12, pro: 0.27 },
+  // Vidu Q2: flat €0.66 per 5s clip → 0.13 €/s for parity
   'ai-vidu':     { standard: 0.13, pro: 0.13 },
-  // HappyHorse 1.0: 65% margin — standard = 720p, pro = 1080p
-  'ai-happyhorse': { standard: 0.40, pro: 0.80 },
+  // HappyHorse 1.0: standard = 720p, pro = 1080p
+  'ai-happyhorse': { standard: 0.42, pro: 0.84 },
   'ai-image':    { standard: 0.01, pro: 0.015 },
   stock:         { standard: 0, pro: 0 },
   'stock-image': { standard: 0, pro: 0 },
