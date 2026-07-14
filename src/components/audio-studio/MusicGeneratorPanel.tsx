@@ -66,6 +66,7 @@ export function MusicGeneratorPanel({
 }: MusicGeneratorPanelProps) {
   const { generateMusic, loading } = useMusicGeneration();
   const { wallet } = useAIVideoWallet();
+  const { language: uiLanguage } = useTranslation();
 
   const matchMoodIdx = (mood?: string): number => {
     if (!mood) return 2;
