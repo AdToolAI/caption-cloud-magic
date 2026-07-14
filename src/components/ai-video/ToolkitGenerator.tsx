@@ -123,7 +123,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // Sprachen, für die der native TTS/Lip-Sync des Providers verlässlich Klartext
   // produziert. Alles außerhalb → ambient-only Fallback (kein Voiceover), sonst
   // erfindet z. B. Kling für DE/ES eine Fantasie-Sprache.
-  // Kling 3.0 Omni ist die einzige Kling-Variante mit nativem DE/EN/ES-Lip-Sync.
+  // Kling 3.0 Omni klingt für DE/ES weiterhin englisch/fantasy-artig; deshalb
+  // erlauben wir dort native Stimmen nur für Englisch und sperren den Rest hart.
   const PROVIDER_TTS_LANGS: Record<string, ReadonlyArray<'en' | 'de' | 'es'>> = {
     veo:        ['en', 'de', 'es'],
     sora:       ['en', 'de', 'es'],
@@ -134,8 +135,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   };
   const isKlingOmni = model.id === 'kling-omni';
   const ttsLangSupported = isKlingOmni
-    ? (['en', 'de', 'es'] as const).includes(effectiveSpokenLang)
+    ? effectiveSpokenLang === 'en'
     : (PROVIDER_TTS_LANGS[model.family] ?? []).includes(effectiveSpokenLang);
+  const omniNonEnglishSilent = isKlingOmni && effectiveSpokenLang !== 'en';
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   /* ── Kling Omni: unified Cast + per-speaker Lip-Sync (max. 4 cast, 2 lip-sync) ── */
   type OmniVoicePreset = 'female-warm' | 'female-bright' | 'male-warm' | 'male-deep' | 'neutral';
@@ -432,7 +434,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         : effectiveSpokenLang === 'es'
         ? 'Spanish (Español)'
         : 'English';
-      const dialogueSuppressed = !!(model.capabilities.audio && generateAudio) && !ttsLangSupported;
+      const dialogueSuppressed = omniNonEnglishSilent || (!!(model.capabilities.audio && generateAudio) && !ttsLangSupported);
       const spokenLangSuffix = (model.capabilities.audio && generateAudio && ttsLangSupported)
         ? `All spoken dialogue, narration and voiceover MUST be performed in ${langLabel}. Do not use any other language for speech. Lip movement must match ${langLabel} phonemes.`
         : '';
@@ -684,20 +686,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         body.referenceImages = composedSubjectRefs;
       }
       if (model.capabilities.audio) {
-        body.generateAudio = generateAudio;
-        if (generateAudio && ttsLangSupported) {
+        body.generateAudio = generateAudio && ttsLangSupported && !omniNonEnglishSilent;
+        if (generateAudio && ttsLangSupported && !omniNonEnglishSilent) {
           body.spokenLanguage = effectiveSpokenLang;
-        } else if (generateAudio && !ttsLangSupported) {
+        } else if (generateAudio && !ttsLangSupported || omniNonEnglishSilent) {
           body.suppressDialogue = true;
         }
       }
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
 
-      // Kling 3.0 Omni — native Lip-Sync in DE/EN/ES bypasses Sync.so.
+      // Kling 3.0 Omni — native Lip-Sync is allowed for English only. DE/ES are
+      // hard-silenced because the provider currently returns fantasy language.
       // Per-speaker lines are merged into a screenplay-style dialog string
       // and — when > 1 speaker — additionally passed as `speaker_voices`.
-      if (isKlingOmni) {
+      if (isKlingOmni && ttsLangSupported && !omniNonEnglishSilent) {
         const activeLines = omniLines
           .filter((l) => l.lipSync && l.line.trim().length > 0)
           .slice(0, 2);
@@ -719,12 +722,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           // Omni conditions lip-motion + prosody on the exact text and locks
           // the language. Without this, native voices fall back to an English-
           // accented default even when spoken_language is set.
-          const langLabel =
-            effectiveSpokenLang === 'de'
-              ? 'German (Hochdeutsch) — all voices speak clearly and naturally in German'
-              : effectiveSpokenLang === 'es'
-                ? 'Spanish (Castellano) — all voices speak clearly and naturally in Spanish'
-                : 'English — all voices speak clearly and naturally in English';
+          const langLabel = 'English — all voices speak clearly and naturally in English';
           const dialogBlock = named.map((n) => `${n.name}: "${n.line}"`).join('\n');
           body.prompt = `${body.prompt}\n\n[SPOKEN LANGUAGE]: ${langLabel}.\n[DIALOG]\n${dialogBlock}`;
         }
