@@ -236,8 +236,13 @@ serve(async (req) => {
     if (modelConfig.supportsNativeLipSync && dialogText && dialogText.trim().length > 0 && !suppressDialogue) {
       replicateInput.dialog = dialogText.trim();
       if (voicePreset) replicateInput.voice = voicePreset;
+      if (Array.isArray(speakerVoices) && speakerVoices.length > 0) {
+        replicateInput.speaker_voices = speakerVoices
+          .slice(0, 2)
+          .map((s) => ({ name: String(s.name || '').slice(0, 40), voice: String(s.voice || 'neutral') }));
+      }
       if (spokenLanguage) replicateInput.spoken_language = spokenLanguage;
-      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${spokenLanguage ?? 'auto'}, chars=${dialogText.length})`);
+      console.log(`[generate-kling-video] Native lip-sync enabled (Omni, lang=${spokenLanguage ?? 'auto'}, chars=${dialogText.length}, speakers=${speakerVoices?.length ?? 1})`);
     }
 
     // Image-to-Video
