@@ -124,10 +124,9 @@ serve(async (req) => {
 
     const currency = walletPreview?.currency || 'EUR';
 
-    // Calculate cost
-    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['kling-3-standard'];
-    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
-    const totalCost = duration * costPerSecond;
+    // Canonical price from shared pricing catalog — single source of truth.
+    const costPerSecond = resolveCostPerSecond(model, currency as 'EUR' | 'USD') ?? 0.18;
+    const totalCost = +(duration * costPerSecond).toFixed(4);
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
     // Check wallet balance
