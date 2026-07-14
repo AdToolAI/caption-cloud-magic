@@ -10,23 +10,24 @@
  */
 export type ClipQuality = "standard" | "pro";
 
-// Margin policy: ~60-70% across the board. Sora/Veo/Grok = Premium-Engine tier (~65%).
+// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin across all video models.
+// Lip-Sync and picture models keep their prior margin policy and live elsewhere.
 // Keep aligned with `src/types/video-composer.ts` (CLIP_SOURCE_COSTS) and
 // `src/lib/cost/videoProviderMargins.ts`.
 export const CLIP_COSTS: Record<string, Record<ClipQuality, number>> = {
-  "ai-hailuo":     { standard: 0.15, pro: 0.22 },
-  "ai-kling":      { standard: 0.18, pro: 0.28 },
-  "ai-sora":       { standard: 0.55, pro: 1.30 },
-  "ai-wan":        { standard: 0.12, pro: 0.20 },
-  "ai-seedance":   { standard: 0.15, pro: 0.20 },
-  "ai-luma":       { standard: 0.20, pro: 0.35 },
-  "ai-veo":        { standard: 0.42, pro: 3.15 },
-  "ai-runway":     { standard: 0.23, pro: 0.23 },
-  "ai-pika":       { standard: 0.14, pro: 0.26 },
-  "ai-happyhorse": { standard: 0.40, pro: 0.80 }, // 720p / 1080p (~65% margin)
-  "ai-vidu":       { standard: 0.13, pro: 0.13 }, // flat €0.65 / 5s
-  "ai-grok":       { standard: 0.42, pro: 0.42 }, // 1080p only (premium-engine)
-  "ai-ltx":        { standard: 0.08, pro: 0.12 },
+  "ai-hailuo":     { standard: 0.14, pro: 0.23 },
+  "ai-kling":      { standard: 0.18, pro: 0.30 },
+  "ai-sora":       { standard: 0.60, pro: 1.35 },
+  "ai-wan":        { standard: 0.12, pro: 0.21 },
+  "ai-seedance":   { standard: 0.09, pro: 0.18 }, // Mini tier is 0.06 (see registry)
+  "ai-luma":       { standard: 0.21, pro: 0.36 },
+  "ai-veo":        { standard: 0.45, pro: 3.30 },
+  "ai-runway":     { standard: 0.24, pro: 0.24 },
+  "ai-pika":       { standard: 0.12, pro: 0.27 },
+  "ai-happyhorse": { standard: 0.42, pro: 0.84 }, // 720p / 1080p
+  "ai-vidu":       { standard: 0.13, pro: 0.13 }, // flat €0.66 / 5s
+  "ai-grok":       { standard: 0.45, pro: 0.45 }, // 1080p only
+  "ai-ltx":        { standard: 0.06, pro: 0.12 },
   "ai-image":      { standard: 0.01, pro: 0.015 },
 };
 
