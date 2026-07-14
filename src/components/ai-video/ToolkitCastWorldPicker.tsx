@@ -27,6 +27,7 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Users, MapPin, Building2, Package, X, Plus, Star, ExternalLink } from 'lucide-react';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { MotionStudioCharacter, MotionStudioLocation } from '@/types/motion-studio';
 import { getConsistencyInfo } from '@/lib/motion-studio/modelConsistencyRanking';
@@ -69,7 +70,34 @@ export function ToolkitCastWorldPicker({
   supportsImageInput,
 }: Props) {
   const { language } = useTranslation();
-  const { characters, locations, loading } = useMotionStudioLibrary();
+  // Cast & World lock: characters come exclusively from `brand_characters`.
+  // Locations / buildings / props still come from Motion Studio Library.
+  const { locations, loading: locsLoading } = useMotionStudioLibrary();
+  const { characters: brandCharList, isLoading: brandLoading } = useBrandCharacters();
+  const loading = locsLoading || brandLoading;
+  const characters = useMemo<MotionStudioCharacter[]>(
+    () =>
+      (brandCharList ?? []).map((c: any) => ({
+        id: c.id,
+        user_id: c.user_id,
+        name: c.name ?? 'Unnamed',
+        description:
+          c.description ??
+          c.visual_identity_json?.identity_card_prompt ??
+          c.visual_identity_json?.identityCard ??
+          '',
+        signature_items: c.visual_identity_json?.signature_items ?? '',
+        reference_image_url: c.portrait_url ?? c.reference_image_url ?? null,
+        reference_image_seed: null,
+        voice_id: c.default_voice_id ?? null,
+        tags: [],
+        usage_count: c.usage_count ?? 0,
+        workspace_id: null,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+      })),
+    [brandCharList],
+  );
 
   const worldLocations = useMemo(() => locations.filter((l) => kindOf(l) === 'location'), [locations]);
   const worldBuildings = useMemo(() => locations.filter((l) => kindOf(l) === 'building'), [locations]);
