@@ -1,31 +1,50 @@
-## Ziel
+## Problem
 
-Die redundante "Brand Character"-Zeile (Single-Select) im AI Video Studio entfernen, wenn Kling Omni aktiv ist, da das neue Unified Cast & Lip-Sync Panel bereits die Charakter-Auswahl (bis zu 4) übernimmt. Andernfalls kann derselbe Charakter zweimal ausgewählt werden — einmal im BrandCharacterSelector und einmal im Cast-Panel.
+Bei Kling Omni läuft der Lip-Sync technisch, aber:
+1. Die Stimmen klingen englisch und sprechen kein sauberes Deutsch (Gibberish/Fantasiesprache).
+2. Der Dialog wird nur als separates `dialog`-Feld an Replicate übergeben — nicht in den eigentlichen `prompt` eingebettet.
 
-## Änderung
+## Ursachen
 
-**Datei:** `src/components/ai-video/ToolkitGenerator.tsx` (Zeilen 862–868)
+- **Prompt enthält keinen Dialog**: Der Prompt beschreibt nur die Szene visuell. Kling Omni konditioniert die Lip-Motion aber deutlich besser, wenn der gesprochene Text auch im Prompt erwähnt wird (Sprecher-Attribution + Zitat).
+- **`spoken_language` wird als 2-Buchstaben-Code (`de`, `en`, `es`) gesendet** — Replicate/Kling Omni erwartet aber den Klarnamen (`german`, `english`, `spanish`). Ohne gültige Sprache fällt das Modell auf einen englisch-gefärbten Default zurück → phonetisches Gestottere.
+- **Prompt sagt der Engine nicht, in welcher Sprache gesprochen wird** — auch wenn `spoken_language` korrekt ist, hilft ein expliziter Hinweis im Prompt zusätzlich.
 
-Die `<Card>` mit `<BrandCharacterSelector />` wird konditional gerendert — nur wenn **nicht** Kling Omni:
+## Änderungen (Frontend only + kleine Edge-Function-Normalisierung)
 
-```tsx
-{!isKlingOmni && (
-  <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60">
-    <BrandCharacterSelector
-      value={brandCharacter?.id ?? null}
-      onChange={setBrandCharacter}
-    />
-  </Card>
-)}
+### 1. `src/components/ai-video/ToolkitGenerator.tsx`
+Vor dem `supabase.functions.invoke(...)`-Call im Omni-Branch (Zeilen 700–718) den `prompt` mit einem sauberen Dialog-Block anreichern, wenn Lip-Sync-Zeilen vorhanden sind:
+
+```
+[SPOKEN LANGUAGE]: German (Hochdeutsch) — all voices speak clearly and naturally in German.
+[DIALOG]
+Sarah: "Hi! Willkommen bei AdTool."
+Matthew: "Danke Sarah — was empfiehlst du?"
 ```
 
-## Warum nur bei Omni ausblenden
+- Block wird an das Ende des vorhandenen `prompt` gehängt (nicht ersetzt) → optimierter visueller Prompt bleibt erhalten.
+- Sprachlabel dynamisch aus `effectiveSpokenLang` (`de` → "German (Hochdeutsch)", `en` → "English", `es` → "Spanish (Castellano)").
+- Nur aktiv, wenn `activeLines.length > 0`.
 
-- Für alle anderen Modelle (Kling 3, Hailuo, Veo, HappyHorse …) bleibt der klassische Brand-Character-Lock nützlich, da der `ToolkitCastWorldPicker` dort weiterhin die einzige Cast-Quelle ist und der Lock als Cross-Studio-Kontinuität dient.
-- Nur bei Omni ist das neue Unified Panel die alleinige Quelle für Charaktere → dort ist die Zeile redundant und widersprüchlich.
+### 2. `supabase/functions/generate-kling-video/index.ts`
+Kleine Normalisierung in Zeilen 231 / 244: `spoken_language` von `de`/`en`/`es` auf `german`/`english`/`spanish` mappen bevor an Replicate gesendet. Fallback: der übergebene Wert unverändert.
+
+```ts
+const LANG_MAP: Record<string, string> = { de: 'german', en: 'english', es: 'spanish' };
+const klingLang = LANG_MAP[spokenLanguage?.toLowerCase() ?? ''] ?? spokenLanguage;
+```
+
+### 3. Keine UI-Änderungen an Voice-Presets nötig
+`female-warm` / `male-warm` etc. sind Kling-native Preset-Labels und funktionieren mit `spoken_language`, sobald diese korrekt gesetzt ist.
 
 ## Nicht betroffen
 
-- `brandCharacter`-State und Analytics/Usage-Tracking bleiben erhalten (werden nur nicht mehr via UI im Omni-Modus gesetzt).
-- Kein Backend-Change.
-- Andere Modelle unverändert.
+- Motion Studio, andere Modelle, Sync.so-Pipeline.
+- `omniLines`-State und UI bleiben unverändert.
+- Kein DB/Migrations-Change.
+
+## Erwartetes Ergebnis
+
+- Kling Omni erhält im `prompt` klare Sprach- und Dialoginformation → Lip-Motion und Prosodie passen zum Text.
+- `spoken_language=german` erzwingt deutsche Aussprache statt englischer Default-Voice.
+- Kein Gibberish mehr; Sprecher sprechen exakt die eingegebenen Zeilen auf Deutsch.
