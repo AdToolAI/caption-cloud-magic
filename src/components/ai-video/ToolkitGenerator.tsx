@@ -686,7 +686,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // and — when > 1 speaker — additionally passed as `speaker_voices`.
       if (isKlingOmni) {
         const activeLines = omniLines
-          .filter((l) => l.line.trim().length > 0)
+          .filter((l) => l.lipSync && l.line.trim().length > 0)
           .slice(0, 2);
         if (activeLines.length > 0) {
           const named = activeLines.map((l, i) => {
