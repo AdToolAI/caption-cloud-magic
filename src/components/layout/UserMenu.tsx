@@ -49,17 +49,6 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/credits" className="flex items-center gap-2 cursor-pointer">
-            <Coins className="h-4 w-4" />
-            <span>{t("header.credits")}</span>
-            {!loading && balance && (
-              <Badge variant="secondary" className="ml-auto text-xs">
-                {balance.balance}
-              </Badge>
-            )}
-          </Link>
-        </DropdownMenuItem>
         {user.email === 'bestofproducts4u@gmail.com' && (
           <DropdownMenuItem asChild>
             <Link to="/instagram-publishing" className="flex items-center gap-2 cursor-pointer">
