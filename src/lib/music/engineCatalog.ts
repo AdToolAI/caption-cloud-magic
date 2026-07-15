@@ -9,6 +9,8 @@ export interface MusicLanguage {
   name: string; // English full name for prompt directive
 }
 
+export type MusicPricingModel = 'flat' | 'per-second';
+
 export interface MusicEngine {
   id: string;
   label: string;         // Card label (short)
@@ -21,7 +23,9 @@ export interface MusicEngine {
   supportsLoop: boolean;
   supportsStyleField: boolean; // Suno-style genre-tag input
   maxDuration: number;   // seconds
-  priceEur: number;      // retail (3x margin)
+  priceEur: number;      // retail flat price OR reference price @ maxDuration for per-second engines
+  pricingModel?: MusicPricingModel; // default 'flat'
+  priceEurPerSecond?: number; // required when pricingModel === 'per-second'
   languages: MusicLanguage[]; // empty = instrumental-only
   route: 'replicate';
   replicateModel?: string;
@@ -79,7 +83,8 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     supportsLoop: true,
     supportsStyleField: false,
     maxDuration: 190,
-    priceEur: 0.15,
+    priceEur: 0.55,
+    pricingModel: 'flat',
     languages: [],
     route: 'replicate',
     replicateModel: 'stability-ai/stable-audio-2.5',
@@ -115,7 +120,9 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     supportsLoop: false,
     supportsStyleField: false,
     maxDuration: 300,
-    priceEur: 0.36,
+    priceEur: 6.90, // reference @ 300s (per-second engine)
+    pricingModel: 'per-second',
+    priceEurPerSecond: 0.023,
     languages: EL_LANGS,
     route: 'replicate',
     replicateModel: 'elevenlabs/music',
@@ -186,4 +193,27 @@ export function engineHasVocals(engineId: string, instrumental: boolean): boolea
   if (!e.vocals) return false;
   if (!e.supportsInstrumentalToggle) return true;
   return !instrumental;
+}
+
+/**
+ * Canonical price computation. Used by UI *and* mirrored in the
+ * generate-music-track edge function for wallet deduction.
+ *   flat        → priceEur (fixed per generation)
+ *   per-second  → priceEurPerSecond × requestedSeconds (Replicate bills per second)
+ */
+export function computeMusicPrice(engineId: string, durationSeconds: number): number {
+  const e = getEngine(engineId);
+  if (e.pricingModel === 'per-second' && e.priceEurPerSecond) {
+    const secs = Math.max(1, Math.min(e.maxDuration, Math.round(durationSeconds || e.maxDuration)));
+    return Math.round(e.priceEurPerSecond * secs * 100) / 100;
+  }
+  return e.priceEur;
+}
+
+export function formatMusicPriceBadge(engineId: string, currencySymbol: string): string {
+  const e = getEngine(engineId);
+  if (e.pricingModel === 'per-second' && e.priceEurPerSecond) {
+    return `${currencySymbol}${e.priceEurPerSecond.toFixed(3)}/s • ≤${e.maxDuration}s`;
+  }
+  return `${currencySymbol}${e.priceEur.toFixed(2)} • ≤${e.maxDuration}s`;
 }

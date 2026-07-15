@@ -1,7 +1,7 @@
 import { Activity, Wand2, Music2, Sparkles, Waves, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { ENGINE_CATALOG, ENGINE_ORDER, type MusicEngineId } from '@/lib/music/engineCatalog';
+import { ENGINE_CATALOG, ENGINE_ORDER, formatMusicPriceBadge, type MusicEngineId } from '@/lib/music/engineCatalog';
 
 interface ProviderSelectorProps {
   value: MusicEngineId;
@@ -70,7 +70,7 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
                 active ? 'border-primary/60 text-primary' : 'border-border/60 text-muted-foreground'
               )}
             >
-              {currencySymbol}{engine.priceEur.toFixed(2)} • ≤{engine.maxDuration}s
+              {formatMusicPriceBadge(id, currencySymbol)}
             </Badge>
             {engine.comingSoon && (
               <div className="absolute inset-0 flex items-end justify-center pb-1.5 pointer-events-none">

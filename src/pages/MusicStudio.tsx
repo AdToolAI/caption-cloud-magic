@@ -5,6 +5,7 @@ import {
   isLanguageSupported,
   getLanguageMeta,
   engineHasVocals,
+  computeMusicPrice,
   type MusicEngineId,
 } from '@/lib/music/engineCatalog';
 import { Helmet } from 'react-helmet-async';
@@ -52,9 +53,9 @@ export default function MusicStudio() {
   const engine = getEngine(engineId);
   const currencySymbol = wallet?.currency === 'USD' ? '$' : '€';
   const balance = wallet?.balance_euros ?? 0;
-  const cost = engine.priceEur;
-  const insufficient = balance < cost;
   const maxDur = engine.maxDuration;
+  const cost = computeMusicPrice(engineId, maxDur);
+  const insufficient = balance < cost;
   const [language, setLanguage] = useState<string>(() => {
     if (typeof navigator === 'undefined') return 'en';
     const lang = navigator.language?.slice(0, 2) || 'en';
@@ -390,7 +391,14 @@ export default function MusicStudio() {
                   </div>
 
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
-                    <span className="text-xs text-muted-foreground">Kosten</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">Kosten (max. Länge)</span>
+                      {engine.pricingModel === 'per-second' && engine.priceEurPerSecond && (
+                        <span className="text-[10px] text-muted-foreground/80">
+                          {currencySymbol}{engine.priceEurPerSecond.toFixed(3)}/s • Abrechnung pro Sekunde
+                        </span>
+                      )}
+                    </div>
                     <span className="font-mono text-lg font-bold text-primary">{currencySymbol}{cost.toFixed(2)}</span>
                   </div>
 

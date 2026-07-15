@@ -1,59 +1,48 @@
-## Ziel
-Suno v5 aus dem Music-Studio-Katalog entfernen (kein offizieller API-Zugang) und stattdessen die zwei besten aktuell verfügbaren Engines laut deiner Bewertung ergänzen: **Google Lyria 3 Pro** (Preview) und **Stable Audio 3.0 Large**. ElevenLabs Music v2 bleibt als Top-Empfehlung.
+## Music Studio Pricing — Minimal-Anpassung (nur Stable Audio + ElevenLabs)
 
-## Neuer Katalog (final)
+Bestehende Marge bei **MiniMax Music 1.5 (0.30 €)** und **Google Lyria 3 Pro (0.42 €)** bleibt unverändert — beide sind komfortabel profitabel (~10× bzw. ~5.7×).
 
-| Karte | Engine | Vocals | Max Länge | Retail | Route | Use-Case |
-|---|---|---|---|---|---|---|
-| **Adaptive (Loop)** | Stable Audio 2.5 | ❌ | 190s | 0.15 € | Replicate | Background, loopable |
-| **Adaptive Large** *(ersetzt Open 2)* | Stable Audio 3.0 Large | ❌ | 190s | 0.18 € | Direct API (Stability) | Höchste Instrumental-Qualität |
-| **Vocal Mini** | MiniMax Music 1.5 | ✅ | 60s | 0.30 € | Replicate | Schnelle Song-Skizze |
-| **Vocal Studio (EL)** ⭐ | ElevenLabs Music v2 | ✅ | 300s | 0.36 € | Direct API | Beste Gesamtlösung, mehrsprachig |
-| **Vocal Pro (Lyria)** *(neu, ersetzt Suno)* | Google Lyria 3 Pro | ✅ | 30–60s (Preview) | 0.42 € | Vertex AI / Gemini API | Google Preview, radio-nahe Qualität |
+Angepasst werden nur die zwei defizitären Engines:
 
-**Entfällt:**
-- **Suno v5** — kein offizieller API-Zugang, Drittanbieter/Scraper wären Compliance-Risiko.
-- **Stable Audio Open 2** — durch das stärkere Stable Audio 3.0 Large ersetzt.
+| Engine | Preis alt | Kosten worst-case | **Preis neu** | Marge neu | Modell |
+|---|---|---|---|---|---|
+| Stable Audio 2.5 | 0.15 € (Verlust) | ~0.184 €/Track | **0.55 €** flat | ~3.0× | flat / Track |
+| ElevenLabs Music v2 | 0.36 € flat (Verlust) | ~0.0076 €/s | **0.023 €/s** | ~3.0× | **per-second** |
+| MiniMax 1.5 | 0.30 € | 0.028 € | **0.30 €** (unverändert) | ~10.7× | flat |
+| Lyria 3 Pro | 0.42 € | 0.074 € | **0.42 €** (unverändert) | ~5.7× | flat |
 
-## Umsetzung
+ElevenLabs muss zwingend auf per-second wechseln, weil Replicate genau so abrechnet (60 s ≈ 1.38 €, 300 s ≈ 6.90 €) — bei Flatprice wäre jeder 5-Min-Song ein 6-€-Verlust.
 
-### 1. `src/lib/music/engineCatalog.ts`
-- `suno-v5` Eintrag entfernen.
-- `stable-audio-open-2` → `stable-audio-3-large` umbenennen (Preis, maxDuration, Label anpassen).
-- Neuer Eintrag `lyria-3-pro` mit `vocals: true`, Sprach-Set (EN, DE, ES, FR, IT, PT, JA), 60s Max.
-- Legacy-Mapping in `useMusicGeneration` erweitern: alte `suno-v5`-IDs aus History → `elevenlabs-music-v2` (nächstbeste Vocal-Engine).
+## Änderungen
 
-### 2. Edge Function `supabase/functions/generate-music-track/index.ts`
-- `suno-v5` Branch komplett entfernen (inkl. Suno-Job-Polling, `SUNO_API_KEY` Check, `SUNO_NOT_CONFIGURED` Fehlercode).
-- Neuer Branch **`stable-audio-3-large`**: Stability AI Direct API `POST https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio` (v3 Large Endpoint), Auth via neuer Secret `STABILITY_API_KEY`. Binary MP3 → Base64 → Storage-Upload (bestehende Pipeline).
-- Neuer Branch **`lyria-3-pro`**: Google Vertex AI / Gemini API `POST https://generativelanguage.googleapis.com/v1beta/models/lyria-3-pro:generateMusic` (bzw. Vertex-Endpoint), Auth via neuer Secret `GOOGLE_LYRIA_API_KEY`. Response = base64 audio → Storage.
-- Bestehende Branches (Stable Audio 2.5, MiniMax 1.5, ElevenLabs Music v2) bleiben unverändert.
-- Idempotenter Credit-Refund bei Provider-Fail bleibt aktiv.
-- Detaillierte Provider-Fehler unverändert durchgereicht.
+1. **`src/lib/music/engineCatalog.ts`**
+   - Neues Feld `pricingModel: 'flat' | 'per-second'` (default `flat`).
+   - Neues Feld `priceEurPerSecond` (optional, nur ElevenLabs).
+   - `stable-audio-25.priceEur`: `0.15` → **`0.55`**.
+   - `elevenlabs-music-v2`: `pricingModel: 'per-second'`, `priceEurPerSecond: 0.023`, `priceEur` bleibt als „Referenz @ 60 s" = `1.38`.
+   - MiniMax + Lyria: unverändert.
 
-### 3. UI `src/pages/MusicStudio.tsx` + `ProviderSelector.tsx`
-- Kein struktureller Umbau — Katalog ist bereits Single-Source-of-Truth.
-- Icons für neue Engines: `Sparkles` (Lyria), `Waves` bleibt für Stable Audio 3.0 Large.
-- Info-Zeile „Suno bietet aktuell keinen offiziellen API-Zugang, daher setzen wir stattdessen auf ElevenLabs Music v2 und Google Lyria 3 Pro" als kleiner Footer-Hinweis.
-- ⭐ Badge auf ElevenLabs (Beste Gesamtlösung laut interner Qualitätsbewertung).
+2. **`src/hooks/useMusicGeneration.ts` / `MUSIC_TIER_PRICING`**
+   - Helper `computeMusicPrice(engine, durationSec)`: `per-second → priceEurPerSecond × duration`, sonst `priceEur`.
+   - Preisberechnung im UI-State über diesen Helper.
 
-### 4. Secrets
-Zwei neue Secrets werden benötigt (nach Plan-Freigabe per `add_secret`):
-- `STABILITY_API_KEY` — https://platform.stability.ai/account/keys
-- `GOOGLE_LYRIA_API_KEY` — Google AI Studio / Vertex AI (Lyria 3 Pro ist aktuell in **Preview** — Access-Approval nötig; Fallback: Karte disabled + Hinweis „In Kürze verfügbar", falls Key fehlt, analog zum bisherigen Suno-Muster).
+3. **`src/components/music-studio/ProviderSelector.tsx`**
+   - Badge dynamisch:
+     - flat → `€X.XX • ≤Ys` (wie heute)
+     - per-second → `€0.023/s • ≤300s`
+   - Nur ElevenLabs-Karte bekommt die Variante.
 
-### 5. Toast-Codes
-- `SUNO_NOT_CONFIGURED` → entfernt.
-- Neu: `LYRIA_NOT_CONFIGURED` (Preview-Access noch offen) + `STABILITY_NOT_CONFIGURED`.
+4. **`src/pages/MusicStudio.tsx`**
+   - Live-Kostenpreview an der Duration/Lyrics-Steuerung: „Kosten dieser Generierung: ~X.XX €".
+
+5. **`supabase/functions/generate-music-track/index.ts`**
+   - Abbuchung analog Helper: `charge = pricingModel === 'per-second' ? priceEurPerSecond × requestedSeconds : priceEur`.
+   - Idempotenter Refund-Pfad bleibt unverändert; `charge` wandert 1:1 durch Wallet-Transaktion.
 
 ## Nicht enthalten
-- Kein Umbau Voice-Studio / Audio-Library / Cast&World.
-- Keine Preisänderung anderer Modalitäten.
-- Kein Suno-Scraper-Fallback.
 
-## Rückfrage
-**Lyria 3 Pro** ist aktuell noch **Preview** bei Google (Zugang nur nach Approval via Vertex AI Waitlist). Zwei Wege:
-- **A) Sofort integrieren, Karte disabled, bis dein Google-Access freigeschaltet ist** (empfohlen — UI zeigt „Bald verfügbar", Nutzer sehen die Roadmap).
-- **B) Erst integrieren, wenn dein Vertex-AI-Access aktiv ist** (Katalog startet mit 4 Engines).
+- Keine Änderungen an MiniMax- oder Lyria-Preisen.
+- Keine Änderungen an anderen Studios, am Video-Katalog oder an History-Einträgen (Alt-Runs behalten ihren damals gebuchten Preis).
+- Kein UI-Rebrand — nur Preis- und Anzeigelogik.
 
-Welchen Weg soll ich fahren?
+Wenn okay, setze ich exakt so um.
