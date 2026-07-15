@@ -15,6 +15,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { VoiceCloneDialog } from '@/components/voice/VoiceCloneDialog';
+import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
+import { Library } from 'lucide-react';
 
 interface AIVoiceOverProps {
   settings: {
@@ -57,6 +59,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   const [voices, setVoices] = useState<VoiceMeta[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(true);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // W4.1 Voice-Lock: pin voice/language/tone across all UDC voiceovers for this project
@@ -262,17 +265,30 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <Label>Sprache & Stimme</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCloneDialogOpen(true)}
-                className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
-                title="Eigene Stimme klonen (3+ Audio-Samples)"
-              >
-                <Plus className="h-3 w-3" />
-                Eigene Stimme klonen
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLibraryOpen(true)}
+                  className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                  title="Vollständige Voice-Bibliothek (Suche, Filter, Native-Only)"
+                >
+                  <Library className="h-3 w-3" />
+                  Bibliothek
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCloneDialogOpen(true)}
+                  className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                  title="Eigene Stimme klonen (3+ Audio-Samples)"
+                >
+                  <Plus className="h-3 w-3" />
+                  Klonen
+                </Button>
+              </div>
             </div>
             <Tabs value={selectedLanguageTab} onValueChange={(v) => setSelectedLanguageTab(v as 'de' | 'en' | 'es')}>
               <TabsList className="grid w-full grid-cols-3">
@@ -449,6 +465,21 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             // Re-fetch voices when dialog closes (catches successful clones)
             loadVoices();
           }
+        }}
+      />
+
+      <UniversalVoiceLibraryPicker
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        language={selectedLanguageTab}
+        currentVoiceId={settings.voiceId}
+        title="Voice-Bibliothek – Director's Cut"
+        enforceNative
+        onSelect={(voice) => {
+          // Merge into local voices list so downstream lookups (name / recommended_model) work.
+          setVoices((prev) => (prev.find((v) => v.id === voice.id) ? prev : [voice, ...prev]));
+          handleVoiceSelect(voice.id);
+          setLibraryOpen(false);
         }}
       />
     </Card>
