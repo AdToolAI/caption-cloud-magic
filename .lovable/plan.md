@@ -1,60 +1,42 @@
-## Ziel
+## Post-Launch Backlog (nach 26.07.2026)
 
-Das alte generische Credit-System (aus der Pre-Beta-Ära) UI-seitig komplett unsichtbar machen. Nur **Media Credits** für AI-Video / Music / Bilder (`ai_video_wallets`) bleiben sichtbar und aktiv. Alles andere ist im **Beta-Basic-Abo (14,99 €)** enthalten. Hooks bleiben als No-Op im Code, damit bestehende Aufrufe nicht brechen.
+Beide Punkte werden **nicht** vor Launch angefasst. Sie sind nicht kritisch und das Risiko einer Regression überwiegt den Nutzen kurz vor Go-Live.
 
-## Was aktuell noch sichtbar ist (und weg soll)
+### Ticket 1 — Cron Heartbeat Watchdog
 
-- `/credits` Route + `Credits.tsx` Seite
-- User-Menü-Eintrag „Credits" mit Balance-Anzeige (`UserMenu.tsx`)
-- `CreditThresholdWatcher`, `TrialUpgradeWatcher`, `StreakMilestoneUpsellWatcher`, `FeatureDiscoveryWatcher` (alle triggern Upsell-Modals basierend auf altem Balance)
-- `CreditGuard`, `CreditBalance`, `CreditHistory`, `CreditsHeroHeader`, `CreditLimitWarning` Komponenten
-- `CreditUsageDashboard` in Analytics / `UsageReports.tsx`
-- `CreditSystemTest.tsx` Beispieldatei
+**Scope**
+- In allen produktiv laufenden Cron-Functions am Anfang ein `upsert` auf `cron_heartbeats` schreiben (Job-Name, Timestamp, Status).
+- Betroffene Functions: `render-queue-manager`, `refresh-voice-library`, `process-email-queue`, `autopilot-video-poll`, `autopilot-publish-due`, `qa-watchdog`, ggf. weitere.
+- Neue Function `cron-heartbeat-watchdog` (Intervall 5 Min):
+  - Prüft pro registriertem Job ob letzter Heartbeat älter als `2 × erwartetes Intervall`.
+  - Schreibt bei Ausfall Zeile in `system_alerts` (severity=warning).
+  - Optional Email an Admin über `send-transactional-email` (Template `cron-job-silent`).
+- Admin-UI: neue Karte im **Render Load Tab** mit „Letzter Heartbeat pro Job" und rotem Punkt bei Overdue.
 
-## Änderungen
+**Warum nicht jetzt**
+Jobs laufen laut Edge-Function-Logs sauber. Nachrüsten ist reine Sichtbarkeit, kein Bugfix.
 
-### 1. Routing & Navigation
-- **`src/App.tsx`**: Route `/credits` entfernen, Lazy-Import raus.
-- **`src/components/layout/UserMenu.tsx`**: „Credits"-Eintrag + Balance-Chip entfernen. `useCredits`-Import raus.
+---
 
-### 2. Watcher deaktivieren
-- **`src/components/upgrade/UpgradeMount.tsx`**: `CreditThresholdWatcher`, `TrialUpgradeWatcher`, `StreakMilestoneUpsellWatcher`, `FeatureDiscoveryWatcher` aus dem Mount entfernen. `SmartUpgradeModal` bleibt (wird von Founders-Flow genutzt).
+### Ticket 2 — Supabase Linter Warnings aufräumen
 
-### 3. Hooks als No-Op belassen
-Bestehende `import`-Statements in ~15 Dateien bleiben stehen, damit nichts bricht. Die Hooks selbst werden neutralisiert:
-- **`src/hooks/useCredits.ts`**: gibt konstant `{ balance: Infinity, loading: false, error: null }` zurück, kein DB-Read auf `wallets`.
-- **`src/hooks/useFeatureGate.ts`**: gibt immer `{ allowed: true }` zurück (Beta-Abo deckt alles).
-- **`src/hooks/useTrialAccess.ts`**: neu verdrahtet gegen aktive Stripe-Subscription statt Balance. Nutzt existierende `check-subscription` Edge-Function bzw. `useSubscription` Hook falls vorhanden — ansonsten kurze eigene Abfrage. Ohne aktive Sub → `trialActive: false`, mit Sub → `trialActive: true`. Keine Credit-Logik mehr.
+**Scope**
+- `function_search_path_mutable` (~250): `ALTER FUNCTION <name>(<args>) SET search_path = public;` für jede betroffene Function. Mechanisch, low-risk.
+- `authenticated_security_definer_function_executable` (~30):
+  - Pro Function prüfen: Wird sie aus dem Client aufgerufen?
+  - Falls **ja** → in `authenticated` GRANT lassen, dokumentieren.
+  - Falls **nein** → `REVOKE EXECUTE ON FUNCTION ... FROM authenticated, anon; GRANT EXECUTE ... TO service_role;`
+  - Testrunde pflicht: für jede geänderte Function 1× Client-Aufruf verifizieren.
 
-### 4. Analytics-Dashboards
-- **`src/components/analytics/CreditUsageDashboard.tsx`**: durch leere Placeholder-Komponente ersetzen die einen kurzen Hinweis rendert („Credit-Nutzung ist im Beta-Abo enthalten. Media-Credits siehst du im AI Video Studio.") — nichts crashen lassen, aber keine alten Zahlen mehr zeigen.
-- **`src/pages/Analytics/UsageReports.tsx`**: falls das Dashboard eingebettet ist, ersetzen oder ausblenden.
+**Warum nicht jetzt**
+Keine aktive Ausnutzung möglich — nur `service_role`/`postgres` dürfen Schemas anlegen, `has_role` selbst ist bereits gehärtet. Fix ist Hygiene, nicht Security-Fix.
 
-### 5. Aufräumen / Deaktivieren
-- **`src/examples/CreditSystemTest.tsx`**: nicht angefasst (Beispieldatei, wird nicht gerendert).
-- `CreditGuard` / `CreditBalance` etc. bleiben im Repo, werden aber nur noch von `Credits.tsx` genutzt — nach Route-Entfernung dead code, aufräumen später.
+---
 
-### 6. AI-Media-Wallet bleibt unverändert
-`useAIVideoWallet`, `ai_video_wallets`, `AIVideoCreditPurchase`, `AIVideoCostConfirmDialog` — alles unverändert. Das ist das aktive System für Video/Music/Bild-Generierung.
+### Nach Launch — Reihenfolge
 
-## Technischer Kontext (Non-Techies können überspringen)
+1. Woche 1 post-launch: Ticket 1 (Heartbeats + Watchdog).
+2. Woche 2–3 post-launch: Ticket 2 (search_path Bulk-Fix, dann SECURITY DEFINER Audit).
+3. Beide Tickets werden im internen Notion/Issue-Tracker angelegt — im Code kein TODO nötig.
 
-- **DB**: Die Tabelle `public.wallets` bleibt stehen (die Escalation-Policy wurde bereits gefixt). Kein Migration nötig, kein Datenverlust.
-- **`useTrialAccess`-Umbau**: falls kein zentraler `useSubscription`-Hook existiert, wird die Prüfung direkt gegen die `check-subscription` Edge-Function laufen (mit React-Query Cache), analog zum bestehenden Muster.
-- **RLS**: unverändert. `wallets`-Zugriff bleibt gesperrt für Clients.
-
-## Verifikation
-
-Nach dem Build:
-1. User-Menü: kein „Credits" mehr, kein Balance-Chip.
-2. `/credits` liefert 404 / NotFound.
-3. AI Video Studio zeigt weiterhin Media-Credits-Kosten (aus `ai_video_wallets`).
-4. Keine Upsell-Modals aufgrund von „niedrigem Credit-Stand" mehr.
-5. Console keine Fehler von `useCredits`-Consumern (Hook returned safe defaults).
-6. Feature-Zugang gated nur noch nach Abo-Status (Stripe-Subscription).
-
-## Nicht in diesem Plan
-
-- Löschen der `wallets`-Tabelle (bleibt für Audit-Trail).
-- Refactor der 15+ `useCredits`-Consumer (unnötig — Hook liefert safe defaults).
-- Neue Media-Credit-Chip im Header (kam als Alternative, User hat konservative Option gewählt).
+**Jetzt zu tun: nichts.** Launch-Fokus bleibt.
