@@ -1,53 +1,43 @@
-## Post-Launch: Canva-Alternative als AI Design Studio
 
-Kein Eingriff vor dem 26.07. Feature wird als Backlog-Ticket für Woche 3-4 post-launch dokumentiert.
+## Fix: Custom-Voice („Samuel Dusatko") wird im Studio verworfen + Cast-Default wird nicht als Fallback benutzt
 
-### Entscheidung
+### Root Cause
+`SceneDialogStudio.tsx` verwirft jede Auswahl aus dem Picker, deren `voiceId` ein UUID ist (Row-ID einer geklonten Stimme aus `custom_voices`). Grund: `cleanDialogVoiceCfg` läuft blind durch `cleanVoiceId`, das UUIDs als „ungültig" filtert — der Filter existiert um Provider-Namen wie `sync-3`/`lipsync-2` zu blockieren, trifft aber Custom-Voice-IDs mit.
 
-- **Zeitpunkt**: nach Launch. Vor dem 26.07. bleibt alles wie es ist.
-- **Struktur**: zwei getrennte Studios im Hub:
-  - `AI Text-Studio` (bestehend) → bleibt Caption/Hashtag/Copy-Generator.
-  - `AI Design Studio` (neu) → vollwertiger Bild-mit-Text-Editor.
-- **Editor-Basis**: post-launch final entscheiden (Polotno vs. Fabric.js vs. AI-Composer). Empfehlungs-Reihenfolge nach Kosten/Nutzen: **Polotno SDK** > Fabric.js Eigenbau > AI-Composer.
+Zweiter Layer: Der `default_voice_id` aus Cast & World (via `defaultVoiceByCharId`) wird zwar für den „Brand"-Badge gelesen, aber nie in die effektive Voice-Map (`resolvedVoicePerSpeaker`) übernommen — d. h. wenn du in Cast & World einen Default zuordnest, hilft das im Studio bisher nichts.
 
-### Scope für das AI Design Studio (wenn wir bauen)
+### Änderungen (frontend-only, kein DB-Migrationsbedarf)
 
-**Editor-Kern**
-- Multi-Layer Canvas mit Undo/Redo, Snap-to-Grid, Alignment-Guides.
-- Format-Presets: IG 1:1, IG Story 9:16, Reel 9:16, FB Feed 4:5, YT Thumbnail 16:9, LinkedIn 1.91:1, Print A4, Custom.
-- Text-Layer mit Google-Fonts-Library (bereits im Projekt geladen), Outline, Shadow, Gradient-Fill.
-- Shape-Layer (Rechteck, Kreis, Linie, Pfeil, Sticker/Icon-Set).
-- Bild-Layer mit Crop, Filter, Opacity, Blend-Mode.
+**1) `src/components/video-composer/SceneDialogStudio.tsx` — `cleanDialogVoiceCfg`**
+- Bei `cfg.isCustom === true`: Cfg unverändert durchreichen. Optional: `voiceName` mit "⭐ …" auffüllen wenn leer.
+- Bei `cfg.isCustom !== true`: bisheriger `cleanVoiceId`-Pfad bleibt.
 
-**Plattform-Integration (unabhängig von SDK-Wahl)**
-- **Brand Kit Auto-Load** aus `brand_kits` (Farben/Fonts/Logo) → 1-Klick-Apply.
-- **Media Library Panel** rechts: Studio Bilder + AI-generierte Bilder + Cast Characters direkt einfügbar.
-- **AI-Copy-Button** ruft `AI Text-Studio` inline auf → Headlines/CTAs landen als Text-Layer.
-- **AI-Background-Button** ruft Nano-Banana/Gemini-Image für Hintergrund-Generierung.
-- **Templates**: 15-20 vorgefertigte Ad-Layouts in James-Bond-Ästhetik + User-eigene Templates speicherbar.
-- **Export → Media Library** statt Direkt-Download, damit Calendar/Publisher zugreifen können. PNG/JPG/PDF.
+**2) `src/components/video-composer/SceneDialogStudio.tsx` — `resolvedVoicePerSpeaker` (Zeile 785)**
+- Neuer Fallback in der Kette:
+  `existing (voicePerSpeaker/scene.dialogVoices) → fromSceneRoot (single-speaker) → **brandDefault via defaultVoiceByCharId[sp.id]** → undefined`
+- `brandDefault` als ElevenLabs-Voice via `toElevenLabsDialogVoice(brandDefault, getAutoVoiceName(brandDefault) ?? 'Brand-Stimme', false)` einsetzen.
+- Damit wird die Cast-&-World-Zuordnung endlich als tatsächliche Studio-Voice benutzt (nicht nur als Chip).
 
-**Daten**
-- Neue Tabelle `design_studio_projects` (Name, Canvas-JSON, Thumbnail-URL, Format, Owner).
-- Storage-Bucket `design-studio-assets` mit RLS auf `user_id/{filename}`.
+**3) `src/components/video-composer/SceneDialogStudio.tsx` — Auto-Bind-Effect (Zeile 825)**
+- Der Effect erweitert `patched` nun auch, wenn der neue `chosen` aus dem brandDefault-Fallback kommt — d. h. beim Öffnen einer Szene wird die Cast-&-World-Voice einmal in `voicePerSpeaker` persistiert und an `onUpdate({ dialogVoices })` durchgereicht. Guard bleibt: keine Endlos-Schleife, weil das Custom-Voice-Objekt stabil ist.
 
-### Cost-Rundown (zur späteren Entscheidung)
+**4) `src/components/video-composer/SceneDialogStudio.tsx` — `updateSpeakerVoice` (Zeile 600)**
+- Beim Custom-Voice-Pick zusätzlich `engine: 'elevenlabs'` explizit setzen (bisher nur aus `cur` geerbt) — verhindert, dass ein vorher auf Hume stehender Cfg-Wert die Custom-Voice fälschlich als Hume interpretiert.
 
-| Weg | Setup | Laufend | Time-to-Ship |
-|---|---|---|---|
-| Polotno SDK | 3 Tage | ~90 EUR/Monat | 1 Woche |
-| Fabric.js Eigenbau | 2-3 Wochen | 0 EUR | 3-4 Wochen |
-| AI-Composer | 1 Woche | 0 EUR (AI-Credits) | 1-2 Wochen |
+**5) `src/lib/video-composer/autoVoiceAssignment.ts` — `cleanVoiceId` bleibt unverändert**
+- Bewusst NICHT anfassen: der UUID-Filter hat legitime Zwecke (verhindert, dass Provider-Modell-IDs oder alte `characterVoiceId`-Werte, die versehentlich UUIDs sind, als Voice-IDs interpretiert werden). Der Fix wird gezielt eine Ebene höher in `cleanDialogVoiceCfg` gemacht, wo wir das `isCustom`-Signal kennen.
 
-Bei 1000 Founders = 14,990 EUR Umsatz → 90 EUR = 0,6% Kosten. Polotno ist wirtschaftlich unauffällig.
+### Was das für den User ändert
+- „Samuel Dusatko" (geklonte Stimme) lässt sich im Studio auswählen und bleibt.
+- Cast-&-World-Zuordnung wirkt sofort: neue Szene öffnen → Samuel hat automatisch die zugeordnete Stimme, ohne Nachpicken.
+- Andere Sprecher (Matthew/Sarah/Kailee) verhalten sich unverändert.
 
-### Reihenfolge post-launch
+### Kein Backend-Eingriff nötig
+- Keine Edge-Function-Änderung: `generate-voiceover` und alle Lip-Sync-Dispatcher lesen bereits `cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId` (Zeilen 611, 1035, 1487) — der echte ElevenLabs-Key wird korrekt an ElevenLabs weitergegeben.
+- Keine Migration: `custom_voices`-Schema bleibt gleich.
 
-1. **Woche 1** (nach 26.07.): Heartbeat-Watchdog (bereits geplant).
-2. **Woche 2-3**: Linter-Warnings aufräumen (bereits geplant).
-3. **Woche 3-4**: Design Studio Entscheidung + Kickoff.
-4. **Woche 5-7**: Design Studio MVP live.
-
-### Jetzt zu tun: nichts.
-
-Launch-Fokus bleibt. Ticket ist in `.lovable/plan.md` dokumentiert und wird nach dem 26.07. wieder aufgegriffen.
+### Verifikation nach Umsetzung
+1. In Cast & World Samuel Dusatko die geklonte Stimme zuweisen → Studio öffnen → Samuel-Zeile zeigt Stimmenname + „Brand"-Chip, kein „Setup"-Chip mehr.
+2. Manuell im Picker eine andere Custom-Voice wählen → bleibt persistiert nach Klick (nicht nur Toast).
+3. Preview-Button ▶ auf Samuel → ElevenLabs gibt die Custom-Voice zurück.
+4. „Clip generieren mit Voiceover" → keine „Wähle eine Stimme für …"-Toast mehr.

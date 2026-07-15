@@ -541,6 +541,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const cleanDialogVoiceCfg = (cfg?: DialogVoiceCfg): DialogVoiceCfg | undefined => {
     if (!cfg?.voiceId) return undefined;
     if (cfg.engine === 'hume') return cfg;
+    // Custom cloned voices carry a UUID row-id in cfg.voiceId and the real
+    // ElevenLabs voice id in cfg.elevenlabsVoiceId. cleanVoiceId strips UUIDs
+    // (to catch stray provider tokens), which would incorrectly discard the
+    // pick. Pass them through unchanged — downstream call sites already read
+    // `cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId`.
+    if (cfg.isCustom && cfg.elevenlabsVoiceId) {
+      return { ...cfg, voiceName: cfg.voiceName || '⭐ Custom voice' };
+    }
     const voiceId = cleanVoiceId(cfg.voiceId);
     return voiceId ? { ...cfg, voiceId, voiceName: cfg.voiceName || getAutoVoiceName(voiceId) || voiceId } : undefined;
   };
@@ -603,6 +611,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       ...(cur ?? { engine: 'elevenlabs', voiceId: '' }),
       ...patch,
     };
+    // Custom voices are always ElevenLabs-backed — never keep a stale
+    // engine:'hume' from a prior pick when the user switches to a cloned voice.
+    if (nextCfg.isCustom) nextCfg.engine = 'elevenlabs';
     const next: Record<string, DialogVoiceCfg> = { ...voicePerSpeaker };
     for (const key of getSpeakerAliases(speakerId)) next[key] = nextCfg;
     setVoicePerSpeaker(next);
@@ -797,12 +808,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       const fromSceneRoot = rootVoiceId
         ? toElevenLabsDialogVoice(rootVoiceId, getAutoVoiceName(rootVoiceId), true)
         : undefined;
-      const chosen = existing ?? fromSceneRoot;
+      // Cast & World "default_voice_id" (brand default) — used when nothing was
+      // explicitly picked yet in the studio. Ensures the voice you assigned in
+      // Cast & World is actually spoken, not just displayed as a "Brand" chip.
+      const brandDefaultId = defaultVoiceByCharId[sp.id] ?? defaultVoiceByCharId[lookupId];
+      const fromBrandDefault = brandDefaultId
+        ? toElevenLabsDialogVoice(brandDefaultId, getAutoVoiceName(brandDefaultId) ?? 'Brand voice', false)
+        : undefined;
+      const chosen = existing ?? fromSceneRoot ?? fromBrandDefault;
       if (chosen?.voiceId) out[sp.id] = chosen;
     }
 
     return out;
-  }, [speakers, sceneCast, voicePerSpeaker, scene.dialogVoices, (scene as any).characterVoiceId]);
+  }, [speakers, sceneCast, voicePerSpeaker, scene.dialogVoices, (scene as any).characterVoiceId, defaultVoiceByCharId]);
 
   const resolvedDialogVoiceMap = useMemo<Record<string, DialogVoiceCfg>>(() => {
     const next: Record<string, DialogVoiceCfg> = { ...voicePerSpeaker };
