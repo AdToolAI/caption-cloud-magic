@@ -100,6 +100,11 @@ serve(async (req) => {
       console.log(`🗺️ Found ${fieldMappings.length} field mappings for template`);
     }
 
+    // Founders-Priority: check active founder status (PRO-FOUNDERS-24M, not revoked)
+    const { data: isFounder } = await supabase.rpc('is_active_founder', { _user_id: user.id });
+    const priority = pickPriority(!!isFounder, priorityOverride);
+    const estimatedWorkers = estimateWorkersFromDuration(estimatedDurationSec);
+
     // Insert into queue
     const { data: queueJob, error: insertError } = await supabase
       .from('render_queue')
@@ -109,6 +114,8 @@ serve(async (req) => {
         template_id: templateId,
         config: preparedConfig,
         priority,
+        is_founder: !!isFounder,
+        estimated_workers: estimatedWorkers,
         engine,
         estimated_cost: estimatedCost,
         estimated_duration_sec: estimatedDurationSec,
