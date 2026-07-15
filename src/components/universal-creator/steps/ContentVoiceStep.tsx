@@ -58,6 +58,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
   const [selectedLanguage, setSelectedLanguage] = useState<string>(language === 'en' ? 'en' : 'de');
   const [showScriptGenerator, setShowScriptGenerator] = useState(false);
   const [useVoiceover, setUseVoiceover] = useState(value?.useVoiceover !== false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>({
     voiceId: '9BWtsMINqrJLrRacOk9x',
