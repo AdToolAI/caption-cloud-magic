@@ -611,14 +611,18 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       ...(cur ?? { engine: 'elevenlabs', voiceId: '' }),
       ...patch,
     };
-    const nextCfg: DialogVoiceCfg = {
-      ...(cur ?? { engine: 'elevenlabs', voiceId: '' }),
-      ...patch,
-    };
     // Custom voices are always ElevenLabs-backed — never keep a stale
     // engine:'hume' from a prior pick when the user switches to a cloned voice.
     if (nextCfg.isCustom) nextCfg.engine = 'elevenlabs';
     const next: Record<string, DialogVoiceCfg> = { ...voicePerSpeaker };
+    for (const key of getSpeakerAliases(speakerId)) next[key] = nextCfg;
+    setVoicePerSpeaker(next);
+    const nextCharacterVoiceId =
+      speakers.length === 1 && nextCfg.engine === 'elevenlabs'
+        ? cleanVoiceId(nextCfg.isCustom ? nextCfg.elevenlabsVoiceId : nextCfg.voiceId)
+        : undefined;
+    onUpdate({
+      dialogVoices: next,
       ...(nextCharacterVoiceId ? { characterVoiceId: nextCharacterVoiceId } : {}),
     });
   };
