@@ -15,6 +15,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { VoiceCloneDialog } from '@/components/voice/VoiceCloneDialog';
+import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
+import { Library } from 'lucide-react';
 
 interface AIVoiceOverProps {
   settings: {
