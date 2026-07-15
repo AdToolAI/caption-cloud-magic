@@ -22,6 +22,7 @@ import {
 
 import { ModelSelector } from './ModelSelector';
 import AIVideoCostConfirmDialog, { type AIVideoCostConfirmPayload } from './AIVideoCostConfirmDialog';
+import { FounderPriorityChip } from '@/components/render/FounderPriorityChip';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import {
   ToolkitCastWorldPicker,
