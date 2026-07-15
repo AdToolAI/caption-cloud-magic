@@ -5,6 +5,7 @@ import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { pickRenderTier } from "../_shared/render-concurrency.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -712,6 +713,10 @@ serve(async (req) => {
       // explicit small framesPerLambda. Static (image/gradient/color) renders keep
       // the conservative stability path.
       ...(() => {
+        // Beta-Launch Concurrency Policy (Lambda quota=100, 60-slot render pool):
+        //   tiered maxWorkers 3/5/8/12 by frame count, minimum framesPerLambda=120.
+        // External MP4 backgrounds (Pixabay etc.) still need distributed mode; when
+        // present we bump the tier by one to keep 600s Lambda timeout safe.
         const scenes = Array.isArray((sanitizedCustomizations as any)?.scenes)
           ? (sanitizedCustomizations as any).scenes
           : [];
@@ -721,21 +726,25 @@ serve(async (req) => {
           const isAnim = s?.useAnimation === true && typeof s?.animatedVideoUrl === 'string' && /^https?:\/\//i.test(s.animatedVideoUrl);
           return n + (isExt ? 1 : 0) + (isAnim ? 1 : 0);
         }, 0);
+
+        const tier = pickRenderTier(durationInFrames);
         const hasExternalVideos = externalVideoCount > 0;
+
         if (hasExternalVideos) {
-          // Target ~5 workers, min 80 / max 200 fpl. For 600 frames → 120 fpl → 5λ.
-          const targetWorkers = 5;
-          const fpl = Math.max(80, Math.min(200, Math.ceil(durationInFrames / targetWorkers)));
-          console.log(`🎞️ External video scenes detected (${externalVideoCount}) — distributed scheduling, framesPerLambda=${fpl}, estWorkers=${Math.ceil(durationInFrames / fpl)}`);
+          // Distributed mode: recompute framesPerLambda from tier target for
+          // small parallel chunks. Cap workers to tier.maxWorkers.
+          const fpl = Math.max(120, Math.min(200, Math.ceil(durationInFrames / tier.maxWorkers)));
+          console.log(`🎞️ External video scenes (${externalVideoCount}) — tier=${tier.label}, maxWorkers=${tier.maxWorkers}, framesPerLambda=${fpl}`);
           return {
             _schedulingMode: 'distributed' as const,
             framesPerLambda: fpl,
             timeoutInMilliseconds: 600000,
           };
         }
-        console.log('🖼️ No external video scenes — using stability scheduling');
+        console.log(`🖼️ Static render — tier=${tier.label}, maxWorkers=${tier.maxWorkers}, framesPerLambda=${tier.framesPerLambda}`);
         return {
-          _schedulingMode: 'stability' as const,
+          _schedulingMode: 'tiered' as const,
+          framesPerLambda: tier.framesPerLambda,
           timeoutInMilliseconds: 600000,
         };
       })(),

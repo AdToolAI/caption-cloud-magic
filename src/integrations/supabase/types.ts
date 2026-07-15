@@ -12239,7 +12239,9 @@ export type Database = {
           error_message: string | null
           estimated_cost: number
           estimated_duration_sec: number | null
+          estimated_workers: number
           id: string
+          is_founder: boolean
           max_retries: number | null
           output_url: string | null
           priority: number | null
@@ -12261,7 +12263,9 @@ export type Database = {
           error_message?: string | null
           estimated_cost: number
           estimated_duration_sec?: number | null
+          estimated_workers?: number
           id?: string
+          is_founder?: boolean
           max_retries?: number | null
           output_url?: string | null
           priority?: number | null
@@ -12283,7 +12287,9 @@ export type Database = {
           error_message?: string | null
           estimated_cost?: number
           estimated_duration_sec?: number | null
+          estimated_workers?: number
           id?: string
+          is_founder?: boolean
           max_retries?: number | null
           output_url?: string | null
           priority?: number | null
@@ -18117,6 +18123,7 @@ export type Database = {
         Args: { date_param: string; user_id_param: string }
         Returns: number
       }
+      is_active_founder: { Args: { _user_id: string }; Returns: boolean }
       is_founder_active: { Args: { _user_id: string }; Returns: boolean }
       is_workspace_admin: {
         Args: { _user_id: string; _workspace_id: string }
@@ -18211,6 +18218,7 @@ export type Database = {
         Args: { _holder: string; _pass_idx?: number; _scene_id: string }
         Returns: undefined
       }
+      render_queue_running_workers: { Args: never; Returns: number }
       replace_composer_scene_with_children: {
         Args: {
           p_children: Json

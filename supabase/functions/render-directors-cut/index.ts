@@ -6,6 +6,7 @@ import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-p
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { pickRenderTier } from "../_shared/render-concurrency.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -724,13 +725,17 @@ serve(async (req) => {
           payload: JSON.stringify(finalInputProps),
         };
 
-        // QA stability mode: pin to 1 Lambda worker by setting framesPerLambda
-        // = total durationInFrames. Avoids AWS concurrency collisions in Deep Sweep.
-        const stabilityFpl = (qa_stability_mode || max_lambda_workers === 1)
-          ? Math.max(durationInFrames, 1)
-          : undefined;
-        if (stabilityFpl) {
-          console.log(`[RenderDirectorsCut] 🛡️ QA stability mode active — single-Lambda render (framesPerLambda=${stabilityFpl})`);
+        // Concurrency policy: QA stability mode pins to 1 Lambda worker.
+        // Otherwise use tiered maxWorkers 3/5/8/12 → framesPerLambda (min 120)
+        // so exports share the 60-slot Lambda pool with concurrent renders.
+        let effectiveFpl: number | undefined;
+        if (qa_stability_mode || max_lambda_workers === 1) {
+          effectiveFpl = Math.max(durationInFrames, 1);
+          console.log(`[RenderDirectorsCut] 🛡️ QA stability — single-Lambda (framesPerLambda=${effectiveFpl})`);
+        } else {
+          const tier = pickRenderTier(durationInFrames);
+          effectiveFpl = tier.framesPerLambda;
+          console.log(`[RenderDirectorsCut] 🎬 tier=${tier.label}, maxWorkers=${tier.maxWorkers}, framesPerLambda=${effectiveFpl}`);
         }
 
         const lambdaPayload = normalizeStartPayload({
@@ -741,7 +746,7 @@ serve(async (req) => {
           codec: format === 'webm' ? 'vp8' : 'h264',
           imageFormat: 'jpeg',
           maxRetries: 1,
-          ...(stabilityFpl ? { framesPerLambda: stabilityFpl } : {}),
+          ...(effectiveFpl ? { framesPerLambda: effectiveFpl } : {}),
           privacy: 'public',
           bucketName: DEFAULT_BUCKET_NAME,
           durationInFrames,

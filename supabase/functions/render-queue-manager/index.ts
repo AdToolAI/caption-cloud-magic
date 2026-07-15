@@ -1,135 +1,134 @@
+// render-queue-manager
+// Tick scheduler for the render queue. Runs every ~10s via pg_cron.
+// Enforces a global Lambda-slot budget (default 60) shared across all users.
+// Founders (priority=3) jump ahead of standard beta users (priority=5).
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
-import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { RENDER_SLOT_BUDGET_DEFAULT } from "../_shared/render-concurrency.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
+const STALE_MINUTES = 15;
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "render-queue-manager" });
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  const result = { dispatched: 0 as number, staleReclaimed: 0 as number, slotsUsed: 0, slotBudget: RENDER_SLOT_BUDGET_DEFAULT, enabled: true };
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // 1. Feature flag + slot budget from system_config (single source of truth).
+    const { data: cfgRows } = await supabase
+      .from('system_config')
+      .select('key,value')
+      .in('key', ['render_queue_enabled', 'render_queue_slot_budget']);
 
-    console.log('🎬 Queue Manager: Processing queue...');
+    const cfg = new Map((cfgRows ?? []).map((r: any) => [r.key, r.value]));
+    const enabled = cfg.get('render_queue_enabled') !== false;
+    const slotBudget = Number(cfg.get('render_queue_slot_budget') ?? RENDER_SLOT_BUDGET_DEFAULT) || RENDER_SLOT_BUDGET_DEFAULT;
+    result.enabled = enabled;
+    result.slotBudget = slotBudget;
 
-    // Get next job to process (highest priority, oldest first)
-    const { data: nextJob, error: fetchError } = await supabase
+    if (!enabled) {
+      return json({ ...result, message: 'render_queue disabled (feature flag)' });
+    }
+
+    // 2. Reclaim stale running jobs — fail-safe if a render never called back.
+    const staleCutoff = new Date(Date.now() - STALE_MINUTES * 60_000).toISOString();
+    const { data: staleJobs } = await supabase
       .from('render_queue')
-      .select('*')
+      .select('id,user_id')
+      .in('status', ['processing', 'rendering'])
+      .lt('started_at', staleCutoff);
+
+    for (const job of staleJobs ?? []) {
+      await supabase.from('render_queue').update({
+        status: 'failed',
+        error_message: `Stale after ${STALE_MINUTES}m — auto-reclaimed by scheduler`,
+        completed_at: new Date().toISOString(),
+      }).eq('id', job.id);
+      result.staleReclaimed++;
+    }
+
+    // 3. Current slot usage after reclaim.
+    const { data: usage } = await supabase.rpc('render_queue_running_workers');
+    let used = Number(usage ?? 0);
+    result.slotsUsed = used;
+
+    if (used >= slotBudget) {
+      return json({ ...result, message: 'slot budget saturated — no dispatch this tick' });
+    }
+
+    // 4. Fetch queued jobs by priority then age; dispatch until budget hit.
+    const { data: queued } = await supabase
+      .from('render_queue')
+      .select('id,user_id,project_id,template_id,config,engine,estimated_workers,priority,is_founder,estimated_duration_sec')
       .eq('status', 'queued')
       .order('priority', { ascending: true })
       .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .limit(20);
 
-    if (fetchError) {
-      throw new Error(`Failed to fetch queue: ${fetchError.message}`);
-    }
+    for (const job of queued ?? []) {
+      const need = Math.max(1, Number(job.estimated_workers ?? 5));
+      if (used + need > slotBudget) continue; // skip; a smaller job later may still fit
 
-    if (!nextJob) {
-      console.log('✅ Queue is empty');
-      return new Response(
-        JSON.stringify({ message: 'Queue is empty', processed: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`🎯 Processing job ${nextJob.id} for user ${nextJob.user_id}`);
-
-    console.log(`🚀 Triggering render for job ${nextJob.id}...`);
-
-    // Trigger actual render process
-    const { error: renderError } = await supabase.functions.invoke(
-      'process-video-render',
-      {
-        body: { job: nextJob }
-      }
-    );
-
-    if (renderError) {
-      console.error(`❌ Failed to trigger render: ${renderError.message}`);
-      
-      // Mark as failed
-      await supabase
+      // Claim the slot atomically (only dispatch if still queued).
+      const { data: claimed, error: claimErr } = await supabase
         .from('render_queue')
         .update({
-          status: 'failed',
-          error_message: renderError.message,
-          completed_at: new Date().toISOString()
+          status: 'processing',
+          started_at: new Date().toISOString(),
         })
-        .eq('id', nextJob.id);
+        .eq('id', job.id)
+        .eq('status', 'queued')
+        .select('id')
+        .maybeSingle();
 
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: renderError.message 
-        }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      if (claimErr || !claimed) continue;
+
+      used += need;
+      result.dispatched++;
+
+      // Fire-and-forget: hand off to render pipeline. Failures are reported back
+      // by the render function itself; we don't await here so one slow user
+      // can't stall the whole tick.
+      supabase.functions.invoke('process-video-render', { body: { job } }).then((r) => {
+        if (r.error) {
+          console.error(`[queue-tick] job ${job.id} dispatch failed:`, r.error);
+          void supabase.from('render_queue').update({
+            status: 'failed',
+            error_message: `Dispatch error: ${r.error.message ?? 'unknown'}`,
+            completed_at: new Date().toISOString(),
+          }).eq('id', job.id);
         }
-      );
+      }).catch((e) => {
+        console.error(`[queue-tick] job ${job.id} threw:`, e);
+      });
     }
 
-    // Update queue stats
-    const today = new Date().toISOString().split('T')[0];
-    const { data: stats } = await supabase
-      .from('render_queue_stats')
-      .select('*')
-      .eq('date', today)
-      .eq('engine', nextJob.engine)
-      .maybeSingle();
-
-    if (stats) {
-      await supabase
-        .from('render_queue_stats')
-        .update({
-          total_jobs: (stats.total_jobs || 0) + 1,
-          peak_queue_size: Math.max((stats.peak_queue_size || 0), 1)
-        })
-        .eq('id', stats.id);
-    } else {
-      await supabase
-        .from('render_queue_stats')
-        .insert({
-          date: today,
-          engine: nextJob.engine,
-          total_jobs: 1,
-          peak_queue_size: 1
-        });
-    }
-
-    console.log(`✅ Job ${nextJob.id} marked as processing`);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        jobId: nextJob.id,
-        status: 'processing',
-        message: 'Job is being processed'
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('❌ Error in queue manager:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    result.slotsUsed = used;
+    return json(result);
+  } catch (err) {
+    console.error('[queue-tick] fatal:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return json({ ...result, error: message }, 500);
   }
 });
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}

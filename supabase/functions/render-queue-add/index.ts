@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { estimateWorkersFromDuration, pickPriority } from "../_shared/render-concurrency.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,13 +33,13 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { 
-      projectId, 
-      templateId, 
-      config, 
-      priority = 5, 
+    const {
+      projectId,
+      templateId,
+      config,
+      priority: priorityOverride,
       engine = 'auto',
-      estimatedDurationSec 
+      estimatedDurationSec
     } = await req.json();
 
     if (!projectId) {
@@ -99,6 +100,11 @@ serve(async (req) => {
       console.log(`🗺️ Found ${fieldMappings.length} field mappings for template`);
     }
 
+    // Founders-Priority: check active founder status (PRO-FOUNDERS-24M, not revoked)
+    const { data: isFounder } = await supabase.rpc('is_active_founder', { _user_id: user.id });
+    const priority = pickPriority(!!isFounder, priorityOverride);
+    const estimatedWorkers = estimateWorkersFromDuration(estimatedDurationSec);
+
     // Insert into queue
     const { data: queueJob, error: insertError } = await supabase
       .from('render_queue')
@@ -108,6 +114,8 @@ serve(async (req) => {
         template_id: templateId,
         config: preparedConfig,
         priority,
+        is_founder: !!isFounder,
+        estimated_workers: estimatedWorkers,
         engine,
         estimated_cost: estimatedCost,
         estimated_duration_sec: estimatedDurationSec,
@@ -120,14 +128,24 @@ serve(async (req) => {
       throw new Error(`Failed to add to queue: ${insertError.message}`);
     }
 
-    console.log(`✅ Job added to queue: ${queueJob.id} for user ${user.id}`);
+    console.log(`✅ Job added to queue: ${queueJob.id} for user ${user.id} (priority=${priority}, workers=${estimatedWorkers}, founder=${!!isFounder})`);
+
+    // Compute queue position (jobs ahead: higher priority OR same priority but older).
+    const { count: aheadCount } = await supabase
+      .from('render_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'queued')
+      .or(`priority.lt.${priority},and(priority.eq.${priority},created_at.lt.${queueJob.created_at})`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         jobId: queueJob.id,
         estimatedCost,
-        position: 'calculating...'
+        priority,
+        isFounder: !!isFounder,
+        estimatedWorkers,
+        position: (aheadCount ?? 0) + 1,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
