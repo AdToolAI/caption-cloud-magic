@@ -26,6 +26,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
 import { ConciergeTipHost } from "@/components/ai-companion/ConciergeTipHost";
+import { ConciergeIntroScreen } from "@/components/ai-companion/ConciergeIntroScreen";
 
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist";
 import { ProductTour } from "@/components/onboarding/ProductTour";
@@ -398,6 +399,7 @@ const AppContent = () => {
                 <CommandPalette />
                 <AICompanionWidget />
                 <ConciergeTipHost />
+                <ConciergeIntroScreen />
                 <UpgradeMount />
                 <EmailVerificationGate>
                   <AppLayout />

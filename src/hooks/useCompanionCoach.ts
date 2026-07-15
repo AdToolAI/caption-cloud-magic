@@ -25,6 +25,16 @@ import {
   type TriggerDefinition,
 } from '@/lib/companion/triggerRegistry';
 
+export type RevealMode = 'whisper' | 'spotlight' | 'ovation';
+
+function revealModeFor(trigger: TriggerDefinition): RevealMode {
+  if (trigger.category === 'milestone') return 'ovation';
+  if (trigger.key === 'intent.wallet.low' || trigger.key === 'intent.errors.streak') {
+    return 'spotlight';
+  }
+  return 'whisper';
+}
+
 export interface ActiveTip {
   trigger: TriggerDefinition;
   title: string;
@@ -32,6 +42,7 @@ export interface ActiveTip {
   cta?: string;
   ctaHref?: string;
   persona: PersonaProfile;
+  revealMode: RevealMode;
 }
 
 type Locale = 'de' | 'en' | 'es';
@@ -52,6 +63,8 @@ export function useCompanionCoach() {
   const [pace, setPace] = useState<LearningPace>(DEFAULT_LEARNING_PACE);
   const [activeTip, setActiveTip] = useState<ActiveTip | null>(null);
   const [paused, setPaused] = useState(false);
+  const [conciergeCompleted, setConciergeCompleted] = useState<boolean | null>(null);
+  const [primaryGoal, setPrimaryGoal] = useState<string | null>(null);
   const historyRef = useRef<Map<string, { shown_at: string; dismissed_at: string | null }>>(
     new Map(),
   );
@@ -80,6 +93,10 @@ export function useCompanionCoach() {
         if (typeof p.coach_paused_until === 'string') {
           setPaused(new Date(p.coach_paused_until).getTime() > Date.now());
         }
+        setConciergeCompleted(Boolean(p.concierge_completed));
+        if (typeof p.primary_goal === 'string') setPrimaryGoal(p.primary_goal);
+      } else if (!cancelled) {
+        setConciergeCompleted(false);
       }
 
       const since = new Date();
@@ -164,6 +181,7 @@ export function useCompanionCoach() {
         cta: copy.cta,
         ctaHref: copy.ctaHref,
         persona,
+        revealMode: revealModeFor(trigger),
       });
 
       // Persist fire — fire-and-forget, error is non-fatal
@@ -251,6 +269,39 @@ export function useCompanionCoach() {
     [user],
   );
 
+  const completeConcierge = useCallback(
+    async (choice: { pace: LearningPace; primaryGoal: string }) => {
+      setPace(choice.pace);
+      setPrimaryGoal(choice.primaryGoal);
+      setConciergeCompleted(true);
+      if (!user) return;
+      const { data: existing } = await supabase
+        .from('companion_user_preferences')
+        .select('id, preferences')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const nextPrefs = {
+        ...((existing?.preferences as Record<string, unknown>) ?? {}),
+        learning_pace: choice.pace,
+        primary_goal: choice.primaryGoal,
+        concierge_completed: true,
+        concierge_completed_at: new Date().toISOString(),
+      };
+      if (existing) {
+        await supabase
+          .from('companion_user_preferences')
+          .update({ preferences: nextPrefs, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id);
+      } else {
+        await supabase.from('companion_user_preferences').insert({
+          user_id: user.id,
+          preferences: nextPrefs,
+        });
+      }
+    },
+    [user],
+  );
+
   return {
     pace,
     persona,
@@ -259,6 +310,9 @@ export function useCompanionCoach() {
     dismiss,
     convert,
     setLearningPace,
+    completeConcierge,
+    conciergeCompleted,
+    primaryGoal,
     paused,
     triggerRegistry: TRIGGER_REGISTRY,
   };
