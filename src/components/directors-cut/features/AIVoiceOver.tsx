@@ -467,6 +467,21 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           }
         }}
       />
+
+      <UniversalVoiceLibraryPicker
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        language={selectedLanguageTab}
+        currentVoiceId={settings.voiceId}
+        title="Voice-Bibliothek – Director's Cut"
+        enforceNative
+        onSelect={(voice) => {
+          // Merge into local voices list so downstream lookups (name / recommended_model) work.
+          setVoices((prev) => (prev.find((v) => v.id === voice.id) ? prev : [voice, ...prev]));
+          handleVoiceSelect(voice.id);
+          setLibraryOpen(false);
+        }}
+      />
     </Card>
   );
 }
