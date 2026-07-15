@@ -280,35 +280,35 @@ export function AIToolsSidebarExpanded({
 
           {/* Music Tab */}
           <TabsContent value="music" className="m-0 space-y-3">
-            <Input placeholder="Musik suchen..." className="text-sm" />
-            
-            <div className="space-y-2">
-              {SAMPLE_MUSIC.map(music => (
-                <motion.div
-                  key={music.id}
-                  className="p-2 rounded-lg border bg-card/50 hover:bg-card cursor-pointer group"
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => handleAddMusic(music)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{music.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {music.genre} • {Math.floor(music.duration / 60)}:{(music.duration % 60).toString().padStart(2, '0')}
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
+            <div className="rounded-lg border bg-card/50 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Music className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Music Library</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Durchsuche die volle Bibliothek (Jamendo, Pixabay, deine Uploads & KI-generierte Tracks).
+              </p>
+              <Button size="sm" className="w-full gap-2" onClick={() => setMusicBrowserOpen(true)}>
+                <Music className="h-4 w-4" />
+                Bibliothek öffnen
+              </Button>
             </div>
 
-            <Button variant="outline" size="sm" className="w-full gap-2">
-              <Upload className="h-4 w-4" />
-              Musik hochladen
-            </Button>
+            <div className="pt-2 border-t space-y-2">
+              <Label className="text-xs">Zuletzt hinzugefügt</Label>
+              {audioTracks
+                .find((t) => t.id === 'track-music')
+                ?.clips?.slice(-3)
+                .reverse()
+                .map((clip) => (
+                  <div key={clip.id} className="p-2 rounded-lg border bg-card/50 text-xs">
+                    <div className="font-medium truncate">{clip.name}</div>
+                    <div className="text-muted-foreground">
+                      {Math.floor(clip.duration / 60)}:{Math.floor(clip.duration % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                )) ?? <p className="text-xs text-muted-foreground italic">Noch keine Musik hinzugefügt.</p>}
+            </div>
           </TabsContent>
 
           {/* SFX Tab */}
