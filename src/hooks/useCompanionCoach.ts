@@ -25,6 +25,16 @@ import {
   type TriggerDefinition,
 } from '@/lib/companion/triggerRegistry';
 
+export type RevealMode = 'whisper' | 'spotlight' | 'ovation';
+
+function revealModeFor(trigger: TriggerDefinition): RevealMode {
+  if (trigger.category === 'milestone') return 'ovation';
+  if (trigger.key === 'intent.wallet.low' || trigger.key === 'intent.errors.streak') {
+    return 'spotlight';
+  }
+  return 'whisper';
+}
+
 export interface ActiveTip {
   trigger: TriggerDefinition;
   title: string;
@@ -32,6 +42,7 @@ export interface ActiveTip {
   cta?: string;
   ctaHref?: string;
   persona: PersonaProfile;
+  revealMode: RevealMode;
 }
 
 type Locale = 'de' | 'en' | 'es';
