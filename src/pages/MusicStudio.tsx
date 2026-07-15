@@ -209,7 +209,7 @@ export default function MusicStudio() {
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">Engine wählen</Label>
-                    <ProviderSelector value={tier} onChange={setTier} currencySymbol={currencySymbol} disabled={loading} />
+                    <ProviderSelector value={engineId} onChange={setEngineId} currencySymbol={currencySymbol} disabled={loading} />
                   </div>
                   <Button
                     type="button"
