@@ -23,7 +23,7 @@ export interface MusicEngine {
   maxDuration: number;   // seconds
   priceEur: number;      // retail (3x margin)
   languages: MusicLanguage[]; // empty = instrumental-only
-  route: 'replicate' | 'direct-elevenlabs' | 'direct-stability' | 'direct-lyria';
+  route: 'replicate';
   replicateModel?: string;
   order: number;
   badge?: string;        // e.g. "NEW"
@@ -85,24 +85,6 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     replicateModel: 'stability-ai/stable-audio-2.5',
     order: 10,
   },
-  'stable-audio-3-large': {
-    id: 'stable-audio-3-large',
-    label: 'Adaptive Large',
-    provider: 'Stable Audio 3.0 Large',
-    subtitle: 'Höchste Instrumental-Qualität',
-    description: 'Stability AI Direct — polished cinematic instrumentals, bis 3 min.',
-    vocals: false,
-    requiresLyrics: false,
-    supportsInstrumentalToggle: false,
-    supportsLoop: false,
-    supportsStyleField: false,
-    maxDuration: 190,
-    priceEur: 0.18,
-    languages: [],
-    route: 'direct-stability',
-    order: 20,
-    badge: 'NEU',
-  },
   'minimax-15': {
     id: 'minimax-15',
     label: 'Vocal Mini',
@@ -135,7 +117,8 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     maxDuration: 300,
     priceEur: 0.36,
     languages: EL_LANGS,
-    route: 'direct-elevenlabs',
+    route: 'replicate',
+    replicateModel: 'elevenlabs/music',
     order: 40,
     badge: '⭐ TOP',
   },
@@ -143,20 +126,20 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     id: 'lyria-3-pro',
     label: 'Vocal Pro',
     provider: 'Google Lyria 3 Pro',
-    subtitle: 'Google Preview',
-    description: 'Google Vertex AI Lyria 3 Pro — radio-nahe Vocal-Qualität. Preview-Access nötig.',
+    subtitle: 'Google – bis 3 Min.',
+    description: 'Google Lyria 3 Pro über Replicate — radio-nahe Vocal-Qualität, Songs bis ~3 Min.',
     vocals: true,
-    requiresLyrics: true,
+    requiresLyrics: false,
     supportsInstrumentalToggle: true,
     supportsLoop: false,
     supportsStyleField: false,
-    maxDuration: 60,
+    maxDuration: 180,
     priceEur: 0.42,
     languages: LYRIA_LANGS,
-    route: 'direct-lyria',
+    route: 'replicate',
+    replicateModel: 'google/lyria-3-pro',
     order: 50,
-    badge: 'PREVIEW',
-    comingSoon: true,
+    badge: 'NEU',
   },
 };
 
@@ -169,13 +152,14 @@ export const ENGINE_ORDER: MusicEngineId[] = Object.values(ENGINE_CATALOG)
 
 // Map legacy tier IDs (quick/adaptive/standard/vocal/pro) to new engine IDs.
 export const LEGACY_TIER_ALIAS: Record<string, MusicEngineId> = {
-  quick:                 'stable-audio-3-large',
-  adaptive:              'stable-audio-25',
-  standard:              'elevenlabs-music-v2',
-  vocal:                 'minimax-15',
-  pro:                   'elevenlabs-music-v2',
-  'suno-v5':             'elevenlabs-music-v2',
-  'stable-audio-open-2': 'stable-audio-3-large',
+  quick:                  'stable-audio-25',
+  adaptive:               'stable-audio-25',
+  standard:               'elevenlabs-music-v2',
+  vocal:                  'minimax-15',
+  pro:                    'elevenlabs-music-v2',
+  'suno-v5':              'elevenlabs-music-v2',
+  'stable-audio-open-2':  'stable-audio-25',
+  'stable-audio-3-large': 'elevenlabs-music-v2',
 };
 
 
