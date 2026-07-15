@@ -541,6 +541,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const cleanDialogVoiceCfg = (cfg?: DialogVoiceCfg): DialogVoiceCfg | undefined => {
     if (!cfg?.voiceId) return undefined;
     if (cfg.engine === 'hume') return cfg;
+    // Custom cloned voices carry a UUID row-id in cfg.voiceId and the real
+    // ElevenLabs voice id in cfg.elevenlabsVoiceId. cleanVoiceId strips UUIDs
+    // (to catch stray provider tokens), which would incorrectly discard the
+    // pick. Pass them through unchanged — downstream call sites already read
+    // `cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId`.
+    if (cfg.isCustom && cfg.elevenlabsVoiceId) {
+      return { ...cfg, voiceName: cfg.voiceName || '⭐ Custom voice' };
+    }
     const voiceId = cleanVoiceId(cfg.voiceId);
     return voiceId ? { ...cfg, voiceId, voiceName: cfg.voiceName || getAutoVoiceName(voiceId) || voiceId } : undefined;
   };
