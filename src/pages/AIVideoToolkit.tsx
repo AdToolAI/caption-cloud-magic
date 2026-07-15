@@ -25,6 +25,7 @@ import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurcha
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
 import { AIVideoDisclaimer } from '@/components/ai-video/AIVideoDisclaimer';
 import { FirstVideoGuide } from '@/components/ai-video/FirstVideoGuide';
+import { SystemLoadPill } from '@/components/render/SystemLoadPill';
 
 const particles = [
   { x: '10%', y: '20%', size: 4, delay: 0,    dur: 6 },
