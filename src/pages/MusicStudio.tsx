@@ -136,72 +136,110 @@ export default function MusicStudio() {
         <meta name="description" content="Generate cinematic background music, social-ready hooks, and full songs with vocals using Stable Audio 2.5, MiniMax Music, MusicGen and ElevenLabs — all in one studio." />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#080a1f] to-[#050816] text-foreground">
-        {/* Hero */}
-        <div className="relative border-b border-primary/10 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,hsl(var(--primary)/0.12),transparent_60%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,hsl(var(--primary)/0.08),transparent_60%)]" />
-          <div className="relative max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/30 flex items-center justify-center backdrop-blur-sm">
-                  <Music2 className="h-5 w-5 text-primary" />
-                </div>
-                <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
-                  Native Music Library
-                </Badge>
-              </div>
-              <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-foreground via-primary to-foreground/80 bg-clip-text text-transparent">
-                Music Studio
-              </h1>
-              <p className="text-muted-foreground mt-2 max-w-xl">
-                Fünf KI-Engines für Background-Loops, polierte Instrumentals und Songs mit Vocals — alles in einem Studio.
-              </p>
-            </motion.div>
+      <div className="relative min-h-screen bg-gradient-to-br from-[#050816] via-[#080a1f] to-[#050816] text-foreground overflow-hidden">
+        {/* Film-grain overlay */}
+        <div
+          className="pointer-events-none fixed inset-0 opacity-[0.035] mix-blend-overlay z-0"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+          }}
+        />
 
-            <Card className="px-5 py-3 bg-background/50 backdrop-blur-md border-primary/20 flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-primary" />
-                <div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Wallet</div>
-                  <div className="font-mono text-lg font-semibold text-foreground">
-                    {currencySymbol}{balance.toFixed(2)}
+        {/* Hero */}
+        <div className="relative border-b border-primary/10 overflow-hidden z-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,hsl(var(--primary)/0.14),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,hsl(var(--primary)/0.09),transparent_60%)]" />
+          <div className="relative max-w-7xl mx-auto px-6 pt-10 pb-6">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="flex-1 min-w-0"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/30 flex items-center justify-center backdrop-blur-sm">
+                    <Music2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <Badge variant="outline" className="border-primary/40 text-primary text-[10px] tracking-widest">
+                    MASTERING SUITE
+                  </Badge>
+                  <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-400/80">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                    </span>
+                    On Air
+                  </span>
+                </div>
+                <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-foreground via-primary to-foreground/80 bg-clip-text text-transparent">
+                  Music Studio
+                </h1>
+                <p className="text-muted-foreground mt-2 max-w-xl">
+                  Fünf KI-Engines für Background-Loops, polierte Instrumentals und Songs mit Vocals — alles in einem Studio.
+                </p>
+              </motion.div>
+
+              <Card className="px-5 py-3 bg-background/50 backdrop-blur-md border-primary/25 flex items-center gap-4 shrink-0 shadow-[0_10px_40px_-20px_hsl(var(--primary)/0.4)]">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Wallet</div>
+                    <div className="font-mono text-lg font-semibold text-foreground tabular-nums">
+                      {currencySymbol}{balance.toFixed(2)}
+                    </div>
                   </div>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-primary/40 text-primary hover:bg-primary/10"
+                  onClick={() => navigate('/ai-video-purchase-credits')}
+                >
+                  Aufladen
+                </Button>
+              </Card>
+            </div>
+
+            {/* Now-playing waveform strip */}
+            <div className="mt-6 relative rounded-xl border border-primary/15 bg-background/40 backdrop-blur-md px-5 py-3 overflow-hidden">
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.06),transparent)]" />
+              <div className="relative flex items-center gap-4">
+                <div className="flex items-center gap-2 shrink-0">
+                  <Radio className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {loading ? 'Rendering' : lastTrack ? 'Last Master' : 'Idle Bus'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <StudioWaveform bars={72} active={loading} height={40} />
+                </div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground shrink-0 hidden md:block">
+                  {engine.provider} · {maxDur}s cap
+                </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-primary/40 text-primary hover:bg-primary/10"
-                onClick={() => navigate('/ai-video-purchase-credits')}
-              >
-                Aufladen
-              </Button>
-            </Card>
+            </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
           <Tabs defaultValue="generate" className="w-full">
-            <TabsList className="bg-background/40 backdrop-blur-md border border-primary/15 p-1 mb-6">
-              <TabsTrigger value="generate" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+            <TabsList className="relative bg-background/40 backdrop-blur-md border border-primary/15 p-1 mb-6 rounded-lg shadow-[inset_0_1px_0_hsl(var(--primary)/0.08)]">
+              <TabsTrigger value="generate" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Sparkles className="h-3.5 w-3.5" /> Generate
               </TabsTrigger>
-              <TabsTrigger value="tracks" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="tracks" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Library className="h-3.5 w-3.5" /> Meine Tracks
               </TabsTrigger>
-              <TabsTrigger value="stock" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="stock" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Search className="h-3.5 w-3.5" /> Stock-Suche
               </TabsTrigger>
-              <TabsTrigger value="beat" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="beat" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Activity className="h-3.5 w-3.5" /> Beat-Sync
               </TabsTrigger>
-              <TabsTrigger value="licensed" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="licensed" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Lock className="h-3.5 w-3.5" /> Lizenziert
               </TabsTrigger>
             </TabsList>
