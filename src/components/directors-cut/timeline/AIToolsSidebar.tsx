@@ -318,63 +318,23 @@ export function AIToolsSidebar({
           
           {/* Music Tab */}
           <TabsContent value="music" className="p-4 space-y-4 mt-0">
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={musicSearch}
-                  onChange={(e) => setMusicSearch(e.target.value)}
-                  placeholder="Musik suchen..."
-                  className="pl-9 h-9 text-sm"
-                />
-              </div>
-              
-              <div className="flex flex-wrap gap-1">
-                {['all', 'Corporate', 'Ambient', 'Cinematic', 'Acoustic'].map(genre => (
-                  <Badge
-                    key={genre}
-                    variant={selectedGenre === genre ? 'default' : 'outline'}
-                    className="cursor-pointer text-xs"
-                    onClick={() => setSelectedGenre(genre)}
-                  >
-                    {genre === 'all' ? 'Alle' : genre}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              {SAMPLE_MUSIC
-                .filter(m => selectedGenre === 'all' || m.genre === selectedGenre)
-                .filter(m => !musicSearch || m.name.toLowerCase().includes(musicSearch.toLowerCase()))
-                .map(music => (
-                  <motion.div
-                    key={music.id}
-                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
-                    whileHover={{ scale: 1.02 }}
-                    onClick={() => handleAddMusic(music)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{music.name}</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{music.genre}</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {Math.floor(music.duration / 60)}:{(music.duration % 60).toString().padStart(2, '0')}
-                          </span>
-                          <span>•</span>
-                          <span>{music.bpm} BPM</span>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Music className="h-4 w-4 text-primary" />
+                  Music Library
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Jamendo, Pixabay, Uploads & KI-generierte Tracks.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full gap-2" onClick={() => setMusicBrowserOpen(true)}>
+                  <Search className="h-4 w-4" />
+                  Bibliothek durchsuchen
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
           
           {/* Sound Effects Tab */}
