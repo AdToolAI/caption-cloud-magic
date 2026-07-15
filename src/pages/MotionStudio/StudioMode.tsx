@@ -295,10 +295,13 @@ export default function StudioMode() {
                   Hub
                 </Link>
               </Button>
-              <Badge variant="outline" className="gap-1.5">
-                <Wand2 className="h-3 w-3 text-primary" />
-                Studio Mode · Geführter Flow
-              </Badge>
+              <div className="flex items-center gap-2">
+                <SystemLoadPill className="hidden sm:inline-flex" />
+                <Badge variant="outline" className="gap-1.5">
+                  <Wand2 className="h-3 w-3 text-primary" />
+                  Studio Mode · Geführter Flow
+                </Badge>
+              </div>
             </div>
 
             <Stepper currentIndex={stepIndex} onJump={(i) => setStep(STEPS[i].id)} />
