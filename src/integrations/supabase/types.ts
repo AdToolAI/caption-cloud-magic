@@ -17154,6 +17154,63 @@ export type Database = {
           },
         ]
       }
+      voice_library_cache: {
+        Row: {
+          accent: string | null
+          age: string | null
+          category: string | null
+          description: string | null
+          gender: string | null
+          is_native: boolean
+          labels: Json
+          language: string
+          name: string
+          popularity: number
+          preview_url: string | null
+          supported_languages: string[]
+          tier: string
+          updated_at: string
+          use_case: string | null
+          voice_id: string
+        }
+        Insert: {
+          accent?: string | null
+          age?: string | null
+          category?: string | null
+          description?: string | null
+          gender?: string | null
+          is_native?: boolean
+          labels?: Json
+          language: string
+          name: string
+          popularity?: number
+          preview_url?: string | null
+          supported_languages?: string[]
+          tier?: string
+          updated_at?: string
+          use_case?: string | null
+          voice_id: string
+        }
+        Update: {
+          accent?: string | null
+          age?: string | null
+          category?: string | null
+          description?: string | null
+          gender?: string | null
+          is_native?: boolean
+          labels?: Json
+          language?: string
+          name?: string
+          popularity?: number
+          preview_url?: string | null
+          supported_languages?: string[]
+          tier?: string
+          updated_at?: string
+          use_case?: string | null
+          voice_id?: string
+        }
+        Relationships: []
+      }
       voice_translations: {
         Row: {
           created_at: string | null
