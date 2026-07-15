@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Volume2, Play, Pause, Upload, Sparkles, Info } from 'lucide-react';
+import { Loader2, Volume2, Play, Pause, Upload, Sparkles, Info, Library } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
@@ -16,6 +16,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
+import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 import type { Scene } from '@/types/scene';
 
