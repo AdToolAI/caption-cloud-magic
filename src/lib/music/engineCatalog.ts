@@ -9,6 +9,8 @@ export interface MusicLanguage {
   name: string; // English full name for prompt directive
 }
 
+export type MusicPricingModel = 'flat' | 'per-second';
+
 export interface MusicEngine {
   id: string;
   label: string;         // Card label (short)
@@ -21,7 +23,9 @@ export interface MusicEngine {
   supportsLoop: boolean;
   supportsStyleField: boolean; // Suno-style genre-tag input
   maxDuration: number;   // seconds
-  priceEur: number;      // retail (3x margin)
+  priceEur: number;      // retail flat price OR reference price @ maxDuration for per-second engines
+  pricingModel?: MusicPricingModel; // default 'flat'
+  priceEurPerSecond?: number; // required when pricingModel === 'per-second'
   languages: MusicLanguage[]; // empty = instrumental-only
   route: 'replicate';
   replicateModel?: string;
