@@ -170,6 +170,7 @@ function AppLayout() {
   
   return (
     <div className="flex w-full">
+      <ScrollToTop />
       {user && !isLandingRoute && <AppSidebar />}
       <div className="min-w-0 flex-1 flex flex-col">
         {isLandingRoute ? <Header /> : <AppHeader />}
