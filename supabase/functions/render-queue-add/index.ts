@@ -128,14 +128,24 @@ serve(async (req) => {
       throw new Error(`Failed to add to queue: ${insertError.message}`);
     }
 
-    console.log(`✅ Job added to queue: ${queueJob.id} for user ${user.id}`);
+    console.log(`✅ Job added to queue: ${queueJob.id} for user ${user.id} (priority=${priority}, workers=${estimatedWorkers}, founder=${!!isFounder})`);
+
+    // Compute queue position (jobs ahead: higher priority OR same priority but older).
+    const { count: aheadCount } = await supabase
+      .from('render_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'queued')
+      .or(`priority.lt.${priority},and(priority.eq.${priority},created_at.lt.${queueJob.created_at})`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         jobId: queueJob.id,
         estimatedCost,
-        position: 'calculating...'
+        priority,
+        isFounder: !!isFounder,
+        estimatedWorkers,
+        position: (aheadCount ?? 0) + 1,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
