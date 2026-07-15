@@ -53,6 +53,10 @@ export default function Admin() {
             <Store className="h-4 w-4" />
             Marketplace Review
           </TabsTrigger>
+          <TabsTrigger value="render-load" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Render Load
+          </TabsTrigger>
           <TabsTrigger value="lambda-health" className="flex items-center gap-2">
             <Server className="h-4 w-4" />
             Lambda Health
