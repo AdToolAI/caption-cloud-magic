@@ -63,6 +63,8 @@ export function useCompanionCoach() {
   const [pace, setPace] = useState<LearningPace>(DEFAULT_LEARNING_PACE);
   const [activeTip, setActiveTip] = useState<ActiveTip | null>(null);
   const [paused, setPaused] = useState(false);
+  const [conciergeCompleted, setConciergeCompleted] = useState<boolean | null>(null);
+  const [primaryGoal, setPrimaryGoal] = useState<string | null>(null);
   const historyRef = useRef<Map<string, { shown_at: string; dismissed_at: string | null }>>(
     new Map(),
   );
