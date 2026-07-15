@@ -828,7 +828,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     for (const sp of speakers) {
       const chosen = resolvedVoicePerSpeaker[sp.id];
       if (!chosen?.voiceId) continue;
-      for (const key of getSpeakerAliases(sp.id)) next[key] = chosen;
+      const stamped: DialogVoiceCfg = { ...chosen, characterId: sp.id };
+      for (const key of getSpeakerAliases(sp.id)) next[key] = stamped;
     }
     return next;
   }, [voicePerSpeaker, resolvedVoicePerSpeaker, speakers, sceneCast]);
