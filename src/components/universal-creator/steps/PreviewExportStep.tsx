@@ -315,6 +315,16 @@ export function PreviewExportStep({
       });
 
       if (error) {
+        const admission = await tryParseAdmissionFromInvokeError(error);
+        if (admission) {
+          toast.warning(admission.message, { duration: 8000 });
+          setRenderJobs(prev =>
+            prev.map(j =>
+              j.id === job.id ? { ...j, status: 'queued', progress: 0, error: admission.message } : j,
+            ),
+          );
+          return;
+        }
         const detail = await extractFunctionsError(error);
         const friendly = /idle.?timeout|aborted|timeout|IDLE_TIMEOUT/i.test(detail || '')
           ? t('uc.renderStartSlow')
@@ -323,6 +333,16 @@ export function PreviewExportStep({
       }
 
       if (data && data.ok === false) {
+        const admission = describeRenderAdmissionError(data);
+        if (admission) {
+          toast.warning(admission.message, { duration: 8000 });
+          setRenderJobs(prev =>
+            prev.map(j =>
+              j.id === job.id ? { ...j, status: 'queued', progress: 0, error: admission.message } : j,
+            ),
+          );
+          return;
+        }
         const raw = String(data.error || '');
         const friendly = /aborted|timeout|idle/i.test(raw)
           ? t('uc.renderStartSlow')
