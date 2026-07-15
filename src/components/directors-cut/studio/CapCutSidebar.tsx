@@ -327,6 +327,7 @@ const AISubtitleScriptSection: React.FC<{
 };
 
 import { sortVoicesPremiumFirst, DEFAULT_VOICE_SETTINGS, DEFAULT_MODEL, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { Badge } from '@/components/ui/badge';
 
