@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity } from 'lucide-react';
+import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +34,7 @@ export default function MusicStudio() {
   const [prompt, setPrompt] = useState('');
   const [genre, setGenre] = useState<string>('any');
   const [mood, setMood] = useState<string>('uplifting');
-  const [duration, setDuration] = useState(30);
+  
   const [bpm, setBpm] = useState<number | undefined>();
   const [musicalKey, setMusicalKey] = useState('');
   const [instrumental, setInstrumental] = useState(true);
@@ -68,7 +68,6 @@ export default function MusicStudio() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     if (tier === 'vocal' && !lyrics.trim()) return;
-    const safeDuration = Math.min(duration, maxDur);
     // Append explicit [LANGUAGE: …] directive so the provider strictly matches the vocal language.
     const langMeta = showLanguagePicker ? getLanguageMeta(tier, language) : undefined;
     const finalPrompt = langMeta
@@ -77,7 +76,7 @@ export default function MusicStudio() {
     const track = await generateMusic({
       prompt: finalPrompt,
       tier,
-      durationSeconds: safeDuration,
+      durationSeconds: maxDur,
       genre: genre !== 'any' ? genre : undefined,
       mood,
       instrumental: tier === 'vocal' ? false : instrumental,
@@ -98,6 +97,22 @@ export default function MusicStudio() {
       language: (['en', 'de', 'es'] as const).includes(language as any) ? (language as 'en' | 'de' | 'es') : 'en',
     });
     if (generated) setLyrics(generated);
+  };
+
+  const handleResetProject = () => {
+    const hasContent = prompt.trim() || lyrics.trim() || lastTrack;
+    if (hasContent && !window.confirm('Neues Projekt starten? Alle aktuellen Eingaben (Prompt, Lyrics, Track-Preview) werden zurückgesetzt.')) {
+      return;
+    }
+    setPrompt('');
+    setLyrics('');
+    setGenre('any');
+    setMood('uplifting');
+    setBpm(undefined);
+    setMusicalKey('');
+    setInstrumental(true);
+    setLoop(false);
+    setLastTrack(null);
   };
 
   return (
@@ -180,9 +195,22 @@ export default function MusicStudio() {
             {/* GENERATE */}
             <TabsContent value="generate" className="space-y-6">
               <Card className="p-5 bg-background/40 backdrop-blur-md border-primary/15">
-                <div className="mb-4">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">Engine wählen</Label>
-                  <ProviderSelector value={tier} onChange={setTier} currencySymbol={currencySymbol} disabled={loading} />
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">Engine wählen</Label>
+                    <ProviderSelector value={tier} onChange={setTier} currencySymbol={currencySymbol} disabled={loading} />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetProject}
+                    disabled={loading}
+                    className="border-primary/30 text-primary hover:bg-primary/10 gap-1.5 shrink-0"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Neues Projekt
+                  </Button>
                 </div>
               </Card>
 
@@ -249,18 +277,10 @@ export default function MusicStudio() {
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="text-xs text-muted-foreground">Dauer</Label>
-                      <span className="text-xs font-mono text-primary">{Math.min(duration, maxDur)}s / max {maxDur}s</span>
-                    </div>
-                    <Slider
-                      value={[Math.min(duration, maxDur)]}
-                      onValueChange={(v) => setDuration(v[0])}
-                      min={5}
-                      max={maxDur}
-                      step={5}
-                    />
+                  <div className="p-3 rounded-lg bg-background/40 border border-primary/10">
+                    <p className="text-[11px] text-muted-foreground">
+                      <span className="text-primary font-medium">Songlänge</span> wird automatisch durch die Lyrics & den Provider bestimmt (typisch 1–3 min bei Vocal-Tracks, {maxDur}s Cap bei Instrumentals).
+                    </p>
                   </div>
 
                   {/* Tier-specific controls */}
