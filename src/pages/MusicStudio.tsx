@@ -34,7 +34,7 @@ export default function MusicStudio() {
   const [prompt, setPrompt] = useState('');
   const [genre, setGenre] = useState<string>('any');
   const [mood, setMood] = useState<string>('uplifting');
-  const [duration, setDuration] = useState(30);
+  
   const [bpm, setBpm] = useState<number | undefined>();
   const [musicalKey, setMusicalKey] = useState('');
   const [instrumental, setInstrumental] = useState(true);
