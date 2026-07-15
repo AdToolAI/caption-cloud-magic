@@ -77,6 +77,61 @@ export interface PlateFaceBox {
   mouth?: [number, number];
 }
 
+/**
+ * v242 — Row-major slot sorting for grid layouts.
+ *
+ * The legacy code sorted faces by center-X only. In a 2×2 (or 2×N) grid
+ * that produces column-major order: the two left faces come first (BL vs
+ * TL by ~sub-pixel X difference), then the two right faces. When the
+ * script order is row-major (TL, TR, BL, BR — the natural reading order
+ * users expect for "Speaker 1..4"), the slot indexes are misaligned
+ * against the script and the wrong voice gets wired to the wrong face.
+ *
+ * Row-major sort:
+ *   1. Cluster faces into rows by center-Y (rows separated by more than
+ *      half the median face height).
+ *   2. Within each row sort by center-X (left → right).
+ *   3. Concatenate rows top → bottom.
+ *
+ * For single-row layouts (all speakers on the same y-band) this collapses
+ * to the same X-only sort we had before, so it is safe to use everywhere.
+ */
+export function sortFacesRowMajor<T extends { center: [number, number]; bbox: [number, number, number, number] }>(
+  faces: T[],
+): T[] {
+  if (faces.length <= 1) return [...faces];
+  const withH = faces.map((f) => ({
+    f,
+    h: Math.max(1, f.bbox[3] - f.bbox[1]),
+    cx: f.center[0],
+    cy: f.center[1],
+  }));
+  const sortedH = [...withH].map((r) => r.h).sort((a, b) => a - b);
+  const medianH = sortedH[Math.floor(sortedH.length / 2)] ?? 1;
+  const rowThreshold = Math.max(24, medianH * 0.5);
+  const byY = [...withH].sort((a, b) => a.cy - b.cy);
+  const rows: Array<typeof withH> = [];
+  for (const r of byY) {
+    const last = rows[rows.length - 1];
+    if (!last) {
+      rows.push([r]);
+      continue;
+    }
+    const lastCy = last[last.length - 1].cy;
+    if (Math.abs(r.cy - lastCy) <= rowThreshold) {
+      last.push(r);
+    } else {
+      rows.push([r]);
+    }
+  }
+  const flat: T[] = [];
+  for (const row of rows) {
+    row.sort((a, b) => a.cx - b.cx);
+    for (const r of row) flat.push(r.f);
+  }
+  return flat;
+}
+
 export interface PlateFaceMap {
   faces: PlateFaceBox[];
   width: number;
@@ -341,7 +396,7 @@ function normalizedFacesToPlateBoxes(
 ): PlateFaceBox[] {
   const W = Math.max(1, plateWidth);
   const H = Math.max(1, plateHeight);
-  return rawFaces
+  const built = rawFaces
     .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
     .map((f) => {
       const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
@@ -356,9 +411,10 @@ function normalizedFacesToPlateBoxes(
         confidence: typeof f.confidence === "number" ? f.confidence : undefined,
       };
     })
-    .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
-    .sort((a, b) => a.center[0] - b.center[0])
-    .map((f, idx) => ({ ...f, slot: idx }));
+    .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4);
+  // v242 — Row-major slot sort so 2×2 / 2×N grid layouts get natural
+  // TL, TR, BL, BR order (single-row layouts collapse to X-only).
+  return sortFacesRowMajor(built).map((f, idx) => ({ ...f, slot: idx }));
 }
 
 /**
@@ -451,16 +507,15 @@ export async function detectPlateFaces(params: {
         prebuiltFrameUrls: [anchorUrl],
       });
       if (mp.ok && mp.faces.length > 0) {
-        mpFaces = mp.faces
-          .map((f, idx) => ({
+        mpFaces = sortFacesRowMajor(
+          mp.faces.map((f, idx) => ({
             bbox: f.bbox,
             center: f.center,
             slot: idx,
             confidence: f.confidence,
             mouth: f.landmarks?.mouth,
-          }))
-          .sort((a, b) => a.center[0] - b.center[0])
-          .map((f, idx) => ({ ...f, slot: idx }));
+          })),
+        ).map((f, idx) => ({ ...f, slot: idx }));
         const mouthCount = mpFaces.filter((f) => Array.isArray(f.mouth)).length;
         const confList = mpFaces.map((f) => (f.confidence ?? 0).toFixed(2)).join(",");
         console.log(
@@ -486,16 +541,15 @@ export async function detectPlateFaces(params: {
         prebuiltFrameUrls: [params.plateUrl],
       });
       if (mp.ok && mp.faces.length > 0) {
-        mpFaces = mp.faces
-          .map((f, idx) => ({
+        mpFaces = sortFacesRowMajor(
+          mp.faces.map((f, idx) => ({
             bbox: f.bbox,
             center: f.center,
             slot: idx,
             confidence: f.confidence,
             mouth: f.landmarks?.mouth,
-          }))
-          .sort((a, b) => a.center[0] - b.center[0])
-          .map((f, idx) => ({ ...f, slot: idx }));
+          })),
+        ).map((f, idx) => ({ ...f, slot: idx }));
         detectorUsed = "aws_rekognition_mp4_fallback";
         console.log(`${tag} v156_mp4_fallback_ok faces=${mpFaces.length}`);
       } else {
@@ -523,13 +577,12 @@ export async function detectPlateFaces(params: {
   } else if (mpFaces && mpFaces.length > expectedN) {
     // More faces detected than expected (e.g. background extra). Take the
     // expectedN largest by bbox area, then re-slot left-to-right.
-    const ranked = [...mpFaces].sort((a, b) => {
+    const topByArea = [...mpFaces].sort((a, b) => {
       const areaA = (a.bbox[2] - a.bbox[0]) * (a.bbox[3] - a.bbox[1]);
       const areaB = (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1]);
       return areaB - areaA;
-    }).slice(0, expectedN)
-      .sort((a, b) => a.center[0] - b.center[0])
-      .map((f, idx) => ({ ...f, slot: idx }));
+    }).slice(0, expectedN);
+    const ranked = sortFacesRowMajor(topByArea).map((f, idx) => ({ ...f, slot: idx }));
     faces = ranked;
     console.log(`${tag} v156_aws_over_detect raw=${mpFaces.length} kept=${expectedN}`);
   } else {
