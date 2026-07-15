@@ -43,6 +43,11 @@ const STALE_HARD_MS = 25 * 60_000;       // v126: 20→25 min — one extra cron
 // to 1min, lost-invoke recovery drops from ~3.5min → ~60s. Double-dispatch is
 // safe — compose-dialog-segments' idempotency guard returns `already_running`.
 const STALE_DISPATCH_RECOVERY_MS = 30_000;
+// v252 — Audio-mux stall guard. A dispatched DialogStitchVideo Lambda that
+// hasn't produced a webhook after this window is considered dead. Lambda's
+// own timeout is now 300 s (see render-sync-segments-audio-mux), so 6 min
+// gives one extra retry cycle before we hard-fail the scene.
+const STALE_AUDIO_MUX_MS = 6 * 60_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
