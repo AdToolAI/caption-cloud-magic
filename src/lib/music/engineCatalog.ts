@@ -169,12 +169,15 @@ export const ENGINE_ORDER: MusicEngineId[] = Object.values(ENGINE_CATALOG)
 
 // Map legacy tier IDs (quick/adaptive/standard/vocal/pro) to new engine IDs.
 export const LEGACY_TIER_ALIAS: Record<string, MusicEngineId> = {
-  quick:    'stable-audio-open-2',
-  adaptive: 'stable-audio-25',
-  standard: 'elevenlabs-music-v2',
-  vocal:    'minimax-15',
-  pro:      'elevenlabs-music-v2',
+  quick:                 'stable-audio-3-large',
+  adaptive:              'stable-audio-25',
+  standard:              'elevenlabs-music-v2',
+  vocal:                 'minimax-15',
+  pro:                   'elevenlabs-music-v2',
+  'suno-v5':             'elevenlabs-music-v2',
+  'stable-audio-open-2': 'stable-audio-3-large',
 };
+
 
 export function resolveEngineId(idOrTier: string): MusicEngineId {
   if (ENGINE_CATALOG[idOrTier]) return idOrTier as MusicEngineId;
