@@ -194,3 +194,26 @@ export function engineHasVocals(engineId: string, instrumental: boolean): boolea
   if (!e.supportsInstrumentalToggle) return true;
   return !instrumental;
 }
+
+/**
+ * Canonical price computation. Used by UI *and* mirrored in the
+ * generate-music-track edge function for wallet deduction.
+ *   flat        → priceEur (fixed per generation)
+ *   per-second  → priceEurPerSecond × requestedSeconds (Replicate bills per second)
+ */
+export function computeMusicPrice(engineId: string, durationSeconds: number): number {
+  const e = getEngine(engineId);
+  if (e.pricingModel === 'per-second' && e.priceEurPerSecond) {
+    const secs = Math.max(1, Math.min(e.maxDuration, Math.round(durationSeconds || e.maxDuration)));
+    return Math.round(e.priceEurPerSecond * secs * 100) / 100;
+  }
+  return e.priceEur;
+}
+
+export function formatMusicPriceBadge(engineId: string, currencySymbol: string): string {
+  const e = getEngine(engineId);
+  if (e.pricingModel === 'per-second' && e.priceEurPerSecond) {
+    return `${currencySymbol}${e.priceEurPerSecond.toFixed(3)}/s • ≤${e.maxDuration}s`;
+  }
+  return `${currencySymbol}${e.priceEur.toFixed(2)} • ≤${e.maxDuration}s`;
+}
