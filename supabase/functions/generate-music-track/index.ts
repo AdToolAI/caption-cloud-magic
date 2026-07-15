@@ -11,7 +11,9 @@ const corsHeaders = {
 
 // ---- Engine catalog (mirror of src/lib/music/engineCatalog.ts) ----
 interface EngineMeta {
-  price: number;
+  price: number;             // flat retail (used when pricingModel === 'flat')
+  pricingModel: 'flat' | 'per-second';
+  pricePerSecond?: number;   // used when pricingModel === 'per-second'
   maxDuration: number;
   route: 'replicate';
   vocals: boolean;
@@ -20,11 +22,19 @@ interface EngineMeta {
   label: string;
 }
 const ENGINES: Record<string, EngineMeta> = {
-  'stable-audio-25':     { price: 0.15, maxDuration: 190, route: 'replicate', vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
-  'minimax-15':          { price: 0.30, maxDuration: 60,  route: 'replicate', vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5',            label: 'MiniMax Music 1.5' },
-  'elevenlabs-music-v2': { price: 0.36, maxDuration: 300, route: 'replicate', vocals: true,  requiresLyrics: false, replicateModel: 'elevenlabs/music',             label: 'ElevenLabs Music v2' },
-  'lyria-3-pro':         { price: 0.42, maxDuration: 180, route: 'replicate', vocals: true,  requiresLyrics: false, replicateModel: 'google/lyria-3-pro',           label: 'Google Lyria 3 Pro' },
+  'stable-audio-25':     { price: 0.55, pricingModel: 'flat',       maxDuration: 190, route: 'replicate', vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
+  'minimax-15':          { price: 0.30, pricingModel: 'flat',       maxDuration: 60,  route: 'replicate', vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5',            label: 'MiniMax Music 1.5' },
+  'elevenlabs-music-v2': { price: 6.90, pricingModel: 'per-second', pricePerSecond: 0.023, maxDuration: 300, route: 'replicate', vocals: true, requiresLyrics: false, replicateModel: 'elevenlabs/music', label: 'ElevenLabs Music v2' },
+  'lyria-3-pro':         { price: 0.42, pricingModel: 'flat',       maxDuration: 180, route: 'replicate', vocals: true,  requiresLyrics: false, replicateModel: 'google/lyria-3-pro',           label: 'Google Lyria 3 Pro' },
 };
+
+function computeCharge(meta: EngineMeta, durationSeconds: number): number {
+  if (meta.pricingModel === 'per-second' && meta.pricePerSecond) {
+    const secs = Math.max(1, Math.min(meta.maxDuration, Math.round(durationSeconds)));
+    return Math.round(meta.pricePerSecond * secs * 100) / 100;
+  }
+  return meta.price;
+}
 
 // Legacy tier IDs → new engine IDs (keeps old clients / stored plans working).
 const LEGACY_ALIAS: Record<string, string> = {
