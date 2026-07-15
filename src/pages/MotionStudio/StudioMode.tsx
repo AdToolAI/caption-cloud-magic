@@ -38,6 +38,10 @@ import type {
   MotionStudioLocation,
   SceneSnippet,
 } from '@/types/motion-studio';
+import { SystemLoadPill } from '@/components/render/SystemLoadPill';
+import { useRenderSystemLoad } from '@/hooks/useRenderSystemLoad';
+import { useFounderStatus } from '@/hooks/useFounderStatus';
+import { Crown } from 'lucide-react';
 
 type StepId = 'cast' | 'location' | 'storyboard' | 'render';
 
