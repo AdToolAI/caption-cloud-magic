@@ -59,7 +59,7 @@ const m = (
   names: [string, string, string],
   taglines: [string, string, string],
   caps: Array<{ en: string; de: string; es: string }>,
-  extras: Partial<Pick<ArsenalModel, "cover" | "recommended" | "hero">> = {}
+  extras: Partial<Pick<ArsenalModel, "cover" | "loop" | "recommended" | "hero">> = {}
 ): ArsenalModel => ({
   id,
   category,
