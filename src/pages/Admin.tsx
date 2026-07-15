@@ -122,6 +122,10 @@ export default function Admin() {
           </Tabs>
         </TabsContent>
 
+        <TabsContent value="render-load">
+          <RenderLoadWidget />
+        </TabsContent>
+
         <TabsContent value="lambda-health">
           <LambdaHealth />
         </TabsContent>
