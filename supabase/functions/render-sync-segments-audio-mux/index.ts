@@ -829,7 +829,10 @@ serve(async (req) => {
       scale: 1,
       envVariables: {},
       chromiumOptions: {},
-      timeoutInMilliseconds: 600000,
+      // v252 — was 600000. Halved so a hung worker is killed faster and the
+      // watchdog + auto-retry path takes over sooner. With OffthreadVideo the
+      // typical mux for a 10 s dialog scene completes in <60 s.
+      timeoutInMilliseconds: 300000,
       concurrencyPerLambda: 1,
       downloadBehavior: { type: "play-in-browser" },
       webhook: {
