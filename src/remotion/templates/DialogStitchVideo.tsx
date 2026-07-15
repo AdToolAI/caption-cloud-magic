@@ -23,7 +23,6 @@ import {
   Audio,
   Freeze,
   Img,
-  OffthreadVideo,
   Sequence,
   // v252 — All video playback in this composition uses OffthreadVideo instead
   // of the classic <Video>. The classic tag decodes via Chromium's
