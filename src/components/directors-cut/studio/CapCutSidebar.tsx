@@ -327,6 +327,7 @@ const AISubtitleScriptSection: React.FC<{
 };
 
 import { sortVoicesPremiumFirst, DEFAULT_VOICE_SETTINGS, DEFAULT_MODEL, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { Badge } from '@/components/ui/badge';
 
@@ -346,16 +347,17 @@ const SubtitleVoiceoverSection: React.FC<{
 }> = ({ existingCaptions, captionLanguage, onVoiceOverGenerated, voiceoverVolume, onVoiceoverVolumeChange, t }) => {
   const initialLang = (['de', 'en', 'es'].includes(captionLanguage) ? captionLanguage : 'de') as 'de' | 'en' | 'es';
   const [activeLang, setActiveLang] = useState<'de' | 'en' | 'es'>(initialLang);
-  const [allVoices, setAllVoices] = useState<VoiceMeta[]>([]);
+  const [libraryVoices, setLibraryVoices] = useState<VoiceMeta[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [localVolume, setLocalVolume] = useState(voiceoverVolume);
+  const { voices: customVoices } = useCustomVoices();
 
   const captionsWithText = existingCaptions.filter(c => c.text && c.text.trim() !== '');
   const combinedText = captionsWithText.map(c => c.text).join(' ');
 
-  // Load voices once
+  // Load library voices once
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -365,7 +367,7 @@ const SubtitleVoiceoverSection: React.FC<{
         if (error) throw error;
         if (cancelled) return;
         const voices: VoiceMeta[] = data?.voices || [];
-        setAllVoices(sortVoicesPremiumFirst(voices));
+        setLibraryVoices(sortVoicesPremiumFirst(voices));
       } catch (err) {
         console.error('[SubtitleVoiceover] list-voices failed:', err);
         toast.error(t('dc.voiceoverGenerationFailed') || 'Stimmen konnten nicht geladen werden');
@@ -375,6 +377,22 @@ const SubtitleVoiceoverSection: React.FC<{
     })();
     return () => { cancelled = true; };
   }, [t]);
+
+  // Merge library + user-cloned custom voices (cloned first per-language)
+  const allVoices = useMemo<VoiceMeta[]>(() => {
+    const clonedAsMeta: VoiceMeta[] = customVoices
+      .filter(v => v.is_active)
+      .map(v => ({
+        id: v.elevenlabs_voice_id,
+        name: v.name,
+        language: (v.language as VoiceMeta['language']) || 'en',
+        gender: 'neutral',
+        description: 'Meine Stimme',
+        tier: 'cloned' as const,
+        supportedLanguages: ['de', 'en', 'es'],
+      }));
+    return [...clonedAsMeta, ...libraryVoices];
+  }, [customVoices, libraryVoices]);
 
   // Voices in active language
   const voicesByLang = useMemo(() => {
@@ -501,6 +519,11 @@ const SubtitleVoiceoverSection: React.FC<{
                     {isPremium && (
                       <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-amber-400/40 text-amber-300 bg-amber-500/10">
                         Premium
+                      </Badge>
+                    )}
+                    {v.tier === 'cloned' && (
+                      <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10">
+                        Meine Stimme
                       </Badge>
                     )}
                   </div>

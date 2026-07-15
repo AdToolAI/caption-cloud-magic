@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Mic, Play, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  sortVoicesPremiumFirst,
+  type VoiceMeta,
+} from '@/lib/elevenlabs-voices';
 import { toast } from 'sonner';
 
 interface VoicePickerProps {
@@ -27,15 +33,65 @@ const PREVIEW_TEXT_FALLBACK =
 
 /**
  * Voice picker for the Motion Studio Library.
- * Shows the user's custom-cloned voices and lets them play a 1-sentence preview
- * before assigning a voice to a character.
+ * Shows the user's cloned voices AND the full premium library so any character
+ * can be assigned a voice — cloned voices are listed first, then Premium, then Standard.
  */
 export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) {
-  const { voices } = useCustomVoices();
+  const { voices: customVoices } = useCustomVoices();
+  const [libraryVoices, setLibraryVoices] = useState<VoiceMeta[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [previewing, setPreviewing] = useState(false);
-  const activeVoices = voices.filter((v) => v.is_active);
 
-  const selected = voices.find((v) => v.elevenlabs_voice_id === value);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingLibrary(true);
+        const { data, error } = await supabase.functions.invoke('list-voices', {
+          body: { language: 'all' },
+        });
+        if (error) throw error;
+        if (cancelled) return;
+        setLibraryVoices(sortVoicesPremiumFirst(data?.voices || []));
+      } catch (err) {
+        console.error('[VoicePicker] list-voices failed:', err);
+      } finally {
+        if (!cancelled) setLoadingLibrary(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const activeCustom = useMemo(
+    () => customVoices.filter((v) => v.is_active),
+    [customVoices]
+  );
+
+  const premiumLibrary = useMemo(
+    () => libraryVoices.filter((v) => v.tier === 'premium'),
+    [libraryVoices]
+  );
+  const standardLibrary = useMemo(
+    () => libraryVoices.filter((v) => v.tier !== 'premium'),
+    [libraryVoices]
+  );
+
+  const selectedLabel = useMemo(() => {
+    if (!value) return null;
+    const custom = activeCustom.find((v) => v.elevenlabs_voice_id === value);
+    if (custom) return { name: custom.name, tag: 'Meine Stimme', tone: 'emerald' as const };
+    const lib = libraryVoices.find((v) => v.id === value);
+    if (lib) {
+      return {
+        name: lib.name,
+        tag: lib.tier === 'premium' ? 'Premium' : (lib.language || '').toString().toUpperCase(),
+        tone: (lib.tier === 'premium' ? 'amber' : 'muted') as 'amber' | 'muted',
+      };
+    }
+    return null;
+  }, [value, activeCustom, libraryVoices]);
 
   const handlePreview = async () => {
     if (!value) {
@@ -51,7 +107,6 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
         },
       });
       if (error) throw error;
-      // Edge function returns base64 audio
       const audioB64 = data?.audioBase64 || data?.audio || data?.audioContent;
       if (!audioB64) throw new Error('Keine Audio-Daten erhalten');
       const audio = new Audio(`data:audio/mpeg;base64,${audioB64}`);
@@ -71,9 +126,18 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
           <Mic className="h-3 w-3" />
           Voice (optional)
         </Label>
-        {selected && (
-          <Badge variant="secondary" className="text-[10px]">
-            {selected.language}
+        {selectedLabel && (
+          <Badge
+            variant="secondary"
+            className={
+              selectedLabel.tone === 'emerald'
+                ? 'text-[10px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10'
+                : selectedLabel.tone === 'amber'
+                  ? 'text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10'
+                  : 'text-[10px]'
+            }
+          >
+            {selectedLabel.tag}
           </Badge>
         )}
       </div>
@@ -86,18 +150,47 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
           <SelectTrigger className="bg-background/60 flex-1">
             <SelectValue placeholder="Keine Voice zugewiesen" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-72">
             <SelectItem value="none">— Keine Voice —</SelectItem>
-            {activeVoices.length === 0 ? (
-              <SelectItem value="empty" disabled>
-                Noch keine aktiven Custom Voices
+
+            {activeCustom.length > 0 && (
+              <SelectGroup>
+                <SelectLabel className="text-emerald-300">Meine Stimmen</SelectLabel>
+                {activeCustom.map((voice) => (
+                  <SelectItem key={voice.id} value={voice.elevenlabs_voice_id}>
+                    {voice.name} · {voice.language}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+
+            {premiumLibrary.length > 0 && (
+              <SelectGroup>
+                <SelectLabel className="text-amber-300">Premium</SelectLabel>
+                {premiumLibrary.map((voice) => (
+                  <SelectItem key={voice.id} value={voice.id}>
+                    {voice.name}
+                    {voice.gender ? ` · ${voice.gender}` : ''} · {String(voice.language).toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+
+            {standardLibrary.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>Standard</SelectLabel>
+                {standardLibrary.map((voice) => (
+                  <SelectItem key={voice.id} value={voice.id}>
+                    {voice.name} · {String(voice.language).toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+
+            {loadingLibrary && activeCustom.length === 0 && (
+              <SelectItem value="loading" disabled>
+                Stimmen werden geladen…
               </SelectItem>
-            ) : (
-              activeVoices.map((voice) => (
-                <SelectItem key={voice.id} value={voice.elevenlabs_voice_id}>
-                  {voice.name} · {voice.language}
-                </SelectItem>
-              ))
             )}
           </SelectContent>
         </Select>
