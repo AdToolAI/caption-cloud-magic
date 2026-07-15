@@ -55,7 +55,7 @@ const MINIMAX_LANGS: MusicLanguage[] = [
   { code: 'zh', label: 'Chinesisch',    flag: '🇨🇳', name: 'Chinese' },
 ];
 
-const SUNO_LANGS: MusicLanguage[] = [
+const LYRIA_LANGS: MusicLanguage[] = [
   { code: 'en', label: 'Englisch',      flag: '🇬🇧', name: 'English' },
   { code: 'de', label: 'Deutsch',       flag: '🇩🇪', name: 'German' },
   { code: 'es', label: 'Spanisch',      flag: '🇪🇸', name: 'Spanish' },
@@ -63,10 +63,8 @@ const SUNO_LANGS: MusicLanguage[] = [
   { code: 'it', label: 'Italienisch',   flag: '🇮🇹', name: 'Italian' },
   { code: 'pt', label: 'Portugiesisch', flag: '🇵🇹', name: 'Portuguese' },
   { code: 'ja', label: 'Japanisch',     flag: '🇯🇵', name: 'Japanese' },
-  { code: 'ko', label: 'Koreanisch',    flag: '🇰🇷', name: 'Korean' },
-  { code: 'zh', label: 'Chinesisch',    flag: '🇨🇳', name: 'Chinese' },
-  { code: 'nl', label: 'Niederländisch', flag: '🇳🇱', name: 'Dutch' },
 ];
+
 
 export const ENGINE_CATALOG: Record<string, MusicEngine> = {
   'stable-audio-25': {
