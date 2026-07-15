@@ -749,7 +749,7 @@ export function usePipelineProgress({
     (isLipSyncIntentional(s) || !!s.twoshotStage),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
-    const n = s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
+    const n = s.dialogVoices ? countSceneSpeakers(s) : 0;
     return n > m ? n : m;
   }, 0);
   const STALL_THRESHOLD_MS = Math.max(4, maxSpeakers * 3, lipTargetCount * 2) * 60 * 1000;
