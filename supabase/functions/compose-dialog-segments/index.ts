@@ -568,14 +568,24 @@ interface SegmentsState {
   final_url?: string | null;
   error?: string;
   plate_identity?: {
-    version: "v153.2";
+    version: "v153.2" | "v160" | "v242";
     dims: { width: number; height: number } | null;
     bboxes: Array<[number, number, number, number] | null>;
     faces?: unknown[];
+    mouths?: Array<[number, number] | null>;
     resolvedCount?: number;
     cached?: boolean;
     sourceClipUrl?: string | null;
     hydratedAt?: string;
+    /**
+     * v242 — Character Assignment Lock.
+     * Persisted map speakerIdx (string) → characterId (stripped) written
+     * once a plate-identity run resolved every speaker with match
+     * confidence ≥ threshold. Subsequent renders read this lock BEFORE
+     * consulting positional bboxes, guaranteeing the same speaker → face
+     * assignment across every rerender.
+     */
+    assignmentLock?: Record<string, string>;
   };
 }
 
