@@ -463,8 +463,7 @@ export function ExportRenderStep({
             offsetY: subtitleSafeZone.offsetY,
             bottomBandPercent: subtitleSafeZone.bottomBandPercent,
           } : undefined,
-        },
-      });
+        });
 
       if (error) {
         const admission = await tryParseAdmissionFromInvokeError(error);
