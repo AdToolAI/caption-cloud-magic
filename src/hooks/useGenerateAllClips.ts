@@ -42,7 +42,7 @@ interface UseGenerateAllClipsArgs {
 }
 
 function isScenePipelineReady(scene: ComposerScene) {
-  const dialogVoiceCount = scene.dialogVoices ? Object.keys(scene.dialogVoices).length : 0;
+  const dialogVoiceCount = scene.dialogVoices ? countSceneSpeakers(scene) : 0;
   const needsLipsync =
     scene.engineOverride === 'cinematic-sync' ||
     !!(scene as any).twoshotStage ||
