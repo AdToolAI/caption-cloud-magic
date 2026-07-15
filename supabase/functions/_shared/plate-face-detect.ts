@@ -541,16 +541,15 @@ export async function detectPlateFaces(params: {
         prebuiltFrameUrls: [params.plateUrl],
       });
       if (mp.ok && mp.faces.length > 0) {
-        mpFaces = mp.faces
-          .map((f, idx) => ({
+        mpFaces = sortFacesRowMajor(
+          mp.faces.map((f, idx) => ({
             bbox: f.bbox,
             center: f.center,
             slot: idx,
             confidence: f.confidence,
             mouth: f.landmarks?.mouth,
-          }))
-          .sort((a, b) => a.center[0] - b.center[0])
-          .map((f, idx) => ({ ...f, slot: idx }));
+          })),
+        ).map((f, idx) => ({ ...f, slot: idx }));
         detectorUsed = "aws_rekognition_mp4_fallback";
         console.log(`${tag} v156_mp4_fallback_ok faces=${mpFaces.length}`);
       } else {
