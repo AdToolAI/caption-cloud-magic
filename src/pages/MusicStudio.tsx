@@ -1,19 +1,25 @@
 import { useState, useEffect } from 'react';
-import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
+import {
+  ENGINE_CATALOG,
+  getEngine,
+  isLanguageSupported,
+  getLanguageMeta,
+  engineHasVocals,
+  type MusicEngineId,
+} from '@/lib/music/engineCatalog';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw } from 'lucide-react';
+import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw, Info } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
-import { useMusicGeneration, MUSIC_TIER_PRICING, type MusicTier, type GeneratedMusicTrack } from '@/hooks/useMusicGeneration';
+import { useMusicGeneration, type GeneratedMusicTrack } from '@/hooks/useMusicGeneration';
 import { ProviderSelector } from '@/components/music-studio/ProviderSelector';
 import { LyricsEditor } from '@/components/music-studio/LyricsEditor';
 import { MyTracksGrid } from '@/components/music-studio/MyTracksGrid';
@@ -30,63 +36,68 @@ export default function MusicStudio() {
   const { wallet } = useAIVideoWallet();
   const { generateMusic, generateLyrics, loading, generatingLyrics } = useMusicGeneration();
 
-  const [tier, setTier] = useState<MusicTier>('adaptive');
+  const [engineId, setEngineId] = useState<MusicEngineId>('stable-audio-25');
   const [prompt, setPrompt] = useState('');
   const [genre, setGenre] = useState<string>('any');
   const [mood, setMood] = useState<string>('uplifting');
-  
+
   const [bpm, setBpm] = useState<number | undefined>();
   const [musicalKey, setMusicalKey] = useState('');
   const [instrumental, setInstrumental] = useState(true);
   const [loop, setLoop] = useState(false);
   const [lyrics, setLyrics] = useState('');
+  const [styleTags, setStyleTags] = useState('');
   const [lastTrack, setLastTrack] = useState<GeneratedMusicTrack | null>(null);
 
+  const engine = getEngine(engineId);
   const currencySymbol = wallet?.currency === 'USD' ? '$' : '€';
   const balance = wallet?.balance_euros ?? 0;
-  const tierPricing = MUSIC_TIER_PRICING[tier];
-  const cost = tierPricing.eur;
+  const cost = engine.priceEur;
   const insufficient = balance < cost;
-  const maxDur = tierPricing.maxDuration;
+  const maxDur = engine.maxDuration;
   const [language, setLanguage] = useState<string>(() => {
     if (typeof navigator === 'undefined') return 'en';
     const lang = navigator.language?.slice(0, 2) || 'en';
-    return isLanguageSupported('vocal', lang) ? lang : 'en';
+    return isLanguageSupported('minimax-15', lang) ? lang : 'en';
   });
 
-  // When tier changes, ensure selected language is still supported
+  // When engine changes, ensure selected language is still supported
   useEffect(() => {
-    const supported = MUSIC_LANGUAGE_SUPPORT[tier];
-    if (supported.length === 0) return; // instrumental-only tier
+    const supported = engine.languages;
+    if (supported.length === 0) return;
     if (!supported.some((l) => l.code === language)) {
       setLanguage(supported[0].code);
     }
-  }, [tier]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [engineId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showLanguagePicker = tierHasVocals(tier, instrumental);
+  const showLanguagePicker = engineHasVocals(engineId, instrumental);
+  const needsLyrics = engine.requiresLyrics;
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
-    if (tier === 'vocal' && !lyrics.trim()) return;
-    // Append explicit [LANGUAGE: …] directive so the provider strictly matches the vocal language.
-    const langMeta = showLanguagePicker ? getLanguageMeta(tier, language) : undefined;
+    if (needsLyrics && !lyrics.trim()) return;
+    const langMeta = showLanguagePicker ? getLanguageMeta(engineId, language) : undefined;
     const finalPrompt = langMeta
       ? `${prompt.trim()}\n\n[LANGUAGE: ${langMeta.name}] — Sing exclusively in ${langMeta.name}. Do not mix languages.`
       : prompt.trim();
     const track = await generateMusic({
       prompt: finalPrompt,
-      tier,
+      tier: engineId,
       durationSeconds: maxDur,
       genre: genre !== 'any' ? genre : undefined,
       mood,
-      instrumental: tier === 'vocal' ? false : instrumental,
+      instrumental: engine.supportsInstrumentalToggle ? instrumental : !engine.vocals,
       bpm,
       key: musicalKey || undefined,
-      lyrics: tier === 'vocal' ? lyrics.trim() : undefined,
-      loop: tier === 'adaptive' ? loop : undefined,
+      lyrics: engine.vocals ? (lyrics.trim() || undefined) : undefined,
+      loop: engine.supportsLoop ? loop : undefined,
+      language: langMeta?.code,
+      languageName: langMeta?.name,
+      styleTags: engine.supportsStyleField ? (styleTags.trim() || undefined) : undefined,
     });
     if (track) setLastTrack(track);
   };
+
 
   const handleAutoLyrics = async () => {
     if (!prompt.trim()) return;
@@ -112,6 +123,7 @@ export default function MusicStudio() {
     setMusicalKey('');
     setInstrumental(true);
     setLoop(false);
+    setStyleTags('');
     setLastTrack(null);
   };
 
@@ -198,7 +210,7 @@ export default function MusicStudio() {
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">Engine wählen</Label>
-                    <ProviderSelector value={tier} onChange={setTier} currencySymbol={currencySymbol} disabled={loading} />
+                    <ProviderSelector value={engineId} onChange={setEngineId} currencySymbol={currencySymbol} disabled={loading} />
                   </div>
                   <Button
                     type="button"
@@ -212,6 +224,12 @@ export default function MusicStudio() {
                     Neues Projekt
                   </Button>
                 </div>
+                <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 mt-1">
+                  <Info className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/70" />
+                  <span>
+                    <strong>Udio v2</strong> bietet aktuell kein öffentliches API — daher nicht integriert. Für vergleichbare Full-Song-Qualität ist <strong>Suno v5</strong> oder <strong>ElevenLabs Music v2</strong> die richtige Wahl.
+                  </span>
+                </p>
               </Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -225,7 +243,7 @@ export default function MusicStudio() {
                       id="prompt"
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      placeholder={tier === 'vocal'
+                      placeholder={engine.vocals
                         ? "z.B. Upbeat indie pop song about late-night freedom and city lights"
                         : "z.B. Epic cinematic build-up with deep bass and ethereal strings"}
                       className="min-h-[100px] bg-background/40 border-primary/20 focus:border-primary/60"
@@ -283,8 +301,8 @@ export default function MusicStudio() {
                     </p>
                   </div>
 
-                  {/* Tier-specific controls */}
-                  {tier === 'adaptive' && (
+                  {/* Engine-specific controls */}
+                  {engine.supportsLoop && (
                     <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                       <div>
                         <Label htmlFor="loop" className="text-sm text-foreground">Seamless Loop</Label>
@@ -294,17 +312,33 @@ export default function MusicStudio() {
                     </div>
                   )}
 
-                  {tier !== 'vocal' && (
+                  {engine.supportsInstrumentalToggle && (
                     <div className="flex items-center justify-between p-3 rounded-lg bg-background/40 border border-primary/10">
                       <div>
                         <Label htmlFor="instr" className="text-sm text-foreground">Instrumental</Label>
-                        <p className="text-[11px] text-muted-foreground">Keine Vocals (außer im Vocal-Tier)</p>
+                        <p className="text-[11px] text-muted-foreground">Ohne Gesang generieren</p>
                       </div>
                       <Switch id="instr" checked={instrumental} onCheckedChange={setInstrumental} />
                     </div>
                   )}
 
-                  {showLanguagePicker && MUSIC_LANGUAGE_SUPPORT[tier].length > 0 && (
+                  {engine.supportsStyleField && (
+                    <div>
+                      <Label htmlFor="style-tags" className="text-sm text-foreground mb-1.5 block">
+                        Style-Tags <span className="text-muted-foreground text-[11px]">(Suno-Style, kommagetrennt)</span>
+                      </Label>
+                      <Input
+                        id="style-tags"
+                        value={styleTags}
+                        onChange={(e) => setStyleTags(e.target.value)}
+                        placeholder="z.B. pop, upbeat, female vocals, 120 bpm"
+                        className="bg-background/40 border-primary/20"
+                        maxLength={200}
+                      />
+                    </div>
+                  )}
+
+                  {showLanguagePicker && engine.languages.length > 0 && (
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
                       <div className="flex items-center justify-between mb-2">
                         <div>
@@ -312,7 +346,7 @@ export default function MusicStudio() {
                           <p className="text-[11px] text-muted-foreground">Nur Sprachen, die dieser Provider sauber singt</p>
                         </div>
                         <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
-                          {tierPricing.engine}
+                          {engine.provider}
                         </Badge>
                       </div>
                       <select
@@ -322,20 +356,20 @@ export default function MusicStudio() {
                         disabled={loading}
                         className="w-full h-9 px-3 rounded-md bg-background/40 border border-primary/20 text-sm focus:border-primary/60 focus:outline-none"
                       >
-                        {MUSIC_LANGUAGE_SUPPORT[tier].map((l) => (
+                        {engine.languages.map((l) => (
                           <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
                         ))}
                       </select>
                     </div>
                   )}
 
-                  {!showLanguagePicker && (tier === 'standard' || tier === 'pro') && instrumental && (
+                  {!showLanguagePicker && engine.supportsInstrumentalToggle && instrumental && (
                     <p className="text-[11px] text-muted-foreground italic">
                       Instrumental aktiv — keine Sprachauswahl nötig. Deaktiviere „Instrumental" für Gesang.
                     </p>
                   )}
 
-                  {tier === 'vocal' && (
+                  {engine.vocals && (
                     <LyricsEditor
                       value={lyrics}
                       onChange={setLyrics}
@@ -350,8 +384,8 @@ export default function MusicStudio() {
                 <Card className="p-5 bg-background/40 backdrop-blur-md border-primary/15 space-y-4 h-fit lg:sticky lg:top-6">
                   <div>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Engine</div>
-                    <div className="font-display font-semibold text-foreground">{tierPricing.engine}</div>
-                    <div className="text-[11px] text-muted-foreground">{tierPricing.description}</div>
+                    <div className="font-display font-semibold text-foreground">{engine.provider}</div>
+                    <div className="text-[11px] text-muted-foreground">{engine.description}</div>
                   </div>
 
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
@@ -361,7 +395,7 @@ export default function MusicStudio() {
 
                   <Button
                     onClick={handleGenerate}
-                    disabled={loading || !prompt.trim() || insufficient || (tier === 'vocal' && !lyrics.trim())}
+                    disabled={loading || !prompt.trim() || insufficient || (needsLyrics && !lyrics.trim())}
                     className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 gap-2 h-11"
                   >
                     {loading ? (

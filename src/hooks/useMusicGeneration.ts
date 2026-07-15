@@ -2,20 +2,25 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAIVideoWallet } from './useAIVideoWallet';
+import { ENGINE_CATALOG, type MusicEngineId } from '@/lib/music/engineCatalog';
 
-export type MusicTier = 'quick' | 'adaptive' | 'standard' | 'vocal' | 'pro';
+// Legacy union retained for compatibility with older callers.
+export type MusicTier = MusicEngineId;
 
 export interface MusicGenerationParams {
   prompt: string;
-  tier: MusicTier;
+  tier: MusicTier;              // engineId
   durationSeconds: number;
   genre?: string;
   mood?: string;
   instrumental?: boolean;
   bpm?: number;
   key?: string;
-  lyrics?: string;       // Required for 'vocal' tier
-  loop?: boolean;        // Hint for 'adaptive' tier
+  lyrics?: string;              // For vocal engines
+  loop?: boolean;               // For loopable engines
+  language?: string;            // 2-letter code (en, de, es, …)
+  languageName?: string;        // English full name for provider directive
+  styleTags?: string;           // Suno-style style prompt (comma-separated tags)
 }
 
 export interface GeneratedMusicTrack {
@@ -26,13 +31,13 @@ export interface GeneratedMusicTrack {
   engine: string;
 }
 
-export const MUSIC_TIER_PRICING: Record<MusicTier, { eur: number; maxDuration: number; engine: string; description: string }> = {
-  quick:    { eur: 0.10, maxDuration: 30,  engine: 'MusicGen (Meta)',     description: 'Fast instrumental loops' },
-  adaptive: { eur: 0.15, maxDuration: 190, engine: 'Stable Audio 2.5',    description: 'Background music, loopable, up to ~3 min' },
-  standard: { eur: 0.35, maxDuration: 60,  engine: 'ElevenLabs Music',    description: 'Polished instrumental tracks' },
-  vocal:    { eur: 0.30, maxDuration: 60,  engine: 'MiniMax Music 1.5',   description: 'Songs with vocals & lyrics' },
-  pro:      { eur: 1.40, maxDuration: 300, engine: 'ElevenLabs Music Pro', description: 'Long-form professional production' },
-};
+// Legacy pricing map (some old imports still reference it). Backed by ENGINE_CATALOG.
+export const MUSIC_TIER_PRICING = Object.fromEntries(
+  Object.values(ENGINE_CATALOG).map((e) => [
+    e.id,
+    { eur: e.priceEur, maxDuration: e.maxDuration, engine: e.provider, description: e.description },
+  ]),
+) as Record<MusicEngineId, { eur: number; maxDuration: number; engine: string; description: string }>;
 
 async function parseInvokeError(error: any): Promise<any> {
   try {
@@ -83,6 +88,10 @@ export function useMusicGeneration() {
           toast.error('Rate limit erreicht', { description: 'Bitte kurz warten und erneut versuchen.' });
         } else if (code === 'MISSING_LYRICS') {
           toast.error('Lyrics fehlen', { description: 'Für Vocal-Tracks bitte Songtext eingeben.' });
+        } else if (code === 'SUNO_NOT_CONFIGURED') {
+          toast.error('Suno v5 ist noch nicht aktiviert', {
+            description: 'SUNO_API_KEY wird in Kürze in der Betaphase aktiviert. Bitte MiniMax oder ElevenLabs Music v2 wählen.',
+          });
         } else {
           toast.error('Music-Generierung fehlgeschlagen', { description: msg });
         }
