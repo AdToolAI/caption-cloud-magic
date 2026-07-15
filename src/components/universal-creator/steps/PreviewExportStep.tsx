@@ -303,18 +303,16 @@ export function PreviewExportStep({
     );
 
     try {
-      const { data, error } = await supabase.functions.invoke('render-with-remotion', {
-        body: {
-          project_id: projectId,
-          component_name: 'UniversalCreatorVideo',
-          quality: videoQuality,
-          customizations: {
-            ...sharedCustomizations,
-            voiceoverDuration: calculatedDuration,
-          },
-          format: 'mp4',
-          aspect_ratio: job.format.aspectRatio,
+      const { data, error } = await invokeWithQueue<any>('render-with-remotion', {
+        project_id: projectId,
+        component_name: 'UniversalCreatorVideo',
+        quality: videoQuality,
+        customizations: {
+          ...sharedCustomizations,
+          voiceoverDuration: calculatedDuration,
         },
+        format: 'mp4',
+        aspect_ratio: job.format.aspectRatio,
       });
 
       if (error) {
