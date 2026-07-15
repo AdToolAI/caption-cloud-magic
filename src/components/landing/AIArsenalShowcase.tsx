@@ -386,7 +386,13 @@ const ArsenalModelRail = ({
   onSelect: (i: number) => void;
 }) => {
   return (
-    <div className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-sm p-2 max-h-[520px] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent">
+    <div
+      className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-sm p-2 max-h-[520px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      style={{
+        maskImage: "linear-gradient(to bottom, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)",
+      }}
+    >
       <div className="px-2 py-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">
         <Zap className="h-3 w-3 text-primary/70" />
         <span>{models.length} Models</span>
