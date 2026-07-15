@@ -13,27 +13,29 @@ const corsHeaders = {
 interface EngineMeta {
   price: number;
   maxDuration: number;
-  route: 'replicate' | 'direct-elevenlabs' | 'direct-suno';
+  route: 'replicate' | 'direct-elevenlabs' | 'direct-stability' | 'direct-lyria';
   vocals: boolean;
   requiresLyrics: boolean;
   replicateModel?: string;
   label: string;
 }
 const ENGINES: Record<string, EngineMeta> = {
-  'stable-audio-25':     { price: 0.15, maxDuration: 190, route: 'replicate',         vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
-  'stable-audio-open-2': { price: 0.12, maxDuration: 47,  route: 'replicate',         vocals: false, requiresLyrics: false, replicateModel: 'stackadoc/stable-audio-open-1.0', label: 'Stable Audio Open 2' },
-  'minimax-15':          { price: 0.30, maxDuration: 60,  route: 'replicate',         vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5', label: 'MiniMax Music 1.5' },
-  'suno-v5':             { price: 0.45, maxDuration: 240, route: 'direct-suno',       vocals: true,  requiresLyrics: true,  label: 'Suno v5' },
-  'elevenlabs-music-v2': { price: 0.36, maxDuration: 300, route: 'direct-elevenlabs', vocals: true,  requiresLyrics: false, label: 'ElevenLabs Music v2' },
+  'stable-audio-25':      { price: 0.15, maxDuration: 190, route: 'replicate',         vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
+  'stable-audio-3-large': { price: 0.18, maxDuration: 190, route: 'direct-stability',  vocals: false, requiresLyrics: false, label: 'Stable Audio 3.0 Large' },
+  'minimax-15':           { price: 0.30, maxDuration: 60,  route: 'replicate',         vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5', label: 'MiniMax Music 1.5' },
+  'elevenlabs-music-v2':  { price: 0.36, maxDuration: 300, route: 'direct-elevenlabs', vocals: true,  requiresLyrics: false, label: 'ElevenLabs Music v2' },
+  'lyria-3-pro':          { price: 0.42, maxDuration: 60,  route: 'direct-lyria',      vocals: true,  requiresLyrics: true,  label: 'Google Lyria 3 Pro' },
 };
 
 // Legacy tier IDs → new engine IDs (keeps old clients / stored plans working).
 const LEGACY_ALIAS: Record<string, string> = {
-  quick:    'stable-audio-open-2',
-  adaptive: 'stable-audio-25',
-  standard: 'elevenlabs-music-v2',
-  vocal:    'minimax-15',
-  pro:      'elevenlabs-music-v2',
+  quick:                 'stable-audio-3-large',
+  adaptive:              'stable-audio-25',
+  standard:              'elevenlabs-music-v2',
+  vocal:                 'minimax-15',
+  pro:                   'elevenlabs-music-v2',
+  'suno-v5':             'elevenlabs-music-v2',
+  'stable-audio-open-2': 'stable-audio-3-large',
 };
 
 function resolveEngine(id: string): { id: string; meta: EngineMeta } | null {
@@ -41,6 +43,7 @@ function resolveEngine(id: string): { id: string; meta: EngineMeta } | null {
   if (!normalized) return null;
   return { id: normalized, meta: ENGINES[normalized] };
 }
+
 
 interface GenerateMusicRequest {
   prompt: string;
