@@ -10,7 +10,7 @@ import {
 } from '@/lib/music/engineCatalog';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw, Info } from 'lucide-react';
+import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw, Info, Radio } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,9 @@ import { useMusicGeneration, type GeneratedMusicTrack } from '@/hooks/useMusicGe
 import { ProviderSelector } from '@/components/music-studio/ProviderSelector';
 import { LyricsEditor } from '@/components/music-studio/LyricsEditor';
 import { MyTracksGrid } from '@/components/music-studio/MyTracksGrid';
+import { StudioWaveform } from '@/components/music-studio/StudioWaveform';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 const GENRES = ['any', 'pop', 'rock', 'electronic', 'hip-hop', 'jazz', 'classical', 'lo-fi', 'cinematic', 'ambient', 'folk', 'r&b'];
 const MOODS = ['energetic', 'calm', 'epic', 'sad', 'happy', 'mysterious', 'romantic', 'dark', 'uplifting', 'dreamy'];
@@ -135,72 +137,110 @@ export default function MusicStudio() {
         <meta name="description" content="Generate cinematic background music, social-ready hooks, and full songs with vocals using Stable Audio 2.5, MiniMax Music, MusicGen and ElevenLabs — all in one studio." />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#080a1f] to-[#050816] text-foreground">
-        {/* Hero */}
-        <div className="relative border-b border-primary/10 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,hsl(var(--primary)/0.12),transparent_60%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,hsl(var(--primary)/0.08),transparent_60%)]" />
-          <div className="relative max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/30 flex items-center justify-center backdrop-blur-sm">
-                  <Music2 className="h-5 w-5 text-primary" />
-                </div>
-                <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
-                  Native Music Library
-                </Badge>
-              </div>
-              <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-foreground via-primary to-foreground/80 bg-clip-text text-transparent">
-                Music Studio
-              </h1>
-              <p className="text-muted-foreground mt-2 max-w-xl">
-                Fünf KI-Engines für Background-Loops, polierte Instrumentals und Songs mit Vocals — alles in einem Studio.
-              </p>
-            </motion.div>
+      <div className="relative min-h-screen bg-gradient-to-br from-[#050816] via-[#080a1f] to-[#050816] text-foreground overflow-hidden">
+        {/* Film-grain overlay */}
+        <div
+          className="pointer-events-none fixed inset-0 opacity-[0.035] mix-blend-overlay z-0"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+          }}
+        />
 
-            <Card className="px-5 py-3 bg-background/50 backdrop-blur-md border-primary/20 flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-primary" />
-                <div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Wallet</div>
-                  <div className="font-mono text-lg font-semibold text-foreground">
-                    {currencySymbol}{balance.toFixed(2)}
+        {/* Hero */}
+        <div className="relative border-b border-primary/10 overflow-hidden z-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,hsl(var(--primary)/0.14),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,hsl(var(--primary)/0.09),transparent_60%)]" />
+          <div className="relative max-w-7xl mx-auto px-6 pt-10 pb-6">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="flex-1 min-w-0"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/30 flex items-center justify-center backdrop-blur-sm">
+                    <Music2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <Badge variant="outline" className="border-primary/40 text-primary text-[10px] tracking-widest">
+                    MASTERING SUITE
+                  </Badge>
+                  <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-400/80">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                    </span>
+                    On Air
+                  </span>
+                </div>
+                <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-foreground via-primary to-foreground/80 bg-clip-text text-transparent">
+                  Music Studio
+                </h1>
+                <p className="text-muted-foreground mt-2 max-w-xl">
+                  Fünf KI-Engines für Background-Loops, polierte Instrumentals und Songs mit Vocals — alles in einem Studio.
+                </p>
+              </motion.div>
+
+              <Card className="px-5 py-3 bg-background/50 backdrop-blur-md border-primary/25 flex items-center gap-4 shrink-0 shadow-[0_10px_40px_-20px_hsl(var(--primary)/0.4)]">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Wallet</div>
+                    <div className="font-mono text-lg font-semibold text-foreground tabular-nums">
+                      {currencySymbol}{balance.toFixed(2)}
+                    </div>
                   </div>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-primary/40 text-primary hover:bg-primary/10"
+                  onClick={() => navigate('/ai-video-purchase-credits')}
+                >
+                  Aufladen
+                </Button>
+              </Card>
+            </div>
+
+            {/* Now-playing waveform strip */}
+            <div className="mt-6 relative rounded-xl border border-primary/15 bg-background/40 backdrop-blur-md px-5 py-3 overflow-hidden">
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.06),transparent)]" />
+              <div className="relative flex items-center gap-4">
+                <div className="flex items-center gap-2 shrink-0">
+                  <Radio className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {loading ? 'Rendering' : lastTrack ? 'Last Master' : 'Idle Bus'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <StudioWaveform bars={72} active={loading} height={40} />
+                </div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground shrink-0 hidden md:block">
+                  {engine.provider} · {maxDur}s cap
+                </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-primary/40 text-primary hover:bg-primary/10"
-                onClick={() => navigate('/ai-video-purchase-credits')}
-              >
-                Aufladen
-              </Button>
-            </Card>
+            </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
           <Tabs defaultValue="generate" className="w-full">
-            <TabsList className="bg-background/40 backdrop-blur-md border border-primary/15 p-1 mb-6">
-              <TabsTrigger value="generate" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+            <TabsList className="relative bg-background/40 backdrop-blur-md border border-primary/15 p-1 mb-6 rounded-lg shadow-[inset_0_1px_0_hsl(var(--primary)/0.08)]">
+              <TabsTrigger value="generate" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Sparkles className="h-3.5 w-3.5" /> Generate
               </TabsTrigger>
-              <TabsTrigger value="tracks" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="tracks" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Library className="h-3.5 w-3.5" /> Meine Tracks
               </TabsTrigger>
-              <TabsTrigger value="stock" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="stock" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Search className="h-3.5 w-3.5" /> Stock-Suche
               </TabsTrigger>
-              <TabsTrigger value="beat" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="beat" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Activity className="h-3.5 w-3.5" /> Beat-Sync
               </TabsTrigger>
-              <TabsTrigger value="licensed" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary gap-1.5">
+              <TabsTrigger value="licensed" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
                 <Lock className="h-3.5 w-3.5" /> Lizenziert
               </TabsTrigger>
             </TabsList>
@@ -238,21 +278,29 @@ export default function MusicStudio() {
                 {/* LEFT: Prompt + Settings */}
                 <Card className="lg:col-span-2 p-5 bg-background/40 backdrop-blur-md border-primary/15 space-y-5">
                   <div>
-                    <Label htmlFor="prompt" className="text-sm font-semibold text-foreground mb-1.5 block">
+                    <Label htmlFor="prompt" className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2 block">
                       Beschreibe den Track
                     </Label>
-                    <Textarea
-                      id="prompt"
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder={engine.vocals
-                        ? "z.B. Upbeat indie pop song about late-night freedom and city lights"
-                        : "z.B. Epic cinematic build-up with deep bass and ethereal strings"}
-                      className="min-h-[100px] bg-background/40 border-primary/20 focus:border-primary/60"
-                      maxLength={500}
-                    />
-                    <div className="text-[10px] text-muted-foreground mt-1 text-right">{prompt.length}/500</div>
+                    <div className="relative group">
+                      {/* Viewfinder corners */}
+                      <span className="pointer-events-none absolute -top-px -left-px h-3 w-3 border-t border-l border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <span className="pointer-events-none absolute -top-px -right-px h-3 w-3 border-t border-r border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <span className="pointer-events-none absolute -bottom-px -left-px h-3 w-3 border-b border-l border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <span className="pointer-events-none absolute -bottom-px -right-px h-3 w-3 border-b border-r border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <Textarea
+                        id="prompt"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder={engine.vocals
+                          ? "z.B. Upbeat indie pop song about late-night freedom and city lights"
+                          : "z.B. Epic cinematic build-up with deep bass and ethereal strings"}
+                        className="min-h-[110px] bg-background/50 border-primary/20 focus:border-primary/60 rounded-md"
+                        maxLength={500}
+                      />
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground mt-1 text-right tabular-nums">{prompt.length.toString().padStart(3, '0')}/500</div>
                   </div>
+
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
@@ -382,56 +430,107 @@ export default function MusicStudio() {
                   )}
                 </Card>
 
-                {/* RIGHT: Generate + Preview */}
-                <Card className="p-5 bg-background/40 backdrop-blur-md border-primary/15 space-y-4 h-fit lg:sticky lg:top-6">
-                  <div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Engine</div>
-                    <div className="font-display font-semibold text-foreground">{engine.provider}</div>
-                    <div className="text-[11px] text-muted-foreground">{engine.description}</div>
+                {/* RIGHT: Master-Bus */}
+                <Card className="relative p-0 overflow-hidden bg-[linear-gradient(180deg,hsl(var(--card)/0.8),hsl(var(--background)/0.7))] backdrop-blur-md border-primary/25 h-fit lg:sticky lg:top-6 shadow-[0_20px_60px_-30px_hsl(var(--primary)/0.5)]">
+                  {/* Rack header */}
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-primary/15 bg-[linear-gradient(180deg,hsl(var(--primary)/0.1),transparent)]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_hsl(var(--primary))]" />
+                      <span className="text-[9.5px] uppercase tracking-widest text-muted-foreground">Master Bus</span>
+                    </div>
+                    <span className="font-mono text-[9.5px] uppercase tracking-widest text-primary/80">
+                      CH · 01
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
-                    <div className="flex flex-col">
-                      <span className="text-xs text-muted-foreground">Kosten (max. Länge)</span>
-                      {engine.pricingModel === 'per-second' && engine.priceEurPerSecond && (
-                        <span className="text-[10px] text-muted-foreground/80">
-                          {currencySymbol}{engine.priceEurPerSecond.toFixed(3)}/s • Abrechnung pro Sekunde
-                        </span>
+                  <div className="p-5 space-y-4">
+                    <div>
+                      <div className="text-[9.5px] text-muted-foreground uppercase tracking-widest mb-1">Engine</div>
+                      <div className="font-display text-lg font-semibold text-foreground leading-tight">{engine.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{engine.provider}</div>
+                      <div className="text-[11px] text-muted-foreground/80 mt-2 leading-snug">{engine.description}</div>
+                    </div>
+
+                    {/* LCD cost display */}
+                    <div className="relative rounded-lg border border-primary/30 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.15),hsl(var(--background)/0.9))] p-3 overflow-hidden">
+                      <div className="pointer-events-none absolute inset-0 opacity-30 bg-[repeating-linear-gradient(0deg,transparent_0,transparent_2px,hsl(var(--primary)/0.05)_2px,hsl(var(--primary)/0.05)_3px)]" />
+                      <div className="relative flex items-end justify-between">
+                        <div>
+                          <div className="text-[9.5px] uppercase tracking-widest text-muted-foreground">Kosten · max</div>
+                          {engine.pricingModel === 'per-second' && engine.priceEurPerSecond && (
+                            <div className="text-[10px] font-mono text-muted-foreground/80 mt-0.5">
+                              {currencySymbol}{engine.priceEurPerSecond.toFixed(3)}/s · pro Sek.
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-baseline gap-0.5">
+                          <span className="font-mono text-xs font-light text-primary/60">{currencySymbol}</span>
+                          <span className="font-mono text-3xl font-bold text-primary tabular-nums leading-none drop-shadow-[0_0_12px_hsl(var(--primary)/0.5)]">
+                            {cost.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Session meta */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-md border border-primary/10 bg-background/40 py-2">
+                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">BPM</div>
+                        <div className="font-mono text-sm text-foreground/90 tabular-nums">{bpm ?? '—'}</div>
+                      </div>
+                      <div className="rounded-md border border-primary/10 bg-background/40 py-2">
+                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">Key</div>
+                        <div className="font-mono text-sm text-foreground/90 truncate px-1">{musicalKey || '—'}</div>
+                      </div>
+                      <div className="rounded-md border border-primary/10 bg-background/40 py-2">
+                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">Cap</div>
+                        <div className="font-mono text-sm text-foreground/90 tabular-nums">{maxDur}s</div>
+                      </div>
+                    </div>
+
+                    {/* Physical button */}
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={loading || !prompt.trim() || insufficient || (needsLyrics && !lyrics.trim())}
+                      className={cn(
+                        'w-full h-12 gap-2 rounded-lg relative overflow-hidden',
+                        'bg-[linear-gradient(180deg,hsl(var(--primary)),hsl(var(--primary)/0.75))]',
+                        'text-primary-foreground font-semibold uppercase tracking-widest text-[12px]',
+                        'shadow-[0_6px_0_hsl(var(--primary)/0.35),0_10px_30px_-5px_hsl(var(--primary)/0.6),inset_0_1px_0_hsl(0_0%_100%/0.3)]',
+                        'active:translate-y-[3px] active:shadow-[0_3px_0_hsl(var(--primary)/0.35),0_6px_20px_-8px_hsl(var(--primary)/0.5),inset_0_1px_0_hsl(0_0%_100%/0.3)]',
+                        'transition-all',
+                        'disabled:opacity-60 disabled:cursor-not-allowed',
                       )}
-                    </div>
-                    <span className="font-mono text-lg font-bold text-primary">{currencySymbol}{cost.toFixed(2)}</span>
-                  </div>
+                    >
+                      {loading ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Rendering…</>
+                      ) : (
+                        <><Sparkles className="h-4 w-4" /> Track generieren</>
+                      )}
+                    </Button>
 
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={loading || !prompt.trim() || insufficient || (needsLyrics && !lyrics.trim())}
-                    className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 gap-2 h-11"
-                  >
-                    {loading ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Generiere…</>
-                    ) : (
-                      <><Sparkles className="h-4 w-4" /> Track generieren</>
+                    {insufficient && (
+                      <div className="text-[11px] text-destructive text-center">
+                        Nicht genug Credits. Lade dein Wallet auf.
+                      </div>
                     )}
-                  </Button>
 
-                  {insufficient && (
-                    <div className="text-[11px] text-destructive">
-                      Nicht genug Credits. Lade dein Wallet auf.
-                    </div>
-                  )}
-
-                  {lastTrack && (
-                    <div className="pt-3 border-t border-primary/10 space-y-2">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Letzter Track</div>
-                      <div className="text-sm font-medium text-foreground truncate">{lastTrack.title}</div>
-                      <audio
-                        src={lastTrack.url}
-                        controls
-                        className="w-full h-9"
-                        style={{ filter: 'invert(0.85) hue-rotate(180deg)' }}
-                      />
-                    </div>
-                  )}
+                    {lastTrack && (
+                      <div className="pt-3 border-t border-primary/10 space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <div className="text-[9.5px] text-muted-foreground uppercase tracking-widest">Last Master</div>
+                        </div>
+                        <div className="text-sm font-medium text-foreground truncate">{lastTrack.title}</div>
+                        <audio
+                          src={lastTrack.url}
+                          controls
+                          className="w-full h-9"
+                          style={{ filter: 'invert(0.85) hue-rotate(180deg)' }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </Card>
               </div>
             </TabsContent>
