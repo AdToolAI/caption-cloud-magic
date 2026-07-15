@@ -48,6 +48,7 @@ interface Voice {
 export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: ContentVoiceStepProps) => {
   const { toast } = useToast();
   const { t, language } = useTranslation();
+  const { voices: customVoices } = useCustomVoices();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
