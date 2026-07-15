@@ -1,83 +1,75 @@
-# Lambda-Wiring — Status & offene Punkte
 
-Kurzantwort: **Fundament steht, aber es gibt 4 offene Kanten.** Das Queue-System (60-Slot-Pool, Founders-Prio, Tick-Scheduler, Stale-Reclaim, `pickRenderTier`) ist vorhanden und aktiv (`render_queue_enabled=true`, `render_queue_slot_budget=60`, `cron.job render-queue-tick-10s` läuft). Die Studios kippen ihre Renders aber aktuell **an der Queue vorbei** direkt in die Renderer — dadurch greift der Slot-Guard nicht bei Lastspitzen. Das sollten wir vor dem 26.07. schließen.
+## Kontext & Realitäts-Check
 
-## Was heute sauber ist
+Der `RenderQueueBadge` funktioniert nur, wenn ein echter `render_queue`-Job existiert. In den beiden Ziel-Studios entsteht der aber **nicht**:
 
-- `_shared/render-concurrency.ts`: Tier-Logik (3/5/8/12 Worker, min. 120 fpl), Founders-Priority-Konstanten.
-- `render-with-remotion` & `render-directors-cut`: nutzen `pickRenderTier` pro Job.
-- `render-queue-manager`: Slot-Budget, Prio-Sort, Stale-Reclaim, atomisches Claim.
-- `render-queue-add`: setzt `is_founder`, `priority`, `estimated_workers`.
-- Cron-Job `render-queue-tick-10s` ist aktiv.
-- DB-Spalten (`is_founder`, `estimated_workers`, `priority`) und Feature-Flag vorhanden.
-- Frontend: `useRenderQueueJob` + `RenderQueueBadge` gebaut.
+- **AI Video Studio** (`ToolkitGenerator.tsx`) → invoked `generate-kling` / `generate-sora` / `generate-hailuo` etc. Diese laufen bei den Providern (Replicate/Kling API), **nicht** im Lambda-Slot-Budget. Ergebnisse landen in `ai_video_generations`.
+- **Motion Studio** (`pages/MotionStudio/StudioMode.tsx`) → hat gar keinen eigenen Render-Endpoint. Der letzte Schritt „In Composer öffnen" reicht das Projekt an Director's Cut weiter — dort hängt der Badge bereits.
 
-## Offene Punkte
+Ein 1:1-`RenderQueueBadge` an diesen Stellen wäre also toter Code. Was der Nutzer *tatsächlich* braucht: **Queue-Awareness** — sichtbare Signale, wenn die Plattform-Renderauslastung hoch ist oder die Founder-Reserve greift, damit später keine 429er überraschen.
 
-### 1. Studios umgehen die Queue (kritisch)
+## Ziel
 
-Diese Aufrufe gehen **direkt** an die Renderer:
+Zwei sichtbare Queue-Signale in Motion Studio + AI Video Studio, ohne Fake-Job-IDs zu erfinden:
 
-- `src/components/directors-cut/steps/ExportRenderStep.tsx` → `render-directors-cut`
-- `src/components/directors-cut/studio/CapCutEditor.tsx` → `render-directors-cut`
-- `src/components/universal-creator/steps/PreviewExportStep.tsx` → `render-with-remotion`
+1. **`SystemLoadPill`** — kleines Live-Element im Studio-Header, das den globalen Render-Slot-Zustand zeigt (idle / busy / founder-reserve / saturated). Reagiert auf Realtime-Änderungen in `render_queue`.
+2. **Founder-Priority-Hinweis** direkt am Generate-Button, wenn der User Founder ist ODER die Reserve gerade greift — damit Founder wissen, dass sie vorrücken, und Nicht-Founder Erwartungen kalibrieren können.
 
-Ergebnis: Bei parallelem Launch-Traffic kann die AWS-Quote (100) trotzdem knapp werden, und Founders bekommen keine echte Vorfahrt.
+## Umsetzung
 
-**Fix:** dünner Wrapper-Hook `useEnqueuedRender()` — pusht in `render-queue-add`, pollt Status über `useRenderQueueJob`, öffnet das gerenderte Video wenn `status=completed`. Die drei Aufrufstellen darauf umbiegen. Kein Redesign der Studios, nur der Invoke-Punkt wechselt.
+### 1. Hook `useRenderSystemLoad`
+- Neu: `src/hooks/useRenderSystemLoad.ts`.
+- Query zählt `render_queue` mit `status in ('queued','processing','rendering')`, summiert `estimated_workers`.
+- Slot-Budget aus `system_config.render_queue_slot_budget` (Default 60), High-Water 50.
+- Realtime-Subscription auf `render_queue`. Fallback: Polling alle 15s.
+- Rückgabe: `{ slotsUsed, slotBudget, queuedCount, state: 'idle' | 'busy' | 'founder_reserve' | 'saturated', founderQueued }`.
 
-### 2. Tick-Frequenz 1 min statt 10 s
+### 2. Komponente `SystemLoadPill`
+- Neu: `src/components/render/SystemLoadPill.tsx`.
+- Kompakte Pille mit farbcodiertem Punkt (grün/amber/rot), Text „Queue frei" / „Queue belegt (32/60)" / „Founder-Reserve aktiv" / „Voll ausgelastet".
+- Tooltip mit Details (queued, slotsUsed, budget, ggf. „Deine Founder-Prio zieht dich vor").
+- Klick → öffnet Admin-Link nur für Admins (via `useAdmin`); für Nutzer nur Tooltip.
 
-Cron ist auf `* * * * *` (pg_cron min. 1 min). Bei 60 Slots + kurzer Beta-Load reicht das, aber ETA-Anzeige wird träge.
+### 3. Wiring
+- **AI Video Studio** (`src/pages/AIVideoToolkit.tsx`): Pille rechts neben Titel im Hero-Header.
+- **Motion Studio** (`src/pages/MotionStudio/StudioMode.tsx`): Pille in der Top-Stepper-Zeile, neben Schritt-Anzeige.
 
-**Fix:** ein Cron-Job, der intern 6× `net.http_post` mit 10s-Abstand feuert (via `pg_sleep(10)` in einer Schleife oder 6 einzelne Aufrufe mit `now() + interval`). Alternativ: kurzer Selbst-Ping am Ende jedes Tick, wenn noch Jobs queued sind und Budget frei ist — hat den Vorteil, dass leere Perioden gar nicht ticken.
+### 4. Founder-Priority-Hinweis am Generate-Button
+- **AI Video Studio** (`ToolkitGenerator.tsx`, Bereich Kosten/Generate): unter dem Kosten-Chip Zeile
+  - Founder + `state !== 'idle'`: goldener Chip „Priority-Slot aktiv — du wirst bevorzugt gerendert".
+  - Nicht-Founder + `state === 'founder_reserve' | 'saturated'`: dezenter Amber-Hinweis „System stark ausgelastet — Founders werden zuerst bedient. Retry-Automatik ist aktiv."
+- **Motion Studio**: analoger Chip neben „In Composer öffnen"-Button.
 
-### 3. Globaler Slot-Guard direkt in den Renderern
+Beide Studios nutzen den bestehenden `useIsFounder` (bzw. den Profile-Flag, den Founder-Status liest — Quelle vor Implementierung final klären).
 
-Auch wenn Punkt 1 gelöst ist, sollte `render-with-remotion` / `render-directors-cut` als Safety-Net vor `renderMediaOnLambda` einmal `render_queue_running_workers` prüfen und bei `used + tier.maxWorkers > slotBudget` mit 429 antworten. Der Client (via Wrapper aus Punkt 1) fällt dann automatisch auf die Queue zurück.
-
-### 4. Beobachtbarkeit
-
-Keine sichtbare Metrik für Slot-Auslastung. Empfehlung: kleine View `render_queue_load` (`used_workers`, `slot_budget`, `queued_count`, `founders_queued`) + Admin-Widget im vorhandenen Ops-Dashboard. Kein Muss für Launch, aber sinnvoll für die ersten 1000 Founders.
-
-### 5. Badge-Einbau
-
-`RenderQueueBadge` steht bereit, wird aber noch nirgends gerendert. Nach Punkt 1 hat jeder Studio-Export eine `jobId` — dann Badge in:
-- Motion Studio Export-Panel
-- Director's Cut `ExportRenderStep` (Progress-Sektion)
-- Universal Creator `PreviewExportStep`
-- AI Video Studio `ToolkitGenerator` Progress-Zone
+### 5. Kein Change an bestehenden Badges
+- `RenderQueueBadge` und `useEnqueuedRender` in Universal Creator + Director's Cut bleiben unverändert; hier existieren echte Job-IDs.
 
 ## Technische Details
 
-**Wrapper-Hook (skizze):**
+- `system_config`-Lesung einmal beim Mount; Realtime nur auf `render_queue` (kein Polling der config).
+- Realtime-Cleanup in `useEffect` return.
+- Pille ist reaktiv, unterdrückt Blitzer via 500 ms Debounce beim State-Übergang.
+- Kein neues Edge-Function — Zählung läuft clientseitig auf `render_queue` (bereits RLS-lesbar für admin & eigene Zeilen; für alle anderen fällt `count` auf 0/nur eigene zurück → deshalb via bestehendem RPC `render_queue_running_workers` und einem neuen leichten RPC `render_queue_stats()` als `security definer`).
+
 ```text
-useEnqueuedRender({ engine, config, estimatedDurationSec })
-  → render-queue-add   (bekommt jobId, priority, position)
-  → useRenderQueueJob(jobId) subscribed
-  → status=completed  → onDone(outputUrl)
-  → status=failed     → onError(errorMessage)
+Motion Studio Header
+┌────────────────────────────────────────────────────────┐
+│ Schritt 3/4 · Storyboard        ● Queue frei (12/60)   │
+└────────────────────────────────────────────────────────┘
+
+AI Video Studio Generate-Panel
+┌────────────────────────────────────────────────────────┐
+│ Kosten: 0.42 €                                         │
+│ 👑 Priority-Slot aktiv — du renderst bevorzugt         │
+│  [ Generieren ]                                        │
+└────────────────────────────────────────────────────────┘
 ```
 
-**Slot-Guard (skizze in Renderer):**
-```text
-const running = await supabase.rpc('render_queue_running_workers');
-if (running + tier.maxWorkers > slotBudget) return 429 { retry_via: 'queue' };
-```
+## Was wir NICHT machen
 
-**Tick-Selbst-Ping:**
-```text
-if (queued.length > 0 && used < slotBudget) {
-  fetch(SELF_URL, { method:'POST', body:{ trigger:'chain' } });
-}
-```
+- Keine künstliche `render_queue`-Zeile für AI-Video-Provider-Jobs (Kling/Sora/Hailuo laufen extern, gehören nicht ins Lambda-Budget).
+- Keine Änderung an `useEnqueuedRender` — bleibt bei den echten Remotion-Renderpfaden.
+- Kein Motion-Studio-eigener Render-Endpoint — Handoff an Composer bleibt so.
 
-## Reihenfolge
-
-1. Wrapper-Hook + drei Studio-Aufrufe (Punkt 1) — größter Impact.
-2. Renderer-Slot-Guard (Punkt 3) — Safety-Net.
-3. Tick-Selbst-Ping (Punkt 2) — bessere ETA.
-4. Badge-Einbau in die vier Studios (Punkt 5).
-5. Optional: Load-View + Ops-Widget (Punkt 4).
-
-Sag Bescheid welche Punkte du mitnehmen willst — 1+3+5 reichen für einen sauberen Launch, 2 und 4 sind Komfort.
+Nach der Umsetzung sehen Nutzer in Motion Studio + AI Video Studio jederzeit den globalen Render-Zustand und Founder wissen, wann ihre Priorität aktiv greift — ohne dass wir eine falsche Semantik einführen.
