@@ -808,12 +808,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       const fromSceneRoot = rootVoiceId
         ? toElevenLabsDialogVoice(rootVoiceId, getAutoVoiceName(rootVoiceId), true)
         : undefined;
-      const chosen = existing ?? fromSceneRoot;
+      // Cast & World "default_voice_id" (brand default) — used when nothing was
+      // explicitly picked yet in the studio. Ensures the voice you assigned in
+      // Cast & World is actually spoken, not just displayed as a "Brand" chip.
+      const brandDefaultId = defaultVoiceByCharId[sp.id] ?? defaultVoiceByCharId[lookupId];
+      const fromBrandDefault = brandDefaultId
+        ? toElevenLabsDialogVoice(brandDefaultId, getAutoVoiceName(brandDefaultId) ?? 'Brand voice', false)
+        : undefined;
+      const chosen = existing ?? fromSceneRoot ?? fromBrandDefault;
       if (chosen?.voiceId) out[sp.id] = chosen;
     }
 
     return out;
-  }, [speakers, sceneCast, voicePerSpeaker, scene.dialogVoices, (scene as any).characterVoiceId]);
+  }, [speakers, sceneCast, voicePerSpeaker, scene.dialogVoices, (scene as any).characterVoiceId, defaultVoiceByCharId]);
 
   const resolvedDialogVoiceMap = useMemo<Record<string, DialogVoiceCfg>>(() => {
     const next: Record<string, DialogVoiceCfg> = { ...voicePerSpeaker };
