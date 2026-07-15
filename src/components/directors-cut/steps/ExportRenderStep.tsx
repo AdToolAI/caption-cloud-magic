@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
+import { describeRenderAdmissionError, tryParseAdmissionFromInvokeError } from '@/lib/render/admission';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
@@ -464,6 +465,12 @@ export function ExportRenderStep({
       });
 
       if (error) {
+        const admission = await tryParseAdmissionFromInvokeError(error);
+        if (admission) {
+          toast.warning(admission.message, { duration: 8000 });
+          setIsRendering(false);
+          return;
+        }
         // Check for AWS Rate Exceeded error
         const errorMessage = error.message || '';
         if (errorMessage.includes('Rate Exceeded') || errorMessage.includes('TooManyRequestsException')) {
@@ -474,6 +481,13 @@ export function ExportRenderStep({
           return;
         }
         throw error;
+      }
+
+      const admissionData = describeRenderAdmissionError(data);
+      if (admissionData) {
+        toast.warning(admissionData.message, { duration: 8000 });
+        setIsRendering(false);
+        return;
       }
 
       if (data?.error === 'INSUFFICIENT_CREDITS') {

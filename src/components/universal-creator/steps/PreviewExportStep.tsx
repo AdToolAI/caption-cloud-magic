@@ -17,6 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { extractFunctionsError } from '@/lib/functionsError';
+import { describeRenderAdmissionError, tryParseAdmissionFromInvokeError } from '@/lib/render/admission';
 import { clampAudioVolume } from '@/lib/audioVolume';
 import { DEFAULT_SUBTITLE_STYLE, DEFAULT_VOICEOVER_VOLUME, computeTotalDurationSeconds, computeDurationInFrames } from '@/lib/universalCreatorDefaults';
 import { buildUniversalCreatorCustomizations, validateScenes } from '@/lib/universalCreatorRenderPayload';
@@ -314,6 +315,16 @@ export function PreviewExportStep({
       });
 
       if (error) {
+        const admission = await tryParseAdmissionFromInvokeError(error);
+        if (admission) {
+          toast.warning(admission.message, { duration: 8000 });
+          setRenderJobs(prev =>
+            prev.map(j =>
+              j.id === job.id ? { ...j, status: 'pending', progress: 0, error: admission.message } : j,
+            ),
+          );
+          return;
+        }
         const detail = await extractFunctionsError(error);
         const friendly = /idle.?timeout|aborted|timeout|IDLE_TIMEOUT/i.test(detail || '')
           ? t('uc.renderStartSlow')
@@ -322,6 +333,16 @@ export function PreviewExportStep({
       }
 
       if (data && data.ok === false) {
+        const admission = describeRenderAdmissionError(data);
+        if (admission) {
+          toast.warning(admission.message, { duration: 8000 });
+          setRenderJobs(prev =>
+            prev.map(j =>
+              j.id === job.id ? { ...j, status: 'pending', progress: 0, error: admission.message } : j,
+            ),
+          );
+          return;
+        }
         const raw = String(data.error || '');
         const friendly = /aborted|timeout|idle/i.test(raw)
           ? t('uc.renderStartSlow')

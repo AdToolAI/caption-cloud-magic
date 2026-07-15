@@ -6,7 +6,7 @@ import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-p
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { pickRenderTier } from "../_shared/render-concurrency.ts";
+import { pickRenderTier, checkRenderAdmission } from "../_shared/render-concurrency.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -415,6 +415,39 @@ serve(async (req) => {
     // Calculate credits with premium features
     const creditsNeeded = calculateCredits(duration, quality, premiumFeatures);
     activeCreditsNeeded = creditsNeeded;
+
+    // Lambda slot admission — safety net so Founders keep priority under load.
+    try {
+      const estFrames = Math.max(30, Math.round(duration * 30));
+      const tier = pickRenderTier(estFrames);
+      const { data: isFounder } = await supabaseClient.rpc('is_active_founder', { _user_id: user.id });
+      const admission = await checkRenderAdmission({
+        supabaseAdmin: supabaseClient,
+        isFounder: !!isFounder,
+        tierMaxWorkers: tier.maxWorkers,
+      });
+      if (!admission.admitted) {
+        console.warn(`[RenderDirectorsCut] admission denied: ${admission.reason} used=${admission.usedWorkers}/${admission.slotBudget} founder=${!!isFounder}`);
+        return new Response(JSON.stringify({
+          error: 'RENDER_SLOT_BUSY',
+          reason: admission.reason,
+          used_workers: admission.usedWorkers,
+          slot_budget: admission.slotBudget,
+          retry_after_seconds: admission.retryAfterSeconds,
+          founders_only: admission.reason === 'founder_reserve',
+        }), {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': String(admission.retryAfterSeconds),
+          },
+        });
+      }
+    } catch (admissionErr) {
+      console.error('[RenderDirectorsCut] admission check threw, admitting:', admissionErr);
+    }
+
 
     // Check user credits
     const { data: wallet, error: walletError } = await supabaseClient

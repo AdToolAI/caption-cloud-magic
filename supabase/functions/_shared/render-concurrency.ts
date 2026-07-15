@@ -56,3 +56,87 @@ export function pickPriority(isFounder: boolean, override?: number | null): numb
   if (typeof override === 'number' && override > 0 && override < 10) return override;
   return isFounder ? PRIORITY_FOUNDER : PRIORITY_STANDARD;
 }
+
+/**
+ * Founders reserve band: when >= this share of the slot budget is in use,
+ * only Founders are admitted. Non-founders get a 429 with a retry hint.
+ * Default: at 50/60 slots (~83%) reserve the last 10 for Founders.
+ */
+export const FOUNDER_RESERVE_HIGH_WATER = 50;
+
+export interface AdmissionResult {
+  admitted: boolean;
+  reason?: 'slot_budget_exhausted' | 'founder_reserve';
+  usedWorkers: number;
+  slotBudget: number;
+  neededWorkers: number;
+  retryAfterSeconds: number;
+}
+
+/**
+ * Central admission check used by direct-render entry points
+ * (render-with-remotion, render-directors-cut) as a safety net so that a
+ * viral burst can't blow past the AWS Lambda quota.
+ */
+export async function checkRenderAdmission(params: {
+  supabaseAdmin: any;
+  isFounder: boolean;
+  tierMaxWorkers: number;
+  slotBudget?: number;
+  highWater?: number;
+}): Promise<AdmissionResult> {
+  const {
+    supabaseAdmin,
+    isFounder,
+    tierMaxWorkers,
+    slotBudget = RENDER_SLOT_BUDGET_DEFAULT,
+    highWater = FOUNDER_RESERVE_HIGH_WATER,
+  } = params;
+
+  let used = 0;
+  try {
+    const { data } = await supabaseAdmin.rpc('render_queue_running_workers');
+    used = Number(data ?? 0);
+  } catch (_err) {
+    // Fail-open: if RPC fails we don't want to block renders entirely,
+    // but log for observability.
+    console.warn('[render-admission] running-workers RPC failed, admitting');
+    return {
+      admitted: true,
+      usedWorkers: 0,
+      slotBudget,
+      neededWorkers: tierMaxWorkers,
+      retryAfterSeconds: 0,
+    };
+  }
+
+  const need = Math.max(1, tierMaxWorkers);
+
+  if (used + need > slotBudget) {
+    return {
+      admitted: false,
+      reason: 'slot_budget_exhausted',
+      usedWorkers: used,
+      slotBudget,
+      neededWorkers: need,
+      retryAfterSeconds: 45,
+    };
+  }
+  if (!isFounder && used >= highWater) {
+    return {
+      admitted: false,
+      reason: 'founder_reserve',
+      usedWorkers: used,
+      slotBudget,
+      neededWorkers: need,
+      retryAfterSeconds: 30,
+    };
+  }
+  return {
+    admitted: true,
+    usedWorkers: used,
+    slotBudget,
+    neededWorkers: need,
+    retryAfterSeconds: 0,
+  };
+}
