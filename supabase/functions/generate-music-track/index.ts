@@ -273,8 +273,11 @@ serve(async (req) => {
       engineUsed = 'replicate/minimax-music-1.5';
       const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-      // MiniMax expects lyrics with [Verse]/[Chorus]/[Bridge] tags + a style description
-      const styleDesc = [
+      // MiniMax schema (replicate.com/minimax/music-1.5):
+      //   lyrics: string  10-600 chars, supports [intro][verse][chorus][bridge][outro]
+      //   prompt: string  10-300 chars — style description
+      const FILLER = 'Cinematic studio production, mastered mix, professional arrangement';
+      let styleDesc = [
         genre && genre !== 'any' ? `Genre: ${genre}` : '',
         mood ? `Mood: ${mood}` : '',
         bpm ? `Tempo: ${bpm} BPM` : '',
@@ -282,24 +285,44 @@ serve(async (req) => {
         prompt.trim(),
         'Studio production quality',
       ].filter(Boolean).join('. ');
+      if (styleDesc.length < 10) styleDesc = `${styleDesc} ${FILLER}`.trim();
+      if (styleDesc.length > 300) styleDesc = styleDesc.slice(0, 300);
+
+      let lyricsInput = (lyrics ?? '').trim();
+      if (lyricsInput.length < 10) {
+        return new Response(JSON.stringify({
+          error: "Lyrics zu kurz (min. 10 Zeichen). Bitte Songtext eingeben oder AI-Lyrics generieren.",
+          code: "MISSING_LYRICS",
+          stage: "replicate-input",
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (lyricsInput.length > 600) lyricsInput = lyricsInput.slice(0, 600);
+
+      const minimaxInput = { lyrics: lyricsInput, prompt: styleDesc };
+      console.log('[generate-music-track] MiniMax input:', {
+        promptLen: styleDesc.length,
+        lyricsLen: lyricsInput.length,
+        promptPreview: styleDesc.slice(0, 80),
+      });
 
       let output: any;
       try {
-        output = await replicate.run(
-          'minimax/music-1.5',
-          {
-            input: {
-              lyrics: lyrics!.trim(),
-              prompt: styleDesc,
-            },
-          }
-        );
+        output = await replicate.run('minimax/music-1.5', { input: minimaxInput });
       } catch (err: any) {
         console.error('[generate-music-track] MiniMax error:', err);
+        // Try to surface the exact provider detail (Replicate 422 body).
+        let providerDetail: string | undefined;
+        try {
+          if (err?.response && typeof err.response.json === 'function') {
+            const body = await err.response.clone().json();
+            providerDetail = body?.detail || JSON.stringify(body);
+          }
+        } catch { /* ignore */ }
         return new Response(JSON.stringify({
-          error: `Vocal music generation failed: ${err.message || 'Unknown error'}`,
-          code: "REPLICATE_ERROR",
-        }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          error: providerDetail || err?.message || 'Unknown MiniMax error',
+          code: "MINIMAX_VALIDATION",
+          stage: "replicate-input",
+        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       let audioUrl: string | null = null;
