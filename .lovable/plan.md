@@ -1,70 +1,71 @@
+# Pre-Launch Deep-Dive Audit — Go-Live 26.07.2026
 
-# Provider-Style Covers + Animated Showcase Clips fürs AI Arsenal
+Ziel: Systematischer End-to-End-Check aller kritischen Pfade. Kein Feature-Build, kein Refactor — nur Audit + gezielte Härtungs-Fixes, wo wir konkrete Risiken finden.
 
-## Ziel
-Statt 37× goldene Clapper zeigen wir pro Modell **eine echte visuelle Signatur** — teils als Still, teils als kurzer Loop-Clip — damit Nutzer aufs erste Anschauen begreifen, was jedes Modell *kann und wie es aussieht*.
+## Audit-Scope (7 Blöcke)
 
-## Mischung (bewusster Mix, nicht alles animiert)
-Wir teilen den Katalog in zwei Klassen ein, damit die Reel-Seite performant bleibt (Video ist teuer im Bandwidth) und trotzdem "lebendig" wirkt:
+### 1. Auth & Onboarding
+- Sign-up / Login / Password-Reset / Google OAuth Redirect-URIs
+- E-Mail-Verifizierung + Suppression-Liste + 3-Tage-Cap
+- Onboarding-Flow inkl. Cinema-Concierge Trigger
+- `user_roles` Absicherung (keine Client-Role-Checks, `has_role` Function korrekt)
 
-| Klasse | Anteil | Format | Wofür |
-|---|---|---|---|
-| **A — Hero-Clips (animiert)** | ~10 Flaggschiffe (Sora 2, Veo 3.1 Pro, Kling 2.5 Pro/Omni, Wan 2.6 Pro, Hailuo 2.3 Pro, Luma Ray 2, Runway Gen-4, Seedance 2 Pro, Pika 2.2) | 3–4 s MP4-Loop, 720p, ~1–2 MB, `muted autoplay loop playsinline` | Bewegung, Kamerafahrt, Lip-Sync-Feel |
-| **B — Style-Stills (statisch)** | Rest (Lite/Fast/Mini + alle Bild-/Audio-/Avatar-Modelle) | JPG 16:9, ~150–250 KB | Farbraum, Grain, Ästhetik-DNA |
+### 2. Billing & Founders-Programm
+- Stripe: 14.99 € Beta-Basic Produkt + Preis-ID live?
+- Founders 20 % Coupon (`FOUNDERS_VIDEO_20`) + 24-Monate-Preisgarantie
+- Status-Forfeit-Logik bei Kündigung
+- `claim_founders_slot` RPC + Slot-Zähler
+- Webhooks (checkout.completed, subscription.updated, invoice.failed)
+- Refund-Automation bei Render-/Provider-Fehlern
 
-Jede Karte im Reel bekommt zusätzlich ein leichtes **Ken-Burns / Parallax-Overlay per CSS** (auch die Stills), damit das ganze Reel „atmet".
+### 3. Studios — Wiring & Persistenz
+- Cast & World (Charaktere/Outfits/Locations/Props, IDs sichtbar, Voice-Zuordnung)
+- Motion Studio, Director's Cut, Universal Content Creator, Video Composer
+- AI Video Studio inkl. Kling Omni Media-Lock + DE-Silent-Mode
+- Picture Studio, Music Studio, Audio Studio + Voice Studio
+- Prüfung: Session-Persistenz (kein Datenverlust bei Reload/Render), Lip-Sync-Intent-Toggle-Veto, Progress-Bar-Consistency
 
-## Prompts pro Provider (Auszug — Ästhetik ohne Markennennung)
-- **Sora 2** — 35mm anamorphic, shallow DOF, golden-hour rooftop, subtle lens flare
-- **Kling 2.5 Pro** — cinematic portrait, warm rim-light, silk-smooth camera dolly
-- **Veo 3.1 Pro** — hyperreal texture, saturated color science, product macro
-- **Wan 2.6 Pro** — Asian blockbuster grade, teal-orange, mist, epic scale
-- **Hailuo 2.3** — surreal poetic dreamscape, painterly, floating objects
-- **Luma Ray 2** — hazy dreamy volumetric light, pastel
-- **Runway Gen-4** — moody teal-orange, urban night, rain reflections
-- **Seedance 2 Pro** — sports slow-motion, dust, dynamic action
-- **Pika 2.2** — playful stylized, punchy colors, keyframe morph
-- **Vidu / Kling Omni** — locked close-up portrait, natural talking motion
-- **Bildmodelle (Nano Banana / Gemini 3 Pro Image / GPT-Image-2)** — jeweils charakteristisches Test-Motiv
-- **Audiomodelle** — abstrakter Waveform/Studio-Vibe (Neonröhren, Mixer-Fader)
-- **Avatare** — Portrait-Style, aber ohne Lip-Sync-Bewegung
+### 4. Backend & Sicherheit
+- RLS-Check aller neu angelegten Tabellen (Founders, Voice-Lib, Companion, Render-Queue)
+- GRANTs auf public.* für neu erstellte Tabellen
+- Edge Functions: CORS-Preflight, Timeouts, Error-Handling, Idempotenz
+- Secrets: Keine geleakten Keys im Frontend, ElevenLabs/Replicate/Sync.so Keys gesetzt
+- Security-Scanner-Run + Ergebnis dokumentieren
 
-**Legal-Safety**: Prompts enthalten **nie** "in the style of Sora / Veo / Kling…", **kein Text**, **kein Wasserzeichen**, **keine echten Personen**. Wir imitieren *visuelle DNA*, nicht Marken.
+### 5. Render-Pipeline & Queue
+- 60-Slot Lambda-Pool + Founders-Priority-Queue Dispatcher (`pg_cron` tickt?)
+- Credit-Refund bei Render-Failures (idempotent)
+- Lip-Sync-Pipeline v55 (audioInput refId-only, stale-payload-guard)
+- Realtime-Fallback-Polling aktiv
 
-## Umsetzung
+### 6. Frontend & Public Pages
+- Startseite (Hero, AI Arsenal Showcase mit Loops, Founders-Dialog, Footer-Links)
+- Legal-Seiten (AGB §8, Impressum, Datenschutz) — Anker + Links
+- SEO: Title/Meta/OG auf allen öffentlichen Routen, Sitemap aktuell
+- 404 / Unauthorized / CheckEmail Flow
+- Mobile-Responsive Spot-Check (Landing, Dashboard, ein Studio)
 
-1. **`src/config/arsenalStyleProfiles.ts`** — pro `modelId`: `kind: 'still' | 'clip'`, `prompt`, `negative`, `aspect`, für Clips zusätzlich `duration`, `motion` (Kamerafahrt-Direktive).
+### 7. Observability & E2E
+- Playwright Smoke-Suite lokal einmal grün?
+- Sentry-Errors letzte 7 Tage sichten
+- Admin-Monitoring-Dashboards funktionieren (Cost, Lambda-Health, Alerts, Render-Load)
+- Cron-Heartbeats (Queue-Manager, Voice-Refresh, Email-Drip) laufen
 
-2. **Batch-Skripte** (einmalig, lokal via Edge Function):
-   - `scripts/generate-arsenal-stills.ts` → ruft `/v1/images/generations` mit `google/gemini-3.1-flash-image`, Ergebnis nach `src/assets/arsenal/{modelId}.jpg` via **Lovable-Assets-CLI** (Pointer-JSON committen, Binary nicht).
-   - `scripts/generate-arsenal-clips.ts` → nutzt unser bestehendes `generate-luma-video` bzw. `generate-hailuo-video` (günstigste Provider für Loops, keine externen Kosten pro Endnutzer-Request), 4 s @ 720p. Danach mit `ffmpeg` auf ~1.5 MB komprimiert, Poster-Frame als JPG. Ausgabe → `.asset.json`-Pointer.
+## Deliverable
 
-3. **`AIArsenalShowcase.tsx`** — Cover-Layer:
-   ```tsx
-   {entry.kind === 'clip' ? (
-     <video src={entry.clipUrl} poster={entry.posterUrl}
-            muted autoPlay loop playsInline
-            className="absolute inset-0 h-full w-full object-cover" />
-   ) : (
-     <img src={entry.stillUrl} alt=""
-          className="absolute inset-0 h-full w-full object-cover ken-burns" />
-   )}
-   ```
-   - Beibehalten: goldener Grain-Layer, Vignette, Genre-Badge, Modellname.
-   - **Bandwidth-Guard**: `IntersectionObserver` lädt Clips erst wenn im Viewport; Mobile (< 768 px) fällt auf Poster-Still zurück.
-   - **Prefers-reduced-motion**: alle Clips → Poster-Still.
+Nach Audit: **Pre-Launch-Report** mit
+- ✅ Grün: was launch-ready ist
+- 🟡 Gelb: was noch nice-to-have vor Launch
+- 🔴 Rot: Blocker, die vor 26.07. gefixt werden müssen
 
-4. **Kosten (einmalig)**
-   - 27 Stills × ~$0.005 ≈ 0.15 €
-   - 10 Clips × ~$0.25 (Luma/Hailuo, 4 s) ≈ 2.50 €
-   - **Gesamt < 3 €**, danach 0 € Runtime (Assets liegen auf CDN).
+Für Rot-Findings jeweils Mini-Fix-Plan (Datei, Aufwand, Risiko). Erst danach Build-Mode für die Fixes.
 
-5. **QA-Loop**
-   - Zuerst 3 Test-Renderings (1 Clip: Sora-Feel via Luma Ray 2; 1 Still: Veo-Feel; 1 Still: Nano-Banana) — Abnahme durch dich.
-   - Dann Full-Batch, Reel-Seite live.
+## Was NICHT Teil des Audits ist
+- Neue Features
+- UI-Redesigns
+- Preisänderungen jenseits der bereits beschlossenen 14.99 € / 20 % Founders
+- Umbau der Lip-Sync-Pipeline (nur Verifikation)
 
-## Ergebnis
-Ein **echtes Cinema-Reel**: 10 Karten bewegen sich subtil, 27 zeigen statisch-atmosphärische Frames, alle mit unverwechselbarer Provider-DNA. Perfekt für Landing/Login-Vor-Bereich, rechtlich sauber, performant.
+## Frage vor Start
 
----
-**Freigabe für 3 Test-Renderings?** Ich schicke dir die drei Vorschauen zurück, bevor der Full-Batch läuft.
+Soll ich **direkt mit dem vollständigen 7-Block-Audit** starten (dauert lange, dafür einmal alles) oder **priorisiert nach Risiko** — also erst Billing + Auth + RLS/Secrets (Block 1, 2, 4), dann der Rest? Priorisiert = früher konkrete Blocker sichtbar.
