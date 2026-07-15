@@ -23,8 +23,18 @@ import {
   Audio,
   Freeze,
   Img,
+  OffthreadVideo,
   Sequence,
-  Video,
+  // v252 — All video playback in this composition uses OffthreadVideo instead
+  // of the classic <Video>. The classic tag decodes via Chromium's
+  // HTMLVideoElement and stalls the whole worker when a signed URL (Sync.so
+  // / S3) hangs on a Range request — Lambda then hits the 600 s hard-kill.
+  // OffthreadVideo decodes out-of-process via ffmpeg with built-in retries
+  // and is Remotion's official recommendation for Lambda rendering. The
+  // aliased import keeps all existing <Video ...> sites in this file
+  // working with no prop changes (props used here — src, muted, playbackRate,
+  // startFrom, style — are 100% API-compatible).
+  OffthreadVideo as Video,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
