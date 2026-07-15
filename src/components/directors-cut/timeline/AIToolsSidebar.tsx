@@ -459,6 +459,14 @@ export function AIToolsSidebar({
           </TabsContent>
         </ScrollArea>
       </Tabs>
+
+      <MusicLibraryBrowser
+        open={musicBrowserOpen}
+        onOpenChange={setMusicBrowserOpen}
+        initialType="music"
+        allowedTypes={['music', 'sfx']}
+        onSelect={handleSelectLibraryTrack}
+      />
     </div>
   );
 }
