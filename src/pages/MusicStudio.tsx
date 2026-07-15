@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity } from 'lucide-react';
+import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
