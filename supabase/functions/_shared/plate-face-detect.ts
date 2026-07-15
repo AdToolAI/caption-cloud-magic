@@ -396,7 +396,7 @@ function normalizedFacesToPlateBoxes(
 ): PlateFaceBox[] {
   const W = Math.max(1, plateWidth);
   const H = Math.max(1, plateHeight);
-  return rawFaces
+  const built = rawFaces
     .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
     .map((f) => {
       const [nx1, ny1, nx2, ny2] = (f.bbox as number[]).map((n) => Math.max(0, Math.min(1, Number(n))));
@@ -411,9 +411,10 @@ function normalizedFacesToPlateBoxes(
         confidence: typeof f.confidence === "number" ? f.confidence : undefined,
       };
     })
-    .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4)
-    .sort((a, b) => a.center[0] - b.center[0])
-    .map((f, idx) => ({ ...f, slot: idx }));
+    .filter((f) => f.bbox[2] > f.bbox[0] + 4 && f.bbox[3] > f.bbox[1] + 4);
+  // v242 — Row-major slot sort so 2×2 / 2×N grid layouts get natural
+  // TL, TR, BL, BR order (single-row layouts collapse to X-only).
+  return sortFacesRowMajor(built).map((f, idx) => ({ ...f, slot: idx }));
 }
 
 /**
