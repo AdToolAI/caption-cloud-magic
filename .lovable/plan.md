@@ -1,66 +1,59 @@
 ## Ziel
-Music Studio um 3 aktuelle Top-Engines erweitern und die alte Tier-Struktur (`quick/adaptive/standard/vocal/pro`) in einen sauberen **Engine-Katalog** umbauen, damit weitere Modelle künftig ohne UI-Refactor dazukommen können.
+Suno v5 aus dem Music-Studio-Katalog entfernen (kein offizieller API-Zugang) und stattdessen die zwei besten aktuell verfügbaren Engines laut deiner Bewertung ergänzen: **Google Lyria 3 Pro** (Preview) und **Stable Audio 3.0 Large**. ElevenLabs Music v2 bleibt als Top-Empfehlung.
 
-## Verfügbarkeitscheck (Stand 15.07.2026)
+## Neuer Katalog (final)
 
-| Engine | API-Verfügbar? | Route | Sprachen | Preis (Provider) | Retail (3×) |
-|---|---|---|---|---|---|
-| **Suno v5** | Ja (Replicate `suno-ai/bark-suno-v5` bzw. offizielle Suno API) | Replicate | EN, DE, ES, FR, IT, PT, JA, KO, ZH + 20 weitere | ~$0.08 / Song | **0.30 €** |
-| **Udio v2** | ❌ **Kein öffentliches API** (Udio Inc. bietet nur Web-UI; nur Drittanbieter-Scraper) | – | – | – | **Nicht integrierbar** |
-| **ElevenLabs Music v2** | Ja (nativ, `api.elevenlabs.io/v1/music`, ElevenLabs-Connector bereits verbunden) | Direct | EN, DE, ES, FR, IT, PT + 20 weitere | ~$0.06 / 30s | **0.24 €** |
-| **Stable Audio Open 2** | Ja (Replicate `stability-ai/stable-audio-open-2`) | Replicate | Instrumental-only | ~$0.03 / Track | **0.12 €** |
+| Karte | Engine | Vocals | Max Länge | Retail | Route | Use-Case |
+|---|---|---|---|---|---|---|
+| **Adaptive (Loop)** | Stable Audio 2.5 | ❌ | 190s | 0.15 € | Replicate | Background, loopable |
+| **Adaptive Large** *(ersetzt Open 2)* | Stable Audio 3.0 Large | ❌ | 190s | 0.18 € | Direct API (Stability) | Höchste Instrumental-Qualität |
+| **Vocal Mini** | MiniMax Music 1.5 | ✅ | 60s | 0.30 € | Replicate | Schnelle Song-Skizze |
+| **Vocal Studio (EL)** ⭐ | ElevenLabs Music v2 | ✅ | 300s | 0.36 € | Direct API | Beste Gesamtlösung, mehrsprachig |
+| **Vocal Pro (Lyria)** *(neu, ersetzt Suno)* | Google Lyria 3 Pro | ✅ | 30–60s (Preview) | 0.42 € | Vertex AI / Gemini API | Google Preview, radio-nahe Qualität |
 
-**Empfehlung:** Suno v5, ElevenLabs Music v2 und Stable Audio Open 2 aufnehmen. **Udio v2 weglassen** und dem User transparent kommunizieren — sonst müssten wir auf einen Grauzonen-Reseller setzen, was für ein Beta-Launch mit Zahlungsflow ein Compliance-Risiko wäre.
-
-## Neuer Engine-Katalog
-
-Ersetzt die alten Tiers. Namen bleiben pro Karte im UI klar erkennbar (Provider-Branding sichtbar, weil Kunden explizit „Suno" wollen).
-
-| Karte | Engine | Vocals | Max Länge | Preis | Use-Case |
-|---|---|---|---|---|---|
-| **Adaptive (Loop)** | Stable Audio 2.5 | ❌ | 190s | 0.15 € | Background, loopable |
-| **Adaptive Open** *(neu)* | Stable Audio Open 2 | ❌ | 47s | 0.12 € | Kurze Stings, günstig |
-| **Vocal Mini** | MiniMax Music 1.5 | ✅ | 60s | 0.30 € | Schnelle Song-Skizze |
-| **Vocal Pro (Suno)** *(neu)* | Suno v5 | ✅ | 240s | 0.45 € | Full Song, radio-ready |
-| **Vocal Studio (EL)** *(neu)* | ElevenLabs Music v2 | ✅ | 300s | 0.36 € | Cinematic, mehrsprachig |
-
-Alte `quick`/`standard`/`pro` werden entfernt (waren Duplikate/nie ausgeliefert).
+**Entfällt:**
+- **Suno v5** — kein offizieller API-Zugang, Drittanbieter/Scraper wären Compliance-Risiko.
+- **Stable Audio Open 2** — durch das stärkere Stable Audio 3.0 Large ersetzt.
 
 ## Umsetzung
 
-### 1. Single-Source-of-Truth `src/lib/music/engineCatalog.ts` (neu)
-Zentrale Registry mit `id, label, provider, vocals, maxDuration, priceEur, languages, replicateModel|nativeEndpoint`. Ersetzt hardcodete `MUSIC_TIER_PRICING`, `MUSIC_LANGUAGE_SUPPORT` und `tier: 'quick'|'adaptive'|…`-Union. Ein neues Modell = ein Eintrag im Katalog.
+### 1. `src/lib/music/engineCatalog.ts`
+- `suno-v5` Eintrag entfernen.
+- `stable-audio-open-2` → `stable-audio-3-large` umbenennen (Preis, maxDuration, Label anpassen).
+- Neuer Eintrag `lyria-3-pro` mit `vocals: true`, Sprach-Set (EN, DE, ES, FR, IT, PT, JA), 60s Max.
+- Legacy-Mapping in `useMusicGeneration` erweitern: alte `suno-v5`-IDs aus History → `elevenlabs-music-v2` (nächstbeste Vocal-Engine).
 
 ### 2. Edge Function `supabase/functions/generate-music-track/index.ts`
-- Umstellung auf `engineId` statt `tier`.
-- Neue Branches:
-  - `suno-v5` → Replicate `suno-ai/…` mit `prompt`, `lyrics`, `style`, `duration` (Feld-Mapping wie MiniMax hardened).
-  - `elevenlabs-music-v2` → Direct `POST https://api.elevenlabs.io/v1/music` (Connector-Key `ELEVENLABS_API_KEY`), binäres MP3 → Base64 → Storage-Upload (gleiche Pipeline wie MiniMax).
-  - `stable-audio-open-2` → Replicate `stability-ai/stable-audio-open-2`.
-- Detaillierte Provider-Fehler weiter durchreichen (wie zuletzt bei `MINIMAX_VALIDATION`).
-- Idempotenter Credit-Refund bei Provider-Fail (bestehende Wallet-Logik).
+- `suno-v5` Branch komplett entfernen (inkl. Suno-Job-Polling, `SUNO_API_KEY` Check, `SUNO_NOT_CONFIGURED` Fehlercode).
+- Neuer Branch **`stable-audio-3-large`**: Stability AI Direct API `POST https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio` (v3 Large Endpoint), Auth via neuer Secret `STABILITY_API_KEY`. Binary MP3 → Base64 → Storage-Upload (bestehende Pipeline).
+- Neuer Branch **`lyria-3-pro`**: Google Vertex AI / Gemini API `POST https://generativelanguage.googleapis.com/v1beta/models/lyria-3-pro:generateMusic` (bzw. Vertex-Endpoint), Auth via neuer Secret `GOOGLE_LYRIA_API_KEY`. Response = base64 audio → Storage.
+- Bestehende Branches (Stable Audio 2.5, MiniMax 1.5, ElevenLabs Music v2) bleiben unverändert.
+- Idempotenter Credit-Refund bei Provider-Fail bleibt aktiv.
+- Detaillierte Provider-Fehler unverändert durchgereicht.
 
 ### 3. UI `src/pages/MusicStudio.tsx` + `ProviderSelector.tsx`
-- ProviderSelector rendert Karten aus `ENGINE_CATALOG` (Grid, 3 Spalten desktop, scrollbar mobil).
-- Sprach-Dropdown liest `engine.languages` (bleibt versteckt bei Instrumental-Engines).
-- Kostenanzeige und „Neues Projekt"-Reset bleiben unverändert.
-- Bei Suno v5 zusätzlich Style-Feld („Genre-Tags, z. B. `pop, upbeat, female vocals`") — Suno-typisch.
+- Kein struktureller Umbau — Katalog ist bereits Single-Source-of-Truth.
+- Icons für neue Engines: `Sparkles` (Lyria), `Waves` bleibt für Stable Audio 3.0 Large.
+- Info-Zeile „Suno bietet aktuell keinen offiziellen API-Zugang, daher setzen wir stattdessen auf ElevenLabs Music v2 und Google Lyria 3 Pro" als kleiner Footer-Hinweis.
+- ⭐ Badge auf ElevenLabs (Beste Gesamtlösung laut interner Qualitätsbewertung).
 
-### 4. Abwärtskompatibilität
-`useMusicGeneration` mappt Legacy-`tier` → neue `engineId` (`adaptive`→`stable-audio-25`, `vocal`→`minimax-15`), damit vorhandene History-Einträge/Deep-Links nicht brechen.
+### 4. Secrets
+Zwei neue Secrets werden benötigt (nach Plan-Freigabe per `add_secret`):
+- `STABILITY_API_KEY` — https://platform.stability.ai/account/keys
+- `GOOGLE_LYRIA_API_KEY` — Google AI Studio / Vertex AI (Lyria 3 Pro ist aktuell in **Preview** — Access-Approval nötig; Fallback: Karte disabled + Hinweis „In Kürze verfügbar", falls Key fehlt, analog zum bisherigen Suno-Muster).
 
-### 5. Kommunikation Udio v2
-Kein UI-Slot. Falls User explizit fragt: Info-Tooltip „Udio bietet aktuell kein öffentliches API" — wird in `MusicStudio.tsx` als Footer-Zeile hinzugefügt.
-
-## Rollout
-1. Katalog + Edge-Function-Branches (kein UI-Break, Legacy-Tiers bleiben eine Version parallel).
-2. UI-Switch auf Katalog-basierte Karten.
-3. Nach 1 Tag Smoke-Test: Legacy-Tier-Enum entfernen.
+### 5. Toast-Codes
+- `SUNO_NOT_CONFIGURED` → entfernt.
+- Neu: `LYRIA_NOT_CONFIGURED` (Preview-Access noch offen) + `STABILITY_NOT_CONFIGURED`.
 
 ## Nicht enthalten
-- Kein Udio-Reseller-Fallback.
-- Keine Änderung an Voice Studio / Audio Library.
-- Kein Preis-Umbau anderer Modalitäten.
+- Kein Umbau Voice-Studio / Audio-Library / Cast&World.
+- Keine Preisänderung anderer Modalitäten.
+- Kein Suno-Scraper-Fallback.
 
 ## Rückfrage
-Suno v5 offiziell nur mit Wasserzeichen im Free-Tier — auf Replicate ohne. Ich integriere über **Replicate** (konsistent mit den anderen Music-Modellen und deinem 3.00×-Margin-Framework). OK so, oder soll ich stattdessen die direkte Suno-API prüfen (eigener Key, kein Replicate-Aufschlag, aber separate Rate-Limit-Handhabung)?
+**Lyria 3 Pro** ist aktuell noch **Preview** bei Google (Zugang nur nach Approval via Vertex AI Waitlist). Zwei Wege:
+- **A) Sofort integrieren, Karte disabled, bis dein Google-Access freigeschaltet ist** (empfohlen — UI zeigt „Bald verfügbar", Nutzer sehen die Roadmap).
+- **B) Erst integrieren, wenn dein Vertex-AI-Access aktiv ist** (Katalog startet mit 4 Engines).
+
+Welchen Weg soll ich fahren?
