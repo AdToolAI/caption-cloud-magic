@@ -376,18 +376,21 @@ export default function StudioMode() {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button
-                onClick={launchInComposer}
-                disabled={creating}
-                className="gap-2 bg-gradient-to-r from-primary to-accent"
-              >
-                {creating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                In Composer öffnen
-              </Button>
+              <div className="flex items-center gap-3">
+                <FounderPriorityChip />
+                <Button
+                  onClick={launchInComposer}
+                  disabled={creating}
+                  className="gap-2 bg-gradient-to-r from-primary to-accent"
+                >
+                  {creating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  In Composer öffnen
+                </Button>
+              </div>
             )}
           </div>
         </footer>
