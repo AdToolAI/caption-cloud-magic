@@ -5031,6 +5031,39 @@ export type Database = {
           },
         ]
       }
+      companion_triggers: {
+        Row: {
+          category: string
+          converted_at: string | null
+          dismissed_at: string | null
+          id: string
+          metadata: Json
+          shown_at: string
+          trigger_key: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          converted_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          metadata?: Json
+          shown_at?: string
+          trigger_key: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          converted_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          metadata?: Json
+          shown_at?: string
+          trigger_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       companion_user_preferences: {
         Row: {
           created_at: string
