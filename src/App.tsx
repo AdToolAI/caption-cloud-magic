@@ -25,6 +25,7 @@ import { OnboardingStepper } from "@/features/onboarding/Stepper";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
+import { ConciergeTipHost } from "@/components/ai-companion/ConciergeTipHost";
 
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist";
 import { ProductTour } from "@/components/onboarding/ProductTour";
