@@ -1,20 +1,23 @@
+import { useAuth } from "@/hooks/useAuth";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
-import { useCredits } from "@/hooks/useCredits";
 
 /**
- * Central helper for "is this user effectively a paying customer?"
+ * useTrialAccess — Beta 2026.
  *
- * During an **active trial** we unlock everything so the user can fully
- * configure their workspace (Brand Kit, social connections, AI Studios, …).
- * Upgrade modals only fire once the trial enters grace / expired.
+ * Zugang zu Premium-Features basiert ausschließlich auf dem Stripe-
+ * Subscription-Status (`useAuth().subscribed`). Das alte Credit-System
+ * ist abgeschafft.
+ *
+ * Trial bleibt als Übergangsfenster für Neu-User erhalten (definiert über
+ * `useTrialStatus`), damit sie die Plattform vor der ersten Zahlung
+ * ausprobieren können.
  */
 export function useTrialAccess() {
   const trial = useTrialStatus();
-  const { balance } = useCredits();
-  const planCode = balance?.plan_code ?? "free";
+  const { subscribed } = useAuth();
 
   const isTrialActive = trial.status === "active";
-  const isPaid = planCode === "pro" || planCode === "enterprise" || planCode === "basic";
+  const isPaid = subscribed === true;
 
   return {
     isTrialActive,
@@ -22,6 +25,6 @@ export function useTrialAccess() {
     /** True = bypass all upgrade walls. */
     hasFullAccess: isTrialActive || isPaid,
     trial,
-    planCode,
+    planCode: isPaid ? "basic" : "free",
   };
 }
