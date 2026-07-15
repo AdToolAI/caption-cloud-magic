@@ -610,6 +610,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     const nextCfg: DialogVoiceCfg = {
       ...(cur ?? { engine: 'elevenlabs', voiceId: '' }),
       ...patch,
+      characterId: speakerId,
     };
     // Custom voices are always ElevenLabs-backed — never keep a stale
     // engine:'hume' from a prior pick when the user switches to a cloned voice.
