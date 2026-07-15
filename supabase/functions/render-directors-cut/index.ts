@@ -6,7 +6,7 @@ import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-p
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { pickRenderTier } from "../_shared/render-concurrency.ts";
+import { pickRenderTier, checkRenderAdmission } from "../_shared/render-concurrency.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
