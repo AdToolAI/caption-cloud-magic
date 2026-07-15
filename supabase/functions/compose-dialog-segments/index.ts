@@ -2234,8 +2234,35 @@ serve(async (req) => {
     // re-running plate-face detection. faces[].mouth still exists for the
     // diagnostic path, but the parallel `mouths[i]` array is the canonical
     // source on the persisted hydration branch above.
+    // v242 — Build the Character-Assignment-Lock. When we have a live
+    // plate-identity result AND every speaker got a plate-face by
+    // characterId (source starts with "plate-identity-cid"), lock the
+    // {speakerIdx → characterId} mapping so future rerenders read it
+    // BEFORE any positional data. Existing lock is preserved when the
+    // current run couldn't produce a fresh, clean assignment.
+    const stripLockPrefix = (id?: string | null) =>
+      String(id ?? "").toLowerCase().replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+    const existingLock: Record<string, string> =
+      (persistedPlateIdentity as any)?.assignmentLock &&
+      typeof (persistedPlateIdentity as any).assignmentLock === "object"
+        ? { ...(persistedPlateIdentity as any).assignmentLock }
+        : {};
+    let freshLock: Record<string, string> | null = null;
+    if (
+      plateIdentityMap &&
+      plateIdentityMap.faces.length > 0 &&
+      speakers.every((sp) => !!stripLockPrefix(sp.character_id)) &&
+      coordSources.every((s) => typeof s === "string" && s.startsWith("plate-identity-cid"))
+    ) {
+      freshLock = {};
+      speakers.forEach((sp, idx) => {
+        const cid = stripLockPrefix(sp.character_id);
+        if (cid) freshLock![String(idx)] = cid;
+      });
+    }
+    const finalAssignmentLock = freshLock ?? existingLock;
     const v153PlateIdentitySnapshot = {
-      version: "v160" as const,
+      version: "v242" as const,
       dims: plateDims,
       bboxes: speakerPlateBboxes,
       mouths: speakerPlateMouths,
@@ -2244,7 +2271,12 @@ serve(async (req) => {
       cached: plateIdentityMap?.cached ?? persistedPlateIdentity?.cached ?? false,
       sourceClipUrl,
       hydratedAt: new Date().toISOString(),
+      assignmentLock: finalAssignmentLock,
     };
+    console.warn(
+      `[compose-dialog-segments] scene=${sceneId} v242_assignment_lock ` +
+      `fresh=${freshLock ? "yes" : "no"} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
+    );
     console.warn(
       `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
     );
