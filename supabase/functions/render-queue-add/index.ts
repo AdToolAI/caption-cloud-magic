@@ -33,13 +33,13 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { 
-      projectId, 
-      templateId, 
-      config, 
-      priority = 5, 
+    const {
+      projectId,
+      templateId,
+      config,
+      priority: priorityOverride,
       engine = 'auto',
-      estimatedDurationSec 
+      estimatedDurationSec
     } = await req.json();
 
     if (!projectId) {
