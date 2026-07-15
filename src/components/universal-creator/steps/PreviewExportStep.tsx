@@ -72,6 +72,7 @@ export function PreviewExportStep({
   const [reservationId, setReservationId] = useState<string | null>(null);
   
   const { balance } = useCredits();
+  const { invoke: invokeWithQueue, waiting: slotWaiting } = useEnqueuedRender({ maxRetries: 6 });
   const { reserve, commit, refund } = useCreditReservation();
   
   const qualityMultiplier = videoQuality === '4k' ? 2 : 1;
