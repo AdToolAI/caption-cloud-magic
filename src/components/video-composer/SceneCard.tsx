@@ -179,6 +179,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useSceneRenderConfirm } from "@/lib/composer/sceneRenderConfirm";
+import { countSceneSpeakers } from "@/lib/composer/countSceneSpeakers";
 
 /**
  * Wave 3.1 — compact Catalog-ID chip strip. Reads scene-level shadow IDs
