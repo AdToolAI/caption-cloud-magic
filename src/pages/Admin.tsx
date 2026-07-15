@@ -14,7 +14,8 @@ import LambdaHealth from '@/pages/admin/LambdaHealth';
 import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPanel';
 import { CharacterMarketplaceReviewPanel } from '@/components/admin/CharacterMarketplaceReviewPanel';
 import { BetaHealth } from '@/components/admin/BetaHealth';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles } from 'lucide-react';
+import { RenderLoadWidget } from '@/components/admin/RenderLoadWidget';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles, Zap } from 'lucide-react';
 
 export default function Admin() {
   return (
