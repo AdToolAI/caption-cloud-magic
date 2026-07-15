@@ -396,6 +396,28 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
             defaultDuration={scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + s.duration, 0) : undefined}
             onScriptGenerated={(script) => { handleScriptChange(script); setShowScriptGenerator(false); }}
           />
+
+          <UniversalVoiceLibraryPicker
+            open={libraryOpen}
+            onOpenChange={setLibraryOpen}
+            language={(selectedLanguage as 'de' | 'en' | 'es') || 'all'}
+            currentVoiceId={voiceConfig.voiceId}
+            title={language === 'de' ? 'Voice-Bibliothek – Content Creator' : "Voice Library – Content Creator"}
+            enforceNative
+            onSelect={(voice) => {
+              setVoices((prev) => (prev.find((v) => v.id === voice.id) ? prev : [voice as unknown as Voice, ...prev]));
+              const custom = customVoices.find((c) => c.elevenlabs_voice_id === voice.id);
+              setVoiceConfig({
+                ...voiceConfig,
+                voiceId: voice.id,
+                voiceName: custom?.name || voice.name || 'Voice',
+                modelId: voice.recommended_model || voiceConfig.modelId,
+                stability: voice.recommended_settings?.stability ?? voiceConfig.stability,
+                similarityBoost: voice.recommended_settings?.similarity_boost ?? voiceConfig.similarityBoost,
+              });
+              setLibraryOpen(false);
+            }}
+          />
         </>
       )}
     </div>
