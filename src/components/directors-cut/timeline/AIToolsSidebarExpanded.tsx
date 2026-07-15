@@ -66,6 +66,27 @@ export function AIToolsSidebarExpanded({
   const [voiceText, setVoiceText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState('sarah');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [musicBrowserOpen, setMusicBrowserOpen] = useState(false);
+
+  const handleSelectLibraryMusic = (track: LibraryTrack) => {
+    const newClip: AudioClip = {
+      id: `music-${Date.now()}`,
+      trackId: 'track-music',
+      name: track.title,
+      url: track.url,
+      startTime: currentTime,
+      duration: track.duration,
+      trimStart: 0,
+      trimEnd: track.duration,
+      volume: 70,
+      fadeIn: 2,
+      fadeOut: 3,
+      source: 'library',
+      color: '#10b981',
+    };
+    onAddAudioClip('track-music', newClip);
+    setMusicBrowserOpen(false);
+  };
 
   const handleGenerateVoice = async () => {
     if (!voiceText.trim()) return;
