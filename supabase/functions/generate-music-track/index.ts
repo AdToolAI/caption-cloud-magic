@@ -192,8 +192,6 @@ serve(async (req) => {
       if (engineId === 'stable-audio-25') {
         const p = loop ? `${enhancedPrompt}. Seamless loop, no fade-in or fade-out, continuous beat` : enhancedPrompt;
         input = { prompt: p, duration, steps: 8, cfg_scale: 7, output_format: 'mp3' };
-      } else if (engineId === 'stable-audio-open-2') {
-        input = { prompt: enhancedPrompt, seconds_total: Math.min(duration, 47), steps: 100, cfg_scale: 6 };
       } else if (engineId === 'minimax-15') {
         // MiniMax: prompt (style, 10-300) + lyrics (10-600)
         const FILLER = 'Cinematic studio production, mastered mix, professional arrangement';
@@ -213,6 +211,7 @@ serve(async (req) => {
         input = { lyrics: lyricsInput, prompt: styleDesc };
         console.log('[generate-music-track] MiniMax input lens:', { promptLen: styleDesc.length, lyricsLen: lyricsInput.length });
       }
+
 
       let output: any;
       try {
