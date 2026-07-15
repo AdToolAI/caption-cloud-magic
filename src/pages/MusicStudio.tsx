@@ -377,8 +377,8 @@ export default function MusicStudio() {
                 <Card className="p-5 bg-background/40 backdrop-blur-md border-primary/15 space-y-4 h-fit lg:sticky lg:top-6">
                   <div>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Engine</div>
-                    <div className="font-display font-semibold text-foreground">{tierPricing.engine}</div>
-                    <div className="text-[11px] text-muted-foreground">{tierPricing.description}</div>
+                    <div className="font-display font-semibold text-foreground">{engine.provider}</div>
+                    <div className="text-[11px] text-muted-foreground">{engine.description}</div>
                   </div>
 
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
@@ -388,7 +388,7 @@ export default function MusicStudio() {
 
                   <Button
                     onClick={handleGenerate}
-                    disabled={loading || !prompt.trim() || insufficient || (tier === 'vocal' && !lyrics.trim())}
+                    disabled={loading || !prompt.trim() || insufficient || (needsLyrics && !lyrics.trim())}
                     className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 gap-2 h-11"
                   >
                     {loading ? (
