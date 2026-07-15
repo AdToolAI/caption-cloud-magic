@@ -1,43 +1,37 @@
-## Beobachtung
+## Plan: Headbar-Bug bei den 3 Dropdown-Buttons sauber beheben
 
-Wenn du auf `/home` (oder einer anderen langen Seite) nach unten scrollst und dann eines der Social-Icons rechts der Suchleiste anklickst, verschwindet die Headbar kurz. Grund ist **keine Änderung an der Header-Komponente selbst** — der Header ist korrekt `sticky top-0 z-50`.
+### Ziel
+Die Headbar soll sichtbar und stabil bleiben, wenn nach dem Scrollen einer dieser Buttons geöffnet wird:
+- Sprachmenü
+- Benachrichtigungen
+- Profilmenü
 
-Zwei Effekte greifen zusammen:
+### Diagnose
+Der vorherige Fix deckt Route-Wechsel ab, aber diese drei Buttons sind Dropdowns. Beim Öffnen eines Radix-Dropdowns kann Focus/Scroll-Locking bzw. Popper-Positionierung nach langem Scrollen den Viewport kurz neu justieren. Dadurch wirkt die sticky Headbar weiterhin so, als würde sie verschwinden.
 
-1. **Route-Wechsel behält Scrollposition** — Die Social-Icons rufen `navigate('/integrations?connect=…')` auf. React Router 6 setzt bei Navigation den `scrollY` **nicht** zurück (`ScrollRestoration` ist nicht aktiviert). Die neue Seite wird also mitten im Scroll gerendert.
-2. **Lazy-Loading + Suspense-Fallback** — `/integrations` ist `React.lazy` und zeigt kurz einen `min-h-screen`-Spinner. In diesem Moment ist `document.scrollHeight` kurzzeitig kleiner als das alte, der Browser klemmt `scrollY` auf den neuen Max-Wert, und der `sticky`-Header rutscht mit — daher wirkt es, als „verschwinde" er, obwohl er nur auf einer Zwischenposition landet.
+### Umsetzung
+1. **Dropdown-Komponente zentral härten**
+   - `src/components/ui/dropdown-menu.tsx` anpassen.
+   - `DropdownMenuContent` bekommt stabile Portal-/Popper-Einstellungen:
+     - kein automatisches Focus-Scrollen in den Header zurück
+     - kein Layout-Shift durch unnötige Repositionierung
+     - hoher, konsistenter z-index über Header/Sidebar
 
-Kein Bug in `AppHeader`, `SocialConnectionIcons` oder Radix-Tooltip.
+2. **Header-Actions gezielt absichern**
+   - `LanguageSwitcher`, `NotificationBell`, `UserMenu` behalten ihre Funktion.
+   - Ihre Menüs bekommen bei Bedarf explizite `side="bottom"`, `align="end"`, `sideOffset` und viewport-sichere Max-Höhen.
+   - Bei `NotificationBell` bleibt die interne Liste scrollbar, aber sie darf nicht den Seiten-Scroll beeinflussen.
 
-## Fix
+3. **AppHeader stabiler machen**
+   - `AppHeader` bekommt eine feste Header-Höhe und bleibt über Dropdown-Portalen visuell sauber.
+   - Falls nötig: `isolate`/höherer z-index, damit Header nicht hinter Overlays oder Scroll-Containern landet.
 
-Eine einzige neue Komponente, ein Import in `src/App.tsx`. Rein UX.
+4. **Verifikation**
+   - In der Preview einloggen/Session nutzen, weit nach unten scrollen.
+   - Sprachmenü, Glocke und Profilmenü einzeln öffnen.
+   - Erwartung: Header bleibt oben sichtbar, keine Sprünge, Dropdown öffnet korrekt unter dem Button.
 
-### 1) Neue Datei `src/components/layout/ScrollToTop.tsx`
-```tsx
-import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
-
-/** Setzt scrollY beim Route-Wechsel auf 0 — verhindert, dass der sticky
- *  Header nach Navigation auf einer Zwischenposition „hängen" bleibt. */
-export function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    // instant, damit während Suspense-Fallback nichts flackert
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
-  }, [pathname]);
-  return null;
-}
-```
-
-### 2) `src/App.tsx` (~Zeile 170)
-`<ScrollToTop />` direkt innerhalb des Routers, oberhalb des Layout-Wrappers einhängen. Kein visuelles Element, nur Effekt.
-
-## Nicht enthalten
-- Keine Änderung an `AppHeader.tsx`, `SocialConnectionIcons.tsx`, `index.css` (`overflow-x: clip` bleibt — funktioniert korrekt mit `sticky`).
-- Kein `hideOnScroll`-Verhalten — der Header soll ja sichtbar bleiben, nicht ausblendbar werden.
-- Kein Anti-Anchor-Verhalten für Anker-Links (`#…`) nötig, da wir aktuell keine In-Page-Anchors nutzen; falls doch, ist der Effekt trivial erweiterbar.
-
-## Verifikation
-- `/home` → runter scrollen → beliebiges Social-Icon oben klicken → `/integrations` öffnet oben, Header sichtbar.
-- Gleiches Verhalten bei allen anderen Header-Actions (Community-Button, Notification-Bell, Language-Switcher-Route, User-Menu-Einträge).
+### Nicht enthalten
+- Keine Änderung am Design der Buttons.
+- Keine Änderung an Support/Einstellungen-Routen.
+- Keine Änderung an der Sidebar oder am Feature-Verhalten.
