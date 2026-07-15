@@ -1522,67 +1522,124 @@ serve(async (req) => {
         );
       }
     }
+    // v242 — ID-first rehydration + Character-Assignment-Lock enforcement.
+    //
+    // Root cause of the "speaker 2 speaks line 3" bug (scene 53976949…):
+    // the legacy code hydrated speakerPlateBboxes[i] from persistedBboxes[i]
+    // positionally. persistedBboxes is written in speaker-index order, so
+    // if the initial run assigned the wrong bbox to speaker i, the swap was
+    // "frozen" and every rerender perpetuated it. persistedFaces[] DID
+    // contain the correct characterId → bbox mapping — it just wasn't used.
+    //
+    // New order of precedence:
+    //   (a) assignmentLock (locked characterId per speakerIdx, if present)
+    //   (b) persistedFaces[] matched by characterId (with stripIdPrefix)
+    //   (c) legacy positional fallback (persistedBboxes[i])
+    //
+    // Any of the above sets plateHydrationSource="persisted" and short-
+    // circuits the live Gemini re-detect below. Consistency (>50 px drift)
+    // is checked implicitly: if a locked characterId cannot be found in
+    // persistedFaces[] we fall through to live detection.
+    const stripIdPrefixLocal = (id?: string | null) =>
+      String(id ?? "")
+        .toLowerCase()
+        .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
     if (persistedGateOk && persistedBboxes.length >= speakers.length) {
-      // v158 — also rehydrate mouth landmarks from persisted faces[] or the
-      // canonical `mouths[]` array on the snapshot. Without this, advance
-      // passes (Pass 2..N) lose the mouth anchor and the dispatcher falls
-      // back to bbox-anchor → Sync.so faceMask misses the lips → morph on
-      // the wrong region.
       const persistedMouths: any[] = Array.isArray(persistedPlateIdentity?.mouths)
         ? persistedPlateIdentity.mouths
         : [];
       const persistedFaces: any[] = Array.isArray(persistedPlateIdentity?.faces)
         ? persistedPlateIdentity.faces
         : [];
+      const assignmentLock: Record<string, string> =
+        (persistedPlateIdentity as any)?.assignmentLock &&
+        typeof (persistedPlateIdentity as any).assignmentLock === "object"
+          ? (persistedPlateIdentity as any).assignmentLock
+          : {};
+      const faceByCharId = new Map<string, any>();
+      for (const pf of persistedFaces) {
+        const cid = stripIdPrefixLocal((pf as any)?.characterId);
+        if (cid && !faceByCharId.has(cid)) faceByCharId.set(cid, pf);
+      }
       let mouthHydrated = 0;
+      let idMatched = 0;
+      let lockMatched = 0;
+      let positionalFallback = 0;
       for (let i = 0; i < speakers.length; i++) {
-        const b = persistedBboxes[i];
-        if (Array.isArray(b) && b.length === 4 && b.every((n: unknown) => Number.isFinite(Number(n)))) {
-          speakerPlateBboxes[i] = [
-            Math.round(Number(b[0])),
-            Math.round(Number(b[1])),
-            Math.round(Number(b[2])),
-            Math.round(Number(b[3])),
+        // (a) Lock: locked characterId for this speakerIdx wins.
+        let matchedFace: any = null;
+        let matchSource: string | null = null;
+        const lockedCid = stripIdPrefixLocal(assignmentLock[String(i)]);
+        if (lockedCid && faceByCharId.has(lockedCid)) {
+          matchedFace = faceByCharId.get(lockedCid);
+          matchSource = "lock";
+          lockMatched++;
+        }
+        // (b) characterId from speakers[i] → persistedFaces[].characterId.
+        if (!matchedFace) {
+          const speakerCid = stripIdPrefixLocal(speakers[i]?.character_id);
+          if (speakerCid && faceByCharId.has(speakerCid)) {
+            matchedFace = faceByCharId.get(speakerCid);
+            matchSource = "cid";
+            idMatched++;
+          }
+        }
+        // (c) Positional fallback (legacy behavior).
+        let bboxSource: [number, number, number, number] | null = null;
+        let mouthSource: [number, number] | null = null;
+        if (matchedFace && Array.isArray(matchedFace.bbox) && matchedFace.bbox.length === 4) {
+          bboxSource = [
+            Math.round(Number(matchedFace.bbox[0])),
+            Math.round(Number(matchedFace.bbox[1])),
+            Math.round(Number(matchedFace.bbox[2])),
+            Math.round(Number(matchedFace.bbox[3])),
           ];
-          // Try to find a persisted face whose bbox matches this speaker
-          // (by slot index first, then by bbox center proximity).
-          const bx1 = speakerPlateBboxes[i]![0];
-          const by1 = speakerPlateBboxes[i]![1];
-          const bx2 = speakerPlateBboxes[i]![2];
-          const by2 = speakerPlateBboxes[i]![3];
-          const targetCx = Math.round((bx1 + bx2) / 2);
-          const targetCy = Math.round((by1 + by2) / 2);
-          let f =
-            persistedFaces.find((pf: any) => Number(pf?.slot) === i) ??
-            persistedFaces.find((pf: any) => {
-              if (!Array.isArray(pf?.bbox) || pf.bbox.length !== 4) return false;
-              const cx = (Number(pf.bbox[0]) + Number(pf.bbox[2])) / 2;
-              const cy = (Number(pf.bbox[1]) + Number(pf.bbox[3])) / 2;
-              return Math.hypot(cx - targetCx, cy - targetCy) < 50;
-            });
-          // Canonical source: snapshot.mouths[i]. Fallback to faces[].mouth.
-          const snapM = persistedMouths[i];
-          const m =
-            (Array.isArray(snapM) && snapM.length === 2 ? snapM : null) ??
-            (f && Array.isArray((f as any).mouth) ? (f as any).mouth : null);
-          if (m && Number.isFinite(Number(m[0])) && Number.isFinite(Number(m[1]))) {
-            speakerPlateMouths[i] = [Math.round(Number(m[0])), Math.round(Number(m[1]))];
-            speakerCoords[i] = clampSyncCoords([
-              Math.round(Number(m[0])),
-              Math.round(Number(m[1])),
-            ]);
-            coordSources[i] = "plate-persisted-mouth";
+          if (Array.isArray(matchedFace.mouth) && matchedFace.mouth.length === 2) {
+            mouthSource = [
+              Math.round(Number(matchedFace.mouth[0])),
+              Math.round(Number(matchedFace.mouth[1])),
+            ];
+          }
+        } else {
+          const b = persistedBboxes[i];
+          if (Array.isArray(b) && b.length === 4 && b.every((n: unknown) => Number.isFinite(Number(n)))) {
+            bboxSource = [
+              Math.round(Number(b[0])),
+              Math.round(Number(b[1])),
+              Math.round(Number(b[2])),
+              Math.round(Number(b[3])),
+            ];
+            const snapM = persistedMouths[i];
+            if (Array.isArray(snapM) && snapM.length === 2 &&
+                Number.isFinite(Number(snapM[0])) && Number.isFinite(Number(snapM[1]))) {
+              mouthSource = [Math.round(Number(snapM[0])), Math.round(Number(snapM[1]))];
+            }
+            matchSource = "positional";
+            positionalFallback++;
+          }
+        }
+        if (bboxSource) {
+          speakerPlateBboxes[i] = bboxSource;
+          const targetCx = Math.round((bboxSource[0] + bboxSource[2]) / 2);
+          const targetCy = Math.round((bboxSource[1] + bboxSource[3]) / 2);
+          if (mouthSource) {
+            speakerPlateMouths[i] = mouthSource;
+            speakerCoords[i] = clampSyncCoords([mouthSource[0], mouthSource[1]]);
+            coordSources[i] = `plate-persisted-mouth-${matchSource ?? "positional"}`;
             mouthHydrated++;
           } else {
             speakerCoords[i] = clampSyncCoords([targetCx, targetCy]);
-            coordSources[i] = "plate-persisted";
+            coordSources[i] = `plate-persisted-${matchSource ?? "positional"}`;
           }
         }
       }
       plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "persisted" : "missing";
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} v158_persisted_mouth_hydration ` +
-        `mouths=${mouthHydrated}/${speakers.length} bboxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length}`,
+        `[compose-dialog-segments] scene=${sceneId} v242_persisted_id_first_hydration ` +
+        `lock=${lockMatched}/${speakers.length} cid=${idMatched}/${speakers.length} ` +
+        `positional=${positionalFallback}/${speakers.length} mouths=${mouthHydrated}/${speakers.length} ` +
+        `bboxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} ` +
+        `lock_present=${Object.keys(assignmentLock).length > 0}`,
       );
     }
     if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
