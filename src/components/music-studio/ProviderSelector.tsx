@@ -1,66 +1,75 @@
-import { Zap, Activity, Wand2, Music2, Sparkles, Lock } from 'lucide-react';
+import { Activity, Wand2, Music2, Sparkles, Waves, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MUSIC_TIER_PRICING, type MusicTier } from '@/hooks/useMusicGeneration';
 import { Badge } from '@/components/ui/badge';
+import { ENGINE_CATALOG, ENGINE_ORDER, type MusicEngineId } from '@/lib/music/engineCatalog';
 
 interface ProviderSelectorProps {
-  value: MusicTier;
-  onChange: (tier: MusicTier) => void;
+  value: MusicEngineId;
+  onChange: (engineId: MusicEngineId) => void;
   currencySymbol?: string;
   disabled?: boolean;
 }
 
-const TIER_META: Record<MusicTier, { icon: typeof Zap; label: string; subtitle: string; accent: string }> = {
-  quick:    { icon: Zap,      label: 'Quick',     subtitle: 'Loops, fast',           accent: 'from-cyan-500/20 to-cyan-500/5' },
-  adaptive: { icon: Activity, label: 'Adaptive',  subtitle: 'Background, loopable',  accent: 'from-emerald-500/20 to-emerald-500/5' },
-  standard: { icon: Wand2,    label: 'Standard',  subtitle: 'Polished instrumental', accent: 'from-primary/30 to-primary/5' },
-  vocal:    { icon: Music2,   label: 'Vocal',     subtitle: 'Songs with lyrics',     accent: 'from-fuchsia-500/20 to-fuchsia-500/5' },
-  pro:      { icon: Sparkles, label: 'Pro',       subtitle: 'Long-form pro',         accent: 'from-amber-500/30 to-amber-500/5' },
+const ICONS: Record<string, typeof Zap> = {
+  'stable-audio-25':     Activity,
+  'stable-audio-open-2': Waves,
+  'minimax-15':          Music2,
+  'suno-v5':             Sparkles,
+  'elevenlabs-music-v2': Wand2,
 };
 
-const ORDER: MusicTier[] = ['quick', 'adaptive', 'standard', 'vocal', 'pro'];
+const ACCENTS: Record<string, string> = {
+  'stable-audio-25':     'from-emerald-500/20 to-emerald-500/5',
+  'stable-audio-open-2': 'from-cyan-500/20 to-cyan-500/5',
+  'minimax-15':          'from-fuchsia-500/20 to-fuchsia-500/5',
+  'suno-v5':             'from-amber-500/25 to-amber-500/5',
+  'elevenlabs-music-v2': 'from-primary/25 to-primary/5',
+};
 
 export function ProviderSelector({ value, onChange, currencySymbol = '€', disabled }: ProviderSelectorProps) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
-      {ORDER.map((tier) => {
-        const meta = TIER_META[tier];
-        const pricing = MUSIC_TIER_PRICING[tier];
-        const Icon = meta.icon;
-        const active = value === tier;
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+      {ENGINE_ORDER.map((id) => {
+        const engine = ENGINE_CATALOG[id];
+        const Icon = ICONS[id] || Music2;
+        const accent = ACCENTS[id] || 'from-primary/20 to-primary/5';
+        const active = value === id;
         return (
           <button
-            key={tier}
+            key={id}
             type="button"
             disabled={disabled}
-            onClick={() => onChange(tier)}
+            onClick={() => onChange(id as MusicEngineId)}
             className={cn(
-              "relative group text-left p-3 rounded-xl border transition-all overflow-hidden",
-              "bg-gradient-to-br backdrop-blur-sm",
+              'relative group text-left p-3 rounded-xl border transition-all overflow-hidden',
+              'bg-gradient-to-br backdrop-blur-sm',
               active
-                ? "border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.45)] scale-[1.02]"
-                : "border-border/40 hover:border-primary/40 hover:scale-[1.01]",
-              meta.accent,
-              disabled && "opacity-50 cursor-not-allowed"
+                ? 'border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.45)] scale-[1.02]'
+                : 'border-border/40 hover:border-primary/40 hover:scale-[1.01]',
+              accent,
+              disabled && 'opacity-50 cursor-not-allowed'
             )}
           >
+            {engine.badge && (
+              <span className="absolute top-1.5 right-1.5 text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-primary/25 text-primary border border-primary/40">
+                {engine.badge}
+              </span>
+            )}
             <div className="flex items-center justify-between mb-1.5">
-              <Icon className={cn("h-4 w-4", active ? "text-primary" : "text-foreground/70")} />
+              <Icon className={cn('h-4 w-4', active ? 'text-primary' : 'text-foreground/70')} />
               {active && <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />}
             </div>
-            <div className="font-display text-sm font-semibold text-foreground">{meta.label}</div>
-            <div className="text-[10px] text-muted-foreground mb-2">{meta.subtitle}</div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground/80">{pricing.engine}</span>
-            </div>
+            <div className="font-display text-sm font-semibold text-foreground">{engine.label}</div>
+            <div className="text-[10px] text-muted-foreground mb-2">{engine.subtitle}</div>
+            <div className="text-[10px] text-muted-foreground/80 truncate mb-1.5">{engine.provider}</div>
             <Badge
               variant="outline"
               className={cn(
-                "mt-1.5 h-5 px-1.5 text-[10px] gap-1",
-                active ? "border-primary/60 text-primary" : "border-border/60 text-muted-foreground"
+                'h-5 px-1.5 text-[10px] gap-1',
+                active ? 'border-primary/60 text-primary' : 'border-border/60 text-muted-foreground'
               )}
             >
-              {currencySymbol}{pricing.eur.toFixed(2)} • ≤{pricing.maxDuration}s
+              {currencySymbol}{engine.priceEur.toFixed(2)} • ≤{engine.maxDuration}s
             </Badge>
           </button>
         );
