@@ -1,101 +1,83 @@
-## Skalierungs-Plan: Lambda-Quota 100 + Render-Queue + Founders-Priority
+# Lambda-Wiring — Status & offene Punkte
 
-Vorbereitet für 3.000+ Beta-User in Woche 1. Kein UI-Redesign, kein Preis-Change — nur Infrastruktur.
+Kurzantwort: **Fundament steht, aber es gibt 4 offene Kanten.** Das Queue-System (60-Slot-Pool, Founders-Prio, Tick-Scheduler, Stale-Reclaim, `pickRenderTier`) ist vorhanden und aktiv (`render_queue_enabled=true`, `render_queue_slot_budget=60`, `cron.job render-queue-tick-10s` läuft). Die Studios kippen ihre Renders aber aktuell **an der Queue vorbei** direkt in die Renderer — dadurch greift der Slot-Guard nicht bei Lastspitzen. Das sollten wir vor dem 26.07. schließen.
 
-## 1. Slot-Budget (100 Lambdas gesamt)
+## Was heute sauber ist
 
-| Zweck | Slots |
-|---|---|
-| Edge-Function-Reserve (Auth, DB, generate-*) | 30 |
-| Burst-Puffer | 10 |
-| **Render-Pool (Remotion)** | **60** |
+- `_shared/render-concurrency.ts`: Tier-Logik (3/5/8/12 Worker, min. 120 fpl), Founders-Priority-Konstanten.
+- `render-with-remotion` & `render-directors-cut`: nutzen `pickRenderTier` pro Job.
+- `render-queue-manager`: Slot-Budget, Prio-Sort, Stale-Reclaim, atomisches Claim.
+- `render-queue-add`: setzt `is_founder`, `priority`, `estimated_workers`.
+- Cron-Job `render-queue-tick-10s` ist aktiv.
+- DB-Spalten (`is_founder`, `estimated_workers`, `priority`) und Feature-Flag vorhanden.
+- Frontend: `useRenderQueueJob` + `RenderQueueBadge` gebaut.
 
-## 2. Tiered Worker-Cap (pro Render)
+## Offene Punkte
 
+### 1. Studios umgehen die Queue (kritisch)
+
+Diese Aufrufe gehen **direkt** an die Renderer:
+
+- `src/components/directors-cut/steps/ExportRenderStep.tsx` → `render-directors-cut`
+- `src/components/directors-cut/studio/CapCutEditor.tsx` → `render-directors-cut`
+- `src/components/universal-creator/steps/PreviewExportStep.tsx` → `render-with-remotion`
+
+Ergebnis: Bei parallelem Launch-Traffic kann die AWS-Quote (100) trotzdem knapp werden, und Founders bekommen keine echte Vorfahrt.
+
+**Fix:** dünner Wrapper-Hook `useEnqueuedRender()` — pusht in `render-queue-add`, pollt Status über `useRenderQueueJob`, öffnet das gerenderte Video wenn `status=completed`. Die drei Aufrufstellen darauf umbiegen. Kein Redesign der Studios, nur der Invoke-Punkt wechselt.
+
+### 2. Tick-Frequenz 1 min statt 10 s
+
+Cron ist auf `* * * * *` (pg_cron min. 1 min). Bei 60 Slots + kurzer Beta-Load reicht das, aber ETA-Anzeige wird träge.
+
+**Fix:** ein Cron-Job, der intern 6× `net.http_post` mit 10s-Abstand feuert (via `pg_sleep(10)` in einer Schleife oder 6 einzelne Aufrufe mit `now() + interval`). Alternativ: kurzer Selbst-Ping am Ende jedes Tick, wenn noch Jobs queued sind und Budget frei ist — hat den Vorteil, dass leere Perioden gar nicht ticken.
+
+### 3. Globaler Slot-Guard direkt in den Renderern
+
+Auch wenn Punkt 1 gelöst ist, sollte `render-with-remotion` / `render-directors-cut` als Safety-Net vor `renderMediaOnLambda` einmal `render_queue_running_workers` prüfen und bei `used + tier.maxWorkers > slotBudget` mit 429 antworten. Der Client (via Wrapper aus Punkt 1) fällt dann automatisch auf die Queue zurück.
+
+### 4. Beobachtbarkeit
+
+Keine sichtbare Metrik für Slot-Auslastung. Empfehlung: kleine View `render_queue_load` (`used_workers`, `slot_budget`, `queued_count`, `founders_queued`) + Admin-Widget im vorhandenen Ops-Dashboard. Kein Muss für Launch, aber sinnvoll für die ersten 1000 Founders.
+
+### 5. Badge-Einbau
+
+`RenderQueueBadge` steht bereit, wird aber noch nirgends gerendert. Nach Punkt 1 hat jeder Studio-Export eine `jobId` — dann Badge in:
+- Motion Studio Export-Panel
+- Director's Cut `ExportRenderStep` (Progress-Sektion)
+- Universal Creator `PreviewExportStep`
+- AI Video Studio `ToolkitGenerator` Progress-Zone
+
+## Technische Details
+
+**Wrapper-Hook (skizze):**
 ```text
-< 300 frames   →  3 workers   (Short)
-300–900        →  5 workers   (Standard)
-900–1800       →  8 workers   (Long)
-> 1800         → 12 workers   (Director's Cut Export)
+useEnqueuedRender({ engine, config, estimatedDurationSec })
+  → render-queue-add   (bekommt jobId, priority, position)
+  → useRenderQueueJob(jobId) subscribed
+  → status=completed  → onDone(outputUrl)
+  → status=failed     → onError(errorMessage)
 ```
 
-`framesPerLambda`: 200 Default; min. 120 für scene-aligned Composer.
-
-**Änderungen in Code:**
-- `supabase/functions/render-with-remotion/index.ts` — `maxWorkers` per Tier bestimmen
-- `supabase/functions/render-directors-cut/index.ts` — dito
-- Composer-Pfad — Untergrenze `framesPerLambda ≥ 120`
-
-## 3. Render-Queue (nutzt bestehende `render_queue` Tabelle)
-
-Die Tabelle existiert bereits (20 Spalten, 4 Policies). Wir erweitern sie um die für Slot-Bookkeeping und Founders-Priority nötigen Spalten:
-
-```sql
-ALTER TABLE public.render_queue
-  ADD COLUMN IF NOT EXISTS estimated_workers int NOT NULL DEFAULT 5,
-  ADD COLUMN IF NOT EXISTS priority int NOT NULL DEFAULT 100,
-  ADD COLUMN IF NOT EXISTS is_founder boolean NOT NULL DEFAULT false;
-
-CREATE INDEX IF NOT EXISTS idx_render_queue_dispatch
-  ON public.render_queue (status, priority, created_at)
-  WHERE status = 'queued';
+**Slot-Guard (skizze in Renderer):**
+```text
+const running = await supabase.rpc('render_queue_running_workers');
+if (running + tier.maxWorkers > slotBudget) return 429 { retry_via: 'queue' };
 ```
 
-Vor dem Schreiben: aktuelle Spalten per `read_query` validieren, damit die Migration keine Konflikte erzeugt.
+**Tick-Selbst-Ping:**
+```text
+if (queued.length > 0 && used < slotBudget) {
+  fetch(SELF_URL, { method:'POST', body:{ trigger:'chain' } });
+}
+```
 
-**Priority-Werte:**
-- `50` → Founders (die ersten 1000, `profiles.is_founder = true`)
-- `100` → Normale Beta-User
-- Sortierung: `ORDER BY priority ASC, created_at ASC`
+## Reihenfolge
 
-## 4. Scheduler: `render-queue-tick`
+1. Wrapper-Hook + drei Studio-Aufrufe (Punkt 1) — größter Impact.
+2. Renderer-Slot-Guard (Punkt 3) — Safety-Net.
+3. Tick-Selbst-Ping (Punkt 2) — bessere ETA.
+4. Badge-Einbau in die vier Studios (Punkt 5).
+5. Optional: Load-View + Ops-Widget (Punkt 4).
 
-Neue Edge Function, alle **10 Sekunden** per `pg_cron` + `pg_net`:
-
-1. `SELECT sum(estimated_workers) FROM render_queue WHERE status='running'` → laufende Last.
-2. Solange `laufend + next.estimated_workers ≤ 60`: nächsten Queued-Job auf `running` setzen und passenden Render (`render-with-remotion` / `render-directors-cut`) invoken.
-3. Job callt bei Abschluss zurück → `status='done'` / `'failed'`; bei `failed` → automatischer Credit-Refund (bestehende Fail-Safe-Logik).
-4. Stale-Job-Detection: `running` länger als 15 min → `failed`, Refund, Slot freigeben.
-
-Cron-Insert läuft über das insert-Tool (enthält Project-URL + anon key, nicht in Migration).
-
-## 5. Founders-Flag
-
-- Neue Spalte `profiles.is_founder boolean DEFAULT false`.
-- Bestehende `claim_founders_slot` RPC setzt sie beim erfolgreichen Claim auf `true`.
-- Beim Enqueue: `priority = is_founder ? 50 : 100`, `is_founder` in Queue-Row spiegeln.
-- Bei Kündigung/Status-Forfeit (bestehende Logik) → `is_founder = false` → nächster Render normal-priority.
-
-## 6. Frontend: Queue-Anzeige
-
-- Neuer Hook `useRenderQueue(jobId)` → subscribed via Realtime auf `render_queue` Row.
-- `usePipelineProgress.ts` — vor "Rendering" neuer Zustand **"Queued · Position N · ~ETA"**.
-- Founders bekommen goldenen "Priority"-Badge in der Wartemeldung.
-- Kein Modal, kein neuer Screen — nur Text-Update im bestehenden Progress-UI.
-
-## 7. Pre-Launch Health-Checks
-
-Vor Go-Live (26.07.2026):
-
-1. `db_health` — Memory-, Connection-Sättigung. Bei Warnsignalen: `resize_compute` anbieten.
-2. `slow_queries` — Hot-Paths (Media Library, Cast & World, Wallet).
-3. Nach Deploy: 24h `edge_function_logs` auf `TooManyRequestsException` + 5xx-Peaks.
-
-## 8. Memory-Updates
-
-- "Lambda Concurrency Policy" → neue Werte (tiered 3/5/8/12; 60-Slot-Pool).
-- Neuer Eintrag: "Render-Queue Architecture" (Founders-Priority, 10s-Tick, Stale-Detection).
-
-## 9. Rollback
-
-- Feature-Flag `RENDER_QUEUE_ENABLED` (system_config) → deaktivieren = direktes Rendern wie heute.
-- Worker-Cap = einzelne Config-Konstante → 1-Zeilen-Change.
-- Cron-Job pausierbar per `cron.unschedule`.
-
-## Nicht im Scope
-
-- Kein Redesign der Studios.
-- Kein Change an Provider-Renders (Sora/Kling/Veo/Replicate — die laufen außerhalb unseres Lambda-Quotas).
-- Keine Preis-/Plan-Änderung.
-
-Sag Bescheid, wenn ich starten soll — dann prüfe ich zuerst die aktuelle `render_queue`-Struktur mit `read_query` und lege dann Migration + Scheduler + Frontend-Wiring in einem Rutsch an.
+Sag Bescheid welche Punkte du mitnehmen willst — 1+3+5 reichen für einen sauberen Launch, 2 und 4 sind Komfort.
