@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
+import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 import type { Scene } from '@/types/scene';
