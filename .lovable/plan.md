@@ -1,75 +1,106 @@
+## Launch-Readiness Status (26.07.2026)
 
-## Kontext & Realitäts-Check
+**Grün — kein Blocker mehr offen:**
+- Founders-Priority-Warteschlange, Slot-Guard (429 + Auto-Retry), Admin-Load-Widget, `SystemLoadPill` & `FounderPriorityChip` in Motion Studio + AI Video Studio.
+- Unified Pricing (14,99 € Beta), Stripe-Wiring, Founders-Rabatt + Status-Forfeit.
+- Email-Pipeline (3-Tage-Cap, Suppression, Unsubscribe).
+- Voice Studio, Music Studio (Replicate-Konsolidierung, Language-Lock), Cast & World IDs.
+- Kling Omni DE-Silent-Lock, No-Text-Guard, Ensemble/Dedup, Content-Filter-Refunds.
+- CORS Preflights, Realtime-Fallback, Header-Dropdown-Stabilität.
+- Logo/Favicon final, Landing (AI Arsenal), FoundersBenefitsDialog, Legal Anchors.
 
-Der `RenderQueueBadge` funktioniert nur, wenn ein echter `render_queue`-Job existiert. In den beiden Ziel-Studios entsteht der aber **nicht**:
+**Empfohlen (nicht launch-blockierend, aber "nice-to-close" vor dem 26.07.):**
+1. **Onboarding via Companion** (dein Vorschlag — Details unten).
+2. **Smoke-Test-Sweep** über alle Studios (Preflight-Skript automatisiert 15 Basisflows).
+3. **Status-Page-Öffentlich** (existiert intern, aber `/status` sollte öffentlich sein).
+4. **Rate-Limit-Toasts** einheitlich (429/402 aus AI-Gateway – teilweise noch generisch).
 
-- **AI Video Studio** (`ToolkitGenerator.tsx`) → invoked `generate-kling` / `generate-sora` / `generate-hailuo` etc. Diese laufen bei den Providern (Replicate/Kling API), **nicht** im Lambda-Slot-Budget. Ergebnisse landen in `ai_video_generations`.
-- **Motion Studio** (`pages/MotionStudio/StudioMode.tsx`) → hat gar keinen eigenen Render-Endpoint. Der letzte Schritt „In Composer öffnen" reicht das Projekt an Director's Cut weiter — dort hängt der Badge bereits.
+Der Rest ist post-launch iterierbar. **Launch-ready: JA.**
 
-Ein 1:1-`RenderQueueBadge` an diesen Stellen wäre also toter Code. Was der Nutzer *tatsächlich* braucht: **Queue-Awareness** — sichtbare Signale, wenn die Plattform-Renderauslastung hoch ist oder die Founder-Reserve greift, damit später keine 429er überraschen.
+---
 
-## Ziel
+## AI-Companion Onboarding — „Concierge Mode"
 
-Zwei sichtbare Queue-Signale in Motion Studio + AI Video Studio, ohne Fake-Job-IDs zu erfinden:
+Ziel: Der bestehende `AICompanionWidget` (unten rechts) wird vom Support-Bot zum **adaptiven Onboarding-Concierge**, der Nutzer intelligent durch die Plattform führt — mit einstellbarem Tempo, spielerisch aber professionell.
 
-1. **`SystemLoadPill`** — kleines Live-Element im Studio-Header, das den globalen Render-Slot-Zustand zeigt (idle / busy / founder-reserve / saturated). Reagiert auf Realtime-Änderungen in `render_queue`.
-2. **Founder-Priority-Hinweis** direkt am Generate-Button, wenn der User Founder ist ODER die Reserve gerade greift — damit Founder wissen, dass sie vorrücken, und Nicht-Founder Erwartungen kalibrieren können.
+### 1. Adaptive Persona & Tempo
 
-## Umsetzung
+Neue Companion-Setting-Kategorie **„Lernstil"** (in `CompanionSettings.tsx`):
 
-### 1. Hook `useRenderSystemLoad`
-- Neu: `src/hooks/useRenderSystemLoad.ts`.
-- Query zählt `render_queue` mit `status in ('queued','processing','rendering')`, summiert `estimated_workers`.
-- Slot-Budget aus `system_config.render_queue_slot_budget` (Default 60), High-Water 50.
-- Realtime-Subscription auf `render_queue`. Fallback: Polling alle 15s.
-- Rückgabe: `{ slotsUsed, slotBudget, queuedCount, state: 'idle' | 'busy' | 'founder_reserve' | 'saturated', founderQueued }`.
+| Modus | Popup-Frequenz | Tonalität | Zielgruppe |
+|---|---|---|---|
+| **Espresso** | max. 1 Tipp pro Session, nur bei echtem Bedarf | knapp, direkt | Power-User |
+| **Balanced** *(default)* | ~1 Tipp pro Milestone | freundlich, kurz | Standard |
+| **Guided Tour** | Schritt-für-Schritt, jede Feature-Fläche | verbindlich, warm | Einsteiger |
+| **Playful** | wie Balanced + subtile Micro-Achievements | leicht verspielt, Emoji-sparsam | jüngere Kreative |
 
-### 2. Komponente `SystemLoadPill`
-- Neu: `src/components/render/SystemLoadPill.tsx`.
-- Kompakte Pille mit farbcodiertem Punkt (grün/amber/rot), Text „Queue frei" / „Queue belegt (32/60)" / „Founder-Reserve aktiv" / „Voll ausgelastet".
-- Tooltip mit Details (queued, slotsUsed, budget, ggf. „Deine Founder-Prio zieht dich vor").
-- Klick → öffnet Admin-Link nur für Admins (via `useAdmin`); für Nutzer nur Tooltip.
+Persistiert in `companion_user_preferences.learning_pace` + `tone_profile`. Umschaltbar jederzeit im Widget-Header.
 
-### 3. Wiring
-- **AI Video Studio** (`src/pages/AIVideoToolkit.tsx`): Pille rechts neben Titel im Hero-Header.
-- **Motion Studio** (`src/pages/MotionStudio/StudioMode.tsx`): Pille in der Top-Stepper-Zeile, neben Schritt-Anzeige.
+### 2. Intelligentes Popup-Switching
 
-### 4. Founder-Priority-Hinweis am Generate-Button
-- **AI Video Studio** (`ToolkitGenerator.tsx`, Bereich Kosten/Generate): unter dem Kosten-Chip Zeile
-  - Founder + `state !== 'idle'`: goldener Chip „Priority-Slot aktiv — du wirst bevorzugt gerendert".
-  - Nicht-Founder + `state === 'founder_reserve' | 'saturated'`: dezenter Amber-Hinweis „System stark ausgelastet — Founders werden zuerst bedient. Retry-Automatik ist aktiv."
-- **Motion Studio**: analoger Chip neben „In Composer öffnen"-Button.
+Neuer Hook `useCompanionCoach()` mit **Event-Trigger-Engine**:
+- **Route-Trigger**: erster Besuch von `/motion-studio`, `/ai-video-toolkit`, `/composer`, `/picture-studio`, `/audio-studio`, `/cast-world` etc.
+- **Intent-Trigger**: leerer Cast-Pool + Klick auf „Generieren", 3× Fehler in Folge, Wallet < 2 €, ungenutztes Feature nach 5 Sessions.
+- **Milestone-Trigger**: erstes Video erfolgreich → „Nächster Schritt: Music Studio?", erste 3 Projekte → Composer-Empfehlung.
+- **Anti-Nag-Guard**: pro Trigger max. 1×; nach Dismiss 7 Tage Cooldown; hartes Cap = 3 Popups pro Tag (Espresso: 1).
 
-Beide Studios nutzen den bestehenden `useIsFounder` (bzw. den Profile-Flag, den Founder-Status liest — Quelle vor Implementierung final klären).
+Alle Trigger in `companion_triggers` (neue Tabelle) mit `user_id, trigger_key, shown_at, dismissed, converted`.
 
-### 5. Kein Change an bestehenden Badges
-- `RenderQueueBadge` und `useEnqueuedRender` in Universal Creator + Director's Cut bleiben unverändert; hier existieren echte Job-IDs.
+### 3. Onboarding-Flow ersetzt statischen `Onboarding.tsx`
 
-## Technische Details
+Statt starrem Stepper öffnet sich der Companion nach Signup mit einem **Concierge-Dialog**:
+1. **Persönlichkeit-Setup** (3 Fragen, ~20 s): Was willst du erstellen? · Wie erfahren bist du? · Wie viel Handhaltung willst du?
+2. **Live-Rundgang**: Companion navigiert automatisch (optional) — hebt UI-Elemente mit `TutorialOverlay.tsx` (existiert bereits) hervor, kommentiert jeden Studio-Bereich in 1-2 Sätzen.
+3. **First-Win-Path**: führt zu einem passenden Quick-Template (Cast auswählen → Prompt → Generate) innerhalb <3 Min.
+4. Existierende `/onboarding` bleibt als Fallback erreichbar.
 
-- `system_config`-Lesung einmal beim Mount; Realtime nur auf `render_queue` (kein Polling der config).
-- Realtime-Cleanup in `useEffect` return.
-- Pille ist reaktiv, unterdrückt Blitzer via 500 ms Debounce beim State-Übergang.
-- Kein neues Edge-Function — Zählung läuft clientseitig auf `render_queue` (bereits RLS-lesbar für admin & eigene Zeilen; für alle anderen fällt `count` auf 0/nur eigene zurück → deshalb via bestehendem RPC `render_queue_running_workers` und einem neuen leichten RPC `render_queue_stats()` als `security definer`).
+### 4. Kontext-Awareness
 
-```text
-Motion Studio Header
-┌────────────────────────────────────────────────────────┐
-│ Schritt 3/4 · Storyboard        ● Queue frei (12/60)   │
-└────────────────────────────────────────────────────────┘
+Companion liest bei jedem Popup:
+- Aktuelle Route + sichtbare UI (via kleinem `PageContext`-Provider).
+- Founder-Status → priorisiert Founder-Perks-Hinweise.
+- Wallet-Balance, letzte 5 Renders, offene Bug-Reports.
+- Sprache (DE/EN/ES) — Prompts an Gateway bleiben Englisch, User-Text lokalisiert.
 
-AI Video Studio Generate-Panel
-┌────────────────────────────────────────────────────────┐
-│ Kosten: 0.42 €                                         │
-│ 👑 Priority-Slot aktiv — du renderst bevorzugt         │
-│  [ Generieren ]                                        │
-└────────────────────────────────────────────────────────┘
-```
+Ergebnis: „Ich sehe du bist im Motion Studio mit 3 Charakteren — willst du direkt in den Composer wechseln oder erst Voice zuweisen?" statt generischer Tipps.
 
-## Was wir NICHT machen
+### 5. Spielerische Elemente (dosiert)
 
-- Keine künstliche `render_queue`-Zeile für AI-Video-Provider-Jobs (Kling/Sora/Hailuo laufen extern, gehören nicht ins Lambda-Budget).
-- Keine Änderung an `useEnqueuedRender` — bleibt bei den echten Remotion-Renderpfaden.
-- Kein Motion-Studio-eigener Render-Endpoint — Handoff an Composer bleibt so.
+- **Milestone-Badges** (dezent, gold-on-black): „Erste Szene", „Cast Master (5 Chars)", „Voice Pioneer" — nur in Companion-Popup, nicht in Header/Nav (keine Gamification-Overkill).
+- **Progress-Ring** im Widget-Icon zeigt Onboarding-Fortschritt (5 Meilensteine → 100 %).
+- Keine Streaks/Punkte/Leaderboards. Kein Confetti-Spam. Micro-Copy mit einem einzigen Emoji max.
 
-Nach der Umsetzung sehen Nutzer in Motion Studio + AI Video Studio jederzeit den globalen Render-Zustand und Founder wissen, wann ihre Priorität aktiv greift — ohne dass wir eine falsche Semantik einführen.
+### 6. Technische Bausteine
+
+**Neu:**
+- `src/hooks/useCompanionCoach.ts` — Trigger-Engine + Cooldown-Logik.
+- `src/lib/companion/triggerRegistry.ts` — deklarative Trigger-Definitionen (Route, Intent, Milestone).
+- `src/lib/companion/personaProfiles.ts` — 4 Lernstil-Presets (System-Prompt + Frequenz).
+- `src/components/ai-companion/ConciergeOnboarding.tsx` — 3-Fragen-Setup.
+- `src/components/ai-companion/MilestoneBadge.tsx` — dezente Badge-UI.
+- `PageContext`-Provider (leichtgewichtig) für Route/Feature-Kontext.
+- Edge Function `companion-coach` — nutzt bestehenden Lovable-AI-Gateway (`openai/gpt-5.5`), erhält System-Prompt aus Persona + Kontext-Snapshot, streamt Antworten.
+- Migration: `companion_triggers` Tabelle (user_id, trigger_key UNIQUE, shown_at, dismissed_at, converted_at) + `companion_user_preferences` um `learning_pace`, `tone_profile`, `onboarding_completed_at` erweitern. RLS + GRANTs wie Standard.
+
+**Erweitert:**
+- `AICompanionWidget.tsx` — Persona-Umschalter im Header, Progress-Ring, Concierge-Modus-Slot.
+- `CompanionSettings.tsx` — Lernstil-Auswahl + „Popups pausieren für 24 h".
+- `TutorialOverlay.tsx` — von Companion aus triggerbar (Element-Highlight per selector).
+- `App.tsx` — nach Login: wenn `onboarding_completed_at` null → Concierge auto-öffnen (statt `/onboarding`-Redirect).
+
+### 7. Was NICHT gebaut wird (bewusste Constraints)
+
+- Kein Voice-Onboarding (Voice-Input existiert schon, bleibt optional).
+- Keine externen Analytics — Trigger-Metriken landen in `companion_triggers` + bestehendem `user_behavior_events`.
+- Kein Auto-Nav ohne Nutzer-OK (immer „Zeig mir das" Button, nie Zwang).
+
+---
+
+## Vorschlag zur Reihenfolge
+
+1. **Concierge-Onboarding + Lernstile + Trigger-Engine** (Kern, ~1 Umsetzungsrunde).
+2. **Milestone-Badges + Progress-Ring** (Polish).
+3. **Smoke-Test-Sweep + öffentliche Status-Page** (Launch-Härtung).
+4. **Rate-Limit-Toast-Vereinheitlichung** (Feinschliff).
+
+Sag Bescheid ob wir mit (1) starten oder ob du an einzelnen Punkten oben (Personas, Trigger-Set, Gamification-Grad) nachjustieren willst.
