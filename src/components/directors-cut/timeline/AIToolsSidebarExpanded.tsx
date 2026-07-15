@@ -108,24 +108,6 @@ export function AIToolsSidebarExpanded({
     }, 2000);
   };
 
-  const handleAddMusic = (music: typeof SAMPLE_MUSIC[0]) => {
-    const newClip: AudioClip = {
-      id: `music-${Date.now()}`,
-      trackId: 'track-music',
-      name: music.name,
-      url: '',
-      startTime: currentTime,
-      duration: music.duration,
-      trimStart: 0,
-      trimEnd: music.duration,
-      volume: 70,
-      fadeIn: 2,
-      fadeOut: 3,
-      source: 'library',
-      color: '#10b981',
-    };
-    onAddAudioClip('track-music', newClip);
-  };
 
   const handleAddSFX = (sfx: typeof SAMPLE_SFX[0]) => {
     const newClip: AudioClip = {
