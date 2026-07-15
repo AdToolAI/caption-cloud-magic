@@ -175,6 +175,7 @@ export function useCompanionCoach() {
         cta: copy.cta,
         ctaHref: copy.ctaHref,
         persona,
+        revealMode: revealModeFor(trigger),
       });
 
       // Persist fire — fire-and-forget, error is non-fatal
