@@ -391,8 +391,7 @@ export function ExportRenderStep({
           })),
         }));
 
-      const { data, error } = await supabase.functions.invoke('render-directors-cut', {
-        body: {
+      const { data, error } = await invokeWithQueue<any>('render-directors-cut', {
           source_video_url: videoUrl,
           effects: effectsWithFilter,
           audio_settings: {
