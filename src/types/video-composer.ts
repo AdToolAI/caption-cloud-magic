@@ -854,6 +854,12 @@ export interface DialogVoiceCfg {
   elevenlabsVoiceId?: string;
   /** Hume only — defaults to HUME_AI. */
   provider?: 'HUME_AI' | 'CUSTOM_VOICE';
+  /**
+   * Cast & World character UUID this cfg belongs to. Written by SceneDialogStudio
+   * so downstream code can dedupe speakers by ID even when `dialogVoices` is
+   * keyed by multiple aliases per speaker (uuid, slug, first-name…).
+   */
+  characterId?: string;
 }
 
 export interface MusicConfig {
