@@ -6,6 +6,30 @@ import imageHero from "@/assets/landing/ai-arsenal/image-hero.jpg";
 import audioHero from "@/assets/landing/ai-arsenal/audio-hero.jpg";
 import avatarHero from "@/assets/landing/ai-arsenal/avatar-hero.jpg";
 
+// -------- Provider-style still covers (batch 2026-07-14) --------
+import coverVeoPro from "@/assets/landing/ai-arsenal/gen/veo-pro.jpg";
+import coverWanPro from "@/assets/landing/ai-arsenal/gen/wan-pro.jpg";
+import coverHailuo from "@/assets/landing/ai-arsenal/gen/hailuo-pro.jpg";
+import coverLuma from "@/assets/landing/ai-arsenal/gen/luma-pro.jpg";
+import coverRunway from "@/assets/landing/ai-arsenal/gen/runway-aleph.jpg";
+import coverPika from "@/assets/landing/ai-arsenal/gen/pika-pro.jpg";
+import coverNano from "@/assets/landing/ai-arsenal/gen/nano-banana.jpg";
+import coverGeminiFlash from "@/assets/landing/ai-arsenal/gen/gemini-flash.jpg";
+import coverFluxFill from "@/assets/landing/ai-arsenal/gen/flux-fill.jpg";
+import coverClarity from "@/assets/landing/ai-arsenal/gen/clarity-upscaler.jpg";
+import coverElevenMusic from "@/assets/landing/ai-arsenal/gen/elevenlabs-music.jpg";
+import coverMinimax from "@/assets/landing/ai-arsenal/gen/minimax-music.jpg";
+import coverStableAudio from "@/assets/landing/ai-arsenal/gen/stable-audio.jpg";
+import coverElevenTts from "@/assets/landing/ai-arsenal/gen/elevenlabs-tts.jpg";
+import coverVoiceClone from "@/assets/landing/ai-arsenal/gen/voice-clone.jpg";
+import coverBrandLock from "@/assets/landing/ai-arsenal/gen/brand-lock.jpg";
+import coverCastWorld from "@/assets/landing/ai-arsenal/gen/cast-world.jpg";
+
+// -------- Animated flagship loops (asset.json pointers) --------
+import soraLoop from "@/assets/landing/ai-arsenal/gen/sora-loop.mp4.asset.json";
+import klingLoop from "@/assets/landing/ai-arsenal/gen/kling-loop.mp4.asset.json";
+import veoLoop from "@/assets/landing/ai-arsenal/gen/veo-loop.mp4.asset.json";
+
 export type ArsenalCategory = "video" | "image" | "audio" | "avatar";
 
 export interface ArsenalModel {
@@ -19,6 +43,8 @@ export interface ArsenalModel {
   caps: Record<Language, string[]>;
   /** Cover image (optional; falls back to genre hero) */
   cover?: string;
+  /** Optional animated loop URL (mp4) — displayed on hover / when in view */
+  loop?: string;
   recommended?: boolean;
   /** Optional featured/hero flag inside category (goes first) */
   hero?: boolean;
@@ -33,7 +59,7 @@ const m = (
   names: [string, string, string],
   taglines: [string, string, string],
   caps: Array<{ en: string; de: string; es: string }>,
-  extras: Partial<Pick<ArsenalModel, "cover" | "recommended" | "hero">> = {}
+  extras: Partial<Pick<ArsenalModel, "cover" | "loop" | "recommended" | "hero">> = {}
 ): ArsenalModel => ({
   id,
   category,
@@ -84,7 +110,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Lip-sync nativo dentro del propio modelo — sin post-sync.",
     ],
     [T2V, I2V, NATIVE_LIP, P1080],
-    { cover: videoKling, hero: true, recommended: true }
+    { cover: videoKling, loop: klingLoop.url, hero: true, recommended: true }
   ),
   m("sora-2", "video",
     ["OpenAI Sora 2", "OpenAI Sora 2", "OpenAI Sora 2"],
@@ -94,7 +120,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Narrativa fotorrealista con comprensión profunda del prompt.",
     ],
     [T2V, I2V, P1080],
-    { cover: videoSora, recommended: true }
+    { cover: videoSora, loop: soraLoop.url, recommended: true }
   ),
   m("veo-3.1-pro", "video",
     ["Google Veo 3.1 Pro", "Google Veo 3.1 Pro", "Google Veo 3.1 Pro"],
@@ -103,7 +129,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Googles Flaggschiff — cinematisch mit präziser Kontrolle.",
       "Buque insignia de Google — calidad cinematográfica.",
     ],
-    [T2V, I2V, P1080]
+    [T2V, I2V, P1080],
+    { cover: coverVeoPro, loop: veoLoop.url, recommended: true }
   ),
   m("veo-3.1-fast", "video",
     ["Veo 3.1 Fast", "Veo 3.1 Fast", "Veo 3.1 Fast"],
@@ -121,7 +148,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Native 1080p Kino-Frames mit starker Physik.",
       "Fotogramas cinematográficos 1080p con física sólida.",
     ],
-    [T2V, I2V, P1080]
+    [T2V, I2V, P1080],
+    { cover: coverWanPro }
   ),
   m("wan-2-6-standard", "video",
     ["Wan 2.6", "Wan 2.6", "Wan 2.6"],
@@ -139,7 +167,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Fotorealistisches Licht mit Kamera-Kontrolle.",
       "Iluminación fotorrealista con control de cámara.",
     ],
-    [T2V, I2V, CAM]
+    [T2V, I2V, CAM],
+    { cover: coverLuma }
   ),
   m("hailuo-pro", "video",
     ["Hailuo 2.3 Pro", "Hailuo 2.3 Pro", "Hailuo 2.3 Pro"],
@@ -148,7 +177,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Regie-Kontrolle auf Studio-Niveau.",
       "Control de personajes al nivel de un director.",
     ],
-    [T2V, I2V, DIR]
+    [T2V, I2V, DIR],
+    { cover: coverHailuo }
   ),
   m("seedance-2-mini", "video",
     ["Seedance 2.0 Mini", "Seedance 2.0 Mini", "Seedance 2.0 Mini"],
@@ -220,7 +250,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Start-/End-Frame-Kontrolle für präzise Schnitte.",
       "Control de fotograma inicio/fin para cortes precisos.",
     ],
-    [I2V, KEYS]
+    [I2V, KEYS],
+    { cover: coverPika }
   ),
   m("pika-2-2-standard", "video",
     ["Pika 2.2", "Pika 2.2", "Pika 2.2"],
@@ -256,7 +287,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Premium-Spezialist für Video-zu-Video.",
       "Especialista premium en vídeo a vídeo.",
     ],
-    [V2V]
+    [V2V],
+    { cover: coverRunway }
   ),
   m("ltx-pro", "video",
     ["LTX Pro", "LTX Pro", "LTX Pro"],
@@ -296,7 +328,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Generación rápida y edición precisa con Gemini.",
     ],
     [T2I, EDIT, FAST],
-    { recommended: true }
+    { cover: coverNano, recommended: true }
   ),
   m("gemini-3.1-flash-image", "image",
     ["Gemini 3.1 Flash Image", "Gemini 3.1 Flash Image", "Gemini 3.1 Flash Image"],
@@ -305,7 +337,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Ultraschnelles Bild-Editing in Pro-Qualität.",
       "Edición de imágenes ultrarrápida a calidad pro.",
     ],
-    [T2I, EDIT, FAST]
+    [T2I, EDIT, FAST],
+    { cover: coverGeminiFlash }
   ),
   m("flux-fill-pro", "image",
     ["FLUX Fill Pro", "FLUX Fill Pro", "FLUX Fill Pro"],
@@ -314,7 +347,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Magic Edit, Inpaint & Outpaint.",
       "Edición mágica, inpaint y outpaint.",
     ],
-    [EDIT, INPAINT]
+    [EDIT, INPAINT],
+    { cover: coverFluxFill }
   ),
   m("clarity-upscaler", "image",
     ["Clarity Upscaler", "Clarity Upscaler", "Clarity Upscaler"],
@@ -323,7 +357,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Bis zu 4× schärfer, ohne Detailverlust.",
       "Hasta 4× más nítido, sin pérdida de detalle.",
     ],
-    [UPS4]
+    [UPS4],
+    { cover: coverClarity }
   ),
   m("style-reference", "image",
     ["Style Reference", "Style Reference", "Referencia de Estilo"],
@@ -353,7 +388,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Track-lange Songs mit Lyrics & Vocals.",
       "Pistas completas con letras y voces.",
     ],
-    [MUSIC, VOCAL]
+    [MUSIC, VOCAL],
+    { cover: coverElevenMusic }
   ),
   m("minimax-music-1.5", "audio",
     ["MiniMax Music 1.5", "MiniMax Music 1.5", "MiniMax Music 1.5"],
@@ -362,7 +398,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Vocal-Tracks mit KI-geschriebenen Lyrics.",
       "Pistas vocales con letras escritas por IA.",
     ],
-    [VOCAL, MUSIC]
+    [VOCAL, MUSIC],
+    { cover: coverMinimax }
   ),
   m("stable-audio-2.5", "audio",
     ["Stable Audio 2.5", "Stable Audio 2.5", "Stable Audio 2.5"],
@@ -371,7 +408,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Cinematische Instrumentals & Sound-Design.",
       "Instrumentales cinematográficos y diseño sonoro.",
     ],
-    [MUSIC, SFX]
+    [MUSIC, SFX],
+    { cover: coverStableAudio }
   ),
   m("elevenlabs-tts", "audio",
     ["ElevenLabs Voice", "ElevenLabs Voice", "ElevenLabs Voice"],
@@ -380,7 +418,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Studio-Voiceover in 30+ Sprachen.",
       "Locución de estudio en más de 30 idiomas.",
     ],
-    [VOICE, MULTILANG]
+    [VOICE, MULTILANG],
+    { cover: coverElevenTts }
   ),
   m("voice-studio-clone", "audio",
     ["Voice Studio Clone", "Voice Studio Klon", "Clon Voice Studio"],
@@ -389,7 +428,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Klone deine eigene Stimme aus einer WhatsApp-Notiz.",
       "Clona tu propia voz desde una nota de WhatsApp.",
     ],
-    [CLONE, VOICE]
+    [CLONE, VOICE],
+    { cover: coverVoiceClone }
   ),
 
   // ============ AVATAR ============
@@ -410,7 +450,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Persistente Charaktere über alle Studios hinweg.",
       "Personajes persistentes en todos los estudios.",
     ],
-    [CONS]
+    [CONS],
+    { cover: coverBrandLock }
   ),
   m("cast-and-world", "avatar",
     ["Cast & World", "Cast & World", "Cast & World"],
@@ -419,7 +460,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Cast, Wardrobe und Locations — überall wiederverwendbar.",
       "Reparto, vestuario y localizaciones reutilizables.",
     ],
-    [CONS, MULTIREF]
+    [CONS, MULTIREF],
+    { cover: coverCastWorld }
   ),
 ];
 

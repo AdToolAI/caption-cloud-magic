@@ -197,6 +197,9 @@ const ArsenalHeroStage = ({
   if (!model) return null;
   const cover = getCoverForModel(model);
   const caps = model.caps[language] ?? model.caps.en;
+  const prefersReducedMotion = typeof window !== "undefined"
+    && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const showLoop = !!model.loop && !prefersReducedMotion;
 
   return (
     <div className="relative rounded-3xl overflow-hidden border border-border/50 bg-card/40 aspect-[16/10] md:aspect-[16/9] lg:aspect-auto lg:min-h-[520px]">
@@ -210,12 +213,26 @@ const ArsenalHeroStage = ({
           transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
           className="absolute inset-0"
         >
-          <img
-            src={cover}
-            alt=""
-            loading="lazy"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+          {showLoop ? (
+            <video
+              key={model.loop}
+              src={model.loop}
+              poster={cover}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <img
+              src={cover}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/10" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-transparent" />
 
@@ -223,6 +240,7 @@ const ArsenalHeroStage = ({
           <SignatureTransition key={`sig-${transitionKey}`} category={categoryForTransition} />
         </motion.div>
       </AnimatePresence>
+
 
       {/* Top row: category chip + progress */}
       <div className="absolute top-4 left-4 right-4 z-20 flex items-center gap-3">
