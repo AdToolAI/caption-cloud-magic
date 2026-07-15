@@ -13,29 +13,29 @@ const corsHeaders = {
 interface EngineMeta {
   price: number;
   maxDuration: number;
-  route: 'replicate' | 'direct-elevenlabs' | 'direct-stability' | 'direct-lyria';
+  route: 'replicate';
   vocals: boolean;
   requiresLyrics: boolean;
-  replicateModel?: string;
+  replicateModel: string;
   label: string;
 }
 const ENGINES: Record<string, EngineMeta> = {
-  'stable-audio-25':      { price: 0.15, maxDuration: 190, route: 'replicate',         vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
-  'stable-audio-3-large': { price: 0.18, maxDuration: 190, route: 'direct-stability',  vocals: false, requiresLyrics: false, label: 'Stable Audio 3.0 Large' },
-  'minimax-15':           { price: 0.30, maxDuration: 60,  route: 'replicate',         vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5', label: 'MiniMax Music 1.5' },
-  'elevenlabs-music-v2':  { price: 0.36, maxDuration: 300, route: 'direct-elevenlabs', vocals: true,  requiresLyrics: false, label: 'ElevenLabs Music v2' },
-  'lyria-3-pro':          { price: 0.42, maxDuration: 60,  route: 'direct-lyria',      vocals: true,  requiresLyrics: true,  label: 'Google Lyria 3 Pro' },
+  'stable-audio-25':     { price: 0.15, maxDuration: 190, route: 'replicate', vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
+  'minimax-15':          { price: 0.30, maxDuration: 60,  route: 'replicate', vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5',            label: 'MiniMax Music 1.5' },
+  'elevenlabs-music-v2': { price: 0.36, maxDuration: 300, route: 'replicate', vocals: true,  requiresLyrics: false, replicateModel: 'elevenlabs/music',             label: 'ElevenLabs Music v2' },
+  'lyria-3-pro':         { price: 0.42, maxDuration: 180, route: 'replicate', vocals: true,  requiresLyrics: false, replicateModel: 'google/lyria-3-pro',           label: 'Google Lyria 3 Pro' },
 };
 
 // Legacy tier IDs → new engine IDs (keeps old clients / stored plans working).
 const LEGACY_ALIAS: Record<string, string> = {
-  quick:                 'stable-audio-3-large',
-  adaptive:              'stable-audio-25',
-  standard:              'elevenlabs-music-v2',
-  vocal:                 'minimax-15',
-  pro:                   'elevenlabs-music-v2',
-  'suno-v5':             'elevenlabs-music-v2',
-  'stable-audio-open-2': 'stable-audio-3-large',
+  quick:                  'stable-audio-25',
+  adaptive:               'stable-audio-25',
+  standard:               'elevenlabs-music-v2',
+  vocal:                  'minimax-15',
+  pro:                    'elevenlabs-music-v2',
+  'suno-v5':              'elevenlabs-music-v2',
+  'stable-audio-open-2':  'stable-audio-25',
+  'stable-audio-3-large': 'elevenlabs-music-v2',
 };
 
 function resolveEngine(id: string): { id: string; meta: EngineMeta } | null {
