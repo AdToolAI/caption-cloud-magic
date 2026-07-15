@@ -88,15 +88,6 @@ export function useMusicGeneration() {
           toast.error('Rate limit erreicht', { description: 'Bitte kurz warten und erneut versuchen.' });
         } else if (code === 'MISSING_LYRICS') {
           toast.error('Lyrics fehlen', { description: 'Für Vocal-Tracks bitte Songtext eingeben.' });
-        } else if (code === 'LYRIA_NOT_CONFIGURED') {
-          toast.error('Google Lyria 3 Pro noch nicht freigeschaltet', {
-            description: 'Vertex-AI Preview-Access wird gerade eingerichtet. Bitte ElevenLabs Music v2 oder Stable Audio 3.0 Large wählen.',
-          });
-        } else if (code === 'STABILITY_NOT_CONFIGURED') {
-          toast.error('Stable Audio 3.0 Large noch nicht konfiguriert', {
-            description: 'STABILITY_API_KEY wird gerade hinterlegt. Bitte Stable Audio 2.5 (Loop) oder ElevenLabs Music v2 wählen.',
-          });
-
         } else {
           toast.error('Music-Generierung fehlgeschlagen', { description: msg });
         }

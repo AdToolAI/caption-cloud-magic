@@ -13,29 +13,29 @@ const corsHeaders = {
 interface EngineMeta {
   price: number;
   maxDuration: number;
-  route: 'replicate' | 'direct-elevenlabs' | 'direct-stability' | 'direct-lyria';
+  route: 'replicate';
   vocals: boolean;
   requiresLyrics: boolean;
-  replicateModel?: string;
+  replicateModel: string;
   label: string;
 }
 const ENGINES: Record<string, EngineMeta> = {
-  'stable-audio-25':      { price: 0.15, maxDuration: 190, route: 'replicate',         vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
-  'stable-audio-3-large': { price: 0.18, maxDuration: 190, route: 'direct-stability',  vocals: false, requiresLyrics: false, label: 'Stable Audio 3.0 Large' },
-  'minimax-15':           { price: 0.30, maxDuration: 60,  route: 'replicate',         vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5', label: 'MiniMax Music 1.5' },
-  'elevenlabs-music-v2':  { price: 0.36, maxDuration: 300, route: 'direct-elevenlabs', vocals: true,  requiresLyrics: false, label: 'ElevenLabs Music v2' },
-  'lyria-3-pro':          { price: 0.42, maxDuration: 60,  route: 'direct-lyria',      vocals: true,  requiresLyrics: true,  label: 'Google Lyria 3 Pro' },
+  'stable-audio-25':     { price: 0.15, maxDuration: 190, route: 'replicate', vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
+  'minimax-15':          { price: 0.30, maxDuration: 60,  route: 'replicate', vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5',            label: 'MiniMax Music 1.5' },
+  'elevenlabs-music-v2': { price: 0.36, maxDuration: 300, route: 'replicate', vocals: true,  requiresLyrics: false, replicateModel: 'elevenlabs/music',             label: 'ElevenLabs Music v2' },
+  'lyria-3-pro':         { price: 0.42, maxDuration: 180, route: 'replicate', vocals: true,  requiresLyrics: false, replicateModel: 'google/lyria-3-pro',           label: 'Google Lyria 3 Pro' },
 };
 
 // Legacy tier IDs → new engine IDs (keeps old clients / stored plans working).
 const LEGACY_ALIAS: Record<string, string> = {
-  quick:                 'stable-audio-3-large',
-  adaptive:              'stable-audio-25',
-  standard:              'elevenlabs-music-v2',
-  vocal:                 'minimax-15',
-  pro:                   'elevenlabs-music-v2',
-  'suno-v5':             'elevenlabs-music-v2',
-  'stable-audio-open-2': 'stable-audio-3-large',
+  quick:                  'stable-audio-25',
+  adaptive:               'stable-audio-25',
+  standard:               'elevenlabs-music-v2',
+  vocal:                  'minimax-15',
+  pro:                    'elevenlabs-music-v2',
+  'suno-v5':              'elevenlabs-music-v2',
+  'stable-audio-open-2':  'stable-audio-25',
+  'stable-audio-3-large': 'elevenlabs-music-v2',
 };
 
 function resolveEngine(id: string): { id: string; meta: EngineMeta } | null {
@@ -176,9 +176,9 @@ serve(async (req) => {
     let engineUsed = engine.label;
 
     // =================================================================
-    // ROUTE 1: Replicate models (Stable Audio 2.5, Open 2, MiniMax 1.5)
+    // All engines run through Replicate.
     // =================================================================
-    if (engine.route === 'replicate') {
+    {
       const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
       if (!REPLICATE_API_KEY) {
         return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
@@ -193,7 +193,6 @@ serve(async (req) => {
         const p = loop ? `${enhancedPrompt}. Seamless loop, no fade-in or fade-out, continuous beat` : enhancedPrompt;
         input = { prompt: p, duration, steps: 8, cfg_scale: 7, output_format: 'mp3' };
       } else if (engineId === 'minimax-15') {
-        // MiniMax: prompt (style, 10-300) + lyrics (10-600)
         const FILLER = 'Cinematic studio production, mastered mix, professional arrangement';
         let styleDesc = [
           genre && genre !== 'any' ? `Genre: ${genre}` : '',
@@ -209,9 +208,34 @@ serve(async (req) => {
         let lyricsInput = (lyrics ?? '').trim();
         if (lyricsInput.length > 600) lyricsInput = lyricsInput.slice(0, 600);
         input = { lyrics: lyricsInput, prompt: styleDesc };
-        console.log('[generate-music-track] MiniMax input lens:', { promptLen: styleDesc.length, lyricsLen: lyricsInput.length });
+      } else if (engineId === 'elevenlabs-music-v2') {
+        // Replicate elevenlabs/music: prompt + music_length_ms + force_instrumental
+        const promptParts = [enhancedPrompt];
+        if (languageName) promptParts.push(`Vocals in ${languageName}`);
+        input = {
+          prompt: promptParts.join('. '),
+          music_length_ms: Math.min(duration, 300) * 1000,
+          force_instrumental: !!instrumental,
+          output_format: 'mp3_44100_128',
+        };
+        if (lyrics && lyrics.trim()) {
+          (input as Record<string, unknown>).lyrics = lyrics.trim();
+        }
+      } else if (engineId === 'lyria-3-pro') {
+        // Replicate google/lyria-3-pro: prompt + optional negative_prompt/seed
+        const promptParts = [enhancedPrompt];
+        if (languageName) promptParts.push(`Vocals in ${languageName}`);
+        if (instrumental) promptParts.push('instrumental, no vocals');
+        if (lyrics && lyrics.trim()) {
+          promptParts.push(`Lyrics:\n${lyrics.trim()}`);
+        }
+        input = {
+          prompt: promptParts.join('. '),
+          negative_prompt: 'low quality, distorted, muddy, harsh clipping',
+        };
       }
 
+      console.log(`[generate-music-track] Replicate input for ${engineId}:`, Object.keys(input));
 
       let output: any;
       try {
@@ -227,8 +251,9 @@ serve(async (req) => {
         } catch { /* ignore */ }
         return new Response(JSON.stringify({
           error: providerDetail || err?.message || 'Unknown Replicate error',
-          code: engineId === 'minimax-15' ? "MINIMAX_VALIDATION" : "REPLICATE_ERROR",
+          code: "REPLICATE_ERROR",
           stage: "replicate-input",
+          engine: engineId,
         }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -245,162 +270,6 @@ serve(async (req) => {
         });
       }
       audioBuffer = await audioRes.arrayBuffer();
-
-    // =================================================================
-    // ROUTE 2: ElevenLabs Music v2 (native API)
-    // =================================================================
-    } else if (engine.route === 'direct-elevenlabs') {
-      const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
-      if (!ELEVENLABS_API_KEY) {
-        return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY not configured" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      engineUsed = 'elevenlabs/music-v2';
-
-      const elPayload: Record<string, unknown> = {
-        prompt: enhancedPrompt,
-        music_length_ms: duration * 1000,
-        model_id: 'music_v2',
-      };
-      if (languageName) elPayload.language = languageName;
-      if (lyrics && lyrics.trim()) elPayload.lyrics = lyrics.trim();
-
-      const elResponse = await fetch('https://api.elevenlabs.io/v1/music', {
-        method: 'POST',
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg',
-        },
-        body: JSON.stringify(elPayload),
-      });
-
-      if (!elResponse.ok) {
-        const errText = await elResponse.text().catch(() => '');
-        console.error('[generate-music-track] ElevenLabs error:', elResponse.status, errText);
-        if (elResponse.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly.", code: "RATE_LIMIT" }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
-        if (elResponse.status === 401 || elResponse.status === 403) {
-          return new Response(JSON.stringify({ error: "ElevenLabs API key fehlt Berechtigungen für Music v2.", code: "ELEVENLABS_UNAUTHORIZED", details: errText }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
-        return new Response(JSON.stringify({
-          error: `ElevenLabs Music v2 failed (${elResponse.status})`,
-          code: "ELEVENLABS_ERROR",
-          details: errText,
-        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      audioBuffer = await elResponse.arrayBuffer();
-
-    // =================================================================
-    // ROUTE 3: Stability AI — Stable Audio 3.0 Large (direct API)
-    // =================================================================
-    } else if (engine.route === 'direct-stability') {
-      const STABILITY_API_KEY = Deno.env.get('STABILITY_API_KEY');
-      if (!STABILITY_API_KEY) {
-        return new Response(JSON.stringify({
-          error: "Stable Audio 3.0 Large ist noch nicht aktiviert. STABILITY_API_KEY wird in Kürze hinterlegt.",
-          code: "STABILITY_NOT_CONFIGURED",
-        }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      engineUsed = 'stability/stable-audio-3-large';
-
-      // Stability AI text-to-audio (v2beta) — expects multipart/form-data.
-      const form = new FormData();
-      form.append('prompt', enhancedPrompt);
-      form.append('duration', String(Math.min(duration, 190)));
-      form.append('output_format', 'mp3');
-      form.append('model', 'stable-audio-2'); // v3 Large served under this endpoint family
-
-      let stRes: Response;
-      try {
-        stRes = await fetch('https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${STABILITY_API_KEY}`,
-            'Accept': 'audio/*',
-          },
-          body: form,
-        });
-      } catch (err: any) {
-        return new Response(JSON.stringify({ error: `Stability request failed: ${err.message}`, code: "STABILITY_ERROR" }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      if (!stRes.ok) {
-        const t = await stRes.text().catch(() => '');
-        console.error('[generate-music-track] Stability error:', stRes.status, t);
-        if (stRes.status === 401 || stRes.status === 403) {
-          return new Response(JSON.stringify({ error: "Stability API key ungültig oder ohne Music-Zugang.", code: "STABILITY_UNAUTHORIZED", details: t }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
-        return new Response(JSON.stringify({
-          error: `Stable Audio 3.0 Large failed (${stRes.status})`, code: "STABILITY_ERROR", details: t,
-        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      audioBuffer = await stRes.arrayBuffer();
-
-    // =================================================================
-    // ROUTE 4: Google Lyria 3 Pro (Vertex AI / Gemini API, Preview)
-    // =================================================================
-    } else if (engine.route === 'direct-lyria') {
-      const GOOGLE_LYRIA_API_KEY = Deno.env.get('GOOGLE_LYRIA_API_KEY');
-      if (!GOOGLE_LYRIA_API_KEY) {
-        return new Response(JSON.stringify({
-          error: "Google Lyria 3 Pro ist noch nicht freigeschaltet. Vertex-AI Preview-Access wird gerade eingerichtet.",
-          code: "LYRIA_NOT_CONFIGURED",
-        }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      engineUsed = 'google/lyria-3-pro';
-
-      const lyriaPayload: Record<string, unknown> = {
-        prompt: enhancedPrompt,
-        lyrics: lyrics?.trim() || undefined,
-        duration_seconds: Math.min(duration, 60),
-        language: languageName || 'English',
-        instrumental: engine.vocals ? !!instrumental : true,
-      };
-
-      let lyRes: Response;
-      try {
-        lyRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/lyria-3-pro:generateMusic?key=${GOOGLE_LYRIA_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(lyriaPayload),
-          },
-        );
-      } catch (err: any) {
-        return new Response(JSON.stringify({ error: `Lyria request failed: ${err.message}`, code: "LYRIA_ERROR" }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      if (!lyRes.ok) {
-        const t = await lyRes.text().catch(() => '');
-        console.error('[generate-music-track] Lyria error:', lyRes.status, t);
-        return new Response(JSON.stringify({
-          error: `Google Lyria 3 Pro failed (${lyRes.status})`, code: "LYRIA_ERROR", details: t,
-        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const lyJson: any = await lyRes.json().catch(() => null);
-      const b64: string | undefined =
-        lyJson?.audio?.data ||
-        lyJson?.audioContent ||
-        lyJson?.candidates?.[0]?.content?.parts?.[0]?.inline_data?.data;
-      if (!b64) {
-        return new Response(JSON.stringify({ error: "Lyria returned no audio", code: "LYRIA_ERROR", details: JSON.stringify(lyJson).slice(0, 500) }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-      audioBuffer = binary.buffer;
     }
 
 
