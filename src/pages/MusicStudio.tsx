@@ -76,7 +76,7 @@ export default function MusicStudio() {
     const track = await generateMusic({
       prompt: finalPrompt,
       tier,
-      durationSeconds: safeDuration,
+      durationSeconds: maxDur,
       genre: genre !== 'any' ? genre : undefined,
       mood,
       instrumental: tier === 'vocal' ? false : instrumental,
