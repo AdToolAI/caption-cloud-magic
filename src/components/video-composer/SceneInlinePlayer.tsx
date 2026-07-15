@@ -70,7 +70,7 @@ export default function SceneInlinePlayer({
   // Pipeline-Vollständigkeit: Bei Cinematic-Sync/Dialog-/Talking-Head-Szenen
   // ist der Clip erst dann "wirklich fertig", wenn auch der Lip-Sync sauber
   // durchgelaufen ist. Sonst zeigen wir keinen grünen Haken.
-  const dialogVoiceCount = scene.dialogVoices ? Object.keys(scene.dialogVoices).length : 0;
+  const dialogVoiceCount = scene.dialogVoices ? countSceneSpeakers(scene) : 0;
   const needsLipsync =
     scene.engineOverride === 'cinematic-sync' ||
     !!(scene as any).twoshotStage ||
