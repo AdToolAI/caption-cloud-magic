@@ -294,8 +294,8 @@ export default function MusicStudio() {
                     </p>
                   </div>
 
-                  {/* Tier-specific controls */}
-                  {tier === 'adaptive' && (
+                  {/* Engine-specific controls */}
+                  {engine.supportsLoop && (
                     <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                       <div>
                         <Label htmlFor="loop" className="text-sm text-foreground">Seamless Loop</Label>
@@ -305,17 +305,33 @@ export default function MusicStudio() {
                     </div>
                   )}
 
-                  {tier !== 'vocal' && (
+                  {engine.supportsInstrumentalToggle && (
                     <div className="flex items-center justify-between p-3 rounded-lg bg-background/40 border border-primary/10">
                       <div>
                         <Label htmlFor="instr" className="text-sm text-foreground">Instrumental</Label>
-                        <p className="text-[11px] text-muted-foreground">Keine Vocals (außer im Vocal-Tier)</p>
+                        <p className="text-[11px] text-muted-foreground">Ohne Gesang generieren</p>
                       </div>
                       <Switch id="instr" checked={instrumental} onCheckedChange={setInstrumental} />
                     </div>
                   )}
 
-                  {showLanguagePicker && MUSIC_LANGUAGE_SUPPORT[tier].length > 0 && (
+                  {engine.supportsStyleField && (
+                    <div>
+                      <Label htmlFor="style-tags" className="text-sm text-foreground mb-1.5 block">
+                        Style-Tags <span className="text-muted-foreground text-[11px]">(Suno-Style, kommagetrennt)</span>
+                      </Label>
+                      <Input
+                        id="style-tags"
+                        value={styleTags}
+                        onChange={(e) => setStyleTags(e.target.value)}
+                        placeholder="z.B. pop, upbeat, female vocals, 120 bpm"
+                        className="bg-background/40 border-primary/20"
+                        maxLength={200}
+                      />
+                    </div>
+                  )}
+
+                  {showLanguagePicker && engine.languages.length > 0 && (
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
                       <div className="flex items-center justify-between mb-2">
                         <div>
@@ -323,7 +339,7 @@ export default function MusicStudio() {
                           <p className="text-[11px] text-muted-foreground">Nur Sprachen, die dieser Provider sauber singt</p>
                         </div>
                         <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
-                          {tierPricing.engine}
+                          {engine.provider}
                         </Badge>
                       </div>
                       <select
@@ -333,20 +349,20 @@ export default function MusicStudio() {
                         disabled={loading}
                         className="w-full h-9 px-3 rounded-md bg-background/40 border border-primary/20 text-sm focus:border-primary/60 focus:outline-none"
                       >
-                        {MUSIC_LANGUAGE_SUPPORT[tier].map((l) => (
+                        {engine.languages.map((l) => (
                           <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
                         ))}
                       </select>
                     </div>
                   )}
 
-                  {!showLanguagePicker && (tier === 'standard' || tier === 'pro') && instrumental && (
+                  {!showLanguagePicker && engine.supportsInstrumentalToggle && instrumental && (
                     <p className="text-[11px] text-muted-foreground italic">
                       Instrumental aktiv — keine Sprachauswahl nötig. Deaktiviere „Instrumental" für Gesang.
                     </p>
                   )}
 
-                  {tier === 'vocal' && (
+                  {engine.vocals && (
                     <LyricsEditor
                       value={lyrics}
                       onChange={setLyrics}
