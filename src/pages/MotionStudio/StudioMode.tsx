@@ -39,9 +39,7 @@ import type {
   SceneSnippet,
 } from '@/types/motion-studio';
 import { SystemLoadPill } from '@/components/render/SystemLoadPill';
-import { useRenderSystemLoad } from '@/hooks/useRenderSystemLoad';
-import { useFounderStatus } from '@/hooks/useFounderStatus';
-import { Crown } from 'lucide-react';
+import { FounderPriorityChip } from '@/components/render/FounderPriorityChip';
 
 type StepId = 'cast' | 'location' | 'storyboard' | 'render';
 
