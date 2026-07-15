@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles, Film, Image as ImageIcon, Volume2, UserSquare2, Star, Play, Pause,
+  Sparkles, Film, Image as ImageIcon, Volume2, UserSquare2, Star,
   ChevronRight, Zap,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
