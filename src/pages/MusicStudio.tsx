@@ -5,6 +5,7 @@ import {
   isLanguageSupported,
   getLanguageMeta,
   engineHasVocals,
+  computeMusicPrice,
   type MusicEngineId,
 } from '@/lib/music/engineCatalog';
 import { Helmet } from 'react-helmet-async';
