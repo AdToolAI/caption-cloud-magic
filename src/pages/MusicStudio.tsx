@@ -1,19 +1,25 @@
 import { useState, useEffect } from 'react';
-import { MUSIC_LANGUAGE_SUPPORT, isLanguageSupported, getLanguageMeta, tierHasVocals } from '@/lib/music/languageSupport';
+import {
+  ENGINE_CATALOG,
+  getEngine,
+  isLanguageSupported,
+  getLanguageMeta,
+  engineHasVocals,
+  type MusicEngineId,
+} from '@/lib/music/engineCatalog';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw } from 'lucide-react';
+import { Music2, Sparkles, Loader2, Wallet, Library, Lock, Search, Activity, RotateCcw, Info } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
-import { useMusicGeneration, MUSIC_TIER_PRICING, type MusicTier, type GeneratedMusicTrack } from '@/hooks/useMusicGeneration';
+import { useMusicGeneration, type GeneratedMusicTrack } from '@/hooks/useMusicGeneration';
 import { ProviderSelector } from '@/components/music-studio/ProviderSelector';
 import { LyricsEditor } from '@/components/music-studio/LyricsEditor';
 import { MyTracksGrid } from '@/components/music-studio/MyTracksGrid';
