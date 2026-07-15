@@ -93,6 +93,10 @@ export function useCompanionCoach() {
         if (typeof p.coach_paused_until === 'string') {
           setPaused(new Date(p.coach_paused_until).getTime() > Date.now());
         }
+        setConciergeCompleted(Boolean(p.concierge_completed));
+        if (typeof p.primary_goal === 'string') setPrimaryGoal(p.primary_goal);
+      } else if (!cancelled) {
+        setConciergeCompleted(false);
       }
 
       const since = new Date();
