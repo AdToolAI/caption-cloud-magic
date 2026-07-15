@@ -9,60 +9,85 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Customer pricing per track in EUR (≥30% margin over Replicate/ElevenLabs cost)
-// quick:    MusicGen ~$0.04 → €0.10 (instrumental loops, fast)
-// adaptive: Stable Audio 2.5 ~$0.04 → €0.15 (background, loopable, up to ~190s, inpainting/continuation)
-// standard: ElevenLabs Music ~$0.20 → €0.35 (full instrumental, polished)
-// vocal:    MiniMax Music 1.5 ~$0.05 → €0.30 (with vocals + lyrics, up to 60s)
-// pro:      ElevenLabs Music ~$0.80 → €1.40 (long-form pro)
-const MUSIC_PRICING: Record<string, { EUR: number; USD: number }> = {
-  quick:    { EUR: 0.10, USD: 0.10 },
-  adaptive: { EUR: 0.15, USD: 0.15 },
-  standard: { EUR: 0.35, USD: 0.35 },
-  vocal:    { EUR: 0.30, USD: 0.30 },
-  pro:      { EUR: 1.40, USD: 1.40 },
+// ---- Engine catalog (mirror of src/lib/music/engineCatalog.ts) ----
+interface EngineMeta {
+  price: number;
+  maxDuration: number;
+  route: 'replicate' | 'direct-elevenlabs' | 'direct-suno';
+  vocals: boolean;
+  requiresLyrics: boolean;
+  replicateModel?: string;
+  label: string;
+}
+const ENGINES: Record<string, EngineMeta> = {
+  'stable-audio-25':     { price: 0.15, maxDuration: 190, route: 'replicate',         vocals: false, requiresLyrics: false, replicateModel: 'stability-ai/stable-audio-2.5', label: 'Stable Audio 2.5' },
+  'stable-audio-open-2': { price: 0.12, maxDuration: 47,  route: 'replicate',         vocals: false, requiresLyrics: false, replicateModel: 'stackadoc/stable-audio-open-1.0', label: 'Stable Audio Open 2' },
+  'minimax-15':          { price: 0.30, maxDuration: 60,  route: 'replicate',         vocals: true,  requiresLyrics: true,  replicateModel: 'minimax/music-1.5', label: 'MiniMax Music 1.5' },
+  'suno-v5':             { price: 0.45, maxDuration: 240, route: 'direct-suno',       vocals: true,  requiresLyrics: true,  label: 'Suno v5' },
+  'elevenlabs-music-v2': { price: 0.36, maxDuration: 300, route: 'direct-elevenlabs', vocals: true,  requiresLyrics: false, label: 'ElevenLabs Music v2' },
 };
 
-const MAX_DURATION: Record<string, number> = {
-  quick:    30,
-  adaptive: 190,   // Stable Audio 2.5 max ~190s
-  standard: 60,
-  vocal:    60,    // MiniMax Music 1.5 max 60s
-  pro:      300,
+// Legacy tier IDs → new engine IDs (keeps old clients / stored plans working).
+const LEGACY_ALIAS: Record<string, string> = {
+  quick:    'stable-audio-open-2',
+  adaptive: 'stable-audio-25',
+  standard: 'elevenlabs-music-v2',
+  vocal:    'minimax-15',
+  pro:      'elevenlabs-music-v2',
 };
+
+function resolveEngine(id: string): { id: string; meta: EngineMeta } | null {
+  const normalized = ENGINES[id] ? id : LEGACY_ALIAS[id];
+  if (!normalized) return null;
+  return { id: normalized, meta: ENGINES[normalized] };
+}
 
 interface GenerateMusicRequest {
   prompt: string;
-  tier: 'quick' | 'adaptive' | 'standard' | 'vocal' | 'pro';
+  tier: string;                     // engineId (or legacy tier)
   durationSeconds?: number;
   genre?: string;
   mood?: string;
   instrumental?: boolean;
-  bpm?: number;          // Optional target BPM (e.g. match video tempo)
-  key?: string;          // Optional musical key (e.g. "C minor")
-  lyrics?: string;       // Required for 'vocal' tier (MiniMax) — supports [Verse]/[Chorus]/[Bridge] tags
-  loop?: boolean;        // For 'adaptive' tier (Stable Audio loop hint)
+  bpm?: number;
+  key?: string;
+  lyrics?: string;
+  loop?: boolean;
+  language?: string;
+  languageName?: string;
+  styleTags?: string;               // Suno style tags
 }
 
 function buildEnhancedPrompt(req: GenerateMusicRequest): string {
   const parts = [req.prompt.trim()];
   if (req.genre && req.genre !== 'any') parts.push(`Genre: ${req.genre}`);
   if (req.mood) parts.push(`Mood: ${req.mood}`);
-  if (req.bpm && req.bpm >= 40 && req.bpm <= 220) {
-    parts.push(`Tempo: exactly ${Math.round(req.bpm)} BPM`);
-  }
+  if (req.bpm && req.bpm >= 40 && req.bpm <= 220) parts.push(`Tempo: exactly ${Math.round(req.bpm)} BPM`);
   if (req.key) parts.push(`Key: ${req.key}`);
   if (req.instrumental) parts.push('instrumental, no vocals');
   parts.push('high quality, professional production, studio mastered');
   return parts.join('. ');
 }
 
+function extractAudioUrl(output: any): string | null {
+  if (typeof output === 'string') return output;
+  if (Array.isArray(output) && output.length > 0) {
+    return typeof output[0] === 'string' ? output[0] : null;
+  }
+  if (output && typeof output === 'object') {
+    if ('audio' in output && typeof (output as any).audio === 'string') return (output as any).audio;
+    if ('url' in output) {
+      const u = (output as any).url;
+      return typeof u === 'function' ? u().toString() : u;
+    }
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-
-  // Bond QA Agent: short-circuit on x-qa-mock header (no provider call, no credits)
   if (isQaMockRequest(req)) {
     return qaMockResponse({ corsHeaders, kind: "music" });
   }
@@ -79,7 +104,6 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !user) {
@@ -94,26 +118,31 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateMusicRequest;
-    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true, bpm, key, lyrics, loop } = body;
+    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true, bpm, key, lyrics, loop, languageName, styleTags } = body;
 
-    // Validation
-    if (!prompt?.trim() || prompt.length > 500) {
-      return new Response(JSON.stringify({ error: "Prompt is required (max 500 chars)" }), {
+    if (!prompt?.trim() || prompt.length > 800) {
+      return new Response(JSON.stringify({ error: "Prompt is required (max 800 chars)" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    if (tier === 'vocal' && (!lyrics || !lyrics.trim())) {
-      return new Response(JSON.stringify({ error: "Lyrics are required for the 'vocal' tier", code: "MISSING_LYRICS" }), {
+
+    const resolved = resolveEngine(tier);
+    if (!resolved) {
+      return new Response(JSON.stringify({ error: `Unknown engine '${tier}'` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    if (!MUSIC_PRICING[tier]) {
-      return new Response(JSON.stringify({ error: "Invalid tier. Use quick, standard, or pro." }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+    const engineId = resolved.id;
+    const engine = resolved.meta;
+
+    if (engine.requiresLyrics && (!lyrics || !lyrics.trim() || lyrics.trim().length < 10)) {
+      return new Response(JSON.stringify({
+        error: "Lyrics zu kurz (min. 10 Zeichen). Bitte Songtext eingeben oder AI-Lyrics generieren.",
+        code: "MISSING_LYRICS",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const maxDur = MAX_DURATION[tier];
-    const duration = Math.max(5, Math.min(maxDur, durationSeconds));
+
+    const duration = Math.max(5, Math.min(engine.maxDuration, durationSeconds));
 
     // Wallet check
     const { data: wallet, error: walletError } = await supabaseAdmin
@@ -121,219 +150,89 @@ serve(async (req) => {
       .select('balance_euros, currency')
       .eq('user_id', user.id)
       .single();
-
     if (walletError || !wallet) {
       return new Response(JSON.stringify({
         error: "No AI Credits wallet found. Please purchase credits first.",
         code: "NO_WALLET", needsPurchase: true
       }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
     const currency = (wallet.currency || 'EUR') as 'EUR' | 'USD';
-    const cost = MUSIC_PRICING[tier][currency] || MUSIC_PRICING[tier].EUR;
+    const cost = engine.price;
     const currencySymbol = currency === 'USD' ? '$' : '€';
-
     if (wallet.balance_euros < cost) {
       return new Response(JSON.stringify({
         error: `Insufficient credits. Need ${currencySymbol}${cost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
-        code: "INSUFFICIENT_CREDITS",
-        needsPurchase: true,
-        required: cost,
-        available: wallet.balance_euros,
-        currency,
+        code: "INSUFFICIENT_CREDITS", needsPurchase: true, required: cost, available: wallet.balance_euros, currency,
       }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const enhancedPrompt = buildEnhancedPrompt(body);
-    console.log(`[generate-music-track] tier=${tier} duration=${duration}s cost=${currencySymbol}${cost}`);
+    console.log(`[generate-music-track] engine=${engineId} duration=${duration}s cost=${currencySymbol}${cost}`);
 
     let audioBuffer: ArrayBuffer | null = null;
-    let engineUsed = '';
+    let engineUsed = engine.label;
 
-    // ===== TIER ROUTING =====
-    if (tier === 'quick') {
-      // ----- Replicate MusicGen (Meta) -----
+    // =================================================================
+    // ROUTE 1: Replicate models (Stable Audio 2.5, Open 2, MiniMax 1.5)
+    // =================================================================
+    if (engine.route === 'replicate') {
       const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
       if (!REPLICATE_API_KEY) {
         return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      engineUsed = 'replicate/musicgen';
       const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+      engineUsed = `replicate/${engine.replicateModel}`;
+
+      let input: Record<string, unknown> = {};
+      if (engineId === 'stable-audio-25') {
+        const p = loop ? `${enhancedPrompt}. Seamless loop, no fade-in or fade-out, continuous beat` : enhancedPrompt;
+        input = { prompt: p, duration, steps: 8, cfg_scale: 7, output_format: 'mp3' };
+      } else if (engineId === 'stable-audio-open-2') {
+        input = { prompt: enhancedPrompt, seconds_total: Math.min(duration, 47), steps: 100, cfg_scale: 6 };
+      } else if (engineId === 'minimax-15') {
+        // MiniMax: prompt (style, 10-300) + lyrics (10-600)
+        const FILLER = 'Cinematic studio production, mastered mix, professional arrangement';
+        let styleDesc = [
+          genre && genre !== 'any' ? `Genre: ${genre}` : '',
+          mood ? `Mood: ${mood}` : '',
+          bpm ? `Tempo: ${bpm} BPM` : '',
+          key ? `Key: ${key}` : '',
+          prompt.trim(),
+          languageName ? `Sung in ${languageName}` : '',
+          'Studio production quality',
+        ].filter(Boolean).join('. ');
+        if (styleDesc.length < 10) styleDesc = `${styleDesc} ${FILLER}`.trim();
+        if (styleDesc.length > 300) styleDesc = styleDesc.slice(0, 300);
+        let lyricsInput = (lyrics ?? '').trim();
+        if (lyricsInput.length > 600) lyricsInput = lyricsInput.slice(0, 600);
+        input = { lyrics: lyricsInput, prompt: styleDesc };
+        console.log('[generate-music-track] MiniMax input lens:', { promptLen: styleDesc.length, lyricsLen: lyricsInput.length });
+      }
 
       let output: any;
       try {
-        output = await replicate.run(
-          'meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb',
-          {
-            input: {
-              prompt: enhancedPrompt,
-              duration,
-              model_version: 'stereo-large',
-              output_format: 'mp3',
-              normalization_strategy: 'peak',
-            },
-          }
-        );
+        output = await replicate.run(engine.replicateModel as `${string}/${string}`, { input });
       } catch (err: any) {
-        console.error('[generate-music-track] Replicate error:', err);
-        return new Response(JSON.stringify({
-          error: `Music generation failed: ${err.message || 'Unknown error'}`,
-          code: "REPLICATE_ERROR",
-        }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      let audioUrl: string | null = null;
-      if (typeof output === 'string') audioUrl = output;
-      else if (Array.isArray(output) && output.length > 0) audioUrl = typeof output[0] === 'string' ? output[0] : null;
-      else if (output && typeof output === 'object' && 'url' in output) {
-        audioUrl = typeof (output as any).url === 'function' ? (output as any).url().toString() : (output as any).url;
-      }
-
-      if (!audioUrl) {
-        return new Response(JSON.stringify({ error: "No audio returned from MusicGen", code: "NO_OUTPUT" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      const audioRes = await fetch(audioUrl);
-      if (!audioRes.ok) {
-        return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      audioBuffer = await audioRes.arrayBuffer();
-
-    } else if (tier === 'adaptive') {
-      // ----- Replicate Stable Audio 2.5 (background, loopable, ≤190s) -----
-      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
-      if (!REPLICATE_API_KEY) {
-        return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      engineUsed = 'replicate/stable-audio-2.5';
-      const replicate = new Replicate({ auth: REPLICATE_API_KEY });
-
-      const stableAudioPrompt = loop
-        ? `${enhancedPrompt}. Seamless loop, no fade-in or fade-out, continuous beat`
-        : enhancedPrompt;
-
-      let output: any;
-      try {
-        output = await replicate.run(
-          'stability-ai/stable-audio-2.5',
-          {
-            input: {
-              prompt: stableAudioPrompt,
-              duration,
-              steps: 8,
-              cfg_scale: 7,
-              output_format: 'mp3',
-            },
-          }
-        );
-      } catch (err: any) {
-        console.error('[generate-music-track] Stable Audio error:', err);
-        return new Response(JSON.stringify({
-          error: `Stable Audio generation failed: ${err.message || 'Unknown error'}`,
-          code: "REPLICATE_ERROR",
-        }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      let audioUrl: string | null = null;
-      if (typeof output === 'string') audioUrl = output;
-      else if (Array.isArray(output) && output.length > 0) audioUrl = typeof output[0] === 'string' ? output[0] : null;
-      else if (output && typeof output === 'object' && 'url' in output) {
-        audioUrl = typeof (output as any).url === 'function' ? (output as any).url().toString() : (output as any).url;
-      }
-
-      if (!audioUrl) {
-        return new Response(JSON.stringify({ error: "No audio returned from Stable Audio", code: "NO_OUTPUT" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      const audioRes = await fetch(audioUrl);
-      if (!audioRes.ok) {
-        return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      audioBuffer = await audioRes.arrayBuffer();
-
-    } else if (tier === 'vocal') {
-      // ----- Replicate MiniMax Music 1.5 (vocals + lyrics, ≤60s) -----
-      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
-      if (!REPLICATE_API_KEY) {
-        return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      engineUsed = 'replicate/minimax-music-1.5';
-      const replicate = new Replicate({ auth: REPLICATE_API_KEY });
-
-      // MiniMax schema (replicate.com/minimax/music-1.5):
-      //   lyrics: string  10-600 chars, supports [intro][verse][chorus][bridge][outro]
-      //   prompt: string  10-300 chars — style description
-      const FILLER = 'Cinematic studio production, mastered mix, professional arrangement';
-      let styleDesc = [
-        genre && genre !== 'any' ? `Genre: ${genre}` : '',
-        mood ? `Mood: ${mood}` : '',
-        bpm ? `Tempo: ${bpm} BPM` : '',
-        key ? `Key: ${key}` : '',
-        prompt.trim(),
-        'Studio production quality',
-      ].filter(Boolean).join('. ');
-      if (styleDesc.length < 10) styleDesc = `${styleDesc} ${FILLER}`.trim();
-      if (styleDesc.length > 300) styleDesc = styleDesc.slice(0, 300);
-
-      let lyricsInput = (lyrics ?? '').trim();
-      if (lyricsInput.length < 10) {
-        return new Response(JSON.stringify({
-          error: "Lyrics zu kurz (min. 10 Zeichen). Bitte Songtext eingeben oder AI-Lyrics generieren.",
-          code: "MISSING_LYRICS",
-          stage: "replicate-input",
-        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      if (lyricsInput.length > 600) lyricsInput = lyricsInput.slice(0, 600);
-
-      const minimaxInput = { lyrics: lyricsInput, prompt: styleDesc };
-      console.log('[generate-music-track] MiniMax input:', {
-        promptLen: styleDesc.length,
-        lyricsLen: lyricsInput.length,
-        promptPreview: styleDesc.slice(0, 80),
-      });
-
-      let output: any;
-      try {
-        output = await replicate.run('minimax/music-1.5', { input: minimaxInput });
-      } catch (err: any) {
-        console.error('[generate-music-track] MiniMax error:', err);
-        // Try to surface the exact provider detail (Replicate 422 body).
+        console.error(`[generate-music-track] Replicate error (${engineId}):`, err);
         let providerDetail: string | undefined;
         try {
           if (err?.response && typeof err.response.json === 'function') {
-            const body = await err.response.clone().json();
-            providerDetail = body?.detail || JSON.stringify(body);
+            const b = await err.response.clone().json();
+            providerDetail = b?.detail || JSON.stringify(b);
           }
         } catch { /* ignore */ }
         return new Response(JSON.stringify({
-          error: providerDetail || err?.message || 'Unknown MiniMax error',
-          code: "MINIMAX_VALIDATION",
+          error: providerDetail || err?.message || 'Unknown Replicate error',
+          code: engineId === 'minimax-15' ? "MINIMAX_VALIDATION" : "REPLICATE_ERROR",
           stage: "replicate-input",
         }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      let audioUrl: string | null = null;
-      if (typeof output === 'string') audioUrl = output;
-      else if (Array.isArray(output) && output.length > 0) audioUrl = typeof output[0] === 'string' ? output[0] : null;
-      else if (output && typeof output === 'object' && 'url' in output) {
-        audioUrl = typeof (output as any).url === 'function' ? (output as any).url().toString() : (output as any).url;
-      }
-
+      const audioUrl = extractAudioUrl(output);
       if (!audioUrl) {
-        return new Response(JSON.stringify({ error: "No audio returned from MiniMax", code: "NO_OUTPUT" }), {
+        return new Response(JSON.stringify({ error: `No audio returned from ${engine.label}`, code: "NO_OUTPUT" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
@@ -345,15 +244,25 @@ serve(async (req) => {
       }
       audioBuffer = await audioRes.arrayBuffer();
 
-    } else {
-      // ----- ElevenLabs Music (standard / pro) -----
+    // =================================================================
+    // ROUTE 2: ElevenLabs Music v2 (native API)
+    // =================================================================
+    } else if (engine.route === 'direct-elevenlabs') {
       const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
       if (!ELEVENLABS_API_KEY) {
         return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY not configured" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      engineUsed = 'elevenlabs/music';
+      engineUsed = 'elevenlabs/music-v2';
+
+      const elPayload: Record<string, unknown> = {
+        prompt: enhancedPrompt,
+        music_length_ms: duration * 1000,
+        model_id: 'music_v2',
+      };
+      if (languageName) elPayload.language = languageName;
+      if (lyrics && lyrics.trim()) elPayload.lyrics = lyrics.trim();
 
       const elResponse = await fetch('https://api.elevenlabs.io/v1/music', {
         method: 'POST',
@@ -362,10 +271,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'Accept': 'audio/mpeg',
         },
-        body: JSON.stringify({
-          prompt: enhancedPrompt,
-          music_length_ms: duration * 1000,
-        }),
+        body: JSON.stringify(elPayload),
       });
 
       if (!elResponse.ok) {
@@ -376,18 +282,107 @@ serve(async (req) => {
             status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
-        if (elResponse.status === 402) {
-          return new Response(JSON.stringify({ error: "ElevenLabs quota exceeded.", code: "PROVIDER_QUOTA" }), {
+        if (elResponse.status === 401 || elResponse.status === 403) {
+          return new Response(JSON.stringify({ error: "ElevenLabs API key fehlt Berechtigungen für Music v2.", code: "ELEVENLABS_UNAUTHORIZED", details: errText }), {
             status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
         return new Response(JSON.stringify({
-          error: `ElevenLabs Music failed (${elResponse.status})`,
+          error: `ElevenLabs Music v2 failed (${elResponse.status})`,
           code: "ELEVENLABS_ERROR",
+          details: errText,
         }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
       audioBuffer = await elResponse.arrayBuffer();
+
+    // =================================================================
+    // ROUTE 3: Suno v5 (direct API)
+    // =================================================================
+    } else if (engine.route === 'direct-suno') {
+      const SUNO_API_KEY = Deno.env.get('SUNO_API_KEY');
+      if (!SUNO_API_KEY) {
+        return new Response(JSON.stringify({
+          error: "Suno v5 ist noch nicht aktiviert. SUNO_API_KEY wird in Kürze in der Betaphase konfiguriert.",
+          code: "SUNO_NOT_CONFIGURED",
+        }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      engineUsed = 'suno/v5';
+
+      // Suno v5 async job pattern: POST /generate → poll /clips
+      const sunoPayload: Record<string, unknown> = {
+        prompt: lyrics?.trim() || prompt.trim(),
+        tags: styleTags?.trim() || [genre !== 'any' ? genre : '', mood].filter(Boolean).join(', '),
+        title: prompt.trim().slice(0, 60),
+        mv: 'chirp-v5',
+        make_instrumental: !!instrumental && engine.vocals ? false : instrumental,
+      };
+      if (languageName) sunoPayload.language = languageName;
+
+      let jobRes: Response;
+      try {
+        jobRes = await fetch('https://api.suno.ai/v1/generate', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUNO_API_KEY}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(sunoPayload),
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: `Suno request failed: ${err.message}`, code: "SUNO_ERROR" }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      if (!jobRes.ok) {
+        const t = await jobRes.text().catch(() => '');
+        console.error('[generate-music-track] Suno error:', jobRes.status, t);
+        return new Response(JSON.stringify({
+          error: `Suno v5 failed (${jobRes.status})`, code: "SUNO_ERROR", details: t,
+        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const jobJson: any = await jobRes.json();
+      const clipId: string | undefined = jobJson?.id || jobJson?.clips?.[0]?.id;
+      if (!clipId) {
+        return new Response(JSON.stringify({ error: "Suno returned no job id", code: "SUNO_ERROR", details: JSON.stringify(jobJson) }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      // Poll for completion (Suno typically takes 30-90s)
+      let audioUrl: string | null = null;
+      const start = Date.now();
+      const MAX_WAIT_MS = 240_000; // 4 min
+      while (Date.now() - start < MAX_WAIT_MS) {
+        await new Promise((r) => setTimeout(r, 5_000));
+        const poll = await fetch(`https://api.suno.ai/v1/clips/${clipId}`, {
+          headers: { 'Authorization': `Bearer ${SUNO_API_KEY}` },
+        });
+        if (!poll.ok) continue;
+        const clip: any = await poll.json();
+        const status = clip?.status;
+        if (status === 'complete' || status === 'succeeded') {
+          audioUrl = clip?.audio_url || clip?.url || clip?.output?.audio;
+          break;
+        }
+        if (status === 'error' || status === 'failed') {
+          return new Response(JSON.stringify({ error: `Suno job failed`, code: "SUNO_ERROR", details: JSON.stringify(clip) }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      }
+      if (!audioUrl) {
+        return new Response(JSON.stringify({ error: "Suno job timeout", code: "SUNO_TIMEOUT" }), {
+          status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const audioRes = await fetch(audioUrl);
+      if (!audioRes.ok) {
+        return new Response(JSON.stringify({ error: "Failed to fetch Suno audio" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      audioBuffer = await audioRes.arrayBuffer();
     }
 
     if (!audioBuffer || audioBuffer.byteLength < 1000) {
@@ -397,30 +392,24 @@ serve(async (req) => {
     }
 
     // ===== Upload to Storage =====
-    const storagePath = `${user.id}/music/${tier}-${Date.now()}.mp3`;
+    const storagePath = `${user.id}/music/${engineId}-${Date.now()}.mp3`;
     const { error: uploadError } = await supabaseAdmin.storage
       .from('audio-studio')
       .upload(storagePath, new Uint8Array(audioBuffer), {
         contentType: 'audio/mpeg',
         upsert: false,
       });
-
     if (uploadError) {
       console.error('[generate-music-track] Storage upload error:', uploadError);
       return new Response(JSON.stringify({ error: `Storage error: ${uploadError.message}` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from('audio-studio')
-      .getPublicUrl(storagePath);
+    const { data: publicUrlData } = supabaseAdmin.storage.from('audio-studio').getPublicUrl(storagePath);
     const publicUrl = publicUrlData.publicUrl;
 
-    // Title from prompt
     const title = prompt.trim().slice(0, 60) + (prompt.length > 60 ? '...' : '');
 
-    // ===== Insert into universal_audio_assets =====
     const { data: asset, error: insertError } = await supabaseAdmin
       .from('universal_audio_assets')
       .insert({
@@ -434,31 +423,31 @@ serve(async (req) => {
         genre: genre || null,
         mood: mood || null,
         source: 'generated',
-        processing_preset: tier,
+        processing_preset: engineId,
         effect_config: {
           prompt: prompt.trim(),
           enhanced_prompt: enhancedPrompt,
           engine: engineUsed,
+          engine_id: engineId,
           instrumental,
           bpm: bpm || null,
           key: key || null,
           lyrics: lyrics || null,
           loop: loop || false,
+          style_tags: styleTags || null,
+          language: languageName || null,
         },
       })
       .select()
       .single();
-
     if (insertError) {
       console.warn('[generate-music-track] Asset insert warning:', insertError);
     }
 
-    // ===== Deduct credits AFTER successful generation =====
     const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
       'deduct_ai_video_credits',
       { p_user_id: user.id, p_amount: cost, p_generation_id: asset?.id || null }
     );
-
     if (deductError) {
       console.error('[generate-music-track] Deduct error:', deductError);
     }
@@ -475,7 +464,7 @@ serve(async (req) => {
       cost,
       currency,
       newBalance: newBalance ?? (wallet.balance_euros - cost),
-      tier,
+      tier: engineId,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error: any) {
