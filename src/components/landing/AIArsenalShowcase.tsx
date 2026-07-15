@@ -271,15 +271,8 @@ const ArsenalHeroStage = ({
           </motion.div>
         </AnimatePresence>
 
-        {/* Controls + progress */}
+        {/* Progress + Next */}
         <div className="mt-5 flex items-center gap-3">
-          <button
-            onClick={onTogglePause}
-            aria-label={paused ? "Play" : "Pause"}
-            className="w-9 h-9 rounded-full border border-primary/40 bg-background/50 backdrop-blur-md text-primary hover:bg-primary/10 transition-colors flex items-center justify-center"
-          >
-            {paused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
-          </button>
           <div className="flex-1 h-1 rounded-full bg-foreground/10 overflow-hidden">
             <div
               ref={progressRef}
