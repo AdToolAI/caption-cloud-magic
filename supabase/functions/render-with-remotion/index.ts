@@ -456,6 +456,42 @@ serve(async (req) => {
     credits_required = calculateCredits(requestedVoiceoverDuration, quality);
     console.log(`💰 Credits für ${requestedVoiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
 
+    // Lambda slot admission — safety net against AWS quota saturation.
+    // Founders reserve band kicks in at 50/60 slots.
+    try {
+      const fps = 30;
+      const estFrames = Math.max(30, Math.round(requestedVoiceoverDuration * fps));
+      const tier = pickRenderTier(estFrames);
+      const { data: isFounder } = await supabaseAdmin.rpc('is_active_founder', { _user_id: userId });
+      const admission = await checkRenderAdmission({
+        supabaseAdmin,
+        isFounder: !!isFounder,
+        tierMaxWorkers: tier.maxWorkers,
+      });
+      if (!admission.admitted) {
+        console.warn(`[render-with-remotion] admission denied: ${admission.reason} used=${admission.usedWorkers}/${admission.slotBudget} need=${admission.neededWorkers} founder=${!!isFounder}`);
+        return new Response(JSON.stringify({
+          error: 'RENDER_SLOT_BUSY',
+          reason: admission.reason,
+          used_workers: admission.usedWorkers,
+          slot_budget: admission.slotBudget,
+          retry_after_seconds: admission.retryAfterSeconds,
+          founders_only: admission.reason === 'founder_reserve',
+        }), {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': String(admission.retryAfterSeconds),
+          },
+        });
+      }
+    } catch (admissionErr) {
+      // Fail-open on unexpected error, but log.
+      console.error('[render-with-remotion] admission check threw, admitting:', admissionErr);
+    }
+
+
     // Check credits
     const { data: wallet } = await supabaseAdmin
       .from('wallets')
