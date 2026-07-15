@@ -53,9 +53,9 @@ export default function MusicStudio() {
   const engine = getEngine(engineId);
   const currencySymbol = wallet?.currency === 'USD' ? '$' : '€';
   const balance = wallet?.balance_euros ?? 0;
-  const cost = engine.priceEur;
-  const insufficient = balance < cost;
   const maxDur = engine.maxDuration;
+  const cost = computeMusicPrice(engineId, maxDur);
+  const insufficient = balance < cost;
   const [language, setLanguage] = useState<string>(() => {
     if (typeof navigator === 'undefined') return 'en';
     const lang = navigator.language?.slice(0, 2) || 'en';
