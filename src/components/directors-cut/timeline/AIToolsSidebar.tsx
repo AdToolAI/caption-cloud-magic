@@ -127,25 +127,24 @@ export function AIToolsSidebar({
     }
   };
 
-  // Add music to timeline
-  const handleAddMusic = (music: typeof SAMPLE_MUSIC[0]) => {
-    // In production, this would fetch from Jamendo API
-    const clip = onAddMusic({
-      name: music.name,
-      url: '', // Would be actual URL
-      startTime: 0, // Music typically starts at beginning
-      duration: Math.min(music.duration, videoDuration),
+  // Add music to timeline from real Library
+  const handleSelectLibraryTrack = (track: LibraryTrack) => {
+    onAddMusic({
+      name: track.title,
+      url: track.url,
+      startTime: 0,
+      duration: Math.min(track.duration, videoDuration || track.duration),
       trimStart: 0,
       trimEnd: 0,
-      volume: 70, // Lower default volume for background music
+      volume: 70,
       fadeIn: 2,
       fadeOut: 2,
       source: 'library',
     });
-    
+    setMusicBrowserOpen(false);
     toast({
       title: 'Musik hinzugefügt',
-      description: `"${music.name}" wurde zur Timeline hinzugefügt`,
+      description: `"${track.title}" wurde zur Timeline hinzugefügt`,
     });
   };
 
