@@ -1652,7 +1652,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         for (const s of synthed) {
           const cfg = getResolvedVoiceForSpeakerId(s.block.speakerId);
           if (cfg) {
-            for (const key of getSpeakerAliases(s.character.id)) dialogVoicesMap[key] = cfg;
+            // v253 — stamp characterId onto every cfg value so downstream
+            // dedup (countSceneSpeakers) works even though we intentionally
+            // write multiple alias keys per speaker for Sync.so matching.
+            const stamped: DialogVoiceCfg = { ...cfg, characterId: s.character.id };
+            for (const key of getSpeakerAliases(s.character.id)) dialogVoicesMap[key] = stamped;
           }
         }
 
