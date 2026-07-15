@@ -123,6 +123,7 @@ export default function MusicStudio() {
     setMusicalKey('');
     setInstrumental(true);
     setLoop(false);
+    setStyleTags('');
     setLastTrack(null);
   };
 
