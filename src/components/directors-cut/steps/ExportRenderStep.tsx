@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
+import { describeRenderAdmissionError, tryParseAdmissionFromInvokeError } from '@/lib/render/admission';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
