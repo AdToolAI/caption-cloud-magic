@@ -332,7 +332,7 @@ export function usePipelineProgress({
 
   // ── Derived per-phase progress (from real state, relative to baseline) ──
   const dialogVoiceCount = (s: ComposerScene) =>
-    s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
+    s.dialogVoices ? countSceneSpeakers(s) : 0;
 
   const hasLipsyncScenes = useMemo(
     () =>
