@@ -577,13 +577,12 @@ export async function detectPlateFaces(params: {
   } else if (mpFaces && mpFaces.length > expectedN) {
     // More faces detected than expected (e.g. background extra). Take the
     // expectedN largest by bbox area, then re-slot left-to-right.
-    const ranked = [...mpFaces].sort((a, b) => {
+    const topByArea = [...mpFaces].sort((a, b) => {
       const areaA = (a.bbox[2] - a.bbox[0]) * (a.bbox[3] - a.bbox[1]);
       const areaB = (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1]);
       return areaB - areaA;
-    }).slice(0, expectedN)
-      .sort((a, b) => a.center[0] - b.center[0])
-      .map((f, idx) => ({ ...f, slot: idx }));
+    }).slice(0, expectedN);
+    const ranked = sortFacesRowMajor(topByArea).map((f, idx) => ({ ...f, slot: idx }));
     faces = ranked;
     console.log(`${tag} v156_aws_over_detect raw=${mpFaces.length} kept=${expectedN}`);
   } else {
