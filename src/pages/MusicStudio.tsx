@@ -277,21 +277,29 @@ export default function MusicStudio() {
                 {/* LEFT: Prompt + Settings */}
                 <Card className="lg:col-span-2 p-5 bg-background/40 backdrop-blur-md border-primary/15 space-y-5">
                   <div>
-                    <Label htmlFor="prompt" className="text-sm font-semibold text-foreground mb-1.5 block">
+                    <Label htmlFor="prompt" className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2 block">
                       Beschreibe den Track
                     </Label>
-                    <Textarea
-                      id="prompt"
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder={engine.vocals
-                        ? "z.B. Upbeat indie pop song about late-night freedom and city lights"
-                        : "z.B. Epic cinematic build-up with deep bass and ethereal strings"}
-                      className="min-h-[100px] bg-background/40 border-primary/20 focus:border-primary/60"
-                      maxLength={500}
-                    />
-                    <div className="text-[10px] text-muted-foreground mt-1 text-right">{prompt.length}/500</div>
+                    <div className="relative group">
+                      {/* Viewfinder corners */}
+                      <span className="pointer-events-none absolute -top-px -left-px h-3 w-3 border-t border-l border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <span className="pointer-events-none absolute -top-px -right-px h-3 w-3 border-t border-r border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <span className="pointer-events-none absolute -bottom-px -left-px h-3 w-3 border-b border-l border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <span className="pointer-events-none absolute -bottom-px -right-px h-3 w-3 border-b border-r border-primary/60 group-focus-within:border-primary transition-colors" />
+                      <Textarea
+                        id="prompt"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder={engine.vocals
+                          ? "z.B. Upbeat indie pop song about late-night freedom and city lights"
+                          : "z.B. Epic cinematic build-up with deep bass and ethereal strings"}
+                        className="min-h-[110px] bg-background/50 border-primary/20 focus:border-primary/60 rounded-md"
+                        maxLength={500}
+                      />
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground mt-1 text-right tabular-nums">{prompt.length.toString().padStart(3, '0')}/500</div>
                   </div>
+
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
