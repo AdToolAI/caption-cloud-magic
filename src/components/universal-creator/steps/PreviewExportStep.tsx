@@ -720,6 +720,12 @@ export function PreviewExportStep({
         </Button>
       </div>
 
+      {slotWaiting && (
+        <div className="flex justify-center">
+          <RenderSlotWaitingBadge waiting={slotWaiting} />
+        </div>
+      )}
+
       {/* Render Progress */}
       {renderJobs.length > 0 && (
         <div className="space-y-3">
