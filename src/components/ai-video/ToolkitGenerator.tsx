@@ -1564,6 +1564,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Button>
       </div>
 
+      <div className="flex justify-end -mt-1">
+        <FounderPriorityChip />
+      </div>
+
       {lastAnchorComposed && (
         <p className="text-center text-[11px] text-primary/80">
           🎬 {language === 'de'
