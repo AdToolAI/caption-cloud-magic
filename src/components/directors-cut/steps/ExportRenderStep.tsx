@@ -137,6 +137,7 @@ export function ExportRenderStep({
   const [renderComplete, setRenderComplete] = useState(false);
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
   const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
+  const { invoke: invokeWithQueue, waiting: slotWaiting } = useEnqueuedRender({ maxRetries: 6 });
 
   const selectedQuality = QUALITY_OPTIONS.find(q => q.value === exportSettings.quality);
 
