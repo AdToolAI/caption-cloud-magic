@@ -68,7 +68,6 @@ export default function MusicStudio() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     if (tier === 'vocal' && !lyrics.trim()) return;
-    const safeDuration = Math.min(duration, maxDur);
     // Append explicit [LANGUAGE: …] directive so the provider strictly matches the vocal language.
     const langMeta = showLanguagePicker ? getLanguageMeta(tier, language) : undefined;
     const finalPrompt = langMeta
