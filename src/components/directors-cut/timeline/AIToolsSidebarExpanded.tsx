@@ -478,6 +478,14 @@ export function AIToolsSidebarExpanded({
           Video exportieren
         </Button>
       </div>
+
+      <MusicLibraryBrowser
+        open={musicBrowserOpen}
+        onOpenChange={setMusicBrowserOpen}
+        initialType="music"
+        allowedTypes={['music', 'sfx']}
+        onSelect={handleSelectLibraryMusic}
+      />
     </div>
   );
 }
