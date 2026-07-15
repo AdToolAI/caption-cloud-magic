@@ -224,6 +224,12 @@ export default function MusicStudio() {
                     Neues Projekt
                   </Button>
                 </div>
+                <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 mt-1">
+                  <Info className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/70" />
+                  <span>
+                    <strong>Udio v2</strong> bietet aktuell kein öffentliches API — daher nicht integriert. Für vergleichbare Full-Song-Qualität ist <strong>Suno v5</strong> oder <strong>ElevenLabs Music v2</strong> die richtige Wahl.
+                  </span>
+                </p>
               </Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
