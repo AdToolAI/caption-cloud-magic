@@ -521,6 +521,11 @@ const SubtitleVoiceoverSection: React.FC<{
                         Premium
                       </Badge>
                     )}
+                    {v.tier === 'cloned' && (
+                      <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10">
+                        Meine Stimme
+                      </Badge>
+                    )}
                   </div>
                   {v.description && (
                     <p className="text-[9px] text-white/45 line-clamp-1 mt-0.5">{v.description}</p>
