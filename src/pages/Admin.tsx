@@ -14,7 +14,8 @@ import LambdaHealth from '@/pages/admin/LambdaHealth';
 import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPanel';
 import { CharacterMarketplaceReviewPanel } from '@/components/admin/CharacterMarketplaceReviewPanel';
 import { BetaHealth } from '@/components/admin/BetaHealth';
-import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles } from 'lucide-react';
+import { RenderLoadWidget } from '@/components/admin/RenderLoadWidget';
+import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles, Zap } from 'lucide-react';
 
 export default function Admin() {
   return (
@@ -51,6 +52,10 @@ export default function Admin() {
           <TabsTrigger value="marketplace-review" className="flex items-center gap-2">
             <Store className="h-4 w-4" />
             Marketplace Review
+          </TabsTrigger>
+          <TabsTrigger value="render-load" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Render Load
           </TabsTrigger>
           <TabsTrigger value="lambda-health" className="flex items-center gap-2">
             <Server className="h-4 w-4" />
@@ -115,6 +120,10 @@ export default function Admin() {
             <TabsContent value="templates"><MarketplaceReviewPanel /></TabsContent>
             <TabsContent value="characters"><CharacterMarketplaceReviewPanel /></TabsContent>
           </Tabs>
+        </TabsContent>
+
+        <TabsContent value="render-load">
+          <RenderLoadWidget />
         </TabsContent>
 
         <TabsContent value="lambda-health">
