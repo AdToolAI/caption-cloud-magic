@@ -18219,6 +18219,14 @@ export type Database = {
         Returns: undefined
       }
       render_queue_running_workers: { Args: never; Returns: number }
+      render_queue_stats: {
+        Args: never
+        Returns: {
+          founder_queued: number
+          queued_count: number
+          slots_used: number
+        }[]
+      }
       replace_composer_scene_with_children: {
         Args: {
           p_children: Json
