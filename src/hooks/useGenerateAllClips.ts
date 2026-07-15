@@ -29,6 +29,7 @@ import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { emitStageEvent } from '@/lib/stage/stageEvents';
+import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 
 interface UseGenerateAllClipsArgs {
   scenes: ComposerScene[];
