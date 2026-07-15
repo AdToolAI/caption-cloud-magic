@@ -610,6 +610,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     const nextCfg: DialogVoiceCfg = {
       ...(cur ?? { engine: 'elevenlabs', voiceId: '' }),
       ...patch,
+      characterId: speakerId,
     };
     // Custom voices are always ElevenLabs-backed — never keep a stale
     // engine:'hume' from a prior pick when the user switches to a cloned voice.
@@ -827,7 +828,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     for (const sp of speakers) {
       const chosen = resolvedVoicePerSpeaker[sp.id];
       if (!chosen?.voiceId) continue;
-      for (const key of getSpeakerAliases(sp.id)) next[key] = chosen;
+      const stamped: DialogVoiceCfg = { ...chosen, characterId: sp.id };
+      for (const key of getSpeakerAliases(sp.id)) next[key] = stamped;
     }
     return next;
   }, [voicePerSpeaker, resolvedVoicePerSpeaker, speakers, sceneCast]);
@@ -1652,7 +1654,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         for (const s of synthed) {
           const cfg = getResolvedVoiceForSpeakerId(s.block.speakerId);
           if (cfg) {
-            for (const key of getSpeakerAliases(s.character.id)) dialogVoicesMap[key] = cfg;
+            // v253 — stamp characterId onto every cfg value so downstream
+            // dedup (countSceneSpeakers) works even though we intentionally
+            // write multiple alias keys per speaker for Sync.so matching.
+            const stamped: DialogVoiceCfg = { ...cfg, characterId: s.character.id };
+            for (const key of getSpeakerAliases(s.character.id)) dialogVoicesMap[key] = stamped;
           }
         }
 

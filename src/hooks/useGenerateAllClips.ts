@@ -29,6 +29,7 @@ import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { emitStageEvent } from '@/lib/stage/stageEvents';
+import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 
 interface UseGenerateAllClipsArgs {
   scenes: ComposerScene[];
@@ -41,7 +42,7 @@ interface UseGenerateAllClipsArgs {
 }
 
 function isScenePipelineReady(scene: ComposerScene) {
-  const dialogVoiceCount = scene.dialogVoices ? Object.keys(scene.dialogVoices).length : 0;
+  const dialogVoiceCount = scene.dialogVoices ? countSceneSpeakers(scene) : 0;
   const needsLipsync =
     scene.engineOverride === 'cinematic-sync' ||
     !!(scene as any).twoshotStage ||

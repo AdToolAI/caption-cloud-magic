@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { subscribePipelineEvents, type PipelinePhaseId } from '@/lib/pipelineEvents';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
+import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 
 export interface PipelinePhaseState {
   id: PipelinePhaseId;
@@ -332,7 +333,7 @@ export function usePipelineProgress({
 
   // ── Derived per-phase progress (from real state, relative to baseline) ──
   const dialogVoiceCount = (s: ComposerScene) =>
-    s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
+    s.dialogVoices ? countSceneSpeakers(s) : 0;
 
   const hasLipsyncScenes = useMemo(
     () =>
@@ -748,7 +749,7 @@ export function usePipelineProgress({
     (isLipSyncIntentional(s) || !!s.twoshotStage),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
-    const n = s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
+    const n = s.dialogVoices ? countSceneSpeakers(s) : 0;
     return n > m ? n : m;
   }, 0);
   const STALL_THRESHOLD_MS = Math.max(4, maxSpeakers * 3, lipTargetCount * 2) * 60 * 1000;

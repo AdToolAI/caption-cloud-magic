@@ -21,6 +21,7 @@ import {
 import { computeProviderEta } from '@/hooks/useProviderEta';
 import { getRenderWarnings, aggregateWarnings, type RenderWarning } from '@/lib/video-composer/renderWarnings';
 import { getRiskyLipsyncInfo, type RiskyLipsyncInfo } from '@/config/lipsyncProviderSafety';
+import { countSceneSpeakers } from './countSceneSpeakers';
 
 const CREDIT_PER_EUR = 100;     // 1 credit = €0.01
 const VO_CREDITS_PER_SCENE = 5; // ~€0.05 ElevenLabs avg
@@ -101,11 +102,9 @@ function sceneUsesLipsync(scene: ComposerScene): boolean {
 }
 
 function passesForScene(scene: ComposerScene): number {
-  // One pass per dialog turn; default 1 for single-speaker scenes.
-  const turns = (scene as any).dialogVoices
-    ? Object.keys((scene as any).dialogVoices).length
-    : 1;
-  return Math.max(1, turns);
+  // One pass per distinct speaker (dedup'd by characterId, see
+  // countSceneSpeakers). Fallback 1 for single-speaker scenes.
+  return countSceneSpeakers(scene);
 }
 
 export function estimateSceneRenderCost(
