@@ -69,8 +69,8 @@ export function AIToolsSidebar({
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
   
   // Music state
-  const [musicSearch, setMusicSearch] = useState('');
-  const [selectedGenre, setSelectedGenre] = useState<string>('all');
+  const [musicBrowserOpen, setMusicBrowserOpen] = useState(false);
+  
   
   // SFX state
   const [selectedSfxCategory, setSelectedSfxCategory] = useState('transitions');
