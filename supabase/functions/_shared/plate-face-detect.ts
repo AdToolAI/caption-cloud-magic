@@ -77,6 +77,61 @@ export interface PlateFaceBox {
   mouth?: [number, number];
 }
 
+/**
+ * v242 — Row-major slot sorting for grid layouts.
+ *
+ * The legacy code sorted faces by center-X only. In a 2×2 (or 2×N) grid
+ * that produces column-major order: the two left faces come first (BL vs
+ * TL by ~sub-pixel X difference), then the two right faces. When the
+ * script order is row-major (TL, TR, BL, BR — the natural reading order
+ * users expect for "Speaker 1..4"), the slot indexes are misaligned
+ * against the script and the wrong voice gets wired to the wrong face.
+ *
+ * Row-major sort:
+ *   1. Cluster faces into rows by center-Y (rows separated by more than
+ *      half the median face height).
+ *   2. Within each row sort by center-X (left → right).
+ *   3. Concatenate rows top → bottom.
+ *
+ * For single-row layouts (all speakers on the same y-band) this collapses
+ * to the same X-only sort we had before, so it is safe to use everywhere.
+ */
+export function sortFacesRowMajor<T extends { center: [number, number]; bbox: [number, number, number, number] }>(
+  faces: T[],
+): T[] {
+  if (faces.length <= 1) return [...faces];
+  const withH = faces.map((f) => ({
+    f,
+    h: Math.max(1, f.bbox[3] - f.bbox[1]),
+    cx: f.center[0],
+    cy: f.center[1],
+  }));
+  const sortedH = [...withH].map((r) => r.h).sort((a, b) => a - b);
+  const medianH = sortedH[Math.floor(sortedH.length / 2)] ?? 1;
+  const rowThreshold = Math.max(24, medianH * 0.5);
+  const byY = [...withH].sort((a, b) => a.cy - b.cy);
+  const rows: Array<typeof withH> = [];
+  for (const r of byY) {
+    const last = rows[rows.length - 1];
+    if (!last) {
+      rows.push([r]);
+      continue;
+    }
+    const lastCy = last[last.length - 1].cy;
+    if (Math.abs(r.cy - lastCy) <= rowThreshold) {
+      last.push(r);
+    } else {
+      rows.push([r]);
+    }
+  }
+  const flat: T[] = [];
+  for (const row of rows) {
+    row.sort((a, b) => a.cx - b.cx);
+    for (const r of row) flat.push(r.f);
+  }
+  return flat;
+}
+
 export interface PlateFaceMap {
   faces: PlateFaceBox[];
   width: number;
