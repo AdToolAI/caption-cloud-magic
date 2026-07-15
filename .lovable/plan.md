@@ -1,71 +1,60 @@
-# Pre-Launch Deep-Dive Audit — Go-Live 26.07.2026
+## Ziel
 
-Ziel: Systematischer End-to-End-Check aller kritischen Pfade. Kein Feature-Build, kein Refactor — nur Audit + gezielte Härtungs-Fixes, wo wir konkrete Risiken finden.
+Das alte generische Credit-System (aus der Pre-Beta-Ära) UI-seitig komplett unsichtbar machen. Nur **Media Credits** für AI-Video / Music / Bilder (`ai_video_wallets`) bleiben sichtbar und aktiv. Alles andere ist im **Beta-Basic-Abo (14,99 €)** enthalten. Hooks bleiben als No-Op im Code, damit bestehende Aufrufe nicht brechen.
 
-## Audit-Scope (7 Blöcke)
+## Was aktuell noch sichtbar ist (und weg soll)
 
-### 1. Auth & Onboarding
-- Sign-up / Login / Password-Reset / Google OAuth Redirect-URIs
-- E-Mail-Verifizierung + Suppression-Liste + 3-Tage-Cap
-- Onboarding-Flow inkl. Cinema-Concierge Trigger
-- `user_roles` Absicherung (keine Client-Role-Checks, `has_role` Function korrekt)
+- `/credits` Route + `Credits.tsx` Seite
+- User-Menü-Eintrag „Credits" mit Balance-Anzeige (`UserMenu.tsx`)
+- `CreditThresholdWatcher`, `TrialUpgradeWatcher`, `StreakMilestoneUpsellWatcher`, `FeatureDiscoveryWatcher` (alle triggern Upsell-Modals basierend auf altem Balance)
+- `CreditGuard`, `CreditBalance`, `CreditHistory`, `CreditsHeroHeader`, `CreditLimitWarning` Komponenten
+- `CreditUsageDashboard` in Analytics / `UsageReports.tsx`
+- `CreditSystemTest.tsx` Beispieldatei
 
-### 2. Billing & Founders-Programm
-- Stripe: 14.99 € Beta-Basic Produkt + Preis-ID live?
-- Founders 20 % Coupon (`FOUNDERS_VIDEO_20`) + 24-Monate-Preisgarantie
-- Status-Forfeit-Logik bei Kündigung
-- `claim_founders_slot` RPC + Slot-Zähler
-- Webhooks (checkout.completed, subscription.updated, invoice.failed)
-- Refund-Automation bei Render-/Provider-Fehlern
+## Änderungen
 
-### 3. Studios — Wiring & Persistenz
-- Cast & World (Charaktere/Outfits/Locations/Props, IDs sichtbar, Voice-Zuordnung)
-- Motion Studio, Director's Cut, Universal Content Creator, Video Composer
-- AI Video Studio inkl. Kling Omni Media-Lock + DE-Silent-Mode
-- Picture Studio, Music Studio, Audio Studio + Voice Studio
-- Prüfung: Session-Persistenz (kein Datenverlust bei Reload/Render), Lip-Sync-Intent-Toggle-Veto, Progress-Bar-Consistency
+### 1. Routing & Navigation
+- **`src/App.tsx`**: Route `/credits` entfernen, Lazy-Import raus.
+- **`src/components/layout/UserMenu.tsx`**: „Credits"-Eintrag + Balance-Chip entfernen. `useCredits`-Import raus.
 
-### 4. Backend & Sicherheit
-- RLS-Check aller neu angelegten Tabellen (Founders, Voice-Lib, Companion, Render-Queue)
-- GRANTs auf public.* für neu erstellte Tabellen
-- Edge Functions: CORS-Preflight, Timeouts, Error-Handling, Idempotenz
-- Secrets: Keine geleakten Keys im Frontend, ElevenLabs/Replicate/Sync.so Keys gesetzt
-- Security-Scanner-Run + Ergebnis dokumentieren
+### 2. Watcher deaktivieren
+- **`src/components/upgrade/UpgradeMount.tsx`**: `CreditThresholdWatcher`, `TrialUpgradeWatcher`, `StreakMilestoneUpsellWatcher`, `FeatureDiscoveryWatcher` aus dem Mount entfernen. `SmartUpgradeModal` bleibt (wird von Founders-Flow genutzt).
 
-### 5. Render-Pipeline & Queue
-- 60-Slot Lambda-Pool + Founders-Priority-Queue Dispatcher (`pg_cron` tickt?)
-- Credit-Refund bei Render-Failures (idempotent)
-- Lip-Sync-Pipeline v55 (audioInput refId-only, stale-payload-guard)
-- Realtime-Fallback-Polling aktiv
+### 3. Hooks als No-Op belassen
+Bestehende `import`-Statements in ~15 Dateien bleiben stehen, damit nichts bricht. Die Hooks selbst werden neutralisiert:
+- **`src/hooks/useCredits.ts`**: gibt konstant `{ balance: Infinity, loading: false, error: null }` zurück, kein DB-Read auf `wallets`.
+- **`src/hooks/useFeatureGate.ts`**: gibt immer `{ allowed: true }` zurück (Beta-Abo deckt alles).
+- **`src/hooks/useTrialAccess.ts`**: neu verdrahtet gegen aktive Stripe-Subscription statt Balance. Nutzt existierende `check-subscription` Edge-Function bzw. `useSubscription` Hook falls vorhanden — ansonsten kurze eigene Abfrage. Ohne aktive Sub → `trialActive: false`, mit Sub → `trialActive: true`. Keine Credit-Logik mehr.
 
-### 6. Frontend & Public Pages
-- Startseite (Hero, AI Arsenal Showcase mit Loops, Founders-Dialog, Footer-Links)
-- Legal-Seiten (AGB §8, Impressum, Datenschutz) — Anker + Links
-- SEO: Title/Meta/OG auf allen öffentlichen Routen, Sitemap aktuell
-- 404 / Unauthorized / CheckEmail Flow
-- Mobile-Responsive Spot-Check (Landing, Dashboard, ein Studio)
+### 4. Analytics-Dashboards
+- **`src/components/analytics/CreditUsageDashboard.tsx`**: durch leere Placeholder-Komponente ersetzen die einen kurzen Hinweis rendert („Credit-Nutzung ist im Beta-Abo enthalten. Media-Credits siehst du im AI Video Studio.") — nichts crashen lassen, aber keine alten Zahlen mehr zeigen.
+- **`src/pages/Analytics/UsageReports.tsx`**: falls das Dashboard eingebettet ist, ersetzen oder ausblenden.
 
-### 7. Observability & E2E
-- Playwright Smoke-Suite lokal einmal grün?
-- Sentry-Errors letzte 7 Tage sichten
-- Admin-Monitoring-Dashboards funktionieren (Cost, Lambda-Health, Alerts, Render-Load)
-- Cron-Heartbeats (Queue-Manager, Voice-Refresh, Email-Drip) laufen
+### 5. Aufräumen / Deaktivieren
+- **`src/examples/CreditSystemTest.tsx`**: nicht angefasst (Beispieldatei, wird nicht gerendert).
+- `CreditGuard` / `CreditBalance` etc. bleiben im Repo, werden aber nur noch von `Credits.tsx` genutzt — nach Route-Entfernung dead code, aufräumen später.
 
-## Deliverable
+### 6. AI-Media-Wallet bleibt unverändert
+`useAIVideoWallet`, `ai_video_wallets`, `AIVideoCreditPurchase`, `AIVideoCostConfirmDialog` — alles unverändert. Das ist das aktive System für Video/Music/Bild-Generierung.
 
-Nach Audit: **Pre-Launch-Report** mit
-- ✅ Grün: was launch-ready ist
-- 🟡 Gelb: was noch nice-to-have vor Launch
-- 🔴 Rot: Blocker, die vor 26.07. gefixt werden müssen
+## Technischer Kontext (Non-Techies können überspringen)
 
-Für Rot-Findings jeweils Mini-Fix-Plan (Datei, Aufwand, Risiko). Erst danach Build-Mode für die Fixes.
+- **DB**: Die Tabelle `public.wallets` bleibt stehen (die Escalation-Policy wurde bereits gefixt). Kein Migration nötig, kein Datenverlust.
+- **`useTrialAccess`-Umbau**: falls kein zentraler `useSubscription`-Hook existiert, wird die Prüfung direkt gegen die `check-subscription` Edge-Function laufen (mit React-Query Cache), analog zum bestehenden Muster.
+- **RLS**: unverändert. `wallets`-Zugriff bleibt gesperrt für Clients.
 
-## Was NICHT Teil des Audits ist
-- Neue Features
-- UI-Redesigns
-- Preisänderungen jenseits der bereits beschlossenen 14.99 € / 20 % Founders
-- Umbau der Lip-Sync-Pipeline (nur Verifikation)
+## Verifikation
 
-## Frage vor Start
+Nach dem Build:
+1. User-Menü: kein „Credits" mehr, kein Balance-Chip.
+2. `/credits` liefert 404 / NotFound.
+3. AI Video Studio zeigt weiterhin Media-Credits-Kosten (aus `ai_video_wallets`).
+4. Keine Upsell-Modals aufgrund von „niedrigem Credit-Stand" mehr.
+5. Console keine Fehler von `useCredits`-Consumern (Hook returned safe defaults).
+6. Feature-Zugang gated nur noch nach Abo-Status (Stripe-Subscription).
 
-Soll ich **direkt mit dem vollständigen 7-Block-Audit** starten (dauert lange, dafür einmal alles) oder **priorisiert nach Risiko** — also erst Billing + Auth + RLS/Secrets (Block 1, 2, 4), dann der Rest? Priorisiert = früher konkrete Blocker sichtbar.
+## Nicht in diesem Plan
+
+- Löschen der `wallets`-Tabelle (bleibt für Audit-Trail).
+- Refactor der 15+ `useCredits`-Consumer (unnötig — Hook liefert safe defaults).
+- Neue Media-Credit-Chip im Header (kam als Alternative, User hat konservative Option gewählt).
