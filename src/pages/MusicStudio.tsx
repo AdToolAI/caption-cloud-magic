@@ -36,63 +36,68 @@ export default function MusicStudio() {
   const { wallet } = useAIVideoWallet();
   const { generateMusic, generateLyrics, loading, generatingLyrics } = useMusicGeneration();
 
-  const [tier, setTier] = useState<MusicTier>('adaptive');
+  const [engineId, setEngineId] = useState<MusicEngineId>('stable-audio-25');
   const [prompt, setPrompt] = useState('');
   const [genre, setGenre] = useState<string>('any');
   const [mood, setMood] = useState<string>('uplifting');
-  
+
   const [bpm, setBpm] = useState<number | undefined>();
   const [musicalKey, setMusicalKey] = useState('');
   const [instrumental, setInstrumental] = useState(true);
   const [loop, setLoop] = useState(false);
   const [lyrics, setLyrics] = useState('');
+  const [styleTags, setStyleTags] = useState('');
   const [lastTrack, setLastTrack] = useState<GeneratedMusicTrack | null>(null);
 
+  const engine = getEngine(engineId);
   const currencySymbol = wallet?.currency === 'USD' ? '$' : '€';
   const balance = wallet?.balance_euros ?? 0;
-  const tierPricing = MUSIC_TIER_PRICING[tier];
-  const cost = tierPricing.eur;
+  const cost = engine.priceEur;
   const insufficient = balance < cost;
-  const maxDur = tierPricing.maxDuration;
+  const maxDur = engine.maxDuration;
   const [language, setLanguage] = useState<string>(() => {
     if (typeof navigator === 'undefined') return 'en';
     const lang = navigator.language?.slice(0, 2) || 'en';
-    return isLanguageSupported('vocal', lang) ? lang : 'en';
+    return isLanguageSupported('minimax-15', lang) ? lang : 'en';
   });
 
-  // When tier changes, ensure selected language is still supported
+  // When engine changes, ensure selected language is still supported
   useEffect(() => {
-    const supported = MUSIC_LANGUAGE_SUPPORT[tier];
-    if (supported.length === 0) return; // instrumental-only tier
+    const supported = engine.languages;
+    if (supported.length === 0) return;
     if (!supported.some((l) => l.code === language)) {
       setLanguage(supported[0].code);
     }
-  }, [tier]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [engineId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showLanguagePicker = tierHasVocals(tier, instrumental);
+  const showLanguagePicker = engineHasVocals(engineId, instrumental);
+  const needsLyrics = engine.requiresLyrics;
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
-    if (tier === 'vocal' && !lyrics.trim()) return;
-    // Append explicit [LANGUAGE: …] directive so the provider strictly matches the vocal language.
-    const langMeta = showLanguagePicker ? getLanguageMeta(tier, language) : undefined;
+    if (needsLyrics && !lyrics.trim()) return;
+    const langMeta = showLanguagePicker ? getLanguageMeta(engineId, language) : undefined;
     const finalPrompt = langMeta
       ? `${prompt.trim()}\n\n[LANGUAGE: ${langMeta.name}] — Sing exclusively in ${langMeta.name}. Do not mix languages.`
       : prompt.trim();
     const track = await generateMusic({
       prompt: finalPrompt,
-      tier,
+      tier: engineId,
       durationSeconds: maxDur,
       genre: genre !== 'any' ? genre : undefined,
       mood,
-      instrumental: tier === 'vocal' ? false : instrumental,
+      instrumental: engine.supportsInstrumentalToggle ? instrumental : !engine.vocals,
       bpm,
       key: musicalKey || undefined,
-      lyrics: tier === 'vocal' ? lyrics.trim() : undefined,
-      loop: tier === 'adaptive' ? loop : undefined,
+      lyrics: engine.vocals ? (lyrics.trim() || undefined) : undefined,
+      loop: engine.supportsLoop ? loop : undefined,
+      language: langMeta?.code,
+      languageName: langMeta?.name,
+      styleTags: engine.supportsStyleField ? (styleTags.trim() || undefined) : undefined,
     });
     if (track) setLastTrack(track);
   };
+
 
   const handleAutoLyrics = async () => {
     if (!prompt.trim()) return;
