@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Volume2, Play, Pause, Upload, Sparkles, Info } from 'lucide-react';
+import { Loader2, Volume2, Play, Pause, Upload, Sparkles, Info, Library } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
@@ -16,6 +16,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
+import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 import type { Scene } from '@/types/scene';
 
@@ -57,6 +58,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
   const [selectedLanguage, setSelectedLanguage] = useState<string>(language === 'en' ? 'en' : 'de');
   const [showScriptGenerator, setShowScriptGenerator] = useState(false);
   const [useVoiceover, setUseVoiceover] = useState(value?.useVoiceover !== false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>({
     voiceId: '9BWtsMINqrJLrRacOk9x',
@@ -297,6 +299,17 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                   {voiceConfig.voiceId && (
                     <VoicePreviewButton voiceId={voiceConfig.voiceId} language={selectedLanguage} size="sm" className="shrink-0" />
                   )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLibraryOpen(true)}
+                    className="shrink-0 h-9 gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                    title={t('uc.chooseAVoice')}
+                  >
+                    <Library className="h-3.5 w-3.5" />
+                    {language === 'de' ? 'Bibliothek' : 'Library'}
+                  </Button>
                 </div>
               </div>
 
@@ -382,6 +395,28 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
             })) : undefined}
             defaultDuration={scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + s.duration, 0) : undefined}
             onScriptGenerated={(script) => { handleScriptChange(script); setShowScriptGenerator(false); }}
+          />
+
+          <UniversalVoiceLibraryPicker
+            open={libraryOpen}
+            onOpenChange={setLibraryOpen}
+            language={(selectedLanguage as 'de' | 'en' | 'es') || 'all'}
+            currentVoiceId={voiceConfig.voiceId}
+            title={language === 'de' ? 'Voice-Bibliothek – Content Creator' : "Voice Library – Content Creator"}
+            enforceNative
+            onSelect={(voice) => {
+              setVoices((prev) => (prev.find((v) => v.id === voice.id) ? prev : [voice as unknown as Voice, ...prev]));
+              const custom = customVoices.find((c) => c.elevenlabs_voice_id === voice.id);
+              setVoiceConfig({
+                ...voiceConfig,
+                voiceId: voice.id,
+                voiceName: custom?.name || voice.name || 'Voice',
+                modelId: voice.recommended_model || voiceConfig.modelId,
+                stability: voice.recommended_settings?.stability ?? voiceConfig.stability,
+                similarityBoost: voice.recommended_settings?.similarity_boost ?? voiceConfig.similarityBoost,
+              });
+              setLibraryOpen(false);
+            }}
           />
         </>
       )}
