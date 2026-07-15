@@ -179,9 +179,22 @@ export default function MusicStudio() {
             {/* GENERATE */}
             <TabsContent value="generate" className="space-y-6">
               <Card className="p-5 bg-background/40 backdrop-blur-md border-primary/15">
-                <div className="mb-4">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">Engine wählen</Label>
-                  <ProviderSelector value={tier} onChange={setTier} currencySymbol={currencySymbol} disabled={loading} />
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">Engine wählen</Label>
+                    <ProviderSelector value={tier} onChange={setTier} currencySymbol={currencySymbol} disabled={loading} />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetProject}
+                    disabled={loading}
+                    className="border-primary/30 text-primary hover:bg-primary/10 gap-1.5 shrink-0"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Neues Projekt
+                  </Button>
                 </div>
               </Card>
 
