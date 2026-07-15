@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles, Film, Image as ImageIcon, Volume2, UserSquare2, Star, Play, Pause,
+  Sparkles, Film, Image as ImageIcon, Volume2, UserSquare2, Star,
   ChevronRight, Zap,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -271,15 +271,8 @@ const ArsenalHeroStage = ({
           </motion.div>
         </AnimatePresence>
 
-        {/* Controls + progress */}
+        {/* Progress + Next */}
         <div className="mt-5 flex items-center gap-3">
-          <button
-            onClick={onTogglePause}
-            aria-label={paused ? "Play" : "Pause"}
-            className="w-9 h-9 rounded-full border border-primary/40 bg-background/50 backdrop-blur-md text-primary hover:bg-primary/10 transition-colors flex items-center justify-center"
-          >
-            {paused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
-          </button>
           <div className="flex-1 h-1 rounded-full bg-foreground/10 overflow-hidden">
             <div
               ref={progressRef}
@@ -393,7 +386,13 @@ const ArsenalModelRail = ({
   onSelect: (i: number) => void;
 }) => {
   return (
-    <div className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-sm p-2 max-h-[520px] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent">
+    <div
+      className="rounded-3xl border border-border/50 bg-card/40 backdrop-blur-sm p-2 max-h-[520px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      style={{
+        maskImage: "linear-gradient(to bottom, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to bottom, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)",
+      }}
+    >
       <div className="px-2 py-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">
         <Zap className="h-3 w-3 text-primary/70" />
         <span>{models.length} Models</span>
