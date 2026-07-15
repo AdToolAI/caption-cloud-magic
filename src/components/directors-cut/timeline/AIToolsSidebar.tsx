@@ -17,6 +17,7 @@ import {
 import { AudioClip } from '@/types/timeline';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import MusicLibraryBrowser, { type LibraryTrack } from '@/components/video-composer/MusicLibraryBrowser';
 
 interface AIToolsSidebarProps {
   onAddVoiceover: (clip: Omit<AudioClip, 'id' | 'trackId'>) => AudioClip;
