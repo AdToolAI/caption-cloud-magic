@@ -92,7 +92,7 @@ const DeleteData = lazy(() => import("./pages/DeleteData"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const Status = lazy(() => import("./pages/Status"));
-const Credits = lazy(() => import("./pages/Credits"));
+// Credits page retired — Beta abo (14.99€) deckt alles ab; Media-Credits laufen über AI Video Studio (ai_video_wallets).
 // UpgradeEnterprise page retired during Beta — route redirects to /pricing
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const VideoManagement = lazy(() => import("./pages/VideoManagement"));
@@ -207,7 +207,8 @@ function AppLayout() {
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/billing" element={<Billing />} />
-                    <Route path="/credits" element={<Credits />} />
+                    {/* /credits retired — Beta abo deckt alles ab. Media-Credits im AI Video Studio. */}
+                    <Route path="/credits" element={<Navigate to="/billing" replace />} />
                     {/* Beta: single plan only — legacy Enterprise upgrade path redirects to /pricing */}
                     <Route path="/upgrade-enterprise" element={<Navigate to="/pricing" replace />} />
                     <Route path="/support" element={<Support />} />

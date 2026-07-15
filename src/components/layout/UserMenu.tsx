@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { User, Settings, CreditCard, HelpCircle, LogOut, Coins, Tag, Share2, Link2 } from "lucide-react";
+import { User, Settings, CreditCard, HelpCircle, LogOut, Tag, Share2, Link2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,14 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
-import { useCredits } from "@/hooks/useCredits";
-import { Badge } from "@/components/ui/badge";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { balance, loading } = useCredits();
 
   if (!user) return null;
 
@@ -52,17 +49,6 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/credits" className="flex items-center gap-2 cursor-pointer">
-            <Coins className="h-4 w-4" />
-            <span>{t("header.credits")}</span>
-            {!loading && balance && (
-              <Badge variant="secondary" className="ml-auto text-xs">
-                {balance.balance}
-              </Badge>
-            )}
-          </Link>
-        </DropdownMenuItem>
         {user.email === 'bestofproducts4u@gmail.com' && (
           <DropdownMenuItem asChild>
             <Link to="/instagram-publishing" className="flex items-center gap-2 cursor-pointer">
