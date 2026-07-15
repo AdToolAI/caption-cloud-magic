@@ -37,7 +37,12 @@ export function UserMenu() {
           <User className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 rounded-2xl shadow-glow">
+      <DropdownMenuContent
+        align="end"
+        side="bottom"
+        sideOffset={10}
+        className="z-[90] w-56 max-h-[min(520px,calc(100vh-5rem))] rounded-2xl shadow-glow"
+      >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{displayName}</p>

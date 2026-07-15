@@ -59,7 +59,14 @@ export function NotificationBell() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80" role="menu" aria-label="Notifications menu">
+      <DropdownMenuContent
+        align="end"
+        side="bottom"
+        sideOffset={10}
+        className="z-[90] w-80 max-h-[min(420px,calc(100vh-5rem))]"
+        role="menu"
+        aria-label="Notifications menu"
+      >
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Notifications</span>
           {unreadCount > 0 && (
@@ -75,7 +82,7 @@ export function NotificationBell() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <ScrollArea className="h-[300px]" aria-label="Notifications list">
+        <ScrollArea className="h-[300px] max-h-[calc(100vh-9rem)]" aria-label="Notifications list">
           {loading ? (
             <div className="space-y-2" role="status" aria-label="Loading notifications">
               <NotificationSkeleton />

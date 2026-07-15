@@ -35,7 +35,9 @@ export const LanguageSwitcher = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 
-        className="bg-popover z-50"
+        side="bottom"
+        sideOffset={10}
+        className="z-[90] bg-popover"
         role="menu"
         aria-label="Language selection menu"
       >
