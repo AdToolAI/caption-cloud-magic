@@ -170,7 +170,7 @@ serve(async (req) => {
       }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const currency = (wallet.currency || 'EUR') as 'EUR' | 'USD';
-    const cost = engine.price;
+    const cost = computeCharge(engine, duration);
     const currencySymbol = currency === 'USD' ? '$' : '€';
     if (wallet.balance_euros < cost) {
       return new Response(JSON.stringify({
