@@ -269,6 +269,39 @@ export function useCompanionCoach() {
     [user],
   );
 
+  const completeConcierge = useCallback(
+    async (choice: { pace: LearningPace; primaryGoal: string }) => {
+      setPace(choice.pace);
+      setPrimaryGoal(choice.primaryGoal);
+      setConciergeCompleted(true);
+      if (!user) return;
+      const { data: existing } = await supabase
+        .from('companion_user_preferences')
+        .select('id, preferences')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const nextPrefs = {
+        ...((existing?.preferences as Record<string, unknown>) ?? {}),
+        learning_pace: choice.pace,
+        primary_goal: choice.primaryGoal,
+        concierge_completed: true,
+        concierge_completed_at: new Date().toISOString(),
+      };
+      if (existing) {
+        await supabase
+          .from('companion_user_preferences')
+          .update({ preferences: nextPrefs, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id);
+      } else {
+        await supabase.from('companion_user_preferences').insert({
+          user_id: user.id,
+          preferences: nextPrefs,
+        });
+      }
+    },
+    [user],
+  );
+
   return {
     pace,
     persona,
@@ -277,6 +310,9 @@ export function useCompanionCoach() {
     dismiss,
     convert,
     setLearningPace,
+    completeConcierge,
+    conciergeCompleted,
+    primaryGoal,
     paused,
     triggerRegistry: TRIGGER_REGISTRY,
   };
