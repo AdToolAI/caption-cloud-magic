@@ -6,6 +6,30 @@ import imageHero from "@/assets/landing/ai-arsenal/image-hero.jpg";
 import audioHero from "@/assets/landing/ai-arsenal/audio-hero.jpg";
 import avatarHero from "@/assets/landing/ai-arsenal/avatar-hero.jpg";
 
+// -------- Provider-style still covers (batch 2026-07-14) --------
+import coverVeoPro from "@/assets/landing/ai-arsenal/gen/veo-pro.jpg";
+import coverWanPro from "@/assets/landing/ai-arsenal/gen/wan-pro.jpg";
+import coverHailuo from "@/assets/landing/ai-arsenal/gen/hailuo-pro.jpg";
+import coverLuma from "@/assets/landing/ai-arsenal/gen/luma-pro.jpg";
+import coverRunway from "@/assets/landing/ai-arsenal/gen/runway-aleph.jpg";
+import coverPika from "@/assets/landing/ai-arsenal/gen/pika-pro.jpg";
+import coverNano from "@/assets/landing/ai-arsenal/gen/nano-banana.jpg";
+import coverGeminiFlash from "@/assets/landing/ai-arsenal/gen/gemini-flash.jpg";
+import coverFluxFill from "@/assets/landing/ai-arsenal/gen/flux-fill.jpg";
+import coverClarity from "@/assets/landing/ai-arsenal/gen/clarity-upscaler.jpg";
+import coverElevenMusic from "@/assets/landing/ai-arsenal/gen/elevenlabs-music.jpg";
+import coverMinimax from "@/assets/landing/ai-arsenal/gen/minimax-music.jpg";
+import coverStableAudio from "@/assets/landing/ai-arsenal/gen/stable-audio.jpg";
+import coverElevenTts from "@/assets/landing/ai-arsenal/gen/elevenlabs-tts.jpg";
+import coverVoiceClone from "@/assets/landing/ai-arsenal/gen/voice-clone.jpg";
+import coverBrandLock from "@/assets/landing/ai-arsenal/gen/brand-lock.jpg";
+import coverCastWorld from "@/assets/landing/ai-arsenal/gen/cast-world.jpg";
+
+// -------- Animated flagship loops (asset.json pointers) --------
+import soraLoop from "@/assets/landing/ai-arsenal/gen/sora-loop.mp4.asset.json";
+import klingLoop from "@/assets/landing/ai-arsenal/gen/kling-loop.mp4.asset.json";
+import veoLoop from "@/assets/landing/ai-arsenal/gen/veo-loop.mp4.asset.json";
+
 export type ArsenalCategory = "video" | "image" | "audio" | "avatar";
 
 export interface ArsenalModel {
@@ -19,6 +43,8 @@ export interface ArsenalModel {
   caps: Record<Language, string[]>;
   /** Cover image (optional; falls back to genre hero) */
   cover?: string;
+  /** Optional animated loop URL (mp4) — displayed on hover / when in view */
+  loop?: string;
   recommended?: boolean;
   /** Optional featured/hero flag inside category (goes first) */
   hero?: boolean;
