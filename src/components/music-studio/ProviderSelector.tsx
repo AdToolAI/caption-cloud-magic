@@ -70,7 +70,7 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
                 active ? 'border-primary/60 text-primary' : 'border-border/60 text-muted-foreground'
               )}
             >
-              {currencySymbol}{engine.priceEur.toFixed(2)} • ≤{engine.maxDuration}s
+              {formatMusicPriceBadge(id, currencySymbol)}
             </Badge>
             {engine.comingSoon && (
               <div className="absolute inset-0 flex items-end justify-center pb-1.5 pointer-events-none">
