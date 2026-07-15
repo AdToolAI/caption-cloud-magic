@@ -120,7 +120,9 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     supportsLoop: false,
     supportsStyleField: false,
     maxDuration: 300,
-    priceEur: 0.36,
+    priceEur: 6.90, // reference @ 300s (per-second engine)
+    pricingModel: 'per-second',
+    priceEurPerSecond: 0.023,
     languages: EL_LANGS,
     route: 'replicate',
     replicateModel: 'elevenlabs/music',
