@@ -857,10 +857,15 @@ export function ExportRenderStep({
                 </div>
               ) : isRendering ? (
                 <div className="space-y-4">
+                  {slotWaiting && (
+                    <div className="flex justify-center">
+                      <RenderSlotWaitingBadge waiting={slotWaiting} />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Rendering...
+                      {slotWaiting ? 'Warte auf Slot…' : 'Rendering...'}
                     </span>
                     <span>{Math.round(renderProgress)}%</span>
                   </div>
