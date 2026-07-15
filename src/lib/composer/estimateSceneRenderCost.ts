@@ -21,6 +21,7 @@ import {
 import { computeProviderEta } from '@/hooks/useProviderEta';
 import { getRenderWarnings, aggregateWarnings, type RenderWarning } from '@/lib/video-composer/renderWarnings';
 import { getRiskyLipsyncInfo, type RiskyLipsyncInfo } from '@/config/lipsyncProviderSafety';
+import { countSceneSpeakers } from './countSceneSpeakers';
 
 const CREDIT_PER_EUR = 100;     // 1 credit = €0.01
 const VO_CREDITS_PER_SCENE = 5; // ~€0.05 ElevenLabs avg
