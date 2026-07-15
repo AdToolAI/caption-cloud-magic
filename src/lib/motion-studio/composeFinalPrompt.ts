@@ -230,10 +230,31 @@ export function composeFinalPrompt(
     lines.push(`[6 AMBIENT] ${inputs.ambientNotes.trim()}`);
   }
 
+  // [7 CAMERA LOCK] — v243. When two or more speakers share the frame we
+  // MUST prevent the video model from cutting, reframing or rearranging
+  // the shot mid-clip (root cause of "layout morph at t≈4s" in Sync.so
+  // multi-speaker plates). Speakers are still free to gesture, look
+  // around, write, walk in place etc. — only the camera + frame
+  // composition + speaker presence are locked.
+  const uniqueSpeakerCount = inputs.audioPlan?.speakers
+    ? new Set(inputs.audioPlan.speakers.map((s) => s.characterId)).size
+    : 0;
+  if (uniqueSpeakerCount >= 2) {
+    lines.push(
+      '[7 CAMERA LOCK] Locked static camera on tripod. Fixed frame, fixed focal length, no camera movement of any kind. All speakers remain fully visible in frame, in the same relative positions, from the first frame to the last. Speakers may move naturally — gesture, look around, write, subtle body movement — but must NOT leave frame or swap positions. Single continuous shot, no cuts, no transitions, no reframing, no zoom, no pan, no dolly, no split-screen, no grid rearrangement, no new characters entering, no character disappearing.',
+    );
+  }
+
   // Negative — always last so providers that respect the trailing tag
   // still pick it up even if they ignore the bracket schema.
-  const negative = layered.negativePrompt || NEGATIVE_DEFAULT;
+  const baseNegative = layered.negativePrompt || NEGATIVE_DEFAULT;
+  const cameraLockNegative =
+    uniqueSpeakerCount >= 2
+      ? ', camera cut, camera pan, camera zoom, dolly, reframe, split screen, grid layout, 2x2 grid, new shot, transition, speaker leaves frame, speaker walks out of frame, character disappears, new characters entering, rearrangement, layout change'
+      : '';
+  const negative = baseNegative.replace(/\.\s*$/, '') + cameraLockNegative + '.';
   lines.push(`[8 NEGATIVE] ${negative}`);
+
 
   const finalPrompt = lines.join('\n');
 
