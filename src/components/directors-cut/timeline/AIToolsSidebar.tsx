@@ -37,12 +37,6 @@ const VOICE_OPTIONS = [
 ];
 
 // Sample music library (Jamendo would be integrated here)
-const SAMPLE_MUSIC = [
-  { id: '1', name: 'Upbeat Corporate', duration: 120, genre: 'Corporate', bpm: 120 },
-  { id: '2', name: 'Chill Ambient', duration: 180, genre: 'Ambient', bpm: 80 },
-  { id: '3', name: 'Epic Cinematic', duration: 90, genre: 'Cinematic', bpm: 100 },
-  { id: '4', name: 'Happy Acoustic', duration: 150, genre: 'Acoustic', bpm: 110 },
-];
 
 // Sound effect categories
 const SFX_CATEGORIES = [
