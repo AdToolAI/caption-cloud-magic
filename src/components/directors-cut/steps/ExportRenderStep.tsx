@@ -24,6 +24,8 @@ import {
 import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { describeRenderAdmissionError, tryParseAdmissionFromInvokeError } from '@/lib/render/admission';
+import { useEnqueuedRender } from '@/hooks/useEnqueuedRender';
+import { RenderSlotWaitingBadge } from '@/components/render/RenderSlotWaitingBadge';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
