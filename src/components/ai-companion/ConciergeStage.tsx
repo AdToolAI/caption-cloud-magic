@@ -131,14 +131,13 @@ function OvationSweep({ accent }: { accent: Props['accent'] }) {
   const color = ACCENT_HEX[accent];
   return (
     <motion.div
-      className="pointer-events-none absolute inset-x-0 top-0 h-px"
+      className="pointer-events-none absolute inset-x-0 top-0 h-px origin-left"
       style={{
         background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
       }}
       initial={{ scaleX: 0, opacity: 0 }}
       animate={{ scaleX: [0, 1, 1], opacity: [0, 1, 0] }}
       transition={{ duration: 0.7, ease: 'easeOut' }}
-      style-origin="left"
     />
   );
 }
