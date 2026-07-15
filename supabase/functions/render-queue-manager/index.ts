@@ -118,6 +118,28 @@ serve(async (req) => {
     }
 
     result.slotsUsed = used;
+
+    // Self-ping: if we still have queued jobs and free slots, chain another
+    // tick in ~10s so ETAs feel responsive (pg_cron min. resolution is 1 min).
+    try {
+      const remainingQueued = (queued?.length ?? 0) - result.dispatched;
+      if (remainingQueued > 0 && used < slotBudget) {
+        const selfUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/render-queue-manager`;
+        const anon = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+        // Fire-and-forget delayed self-invoke via edge waitUntil-like pattern.
+        (async () => {
+          await new Promise((r) => setTimeout(r, 10_000));
+          try {
+            await fetch(selfUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', apikey: anon },
+              body: JSON.stringify({ trigger: 'chain' }),
+            });
+          } catch (_e) { /* ignore */ }
+        })();
+      }
+    } catch (_e) { /* ignore */ }
+
     return json(result);
   } catch (err) {
     console.error('[queue-tick] fatal:', err);
