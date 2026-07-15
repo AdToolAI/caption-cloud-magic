@@ -11,20 +11,21 @@ interface ProviderSelectorProps {
 }
 
 const ICONS: Record<string, typeof Zap> = {
-  'stable-audio-25':     Activity,
-  'stable-audio-open-2': Waves,
-  'minimax-15':          Music2,
-  'suno-v5':             Sparkles,
-  'elevenlabs-music-v2': Wand2,
+  'stable-audio-25':      Activity,
+  'stable-audio-3-large': Waves,
+  'minimax-15':           Music2,
+  'elevenlabs-music-v2':  Wand2,
+  'lyria-3-pro':          Sparkles,
 };
 
 const ACCENTS: Record<string, string> = {
-  'stable-audio-25':     'from-emerald-500/20 to-emerald-500/5',
-  'stable-audio-open-2': 'from-cyan-500/20 to-cyan-500/5',
-  'minimax-15':          'from-fuchsia-500/20 to-fuchsia-500/5',
-  'suno-v5':             'from-amber-500/25 to-amber-500/5',
-  'elevenlabs-music-v2': 'from-primary/25 to-primary/5',
+  'stable-audio-25':      'from-emerald-500/20 to-emerald-500/5',
+  'stable-audio-3-large': 'from-cyan-500/20 to-cyan-500/5',
+  'minimax-15':           'from-fuchsia-500/20 to-fuchsia-500/5',
+  'elevenlabs-music-v2':  'from-primary/25 to-primary/5',
+  'lyria-3-pro':          'from-amber-500/25 to-amber-500/5',
 };
+
 
 export function ProviderSelector({ value, onChange, currencySymbol = '€', disabled }: ProviderSelectorProps) {
   return (
