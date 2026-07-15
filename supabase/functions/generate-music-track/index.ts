@@ -298,94 +298,111 @@ serve(async (req) => {
       audioBuffer = await elResponse.arrayBuffer();
 
     // =================================================================
-    // ROUTE 3: Suno v5 (direct API)
+    // ROUTE 3: Stability AI — Stable Audio 3.0 Large (direct API)
     // =================================================================
-    } else if (engine.route === 'direct-suno') {
-      const SUNO_API_KEY = Deno.env.get('SUNO_API_KEY');
-      if (!SUNO_API_KEY) {
+    } else if (engine.route === 'direct-stability') {
+      const STABILITY_API_KEY = Deno.env.get('STABILITY_API_KEY');
+      if (!STABILITY_API_KEY) {
         return new Response(JSON.stringify({
-          error: "Suno v5 ist noch nicht aktiviert. SUNO_API_KEY wird in Kürze in der Betaphase konfiguriert.",
-          code: "SUNO_NOT_CONFIGURED",
+          error: "Stable Audio 3.0 Large ist noch nicht aktiviert. STABILITY_API_KEY wird in Kürze hinterlegt.",
+          code: "STABILITY_NOT_CONFIGURED",
         }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      engineUsed = 'suno/v5';
+      engineUsed = 'stability/stable-audio-3-large';
 
-      // Suno v5 async job pattern: POST /generate → poll /clips
-      const sunoPayload: Record<string, unknown> = {
-        prompt: lyrics?.trim() || prompt.trim(),
-        tags: styleTags?.trim() || [genre !== 'any' ? genre : '', mood].filter(Boolean).join(', '),
-        title: prompt.trim().slice(0, 60),
-        mv: 'chirp-v5',
-        make_instrumental: !!instrumental && engine.vocals ? false : instrumental,
-      };
-      if (languageName) sunoPayload.language = languageName;
+      // Stability AI text-to-audio (v2beta) — expects multipart/form-data.
+      const form = new FormData();
+      form.append('prompt', enhancedPrompt);
+      form.append('duration', String(Math.min(duration, 190)));
+      form.append('output_format', 'mp3');
+      form.append('model', 'stable-audio-2'); // v3 Large served under this endpoint family
 
-      let jobRes: Response;
+      let stRes: Response;
       try {
-        jobRes = await fetch('https://api.suno.ai/v1/generate', {
+        stRes = await fetch('https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${SUNO_API_KEY}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            'Authorization': `Bearer ${STABILITY_API_KEY}`,
+            'Accept': 'audio/*',
           },
-          body: JSON.stringify(sunoPayload),
+          body: form,
         });
       } catch (err: any) {
-        return new Response(JSON.stringify({ error: `Suno request failed: ${err.message}`, code: "SUNO_ERROR" }), {
+        return new Response(JSON.stringify({ error: `Stability request failed: ${err.message}`, code: "STABILITY_ERROR" }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      if (!jobRes.ok) {
-        const t = await jobRes.text().catch(() => '');
-        console.error('[generate-music-track] Suno error:', jobRes.status, t);
-        return new Response(JSON.stringify({
-          error: `Suno v5 failed (${jobRes.status})`, code: "SUNO_ERROR", details: t,
-        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const jobJson: any = await jobRes.json();
-      const clipId: string | undefined = jobJson?.id || jobJson?.clips?.[0]?.id;
-      if (!clipId) {
-        return new Response(JSON.stringify({ error: "Suno returned no job id", code: "SUNO_ERROR", details: JSON.stringify(jobJson) }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      // Poll for completion (Suno typically takes 30-90s)
-      let audioUrl: string | null = null;
-      const start = Date.now();
-      const MAX_WAIT_MS = 240_000; // 4 min
-      while (Date.now() - start < MAX_WAIT_MS) {
-        await new Promise((r) => setTimeout(r, 5_000));
-        const poll = await fetch(`https://api.suno.ai/v1/clips/${clipId}`, {
-          headers: { 'Authorization': `Bearer ${SUNO_API_KEY}` },
-        });
-        if (!poll.ok) continue;
-        const clip: any = await poll.json();
-        const status = clip?.status;
-        if (status === 'complete' || status === 'succeeded') {
-          audioUrl = clip?.audio_url || clip?.url || clip?.output?.audio;
-          break;
-        }
-        if (status === 'error' || status === 'failed') {
-          return new Response(JSON.stringify({ error: `Suno job failed`, code: "SUNO_ERROR", details: JSON.stringify(clip) }), {
+      if (!stRes.ok) {
+        const t = await stRes.text().catch(() => '');
+        console.error('[generate-music-track] Stability error:', stRes.status, t);
+        if (stRes.status === 401 || stRes.status === 403) {
+          return new Response(JSON.stringify({ error: "Stability API key ungültig oder ohne Music-Zugang.", code: "STABILITY_UNAUTHORIZED", details: t }), {
             status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
+        return new Response(JSON.stringify({
+          error: `Stable Audio 3.0 Large failed (${stRes.status})`, code: "STABILITY_ERROR", details: t,
+        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      if (!audioUrl) {
-        return new Response(JSON.stringify({ error: "Suno job timeout", code: "SUNO_TIMEOUT" }), {
-          status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      audioBuffer = await stRes.arrayBuffer();
+
+    // =================================================================
+    // ROUTE 4: Google Lyria 3 Pro (Vertex AI / Gemini API, Preview)
+    // =================================================================
+    } else if (engine.route === 'direct-lyria') {
+      const GOOGLE_LYRIA_API_KEY = Deno.env.get('GOOGLE_LYRIA_API_KEY');
+      if (!GOOGLE_LYRIA_API_KEY) {
+        return new Response(JSON.stringify({
+          error: "Google Lyria 3 Pro ist noch nicht freigeschaltet. Vertex-AI Preview-Access wird gerade eingerichtet.",
+          code: "LYRIA_NOT_CONFIGURED",
+        }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      engineUsed = 'google/lyria-3-pro';
+
+      const lyriaPayload: Record<string, unknown> = {
+        prompt: enhancedPrompt,
+        lyrics: lyrics?.trim() || undefined,
+        duration_seconds: Math.min(duration, 60),
+        language: languageName || 'English',
+        instrumental: engine.vocals ? !!instrumental : true,
+      };
+
+      let lyRes: Response;
+      try {
+        lyRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/lyria-3-pro:generateMusic?key=${GOOGLE_LYRIA_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(lyriaPayload),
+          },
+        );
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: `Lyria request failed: ${err.message}`, code: "LYRIA_ERROR" }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      const audioRes = await fetch(audioUrl);
-      if (!audioRes.ok) {
-        return new Response(JSON.stringify({ error: "Failed to fetch Suno audio" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      if (!lyRes.ok) {
+        const t = await lyRes.text().catch(() => '');
+        console.error('[generate-music-track] Lyria error:', lyRes.status, t);
+        return new Response(JSON.stringify({
+          error: `Google Lyria 3 Pro failed (${lyRes.status})`, code: "LYRIA_ERROR", details: t,
+        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const lyJson: any = await lyRes.json().catch(() => null);
+      const b64: string | undefined =
+        lyJson?.audio?.data ||
+        lyJson?.audioContent ||
+        lyJson?.candidates?.[0]?.content?.parts?.[0]?.inline_data?.data;
+      if (!b64) {
+        return new Response(JSON.stringify({ error: "Lyria returned no audio", code: "LYRIA_ERROR", details: JSON.stringify(lyJson).slice(0, 500) }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      audioBuffer = await audioRes.arrayBuffer();
+      const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      audioBuffer = binary.buffer;
     }
+
 
     if (!audioBuffer || audioBuffer.byteLength < 1000) {
       return new Response(JSON.stringify({ error: "Generated audio too small / invalid" }), {
