@@ -299,6 +299,17 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                   {voiceConfig.voiceId && (
                     <VoicePreviewButton voiceId={voiceConfig.voiceId} language={selectedLanguage} size="sm" className="shrink-0" />
                   )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLibraryOpen(true)}
+                    className="shrink-0 h-9 gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                    title={t('uc.chooseAVoice')}
+                  >
+                    <Library className="h-3.5 w-3.5" />
+                    {language === 'de' ? 'Bibliothek' : 'Library'}
+                  </Button>
                 </div>
               </div>
 
