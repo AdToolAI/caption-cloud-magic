@@ -248,18 +248,10 @@ export default function MusicStudio() {
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="text-xs text-muted-foreground">Dauer</Label>
-                      <span className="text-xs font-mono text-primary">{Math.min(duration, maxDur)}s / max {maxDur}s</span>
-                    </div>
-                    <Slider
-                      value={[Math.min(duration, maxDur)]}
-                      onValueChange={(v) => setDuration(v[0])}
-                      min={5}
-                      max={maxDur}
-                      step={5}
-                    />
+                  <div className="p-3 rounded-lg bg-background/40 border border-primary/10">
+                    <p className="text-[11px] text-muted-foreground">
+                      <span className="text-primary font-medium">Songlänge</span> wird automatisch durch die Lyrics & den Provider bestimmt (typisch 1–3 min bei Vocal-Tracks, {maxDur}s Cap bei Instrumentals).
+                    </p>
                   </div>
 
                   {/* Tier-specific controls */}
