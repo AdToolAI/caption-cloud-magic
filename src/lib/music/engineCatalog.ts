@@ -23,11 +23,13 @@ export interface MusicEngine {
   maxDuration: number;   // seconds
   priceEur: number;      // retail (3x margin)
   languages: MusicLanguage[]; // empty = instrumental-only
-  route: 'replicate' | 'direct-elevenlabs' | 'direct-suno';
+  route: 'replicate' | 'direct-elevenlabs' | 'direct-stability' | 'direct-lyria';
   replicateModel?: string;
   order: number;
   badge?: string;        // e.g. "NEW"
+  comingSoon?: boolean;  // true = card visible but disabled until secret configured
 }
+
 
 const EL_LANGS: MusicLanguage[] = [
   { code: 'en', label: 'Englisch',      flag: '🇬🇧', name: 'English' },
