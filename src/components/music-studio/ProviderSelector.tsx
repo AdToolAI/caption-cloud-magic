@@ -11,20 +11,21 @@ interface ProviderSelectorProps {
 }
 
 const ICONS: Record<string, typeof Zap> = {
-  'stable-audio-25':     Activity,
-  'stable-audio-open-2': Waves,
-  'minimax-15':          Music2,
-  'suno-v5':             Sparkles,
-  'elevenlabs-music-v2': Wand2,
+  'stable-audio-25':      Activity,
+  'stable-audio-3-large': Waves,
+  'minimax-15':           Music2,
+  'elevenlabs-music-v2':  Wand2,
+  'lyria-3-pro':          Sparkles,
 };
 
 const ACCENTS: Record<string, string> = {
-  'stable-audio-25':     'from-emerald-500/20 to-emerald-500/5',
-  'stable-audio-open-2': 'from-cyan-500/20 to-cyan-500/5',
-  'minimax-15':          'from-fuchsia-500/20 to-fuchsia-500/5',
-  'suno-v5':             'from-amber-500/25 to-amber-500/5',
-  'elevenlabs-music-v2': 'from-primary/25 to-primary/5',
+  'stable-audio-25':      'from-emerald-500/20 to-emerald-500/5',
+  'stable-audio-3-large': 'from-cyan-500/20 to-cyan-500/5',
+  'minimax-15':           'from-fuchsia-500/20 to-fuchsia-500/5',
+  'elevenlabs-music-v2':  'from-primary/25 to-primary/5',
+  'lyria-3-pro':          'from-amber-500/25 to-amber-500/5',
 };
+
 
 export function ProviderSelector({ value, onChange, currencySymbol = '€', disabled }: ProviderSelectorProps) {
   return (
@@ -34,12 +35,14 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
         const Icon = ICONS[id] || Music2;
         const accent = ACCENTS[id] || 'from-primary/20 to-primary/5';
         const active = value === id;
+        const isDisabled = disabled || engine.comingSoon;
         return (
           <button
             key={id}
             type="button"
-            disabled={disabled}
+            disabled={isDisabled}
             onClick={() => onChange(id as MusicEngineId)}
+            title={engine.comingSoon ? 'Preview-Access wird in Kürze freigeschaltet' : undefined}
             className={cn(
               'relative group text-left p-3 rounded-xl border transition-all overflow-hidden',
               'bg-gradient-to-br backdrop-blur-sm',
@@ -47,7 +50,7 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
                 ? 'border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.45)] scale-[1.02]'
                 : 'border-border/40 hover:border-primary/40 hover:scale-[1.01]',
               accent,
-              disabled && 'opacity-50 cursor-not-allowed'
+              isDisabled && 'opacity-50 cursor-not-allowed hover:scale-100'
             )}
           >
             {engine.badge && (
@@ -71,9 +74,17 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
             >
               {currencySymbol}{engine.priceEur.toFixed(2)} • ≤{engine.maxDuration}s
             </Badge>
+            {engine.comingSoon && (
+              <div className="absolute inset-0 flex items-end justify-center pb-1.5 pointer-events-none">
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-background/80 border border-primary/30 text-primary">
+                  Bald verfügbar
+                </span>
+              </div>
+            )}
           </button>
         );
       })}
+
     </div>
   );
 }

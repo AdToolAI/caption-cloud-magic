@@ -23,11 +23,13 @@ export interface MusicEngine {
   maxDuration: number;   // seconds
   priceEur: number;      // retail (3x margin)
   languages: MusicLanguage[]; // empty = instrumental-only
-  route: 'replicate' | 'direct-elevenlabs' | 'direct-suno';
+  route: 'replicate' | 'direct-elevenlabs' | 'direct-stability' | 'direct-lyria';
   replicateModel?: string;
   order: number;
   badge?: string;        // e.g. "NEW"
+  comingSoon?: boolean;  // true = card visible but disabled until secret configured
 }
+
 
 const EL_LANGS: MusicLanguage[] = [
   { code: 'en', label: 'Englisch',      flag: '🇬🇧', name: 'English' },
@@ -53,7 +55,7 @@ const MINIMAX_LANGS: MusicLanguage[] = [
   { code: 'zh', label: 'Chinesisch',    flag: '🇨🇳', name: 'Chinese' },
 ];
 
-const SUNO_LANGS: MusicLanguage[] = [
+const LYRIA_LANGS: MusicLanguage[] = [
   { code: 'en', label: 'Englisch',      flag: '🇬🇧', name: 'English' },
   { code: 'de', label: 'Deutsch',       flag: '🇩🇪', name: 'German' },
   { code: 'es', label: 'Spanisch',      flag: '🇪🇸', name: 'Spanish' },
@@ -61,10 +63,8 @@ const SUNO_LANGS: MusicLanguage[] = [
   { code: 'it', label: 'Italienisch',   flag: '🇮🇹', name: 'Italian' },
   { code: 'pt', label: 'Portugiesisch', flag: '🇵🇹', name: 'Portuguese' },
   { code: 'ja', label: 'Japanisch',     flag: '🇯🇵', name: 'Japanese' },
-  { code: 'ko', label: 'Koreanisch',    flag: '🇰🇷', name: 'Korean' },
-  { code: 'zh', label: 'Chinesisch',    flag: '🇨🇳', name: 'Chinese' },
-  { code: 'nl', label: 'Niederländisch', flag: '🇳🇱', name: 'Dutch' },
 ];
+
 
 export const ENGINE_CATALOG: Record<string, MusicEngine> = {
   'stable-audio-25': {
@@ -85,22 +85,21 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     replicateModel: 'stability-ai/stable-audio-2.5',
     order: 10,
   },
-  'stable-audio-open-2': {
-    id: 'stable-audio-open-2',
-    label: 'Stings',
-    provider: 'Stable Audio Open 2',
-    subtitle: 'Kurze Stings, günstig',
-    description: 'Kurze, günstige Sound-Stings und Ambient-Loops (≤47s).',
+  'stable-audio-3-large': {
+    id: 'stable-audio-3-large',
+    label: 'Adaptive Large',
+    provider: 'Stable Audio 3.0 Large',
+    subtitle: 'Höchste Instrumental-Qualität',
+    description: 'Stability AI Direct — polished cinematic instrumentals, bis 3 min.',
     vocals: false,
     requiresLyrics: false,
     supportsInstrumentalToggle: false,
     supportsLoop: false,
     supportsStyleField: false,
-    maxDuration: 47,
-    priceEur: 0.12,
+    maxDuration: 190,
+    priceEur: 0.18,
     languages: [],
-    route: 'replicate',
-    replicateModel: 'stackadoc/stable-audio-open-1.0',
+    route: 'direct-stability',
     order: 20,
     badge: 'NEU',
   },
@@ -122,30 +121,12 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     replicateModel: 'minimax/music-1.5',
     order: 30,
   },
-  'suno-v5': {
-    id: 'suno-v5',
-    label: 'Vocal Pro',
-    provider: 'Suno v5',
-    subtitle: 'Full Song, radio-ready',
-    description: 'Radio-ready Full Songs mit Vocals, bis 4 min.',
-    vocals: true,
-    requiresLyrics: true,
-    supportsInstrumentalToggle: true,
-    supportsLoop: false,
-    supportsStyleField: true,
-    maxDuration: 240,
-    priceEur: 0.45,
-    languages: SUNO_LANGS,
-    route: 'direct-suno',
-    order: 40,
-    badge: 'NEU',
-  },
   'elevenlabs-music-v2': {
     id: 'elevenlabs-music-v2',
     label: 'Vocal Studio',
     provider: 'ElevenLabs Music v2',
-    subtitle: 'Cinematic, mehrsprachig',
-    description: 'Cinematic Songs & polierte Instrumentals, bis 5 min.',
+    subtitle: 'Beste Gesamtlösung',
+    description: 'Cinematic Songs & polierte Instrumentals, bis 5 min. Beste Gesamtqualität laut interner Bewertung.',
     vocals: true,
     requiresLyrics: false,
     supportsInstrumentalToggle: true,
@@ -155,10 +136,30 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     priceEur: 0.36,
     languages: EL_LANGS,
     route: 'direct-elevenlabs',
+    order: 40,
+    badge: '⭐ TOP',
+  },
+  'lyria-3-pro': {
+    id: 'lyria-3-pro',
+    label: 'Vocal Pro',
+    provider: 'Google Lyria 3 Pro',
+    subtitle: 'Google Preview',
+    description: 'Google Vertex AI Lyria 3 Pro — radio-nahe Vocal-Qualität. Preview-Access nötig.',
+    vocals: true,
+    requiresLyrics: true,
+    supportsInstrumentalToggle: true,
+    supportsLoop: false,
+    supportsStyleField: false,
+    maxDuration: 60,
+    priceEur: 0.42,
+    languages: LYRIA_LANGS,
+    route: 'direct-lyria',
     order: 50,
-    badge: 'NEU',
+    badge: 'PREVIEW',
+    comingSoon: true,
   },
 };
+
 
 export type MusicEngineId = keyof typeof ENGINE_CATALOG;
 
@@ -168,12 +169,15 @@ export const ENGINE_ORDER: MusicEngineId[] = Object.values(ENGINE_CATALOG)
 
 // Map legacy tier IDs (quick/adaptive/standard/vocal/pro) to new engine IDs.
 export const LEGACY_TIER_ALIAS: Record<string, MusicEngineId> = {
-  quick:    'stable-audio-open-2',
-  adaptive: 'stable-audio-25',
-  standard: 'elevenlabs-music-v2',
-  vocal:    'minimax-15',
-  pro:      'elevenlabs-music-v2',
+  quick:                 'stable-audio-3-large',
+  adaptive:              'stable-audio-25',
+  standard:              'elevenlabs-music-v2',
+  vocal:                 'minimax-15',
+  pro:                   'elevenlabs-music-v2',
+  'suno-v5':             'elevenlabs-music-v2',
+  'stable-audio-open-2': 'stable-audio-3-large',
 };
+
 
 export function resolveEngineId(idOrTier: string): MusicEngineId {
   if (ENGINE_CATALOG[idOrTier]) return idOrTier as MusicEngineId;

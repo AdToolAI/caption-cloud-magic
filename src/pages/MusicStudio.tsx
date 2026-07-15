@@ -227,9 +227,10 @@ export default function MusicStudio() {
                 <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 mt-1">
                   <Info className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/70" />
                   <span>
-                    <strong>Udio v2</strong> bietet aktuell kein öffentliches API — daher nicht integriert. Für vergleichbare Full-Song-Qualität ist <strong>Suno v5</strong> oder <strong>ElevenLabs Music v2</strong> die richtige Wahl.
+                    <strong>Suno</strong> und <strong>Udio</strong> bieten aktuell keinen offiziellen API-Zugang. Für Full-Song-Qualität setzen wir auf <strong>ElevenLabs Music v2</strong> (beste Gesamtlösung) und <strong>Google Lyria 3 Pro</strong> (Preview) — <strong>Stable Audio 3.0 Large</strong> deckt den Instrumental-Bereich ab.
                   </span>
                 </p>
+
               </Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
