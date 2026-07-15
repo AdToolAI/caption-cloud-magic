@@ -1,7 +1,7 @@
 import { Activity, Wand2, Music2, Sparkles, Waves, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { ENGINE_CATALOG, ENGINE_ORDER, type MusicEngineId } from '@/lib/music/engineCatalog';
+import { ENGINE_CATALOG, ENGINE_ORDER, formatMusicPriceBadge, type MusicEngineId } from '@/lib/music/engineCatalog';
 
 interface ProviderSelectorProps {
   value: MusicEngineId;
