@@ -429,56 +429,107 @@ export default function MusicStudio() {
                   )}
                 </Card>
 
-                {/* RIGHT: Generate + Preview */}
-                <Card className="p-5 bg-background/40 backdrop-blur-md border-primary/15 space-y-4 h-fit lg:sticky lg:top-6">
-                  <div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Engine</div>
-                    <div className="font-display font-semibold text-foreground">{engine.provider}</div>
-                    <div className="text-[11px] text-muted-foreground">{engine.description}</div>
+                {/* RIGHT: Master-Bus */}
+                <Card className="relative p-0 overflow-hidden bg-[linear-gradient(180deg,hsl(var(--card)/0.8),hsl(var(--background)/0.7))] backdrop-blur-md border-primary/25 h-fit lg:sticky lg:top-6 shadow-[0_20px_60px_-30px_hsl(var(--primary)/0.5)]">
+                  {/* Rack header */}
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-primary/15 bg-[linear-gradient(180deg,hsl(var(--primary)/0.1),transparent)]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_hsl(var(--primary))]" />
+                      <span className="text-[9.5px] uppercase tracking-widest text-muted-foreground">Master Bus</span>
+                    </div>
+                    <span className="font-mono text-[9.5px] uppercase tracking-widest text-primary/80">
+                      CH · 01
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
-                    <div className="flex flex-col">
-                      <span className="text-xs text-muted-foreground">Kosten (max. Länge)</span>
-                      {engine.pricingModel === 'per-second' && engine.priceEurPerSecond && (
-                        <span className="text-[10px] text-muted-foreground/80">
-                          {currencySymbol}{engine.priceEurPerSecond.toFixed(3)}/s • Abrechnung pro Sekunde
-                        </span>
+                  <div className="p-5 space-y-4">
+                    <div>
+                      <div className="text-[9.5px] text-muted-foreground uppercase tracking-widest mb-1">Engine</div>
+                      <div className="font-display text-lg font-semibold text-foreground leading-tight">{engine.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{engine.provider}</div>
+                      <div className="text-[11px] text-muted-foreground/80 mt-2 leading-snug">{engine.description}</div>
+                    </div>
+
+                    {/* LCD cost display */}
+                    <div className="relative rounded-lg border border-primary/30 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.15),hsl(var(--background)/0.9))] p-3 overflow-hidden">
+                      <div className="pointer-events-none absolute inset-0 opacity-30 bg-[repeating-linear-gradient(0deg,transparent_0,transparent_2px,hsl(var(--primary)/0.05)_2px,hsl(var(--primary)/0.05)_3px)]" />
+                      <div className="relative flex items-end justify-between">
+                        <div>
+                          <div className="text-[9.5px] uppercase tracking-widest text-muted-foreground">Kosten · max</div>
+                          {engine.pricingModel === 'per-second' && engine.priceEurPerSecond && (
+                            <div className="text-[10px] font-mono text-muted-foreground/80 mt-0.5">
+                              {currencySymbol}{engine.priceEurPerSecond.toFixed(3)}/s · pro Sek.
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-baseline gap-0.5">
+                          <span className="font-mono text-xs font-light text-primary/60">{currencySymbol}</span>
+                          <span className="font-mono text-3xl font-bold text-primary tabular-nums leading-none drop-shadow-[0_0_12px_hsl(var(--primary)/0.5)]">
+                            {cost.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Session meta */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-md border border-primary/10 bg-background/40 py-2">
+                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">BPM</div>
+                        <div className="font-mono text-sm text-foreground/90 tabular-nums">{bpm ?? '—'}</div>
+                      </div>
+                      <div className="rounded-md border border-primary/10 bg-background/40 py-2">
+                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">Key</div>
+                        <div className="font-mono text-sm text-foreground/90 truncate px-1">{musicalKey || '—'}</div>
+                      </div>
+                      <div className="rounded-md border border-primary/10 bg-background/40 py-2">
+                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">Cap</div>
+                        <div className="font-mono text-sm text-foreground/90 tabular-nums">{maxDur}s</div>
+                      </div>
+                    </div>
+
+                    {/* Physical button */}
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={loading || !prompt.trim() || insufficient || (needsLyrics && !lyrics.trim())}
+                      className={cn(
+                        'w-full h-12 gap-2 rounded-lg relative overflow-hidden',
+                        'bg-[linear-gradient(180deg,hsl(var(--primary)),hsl(var(--primary)/0.75))]',
+                        'text-primary-foreground font-semibold uppercase tracking-widest text-[12px]',
+                        'shadow-[0_6px_0_hsl(var(--primary)/0.35),0_10px_30px_-5px_hsl(var(--primary)/0.6),inset_0_1px_0_hsl(0_0%_100%/0.3)]',
+                        'active:translate-y-[3px] active:shadow-[0_3px_0_hsl(var(--primary)/0.35),0_6px_20px_-8px_hsl(var(--primary)/0.5),inset_0_1px_0_hsl(0_0%_100%/0.3)]',
+                        'transition-all',
+                        'disabled:opacity-60 disabled:cursor-not-allowed',
                       )}
-                    </div>
-                    <span className="font-mono text-lg font-bold text-primary">{currencySymbol}{cost.toFixed(2)}</span>
-                  </div>
+                    >
+                      {loading ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Rendering…</>
+                      ) : (
+                        <><Sparkles className="h-4 w-4" /> Track generieren</>
+                      )}
+                    </Button>
 
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={loading || !prompt.trim() || insufficient || (needsLyrics && !lyrics.trim())}
-                    className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 gap-2 h-11"
-                  >
-                    {loading ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Generiere…</>
-                    ) : (
-                      <><Sparkles className="h-4 w-4" /> Track generieren</>
+                    {insufficient && (
+                      <div className="text-[11px] text-destructive text-center">
+                        Nicht genug Credits. Lade dein Wallet auf.
+                      </div>
                     )}
-                  </Button>
 
-                  {insufficient && (
-                    <div className="text-[11px] text-destructive">
-                      Nicht genug Credits. Lade dein Wallet auf.
-                    </div>
-                  )}
-
-                  {lastTrack && (
-                    <div className="pt-3 border-t border-primary/10 space-y-2">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Letzter Track</div>
-                      <div className="text-sm font-medium text-foreground truncate">{lastTrack.title}</div>
-                      <audio
-                        src={lastTrack.url}
-                        controls
-                        className="w-full h-9"
-                        style={{ filter: 'invert(0.85) hue-rotate(180deg)' }}
-                      />
-                    </div>
-                  )}
+                    {lastTrack && (
+                      <div className="pt-3 border-t border-primary/10 space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <div className="text-[9.5px] text-muted-foreground uppercase tracking-widest">Last Master</div>
+                        </div>
+                        <div className="text-sm font-medium text-foreground truncate">{lastTrack.title}</div>
+                        <audio
+                          src={lastTrack.url}
+                          controls
+                          className="w-full h-9"
+                          style={{ filter: 'invert(0.85) hue-rotate(180deg)' }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </Card>
               </div>
             </TabsContent>
