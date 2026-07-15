@@ -27,13 +27,6 @@ interface AIToolsSidebarExpandedProps {
   onExport?: () => void;
 }
 
-const SAMPLE_MUSIC = [
-  { id: 'm1', name: 'Epic Cinematic', duration: 120, genre: 'Cinematic' },
-  { id: 'm2', name: 'Upbeat Pop', duration: 90, genre: 'Pop' },
-  { id: 'm3', name: 'Ambient Chill', duration: 180, genre: 'Ambient' },
-  { id: 'm4', name: 'Corporate Motivation', duration: 150, genre: 'Corporate' },
-  { id: 'm5', name: 'Electronic Energy', duration: 100, genre: 'Electronic' },
-];
 
 const SAMPLE_SFX = [
   { id: 's1', name: 'Whoosh', duration: 1, category: 'Transition' },
