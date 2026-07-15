@@ -59,6 +59,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   const [voices, setVoices] = useState<VoiceMeta[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(true);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // W4.1 Voice-Lock: pin voice/language/tone across all UDC voiceovers for this project
