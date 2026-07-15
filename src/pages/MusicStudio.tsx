@@ -26,6 +26,7 @@ import { LyricsEditor } from '@/components/music-studio/LyricsEditor';
 import { MyTracksGrid } from '@/components/music-studio/MyTracksGrid';
 import { StudioWaveform } from '@/components/music-studio/StudioWaveform';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 const GENRES = ['any', 'pop', 'rock', 'electronic', 'hip-hop', 'jazz', 'classical', 'lo-fi', 'cinematic', 'ambient', 'folk', 'r&b'];
 const MOODS = ['energetic', 'calm', 'epic', 'sad', 'happy', 'mysterious', 'romantic', 'dark', 'uplifting', 'dreamy'];
