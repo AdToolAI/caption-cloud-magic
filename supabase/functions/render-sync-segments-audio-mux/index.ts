@@ -691,9 +691,78 @@ serve(async (req) => {
       );
     }
 
+    // v252 — URL preflight before Lambda dispatch. Historical incident:
+    // scene 53976949… hung 10 min in `audio_muxing` because one of the input
+    // URLs (masterVideo / Sync.so pass output / master audio) stalled inside
+    // the Chromium <Video> decoder in Lambda until the 600 s hard-kill.
+    // We now HEAD-check every URL with an 8 s timeout and fail fast — the
+    // scene is marked failed and the caller (auto-trigger / user-reset)
+    // can retry immediately instead of waiting for the Lambda timeout.
+    const preflightUrls: Array<{ label: string; url: string }> = [];
+    if (masterVideoUrlForMux) {
+      preflightUrls.push({ label: "master_video", url: masterVideoUrlForMux });
+    }
+    if (masterAudioUrl) {
+      preflightUrls.push({ label: "master_audio", url: masterAudioUrl });
+    }
+    for (const shot of fanoutShots as any[]) {
+      const u = String(shot?.outputUrl ?? "");
+      if (u) preflightUrls.push({ label: `shot_${shot?.speakerIdx ?? "?"}`, url: u });
+    }
+    async function headOk(url: string, ms = 8000): Promise<{ ok: boolean; status: number; reason?: string }> {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), ms);
+      try {
+        const r = await fetch(url, { method: "HEAD", signal: ac.signal });
+        // Consume any body to avoid resource leak in Deno runtime.
+        try { await r.body?.cancel(); } catch { /* noop */ }
+        return { ok: r.ok, status: r.status };
+      } catch (e) {
+        return { ok: false, status: 0, reason: (e as Error).message };
+      } finally {
+        clearTimeout(t);
+      }
+    }
+    const preflightResults = await Promise.all(
+      preflightUrls.map(async ({ label, url }) => ({ label, url, ...(await headOk(url)) })),
+    );
+    const unreachable = preflightResults.filter((r) => !r.ok);
+    if (unreachable.length > 0) {
+      const first = unreachable[0];
+      const detail =
+        `mux_preflight_url_unreachable: ${first.label} (status=${first.status}${first.reason ? `, ${first.reason}` : ""}) ` +
+        `url=${first.url.slice(0, 120)}`;
+      console.error(`[render-sync-segments-audio-mux] scene=${sceneId} ${detail}`);
+      try {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: detail.slice(0, 300),
+            dialog_shots: {
+              ...(state as any),
+              status: "failed",
+              error: detail.slice(0, 500),
+              preflight: preflightResults.map((r) => ({ label: r.label, ok: r.ok, status: r.status })),
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+      } catch (e) {
+        console.warn("[render-sync-segments-audio-mux] failed to persist preflight failure:", (e as Error).message);
+      }
+      return json({ error: detail, code: "mux_preflight_failed", details: preflightResults }, 502);
+    }
+
     const renderId = crypto.randomUUID();
     const outName = `dialog-stitch-muxed-${sceneId}-${Date.now()}.mp4`;
-    const muxFramesPerLambda = Math.max(45, Math.ceil(durationInFrames / 5));
+    // v252 — Tighter framesPerLambda. Historical value max(45, frames/5) put
+    // ~60 frames per worker; a single stalled worker held the whole render
+    // for 600 s. Now max(30, frames/8) means shorter, more numerous workers
+    // → smaller blast radius per stall, and OffthreadVideo in
+    // `DialogStitchVideo` handles the URL loading robustly per worker.
+    const muxFramesPerLambda = Math.max(30, Math.ceil(durationInFrames / 8));
 
     const { error: insertErr } = await supabase
       .from("video_renders")
@@ -760,7 +829,10 @@ serve(async (req) => {
       scale: 1,
       envVariables: {},
       chromiumOptions: {},
-      timeoutInMilliseconds: 600000,
+      // v252 — was 600000. Halved so a hung worker is killed faster and the
+      // watchdog + auto-retry path takes over sooner. With OffthreadVideo the
+      // typical mux for a 10 s dialog scene completes in <60 s.
+      timeoutInMilliseconds: 300000,
       concurrencyPerLambda: 1,
       downloadBehavior: { type: "play-in-browser" },
       webhook: {

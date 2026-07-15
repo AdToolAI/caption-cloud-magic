@@ -43,6 +43,11 @@ const STALE_HARD_MS = 25 * 60_000;       // v126: 20→25 min — one extra cron
 // to 1min, lost-invoke recovery drops from ~3.5min → ~60s. Double-dispatch is
 // safe — compose-dialog-segments' idempotency guard returns `already_running`.
 const STALE_DISPATCH_RECOVERY_MS = 30_000;
+// v252 — Audio-mux stall guard. A dispatched DialogStitchVideo Lambda that
+// hasn't produced a webhook after this window is considered dead. Lambda's
+// own timeout is now 300 s (see render-sync-segments-audio-mux), so 6 min
+// gives one extra retry cycle before we hard-fail the scene.
+const STALE_AUDIO_MUX_MS = 6 * 60_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
@@ -259,6 +264,83 @@ serve(async (req) => {
       ds?.version === 5 &&
       ds?.engine === "sync-segments" &&
       Array.isArray(ds?.passes);
+
+    // ── v252 audio-mux stall guard ────────────────────────────────────────
+    // `render-sync-segments-audio-mux` dispatches the final DialogStitchVideo
+    // Lambda and persists `dialog_shots.audio_mux = { render_id, dispatched_at }`.
+    // If that Lambda never calls remotion-webhook (crash pre-startup / lost
+    // invoke / IAM anomaly), the scene sits in `audio_muxing` forever. Detect
+    // it here, mark it failed, refund credits, and let the reset/auto-trigger
+    // path start a clean retry.
+    const muxDispatchedAt = ds?.audio_mux?.dispatched_at
+      ? Date.parse(String(ds.audio_mux.dispatched_at))
+      : null;
+    const muxAge = muxDispatchedAt ? now - muxDispatchedAt : 0;
+    if (
+      d.lip_sync_status === "audio_muxing" &&
+      muxDispatchedAt &&
+      muxAge >= STALE_AUDIO_MUX_MS
+    ) {
+      const refundCredits = Number(ds?.cost_credits) || 0;
+      let refundedFlag = !!ds?.refunded;
+      // Best-effort refund via increment_balance RPC (same path used by the
+      // dialog-stitch webhook fail branch).
+      if (!refundedFlag && refundCredits > 0) {
+        const { data: sceneUser } = await supabase
+          .from("composer_scenes")
+          .select("created_by")
+          .eq("id", d.id)
+          .maybeSingle();
+        const userId = (sceneUser as any)?.created_by;
+        if (userId) {
+          try {
+            await supabase.rpc("increment_balance", {
+              p_user_id: userId,
+              p_amount: refundCredits,
+            });
+            refundedFlag = true;
+          } catch (e) {
+            console.warn(
+              `[lipsync-watchdog] scene=${d.id} audio_mux refund failed: ${(e as Error).message}`,
+            );
+          }
+        }
+      }
+      // Flip the pending video_renders row for this render_id to failed so
+      // downstream analytics / status pages reflect reality.
+      const muxRenderId = ds?.audio_mux?.render_id;
+      if (muxRenderId) {
+        await supabase
+          .from("video_renders")
+          .update({
+            status: "failed",
+            error_message: "watchdog_audio_mux_stall: no webhook after 6min",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("render_id", muxRenderId)
+          .in("status", ["pending", "rendering"]);
+      }
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "audio_mux_failed",
+          clip_error: "watchdog_audio_mux_stall: no webhook after 6min",
+          dialog_shots: {
+            ...(ds as any),
+            status: "failed",
+            error: "watchdog_audio_mux_stall",
+            refunded: refundedFlag,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", d.id);
+      console.log(
+        `[lipsync-watchdog] scene=${d.id} audio_mux_stall killed after ${Math.round(muxAge / 1000)}s (refunded=${refundedFlag})`,
+      );
+      failed.push({ scene_id: d.id, reason: "audio_mux_stall" });
+      return;
+    }
 
     const orphanedPendingNoClip =
       d.lip_sync_status === "pending" &&
