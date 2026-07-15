@@ -99,6 +99,22 @@ export default function MusicStudio() {
     if (generated) setLyrics(generated);
   };
 
+  const handleResetProject = () => {
+    const hasContent = prompt.trim() || lyrics.trim() || lastTrack;
+    if (hasContent && !window.confirm('Neues Projekt starten? Alle aktuellen Eingaben (Prompt, Lyrics, Track-Preview) werden zurückgesetzt.')) {
+      return;
+    }
+    setPrompt('');
+    setLyrics('');
+    setGenre('any');
+    setMood('uplifting');
+    setBpm(undefined);
+    setMusicalKey('');
+    setInstrumental(true);
+    setLoop(false);
+    setLastTrack(null);
+  };
+
   return (
     <>
       <Helmet>
