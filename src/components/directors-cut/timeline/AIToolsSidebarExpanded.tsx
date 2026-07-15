@@ -13,7 +13,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { MusicLibraryBrowser, type LibraryTrack } from '@/components/video-composer/MusicLibraryBrowser';
+import MusicLibraryBrowser, { type LibraryTrack } from '@/components/video-composer/MusicLibraryBrowser';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 
