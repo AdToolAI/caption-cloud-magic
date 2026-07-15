@@ -236,7 +236,7 @@ export default function MusicStudio() {
                       id="prompt"
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      placeholder={tier === 'vocal'
+                      placeholder={engine.vocals
                         ? "z.B. Upbeat indie pop song about late-night freedom and city lights"
                         : "z.B. Epic cinematic build-up with deep bass and ethereal strings"}
                       className="min-h-[100px] bg-background/40 border-primary/20 focus:border-primary/60"
