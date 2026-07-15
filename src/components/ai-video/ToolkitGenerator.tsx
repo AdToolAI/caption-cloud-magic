@@ -22,6 +22,7 @@ import {
 
 import { ModelSelector } from './ModelSelector';
 import AIVideoCostConfirmDialog, { type AIVideoCostConfirmPayload } from './AIVideoCostConfirmDialog';
+import { FounderPriorityChip } from '@/components/render/FounderPriorityChip';
 import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import {
   ToolkitCastWorldPicker,
@@ -1562,6 +1563,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <><Sparkles className="h-4 w-4 mr-2" /> {language === 'de' ? 'Video generieren' : 'Generate video'}</>
           )}
         </Button>
+      </div>
+
+      <div className="flex justify-end -mt-1">
+        <FounderPriorityChip />
       </div>
 
       {lastAnchorComposed && (

@@ -25,6 +25,7 @@ import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurcha
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
 import { AIVideoDisclaimer } from '@/components/ai-video/AIVideoDisclaimer';
 import { FirstVideoGuide } from '@/components/ai-video/FirstVideoGuide';
+import { SystemLoadPill } from '@/components/render/SystemLoadPill';
 
 const particles = [
   { x: '10%', y: '20%', size: 4, delay: 0,    dur: 6 },
@@ -158,13 +159,16 @@ export default function AIVideoToolkit() {
               </h1>
               <p className="text-muted-foreground mt-1 text-sm md:text-base">{subtitle}</p>
             </div>
-            <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-card/60 backdrop-blur-sm border border-border">
-              <CreditCard className="w-4 h-4 text-primary" />
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('aiVid.yourBalance')}</p>
-                <p className="text-sm font-bold">
-                  {walletLoading ? '...' : formatPrice(wallet?.balance_euros || 0, currency)}
-                </p>
+            <div className="hidden md:flex items-center gap-3">
+              <SystemLoadPill />
+              <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-card/60 backdrop-blur-sm border border-border">
+                <CreditCard className="w-4 h-4 text-primary" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('aiVid.yourBalance')}</p>
+                  <p className="text-sm font-bold">
+                    {walletLoading ? '...' : formatPrice(wallet?.balance_euros || 0, currency)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

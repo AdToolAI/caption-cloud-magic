@@ -38,6 +38,8 @@ import type {
   MotionStudioLocation,
   SceneSnippet,
 } from '@/types/motion-studio';
+import { SystemLoadPill } from '@/components/render/SystemLoadPill';
+import { FounderPriorityChip } from '@/components/render/FounderPriorityChip';
 
 type StepId = 'cast' | 'location' | 'storyboard' | 'render';
 
@@ -291,10 +293,13 @@ export default function StudioMode() {
                   Hub
                 </Link>
               </Button>
-              <Badge variant="outline" className="gap-1.5">
-                <Wand2 className="h-3 w-3 text-primary" />
-                Studio Mode · Geführter Flow
-              </Badge>
+              <div className="flex items-center gap-2">
+                <SystemLoadPill className="hidden sm:inline-flex" />
+                <Badge variant="outline" className="gap-1.5">
+                  <Wand2 className="h-3 w-3 text-primary" />
+                  Studio Mode · Geführter Flow
+                </Badge>
+              </div>
             </div>
 
             <Stepper currentIndex={stepIndex} onJump={(i) => setStep(STEPS[i].id)} />
@@ -369,18 +374,21 @@ export default function StudioMode() {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button
-                onClick={launchInComposer}
-                disabled={creating}
-                className="gap-2 bg-gradient-to-r from-primary to-accent"
-              >
-                {creating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                In Composer öffnen
-              </Button>
+              <div className="flex items-center gap-3">
+                <FounderPriorityChip />
+                <Button
+                  onClick={launchInComposer}
+                  disabled={creating}
+                  className="gap-2 bg-gradient-to-r from-primary to-accent"
+                >
+                  {creating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  In Composer öffnen
+                </Button>
+              </div>
             )}
           </div>
         </footer>
