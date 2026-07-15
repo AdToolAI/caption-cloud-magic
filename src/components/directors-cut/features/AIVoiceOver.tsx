@@ -265,17 +265,30 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <Label>Sprache & Stimme</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCloneDialogOpen(true)}
-                className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
-                title="Eigene Stimme klonen (3+ Audio-Samples)"
-              >
-                <Plus className="h-3 w-3" />
-                Eigene Stimme klonen
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLibraryOpen(true)}
+                  className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                  title="Vollständige Voice-Bibliothek (Suche, Filter, Native-Only)"
+                >
+                  <Library className="h-3 w-3" />
+                  Bibliothek
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCloneDialogOpen(true)}
+                  className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                  title="Eigene Stimme klonen (3+ Audio-Samples)"
+                >
+                  <Plus className="h-3 w-3" />
+                  Klonen
+                </Button>
+              </div>
             </div>
             <Tabs value={selectedLanguageTab} onValueChange={(v) => setSelectedLanguageTab(v as 'de' | 'en' | 'es')}>
               <TabsList className="grid w-full grid-cols-3">
