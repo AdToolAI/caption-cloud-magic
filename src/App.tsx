@@ -14,6 +14,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 
 import { Header } from "@/components/Header";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { Loader2 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
