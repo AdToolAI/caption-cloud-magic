@@ -102,11 +102,9 @@ function sceneUsesLipsync(scene: ComposerScene): boolean {
 }
 
 function passesForScene(scene: ComposerScene): number {
-  // One pass per dialog turn; default 1 for single-speaker scenes.
-  const turns = (scene as any).dialogVoices
-    ? Object.keys((scene as any).dialogVoices).length
-    : 1;
-  return Math.max(1, turns);
+  // One pass per distinct speaker (dedup'd by characterId, see
+  // countSceneSpeakers). Fallback 1 for single-speaker scenes.
+  return countSceneSpeakers(scene);
 }
 
 export function estimateSceneRenderCost(
