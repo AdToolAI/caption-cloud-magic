@@ -399,6 +399,7 @@ const AppContent = () => {
                 <CommandPalette />
                 <AICompanionWidget />
                 <ConciergeTipHost />
+                <ConciergeIntroScreen />
                 <UpgradeMount />
                 <EmailVerificationGate>
                   <AppLayout />
