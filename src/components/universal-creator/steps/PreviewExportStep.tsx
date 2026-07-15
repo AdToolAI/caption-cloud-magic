@@ -320,7 +320,7 @@ export function PreviewExportStep({
           toast.warning(admission.message, { duration: 8000 });
           setRenderJobs(prev =>
             prev.map(j =>
-              j.id === job.id ? { ...j, status: 'queued', progress: 0, error: admission.message } : j,
+              j.id === job.id ? { ...j, status: 'pending', progress: 0, error: admission.message } : j,
             ),
           );
           return;
@@ -338,7 +338,7 @@ export function PreviewExportStep({
           toast.warning(admission.message, { duration: 8000 });
           setRenderJobs(prev =>
             prev.map(j =>
-              j.id === job.id ? { ...j, status: 'queued', progress: 0, error: admission.message } : j,
+              j.id === job.id ? { ...j, status: 'pending', progress: 0, error: admission.message } : j,
             ),
           );
           return;
