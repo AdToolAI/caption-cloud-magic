@@ -18,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { describeRenderAdmissionError, tryParseAdmissionFromInvokeError } from '@/lib/render/admission';
+import { useEnqueuedRender } from '@/hooks/useEnqueuedRender';
+import { RenderSlotWaitingBadge } from '@/components/render/RenderSlotWaitingBadge';
 import { clampAudioVolume } from '@/lib/audioVolume';
 import { DEFAULT_SUBTITLE_STYLE, DEFAULT_VOICEOVER_VOLUME, computeTotalDurationSeconds, computeDurationInFrames } from '@/lib/universalCreatorDefaults';
 import { buildUniversalCreatorCustomizations, validateScenes } from '@/lib/universalCreatorRenderPayload';
@@ -70,6 +72,7 @@ export function PreviewExportStep({
   const [reservationId, setReservationId] = useState<string | null>(null);
   
   const { balance } = useCredits();
+  const { invoke: invokeWithQueue, waiting: slotWaiting } = useEnqueuedRender({ maxRetries: 6 });
   const { reserve, commit, refund } = useCreditReservation();
   
   const qualityMultiplier = videoQuality === '4k' ? 2 : 1;
@@ -300,18 +303,16 @@ export function PreviewExportStep({
     );
 
     try {
-      const { data, error } = await supabase.functions.invoke('render-with-remotion', {
-        body: {
-          project_id: projectId,
-          component_name: 'UniversalCreatorVideo',
-          quality: videoQuality,
-          customizations: {
-            ...sharedCustomizations,
-            voiceoverDuration: calculatedDuration,
-          },
-          format: 'mp4',
-          aspect_ratio: job.format.aspectRatio,
+      const { data, error } = await invokeWithQueue<any>('render-with-remotion', {
+        project_id: projectId,
+        component_name: 'UniversalCreatorVideo',
+        quality: videoQuality,
+        customizations: {
+          ...sharedCustomizations,
+          voiceoverDuration: calculatedDuration,
         },
+        format: 'mp4',
+        aspect_ratio: job.format.aspectRatio,
       });
 
       if (error) {
@@ -718,6 +719,12 @@ export function PreviewExportStep({
           )}
         </Button>
       </div>
+
+      {slotWaiting && (
+        <div className="flex justify-center">
+          <RenderSlotWaitingBadge waiting={slotWaiting} />
+        </div>
+      )}
 
       {/* Render Progress */}
       {renderJobs.length > 0 && (

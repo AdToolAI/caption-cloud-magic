@@ -24,6 +24,8 @@ import {
 import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { describeRenderAdmissionError, tryParseAdmissionFromInvokeError } from '@/lib/render/admission';
+import { useEnqueuedRender } from '@/hooks/useEnqueuedRender';
+import { RenderSlotWaitingBadge } from '@/components/render/RenderSlotWaitingBadge';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
@@ -135,6 +137,7 @@ export function ExportRenderStep({
   const [renderComplete, setRenderComplete] = useState(false);
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
   const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
+  const { invoke: invokeWithQueue, waiting: slotWaiting } = useEnqueuedRender({ maxRetries: 6 });
 
   const selectedQuality = QUALITY_OPTIONS.find(q => q.value === exportSettings.quality);
 
@@ -388,8 +391,7 @@ export function ExportRenderStep({
           })),
         }));
 
-      const { data, error } = await supabase.functions.invoke('render-directors-cut', {
-        body: {
+      const { data, error } = await invokeWithQueue<any>('render-directors-cut', {
           source_video_url: videoUrl,
           effects: effectsWithFilter,
           audio_settings: {
@@ -461,8 +463,7 @@ export function ExportRenderStep({
             offsetY: subtitleSafeZone.offsetY,
             bottomBandPercent: subtitleSafeZone.bottomBandPercent,
           } : undefined,
-        },
-      });
+        });
 
       if (error) {
         const admission = await tryParseAdmissionFromInvokeError(error);
@@ -856,10 +857,15 @@ export function ExportRenderStep({
                 </div>
               ) : isRendering ? (
                 <div className="space-y-4">
+                  {slotWaiting && (
+                    <div className="flex justify-center">
+                      <RenderSlotWaitingBadge waiting={slotWaiting} />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Rendering...
+                      {slotWaiting ? 'Warte auf Slot…' : 'Rendering...'}
                     </span>
                     <span>{Math.round(renderProgress)}%</span>
                   </div>
