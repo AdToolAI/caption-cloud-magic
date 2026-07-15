@@ -17,6 +17,7 @@ import {
 import { AudioClip } from '@/types/timeline';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import MusicLibraryBrowser, { type LibraryTrack } from '@/components/video-composer/MusicLibraryBrowser';
 
 interface AIToolsSidebarProps {
   onAddVoiceover: (clip: Omit<AudioClip, 'id' | 'trackId'>) => AudioClip;
@@ -36,12 +37,6 @@ const VOICE_OPTIONS = [
 ];
 
 // Sample music library (Jamendo would be integrated here)
-const SAMPLE_MUSIC = [
-  { id: '1', name: 'Upbeat Corporate', duration: 120, genre: 'Corporate', bpm: 120 },
-  { id: '2', name: 'Chill Ambient', duration: 180, genre: 'Ambient', bpm: 80 },
-  { id: '3', name: 'Epic Cinematic', duration: 90, genre: 'Cinematic', bpm: 100 },
-  { id: '4', name: 'Happy Acoustic', duration: 150, genre: 'Acoustic', bpm: 110 },
-];
 
 // Sound effect categories
 const SFX_CATEGORIES = [
@@ -68,8 +63,8 @@ export function AIToolsSidebar({
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
   
   // Music state
-  const [musicSearch, setMusicSearch] = useState('');
-  const [selectedGenre, setSelectedGenre] = useState<string>('all');
+  const [musicBrowserOpen, setMusicBrowserOpen] = useState(false);
+  
   
   // SFX state
   const [selectedSfxCategory, setSelectedSfxCategory] = useState('transitions');
@@ -132,25 +127,24 @@ export function AIToolsSidebar({
     }
   };
 
-  // Add music to timeline
-  const handleAddMusic = (music: typeof SAMPLE_MUSIC[0]) => {
-    // In production, this would fetch from Jamendo API
-    const clip = onAddMusic({
-      name: music.name,
-      url: '', // Would be actual URL
-      startTime: 0, // Music typically starts at beginning
-      duration: Math.min(music.duration, videoDuration),
+  // Add music to timeline from real Library
+  const handleSelectLibraryTrack = (track: LibraryTrack) => {
+    onAddMusic({
+      name: track.title,
+      url: track.url,
+      startTime: 0,
+      duration: Math.min(track.duration, videoDuration || track.duration),
       trimStart: 0,
       trimEnd: 0,
-      volume: 70, // Lower default volume for background music
+      volume: 70,
       fadeIn: 2,
       fadeOut: 2,
       source: 'library',
     });
-    
+    setMusicBrowserOpen(false);
     toast({
       title: 'Musik hinzugefügt',
-      description: `"${music.name}" wurde zur Timeline hinzugefügt`,
+      description: `"${track.title}" wurde zur Timeline hinzugefügt`,
     });
   };
 
@@ -317,63 +311,23 @@ export function AIToolsSidebar({
           
           {/* Music Tab */}
           <TabsContent value="music" className="p-4 space-y-4 mt-0">
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={musicSearch}
-                  onChange={(e) => setMusicSearch(e.target.value)}
-                  placeholder="Musik suchen..."
-                  className="pl-9 h-9 text-sm"
-                />
-              </div>
-              
-              <div className="flex flex-wrap gap-1">
-                {['all', 'Corporate', 'Ambient', 'Cinematic', 'Acoustic'].map(genre => (
-                  <Badge
-                    key={genre}
-                    variant={selectedGenre === genre ? 'default' : 'outline'}
-                    className="cursor-pointer text-xs"
-                    onClick={() => setSelectedGenre(genre)}
-                  >
-                    {genre === 'all' ? 'Alle' : genre}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              {SAMPLE_MUSIC
-                .filter(m => selectedGenre === 'all' || m.genre === selectedGenre)
-                .filter(m => !musicSearch || m.name.toLowerCase().includes(musicSearch.toLowerCase()))
-                .map(music => (
-                  <motion.div
-                    key={music.id}
-                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
-                    whileHover={{ scale: 1.02 }}
-                    onClick={() => handleAddMusic(music)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{music.name}</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{music.genre}</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {Math.floor(music.duration / 60)}:{(music.duration % 60).toString().padStart(2, '0')}
-                          </span>
-                          <span>•</span>
-                          <span>{music.bpm} BPM</span>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Music className="h-4 w-4 text-primary" />
+                  Music Library
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Jamendo, Pixabay, Uploads & KI-generierte Tracks.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full gap-2" onClick={() => setMusicBrowserOpen(true)}>
+                  <Search className="h-4 w-4" />
+                  Bibliothek durchsuchen
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
           
           {/* Sound Effects Tab */}
@@ -505,6 +459,14 @@ export function AIToolsSidebar({
           </TabsContent>
         </ScrollArea>
       </Tabs>
+
+      <MusicLibraryBrowser
+        open={musicBrowserOpen}
+        onOpenChange={setMusicBrowserOpen}
+        initialType="music"
+        allowedTypes={['music', 'sfx']}
+        onSelect={handleSelectLibraryTrack}
+      />
     </div>
   );
 }

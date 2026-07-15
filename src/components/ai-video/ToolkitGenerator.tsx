@@ -1470,6 +1470,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                               </SelectContent>
                             </Select>
                           </div>
+                          {(() => {
+                            const ch = libCharacters.find((c) => c.id === row.characterId);
+                            if (ch?.voice_id) {
+                              return (
+                                <p className="text-[10px] text-muted-foreground italic">
+                                  {language === 'de'
+                                    ? `Hinweis: Cast-Stimme hinterlegt — wird in Motion Studio / Voiceover verwendet. Kling Omni nutzt hier eigene Presets.`
+                                    : `Note: Cast voice saved — used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`}
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
                           <Textarea
                             value={row.line}
                             onChange={(e) => updateRow(idx, { line: e.target.value.slice(0, 300) })}

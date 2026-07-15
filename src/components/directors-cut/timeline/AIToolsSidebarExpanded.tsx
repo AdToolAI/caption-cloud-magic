@@ -13,6 +13,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import MusicLibraryBrowser, { type LibraryTrack } from '@/components/video-composer/MusicLibraryBrowser';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 
@@ -26,13 +27,6 @@ interface AIToolsSidebarExpandedProps {
   onExport?: () => void;
 }
 
-const SAMPLE_MUSIC = [
-  { id: 'm1', name: 'Epic Cinematic', duration: 120, genre: 'Cinematic' },
-  { id: 'm2', name: 'Upbeat Pop', duration: 90, genre: 'Pop' },
-  { id: 'm3', name: 'Ambient Chill', duration: 180, genre: 'Ambient' },
-  { id: 'm4', name: 'Corporate Motivation', duration: 150, genre: 'Corporate' },
-  { id: 'm5', name: 'Electronic Energy', duration: 100, genre: 'Electronic' },
-];
 
 const SAMPLE_SFX = [
   { id: 's1', name: 'Whoosh', duration: 1, category: 'Transition' },
@@ -65,6 +59,27 @@ export function AIToolsSidebarExpanded({
   const [voiceText, setVoiceText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState('sarah');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [musicBrowserOpen, setMusicBrowserOpen] = useState(false);
+
+  const handleSelectLibraryMusic = (track: LibraryTrack) => {
+    const newClip: AudioClip = {
+      id: `music-${Date.now()}`,
+      trackId: 'track-music',
+      name: track.title,
+      url: track.url,
+      startTime: currentTime,
+      duration: track.duration,
+      trimStart: 0,
+      trimEnd: track.duration,
+      volume: 70,
+      fadeIn: 2,
+      fadeOut: 3,
+      source: 'library',
+      color: '#10b981',
+    };
+    onAddAudioClip('track-music', newClip);
+    setMusicBrowserOpen(false);
+  };
 
   const handleGenerateVoice = async () => {
     if (!voiceText.trim()) return;
@@ -93,24 +108,6 @@ export function AIToolsSidebarExpanded({
     }, 2000);
   };
 
-  const handleAddMusic = (music: typeof SAMPLE_MUSIC[0]) => {
-    const newClip: AudioClip = {
-      id: `music-${Date.now()}`,
-      trackId: 'track-music',
-      name: music.name,
-      url: '',
-      startTime: currentTime,
-      duration: music.duration,
-      trimStart: 0,
-      trimEnd: music.duration,
-      volume: 70,
-      fadeIn: 2,
-      fadeOut: 3,
-      source: 'library',
-      color: '#10b981',
-    };
-    onAddAudioClip('track-music', newClip);
-  };
 
   const handleAddSFX = (sfx: typeof SAMPLE_SFX[0]) => {
     const newClip: AudioClip = {
@@ -258,35 +255,35 @@ export function AIToolsSidebarExpanded({
 
           {/* Music Tab */}
           <TabsContent value="music" className="m-0 space-y-3">
-            <Input placeholder="Musik suchen..." className="text-sm" />
-            
-            <div className="space-y-2">
-              {SAMPLE_MUSIC.map(music => (
-                <motion.div
-                  key={music.id}
-                  className="p-2 rounded-lg border bg-card/50 hover:bg-card cursor-pointer group"
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => handleAddMusic(music)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{music.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {music.genre} • {Math.floor(music.duration / 60)}:{(music.duration % 60).toString().padStart(2, '0')}
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
+            <div className="rounded-lg border bg-card/50 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Music className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Music Library</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Durchsuche die volle Bibliothek (Jamendo, Pixabay, deine Uploads & KI-generierte Tracks).
+              </p>
+              <Button size="sm" className="w-full gap-2" onClick={() => setMusicBrowserOpen(true)}>
+                <Music className="h-4 w-4" />
+                Bibliothek öffnen
+              </Button>
             </div>
 
-            <Button variant="outline" size="sm" className="w-full gap-2">
-              <Upload className="h-4 w-4" />
-              Musik hochladen
-            </Button>
+            <div className="pt-2 border-t space-y-2">
+              <Label className="text-xs">Zuletzt hinzugefügt</Label>
+              {audioTracks
+                .find((t) => t.id === 'track-music')
+                ?.clips?.slice(-3)
+                .reverse()
+                .map((clip) => (
+                  <div key={clip.id} className="p-2 rounded-lg border bg-card/50 text-xs">
+                    <div className="font-medium truncate">{clip.name}</div>
+                    <div className="text-muted-foreground">
+                      {Math.floor(clip.duration / 60)}:{Math.floor(clip.duration % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                )) ?? <p className="text-xs text-muted-foreground italic">Noch keine Musik hinzugefügt.</p>}
+            </div>
           </TabsContent>
 
           {/* SFX Tab */}
@@ -481,6 +478,14 @@ export function AIToolsSidebarExpanded({
           Video exportieren
         </Button>
       </div>
+
+      <MusicLibraryBrowser
+        open={musicBrowserOpen}
+        onOpenChange={setMusicBrowserOpen}
+        initialType="music"
+        allowedTypes={['music', 'sfx']}
+        onSelect={handleSelectLibraryMusic}
+      />
     </div>
   );
 }

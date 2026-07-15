@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
+import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 import type { Scene } from '@/types/scene';
@@ -47,6 +48,7 @@ interface Voice {
 export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: ContentVoiceStepProps) => {
   const { toast } = useToast();
   const { t, language } = useTranslation();
+  const { voices: customVoices } = useCustomVoices();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
@@ -242,21 +244,42 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                   <Select
                     value={voiceConfig.voiceId}
                     onValueChange={(voiceId) => {
+                      const custom = customVoices.find((c) => c.elevenlabs_voice_id === voiceId);
                       const voice = filteredVoices.find((v) => v.id === voiceId);
                       const newCfg = {
                         ...voiceConfig,
                         voiceId,
-                        voiceName: voice?.name || 'Voice',
+                        voiceName: custom?.name || voice?.name || 'Voice',
                         modelId: voice?.recommended_model || voiceConfig.modelId,
                         stability: voice?.recommended_settings?.stability ?? voiceConfig.stability,
                         similarityBoost: voice?.recommended_settings?.similarity_boost ?? voiceConfig.similarityBoost,
                       };
                       setVoiceConfig(newCfg);
                     }}
-                    disabled={loadingVoices || filteredVoices.length === 0}
+                    disabled={loadingVoices || (filteredVoices.length === 0 && customVoices.length === 0)}
                   >
                     <SelectTrigger className="flex-1"><SelectValue placeholder={loadingVoices ? t('uc.loadingVoices') : t('uc.chooseAVoice')} /></SelectTrigger>
                     <SelectContent>
+                      {customVoices.filter((c) => c.is_active && c.elevenlabs_voice_id).length > 0 && (
+                        <>
+                          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {language === 'de' ? 'Meine Stimmen' : 'My Voices'}
+                          </div>
+                          {customVoices
+                            .filter((c) => c.is_active && c.elevenlabs_voice_id)
+                            .map((c) => (
+                              <SelectItem key={c.id} value={c.elevenlabs_voice_id!}>
+                                <span className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
+                                    {language === 'de' ? 'Eigene' : 'Custom'}
+                                  </Badge>
+                                  <span>{c.name}</span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          <div className="my-1 h-px bg-border" />
+                        </>
+                      )}
                       {filteredVoices.map((voice) => (
                         <SelectItem key={voice.id} value={voice.id}>
                           <span className="flex items-center gap-2">

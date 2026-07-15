@@ -1,48 +1,77 @@
-## Music Studio Pricing — Minimal-Anpassung (nur Stable Audio + ElevenLabs)
+## Ziel
 
-Bestehende Marge bei **MiniMax Music 1.5 (0.30 €)** und **Google Lyria 3 Pro (0.42 €)** bleibt unverändert — beide sind komfortabel profitabel (~10× bzw. ~5.7×).
+Music Studio (`universal_audio_assets` + Stock) und Voice Library (`useCustomVoices` → `user_voices`) so verdrahten, dass **jede** Kreativ-Oberfläche denselben Datenstand sieht — keine Sample-Libraries, keine hardcoded ElevenLabs-Presets, keine Duplikate.
 
-Angepasst werden nur die zwei defizitären Engines:
+## Ist-Zustand (Audit)
 
-| Engine | Preis alt | Kosten worst-case | **Preis neu** | Marge neu | Modell |
-|---|---|---|---|---|---|
-| Stable Audio 2.5 | 0.15 € (Verlust) | ~0.184 €/Track | **0.55 €** flat | ~3.0× | flat / Track |
-| ElevenLabs Music v2 | 0.36 € flat (Verlust) | ~0.0076 €/s | **0.023 €/s** | ~3.0× | **per-second** |
-| MiniMax 1.5 | 0.30 € | 0.028 € | **0.30 €** (unverändert) | ~10.7× | flat |
-| Lyria 3 Pro | 0.42 € | 0.074 € | **0.42 €** (unverändert) | ~5.7× | flat |
+**Voice Library (`useCustomVoices` / user_voices):**
+| Studio | Voice Library eingebunden? |
+|---|---|
+| Cast & World | ✅ `AvatarVoicePicker` |
+| Motion Studio | ✅ `VoicePicker` |
+| Video Composer / TalkingHead | ✅ `TalkingHeadDialog`, `SceneDialogStudio` |
+| Universal Content Creator (Step: Voiceover) | ❌ nur `list-voices` (ElevenLabs-Presets) |
+| AI Video Studio (Kling Omni Panel) | ❌ nur 5 hardcoded `voicePreset` Werte (`neutral` etc.) |
+| Director's Cut (Timeline) | ❌ kein Voice-Picker für VO-Clips |
 
-ElevenLabs muss zwingend auf per-second wechseln, weil Replicate genau so abrechnet (60 s ≈ 1.38 €, 300 s ≈ 6.90 €) — bei Flatprice wäre jeder 5-Min-Song ein 6-€-Verlust.
+**Music Library (`universal_audio_assets` type='music' + Stock via `MusicLibraryBrowser`):**
+| Studio | Library eingebunden? |
+|---|---|
+| Video Composer / AudioTab | ✅ `MusicLibraryBrowser` |
+| Universal Content Creator | ✅ `AudioAssetSelector` |
+| Director's Cut (AIToolsSidebar + FloatingAIPanel) | ❌ hardcoded `SAMPLE_MUSIC` + eigene Search-UI |
+| Motion Studio | ❌ kein Music-Selector |
+| AI Video Studio | ❌ kein Music-Selector (Nutzer muss zu Motion Studio wechseln) |
 
-## Änderungen
+## Umsetzungsplan — 2 Phasen
 
-1. **`src/lib/music/engineCatalog.ts`**
-   - Neues Feld `pricingModel: 'flat' | 'per-second'` (default `flat`).
-   - Neues Feld `priceEurPerSecond` (optional, nur ElevenLabs).
-   - `stable-audio-25.priceEur`: `0.15` → **`0.55`**.
-   - `elevenlabs-music-v2`: `pricingModel: 'per-second'`, `priceEurPerSecond: 0.023`, `priceEur` bleibt als „Referenz @ 60 s" = `1.38`.
-   - MiniMax + Lyria: unverändert.
+### Phase 1 — Voice Library überall (Priorität A)
 
-2. **`src/hooks/useMusicGeneration.ts` / `MUSIC_TIER_PRICING`**
-   - Helper `computeMusicPrice(engine, durationSec)`: `per-second → priceEurPerSecond × duration`, sonst `priceEur`.
-   - Preisberechnung im UI-State über diesen Helper.
+1. **Universal Content Creator → `ContentVoiceStep.tsx`**
+   - Neben `list-voices` zusätzlich `useCustomVoices()` laden.
+   - Gruppierte Select-Optionen: „⭐ Meine geklonten Stimmen" (aktive `user_voices` mit `elevenlabs_voice_id`) → dann „ElevenLabs Premium" → dann restliche.
+   - Bei Auswahl einer Custom Voice: `voiceId` = `elevenlabs_voice_id`, `voiceName` = `name`. `generate-voiceover` läuft unverändert (nimmt beliebige EL Voice-ID).
 
-3. **`src/components/music-studio/ProviderSelector.tsx`**
-   - Badge dynamisch:
-     - flat → `€X.XX • ≤Ys` (wie heute)
-     - per-second → `€0.023/s • ≤300s`
-   - Nur ElevenLabs-Karte bekommt die Variante.
+2. **AI Video Studio → `ToolkitGenerator.tsx` (Kling Omni Cast Panel)**
+   - `voicePreset` (Enum `neutral|warm|energetic|deep|bright`) erweitern zu einer **Voice-Source**-Struktur:
+     - Preset (bisher) **oder** Custom-Voice-ID aus `useCustomVoices()`.
+   - UI: bestehendes `<Select>` bekommt Sektionen „Presets" + „Meine Stimmen".
+   - Wenn Charakter ein `default_voice_id` hat, wird diese automatisch vorselektiert (heute im Code schon vorbereitet, aber nicht ausgewertet).
+   - Payload an `generate-kling-video`: neues optionales Feld `voice_id` pro Speaker; Preset bleibt Fallback. (Edge Function nimmt es aktuell noch nicht — separate Anpassung darin.)
 
-4. **`src/pages/MusicStudio.tsx`**
-   - Live-Kostenpreview an der Duration/Lyrics-Steuerung: „Kosten dieser Generierung: ~X.XX €".
+3. **Director's Cut → Timeline VO-Regeneration**
+   - Bestehendes VO-Clip-Kontextmenü um „Stimme wechseln / VO neu rendern" ergänzen mit `useCustomVoices()` + Presets.
+   - Kein neuer Timeline-Track — nur Regenerate-Button.
 
-5. **`supabase/functions/generate-music-track/index.ts`**
-   - Abbuchung analog Helper: `charge = pricingModel === 'per-second' ? priceEurPerSecond × requestedSeconds : priceEur`.
-   - Idempotenter Refund-Pfad bleibt unverändert; `charge` wandert 1:1 durch Wallet-Transaktion.
+### Phase 2 — Music Library überall (Priorität B)
+
+4. **Director's Cut → `AIToolsSidebar.tsx` + `AIToolsSidebarExpanded.tsx` + `FloatingAIPanel.tsx`**
+   - `SAMPLE_MUSIC` und eigene Search-UI komplett entfernen.
+   - Stattdessen `<MusicLibraryBrowser>` als Dialog öffnen → Auswahl produziert einen Audio-Clip auf `track-music` (bestehender `handleAddMusic`-Kontrakt bleibt, nur die Quelle wechselt).
+
+5. **Motion Studio + AI Video Studio → optionale Background-Music**
+   - Kleiner „🎵 Musik hinzufügen"-Button, öffnet denselben `MusicLibraryBrowser`.
+   - Motion Studio: schreibt `backgroundMusicUrl` in den Render-Payload (`compose-video-clips` / Motion Composer supportet das bereits über `background_music_url`).
+   - AI Video Studio: als Post-Render-Overlay — der ausgewählte Track wird auf das gerenderte Video-Asset gemerged (neuer Edge-Function-Call `mix-audio-track` — dünner Wrapper um bestehende ducking-Pipeline). Alternativ: nur Metadaten speichern, Mixing beim Übergang in Director's Cut.
+
+## Vereinheitlichte Datenkontrakte
+
+- **Voice-Ref** (überall): `{ source: 'preset' | 'custom' | 'elevenlabs', id: string, name?: string }`.
+- **Music-Ref** (überall): `LibraryTrack` (bereits Standard im Video Composer) — kein neuer Typ nötig.
+- `MusicLibraryBrowser` wird aus `src/components/video-composer/` nach `src/components/media/MusicLibraryBrowser.tsx` verschoben (Re-Export aus dem alten Pfad, damit nichts bricht).
 
 ## Nicht enthalten
 
-- Keine Änderungen an MiniMax- oder Lyria-Preisen.
-- Keine Änderungen an anderen Studios, am Video-Katalog oder an History-Einträgen (Alt-Runs behalten ihren damals gebuchten Preis).
-- Kein UI-Rebrand — nur Preis- und Anzeigelogik.
+- Keine Änderungen an den Music-/Voice-Preisen oder am Generierungs-Flow selbst.
+- Kein neues UI für Voice-Cloning oder Music-Generierung — die bleiben in Voice Studio / Music Studio.
+- Keine Timeline-Refactorings im Director's Cut außer dem Music-Source-Swap.
 
-Wenn okay, setze ich exakt so um.
+## Rückfrage
+
+Der Umfang ist real — Phase 1 ist ~4 Files, Phase 2 sind ~6 Files + eventuell ein neuer Edge-Function-Wrapper. Wie soll ich vorgehen?
+
+**A) Beide Phasen komplett** (Voice + Music überall, größerer Wurf, empfohlen für „professionelle Verdrahtung").
+**B) Erst Phase 1 (Voice)** — ausliefern & testen, dann Phase 2.
+**C) Nur bestimmte Studios** — sag mir, welche zuerst, dann gehe ich chirurgisch vor.
+
+Und beim AI Video Studio Music (Punkt 5): soll die Musik direkt auf das gerenderte Video gemischt werden, oder reicht Metadaten-Übergabe an Motion Studio / Director's Cut für den finalen Mix?
