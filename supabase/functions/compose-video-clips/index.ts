@@ -981,19 +981,63 @@ serve(async (req) => {
       const castShots = (scene.characterShots ?? []).filter(
         (s) => s && s.shotType !== "absent" && s.characterId,
       );
-      const speakerNames = speakerSlugs
-        .map((slug) => resolveSpeakerToShot(slug, castShots))
-        .map((shot) => (shot ? charById.get(shot.characterId)?.name : null))
-        .filter(
-          (name): name is string => typeof name === "string" && name.length > 0,
+      // v246 — Cast-Union: build the visible-cast union (speakers first, then
+      // remaining non-absent cast). Prevents silent cast members from being
+      // dropped out of the master prompt (collapsing "Exactly 4 people" to
+      // "Exactly 1 person" when only one character has dialog lines).
+      // Dedup strictly by characterId; name-fallback only when no id resolves.
+      const unionIds: string[] = [];
+      const unionNames: string[] = [];
+      const seenId = new Set<string>();
+      const seenNameKey = new Set<string>();
+      const pushMember = (characterId: string | undefined, name: string | undefined) => {
+        const nm = (name || "").trim();
+        const nameKey = nm.toLowerCase();
+        if (characterId) {
+          if (seenId.has(characterId)) return;
+          seenId.add(characterId);
+        } else if (nameKey) {
+          if (seenNameKey.has(nameKey)) return;
+          seenNameKey.add(nameKey);
+        } else {
+          return;
+        }
+        if (nm) {
+          unionNames.push(nm);
+          if (nameKey) seenNameKey.add(nameKey);
+        }
+        if (characterId) unionIds.push(characterId);
+      };
+      // 1) Speakers from the script (in first-appearance order)
+      for (const slug of speakerSlugs) {
+        const shot = resolveSpeakerToShot(slug, castShots);
+        const cid = shot?.characterId;
+        const nm = cid ? charById.get(cid)?.name : undefined;
+        pushMember(cid, nm || slug);
+      }
+      // 2) Remaining non-absent cast members
+      for (const shot of castShots) {
+        const cid = shot.characterId;
+        const nm = charById.get(cid)?.name;
+        pushMember(cid, nm);
+      }
+      const unionCount = Math.max(unionIds.length, unionNames.length);
+      // Guard — if union collapses to empty, fall back to old speaker-only path
+      const useUnion = unionCount > 0;
+      const promptNames = useUnion ? unionNames : [];
+      const promptCount = useUnion ? unionCount : speakerSlugs.length;
+      try {
+        console.log(
+          `[compose-video-clips] v246_cast_union_prompt scene=${scene.id ?? "?"} speakers=${speakerSlugs.length} cast=${castShots.length} union=${unionCount} ids=${JSON.stringify(unionIds.slice(0, 8))}`,
         );
+      } catch (_) { /* noop */ }
       // v172 — N=1 now also gets the frontal/lip-ready wrapper (was only
       // applied for N≥2 before). `neutralTwoShotPrompt` has a built-in n===1
       // branch that forces "front, three-quarter or natural profile angle …
       // mouth and jaw remain clearly visible and unobstructed".
       const neutralPlate = neutralTwoShotPrompt(
-        speakerNames,
-        speakerSlugs.length,
+        promptNames,
+        promptCount,
       );
       const sceneDescription =
         cleanedVisualPrompt || "modern cinematic interior scene";
@@ -1031,7 +1075,7 @@ serve(async (req) => {
       // re-add a camera-only lock (no zoom, no push-in, no dolly, no pan,
       // no tilt, no reframing) while still allowing natural body / gesture
       // / facial-performance motion driven by the scene description.
-      if (speakerSlugs.length === 1) {
+      if (promptCount === 1) {
         // v175 (Jun 30 2026) — Closed-mouth N=1 plate. v167 had asked for
         // "small, continuous idle mouth and jaw motion" on the plate so
         // sync-3 had something to drive. Combined with v169-Overlay-Mode
