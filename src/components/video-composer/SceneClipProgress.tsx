@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import RerollVariantGrid from './RerollVariantGrid';
 import LeadInTrimSheet from './LeadInTrimSheet';
 import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
+import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
@@ -46,6 +47,12 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const [trimOpen, setTrimOpen] = useState(false);
   const variantCount = (scene.seedVariations ?? []).length;
   const variantsGenerating = (scene.seedVariations ?? []).some((v) => v?.status === 'generating');
+
+  // v248 — Sample mouth-band motion on each completed lipsync pass to
+  // detect silent Sync.so outputs (motion-noops). Server flags the pass
+  // with motion_noop=true when yavg is below threshold; the retry
+  // orchestration in compose-dialog-segments consumes that flag.
+  useMouthYavgProbe(scene);
 
   // Phase 5.5 — Auto-detect lead-in freeze ONCE per clipUrl, only for i2v
   // providers that haven't been trimmed yet (clip_lead_in_trim_seconds === 0).
