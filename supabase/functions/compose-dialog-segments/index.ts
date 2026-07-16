@@ -4963,6 +4963,7 @@ serve(async (req) => {
             srcHeight: plateDims.height,
             coords: [Number(pass.coords[0]), Number(pass.coords[1])],
             bbox: platePassBoxForPreclip,
+            mouth: speakerPlateMouths?.[pass.speaker_idx] ?? null,
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
