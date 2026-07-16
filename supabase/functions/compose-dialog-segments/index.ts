@@ -7411,6 +7411,7 @@ serve(async (req) => {
                       srcHeight: plateDims.height,
                       coords: [Number(wp.coords[0]), Number(wp.coords[1])],
                       bbox: wpPlateBox,
+                      mouth: speakerPlateMouths?.[wp.speaker_idx] ?? null,
                       siblingCoords: wpSiblings.length > 0 ? wpSiblings : null,
                       startSec: wpUnionStart,
                       endSec: wpUnionEnd,
