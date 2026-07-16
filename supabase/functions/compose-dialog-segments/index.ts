@@ -4995,8 +4995,17 @@ serve(async (req) => {
             (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
           );
           (pass as any).preclip_error = null;
+          // v247 — mouth-anchor observability, flowed into syncso_dispatch_log via meta.
+          (pass as any).preclip_anchor = preclipResult.anchor ?? null;
+          (pass as any).preclip_face_share = Number.isFinite(Number(preclipResult.faceShareInCrop))
+            ? Number(preclipResult.faceShareInCrop)
+            : null;
+          (pass as any).preclip_mouth_offset_px = Number.isFinite(Number(preclipResult.mouthOffsetPx))
+            ? Number(preclipResult.mouthOffsetPx)
+            : null;
+          (pass as any).preclip_clamped = !!preclipResult.clamped;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px}`,
           );
 
         } else {

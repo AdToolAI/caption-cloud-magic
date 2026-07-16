@@ -981,6 +981,12 @@ export interface SyncDispatchLogRow {
   error_class?: string | null;
   error_message?: string | null;
   meta?: Record<string, unknown> | null;
+  // v247 — face-anchor + noop observability
+  face_share_in_preclip?: number | null;
+  mouth_center_offset_px?: number | null;
+  noop_mouth_yavg?: number | null;
+  detector_used?: string | null;
+  retry_count?: number | null;
 }
 
 /** Best-effort fire-and-forget log. Never throws. */
