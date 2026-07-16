@@ -14317,16 +14317,21 @@ export type Database = {
           audio_url: string | null
           coords: Json | null
           created_at: string
+          detector_used: string | null
           engine: string
           error_class: string | null
           error_message: string | null
+          face_share_in_preclip: number | null
           frame_number: number | null
           http_status: number | null
           id: string
           job_id: string | null
           meta: Json | null
           mode: string | null
+          mouth_center_offset_px: number | null
+          noop_mouth_yavg: number | null
           preflight_repairs: Json | null
+          retry_count: number
           scene_id: string | null
           sync_source_kind: string | null
           sync_status: string | null
@@ -14350,16 +14355,21 @@ export type Database = {
           audio_url?: string | null
           coords?: Json | null
           created_at?: string
+          detector_used?: string | null
           engine: string
           error_class?: string | null
           error_message?: string | null
+          face_share_in_preclip?: number | null
           frame_number?: number | null
           http_status?: number | null
           id?: string
           job_id?: string | null
           meta?: Json | null
           mode?: string | null
+          mouth_center_offset_px?: number | null
+          noop_mouth_yavg?: number | null
           preflight_repairs?: Json | null
+          retry_count?: number
           scene_id?: string | null
           sync_source_kind?: string | null
           sync_status?: string | null
@@ -14383,16 +14393,21 @@ export type Database = {
           audio_url?: string | null
           coords?: Json | null
           created_at?: string
+          detector_used?: string | null
           engine?: string
           error_class?: string | null
           error_message?: string | null
+          face_share_in_preclip?: number | null
           frame_number?: number | null
           http_status?: number | null
           id?: string
           job_id?: string | null
           meta?: Json | null
           mode?: string | null
+          mouth_center_offset_px?: number | null
+          noop_mouth_yavg?: number | null
           preflight_repairs?: Json | null
+          retry_count?: number
           scene_id?: string | null
           sync_source_kind?: string | null
           sync_status?: string | null
