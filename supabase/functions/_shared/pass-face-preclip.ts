@@ -35,6 +35,7 @@
 import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
+import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
 
 export interface PassPreclipInput {
   sceneId: string;
@@ -66,6 +67,12 @@ export interface PassPreclipInput {
    * to source bounds; never includes a neighbor's coordinate.
    */
   cropExpansionFactor?: number;
+  /** v247 — precise mouth-center landmark [x, y] in source-master pixel
+   *  space (AWS Rekognition mouthLeft/Right midpoint). When present we
+   *  center the crop on the mouth instead of the face-bbox center and
+   *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
+   *  computeFaceCrop path when unset. */
+  mouth?: [number, number] | null;
 }
 
 export interface PassPreclipResult {
@@ -75,13 +82,16 @@ export interface PassPreclipResult {
   crop?: FaceCropRegion;
   /** Window passed to Lambda (preclip plays t=0 → endSec-startSec). */
   durationSec?: number;
-  /** v163 — actual fps the preclip was rendered at. Required by callers
-   *  building Sync.so `bounding_boxes_url` JSON: the array length MUST
-   *  match the dispatched video's real frame count, NOT the legacy 24fps
-   *  plate assumption. Mismatch → opaque `generation_unknown_error`. */
   fps?: number;
-  /** v163 — exact Remotion render frame count (`durationInFrames`). */
   frameCount?: number;
+  /** v247 — anchor used ("mouth" | "face_center"). */
+  anchor?: "mouth" | "face_center";
+  /** v247 — face bbox area / crop area after clamping (0..1). */
+  faceShareInCrop?: number;
+  /** v247 — distance (px) between mouth and crop center. */
+  mouthOffsetPx?: number;
+  /** v247 — true when clamping forced the crop off the ideal anchor. */
+  clamped?: boolean;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
@@ -126,6 +136,7 @@ export async function renderPassFacePreclip(
     startSec,
     endSec,
     cropExpansionFactor,
+    mouth,
   } = input;
 
   if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
@@ -141,7 +152,62 @@ export async function renderPassFacePreclip(
 
   const sW = evenDimension(srcWidth, 1280);
   const sH = evenDimension(srcHeight, 720);
-  const crop0 = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
+
+  // v247 — mouth-anchor crop when we have both a mouth landmark and a
+  // face bbox. Guarantees faceShareInCrop ≥ ~42% so Sync.so cannot no-op
+  // on tiny/far faces. Falls back to legacy face-center crop otherwise.
+  const useMouthAnchor =
+    Array.isArray(mouth) &&
+    mouth.length === 2 &&
+    Number.isFinite(Number(mouth[0])) &&
+    Number.isFinite(Number(mouth[1])) &&
+    Array.isArray(bbox) &&
+    bbox.length === 4 &&
+    bbox.every((n) => Number.isFinite(Number(n)));
+
+  let crop0Size: number;
+  let crop0X: number;
+  let crop0Y: number;
+  let anchor: "mouth" | "face_center" = "face_center";
+  let faceShareInCrop = 0;
+  let mouthOffsetPx = 0;
+  let clampedAnchor = false;
+
+  if (useMouthAnchor) {
+    const r = computeMouthCenteredCrop({
+      face: {
+        bbox: [
+          Math.round(Number((bbox as number[])[0])),
+          Math.round(Number((bbox as number[])[1])),
+          Math.round(Number((bbox as number[])[2])),
+          Math.round(Number((bbox as number[])[3])),
+        ],
+        center: [Math.round(Number(coords[0])), Math.round(Number(coords[1]))],
+        mouth: [Math.round(Number((mouth as number[])[0])), Math.round(Number((mouth as number[])[1]))],
+      },
+      plateWidth: sW,
+      plateHeight: sH,
+      targetFaceShare: 0.42,
+      minSize: 128,
+      outputSize: 720,
+    });
+    crop0X = r.crop.x;
+    crop0Y = r.crop.y;
+    crop0Size = r.crop.size;
+    anchor = r.anchor;
+    faceShareInCrop = r.faceShareInCrop;
+    mouthOffsetPx = r.mouthOffsetPx;
+    clampedAnchor = r.clamped;
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
+    );
+  } else {
+    const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
+    crop0X = cf.x;
+    crop0Y = cf.y;
+    crop0Size = cf.size;
+  }
+  const crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
 
   // v116 (Fix B) — expand the crop on repair retries. We multiply `size`
   // around the same center coords and re-clamp to source bounds. This is
@@ -221,6 +287,10 @@ export async function renderPassFacePreclip(
         durationSec: dur,
         fps: FPS,
         frameCount: durationInFrames,
+        anchor,
+        faceShareInCrop,
+        mouthOffsetPx,
+        clamped: clampedAnchor,
       };
     }
   } catch (reuseErr) {
@@ -385,6 +455,10 @@ export async function renderPassFacePreclip(
         durationSec: dur,
         fps: FPS,
         frameCount: durationInFrames,
+        anchor,
+        faceShareInCrop,
+        mouthOffsetPx,
+        clamped: clampedAnchor,
       };
     }
     if (status === "failed") {

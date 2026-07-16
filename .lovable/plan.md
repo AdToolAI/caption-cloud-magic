@@ -1,83 +1,67 @@
 
-# Plan v247+v248 — Reliable Lip-Sync at Scale (AWS Rekognition + Re-Zoom + NoOp-Retry)
+## Kontext (Slice 1 ist grün)
 
-## Ziel
-Sync-Ausfälle wie in Szene `72b7bba5` (Face nur 104×108 px im 1284×718 Plate → Sync.so no-op) systematisch verhindern. Pipeline muss 1000e Renders/Tag mit variablen Kompositionen (Weitwinkel, Seitenprofile, Mehrpersonen) sauber verarbeiten.
+- `src/lib/composer/computeMouthCenteredCrop.ts` + 12 Unit-Tests ✅ (12/12 grün, verifiziert).
+- `_shared/face-detect-mediapipe.ts` liest bereits AWS Rekognition-Landmarks (`mouthLeft/Right/Up/Down`) und leitet `mouth` = Corner-Midpoint ab ✅.
+- Migration hat `face_share_in_preclip`, `mouth_center_offset_px`, `noop_mouth_yavg`, `detector_used`, `retry_count` auf `syncso_dispatch_log` ✅.
+- Preclip-Generator = `_shared/pass-face-preclip.ts` → nutzt heute `computeFaceCrop(coords, bbox, …)` (face-bbox-center, KEINE Mouth-Anchor).
+- Webhook = `sync-so-webhook/index.ts` hat bereits eine `noopSuspect`-Ladder (Zeilen 604–740) mit `NOOP_LADDER` — dort dockt YAVG als zusätzliches Signal an, **ohne** die bestehende Ladder umzubauen.
 
-## Root-Cause Recap
-- MediaPipe liefert nur BBox, kein Mouth-Landmark → Crop wird auf Face-Center gerechnet, nicht auf Mouth-Center.
-- Bei kleinem Face-Share (<0.35 im Preclip) fehlt Sync.so Auflösung im Mundbereich → status=done, aber 0 Pixel-Delta.
-- Kein Post-Dispatch Verify → stille Fehler erreichen den Nutzer.
+## Ziel Slice 2
 
-## Lösungsarchitektur (Defense-in-Depth, 3 Stufen)
+Mouth-Anchor-Crop live schalten und Post-Dispatch-Beweis erbringen (YAVG < 2.0 = Sync.so no-op). Nichts an der v242 Assignment-Lock- oder v246 Cast-Union-Logik anfassen.
 
-### Stufe 1 — AWS Rekognition als Primär-Detektor (v248-Kern)
-- **Neue Edge Function** `aws-rekognition-face-detect` (Deno + AWS SDK v3):
-  - Input: `plate_url`, `frame_timestamps[]` (0.5s, 25%, 50%, 90%)
-  - Output: Pro Frame `{ boundingBox, landmarks: { mouthLeft, mouthRight, mouthUp, mouthDown, nose, eyeLeft, eyeRight }, confidence, pose }`
-  - Nutzt `DetectFaces` mit `Attributes=['ALL']` für Landmarks
-- **Region**: `eu-central-1` (Frankfurt, DSGVO-konform, niedrigste Latenz zu Lambda-Pool)
-- **Rate-Limit-Handling**: AWS default 50 TPS → interner Token-Bucket + exponential backoff; bei >40 TPS Warteschlange über `plate_face_detection_queue` Tabelle
-- **Fallback-Kaskade**: AWS (primär) → MediaPipe (bestehend) → manueller Retry-Log
-- **Kosten**: ~$0.001 pro Bild × 3 Frames = $0.003/Szene → in `videoPricingCatalog` als Overhead deklariert (bereits in 3× Marge gedeckt)
+## Änderungen (klein, additiv)
 
-### Stufe 2 — Mouth-Centered Re-Zoom Preclip (v247 + AWS)
-Ersetzt aktuelle Face-Center-Crop-Logik in `plate-face-detect.ts` / `compose-dialog-segments`:
-- Neue Utility `src/lib/composer/computeMouthCenteredCrop.ts`:
-  - Input: AWS Landmarks + Plate-Dimensionen + Ziel-Face-Share (default 0.42)
-  - Berechnet Crop-Zentrum aus `(mouthLeft + mouthRight) / 2`, nicht Face-Center
-  - Berechnet Crop-Größe damit Face-BBox ≥ 42% der Preclip-Fläche einnimmt
-  - Clampt an Plate-Ränder ohne Face abzuschneiden (Priorität: Mund > Nase > Augen)
-- **Speaker-Rechts-Szenario funktioniert weiter**: Center folgt Mund-Punkt, nicht Plate-Mitte.
-- **Multi-Speaker (2×2 / Row)**: Row-Major-Sort aus v242 bleibt bestehen; pro Speaker eigener mouth-centered Crop.
+### 1. Neuer Shared-Helper für Deno
+`supabase/functions/_shared/compute-mouth-centered-crop.ts` — 1:1-Deno-Port der Node-Utility (pure fn, keine Imports). Getrennte Datei, damit `src/lib` weiter im Client-Bundle bleibt und die Edge-Function-Bundler keine `src/`-Pfade auflösen müssen.
 
-### Stufe 3 — Post-Dispatch Verify + Auto-Retry/Refund
-In `sync-so-webhook/index.ts`:
-- Mouth-Band ffprobe-Probe (bestehende `noop_mouth_yavg` Idee):
-  - Extrahiere 4 Frames aus Sync-Output, ffmpeg-crop auf Mouth-BBox (aus AWS-Landmarks), YAVG-Diff berechnen
-  - Schwellwert: YAVG-Delta < 2.0 → **no-op detected**
-- Auto-Retry-Policy (max 1 Retry pro Speaker/Szene):
-  - Retry mit +25% Zoom auf Mouth-Center
-  - Falls Retry auch <2.0 → automatischer Credit-Refund via bestehendem `lipsync_refund_ledger` + Fehler-Chip "no_op_after_retry"
-- Idempotenz: `dispatch_id` als Refund-Key (verhindert Doppel-Refund)
+### 2. `pass-face-preclip.ts` erweitern
+- Neuer optionaler Input: `mouth?: [number, number]`, `faceBbox?: [number,number,number,number]`.
+- Wenn `mouth` gesetzt → `computeMouthCenteredCrop({face:{bbox, center: coords, mouth}, plateWidth: sW, plateHeight: sH, targetFaceShare: 0.42, outputSize: nativeOut})` verwenden.
+- Fallback: bestehender `computeFaceCrop`-Pfad bleibt unverändert (kein Regression-Risk, wenn Landmarks fehlen).
+- Rückgabe zusätzlich: `faceShareInCrop`, `mouthOffsetPx`, `anchor`, `clamped` (weiterreichen zum Caller).
 
-### Stufe 4 — Observability + Skalierung
-- **DB-Erweiterung** `syncso_dispatch_log`:
-  - `face_share_in_preclip numeric`
-  - `mouth_center_offset_px numeric`
-  - `noop_mouth_yavg numeric`
-  - `detector_used text` ('aws' | 'mediapipe' | 'both')
-  - `retry_count int default 0`
-- **Admin-Cockpit** (`/admin/lipsync-health`):
-  - Live-KPIs: Detection-Success-Rate, NoOp-Rate, Auto-Refund-Rate, AWS-Latency P50/P95
-  - Alarm bei NoOp-Rate >2% über 15min-Fenster
-- **Load-Test-Skript**: 200 parallele Preclip-Detections gegen AWS + Fallback (verifiziert 1000/Tag Kapazität mit Spitzen 60/min)
+### 3. `compose-dialog-segments/index.ts` — 2 Call-Sites
+An beiden `renderPassFacePreclip(...)`-Aufrufen (Zeilen ~4232 und ~4951) den Mouth-Landmark aus `matchedFace.mouth`/`landmarks.mouth` mitgeben (kommt bereits aus `face-detect-mediapipe.ts`). Ergebnisfelder auf `pass` mitschreiben: `preclip_face_share`, `preclip_mouth_offset_px`, `preclip_anchor`.
+Log-Marker: `v247_mouth_anchor_preclip`.
 
-## Sicherheiten für Skalierung (1000+ Renders/Tag)
-- AWS Rekognition SLA: 99.9% verfügbar; unser Fallback auf MediaPipe deckt die 0.1%.
-- Token-Bucket + Queue verhindert TPS-Limits bei Peak-Traffic.
-- Refund-Automatik schützt Nutzer bei stillen Fehlern → keine Support-Eskalation nötig.
-- Detector-Kaskade (aws → mediapipe → manuell) heißt: kein einzelner Ausfallpunkt.
+### 4. `syncso_dispatch_log`-Insert erweitern
+Beim Dispatch (bereits vorhandener Insert im gleichen Modul) `face_share_in_preclip`, `mouth_center_offset_px`, `detector_used` mitschreiben. Keine neuen Inserts, nur Felder erweitern.
 
-## Rollout
-1. **AWS-Secrets anfordern** (`AWS_REKOGNITION_ACCESS_KEY_ID`, `AWS_REKOGNITION_SECRET_ACCESS_KEY`, `AWS_REKOGNITION_REGION=eu-central-1`) via `add_secret`.
-2. Edge Function `aws-rekognition-face-detect` + Utility `computeMouthCenteredCrop.ts` bauen, Unit-Tests (12 Fälle: klein/groß/seitlich/multi/edge).
-3. `plate-face-detect.ts` und `compose-dialog-segments` auf AWS-primär umstellen, MediaPipe als Fallback.
-4. `sync-so-webhook` um Mouth-Band-YAVG + Auto-Retry erweitern.
-5. Migration für `syncso_dispatch_log` Spalten + Admin-Cockpit Widget.
-6. Kontrollierter Re-Test: Szenen `72b7bba5` und `39a75cb6` — beide müssen "success + non-zero YAVG" liefern.
-7. Shadow-Mode 24h (AWS läuft parallel, aber nur logging), dann Cutover.
+### 5. YAVG-Probe in `sync-so-webhook/index.ts`
+- Neuer Helper `probeMouthBandYavg(outputUrl, cropRegion)` — ruft `chigozienri/ffmpeg-extract-frame` via Replicate für 3 Frames (25% / 50% / 75% der Dauer), rechnet auf einer 20%-hohen Mund-Band-ROI die Y-Varianz, gibt `delta = max(YAVG) − min(YAVG)` zurück. Timeouts: `withTimeout` 25s, best-effort.
+- Nur laufen wenn: `status==="COMPLETED"` **und** Pass hat `preclip_crop` **und** noch nicht durch die vorhandene `syncOutputUnchanged`-Detection als NOOP erkannt.
+- `delta < 2.0` → `noopSuspect = true` mit `noopReason = "yavg_below_threshold"`. Läuft danach durch die **bestehende** NOOP-Ladder — kein Fork, kein neuer State.
+- Wert wird in `syncso_dispatch_log.noop_mouth_yavg` geschrieben (Observability, auch bei Erfolg).
+
+### 6. Refund-Anschluss
+Kein neuer Refund-Pfad. Die vorhandene `sync_noop_unrecoverable`-Route (webhook Zeile ~724) übernimmt automatisch die Rückerstattung über den bestehenden Credit-Refund-Automation-Weg (siehe `mem://architecture/failure-credit-refund-automation`).
+
+## Nicht-Ziele Slice 2
+
+- Kein Admin-Cockpit-Dashboard (`/admin/lipsync-health`) — kommt in Slice 3.
+- Kein Auto-Retry-Ladder-Umbau — nutzt bestehende `NOOP_LADDER`.
+- Kein Kling/Hailuo-spezifisches Verhalten.
+
+## Verifikation
+
+- Unit-Tests bleiben 12/12 grün.
+- Neuer Deno-Test `supabase/functions/_shared/compute-mouth-centered-crop.test.ts` (2 Sanity-Cases) via `supabase--test_edge_functions`.
+- Manueller Re-Render der Referenz-Szene aus dem letzten Ticket → erwartet: `preclip_anchor=mouth`, `face_share_in_preclip ≥ 0.35`, Sync.so animiert alle 4 Sprecher.
+- Log-Grep: `v247_mouth_anchor_preclip` muss in `edge_function_logs` erscheinen.
 
 ## Technische Details
-- **AWS SDK**: `npm:@aws-sdk/client-rekognition@3` in Deno Edge Function.
-- **Frame-Extraktion für Detection**: bestehende `extractPlateFrames.ts` liefert 4 Timestamps → Buffer → base64 an Rekognition.
-- **Landmark-Konsolidierung**: pro Speaker Median über 3 Frames (Robustheit gegen Blinks/Motion-Blur).
-- **Character-Assignment-Lock (v242)** bleibt aktiv — AWS-Detektion ersetzt nur die Face→Crop-Berechnung, nicht die ID-Zuordnung.
-- **Keine Änderungen** an: v169 Parallel-Fanout, v242 Row-Major-Sort, v246 Cast-Union-Prompt, HappyHorse/Hailuo Routing.
 
-## Nicht Teil dieses Plans (bewusst außen vor)
-- Sync.so Modell-Upgrade (separate Entscheidung)
-- Wechsel des Video-Providers
-- UI-Redesign der Lip-Sync-Karten
+```text
+Frame → face-detect (AWS primary, MediaPipe fallback)
+      → landmarks {bbox, center, mouth}
+      → renderPassFacePreclip(mouth) → computeMouthCenteredCrop
+      → preclip_url + preclip_crop{x,y,size,outputSize=720}
+      → dispatch Sync.so (auto_detect:true, single face)
+      → webhook COMPLETED → probeMouthBandYavg
+        - delta ≥ 2.0 → OK
+        - delta < 2.0 → NOOP-ladder (bestehend) → retry oder refund
+```
 
-Nach Approval starte ich mit Stufe 1 (AWS-Secret-Request + Edge Function) und liefere danach Shadow-Mode-Logs bevor der Cutover erfolgt.
+Nach Approval baue ich Punkte 1–6 in **einem** Build-Turn.
