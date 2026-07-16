@@ -48,6 +48,12 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const variantCount = (scene.seedVariations ?? []).length;
   const variantsGenerating = (scene.seedVariations ?? []).some((v) => v?.status === 'generating');
 
+  // v248 — Sample mouth-band motion on each completed lipsync pass to
+  // detect silent Sync.so outputs (motion-noops). Server flags the pass
+  // with motion_noop=true when yavg is below threshold; the retry
+  // orchestration in compose-dialog-segments consumes that flag.
+  useMouthYavgProbe(scene);
+
   // Phase 5.5 — Auto-detect lead-in freeze ONCE per clipUrl, only for i2v
   // providers that haven't been trimmed yet (clip_lead_in_trim_seconds === 0).
   // The compose-video-clips function seeds a heuristic default; we only run
