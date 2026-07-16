@@ -67,6 +67,12 @@ export interface PassPreclipInput {
    * to source bounds; never includes a neighbor's coordinate.
    */
   cropExpansionFactor?: number;
+  /** v247 — precise mouth-center landmark [x, y] in source-master pixel
+   *  space (AWS Rekognition mouthLeft/Right midpoint). When present we
+   *  center the crop on the mouth instead of the face-bbox center and
+   *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
+   *  computeFaceCrop path when unset. */
+  mouth?: [number, number] | null;
 }
 
 export interface PassPreclipResult {
