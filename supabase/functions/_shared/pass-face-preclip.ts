@@ -455,6 +455,10 @@ export async function renderPassFacePreclip(
         durationSec: dur,
         fps: FPS,
         frameCount: durationInFrames,
+        anchor,
+        faceShareInCrop,
+        mouthOffsetPx,
+        clamped: clampedAnchor,
       };
     }
     if (status === "failed") {
