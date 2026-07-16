@@ -237,10 +237,17 @@ async function callRekognition(
         if (l.Type === "eyeLeft") lm.leftEye = px;
         else if (l.Type === "eyeRight") lm.rightEye = px;
         else if (l.Type === "nose") lm.nose = px;
-        else if (l.Type === "mouthLeft" || l.Type === "mouthDown" || l.Type === "mouthRight") {
-          // Use any mouth landmark as a coarse mouth anchor.
-          lm.mouth ||= px;
-        }
+        else if (l.Type === "mouthLeft") { lm.mouthLeft = px; lm.mouth ||= px; }
+        else if (l.Type === "mouthRight") { lm.mouthRight = px; lm.mouth ||= px; }
+        else if (l.Type === "mouthUp") { lm.mouthUp = px; lm.mouth ||= px; }
+        else if (l.Type === "mouthDown") { lm.mouthDown = px; lm.mouth ||= px; }
+      }
+      // v247 — derive precise mouth-center from corners when both present.
+      if (lm.mouthLeft && lm.mouthRight) {
+        lm.mouth = [
+          Math.round((lm.mouthLeft[0] + lm.mouthRight[0]) / 2),
+          Math.round((lm.mouthLeft[1] + lm.mouthRight[1]) / 2),
+        ];
       }
     }
 
