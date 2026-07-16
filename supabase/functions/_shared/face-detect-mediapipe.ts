@@ -51,7 +51,13 @@ export interface MediaPipeFace {
     leftEye?: [number, number];
     rightEye?: [number, number];
     nose?: [number, number];
+    /** Legacy coarse mouth anchor (first mouth landmark seen). */
     mouth?: [number, number];
+    /** v247 — separate mouth corners for mouth-centered crop. */
+    mouthLeft?: [number, number];
+    mouthRight?: [number, number];
+    mouthUp?: [number, number];
+    mouthDown?: [number, number];
   };
   /** Which frame index this detection came from. */
   frameSeen: number;
