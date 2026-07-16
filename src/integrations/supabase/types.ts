@@ -14327,6 +14327,7 @@ export type Database = {
           id: string
           job_id: string | null
           meta: Json | null
+          meta_yavg_probe: Json | null
           mode: string | null
           mouth_center_offset_px: number | null
           noop_mouth_yavg: number | null
@@ -14365,6 +14366,7 @@ export type Database = {
           id?: string
           job_id?: string | null
           meta?: Json | null
+          meta_yavg_probe?: Json | null
           mode?: string | null
           mouth_center_offset_px?: number | null
           noop_mouth_yavg?: number | null
@@ -14403,6 +14405,7 @@ export type Database = {
           id?: string
           job_id?: string | null
           meta?: Json | null
+          meta_yavg_probe?: Json | null
           mode?: string | null
           mouth_center_offset_px?: number | null
           noop_mouth_yavg?: number | null
