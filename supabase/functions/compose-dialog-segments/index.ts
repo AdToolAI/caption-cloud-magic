@@ -4243,6 +4243,7 @@ serve(async (req) => {
                     srcHeight: plateDims.height,
                     coords: [Number(bp.coords[0]), Number(bp.coords[1])],
                     bbox: speakerPlateBboxes?.[bp.speaker_idx] ?? null,
+                    mouth: speakerPlateMouths?.[bp.speaker_idx] ?? null,
                     siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
                     startSec: unionStart,
                     endSec: unionEnd,
