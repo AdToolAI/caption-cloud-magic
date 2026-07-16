@@ -82,13 +82,16 @@ export interface PassPreclipResult {
   crop?: FaceCropRegion;
   /** Window passed to Lambda (preclip plays t=0 → endSec-startSec). */
   durationSec?: number;
-  /** v163 — actual fps the preclip was rendered at. Required by callers
-   *  building Sync.so `bounding_boxes_url` JSON: the array length MUST
-   *  match the dispatched video's real frame count, NOT the legacy 24fps
-   *  plate assumption. Mismatch → opaque `generation_unknown_error`. */
   fps?: number;
-  /** v163 — exact Remotion render frame count (`durationInFrames`). */
   frameCount?: number;
+  /** v247 — anchor used ("mouth" | "face_center"). */
+  anchor?: "mouth" | "face_center";
+  /** v247 — face bbox area / crop area after clamping (0..1). */
+  faceShareInCrop?: number;
+  /** v247 — distance (px) between mouth and crop center. */
+  mouthOffsetPx?: number;
+  /** v247 — true when clamping forced the crop off the ideal anchor. */
+  clamped?: boolean;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
