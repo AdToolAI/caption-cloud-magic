@@ -1075,7 +1075,7 @@ serve(async (req) => {
       // re-add a camera-only lock (no zoom, no push-in, no dolly, no pan,
       // no tilt, no reframing) while still allowing natural body / gesture
       // / facial-performance motion driven by the scene description.
-      if (speakerSlugs.length === 1) {
+      if (promptCount === 1) {
         // v175 (Jun 30 2026) — Closed-mouth N=1 plate. v167 had asked for
         // "small, continuous idle mouth and jaw motion" on the plate so
         // sync-3 had something to drive. Combined with v169-Overlay-Mode
