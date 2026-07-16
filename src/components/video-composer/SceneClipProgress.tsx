@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import RerollVariantGrid from './RerollVariantGrid';
 import LeadInTrimSheet from './LeadInTrimSheet';
 import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
+import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
