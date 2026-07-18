@@ -1,64 +1,60 @@
-## Bug: Drehbuch verschwindet während des Tippens
+## Was der Log tatsächlich zeigt (verifiziert in `syncso_dispatch_log`)
 
-### Root Cause (bestätigt in `SceneDialogStudio.tsx:568-583`)
+Für die letzten 4 Szenen (heute 14:30 und davor) ist das Muster identisch:
 
-Der Sync-Effekt hat zwei Design-Fehler, die zusammen den User-Text löschen:
+- `engine = "sync-segments"` (auch bei 1 Sprecher — Toggle-Pfad geht immer über `compose-dialog-segments`, das ist so gewollt).
+- Jede Szene: erst `FACE_GATE_PROBE_UNAVAILABLE` / `face_probe_unavailable`, dann `DISPATCHED` mit HTTP 201.
+- **`face_share_in_preclip`, `mouth_center_offset_px`, `noop_mouth_yavg`, `detector_used`, `retry_count` sind für ALLE Zeilen NULL.**
 
-```ts
-// Zeile 571-573
-const localMatchesPersisted =
-  script === (scene.dialogScript ?? '') || script === '';
-if (sceneChanged || localMatchesPersisted) {
-  setScript(cleanedScript);   // ← überschreibt User-Eingabe
-  ...
-}
-```
+Damit ist klar, dass Lip-Sync zwar dispatcht wird, aber der v247/v248-Pfad, den wir letzte Runde gebaut haben, in der Praxis nicht scharf ist.
 
-**Problem 1 — `script === ''` als "Match" behandelt:**
-Sobald der User das Feld leert (Strg+A, Backspace) und dann tippt, gilt der Zwischenzustand `''` als "local matches persisted". Feuert der Effekt jetzt (weil `canonicalDialogTurns` sich referenziell ändert), wird `setScript(cleanedScript)` mit dem aus `dialogTurns` rekonstruierten Skript aufgerufen → das gerade Getippte ist weg.
+## Diagnose — drei Bugs, die zusammen "kein Lip-Sync" erzeugen
 
-**Problem 2 — `canonicalDialogTurns` in Deps ohne Ref-Stabilität:**
-Der Effekt hängt an `canonicalDialogTurns`. Wenn dieses Array bei jedem Render neu berechnet wird (Zeile 794 `Array.from(byId.values())`), feuert der Sync-Effekt in Schleife. Kombiniert mit dem Debounce (500 ms, Zeile 602), der `scene.dialogScript` asynchron zurückpropagiert, entsteht ein Fenster, in dem `cleanedScript` (aus alten Turns) neuer erscheint als `script`.
+### 1. v247 Preclip-Metriken werden nicht persistiert (Hauptursache)
+`compose-dialog-segments/index.ts:4998-5008` schreibt `preclip_anchor`, `preclip_face_share`, `preclip_mouth_offset_px` auf das lokale `pass`-Objekt und loggt sie nur nach stdout. Kein einziger `logSyncDispatch({...})`-Call reicht diese Felder als `face_share_in_preclip` / `mouth_center_offset_px` / `detector_used` weiter. Der Logger akzeptiert sie (`_shared/syncso-preflight.ts:985-989`), aber niemand füllt sie.
 
-**Problem 3 — `displayScriptFromScene()` fällt bei leerem Skript auf `dialogTurnsToScript()` zurück:**
-Löscht der User bewusst und tippt neu, ist der erste Buchstabe (`'I'`) noch nicht persistiert. `scene.dialogScript` ist `''`, `cleanedScript` liefert stattdessen das alte Dialog-Turns-Skript → Überschreibung.
+Folge: v248-Slice-4-Ladder in `report-lipsync-motion-probe` kann nicht sehen, ob der Preclip Face-Share ≥ 0.42 hatte, entscheidet blind, und der Coord-Pro-Box-Retry feuert bei kleinen Gesichtern nicht.
 
-### Fix
+### 2. Face-Gate-Probe ist strukturell offline (`FACE_GATE_PROBE_UNAVAILABLE` in 100% der Dispatches)
+Der v130-Face-Gate liefert konsistent `probe_unavailable`. `compose-dialog-segments:6428` lässt Dispatch trotzdem durch ("non-blocking signal"), womit die Coord-Snap-Sicherung nie greift. Ursache muss ich in der Slice-Untersuchung noch nachfassen (Gemini-Frame-Extract 5xx vs. Rekognition-Key vs. `probeEndpoint`-URL) — Datenpunkt: `raw_reply` / `http_status` in `meta.face_gate` der letzten Fehler.
 
-Der Sync-Effekt darf ausschließlich bei echten externen Änderungen laufen — nicht mehr bei jedem Turn-Ref-Wechsel und nicht mehr, wenn der lokale Puffer leer ist.
+### 3. Client-Yavg-Probe hat keine Preclip-Signale, mit denen sie eskalieren könnte
+`useMouthYavgProbe` läuft in `SceneClipProgress`, aber weil (1) NULL bleibt, kann `report-lipsync-motion-probe` seine Rungs nicht sauber staffeln — jeder Fall sieht gleich aus.
 
-**1. Typing-Guard verschärfen (`SceneDialogStudio.tsx`, ~Z. 567-583)**
+## Plan v249 — Slice A/B/C
 
-- `localMatchesPersisted` neu definieren als *nur* `script === (scene.dialogScript ?? '')` — kein `script === ''`-Zweig mehr. Ein leerer lokaler Puffer ist eine bewusste User-Aktion, kein Freibrief zum Überschreiben.
-- Ein `isUserTypingRef = useRef(false)` einführen; im `onChange` des Textareas (Z. 1993) auf `true` setzen und via `setTimeout` (~1500 ms nach letztem Keystroke) wieder auf `false`. Solange `isUserTypingRef.current === true` gilt: **kein** `setScript()` aus dem Sync-Effekt, egal was extern kommt.
-- `sceneChanged` bleibt die einzige Bedingung, die die Typing-Guard aushebelt (Scene-Wechsel = User verlässt die Szene, Puffer muss neu geladen werden).
+### Slice A — Preclip-Metriken durchreichen (fixt Hauptursache)
+1. In `supabase/functions/compose-dialog-segments/index.ts` bei jedem `logSyncDispatch({...})`, der nach dem Preclip-Render steht (Dispatched, Coord-Snap, Face-Gate-Probe-Unavailable, Preflight-Blocked, Sync.so-Error), zusätzlich folgende Top-Level-Felder mitgeben:
+   - `face_share_in_preclip: (pass as any).preclip_face_share ?? null`
+   - `mouth_center_offset_px: (pass as any).preclip_mouth_offset_px ?? null`
+   - `detector_used: (pass as any).preclip_anchor ?? null` (Werte: `mouth-centered` | `face-fallback` | `plate-fallback`)
+   - `retry_count: currentAttempt ?? 0`
+2. Marker `v249_preclip_metrics_persisted` im `meta` des jeweiligen Dispatch-Rows.
+3. Test: nach nächstem Cinematic-Sync-Pass müssen die vier Spalten in `syncso_dispatch_log` gefüllt sein.
 
-**2. Deps stabilisieren**
+### Slice B — Face-Gate-Probe-Diagnose (nicht blind fixen)
+1. Query auf `syncso_dispatch_log.meta->face_gate` der letzten 20 `FACE_GATE_PROBE_UNAVAILABLE`-Zeilen: `raw_reply`, `raw_error`, `http_status`.
+2. Danach entscheiden:
+   - Wenn `http_status = 429` oder `5xx` → nichts patchen, Retry-Ladder greift bereits.
+   - Wenn `raw_error` ein fehlender Endpoint/Key ist → gezielt reparieren (config oder Secret setzen, kein Blind-Code-Push).
+3. Solange Probe offline ist, in Slice A `detector_used` explizit auf `face-fallback` mappen, damit die yavg-Ladder das erkennt.
 
-- Statt `canonicalDialogTurns` (Array-Ref) als Dependency einen daraus abgeleiteten stabilen String hashen, z.B. `canonicalDialogTurns.map(t => t.characterId + ':' + t.text).join('|')`. Damit feuert der Effekt nur bei semantischer Änderung, nicht bei jedem Render.
+### Slice C — Ladder-Schärfung im Motion-Probe-Consumer
+1. In `supabase/functions/report-lipsync-motion-probe/index.ts` (Slice-4-Consumer) beim yavg < 4.0-Fall zusätzlich lesen: letzter Dispatch-Row der Szene, Feld `face_share_in_preclip`.
+2. Regel:
+   - `face_share_in_preclip < 0.30` und `retry_count < 2` → dispatch mit `retry_variant='mouth-anchored-zoom'` (bereits vorhandener Preclip-Zoom).
+   - `face_share_in_preclip >= 0.30` und `retry_count < 2` → weiterhin `coords-pro-box`.
+   - `retry_count >= 2` → Hard-Fail + Refund (bestehender Pfad).
+3. Marker `v249_slice_c_face_share_gate` im `syncso_dispatch_log`.
 
-**3. Debounce race schließen**
+## Was NICHT im Plan ist
 
-- Im Persist-Effekt (Z. 587-605) einen Vergleich `if (script === lastPushedRef.current) return;` ergänzen, damit die zurückpropagierte `scene.dialogScript` nicht als „externe Änderung" fehlgedeutet wird.
-- `lastPushedRef` wird direkt vor `onUpdate(updates)` (Z. 601) auf `script` gesetzt.
+- **Router-Änderung**: `sync-polish` vs. `sync-segments` in `sceneEngineRouter` bleibt wie es ist. Beide Wege gehen bewusst durch `compose-dialog-segments` — kein Bug.
+- **UI-Änderungen** an `SceneClipProgress` / `SceneCard`: Keine, Fix ist rein serverseitig.
+- **Neue Migrationen**: nicht nötig — alle vier Spalten (`face_share_in_preclip`, `mouth_center_offset_px`, `noop_mouth_yavg`, `detector_used`, `retry_count`) existieren bereits.
 
-**4. Fallback-Reihenfolge fixen**
+## Akzeptanzkriterien
 
-- `displayScriptFromScene()` (Z. 502) darf nur beim initialen Mount oder bei Scene-Wechsel auf `dialogTurnsToScript()` zurückfallen. Sonst: wenn `scene.dialogScript === ''`, den bestehenden `script` behalten. Realisierung: neue Signatur `displayScriptFromScene({ fallbackToTurns: boolean })`, im Sync-Effekt mit `fallbackToTurns: sceneChanged` aufgerufen.
-
-### Verifikation
-
-- Vitest-Unit-Test in `src/components/video-composer/__tests__/SceneDialogStudio.script.test.tsx`:
-  - Simuliert schnelles Tippen, während parent `scene.dialogTurns`-Prop referenziell wechselt (gleicher Inhalt).
-  - Erwartung: Der Textarea-Wert bleibt exakt der User-Input, keine Restauration.
-- Manueller Preview-Check: Neue Szene öffnen, in Drehbuch tippen, Cast in einer anderen Szene ändern (löst Realtime-Update aus) → Text bleibt stehen.
-
-### Nicht angefasst
-
-- Voice-Map, Dialog-Takes, Debounce-Intervall, Persist-Pfad (`onUpdate`), Kling-Omni-Integration.
-- Lip-Sync-Pipeline (v247/v248) — reiner Frontend-Statebug.
-
-### Betroffene Dateien
-
-- `src/components/video-composer/SceneDialogStudio.tsx` (Sync- + Persist-Effekt, Fallback-Signatur, Typing-Ref)
-- `src/components/video-composer/__tests__/SceneDialogStudio.script.test.tsx` (neu)
+1. Nach dem nächsten Cinematic-Sync-Pass zeigt `SELECT face_share_in_preclip, detector_used, mouth_center_offset_px FROM syncso_dispatch_log ORDER BY created_at DESC LIMIT 5` echte Werte.
+2. Bei einem Pass mit `noop_mouth_yavg < 4.0` UND `face_share_in_preclip < 0.30` erscheint eine automatische Retry-Dispatch-Zeile mit `retry_variant='mouth-anchored-zoom'`.
+3. Logs enthalten Marker `v249_preclip_metrics_persisted` + `v249_slice_c_face_share_gate`.
