@@ -531,33 +531,13 @@ export async function detectPlateFaces(params: {
       console.warn(`${tag} v156_anchor_detect_threw ${awsError}`);
     }
   } else {
-    console.warn(`${tag} v156_anchor_missing → aws_on_mp4_fallback (legacy scene)`);
-    try {
-      const mp = await detectFacesMediaPipe({
-        videoUrl: params.plateUrl,
-        plateWidth: params.plateWidth,
-        plateHeight: params.plateHeight,
-        durationSec: Math.max(0.5, params.midDurationSec * 2),
-        prebuiltFrameUrls: [params.plateUrl],
-      });
-      if (mp.ok && mp.faces.length > 0) {
-        mpFaces = sortFacesRowMajor(
-          mp.faces.map((f, idx) => ({
-            bbox: f.bbox,
-            center: f.center,
-            slot: idx,
-            confidence: f.confidence,
-            mouth: f.landmarks?.mouth,
-          })),
-        ).map((f, idx) => ({ ...f, slot: idx }));
-        detectorUsed = "aws_rekognition_mp4_fallback";
-        console.log(`${tag} v156_mp4_fallback_ok faces=${mpFaces.length}`);
-      } else {
-        awsError = mp.error ?? "zero_faces_on_mp4";
-      }
-    } catch (e) {
-      awsError = `exception:${(e as Error)?.message}`;
-    }
+    // v249 — the historical "aws_on_mp4_fallback" path passed the mp4 URL as
+    // a prebuilt-frame URL to Rekognition. Rekognition rejects video bytes,
+    // so this branch never produced faces; it only polluted logs with a
+    // false `aws_rekognition_mp4_fallback` detector label. We now short-
+    // circuit to the downstream Gemini/cartoon-rescue path with a clear tag.
+    awsError = "anchor_missing_no_mp4_fallback";
+    console.warn(`${tag} v249_anchor_missing_skip_aws → downstream_rescue`);
   }
 
   // 3. v156 Decision Tree.

@@ -1,60 +1,40 @@
-## Was der Log tatsächlich zeigt (verifiziert in `syncso_dispatch_log`)
+## Frage
+Wurde AWS (Rekognition) im Lip-Sync-Pfad korrekt verwendet?
 
-Für die letzten 4 Szenen (heute 14:30 und davor) ist das Muster identisch:
+## Prüfung des Ist-Zustands (nur gelesen, nichts geändert)
 
-- `engine = "sync-segments"` (auch bei 1 Sprecher — Toggle-Pfad geht immer über `compose-dialog-segments`, das ist so gewollt).
-- Jede Szene: erst `FACE_GATE_PROBE_UNAVAILABLE` / `face_probe_unavailable`, dann `DISPATCHED` mit HTTP 201.
-- **`face_share_in_preclip`, `mouth_center_offset_px`, `noop_mouth_yavg`, `detector_used`, `retry_count` sind für ALLE Zeilen NULL.**
+**Was AWS-seitig korrekt ist**
+- `_shared/face-detect-mediapipe.ts` implementiert eine echte SigV4-signierte `RekognitionService.DetectFaces`-Anfrage. Region wird sauber auf ein gültiges Muster geprüft und fällt auf `eu-central-1` zurück, wenn `AWS_REGION` fehlt oder z. B. `"Global"` ist. Credentials aus `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. Payload als Base64-JPEG, Timeout, saubere Fehlerpfade.
+- `_shared/plate-face-detect.ts` ruft Rekognition primär auf **Anchor-JPEGs** (nicht auf mp4) auf — genau so wie Rekognition das erwartet — und liest `MouthLeft/Right/Down` als Landmarks (`landmarks.mouth`) heraus. Diese Landmarks werden persistiert (`mouth_landmarks`) und in `compose-dialog-segments` als `speakerPlateMouths` bzw. `speakerCoords` verwendet — d. h. der Mund-Anker aus Rekognition fließt in den v247-Preclip.
+- `_shared/pass-face-preclip.ts` verwendet den Mund-Anker exakt dann, wenn `mouth` und `bbox` da sind (`useMouthAnchor`), erzwingt `faceShareInCrop ≥ 0.42` und liefert die Metriken zurück (`anchor`, `faceShareInCrop`, `mouthOffsetPx`), die `compose-dialog-segments` heute an das `pass`-Objekt hängt.
+- `_shared/syncso-face-gate.ts` nutzt Rekognition zusätzlich als Auto-Snap-Guard (v129.22.3).
 
-Damit ist klar, dass Lip-Sync zwar dispatcht wird, aber der v247/v248-Pfad, den wir letzte Runde gebaut haben, in der Praxis nicht scharf ist.
+Kurz: die eigentlichen AWS-Aufrufe (Signatur, Region, Endpoint, Payload-Form) sind korrekt.
 
-## Diagnose — drei Bugs, die zusammen "kein Lip-Sync" erzeugen
+**Was nicht korrekt „durchgezogen" ist**
+1. **Server-Frame-Extract für den Face-Gate-Probe ist deaktiviert.**
+   `_shared/face-frame-extract.ts` liefert immer entweder einen zwischengespeicherten Frame aus dem `composer-frames`-Bucket oder `server_extract_disabled_use_client_canvas`. Dadurch bekommt der Face-Gate im Dispatch-Pfad in 100 % der Fälle `FACE_GATE_PROBE_UNAVAILABLE`. Rekognition selbst wäre bereit, es fehlt nur die JPEG-Quelle.
+2. **Preclip-Metriken landen (v249) zwar im Code auf dem `pass`-Objekt, wurden bis zum letzten Dispatch aber nicht in `syncso_dispatch_log` persistiert**, weil das produktive Bundle noch `v222-bridge-recount-resolved` war. Der Code für v249 existiert lokal, nur der Deploy fehlt.
+3. **Fallback auf Rekognition „mp4 direkt"** in `plate-face-detect.ts` ist historisch drin (`aws_rekognition_mp4_fallback`), aber Rekognition akzeptiert kein Video — der Kommentar im Code sagt das selbst. Dieser Fallback ist tot, sollte klar deaktiviert oder auf einen JPEG-Extract umgestellt werden, damit er im Log nicht als Erfolgspfad wirkt.
 
-### 1. v247 Preclip-Metriken werden nicht persistiert (Hauptursache)
-`compose-dialog-segments/index.ts:4998-5008` schreibt `preclip_anchor`, `preclip_face_share`, `preclip_mouth_offset_px` auf das lokale `pass`-Objekt und loggt sie nur nach stdout. Kein einziger `logSyncDispatch({...})`-Call reicht diese Felder als `face_share_in_preclip` / `mouth_center_offset_px` / `detector_used` weiter. Der Logger akzeptiert sie (`_shared/syncso-preflight.ts:985-989`), aber niemand füllt sie.
+## Bewertung
+AWS-Rekognition ist **an sich korrekt eingebunden**: Signatur, Region, DetectFaces auf Bild-Bytes, Landmark-Auswertung, Mund-Anker im Preclip. Die Kette ist aber an zwei Stellen unterbrochen, sodass die AWS-Signale in der Produktion **nicht wirken**:
+- Der Server-seitige Frame-Extract ist ausgeschaltet → Face-Gate-Probe kommt nie zu Rekognition.
+- Der neue v249-Metrik-Persistenz-Pfad ist noch nicht deployed → die Slice-C-Ladder in `report-lipsync-motion-probe` bekommt weiter NULLs.
 
-Folge: v248-Slice-4-Ladder in `report-lipsync-motion-probe` kann nicht sehen, ob der Preclip Face-Share ≥ 0.42 hatte, entscheidet blind, und der Coord-Pro-Box-Retry feuert bei kleinen Gesichtern nicht.
+Fazit: AWS ist korrekt verwendet, aber der Nutzen kommt nicht durch, solange Frame-Extract offline und v249 nicht produktiv aktiv ist.
 
-### 2. Face-Gate-Probe ist strukturell offline (`FACE_GATE_PROBE_UNAVAILABLE` in 100% der Dispatches)
-Der v130-Face-Gate liefert konsistent `probe_unavailable`. `compose-dialog-segments:6428` lässt Dispatch trotzdem durch ("non-blocking signal"), womit die Coord-Snap-Sicherung nie greift. Ursache muss ich in der Slice-Untersuchung noch nachfassen (Gemini-Frame-Extract 5xx vs. Rekognition-Key vs. `probeEndpoint`-URL) — Datenpunkt: `raw_reply` / `http_status` in `meta.face_gate` der letzten Fehler.
+## Vorschlag (kein Code-Change ohne Freigabe)
 
-### 3. Client-Yavg-Probe hat keine Preclip-Signale, mit denen sie eskalieren könnte
-`useMouthYavgProbe` läuft in `SceneClipProgress`, aber weil (1) NULL bleibt, kann `report-lipsync-motion-probe` seine Rungs nicht sauber staffeln — jeder Fall sieht gleich aus.
+1. **Deploy verifizieren**: sicherstellen, dass `compose-dialog-segments` als `v249-preclip-metrics-persisted` und `report-lipsync-motion-probe` mit Slice-C-Ladder live sind. Danach an einer Test-Szene prüfen, ob `face_share_in_preclip`, `mouth_center_offset_px`, `detector_used` in `syncso_dispatch_log` gefüllt sind.
 
-## Plan v249 — Slice A/B/C
+2. **Face-Gate-Probe wieder scharf machen**: In `face-frame-extract.ts` einen echten Frame-Extract implementieren (Remotion-`still` oder ffmpeg-Edge-Call auf das Preclip-mp4, JPEG nach `composer-frames` schreiben). Dann greift der bestehende Rekognition-Auto-Snap in `syncso-face-gate.ts` wieder — statt `FACE_GATE_PROBE_UNAVAILABLE` bekommen wir echte `ok` / `ok_after_snap` Signale.
 
-### Slice A — Preclip-Metriken durchreichen (fixt Hauptursache)
-1. In `supabase/functions/compose-dialog-segments/index.ts` bei jedem `logSyncDispatch({...})`, der nach dem Preclip-Render steht (Dispatched, Coord-Snap, Face-Gate-Probe-Unavailable, Preflight-Blocked, Sync.so-Error), zusätzlich folgende Top-Level-Felder mitgeben:
-   - `face_share_in_preclip: (pass as any).preclip_face_share ?? null`
-   - `mouth_center_offset_px: (pass as any).preclip_mouth_offset_px ?? null`
-   - `detector_used: (pass as any).preclip_anchor ?? null` (Werte: `mouth-centered` | `face-fallback` | `plate-fallback`)
-   - `retry_count: currentAttempt ?? 0`
-2. Marker `v249_preclip_metrics_persisted` im `meta` des jeweiligen Dispatch-Rows.
-3. Test: nach nächstem Cinematic-Sync-Pass müssen die vier Spalten in `syncso_dispatch_log` gefüllt sein.
+3. **Toten `aws_rekognition_mp4_fallback` entfernen** bzw. explizit als „nicht mehr genutzt" markieren, damit Logs nicht irreführen.
 
-### Slice B — Face-Gate-Probe-Diagnose (nicht blind fixen)
-1. Query auf `syncso_dispatch_log.meta->face_gate` der letzten 20 `FACE_GATE_PROBE_UNAVAILABLE`-Zeilen: `raw_reply`, `raw_error`, `http_status`.
-2. Danach entscheiden:
-   - Wenn `http_status = 429` oder `5xx` → nichts patchen, Retry-Ladder greift bereits.
-   - Wenn `raw_error` ein fehlender Endpoint/Key ist → gezielt reparieren (config oder Secret setzen, kein Blind-Code-Push).
-3. Solange Probe offline ist, in Slice A `detector_used` explizit auf `face-fallback` mappen, damit die yavg-Ladder das erkennt.
+4. Erst nach 1–3 den nächsten visuellen Lip-Sync-Test fahren; alles davor läuft weiter am AWS-Signal vorbei.
 
-### Slice C — Ladder-Schärfung im Motion-Probe-Consumer
-1. In `supabase/functions/report-lipsync-motion-probe/index.ts` (Slice-4-Consumer) beim yavg < 4.0-Fall zusätzlich lesen: letzter Dispatch-Row der Szene, Feld `face_share_in_preclip`.
-2. Regel:
-   - `face_share_in_preclip < 0.30` und `retry_count < 2` → dispatch mit `retry_variant='mouth-anchored-zoom'` (bereits vorhandener Preclip-Zoom).
-   - `face_share_in_preclip >= 0.30` und `retry_count < 2` → weiterhin `coords-pro-box`.
-   - `retry_count >= 2` → Hard-Fail + Refund (bestehender Pfad).
-3. Marker `v249_slice_c_face_share_gate` im `syncso_dispatch_log`.
-
-## Was NICHT im Plan ist
-
-- **Router-Änderung**: `sync-polish` vs. `sync-segments` in `sceneEngineRouter` bleibt wie es ist. Beide Wege gehen bewusst durch `compose-dialog-segments` — kein Bug.
-- **UI-Änderungen** an `SceneClipProgress` / `SceneCard`: Keine, Fix ist rein serverseitig.
-- **Neue Migrationen**: nicht nötig — alle vier Spalten (`face_share_in_preclip`, `mouth_center_offset_px`, `noop_mouth_yavg`, `detector_used`, `retry_count`) existieren bereits.
-
-## Akzeptanzkriterien
-
-1. Nach dem nächsten Cinematic-Sync-Pass zeigt `SELECT face_share_in_preclip, detector_used, mouth_center_offset_px FROM syncso_dispatch_log ORDER BY created_at DESC LIMIT 5` echte Werte.
-2. Bei einem Pass mit `noop_mouth_yavg < 4.0` UND `face_share_in_preclip < 0.30` erscheint eine automatische Retry-Dispatch-Zeile mit `retry_variant='mouth-anchored-zoom'`.
-3. Logs enthalten Marker `v249_preclip_metrics_persisted` + `v249_slice_c_face_share_gate`.
+## Nicht Teil des Plans
+- Keine Änderung an Rekognition-Signatur, Region oder Auth — die sind korrekt.
+- Keine Änderung an `pass-face-preclip` / `computeMouthCenteredCrop` — der v247-Anker greift, sobald die Landmarks weiterhin sauber ankommen (was sie tun).
+- Keine neuen AWS-Ressourcen (Bedrock, S3-Buckets, Lambda-Deploy) — reine Wiring-Reparatur.
