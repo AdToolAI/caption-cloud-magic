@@ -107,9 +107,9 @@ export interface FaceGateInput {
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
-  const apiKey = getApiKey();
-  if (!apiKey) return { ok: true, code: "skipped", reason: "no_gemini_api_key" };
+  if (!hasAwsCreds()) return { ok: true, code: "skipped", reason: "no_aws_credentials" };
   if (!input.videoUrl) return { ok: true, code: "skipped", reason: "no_video_url" };
+
 
   const frame = Number.isFinite(input.frameNumber) ? Number(input.frameNumber) : null;
   const coord = Array.isArray(input.coord) && input.coord.length >= 2
