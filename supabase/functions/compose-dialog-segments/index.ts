@@ -134,7 +134,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v249-preclip-metrics-persisted";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v254-attempt-tdz-hardlock";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -4136,6 +4136,10 @@ serve(async (req) => {
 
 
     const pass = passes[currentPassIdx];
+    // v254 — Dispatch-pass retry counter. Keep this initialized at the top of
+    // the per-pass scope so every preflight/face-gate/logging path can safely
+    // stamp retry_count before the provider retry loop starts.
+    let attempt = 0;
 
     // ── v193 — Pass-level dedupe/claim before expensive preflight ────────
     // The Plan-D fanout and webhook advance can race when a sibling pass is
@@ -6351,10 +6355,8 @@ serve(async (req) => {
     // + frame + coord we are about to send. If Gemini is confident the
     // promise won't hold (no_face / yes_but_not_at_coord / multi_face in
     // multi-speaker context) refund + fail BEFORE we burn a Sync.so credit.
-    // v253 — hoisted from the 429-backoff loop below so pre-dispatch
-    // face-gate log calls (preclipMetricsForPass(..., attempt, ...)) don't
-    // trip a TDZ. Value is 0 until the retry loop increments it.
-    let attempt = 0;
+    // v254 — `attempt` is initialized at the top of the per-pass scope. Value
+    // is 0 here because the provider retry loop has not started yet.
     {
       const gateAsd: any = (syncOptions as any)?.active_speaker_detection ?? {};
       const gateFrame: number | null = Number.isFinite(gateAsd?.frame_number)
