@@ -55,9 +55,46 @@ interface Props {
 
 export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: accessible = [] } = useAccessibleCharacters();
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [poseOpen, setPoseOpen] = useState(false);
+  const [uploadingRef, setUploadingRef] = useState(false);
+  const refFileInput = useRef<HTMLInputElement>(null);
+
+  const handleReferenceUpload = async (file: File) => {
+    if (!user) {
+      toast.error('Bitte einloggen, um ein Referenzbild hochzuladen.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Datei zu groß (max. 10 MB).');
+      return;
+    }
+    setUploadingRef(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'png';
+      const path = `${user.id}/scene-ref-${scene.id}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('ai-video-reference')
+        .upload(path, file, { upsert: true, contentType: file.type || 'image/png' });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage
+        .from('ai-video-reference')
+        .getPublicUrl(path);
+      onUpdate({ referenceImageUrl: publicUrl } as Partial<ComposerScene>);
+      toast.success('Referenzbild gesetzt — wird als i2v-Startframe verwendet.');
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+    } finally {
+      setUploadingRef(false);
+    }
+  };
+
+  const clearReference = () => {
+    onUpdate({ referenceImageUrl: undefined } as Partial<ComposerScene>);
+  };
+
 
   const activeShotId =
     scene.characterShots?.[0]?.characterId ||
