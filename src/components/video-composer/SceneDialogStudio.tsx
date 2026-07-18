@@ -2025,7 +2025,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         <Label className="text-[10px] text-muted-foreground">{t.script}</Label>
         <Textarea
           value={script}
-          onChange={(e) => setScript(e.target.value)}
+          onChange={(e) => {
+            isUserTypingRef.current = true;
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+              isUserTypingRef.current = false;
+            }, 1500);
+            setScript(e.target.value);
+          }}
           placeholder={
             isMonologue
               ? `${sceneCast[0]?.name ?? 'Sarah'}: ${
