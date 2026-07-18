@@ -134,7 +134,43 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v222-bridge-recount-resolved";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v249-preclip-metrics-persisted";
+
+// v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
+// on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
+// can escalate on the actual face-share signal instead of guessing.
+// Contract:
+//   detector_used ∈ { "mouth-centered" | "face-fallback" | "plate-fallback" }
+//     • mouth-centered → pass-face-preclip found AWS Rekognition mouth landmarks
+//     • face-fallback  → face bbox only (no mouth landmark, or face-gate probe
+//                        server-disabled — the current default per Slice-B audit)
+//     • plate-fallback → preclip skipped, full-plate dispatch (multi-speaker
+//                        would have been fail-closed here; single-speaker only)
+function preclipMetricsForPass(
+  pass: Record<string, unknown> | null | undefined,
+  attempt: number,
+  usePassPreclip: boolean,
+): {
+  face_share_in_preclip: number | null;
+  mouth_center_offset_px: number | null;
+  detector_used: string | null;
+  retry_count: number;
+} {
+  const p = (pass ?? {}) as Record<string, unknown>;
+  const rawShare = (p as any).preclip_face_share;
+  const rawOffset = (p as any).preclip_mouth_offset_px;
+  const rawAnchor = (p as any).preclip_anchor;
+  const anchor = typeof rawAnchor === "string" && rawAnchor.length > 0 ? rawAnchor : null;
+  const detector = usePassPreclip
+    ? (anchor === "mouth-centered" ? "mouth-centered" : "face-fallback")
+    : "plate-fallback";
+  return {
+    face_share_in_preclip: Number.isFinite(Number(rawShare)) ? Number(rawShare) : null,
+    mouth_center_offset_px: Number.isFinite(Number(rawOffset)) ? Number(rawOffset) : null,
+    detector_used: detector,
+    retry_count: Number.isFinite(Number(attempt)) ? Number(attempt) : 0,
+  };
+}
 
 // v153.8 — Sync.so spec (https://sync.so/docs/developer-guides/speaker-selection)
 // requires the `bounding_boxes` array length to MATCH the actual video frame
@@ -6394,6 +6430,7 @@ serve(async (req) => {
           http_status: 0, sync_status: "COORD_AUTO_SNAPPED",
           error_class: "coord_auto_snap",
           error_message: (gate.reason ?? "auto_snapped").slice(0, 240),
+          ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {
             diagnostic_id: diagnosticId,
             retry_variant: retryVariant,
@@ -6433,6 +6470,7 @@ serve(async (req) => {
           http_status: gate.http_status ?? 0, sync_status: "FACE_GATE_PROBE_UNAVAILABLE",
           error_class: "face_probe_unavailable",
           error_message: (gate.reason ?? "face_probe_unavailable").slice(0, 240),
+          ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {
             diagnostic_id: diagnosticId,
             retry_variant: retryVariant,
@@ -6463,6 +6501,7 @@ serve(async (req) => {
           http_status: 0, sync_status: "FACE_GATE_BLOCKED",
           error_class: "face_validation_failed",
           error_message: reason,
+          ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {
             diagnostic_id: diagnosticId,
             retry_variant: retryVariant,
@@ -6751,7 +6790,8 @@ serve(async (req) => {
         http_status: resp.status, sync_status: "DISPATCH_FAILED",
         error_class: classifySyncError(errTxt),
         error_message: errTxt.slice(0, 500),
-        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload },
+        ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
+        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload, v249_preclip_metrics_persisted: true },
       });
       await recordCircuitFailure(supabase, "sync.so", classifySyncError(errTxt));
       return json(
@@ -6945,7 +6985,9 @@ serve(async (req) => {
       // requires pulling pass_idx out of meta JSON.
       turn_idx: Number.isFinite(currentPassIdx) ? Number(currentPassIdx) : null,
       http_status: resp.status, sync_status: "DISPATCHED",
+      ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
       meta: {
+        v249_preclip_metrics_persisted: true,
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
         canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",

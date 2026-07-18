@@ -28,8 +28,19 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const YAVG_NOOP_THRESHOLD = 4.0;
 
-// Mirrors sync-so-webhook v150 NOOP_LADDER exactly (single rung).
-const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [
+// v249 Slice C: face-share-aware ladder. When the persisted
+// `preclip_face_share` is below SMALL_FACE_THRESHOLD we suspect the mouth
+// region is too small for Sync.so to lock onto — try a mouth-anchored
+// re-zoom preclip first, before falling back to the sync-3 bounding-box ASD
+// rung. Above threshold, the classic `coords-pro-box` rung (v150) stays as
+// the first rung so we don't waste an extra provider call on a preclip that
+// is already correctly framed.
+const SMALL_FACE_THRESHOLD = 0.30;
+const LADDER_SMALL_FACE: Array<{ step: number; variant: string; label: string }> = [
+  { step: 0, variant: "mouth-anchored-zoom", label: "mouth-anchored re-zoom preclip (v247)" },
+  { step: 1, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
+];
+const LADDER_NORMAL_FACE: Array<{ step: number; variant: string; label: string }> = [
   { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
 ];
 
@@ -159,6 +170,10 @@ Deno.serve(async (req) => {
     const havePreclipCrop = !!pass.preclip_crop &&
       Number.isFinite(Number((pass.preclip_crop as { size?: number }).size));
     const haveReferenceFrame = Number.isFinite(Number(pass.reference_frame_number));
+    const faceShare = Number((pass as any).preclip_face_share);
+    const NOOP_LADDER = Number.isFinite(faceShare) && faceShare < SMALL_FACE_THRESHOLD
+      ? LADDER_SMALL_FACE
+      : LADDER_NORMAL_FACE;
     const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
     const canEscalate = !!nextRung && havePlateCoords && havePreclipCrop && haveReferenceFrame;
 
