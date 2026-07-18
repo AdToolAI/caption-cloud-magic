@@ -6351,6 +6351,10 @@ serve(async (req) => {
     // + frame + coord we are about to send. If Gemini is confident the
     // promise won't hold (no_face / yes_but_not_at_coord / multi_face in
     // multi-speaker context) refund + fail BEFORE we burn a Sync.so credit.
+    // v253 — hoisted from the 429-backoff loop below so pre-dispatch
+    // face-gate log calls (preclipMetricsForPass(..., attempt, ...)) don't
+    // trip a TDZ. Value is 0 until the retry loop increments it.
+    let attempt = 0;
     {
       const gateAsd: any = (syncOptions as any)?.active_speaker_detection ?? {};
       const gateFrame: number | null = Number.isFinite(gateAsd?.frame_number)
@@ -6713,7 +6717,8 @@ serve(async (req) => {
     // falling through to the existing dispatch-failure path.
     const BACKOFFS_MS = [4_000, 10_000, 22_000];
     let resp: Response;
-    let attempt = 0;
+    // v253 — `attempt` is hoisted above the face-gate block; reset here.
+    attempt = 0;
     while (true) {
       resp = await fetch(`${SYNC_API_BASE}/generate`, {
         method: "POST",

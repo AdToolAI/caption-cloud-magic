@@ -1,44 +1,26 @@
-# Plan v252 — Face-Gate-Probe: AWS-only
+# Plan v253 — Face-Gate TDZ-Fix (Hoist-Variante)
 
-## Ziel
-Der Preflight-Check direkt vor jedem Sync.so-Dispatch (`_shared/syncso-face-gate.ts`) läuft aktuell auf **Gemini 2.5 Flash** (Textprompt „yes_one_face_at_coord / no_face / …"). Der ist regelmäßig flaky (429/5xx, halluzinierte Text-Antworten, Parser-Fails → `unparsed`). AWS Rekognition liefert für exakt diesen Job (Ja/Nein Gesicht + Bbox am Coord) deterministische Bboxes mit Confidence — genau das, was wir brauchen.
+## Root Cause
+In `supabase/functions/compose-dialog-segments/index.ts` referenzieren die Face-Gate-Log-Aufrufe an Zeilen **6433, 6473, 6504** die Variable `attempt` via `preclipMetricsForPass(pass, attempt, usePassPreclip)`. `attempt` wird aber erst an Zeile **6716** als `let attempt = 0;` in der 429-Backoff-Retry-Schleife deklariert — gleiche Funktionsscope → JavaScript TDZ → `Cannot access 'attempt' before initialization`. Jeder Dispatch crasht, bevor überhaupt zu Sync.so gefetcht wird.
 
-**Umstellung nur für den Face-Gate-Probe.** Identity-Matching (`plate-face-identity.ts`) und Cartoon-Rescue (`plate-face-detect.ts`) bleiben bei Gemini — das sind andere Aufgaben, die Rekognition strukturell nicht kann.
+Regression stammt aus v249 (Preclip-Metriken-Erweiterung): die drei Pre-Dispatch-Log-Aufrufe wurden mit `attempt` ergänzt, ohne zu bemerken dass die Retry-Variable weiter unten deklariert ist.
+
+## Fix — Hoist (Single Source of Truth)
+`let attempt = 0;` wird aus der 429-Retry-Schleife an den Anfang des Dispatch-Blocks für den aktuellen Pass gehoben — vor den Face-Gate-Log-Sektionen (also oberhalb Zeile 6433, im selben Scope wie die spätere Retry-Schleife). Die Zeile an 6716 entfällt.
+
+Ergebnis:
+- Face-Gate-Logs referenzieren `attempt` legal (Wert = 0, weil noch kein Sync.so-Call passiert ist).
+- 429-Retry-Schleife nutzt exakt dieselbe Variable, inkrementiert wie gehabt (`attempt++`).
+- Post-Dispatch-Logs (6793, 6988) und `attempt`-Anzeige in Log-Prefixes bleiben unverändert und semantisch korrekt.
+- Eine Deklaration, ein Zähler, keine Literale mehr.
 
 ## Scope
-
-### Geändert
-`supabase/functions/_shared/syncso-face-gate.ts`
-- Stage 2 („ask Gemini about the extracted frame") wird ersetzt durch `detectFacesMediaPipe(...)` (= AWS Rekognition DetectFaces auf denselben JPEG-Bytes).
-- Verdict-Ableitung direkt aus dem Rekognition-Ergebnis:
-  - `0 faces` → `code: "no_face"` (hard fail, refund + skip dispatch)
-  - `≥2 faces` bei multi-speaker plate → `code: "multiple_faces"` (hard fail); bei single-speaker preclip → soft pass wie bisher
-  - `1 face` + Center innerhalb ±15 % vom Intent-Coord (bereits auf Bild-Dim normalisiert) → `code: "ok"`
-  - `1 face` außerhalb Toleranz, mit `plateWidth/plateHeight` gesetzt → `code: "ok_after_snap"` mit Rekognition-Center als `snapped_coord` (der bestehende Auto-Snap-Pfad — Rekognition wurde dort schon vorher aufgerufen, jetzt sparen wir uns den zweiten Call)
-  - `1 face` außerhalb Toleranz ohne Plate-Dims → `code: "not_at_coord"` (hard fail, wie legacy)
-- Netzwerk-Errors / IAM-Fehler / Timeouts → `code: "probe_unavailable"` (non-blocking, wie heute bei Gemini).
-- Felder `gemini_ms`, `raw_reply` bleiben aus Kompatibilität im Result, werden aber mit den Rekognition-Werten (`aws_ms`, kurze `raw_reply="aws_rek:1_face@0.42,0.51"`-Zeile) befüllt, damit Forensik-UI unverändert weiterläuft. Neu: `detector: "aws_rekognition"` im Meta-Objekt.
-
-### Unverändert
-- `_shared/face-frame-extract.ts` — bleibt Anchor-First (v251), keine Änderung.
-- `_shared/face-detect-mediapipe.ts` — wird schon von `plate-face-detect.ts` genutzt, keine Änderung nötig.
-- `_shared/plate-face-detect.ts` — Cartoon-Rescue via Gemini bleibt, weil Rekognition auf Cartoons/Illustrationen ~0 Faces liefert.
-- `_shared/plate-face-identity.ts` — Identity-Matching bleibt Gemini (Rekognition kennt unsere Charaktere nicht).
-- Escalation-Ladder in `report-lipsync-motion-probe` — unverändert (liest weiterhin `detector_used`).
-
-## Grenzen / bewusste Trade-offs
-- **Cartoons / stilisierte Avatare**: Wenn ein Nutzer mal einen gezeichneten Charakter durch die Dialog-Pipeline schickt, wird der Face-Gate jetzt öfter `no_face` sagen und die Szene refunden statt Gemini-Weichspüler zu geben. Das ist gewollt und im Einklang mit unserer generellen v156-Härte („no hallucinated faces"). Cast & World generiert photoreal, also kein Praxisproblem.
-- **Preclip-Trusted-Pfad** bleibt wie bisher: wenn Preclip schon validiert wurde, ist ein Rekognition-Miss ein soft pass (probe_unavailable), kein Hard-Fail.
+- Datei: `supabase/functions/compose-dialog-segments/index.ts` (Zeile mit `let attempt = 0` verschieben — kein Verhaltens-Delta, nur Scope-Hoist).
+- Log-Prefix bumpt intern auf `v253-face-gate-tdz-hoist`.
+- Keine DB-Änderung, keine anderen Functions, kein Schema-Touch.
 
 ## Verifikation
-1. Rendere eine 2-Sprecher-Szene und eine 4-Sprecher-Szene.
-2. In `syncso_dispatch_log` erwarten: `detector_used='aws_rekognition'`, `face_gate_code='ok'` bzw. `ok_after_snap`, `gemini_ms` klein (nur noch Meta-Feld, kein echter Gemini-Call).
-3. Edge-Function-Logs: kein `[face-gate] gemini_http_…` mehr, stattdessen `v252_aws_face_gate ok faces=1 …`.
-4. Bewusst schlechte Szene (Rücken zur Kamera) → `code: "no_face"`, Refund läuft, kein Dispatch.
-
-## Version-Tag
-- `syncso-face-gate.ts` bumpt intern auf `v252-aws-face-gate-primary`.
-- Deployt werden `compose-dialog-segments`, `report-lipsync-motion-probe` und jede Dispatcher-Function, die den Gate importiert — passiert bei Lovable-managed Functions automatisch beim Save.
-
-## Was du tun musst
-Nichts. Rekognition-Credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `REKOGNITION_REGION`) sind bereits im Secret-Store und laufen produktiv für v156/v249. Plan freigeben, ich baue um.
+1. Aktuell gecrashte Szene über „Neu rendern" antriggern.
+2. Edge-Logs: kein `dispatch_crash: Cannot access 'attempt'` mehr; stattdessen normale v252-AWS-Face-Gate-Zeilen (`[face-gate] v252-aws-face-gate-primary …`).
+3. `syncso_dispatch_log` bekommt reguläre Einträge (`SUBMITTED` / `COORD_AUTO_SNAPPED` / `FACE_GATE_PROBE_UNAVAILABLE` / `FACE_GATE_BLOCKED`), kein Sofort-Crash.
+4. Bei 429 von Sync.so: Retry-Schleife läuft wie vorher, Log zeigt `429_RETRY attempt=1/3 …`.
