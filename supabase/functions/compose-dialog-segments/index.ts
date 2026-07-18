@@ -6501,6 +6501,7 @@ serve(async (req) => {
           http_status: 0, sync_status: "FACE_GATE_BLOCKED",
           error_class: "face_validation_failed",
           error_message: reason,
+          ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {
             diagnostic_id: diagnosticId,
             retry_variant: retryVariant,
