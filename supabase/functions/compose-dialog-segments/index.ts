@@ -6985,7 +6985,9 @@ serve(async (req) => {
       // requires pulling pass_idx out of meta JSON.
       turn_idx: Number.isFinite(currentPassIdx) ? Number(currentPassIdx) : null,
       http_status: resp.status, sync_status: "DISPATCHED",
+      ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
       meta: {
+        v249_preclip_metrics_persisted: true,
         // v131.5 — version pin for forensic attribution
         compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
         canonical_lipsync_pipeline: speakers.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
