@@ -521,7 +521,15 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return out;
   };
 
-  const [script, setScript] = useState(() => displayScriptFromScene());
+  const [script, setScript] = useState(() => displayScriptFromScene({ fallbackToTurns: true }));
+  // Typing-guard: while the user is actively editing the script, we refuse to
+  // let the external-sync effect stomp on the textarea. Cleared 1.5s after the
+  // last keystroke.
+  const isUserTypingRef = useRef(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Debounce-echo filter: remembers the last value we pushed to the parent so
+  // the round-tripped scene.dialogScript update isn't misread as an external edit.
+  const lastPushedScriptRef = useRef<string>('');
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
     normalizeVoiceMap(scene.dialogVoices),
   );
