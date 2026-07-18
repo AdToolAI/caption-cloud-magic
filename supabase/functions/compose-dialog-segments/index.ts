@@ -6790,7 +6790,8 @@ serve(async (req) => {
         http_status: resp.status, sync_status: "DISPATCH_FAILED",
         error_class: classifySyncError(errTxt),
         error_message: errTxt.slice(0, 500),
-        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload },
+        ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
+        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload, v249_preclip_metrics_persisted: true },
       });
       await recordCircuitFailure(supabase, "sync.so", classifySyncError(errTxt));
       return json(
