@@ -1,40 +1,39 @@
 /**
- * Sync.so Live Face-Gate — v129.23.2 (Client-Canvas/AWS only)
+ * Sync.so Live Face-Gate — v252-aws-face-gate-primary
  *
- * Runs Gemini Vision on the EXACT frame + coord we are about to send to
- * Sync.so, BEFORE the dispatch call.
+ * Runs AWS Rekognition DetectFaces on the EXACT frame we are about to send to
+ * Sync.so, BEFORE the dispatch call. Gemini Vision (previously the primary
+ * detector here) was flaky under load — 429/5xx and unparsed text replies
+ * forced too many `probe_unavailable` results. Rekognition returns
+ * deterministic bboxes with confidence; that's exactly what this gate needs.
  *
- * v129.22.3 self-healing: when Gemini says "yes_but_not_at_coord" (a face
- * is on the frame but not at the intent coord — typically because the
- * intent coord came from a heuristic fallback, see compose-dialog-segments
- * lines ~1379-1401), we run AWS Rekognition on the same JPEG. If exactly
- * one face is detected and it sits at a plausible plate position, we return
- * `code: "ok_after_snap"` with the Rekognition center as `snapped_coord`.
- * The caller MUST replace the active_speaker_detection.coordinates with
- * snapped_coord before dispatching to Sync.so.
+ * Gemini is intentionally NOT used in this file anymore. Cartoon-Rescue and
+ * Identity-Matching still use Gemini in their own modules
+ * (plate-face-detect / plate-face-identity) — this file is the pre-dispatch
+ * face gate only.
  *
- * v129.23.2 fix: do not server-extract MP4 frames via Replicate/lucataco and
- * do not use video fallback as hard proof. The supported probe source is a
- * client-canvas JPEG/PNG in `composer-frames` (or an already cached frame).
- * If no real still image exists, return `probe_unavailable` and proceed,
- * especially for preclip-validated passes.
+ * Frame source (unchanged, v251 Anchor-First):
+ *   - `prebuiltFrameUrl` from the caller (client-canvas capture) is preferred
+ *   - otherwise a deterministic composer-frames cache hit
+ *   - no server-side MP4 extraction (no Replicate/lucataco/ffmpeg)
  *
- * Verdict mapping:
- *   - ok: true,  code: "ok"                                 → safe to dispatch
- *   - ok: true,  code: "ok_after_snap", snapped_coord       → caller MUST
- *       override ASD coordinates with snapped_coord (v129.22.3)
- *   - ok: true,  code: "skipped"                            → preflight
- *       constraint (no API key / no video URL); never seen in production
- *   - ok: true,  code: "probe_unavailable"                  → frame extract
- *       or Gemini transport failed; dispatch proceeds unchecked + Forensik
- *       UI surfaces the warning honestly
- *   - ok: false, code: "no_face" | "not_at_coord"
- *               | "multiple_faces" | "unparsed"             → caller MUST
- *       refund + fail BEFORE dispatching to Sync.so
+ * Verdict mapping (unchanged so callers/DB/UI keep working):
+ *   - ok: true,  code: "ok"                       → safe to dispatch
+ *   - ok: true,  code: "ok_after_snap", snapped_coord → caller MUST override
+ *                                                       ASD coords before dispatch
+ *   - ok: true,  code: "skipped"                  → preflight constraint
+ *   - ok: true,  code: "probe_unavailable"        → non-blocking, dispatch proceeds
+ *   - ok: false, code: "no_face" | "not_at_coord" | "multiple_faces"
+ *                                                 → caller MUST refund + fail
+ *
+ * `unparsed` stays in the type union for back-compat but is no longer emitted.
  */
 
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
+
+const GATE_VERSION = "v252-aws-face-gate-primary";
+
 
 export type FaceGateCode =
   | "ok"
