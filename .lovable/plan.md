@@ -1,67 +1,64 @@
+## Bug: Drehbuch verschwindet während des Tippens
 
-## Kontext (Slice 1 ist grün)
+### Root Cause (bestätigt in `SceneDialogStudio.tsx:568-583`)
 
-- `src/lib/composer/computeMouthCenteredCrop.ts` + 12 Unit-Tests ✅ (12/12 grün, verifiziert).
-- `_shared/face-detect-mediapipe.ts` liest bereits AWS Rekognition-Landmarks (`mouthLeft/Right/Up/Down`) und leitet `mouth` = Corner-Midpoint ab ✅.
-- Migration hat `face_share_in_preclip`, `mouth_center_offset_px`, `noop_mouth_yavg`, `detector_used`, `retry_count` auf `syncso_dispatch_log` ✅.
-- Preclip-Generator = `_shared/pass-face-preclip.ts` → nutzt heute `computeFaceCrop(coords, bbox, …)` (face-bbox-center, KEINE Mouth-Anchor).
-- Webhook = `sync-so-webhook/index.ts` hat bereits eine `noopSuspect`-Ladder (Zeilen 604–740) mit `NOOP_LADDER` — dort dockt YAVG als zusätzliches Signal an, **ohne** die bestehende Ladder umzubauen.
+Der Sync-Effekt hat zwei Design-Fehler, die zusammen den User-Text löschen:
 
-## Ziel Slice 2
-
-Mouth-Anchor-Crop live schalten und Post-Dispatch-Beweis erbringen (YAVG < 2.0 = Sync.so no-op). Nichts an der v242 Assignment-Lock- oder v246 Cast-Union-Logik anfassen.
-
-## Änderungen (klein, additiv)
-
-### 1. Neuer Shared-Helper für Deno
-`supabase/functions/_shared/compute-mouth-centered-crop.ts` — 1:1-Deno-Port der Node-Utility (pure fn, keine Imports). Getrennte Datei, damit `src/lib` weiter im Client-Bundle bleibt und die Edge-Function-Bundler keine `src/`-Pfade auflösen müssen.
-
-### 2. `pass-face-preclip.ts` erweitern
-- Neuer optionaler Input: `mouth?: [number, number]`, `faceBbox?: [number,number,number,number]`.
-- Wenn `mouth` gesetzt → `computeMouthCenteredCrop({face:{bbox, center: coords, mouth}, plateWidth: sW, plateHeight: sH, targetFaceShare: 0.42, outputSize: nativeOut})` verwenden.
-- Fallback: bestehender `computeFaceCrop`-Pfad bleibt unverändert (kein Regression-Risk, wenn Landmarks fehlen).
-- Rückgabe zusätzlich: `faceShareInCrop`, `mouthOffsetPx`, `anchor`, `clamped` (weiterreichen zum Caller).
-
-### 3. `compose-dialog-segments/index.ts` — 2 Call-Sites
-An beiden `renderPassFacePreclip(...)`-Aufrufen (Zeilen ~4232 und ~4951) den Mouth-Landmark aus `matchedFace.mouth`/`landmarks.mouth` mitgeben (kommt bereits aus `face-detect-mediapipe.ts`). Ergebnisfelder auf `pass` mitschreiben: `preclip_face_share`, `preclip_mouth_offset_px`, `preclip_anchor`.
-Log-Marker: `v247_mouth_anchor_preclip`.
-
-### 4. `syncso_dispatch_log`-Insert erweitern
-Beim Dispatch (bereits vorhandener Insert im gleichen Modul) `face_share_in_preclip`, `mouth_center_offset_px`, `detector_used` mitschreiben. Keine neuen Inserts, nur Felder erweitern.
-
-### 5. YAVG-Probe in `sync-so-webhook/index.ts`
-- Neuer Helper `probeMouthBandYavg(outputUrl, cropRegion)` — ruft `chigozienri/ffmpeg-extract-frame` via Replicate für 3 Frames (25% / 50% / 75% der Dauer), rechnet auf einer 20%-hohen Mund-Band-ROI die Y-Varianz, gibt `delta = max(YAVG) − min(YAVG)` zurück. Timeouts: `withTimeout` 25s, best-effort.
-- Nur laufen wenn: `status==="COMPLETED"` **und** Pass hat `preclip_crop` **und** noch nicht durch die vorhandene `syncOutputUnchanged`-Detection als NOOP erkannt.
-- `delta < 2.0` → `noopSuspect = true` mit `noopReason = "yavg_below_threshold"`. Läuft danach durch die **bestehende** NOOP-Ladder — kein Fork, kein neuer State.
-- Wert wird in `syncso_dispatch_log.noop_mouth_yavg` geschrieben (Observability, auch bei Erfolg).
-
-### 6. Refund-Anschluss
-Kein neuer Refund-Pfad. Die vorhandene `sync_noop_unrecoverable`-Route (webhook Zeile ~724) übernimmt automatisch die Rückerstattung über den bestehenden Credit-Refund-Automation-Weg (siehe `mem://architecture/failure-credit-refund-automation`).
-
-## Nicht-Ziele Slice 2
-
-- Kein Admin-Cockpit-Dashboard (`/admin/lipsync-health`) — kommt in Slice 3.
-- Kein Auto-Retry-Ladder-Umbau — nutzt bestehende `NOOP_LADDER`.
-- Kein Kling/Hailuo-spezifisches Verhalten.
-
-## Verifikation
-
-- Unit-Tests bleiben 12/12 grün.
-- Neuer Deno-Test `supabase/functions/_shared/compute-mouth-centered-crop.test.ts` (2 Sanity-Cases) via `supabase--test_edge_functions`.
-- Manueller Re-Render der Referenz-Szene aus dem letzten Ticket → erwartet: `preclip_anchor=mouth`, `face_share_in_preclip ≥ 0.35`, Sync.so animiert alle 4 Sprecher.
-- Log-Grep: `v247_mouth_anchor_preclip` muss in `edge_function_logs` erscheinen.
-
-## Technische Details
-
-```text
-Frame → face-detect (AWS primary, MediaPipe fallback)
-      → landmarks {bbox, center, mouth}
-      → renderPassFacePreclip(mouth) → computeMouthCenteredCrop
-      → preclip_url + preclip_crop{x,y,size,outputSize=720}
-      → dispatch Sync.so (auto_detect:true, single face)
-      → webhook COMPLETED → probeMouthBandYavg
-        - delta ≥ 2.0 → OK
-        - delta < 2.0 → NOOP-ladder (bestehend) → retry oder refund
+```ts
+// Zeile 571-573
+const localMatchesPersisted =
+  script === (scene.dialogScript ?? '') || script === '';
+if (sceneChanged || localMatchesPersisted) {
+  setScript(cleanedScript);   // ← überschreibt User-Eingabe
+  ...
+}
 ```
 
-Nach Approval baue ich Punkte 1–6 in **einem** Build-Turn.
+**Problem 1 — `script === ''` als "Match" behandelt:**
+Sobald der User das Feld leert (Strg+A, Backspace) und dann tippt, gilt der Zwischenzustand `''` als "local matches persisted". Feuert der Effekt jetzt (weil `canonicalDialogTurns` sich referenziell ändert), wird `setScript(cleanedScript)` mit dem aus `dialogTurns` rekonstruierten Skript aufgerufen → das gerade Getippte ist weg.
+
+**Problem 2 — `canonicalDialogTurns` in Deps ohne Ref-Stabilität:**
+Der Effekt hängt an `canonicalDialogTurns`. Wenn dieses Array bei jedem Render neu berechnet wird (Zeile 794 `Array.from(byId.values())`), feuert der Sync-Effekt in Schleife. Kombiniert mit dem Debounce (500 ms, Zeile 602), der `scene.dialogScript` asynchron zurückpropagiert, entsteht ein Fenster, in dem `cleanedScript` (aus alten Turns) neuer erscheint als `script`.
+
+**Problem 3 — `displayScriptFromScene()` fällt bei leerem Skript auf `dialogTurnsToScript()` zurück:**
+Löscht der User bewusst und tippt neu, ist der erste Buchstabe (`'I'`) noch nicht persistiert. `scene.dialogScript` ist `''`, `cleanedScript` liefert stattdessen das alte Dialog-Turns-Skript → Überschreibung.
+
+### Fix
+
+Der Sync-Effekt darf ausschließlich bei echten externen Änderungen laufen — nicht mehr bei jedem Turn-Ref-Wechsel und nicht mehr, wenn der lokale Puffer leer ist.
+
+**1. Typing-Guard verschärfen (`SceneDialogStudio.tsx`, ~Z. 567-583)**
+
+- `localMatchesPersisted` neu definieren als *nur* `script === (scene.dialogScript ?? '')` — kein `script === ''`-Zweig mehr. Ein leerer lokaler Puffer ist eine bewusste User-Aktion, kein Freibrief zum Überschreiben.
+- Ein `isUserTypingRef = useRef(false)` einführen; im `onChange` des Textareas (Z. 1993) auf `true` setzen und via `setTimeout` (~1500 ms nach letztem Keystroke) wieder auf `false`. Solange `isUserTypingRef.current === true` gilt: **kein** `setScript()` aus dem Sync-Effekt, egal was extern kommt.
+- `sceneChanged` bleibt die einzige Bedingung, die die Typing-Guard aushebelt (Scene-Wechsel = User verlässt die Szene, Puffer muss neu geladen werden).
+
+**2. Deps stabilisieren**
+
+- Statt `canonicalDialogTurns` (Array-Ref) als Dependency einen daraus abgeleiteten stabilen String hashen, z.B. `canonicalDialogTurns.map(t => t.characterId + ':' + t.text).join('|')`. Damit feuert der Effekt nur bei semantischer Änderung, nicht bei jedem Render.
+
+**3. Debounce race schließen**
+
+- Im Persist-Effekt (Z. 587-605) einen Vergleich `if (script === lastPushedRef.current) return;` ergänzen, damit die zurückpropagierte `scene.dialogScript` nicht als „externe Änderung" fehlgedeutet wird.
+- `lastPushedRef` wird direkt vor `onUpdate(updates)` (Z. 601) auf `script` gesetzt.
+
+**4. Fallback-Reihenfolge fixen**
+
+- `displayScriptFromScene()` (Z. 502) darf nur beim initialen Mount oder bei Scene-Wechsel auf `dialogTurnsToScript()` zurückfallen. Sonst: wenn `scene.dialogScript === ''`, den bestehenden `script` behalten. Realisierung: neue Signatur `displayScriptFromScene({ fallbackToTurns: boolean })`, im Sync-Effekt mit `fallbackToTurns: sceneChanged` aufgerufen.
+
+### Verifikation
+
+- Vitest-Unit-Test in `src/components/video-composer/__tests__/SceneDialogStudio.script.test.tsx`:
+  - Simuliert schnelles Tippen, während parent `scene.dialogTurns`-Prop referenziell wechselt (gleicher Inhalt).
+  - Erwartung: Der Textarea-Wert bleibt exakt der User-Input, keine Restauration.
+- Manueller Preview-Check: Neue Szene öffnen, in Drehbuch tippen, Cast in einer anderen Szene ändern (löst Realtime-Update aus) → Text bleibt stehen.
+
+### Nicht angefasst
+
+- Voice-Map, Dialog-Takes, Debounce-Intervall, Persist-Pfad (`onUpdate`), Kling-Omni-Integration.
+- Lip-Sync-Pipeline (v247/v248) — reiner Frontend-Statebug.
+
+### Betroffene Dateien
+
+- `src/components/video-composer/SceneDialogStudio.tsx` (Sync- + Persist-Effekt, Fallback-Signatur, Typing-Ref)
+- `src/components/video-composer/__tests__/SceneDialogStudio.script.test.tsx` (neu)
