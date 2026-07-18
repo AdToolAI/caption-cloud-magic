@@ -157,206 +157,147 @@ export async function verifyFaceBeforeDispatch(
     };
   }
 
-  // ── Stage 2 — ask Gemini about the extracted frame ───────────────
-  const question = (frame != null && coord != null)
-    ? `You are looking at a single video frame extracted at frame ${frame}. Is there exactly one clearly visible human face whose center is near the normalized image coordinates x=${coord[0]}, y=${coord[1]} (tolerance ±0.15)? Reply with EXACTLY one of: "yes_one_face_at_coord", "yes_but_not_at_coord", "multiple_faces", "no_face". No other text.`
-    : `Count distinct human faces clearly visible in this still image. Reply with ONLY a single integer (0, 1, 2, ...). No words.`;
+  // ── Stage 2 — AWS Rekognition on the extracted JPEG ─────────────
+  // v252: primary detector is AWS Rekognition, not Gemini. Deterministic
+  // bboxes with confidence; no text parsing, no rate-limit surprises.
+  const W = Math.max(0, Number(input.plateWidth ?? 0));
+  const H = Math.max(0, Number(input.plateHeight ?? 0));
+  // Rekognition needs plate dims to convert its relative bbox to pixel
+  // space. When callers didn't provide them, fall back to a 1x1 unit box —
+  // the face count is still trustworthy, we just can't do coord-tolerance
+  // or safe-zone snapping.
+  const rekW = W > 0 ? W : 1280;
+  const rekH = H > 0 ? H : 720;
 
-  const userContent: Array<Record<string, unknown>> = [{ type: "text", text: question }];
-  userContent.push({ type: "image_url", image_url: { url: frameJpegUrl } });
-
-  const geminiStart = Date.now();
-  let r: Response;
+  const awsStart = Date.now();
+  let rek: Awaited<ReturnType<typeof detectFacesMediaPipe>>;
   try {
-    r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(input.timeoutMs ?? 15_000),
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: userContent }],
-      }),
+    rek = await detectFacesMediaPipe({
+      videoUrl: input.videoUrl,
+      plateWidth: rekW,
+      plateHeight: rekH,
+      durationSec: 1,
+      prebuiltFrameUrls: [frameJpegUrl],
     });
   } catch (e) {
     return {
       ok: true,
       code: "probe_unavailable",
-      reason: `gemini_network_error: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
+      reason: `aws_rekognition_threw: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
       frame_jpeg_url: frameJpegUrl,
       frame_cached: frameCached,
       extract_ms: extractMs,
-      gemini_ms: Date.now() - geminiStart,
+      gemini_ms: Date.now() - awsStart,
     };
   }
-
-  const geminiMs = Date.now() - geminiStart;
-  const rawBody = await r.text().catch(() => "");
-
-  if (!r.ok) {
-    // With a real JPEG, a non-2xx from Gemini is almost always a 5xx /
-    // rate-limit. Treat as probe_unavailable (non-blocking) so production
-    // doesn't fall over on transient outages.
-    return {
-      ok: true,
-      code: "probe_unavailable",
-      reason: `gemini_http_${r.status} on extracted_jpeg — dispatch will proceed unchecked.`,
-      http_status: r.status,
-      raw_error: rawBody.slice(0, 400),
-      frame_jpeg_url: frameJpegUrl,
-      frame_cached: frameCached,
-      extract_ms: extractMs,
-      gemini_ms: geminiMs,
-    };
-  }
-
-  let body: unknown = null;
-  try { body = JSON.parse(rawBody); } catch { /* fallthrough */ }
-  const txt: string = String(
-    (body as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]?.message?.content ?? "",
-  ).trim();
-  const tl = txt.toLowerCase();
+  const awsMs = Date.now() - awsStart;
+  const faceCount = rek.faces?.length ?? 0;
+  const rawReply = rek.ok
+    ? `aws_rek:${faceCount}_face${faceCount === 1 ? `@${Math.round(rek.faces[0].center[0])},${Math.round(rek.faces[0].center[1])}` : ""}`
+    : `aws_rek_error:${rek.error ?? "unknown"}`;
 
   const baseMeta = {
     frame_jpeg_url: frameJpegUrl,
     frame_cached: frameCached,
     extract_ms: extractMs,
-    gemini_ms: geminiMs,
+    gemini_ms: awsMs, // reused meta field for wall-clock (kept name for schema compat)
   } as const;
 
-  if (frame != null && coord != null) {
-    if (tl.includes("yes_one_face_at_coord")) {
-      return { ok: true, code: "ok", raw_reply: txt.slice(0, 80), ...baseMeta };
-    }
-    if (tl.includes("no_face")) {
-      return {
-        ok: false,
-        code: "no_face",
-        reason: "Gemini detected no human face in the extracted ASD frame — Sync.so cannot lipsync.",
-        raw_reply: txt.slice(0, 80),
-        ...baseMeta,
-      };
-    }
-    if (tl.includes("yes_but_not_at_coord")) {
-      // v129.22.3 — Auto-snap: ask AWS Rekognition for the actual face
-      // center on the same JPEG. If exactly one face is found and it's
-      // a plausible plate position, return ok_after_snap so the caller
-      // can override the ASD coords instead of failing the dispatch.
-      // This rescues runs where the original plate-face detector wasn't
-      // available (e.g. AWS IAM not yet granted) and the inferred coord
-      // landed off-face.
-      const W = Number(input.plateWidth ?? 0);
-      const H = Number(input.plateHeight ?? 0);
-      const canSnap = frameJpegUrl && W > 0 && H > 0;
-      if (canSnap) {
-        try {
-          const snap = await detectFacesMediaPipe({
-            videoUrl: input.videoUrl,
-            plateWidth: W,
-            plateHeight: H,
-            durationSec: 1,
-            prebuiltFrameUrls: [frameJpegUrl as string],
-          });
-          if (snap.ok && snap.faces.length === 1) {
-            const f = snap.faces[0];
-            // Sanity: face must sit inside the 5%-95% safe zone, otherwise
-            // we're likely snapping onto a background detection artefact.
-            const minX = W * 0.05;
-            const maxX = W * 0.95;
-            const minY = H * 0.05;
-            const maxY = H * 0.95;
-            const inBounds = f.center[0] >= minX && f.center[0] <= maxX &&
-                             f.center[1] >= minY && f.center[1] <= maxY;
-            if (inBounds) {
-              const dist = Math.round(Math.hypot(
-                f.center[0] - coord[0],
-                f.center[1] - coord[1],
-              ));
-              const snapped: [number, number] = [
-                Math.round(f.center[0]),
-                Math.round(f.center[1]),
-              ];
-              console.log(
-                `[face-gate] v129.22.3 AUTO_SNAP intent=[${coord[0]},${coord[1]}] ` +
-                `→ rekognition=[${snapped[0]},${snapped[1]}] dist=${dist}px plate=${W}x${H}`,
-              );
-              return {
-                ok: true,
-                code: "ok_after_snap",
-                reason: `Intent coord [${coord[0]},${coord[1]}] missed the face. ` +
-                  `Rekognition snapped to [${snapped[0]},${snapped[1]}] (${dist}px delta).`,
-                raw_reply: txt.slice(0, 80),
-                snapped_coord: snapped,
-                original_coord: [coord[0], coord[1]],
-                snap_distance_px: dist,
-                ...baseMeta,
-              };
-            }
-            console.warn(
-              `[face-gate] v129.22.3 snap candidate [${f.center[0]},${f.center[1]}] ` +
-              `outside safe-zone on plate ${W}x${H} — refusing snap, failing hard.`,
-            );
-          } else if (snap.ok && snap.faces.length > 1) {
-            console.warn(
-              `[face-gate] v129.22.3 snap aborted — rekognition saw ${snap.faces.length} faces, ` +
-              `ambiguous which to snap to.`,
-            );
-          } else {
-            console.warn(
-              `[face-gate] v129.22.3 snap aborted — rekognition error: ${snap.error ?? "0 faces"}`,
-            );
-          }
-        } catch (e) {
-          console.warn(`[face-gate] v129.22.3 snap threw: ${(e as Error)?.message ?? e}`);
-        }
-      }
-      return {
-        ok: false,
-        code: "not_at_coord",
-        reason: `Face exists but not at active_speaker_detection coord [${coord[0]},${coord[1]}] — Sync.so would return generation_unknown_error.`,
-        raw_reply: txt.slice(0, 80),
-        ...baseMeta,
-      };
-    }
-    if (tl.includes("multiple_faces")) {
-      if (input.isMultiSpeakerContext) {
-        return {
-          ok: false,
-          code: "multiple_faces",
-          reason: "Multiple faces at the target coord — Sync.so cannot disambiguate from a single coordinate.",
-          raw_reply: txt.slice(0, 80),
-          ...baseMeta,
-        };
-      }
-      return { ok: true, code: "ok", raw_reply: txt.slice(0, 80), ...baseMeta };
-    }
+  if (!rek.ok) {
     return {
       ok: true,
-      code: "unparsed",
-      reason: `Gemini reply not recognized: "${txt.slice(0, 80)}" — dispatch will proceed unchecked.`,
-      raw_reply: txt.slice(0, 80),
+      code: "probe_unavailable",
+      reason: `aws_rekognition_error: ${rek.error ?? "unknown"} — dispatch will proceed unchecked.`,
+      raw_error: (rek.error ?? "").slice(0, 400),
+      raw_reply: rawReply,
       ...baseMeta,
     };
   }
 
-  const m = txt.match(/\d+/);
-  const n = m ? Number(m[0]) : null;
-  if (n === 0) {
+  // ── Verdict from face count ──────────────────────────────────────
+  if (faceCount === 0) {
+    console.log(`[face-gate] ${GATE_VERSION} no_face on jpeg`);
     return {
       ok: false,
       code: "no_face",
-      reason: "Gemini detected zero faces in the extracted frame.",
-      raw_reply: txt.slice(0, 80),
+      reason: "AWS Rekognition detected no human face in the extracted ASD frame — Sync.so cannot lipsync.",
+      raw_reply: rawReply,
       ...baseMeta,
     };
   }
-  if (n != null && n >= 1) {
-    return { ok: true, code: "ok", raw_reply: txt.slice(0, 80), ...baseMeta };
+
+  if (faceCount > 1) {
+    if (input.isMultiSpeakerContext) {
+      console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} multi_speaker=true → hard fail`);
+      return {
+        ok: false,
+        code: "multiple_faces",
+        reason: `AWS Rekognition saw ${faceCount} faces on a multi-speaker plate — Sync.so cannot disambiguate from a single coordinate.`,
+        raw_reply: rawReply,
+        ...baseMeta,
+      };
+    }
+    // Single-speaker preclip: extra faces (e.g. background extra) are a
+    // soft pass — the preclip crop guarantees the target face dominates.
+    console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} single_speaker → soft pass`);
+    return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
   }
-  return {
-    ok: true,
-    code: "unparsed",
-    reason: `Gemini reply not recognized: "${txt.slice(0, 80)}" — dispatch will proceed unchecked.`,
-    raw_reply: txt.slice(0, 80),
-    ...baseMeta,
-  };
+
+  // Exactly one face — check coord tolerance if we have both coord + plate dims.
+  const f = rek.faces[0];
+  const faceCx = f.center[0];
+  const faceCy = f.center[1];
+
+  if (coord != null && W > 0 && H > 0) {
+    // Tolerance: 15% of the longer plate side.
+    const tolPx = Math.max(W, H) * 0.15;
+    const dist = Math.hypot(faceCx - coord[0], faceCy - coord[1]);
+    if (dist <= tolPx) {
+      console.log(
+        `[face-gate] ${GATE_VERSION} ok face=[${Math.round(faceCx)},${Math.round(faceCy)}] ` +
+        `coord=[${coord[0]},${coord[1]}] dist=${Math.round(dist)}px tol=${Math.round(tolPx)}px`,
+      );
+      return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+    }
+
+    // Off-coord: attempt auto-snap when the face is inside the 5-95% safe zone.
+    const inBounds =
+      faceCx >= W * 0.05 && faceCx <= W * 0.95 &&
+      faceCy >= H * 0.05 && faceCy <= H * 0.95;
+    if (inBounds) {
+      const snapped: [number, number] = [Math.round(faceCx), Math.round(faceCy)];
+      console.log(
+        `[face-gate] ${GATE_VERSION} AUTO_SNAP intent=[${coord[0]},${coord[1]}] ` +
+        `→ rekognition=[${snapped[0]},${snapped[1]}] dist=${Math.round(dist)}px plate=${W}x${H}`,
+      );
+      return {
+        ok: true,
+        code: "ok_after_snap",
+        reason: `Intent coord [${coord[0]},${coord[1]}] missed the face. ` +
+          `Rekognition snapped to [${snapped[0]},${snapped[1]}] (${Math.round(dist)}px delta).`,
+        raw_reply: rawReply,
+        snapped_coord: snapped,
+        original_coord: [coord[0], coord[1]],
+        snap_distance_px: Math.round(dist),
+        ...baseMeta,
+      };
+    }
+
+    console.warn(
+      `[face-gate] ${GATE_VERSION} not_at_coord face=[${Math.round(faceCx)},${Math.round(faceCy)}] ` +
+      `outside safe-zone on plate ${W}x${H} — hard fail.`,
+    );
+    return {
+      ok: false,
+      code: "not_at_coord",
+      reason: `Face exists but not at active_speaker_detection coord [${coord[0]},${coord[1]}] — Sync.so would return generation_unknown_error.`,
+      raw_reply: rawReply,
+      ...baseMeta,
+    };
+  }
+
+  // No coord or no plate dims → 1 face is a green light.
+  console.log(`[face-gate] ${GATE_VERSION} ok face_count=1 (no coord check)`);
+  return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+
 }
