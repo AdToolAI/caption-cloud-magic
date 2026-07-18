@@ -499,7 +499,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       })
       .join('\n');
 
-  const displayScriptFromScene = () => sanitizeDialogScript(scene.dialogScript) || dialogTurnsToScript();
+  const displayScriptFromScene = (opts?: { fallbackToTurns?: boolean }) => {
+    const sanitized = sanitizeDialogScript(scene.dialogScript);
+    if (sanitized) return sanitized;
+    // Only rebuild from canonical turns when this is a fresh mount / scene switch.
+    // Otherwise the user just cleared the field and is retyping — don't re-inject
+    // the old turn text back on top of them.
+    return opts?.fallbackToTurns ? dialogTurnsToScript() : '';
+  };
 
   // ── Voice map state — backwards-compatible (string → DialogVoiceCfg) ──
   const normalizeVoiceMap = (
