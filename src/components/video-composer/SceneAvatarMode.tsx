@@ -11,7 +11,9 @@
  *   Sci-Fi / Sport — clicking a variant assigns it to `scene.selectedOutfit`
  *   and instantly updates the stage.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
