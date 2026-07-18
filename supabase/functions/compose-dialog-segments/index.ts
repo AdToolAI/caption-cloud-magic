@@ -6717,7 +6717,8 @@ serve(async (req) => {
     // falling through to the existing dispatch-failure path.
     const BACKOFFS_MS = [4_000, 10_000, 22_000];
     let resp: Response;
-    let attempt = 0;
+    // v253 — `attempt` is hoisted above the face-gate block; reset here.
+    attempt = 0;
     while (true) {
       resp = await fetch(`${SYNC_API_BASE}/generate`, {
         method: "POST",
