@@ -32,6 +32,9 @@ import {
   Sparkles,
   ChevronDown,
   RotateCcw,
+  Image as ImageIcon,
+  Upload,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
