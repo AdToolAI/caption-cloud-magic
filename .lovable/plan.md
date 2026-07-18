@@ -1,31 +1,38 @@
-# Plan v254 — `attempt`-TDZ endgültig beheben
+## Ausgangslage
 
-## Diagnose
-Der lokale Code enthält die Hoist-Änderung bereits korrekt: `let attempt = 0;` steht vor den Face-Gate-Logs, und die Retry-Schleife nutzt dieselbe Variable weiter.
+Im Video Composer / Motion Studio Stage gibt es aktuell **kein UI-Feld** für ein Referenzbild direkt an der Szene. Referenzen kommen ausschließlich aus Cast & World (`brand_characters.reference_image_url`, `brand_locations.reference_image_url`, Snippets).
 
-Die Live-Logs zeigen aber weiterhin den alten Crash und keinen `v253`-Marker. Das bedeutet: Die laufende Edge-Function bedient noch ein altes Deployment/Bundle oder der Crash kommt aus einem zweiten früheren `attempt`-Scope, der in der kompilierten Bundle-Zeile anders gemappt ist. Deshalb reicht „nur nochmal rendern“ nicht zuverlässig.
+Das Datenmodell trägt aber bereits ein optionales Feld: `Scene.referenceImageUrl` (`src/types/video-composer.ts:242-243`) — es wird von den Compose-Pipelines als i2v-Anchor akzeptiert. Es fehlt lediglich die Bedien-UI.
 
-## Umsetzung
-1. **Version eindeutig bumpen**
-   - `COMPOSE_DIALOG_SEGMENTS_VERSION` von `v249-preclip-metrics-persisted` auf `v254-attempt-tdz-hardlock` setzen.
-   - Startup-/Dispatch-Logs damit eindeutig erkennbar machen.
+Vorgabe des Nutzers:
+- Slot soll **nur sichtbar** sein, wenn der **Lip-Sync-Toggle deaktiviert** ist (bei aktivem Lip-Sync kollidieren zwei Referenzbilder mit dem Anchor/Plate-Flow).
+- Bedienung analog zum AI Video Studio (`ToolkitGenerator` → `MultiReferenceUploader`), also Drag-and-drop + Preview + Entfernen.
 
-2. **TDZ fail-safe härten**
-   - Den `attempt`-Zähler noch früher im Dispatch-Pass-Scope deklarieren, nicht erst direkt vor dem Face-Gate-Block.
-   - Dadurch ist er garantiert für alle Preflight-, Face-Gate-, Log- und Provider-Dispatch-Pfade initialisiert.
-   - Die Retry-Schleife setzt dann nur noch `attempt = 0`, ohne neue Deklaration.
+## Änderungen (nur Frontend / Persistenz-Mapping)
 
-3. **Deployment erzwingen**
-   - `compose-dialog-segments` neu deployen.
-   - Danach Logs auf `v254-attempt-tdz-hardlock` prüfen.
+1. **`src/components/video-composer/SceneAvatarMode.tsx`**
+   - Neuen Block „Szenen-Referenzbild (optional)" direkt unter dem Lip-Sync-Toggle rendern, **conditional** `!lipSyncOn`.
+   - Wiederverwendung des bestehenden Upload-Patterns aus `ToolkitGenerator.handleImageUpload` (Supabase Storage Bucket `user-uploads`, User-ID als erstes Path-Segment gemäß RLS-Constraint aus dem Core-Memory).
+   - State-Update via `onUpdate({ referenceImageUrl: url })` + Persistierung nach `composer_scenes.reference_image_url` (Spalte existiert bereits, wird von der Pipeline gelesen).
+   - Preview mit „Entfernen"-Button (setzt Feld auf `null`).
+   - Hinweistext: „Wird als Startframe (i2v-Anchor) an das AI-Video-Modell übergeben."
 
-4. **Verifikation**
-   - In den Edge-Logs darf kein neuer Eintrag `Cannot access 'attempt' before initialization` mehr erscheinen.
-   - Stattdessen muss beim nächsten Neu-Rendern entweder ein regulärer Face-Gate-/Dispatch-Log oder ein fachlicher Fehler erscheinen.
-   - Falls noch ein fachlicher Fehler kommt, analysieren wir ihn separat; der TDZ-Crash ist dann nicht mehr der Blocker.
+2. **Auto-Cleanup bei Lip-Sync-Reaktivierung**
+   - Wenn `lipSyncWithVoiceover` von `false` → `true` gesetzt wird und `scene.referenceImageUrl` gefüllt ist: Feld nicht löschen, aber UI ausblenden + Toast: „Referenzbild ausgeblendet – Lip-Sync nutzt den Charakter-Anchor."
+   - Kein Datenverlust: bei erneutem Ausschalten des Lip-Syncs erscheint das Bild wieder.
 
-## Technische Details
-- Datei: `supabase/functions/compose-dialog-segments/index.ts`
-- Keine Datenbankänderung.
-- Keine Preis-/Credit-Änderung.
-- Keine Änderung am eigentlichen Lip-Sync-Verhalten, nur Scope/Deployment-Härtung und eindeutige Versionierung.
+3. **Keine Backend-Änderungen nötig**
+   - `compose-video-clips` verarbeitet `referenceImageUrl` bereits als `start_image` / `first_frame_image` / `image` je Engine (siehe `modelConsistencyRanking.ts`).
+   - Keine neue Migration, keine RLS-Änderung.
+
+## Nicht Teil dieses Plans
+
+- Kein Upload-Slot bei aktivem Lip-Sync (bewusst, wie vom Nutzer vorgegeben).
+- Keine Änderung an Cast & World oder Snippet-Referenzbild-Pfaden.
+- Kein „Als Charakter speichern"-Button (kann später ergänzt werden).
+
+## Verifikation nach Build
+
+- Toggle Lip-Sync AUS → Upload-Slot erscheint, Bild hochladen, Szene rendern → in Edge-Logs steht `start_image`/`first_frame_image` = hochgeladene URL.
+- Toggle Lip-Sync AN → Slot verschwindet, Wert bleibt persistiert.
+- Reload der Szene → Preview-Thumbnail des Referenzbildes wieder sichtbar.

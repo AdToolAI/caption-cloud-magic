@@ -11,7 +11,9 @@
  *   Sci-Fi / Sport — clicking a variant assigns it to `scene.selectedOutfit`
  *   and instantly updates the stage.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +32,9 @@ import {
   Sparkles,
   ChevronDown,
   RotateCcw,
+  Image as ImageIcon,
+  Upload,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
@@ -50,9 +55,46 @@ interface Props {
 
 export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: accessible = [] } = useAccessibleCharacters();
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [poseOpen, setPoseOpen] = useState(false);
+  const [uploadingRef, setUploadingRef] = useState(false);
+  const refFileInput = useRef<HTMLInputElement>(null);
+
+  const handleReferenceUpload = async (file: File) => {
+    if (!user) {
+      toast.error('Bitte einloggen, um ein Referenzbild hochzuladen.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Datei zu groß (max. 10 MB).');
+      return;
+    }
+    setUploadingRef(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'png';
+      const path = `${user.id}/scene-ref-${scene.id}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('ai-video-reference')
+        .upload(path, file, { upsert: true, contentType: file.type || 'image/png' });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage
+        .from('ai-video-reference')
+        .getPublicUrl(path);
+      onUpdate({ referenceImageUrl: publicUrl } as Partial<ComposerScene>);
+      toast.success('Referenzbild gesetzt — wird als i2v-Startframe verwendet.');
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+    } finally {
+      setUploadingRef(false);
+    }
+  };
+
+  const clearReference = () => {
+    onUpdate({ referenceImageUrl: undefined } as Partial<ComposerScene>);
+  };
+
 
   const activeShotId =
     scene.characterShots?.[0]?.characterId ||
@@ -329,6 +371,71 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
           }}
         />
       </div>
+
+      {/* Szenen-Referenzbild — nur sichtbar wenn Lip-Sync AUS ist.
+          Bei aktivem Lip-Sync würden zwei Anchor-Bilder (Charakter-Anchor +
+          Szenen-Ref) kollidieren, daher bewusst ausgeblendet. */}
+      {!lipSyncOn && (
+        <div className="rounded-xl border border-primary/20 bg-card/40 px-3 py-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-md bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+              <ImageIcon className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold text-foreground">
+                Szenen-Referenzbild (optional)
+              </div>
+              <p className="text-[10px] text-muted-foreground line-clamp-2">
+                Wird als Startframe (i2v-Anchor) an das AI-Video-Modell übergeben. Nur verfügbar, wenn Lip-Sync deaktiviert ist.
+              </p>
+            </div>
+          </div>
+
+          <input
+            ref={refFileInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleReferenceUpload(f);
+              e.target.value = '';
+            }}
+          />
+
+          {scene.referenceImageUrl ? (
+            <div className="relative rounded-lg overflow-hidden border border-primary/30 bg-black/40">
+              <img
+                src={scene.referenceImageUrl}
+                alt="Szenen-Referenzbild"
+                className="w-full max-h-48 object-contain"
+              />
+              <button
+                type="button"
+                onClick={clearReference}
+                className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-black/70 backdrop-blur border border-destructive/40 text-[10px] uppercase tracking-wider text-destructive hover:bg-destructive/15 transition-colors"
+                title="Referenzbild entfernen"
+              >
+                <X className="h-3 w-3" />
+                Entfernen
+              </button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploadingRef}
+              onClick={() => refFileInput.current?.click()}
+              className="w-full gap-2 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              {uploadingRef ? 'Lädt hoch…' : 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)'}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
+
   );
 }
