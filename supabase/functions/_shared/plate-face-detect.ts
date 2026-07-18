@@ -537,7 +537,7 @@ export async function detectPlateFaces(params: {
     // false `aws_rekognition_mp4_fallback` detector label. We now short-
     // circuit to the downstream Gemini/cartoon-rescue path with a clear tag.
     awsError = "anchor_missing_no_mp4_fallback";
-    console.warn(`${tag} v249_anchor_missing_skip_aws → downstream_rescue`);
+    console.warn(`${tag} v251_anchor_missing_skip_aws → downstream_rescue (anchor-first only, no replicate)`);
   }
 
   // 3. v156 Decision Tree.
