@@ -69,9 +69,10 @@ export interface FaceGateResult {
   snap_distance_px?: number;
 }
 
-function getApiKey(): string {
-  return Deno.env.get("LOVABLE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ?? "";
+function hasAwsCreds(): boolean {
+  return Boolean(Deno.env.get("AWS_ACCESS_KEY_ID") && Deno.env.get("AWS_SECRET_ACCESS_KEY"));
 }
+
 
 export interface FaceGateInput {
   videoUrl: string;
