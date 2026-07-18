@@ -6470,6 +6470,7 @@ serve(async (req) => {
           http_status: gate.http_status ?? 0, sync_status: "FACE_GATE_PROBE_UNAVAILABLE",
           error_class: "face_probe_unavailable",
           error_message: (gate.reason ?? "face_probe_unavailable").slice(0, 240),
+          ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {
             diagnostic_id: diagnosticId,
             retry_variant: retryVariant,
