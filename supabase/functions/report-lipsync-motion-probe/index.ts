@@ -170,6 +170,10 @@ Deno.serve(async (req) => {
     const havePreclipCrop = !!pass.preclip_crop &&
       Number.isFinite(Number((pass.preclip_crop as { size?: number }).size));
     const haveReferenceFrame = Number.isFinite(Number(pass.reference_frame_number));
+    const faceShare = Number((pass as any).preclip_face_share);
+    const NOOP_LADDER = Number.isFinite(faceShare) && faceShare < SMALL_FACE_THRESHOLD
+      ? LADDER_SMALL_FACE
+      : LADDER_NORMAL_FACE;
     const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
     const canEscalate = !!nextRung && havePlateCoords && havePreclipCrop && haveReferenceFrame;
 
