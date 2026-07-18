@@ -580,14 +580,30 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   // `scene.dialogScript`, we don't overwrite — the debounced save effect
   // below will flush the user's edits back onto the scene.
   const lastSyncedSceneIdRef = useRef<string | null>(null);
+  // Stable hash of canonical turns so the sync effect re-runs on semantic
+  // (text/character-id) changes only — not on every render-induced ref churn.
+  const canonicalTurnsHash = useMemo(
+    () => canonicalDialogTurns.map((t) => `${t.characterId}:${t.text}`).join('|'),
+    [canonicalDialogTurns],
+  );
   useEffect(() => {
-    const cleanedScript = displayScriptFromScene();
     const sceneChanged = lastSyncedSceneIdRef.current !== scene.id;
-    const localMatchesPersisted =
-      script === (scene.dialogScript ?? '') || script === '';
+    const cleanedScript = displayScriptFromScene({ fallbackToTurns: sceneChanged });
+    const persisted = scene.dialogScript ?? '';
+    // Only allow overwrite when this is a genuine scene switch, OR when the
+    // local buffer is *exactly* the persisted value (i.e. nothing to lose).
+    // A cleared buffer ('') is NOT treated as a match anymore — it's a
+    // deliberate user action while retyping.
+    const localMatchesPersisted = script === persisted;
+    // While the user is actively typing, refuse any external stomp except
+    // on scene switch.
+    if (isUserTypingRef.current && !sceneChanged) {
+      lastSyncedSceneIdRef.current = scene.id;
+      return;
+    }
     if (sceneChanged || localMatchesPersisted) {
-      setScript(cleanedScript);
-      if ((scene.dialogScript ?? '') && cleanedScript !== (scene.dialogScript ?? '')) {
+      if (cleanedScript !== script) setScript(cleanedScript);
+      if (persisted && cleanedScript !== persisted) {
         onUpdate({ dialogScript: cleanedScript });
       }
       setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
@@ -595,12 +611,15 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
     lastSyncedSceneIdRef.current = scene.id;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.id, scene.dialogScript, canonicalDialogTurns]);
+  }, [scene.id, scene.dialogScript, canonicalTurnsHash]);
 
   // Persist script with debounce. If canonical ID turns exist, keep them as the
   // technical source of truth and only update turn text by line order.
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
+    // Skip echoes: if this value is the one we just pushed, the parent update
+    // that came back is not a fresh user edit — don't re-emit.
+    if (script === lastPushedScriptRef.current) return;
     const handle = setTimeout(() => {
       const updates: Partial<ComposerScene> = { dialogScript: script };
       if (canonicalDialogTurns.length > 0) {
@@ -613,11 +632,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           }));
         }
       }
+      lastPushedScriptRef.current = script;
       onUpdate(updates);
     }, 500);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [script, canonicalDialogTurns]);
+  }, [script, canonicalTurnsHash]);
 
   /** Persist voice map immediately on change */
   const updateSpeakerVoice = (speakerId: string, patch: Partial<DialogVoiceCfg>) => {
