@@ -6430,6 +6430,7 @@ serve(async (req) => {
           http_status: 0, sync_status: "COORD_AUTO_SNAPPED",
           error_class: "coord_auto_snap",
           error_message: (gate.reason ?? "auto_snapped").slice(0, 240),
+          ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {
             diagnostic_id: diagnosticId,
             retry_variant: retryVariant,
