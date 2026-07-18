@@ -1,40 +1,60 @@
-## Frage
-Wurde AWS (Rekognition) im Lip-Sync-Pfad korrekt verwendet?
+# Plan v250 — Frame-Extractor Reaktivierung für v249 Lip-Sync
 
-## Prüfung des Ist-Zustands (nur gelesen, nichts geändert)
+## Ehrliche Antwort vorab
+Nein — die Pipeline läuft nach v249 **noch nicht garantiert** durch mit Lip-Sync. v249 hat zwei Dinge erledigt:
 
-**Was AWS-seitig korrekt ist**
-- `_shared/face-detect-mediapipe.ts` implementiert eine echte SigV4-signierte `RekognitionService.DetectFaces`-Anfrage. Region wird sauber auf ein gültiges Muster geprüft und fällt auf `eu-central-1` zurück, wenn `AWS_REGION` fehlt oder z. B. `"Global"` ist. Credentials aus `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. Payload als Base64-JPEG, Timeout, saubere Fehlerpfade.
-- `_shared/plate-face-detect.ts` ruft Rekognition primär auf **Anchor-JPEGs** (nicht auf mp4) auf — genau so wie Rekognition das erwartet — und liest `MouthLeft/Right/Down` als Landmarks (`landmarks.mouth`) heraus. Diese Landmarks werden persistiert (`mouth_landmarks`) und in `compose-dialog-segments` als `speakerPlateMouths` bzw. `speakerCoords` verwendet — d. h. der Mund-Anker aus Rekognition fließt in den v247-Preclip.
-- `_shared/pass-face-preclip.ts` verwendet den Mund-Anker exakt dann, wenn `mouth` und `bbox` da sind (`useMouthAnchor`), erzwingt `faceShareInCrop ≥ 0.42` und liefert die Metriken zurück (`anchor`, `faceShareInCrop`, `mouthOffsetPx`), die `compose-dialog-segments` heute an das `pass`-Objekt hängt.
-- `_shared/syncso-face-gate.ts` nutzt Rekognition zusätzlich als Auto-Snap-Guard (v129.22.3).
+1. Metriken (`face_share_in_preclip`, `mouth_center_offset_px`, `detector_used`) werden jetzt in `syncso_dispatch_log` persistiert.
+2. Der Escalation-Ladder in `report-lipsync-motion-probe` reagiert face-share-aware.
 
-Kurz: die eigentlichen AWS-Aufrufe (Signatur, Region, Endpoint, Payload-Form) sind korrekt.
+**Aber**: Der server-seitige Frame-Extractor in `supabase/functions/_shared/face-frame-extract.ts` ist noch gestubbt (Client-Canvas-Fallback). Das heißt:
 
-**Was nicht korrekt „durchgezogen" ist**
-1. **Server-Frame-Extract für den Face-Gate-Probe ist deaktiviert.**
-   `_shared/face-frame-extract.ts` liefert immer entweder einen zwischengespeicherten Frame aus dem `composer-frames`-Bucket oder `server_extract_disabled_use_client_canvas`. Dadurch bekommt der Face-Gate im Dispatch-Pfad in 100 % der Fälle `FACE_GATE_PROBE_UNAVAILABLE`. Rekognition selbst wäre bereit, es fehlt nur die JPEG-Quelle.
-2. **Preclip-Metriken landen (v249) zwar im Code auf dem `pass`-Objekt, wurden bis zum letzten Dispatch aber nicht in `syncso_dispatch_log` persistiert**, weil das produktive Bundle noch `v222-bridge-recount-resolved` war. Der Code für v249 existiert lokal, nur der Deploy fehlt.
-3. **Fallback auf Rekognition „mp4 direkt"** in `plate-face-detect.ts` ist historisch drin (`aws_rekognition_mp4_fallback`), aber Rekognition akzeptiert kein Video — der Kommentar im Code sagt das selbst. Dieser Fallback ist tot, sollte klar deaktiviert oder auf einen JPEG-Extract umgestellt werden, damit er im Log nicht als Erfolgspfad wirkt.
+- Beim Dispatch kommt kein JPEG an Rekognition an → `FACE_GATE_PROBE_UNAVAILABLE`.
+- Rekognition-Landmarks werden nur ausgewertet, wenn der Client rechtzeitig einen Frame nachliefert.
+- Bei kurzen Szenen oder wenn der Client keinen Frame-Probe schickt, bleibt der neue face-share-Ladder blind und wir fallen auf den alten Pfad zurück (kein Lip-Sync bei kleinen Gesichtern).
 
-## Bewertung
-AWS-Rekognition ist **an sich korrekt eingebunden**: Signatur, Region, DetectFaces auf Bild-Bytes, Landmark-Auswertung, Mund-Anker im Preclip. Die Kette ist aber an zwei Stellen unterbrochen, sodass die AWS-Signale in der Produktion **nicht wirken**:
-- Der Server-seitige Frame-Extract ist ausgeschaltet → Face-Gate-Probe kommt nie zu Rekognition.
-- Der neue v249-Metrik-Persistenz-Pfad ist noch nicht deployed → die Slice-C-Ladder in `report-lipsync-motion-probe` bekommt weiter NULLs.
+Solange dieser Gap besteht, funktioniert v249 nur in einem Teil der Szenen zuverlässig. Deshalb dieser Plan.
 
-Fazit: AWS ist korrekt verwendet, aber der Nutzen kommt nicht durch, solange Frame-Extract offline und v249 nicht produktiv aktiv ist.
+## Ziel
+Frame-Extractor server-seitig aktivieren, damit Face-Gate + v247 Mouth-Anchored-Zoom + v249 Metrik-Ladder in **jeder** Szene greifen — unabhängig vom Client.
 
-## Vorschlag (kein Code-Change ohne Freigabe)
+## Umfang
 
-1. **Deploy verifizieren**: sicherstellen, dass `compose-dialog-segments` als `v249-preclip-metrics-persisted` und `report-lipsync-motion-probe` mit Slice-C-Ladder live sind. Danach an einer Test-Szene prüfen, ob `face_share_in_preclip`, `mouth_center_offset_px`, `detector_used` in `syncso_dispatch_log` gefüllt sind.
+### 1. Server-side Frame-Extractor
+`supabase/functions/_shared/face-frame-extract.ts`:
+- Stub entfernen, echten Extractor implementieren.
+- Ansatz: Replicate `ffmpeg` still-frame route (mittlere Zeitstempel-Extraktion, JPEG-Bytes, ≤ 1280px lange Kante).
+- Fallback: signed URL zum Anchor-Frame, falls Video-still fehlschlägt.
+- Timeout hart auf 8s begrenzen, damit Dispatch nicht blockiert.
 
-2. **Face-Gate-Probe wieder scharf machen**: In `face-frame-extract.ts` einen echten Frame-Extract implementieren (Remotion-`still` oder ffmpeg-Edge-Call auf das Preclip-mp4, JPEG nach `composer-frames` schreiben). Dann greift der bestehende Rekognition-Auto-Snap in `syncso-face-gate.ts` wieder — statt `FACE_GATE_PROBE_UNAVAILABLE` bekommen wir echte `ok` / `ok_after_snap` Signale.
+### 2. Face-Gate Verdrahtung
+`supabase/functions/_shared/plate-face-detect.ts`:
+- Beim Dispatch: `face-frame-extract` aufrufen → JPEG → Rekognition `DetectFaces`.
+- Mouth-Landmarks + BoundingBox in `syncso_dispatch_log` schreiben (`detector_used = 'rekognition-server'`).
+- Bei Extract-Fail: sauber auf `FACE_GATE_PROBE_UNAVAILABLE` fallen (keine falschen Positives, kein Log-Spam).
 
-3. **Toten `aws_rekognition_mp4_fallback` entfernen** bzw. explizit als „nicht mehr genutzt" markieren, damit Logs nicht irreführen.
+### 3. Escalation-Ladder scharfschalten
+`supabase/functions/report-lipsync-motion-probe/index.ts`:
+- Sicherstellen, dass bei `face_share < 0.30` UND `detector_used = 'rekognition-server'` der Re-Dispatch mit `mouth-anchored-zoom` sofort feuert (nicht erst nach Client-Probe).
+- Refund-Pfad bleibt bei `yavg < 4.0` nach 2. Anlauf.
 
-4. Erst nach 1–3 den nächsten visuellen Lip-Sync-Test fahren; alles davor läuft weiter am AWS-Signal vorbei.
+### 4. Observability
+- `syncso_dispatch_log`-Query zum Verifizieren: nach 5 Test-Szenen sollten ≥ 90 % `detector_used = 'rekognition-server'` haben und `face_share_in_preclip` NICHT NULL sein.
+- Version bump: `v250-server-frame-extract-live`.
 
-## Nicht Teil des Plans
-- Keine Änderung an Rekognition-Signatur, Region oder Auth — die sind korrekt.
-- Keine Änderung an `pass-face-preclip` / `computeMouthCenteredCrop` — der v247-Anker greift, sobald die Landmarks weiterhin sauber ankommen (was sie tun).
-- Keine neuen AWS-Ressourcen (Bedrock, S3-Buckets, Lambda-Deploy) — reine Wiring-Reparatur.
+## Explizit NICHT im Umfang
+- Keine Änderungen am Rekognition-SigV4-Client (bereits korrekt, v249 auditiert).
+- Kein Umbau des Preclip-Renderers.
+- Keine Prompt- oder Cast-Union-Änderungen.
+
+## Verifikation
+1. Testszene mit 2 Sprechern, kleines Gesicht (< 30 % face-share) rendern.
+2. Log prüfen: `detector_used`, `face_share_in_preclip`, `mouth_center_offset_px` müssen gesetzt sein.
+3. Bei kleinem Gesicht: Re-Dispatch mit `mouth-anchored-zoom` muss automatisch triggern.
+4. Lip-Sync im finalen Clip visuell prüfen.
+
+## Technische Details
+- Replicate-Modell für Still-Extract: `fofr/video-to-frames` oder Lambda-Route falls schon verdrahtet.
+- JPEG-Quality 85, max 1280px, mittlerer Zeitstempel des Preclips.
+- Rekognition-Region primary `eu-central-1`, Fallback `us-east-1` (bereits konfiguriert).
+
+Nach Umsetzung sollte die Pipeline zuverlässig durchlaufen und Lip-Sync auch bei kleinen/entfernten Gesichtern generieren.
