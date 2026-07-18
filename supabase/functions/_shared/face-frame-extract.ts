@@ -1,33 +1,32 @@
 /**
- * face-frame-extract (v250-server-frame-extract-live)
+ * face-frame-extract (v251-anchor-first-only, no replicate)
  *
- * Server-side MP4 frame extraction via Replicate `lucataco/ffmpeg-extract-frame`.
- * v129.23.2 disabled this path entirely; v250 restores it so the Face-Gate,
- * v247 mouth-anchored zoom, and v249 metric-ladder actually receive a JPEG
- * at dispatch time — independent of whether the client uploaded a canvas
- * frame.
+ * v250 briefly re-introduced a Replicate `lucataco/ffmpeg-extract-frame` call
+ * to extract still frames from rendered MP4s. That path was rejected — it
+ * was previously error-prone and violated our AWS-only policy for
+ * face/frame work (AWS Rekognition on the anchor is our sole detector path,
+ * see mem://architecture/lipsync/v156-anchor-first-detection).
  *
- * Contract
- * ────────
- *   1. Cache hit: reuse the deterministic path in `composer-frames` under
- *      `{userId}/{projectId}/probe-frames/{sceneId}-p{passIdx+1}-f{frame}.png`.
- *   2. Cache miss: call Replicate with the plate URL + timestamp, download
- *      the returned PNG, upload it to the cache path, return the public URL.
- *   3. Hard timeout: 8s total (Replicate + upload). Any failure returns
- *      `ok: false` with a reason string — the caller falls back to
- *      `FACE_GATE_PROBE_UNAVAILABLE` (unblocked dispatch).
+ * v251 removes Replicate entirely:
+ *   1. If the caller passed a `prebuiltFrameUrl` (client-canvas capture),
+ *      that path is used directly by the Face-Gate — this helper is not
+ *      invoked.
+ *   2. If a deterministic frame was previously cached in `composer-frames`
+ *      at `{userId}/{projectId}/probe-frames/{sceneId}-p{passIdx+1}-f{frame}.png`,
+ *      we return a signed URL for that cache entry.
+ *   3. Otherwise we return `ok: false` with a clean reason. The caller
+ *      short-circuits to `FACE_GATE_PROBE_UNAVAILABLE` and dispatch
+ *      proceeds unchecked, exactly like v129.11 behaviour. Anchor-First
+ *      (v156) already covers every current dialog scene via
+ *      `lock_reference_url` / `reference_image_url` at the plate-face
+ *      detector; no server-side MP4 frame grab is needed.
  *
- * RLS: composer-frames enforces user-id-first paths. `safeSegment` sanitises
- * every path part; a missing userId collapses to `system` (service role
- * bucket write).
+ * No Replicate. No lucataco. No ffmpeg calls. Ever.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import Replicate from "npm:replicate@0.25.2";
 
-const MODEL_TAG = "replicate:lucataco/ffmpeg-extract-frame@v250";
-const REPLICATE_MODEL = "lucataco/ffmpeg-extract-frame";
-const HARD_TIMEOUT_MS = 8_000;
+const MODEL_TAG = "v251-anchor-first-only";
 
 export interface ExtractInput {
   videoUrl: string;
@@ -56,105 +55,55 @@ export async function extractFrameForFaceProbe(
   const t0 = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const replicateToken =
-    Deno.env.get("REPLICATE_API_TOKEN") ?? Deno.env.get("REPLICATE_API_KEY") ?? "";
 
   try {
-    if (!input.videoUrl || !/^https?:\/\//i.test(input.videoUrl)) {
-      return { ok: false, reason: "invalid_video_url", model: MODEL_TAG, latencyMs: Date.now() - t0 };
-    }
     if (!supabaseUrl || !serviceKey) {
-      return { ok: false, reason: "storage_env_missing", model: MODEL_TAG, latencyMs: Date.now() - t0 };
+      return {
+        ok: false,
+        reason: "v251_anchor_missing_probe_unavailable:storage_env_missing",
+        model: MODEL_TAG,
+        latencyMs: Date.now() - t0,
+      };
     }
 
     const frame = Math.max(0, Math.round(Number(input.frameNumber ?? 0)));
-    const fps = Number.isFinite(Number(input.fps)) && Number(input.fps) > 0 ? Number(input.fps) : 30;
     const userId = safeSegment(input.userId) || "system";
     const projectId = safeSegment(input.projectId) || "shared";
     const sceneId = safeSegment(input.sceneId) || "unknown-scene";
-    const passIdx = Number.isFinite(Number(input.passIdx)) ? Math.max(0, Number(input.passIdx)) : 0;
+    const passIdx = Number.isFinite(Number(input.passIdx))
+      ? Math.max(0, Number(input.passIdx))
+      : 0;
     const cachePath = `${userId}/${projectId}/probe-frames/${sceneId}-p${passIdx + 1}-f${frame}.png`;
 
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // ── Stage 1 — cache hit? ────────────────────────────────────────
+    // Deterministic cache hit — a prior client-canvas upload landed here.
     const cached = await tryCacheHit(supabase, cachePath);
     if (cached) {
-      return { ok: true, frameUrl: cached, cached: true, model: MODEL_TAG, latencyMs: Date.now() - t0 };
+      return {
+        ok: true,
+        frameUrl: cached,
+        cached: true,
+        model: MODEL_TAG,
+        latencyMs: Date.now() - t0,
+        reason: "v251_anchor_bytes_ok:cache_hit",
+      };
     }
 
-    // ── Stage 2 — server-side extract via Replicate ────────────────
-    if (!replicateToken) {
-      return { ok: false, reason: "replicate_token_missing", model: MODEL_TAG, latencyMs: Date.now() - t0 };
-    }
-
-    const timestamp = Math.max(0.05, frame / fps);
-    const budget = Math.min(Math.max(1_000, Number(input.timeoutMs ?? HARD_TIMEOUT_MS)), HARD_TIMEOUT_MS);
-    const deadline = t0 + budget;
-
-    const replicate = new Replicate({ auth: replicateToken });
-    const framePngUrl = await withDeadline(
-      (async () => {
-        const out = await replicate.run(REPLICATE_MODEL as `${string}/${string}`, {
-          input: { video: input.videoUrl, timestamp },
-        });
-        // Replicate returns a URL string, an array of URLs, or a FileOutput-like object.
-        const url =
-          typeof out === "string"
-            ? out
-            : Array.isArray(out)
-              ? out[0]
-              : ((out as { url?: unknown })?.url instanceof Function
-                  ? String(((out as { url: () => unknown }).url)())
-                  : ((out as { url?: string })?.url ?? ""));
-        return typeof url === "string" ? url : "";
-      })(),
-      deadline,
-      "replicate_timeout",
-    );
-
-    if (!framePngUrl) {
-      return { ok: false, reason: "replicate_no_frame_url", model: MODEL_TAG, latencyMs: Date.now() - t0 };
-    }
-
-    // ── Stage 3 — download + upload to composer-frames ─────────────
-    const pngRes = await fetch(framePngUrl, { signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())) });
-    if (!pngRes.ok) {
-      return { ok: false, reason: `frame_download_failed_${pngRes.status}`, model: MODEL_TAG, latencyMs: Date.now() - t0 };
-    }
-    const bytes = new Uint8Array(await pngRes.arrayBuffer());
-
-    const { error: uploadErr } = await supabase.storage
-      .from("composer-frames")
-      .upload(cachePath, bytes, {
-        contentType: "image/png",
-        upsert: true,
-        cacheControl: "31536000",
-      });
-    if (uploadErr) {
-      return { ok: false, reason: `storage_upload_failed:${uploadErr.message}`, model: MODEL_TAG, latencyMs: Date.now() - t0 };
-    }
-
-    const { data: pub } = supabase.storage.from("composer-frames").getPublicUrl(cachePath);
-    const publicUrl = pub?.publicUrl;
-    if (!publicUrl) {
-      // Fall back to a signed URL if the bucket is not public.
-      const signed = await supabase.storage
-        .from("composer-frames")
-        .createSignedUrl(cachePath, 60 * 30);
-      if (signed.error || !signed.data?.signedUrl) {
-        return { ok: false, reason: "storage_url_unavailable", model: MODEL_TAG, latencyMs: Date.now() - t0 };
-      }
-      return { ok: true, frameUrl: signed.data.signedUrl, cached: false, model: MODEL_TAG, latencyMs: Date.now() - t0 };
-    }
-
-    return { ok: true, frameUrl: publicUrl, cached: false, model: MODEL_TAG, latencyMs: Date.now() - t0 };
+    // No server-side MP4 extraction. AWS Rekognition runs on the anchor
+    // frame in plate-face-detect; no second network hop is required here.
+    return {
+      ok: false,
+      reason: "v251_anchor_missing_probe_unavailable:no_cache_no_server_extract",
+      model: MODEL_TAG,
+      latencyMs: Date.now() - t0,
+    };
   } catch (e) {
     return {
       ok: false,
-      reason: (e as Error)?.message ?? String(e),
+      reason: `v251_anchor_missing_probe_unavailable:${(e as Error)?.message ?? String(e)}`,
       model: MODEL_TAG,
       latencyMs: Date.now() - t0,
     };
@@ -178,14 +127,6 @@ async function tryCacheHit(
   } catch {
     return null;
   }
-}
-
-async function withDeadline<T>(p: Promise<T>, deadline: number, timeoutReason: string): Promise<T> {
-  const remaining = Math.max(1, deadline - Date.now());
-  return await Promise.race([
-    p,
-    new Promise<T>((_, rej) => setTimeout(() => rej(new Error(timeoutReason)), remaining)),
-  ]);
 }
 
 function safeSegment(value: unknown): string {
