@@ -530,6 +530,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   // Debounce-echo filter: remembers the last value we pushed to the parent so
   // the round-tripped scene.dialogScript update isn't misread as an external edit.
   const lastPushedScriptRef = useRef<string>('');
+  useEffect(() => () => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+  }, []);
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
     normalizeVoiceMap(scene.dialogVoices),
   );
