@@ -332,6 +332,27 @@ serve(async (req) => {
       ? ` FINAL FACE-LOCK MODE — the previous TWO attempts both produced the wrong face in at least one slot${swapMismatches.length > 0 ? ` (offenders: ${swapMismatches.join(", ")})` : ""}. For each numbered reference slot, COPY THE FACE DIRECTLY FROM THAT SLOT'S IDENTITY HEADSHOT pixel-for-pixel — same geometry, same jaw, same eyes, same nose, same hairline, same skin tone, same age, same sex. NO creative interpretation of faces. NO blending. NO substitution. NO "improvement". The IDENTITY headshot IS the face — paste it. Outfits come from the wardrobe references (Image #1..#${portraits.length}), but every face is a direct copy from its IDENTITY headshot. If you cannot copy a face exactly from its identity headshot, leave that character out rather than substitute a different person.`
       : "";
 
+    // v250 — FAMILY-NAME DISTINGUISH BLOCK. When two or more cast members
+    // share a surname (siblings/family), Nano Banana 2 collapses their
+    // faces into a single "family look" — the #1 source of clone/swap
+    // failures for our test cast. Emit an explicit differentiator so the
+    // model treats them as unrelated individuals for face rendering.
+    const surnameGroups = new Map<string, string[]>();
+    for (const nm of names) {
+      const parts = String(nm).trim().split(/\s+/);
+      if (parts.length < 2) continue;
+      const last = parts[parts.length - 1].toLowerCase();
+      if (!last || last.length < 3) continue;
+      const arr = surnameGroups.get(last) ?? [];
+      arr.push(nm);
+      surnameGroups.set(last, arr);
+    }
+    const sharedSurnames = [...surnameGroups.entries()].filter(([, v]) => v.length >= 2);
+    const FAMILY_DISTINGUISH_SUFFIX = sharedSurnames.length > 0
+      ? ` FAMILY-NAME DISTINGUISH — ${sharedSurnames.map(([, v]) => v.join(" and ")).join("; ")} share a surname but are DIFFERENT individuals with DIFFERENT faces. Do NOT merge their faces into a "family average", do NOT make them look like siblings if their reference portraits show different facial geometry, do NOT copy facial features from one onto the other. Treat each named character's face as fully independent — pull face geometry only from that character's own reference/identity portrait.`
+      : "";
+
+
     // Per-character action clause — protected from the dialog stripper and
     // placed BEFORE the framing rules so the model treats placement /
     // activity per character as the ground truth.
