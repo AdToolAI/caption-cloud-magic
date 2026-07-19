@@ -67,7 +67,17 @@ interface Body {
    *  `wardrobeLockNames` are the cast members whose wardrobe is locked. */
   wardrobeLock?: boolean;
   wardrobeLockNames?: string[];
+  /** v260 Speaker Priority Framing (Phase 1) — when set, the composed
+   *  first-frame prioritises the named speaker: they are placed frontal /
+   *  three-quarter to camera with the mouth clearly readable for lip-sync,
+   *  while the other cast members continue to perform their CastActions
+   *  in mid-/background. Only used for `dialogMode` scenes with asymmetric
+   *  CastActions. Index is 0-based, aligned with `portraitUrls` /
+   *  `characterNames`. When absent → legacy neutral group-shot behavior. */
+  speakerFocusIdx?: number;
+  speakerFocusName?: string;
 }
+
 
 async function sha1(s: string): Promise<string> {
   const buf = new TextEncoder().encode(s);
