@@ -664,6 +664,32 @@ serve(async (req) => {
       }
     }
 
+    /**
+     * Marker-Block-Guard: preserve `[CastActions]…[/CastActions]` and
+     * `[SceneAction]…[/SceneAction]` across the anchor strippers. The generic
+     * `- Name: ...` bullet regex below would otherwise annihilate the very
+     * lines that carry per-character actions, causing `compose-scene-anchor`
+     * to see an empty CastActions block and fall back to the equal-share
+     * TWO_SHOT_FRAMING line-up.
+     */
+    const MARKER_BLOCK_RES: RegExp[] = [
+      /\[CastActions\][\s\S]*?\[\/CastActions\]/g,
+      /\[SceneAction\][\s\S]*?\[\/SceneAction\]/g,
+    ];
+    const preserveMarkers = (fn: (s: string) => string) => (raw: string): string => {
+      if (!raw) return "";
+      const saved: string[] = [];
+      let masked = raw;
+      for (const re of MARKER_BLOCK_RES) {
+        masked = masked.replace(re, (m) => {
+          const idx = saved.push(m) - 1;
+          return `§§MARKER_${idx}§§`;
+        });
+      }
+      let out = fn(masked);
+      out = out.replace(/§§MARKER_(\d+)§§/g, (_, i) => saved[Number(i)] ?? "");
+      return out;
+    };
 
     /**
      * Strip spoken-dialog patterns from a scene prompt BEFORE handing it to
@@ -672,8 +698,9 @@ serve(async (req) => {
      * Banana (which would otherwise paint the same speaker twice when a
      * script repeats a name across lines).
      */
-    const stripDialogForAnchor = (raw: string): string => {
+    const stripDialogForAnchor = preserveMarkers((raw: string): string => {
       if (!raw) return "";
+
       const cleaned = raw
         .replace(/\[\s*dialog\s*\][\s\S]*?\[\s*\/\s*dialog\s*\]/gi, "")
         .replace(/^\s*featuring\s+[^:\n]{1,200}:\s*/gim, "")
