@@ -2509,21 +2509,55 @@ serve(async (req) => {
                   if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
-                    const msg = `${code}: ${identityNotes || identityFailure} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
+                    // v250 — Soft-Pass: when three retries produced the right
+                    // headcount (faces=N, humans=N) but Gemini still flags a
+                    // clone/swap, the failure is almost always similar-looking
+                    // cast (e.g. two brothers sharing a surname). Instead of
+                    // hard-blocking the whole render, we mark the anchor as
+                    // `anchor_soft_pass`, warn in the DB, and continue so the
+                    // user can review the anchor and either accept or re-roll.
+                    const headcountOk =
+                      typeof faceCount === "number" &&
+                      typeof humanCount === "number" &&
+                      faceCount === expectedFaces &&
+                      humanCount === expectedFaces;
+                    const softPassEligible =
+                      headcountOk &&
+                      (identityFailure === "clone" || identityFailure === "swap") &&
+                      (((scene as any).__anchorAttempts?.length ?? 0) >= 3);
+                    if (softPassEligible) {
+                      const warn = `${code}_soft_pass: ${identityNotes || identityFailure} — Anchor zeigt zwar ${expectedFaces} Personen, aber Gesichter wirken ähnlich (z. B. Cast mit gleichem Nachnamen). Bitte den Anchor in der Vorschau prüfen und ggf. neu rendern.`;
+                      console.log(
+                        `[compose-video-clips] v250_anchor_soft_pass scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces}`,
+                      );
+                      try {
+                        await supabaseAdmin
+                          .from("composer_scenes")
+                          .update({
+                            twoshot_stage: "anchor_soft_pass",
+                            clip_error: warn,
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq("id", scene.id);
+                      } catch (_) { /* non-fatal */ }
+                      // do NOT `continue` — fall through into normal pipeline
+                    } else {
+                      const msg = `${code}: ${identityNotes || identityFailure} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
+                      await supabaseAdmin
+                        .from("composer_scenes")
+                        .update({
+                          clip_status: "failed",
+                          clip_error: msg,
+                          updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", scene.id);
+                      results.push({
+                        sceneId: scene.id,
+                        status: "failed",
+                        error: msg,
+                      });
+                      continue;
+                    }
                   }
                 }
               }
