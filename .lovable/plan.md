@@ -1,24 +1,81 @@
-## Diagnose
 
-Der Referenzbild-Slot wurde in `SceneAvatarMode.tsx` eingebaut — der rendert aber nur im **Avatar-Tab**. Der sichtbare „Dialog & Lip-Sync"-Toggle im Screenshot liegt jedoch im **Editor-Tab** (`SceneCard.tsx`, Zeile ~1438–1600, unter „Story & Engine"). Deshalb: Toggle AUS → im Editor passiert nichts, weil der Slot in einem anderen Tab wohnt.
+# Root Cause (bestätigt)
 
-## Fix
+Die Pipeline ist verdrahtet, aber `stripDialogForAnchor` in `supabase/functions/compose-video-clips/index.ts` (Z. 675-698) läuft **vor** `compose-scene-anchor` und entfernt genau die Bulletzeilen, die die Aktionen tragen.
 
-1. **Neue Datei `src/components/video-composer/SceneReferenceImageSlot.tsx`**
-   - Extrahiert den bestehenden Upload/Preview/Remove-Block aus `SceneAvatarMode.tsx` (Bucket `ai-video-reference`, User-ID-Path, `onUpdate({ referenceImageUrl })`).
-   - Rendert `null`, wenn `scene.lipSyncWithVoiceover === true` (Auto-Hide, kein Datenverlust).
-   - Props: `{ scene, onUpdate }`.
+Der Client komponiert:
+```
+[CastActions]
+- Samuel Dusatko: is talking on the phone in the foreground, gesturing freely
+- Matthew Dusatko: is typing on the laptop, is listening
+- Sarah Dusatko: is standing at the printer in the background, is flipping pages
+- Kailee: he's leaning against the window pane, a coffee cup in his hand
+[/CastActions]
+<Rest des Prompts>
+```
 
-2. **`src/components/video-composer/SceneCard.tsx`**
-   - Direkt nach dem „Dialog & Lip-Sync"-Toggle-Block (nach Zeile ~1600) das neue `<SceneReferenceImageSlot />` einfügen — sichtbar im Editor-Tab, dort wo der Nutzer den Toggle bedient.
+Regex Z. 684 matcht `^\s*[-*•]\s*Name\s*:\s.*$` global → alle vier Bullets weg. `[CastActions]` und `[/CastActions]` bleiben leer stehen. Server-Extraktor in `compose-scene-anchor` (Z. 133-153) findet keinen Content → `castActions = []` → `CAST_ACTIONS_CLAUSE` leer → `ASYM_RE` false → equal-share TWO_SHOT_FRAMING greift → Line-Up.
 
-3. **`src/components/video-composer/SceneAvatarMode.tsx`**
-   - Alten Inline-Block (Zeilen ~375–420) durch dieselbe `<SceneReferenceImageSlot />`-Komponente ersetzen, damit Avatar- und Editor-Tab identisch bleiben und keine Doppel-Implementierung driftet.
+Dasselbe passiert bei Z. 689 (`^Name: ...` ohne Bullet). Und `stripExtraHumansForAnchor` (Z. 710+) könnte Actions wie "at the printer in the background" partiell entstellen.
 
-Keine Backend-/DB-Änderung — `composer_scenes.reference_image_url` und die i2v-Pipelines konsumieren das Feld bereits.
+## Fix — Marker-Block-Guard vor den Strippern
 
-## Verifikation
+**Eine Datei, ~15 Zeilen:** `supabase/functions/compose-video-clips/index.ts`
 
-- Editor-Tab, Lip-Sync AUS → Referenzbild-Slot erscheint unter dem Toggle.
-- Lip-Sync AN → Slot verschwindet, Wert bleibt in DB.
-- Avatar-Tab zeigt denselben Slot mit derselben Vorschau.
+Ein neuer Helper wickelt beide Stripper so ein, dass `[CastActions]…[/CastActions]` und `[SceneAction]…[/SceneAction]` vor dem Strippen ausgeschnitten, durch Platzhalter (`§§CASTACTIONS_0§§`) ersetzt, und nach dem Strippen unverändert re-injiziert werden:
+
+```ts
+const MARKER_BLOCKS = [
+  /\[CastActions\][\s\S]*?\[\/CastActions\]/g,
+  /\[SceneAction\][\s\S]*?\[\/SceneAction\]/g,
+];
+
+function preserveMarkers<T extends (s: string) => string>(fn: T) {
+  return (raw: string): string => {
+    if (!raw) return "";
+    const saved: string[] = [];
+    let masked = raw;
+    for (const re of MARKER_BLOCKS) {
+      masked = masked.replace(re, (m) => {
+        const idx = saved.push(m) - 1;
+        return `§§MARKER_${idx}§§`;
+      });
+    }
+    let out = fn(masked);
+    out = out.replace(/§§MARKER_(\d+)§§/g, (_, i) => saved[Number(i)] ?? "");
+    return out;
+  };
+}
+```
+
+Dann beide Stripper wrappen — Signaturen und Aufrufsites bleiben identisch:
+```ts
+const stripDialogForAnchor = preserveMarkers((raw: string) => { /* bestehende Regex-Kette */ });
+const stripExtraHumansForAnchor = preserveMarkers((raw: string) => { /* bestehende Kette */ });
+```
+
+Alle drei Aufrufsites (Z. 964, 2090-2091, 2581) bleiben unverändert.
+
+## Warum das minimal-invasiv ist
+
+- Keine Änderung an `compose-scene-anchor`, keine Änderung am Client, keine Änderung am `applyActionsToPrompt`-Format.
+- Kein neuer Cache-Bust nötig: sobald der `[CastActions]`-Block den Anchor erreicht, ändert sich der Anchor-Prompt (und damit die interne Signatur des Anchor-Cache in `compose-scene-anchor` inkl. `castActions`-Signature + `asym`-Flag, siehe v14/v16-Memo). Neue Runs kompilieren korrekt.
+- `stripDialogForAnchor` behält seine Aufgabe (Dialog-Bullets aus Freitext killen); die schützenswerten Marker-Blöcke sind explizit signiert und werden nicht mit "zufälligen" Dialog-Bullets verwechselt.
+
+## Test / Akzeptanz
+
+Nach Deploy von `compose-video-clips`:
+1. Szene mit 4 Charakteren + befüllten Action-Feldern rendern (dein aktueller Fall).
+2. In den Edge-Function-Logs von `compose-scene-anchor` erscheint `castActions=4` und `hasAsymmetricCast=true` (Keywords: foreground / typing / printer in the background / leaning / window).
+3. Anchor-Bild zeigt asymmetrische Bühne: einer telefoniert vorn, einer tippt, einer am Drucker hinten, einer am Fenster — statt Line-Up.
+4. Log-Signature enthält `asym=1` und ein neuer Cache-Eintrag wird erzeugt.
+
+## Nicht enthalten (bewusst)
+
+- UI-Änderungen (Placeholder-Rotation, Preset-Chips): nicht nötig, sobald der Server die Actions endlich sieht.
+- Kein `ANCHOR_AUDIT_VERSION` Bump — die Prompt-Logik in `compose-scene-anchor` bleibt gleich; nur der Input wird sauber.
+- Kein Refund alter Line-Up-Renders vorgeschrieben — auf Wunsch ergänzbar.
+
+## Aufwand
+
+Eine Datei, ~15 Zeilen Helper + 2 Wrapper. Ein Deploy von `compose-video-clips`. Keine DB-Migration.
