@@ -2523,8 +2523,7 @@ serve(async (req) => {
                       humanCount === expectedFaces;
                     const softPassEligible =
                       headcountOk &&
-                      (identityFailure === "clone" || identityFailure === "swap") &&
-                      (((scene as any).__anchorAttempts?.length ?? 0) >= 3);
+                      (identityFailure === "clone" || identityFailure === "swap");
                     if (softPassEligible) {
                       const warn = `${code}_soft_pass: ${identityNotes || identityFailure} — Anchor zeigt zwar ${expectedFaces} Personen, aber Gesichter wirken ähnlich (z. B. Cast mit gleichem Nachnamen). Bitte den Anchor in der Vorschau prüfen und ggf. neu rendern.`;
                       console.log(
