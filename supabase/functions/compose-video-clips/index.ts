@@ -2402,11 +2402,11 @@ serve(async (req) => {
                       // retried again because they need different fixes
                       // (count or composition, not face-pixel-copy).
                       if (
-                        identityFailure === "swap" &&
+                        (identityFailure === "swap" || identityFailure === "clone") &&
                         identityPortraitUrls.length === portraitUrls.length
                       ) {
                         console.log(
-                          `[compose-video-clips] anchor scene ${scene.id}: attempt-2 still swap → attempt-3 face-lock`,
+                          `[compose-video-clips] anchor scene ${scene.id}: attempt-2 still ${identityFailure} → attempt-3 face-lock`,
                         );
                         await invalidateCache();
                         const lockUrl = await composeAnchor(
