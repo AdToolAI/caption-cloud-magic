@@ -120,8 +120,17 @@ interface ClipScene {
   /** Optional anchor image for the END of the clip (Kling/Luma backward extend / bridge). */
   endReferenceImageUrl?: string;
   durationSeconds: number;
-  characterShot?: { characterId: string; shotType: CharacterShotType };
-  characterShots?: Array<{ characterId: string; shotType: CharacterShotType }>;
+  characterShot?: { characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string };
+  characterShots?: Array<{ characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string }>;
+  /** Optional scene-wide action beat (Auto-Director / Briefing). */
+  actionBeat?: {
+    characterAction?: string;
+    environmentMotion?: string;
+    motionIntensity?: 'static' | 'subtle' | 'moderate' | 'high';
+  };
+  /** English mirror of the scene action, when available. */
+  sceneActionEn?: string;
+  sceneActionUser?: string;
   /** Per-scene dialog screenplay ("NAME: text" per line). Triggers HeyGen routing. */
   dialogScript?: string;
   /** Map of characterId → voice (string voiceId or { voiceId }). */
@@ -866,7 +875,81 @@ serve(async (req) => {
     // list every framing-change keyword (cut/zoom/push/pull/dolly/pan/tilt/
     // reframe/shot change/insert). A regression here triggers wrong-face
     // ASD mapping on multi-speaker plates.
-    const neutralTwoShotPrompt = (names: string[], fallbackCount: number) => {
+    // ── v250 SERVER-SIDE CAST ACTIONS ENRICHMENT ───────────────────────
+    // Guarantees that manually-typed / Auto-Director actions reach the
+    // anchor + master-plate prompt even when the client failed to write
+    // a `[CastActions]` marker block into `ai_prompt`.
+    const CAST_ACTION_ASYM_RE = /\b(?:foreground|background|behind|beside|at\s+the|near\s+the|window|printer|desk|laptop|phone|call|calling|typing|printing|walking|standing|leaning|sitting|gestur|holding|writes?|reads?|operat|uses?|points?|turns?|faces?|listens?|looks?)\b/i;
+
+    const getSceneCastActions = (
+      scene: ClipScene,
+    ): Array<{ characterId: string; name: string; action: string }> => {
+      const shots = [
+        ...(scene.characterShots ?? []),
+        ...(scene.characterShot ? [scene.characterShot] : []),
+      ].filter((s) => s && s.shotType !== "absent" && s.characterId);
+      const seen = new Set<string>();
+      const out: Array<{ characterId: string; name: string; action: string }> = [];
+      for (const shot of shots) {
+        const id = String(shot.characterId ?? "");
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        const action = String(
+          (shot as any).actionEn || (shot as any).actionUser || "",
+        ).trim();
+        if (!action) continue;
+        const name = (charById.get(id)?.name || id).trim();
+        out.push({ characterId: id, name, action });
+      }
+      return out;
+    };
+
+    const promptHasCastActionsBlock = (prompt?: string | null): boolean => {
+      const m = String(prompt ?? "").match(
+        /\[CastActions\]\s*([\s\S]*?)\s*\[\/CastActions\]/i,
+      );
+      return !!m && /\S/.test(m[1] ?? "");
+    };
+
+    /** Prepend [CastActions] to prompt when actions exist in `character_shots` but
+     *  the client did not write the marker block. Idempotent. */
+    const withServerCastActions = (scene: ClipScene, prompt: string): string => {
+      const raw = String(prompt ?? "");
+      if (promptHasCastActionsBlock(raw)) return raw;
+      const actions = getSceneCastActions(scene);
+      if (actions.length === 0) return raw;
+      const lines = actions.map((a) => `- ${a.name}: ${a.action}`);
+      const block = `[CastActions]\n${lines.join("\n")}\n[/CastActions]`;
+      try {
+        console.log(
+          `[compose-video-clips] v250_server_cast_actions_injected scene=${scene.id ?? "?"} n=${actions.length}`,
+        );
+      } catch (_) { /* noop */ }
+      return `${block}\n${raw}`.trim();
+    };
+
+    const hasAsymmetricCastDirection = (
+      scene: ClipScene,
+      prompt?: string | null,
+    ): boolean => {
+      const block = String(prompt ?? "").match(
+        /\[CastActions\]\s*([\s\S]*?)\s*\[\/CastActions\]/i,
+      )?.[1] ?? "";
+      if (block && CAST_ACTION_ASYM_RE.test(block)) return true;
+      return getSceneCastActions(scene).some((a) => CAST_ACTION_ASYM_RE.test(a.action));
+    };
+
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.4)
+    // The returned string MUST contain "LOCKED static camera" verbatim and
+    // the negative prompt block CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE MUST
+    // list every framing-change keyword (cut/zoom/push/pull/dolly/pan/tilt/
+    // reframe/shot change/insert). A regression here triggers wrong-face
+    // ASD mapping on multi-speaker plates.
+    const neutralTwoShotPrompt = (
+      names: string[],
+      fallbackCount: number,
+      opts: { asymmetric?: boolean } = {},
+    ) => {
       const cleanNames = names.filter(Boolean);
       // STAGE 6 (May 31 2026): allow n=1 for single-speaker cinematic-sync.
       // STAGE 3-Speaker (May 31 2026): explicit group-shot framing for n≥3 so
@@ -877,13 +960,18 @@ serve(async (req) => {
       const named =
         cleanNames.length > 0 ? `: ${cleanNames.join(", ")}` : "";
       const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
+      const asymBlocking = opts.asymmetric && n >= 3
+        ? `all present in the same physical room as a natural asymmetric ensemble captured in one continuous cinematic frame. Each person appears exactly once and performs their own distinct assigned task (foreground / midground / background depth staging is required — do NOT force a symmetric side-by-side line-up). Preserve practical office / on-set blocking and depth: some subjects closer to camera, others further away, each occupying a different area of the room. Every face still stays clearly readable enough for lip-sync — front, three-quarter or natural profile is acceptable — with mouth and jaw unobstructed by hands, phones, microphones or props`
+        : null;
       const visibility = n === 1
         ? "framed in a clean front, three-quarter or natural profile angle (sync-3 handles profile and partial-occlusion natively) so the mouth and jaw remain clearly visible and unobstructed by hands, microphones or props"
         : n === 2
           ? "each visible exactly once, in a natural two-shot — front, three-quarter, profile or over-the-shoulder angles are all acceptable (sync-3 handles profile/OTS natively); the mouth and jaw of every person must stay clearly visible and unobstructed by hands, microphones or props"
-          : n >= 4
-            ? `all four standing in a single horizontal line facing the camera, evenly spaced with clear vertical gaps between neighbours, no overlap and no depth stacking. Each head occupies at least 18% of the frame width and is centred on a shared eye-line; every face is front- or three-quarter-facing with mouth and jaw clearly visible and unobstructed by hands, microphones or props. Identical ambient lighting across the whole line, waist-up framing captured in one continuous cinematic frame by a single locked camera in one take`
-            : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
+          : asymBlocking
+            ? asymBlocking
+            : n >= 4
+              ? `all four standing in a single horizontal line facing the camera, evenly spaced with clear vertical gaps between neighbours, no overlap and no depth stacking. Each head occupies at least 18% of the frame width and is centred on a shared eye-line; every face is front- or three-quarter-facing with mouth and jaw clearly visible and unobstructed by hands, microphones or props. Identical ambient lighting across the whole line, waist-up framing captured in one continuous cinematic frame by a single locked camera in one take`
+              : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
 
       // v173 (Jun 28 2026) — Single-speaker carve-out (revised v166): the
       // previous wrapper forced a tripod-locked camera AND "heads stay
@@ -988,7 +1076,10 @@ serve(async (req) => {
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
       const speakerSlugs = uniqueSpeakerSlugsFromScript(scene.dialogScript);
-      const cleanedVisualPromptRaw = stripDialogForAnchor(scene.aiPrompt || "");
+      // v250 — inject server-side [CastActions] block when the client
+      // didn't write one, so per-character tasks survive the strippers.
+      const enrichedAiPrompt = withServerCastActions(scene, scene.aiPrompt || "");
+      const cleanedVisualPromptRaw = stripDialogForAnchor(enrichedAiPrompt);
       const occlusionSanitized = stripFaceOcclusionForPlate(cleanedVisualPromptRaw);
       // v166 — strip camera-push tokens so the AI plate stays framed
       // identically frame-to-frame. The v163 preclip overlay sits at a
@@ -1062,9 +1153,11 @@ serve(async (req) => {
       // applied for N≥2 before). `neutralTwoShotPrompt` has a built-in n===1
       // branch that forces "front, three-quarter or natural profile angle …
       // mouth and jaw remain clearly visible and unobstructed".
+      const asymmetricUnion = hasAsymmetricCastDirection(scene, cleanedVisualPrompt);
       const neutralPlate = neutralTwoShotPrompt(
         promptNames,
         promptCount,
+        { asymmetric: asymmetricUnion },
       );
       const sceneDescription =
         cleanedVisualPrompt || "modern cinematic interior scene";
@@ -2114,12 +2207,18 @@ serve(async (req) => {
                   console.log(
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}]`,
                   );
+                  // v250 — enrich the anchor prompt with server-side
+                  // [CastActions] block before the strippers run so
+                  // per-character tasks reach `compose-scene-anchor`.
+                  const anchorEnriched = withServerCastActions(scene, scene.aiPrompt || "");
                   const sceneDesc = stripExtraHumansForAnchor(
-                    stripDialogForAnchor(scene.aiPrompt || ""),
+                    stripDialogForAnchor(anchorEnriched),
                   );
+                  const asymmetricAnchor = hasAsymmetricCastDirection(scene, anchorEnriched);
                   const framing = neutralTwoShotPrompt(
                     characterNames,
                     portraitUrls.length,
+                    { asymmetric: asymmetricAnchor },
                   );
                   const anchorPrompt = sceneDesc
                     ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
@@ -2410,21 +2509,55 @@ serve(async (req) => {
                   if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
-                    const msg = `${code}: ${identityNotes || identityFailure} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
-                    await supabaseAdmin
-                      .from("composer_scenes")
-                      .update({
-                        clip_status: "failed",
-                        clip_error: msg,
-                        updated_at: new Date().toISOString(),
-                      })
-                      .eq("id", scene.id);
-                    results.push({
-                      sceneId: scene.id,
-                      status: "failed",
-                      error: msg,
-                    });
-                    continue;
+                    // v250 — Soft-Pass: when three retries produced the right
+                    // headcount (faces=N, humans=N) but Gemini still flags a
+                    // clone/swap, the failure is almost always similar-looking
+                    // cast (e.g. two brothers sharing a surname). Instead of
+                    // hard-blocking the whole render, we mark the anchor as
+                    // `anchor_soft_pass`, warn in the DB, and continue so the
+                    // user can review the anchor and either accept or re-roll.
+                    const headcountOk =
+                      typeof faceCount === "number" &&
+                      typeof humanCount === "number" &&
+                      faceCount === expectedFaces &&
+                      humanCount === expectedFaces;
+                    const softPassEligible =
+                      headcountOk &&
+                      (identityFailure === "clone" || identityFailure === "swap") &&
+                      (((scene as any).__anchorAttempts?.length ?? 0) >= 3);
+                    if (softPassEligible) {
+                      const warn = `${code}_soft_pass: ${identityNotes || identityFailure} — Anchor zeigt zwar ${expectedFaces} Personen, aber Gesichter wirken ähnlich (z. B. Cast mit gleichem Nachnamen). Bitte den Anchor in der Vorschau prüfen und ggf. neu rendern.`;
+                      console.log(
+                        `[compose-video-clips] v250_anchor_soft_pass scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces}`,
+                      );
+                      try {
+                        await supabaseAdmin
+                          .from("composer_scenes")
+                          .update({
+                            twoshot_stage: "anchor_soft_pass",
+                            clip_error: warn,
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq("id", scene.id);
+                      } catch (_) { /* non-fatal */ }
+                      // do NOT `continue` — fall through into normal pipeline
+                    } else {
+                      const msg = `${code}: ${identityNotes || identityFailure} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
+                      await supabaseAdmin
+                        .from("composer_scenes")
+                        .update({
+                          clip_status: "failed",
+                          clip_error: msg,
+                          updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", scene.id);
+                      results.push({
+                        sceneId: scene.id,
+                        status: "failed",
+                        error: msg,
+                      });
+                      continue;
+                    }
                   }
                 }
               }
@@ -2598,14 +2731,18 @@ serve(async (req) => {
                 (n): n is string => typeof n === "string" && n.length > 0,
               );
             if (portraitUrls.length >= 1) {
+              // v250 — same enrichment for the universal (non-cinematic-sync)
+              // anchor path so per-character actions reach Nano Banana 2.
+              const uniEnriched = withServerCastActions(scene, scene.aiPrompt || "");
+              const uniAsym = hasAsymmetricCastDirection(scene, uniEnriched);
               const neutralFallback =
                 portraitUrls.length >= 2
-                  ? neutralTwoShotPrompt(characterNames, portraitUrls.length)
+                  ? neutralTwoShotPrompt(characterNames, portraitUrls.length, { asymmetric: uniAsym })
                   : "Natural cinematic scene, photorealistic, no rendered text.";
               const anchorPrompt =
                 scriptSpeakers.length >= 2
                   ? neutralFallback
-                  : stripDialogForAnchor(scene.aiPrompt || "") ||
+                  : stripDialogForAnchor(uniEnriched) ||
                     neutralFallback;
               console.log(
                 `[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length}, outfits=${outfitUrlByIdUni.size}/${outfitLookIdsUni.length}${wardrobeLockNamesUni.length > 0 ? `, wardrobeLock=[${wardrobeLockNamesUni.join("/")}]` : ""})`,
