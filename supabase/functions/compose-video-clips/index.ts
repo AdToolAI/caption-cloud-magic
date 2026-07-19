@@ -2697,14 +2697,18 @@ serve(async (req) => {
                 (n): n is string => typeof n === "string" && n.length > 0,
               );
             if (portraitUrls.length >= 1) {
+              // v250 — same enrichment for the universal (non-cinematic-sync)
+              // anchor path so per-character actions reach Nano Banana 2.
+              const uniEnriched = withServerCastActions(scene, scene.aiPrompt || "");
+              const uniAsym = hasAsymmetricCastDirection(scene, uniEnriched);
               const neutralFallback =
                 portraitUrls.length >= 2
-                  ? neutralTwoShotPrompt(characterNames, portraitUrls.length)
+                  ? neutralTwoShotPrompt(characterNames, portraitUrls.length, { asymmetric: uniAsym })
                   : "Natural cinematic scene, photorealistic, no rendered text.";
               const anchorPrompt =
                 scriptSpeakers.length >= 2
                   ? neutralFallback
-                  : stripDialogForAnchor(scene.aiPrompt || "") ||
+                  : stripDialogForAnchor(uniEnriched) ||
                     neutralFallback;
               console.log(
                 `[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length}, outfits=${outfitUrlByIdUni.size}/${outfitLookIdsUni.length}${wardrobeLockNamesUni.length > 0 ? `, wardrobeLock=[${wardrobeLockNamesUni.join("/")}]` : ""})`,
