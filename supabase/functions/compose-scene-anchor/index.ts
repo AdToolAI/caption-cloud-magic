@@ -231,10 +231,25 @@ serve(async (req) => {
       .map((c) => `${c.name.toLowerCase()}:${c.action.toLowerCase()}`)
       .sort()
       .join('|');
-    // v16 — adds face-lock mode (v131.6).
+    // v17 — adds family-name distinguish signature (v250).
+    const familyHash = [...surnameGroupsForHashPlaceholder()].sort().join(',');
     const promptHash = await sha1(
-      `v16|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}`,
+      `v17|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}`,
     );
+
+    function surnameGroupsForHashPlaceholder(): string[] {
+      const g = new Map<string, string[]>();
+      for (const nm of names) {
+        const parts = String(nm).trim().split(/\s+/);
+        if (parts.length < 2) continue;
+        const last = parts[parts.length - 1].toLowerCase();
+        if (!last || last.length < 3) continue;
+        const arr = g.get(last) ?? [];
+        arr.push(nm.toLowerCase());
+        g.set(last, arr);
+      }
+      return [...g.entries()].filter(([, v]) => v.length >= 2).map(([k, v]) => `${k}:${v.length}`);
+    }
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
