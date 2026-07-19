@@ -412,7 +412,7 @@ serve(async (req) => {
       : "";
 
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${WARDROBE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
