@@ -44,6 +44,7 @@ import { AvatarWardrobeSheet } from '@/components/brand-characters/AvatarWardrob
 import { AvatarPoseSheet } from '@/components/brand-characters/AvatarPoseSheet';
 import { supabase } from '@/integrations/supabase/client';
 import { markLipSyncPending, clearLipSyncPending } from '@/lib/video-composer/lipSyncPending';
+import SceneReferenceImageSlot from './SceneReferenceImageSlot';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
