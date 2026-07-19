@@ -233,6 +233,20 @@ serve(async (req) => {
       ? body.swapMismatches.filter((s) => typeof s === "string" && s.length > 0)
       : [];
     const faceLockMode = body.faceLockMode === true;
+    // v260 Speaker Priority Framing — normalise the focus index into range.
+    const speakerFocusIdxRaw = Number.isFinite(body.speakerFocusIdx as number)
+      ? Math.trunc(body.speakerFocusIdx as number)
+      : -1;
+    const speakerFocusIdx =
+      speakerFocusIdxRaw >= 0 && speakerFocusIdxRaw < portraits.length
+        ? speakerFocusIdxRaw
+        : -1;
+    const speakerFocusName =
+      speakerFocusIdx >= 0
+        ? (typeof body.speakerFocusName === "string" && body.speakerFocusName.trim().length > 0
+            ? body.speakerFocusName.trim()
+            : (names[speakerFocusIdx] ?? `Character #${speakerFocusIdx + 1}`))
+        : "";
     const worldRefSig = `loc=${locationUrls.join(',')}|bld=${buildingUrls.join(',')}|prop=${propUrls.join(',')}`;
     const identitySig = identityPortraits.length > 0
       ? `id=${identityPortraits.join(',')}`
@@ -257,9 +271,13 @@ serve(async (req) => {
       .map(([k, v]) => `${k}:${v.length}`)
       .sort()
       .join(",");
+    // v18 — adds speaker-focus signature (v260 Speaker Priority Framing).
+    // Any pass with a different focus speaker gets its own cache slot; the
+    // legacy neutral group-shot path (speakerFocusIdx=-1) is unchanged.
     const promptHash = await sha1(
-      `v17|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}`,
+      `v18|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}`,
     );
+
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
