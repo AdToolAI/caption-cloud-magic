@@ -793,7 +793,7 @@ serve(async (req) => {
       const noExtraClause =
         " The environment shows NO additional humans anywhere — no people on screens, no portraits or photos of people on walls, no posters showing people, no reflections of people, no mannequins, no statues of people, no background bystanders or coworkers, no out-of-focus crowd. Any visible laptop, phone or TV screen is turned away from camera, dim, or shows abstract patterns only (no faces, no UI with avatars).";
       return s.length === 0 ? noExtraClause.trim() : `${s}.${noExtraClause}`;
-    };
+    });
 
 
     /**
