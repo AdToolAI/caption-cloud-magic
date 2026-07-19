@@ -120,8 +120,17 @@ interface ClipScene {
   /** Optional anchor image for the END of the clip (Kling/Luma backward extend / bridge). */
   endReferenceImageUrl?: string;
   durationSeconds: number;
-  characterShot?: { characterId: string; shotType: CharacterShotType };
-  characterShots?: Array<{ characterId: string; shotType: CharacterShotType }>;
+  characterShot?: { characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string };
+  characterShots?: Array<{ characterId: string; shotType: CharacterShotType; actionEn?: string; actionUser?: string }>;
+  /** Optional scene-wide action beat (Auto-Director / Briefing). */
+  actionBeat?: {
+    characterAction?: string;
+    environmentMotion?: string;
+    motionIntensity?: 'static' | 'subtle' | 'moderate' | 'high';
+  };
+  /** English mirror of the scene action, when available. */
+  sceneActionEn?: string;
+  sceneActionUser?: string;
   /** Per-scene dialog screenplay ("NAME: text" per line). Triggers HeyGen routing. */
   dialogScript?: string;
   /** Map of characterId → voice (string voiceId or { voiceId }). */
