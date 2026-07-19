@@ -875,7 +875,81 @@ serve(async (req) => {
     // list every framing-change keyword (cut/zoom/push/pull/dolly/pan/tilt/
     // reframe/shot change/insert). A regression here triggers wrong-face
     // ASD mapping on multi-speaker plates.
-    const neutralTwoShotPrompt = (names: string[], fallbackCount: number) => {
+    // ── v250 SERVER-SIDE CAST ACTIONS ENRICHMENT ───────────────────────
+    // Guarantees that manually-typed / Auto-Director actions reach the
+    // anchor + master-plate prompt even when the client failed to write
+    // a `[CastActions]` marker block into `ai_prompt`.
+    const CAST_ACTION_ASYM_RE = /\b(?:foreground|background|behind|beside|at\s+the|near\s+the|window|printer|desk|laptop|phone|call|calling|typing|printing|walking|standing|leaning|sitting|gestur|holding|writes?|reads?|operat|uses?|points?|turns?|faces?|listens?|looks?)\b/i;
+
+    const getSceneCastActions = (
+      scene: ClipScene,
+    ): Array<{ characterId: string; name: string; action: string }> => {
+      const shots = [
+        ...(scene.characterShots ?? []),
+        ...(scene.characterShot ? [scene.characterShot] : []),
+      ].filter((s) => s && s.shotType !== "absent" && s.characterId);
+      const seen = new Set<string>();
+      const out: Array<{ characterId: string; name: string; action: string }> = [];
+      for (const shot of shots) {
+        const id = String(shot.characterId ?? "");
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        const action = String(
+          (shot as any).actionEn || (shot as any).actionUser || "",
+        ).trim();
+        if (!action) continue;
+        const name = (charById.get(id)?.name || id).trim();
+        out.push({ characterId: id, name, action });
+      }
+      return out;
+    };
+
+    const promptHasCastActionsBlock = (prompt?: string | null): boolean => {
+      const m = String(prompt ?? "").match(
+        /\[CastActions\]\s*([\s\S]*?)\s*\[\/CastActions\]/i,
+      );
+      return !!m && /\S/.test(m[1] ?? "");
+    };
+
+    /** Prepend [CastActions] to prompt when actions exist in `character_shots` but
+     *  the client did not write the marker block. Idempotent. */
+    const withServerCastActions = (scene: ClipScene, prompt: string): string => {
+      const raw = String(prompt ?? "");
+      if (promptHasCastActionsBlock(raw)) return raw;
+      const actions = getSceneCastActions(scene);
+      if (actions.length === 0) return raw;
+      const lines = actions.map((a) => `- ${a.name}: ${a.action}`);
+      const block = `[CastActions]\n${lines.join("\n")}\n[/CastActions]`;
+      try {
+        console.log(
+          `[compose-video-clips] v250_server_cast_actions_injected scene=${scene.id ?? "?"} n=${actions.length}`,
+        );
+      } catch (_) { /* noop */ }
+      return `${block}\n${raw}`.trim();
+    };
+
+    const hasAsymmetricCastDirection = (
+      scene: ClipScene,
+      prompt?: string | null,
+    ): boolean => {
+      const block = String(prompt ?? "").match(
+        /\[CastActions\]\s*([\s\S]*?)\s*\[\/CastActions\]/i,
+      )?.[1] ?? "";
+      if (block && CAST_ACTION_ASYM_RE.test(block)) return true;
+      return getSceneCastActions(scene).some((a) => CAST_ACTION_ASYM_RE.test(a.action));
+    };
+
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.4)
+    // The returned string MUST contain "LOCKED static camera" verbatim and
+    // the negative prompt block CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE MUST
+    // list every framing-change keyword (cut/zoom/push/pull/dolly/pan/tilt/
+    // reframe/shot change/insert). A regression here triggers wrong-face
+    // ASD mapping on multi-speaker plates.
+    const neutralTwoShotPrompt = (
+      names: string[],
+      fallbackCount: number,
+      opts: { asymmetric?: boolean } = {},
+    ) => {
       const cleanNames = names.filter(Boolean);
       // STAGE 6 (May 31 2026): allow n=1 for single-speaker cinematic-sync.
       // STAGE 3-Speaker (May 31 2026): explicit group-shot framing for n≥3 so
@@ -886,13 +960,18 @@ serve(async (req) => {
       const named =
         cleanNames.length > 0 ? `: ${cleanNames.join(", ")}` : "";
       const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
+      const asymBlocking = opts.asymmetric && n >= 3
+        ? `all present in the same physical room as a natural asymmetric ensemble captured in one continuous cinematic frame. Each person appears exactly once and performs their own distinct assigned task (foreground / midground / background depth staging is required — do NOT force a symmetric side-by-side line-up). Preserve practical office / on-set blocking and depth: some subjects closer to camera, others further away, each occupying a different area of the room. Every face still stays clearly readable enough for lip-sync — front, three-quarter or natural profile is acceptable — with mouth and jaw unobstructed by hands, phones, microphones or props`
+        : null;
       const visibility = n === 1
         ? "framed in a clean front, three-quarter or natural profile angle (sync-3 handles profile and partial-occlusion natively) so the mouth and jaw remain clearly visible and unobstructed by hands, microphones or props"
         : n === 2
           ? "each visible exactly once, in a natural two-shot — front, three-quarter, profile or over-the-shoulder angles are all acceptable (sync-3 handles profile/OTS natively); the mouth and jaw of every person must stay clearly visible and unobstructed by hands, microphones or props"
-          : n >= 4
-            ? `all four standing in a single horizontal line facing the camera, evenly spaced with clear vertical gaps between neighbours, no overlap and no depth stacking. Each head occupies at least 18% of the frame width and is centred on a shared eye-line; every face is front- or three-quarter-facing with mouth and jaw clearly visible and unobstructed by hands, microphones or props. Identical ambient lighting across the whole line, waist-up framing captured in one continuous cinematic frame by a single locked camera in one take`
-            : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
+          : asymBlocking
+            ? asymBlocking
+            : n >= 4
+              ? `all four standing in a single horizontal line facing the camera, evenly spaced with clear vertical gaps between neighbours, no overlap and no depth stacking. Each head occupies at least 18% of the frame width and is centred on a shared eye-line; every face is front- or three-quarter-facing with mouth and jaw clearly visible and unobstructed by hands, microphones or props. Identical ambient lighting across the whole line, waist-up framing captured in one continuous cinematic frame by a single locked camera in one take`
+              : `all standing together in the same physical room as a natural group, captured in one continuous cinematic frame by a single locked camera in one take. Wide medium group shot, ensemble composition: every person occupies real shared 3D space (overlapping depth planes, natural personal distance around shoulder-width, slight depth stagger so nobody is perfectly side-by-side). Each face stays clearly visible, front- or three-quarter-facing, mouth and jaw unobstructed by hands, microphones or props. Identical ambient lighting across the whole room`;
 
       // v173 (Jun 28 2026) — Single-speaker carve-out (revised v166): the
       // previous wrapper forced a tripod-locked camera AND "heads stay
