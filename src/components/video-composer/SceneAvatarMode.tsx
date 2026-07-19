@@ -44,6 +44,7 @@ import { AvatarWardrobeSheet } from '@/components/brand-characters/AvatarWardrob
 import { AvatarPoseSheet } from '@/components/brand-characters/AvatarPoseSheet';
 import { supabase } from '@/integrations/supabase/client';
 import { markLipSyncPending, clearLipSyncPending } from '@/lib/video-composer/lipSyncPending';
+import SceneReferenceImageSlot from './SceneReferenceImageSlot';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -372,69 +373,8 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
         />
       </div>
 
-      {/* Szenen-Referenzbild — nur sichtbar wenn Lip-Sync AUS ist.
-          Bei aktivem Lip-Sync würden zwei Anchor-Bilder (Charakter-Anchor +
-          Szenen-Ref) kollidieren, daher bewusst ausgeblendet. */}
-      {!lipSyncOn && (
-        <div className="rounded-xl border border-primary/20 bg-card/40 px-3 py-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-md bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-              <ImageIcon className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold text-foreground">
-                Szenen-Referenzbild (optional)
-              </div>
-              <p className="text-[10px] text-muted-foreground line-clamp-2">
-                Wird als Startframe (i2v-Anchor) an das AI-Video-Modell übergeben. Nur verfügbar, wenn Lip-Sync deaktiviert ist.
-              </p>
-            </div>
-          </div>
-
-          <input
-            ref={refFileInput}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleReferenceUpload(f);
-              e.target.value = '';
-            }}
-          />
-
-          {scene.referenceImageUrl ? (
-            <div className="relative rounded-lg overflow-hidden border border-primary/30 bg-black/40">
-              <img
-                src={scene.referenceImageUrl}
-                alt="Szenen-Referenzbild"
-                className="w-full max-h-48 object-contain"
-              />
-              <button
-                type="button"
-                onClick={clearReference}
-                className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-black/70 backdrop-blur border border-destructive/40 text-[10px] uppercase tracking-wider text-destructive hover:bg-destructive/15 transition-colors"
-                title="Referenzbild entfernen"
-              >
-                <X className="h-3 w-3" />
-                Entfernen
-              </button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={uploadingRef}
-              onClick={() => refFileInput.current?.click()}
-              className="w-full gap-2 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              {uploadingRef ? 'Lädt hoch…' : 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)'}
-            </Button>
-          )}
-        </div>
-      )}
+      {/* Szenen-Referenzbild — Shared-Slot, blendet sich bei Lip-Sync AN automatisch aus. */}
+      <SceneReferenceImageSlot scene={scene} onUpdate={onUpdate} />
     </div>
 
   );

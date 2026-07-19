@@ -62,6 +62,7 @@ import {
 import SceneMediaUpload from "./SceneMediaUpload";
 import StockMediaBrowser, { type StockMediaItem } from "./StockMediaBrowser";
 import SceneReferenceImageUpload from "./SceneReferenceImageUpload";
+import SceneReferenceImageSlot from "./SceneReferenceImageSlot";
 import { CharacterShotBadge } from "./CharacterShotBadge";
 import { CharacterCastPicker } from "./CharacterCastPicker";
 import { UnifiedAssetPicker } from "./UnifiedAssetPicker";
@@ -1601,6 +1602,9 @@ export default function SceneCard({
                               />
                             </button>
                           </div>
+
+                          {/* Szenen-Referenzbild — nur sichtbar wenn Lip-Sync AUS ist */}
+                          <SceneReferenceImageSlot scene={scene} onUpdate={onUpdate} />
 
                           <div className="space-y-1">
                             <Label className="text-[10px] text-muted-foreground">
