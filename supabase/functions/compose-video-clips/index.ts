@@ -1076,7 +1076,10 @@ serve(async (req) => {
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
       const speakerSlugs = uniqueSpeakerSlugsFromScript(scene.dialogScript);
-      const cleanedVisualPromptRaw = stripDialogForAnchor(scene.aiPrompt || "");
+      // v250 — inject server-side [CastActions] block when the client
+      // didn't write one, so per-character tasks survive the strippers.
+      const enrichedAiPrompt = withServerCastActions(scene, scene.aiPrompt || "");
+      const cleanedVisualPromptRaw = stripDialogForAnchor(enrichedAiPrompt);
       const occlusionSanitized = stripFaceOcclusionForPlate(cleanedVisualPromptRaw);
       // v166 — strip camera-push tokens so the AI plate stays framed
       // identically frame-to-frame. The v163 preclip overlay sits at a
@@ -1150,9 +1153,11 @@ serve(async (req) => {
       // applied for N≥2 before). `neutralTwoShotPrompt` has a built-in n===1
       // branch that forces "front, three-quarter or natural profile angle …
       // mouth and jaw remain clearly visible and unobstructed".
+      const asymmetricUnion = hasAsymmetricCastDirection(scene, cleanedVisualPrompt);
       const neutralPlate = neutralTwoShotPrompt(
         promptNames,
         promptCount,
+        { asymmetric: asymmetricUnion },
       );
       const sceneDescription =
         cleanedVisualPrompt || "modern cinematic interior scene";
@@ -2202,12 +2207,18 @@ serve(async (req) => {
                   console.log(
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}]`,
                   );
+                  // v250 — enrich the anchor prompt with server-side
+                  // [CastActions] block before the strippers run so
+                  // per-character tasks reach `compose-scene-anchor`.
+                  const anchorEnriched = withServerCastActions(scene, scene.aiPrompt || "");
                   const sceneDesc = stripExtraHumansForAnchor(
-                    stripDialogForAnchor(scene.aiPrompt || ""),
+                    stripDialogForAnchor(anchorEnriched),
                   );
+                  const asymmetricAnchor = hasAsymmetricCastDirection(scene, anchorEnriched);
                   const framing = neutralTwoShotPrompt(
                     characterNames,
                     portraitUrls.length,
+                    { asymmetric: asymmetricAnchor },
                   );
                   const anchorPrompt = sceneDesc
                     ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
