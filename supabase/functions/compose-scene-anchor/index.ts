@@ -67,7 +67,17 @@ interface Body {
    *  `wardrobeLockNames` are the cast members whose wardrobe is locked. */
   wardrobeLock?: boolean;
   wardrobeLockNames?: string[];
+  /** v260 Speaker Priority Framing (Phase 1) — when set, the composed
+   *  first-frame prioritises the named speaker: they are placed frontal /
+   *  three-quarter to camera with the mouth clearly readable for lip-sync,
+   *  while the other cast members continue to perform their CastActions
+   *  in mid-/background. Only used for `dialogMode` scenes with asymmetric
+   *  CastActions. Index is 0-based, aligned with `portraitUrls` /
+   *  `characterNames`. When absent → legacy neutral group-shot behavior. */
+  speakerFocusIdx?: number;
+  speakerFocusName?: string;
 }
+
 
 async function sha1(s: string): Promise<string> {
   const buf = new TextEncoder().encode(s);
@@ -223,6 +233,20 @@ serve(async (req) => {
       ? body.swapMismatches.filter((s) => typeof s === "string" && s.length > 0)
       : [];
     const faceLockMode = body.faceLockMode === true;
+    // v260 Speaker Priority Framing — normalise the focus index into range.
+    const speakerFocusIdxRaw = Number.isFinite(body.speakerFocusIdx as number)
+      ? Math.trunc(body.speakerFocusIdx as number)
+      : -1;
+    const speakerFocusIdx =
+      speakerFocusIdxRaw >= 0 && speakerFocusIdxRaw < portraits.length
+        ? speakerFocusIdxRaw
+        : -1;
+    const speakerFocusName =
+      speakerFocusIdx >= 0
+        ? (typeof body.speakerFocusName === "string" && body.speakerFocusName.trim().length > 0
+            ? body.speakerFocusName.trim()
+            : (names[speakerFocusIdx] ?? `Character #${speakerFocusIdx + 1}`))
+        : "";
     const worldRefSig = `loc=${locationUrls.join(',')}|bld=${buildingUrls.join(',')}|prop=${propUrls.join(',')}`;
     const identitySig = identityPortraits.length > 0
       ? `id=${identityPortraits.join(',')}`
@@ -247,9 +271,13 @@ serve(async (req) => {
       .map(([k, v]) => `${k}:${v.length}`)
       .sort()
       .join(",");
+    // v18 — adds speaker-focus signature (v260 Speaker Priority Framing).
+    // Any pass with a different focus speaker gets its own cache slot; the
+    // legacy neutral group-shot path (speakerFocusIdx=-1) is unchanged.
     const promptHash = await sha1(
-      `v17|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}`,
+      `v18|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}`,
     );
+
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
@@ -426,8 +454,21 @@ serve(async (req) => {
       ? ` WARDROBE LOCK — the wardrobe / clothing / armor visible in the reference image${portraits.length > 1 ? "s" : ""} for ${(body.wardrobeLockNames && body.wardrobeLockNames.length > 0 ? body.wardrobeLockNames.join(", ") : "the character(s)")} is MANDATORY and OVERRIDES any clothing implied by the scene description. The wardrobe in the reference IS the ground truth — the scene only provides location, lighting, pose and props. If the scene description says "modern office", "business meeting", "wedding", "beach" etc. but the wardrobe reference shows Roman armor, a fantasy robe, a costume, period dress or any unusual garment, the character wears EXACTLY that wardrobe inside the described environment (e.g. full Roman armor inside the modern boardroom). Do NOT translate the outfit into a "scene-appropriate" equivalent. Do NOT swap fabrics, colors, materials, silhouettes, accessories, headwear or footwear to match the setting. Preserve every wardrobe detail visible in the reference: garment type, layers, color palette, patterns, metals, leather, belts, capes, helmets, jewelry, footwear.`
       : "";
 
+    // v260 — SPEAKER PRIORITY FRAMING SUFFIX. When set, the plate is being
+    // rendered as one of N per-speaker plates (one per lip-sync pass). The
+    // FOCUS speaker must be placed frontal / three-quarter to camera with
+    // the mouth clearly readable so downstream Sync.so can detect the face
+    // reliably. Other cast members KEEP their assigned CastActions (phone /
+    // laptop / printer / …) in the mid- or background. FROZEN camera-lock
+    // and negative blocks stay untouched — this suffix only rearranges
+    // WHO stands where, never HOW the camera moves.
+    const SPEAKER_PRIORITY_FRAMING_SUFFIX = speakerFocusIdx >= 0 && isMulti
+      ? ` SPEAKER PRIORITY FRAMING — ${speakerFocusName} is the current active speaker for this shot. Place ${speakerFocusName} in the FOREGROUND, clearly closer to camera than the other cast members, framed at a FRONT or slight THREE-QUARTER angle with the mouth and jaw fully visible and unobstructed by hands, phones, props, hair or microphones (sync-3 needs a readable mouth on this speaker). ${speakerFocusName}'s face must occupy a visibly larger share of the frame than any other cast member, positioned in the upper third of the composition. The OTHER cast members remain in the SAME room performing their CHARACTER ACTIONS above (phone, laptop, printer, coffee, etc.) but they are staged in the MID-ground or BACKGROUND, slightly turned away, in profile, or engaged with their prop so their attention does not compete with ${speakerFocusName}'s face for the viewer. Every cast face still stays visible enough that a face detector can find ${N} distinct people, but only ${speakerFocusName} is framed talking-head-ready. Do NOT change the camera position or focal length compared to sibling plates — depth staging changes, camera lock does not.`
+      : "";
+
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
+
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
@@ -496,8 +537,9 @@ serve(async (req) => {
       );
     }
     console.log(
-      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} wardrobeLock=${body.wardrobeLock ? 1 : 0}${body.wardrobeLock && body.wardrobeLockNames?.length ? `(${body.wardrobeLockNames.join("/")})` : ""} elapsedMs=${Date.now() - t0}`,
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} wardrobeLock=${body.wardrobeLock ? 1 : 0}${body.wardrobeLock && body.wardrobeLockNames?.length ? `(${body.wardrobeLockNames.join("/")})` : ""} spf=${speakerFocusIdx >= 0 ? `${speakerFocusIdx}:${speakerFocusName}` : "off"} elapsedMs=${Date.now() - t0}`,
     );
+
 
     const aiJson = await aiResp.json();
     const dataUrl: string | undefined =
@@ -553,7 +595,11 @@ serve(async (req) => {
     // `lock_reference_url` on the scene so the Continuity Guardian can
     // compare the rendered clip against it. Single-character anchors stay
     // out of lock_reference_url to avoid clobbering manually pinned refs.
-    if (portraits.length >= 2) {
+    // v260 — per-speaker priority-framing plates (speakerFocusIdx>=0) do NOT
+    // write `lock_reference_url` — that lock stays scoped to the neutral
+    // group plate (the reference the Continuity Guardian was calibrated on).
+    if (portraits.length >= 2 && speakerFocusIdx < 0) {
+
       try {
         await admin
           .from("composer_scenes")
