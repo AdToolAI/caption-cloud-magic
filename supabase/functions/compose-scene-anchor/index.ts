@@ -594,7 +594,11 @@ serve(async (req) => {
     // `lock_reference_url` on the scene so the Continuity Guardian can
     // compare the rendered clip against it. Single-character anchors stay
     // out of lock_reference_url to avoid clobbering manually pinned refs.
-    if (portraits.length >= 2) {
+    // v260 — per-speaker priority-framing plates (speakerFocusIdx>=0) do NOT
+    // write `lock_reference_url` — that lock stays scoped to the neutral
+    // group plate (the reference the Continuity Guardian was calibrated on).
+    if (portraits.length >= 2 && speakerFocusIdx < 0) {
+
       try {
         await admin
           .from("composer_scenes")
