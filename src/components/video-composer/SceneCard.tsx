@@ -62,6 +62,7 @@ import {
 import SceneMediaUpload from "./SceneMediaUpload";
 import StockMediaBrowser, { type StockMediaItem } from "./StockMediaBrowser";
 import SceneReferenceImageUpload from "./SceneReferenceImageUpload";
+import SceneReferenceImageSlot from "./SceneReferenceImageSlot";
 import { CharacterShotBadge } from "./CharacterShotBadge";
 import { CharacterCastPicker } from "./CharacterCastPicker";
 import { UnifiedAssetPicker } from "./UnifiedAssetPicker";
