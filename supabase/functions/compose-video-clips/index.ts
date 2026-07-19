@@ -734,7 +734,7 @@ serve(async (req) => {
      * secondary depiction (even a tiny UI avatar on a screen) is counted by
      * Gemini Vision and aborts the run before Hailuo spends credits.
      */
-    const stripExtraHumansForAnchor = (raw: string): string => {
+    const stripExtraHumansForAnchor = preserveMarkers((raw: string): string => {
       let s = raw || "";
       const riskyTerms = [
         "laptop screen",
