@@ -2495,6 +2495,187 @@ serve(async (req) => {
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? "?"}/${expectedFaces}, humans=${humanCount ?? "?"}/${expectedFaces}, identity=${identityFailure ?? "ok"}) → ${composedUrl.slice(0, 80)}…`,
                   );
 
+                  // ── v260 SPEAKER PRIORITY FRAMING — Phase 1 ─────────────
+                  // When the scene is a dialog scene with asymmetric
+                  // CastActions (phone/laptop/printer/…), render one
+                  // ADDITIONAL per-speaker anchor plate in which the focus
+                  // speaker is placed frontal/mouth-readable while the
+                  // others perform their actions in the background. Plates
+                  // are stored on `audio_plan.twoshot.speaker_priority_plates`
+                  // (jsonb, no migration). Phase 2 will wire them into the
+                  // provider dispatch. Feature-flag-gated so nothing changes
+                  // for existing runs unless SPEAKER_PRIORITY_FRAMING=1 is
+                  // set at the edge. Neutral main plate above is unchanged.
+                  try {
+                    const spfFlag = String(
+                      Deno.env.get("SPEAKER_PRIORITY_FRAMING") ?? "",
+                    ).toLowerCase();
+                    const spfEnabled =
+                      spfFlag === "1" || spfFlag === "true" || spfFlag === "on";
+                    const dialogModeOn =
+                      (scene as any).dialogMode === true ||
+                      (scene as any).dialog_mode === true;
+                    const anchorPromptEnrichedForGate = withServerCastActions(
+                      scene,
+                      scene.aiPrompt || "",
+                    );
+                    const gateAsym = hasAsymmetricCastDirection(
+                      scene,
+                      anchorPromptEnrichedForGate,
+                    );
+                    const spfGateOn =
+                      spfEnabled &&
+                      dialogModeOn &&
+                      gateAsym &&
+                      portraitUrls.length >= 2 &&
+                      portraitUrls.length <= 4 &&
+                      identityFailure === null; // don't fan-out if main plate flagged
+                    console.log(
+                      `[compose-video-clips] v260_spf_gate scene=${scene.id} enabled=${spfEnabled ? 1 : 0} dialog=${dialogModeOn ? 1 : 0} asym=${gateAsym ? 1 : 0} n=${portraitUrls.length} identityFail=${identityFailure ?? "ok"} → ${spfGateOn ? "ON" : "off"}`,
+                    );
+                    if (spfGateOn) {
+                      const priorityPlates: Array<{
+                        speaker_idx: number;
+                        speaker_name: string;
+                        plate_image_url: string | null;
+                        rendered_at: string;
+                        error?: string;
+                      }> = [];
+                      // Render sequentially — Nano Banana 2 quota is tight and
+                      // parallel bursts risk 429s on 4-speaker scenes. Phase 2
+                      // may batch this behind a rate-limiter.
+                      for (let i = 0; i < portraitUrls.length; i++) {
+                        const spName = characterNames[i] ?? `Speaker ${i + 1}`;
+                        try {
+                          const anchorEnriched = withServerCastActions(
+                            scene,
+                            scene.aiPrompt || "",
+                          );
+                          const sceneDesc = stripExtraHumansForAnchor(
+                            stripDialogForAnchor(anchorEnriched),
+                          );
+                          const framing = neutralTwoShotPrompt(
+                            characterNames,
+                            portraitUrls.length,
+                            { asymmetric: true },
+                          );
+                          const spfPrompt = sceneDesc
+                            ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
+                            : framing;
+                          const r = await fetch(
+                            `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-scene-anchor`,
+                            {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: authHeader,
+                              },
+                              body: JSON.stringify({
+                                sceneId: scene.id,
+                                portraitUrl: portraitUrls[0],
+                                portraitUrls,
+                                identityPortraitUrls,
+                                characterNames,
+                                scenePrompt: spfPrompt,
+                                aspectRatio: "16:9",
+                                shotType: scene.characterShot?.shotType,
+                                wardrobeLock: wardrobeLockNamesCS.length > 0,
+                                wardrobeLockNames: wardrobeLockNamesCS,
+                                speakerFocusIdx: i,
+                                speakerFocusName: spName,
+                              }),
+                            },
+                          );
+                          if (!r.ok) {
+                            const errTxt = await r.text().catch(() => "");
+                            console.warn(
+                              `[compose-video-clips] v260_spf_plate_failed scene=${scene.id} i=${i} name=${spName} status=${r.status} ${errTxt.slice(0, 200)}`,
+                            );
+                            priorityPlates.push({
+                              speaker_idx: i,
+                              speaker_name: spName,
+                              plate_image_url: null,
+                              rendered_at: new Date().toISOString(),
+                              error: `http_${r.status}`,
+                            });
+                            continue;
+                          }
+                          const aj = await r.json().catch(() => ({}));
+                          const url = typeof aj?.composedUrl === "string" ? aj.composedUrl : null;
+                          console.log(
+                            `[compose-video-clips] v260_spf_plate_ready scene=${scene.id} i=${i} name=${spName} url=${url ? url.slice(0, 80) + "…" : "null"}`,
+                          );
+                          priorityPlates.push({
+                            speaker_idx: i,
+                            speaker_name: spName,
+                            plate_image_url: url,
+                            rendered_at: new Date().toISOString(),
+                          });
+                        } catch (e) {
+                          console.warn(
+                            `[compose-video-clips] v260_spf_plate_crash scene=${scene.id} i=${i}`,
+                            e,
+                          );
+                          priorityPlates.push({
+                            speaker_idx: i,
+                            speaker_name: spName,
+                            plate_image_url: null,
+                            rendered_at: new Date().toISOString(),
+                            error: e instanceof Error ? e.message : "unknown",
+                          });
+                        }
+                      }
+                      // Persist plates on the audio_plan without touching
+                      // reference_image_url (legacy fallback stays valid).
+                      try {
+                        const { data: planRow } = await supabaseAdmin
+                          .from("composer_scenes")
+                          .select("audio_plan")
+                          .eq("id", scene.id)
+                          .maybeSingle();
+                        const basePlan = ((planRow as any)?.audio_plan ??
+                          (scene as any).audioPlan ??
+                          {}) as Record<string, any>;
+                        const baseTwoshot = (basePlan.twoshot ?? {}) as Record<string, any>;
+                        await supabaseAdmin
+                          .from("composer_scenes")
+                          .update({
+                            audio_plan: {
+                              ...basePlan,
+                              twoshot: {
+                                ...baseTwoshot,
+                                speaker_priority_plates: {
+                                  version: "v260-phase1",
+                                  n: portraitUrls.length,
+                                  plates: priorityPlates,
+                                  rendered_at: new Date().toISOString(),
+                                },
+                              },
+                            },
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq("id", scene.id);
+                      } catch (e) {
+                        console.warn(
+                          `[compose-video-clips] v260_spf_persist_failed scene=${scene.id}`,
+                          e,
+                        );
+                      }
+                      const okCount = priorityPlates.filter((p) => !!p.plate_image_url).length;
+                      console.log(
+                        `[compose-video-clips] v260_spf_complete scene=${scene.id} ok=${okCount}/${priorityPlates.length}`,
+                      );
+                    }
+                  } catch (spfErr) {
+                    // SPF is opt-in and pre-wired — never break main pipeline.
+                    console.warn(
+                      `[compose-video-clips] v260_spf_outer_error scene=${scene.id} (non-fatal)`,
+                      spfErr,
+                    );
+                  }
+
+
+
                   // v170 — Hard-abort BEFORE Hailuo/Sync.so spend credits.
                   // Only true cast-integrity failures block: clone, swap, missing,
                   // ambiguous. "extra" reason and headcount-> checks are gone —
