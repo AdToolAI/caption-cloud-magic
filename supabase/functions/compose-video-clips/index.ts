@@ -722,7 +722,7 @@ serve(async (req) => {
         .trim();
       const meaningful = cleaned.replace(/[\s.\-,;:!?]/g, "").length >= 10;
       return meaningful ? cleaned : "";
-    };
+    });
 
     /**
      * Anchor-Audit-Safe sanitizer: removes / neutralises scene elements that
