@@ -1,46 +1,64 @@
-# Artlist Deep-Dive — Wie machen die das mit Lip-Sync + Charakter-Bewegung?
+## Plan v261 — Segments-Aggregation Fix (echte Ursache gefunden)
 
-## Deliverable
+### Bestätigte Diagnose
 
-Eine neue Analyse-Datei `.lovable/analysis/artlist-lipsync-motion-deepdive.md` (kein Code, keine Pipeline-Änderungen). Reine Recherche + Vergleich mit unserem Stack seit v169. Ziel: verstehen, warum bei Artlist 4 Sprecher in einer Action-Szene synchron sprechen UND telefonieren/tippen können, ohne dass Lip-Sync verloren geht — und was davon wir übernehmen könnten.
+Untersuchung der letzten Szene (`composer_scenes.id = 7469bca3-cb52-4b48-9202-e3941d43f18d`, 4 Sprecher, 19.07.2026 23:28):
 
-## Inhalt der Datei
+- Alle 4 Sync.so-Passes: `status=done`, gültige `output_url`, korrekte `characterId` (Samuel/Matthew/Sarah/Kailee).
+- Gemini-Identitätsauflösung: `plate_identity.resolvedCount=4`, `assignmentLock` sauber gesetzt, alle 4 mit `matchConfidence=0.85`.
+- Mund-Koordinaten pro Pass: korrekt zum jeweiligen Charakter zugeordnet.
+- Sync.so-Output-Probe (Pass 3): `syncOutputUnchanged=false` — Sync.so hat animiert.
 
-**1. Artlist-Stack Reverse-Engineering (Web-Research)**
-- Welche Modelle Artlist / Artlist Max / Artlist Motion aktuell öffentlich einsetzt (Kling 2.1/2.5 Omni, Runway Act-One / Act-Two, Hedra Character-3, Sync.so v2 vs sync-3, HeyGen Avatar IV, D-ID).
-- Konkret: bekannte API-/Doku-Belege für Multi-Character-Dialog-Pfade (Kling Omni „multi_speaker", Hedra „scene mode", Runway Act-Two „performance capture").
-- Preise pro Sekunde und Marge im Vergleich zu unserem 3.00× Modell.
+**Aber:** `dialog_shots.segments` (Top-Level) enthält nur einen einzigen Eintrag — den letzten fertig gewordenen Pass. Die `passes[i].segments[]` sind alle 4 korrekt gefüllt.
 
-**2. Wie sie das technisch lösen — 3 Hypothesen mit Belegen**
-- **A) End-to-End Dialog-Modell** (Kling Omni / Hedra Character-3): Audio + Anchor-Bilder + Aktionen → ein einziges i2v-Render pro Szene, Lip-Sync ist Teil des Modells, keine Sync.so-Post-Pass. Skaliert nativ auf N Sprecher + Aktionen.
-- **B) Performance-Capture-Overlay** (Runway Act-Two): Actor-Video → Face-Retargeting auf Anchor. Aktionen kommen aus dem Original-Take, Lip-Sync ist implizit.
-- **C) Per-Speaker-Plate + separater Sync-Pass** (unser aktueller v169–v260-Weg): fragil bei Action-Szenen, weil Face-Share droppt wenn Charakter telefoniert.
+Der `dialog-stitch-muxed`-Step liest die Top-Level-Liste. Er komponiert deshalb nur Kailees Sync.so-Output über das Master-Video. Die anderen 3 fertigen, korrekt animierten Sync.so-Outputs werden nie ins Endvideo gemischt.
 
-**3. Direkter Vergleich zu unserer Pipeline seit v169**
-- Kurze Tabelle: v169 Preclip / v195 Anchor-Invariant / v204 Rollback / v217 UUID / v242 Row-Major / v247 Rekognition Face-Share ≥42% / v249 AWS-only / v260 Speaker Priority Framing → welches Problem war das, das die Art-One-/Kling-Omni-Konkurrenz gar nicht erst hat.
-- Warum unser Face-Gate (42%) systembedingt an Action-Posen (Profil, Kopf gesenkt, Hand vor Mund) scheitert, während Kling Omni das intern löst.
+**Root cause:** In `supabase/functions/compose-dialog-segments/index.ts` wird `dialog_shots.segments` beim Pass-Update mit `[currentSegment]` überschrieben statt appended.
 
-**4. Was uns fehlt / offene Baustellen**
-- Sync.so sync-3 kann kein „active speaker in profile with prop occlusion" zuverlässig.
-- Wir haben keinen Zugang zu Kling Omni multi_speaker über Replicate (nur Basic/Standard-Endpoints).
-- Hedra Character-3 API ist verfügbar, aber Marge und deutscher Sprach-Support unklar.
+Das erklärt jede bisherige Beobachtung („mal Sprecher 3, mal ein anderer" = immer der zuletzt fertig gewordene Pass, Race-abhängig).
 
-**5. Konkrete Optionen für uns (nur Bewertung, kein Plan)**
-- **Option 1**: Kling 2.5 Omni multi_speaker direkt über Kling API (nicht Replicate) — löst A + B in einem Call.
-- **Option 2**: Hedra Character-3 als N-Sprecher-Ersatz für Sync.so.
-- **Option 3**: Bei Sync.so bleiben, aber Speaker Priority Framing (v260 Phase 2/3) fertig bauen.
-- **Option 4**: Runway Act-Two als optionaler „Premium-Dialog"-Engine.
+### Was NICHT gebaut wird
 
-Für jede Option: geschätzte Kosten/Sekunde, Marge bei 3×, deutsche Sprachqualität, Multi-Sprecher-Fähigkeit, Charakter-Aktions-Support, Integrations-Aufwand in Stunden.
+Verworfen, weil die Diagnosen falsch waren:
+- v260 Speaker-Priority-Framing Phase 2 (Focus-Plates in Face-Gate) — Face-Gate war nie das Problem.
+- AWS `CompareFaces` als zweites Identitätssignal — Gemini-Identity war korrekt.
+- Never-Fail/SOFT_DEGRADE — kein Sprecher wurde abgewiesen.
 
-## Vorgehen
+Die bestehende Pipeline (Sync.so + AWS Rekognition + Gemini-Identity + v242 Row-Major + Character-Assignment-Lock) ist **korrekt**. Nur die Aggregation zum Stitcher ist kaputt.
 
-1. Web-Research über `websearch--web_search` + `websearch--web_code_search` (Kling Omni API docs, Hedra Character-3, Runway Act-Two, Artlist Motion Marketing-Seite, Reddit/HackerNews Erfahrungsberichte).
-2. Gegenlese mit unserer bestehenden Config (`hailuoVideoCredits.ts`, `happyhorseVideoCredits.ts`, `syncso-face-gate.ts`) — nur lesen, nichts anfassen.
-3. Datei schreiben, danach im Chat kurz zusammenfassen (3–5 Bullets + Empfehlung).
+### Fix
 
-## Nicht Teil dieses Plans
+**Datei 1:** `supabase/functions/compose-dialog-segments/index.ts`
+- Beim Persistieren nach jedem Pass: `segments` aus `passes[*].segments` **rekonstruieren** (flat map + dedup by speakerIdx, aufsteigend nach startTime), nicht überschreiben.
+- Concurrent-Safe: Rekonstruktion aus dem Passes-Array statt aus einer akkumulierten Variable, damit parallel laufende Passes sich nicht überschreiben.
+- Explizite Assertion vor `audio_mux`-Dispatch: `segments.length === passes.filter(p => p.status==='done').length`, sonst Log-Warning + Reconstruct.
 
-- Keine Änderung an `compose-video-clips`, `compose-scene-anchor`, `compose-dialog-segments`.
-- Keine Speaker-Priority-Framing Phase 2/3.
-- Keine neue Engine-Integration — die kommt erst nach Deiner Entscheidung basierend auf dem Report.
+**Datei 2:** `supabase/functions/dialog-stitch-muxed/index.ts` (Verifikation)
+- Prüfen, dass die Funktion tatsächlich `dialog_shots.segments` (Top-Level) als Wahrheitsquelle nutzt und alle Einträge iteriert. Falls sie stattdessen per-Pass-Arrays lesen kann, direkt darauf umstellen (robuster).
+
+**Datei 3:** `supabase/functions/_shared/dialog-segments-repair.ts` (neu, ~30 Zeilen)
+- Utility `rebuildTopLevelSegments(dialogShots)`: liest alle `passes[*].segments`, dedupt by speakerIdx, sortiert by startTime, gibt Top-Level-Array zurück. Wird in Datei 1 verwendet und ist zusätzlich als Repair-Helper aufrufbar.
+
+### Backfill für die kaputte Szene
+
+Ein einmaliger Repair-Call für Scene `7469bca3-cb52-4b48-9202-e3941d43f18d`:
+1. `segments` aus `passes[*].segments` rekonstruieren, in `dialog_shots` schreiben.
+2. `dialog-stitch-muxed` erneut triggern.
+3. Ergebnis: alle 4 Sprecher sollten animierte Lippen zeigen.
+
+Das ist der Beweis-Test, dass die Diagnose stimmt — **bevor** wir irgendwelche neuen Provider-Änderungen anfassen.
+
+### Rollout
+
+1. Fix deployen (`compose-dialog-segments`).
+2. Backfill für die eine Test-Szene ausführen, Video ansehen.
+3. Bei Erfolg: nächste 4-Sprecher-Szene neu generieren und prüfen.
+4. Kein Feature-Flag nötig — es ist ein reiner Bugfix.
+
+### Restrisiko
+
+Wenn `dialog-stitch-muxed` bereits die per-Pass-Arrays korrekt liest und der Bug woanders sitzt (z. B. im Composer-Frontend, das die Segments zusammenbaut), verschiebt sich der Fix in Datei 2 oder ins Frontend. Das klärt Datei 2 als erster Schritt der Umsetzung — 10 Minuten Lesearbeit — bevor wir Datei 1 anfassen.
+
+### Erwartetes Ergebnis
+
+Die Büro-Szene mit 4 Sprechern zeigt nach dem Backfill 4 animierte Münder statt einem. Zukünftige Szenen laufen ohne diesen Aggregations-Bug.
