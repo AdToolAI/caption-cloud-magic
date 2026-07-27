@@ -346,11 +346,11 @@ serve(async (req) => {
     // not arbitrary faces, so extras do not break the pipeline.
     const EXACT_COUNT_SUFFIX = isMulti
       ? ` CAST COUNT — NON-NEGOTIABLE: the final image must show the ${N} CAST reference people, each appearing EXACTLY ONCE as a clearly visible, individually recognizable person. ` +
-        `FORBIDDEN: duplicating any cast reference, rendering the same cast identity twice, twins, doppelgängers, clones, mirror reflections of a cast person, posters/photos/screens/statues/mannequins depicting a cast person. ` +
+        `FORBIDDEN: duplicating any cast reference, rendering the same cast identity twice, twins, doppelgängers, clones, mirror reflections of a cast person, posters/photos/screens/statues/mannequins depicting a cast person, ADDING ANY NEW NAMED SUBJECT (no children, no babies, no toddlers, no pets, no dogs, no cats, no extra adult held/carried by anyone). Headcount of foreground/mid-ground named people MUST equal exactly ${N} — not ${N + 1}, not ${N + 2}. ` +
         `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people whose face is not a cast reference — include them naturally when the scene calls for it. ` +
         `Each of the ${N} cast people remains clearly identifiable and unobstructed.`
       : ` CAST COUNT — NON-NEGOTIABLE: the final image must contain the 1 CAST reference person, appearing EXACTLY ONCE as a clearly visible, individually recognizable person in ONE continuous frame. ` +
-        `FORBIDDEN: duplicating the cast person, rendering the same identity twice or three times, twins, doppelgängers, clones, mirror duplicates of the cast person, triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid. ` +
+        `FORBIDDEN: duplicating the cast person, rendering the same identity twice or three times, twins, doppelgängers, clones, mirror duplicates of the cast person, triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid, adding a child/baby/pet held or carried by the cast person unless the scene explicitly names one. ` +
         `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people — include them naturally when the scene calls for it. Decorative depicted humans on laptop/phone/TV screens, framed photos, mirror reflections of bystanders, posters and statues are also allowed. ` +
         `The cast person stays in one continuous shot.`;
     // Two-shot framing enforcement — when ≥2 portraits, the downstream
@@ -486,26 +486,33 @@ serve(async (req) => {
     // string when the caller didn't request a retry.
     const FRAMING_RETRY_SUFFIX = framingSuffix ? ` ${framingSuffix}` : "";
 
-    const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
-
-      `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
-      `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
-      `Scene: ${safeScenePrompt}`;
+    const editInstruction = isMulti
+      ? // Environment-first for multi-speaker: lead with the scene, THEN place people.
+        // Prevents Seedream/Gemini from treating this as "isolate subjects on neutral bg".
+        `Scene / environment (MANDATORY — render this location faithfully as the full background and setting of the image): ${safeScenePrompt}\n\n` +
+        `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description above. The named location, its architecture, props, and atmosphere MUST be clearly visible around the people — never a neutral studio or white/black background.\n\n` +
+        `Now place ${peopleNoun} INTO that environment without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
+        `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable.`
+      : `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
+        `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
+        `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
+        `Scene: ${safeScenePrompt}`;
 
     // ------------------------------------------------------------------
-    // v270 — Anchor-Modell-Router (Seedream 4 als Default für Multi-Sprecher)
+    // v271 — Anchor-Modell-Router (Gemini 3 Pro Image als Default für Multi)
     // ------------------------------------------------------------------
-    // Nano Banana 2 (google/gemini-3.1-flash-image-preview) verwechselt bei
-    // 3–4 Charakteren mit ähnlichen Merkmalen (z.B. gleicher Nachname)
-    // regelmäßig Identitäten oder klont einen Sprecher doppelt.
-    // Seedream 4 (bytedance/seedream-4) über Replicate unterstützt native
-    // Multi-Image-Reference und hält 3–4 unterschiedliche Identitäten
-    // deutlich stabiler. Feature-Flag `ANCHOR_MODEL_MULTI` erlaubt Rollback
-    // ohne Redeploy.
-    const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "seedream4").toLowerCase();
+    // Nano Banana 2 verwechselt Identitäten bei 3–4 Charakteren.
+    // Seedream 4 hält Identitäten, isoliert Personen aber auf neutralem
+    // Hintergrund und ignoriert die Location.
+    // Gemini 3 Pro Image (`google/gemini-3-pro-image`) läuft über den
+    // Lovable AI Gateway, respektiert Multi-Image-Refs + Scene-Prompt
+    // gleichzeitig und hält Identitäten deutlich besser als Nano Banana 2.
+    // Feature-Flag `ANCHOR_MODEL_MULTI` erlaubt Rollback ohne Redeploy.
+    //   Werte: "gemini3pro" (Default) | "nano_banana_2" | "seedream4"
+    const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "gemini3pro").toLowerCase();
     const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
     const useSeedream = isMulti && ANCHOR_MODEL_MULTI === "seedream4" && REPLICATE_API_KEY.length > 0;
+    const useGemini3Pro = isMulti && ANCHOR_MODEL_MULTI === "gemini3pro";
 
     // Reference image URLs, in strict order: portraits → identity headshots →
     // world refs. Seedream 4 accepts an array of reference URLs directly.
@@ -521,7 +528,7 @@ serve(async (req) => {
     let bytes: Uint8Array | null = null;
     let mime = "image/png";
     let ext = "png";
-    let anchorProvider: "seedream4" | "nano_banana_2" = "nano_banana_2";
+    let anchorProvider: "seedream4" | "nano_banana_2" | "gemini3pro" = "nano_banana_2";
     const t0 = Date.now();
 
     const callNanoBanana2 = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
@@ -564,6 +571,57 @@ serve(async (req) => {
       const dataUrl: string | undefined = aiJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
       if (!dataUrl || !dataUrl.startsWith("data:image")) {
         console.error("[compose-scene-anchor] nano_banana no image", JSON.stringify(aiJson).slice(0, 300));
+        return null;
+      }
+      const [meta, b64] = dataUrl.split(",", 2);
+      const m = /data:(image\/[a-z+]+);/.exec(meta)?.[1] ?? "image/png";
+      const e2 = m.includes("png") ? "png" : m.includes("webp") ? "webp" : "jpg";
+      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), mime: m, ext: e2 };
+    };
+
+    // v271 — Gemini 3 Pro Image via Lovable Gateway (chat-completions image shape).
+    // Same payload as Nano Banana 2 but with a stronger model; better identity
+    // preservation + better environment retention for multi-speaker scenes.
+    const callGemini3ProImage = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
+      const userContent: any[] = [{ type: "text", text: editInstruction }];
+      for (const url of portraits) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of locationUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of buildingUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of propUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of identityPortraits) userContent.push({ type: "image_url", image_url: { url } });
+
+      const ac = new AbortController();
+      const timeoutId = setTimeout(() => ac.abort(), 90_000);
+      let aiResp: Response;
+      try {
+        aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-pro-image",
+            messages: [{ role: "user", content: userContent }],
+            modalities: ["image", "text"],
+            ...(faceLockMode ? { temperature: 0 } : {}),
+          }),
+          signal: ac.signal,
+        });
+      } catch (e) {
+        clearTimeout(timeoutId);
+        console.warn(`[compose-scene-anchor] gemini3pro ${(e as any)?.name === "AbortError" ? "timeout" : "network"} sceneId=${body.sceneId}`);
+        return null;
+      }
+      clearTimeout(timeoutId);
+      if (!aiResp.ok) {
+        console.error("[compose-scene-anchor] gemini3pro error", aiResp.status, (await aiResp.text()).slice(0, 300));
+        return null;
+      }
+      const aiJson = await aiResp.json();
+      const dataUrl: string | undefined = aiJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!dataUrl || !dataUrl.startsWith("data:image")) {
+        console.error("[compose-scene-anchor] gemini3pro no image", JSON.stringify(aiJson).slice(0, 300));
         return null;
       }
       const [meta, b64] = dataUrl.split(",", 2);
@@ -635,7 +693,15 @@ serve(async (req) => {
     };
 
     // --- Execute with fallback -------------------------------------------
-    if (useSeedream) {
+    if (useGemini3Pro) {
+      const r = await callGemini3ProImage();
+      if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "gemini3pro"; }
+      else {
+        console.warn(`[compose-scene-anchor] gemini3pro failed → fallback nano_banana_2 sceneId=${body.sceneId}`);
+        const r2 = await callNanoBanana2();
+        if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "nano_banana_2"; }
+      }
+    } else if (useSeedream) {
       const r = await callSeedream4();
       if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "seedream4"; }
       else {
