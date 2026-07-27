@@ -1451,8 +1451,10 @@ serve(async (req) => {
       persistedPlateIdentity?.assignmentLock && typeof persistedPlateIdentity.assignmentLock === "object"
         ? persistedPlateIdentity.assignmentLock
         : null;
+    const _persistedAssignmentLockSource = String(persistedPlateIdentity?.assignmentLockSource ?? "");
+    const _isRekognitionLock = /rekognition/i.test(_persistedAssignmentLockSource) || !!_anchorIdentitySeed?.assignmentLock;
     const anchorRekLockSeed: Record<string, string> | null =
-      (_persistedAssignmentLock && Object.keys(_persistedAssignmentLock).length > 0)
+      (_isRekognitionLock && _persistedAssignmentLock && Object.keys(_persistedAssignmentLock).length > 0)
         ? { ...(_persistedAssignmentLock as Record<string, string>) }
         : null;
     const anchorRekLockCount = anchorRekLockSeed ? Object.keys(anchorRekLockSeed).length : 0;
