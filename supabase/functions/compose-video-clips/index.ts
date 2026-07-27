@@ -3006,14 +3006,9 @@ serve(async (req) => {
                         : "";
                       const msg = `${code}: ${identityNotes || identityFailure}${missingSuffix} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen (ähnliche Gesichter/gleicher Nachname?).`;
 
-                      await supabaseAdmin
-                        .from("composer_scenes")
-                        .update({
-                          clip_status: "failed",
-                          clip_error: msg,
-                          updated_at: new Date().toISOString(),
-                        })
-                        .eq("id", scene.id);
+                      await safeMarkSceneFailed(scene.id, msg, {
+                        isCinematicSyncScene: true,
+                      });
                       results.push({
                         sceneId: scene.id,
                         status: "failed",
