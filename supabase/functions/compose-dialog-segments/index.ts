@@ -1861,7 +1861,13 @@ serve(async (req) => {
       ) {
         try {
           const routed = await routePlateFacesToAnchor({
-            plateUrl: sourceClipUrl,
+            // v278.2 — Anchor-First router: AWS Rekognition cannot detect faces
+            // from MP4 bytes. Route on the still anchor/reference image, then
+            // scale normalized boxes into plate dimensions. This preserves the
+            // no-duplicate bijection without falling back to v153 on videos.
+            plateUrl: anchorLayoutRaw.anchorUrl?.startsWith("http")
+              ? anchorLayoutRaw.anchorUrl
+              : (anchorUrl ?? sourceClipUrl),
             anchorLayout: anchorLayoutRaw,
             plateDims,
           });
