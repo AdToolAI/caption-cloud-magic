@@ -1072,6 +1072,23 @@ serve(async (req) => {
     const existing = (scene as any).dialog_shots as SegmentsState | null;
     const existingStatus = String((existing as any)?.status ?? "");
     const existingError = String((existing as any)?.error ?? (scene as any)?.clip_error ?? "");
+    const mergeDialogShots = (base: any, patch: Record<string, unknown>) => {
+      const safeBase = base && typeof base === "object" && !Array.isArray(base) ? base : {};
+      return {
+        ...safeBase,
+        ...patch,
+        // v278.1 — routing artefacts are expensive and must survive terminal
+        // error updates. A later failure state may set status/error, but it
+        // must not erase the anchor layout that lets the next retry take the
+        // Hungarian route instead of falling back to v153 duplicates.
+        ...(safeBase.anchor_face_layout && !patch.anchor_face_layout
+          ? { anchor_face_layout: safeBase.anchor_face_layout }
+          : {}),
+        ...(safeBase.plate_identity && !patch.plate_identity
+          ? { plate_identity: safeBase.plate_identity }
+          : {}),
+      };
+    };
     const isStaleFailedState =
       !isRetry &&
       !isAdvance &&
@@ -1554,6 +1571,14 @@ serve(async (req) => {
           .map((face: any) => face?.bbox)
           .filter((bbox: unknown) => Array.isArray(bbox) && (bbox as unknown[]).length === 4)
         : [];
+    const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
+    const anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
+    const hasCompleteV278AnchorLayout =
+      v278Enabled &&
+      speakers.length >= 3 &&
+      anchorLayoutRaw &&
+      Array.isArray(anchorLayoutRaw.slots) &&
+      anchorLayoutRaw.slots.length >= speakers.length;
     // v154 — Geometry sanity gate against the persisted bboxes. The pre-v154
     // detector path occasionally cached torso/upper-body boxes (center y >
     // 0.55 of plate height). If those got persisted into dialog_shots, they
@@ -1608,7 +1633,7 @@ serve(async (req) => {
       String(id ?? "")
         .toLowerCase()
         .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
-    if (persistedGateOk && persistedBboxes.length >= speakers.length) {
+    if (persistedGateOk && persistedBboxes.length >= speakers.length && !hasCompleteV278AnchorLayout) {
       const persistedMouths: any[] = Array.isArray(persistedPlateIdentity?.mouths)
         ? persistedPlateIdentity.mouths
         : [];
@@ -1705,6 +1730,11 @@ serve(async (req) => {
         `bboxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} ` +
         `lock_present=${Object.keys(assignmentLock).length > 0}`,
       );
+    } else if (persistedBboxes.length >= speakers.length && hasCompleteV278AnchorLayout) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v278_skip_legacy_persisted_hydration ` +
+        `anchor_layout=${anchorLayoutRaw.slots.length}/${speakers.length} persisted_boxes=${persistedBboxes.length} — trying Hungarian router first`,
+      );
     }
     if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
       // ── v278 FAST-PATH — HUNGARIAN PLATE ROUTER ────────────────────
@@ -1721,14 +1751,9 @@ serve(async (req) => {
       // when: N < 3 (legacy is cheap and reliable there), the anchor
       // layout is missing (older scenes), face-count mismatch, or the
       // AWS DetectFaces call fails.
-      const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
-      const anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
       if (
-        v278Enabled &&
-        speakers.length >= 3 &&
-        anchorLayoutRaw &&
-        Array.isArray(anchorLayoutRaw.slots) &&
-        anchorLayoutRaw.slots.length >= speakers.length
+        hasCompleteV278AnchorLayout &&
+        anchorLayoutRaw
       ) {
         try {
           const routed = await routePlateFacesToAnchor({
