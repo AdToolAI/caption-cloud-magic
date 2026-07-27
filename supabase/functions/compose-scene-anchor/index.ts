@@ -693,7 +693,15 @@ serve(async (req) => {
     };
 
     // --- Execute with fallback -------------------------------------------
-    if (useSeedream) {
+    if (useGemini3Pro) {
+      const r = await callGemini3ProImage();
+      if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "gemini3pro"; }
+      else {
+        console.warn(`[compose-scene-anchor] gemini3pro failed → fallback nano_banana_2 sceneId=${body.sceneId}`);
+        const r2 = await callNanoBanana2();
+        if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "nano_banana_2"; }
+      }
+    } else if (useSeedream) {
       const r = await callSeedream4();
       if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "seedream4"; }
       else {
