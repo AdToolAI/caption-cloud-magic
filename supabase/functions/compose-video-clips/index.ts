@@ -35,6 +35,7 @@ import {
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
+import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
@@ -2764,6 +2765,137 @@ serve(async (req) => {
                   console.log(
                     `[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? "?"}/${expectedFaces}, humans=${humanCount ?? "?"}/${expectedFaces}, identity=${identityFailure ?? "ok"}) → ${composedUrl.slice(0, 80)}…`,
                   );
+
+                  // ── v274 SPEAKER ↔ FACE IDENTITY VIA AWS REKOGNITION ───
+                  // Deterministic biometric mapping on the anchor plate.
+                  // Persists to `audio_plan.twoshot.anchor_identity` and
+                  // pre-seeds `dialog_shots.plate_identity.assignmentLock`
+                  // so compose-dialog-segments routes each script line to
+                  // the correct face instead of falling back to
+                  // slot-order = script-order.
+                  //
+                  // For N ≥ 3 speakers, an unresolved mapping (< N matches
+                  // at similarity ≥ 55) marks the scene as
+                  // `awaiting_manual_face_map` so the user can fix it via
+                  // FaceMapReviewDialog BEFORE any provider credits are
+                  // spent on the wrong speaker↔face routing.
+                  try {
+                    if (portraitUrls.length >= 2) {
+                      const idRefs = (identityPortraitUrls.length === portraitUrls.length
+                        ? identityPortraitUrls
+                        : portraitUrls);
+                      const characterIds = effectiveShots
+                        .slice(0, portraitUrls.length)
+                        .map((cs) => cs.characterId);
+                      const rekChars = characterIds
+                        .map((cid, i) => ({
+                          characterId: cid,
+                          portraitUrl: idRefs[i],
+                          speakerIdx: i,
+                        }))
+                        .filter((c) => c.portraitUrl && c.characterId);
+                      if (rekChars.length >= 2) {
+                        const idResolved = await resolveIdentityViaRekognition({
+                          anchorUrl: composedUrl,
+                          characters: rekChars,
+                        });
+                        console.log(
+                          `[compose-video-clips] v274_rekognition_id scene=${scene.id} ok=${idResolved.ok ? 1 : 0} ` +
+                          `resolved=${idResolved.resolvedCount}/${idResolved.expectedCount} ` +
+                          `minSim=${idResolved.minSimilarity ?? "-"} reason=${idResolved.reason ?? "-"} ms=${idResolved.msTotal}`,
+                        );
+                        // Persist to audio_plan.twoshot.anchor_identity — this
+                        // becomes the fallback source for
+                        // dialog_shots.plate_identity in compose-dialog-segments.
+                        try {
+                          const { data: sceneRow } = await supabaseAdmin
+                            .from("composer_scenes")
+                            .select("audio_plan, dialog_shots")
+                            .eq("id", scene.id)
+                            .single();
+                          const baseAudioPlan = (sceneRow?.audio_plan ?? {}) as Record<string, any>;
+                          const baseTwoshot = (baseAudioPlan.twoshot ?? {}) as Record<string, any>;
+                          const anchorIdentityPayload = {
+                            method: idResolved.method,
+                            dims: idResolved.dims,
+                            faces: idResolved.faces,
+                            assignmentLock: idResolved.assignmentLock,
+                            resolvedCount: idResolved.resolvedCount,
+                            expectedCount: idResolved.expectedCount,
+                            minSimilarity: idResolved.minSimilarity,
+                            reason: idResolved.reason ?? null,
+                            anchor_url: composedUrl,
+                            resolved_at: new Date().toISOString(),
+                          };
+                          // Also pre-seed dialog_shots.plate_identity so the
+                          // downstream reader picks it up without any code
+                          // change on the compose-dialog-segments side when
+                          // dialog_shots already exists.
+                          const existingDs = (sceneRow?.dialog_shots ?? null) as Record<string, any> | null;
+                          const nextDialogShots = existingDs && typeof existingDs === "object"
+                            ? {
+                                ...existingDs,
+                                plate_identity: {
+                                  ...(existingDs.plate_identity ?? {}),
+                                  method: idResolved.method,
+                                  dims: idResolved.dims,
+                                  faces: idResolved.faces,
+                                  assignmentLock: idResolved.assignmentLock,
+                                  resolvedCount: idResolved.resolvedCount,
+                                },
+                              }
+                            : existingDs;
+                          const needsManualReview =
+                            portraitUrls.length >= 3 &&
+                            (!idResolved.ok || idResolved.resolvedCount < portraitUrls.length);
+                          await supabaseAdmin
+                            .from("composer_scenes")
+                            .update({
+                              audio_plan: {
+                                ...baseAudioPlan,
+                                twoshot: {
+                                  ...baseTwoshot,
+                                  anchor_identity: anchorIdentityPayload,
+                                },
+                              },
+                              ...(nextDialogShots ? { dialog_shots: nextDialogShots } : {}),
+                              ...(needsManualReview
+                                ? {
+                                    clip_status: "awaiting_manual_face_map",
+                                    clip_error:
+                                      `anchor_identity_needs_review: ${idResolved.resolvedCount}/${portraitUrls.length} Sprecher konnten automatisch zugeordnet werden. Bitte im Face-Map-Review die Sprecher den Gesichtern auf dem Anchor zuweisen, bevor der Clip gerendert wird.`,
+                                  }
+                                : {}),
+                              updated_at: new Date().toISOString(),
+                            })
+                            .eq("id", scene.id);
+                          if (needsManualReview) {
+                            console.log(
+                              `[compose-video-clips] v274_awaiting_manual_face_map scene=${scene.id} resolved=${idResolved.resolvedCount}/${portraitUrls.length} — skipping provider dispatch`,
+                            );
+                            results.push({
+                              sceneId: scene.id,
+                              status: "awaiting_manual_face_map",
+                              resolved: idResolved.resolvedCount,
+                              expected: portraitUrls.length,
+                            } as any);
+                            continue;
+                          }
+                        } catch (persistErr) {
+                          console.warn(
+                            `[compose-video-clips] v274 persist failed scene=${scene.id}:`,
+                            persistErr,
+                          );
+                        }
+                      }
+                    }
+                  } catch (rekErr) {
+                    console.warn(
+                      `[compose-video-clips] v274 rekognition non-fatal error scene=${scene.id}:`,
+                      rekErr,
+                    );
+                  }
+
 
                   // ── v260 SPEAKER PRIORITY FRAMING — Phase 1 ─────────────
                   // When the scene is a dialog scene with asymmetric
