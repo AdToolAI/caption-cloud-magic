@@ -3046,15 +3046,10 @@ serve(async (req) => {
           console.warn(
             `[compose-video-clips] scene ${scene.id}: v195_cinematic_sync_anchor_missing → hard-fail before provider dispatch`,
           );
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              clip_status: "failed",
-              clip_error: msg,
-              twoshot_stage: "failed",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", scene.id);
+          await safeMarkSceneFailed(scene.id, msg, {
+            isCinematicSyncScene: true,
+            extra: { twoshot_stage: "failed" },
+          });
           results.push({ sceneId: scene.id, status: "failed", error: msg });
           continue;
         }
