@@ -745,10 +745,20 @@ serve(async (req) => {
         const r2 = await callNanoBanana2();
         if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "nano_banana_2"; }
       }
+    } else if (useNanoBananaFirst) {
+      // v276 — NB2 first with Gemini 3 Pro auto-fallback.
+      const r = await callNanoBanana2();
+      if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "nano_banana_2"; }
+      else {
+        console.warn(`[compose-scene-anchor] v276 nano_banana_2 failed → fallback gemini3pro sceneId=${body.sceneId}`);
+        const r2 = await callGemini3ProImage();
+        if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "gemini3pro"; }
+      }
     } else {
       const r = await callNanoBanana2();
       if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "nano_banana_2"; }
     }
+
 
     if (!bytes) {
       return new Response(
