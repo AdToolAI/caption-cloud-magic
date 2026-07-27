@@ -346,6 +346,8 @@ serve(async (req) => {
     // not arbitrary faces, so extras do not break the pipeline.
     const EXACT_COUNT_SUFFIX = isMulti
       ? ` CAST COUNT — NON-NEGOTIABLE: the final image must show the ${N} CAST reference people, each appearing EXACTLY ONCE as a clearly visible, individually recognizable person. ` +
+        `All ${N} cast people appear together in ONE single continuous photographic frame — one shared physical space, one camera, one exposure, one moment in time. ` +
+        `FORBIDDEN LAYOUTS: 2x2 grid, 2x1 or 1x2 split-screen, 3x1 or 1x3 strip, panel grid, multi-panel composition, photo collage, contact sheet, tiled portraits, framed headshot arrangement, video-conference / Zoom / Teams / Google Meet grid, before/after grid, magazine-style portrait grid, side-by-side headshot strip, stitched individual portraits, picture-in-picture. ` +
         `FORBIDDEN: duplicating any cast reference, rendering the same cast identity twice, twins, doppelgängers, clones, mirror reflections of a cast person, posters/photos/screens/statues/mannequins depicting a cast person, ADDING ANY NEW NAMED SUBJECT (no children, no babies, no toddlers, no pets, no dogs, no cats, no extra adult held/carried by anyone). Headcount of foreground/mid-ground named people MUST equal exactly ${N} — not ${N + 1}, not ${N + 2}. ` +
         `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people whose face is not a cast reference — include them naturally when the scene calls for it. ` +
         `Each of the ${N} cast people remains clearly identifiable and unobstructed.`
