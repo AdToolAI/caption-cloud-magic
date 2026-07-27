@@ -486,12 +486,17 @@ serve(async (req) => {
     // string when the caller didn't request a retry.
     const FRAMING_RETRY_SUFFIX = framingSuffix ? ` ${framingSuffix}` : "";
 
-    const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
-
-      `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
-      `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
-      `Scene: ${safeScenePrompt}`;
+    const editInstruction = isMulti
+      ? // Environment-first for multi-speaker: lead with the scene, THEN place people.
+        // Prevents Seedream/Gemini from treating this as "isolate subjects on neutral bg".
+        `Scene / environment (MANDATORY — render this location faithfully as the full background and setting of the image): ${safeScenePrompt}\n\n` +
+        `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description above. The named location, its architecture, props, and atmosphere MUST be clearly visible around the people — never a neutral studio or white/black background.\n\n` +
+        `Now place ${peopleNoun} INTO that environment without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
+        `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable.`
+      : `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
+        `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
+        `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
+        `Scene: ${safeScenePrompt}`;
 
     // ------------------------------------------------------------------
     // v270 — Anchor-Modell-Router (Seedream 4 als Default für Multi-Sprecher)
