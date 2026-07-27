@@ -43,7 +43,7 @@ export type VideoMode = 'video' | 'image' | 'mixed';
 
 export type ClipQuality = 'standard' | 'pro';
 
-export type ClipStatus = 'pending' | 'generating' | 'ready' | 'failed';
+export type ClipStatus = 'pending' | 'generating' | 'ready' | 'failed' | 'awaiting_manual_face_map';
 
 // =============================================================================
 // Phase 2 — Performance Layer
