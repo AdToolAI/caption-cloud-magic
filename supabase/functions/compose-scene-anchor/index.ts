@@ -488,12 +488,20 @@ serve(async (req) => {
     // string when the caller didn't request a retry.
     const FRAMING_RETRY_SUFFIX = framingSuffix ? ` ${framingSuffix}` : "";
 
+    // v272 — SINGLE CONTINUOUS PHOTOGRAPH suffix (multi only). Gemini 3 Pro
+    // Image otherwise interprets N reference portraits literally as N panels
+    // (2x2 grid, Zoom-style tiles). This hard-locks the output to one shared
+    // physical frame.
+    const SINGLE_FRAME_SUFFIX = isMulti
+      ? ` SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a 2x2 layout, NOT a collage, NOT a stitched image, NOT a video-conference / Zoom / Teams / Meet screenshot, NOT a picture-in-picture, NOT a framed portrait wall. All ${N} people share the SAME floor, SAME walls, SAME lighting direction, SAME perspective, SAME camera focal length. Zero panel borders, zero dividing lines, zero separate frames.`
+      : "";
+
     const editInstruction = isMulti
       ? // Environment-first for multi-speaker: lead with the scene, THEN place people.
         // Prevents Seedream/Gemini from treating this as "isolate subjects on neutral bg".
         `Scene / environment (MANDATORY — render this location faithfully as the full background and setting of the image): ${safeScenePrompt}\n\n` +
         `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description above. The named location, its architecture, props, and atmosphere MUST be clearly visible around the people — never a neutral studio or white/black background.\n\n` +
-        `Now place ${peopleNoun} INTO that environment without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
+        `Now place ${peopleNoun} INTO that environment without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause}${SINGLE_FRAME_SUFFIX} ` +
         `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable.`
       : `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
         `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
