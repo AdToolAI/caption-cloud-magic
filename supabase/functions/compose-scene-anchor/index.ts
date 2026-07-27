@@ -375,9 +375,11 @@ serve(async (req) => {
     // crops to a single character or stacks faces and the multi-pass
     // face-target lipsync collapses to one speaker.
     const TWO_SHOT_FRAMING_SUFFIX = isMulti
-      ? (hasAsymmetricCast
-        ? ` MULTI-CHARACTER FRAMING (asymmetric, per CHARACTER ACTIONS above): all ${N} cast people must be clearly visible and individually recognizable in the SAME frame. Screen share may be UNEQUAL — honor the per-character placement (foreground/background, primary/secondary, near/far) exactly as written in CHARACTER ACTIONS. Each cast face must still be unobstructed enough that a face detector can locate ${N} distinct cast faces (no full back-of-head, no fully hidden face, no silhouette).`
-        : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} cast characters are fully visible in the SAME frame at roughly EQUAL screen share. Each cast face must be unobstructed, front-3/4 to camera, with clear separation between subjects. NEVER produce a single-character close-up, NEVER cut a cast member out of frame, NEVER show only the back of a head.`)
+      ? (gridRequested
+        ? ` GRID PANEL FRAMING: exactly ${N} equal panels arranged as a clean ${N === 4 ? "2x2" : N === 2 ? "1x2 side-by-side" : N === 3 ? "1x3 strip" : `${N}-panel grid`}, thin neutral divider between panels. Each panel is centered on exactly ONE cast member, framed as a medium close-up (chest up), front or slight three-quarter to camera, mouth and jaw fully visible. Each cast face must be unobstructed and sharp. NEVER put two cast members in the same panel, NEVER leave a panel empty, NEVER duplicate a cast identity across panels.`
+        : (hasAsymmetricCast
+          ? ` MULTI-CHARACTER FRAMING (asymmetric, per CHARACTER ACTIONS above): all ${N} cast people must be clearly visible and individually recognizable in the SAME frame. Screen share may be UNEQUAL — honor the per-character placement (foreground/background, primary/secondary, near/far) exactly as written in CHARACTER ACTIONS. Each cast face must still be unobstructed enough that a face detector can locate ${N} distinct cast faces (no full back-of-head, no fully hidden face, no silhouette).`
+          : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} cast characters are fully visible in the SAME frame at roughly EQUAL screen share. Each cast face must be unobstructed, front-3/4 to camera, with clear separation between subjects. NEVER produce a single-character close-up, NEVER cut a cast member out of frame, NEVER show only the back of a head.`))
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
       ? (gridRequested
