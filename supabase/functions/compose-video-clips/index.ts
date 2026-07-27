@@ -2957,17 +2957,20 @@ serve(async (req) => {
                     ambiguous: "anchor_identity_ambiguous",
                     swap: "anchor_identity_swap_detected",
                   };
-                  // v266 — Multi-Speaker Cinematic-Sync: Anchor + Identity-Audit
-                  // sind KEIN blockendes Gate mehr. Der Anker wird best-effort
-                  // erzeugt (dient als Referenzbild für den Provider), aber ein
-                  // fehlgeschlagener Gemini-Identity-Audit stoppt den Render
-                  // nicht mehr. Ursache der wiederkehrenden
-                  // "anchor_identity_missing/clone/swap"-Fehler war das
-                  // KI-Zwischenbild + KI-Audit auf ähnlichen Gesichtern
-                  // (gleicher Nachname). Sync.so-Multi-Face-Lipsync arbeitet
-                  // auf dem echten Video-Frame, nicht auf diesem Anker.
+                  // v267 — Anchor bleibt als Referenzbild (stabilisiert
+                  // gegen Morphs, Sprecher 2/3/4 werden vom Lip-Sync
+                  // getroffen), aber der Gemini-Identity-Audit ist KEIN
+                  // Hard-Gate mehr. Falsch-positive Audits (ähnliche
+                  // Nachnamen, Cast-Verwechslung) blockieren die Szene
+                  // nie mehr. Echte Headcount-Fehler (faces < expected)
+                  // werden bereits im Retry-Block davor abgefangen und
+                  // führen dort zu identityFailure="missing" — auch das
+                  // wird jetzt als Warnung behandelt statt zu blocken.
+                  // Kill-Switch: CINEMATIC_SYNC_NO_ANCHOR=1 = alter
+                  // v266-Modus (Anker komplett aus dem Provider-Input),
+                  // Default "0" = Anker AN + Audit als Soft-Signal.
                   const noAnchorGateFlag = String(
-                    Deno.env.get("CINEMATIC_SYNC_NO_ANCHOR") ?? "1",
+                    Deno.env.get("CINEMATIC_SYNC_NO_ANCHOR") ?? "0",
                   ).toLowerCase();
                   const noAnchorGate =
                     (noAnchorGateFlag === "1" ||
@@ -2982,62 +2985,32 @@ serve(async (req) => {
                   } else if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
-                    // v250 — Soft-Pass: when three retries produced the right
-                    // headcount (faces=N, humans=N) but Gemini still flags a
-                    // clone/swap, the failure is almost always similar-looking
-                    // cast (e.g. two brothers sharing a surname). Instead of
-                    // hard-blocking the whole render, we mark the anchor as
-                    // `anchor_soft_pass`, warn in the DB, and continue so the
-                    // user can review the anchor and either accept or re-roll.
-                    const headcountOk =
-                      typeof faceCount === "number" &&
-                      typeof humanCount === "number" &&
-                      faceCount === expectedFaces &&
-                      humanCount === expectedFaces;
-                    // v263 — Soft-pass ONLY when no cast member is actually
-                    // missing from the anchor. A `clone` with a missing
-                    // character means face i in the anchor is not that
-                    // character's face → row-major voice mapping breaks →
-                    // silent lip-sync mismatch. Hard-fail instead so the
-                    // user re-renders (or the founders/Preview-Gate catches
-                    // it before Hailuo + Sync.so spend).
-                    const hasMissingCast = identityMissing.length > 0;
-                    const softPassEligible =
-                      headcountOk &&
-                      !hasMissingCast &&
-                      (identityFailure === "clone" || identityFailure === "swap");
-                    if (softPassEligible) {
-                      const warn = `${code}_soft_pass: ${identityNotes || identityFailure} — Anchor zeigt zwar ${expectedFaces} Personen, aber Gesichter wirken ähnlich (z. B. Cast mit gleichem Nachnamen). Bitte den Anchor in der Vorschau prüfen und ggf. neu rendern.`;
-                      console.log(
-                        `[compose-video-clips] v250_anchor_soft_pass scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
-                      );
-                      try {
-                        await supabaseAdmin
-                          .from("composer_scenes")
-                          .update({
-                            twoshot_stage: "anchor_soft_pass",
-                            clip_error: warn,
-                            updated_at: new Date().toISOString(),
-                          })
-                          .eq("id", scene.id);
-                      } catch (_) { /* non-fatal */ }
-                      // do NOT `continue` — fall through into normal pipeline
-                    } else {
-                      const missingSuffix = hasMissingCast
-                        ? ` — Fehlende Charaktere: ${identityMissing.join(", ")}. Doppelt: ${identityDuplicated.join(", ") || "—"}.`
-                        : "";
-                      const msg = `${code}: ${identityNotes || identityFailure}${missingSuffix} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen (ähnliche Gesichter/gleicher Nachname?).`;
-
-                      await safeMarkSceneFailed(scene.id, msg, {
-                        isCinematicSyncScene: true,
-                      });
-                      results.push({
-                        sceneId: scene.id,
-                        status: "failed",
-                        error: msg,
-                      });
-                      continue;
-                    }
+                    // v267 — Soft-Warn für ALLE identity failures. Der
+                    // Anker wird trotzdem als reference_image_url an den
+                    // Provider gegeben, die Pipeline läuft weiter. Der
+                    // User sieht die Warnung in `clip_error` und kann
+                    // via Preview-Gate / "Neu rendern" reagieren.
+                    const missingSuffix = identityMissing.length > 0
+                      ? ` — Möglicherweise fehlend: ${identityMissing.join(", ")}.`
+                      : "";
+                    const duplicatedSuffix = identityDuplicated.length > 0
+                      ? ` Doppelt: ${identityDuplicated.join(", ")}.`
+                      : "";
+                    const warn = `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor-Identity-Check unsicher (Cast mit ähnlichen Gesichtern / gleichem Nachnamen?). Render läuft trotzdem weiter. Bitte Ergebnis prüfen und ggf. neu rendern.`;
+                    console.log(
+                      `[compose-video-clips] v267_anchor_soft_warn scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
+                    );
+                    try {
+                      await supabaseAdmin
+                        .from("composer_scenes")
+                        .update({
+                          twoshot_stage: "anchor_soft_pass",
+                          clip_error: warn,
+                          updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", scene.id);
+                    } catch (_) { /* non-fatal */ }
+                    // Fall through — never block on identity audit alone.
                   }
                 }
               }
