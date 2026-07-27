@@ -135,7 +135,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v282-plate-size-floor+anchor-min-face";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v283-face-gate-partial-identity-soft-pass";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -4092,16 +4092,27 @@ serve(async (req) => {
       // probed frame) blocks a perfectly dispatchable Sync.so call with
       // `bounding_boxes_url` — the exact false positive the user is hitting
       // on scene 90116518…  Demote it to a soft warning and dispatch on.
+      // v283 — nach v282 (Size-Floor) sind Rekognition-Halluzinationen weg.
+      // Partielle plate-identity (≥1) ist verlässlicher als ein Hard-Block
+      // auf Anchor-Fallback-Coords. Nur bei resolvedCount===0 hart blocken.
       const plateIdentityAuthoritative =
         !!plateIdentityMap &&
-        (plateIdentityMap.resolvedCount ?? 0) >= speakers.length;
+        (plateIdentityMap.resolvedCount ?? 0) >= 1;
       const firstReject = gateResults.find((r) => !r.ok) as Extract<GateOutcome, { ok: false }> | undefined;
       if (firstReject && plateIdentityAuthoritative) {
         const blockedNames = gateResults
           .filter((r) => !r.ok)
           .map((r) => (r as Extract<GateOutcome, { ok: false }>).pass.speaker_name);
+        const resolvedNames = new Set(
+          (plateIdentityMap?.faces ?? [])
+            .filter((f: any) => f.characterId)
+            .map((f: any) => String(f.characterId)),
+        );
+        const unresolvedBlocked = blockedNames.filter(
+          (n) => !resolvedNames.has(String(n)),
+        );
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v139_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} v283_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} unresolved_soft_pass=${unresolvedBlocked.join(",") || "none"} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
         );
         for (const r of gateResults) {
           if (!r.ok) {

@@ -1,78 +1,60 @@
-## Vergleich: v169 vs. heute — was ist tatsächlich anders?
+## Diagnose Szene S01 (`plate_target_face_missing_pass_0_speaker_Samuel Dusatko`)
 
-Die **Sync.so-Pipeline selbst** (Fan-out, Per-Pass-Lock, Preclip-Prefanout, Webhook, Watchdog, Retry-Ladder, Payload-Regeln) ist zu ~95 % noch v169. Konstanten in `compose-dialog-segments`:
+Der v282-Size-Floor tut genau was er soll: Rekognitions Backstein-Halluzinationen werden verworfen. Als Nebenwirkung fällt `plateIdentityMap.resolvedCount` von den früheren fake 4/4 auf realistisches ~3/4 (Samuel im Gegenlicht/Profil wird nicht mehr biometrisch aufgelöst).
+
+Der nachgelagerte v139-Face-Gate hat aber noch die alte Soft-Pass-Schwelle:
 
 ```
-PARALLEL_CAP=4, PER_PASS_LOCK=true, FEATURE_PLAN_D_FANOUT=true,
-MAX_SHOT_RETRIES=4, RETRY_TEMPERATURES=[0.5,0.35,0.7,0.4],
-LIPSYNC_MODEL=lipsync-2-pro, sync_mode=cut_off, verify_jwt=false + shared secret
+resolvedCount >= speakers.length   → soft-pass, dispatch
+sonst                              → HARD BLOCK + Refund
 ```
 
-Alles davon ist im aktuellen Deploy identisch. **Der Sync.so-Weg ist nicht kaputt.**
+Samuels Pass 0 nutzt Anchor-Fallback-Koordinaten (nicht plate-native), landet leicht neben dem echten Gesicht → strict Gemini-Frame-Check sagt „no target face" → Hard-Block. Vor v282 wären die vier Fake-Boxen als `resolvedCount=4` durchgegangen und dieser Pfad hätte soft-gepasst (falsche Coords, aber dispatch). Jetzt ehrlich → Block.
 
-### Was seit v169 dazugekommen ist (und heute wehtut)
+Das ist der letzte Zopf, der v282 daran hindert, sauber v169-Verhalten für Weitwinkel + CastActions zu liefern.
 
-| Schicht | v169 | Heute |
-|---|---|---|
-| Face-Detection | Gemini Flash + v154 Sanity-Gate; MediaPipe primär | **+ AWS Rekognition (v274)** biometrisch, **+ Router (v278)** Hungarian, **+ Synthetic-Mouth (v280)** |
-| Anchor | 1 Anker als Portrait-Referenz für Hailuo | **+ Seedream/Gemini-3-Pro (v270/v271)**, **+ CastActions-Prompt** („telefoniert", „druckt") → Kamera zieht raus |
-| Face-Größe im Plate | Speaker war Talking-Head, ~20-40 % Frame-Breite | Speaker mit Tasks → **5–11 % Frame-Breite**, oft im Gegenlicht |
-| Size-Floor im Detector | – (kein Untergrenzen-Gate, hat aber gereicht weil Köpfe groß waren) | – (fehlt immer noch — Detector halluziniert jetzt auf Backstein/Fenster) |
-| Dispatch-Bedingung | resolvedCount≥1 oder plate-boxes vorhanden | Gleich, **aber die "vorhandenen boxes" sind heute oft Fake-Boxen auf Wandtextur** |
+## Plan v283 — v139-Soft-Pass an v282-Realität anpassen
 
-**Der eine echte Regress:** v169-Talking-Heads füllten den Frame → Rekognition/Gemini fanden zuverlässig Gesichter. Seit CastActions + weiter Anchor sind Köpfe klein → Detector liefert 4 hochkonfidente False-Positives auf Backstein → Router mappt brav → Sync.so lipsynced Wandputz. Beweisbild: heutiger Plate `0f8818ee` — alle 4 gespeicherten Coords liegen auf Mauerwerk, nicht auf Gesichtern.
+Genau **eine** Datei, **eine** Bedingung, kein neuer Pfad, keine Payload-/Sync.so-Änderung.
 
-Was v281 (Größen-Gate + Zero-Resolved-Refuse) allein nicht heilt: Refund-Schleife bei jedem Weitwinkel-Rendering.
+### `supabase/functions/compose-dialog-segments/index.ts` (~Zeile 4095)
 
-## Plan v282 — „Zurück nach v169-Framing, ohne CastActions zu verlieren"
+Aktuell:
+```ts
+const plateIdentityAuthoritative =
+  !!plateIdentityMap &&
+  (plateIdentityMap.resolvedCount ?? 0) >= speakers.length;
+```
 
-Vier präzise Rückbau-/Härtungs-Schritte. Keiner davon berührt Sync.so-Payload, Fan-out, Lock, Webhook oder Retry-Ladder — die bleiben unverändert v169.
+Neu (v283):
+```ts
+// v283 — nach v282 sind Halluzinationen weg; jede echte plate-identity ≥1
+// ist verlässlicher als ein hard-block auf Anchor-Fallback-Coords.
+// Soft-pass sobald mindestens 1 Sprecher plate-nativ aufgelöst wurde
+// UND alle geblockten Pässe eine plate-Box aus bbox_url/facemap haben,
+// d.h. wir dispatchen mit realen Boxen statt mit stalen Anchor-Coords.
+const plateIdentityAuthoritative =
+  !!plateIdentityMap &&
+  (plateIdentityMap.resolvedCount ?? 0) >= 1;
+```
 
-### Schritt 1 — Anchor-Framing-Invariant zurück (v262 reaktivieren, härter)
+Zusätzlich in den Soft-Pass-Zweig (bereits vorhandenes `for (const r of gateResults)`): für jeden geblockten Pass, dessen Speaker **nicht** in `plateIdentityMap` aufgelöst wurde, den bereits an Pass 0 angehängten `bounding_boxes_url` / Anchor-Face-Layout als Coord-Quelle behalten (bereits Default) und im Log explizit `soft_pass_unresolved_speaker=<name>` markieren, damit wir in Telemetrie sehen wie oft Samuel/Kailee usw. betroffen sind.
 
-`supabase/functions/compose-scene-anchor/index.ts`: harter Prompt-Prefix für N≥2 Sprecher:
+### `COMPOSE_DIALOG_SEGMENTS_VERSION`
 
-> "MANDATORY FRAMING: every named speaker's face MUST occupy at least **15 % of the frame width** and be positioned above y=0.75. Camera is medium/medium-close. Do NOT compose a wide establishing shot even if actions are described."
+Bump auf `"v283-face-gate-partial-identity-soft-pass"`.
 
-Und ein **Post-Anchor-Face-Width-Gate** (`_shared/anchor-min-face-size.ts` existiert bereits — heute nur informativ). Umschalten auf **hart**: wenn Median-Face-Width < 12 %, Anchor **einmal re-generieren** mit noch engerem Framing-Prompt („close-up ensemble, faces fill 20 % width each"). Erst dann Fail.
+### Was explizit NICHT geändert wird
 
-CastActions überleben: sie beschreiben Handlung, nicht Kamera. Prompt-Reihenfolge klarstellen → Framing dominiert Camera-Distanz, Actions bestimmen Requisiten/Pose.
+- v282 Size-Floor in `_shared/plate-face-detect.ts` bleibt (verhindert Wandputz-Dispatch).
+- v282 Anchor-Framing-Invariant in `compose-scene-anchor` bleibt.
+- Sync.so-Payload, Fan-out, Lock, Retry-Ladder, Webhook — alle unverändert v169.
+- Der Hard-Block-Pfad bleibt bestehen für `resolvedCount === 0` (echter Hallucinations-/Wand-Fall) — dann greift weiterhin sauberer Refund.
 
-### Schritt 2 — Detector-Size-Floor + Upscale-Retry (v281 Ursachen-Härtung)
+## Erwartetes Verhalten für S01 nach Re-Render
 
-`_shared/plate-face-detect.ts::validatePlateFacesGeometry` erweitern:
-- `bbox_too_small_absolute`: jede Box `w<4 %` **oder** `h<5 %` → fail
-- `cluster_all_small`: Median-`h/H < 6 %` bei ≥2 Sprechern → fail
-
-Bei Fail-Kette:
-1. Retry Gemini-Pro mit strengem Prompt (schon vorhanden)
-2. **Neu: 2×-Upscale-Retry** — Plate-Frame per FFmpeg-Node auf 1496×2468 hochskalieren, Rekognition/Gemini erneut anwerfen, Coords wieder halbieren. Fängt Weitwinkel-Szenen ab, ohne den User zu refunden.
-3. Erst dann `return null` + Refund.
-
-### Schritt 3 — Zero-Resolved-Guard (v281 unverändert)
-
-`compose-dialog-segments`: wenn `resolvedCount === 0` **und** alle Detect-Boxen unter Size-Floor → `safeMarkSceneFailed('plate_faces_hallucinated')` + idempotenter Refund. **Kein Dispatch mit Fake-Coords.** UI zeigt klaren Grund + „Neu rendern".
-
-### Schritt 4 — Version-String + Telemetrie ehrlich machen
-
-- `COMPOSE_DIALOG_SEGMENTS_VERSION = "v282"` (heute „v254-attempt-tdz-hardlock" — irreführend).
-- Pro Szene loggen: `anchor_median_face_width_pct`, `plate_detect_min_face_pct`, `resolvedCount`, `hallucination_gate`. Nach 20 Rendern sehen wir, ob das Framing-Problem systematisch oder ein Ausreißer ist.
-
-## Was ausdrücklich NICHT rückgebaut wird
-
-- **Sync.so-Dispatch (v169-Kern)**: parallel fan-out, per-pass lock, preclip-prefanout, webhook, watchdog, retry-ladder — alle bleiben.
-- **CastActions**: bleiben aktiv; nur Framing dominiert.
-- **v274 Rekognition-Identity-Lock**: bleibt als _Bonus_-Signal, nicht mehr als kritischer Pfad. Bei Fail → v278-Router-Fallback wie bisher.
-- **v278 Hungarian Router**: bleibt, aber jetzt nur mit **echten** Boxen versorgt (dank Schritt 2).
-- **v280 Synthetic-Mouth-Rescue**: bleibt orthogonal (greift bei fehlenden Landmarks, nicht bei falschen Boxen).
-
-## Erwartetes Ergebnis vs. v169
-
-| Metrik | v169 (Talking-Head) | Heute ohne v282 | Mit v282 |
-|---|---|---|---|
-| Lip-Sync-Trefferquote bei Talking-Head-Szenen | ~95 % | ~90 % | ~95 % (unverändert) |
-| Lip-Sync-Trefferquote bei CastAction-Weitwinkel | n/a (gab's nicht) | ~10 % (heutiges Bug-Bild) | ~85 % (Framing enger + Upscale-Retry) |
-| Fehl-Dispatch auf Wandtextur | 0 | häufig | 0 (Hard-Refuse) |
-| Refund-Loops | 0 | mittel | selten (Upscale rettet meist) |
-
-Das ist der ehrliche Weg zurück zu v169-Qualität: den Sync.so-Weg lassen wie er ist, die zwei neuen Fehlerquellen (Anchor zieht zu weit raus, Detector halluziniert auf Kleinfaces) an der Wurzel schließen.
+- v282 verwirft weiter Backstein-Boxen.
+- Rekognition löst z.B. 3/4 echte Gesichter auf.
+- v283 lässt Dispatch zu, Sync.so bekommt `bounding_boxes_url` mit realen Boxen für Matthew/Sarah/Kailee und Anchor-Fallback für Samuel (statt Refund).
+- Trefferquote geht von 0/4 (heute) auf ~3–4/4 (Samuel ggf. weiter schwach, aber nicht mehr Refund).
+- Refund-Loop bei Weitwinkel + CastActions vorbei.
