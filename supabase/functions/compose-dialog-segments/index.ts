@@ -5864,8 +5864,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(prevState ?? {}),
+          dialog_shots: mergeDialogShots(prevState, {
             canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             input_space: passes.length >= 2 ? "plate" : undefined,
             preclip_used: passes.length >= 2 ? false : undefined,
@@ -5884,7 +5883,7 @@ serve(async (req) => {
             plate_identity: v153PlateIdentitySnapshot,
             error: reason,
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: reason,
@@ -6947,8 +6946,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(prevState ?? {}),
+          dialog_shots: mergeDialogShots(prevState, {
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -6963,7 +6961,7 @@ serve(async (req) => {
             refunded: !alreadyRefunded,
             error: pass.error,
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: resp.status === 429
@@ -7345,14 +7343,13 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...freshState,
+            dialog_shots: mergeDialogShots(freshState, {
               ...state,
               canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
               input_space: passes.length >= 2 ? "plate" : undefined,
               preclip_used: passes.length >= 2 ? false : undefined,
               passes: freshPasses,
-            },
+            }),
           })
           .eq("id", sceneId);
       } else {
@@ -7530,7 +7527,7 @@ serve(async (req) => {
             await supabase
               .from("composer_scenes")
               .update({
-                dialog_shots: { ...freshDs, passes: freshPasses, total_passes: passes.length, multi_pass: passes.length > 1 },
+                dialog_shots: mergeDialogShots(freshDs, { passes: freshPasses, total_passes: passes.length, multi_pass: passes.length > 1 }),
                 updated_at: nowIso,
               })
               .eq("id", sceneId);
