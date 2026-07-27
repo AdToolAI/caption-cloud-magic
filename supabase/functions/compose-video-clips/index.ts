@@ -1608,14 +1608,11 @@ serve(async (req) => {
         console.warn(
           `[compose-video-clips] scene ${scene.id}: blocked legacy talking-head-renders upload URL`,
         );
-        await supabaseAdmin
-          .from("composer_scenes")
-          .update({
-            clip_status: "failed",
-            clip_error: "legacy_talking_head_route_blocked",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", scene.id);
+        await safeMarkSceneFailed(
+          scene.id,
+          "legacy_talking_head_route_blocked",
+          { isCinematicSyncScene: scene.engineOverride === "cinematic-sync" },
+        );
         results.push({
           sceneId: scene.id,
           status: "failed",
