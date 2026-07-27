@@ -2399,8 +2399,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2408,7 +2407,7 @@ serve(async (req) => {
               refunded: true,
               error: "v183_cast_duplicate_character_id",
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error: msg,
@@ -3269,13 +3268,13 @@ serve(async (req) => {
                 twoshot_stage: "failed",
                 clip_error:
                   "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
-                dialog_shots: { ...existingDs, face_detect_retry_count: 0 },
+                dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: 0 }),
               }
             : {
                 lip_sync_status: "pending",
                 twoshot_stage: "pending",
                 clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
-                dialog_shots: { ...existingDs, face_detect_retry_count: nextRetryCount },
+                dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: nextRetryCount }),
               },
         )
         .eq("id", sceneId);
@@ -5380,8 +5379,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...existingDsLocal,
+          dialog_shots: mergeDialogShots(existingDsLocal, {
             version: 5,
             engine: "sync-segments",
             passes: passesPatched,
@@ -5398,7 +5396,7 @@ serve(async (req) => {
               resolved_count: plateIdentityMap?.resolvedCount ?? 0,
             },
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "needs_clip_rerender",
           clip_status: "pending",
