@@ -162,7 +162,14 @@ interface ClipRequest {
   /** Optional recurring characters from the briefing — used to inject
    *  appearance / signatureItems into prompts based on each scene's shotType. */
   characters?: ComposerCharacter[];
+  /** v263 Anchor-Preview-Gate. When true, the pipeline composes + audits the
+   *  anchor image, persists it to `composer_scenes.preview_anchor_url`, marks
+   *  the scene `awaiting_confirmation` and STOPS before any Hailuo/Sync.so
+   *  spend. The client then shows the preview and re-invokes without this
+   *  flag once the user confirms. */
+  previewOnly?: boolean;
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -205,7 +212,7 @@ serve(async (req) => {
     __stage = "parse_body";
     const body: ClipRequest = await req.json();
     __parsedBody = body;
-    const { projectId, scenes, visualStyle, characters } = body;
+    const { projectId, scenes, visualStyle, characters, previewOnly } = body;
 
     if (!projectId) {
       return new Response(
@@ -2291,6 +2298,8 @@ serve(async (req) => {
                     | null = null;
                   let notes = "";
                   let mismatched: string[] = [];
+                  let missingCast: string[] = [];
+                  let duplicatedCast: string[] = [];
                   if (portraitUrls.length >= 1) {
                     // v170 — audit runs for N=1 too (extras ignored, clones/swap/missing still caught).
                     const auditRefs = identityPortraitUrls.length === portraitUrls.length
@@ -2308,13 +2317,19 @@ serve(async (req) => {
                       if (audit.reason === "swap" && Array.isArray(audit.mismatched)) {
                         mismatched = audit.mismatched;
                       }
+                      // v263 — always capture missing/duplicated so the soft-pass
+                      // gate can distinguish "lookalike cast" (safe) from
+                      // "character actually absent" (unsafe, must hard-fail).
+                      if (Array.isArray(audit.missing)) missingCast = audit.missing;
+                      if (Array.isArray(audit.duplicated)) duplicatedCast = audit.duplicated;
                     }
                   }
                   console.log(
-                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
+                    `[compose-video-clips] anchor audit scene ${scene.id} ${label}: cast=${identity ?? "ok"} mismatched=[${mismatched.join(",")}] missing=[${missingCast.join(",")}] duplicated=[${duplicatedCast.join(",")}] telemetry(faces=${fc} humans=${hc}/${expectedFaces}) notes="${notes.slice(0, 120)}"`,
                   );
-                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched };
+                  return { faceCount: fc, humanCount: hc, identity, notes, mismatched, missing: missingCast, duplicated: duplicatedCast };
                 };
+
 
 
                 let composedUrl: string | null = null;
@@ -2329,7 +2344,10 @@ serve(async (req) => {
                   | null = null;
                 let identityNotes = "";
                 let identityMismatched: string[] = [];
+                let identityMissing: string[] = [];
+                let identityDuplicated: string[] = [];
                 let skipAuditPersist = false;
+
 
                 if (prevAuditOk && existingLooksComposed) {
                   console.log(
@@ -2360,13 +2378,18 @@ serve(async (req) => {
                     identityFailure = e1.identity;
                     identityNotes = e1.notes;
                     identityMismatched = e1.mismatched ?? [];
+                    identityMissing = e1.missing ?? [];
+                    identityDuplicated = e1.duplicated ?? [];
                     anchorAttempts.push({
                       attempt: 1, mode: "normal",
                       identity: identityFailure ?? "ok",
                       faces: faceCount, humans: humanCount,
                       mismatched: identityMismatched,
+                      missing: identityMissing,
+                      duplicated: identityDuplicated,
                       at: new Date().toISOString(),
                     });
+
 
                     // v170 — retry only on real cast-integrity failures.
                     // Headcount differences alone (extras/bystanders) are OK.
@@ -2391,33 +2414,50 @@ serve(async (req) => {
                         identityFailure = e2.identity;
                         identityNotes = e2.notes;
                         identityMismatched = e2.mismatched ?? [];
+                        identityMissing = e2.missing ?? [];
+                        identityDuplicated = e2.duplicated ?? [];
                         anchorAttempts.push({
                           attempt: 2, mode: isSwap ? "swap" : "strict",
                           identity: identityFailure ?? "ok",
                           faces: faceCount, humans: humanCount,
                           mismatched: identityMismatched,
+                          missing: identityMissing,
+                          duplicated: identityDuplicated,
                           at: new Date().toISOString(),
                         });
+
                       }
 
-                      // v131.6 — third (final) auto-recovery attempt with
-                      // FACE-LOCK mode when attempt-2 still shows an
-                      // identity SWAP. Clones/extras/missing are not
-                      // retried again because they need different fixes
-                      // (count or composition, not face-pixel-copy).
+                      // v131.6 / v263 — third (final) auto-recovery attempt
+                      // with FACE-LOCK mode. Triggers on swap, clone, or a
+                      // missing-cast (character absent from the anchor —
+                      // v263 broadens the trigger so clone+missing gets a
+                      // pixel-accurate retry instead of falling through to
+                      // soft-pass with a broken face→voice mapping).
+                      const attempt3Trigger =
+                        identityFailure === "swap" ||
+                        identityFailure === "clone" ||
+                        identityFailure === "missing" ||
+                        identityMissing.length > 0;
                       if (
-                        (identityFailure === "swap" || identityFailure === "clone") &&
+                        attempt3Trigger &&
                         identityPortraitUrls.length === portraitUrls.length
                       ) {
                         console.log(
-                          `[compose-video-clips] anchor scene ${scene.id}: attempt-2 still ${identityFailure} → attempt-3 face-lock`,
+                          `[compose-video-clips] anchor scene ${scene.id}: attempt-2 still ${identityFailure} (missing=[${identityMissing.join(",")}] dup=[${identityDuplicated.join(",")}]) → attempt-3 face-lock`,
                         );
                         await invalidateCache();
+                        // Feed BOTH mismatched and missing cast names into
+                        // the face-lock prompt so Nano Banana knows which
+                        // specific person to render pixel-for-pixel.
+                        const focusNames = Array.from(
+                          new Set([...identityMismatched, ...identityMissing]),
+                        );
                         const lockUrl = await composeAnchor(
                           "attempt-3",
                           false,
                           true,
-                          identityMismatched,
+                          focusNames,
                           true, // faceLock
                         );
                         if (lockUrl) {
@@ -2428,15 +2468,20 @@ serve(async (req) => {
                           identityFailure = e3.identity;
                           identityNotes = e3.notes;
                           identityMismatched = e3.mismatched ?? [];
+                          identityMissing = e3.missing ?? [];
+                          identityDuplicated = e3.duplicated ?? [];
                           anchorAttempts.push({
                             attempt: 3, mode: "face-lock",
                             identity: identityFailure ?? "ok",
                             faces: faceCount, humans: humanCount,
                             mismatched: identityMismatched,
+                            missing: identityMissing,
+                            duplicated: identityDuplicated,
                             at: new Date().toISOString(),
                           });
                         }
                       }
+
                     }
                   }
                   (scene as any).__anchorAttempts = anchorAttempts;
@@ -2546,6 +2591,9 @@ serve(async (req) => {
                             identityFailure = eRetry.identity;
                             identityNotes = eRetry.notes;
                             identityMismatched = eRetry.mismatched ?? [];
+                            identityMissing = eRetry.missing ?? [];
+                            identityDuplicated = eRetry.duplicated ?? [];
+
                             minFaceCheck = {
                               ok: checkRetry.ok,
                               minWidthRatio: checkRetry.minWidthRatio,
@@ -2854,13 +2902,22 @@ serve(async (req) => {
                       typeof humanCount === "number" &&
                       faceCount === expectedFaces &&
                       humanCount === expectedFaces;
+                    // v263 — Soft-pass ONLY when no cast member is actually
+                    // missing from the anchor. A `clone` with a missing
+                    // character means face i in the anchor is not that
+                    // character's face → row-major voice mapping breaks →
+                    // silent lip-sync mismatch. Hard-fail instead so the
+                    // user re-renders (or the founders/Preview-Gate catches
+                    // it before Hailuo + Sync.so spend).
+                    const hasMissingCast = identityMissing.length > 0;
                     const softPassEligible =
                       headcountOk &&
+                      !hasMissingCast &&
                       (identityFailure === "clone" || identityFailure === "swap");
                     if (softPassEligible) {
                       const warn = `${code}_soft_pass: ${identityNotes || identityFailure} — Anchor zeigt zwar ${expectedFaces} Personen, aber Gesichter wirken ähnlich (z. B. Cast mit gleichem Nachnamen). Bitte den Anchor in der Vorschau prüfen und ggf. neu rendern.`;
                       console.log(
-                        `[compose-video-clips] v250_anchor_soft_pass scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces}`,
+                        `[compose-video-clips] v250_anchor_soft_pass scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
                       );
                       try {
                         await supabaseAdmin
@@ -2874,7 +2931,11 @@ serve(async (req) => {
                       } catch (_) { /* non-fatal */ }
                       // do NOT `continue` — fall through into normal pipeline
                     } else {
-                      const msg = `${code}: ${identityNotes || identityFailure} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
+                      const missingSuffix = hasMissingCast
+                        ? ` — Fehlende Charaktere: ${identityMissing.join(", ")}. Doppelt: ${identityDuplicated.join(", ") || "—"}.`
+                        : "";
+                      const msg = `${code}: ${identityNotes || identityFailure}${missingSuffix} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen (ähnliche Gesichter/gleicher Nachname?).`;
+
                       await supabaseAdmin
                         .from("composer_scenes")
                         .update({
@@ -3153,6 +3214,98 @@ serve(async (req) => {
           universalAnchorErr,
         );
       }
+
+      // ── v263 ANCHOR-PREVIEW-GATE ─────────────────────────────────────────
+      // When the caller sets `previewOnly: true`, halt the pipeline right
+      // after the anchor is composed + identity-audited. Persist the anchor
+      // + audit onto composer_scenes so the client can render the preview
+      // card, and skip Hailuo / Sync.so spend entirely. On confirmation the
+      // client re-invokes without `previewOnly`; the pinned anchor is then
+      // reused via the existing `prevAuditOk` cache path.
+      if (previewOnly === true) {
+        const anchorUrl = String(scene.referenceImageUrl ?? "");
+        const looksComposedAnchor =
+          anchorUrl.includes("/scene-anchors/") ||
+          anchorUrl.includes("/composer-anchors/");
+        if (anchorUrl && looksComposedAnchor) {
+          try {
+            const { data: planRow } = await supabaseAdmin
+              .from("composer_scenes")
+              .select("audio_plan")
+              .eq("id", scene.id)
+              .maybeSingle();
+            const twoshot =
+              ((planRow as any)?.audio_plan?.twoshot ?? {}) as Record<
+                string,
+                any
+              >;
+            const previewAudit = {
+              reason: twoshot.anchor_face_audit?.reason ?? "ok",
+              missing: twoshot.anchor_face_audit?.missing ?? [],
+              duplicated: twoshot.anchor_face_audit?.duplicated ?? [],
+              mismatched: twoshot.anchor_face_audit?.mismatched ?? [],
+              face_count: twoshot.anchor_face_audit?.face_count ?? null,
+              human_count: twoshot.anchor_face_audit?.human_count ?? null,
+              expected_faces: twoshot.anchor_face_audit?.expected_faces ?? null,
+              soft_pass: twoshot.anchor_face_audit?.soft_pass ?? false,
+              anchor_attempts: twoshot.anchor_attempts ?? [],
+            };
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                preview_anchor_url: anchorUrl,
+                preview_audit: previewAudit,
+                clip_status: "awaiting_confirmation",
+                twoshot_stage: "preview",
+                anchor_confirmed_at: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", scene.id);
+            console.log(
+              `[compose-video-clips] v263_preview_gate scene ${scene.id}: anchor ready → awaiting user confirmation (no Hailuo/Sync spend)`,
+            );
+            results.push({
+              sceneId: scene.id,
+              status: "awaiting_confirmation" as any,
+              previewAnchorUrl: anchorUrl,
+              previewAudit,
+            } as any);
+          } catch (previewErr) {
+            console.warn(
+              `[compose-video-clips] v263_preview_gate persist failed for ${scene.id}:`,
+              previewErr,
+            );
+            results.push({
+              sceneId: scene.id,
+              status: "failed",
+              error: "preview_gate_persist_failed",
+            });
+          }
+        } else {
+          // No composable anchor was produced (upload / stock / no cast).
+          // Preview-gate does not apply — mark as failed so the client
+          // shows a clear message instead of spending on render.
+          console.warn(
+            `[compose-video-clips] v263_preview_gate scene ${scene.id}: no composed anchor available (anchorUrl='${anchorUrl.slice(0, 60)}') → skipping preview`,
+          );
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({
+              clip_status: "failed",
+              clip_error:
+                "preview_gate_no_anchor: Für diese Szene konnte kein Anchor-Bild komponiert werden (kein Cast oder Upload/Stock-Szene). Bitte direkt rendern statt Preview.",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene.id);
+          results.push({
+            sceneId: scene.id,
+            status: "failed",
+            error: "preview_gate_no_anchor",
+          });
+        }
+        continue;
+      }
+
 
       // ── LEGACY HEYGEN / TALKING-HEAD ROUTE — REMOVED ─────────────────────
       // Previously `engineOverride === 'heygen'` (or a soft `auto + dialog +

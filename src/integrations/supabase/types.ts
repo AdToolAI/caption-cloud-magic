@@ -5814,6 +5814,7 @@ export type Database = {
         Row: {
           action_beat: Json | null
           ai_prompt: string | null
+          anchor_confirmed_at: string | null
           applied_style_preset_id: string | null
           audio_plan: Json | null
           character_audio_url: string | null
@@ -5865,6 +5866,8 @@ export type Database = {
           mentioned_character_ids: string[] | null
           mentioned_location_ids: string[] | null
           order_index: number
+          preview_anchor_url: string | null
+          preview_audit: Json | null
           preview_clip_url: string | null
           preview_status: string | null
           progress_percent: number | null
@@ -5901,6 +5904,7 @@ export type Database = {
         Insert: {
           action_beat?: Json | null
           ai_prompt?: string | null
+          anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
           character_audio_url?: string | null
@@ -5952,6 +5956,8 @@ export type Database = {
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
+          preview_anchor_url?: string | null
+          preview_audit?: Json | null
           preview_clip_url?: string | null
           preview_status?: string | null
           progress_percent?: number | null
@@ -5988,6 +5994,7 @@ export type Database = {
         Update: {
           action_beat?: Json | null
           ai_prompt?: string | null
+          anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
           character_audio_url?: string | null
@@ -6039,6 +6046,8 @@ export type Database = {
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
+          preview_anchor_url?: string | null
+          preview_audit?: Json | null
           preview_clip_url?: string | null
           preview_status?: string | null
           progress_percent?: number | null

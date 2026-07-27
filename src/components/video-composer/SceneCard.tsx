@@ -60,6 +60,8 @@ import {
 } from "@/types/video-composer";
 
 import SceneMediaUpload from "./SceneMediaUpload";
+import AnchorPreviewGate from "./AnchorPreviewGate";
+
 import StockMediaBrowser, { type StockMediaItem } from "./StockMediaBrowser";
 import SceneReferenceImageUpload from "./SceneReferenceImageUpload";
 import SceneReferenceImageSlot from "./SceneReferenceImageSlot";
